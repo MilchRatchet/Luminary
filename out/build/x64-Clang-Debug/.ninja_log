@@ -1,0 +1,5 @@
+# ninja log v5
+150	369	634067409	Luminary/CMakeFiles/Luminary.dir/lib/zutil.c.obj	f14d94090534f63
+147	370	634067409	Luminary/CMakeFiles/Luminary.dir/lib/png.c.obj	a98e5bbcf5b4e4d8
+148	370	634067409	Luminary/CMakeFiles/Luminary.dir/lib/deflate.c.obj	c26fbec917024e20
+145	372	634067409	Luminary/CMakeFiles/Luminary.dir/lib/crc32.c.obj	8c417ae094c5bf60

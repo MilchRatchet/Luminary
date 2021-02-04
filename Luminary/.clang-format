@@ -1,0 +1,278 @@
+# The examples for the settings effects are copied from clang-format style options documentation
+# https://clang.llvm.org/docs/ClangFormatStyleOptions.html
+---
+# Use these settings for C/C++ files
+Language: Cpp
+
+# Copy all settings that are not overwritten here from the Google style
+BasedOnStyle: Google
+
+# The extra indent or outdent of access modifiers, e.g. public:
+AccessModifierOffset: -2
+
+# set the standard indent to 2
+IndentWidth: 2
+
+# someLongFunction(argument1,
+#                  argument2);
+AlignAfterOpenBracket: AlwaysBreak
+
+# int aaaa = 12;
+# int b    = 23;
+# int ccc  = 23;
+AlignConsecutiveAssignments: true
+
+# NOT!
+# int         aaaa = 12;
+# float       b = 23;
+# std::string ccc = 23;
+AlignConsecutiveDeclarations: false
+
+# #define A   \
+#   int aaaa; \
+#   int b;    \
+AlignEscapedNewlinesLeft: true
+
+# int aaa = bbbbbbbbbbbbbbb +
+#           ccccccccccccccc;
+AlignOperands: true
+
+# int a;      // My comment a
+# int b = 2;  // comment  b
+AlignTrailingComments: true
+
+# void myFunction(int a,
+#                 int b,
+#                 int c);
+AllowAllParametersOfDeclarationOnNextLine: false
+
+# NOT!
+# if (a) { return; }
+AllowShortBlocksOnASingleLine: false
+
+# NOT!
+# case 1: x = 1; break;
+AllowShortCaseLabelsOnASingleLine: false
+
+# Never merge functions into a single line
+AllowShortFunctionsOnASingleLine: None
+
+# NOT!
+# if (a) return;
+AllowShortIfStatementsOnASingleLine: false
+
+# NOT!
+# while (true) continue;
+AllowShortLoopsOnASingleLine: false
+
+# class A {
+#     int f() {
+#         return 0;
+#     };
+# };
+# int f();
+# int f() { return 1; }
+AlwaysBreakAfterReturnType: None
+
+# aaaa =
+#     "bbbb"
+#     "cccc";
+AlwaysBreakBeforeMultilineStrings: true
+
+# template <typename T>
+# class C {
+# };
+AlwaysBreakTemplateDeclarations: true
+
+# void f()
+# {
+#     f(aaaaaaaaaaaaaaaaaaaa, aaaaaaaaaaaaaaaaaaaa,
+#       aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa);
+# }
+BinPackArguments: true
+
+# void f(int aaaaaaaaaaaaaaaaaaaa, int aaaaaaaaaaaaaaaaaaaa,
+#        int aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) {}
+BinPackParameters: true
+
+# Customize brace breaking/wrapping
+BreakBeforeBraces: Custom
+
+BraceWrapping:
+    # class foo {
+    # };
+    AfterClass: false
+
+    # if (foo()) {
+    # }
+    # else {
+    # }
+    AfterControlStatement: false
+
+    # enum X : int {
+    #     B
+    # };
+    AfterEnum: false
+
+    # void foo() {
+    #     bar();
+    #     bar2();
+    # }
+    AfterFunction: false
+
+    # namespace {
+    # int foo();
+    # int bar();
+    # }
+    AfterNamespace: false
+
+    # struct foo {
+    #     int x;
+    # };
+    AfterStruct: false
+
+    # union foo {
+    #     int x;
+    # };
+    AfterUnion: false
+
+    # try {
+    #     foo();
+    # }
+    # catch () {
+    # }
+    BeforeCatch: false
+
+    # if (foo()) {
+    # }
+    # else {
+    # }
+    BeforeElse: true
+
+    # Do not indent the braces themselves
+    IndentBraces: false
+
+# LooooooooooongType loooooooooooooooooooooongVariable =
+#     someLooooooooooooooooongFunction();
+#
+# bool value = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+#                      + aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+#                  == aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+#              && aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+#                     > ccccccccccccccccccccccccccccccccccccccccc;
+BreakBeforeBinaryOperators: NonAssignment
+
+# veryVeryVeryVeryVeryVeryVeryVeryVeryVeryVeryLongDescription
+#     ? firstValue
+#     : SecondValueVeryVeryVeryVeryLong;
+BreakBeforeTernaryOperators: true
+
+# Constructor()
+#     : initializer1()
+#     , initializer2()
+BreakConstructorInitializers: BeforeComma
+
+# Allow breaking string literals when formatting
+BreakStringLiterals: true
+
+# The column limit
+ColumnLimit: 100
+
+# If the initializers do not fit into one line, put every one on its own
+ConstructorInitializerAllOnOneLineOrOnePerLine: true
+
+# The number of characters to use for indentation of constructor initializer lists
+ConstructorInitializerIndentWidth: 2
+
+# int i =         //  VeryVeryVeryVeryVeryLongComment
+#   longFunction( // Again a long comment
+#     arg);
+ContinuationIndentWidth: 2
+
+# vector<int> x{1, 2, 3, 4};
+# vector<T> x{{}, {}, {}, {}};
+# f(MyMap[{composite, key}]);
+# new int[3]{1, 2, 3};
+Cpp11BracedListStyle: true
+
+# Do not automatically derive the pointer alignment, use my setting all the time
+DerivePointerAlignment: false
+
+# Do not disable formatting at all
+DisableFormat: false
+
+# switch (fool) {
+# case 1:
+#     bar();
+#     break;
+# default:
+#     plop();
+# }
+IndentCaseLabels: false
+
+# LoooooooooooooooooooooooooooooooooooooooongReturnType
+#     LoooooooooooooooooooooooooooooooongFunctionDeclaration();
+IndentWrappedFunctionNames: true
+
+# NOT!
+# if (foo)
+# {
+#
+#     bar();
+# }
+KeepEmptyLinesAtTheStartOfBlocks: false
+
+# int* a;
+PointerAlignment: Left
+
+# Let clang-format break long comments
+ReflowComments: true
+
+# I want to keep the includes in my order
+SortIncludes: false
+
+# (int) i;
+SpaceAfterCStyleCast: true
+
+# int a = 5;
+# a += 42;
+SpaceBeforeAssignmentOperators: true
+
+# void f() {
+#     if (true) {
+#         f();
+#     }
+# }
+SpaceBeforeParens: ControlStatements
+
+# f();
+SpaceInEmptyParentheses: false
+
+# void f() {
+#     if (true) {
+#         f();  // bar
+#     }
+# }
+SpacesBeforeTrailingComments: 2
+
+# static_cast<int>(arg);
+SpacesInAngles: false
+
+# x = (int32) y;
+SpacesInCStyleCastParentheses: false
+
+# t f(Deleted&) & = delete;
+SpacesInParentheses: false
+
+# int a[5];
+SpacesInSquareBrackets: false
+
+# Use features of C++11, C++14 and C++1z
+Standard: Cpp11
+
+# The number of columns used for tab stops
+TabWidth: 2
+
+# Never use tab
+UseTab: Never
+...

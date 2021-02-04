@@ -1,0 +1,20 @@
+# ninja log v5
+4	3391	634127880	Luminary/CMakeFiles/Luminary.dir/lib/zlib/deflate.c.obj	9be91c918990bbba
+1010	2870	634066340	Luminary/CMakeFiles/Luminary.dir/lib/zutil.c.obj	cea5533e6b192206
+0	113	634068767	Luminary/CMakeFiles/Luminary.dir/lib/trees.c.obj	f64fd9e74dae3f59
+0	992	634068540	Luminary/CMakeFiles/Luminary.dir/lib/adler32.c.obj	a1de30338704c9d4
+1	879	634127905	Luminary/CMakeFiles/Luminary.dir/lib/png.c.obj	695096072214477f
+4	56	634079073	Luminary/CMakeFiles/Luminary.dir/lib/compress.c.obj	e733fe13b007d9c1
+0	2664	634127879	Luminary/CMakeFiles/Luminary.dir/Luminary.c.obj	9a61a0fe73922080
+1009	2885	634066340	Luminary/CMakeFiles/Luminary.dir/lib/crc32.c.obj	474bff4842c2b19d
+880	1803	634127906	Luminary/Luminary.exe	76dbfbf05001d64
+576	2952	634066340	Luminary/CMakeFiles/Luminary.dir/lib/deflate.c.obj	fb24ad917d66d9ca
+2	3072	634127879	Luminary/CMakeFiles/Luminary.dir/lib/zlib/adler32.c.obj	9b9b00154d82968
+10	3327	634127880	Luminary/CMakeFiles/Luminary.dir/lib/zlib/compress.c.obj	277b41e79141e083
+7	3338	634127880	Luminary/CMakeFiles/Luminary.dir/lib/zlib/crc32.c.obj	faf896afaf53afd4
+9	3370	634127880	Luminary/CMakeFiles/Luminary.dir/lib/zlib/trees.c.obj	c4ea402562ca157d
+6	6976	634127883	Luminary/CMakeFiles/Luminary.dir/lib/zlib/zutil.c.obj	9bda596b001cf3eb
+1	1100	634167140	Luminary/CMakeFiles/Luminary.dir/Luminary.c.obj	9a61a0fe73922080
+1	2475	634167284	build.ninja	6f67b95378a3bf4d
+0	12839	634167292	Luminary/CMakeFiles/Luminary.dir/lib/cudatest.cu.obj	bbec4000be7bcc1d
+12840	15443	634167303	Luminary/Luminary.exe	a6d6222044ebe690
