@@ -14,6 +14,7 @@ Routines for saving a frame buffer as a `png` are implemented. Working `CUDA` sa
 - Implementing Ray Tracer.
 - Implementing some Anti-Aliasing method.
 - Implementing some Depth of Field method.
+- Implementing custom scene description file format.
 
 The licence for this code can be found in the `LICENCE` file.
 The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.
