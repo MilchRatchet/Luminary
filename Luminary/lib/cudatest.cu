@@ -27,22 +27,14 @@ void fillPixel(uint8_t* frame, unsigned int width, unsigned int height) {
 extern "C" uint8_t* test_frame(const unsigned int width, const unsigned int height) {
   uint8_t* frame_cpu = (uint8_t*)malloc(3 * width * height);
   uint8_t* frame_gpu;
-  unsigned int width_gpu, height_gpu;
 
   cudaMalloc((void**) &frame_gpu, 3 * width * height);
-  cudaMalloc((void**) &width_gpu, sizeof(int));
-  cudaMalloc((void**) &height_gpu, sizeof(int));
-
-  cudaMemcpy(&width_gpu,&width,sizeof(int),cudaMemcpyHostToDevice);
-  cudaMemcpy(&height_gpu,&height,sizeof(int),cudaMemcpyHostToDevice);
 
   fillPixel<<<blocks_per_grid,threads_per_block>>>(frame_gpu,width,height);
 
   cudaMemcpy(frame_cpu, frame_gpu, 3 * width * height, cudaMemcpyDeviceToHost);
 
   cudaFree(frame_gpu);
-  cudaFree(&width_gpu);
-  cudaFree(&height_gpu);
 
   return frame_cpu;
 }
