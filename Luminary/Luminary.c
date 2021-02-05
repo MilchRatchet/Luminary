@@ -1,36 +1,30 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <math.h>
+#include <time.h>
 #include "Luminary.h"
 #include "lib/png.h"
 #include "lib/image.h"
 #include "lib/cudatest.h"
+#include "lib/device.h"
 
 int main() {
-  cudatest();
+  display_gpu_information();
+
+  clock_t time = clock();
 
   const int width  = 3840;
   const int height = 2160;
 
-  const int point = 250;
-  const int dist  = 50;
+  uint8_t* frame = test_frame(width, height);
 
-  RGB8* test = (RGB8*)malloc(sizeof(RGB8) * width * height);
-
-  unsigned long ptr = 0;
-
-  for (int i = 0; i < height; i++) {
-    for (int j = 0; j < width; j++) {
-      test[ptr].r = 255;
-      test[ptr].g = 255 * (ptr % 2);
-      test[ptr].b = 200;
-
-      ptr++;
-    }
-  }
+  printf("[%.3fs] Frame Buffer set by GPU.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   store_as_png(
-    "test.png", (uint8_t*) test, sizeof(RGB8) * width * height, width, height,
+    "test.png", (uint8_t*) frame, sizeof(RGB8) * width * height, width, height,
     PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+
+  printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   return 0;
 }
