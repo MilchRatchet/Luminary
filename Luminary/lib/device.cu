@@ -13,14 +13,14 @@ extern "C" void display_gpu_information() {
         printf("  Device name: %s\n", prop.name);
         printf("  Compatibility Version: %d.%d\n",
             prop.major, prop.minor);
-        printf("  Memory Clock Rate (KHz): %d\n",
-            prop.memoryClockRate);
-        printf("  Memory Bus Width (bits): %d\n",
+        printf("  Memory Clock Rate: %d MHz\n",
+            prop.memoryClockRate / 1000);
+        printf("  Memory Bus Width: %d bit\n",
             prop.memoryBusWidth);
-        printf("  Peak Memory Bandwidth (GB/s): %f\n",
+        printf("  Peak Memory Bandwidth: %.1f GB/s\n",
             2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
-        printf("  Global Memory Available: %zu\n",
-            prop.totalGlobalMem / ((1024ul)^3));
+        printf("  Global Memory Available: %zu MB\n",
+            prop.totalGlobalMem / (1024ul*1024ul));
         printf("  Single to Double Precision Performance Ratio: %d\n",
             prop.singleToDoublePrecisionPerfRatio);
         printf("  Warp Size: %d\n",
