@@ -1,13 +1,12 @@
-﻿# CMakeList.txt : Top-level CMake project file, do global configuration
-# and include sub-projects here.
-#
-cmake_minimum_required (VERSION 3.8)
+﻿cmake_minimum_required (VERSION 3.9)
 
-project ("Luminary")
-
-enable_language(CUDA)
+project ("Luminary" LANGUAGES CUDA C)
 
 set(CMAKE_CUDA_ARCHITECTURES 61)
 
-# Include sub-projects.
-add_subdirectory ("Luminary")
+message(STATUS "SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
+
+file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/zlib/*.c")
+file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/lib/*.cu")
+
+add_executable(Luminary ${cpu_source_files} ${gpu_source_files})

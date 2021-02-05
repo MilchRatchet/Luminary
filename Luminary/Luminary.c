@@ -3,16 +3,18 @@
 #include "Luminary.h"
 #include "lib/png.h"
 #include "lib/image.h"
-#include "lib/cudatest.cu"
+#include "lib/cudatest.h"
 
 int main() {
+  cudatest();
+
   const int width  = 3840;
   const int height = 2160;
 
   const int point = 250;
   const int dist  = 50;
 
-  RGB8* test = malloc(sizeof(RGB8) * width * height);
+  RGB8* test = (RGB8*)malloc(sizeof(RGB8) * width * height);
 
   unsigned long ptr = 0;
 
