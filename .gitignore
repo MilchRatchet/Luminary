@@ -1,13 +1,3 @@
-# the following lines help us ignore extensionless binaries
-# Ignore all
-*
-# Unignore all with extensions
-!*.*
-# Unignore all dirs
-!*/
-# Unignore makefile
-!Makefile
-
 #no matrix market files
 *.mtx
 
