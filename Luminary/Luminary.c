@@ -17,7 +17,7 @@ int main() {
 
   const int width  = 3840;
   const int height = 2160;
-  Camera camera    = {.x = 0, .y = 0, .z = 0, .fov = 1.6};
+  Camera camera    = {.x = 0, .y = 0, .z = 0, .fov = 1.56079632679};
   Sphere* spheres  = (Sphere*) malloc(sizeof(Sphere) * 4);
 
   spheres[0].x      = 0;
@@ -48,15 +48,16 @@ int main() {
   spheres[2].color.b = 0;
 
   spheres[3].x      = 10;
-  spheres[3].y      = 10;
-  spheres[3].z      = -10;
+  spheres[3].y      = 6;
+  spheres[3].z      = -12;
   spheres[3].radius = 3;
 
   spheres[3].color.r = 0;
   spheres[3].color.g = 255;
   spheres[3].color.b = 255;
 
-  Scene scene = {.camera = camera, .spheres = spheres, .spheres_length = 4};
+  Scene scene = {
+    .camera = camera, .far_clip_distance = 1000, .spheres = spheres, .spheres_length = 4};
 
   uint8_t* frame = scene_to_frame(scene, width, height);
 

@@ -3,11 +3,6 @@
 
 #include "primitives.h"
 
-/*
- * Camera FOV needs to be done through rotating dir to obtain the grid and giving the rotation limit
- * on the horizontal axis, this avoid fisheye effect
- */
-
 struct Camera {
   float x;
   float y;
@@ -20,6 +15,7 @@ struct Camera {
 
 struct Scene {
   Camera camera;
+  unsigned int far_clip_distance;
   Sphere* spheres;
   unsigned int spheres_length;
   Cuboid* cuboids;

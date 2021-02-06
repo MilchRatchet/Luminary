@@ -38,7 +38,7 @@ void trace_rays(uint8_t* frame, Scene scene, const unsigned int width, const uns
 
         int last_hit = 0;
 
-        for (int i = 0; i < 10; i++) {
+        for (int i = 0; i < 100; i++) {
             float curr_x = scene.camera.x + ray_x * depth;
             float curr_y = scene.camera.y + ray_y * depth;
             float curr_z = scene.camera.z + ray_z * depth;
@@ -56,12 +56,16 @@ void trace_rays(uint8_t* frame, Scene scene, const unsigned int width, const uns
                 }
             }
 
-            if (dist < 0.01) {
+            if (dist < 0.00001) {
                 color_multiplier = 1;
                 break;
             }
 
             depth += dist;
+
+            if (depth > scene.far_clip_distance) {
+                break;
+            }
         }
 
         unsigned int ptr = 3 * id;
