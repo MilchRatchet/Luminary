@@ -3,7 +3,13 @@
 
 #include "image.h"
 
+/*
+ * IDs unique identify each object
+ * 0 is reserved
+ */
+
 struct Sphere {
+  unsigned int id;
   float x;
   float y;
   float z;
@@ -12,6 +18,7 @@ struct Sphere {
 } typedef Sphere;
 
 struct Cuboid {
+  unsigned int id;
   float x;
   float y;
   float z;
@@ -20,5 +27,14 @@ struct Cuboid {
   float size_z;
   RGB8 color;
 } typedef Cuboid;
+
+struct Light {
+  unsigned int id;
+  float x;
+  float y;
+  float z;
+  float intensity;
+  RGB8 color;
+} typedef Light;
 
 #endif /* PRIMITIVES_H */

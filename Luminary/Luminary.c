@@ -18,46 +18,65 @@ int main() {
   const int width  = 3840;
   const int height = 2160;
   Camera camera    = {.x = 0, .y = 0, .z = 0, .fov = 1.56079632679};
-  Sphere* spheres  = (Sphere*) malloc(sizeof(Sphere) * 4);
 
-  spheres[0].x      = 0;
-  spheres[0].y      = 0;
-  spheres[0].z      = -20;
-  spheres[0].radius = 7;
+  const int rows = 10;
 
-  spheres[0].color.r = 255;
-  spheres[0].color.g = 255;
-  spheres[0].color.b = 0;
+  Sphere* spheres = (Sphere*) malloc(sizeof(Sphere) * 9 * rows);
 
-  spheres[1].x      = -30;
-  spheres[1].y      = 0;
-  spheres[1].z      = -25;
-  spheres[1].radius = 10;
+  int ptr = 0;
 
-  spheres[1].color.r = 0;
-  spheres[1].color.g = 0;
-  spheres[1].color.b = 255;
+  for (int i = 0; i < 9; i++) {
+    for (int j = 0; j < rows; j++) {
+      spheres[ptr].id     = ptr + 1;
+      spheres[ptr].x      = -10 + 10 * (i % 3);
+      spheres[ptr].y      = -10 + 10 * (i / 3);
+      spheres[ptr].z      = -10 - 10 * j;
+      spheres[ptr].radius = 1;
 
-  spheres[2].x      = 10;
-  spheres[2].y      = 0;
-  spheres[2].z      = -10;
-  spheres[2].radius = 3;
+      spheres[ptr].color.r = 25;
+      spheres[ptr].color.g = 25;
+      spheres[ptr].color.b = 25;
 
-  spheres[2].color.r = 255;
-  spheres[2].color.g = 0;
-  spheres[2].color.b = 0;
+      ptr++;
+    }
+  }
 
-  spheres[3].x      = 10;
-  spheres[3].y      = 6;
-  spheres[3].z      = -12;
-  spheres[3].radius = 3;
+  Light* lights = (Light*) malloc(sizeof(Light) * 3);
 
-  spheres[3].color.r = 0;
-  spheres[3].color.g = 255;
-  spheres[3].color.b = 255;
+  lights[0].id = ptr++;
+  lights[0].x  = 20;
+  lights[0].y  = 10;
+  lights[0].z  = 0;
+
+  lights[0].color.r = 100;
+  lights[0].color.g = 0;
+  lights[0].color.b = 0;
+
+  lights[1].id = ptr++;
+  lights[1].x  = -20;
+  lights[1].y  = 10;
+  lights[1].z  = 0;
+
+  lights[1].color.r = 0;
+  lights[1].color.g = 0;
+  lights[1].color.b = 100;
+
+  lights[2].id = ptr++;
+  lights[2].x  = 0;
+  lights[2].y  = -20;
+  lights[2].z  = 0;
+
+  lights[2].color.r = 0;
+  lights[2].color.g = 100;
+  lights[2].color.b = 0;
 
   Scene scene = {
-    .camera = camera, .far_clip_distance = 1000, .spheres = spheres, .spheres_length = 4};
+    .camera            = camera,
+    .far_clip_distance = 1000,
+    .spheres           = spheres,
+    .spheres_length    = 9 * rows,
+    .lights            = lights,
+    .lights_length     = 3};
 
   uint8_t* frame = scene_to_frame(scene, width, height);
 
