@@ -37,21 +37,7 @@ vec3 sphere_normal(Sphere sphere, const vec3 pos) {
 
 
 __device__
-RGBF trace_light(Light light, Scene scene, const vec3 origin) {
-    vec3 ray;
-
-    ray.x = light.pos.x - origin.x;
-    ray.y = light.pos.y - origin.y;
-    ray.z = light.pos.z - origin.z;
-
-    float goal_dist = rsqrtf(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
-
-    ray.x *= goal_dist;
-    ray.y *= goal_dist;
-    ray.z *= goal_dist;
-
-    goal_dist = 1.0f/goal_dist;
-
+RGBF trace_light(Light light, Scene scene, const vec3 origin, const vec3 ray, float goal_dist) {
     RGBF result;
     result.r = 0.0f;
     result.g = 0.0f;
@@ -97,12 +83,6 @@ RGBF trace_light(Light light, Scene scene, const vec3 origin) {
 
 __device__
 RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int id, const unsigned int reflection_number) {
-    float ray_length = rsqrtf(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
-
-    ray.x *= ray_length;
-    ray.y *= ray_length;
-    ray.z *= ray_length;
-
     RGBF result;
     result.r = 0;
     result.g = 0;
@@ -150,11 +130,13 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
 
     if (hit_id != 0) {
         vec3 normal;
+        float smoothness;
 
         for (int i = 0; i < scene.spheres_length; i++) {
             if (hit_id == scene.spheres[i].id) {
                 result = scene.spheres[i].color;
                 normal = sphere_normal(scene.spheres[i], curr);
+                smoothness = scene.spheres[i].smoothness;
                 break;
             }
         }
@@ -169,11 +151,42 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
         curr.y += normal.y * epsilon * 2;
         curr.z += normal.z * epsilon * 2;
 
+        vec3 specular_ray;
+
+        float projected_length = ray.x * normal.x + ray.y * normal.y + ray.z * normal.z;
+
+        specular_ray.x = ray.x - 2 * projected_length * normal.x;
+        specular_ray.y = ray.y - 2 * projected_length * normal.y;
+        specular_ray.z = ray.z - 2 * projected_length * normal.z;
+
+        float specular_ray_length = rsqrtf(specular_ray.x * specular_ray.x + specular_ray.y * specular_ray.y + specular_ray.z * specular_ray.z);
+
+        specular_ray.x *= specular_ray_length;
+        specular_ray.y *= specular_ray_length;
+        specular_ray.z *= specular_ray_length;
+
         for (int i = 0; i < scene.lights_length; i++) {
-            RGBF light_color = trace_light(scene.lights[i], scene, curr);
-            light_sum.r += light_color.r;
-            light_sum.g += light_color.g;
-            light_sum.b += light_color.b;
+            vec3 light_ray;
+
+            light_ray.x = scene.lights[i].pos.x - curr.x;
+            light_ray.y = scene.lights[i].pos.y - curr.y;
+            light_ray.z = scene.lights[i].pos.z - curr.z;
+
+            float goal_dist = rsqrtf(light_ray.x * light_ray.x + light_ray.y * light_ray.y + light_ray.z * light_ray.z);
+
+            light_ray.x *= goal_dist;
+            light_ray.y *= goal_dist;
+            light_ray.z *= goal_dist;
+
+            RGBF light_color = trace_light(scene.lights[i], scene, curr, light_ray, 1.0f/goal_dist);
+
+            float angle = light_ray.x * specular_ray.x + light_ray.y * specular_ray.y + light_ray.z * specular_ray.z;
+
+            angle = powf(angle,smoothness);
+
+            light_sum.r += light_color.r * angle;
+            light_sum.g += light_color.g * angle;
+            light_sum.b += light_color.b * angle;
         }
 
         result.r *= light_sum.r;
@@ -182,19 +195,11 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
 
 
         if (reflection_number < device_reflection_depth) {
-            vec3 specular_ray;
-
-            float projected_length = ray.x * normal.x + ray.y * normal.y + ray.z * normal.z;
-
-            specular_ray.x = ray.x - 2 * projected_length * normal.x;
-            specular_ray.y = ray.y - 2 * projected_length * normal.y;
-            specular_ray.z = ray.z - 2 * projected_length * normal.z;
-
             RGBF specular_color = trace_specular(scene, curr, specular_ray, hit_id, reflection_number + 1);
 
-            result.r += specular_color.r;
-            result.g += specular_color.g;
-            result.b += specular_color.b;
+            result.r += (fabsf(specular_color.r) + specular_color.r) * 0.5f * smoothness;
+            result.g += (fabsf(specular_color.g) + specular_color.g) * 0.5f * smoothness;
+            result.b += (fabsf(specular_color.b) + specular_color.b) * 0.5f * smoothness;
         }
     }
 
@@ -226,6 +231,12 @@ void trace_rays(RGBF* frame, Scene scene, const unsigned int width, const unsign
         ray.x = -scene.camera.fov + step * x + offset_x - scene.camera.pos.x;
         ray.y = -vfov + step * y + offset_y - scene.camera.pos.y;
         ray.z = -1 - scene.camera.pos.z;
+
+        float ray_length = rsqrtf(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
+
+        ray.x *= ray_length;
+        ray.y *= ray_length;
+        ray.z *= ray_length;
 
         RGBF result = trace_specular(scene, scene.camera.pos, ray, 0, 0);
 
@@ -273,9 +284,9 @@ extern "C" void frame_buffer_to_image(Camera camera, raytrace_instance* instance
             RGB8 pixel;
             RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
 
-            pixel.r = (pixel_float.r > 1.0f) ? 255 : (int)(pixel_float.r * 255);
-            pixel.g = (pixel_float.g > 1.0f) ? 255 : (int)(pixel_float.g * 255);
-            pixel.b = (pixel_float.b > 1.0f) ? 255 : (int)(pixel_float.b * 255);
+            pixel.r = (pixel_float.r > 1.0f) ? 255 : ((pixel_float.r < 0.0f) ? 0 : (int)(pixel_float.r * 255));
+            pixel.g = (pixel_float.g > 1.0f) ? 255 : ((pixel_float.g < 0.0f) ? 0 : (int)(pixel_float.g * 255));
+            pixel.b = (pixel_float.b > 1.0f) ? 255 : ((pixel_float.b < 0.0f) ? 0 : (int)(pixel_float.b * 255));
 
 
             image[i + instance->width * j] = pixel;

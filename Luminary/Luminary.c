@@ -38,6 +38,8 @@ int main() {
       spheres[ptr].color.g = 0.1f + 0.9f * (i % 3 == 1);
       spheres[ptr].color.b = 0.1f + 0.9f * (i % 3 == 2);
 
+      spheres[ptr].smoothness = 1.0f;
+
       ptr++;
     }
   }
@@ -49,9 +51,11 @@ int main() {
   spheres[ptr].radius = 100;
   spheres[ptr].sign   = -1;
 
-  spheres[ptr].color.r = 1.0f;
-  spheres[ptr].color.g = 1.0f;
+  spheres[ptr].color.r = 0.5f;
+  spheres[ptr].color.g = 0.5f;
   spheres[ptr].color.b = 1.0f;
+
+  spheres[ptr].smoothness = 0.0f;
 
   ptr++;
 
@@ -92,7 +96,7 @@ int main() {
     .lights            = lights,
     .lights_length     = 1};
 
-  raytrace_instance* instance = init_raytracing(width, height, 2);
+  raytrace_instance* instance = init_raytracing(width, height, 3);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

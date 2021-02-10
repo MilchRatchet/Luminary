@@ -20,6 +20,7 @@ struct Sphere {
   float radius;
   float sign;
   RGBF color;
+  float smoothness;
 } typedef Sphere;
 
 struct Cuboid {
