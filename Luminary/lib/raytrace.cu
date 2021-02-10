@@ -13,7 +13,7 @@ const float epsilon = 0.0001f;
 
 __device__
 float sphere_dist(Sphere sphere, const vec3 pos) {
-    return sqrtf((sphere.pos.x-pos.x)*(sphere.pos.x-pos.x) + (sphere.pos.y-pos.y)*(sphere.pos.y-pos.y) + (sphere.pos.z-pos.z)*(sphere.pos.z-pos.z)) - sphere.radius;
+    return sphere.sign * (sqrtf((sphere.pos.x-pos.x)*(sphere.pos.x-pos.x) + (sphere.pos.y-pos.y)*(sphere.pos.y-pos.y) + (sphere.pos.z-pos.z)*(sphere.pos.z-pos.z)) - sphere.radius);
 }
 
 __device__
@@ -23,7 +23,7 @@ vec3 sphere_normal(Sphere sphere, const vec3 pos) {
     result.y = pos.y - sphere.pos.y;
     result.z = pos.z - sphere.pos.z;
 
-    float length = rsqrtf(result.x * result.x + result.y * result.y + result.z * result.z);
+    float length = rsqrtf(result.x * result.x + result.y * result.y + result.z * result.z) * sphere.sign;
 
     result.x *= length;
     result.y *= length;

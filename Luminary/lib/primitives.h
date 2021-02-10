@@ -18,6 +18,7 @@ struct Sphere {
   unsigned int id;
   vec3 pos;
   float radius;
+  float sign;
   RGBF color;
 } typedef Sphere;
 

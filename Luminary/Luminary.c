@@ -21,17 +21,18 @@ int main() {
 
   const int rows = 10;
 
-  Sphere* spheres = (Sphere*) malloc(sizeof(Sphere) * 9 * rows);
+  Sphere* spheres = (Sphere*) malloc(sizeof(Sphere) * (9 * rows + 1));
 
   int ptr = 0;
 
   for (int i = 0; i < 9; i++) {
     for (int j = 0; j < rows; j++) {
       spheres[ptr].id     = ptr + 1;
-      spheres[ptr].pos.x      = -10 + 10 * (i % 3);
+      spheres[ptr].pos.x  = -10 + 10 * (i % 3);
       spheres[ptr].pos.y  = -10 + 10 * (i / 3);
-      spheres[ptr].pos.z      = -10 - 10 * j;
+      spheres[ptr].pos.z  = -10 - 10 * j;
       spheres[ptr].radius = 1;
+      spheres[ptr].sign   = 1;
 
       spheres[ptr].color.r = 1.0f;
       spheres[ptr].color.g = 0.1f;
@@ -41,9 +42,22 @@ int main() {
     }
   }
 
+  spheres[ptr].id     = ptr + 1;
+  spheres[ptr].pos.x  = 0;
+  spheres[ptr].pos.y  = 0;
+  spheres[ptr].pos.z  = 0;
+  spheres[ptr].radius = 100;
+  spheres[ptr].sign   = -1;
+
+  spheres[ptr].color.r = 0.1f;
+  spheres[ptr].color.g = 0.1f;
+  spheres[ptr].color.b = 1.0f;
+
+  ptr++;
+
   Light* lights = (Light*) malloc(sizeof(Light) * 3);
 
-  lights[0].id = ptr++;
+  lights[0].id    = ptr++;
   lights[0].pos.x = 20;
   lights[0].pos.y = 10;
   lights[0].pos.z = 0;
@@ -52,7 +66,7 @@ int main() {
   lights[0].color.g = 0;
   lights[0].color.b = 0;
 
-  lights[1].id = ptr++;
+  lights[1].id    = ptr++;
   lights[1].pos.x = -20;
   lights[1].pos.y = 10;
   lights[1].pos.z = 0;
@@ -61,7 +75,7 @@ int main() {
   lights[1].color.g = 0;
   lights[1].color.b = 1.0f;
 
-  lights[2].id = ptr++;
+  lights[2].id    = ptr++;
   lights[2].pos.x = 0;
   lights[2].pos.y = -20;
   lights[2].pos.z = 0;
@@ -74,9 +88,9 @@ int main() {
     .camera            = camera,
     .far_clip_distance = 1000,
     .spheres           = spheres,
-    .spheres_length    = 9 * rows,
+    .spheres_length    = 1 + 9 * rows,
     .lights            = lights,
-    .lights_length     = 3};
+    .lights_length     = 1};
 
   raytrace_instance* instance = init_raytracing(width, height);
 
