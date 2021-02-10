@@ -1,6 +1,4 @@
-// Luminary.h : Include file for standard system include files,
-// or project specific include files.
+#ifndef LUMINARY_H
+#define LUMINARY_H
 
-#pragma once
-
-// TODO: Reference additional headers your program requires here.
+#endif /* LUMINARY_H */

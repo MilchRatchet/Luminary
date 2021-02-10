@@ -4,15 +4,11 @@
 #include <stdint.h>
 #include "scene.h"
 #include "image.h"
+#include "primitives.h"
 
 #if __cplusplus
 extern "C" {
 #endif
-struct vec3 {
-  float x;
-  float y;
-  float z;
-} typedef vec3;
 
 struct raytrace_instance {
   unsigned int width;

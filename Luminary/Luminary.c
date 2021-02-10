@@ -17,7 +17,7 @@ int main() {
 
   const int width  = 3840;
   const int height = 2160;
-  Camera camera    = {.x = 0, .y = 0, .z = 0, .fov = 1.56079632679};
+  Camera camera    = {.pos = {.x = 0.0f, .y = 0.0f, .z = 0.0f}, .fov = 1.56079632679};
 
   const int rows = 10;
 
@@ -28,12 +28,12 @@ int main() {
   for (int i = 0; i < 9; i++) {
     for (int j = 0; j < rows; j++) {
       spheres[ptr].id     = ptr + 1;
-      spheres[ptr].x      = -10 + 10 * (i % 3);
-      spheres[ptr].y      = -10 + 10 * (i / 3);
-      spheres[ptr].z      = -10 - 10 * j;
+      spheres[ptr].pos.x      = -10 + 10 * (i % 3);
+      spheres[ptr].pos.y  = -10 + 10 * (i / 3);
+      spheres[ptr].pos.z      = -10 - 10 * j;
       spheres[ptr].radius = 1;
 
-      spheres[ptr].color.r = 0.1f;
+      spheres[ptr].color.r = 1.0f;
       spheres[ptr].color.g = 0.1f;
       spheres[ptr].color.b = 0.1f;
 
@@ -44,30 +44,30 @@ int main() {
   Light* lights = (Light*) malloc(sizeof(Light) * 3);
 
   lights[0].id = ptr++;
-  lights[0].x  = 20;
-  lights[0].y  = 10;
-  lights[0].z  = 0;
+  lights[0].pos.x = 20;
+  lights[0].pos.y = 10;
+  lights[0].pos.z = 0;
 
-  lights[0].color.r = 0.5f;
+  lights[0].color.r = 1.0f;
   lights[0].color.g = 0;
   lights[0].color.b = 0;
 
   lights[1].id = ptr++;
-  lights[1].x  = -20;
-  lights[1].y  = 10;
-  lights[1].z  = 0;
+  lights[1].pos.x = -20;
+  lights[1].pos.y = 10;
+  lights[1].pos.z = 0;
 
   lights[1].color.r = 0;
   lights[1].color.g = 0;
-  lights[1].color.b = 0.5f;
+  lights[1].color.b = 1.0f;
 
   lights[2].id = ptr++;
-  lights[2].x  = 0;
-  lights[2].y  = -20;
-  lights[2].z  = 0;
+  lights[2].pos.x = 0;
+  lights[2].pos.y = -20;
+  lights[2].pos.z = 0;
 
   lights[2].color.r = 0;
-  lights[2].color.g = 0.5f;
+  lights[2].color.g = 1.0f;
   lights[2].color.b = 0;
 
   Scene scene = {

@@ -4,12 +4,8 @@
 #include "primitives.h"
 
 struct Camera {
-  float x;
-  float y;
-  float z;
-  float dir_x;
-  float dir_y;
-  float dir_z;
+  vec3 pos;
+  vec3 dir;
   float fov;  // As the ratio of grid width / 2 to grid distance from camera
 } typedef Camera;
 
