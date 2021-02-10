@@ -34,9 +34,9 @@ int main() {
       spheres[ptr].radius = 1;
       spheres[ptr].sign   = 1;
 
-      spheres[ptr].color.r = 1.0f;
-      spheres[ptr].color.g = 0.1f;
-      spheres[ptr].color.b = 0.1f;
+      spheres[ptr].color.r = 0.1f + 0.9f * (i % 3 == 0);
+      spheres[ptr].color.g = 0.1f + 0.9f * (i % 3 == 1);
+      spheres[ptr].color.b = 0.1f + 0.9f * (i % 3 == 2);
 
       ptr++;
     }
@@ -49,8 +49,8 @@ int main() {
   spheres[ptr].radius = 100;
   spheres[ptr].sign   = -1;
 
-  spheres[ptr].color.r = 0.1f;
-  spheres[ptr].color.g = 0.1f;
+  spheres[ptr].color.r = 1.0f;
+  spheres[ptr].color.g = 1.0f;
   spheres[ptr].color.b = 1.0f;
 
   ptr++;
@@ -63,8 +63,8 @@ int main() {
   lights[0].pos.z = 0;
 
   lights[0].color.r = 1.0f;
-  lights[0].color.g = 0;
-  lights[0].color.b = 0;
+  lights[0].color.g = 1.0f;
+  lights[0].color.b = 1.0f;
 
   lights[1].id    = ptr++;
   lights[1].pos.x = -20;
@@ -88,11 +88,11 @@ int main() {
     .camera            = camera,
     .far_clip_distance = 1000,
     .spheres           = spheres,
-    .spheres_length    = 1 + 9 * rows,
+    .spheres_length    = 9 * rows,
     .lights            = lights,
     .lights_length     = 1};
 
-  raytrace_instance* instance = init_raytracing(width, height);
+  raytrace_instance* instance = init_raytracing(width, height, 2);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

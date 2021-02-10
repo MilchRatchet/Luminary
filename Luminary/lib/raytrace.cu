@@ -12,6 +12,9 @@ __device__
 const float epsilon = 0.0001f;
 
 __device__
+int device_reflection_depth;
+
+__device__
 float sphere_dist(Sphere sphere, const vec3 pos) {
     return sphere.sign * (sqrtf((sphere.pos.x-pos.x)*(sphere.pos.x-pos.x) + (sphere.pos.y-pos.y)*(sphere.pos.y-pos.y) + (sphere.pos.z-pos.z)*(sphere.pos.z-pos.z)) - sphere.radius);
 }
@@ -93,7 +96,7 @@ RGBF trace_light(Light light, Scene scene, const vec3 origin) {
 }
 
 __device__
-RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int id) {
+RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int id, const unsigned int reflection_number) {
     float ray_length = rsqrtf(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
 
     ray.x *= ray_length;
@@ -176,6 +179,23 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
         result.r *= light_sum.r;
         result.g *= light_sum.g;
         result.b *= light_sum.b;
+
+
+        if (reflection_number < device_reflection_depth) {
+            vec3 specular_ray;
+
+            float projected_length = ray.x * normal.x + ray.y * normal.y + ray.z * normal.z;
+
+            specular_ray.x = ray.x - 2 * projected_length * normal.x;
+            specular_ray.y = ray.y - 2 * projected_length * normal.y;
+            specular_ray.z = ray.z - 2 * projected_length * normal.z;
+
+            RGBF specular_color = trace_specular(scene, curr, specular_ray, hit_id, reflection_number + 1);
+
+            result.r += specular_color.r;
+            result.g += specular_color.g;
+            result.b += specular_color.b;
+        }
     }
 
     return result;
@@ -184,9 +204,11 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
 
 
 __global__
-void trace_rays(RGBF* frame, Scene scene, const unsigned int width, const unsigned int height) {
+void trace_rays(RGBF* frame, Scene scene, const unsigned int width, const unsigned int height, const unsigned int reflection_depth) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int amount = width * height;
+
+    device_reflection_depth = reflection_depth;
 
     float step = 2 * (scene.camera.fov / width);
 
@@ -205,7 +227,7 @@ void trace_rays(RGBF* frame, Scene scene, const unsigned int width, const unsign
         ray.y = -vfov + step * y + offset_y - scene.camera.pos.y;
         ray.z = -1 - scene.camera.pos.z;
 
-        RGBF result = trace_specular(scene, scene.camera.pos, ray, 0);
+        RGBF result = trace_specular(scene, scene.camera.pos, ray, 0, 0);
 
         frame[id] = result;
 
@@ -214,7 +236,7 @@ void trace_rays(RGBF* frame, Scene scene, const unsigned int width, const unsign
 }
 
 
-extern "C" raytrace_instance* init_raytracing(const unsigned int width, const unsigned int height) {
+extern "C" raytrace_instance* init_raytracing(const unsigned int width, const unsigned int height, const unsigned int reflection_depth) {
     raytrace_instance* instance = (raytrace_instance*)malloc(sizeof(raytrace_instance));
 
     instance->width = width;
@@ -222,6 +244,8 @@ extern "C" raytrace_instance* init_raytracing(const unsigned int width, const un
     instance->frame_buffer = (RGBF*)malloc(sizeof(RGBF) * width * height);
 
     cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height);
+
+    instance->reflection_depth = reflection_depth;
 
     return instance;
 }
@@ -235,7 +259,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     cudaMemcpy(scene_gpu.spheres, scene.spheres, sizeof(Sphere) * scene.spheres_length, cudaMemcpyHostToDevice);
     cudaMemcpy(scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice);
 
-    trace_rays<<<blocks_per_grid,threads_per_block>>>(instance->frame_buffer_gpu,scene_gpu,instance->width,instance->height);
+    trace_rays<<<blocks_per_grid,threads_per_block>>>(instance->frame_buffer_gpu,scene_gpu,instance->width,instance->height, instance->reflection_depth);
 
     cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost);
 
@@ -249,9 +273,9 @@ extern "C" void frame_buffer_to_image(Camera camera, raytrace_instance* instance
             RGB8 pixel;
             RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
 
-            pixel.r = (int)(pixel_float.r * 255);
-            pixel.g = (int)(pixel_float.g * 255);
-            pixel.b = (int)(pixel_float.b * 255);
+            pixel.r = (pixel_float.r > 1.0f) ? 255 : (int)(pixel_float.r * 255);
+            pixel.g = (pixel_float.g > 1.0f) ? 255 : (int)(pixel_float.g * 255);
+            pixel.b = (pixel_float.b > 1.0f) ? 255 : (int)(pixel_float.b * 255);
 
 
             image[i + instance->width * j] = pixel;
