@@ -5,11 +5,11 @@
 #include <cuda_runtime_api.h>
 #include <float.h>
 
-const int threads_per_block = 256;
-const int blocks_per_grid = 32;
+const int threads_per_block = 64;
+const int blocks_per_grid = 512;
 
 __device__
-const float epsilon = 0.00001;
+const float epsilon = 0.0001f;
 
 __device__
 float sphere_dist(Sphere sphere, const float x, const float y, const float z) {
@@ -34,7 +34,7 @@ vec3 sphere_normal(Sphere sphere, const float x, const float y, const float z) {
 
 
 __device__
-RGB8 trace_light(Light light, Scene scene, const float x, const float y, const float z) {
+RGBF trace_light(Light light, Scene scene, const float x, const float y, const float z) {
     float ray_x = light.x - x;
     float ray_y = light.y - y;
     float ray_z = light.z - z;
@@ -45,7 +45,7 @@ RGB8 trace_light(Light light, Scene scene, const float x, const float y, const f
     ray_y /= goal_dist;
     ray_z /= goal_dist;
 
-    RGB8 result;
+    RGBF result;
     result.r = 0;
     result.g = 0;
     result.b = 0;
@@ -87,14 +87,14 @@ RGB8 trace_light(Light light, Scene scene, const float x, const float y, const f
 }
 
 __device__
-RGB8 trace_specular(Scene scene, const float x, const float y, const float z, float ray_x, float ray_y, float ray_z, const unsigned int id) {
+RGBF trace_specular(Scene scene, const float x, const float y, const float z, float ray_x, float ray_y, float ray_z, const unsigned int id) {
     float ray_length = rsqrtf(ray_x * ray_x + ray_y * ray_y + ray_z * ray_z);
 
     ray_x *= ray_length;
     ray_y *= ray_length;
     ray_z *= ray_length;
 
-    RGB8 result;
+    RGBF result;
     result.r = 0;
     result.g = 0;
     result.b = 0;
@@ -153,16 +153,16 @@ RGB8 trace_specular(Scene scene, const float x, const float y, const float z, fl
         }
 
         unsigned int hits = 0;
-        unsigned int red = result.r;
-        unsigned int green = result.g;
-        unsigned int blue = result.b;
+        float red = result.r;
+        float green = result.g;
+        float blue = result.b;
 
         curr_x += normal.x * epsilon * 2;
         curr_y += normal.y * epsilon * 2;
         curr_z += normal.z * epsilon * 2;
 
         for (int i = 0; i < scene.lights_length; i++) {
-            RGB8 light_color = trace_light(scene.lights[i], scene, curr_x, curr_y, curr_z);
+            RGBF light_color = trace_light(scene.lights[i], scene, curr_x, curr_y, curr_z);
             red += light_color.r;
             green += light_color.g;
             blue += light_color.b;
@@ -173,9 +173,9 @@ RGB8 trace_specular(Scene scene, const float x, const float y, const float z, fl
         //float inv_hits = 1 / (float)hits;
 
         for (int i = 0; i < scene.lights_length; i++) {
-            result.r = (red > 255) ? 255 : red;
-            result.g = (green > 255) ? 255 : green;
-            result.b = (blue > 255) ? 255 : blue;
+            result.r = (red > 1.0) ? 1.0 : red;
+            result.g = (green > 1.0) ? 1.0 : green;
+            result.b = (blue > 1.0) ? 1.0 : blue;
         }
     }
 
@@ -185,7 +185,7 @@ RGB8 trace_specular(Scene scene, const float x, const float y, const float z, fl
 
 
 __global__
-void trace_rays(uint8_t* frame, Scene scene, const unsigned int width, const unsigned int height) {
+void trace_rays(RGBF* frame, Scene scene, const unsigned int width, const unsigned int height) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int amount = width * height;
 
@@ -204,24 +204,28 @@ void trace_rays(uint8_t* frame, Scene scene, const unsigned int width, const uns
         float ray_y = -vfov + step * y + offset_y - scene.camera.y;
         float ray_z = -1 - scene.camera.z;
 
-        RGB8 result = trace_specular(scene, scene.camera.x, scene.camera.y, scene.camera.z, ray_x, ray_y, ray_z, 0);
+        RGBF result = trace_specular(scene, scene.camera.x, scene.camera.y, scene.camera.z, ray_x, ray_y, ray_z, 0);
 
-        unsigned int ptr = 3 * id;
-
-        frame[ptr] = result.r;
-        frame[ptr + 1] = result.g;
-        frame[ptr + 2] = result.b;
+        frame[id] = result;
 
         id += blockDim.x * gridDim.x;
     }
 }
 
-extern "C" uint8_t* scene_to_frame(Scene scene, const unsigned int width, const unsigned int height) {
-    uint8_t* frame_cpu = (uint8_t*)malloc(3 * width * height);
-    uint8_t* frame_gpu;
 
-    cudaMalloc((void**) &frame_gpu, 3 * width * height);
+extern "C" raytrace_instance* init_raytracing(const unsigned int width, const unsigned int height) {
+    raytrace_instance* instance = (raytrace_instance*)malloc(sizeof(raytrace_instance));
 
+    instance->width = width;
+    instance->height = height;
+    instance->frame_buffer = (RGBF*)malloc(sizeof(RGBF) * width * height);
+
+    cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height);
+
+    return instance;
+}
+
+extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     Scene scene_gpu = scene;
 
     cudaMalloc((void**) &(scene_gpu.spheres), sizeof(Sphere) * scene_gpu.spheres_length);
@@ -230,13 +234,34 @@ extern "C" uint8_t* scene_to_frame(Scene scene, const unsigned int width, const 
     cudaMemcpy(scene_gpu.spheres, scene.spheres, sizeof(Sphere) * scene.spheres_length, cudaMemcpyHostToDevice);
     cudaMemcpy(scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice);
 
-    trace_rays<<<blocks_per_grid,threads_per_block>>>(frame_gpu,scene_gpu,width,height);
+    trace_rays<<<blocks_per_grid,threads_per_block>>>(instance->frame_buffer_gpu,scene_gpu,instance->width,instance->height);
 
-    cudaMemcpy(frame_cpu, frame_gpu, 3 * width * height, cudaMemcpyDeviceToHost);
+    cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost);
 
-    cudaFree(frame_gpu);
     cudaFree(scene_gpu.spheres);
     cudaFree(scene_gpu.lights);
+}
 
-    return frame_cpu;
+extern "C" void frame_buffer_to_image(Camera camera, raytrace_instance* instance, RGB8* image) {
+    for (int j = 0; j < instance->height; j++) {
+        for (int i = 0; i < instance->width; i++) {
+            RGB8 pixel;
+            RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
+
+            pixel.r = (int)(pixel_float.r * 255);
+            pixel.g = (int)(pixel_float.r * 255);
+            pixel.b = (int)(pixel_float.r * 255);
+
+
+            image[i + instance->width * j] = pixel;
+        }
+    }
+}
+
+extern "C" void free_raytracing(raytrace_instance* instance) {
+    cudaFree(instance->frame_buffer_gpu);
+
+    free(instance->frame_buffer);
+
+    free(instance);
 }

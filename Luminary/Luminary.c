@@ -33,9 +33,9 @@ int main() {
       spheres[ptr].z      = -10 - 10 * j;
       spheres[ptr].radius = 1;
 
-      spheres[ptr].color.r = 25;
-      spheres[ptr].color.g = 25;
-      spheres[ptr].color.b = 25;
+      spheres[ptr].color.r = 0.1f;
+      spheres[ptr].color.g = 0.1f;
+      spheres[ptr].color.b = 0.1f;
 
       ptr++;
     }
@@ -48,7 +48,7 @@ int main() {
   lights[0].y  = 10;
   lights[0].z  = 0;
 
-  lights[0].color.r = 100;
+  lights[0].color.r = 0.5f;
   lights[0].color.g = 0;
   lights[0].color.b = 0;
 
@@ -59,7 +59,7 @@ int main() {
 
   lights[1].color.r = 0;
   lights[1].color.g = 0;
-  lights[1].color.b = 100;
+  lights[1].color.b = 0.5f;
 
   lights[2].id = ptr++;
   lights[2].x  = 0;
@@ -67,7 +67,7 @@ int main() {
   lights[2].z  = 0;
 
   lights[2].color.r = 0;
-  lights[2].color.g = 100;
+  lights[2].color.g = 0.5f;
   lights[2].color.b = 0;
 
   Scene scene = {
@@ -78,11 +78,24 @@ int main() {
     .lights            = lights,
     .lights_length     = 3};
 
-  uint8_t* frame = scene_to_frame(scene, width, height);
+  raytrace_instance* instance = init_raytracing(width, height);
 
-  // uint8_t* frame = test_frame(width, height);
+  printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
-  printf("[%.3fs] Frame Buffer set by GPU.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+  trace_scene(scene, instance);
+
+  printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
+  RGB8* frame = (RGB8*) malloc(sizeof(RGB8) * instance->width * instance->height);
+
+  frame_buffer_to_image(camera, instance, frame);
+
+  printf(
+    "[%.3fs] Converted frame buffer to image.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
+  free_raytracing(instance);
+
+  printf("[%.3fs] Instance freed.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   store_as_png(
     "test.png", (uint8_t*) frame, sizeof(RGB8) * width * height, width, height,

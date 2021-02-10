@@ -14,7 +14,7 @@ struct Sphere {
   float y;
   float z;
   float radius;
-  RGB8 color;
+  RGBF color;
 } typedef Sphere;
 
 struct Cuboid {
@@ -25,7 +25,7 @@ struct Cuboid {
   float size_x;
   float size_y;
   float size_z;
-  RGB8 color;
+  RGBF color;
 } typedef Cuboid;
 
 struct Light {
@@ -34,7 +34,7 @@ struct Light {
   float y;
   float z;
   float intensity;
-  RGB8 color;
+  RGBF color;
 } typedef Light;
 
 #endif /* PRIMITIVES_H */

@@ -16,4 +16,10 @@ struct RGB8 {
   uint16_t b;
 } typedef RGB16;*/
 
+struct RGBF {
+  float r;
+  float g;
+  float b;
+} typedef RGBF;
+
 #endif /* IMAGE_H */
