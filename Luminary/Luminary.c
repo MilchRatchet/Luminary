@@ -38,24 +38,28 @@ int main() {
       spheres[ptr].color.g = 0.1f + 0.9f * (i % 3 == 1);
       spheres[ptr].color.b = 0.1f + 0.9f * (i % 3 == 2);
 
-      spheres[ptr].smoothness = 1.0f;
+      spheres[ptr].smoothness = 0.1f;
 
       ptr++;
     }
   }
 
-  spheres[ptr].id     = ptr + 1;
-  spheres[ptr].pos.x  = 0;
-  spheres[ptr].pos.y  = 0;
-  spheres[ptr].pos.z  = 0;
-  spheres[ptr].radius = 100;
-  spheres[ptr].sign   = -1;
+  Cuboid* cuboids = (Cuboid*) malloc(sizeof(Cuboid) * 1);
 
-  spheres[ptr].color.r = 0.5f;
-  spheres[ptr].color.g = 0.5f;
-  spheres[ptr].color.b = 1.0f;
+  cuboids[0].id     = ptr + 1;
+  cuboids[0].pos.x  = 0;
+  cuboids[0].pos.y  = 20;
+  cuboids[0].pos.z  = 0;
+  cuboids[0].size.x = 60;
+  cuboids[0].size.y = 1;
+  cuboids[0].size.z = 100;
+  cuboids[0].sign   = 1;
 
-  spheres[ptr].smoothness = 0.0f;
+  cuboids[0].color.r = 0.5f;
+  cuboids[0].color.g = 0.5f;
+  cuboids[0].color.b = 1.0f;
+
+  cuboids[0].smoothness = 0.1f;
 
   ptr++;
 
@@ -93,10 +97,12 @@ int main() {
     .far_clip_distance = 1000,
     .spheres           = spheres,
     .spheres_length    = 9 * rows,
+    .cuboids           = cuboids,
+    .cuboids_length    = 1,
     .lights            = lights,
     .lights_length     = 1};
 
-  raytrace_instance* instance = init_raytracing(width, height, 3);
+  raytrace_instance* instance = init_raytracing(width, height, 1);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

@@ -35,6 +35,50 @@ vec3 sphere_normal(Sphere sphere, const vec3 pos) {
     return result;
 }
 
+__device__
+float cuboid_dist(Cuboid cuboid, const vec3 pos) {
+    vec3 dist_vector;
+
+    dist_vector.x = fabsf(cuboid.pos.x - pos.x) - cuboid.size.x;
+    dist_vector.y = fabsf(cuboid.pos.y - pos.y) - cuboid.size.y;
+    dist_vector.z = fabsf(cuboid.pos.z - pos.z) - cuboid.size.z;
+    dist_vector.x = (dist_vector.x + fabsf(dist_vector.x)) * 0.5f;
+    dist_vector.y = (dist_vector.y + fabsf(dist_vector.y)) * 0.5f;
+    dist_vector.z = (dist_vector.z + fabsf(dist_vector.z)) * 0.5f;
+
+    return cuboid.sign * sqrtf(dist_vector.x * dist_vector.x + dist_vector.y * dist_vector.y + dist_vector.z * dist_vector.z);
+}
+
+__device__
+vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
+    vec3 normal;
+    vec3 abs_norm;
+
+    normal.x = pos.x - cuboid.pos.x;
+    normal.y = pos.y - cuboid.pos.y;
+    normal.z = pos.z - cuboid.pos.z;
+
+    abs_norm.x = fabsf(normal.x) - cuboid.size.x;
+    abs_norm.y = fabsf(normal.y) - cuboid.size.y;
+    abs_norm.z = fabsf(normal.z) - cuboid.size.z;
+
+    abs_norm.x = (abs_norm.x + fabsf(abs_norm.x)) * 0.5f;
+    abs_norm.y = (abs_norm.y + fabsf(abs_norm.y)) * 0.5f;
+    abs_norm.z = (abs_norm.z + fabsf(abs_norm.z)) * 0.5f;
+
+    normal.x = copysignf(abs_norm.x, normal.x);
+    normal.y = copysignf(abs_norm.y, normal.y);
+    normal.z = copysignf(abs_norm.z, normal.z);
+
+    float length = rsqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z) * cuboid.sign;
+
+    normal.x *= length;
+    normal.y *= length;
+    normal.z *= length;
+
+    return normal;
+}
+
 
 __device__
 RGBF trace_light(Light light, Scene scene, const vec3 origin, const vec3 ray, float goal_dist) {
@@ -58,6 +102,16 @@ RGBF trace_light(Light light, Scene scene, const vec3 origin, const vec3 ray, fl
             Sphere sphere = scene.spheres[j];
 
             float d = sphere_dist(sphere,curr);
+
+            if (d < dist) {
+                dist = d;
+            }
+        }
+
+        for (int j = 0; j < scene.cuboids_length; j++) {
+            Cuboid cuboid = scene.cuboids[j];
+
+            float d = cuboid_dist(cuboid,curr);
 
             if (d < dist) {
                 dist = d;
@@ -116,6 +170,19 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
             }
         }
 
+        for (int j = 0; j < scene.cuboids_length; j++) {
+            Cuboid cuboid = scene.cuboids[j];
+
+            if (id == cuboid.id) continue;
+
+            float d = cuboid_dist(cuboid,curr);
+
+            if (d < dist) {
+                dist = d;
+                hit_id = cuboid.id;
+            }
+        }
+
         if (dist < epsilon) {
             break;
         }
@@ -137,6 +204,14 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
                 result = scene.spheres[i].color;
                 normal = sphere_normal(scene.spheres[i], curr);
                 smoothness = scene.spheres[i].smoothness;
+                break;
+            }
+        }
+        for (int i = 0; i < scene.cuboids_length; i++) {
+            if (hit_id == scene.cuboids[i].id) {
+                result = scene.cuboids[i].color;
+                normal = cuboid_normal(scene.cuboids[i], curr);
+                smoothness = scene.cuboids[i].smoothness;
                 break;
             }
         }
@@ -180,9 +255,9 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
 
             RGBF light_color = trace_light(scene.lights[i], scene, curr, light_ray, 1.0f/goal_dist);
 
-            float angle = light_ray.x * specular_ray.x + light_ray.y * specular_ray.y + light_ray.z * specular_ray.z;
+            float angle = 1.0f + light_ray.x * specular_ray.x + light_ray.y * specular_ray.y + light_ray.z * specular_ray.z;
 
-            angle = powf(angle,smoothness);
+            angle += powf(angle,smoothness);
 
             light_sum.r += light_color.r * angle;
             light_sum.g += light_color.g * angle;
@@ -265,9 +340,11 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     Scene scene_gpu = scene;
 
     cudaMalloc((void**) &(scene_gpu.spheres), sizeof(Sphere) * scene_gpu.spheres_length);
+    cudaMalloc((void**) &(scene_gpu.cuboids), sizeof(Cuboid) * scene_gpu.cuboids_length);
     cudaMalloc((void**) &(scene_gpu.lights), sizeof(Light) * scene_gpu.lights_length);
 
     cudaMemcpy(scene_gpu.spheres, scene.spheres, sizeof(Sphere) * scene.spheres_length, cudaMemcpyHostToDevice);
+    cudaMemcpy(scene_gpu.cuboids, scene.cuboids, sizeof(Cuboid) * scene.cuboids_length, cudaMemcpyHostToDevice);
     cudaMemcpy(scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice);
 
     trace_rays<<<blocks_per_grid,threads_per_block>>>(instance->frame_buffer_gpu,scene_gpu,instance->width,instance->height, instance->reflection_depth);
@@ -275,6 +352,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost);
 
     cudaFree(scene_gpu.spheres);
+    cudaFree(scene_gpu.cuboids);
     cudaFree(scene_gpu.lights);
 }
 

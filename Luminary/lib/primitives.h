@@ -27,7 +27,9 @@ struct Cuboid {
   unsigned int id;
   vec3 pos;
   vec3 size;
+  float sign;
   RGBF color;
+  float smoothness;
 } typedef Cuboid;
 
 struct Light {
