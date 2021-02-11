@@ -58,9 +58,9 @@ vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
     normal.y = pos.y - cuboid.pos.y;
     normal.z = pos.z - cuboid.pos.z;
 
-    abs_norm.x = fabsf(normal.x) - cuboid.size.x;
-    abs_norm.y = fabsf(normal.y) - cuboid.size.y;
-    abs_norm.z = fabsf(normal.z) - cuboid.size.z;
+    abs_norm.x = epsilon + fabsf(normal.x) - cuboid.size.x;
+    abs_norm.y = epsilon + fabsf(normal.y) - cuboid.size.y;
+    abs_norm.z = epsilon + fabsf(normal.z) - cuboid.size.z;
 
     abs_norm.x = (abs_norm.x + fabsf(abs_norm.x)) * 0.5f;
     abs_norm.y = (abs_norm.y + fabsf(abs_norm.y)) * 0.5f;
