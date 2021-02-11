@@ -15,6 +15,9 @@ __device__
 int device_reflection_depth;
 
 __device__
+Scene scene;
+
+__device__
 float sphere_dist(Sphere sphere, const vec3 pos) {
     return sphere.sign * (sqrtf((sphere.pos.x-pos.x)*(sphere.pos.x-pos.x) + (sphere.pos.y-pos.y)*(sphere.pos.y-pos.y) + (sphere.pos.z-pos.z)*(sphere.pos.z-pos.z)) - sphere.radius);
 }
@@ -81,7 +84,7 @@ vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
 
 
 __device__
-RGBF trace_light(Light light, Scene scene, const vec3 origin, const vec3 ray, float goal_dist) {
+RGBF trace_light(Light light, const vec3 origin, const vec3 ray, float goal_dist) {
     RGBF result;
     result.r = 0.0f;
     result.g = 0.0f;
@@ -136,7 +139,7 @@ RGBF trace_light(Light light, Scene scene, const vec3 origin, const vec3 ray, fl
 }
 
 __device__
-RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int id, const unsigned int reflection_number) {
+RGBF trace_specular(const vec3 origin, vec3 ray, const unsigned int id, const unsigned int reflection_number) {
     RGBF result;
     result.r = 0;
     result.g = 0;
@@ -253,7 +256,7 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
             light_ray.y *= goal_dist;
             light_ray.z *= goal_dist;
 
-            RGBF light_color = trace_light(scene.lights[i], scene, curr, light_ray, 1.0f/goal_dist);
+            RGBF light_color = trace_light(scene.lights[i], curr, light_ray, 1.0f/goal_dist);
 
             float angle = 1.0f + light_ray.x * specular_ray.x + light_ray.y * specular_ray.y + light_ray.z * specular_ray.z;
 
@@ -264,18 +267,17 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
             light_sum.b += light_color.b * angle;
         }
 
+        if (reflection_number < device_reflection_depth) {
+            RGBF specular_color = trace_specular(curr, specular_ray, hit_id, reflection_number + 1);
+
+            light_sum.r += (fabsf(specular_color.r) + specular_color.r) * 0.5f * smoothness;
+            light_sum.g += (fabsf(specular_color.g) + specular_color.g) * 0.5f * smoothness;
+            light_sum.b += (fabsf(specular_color.b) + specular_color.b) * 0.5f * smoothness;
+        }
+
         result.r *= light_sum.r;
         result.g *= light_sum.g;
         result.b *= light_sum.b;
-
-
-        if (reflection_number < device_reflection_depth) {
-            RGBF specular_color = trace_specular(scene, curr, specular_ray, hit_id, reflection_number + 1);
-
-            result.r += (fabsf(specular_color.r) + specular_color.r) * 0.5f * smoothness;
-            result.g += (fabsf(specular_color.g) + specular_color.g) * 0.5f * smoothness;
-            result.b += (fabsf(specular_color.b) + specular_color.b) * 0.5f * smoothness;
-        }
     }
 
     return result;
@@ -284,9 +286,11 @@ RGBF trace_specular(Scene scene, const vec3 origin, vec3 ray, const unsigned int
 
 
 __global__
-void trace_rays(RGBF* frame, Scene scene, const unsigned int width, const unsigned int height, const unsigned int reflection_depth) {
+void trace_rays(RGBF* frame, Scene scene_, const unsigned int width, const unsigned int height, const unsigned int reflection_depth) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
     unsigned int amount = width * height;
+
+    scene = scene_;
 
     device_reflection_depth = reflection_depth;
 
@@ -313,7 +317,7 @@ void trace_rays(RGBF* frame, Scene scene, const unsigned int width, const unsign
         ray.y *= ray_length;
         ray.z *= ray_length;
 
-        RGBF result = trace_specular(scene, scene.camera.pos, ray, 0, 0);
+        RGBF result = trace_specular(scene.camera.pos, ray, 0, 0);
 
         frame[id] = result;
 
