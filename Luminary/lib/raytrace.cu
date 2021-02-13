@@ -3,10 +3,12 @@
 #include "image.h"
 #include "raytrace.h"
 #include <cuda_runtime_api.h>
+#include <curand_kernel.h>
 #include <float.h>
+#include <stdio.h>
 
-const int threads_per_block = 64;
-const int blocks_per_grid = 512;
+const int threads_per_block = 256;
+const int blocks_per_grid = 960;
 
 __device__
 const float epsilon = 0.0001f;
@@ -15,11 +17,43 @@ __device__
 int device_reflection_depth;
 
 __device__
-Scene scene;
+Scene device_scene;
+
+__device__
+int device_diffuse_samples;
+
+__device__
+RGBF* device_frame;
+
+__device__
+unsigned int device_width;
+
+__device__
+unsigned int device_height;
+
+__device__
+unsigned int device_amount;
+
+__device__
+float device_step;
+
+__device__
+float device_vfov;
+
+__device__
+float device_offset_x;
+
+__device__
+float device_offset_y;
+
+__device__
+Quaternion device_camera_rotation;
+
+
 
 __device__
 float sphere_dist(Sphere sphere, const vec3 pos) {
-    return sphere.sign * (sqrtf((sphere.pos.x-pos.x)*(sphere.pos.x-pos.x) + (sphere.pos.y-pos.y)*(sphere.pos.y-pos.y) + (sphere.pos.z-pos.z)*(sphere.pos.z-pos.z)) - sphere.radius);
+    return sphere.sign * (__fsqrt_rn((sphere.pos.x-pos.x)*(sphere.pos.x-pos.x) + (sphere.pos.y-pos.y)*(sphere.pos.y-pos.y) + (sphere.pos.z-pos.z)*(sphere.pos.z-pos.z)) - sphere.radius);
 }
 
 __device__
@@ -29,7 +63,7 @@ vec3 sphere_normal(Sphere sphere, const vec3 pos) {
     result.y = pos.y - sphere.pos.y;
     result.z = pos.z - sphere.pos.z;
 
-    float length = rsqrtf(result.x * result.x + result.y * result.y + result.z * result.z) * sphere.sign;
+    float length = __frsqrt_rn(result.x * result.x + result.y * result.y + result.z * result.z) * sphere.sign;
 
     result.x *= length;
     result.y *= length;
@@ -49,7 +83,7 @@ float cuboid_dist(Cuboid cuboid, const vec3 pos) {
     dist_vector.y = (dist_vector.y + fabsf(dist_vector.y)) * 0.5f;
     dist_vector.z = (dist_vector.z + fabsf(dist_vector.z)) * 0.5f;
 
-    return cuboid.sign * sqrtf(dist_vector.x * dist_vector.x + dist_vector.y * dist_vector.y + dist_vector.z * dist_vector.z);
+    return cuboid.sign * __fsqrt_rn(dist_vector.x * dist_vector.x + dist_vector.y * dist_vector.y + dist_vector.z * dist_vector.z);
 }
 
 __device__
@@ -73,7 +107,7 @@ vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
     normal.y = copysignf(abs_norm.y, normal.y);
     normal.z = copysignf(abs_norm.z, normal.z);
 
-    float length = rsqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z) * cuboid.sign;
+    float length = __frsqrt_rn(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z) * cuboid.sign;
 
     normal.x *= length;
     normal.y *= length;
@@ -82,251 +116,265 @@ vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
     return normal;
 }
 
-
 __device__
-RGBF trace_light(Light light, const vec3 origin, const vec3 ray, float goal_dist) {
+RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     RGBF result;
     result.r = 0.0f;
     result.g = 0.0f;
     result.b = 0.0f;
 
-    float depth = 0;
+    float weight = 1.0f;
+    RGBF record;
+    record.r = 1.0f;
+    record.g = 1.0f;
+    record.b = 1.0f;
 
-    for (int i = 0; i < 1000; i++) {
+    RGBF sky;
+    sky.r = 10.0f;
+    sky.g = 10.0f;
+    sky.b = 14.0f;
+
+    for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
+        float depth = 0.0f;
+
+        int hit_id = 0;
+
         vec3 curr;
 
-        curr.x = origin.x + ray.x * depth;
-        curr.y = origin.y + ray.y * depth;
-        curr.z = origin.z + ray.z * depth;
+        float dist = 0.0f;
 
-        float dist = FLT_MAX;
+        for (int i = 0; i < 1000; i++) {
+            curr.x = origin.x + ray.x * depth;
+            curr.y = origin.y + ray.y * depth;
+            curr.z = origin.z + ray.z * depth;
 
-        for (int j = 0; j < scene.spheres_length; j++) {
-            Sphere sphere = scene.spheres[j];
+            dist = FLT_MAX;
 
-            float d = sphere_dist(sphere,curr);
+            for (int j = 0; j < device_scene.spheres_length; j++) {
+                Sphere sphere = device_scene.spheres[j];
 
-            if (d < dist) {
-                dist = d;
+                float d = sphere_dist(sphere,curr);
+
+                if (d < dist) {
+                    dist = d;
+                    hit_id = sphere.id;
+                }
+            }
+
+            for (int j = 0; j < device_scene.cuboids_length; j++) {
+                Cuboid cuboid = device_scene.cuboids[j];
+
+                float d = cuboid_dist(cuboid,curr);
+
+                if (d < dist) {
+                    dist = d;
+                    hit_id = cuboid.id;
+                }
+            }
+
+            if (dist < epsilon) {
+                break;
+            }
+
+            depth += dist;
+
+            if (depth > device_scene.far_clip_distance) {
+                hit_id = 0;
+                break;
             }
         }
 
-        for (int j = 0; j < scene.cuboids_length; j++) {
-            Cuboid cuboid = scene.cuboids[j];
+        if (hit_id == 0) {
+            result.r += sky.r * weight * record.r;
+            result.g += sky.g * weight * record.g;
+            result.b += sky.b * weight * record.b;
 
-            float d = cuboid_dist(cuboid,curr);
+            return result;
+        }
 
-            if (d < dist) {
-                dist = d;
+        RGBF intermediate_result;
+        vec3 normal;
+        float smoothness;
+        RGBF emission;
+        float intensity;
+
+        for (int i = 0; i < device_scene.spheres_length; i++) {
+            if (hit_id == device_scene.spheres[i].id) {
+                intermediate_result = device_scene.spheres[i].color;
+                normal = sphere_normal(device_scene.spheres[i], curr);
+                smoothness = device_scene.spheres[i].smoothness;
+                emission = device_scene.spheres[i].emission;
+                intensity = device_scene.spheres[i].intensity;
+                break;
+            }
+        }
+        for (int i = 0; i < device_scene.cuboids_length; i++) {
+            if (hit_id == device_scene.cuboids[i].id) {
+                intermediate_result = device_scene.cuboids[i].color;
+                normal = cuboid_normal(device_scene.cuboids[i], curr);
+                smoothness = device_scene.cuboids[i].smoothness;
+                emission = device_scene.cuboids[i].emission;
+                intensity = device_scene.cuboids[i].intensity;
+                break;
             }
         }
 
-        if (dist > goal_dist) {
-            result = light.color;
-            break;
-        }
+        result.r += emission.r * intensity * weight * record.r;
+        result.g += emission.g * intensity * weight * record.g;
+        result.b += emission.b * intensity * weight * record.b;
 
-        if (dist < epsilon) {
-            break;
-        }
+        curr.x += normal.x * epsilon * 2.0f;
+        curr.y += normal.y * epsilon * 2.0f;
+        curr.z += normal.z * epsilon * 2.0f;
 
-        goal_dist -= dist;
-        depth += dist;
+        origin.x = curr.x;
+        origin.y = curr.y;
+        origin.z = curr.z;
 
+        float alpha = 1.57079632679f - 3.1415926535f * curand_uniform(random);
+        float beta = 1.57079632679f - 3.1415926535f * curand_uniform(random);
+        float gamma = 1.57079632679f - 3.1415926535f * curand_uniform(random);
+
+        ray.x =
+        __cosf(alpha)*__cosf(beta)*normal.x+
+            (__cosf(alpha)*__sinf(beta)*__sinf(gamma)-__sinf(alpha)*__cosf(gamma))*normal.y+
+            (__cosf(alpha)*__sinf(beta)*__cosf(gamma)+__sinf(alpha)*__sinf(gamma))*normal.z;
+
+        ray.y =
+        __sinf(alpha)*__cosf(beta)*normal.x+
+            (__sinf(alpha)*__sinf(beta)*__sinf(gamma)+__cosf(alpha)*__cosf(gamma))*normal.y+
+            (__sinf(alpha)*__sinf(beta)*__cosf(gamma)-__cosf(alpha)*__sinf(gamma))*normal.z;
+
+        ray.z =
+            -__sinf(beta)*normal.x+
+            __cosf(beta)*__sinf(gamma)*normal.y+
+            __cosf(beta)*__cosf(gamma)*normal.z;
+
+        float angle = normal.x * ray.x + normal.y * ray.y + normal.z * ray.z;
+
+        record.r *= intermediate_result.r;
+        record.g *= intermediate_result.g;
+        record.b *= intermediate_result.b;
+
+        weight *= 0.5f * 0.31830988618f * 0.31830988618f * angle;
     }
 
     return result;
 }
 
 __device__
-RGBF trace_specular(const vec3 origin, vec3 ray, const unsigned int id, const unsigned int reflection_number) {
-    RGBF result;
-    result.r = 0;
-    result.g = 0;
-    result.b = 0;
+vec3 rotate_vector_by_quaternion(vec3 v, Quaternion q) {
+    vec3 result;
 
-    float depth = 0;
+    vec3 u;
+    u.x = q.x;
+    u.y = q.y;
+    u.z = q.z;
 
-    unsigned int hit_id = 0;
+    float s = q.w;
 
-    vec3 curr;
+    float dot_uv = u.x * v.x + u.y * v.y + u.z * v.z;
+    float dot_uu = u.x * u.x + u.y * u.y + u.z * u.z;
 
-    float dist;
+    vec3 cross;
 
-    for (int i = 0; i < 1000; i++) {
-        curr.x = origin.x + ray.x * depth;
-        curr.y = origin.y + ray.y * depth;
-        curr.z = origin.z + ray.z * depth;
+    cross.x = u.y*v.z - u.z*v.y;
+    cross.y = u.z*v.x - u.x*v.z;
+    cross.z = u.x*v.y - u.y*v.x;
 
-        dist = FLT_MAX;
-
-        for (int j = 0; j < scene.spheres_length; j++) {
-            Sphere sphere = scene.spheres[j];
-
-            if (id == sphere.id) continue;
-
-            float d = sphere_dist(sphere,curr);
-
-            if (d < dist) {
-                dist = d;
-                hit_id = sphere.id;
-            }
-        }
-
-        for (int j = 0; j < scene.cuboids_length; j++) {
-            Cuboid cuboid = scene.cuboids[j];
-
-            if (id == cuboid.id) continue;
-
-            float d = cuboid_dist(cuboid,curr);
-
-            if (d < dist) {
-                dist = d;
-                hit_id = cuboid.id;
-            }
-        }
-
-        if (dist < epsilon) {
-            break;
-        }
-
-        depth += dist;
-
-        if (depth > scene.far_clip_distance) {
-            hit_id = 0;
-            break;
-        }
-    }
-
-    if (hit_id != 0) {
-        vec3 normal;
-        float smoothness;
-
-        for (int i = 0; i < scene.spheres_length; i++) {
-            if (hit_id == scene.spheres[i].id) {
-                result = scene.spheres[i].color;
-                normal = sphere_normal(scene.spheres[i], curr);
-                smoothness = scene.spheres[i].smoothness;
-                break;
-            }
-        }
-        for (int i = 0; i < scene.cuboids_length; i++) {
-            if (hit_id == scene.cuboids[i].id) {
-                result = scene.cuboids[i].color;
-                normal = cuboid_normal(scene.cuboids[i], curr);
-                smoothness = scene.cuboids[i].smoothness;
-                break;
-            }
-        }
-
-        RGBF light_sum;
-
-        light_sum.r = 0.0f;
-        light_sum.g = 0.0f;
-        light_sum.b = 0.0f;
-
-        curr.x += normal.x * epsilon * 2;
-        curr.y += normal.y * epsilon * 2;
-        curr.z += normal.z * epsilon * 2;
-
-        vec3 specular_ray;
-
-        float projected_length = ray.x * normal.x + ray.y * normal.y + ray.z * normal.z;
-
-        specular_ray.x = ray.x - 2 * projected_length * normal.x;
-        specular_ray.y = ray.y - 2 * projected_length * normal.y;
-        specular_ray.z = ray.z - 2 * projected_length * normal.z;
-
-        float specular_ray_length = rsqrtf(specular_ray.x * specular_ray.x + specular_ray.y * specular_ray.y + specular_ray.z * specular_ray.z);
-
-        specular_ray.x *= specular_ray_length;
-        specular_ray.y *= specular_ray_length;
-        specular_ray.z *= specular_ray_length;
-
-        for (int i = 0; i < scene.lights_length; i++) {
-            vec3 light_ray;
-
-            light_ray.x = scene.lights[i].pos.x - curr.x;
-            light_ray.y = scene.lights[i].pos.y - curr.y;
-            light_ray.z = scene.lights[i].pos.z - curr.z;
-
-            float goal_dist = rsqrtf(light_ray.x * light_ray.x + light_ray.y * light_ray.y + light_ray.z * light_ray.z);
-
-            light_ray.x *= goal_dist;
-            light_ray.y *= goal_dist;
-            light_ray.z *= goal_dist;
-
-            RGBF light_color = trace_light(scene.lights[i], curr, light_ray, 1.0f/goal_dist);
-
-            float angle = 1.0f + light_ray.x * specular_ray.x + light_ray.y * specular_ray.y + light_ray.z * specular_ray.z;
-
-            angle += powf(angle,smoothness);
-
-            light_sum.r += light_color.r * angle;
-            light_sum.g += light_color.g * angle;
-            light_sum.b += light_color.b * angle;
-        }
-
-        if (reflection_number < device_reflection_depth) {
-            RGBF specular_color = trace_specular(curr, specular_ray, hit_id, reflection_number + 1);
-
-            light_sum.r += (fabsf(specular_color.r) + specular_color.r) * 0.5f * smoothness;
-            light_sum.g += (fabsf(specular_color.g) + specular_color.g) * 0.5f * smoothness;
-            light_sum.b += (fabsf(specular_color.b) + specular_color.b) * 0.5f * smoothness;
-        }
-
-        result.r *= light_sum.r;
-        result.g *= light_sum.g;
-        result.b *= light_sum.b;
-    }
+    result.x = 2.0f * dot_uv * u.x + ((s*s)-dot_uu) * v.x + 2.0f * s * cross.x;
+    result.y = 2.0f * dot_uv * u.y + ((s*s)-dot_uu) * v.y + 2.0f * s * cross.y;
+    result.z = 2.0f * dot_uv * u.z + ((s*s)-dot_uu) * v.z + 2.0f * s * cross.z;
 
     return result;
 }
 
-
-
 __global__
-void trace_rays(RGBF* frame, Scene scene_, const unsigned int width, const unsigned int height, const unsigned int reflection_depth) {
+void trace_rays() {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-    unsigned int amount = width * height;
 
-    scene = scene_;
+    while (id < device_amount) {
+        int x = id % device_width;
+        int y = (id - x) / device_width;
 
-    device_reflection_depth = reflection_depth;
+        curandStateXORWOW_t random;
 
-    float step = 2 * (scene.camera.fov / width);
-
-    float vfov = step * height / 2;
-
-    float offset_x = (step / 2);
-    float offset_y = (step / 2);
-
-    while (id < amount) {
-        int x = id % width;
-        int y = (id - x) / width;
+        curand_init(id, 0, 0, &random);
 
         vec3 ray;
+        vec3 default_ray;
 
-        ray.x = -scene.camera.fov + step * x + offset_x - scene.camera.pos.x;
-        ray.y = -vfov + step * y + offset_y - scene.camera.pos.y;
-        ray.z = -1 - scene.camera.pos.z;
+        RGBF result;
 
-        float ray_length = rsqrtf(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
+        result.r = 0.0f;
+        result.g = 0.0f;
+        result.b = 0.0f;
 
-        ray.x *= ray_length;
-        ray.y *= ray_length;
-        ray.z *= ray_length;
+        for (int i = 0; i < device_diffuse_samples; i++) {
+            default_ray.x = -device_scene.camera.fov + device_step * x + device_offset_x * curand_uniform(&random) * 2.0f;
+            default_ray.y = -device_vfov + device_step * y + device_offset_y * curand_uniform(&random) * 2.0f;
+            default_ray.z = -1.0f;
 
-        RGBF result = trace_specular(scene.camera.pos, ray, 0, 0);
+            ray = rotate_vector_by_quaternion(default_ray, device_camera_rotation);
 
-        frame[id] = result;
+            float ray_length = __frsqrt_rn(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
+
+            ray.x *= ray_length;
+            ray.y *= ray_length;
+            ray.z *= ray_length;
+
+            RGBF color = trace_ray_iterative(device_scene.camera.pos, ray, &random);
+
+            result.r += color.r;
+            result.g += color.g;
+            result.b += color.b;
+        }
+
+        float weight = 1.0f/(float)device_diffuse_samples;
+
+        result.r *= weight;
+        result.g *= weight;
+        result.b *= weight;
+
+        device_frame[id] = result;
 
         id += blockDim.x * gridDim.x;
     }
 }
 
+__global__
+void set_up_raytracing_device() {
+    device_amount = device_width * device_height;
 
-extern "C" raytrace_instance* init_raytracing(const unsigned int width, const unsigned int height, const unsigned int reflection_depth) {
+    device_step = 2.0f * (device_scene.camera.fov / device_width);
+
+    device_vfov = device_step * device_height / 2.0f;
+
+    device_offset_x = (device_step / 2.0f);
+    device_offset_y = (device_step / 2.0f);
+
+    float alpha = device_scene.camera.rotation.x;
+    float beta = device_scene.camera.rotation.y;
+    float gamma = device_scene.camera.rotation.z;
+
+    double cy = __cosf(gamma * 0.5);
+    double sy = __sinf(gamma * 0.5);
+    double cp = __cosf(beta * 0.5);
+    double sp = __sinf(beta * 0.5);
+    double cr = __cosf(alpha * 0.5);
+    double sr = __sinf(alpha * 0.5);
+
+    Quaternion q;
+    q.w = cr * cp * cy + sr * sp * sy;
+    q.x = sr * cp * cy - cr * sp * sy;
+    q.y = cr * sp * cy + sr * cp * sy;
+    q.z = cr * cp * sy - sr * sp * cy;
+
+    device_camera_rotation = q;
+}
+
+
+extern "C" raytrace_instance* init_raytracing(const unsigned int width, const unsigned int height, const int reflection_depth, const int diffuse_samples) {
     raytrace_instance* instance = (raytrace_instance*)malloc(sizeof(raytrace_instance));
 
     instance->width = width;
@@ -336,6 +384,7 @@ extern "C" raytrace_instance* init_raytracing(const unsigned int width, const un
     cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height);
 
     instance->reflection_depth = reflection_depth;
+    instance->diffuse_samples = diffuse_samples;
 
     return instance;
 }
@@ -351,9 +400,24 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     cudaMemcpy(scene_gpu.cuboids, scene.cuboids, sizeof(Cuboid) * scene.cuboids_length, cudaMemcpyHostToDevice);
     cudaMemcpy(scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice);
 
-    trace_rays<<<blocks_per_grid,threads_per_block>>>(instance->frame_buffer_gpu,scene_gpu,instance->width,instance->height, instance->reflection_depth);
+    cudaMemcpyToSymbol(device_frame, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(device_scene, &scene_gpu, sizeof(Scene), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(device_reflection_depth, &(instance->reflection_depth), sizeof(int), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(device_diffuse_samples, &(instance->diffuse_samples), sizeof(int), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
+    cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
+
+    set_up_raytracing_device<<<1,1>>>();
+
+    cudaDeviceSynchronize();
+
+    trace_rays<<<blocks_per_grid,threads_per_block>>>();
+
+    cudaDeviceSynchronize();
 
     cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost);
+
+    puts(cudaGetErrorString(cudaGetLastError()));
 
     cudaFree(scene_gpu.spheres);
     cudaFree(scene_gpu.cuboids);

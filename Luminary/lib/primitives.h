@@ -9,6 +9,13 @@ struct vec3 {
   float z;
 } typedef vec3;
 
+struct Quaternion {
+  float w;
+  float x;
+  float y;
+  float z;
+} typedef Quaternion;
+
 /*
  * IDs unique identify each object
  * 0 is reserved
@@ -20,6 +27,8 @@ struct Sphere {
   float radius;
   float sign;
   RGBF color;
+  RGBF emission;
+  float intensity;
   float smoothness;
 } typedef Sphere;
 
@@ -29,6 +38,8 @@ struct Cuboid {
   vec3 size;
   float sign;
   RGBF color;
+  RGBF emission;
+  float intensity;
   float smoothness;
 } typedef Cuboid;
 

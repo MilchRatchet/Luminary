@@ -5,7 +5,7 @@
 
 struct Camera {
   vec3 pos;
-  vec3 dir;
+  vec3 rotation;
   float fov;  // As the ratio of grid width / 2 to grid distance from camera
 } typedef Camera;
 
