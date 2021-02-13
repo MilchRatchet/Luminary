@@ -1,19 +1,21 @@
 # Luminary
 
-Luminary is a CUDA based Raytracing renderer for Signed Distance Fields.
+Luminary is a CUDA based Pathtracing renderer for Signed Distance Fields.
 
 ## Status
 
-A sample containing multiple reflective spheres and multiple point lights with specular reflections is currently implemented which is rendered and saved as a `png` file.
+A sample scene containing spheres and cuboids is rendered with simple fully diffuse monte carlo method. Result is stored as a `png`.
 
-## Goal
+## ToDo
 
-- Implementing filters for the `png` routines.
-- Implementing primite shapes.
-- Implementing some Anti-Aliasing method.
-- Implementing some Depth of Field method.
-- Implementing custom scene description file format.
-- Implementing some motion properties that change the scene between each frame.
+- Implement better distribution function for monte carlo method.
+- Implement post processing routines (AA, DoF, Bloom).
+- Implement filters for the `png` routine.
+- Implement custom scene description file format.
+- Implement some motion properties that change the scene between each frame.
+- Implement refraction. (Maybe)
+- Implement volumetric lighting. (Maybe)
+
 
 The licence for this code can be found in the `LICENCE` file.
 The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.
