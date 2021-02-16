@@ -23,6 +23,7 @@ Scene example_scene1() {
   spheres[0].emission.b = 0.0f;
   spheres[0].intensity  = 0.0f;
   spheres[0].smoothness = 1.0f;
+  spheres[0].metallic   = 1.0f;
 
   spheres[1].id         = 2;
   spheres[1].pos.x      = 4.0f;
@@ -38,6 +39,7 @@ Scene example_scene1() {
   spheres[1].emission.b = 0.0f;
   spheres[1].intensity  = 0.0f;
   spheres[1].smoothness = 1.0f;
+  spheres[1].metallic   = 1.0f;
 
   spheres[2].id         = 3;
   spheres[2].pos.x      = 8.0f;
@@ -53,6 +55,7 @@ Scene example_scene1() {
   spheres[2].emission.b = 0.0f;
   spheres[2].intensity  = 0.0f;
   spheres[2].smoothness = 1.0f;
+  spheres[2].metallic   = 1.0f;
 
   spheres[3].id         = 4;
   spheres[3].pos.x      = 12.0f;
@@ -68,6 +71,7 @@ Scene example_scene1() {
   spheres[3].emission.b = 0.0f;
   spheres[3].intensity  = 0.0f;
   spheres[3].smoothness = 1.0f;
+  spheres[3].metallic   = 1.0f;
 
   spheres[4].id         = 5;
   spheres[4].pos.x      = 1.0f;
@@ -83,6 +87,7 @@ Scene example_scene1() {
   spheres[4].emission.b = 0.0f;
   spheres[4].intensity  = 0.0f;
   spheres[4].smoothness = 1.0f;
+  spheres[4].metallic   = 1.0f;
 
   spheres[5].id         = 6;
   spheres[5].pos.x      = 6.0f;
@@ -98,6 +103,7 @@ Scene example_scene1() {
   spheres[5].emission.b = 0.0f;
   spheres[5].intensity  = 0.0f;
   spheres[5].smoothness = 1.0f;
+  spheres[5].metallic   = 1.0f;
 
   spheres[6].id         = 7;
   spheres[6].pos.x      = 0.0f;
@@ -113,6 +119,7 @@ Scene example_scene1() {
   spheres[6].emission.b = 0.1f;
   spheres[6].intensity  = 0.0f;
   spheres[6].smoothness = 1.0f;
+  spheres[6].metallic   = 1.0f;
 
   spheres[7].id         = 8;
   spheres[7].pos.x      = 6.0f;
@@ -128,6 +135,7 @@ Scene example_scene1() {
   spheres[7].emission.b = 0.0f;
   spheres[7].intensity  = 0.0f;
   spheres[7].smoothness = 1.0f;
+  spheres[7].metallic   = 1.0f;
 
   spheres[8].id         = 9;
   spheres[8].pos.x      = 12.0f;
@@ -143,6 +151,7 @@ Scene example_scene1() {
   spheres[8].emission.b = 0.0f;
   spheres[8].intensity  = 0.0f;
   spheres[8].smoothness = 0.05f;
+  spheres[8].metallic   = 1.0f;
 
   spheres[9].id         = 10;
   spheres[9].pos.x      = 12.0f;
@@ -158,6 +167,7 @@ Scene example_scene1() {
   spheres[9].emission.b = 0.9f;
   spheres[9].intensity  = 2.0f;
   spheres[9].smoothness = 0.0f;
+  spheres[9].metallic   = 1.0f;
 
   Cuboid* cuboids = (Cuboid*) malloc(sizeof(Cuboid) * 6);
 
@@ -176,7 +186,8 @@ Scene example_scene1() {
   cuboids[0].emission.g = 0.0f;
   cuboids[0].emission.b = 0.0f;
   cuboids[0].intensity  = 0.0f;
-  cuboids[0].smoothness = 0.1f;
+  cuboids[0].smoothness = 0.05f;
+  cuboids[0].metallic   = 1.0f;
 
   cuboids[1].id         = 102;
   cuboids[1].pos.x      = 14.0f;
@@ -194,6 +205,7 @@ Scene example_scene1() {
   cuboids[1].emission.b = 0.0f;
   cuboids[1].intensity  = 0.0f;
   cuboids[1].smoothness = 0.05f;
+  cuboids[1].metallic   = 1.0f;
 
   cuboids[2].id         = 103;
   cuboids[2].pos.x      = 0.0f;
@@ -211,6 +223,7 @@ Scene example_scene1() {
   cuboids[2].emission.b = 0.0f;
   cuboids[2].intensity  = 0.0f;
   cuboids[2].smoothness = 0.05f;
+  cuboids[2].metallic   = 1.0f;
 
   cuboids[3].id         = 104;
   cuboids[3].pos.x      = 0.0f;
@@ -228,6 +241,7 @@ Scene example_scene1() {
   cuboids[3].emission.b = 0.0f;
   cuboids[3].intensity  = 0.0f;
   cuboids[3].smoothness = 0.05f;
+  cuboids[3].metallic   = 1.0f;
 
   cuboids[4].id         = 105;
   cuboids[4].pos.x      = 14.0f;
@@ -245,6 +259,7 @@ Scene example_scene1() {
   cuboids[4].emission.b = 0.0f;
   cuboids[4].intensity  = 0.0f;
   cuboids[4].smoothness = 0.05f;
+  cuboids[4].metallic   = 1.0f;
 
   cuboids[5].id         = 106;
   cuboids[5].pos.x      = 0.0f;
@@ -262,6 +277,7 @@ Scene example_scene1() {
   cuboids[5].emission.b = 0.0f;
   cuboids[5].intensity  = 0.0f;
   cuboids[5].smoothness = 0.05f;
+  cuboids[5].metallic   = 1.0f;
 
   Scene scene = {
     .camera            = camera,
@@ -296,6 +312,7 @@ Scene example_scene2() {
   spheres[0].emission.b = 0.0f;
   spheres[0].intensity  = 0.0f;
   spheres[0].smoothness = 1.0f;
+  spheres[0].metallic   = 1.0f;
 
   spheres[1].id         = 2;
   spheres[1].pos.x      = -3.0f;
@@ -311,6 +328,7 @@ Scene example_scene2() {
   spheres[1].emission.b = 0.0f;
   spheres[1].intensity  = 0.0f;
   spheres[1].smoothness = 0.75f;
+  spheres[1].metallic   = 1.0f;
 
   spheres[2].id         = 3;
   spheres[2].pos.x      = 0.0f;
@@ -326,6 +344,7 @@ Scene example_scene2() {
   spheres[2].emission.b = 0.0f;
   spheres[2].intensity  = 0.0f;
   spheres[2].smoothness = 0.5f;
+  spheres[2].metallic   = 1.0f;
 
   spheres[3].id         = 4;
   spheres[3].pos.x      = 3.0f;
@@ -341,6 +360,7 @@ Scene example_scene2() {
   spheres[3].emission.b = 0.0f;
   spheres[3].intensity  = 0.0f;
   spheres[3].smoothness = 0.25f;
+  spheres[3].metallic   = 1.0f;
 
   spheres[4].id         = 5;
   spheres[4].pos.x      = 6.0f;
@@ -356,6 +376,7 @@ Scene example_scene2() {
   spheres[4].emission.b = 0.0f;
   spheres[4].intensity  = 0.0f;
   spheres[4].smoothness = 0.0f;
+  spheres[4].metallic   = 1.0f;
 
   spheres[5].id         = 6;
   spheres[5].pos.x      = 0.0f;
@@ -371,6 +392,7 @@ Scene example_scene2() {
   spheres[5].emission.b = 0.0f;
   spheres[5].intensity  = 0.0f;
   spheres[5].smoothness = 1.0f;
+  spheres[5].metallic   = 1.0f;
 
   Cuboid* cuboids = (Cuboid*) malloc(sizeof(Cuboid) * 7);
 
@@ -390,6 +412,7 @@ Scene example_scene2() {
   cuboids[0].emission.b = 0.0f;
   cuboids[0].intensity  = 0.0f;
   cuboids[0].smoothness = 0.1f;
+  cuboids[0].metallic   = 1.0f;
 
   cuboids[1].id         = 102;
   cuboids[1].pos.x      = 9.0f;
@@ -407,6 +430,7 @@ Scene example_scene2() {
   cuboids[1].emission.b = 0.0f;
   cuboids[1].intensity  = 0.0f;
   cuboids[1].smoothness = 0.05f;
+  cuboids[1].metallic   = 1.0f;
 
   cuboids[2].id         = 103;
   cuboids[2].pos.x      = -9.0f;
@@ -424,6 +448,7 @@ Scene example_scene2() {
   cuboids[2].emission.b = 0.0f;
   cuboids[2].intensity  = 0.0f;
   cuboids[2].smoothness = 0.05f;
+  cuboids[2].metallic   = 1.0f;
 
   cuboids[3].id         = 104;
   cuboids[3].pos.x      = 0.0f;
@@ -441,6 +466,7 @@ Scene example_scene2() {
   cuboids[3].emission.b = 0.0f;
   cuboids[3].intensity  = 0.0f;
   cuboids[3].smoothness = 0.05f;
+  cuboids[3].metallic   = 1.0f;
 
   cuboids[4].id         = 105;
   cuboids[4].pos.x      = 0.0f;
@@ -458,6 +484,7 @@ Scene example_scene2() {
   cuboids[4].emission.b = 0.0f;
   cuboids[4].intensity  = 0.0f;
   cuboids[4].smoothness = 0.05f;
+  cuboids[4].metallic   = 1.0f;
 
   cuboids[5].id         = 106;
   cuboids[5].pos.x      = 0.0f;
@@ -475,6 +502,7 @@ Scene example_scene2() {
   cuboids[5].emission.b = 1.0f;
   cuboids[5].intensity  = 1.0f;
   cuboids[5].smoothness = 0.05f;
+  cuboids[5].metallic   = 1.0f;
 
   cuboids[6].id         = 107;
   cuboids[6].pos.x      = 0.0f;
@@ -492,6 +520,7 @@ Scene example_scene2() {
   cuboids[6].emission.b = 0.0f;
   cuboids[6].intensity  = 0.0f;
   cuboids[6].smoothness = 0.05f;
+  cuboids[6].metallic   = 1.0f;
 
   Scene scene = {
     .camera            = camera,

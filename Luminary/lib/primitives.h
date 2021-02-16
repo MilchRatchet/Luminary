@@ -30,6 +30,7 @@ struct Sphere {
   RGBF emission;
   float intensity;
   float smoothness;
+  float metallic;
 } typedef Sphere;
 
 struct Cuboid {
@@ -41,6 +42,7 @@ struct Cuboid {
   RGBF emission;
   float intensity;
   float smoothness;
+  float metallic;
 } typedef Cuboid;
 
 #endif /* PRIMITIVES_H */

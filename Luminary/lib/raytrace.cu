@@ -306,31 +306,34 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         curr.y = origin.y + ray.y * depth;
         curr.z = origin.z + ray.z * depth;
 
-        RGBF intermediate_result;
+        RGBF albedo;
         vec3 normal;
         float smoothness;
         RGBF emission;
         float intensity;
+        float metallic;
 
         for (int i = 0; i < device_scene.spheres_length; i++) {
             if (hit_id == device_scene.spheres[i].id) {
                 const Sphere sphere = device_scene.spheres[i];
-                intermediate_result = sphere.color;
+                albedo = sphere.color;
                 normal = sphere_normal(sphere, curr);
                 smoothness = sphere.smoothness;
                 emission = sphere.emission;
                 intensity = sphere.intensity;
+                metallic = sphere.metallic;
                 break;
             }
         }
         for (int i = 0; i < device_scene.cuboids_length; i++) {
             if (hit_id == device_scene.cuboids[i].id) {
                 const Cuboid cuboid = device_scene.cuboids[i];
-                intermediate_result = cuboid.color;
+                albedo = cuboid.color;
                 normal = cuboid_normal(cuboid, curr);
                 smoothness = cuboid.smoothness;
                 emission = cuboid.emission;
                 intensity = cuboid.intensity;
+                metallic = cuboid.metallic;
                 break;
             }
         }
@@ -338,10 +341,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         result.r += emission.r * intensity * weight * record.r;
         result.g += emission.g * intensity * weight * record.g;
         result.b += emission.b * intensity * weight * record.b;
-
-        record.r *= intermediate_result.r;
-        record.g *= intermediate_result.g;
-        record.b *= intermediate_result.b;
 
         curr.x += normal.x * epsilon * 2.0f;
         curr.y += normal.y * epsilon * 2.0f;
@@ -367,6 +366,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         const float specular = curand_uniform(&device_random);
 
         if (specular < smoothness) {
+            record.r *= (albedo.r * metallic + 1.0f - metallic);
+            record.g *= (albedo.g * metallic + 1.0f - metallic);
+            record.b *= (albedo.b * metallic + 1.0f - metallic);
+
             const float n = 100.0f * smoothness / (1.0f + epsilon - smoothness);
 
             const float alpha = acosf(__powf(curand_uniform(random),(1.0f/(1.0f+n))));
@@ -378,6 +381,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         }
         else
         {
+            record.r *= albedo.r;
+            record.g *= albedo.g;
+            record.b *= albedo.b;
+
             const float alpha = acosf(__fsqrt_rn(curand_uniform(random)));
             const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
