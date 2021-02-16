@@ -16,12 +16,12 @@ int main() {
 
   clock_t time = clock();
 
-  Scene scene = example_scene1();
+  Scene scene = example_scene2();
 
   const int width  = 3840;
   const int height = 2160;
 
-  raytrace_instance* instance = init_raytracing(width, height, 50, 10);
+  raytrace_instance* instance = init_raytracing(width, height, 5, 10000);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

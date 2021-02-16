@@ -16,8 +16,6 @@ struct Scene {
   unsigned int spheres_length;
   Cuboid* cuboids;
   unsigned int cuboids_length;
-  Light* lights;
-  unsigned int lights_length;
 } typedef Scene;
 
 #endif /* SCENE_H */

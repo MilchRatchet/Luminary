@@ -11,7 +11,7 @@ const int threads_per_block = 256;
 const int blocks_per_grid = 960;
 
 __device__
-const float epsilon = 0.0001f;
+const float epsilon = 0.001f;
 
 __device__
 int device_reflection_depth;
@@ -49,11 +49,20 @@ float device_offset_y;
 __device__
 Quaternion device_camera_rotation;
 
+__device__
+curandStateXORWOW_t device_random;
+
 
 
 __device__
 float sphere_dist(Sphere sphere, const vec3 pos) {
-    return sphere.sign * (__fsqrt_rn((sphere.pos.x-pos.x)*(sphere.pos.x-pos.x) + (sphere.pos.y-pos.y)*(sphere.pos.y-pos.y) + (sphere.pos.z-pos.z)*(sphere.pos.z-pos.z)) - sphere.radius);
+    vec3 diff;
+
+    diff.x = sphere.pos.x-pos.x;
+    diff.y = sphere.pos.y-pos.y;
+    diff.z = sphere.pos.z-pos.z;
+
+    return sphere.sign * (norm3df(diff.x, diff.y, diff.z) - sphere.radius);
 }
 
 __device__
@@ -63,7 +72,7 @@ vec3 sphere_normal(Sphere sphere, const vec3 pos) {
     result.y = pos.y - sphere.pos.y;
     result.z = pos.z - sphere.pos.z;
 
-    float length = __frsqrt_rn(result.x * result.x + result.y * result.y + result.z * result.z) * sphere.sign;
+    const float length = __frsqrt_rn(result.x * result.x + result.y * result.y + result.z * result.z) * sphere.sign;
 
     result.x *= length;
     result.y *= length;
@@ -73,17 +82,35 @@ vec3 sphere_normal(Sphere sphere, const vec3 pos) {
 }
 
 __device__
+float sphere_intersect(Sphere sphere, vec3 origin, vec3 ray) {
+    const float p = 2.0f * ((origin.x - sphere.pos.x) * ray.x + (origin.y - sphere.pos.y) * ray.y + (origin.z - sphere.pos.z) * ray.z);
+    const float q =
+        origin.x * origin.x + origin.y * origin.y + origin.z * origin.z +
+        sphere.pos.x * sphere.pos.x + sphere.pos.y * sphere.pos.y + sphere.pos.z * sphere.pos.z -
+        2.0f * (origin.x * sphere.pos.x + origin.y * sphere.pos.y + origin.z * sphere.pos.z) -
+        sphere.radius * sphere.radius;
+
+    const float a = -p * 0.5f;
+    const float b = sqrtf((0.25f * p * p) - q);
+
+    if (isnan(b)) {
+        return FLT_MAX;
+    }
+
+    const float result = a - b;
+
+    return (result < 0.0f) ? FLT_MAX : result;
+}
+
+__device__
 float cuboid_dist(Cuboid cuboid, const vec3 pos) {
     vec3 dist_vector;
 
-    dist_vector.x = fabsf(cuboid.pos.x - pos.x) - cuboid.size.x;
-    dist_vector.y = fabsf(cuboid.pos.y - pos.y) - cuboid.size.y;
-    dist_vector.z = fabsf(cuboid.pos.z - pos.z) - cuboid.size.z;
-    dist_vector.x = (dist_vector.x + fabsf(dist_vector.x)) * 0.5f;
-    dist_vector.y = (dist_vector.y + fabsf(dist_vector.y)) * 0.5f;
-    dist_vector.z = (dist_vector.z + fabsf(dist_vector.z)) * 0.5f;
+    dist_vector.x = fmaxf(fabsf(cuboid.pos.x - pos.x) - cuboid.size.x, 0.0f);
+    dist_vector.y = fmaxf(fabsf(cuboid.pos.y - pos.y) - cuboid.size.y, 0.0f);
+    dist_vector.z = fmaxf(fabsf(cuboid.pos.z - pos.z) - cuboid.size.z, 0.0f);
 
-    return cuboid.sign * __fsqrt_rn(dist_vector.x * dist_vector.x + dist_vector.y * dist_vector.y + dist_vector.z * dist_vector.z);
+    return cuboid.sign * norm3df(dist_vector.x, dist_vector.y, dist_vector.z);
 }
 
 __device__
@@ -95,13 +122,9 @@ vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
     normal.y = pos.y - cuboid.pos.y;
     normal.z = pos.z - cuboid.pos.z;
 
-    abs_norm.x = epsilon + fabsf(normal.x) - cuboid.size.x;
-    abs_norm.y = epsilon + fabsf(normal.y) - cuboid.size.y;
-    abs_norm.z = epsilon + fabsf(normal.z) - cuboid.size.z;
-
-    abs_norm.x = (abs_norm.x + fabsf(abs_norm.x)) * 0.5f;
-    abs_norm.y = (abs_norm.y + fabsf(abs_norm.y)) * 0.5f;
-    abs_norm.z = (abs_norm.z + fabsf(abs_norm.z)) * 0.5f;
+    abs_norm.x = fmaxf(epsilon + fabsf(normal.x) - cuboid.size.x, 0.0f);
+    abs_norm.y = fmaxf(epsilon + fabsf(normal.y) - cuboid.size.y, 0.0f);
+    abs_norm.z = fmaxf(epsilon + fabsf(normal.z) - cuboid.size.z, 0.0f);
 
     normal.x = copysignf(abs_norm.x, normal.x);
     normal.y = copysignf(abs_norm.y, normal.y);
@@ -116,6 +139,118 @@ vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
     return normal;
 }
 
+/*
+ * Based on:
+ * A. Majercik, C. Crassin, P. Shirley, M. McGuire,
+ * "A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering",
+ * Journal of Computer Graphics Techniques, 7(3), pp. 66-82, 2018
+ *
+ * This implementation is probably not quite sufficient
+ *
+ * Assumes that origin is not inside a box
+ */
+__device__
+float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
+    origin.x -= cuboid.pos.x;
+    origin.y -= cuboid.pos.y;
+    origin.z -= cuboid.pos.z;
+
+    vec3 d;
+
+    vec3 sign;
+
+    sign.x = copysignf(1.0f, -ray.x);
+    sign.y = copysignf(1.0f, -ray.y);
+    sign.z = copysignf(1.0f, -ray.z);
+
+    d.x = cuboid.size.x * sign.x - origin.x;
+    d.y = cuboid.size.y * sign.y - origin.y;
+    d.z = cuboid.size.z * sign.z - origin.z;
+
+    d.x /= ray.x;
+    d.y /= ray.y;
+    d.z /= ray.z;
+
+    const bool test_x = (d.x >= 0.0f) && (fabsf(origin.y + ray.y * d.x) < cuboid.size.y) && (fabsf(origin.z + ray.z * d.x) < cuboid.size.z);
+    const bool test_y = (d.y >= 0.0f) && (fabsf(origin.x + ray.x * d.y) < cuboid.size.x) && (fabsf(origin.z + ray.z * d.y) < cuboid.size.z);
+    const bool test_z = (d.z >= 0.0f) && (fabsf(origin.x + ray.x * d.z) < cuboid.size.x) && (fabsf(origin.y + ray.y * d.z) < cuboid.size.y);
+
+    vec3 sgn;
+
+    sgn.x = 0.0f;
+    sgn.y = 0.0f;
+    sgn.z = 0.0f;
+
+    if (test_x) {
+        sgn.x = sign.x;
+    }
+    else if (test_y) {
+        sgn.y = sign.y;
+    }
+    else if (test_z) {
+        sgn.z = sign.z;
+    }
+
+    if (sgn.x != 0.0f) {
+        return d.x;
+    }
+    else if (sgn.y != 0.0f) {
+        return d.y;
+    }
+    else if (sgn.z != 0.0f) {
+        return d.z;
+    }
+    else {
+        return FLT_MAX;
+    }
+}
+
+/*
+ * Based on
+ * J. Frisvad,
+ * "Building an Orthonormal Basis from a 3D Unit Vector Without Normalization",
+ * Journal of Graphics Tools, 16(3), pp. 151-159, 2012
+ */
+__device__
+vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const vec3 basis) {
+    vec3 u1, u2;
+    if (basis.z < -0.9999999f) {
+        u1.x = 0.0f;
+        u1.y = -1.0f;
+        u1.z = 0.0f;
+        u2.x = -1.0f;
+        u2.y = 0.0f;
+        u2.z = 0.0f;
+    }
+    else
+    {
+        const float a = 1.0f/(1.0f+basis.z);
+        const float b = -basis.x*basis.y*a;
+        u1.x = 1.0f - basis.x*basis.x*a;
+        u1.y = b;
+        u1.z = -basis.x;
+        u2.x = b;
+        u2.y = 1.0f-basis.y*basis.y*a;
+        u2.z = -basis.y;
+    }
+
+
+    const float c1 = sinf(theta) * cosf(phi);
+    const float c2 = sinf(theta) * sinf(phi);
+    const float c3 = cosf(theta);
+
+    vec3 result;
+
+    result.x = c1 * u1.x + c2 * u2.x + c3 * basis.x;
+    result.y = c1 * u1.y + c2 * u2.y + c3 * basis.y;
+    result.z = c1 * u1.z + c2 * u2.z + c3 * basis.z;
+
+    return result;
+}
+
+/*
+ * Uses some self modified Blinn-Phong BRDF.
+ */
 __device__
 RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     RGBF result;
@@ -130,57 +265,32 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     record.b = 1.0f;
 
     RGBF sky;
-    sky.r = 10.0f;
-    sky.g = 10.0f;
-    sky.b = 14.0f;
+    sky.r = 0.0f;
+    sky.g = 0.0f;
+    sky.b = 0.0f;
 
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
-        float depth = 0.0f;
+        float depth = FLT_MAX;
 
         int hit_id = 0;
 
         vec3 curr;
 
-        float dist = 0.0f;
+        for (int j = 0; j < device_scene.spheres_length; j++) {
+            const float d = sphere_intersect(device_scene.spheres[j], origin, ray);
 
-        for (int i = 0; i < 1000; i++) {
-            curr.x = origin.x + ray.x * depth;
-            curr.y = origin.y + ray.y * depth;
-            curr.z = origin.z + ray.z * depth;
-
-            dist = FLT_MAX;
-
-            for (int j = 0; j < device_scene.spheres_length; j++) {
-                Sphere sphere = device_scene.spheres[j];
-
-                float d = sphere_dist(sphere,curr);
-
-                if (d < dist) {
-                    dist = d;
-                    hit_id = sphere.id;
-                }
+            if (d < depth) {
+                depth = d;
+                hit_id = device_scene.spheres[j].id;
             }
+        }
 
-            for (int j = 0; j < device_scene.cuboids_length; j++) {
-                Cuboid cuboid = device_scene.cuboids[j];
+        for (int j = 0; j < device_scene.cuboids_length; j++) {
+            const float d = cuboid_intersect(device_scene.cuboids[j], origin, ray);
 
-                float d = cuboid_dist(cuboid,curr);
-
-                if (d < dist) {
-                    dist = d;
-                    hit_id = cuboid.id;
-                }
-            }
-
-            if (dist < epsilon) {
-                break;
-            }
-
-            depth += dist;
-
-            if (depth > device_scene.far_clip_distance) {
-                hit_id = 0;
-                break;
+            if (d < depth) {
+                depth = d;
+                hit_id = device_scene.cuboids[j].id;
             }
         }
 
@@ -192,6 +302,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             return result;
         }
 
+        curr.x = origin.x + ray.x * depth;
+        curr.y = origin.y + ray.y * depth;
+        curr.z = origin.z + ray.z * depth;
+
         RGBF intermediate_result;
         vec3 normal;
         float smoothness;
@@ -200,21 +314,23 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
         for (int i = 0; i < device_scene.spheres_length; i++) {
             if (hit_id == device_scene.spheres[i].id) {
-                intermediate_result = device_scene.spheres[i].color;
-                normal = sphere_normal(device_scene.spheres[i], curr);
-                smoothness = device_scene.spheres[i].smoothness;
-                emission = device_scene.spheres[i].emission;
-                intensity = device_scene.spheres[i].intensity;
+                const Sphere sphere = device_scene.spheres[i];
+                intermediate_result = sphere.color;
+                normal = sphere_normal(sphere, curr);
+                smoothness = sphere.smoothness;
+                emission = sphere.emission;
+                intensity = sphere.intensity;
                 break;
             }
         }
         for (int i = 0; i < device_scene.cuboids_length; i++) {
             if (hit_id == device_scene.cuboids[i].id) {
-                intermediate_result = device_scene.cuboids[i].color;
-                normal = cuboid_normal(device_scene.cuboids[i], curr);
-                smoothness = device_scene.cuboids[i].smoothness;
-                emission = device_scene.cuboids[i].emission;
-                intensity = device_scene.cuboids[i].intensity;
+                const Cuboid cuboid = device_scene.cuboids[i];
+                intermediate_result = cuboid.color;
+                normal = cuboid_normal(cuboid, curr);
+                smoothness = cuboid.smoothness;
+                emission = cuboid.emission;
+                intensity = cuboid.intensity;
                 break;
             }
         }
@@ -222,6 +338,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         result.r += emission.r * intensity * weight * record.r;
         result.g += emission.g * intensity * weight * record.g;
         result.b += emission.b * intensity * weight * record.b;
+
+        record.r *= intermediate_result.r;
+        record.g *= intermediate_result.g;
+        record.b *= intermediate_result.b;
 
         curr.x += normal.x * epsilon * 2.0f;
         curr.y += normal.y * epsilon * 2.0f;
@@ -231,32 +351,46 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         origin.y = curr.y;
         origin.z = curr.z;
 
-        float alpha = 1.57079632679f - 3.1415926535f * curand_uniform(random);
-        float beta = 1.57079632679f - 3.1415926535f * curand_uniform(random);
-        float gamma = 1.57079632679f - 3.1415926535f * curand_uniform(random);
+        vec3 specular_ray;
+        const float projected_length = ray.x * normal.x + ray.y * normal.y + ray.z * normal.z;
 
-        ray.x =
-        __cosf(alpha)*__cosf(beta)*normal.x+
-            (__cosf(alpha)*__sinf(beta)*__sinf(gamma)-__sinf(alpha)*__cosf(gamma))*normal.y+
-            (__cosf(alpha)*__sinf(beta)*__cosf(gamma)+__sinf(alpha)*__sinf(gamma))*normal.z;
+        specular_ray.x = ray.x - 2.0f * projected_length * normal.x;
+        specular_ray.y = ray.y - 2.0f * projected_length * normal.y;
+        specular_ray.z = ray.z - 2.0f * projected_length * normal.z;
 
-        ray.y =
-        __sinf(alpha)*__cosf(beta)*normal.x+
-            (__sinf(alpha)*__sinf(beta)*__sinf(gamma)+__cosf(alpha)*__cosf(gamma))*normal.y+
-            (__sinf(alpha)*__sinf(beta)*__cosf(gamma)-__cosf(alpha)*__sinf(gamma))*normal.z;
+        const float specular_ray_length = rsqrtf(specular_ray.x * specular_ray.x + specular_ray.y * specular_ray.y + specular_ray.z * specular_ray.z);
 
-        ray.z =
-            -__sinf(beta)*normal.x+
-            __cosf(beta)*__sinf(gamma)*normal.y+
-            __cosf(beta)*__cosf(gamma)*normal.z;
+        specular_ray.x *= specular_ray_length;
+        specular_ray.y *= specular_ray_length;
+        specular_ray.z *= specular_ray_length;
 
-        float angle = normal.x * ray.x + normal.y * ray.y + normal.z * ray.z;
+        const float specular = curand_uniform(&device_random);
 
-        record.r *= intermediate_result.r;
-        record.g *= intermediate_result.g;
-        record.b *= intermediate_result.b;
+        if (specular < smoothness) {
+            const float n = 100.0f * smoothness / (1.0f + epsilon - smoothness);
 
-        weight *= 0.5f * 0.31830988618f * 0.31830988618f * angle;
+            const float alpha = acosf(__powf(curand_uniform(random),(1.0f/(1.0f+n))));
+            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+
+            ray = sample_ray_from_angles_and_vector(alpha, gamma, specular_ray);
+
+            weight *= 2.0f * 3.1415926535f;
+        }
+        else
+        {
+            const float alpha = acosf(__fsqrt_rn(curand_uniform(random)));
+            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+
+            ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
+
+            const float angle = normal.x * ray.x + normal.y * ray.y + normal.z * ray.z;
+
+            weight *= 3.1415926535f / (angle + epsilon);
+        }
+
+        const float angle = specular_ray.x * ray.x + specular_ray.y * ray.y + specular_ray.z * ray.z;
+
+        weight *= ((1.0f - smoothness) * 0.31830988618f) + (smoothness * 0.5f * 0.31830988618f);
     }
 
     return result;
@@ -371,6 +505,8 @@ void set_up_raytracing_device() {
     q.z = cr * cp * sy - sr * sp * cy;
 
     device_camera_rotation = q;
+
+    curand_init(0,0,0,&device_random);
 }
 
 
@@ -394,11 +530,9 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
 
     cudaMalloc((void**) &(scene_gpu.spheres), sizeof(Sphere) * scene_gpu.spheres_length);
     cudaMalloc((void**) &(scene_gpu.cuboids), sizeof(Cuboid) * scene_gpu.cuboids_length);
-    cudaMalloc((void**) &(scene_gpu.lights), sizeof(Light) * scene_gpu.lights_length);
 
     cudaMemcpy(scene_gpu.spheres, scene.spheres, sizeof(Sphere) * scene.spheres_length, cudaMemcpyHostToDevice);
     cudaMemcpy(scene_gpu.cuboids, scene.cuboids, sizeof(Cuboid) * scene.cuboids_length, cudaMemcpyHostToDevice);
-    cudaMemcpy(scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice);
 
     cudaMemcpyToSymbol(device_frame, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice);
     cudaMemcpyToSymbol(device_scene, &scene_gpu, sizeof(Scene), 0, cudaMemcpyHostToDevice);
@@ -421,7 +555,6 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
 
     cudaFree(scene_gpu.spheres);
     cudaFree(scene_gpu.cuboids);
-    cudaFree(scene_gpu.lights);
 }
 
 extern "C" void frame_buffer_to_image(Camera camera, raytrace_instance* instance, RGB8* image) {
@@ -430,9 +563,9 @@ extern "C" void frame_buffer_to_image(Camera camera, raytrace_instance* instance
             RGB8 pixel;
             RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
 
-            pixel.r = (pixel_float.r > 1.0f) ? 255 : ((pixel_float.r < 0.0f) ? 0 : (int)(pixel_float.r * 255));
-            pixel.g = (pixel_float.g > 1.0f) ? 255 : ((pixel_float.g < 0.0f) ? 0 : (int)(pixel_float.g * 255));
-            pixel.b = (pixel_float.b > 1.0f) ? 255 : ((pixel_float.b < 0.0f) ? 0 : (int)(pixel_float.b * 255));
+            pixel.r = (uint8_t)(min(255.9f, pixel_float.r * 255.9f));
+            pixel.g = (uint8_t)(min(255.9f, pixel_float.g * 255.9f));
+            pixel.b = (uint8_t)(min(255.9f, pixel_float.b * 255.9f));
 
 
             image[i + instance->width * j] = pixel;

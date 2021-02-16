@@ -43,11 +43,4 @@ struct Cuboid {
   float smoothness;
 } typedef Cuboid;
 
-struct Light {
-  unsigned int id;
-  vec3 pos;
-  float intensity;
-  RGBF color;
-} typedef Light;
-
 #endif /* PRIMITIVES_H */
