@@ -9,6 +9,8 @@
 #include "lib/device.h"
 #include "lib/scene.h"
 #include "lib/raytrace.h"
+#include "lib/mesh.h"
+#include "lib/wavefront.h"
 #include "examples.h"
 
 int main() {
@@ -16,12 +18,24 @@ int main() {
 
   clock_t time = clock();
 
+  Mesh* meshes;
+
+  int meshes_length = read_mesh_from_file("test_mesh.obj", &meshes);
+
+  for (int i = 0; i < meshes_length; i++) {
+    printf("Mesh %d\n", i);
+    printf("  Vertices %d\n", meshes[i].vertices_length);
+    printf("  UVs %d\n", meshes[i].uvs_length);
+    printf("  Normals %d\n", meshes[i].normals_length);
+    printf("  Triangles %d\n", meshes[i].triangles_length);
+  }
+
   Scene scene = example_scene2();
 
-  const int width  = 3840;
-  const int height = 2160;
+  const int width  = 640;
+  const int height = 480;
 
-  raytrace_instance* instance = init_raytracing(width, height, 5, 10000);
+  raytrace_instance* instance = init_raytracing(width, height, 5, 1);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

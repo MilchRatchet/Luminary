@@ -15,7 +15,7 @@ static unsigned int read_vertices(FILE* file, Vertex** vertices, char* line) {
   while (line[0] == 'v' && line[1] == ' ') {
     Vertex v;
 
-    sscanf(line, "%*c %f %f %f", v.x, v.y, v.z);
+    sscanf(line, "%*c %f %f %f\n", &v.x, &v.y, &v.z);
 
     (*vertices)[ptr++] = v;
 
@@ -27,7 +27,7 @@ static unsigned int read_vertices(FILE* file, Vertex** vertices, char* line) {
     fgets(line, LINE_SIZE, file);
 
     if (feof(file))
-      return 1;
+      break;
   }
 
   length = ptr;
@@ -37,52 +37,68 @@ static unsigned int read_vertices(FILE* file, Vertex** vertices, char* line) {
   return length;
 }
 
-static int read_uv(FILE* file, UV** uvs, char* line, unsigned int length) {
+static unsigned int read_uv(FILE* file, UV** uvs, char* line) {
+  unsigned int length = 1024;
+
   *uvs = (UV*) malloc(sizeof(UV) * length);
 
   unsigned int ptr = 0;
 
   while (line[0] == 'v' && line[1] == 't') {
-    if (ptr == length)
-      return 1;
-
     UV uv;
 
-    sscanf(line, "%*c %f %f", uv.u, uv.v);
+    sscanf(line, "%*2c %f %f", &uv.u, &uv.v);
 
     (*uvs)[ptr++] = uv;
+
+    if (ptr == length) {
+      length *= 2;
+      *uvs = (UV*) realloc(*uvs, sizeof(UV) * length);
+    }
 
     fgets(line, LINE_SIZE, file);
 
     if (feof(file))
-      return 1;
+      break;
   }
 
-  return 0;
+  length = ptr;
+
+  *uvs = (UV*) realloc(*uvs, sizeof(UV) * length);
+
+  return length;
 }
 
-static int read_normal(FILE* file, Normal** normals, char* line, unsigned int length) {
+static unsigned int read_normal(FILE* file, Normal** normals, char* line) {
+  unsigned int length = 1024;
+
   *normals = (Normal*) malloc(sizeof(Normal) * length);
 
   unsigned int ptr = 0;
 
   while (line[0] == 'v' && line[1] == 'n') {
-    if (ptr == length)
-      return 1;
-
     Normal normal;
 
-    sscanf(line, "%*c %f %f %f", normal.x, normal.y, normal.z);
+    sscanf(line, "%*2c %f %f %f", &normal.x, &normal.y, &normal.z);
 
     (*normals)[ptr++] = normal;
+
+    if (ptr == length) {
+      length *= 2;
+      *normals = (Normal*) realloc(*normals, sizeof(Normal) * length);
+    }
 
     fgets(line, LINE_SIZE, file);
 
     if (feof(file))
-      return 1;
+      break;
   }
 
-  return 0;
+  length = ptr;
+
+  *normals = (Normal*) realloc(*normals, sizeof(Normal) * length);
+
+  return length;
 }
 
 static unsigned int read_triangles(FILE* file, Triangle** triangles, char* line) {
@@ -94,35 +110,34 @@ static unsigned int read_triangles(FILE* file, Triangle** triangles, char* line)
 
   __m256i addend = _mm256_set1_epi32(1);
 
-  while (line[0] == 'v' && line[1] == 'n') {
-    if (ptr == length)
-      return 1;
+  while (line[0] == 'f' || line[0] == 's') {
+    // ignore smoothing groups
+    if (line[0] != 's') {
+      Triangle face;
 
-    Triangle face;
+      sscanf(
+        line, "%*c %lu/%lu/%lu %lu/%lu/%lu %lu/%lu/%lu", &face.v1, &face.vt1, &face.vn1, &face.v2,
+        &face.vt2, &face.vn2, &face.v3, &face.vt3, &face.vn3);
 
-    sscanf(
-      line, "%*c %lu/%lu/%lu %lu/%lu/%lu %lu/%lu/%lu", face.v1, face.vt1, face.vn1, face.v2,
-      face.vt2, face.vn2, face.v3, face.vt3, face.vn3);
+      (*triangles)[ptr].vn3 = face.vn3 - 1;
 
-    (*triangles)[ptr].vn3 = face.vn3 - 1;
+      __m256i entries = _mm256_loadu_si256(&face);
 
-    __m256i entries = _mm256_loadu_si256(&face);
+      entries = _mm256_sub_epi32(entries, addend);
 
-    entries = _mm256_sub_epi32(entries, addend);
+      _mm256_storeu_si256(&((*triangles)[ptr]), entries);
 
-    _mm256_storeu_si256(&((*triangles)[ptr]), entries);
+      ptr++;
 
-    ptr++;
-
-    if (ptr == length) {
-      length *= 2;
-      *triangles = (Triangle*) realloc(*triangles, sizeof(Triangle) * length);
+      if (ptr == length) {
+        length *= 2;
+        *triangles = (Triangle*) realloc(*triangles, sizeof(Triangle) * length);
+      }
     }
-
     fgets(line, LINE_SIZE, file);
 
     if (feof(file))
-      return -1;
+      break;
   }
 
   length = ptr;
@@ -145,17 +160,11 @@ static int read_mesh(FILE* file, Mesh* mesh, char* line) {
   mesh->vertices        = vertices;
 
   UV* uvs;
-  if (read_uv(file, &uvs, line, mesh->vertices_length))
-    return 1;
-
-  mesh->uvs_length = mesh->vertices_length;
+  mesh->uvs_length = read_uv(file, &uvs, line);
   mesh->uvs        = uvs;
 
   Normal* normals;
-  if (read_uv(file, &normals, line, mesh->vertices_length))
-    return 1;
-
-  mesh->normals_length = mesh->vertices_length;
+  mesh->normals_length = read_normal(file, &normals, line);
   mesh->normals        = normals;
 
   while (line[0] != 'f') {
@@ -173,10 +182,10 @@ static int read_mesh(FILE* file, Mesh* mesh, char* line) {
 }
 
 int read_mesh_from_file(char* name, Mesh** meshes) {
-  FILE* file = fopen(name, 'r');
+  FILE* file = fopen(name, "r");
 
   if (!file) {
-    return 1;
+    return -1;
   }
 
   int mesh_count = 8;
@@ -187,17 +196,20 @@ int read_mesh_from_file(char* name, Mesh** meshes) {
 
   char* line = (char*) malloc(LINE_SIZE);
 
+  line[LINE_SIZE - 1] = '\0';
+
   fgets(line, LINE_SIZE, file);
+
   while (!feof(file)) {
     if (line[0] == 'o') {
-      if (!read_mesh(file, (*meshes) + mesh_ptr, line)) {
+      if (read_mesh(file, (*meshes) + mesh_ptr, line)) {
         free(*meshes);
-        return 1;
+        return -1;
       }
       mesh_ptr++;
       if (mesh_ptr == mesh_count) {
         mesh_count *= 2;
-        *meshes = (Triangle*) realloc(*meshes, sizeof(Triangle) * mesh_count);
+        *meshes = (Mesh*) realloc(*meshes, sizeof(Mesh) * mesh_count);
       }
     }
     else {
@@ -207,7 +219,9 @@ int read_mesh_from_file(char* name, Mesh** meshes) {
 
   mesh_count = mesh_ptr;
 
-  *meshes = (Triangle*) realloc(*meshes, sizeof(Triangle) * mesh_count);
+  *meshes = (Mesh*) realloc(*meshes, sizeof(Mesh) * mesh_count);
 
-  return 0;
+  free(line);
+
+  return mesh_count;
 }

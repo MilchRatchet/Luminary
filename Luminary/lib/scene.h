@@ -2,6 +2,7 @@
 #define SCENE_H
 
 #include "primitives.h"
+#include "mesh.h"
 
 struct Camera {
   vec3 pos;
@@ -16,6 +17,8 @@ struct Scene {
   unsigned int spheres_length;
   Cuboid* cuboids;
   unsigned int cuboids_length;
+  Mesh* meshes;
+  unsigned int meshes_length;
 } typedef Scene;
 
 #endif /* SCENE_H */
