@@ -18,7 +18,7 @@ int main() {
 
   clock_t time = clock();
 
-  Mesh* meshes;
+  Wavefront_Mesh* meshes;
 
   int meshes_length = read_mesh_from_file("test_mesh.obj", &meshes);
 
@@ -29,6 +29,12 @@ int main() {
     printf("  Normals %d\n", meshes[i].normals_length);
     printf("  Triangles %d\n", meshes[i].triangles_length);
   }
+
+  Triangle* triangles;
+
+  unsigned int triangle_count = convert_wavefront_mesh(&triangles, meshes, meshes_length);
+
+  printf("Total Triangles: %lu\n", triangle_count);
 
   Scene scene = example_scene2();
 
