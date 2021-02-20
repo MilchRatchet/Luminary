@@ -20,7 +20,7 @@ int main() {
 
   Wavefront_Mesh* meshes;
 
-  int meshes_length = read_mesh_from_file("test_mesh.obj", &meshes);
+  int meshes_length = read_mesh_from_file("test_mesh.obj", &meshes, 0);
 
   for (int i = 0; i < meshes_length; i++) {
     printf("Mesh %d\n", i);

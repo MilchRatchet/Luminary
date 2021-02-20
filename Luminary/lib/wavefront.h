@@ -43,7 +43,7 @@ struct Wavefront_Mesh {
   unsigned int triangles_length;
 } typedef Wavefront_Mesh;
 
-int read_mesh_from_file(char* name, Wavefront_Mesh** meshes);
-unsigned int convert_wavefront_mesh(Triangle** triangles, Wavefront_Mesh* meshes, int length);
+int read_mesh_from_file(const char* name, Wavefront_Mesh** meshes, const int previous_length);
+unsigned int convert_wavefront_mesh(Triangle** triangles, Wavefront_Mesh* meshes, const int length);
 
 #endif /* WAVEFRONT_H */

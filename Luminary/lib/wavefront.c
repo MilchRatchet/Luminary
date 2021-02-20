@@ -181,18 +181,23 @@ static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line) {
   return 0;
 }
 
-int read_mesh_from_file(char* name, Wavefront_Mesh** meshes) {
+int read_mesh_from_file(const char* name, Wavefront_Mesh** meshes, const int previous_length) {
   FILE* file = fopen(name, "r");
 
   if (!file) {
     return -1;
   }
 
-  int mesh_count = 8;
+  int mesh_count = 8 + previous_length;
 
-  *meshes = (Wavefront_Mesh*) malloc(sizeof(Wavefront_Mesh) * mesh_count);
+  if (previous_length) {
+    *meshes = (Wavefront_Mesh*) realloc(*meshes, sizeof(Wavefront_Mesh) * mesh_count);
+  }
+  else {
+    *meshes = (Wavefront_Mesh*) malloc(sizeof(Wavefront_Mesh) * mesh_count);
+  }
 
-  int mesh_ptr = 0;
+  int mesh_ptr = previous_length;
 
   char* line = (char*) malloc(LINE_SIZE);
 
@@ -226,7 +231,8 @@ int read_mesh_from_file(char* name, Wavefront_Mesh** meshes) {
   return mesh_count;
 }
 
-unsigned int convert_wavefront_mesh(Triangle** triangles, Wavefront_Mesh* meshes, int length) {
+unsigned int convert_wavefront_mesh(
+  Triangle** triangles, Wavefront_Mesh* meshes, const int length) {
   unsigned int count = 0;
   for (int i = 0; i < length; i++) {
     count += meshes[i].triangles_length;
