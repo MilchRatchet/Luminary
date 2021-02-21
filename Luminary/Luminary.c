@@ -34,14 +34,29 @@ int main() {
 
   unsigned int triangle_count = convert_wavefront_mesh(&triangles, meshes, meshes_length);
 
-  printf("Total Triangles: %lu\n", triangle_count);
+  printf("Total Triangles: %u\n", triangle_count);
 
-  Scene scene = example_scene2();
+  Scene scene;
 
-  const int width  = 640;
-  const int height = 480;
+  scene.camera.fov   = 1.0f;
+  scene.camera.pos.x = 5.0f;
+  scene.camera.pos.y = 2.0f;
+  scene.camera.pos.z = -7.0f;
 
-  raytrace_instance* instance = init_raytracing(width, height, 5, 1);
+  scene.camera.rotation.x = -0.3f;
+  scene.camera.rotation.y = 2.5f;
+  scene.camera.rotation.z = 0.0f;
+
+  scene.spheres_length = 0;
+  scene.cuboids_length = 0;
+
+  scene.triangles        = triangles;
+  scene.triangles_length = triangle_count;
+
+  const int width  = 1920;
+  const int height = 1080;
+
+  raytrace_instance* instance = init_raytracing(width, height, 2, 5);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

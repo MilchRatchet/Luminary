@@ -3,7 +3,6 @@
 #include "image.h"
 #include "raytrace.h"
 #include "mesh.h"
-#include "cudaLinAlg.cuh"
 #include <cuda_runtime_api.h>
 #include <curand_kernel.h>
 #include <float.h>
@@ -53,6 +52,77 @@ Quaternion device_camera_rotation;
 
 __device__
 curandStateXORWOW_t device_random;
+
+__device__
+vec3 cross_product(const vec3 a, const vec3 b) {
+    vec3 result;
+
+    result.x = a.y*b.z - a.z*b.y;
+    result.y = a.z*b.x - a.x*b.z;
+    result.z = a.x*b.y - a.y*b.x;
+
+    return result;
+}
+
+__device__
+float dot_product(const vec3 a, const vec3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+__device__
+vec3 vec_diff(const vec3 a, const vec3 b) {
+    vec3 result;
+
+    result.x = a.x - b.x;
+    result.y = a.y - b.y;
+    result.z = a.z - b.z;
+
+    return result;
+}
+
+__device__
+vec3 get_coordinates_in_triangle(const Triangle triangle, const vec3 point) {
+    const vec3 e1 = vec_diff(triangle.v2, triangle.v1);
+    const vec3 e2 = vec_diff(triangle.v3, triangle.v1);
+    const vec3 diff = vec_diff(point, triangle.v1);
+    const float d00 = dot_product(e1,e1);
+    const float d01 = dot_product(e1,e2);
+    const float d11 = dot_product(e2,e2);
+    const float d20 = dot_product(diff,e1);
+    const float d21 = dot_product(diff,e2);
+    const float denom = 1.0f / (d00 * d11 - d01 * d01);
+    vec3 result;
+    result.x = (d11 * d20 - d01 * d21) * denom;
+    result.y = (d00 * d21 - d01 * d20) * denom;
+    return result;
+}
+
+__device__
+vec3 slerp_normals(const Triangle triangle, const float lambda, const float mu) {
+    vec3 result;
+
+    float omega = acosf(dot_product(triangle.vn1, triangle.vn2));
+
+    float inv_omega = 1.0f / sinf(omega);
+    float factor_1 = sinf((1.0f - lambda) * omega) * inv_omega;
+    float factor_2 = sinf(lambda * omega) * inv_omega;
+
+    result.x = factor_1 * triangle.vn1.x + factor_2 * triangle.vn2.x;
+    result.y = factor_1 * triangle.vn1.y + factor_2 * triangle.vn2.y;
+    result.z = factor_1 * triangle.vn1.z + factor_2 * triangle.vn2.z;
+
+    omega = acosf(dot_product(triangle.vn1, triangle.vn3));
+
+    inv_omega = 1.0f / sinf(omega);
+    factor_1 = sinf((1.0f - mu) * omega) * inv_omega;
+    factor_2 = sinf(mu * omega) * inv_omega;
+
+    result.x = factor_1 * result.x + factor_2 * triangle.vn2.x;
+    result.y = factor_1 * result.y + factor_2 * triangle.vn2.y;
+    result.z = factor_1 * result.z + factor_2 * triangle.vn2.z;
+
+    return result;
+}
 
 __device__
 float sphere_dist(Sphere sphere, const vec3 pos) {
@@ -215,7 +285,7 @@ float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
  * This suggests storing vertex1, edge1 and edge2 in triangle instead of the three vertices
  */
 __device__
-float triangle_intersection(Triangle triangle, const vec3 origin, const vec3 ray) {
+float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
     const vec3 e1 = vec_diff(triangle.v2, triangle.v1);
     const vec3 e2 = vec_diff(triangle.v3, triangle.v1);
 
@@ -226,7 +296,7 @@ float triangle_intersection(Triangle triangle, const vec3 origin, const vec3 ray
 
     const float f = 1.0f / a;
     const vec3 s = vec_diff(origin, triangle.v1);
-    const float u = f * dot_product(ray, h);
+    const float u = f * dot_product(s, h);
 
     if (u < 0.0f || u > 1.0f) return FLT_MAX;
 
@@ -235,7 +305,13 @@ float triangle_intersection(Triangle triangle, const vec3 origin, const vec3 ray
 
     if (v < 0.0f || u + v > 1.0f) return FLT_MAX;
 
-    return f * dot_product(e2, q);
+    const float t = f * dot_product(e2, q);
+
+    if (t > epsilon) {
+        return t;
+    } else {
+        return FLT_MAX;
+    }
 }
 
 /*
@@ -298,39 +374,37 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     record.b = 1.0f;
 
     RGBF sky;
-    sky.r = 0.0f;
-    sky.g = 0.0f;
-    sky.b = 0.0f;
+    sky.r = 10.0f;
+    sky.g = 10.0f;
+    sky.b = 10.0f;
 
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
-        float depth = FLT_MAX;
+        float depth = 1000.0f;
 
-        int hit_id = 0;
+        unsigned int hit_id = 0xffffffff;
 
         vec3 curr;
 
-        for (int j = 0; j < device_scene.spheres_length; j++) {
-            const float d = sphere_intersect(device_scene.spheres[j], origin, ray);
+        for (unsigned int i = 0; i < device_scene.triangles_length; i++) {
+            const float d = triangle_intersection(device_scene.triangles[i], origin, ray);
 
             if (d < depth) {
                 depth = d;
-                hit_id = device_scene.spheres[j].id;
+                hit_id = i;
             }
         }
 
-        for (int j = 0; j < device_scene.cuboids_length; j++) {
-            const float d = cuboid_intersect(device_scene.cuboids[j], origin, ray);
-
-            if (d < depth) {
-                depth = d;
-                hit_id = device_scene.cuboids[j].id;
-            }
-        }
-
-        if (hit_id == 0) {
+        if (hit_id == 0xffffffff) {
             result.r += sky.r * weight * record.r;
             result.g += sky.g * weight * record.g;
             result.b += sky.b * weight * record.b;
+
+            return result;
+        }
+        else {
+            result.r = 0.05f * depth;
+            result.g = 0.05f * depth;
+            result.b = 0.05f * depth;
 
             return result;
         }
@@ -339,37 +413,37 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         curr.y = origin.y + ray.y * depth;
         curr.z = origin.z + ray.z * depth;
 
-        RGBF albedo;
-        vec3 normal;
-        float smoothness;
-        RGBF emission;
-        float intensity;
-        float metallic;
+        Triangle hit_triangle = device_scene.triangles[hit_id];
 
-        for (int i = 0; i < device_scene.spheres_length; i++) {
-            if (hit_id == device_scene.spheres[i].id) {
-                const Sphere sphere = device_scene.spheres[i];
-                albedo = sphere.color;
-                normal = sphere_normal(sphere, curr);
-                smoothness = sphere.smoothness;
-                emission = sphere.emission;
-                intensity = sphere.intensity;
-                metallic = sphere.metallic;
-                break;
-            }
-        }
-        for (int i = 0; i < device_scene.cuboids_length; i++) {
-            if (hit_id == device_scene.cuboids[i].id) {
-                const Cuboid cuboid = device_scene.cuboids[i];
-                albedo = cuboid.color;
-                normal = cuboid_normal(cuboid, curr);
-                smoothness = cuboid.smoothness;
-                emission = cuboid.emission;
-                intensity = cuboid.intensity;
-                metallic = cuboid.metallic;
-                break;
-            }
-        }
+        RGBF albedo;
+        albedo.r = 1.0f;
+        albedo.g = 0.0f;
+        albedo.b = 0.0f;
+        vec3 normal;
+        normal.x = 1.0f;
+        normal.y = 1.0f;
+        normal.z = 1.0f;
+        const float smoothness = 1.0f;
+        RGBF emission;
+        emission.r = 1.0f;
+        emission.g = 0.0f;
+        emission.b = 0.0f;
+        const float intensity = 0.0f;
+        const float metallic = 1.0f;
+
+        normal = get_coordinates_in_triangle(hit_triangle, curr);
+
+        const float lambda = normal.x;
+        const float mu = normal.y;
+
+        normal = slerp_normals(hit_triangle, lambda, mu);
+
+        result.r = 0.5f * normal.x + 0.5f;
+        result.g = 0.5f * normal.y + 0.5f;
+        result.b = 0.5f * normal.z + 0.5f;
+
+
+        return result;
 
         result.r += emission.r * intensity * weight * record.r;
         result.g += emission.g * intensity * weight * record.g;
@@ -486,7 +560,7 @@ void trace_rays() {
 
         for (int i = 0; i < device_diffuse_samples; i++) {
             default_ray.x = -device_scene.camera.fov + device_step * x + device_offset_x * curand_uniform(&random) * 2.0f;
-            default_ray.y = -device_vfov + device_step * y + device_offset_y * curand_uniform(&random) * 2.0f;
+            default_ray.y = device_vfov - device_step * y - device_offset_y * curand_uniform(&random) * 2.0f;
             default_ray.z = -1.0f;
 
             ray = rotate_vector_by_quaternion(default_ray, device_camera_rotation);
@@ -569,25 +643,44 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     Scene scene_gpu = scene;
 
     cudaMalloc((void**) &(scene_gpu.spheres), sizeof(Sphere) * scene_gpu.spheres_length);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMalloc((void**) &(scene_gpu.cuboids), sizeof(Cuboid) * scene_gpu.cuboids_length);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMalloc((void**) &(scene_gpu.triangles), sizeof(Triangle) * scene_gpu.triangles_length);
+    puts(cudaGetErrorString(cudaGetLastError()));
 
     cudaMemcpy(scene_gpu.spheres, scene.spheres, sizeof(Sphere) * scene.spheres_length, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpy(scene_gpu.cuboids, scene.cuboids, sizeof(Cuboid) * scene.cuboids_length, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpy(scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
 
     cudaMemcpyToSymbol(device_frame, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_scene, &scene_gpu, sizeof(Scene), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_reflection_depth, &(instance->reflection_depth), sizeof(int), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_diffuse_samples, &(instance->diffuse_samples), sizeof(int), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
+
+    puts(cudaGetErrorString(cudaGetLastError()));
 
     set_up_raytracing_device<<<1,1>>>();
 
     cudaDeviceSynchronize();
 
+    puts(cudaGetErrorString(cudaGetLastError()));
+
     trace_rays<<<blocks_per_grid,threads_per_block>>>();
 
     cudaDeviceSynchronize();
+
+    puts(cudaGetErrorString(cudaGetLastError()));
 
     cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost);
 
