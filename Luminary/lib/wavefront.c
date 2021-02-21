@@ -2,181 +2,107 @@
 #include <immintrin.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <math.h>
 
 #define LINE_SIZE 4096
 
-static unsigned int read_vertices(FILE* file, Wavefront_Vertex** vertices, char* line) {
-  unsigned int length = 1024;
+static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line) {
+  fgets(line, LINE_SIZE, file);
+  if (feof(file))
+    return -1;
 
-  *vertices = (Wavefront_Vertex*) malloc(sizeof(Wavefront_Vertex) * length);
+  mesh->vertices_length = 1024;
+  mesh->vertices = (Wavefront_Vertex*) malloc(sizeof(Wavefront_Vertex) * mesh->vertices_length);
+  unsigned int vertex_ptr = 0;
 
-  unsigned int ptr = 0;
+  mesh->uvs_length    = 1024;
+  mesh->uvs           = (Wavefront_UV*) malloc(sizeof(Wavefront_UV) * mesh->uvs_length);
+  unsigned int uv_ptr = 0;
 
-  while (line[0] == 'v' && line[1] == ' ') {
-    Wavefront_Vertex v;
+  mesh->normals_length = 1024;
+  mesh->normals = (Wavefront_Normal*) malloc(sizeof(Wavefront_Normal) * mesh->normals_length);
+  unsigned int normal_ptr = 0;
 
-    sscanf(line, "%*c %f %f %f\n", &v.x, &v.y, &v.z);
+  mesh->triangles_length = 1024;
+  mesh->triangles =
+    (Wavefront_Triangle*) malloc(sizeof(Wavefront_Triangle) * mesh->triangles_length);
+  unsigned int triangle_ptr = 0;
 
-    (*vertices)[ptr++] = v;
+  while (line[0] != 'o') {
+    if (line[0] == 'v' && line[1] == ' ') {
+      Wavefront_Vertex v;
 
-    if (ptr == length) {
-      length *= 2;
-      *vertices = (Wavefront_Vertex*) realloc(*vertices, sizeof(Wavefront_Vertex) * length);
+      sscanf(line, "%*c %f %f %f\n", &v.x, &v.y, &v.z);
+
+      mesh->vertices[vertex_ptr++] = v;
+
+      if (vertex_ptr == mesh->vertices_length) {
+        mesh->vertices_length *= 2;
+        mesh->vertices = (Wavefront_Vertex*) realloc(
+          mesh->vertices, sizeof(Wavefront_Vertex) * mesh->vertices_length);
+      }
     }
+    else if (line[0] == 'v' && line[1] == 't') {
+      Wavefront_UV uv;
 
-    fgets(line, LINE_SIZE, file);
+      sscanf(line, "%*2c %f %f", &uv.u, &uv.v);
 
-    if (feof(file))
-      break;
-  }
+      mesh->uvs[uv_ptr++] = uv;
 
-  length = ptr;
-
-  *vertices = (Wavefront_Vertex*) realloc(*vertices, sizeof(Wavefront_Vertex) * length);
-
-  return length;
-}
-
-static unsigned int read_uv(FILE* file, Wavefront_UV** uvs, char* line) {
-  unsigned int length = 1024;
-
-  *uvs = (Wavefront_UV*) malloc(sizeof(Wavefront_UV) * length);
-
-  unsigned int ptr = 0;
-
-  while (line[0] == 'v' && line[1] == 't') {
-    Wavefront_UV uv;
-
-    sscanf(line, "%*2c %f %f", &uv.u, &uv.v);
-
-    (*uvs)[ptr++] = uv;
-
-    if (ptr == length) {
-      length *= 2;
-      *uvs = (Wavefront_UV*) realloc(*uvs, sizeof(Wavefront_UV) * length);
+      if (uv_ptr == mesh->uvs_length) {
+        mesh->uvs_length *= 2;
+        mesh->uvs = (Wavefront_UV*) realloc(mesh->uvs, sizeof(Wavefront_UV) * mesh->uvs_length);
+      }
     }
+    else if (line[0] == 'v' && line[1] == 'n') {
+      Wavefront_Normal normal;
 
-    fgets(line, LINE_SIZE, file);
+      sscanf(line, "%*2c %f %f %f", &normal.x, &normal.y, &normal.z);
 
-    if (feof(file))
-      break;
-  }
+      mesh->normals[normal_ptr++] = normal;
 
-  length = ptr;
-
-  *uvs = (Wavefront_UV*) realloc(*uvs, sizeof(Wavefront_UV) * length);
-
-  return length;
-}
-
-static unsigned int read_normal(FILE* file, Wavefront_Normal** normals, char* line) {
-  unsigned int length = 1024;
-
-  *normals = (Wavefront_Normal*) malloc(sizeof(Wavefront_Normal) * length);
-
-  unsigned int ptr = 0;
-
-  while (line[0] == 'v' && line[1] == 'n') {
-    Wavefront_Normal normal;
-
-    sscanf(line, "%*2c %f %f %f", &normal.x, &normal.y, &normal.z);
-
-    (*normals)[ptr++] = normal;
-
-    if (ptr == length) {
-      length *= 2;
-      *normals = (Wavefront_Normal*) realloc(*normals, sizeof(Wavefront_Normal) * length);
+      if (normal_ptr == mesh->normals_length) {
+        mesh->normals_length *= 2;
+        mesh->normals = (Wavefront_Normal*) realloc(
+          mesh->normals, sizeof(Wavefront_Normal) * mesh->normals_length);
+      }
     }
-
-    fgets(line, LINE_SIZE, file);
-
-    if (feof(file))
-      break;
-  }
-
-  length = ptr;
-
-  *normals = (Wavefront_Normal*) realloc(*normals, sizeof(Wavefront_Normal) * length);
-
-  return length;
-}
-
-static unsigned int read_triangles(FILE* file, Wavefront_Triangle** triangles, char* line) {
-  unsigned int length = 1024;
-
-  *triangles = (Wavefront_Triangle*) malloc(sizeof(Wavefront_Triangle) * length);
-
-  unsigned int ptr = 0;
-
-  __m256i addend = _mm256_set1_epi32(1);
-
-  while (line[0] == 'f' || line[0] == 's') {
-    // ignore smoothing groups
-    if (line[0] != 's') {
+    else if (line[0] == 'f') {
       Wavefront_Triangle face;
 
       sscanf(
-        line, "%*c %lu/%lu/%lu %lu/%lu/%lu %lu/%lu/%lu", &face.v1, &face.vt1, &face.vn1, &face.v2,
-        &face.vt2, &face.vn2, &face.v3, &face.vt3, &face.vn3);
+        line, "%*c %u/%u/%u %u/%u/%u %u/%u/%u", &face.v1, &face.vt1, &face.vn1, &face.v2, &face.vt2,
+        &face.vn2, &face.v3, &face.vt3, &face.vn3);
 
-      (*triangles)[ptr].vn3 = face.vn3 - 1;
+      mesh->triangles[triangle_ptr++] = face;
 
-      __m256i entries = _mm256_loadu_si256(&face);
-
-      entries = _mm256_sub_epi32(entries, addend);
-
-      _mm256_storeu_si256(&((*triangles)[ptr]), entries);
-
-      ptr++;
-
-      if (ptr == length) {
-        length *= 2;
-        *triangles = (Wavefront_Triangle*) realloc(*triangles, sizeof(Wavefront_Triangle) * length);
+      if (triangle_ptr == mesh->triangles_length) {
+        mesh->triangles_length *= 2;
+        mesh->triangles = (Wavefront_Triangle*) realloc(
+          mesh->triangles, sizeof(Wavefront_Triangle) * mesh->triangles_length);
       }
     }
+
     fgets(line, LINE_SIZE, file);
 
     if (feof(file))
       break;
   }
 
-  length = ptr;
+  mesh->vertices_length = vertex_ptr;
+  mesh->vertices =
+    (Wavefront_Vertex*) realloc(mesh->vertices, sizeof(Wavefront_Vertex) * mesh->vertices_length);
 
-  *triangles = (Wavefront_Triangle*) realloc(*triangles, sizeof(Wavefront_Triangle) * length);
+  mesh->uvs_length = uv_ptr;
+  mesh->uvs        = (Wavefront_UV*) realloc(mesh->uvs, sizeof(Wavefront_UV) * mesh->uvs_length);
 
-  return length;
-}
+  mesh->normals_length = normal_ptr;
+  mesh->normals =
+    (Wavefront_Normal*) realloc(mesh->normals, sizeof(Wavefront_Normal) * mesh->normals_length);
 
-static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line) {
-  while (line[0] != 'v') {
-    fgets(line, LINE_SIZE, file);
-    if (feof(file) || line[0] == 'o') {
-      return 1;
-    }
-  }
-
-  Wavefront_Vertex* vertices;
-  mesh->vertices_length = read_vertices(file, &vertices, line);
-  mesh->vertices        = vertices;
-
-  Wavefront_UV* uvs;
-  mesh->uvs_length = read_uv(file, &uvs, line);
-  mesh->uvs        = uvs;
-
-  Wavefront_Normal* normals;
-  mesh->normals_length = read_normal(file, &normals, line);
-  mesh->normals        = normals;
-
-  while (line[0] != 'f') {
-    fgets(line, LINE_SIZE, file);
-    if (feof(file) || line[0] == 'o') {
-      return 1;
-    }
-  }
-
-  Wavefront_Triangle* triangles;
-  mesh->triangles_length = read_triangles(file, &triangles, line);
-  mesh->triangles        = triangles;
+  mesh->triangles_length = triangle_ptr;
+  mesh->triangles        = (Wavefront_Triangle*) realloc(
+    mesh->triangles, sizeof(Wavefront_Triangle) * mesh->triangles_length);
 
   return 0;
 }
@@ -240,65 +166,78 @@ unsigned int convert_wavefront_mesh(
   *triangles       = (Triangle*) malloc(sizeof(Triangle) * count);
   unsigned int ptr = 0;
 
+  int vertex_offset = 0;
+  int uv_offset     = 0;
+  int normal_offset = 0;
+
   for (int i = 0; i < length; i++) {
     Wavefront_Mesh mesh = meshes[i];
     for (int j = 0; j < mesh.triangles_length; j++) {
       Wavefront_Triangle t = mesh.triangles[j];
       Triangle triangle;
 
-      Wavefront_Vertex v = mesh.vertices[t.v1 % mesh.vertices_length];
+      Wavefront_Vertex v = mesh.vertices[t.v1 - 1 - vertex_offset];
 
       triangle.v1.x = v.x;
       triangle.v1.y = v.y;
       triangle.v1.z = v.z;
 
-      v = mesh.vertices[t.v2 % mesh.vertices_length];
+      v = mesh.vertices[t.v2 - 1 - vertex_offset];
 
       triangle.v2.x = v.x;
       triangle.v2.y = v.y;
       triangle.v2.z = v.z;
 
-      v = mesh.vertices[t.v3 % mesh.vertices_length];
+      v = mesh.vertices[t.v3 - 1 - vertex_offset];
 
       triangle.v3.x = v.x;
       triangle.v3.y = v.y;
       triangle.v3.z = v.z;
 
-      Wavefront_UV uv = mesh.uvs[t.vt1 % mesh.uvs_length];
+      Wavefront_UV uv = mesh.uvs[t.vt1 - 1 - uv_offset];
 
       triangle.vt1.u = uv.u;
       triangle.vt1.v = uv.v;
 
-      uv = mesh.uvs[t.vt2 % mesh.uvs_length];
+      uv = mesh.uvs[t.vt2 - 1 - uv_offset];
 
       triangle.vt2.u = uv.u;
       triangle.vt2.v = uv.v;
 
-      uv = mesh.uvs[t.vt3 % mesh.uvs_length];
+      uv = mesh.uvs[t.vt3 - 1 - uv_offset];
 
       triangle.vt3.u = uv.u;
       triangle.vt3.v = uv.v;
 
-      Wavefront_Normal n = mesh.normals[t.vn1 % mesh.normals_length];
+      Wavefront_Normal n = mesh.normals[t.vn1 - 1 - normal_offset];
 
-      triangle.vn1.x = n.x;
-      triangle.vn1.y = n.y;
-      triangle.vn1.z = n.z;
+      float n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
 
-      n = mesh.normals[t.vn2 % mesh.normals_length];
+      triangle.vn1.x = n.x * n_length;
+      triangle.vn1.y = n.y * n_length;
+      triangle.vn1.z = n.z * n_length;
 
-      triangle.vn2.x = n.x;
-      triangle.vn2.y = n.y;
-      triangle.vn2.z = n.z;
+      n = mesh.normals[t.vn2 - 1 - normal_offset];
 
-      n = mesh.normals[t.vn3 % mesh.normals_length];
+      n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
 
-      triangle.vn3.x = n.x;
-      triangle.vn3.y = n.y;
-      triangle.vn3.z = n.z;
+      triangle.vn2.x = n.x * n_length;
+      triangle.vn2.y = n.y * n_length;
+      triangle.vn2.z = n.z * n_length;
+
+      n = mesh.normals[t.vn3 - 1 - normal_offset];
+
+      n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
+
+      triangle.vn3.x = n.x * n_length;
+      triangle.vn3.y = n.y * n_length;
+      triangle.vn3.z = n.z * n_length;
 
       (*triangles)[ptr++] = triangle;
     }
+    vertex_offset += mesh.vertices_length;
+    uv_offset += mesh.uvs_length;
+    normal_offset += mesh.normals_length;
   }
   return count;
 }
