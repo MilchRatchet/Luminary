@@ -2,6 +2,8 @@
 #include "primitives.h"
 #include "image.h"
 #include "raytrace.h"
+#include "mesh.h"
+#include "cudaLinAlg.cuh"
 #include <cuda_runtime_api.h>
 #include <curand_kernel.h>
 #include <float.h>
@@ -51,8 +53,6 @@ Quaternion device_camera_rotation;
 
 __device__
 curandStateXORWOW_t device_random;
-
-
 
 __device__
 float sphere_dist(Sphere sphere, const vec3 pos) {
@@ -203,6 +203,39 @@ float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
     else {
         return FLT_MAX;
     }
+}
+
+/*
+ * Based on
+ *
+ * Möller, Tomas, Trumbore, Ben,
+ * "Fast, Minimum Storage Ray-Triangle Intersection",
+ * Journal of Graphics Tools, 2, pp. 21-28, 1997.
+ *
+ * This suggests storing vertex1, edge1 and edge2 in triangle instead of the three vertices
+ */
+__device__
+float triangle_intersection(Triangle triangle, const vec3 origin, const vec3 ray) {
+    const vec3 e1 = vec_diff(triangle.v2, triangle.v1);
+    const vec3 e2 = vec_diff(triangle.v3, triangle.v1);
+
+    const vec3 h = cross_product(ray, e2);
+    const float a = dot_product(e1, h);
+
+    if (a > -epsilon && a < epsilon) return FLT_MAX;
+
+    const float f = 1.0f / a;
+    const vec3 s = vec_diff(origin, triangle.v1);
+    const float u = f * dot_product(ray, h);
+
+    if (u < 0.0f || u > 1.0f) return FLT_MAX;
+
+    const vec3 q = cross_product(s, e1);
+    const float v = f * dot_product(ray, q);
+
+    if (v < 0.0f || u + v > 1.0f) return FLT_MAX;
+
+    return f * dot_product(e2, q);
 }
 
 /*
