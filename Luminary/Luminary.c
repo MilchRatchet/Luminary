@@ -5,13 +5,11 @@
 #include "Luminary.h"
 #include "lib/png.h"
 #include "lib/image.h"
-#include "lib/cudatest.h"
 #include "lib/device.h"
 #include "lib/scene.h"
 #include "lib/raytrace.h"
 #include "lib/mesh.h"
 #include "lib/wavefront.h"
-#include "examples.h"
 
 int main() {
   display_gpu_information();
@@ -47,16 +45,13 @@ int main() {
   scene.camera.rotation.y = 2.5f;
   scene.camera.rotation.z = 0.0f;
 
-  scene.spheres_length = 0;
-  scene.cuboids_length = 0;
-
   scene.triangles        = triangles;
   scene.triangles_length = triangle_count;
 
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 5, 50);
+  raytrace_instance* instance = init_raytracing(width, height, 5, 1);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

@@ -122,91 +122,6 @@ vec3 lerp_normals(const Triangle triangle, const float lambda, const float mu) {
     return result;
 }
 
-__device__
-float sphere_dist(Sphere sphere, const vec3 pos) {
-    vec3 diff;
-
-    diff.x = sphere.pos.x-pos.x;
-    diff.y = sphere.pos.y-pos.y;
-    diff.z = sphere.pos.z-pos.z;
-
-    return sphere.sign * (norm3df(diff.x, diff.y, diff.z) - sphere.radius);
-}
-
-__device__
-vec3 sphere_normal(Sphere sphere, const vec3 pos) {
-    vec3 result;
-    result.x = pos.x - sphere.pos.x;
-    result.y = pos.y - sphere.pos.y;
-    result.z = pos.z - sphere.pos.z;
-
-    const float length = __frsqrt_rn(result.x * result.x + result.y * result.y + result.z * result.z) * sphere.sign;
-
-    result.x *= length;
-    result.y *= length;
-    result.z *= length;
-
-    return result;
-}
-
-__device__
-float sphere_intersect(Sphere sphere, vec3 origin, vec3 ray) {
-    const float p = 2.0f * ((origin.x - sphere.pos.x) * ray.x + (origin.y - sphere.pos.y) * ray.y + (origin.z - sphere.pos.z) * ray.z);
-    const float q =
-        origin.x * origin.x + origin.y * origin.y + origin.z * origin.z +
-        sphere.pos.x * sphere.pos.x + sphere.pos.y * sphere.pos.y + sphere.pos.z * sphere.pos.z -
-        2.0f * (origin.x * sphere.pos.x + origin.y * sphere.pos.y + origin.z * sphere.pos.z) -
-        sphere.radius * sphere.radius;
-
-    const float a = -p * 0.5f;
-    const float b = sqrtf((0.25f * p * p) - q);
-
-    if (isnan(b)) {
-        return FLT_MAX;
-    }
-
-    const float result = a - b;
-
-    return (result < 0.0f) ? FLT_MAX : result;
-}
-
-__device__
-float cuboid_dist(Cuboid cuboid, const vec3 pos) {
-    vec3 dist_vector;
-
-    dist_vector.x = fmaxf(fabsf(cuboid.pos.x - pos.x) - cuboid.size.x, 0.0f);
-    dist_vector.y = fmaxf(fabsf(cuboid.pos.y - pos.y) - cuboid.size.y, 0.0f);
-    dist_vector.z = fmaxf(fabsf(cuboid.pos.z - pos.z) - cuboid.size.z, 0.0f);
-
-    return cuboid.sign * norm3df(dist_vector.x, dist_vector.y, dist_vector.z);
-}
-
-__device__
-vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
-    vec3 normal;
-    vec3 abs_norm;
-
-    normal.x = pos.x - cuboid.pos.x;
-    normal.y = pos.y - cuboid.pos.y;
-    normal.z = pos.z - cuboid.pos.z;
-
-    abs_norm.x = fmaxf(epsilon + fabsf(normal.x) - cuboid.size.x, 0.0f);
-    abs_norm.y = fmaxf(epsilon + fabsf(normal.y) - cuboid.size.y, 0.0f);
-    abs_norm.z = fmaxf(epsilon + fabsf(normal.z) - cuboid.size.z, 0.0f);
-
-    normal.x = copysignf(abs_norm.x, normal.x);
-    normal.y = copysignf(abs_norm.y, normal.y);
-    normal.z = copysignf(abs_norm.z, normal.z);
-
-    float length = __frsqrt_rn(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z) * cuboid.sign;
-
-    normal.x *= length;
-    normal.y *= length;
-    normal.z *= length;
-
-    return normal;
-}
-
 /*
  * Based on:
  * A. Majercik, C. Crassin, P. Shirley, M. McGuire,
@@ -217,7 +132,7 @@ vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
  *
  * Assumes that origin is not inside a box
  */
-__device__
+/*__device__
 float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
     origin.x -= cuboid.pos.x;
     origin.y -= cuboid.pos.y;
@@ -271,7 +186,7 @@ float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
     else {
         return FLT_MAX;
     }
-}
+}*/
 
 /*
  * Based on
@@ -626,17 +541,9 @@ extern "C" raytrace_instance* init_raytracing(const unsigned int width, const un
 extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     Scene scene_gpu = scene;
 
-    cudaMalloc((void**) &(scene_gpu.spheres), sizeof(Sphere) * scene_gpu.spheres_length);
-    puts(cudaGetErrorString(cudaGetLastError()));
-    cudaMalloc((void**) &(scene_gpu.cuboids), sizeof(Cuboid) * scene_gpu.cuboids_length);
-    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMalloc((void**) &(scene_gpu.triangles), sizeof(Triangle) * scene_gpu.triangles_length);
     puts(cudaGetErrorString(cudaGetLastError()));
 
-    cudaMemcpy(scene_gpu.spheres, scene.spheres, sizeof(Sphere) * scene.spheres_length, cudaMemcpyHostToDevice);
-    puts(cudaGetErrorString(cudaGetLastError()));
-    cudaMemcpy(scene_gpu.cuboids, scene.cuboids, sizeof(Cuboid) * scene.cuboids_length, cudaMemcpyHostToDevice);
-    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpy(scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice);
     puts(cudaGetErrorString(cudaGetLastError()));
 
@@ -670,8 +577,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
 
     puts(cudaGetErrorString(cudaGetLastError()));
 
-    cudaFree(scene_gpu.spheres);
-    cudaFree(scene_gpu.cuboids);
+    cudaFree(scene_gpu.triangles);
 }
 
 extern "C" void frame_buffer_to_image(Camera camera, raytrace_instance* instance, RGB8* image) {

@@ -13,10 +13,6 @@ struct Camera {
 struct Scene {
   Camera camera;
   unsigned int far_clip_distance;
-  Sphere* spheres;
-  unsigned int spheres_length;
-  Cuboid* cuboids;
-  unsigned int cuboids_length;
   Triangle* triangles;
   unsigned int triangles_length;
 } typedef Scene;

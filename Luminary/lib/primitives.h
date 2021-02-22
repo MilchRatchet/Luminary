@@ -16,33 +16,4 @@ struct Quaternion {
   float z;
 } typedef Quaternion;
 
-/*
- * IDs unique identify each object
- * 0 is reserved
- */
-
-struct Sphere {
-  unsigned int id;
-  vec3 pos;
-  float radius;
-  float sign;
-  RGBF color;
-  RGBF emission;
-  float intensity;
-  float smoothness;
-  float metallic;
-} typedef Sphere;
-
-struct Cuboid {
-  unsigned int id;
-  vec3 pos;
-  vec3 size;
-  float sign;
-  RGBF color;
-  RGBF emission;
-  float intensity;
-  float smoothness;
-  float metallic;
-} typedef Cuboid;
-
 #endif /* PRIMITIVES_H */
