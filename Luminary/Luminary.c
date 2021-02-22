@@ -56,7 +56,7 @@ int main() {
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 2, 5);
+  raytrace_instance* instance = init_raytracing(width, height, 5, 50);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

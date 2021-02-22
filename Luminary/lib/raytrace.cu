@@ -97,29 +97,27 @@ vec3 get_coordinates_in_triangle(const Triangle triangle, const vec3 point) {
     return result;
 }
 
+/*
+ * Normals should really be spherically lerped but in most cases
+ * the angle between the vertex normals is small enough, so that
+ * the performance advantage is probably worth it.
+ */
 __device__
-vec3 slerp_normals(const Triangle triangle, const float lambda, const float mu) {
+vec3 lerp_normals(const Triangle triangle, const float lambda, const float mu) {
+    const vec3 e1 = vec_diff(triangle.vn2, triangle.vn1);
+    const vec3 e2 = vec_diff(triangle.vn3, triangle.vn1);
+
     vec3 result;
 
-    float omega = acosf(dot_product(triangle.vn1, triangle.vn2));
+    result.x = triangle.vn1.x + lambda * e1.x + mu * e2.x;
+    result.y = triangle.vn1.y + lambda * e1.y + mu * e2.y;
+    result.z = triangle.vn1.z + lambda * e1.z + mu * e2.z;
 
-    float inv_omega = 1.0f / sinf(omega);
-    float factor_1 = sinf((1.0f - lambda) * omega) * inv_omega;
-    float factor_2 = sinf(lambda * omega) * inv_omega;
+    const float length = 1.0f / sqrtf(dot_product(result, result));
 
-    result.x = factor_1 * triangle.vn1.x + factor_2 * triangle.vn2.x;
-    result.y = factor_1 * triangle.vn1.y + factor_2 * triangle.vn2.y;
-    result.z = factor_1 * triangle.vn1.z + factor_2 * triangle.vn2.z;
-
-    omega = acosf(dot_product(triangle.vn1, triangle.vn3));
-
-    inv_omega = 1.0f / sinf(omega);
-    factor_1 = sinf((1.0f - mu) * omega) * inv_omega;
-    factor_2 = sinf(mu * omega) * inv_omega;
-
-    result.x = factor_1 * result.x + factor_2 * triangle.vn2.x;
-    result.y = factor_1 * result.y + factor_2 * triangle.vn2.y;
-    result.z = factor_1 * result.z + factor_2 * triangle.vn2.z;
+    result.x *= length;
+    result.y *= length;
+    result.z *= length;
 
     return result;
 }
@@ -374,9 +372,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     record.b = 1.0f;
 
     RGBF sky;
-    sky.r = 10.0f;
-    sky.g = 10.0f;
-    sky.b = 10.0f;
+    sky.r = 1.0f;
+    sky.g = 1.0f;
+    sky.b = 1.0f;
 
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
         float depth = 1000.0f;
@@ -401,13 +399,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
             return result;
         }
-        else {
-            result.r = 0.05f * depth;
-            result.g = 0.05f * depth;
-            result.b = 0.05f * depth;
-
-            return result;
-        }
 
         curr.x = origin.x + ray.x * depth;
         curr.y = origin.y + ray.y * depth;
@@ -416,16 +407,16 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         Triangle hit_triangle = device_scene.triangles[hit_id];
 
         RGBF albedo;
-        albedo.r = 1.0f;
-        albedo.g = 0.0f;
-        albedo.b = 0.0f;
+        albedo.r = 0.5f;
+        albedo.g = 0.5f;
+        albedo.b = 0.5f;
         vec3 normal;
         normal.x = 1.0f;
         normal.y = 1.0f;
         normal.z = 1.0f;
-        const float smoothness = 1.0f;
+        const float smoothness = 0.0f;
         RGBF emission;
-        emission.r = 1.0f;
+        emission.r = 0.0f;
         emission.g = 0.0f;
         emission.b = 0.0f;
         const float intensity = 0.0f;
@@ -436,14 +427,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         const float lambda = normal.x;
         const float mu = normal.y;
 
-        normal = slerp_normals(hit_triangle, lambda, mu);
-
-        result.r = 0.5f * normal.x + 0.5f;
-        result.g = 0.5f * normal.y + 0.5f;
-        result.b = 0.5f * normal.z + 0.5f;
-
-
-        return result;
+        normal = lerp_normals(hit_triangle, lambda, mu);
 
         result.r += emission.r * intensity * weight * record.r;
         result.g += emission.g * intensity * weight * record.g;
