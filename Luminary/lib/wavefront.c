@@ -178,60 +178,60 @@ unsigned int convert_wavefront_mesh(
 
       Wavefront_Vertex v = mesh.vertices[t.v1 - 1 - vertex_offset];
 
-      triangle.v1.x = v.x;
-      triangle.v1.y = v.y;
-      triangle.v1.z = v.z;
+      triangle.vertex.x = v.x;
+      triangle.vertex.y = v.y;
+      triangle.vertex.z = v.z;
 
       v = mesh.vertices[t.v2 - 1 - vertex_offset];
 
-      triangle.v2.x = v.x;
-      triangle.v2.y = v.y;
-      triangle.v2.z = v.z;
+      triangle.edge1.x = v.x - triangle.vertex.x;
+      triangle.edge1.y = v.y - triangle.vertex.y;
+      triangle.edge1.z = v.z - triangle.vertex.z;
 
       v = mesh.vertices[t.v3 - 1 - vertex_offset];
 
-      triangle.v3.x = v.x;
-      triangle.v3.y = v.y;
-      triangle.v3.z = v.z;
+      triangle.edge2.x = v.x - triangle.vertex.x;
+      triangle.edge2.y = v.y - triangle.vertex.y;
+      triangle.edge2.z = v.z - triangle.vertex.z;
 
       Wavefront_UV uv = mesh.uvs[t.vt1 - 1 - uv_offset];
 
-      triangle.vt1.u = uv.u;
-      triangle.vt1.v = uv.v;
+      triangle.vertex_texture.u = uv.u;
+      triangle.vertex_texture.v = uv.v;
 
       uv = mesh.uvs[t.vt2 - 1 - uv_offset];
 
-      triangle.vt2.u = uv.u;
-      triangle.vt2.v = uv.v;
+      triangle.edge1_texture.u = uv.u - triangle.vertex_texture.u;
+      triangle.edge1_texture.v = uv.v - triangle.vertex_texture.v;
 
       uv = mesh.uvs[t.vt3 - 1 - uv_offset];
 
-      triangle.vt3.u = uv.u;
-      triangle.vt3.v = uv.v;
+      triangle.edge2_texture.u = uv.u - triangle.vertex_texture.u;
+      triangle.edge2_texture.v = uv.v - triangle.vertex_texture.v;
 
       Wavefront_Normal n = mesh.normals[t.vn1 - 1 - normal_offset];
 
       float n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
 
-      triangle.vn1.x = n.x * n_length;
-      triangle.vn1.y = n.y * n_length;
-      triangle.vn1.z = n.z * n_length;
+      triangle.vertex_normal.x = n.x * n_length;
+      triangle.vertex_normal.y = n.y * n_length;
+      triangle.vertex_normal.z = n.z * n_length;
 
       n = mesh.normals[t.vn2 - 1 - normal_offset];
 
       n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
 
-      triangle.vn2.x = n.x * n_length;
-      triangle.vn2.y = n.y * n_length;
-      triangle.vn2.z = n.z * n_length;
+      triangle.edge1_normal.x = n.x * n_length - triangle.vertex_normal.x;
+      triangle.edge1_normal.y = n.y * n_length - triangle.vertex_normal.y;
+      triangle.edge1_normal.z = n.z * n_length - triangle.vertex_normal.z;
 
       n = mesh.normals[t.vn3 - 1 - normal_offset];
 
       n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
 
-      triangle.vn3.x = n.x * n_length;
-      triangle.vn3.y = n.y * n_length;
-      triangle.vn3.z = n.z * n_length;
+      triangle.edge2_normal.x = n.x * n_length - triangle.vertex_normal.x;
+      triangle.edge2_normal.y = n.y * n_length - triangle.vertex_normal.y;
+      triangle.edge2_normal.z = n.z * n_length - triangle.vertex_normal.z;
 
       (*triangles)[ptr++] = triangle;
     }

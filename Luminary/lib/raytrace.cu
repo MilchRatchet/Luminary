@@ -82,14 +82,12 @@ vec3 vec_diff(const vec3 a, const vec3 b) {
 
 __device__
 vec3 get_coordinates_in_triangle(const Triangle triangle, const vec3 point) {
-    const vec3 e1 = vec_diff(triangle.v2, triangle.v1);
-    const vec3 e2 = vec_diff(triangle.v3, triangle.v1);
-    const vec3 diff = vec_diff(point, triangle.v1);
-    const float d00 = dot_product(e1,e1);
-    const float d01 = dot_product(e1,e2);
-    const float d11 = dot_product(e2,e2);
-    const float d20 = dot_product(diff,e1);
-    const float d21 = dot_product(diff,e2);
+    const vec3 diff = vec_diff(point, triangle.vertex);
+    const float d00 = dot_product(triangle.edge1,triangle.edge1);
+    const float d01 = dot_product(triangle.edge1,triangle.edge2);
+    const float d11 = dot_product(triangle.edge2,triangle.edge2);
+    const float d20 = dot_product(diff,triangle.edge1);
+    const float d21 = dot_product(diff,triangle.edge2);
     const float denom = 1.0f / (d00 * d11 - d01 * d01);
     vec3 result;
     result.x = (d11 * d20 - d01 * d21) * denom;
@@ -104,14 +102,11 @@ vec3 get_coordinates_in_triangle(const Triangle triangle, const vec3 point) {
  */
 __device__
 vec3 lerp_normals(const Triangle triangle, const float lambda, const float mu) {
-    const vec3 e1 = vec_diff(triangle.vn2, triangle.vn1);
-    const vec3 e2 = vec_diff(triangle.vn3, triangle.vn1);
-
     vec3 result;
 
-    result.x = triangle.vn1.x + lambda * e1.x + mu * e2.x;
-    result.y = triangle.vn1.y + lambda * e1.y + mu * e2.y;
-    result.z = triangle.vn1.z + lambda * e1.z + mu * e2.z;
+    result.x = triangle.vertex_normal.x + lambda * triangle.edge1_normal.x + mu * triangle.edge2_normal.x;
+    result.y = triangle.vertex_normal.y + lambda * triangle.edge1_normal.y + mu * triangle.edge2_normal.y;
+    result.z = triangle.vertex_normal.z + lambda * triangle.edge1_normal.z + mu * triangle.edge2_normal.z;
 
     const float length = 1.0f / sqrtf(dot_product(result, result));
 
@@ -199,26 +194,23 @@ float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
  */
 __device__
 float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
-    const vec3 e1 = vec_diff(triangle.v2, triangle.v1);
-    const vec3 e2 = vec_diff(triangle.v3, triangle.v1);
-
-    const vec3 h = cross_product(ray, e2);
-    const float a = dot_product(e1, h);
+    const vec3 h = cross_product(ray, triangle.edge2);
+    const float a = dot_product(triangle.edge1, h);
 
     if (a > -epsilon && a < epsilon) return FLT_MAX;
 
     const float f = 1.0f / a;
-    const vec3 s = vec_diff(origin, triangle.v1);
+    const vec3 s = vec_diff(origin, triangle.vertex);
     const float u = f * dot_product(s, h);
 
     if (u < 0.0f || u > 1.0f) return FLT_MAX;
 
-    const vec3 q = cross_product(s, e1);
+    const vec3 q = cross_product(s, triangle.edge1);
     const float v = f * dot_product(ray, q);
 
     if (v < 0.0f || u + v > 1.0f) return FLT_MAX;
 
-    const float t = f * dot_product(e2, q);
+    const float t = f * dot_product(triangle.edge2, q);
 
     if (t > epsilon) {
         return t;
