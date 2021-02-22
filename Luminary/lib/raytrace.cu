@@ -284,7 +284,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     sky.b = 1.0f;
 
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
-        float depth = 1000.0f;
+        float depth = device_scene.far_clip_distance;
 
         unsigned int hit_id = 0xffffffff;
 

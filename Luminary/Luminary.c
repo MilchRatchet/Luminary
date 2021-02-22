@@ -36,6 +36,8 @@ int main() {
 
   Scene scene;
 
+  scene.far_clip_distance = 1000.0f;
+
   scene.camera.fov   = 1.0f;
   scene.camera.pos.x = 5.0f;
   scene.camera.pos.y = 2.0f;
