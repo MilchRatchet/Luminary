@@ -152,6 +152,8 @@ int read_mesh_from_file(const char* name, Wavefront_Mesh** meshes, const int pre
 
   *meshes = (Wavefront_Mesh*) realloc(*meshes, sizeof(Wavefront_Mesh) * mesh_count);
 
+  fclose(file);
+
   free(line);
 
   return mesh_count;
