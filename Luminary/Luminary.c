@@ -10,6 +10,7 @@
 #include "lib/raytrace.h"
 #include "lib/mesh.h"
 #include "lib/wavefront.h"
+#include "lib/bvh.h"
 
 int main() {
   display_gpu_information();
@@ -28,11 +29,21 @@ int main() {
     printf("  Triangles %d\n", meshes[i].triangles_length);
   }
 
+  printf("[%.3fs] Mesh loaded from file.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
   Triangle* triangles;
 
   unsigned int triangle_count = convert_wavefront_mesh(&triangles, meshes, meshes_length);
 
   printf("Total Triangles: %u\n", triangle_count);
+
+  printf("[%.3fs] Mesh converted.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
+  Node* nodes = build_bvh_structure(&triangles, &triangle_count, 5);
+
+  printf("Total Triangles: %u\n", triangle_count);
+
+  printf("[%.3fs] BVH structure built.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   Scene scene;
 
@@ -77,6 +88,16 @@ int main() {
     PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
 
   printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
+  free(triangles);
+  free(nodes);
+  for (int i = 0; i < meshes_length; i++) {
+    free(meshes[i].triangles);
+    free(meshes[i].normals);
+    free(meshes[i].uvs);
+    free(meshes[i].vertices);
+  }
+  free(meshes);
 
   return 0;
 }
