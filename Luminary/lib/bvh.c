@@ -148,7 +148,8 @@ static void divide_along_z_axis(
  * Idea, don't convert leaf node, if triangle_count < threshold
  */
 Node* build_bvh_structure(
-  Triangle** triangles_io, unsigned int* triangles_length, const int max_depth) {
+  Triangle** triangles_io, unsigned int* triangles_length, const int max_depth,
+  int* nodes_length_out) {
   Triangle* triangles = *triangles_io;
   int pow             = 2;
   int node_count      = 1;
@@ -179,31 +180,60 @@ Node* build_bvh_structure(
       vec3 high, low;
       int left, right;
       Node node = nodes[node_ptr];
-      fit_bounds(triangles + node.triangles_address, node.triangle_count, &high, &low);
-
-      if (high.x - low.x > high.y - low.y && high.x - low.x > high.z - low.z) {
-        divide_along_x_axis(
-          (high.x + low.x) / 2.0f, &left, &right, new_triangles + triangles_ptr, triangles,
-          triangles + node.triangles_address, node.triangle_count);
-      }
-      else if (high.y - low.y > high.z - low.z) {
-        divide_along_y_axis(
-          (high.y + low.y) / 2.0f, &left, &right, new_triangles + triangles_ptr, triangles,
-          triangles + node.triangles_address, node.triangle_count);
+      if (node_ptr == 0) {
+        fit_bounds(triangles + node.triangles_address, node.triangle_count, &high, &low);
       }
       else {
-        divide_along_z_axis(
-          (high.z + low.z) / 2.0f, &left, &right, new_triangles + triangles_ptr, triangles,
+        high = (node_ptr & 1) ? nodes[(node_ptr - 1) / 2].left_high
+                              : nodes[(node_ptr - 1) / 2].right_high;
+        low =
+          (node_ptr & 1) ? nodes[(node_ptr - 1) / 2].left_low : nodes[(node_ptr - 1) / 2].right_low;
+      }
+
+      int axis;
+      float split;
+
+      if (high.x - low.x > high.y - low.y && high.x - low.x > high.z - low.z) {
+        split = (high.x + low.x) / 2.0f;
+        divide_along_x_axis(
+          split, &left, &right, new_triangles + triangles_ptr, triangles,
           triangles + node.triangles_address, node.triangle_count);
+        axis = 0;
+      }
+      else if (high.y - low.y > high.z - low.z) {
+        split = (high.y + low.y) / 2.0f;
+        divide_along_y_axis(
+          split, &left, &right, new_triangles + triangles_ptr, triangles,
+          triangles + node.triangles_address, node.triangle_count);
+        axis = 1;
+      }
+      else {
+        split = (high.z + low.z) / 2.0f;
+        divide_along_z_axis(
+          split, &left, &right, new_triangles + triangles_ptr, triangles,
+          triangles + node.triangles_address, node.triangle_count);
+        axis = 2;
       }
 
       fit_bounds(new_triangles + triangles_ptr, left, &high, &low);
+
+      if (axis == 0) {
+        high.x = min(split, high.x);
+      }
+      else if (axis == 1) {
+        high.y = min(split, high.y);
+      }
+      else {
+        high.z = min(split, high.z);
+      }
 
       node.left_address = 2 * node_ptr + 1;
       node.left_high    = high;
       node.left_low     = low;
 
-      nodes[node.left_address].uncle_address       = node_ptr;
+      nodes[node.left_address].uncle_address       = (node_ptr & 1)
+                                                       ? nodes[(node_ptr - 1) / 2].right_address
+                                                       : nodes[(node_ptr - 1) / 2].left_address;
       nodes[node.left_address].grand_uncle_address = node.uncle_address;
       nodes[node.left_address].triangle_count      = left;
       nodes[node.left_address].triangles_address   = triangles_ptr;
@@ -214,11 +244,23 @@ Node* build_bvh_structure(
 
       fit_bounds(new_triangles + triangles_ptr, right, &high, &low);
 
+      if (axis == 0) {
+        low.x = max(split, low.x);
+      }
+      else if (axis == 1) {
+        low.y = max(split, low.y);
+      }
+      else {
+        low.z = max(split, low.z);
+      }
+
       node.right_address = 2 * node_ptr + 2;
       node.right_high    = high;
       node.right_low     = low;
 
-      nodes[node.right_address].uncle_address       = node_ptr;
+      nodes[node.right_address].uncle_address       = (node_ptr & 1)
+                                                        ? nodes[(node_ptr - 1) / 2].right_address
+                                                        : nodes[(node_ptr - 1) / 2].left_address;
       nodes[node.right_address].grand_uncle_address = node.uncle_address;
       nodes[node.right_address].triangle_count      = right;
       nodes[node.right_address].triangles_address   = triangles_ptr;
@@ -244,6 +286,8 @@ Node* build_bvh_structure(
   *triangles_io = (Triangle*) realloc(triangles, new_triangles_length * sizeof(Triangle));
 
   *triangles_length = new_triangles_length;
+
+  *nodes_length_out = node_count;
 
   return nodes;
 }

@@ -39,7 +39,9 @@ int main() {
 
   printf("[%.3fs] Mesh converted.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
-  Node* nodes = build_bvh_structure(&triangles, &triangle_count, 5);
+  int nodes_length;
+
+  Node* nodes = build_bvh_structure(&triangles, &triangle_count, 6, &nodes_length);
 
   printf("Total Triangles: %u\n", triangle_count);
 
@@ -60,11 +62,13 @@ int main() {
 
   scene.triangles        = triangles;
   scene.triangles_length = triangle_count;
+  scene.nodes            = nodes;
+  scene.nodes_length     = nodes_length;
 
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 5, 1);
+  raytrace_instance* instance = init_raytracing(width, height, 5, 10);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

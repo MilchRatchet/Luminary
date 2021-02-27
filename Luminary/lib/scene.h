@@ -3,6 +3,7 @@
 
 #include "primitives.h"
 #include "mesh.h"
+#include "bvh.h"
 
 struct Camera {
   vec3 pos;
@@ -15,6 +16,8 @@ struct Scene {
   unsigned int far_clip_distance;
   Triangle* triangles;
   unsigned int triangles_length;
+  Node* nodes;
+  unsigned int nodes_length;
 } typedef Scene;
 
 #endif /* SCENE_H */

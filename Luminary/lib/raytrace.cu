@@ -122,16 +122,18 @@ vec3 lerp_normals(const Triangle triangle, const float lambda, const float mu) {
  * A. Majercik, C. Crassin, P. Shirley, M. McGuire,
  * "A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering",
  * Journal of Computer Graphics Techniques, 7(3), pp. 66-82, 2018
- *
- * This implementation is probably not quite sufficient
- *
- * Assumes that origin is not inside a box
  */
-/*__device__
-float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
-    origin.x -= cuboid.pos.x;
-    origin.y -= cuboid.pos.y;
-    origin.z -= cuboid.pos.z;
+__device__
+float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
+    origin.x -= (high.x + low.x) * 0.5f;
+    origin.y -= (high.y + low.y) * 0.5f;
+    origin.z -= (high.z + low.z) * 0.5f;
+
+    const float size_x = (high.x - low.x) * 0.5f;
+    const float size_y = (high.y - low.y) * 0.5f;
+    const float size_z = (high.z - low.z) * 0.5f;
+
+    const float winding = ((fabsf(origin.x) < size_x) && (fabsf(origin.y) < size_y) && (fabsf(origin.z) < size_z)) ? -1 : 1;
 
     vec3 d;
 
@@ -141,17 +143,17 @@ float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
     sign.y = copysignf(1.0f, -ray.y);
     sign.z = copysignf(1.0f, -ray.z);
 
-    d.x = cuboid.size.x * sign.x - origin.x;
-    d.y = cuboid.size.y * sign.y - origin.y;
-    d.z = cuboid.size.z * sign.z - origin.z;
+    d.x = size_x * winding * sign.x - origin.x;
+    d.y = size_y * winding * sign.y - origin.y;
+    d.z = size_z * winding * sign.z - origin.z;
 
     d.x /= ray.x;
     d.y /= ray.y;
     d.z /= ray.z;
 
-    const bool test_x = (d.x >= 0.0f) && (fabsf(origin.y + ray.y * d.x) < cuboid.size.y) && (fabsf(origin.z + ray.z * d.x) < cuboid.size.z);
-    const bool test_y = (d.y >= 0.0f) && (fabsf(origin.x + ray.x * d.y) < cuboid.size.x) && (fabsf(origin.z + ray.z * d.y) < cuboid.size.z);
-    const bool test_z = (d.z >= 0.0f) && (fabsf(origin.x + ray.x * d.z) < cuboid.size.x) && (fabsf(origin.y + ray.y * d.z) < cuboid.size.y);
+    const bool test_x = (d.x >= 0.0f) && (fabsf(origin.y + ray.y * d.x) < size_y) && (fabsf(origin.z + ray.z * d.x) < size_z);
+    const bool test_y = (d.y >= 0.0f) && (fabsf(origin.x + ray.x * d.y) < size_x) && (fabsf(origin.z + ray.z * d.y) < size_z);
+    const bool test_z = (d.z >= 0.0f) && (fabsf(origin.x + ray.x * d.z) < size_x) && (fabsf(origin.y + ray.y * d.z) < size_y);
 
     vec3 sgn;
 
@@ -181,7 +183,7 @@ float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
     else {
         return FLT_MAX;
     }
-}*/
+}
 
 /*
  * Based on
@@ -262,6 +264,16 @@ vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const
     return result;
 }
 
+__device__
+int trailing_zeros(unsigned int n) {
+    int mask = 1;
+    for (int i = 0; i < 32; i++, mask <<= 1)
+        if ((n & mask) != 0)
+            return i;
+
+    return 32;
+}
+
 /*
  * Uses some self modified Blinn-Phong BRDF.
  */
@@ -283,6 +295,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     sky.g = 1.0f;
     sky.b = 1.0f;
 
+    int traversals = 0;
+    unsigned int ray_triangle_intersections = 0;
+
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
         float depth = device_scene.far_clip_distance;
 
@@ -290,12 +305,102 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
         vec3 curr;
 
-        for (unsigned int i = 0; i < device_scene.triangles_length; i++) {
-            const float d = triangle_intersection(device_scene.triangles[i], origin, ray);
+        int node_address = 0;
+        int node_key = 1;
+        int bit_trail = 0;
+        int mrpn_address = -1;
 
-            if (d < depth) {
-                depth = d;
-                hit_id = i;
+        while (node_address != -1) {
+            while (device_scene.nodes[node_address].triangle_count == 0) {
+                Node node = device_scene.nodes[node_address];
+
+                traversals++;
+
+                if (mrpn_address == -1) {
+                    if (bit_trail & 0b110) {
+                        if (bit_trail & 0b10) {
+                            mrpn_address = node.uncle_address;
+                        }
+                        else {
+                            mrpn_address = node.grand_uncle_address;
+                        }
+                    }
+                }
+
+                const float L = ray_box_intersect(node.left_low, node.left_high, origin, ray);
+                const float R = ray_box_intersect(node.right_low, node.right_high, origin, ray);
+                const int R_is_closest = R < L;
+
+                if (L < depth || R < depth) {
+
+                    if (L >= depth || R_is_closest) {
+                        node_address = node.right_address;
+                    }
+                    else {
+                        node_address = node.left_address;
+                    }
+
+                    node_key = node_key << 1;
+                    bit_trail = bit_trail << 1;
+
+                    if (L < depth && R < depth) {
+                        bit_trail = bit_trail ^ 0b1;
+                        if (R_is_closest) {
+                            mrpn_address = node.left_address;
+                        }
+                        else {
+                            mrpn_address = node.right_address;
+                        }
+                    }
+
+                    if (node_address == node.right_address) {
+                        node_key = node_key ^ 0b1;
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if (device_scene.nodes[node_address].triangle_count != 0) {
+                Node node = device_scene.nodes[node_address];
+
+                for (unsigned int i = 0; i < node.triangle_count; i++) {
+                    const float d = triangle_intersection(device_scene.triangles[node.triangles_address + i], origin, ray);
+
+                    ray_triangle_intersections++;
+
+                    if (d < depth) {
+                        depth = d;
+                        hit_id = node.triangles_address + i;
+                    }
+                }
+
+                if (mrpn_address == -1) {
+                    if (bit_trail & 0b110) {
+                        if (bit_trail & 0b10) {
+                            mrpn_address = node.uncle_address;
+                        }
+                        else {
+                            mrpn_address = node.grand_uncle_address;
+                        }
+                    }
+                }
+            }
+
+            if (bit_trail == 0) {
+                node_address = -1;
+            }
+            else {
+                int num_levels = trailing_zeros(bit_trail);
+                bit_trail = (bit_trail >> num_levels) ^ 0b1;
+                node_key = (node_key >> num_levels) ^ 0b1;
+                if (mrpn_address != -1) {
+                    node_address = mrpn_address;
+                    mrpn_address = -1;
+                }
+                else {
+                    node_address = node_key - 1;
+                }
             }
         }
 
@@ -304,8 +409,18 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             result.g += sky.g * weight * record.g;
             result.b += sky.b * weight * record.b;
 
+            /*result.r = ray_triangle_intersections * (2.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
+            result.g = 0;
+            result.b = traversals * (2.0f/device_scene.nodes_length);*/
+
             return result;
-        }
+        } /*else {
+            result.r += depth * 0.05f;
+            result.g += depth * 0.05f;
+            result.b += depth * 0.05f;
+
+            return result;
+        }*/
 
         curr.x = origin.x + ray.x * depth;
         curr.y = origin.y + ray.y * depth;
@@ -397,6 +512,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
         weight *= ((1.0f - smoothness) * 0.31830988618f) + (smoothness * 0.5f * 0.31830988618f);
     }
+
+    /*result.r = ray_triangle_intersections * (2.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
+    result.g = 0;
+    result.b = traversals * (2.0f/device_scene.nodes_length);*/
 
     return result;
 }
@@ -535,8 +654,12 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
 
     cudaMalloc((void**) &(scene_gpu.triangles), sizeof(Triangle) * scene_gpu.triangles_length);
     puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMalloc((void**) &(scene_gpu.nodes), sizeof(Node) * scene_gpu.nodes_length);
+    puts(cudaGetErrorString(cudaGetLastError()));
 
     cudaMemcpy(scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpy(scene_gpu.nodes, scene.nodes, sizeof(Node) * scene.nodes_length, cudaMemcpyHostToDevice);
     puts(cudaGetErrorString(cudaGetLastError()));
 
     cudaMemcpyToSymbol(device_frame, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice);
@@ -550,26 +673,23 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
     puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
-
     puts(cudaGetErrorString(cudaGetLastError()));
 
     set_up_raytracing_device<<<1,1>>>();
 
     cudaDeviceSynchronize();
-
     puts(cudaGetErrorString(cudaGetLastError()));
 
     trace_rays<<<blocks_per_grid,threads_per_block>>>();
 
     cudaDeviceSynchronize();
-
     puts(cudaGetErrorString(cudaGetLastError()));
 
     cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost);
-
     puts(cudaGetErrorString(cudaGetLastError()));
 
     cudaFree(scene_gpu.triangles);
+    cudaFree(scene_gpu.nodes);
 }
 
 extern "C" void frame_buffer_to_image(Camera camera, raytrace_instance* instance, RGB8* image) {

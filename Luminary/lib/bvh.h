@@ -19,6 +19,7 @@ struct Node {
 } typedef Node;
 
 Node* build_bvh_structure(
-  Triangle** triangles_io, unsigned int* triangles_length, const int max_depth);
+  Triangle** triangles_io, unsigned int* triangles_length, const int max_depth,
+  int* nodes_length_out);
 
 #endif /* BVH_H */
