@@ -8,8 +8,8 @@
 #include <float.h>
 #include <stdio.h>
 
-const int threads_per_block = 256;
-const int blocks_per_grid = 960;
+const int threads_per_block = 128;
+const int blocks_per_grid = 512;
 
 __device__
 const float epsilon = 0.001f;
@@ -133,7 +133,7 @@ float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
     const float size_y = (high.y - low.y) * 0.5f;
     const float size_z = (high.z - low.z) * 0.5f;
 
-    const float winding = ((fabsf(origin.x) < size_x) && (fabsf(origin.y) < size_y) && (fabsf(origin.z) < size_z)) ? -1 : 1;
+    if ((fabsf(origin.x) < size_x) && (fabsf(origin.y) < size_y) && (fabsf(origin.z) < size_z)) return 0.0f;
 
     vec3 d;
 
@@ -143,9 +143,9 @@ float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
     sign.y = copysignf(1.0f, -ray.y);
     sign.z = copysignf(1.0f, -ray.z);
 
-    d.x = size_x * winding * sign.x - origin.x;
-    d.y = size_y * winding * sign.y - origin.y;
-    d.z = size_z * winding * sign.z - origin.z;
+    d.x = size_x * sign.x - origin.x;
+    d.y = size_y * sign.y - origin.y;
+    d.z = size_z * sign.z - origin.z;
 
     d.x /= ray.x;
     d.y /= ray.y;
@@ -191,8 +191,6 @@ float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
  * Möller, Tomas, Trumbore, Ben,
  * "Fast, Minimum Storage Ray-Triangle Intersection",
  * Journal of Graphics Tools, 2, pp. 21-28, 1997.
- *
- * This suggests storing vertex1, edge1 and edge2 in triangle instead of the three vertices
  */
 __device__
 float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
@@ -214,7 +212,7 @@ float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
 
     const float t = f * dot_product(triangle.edge2, q);
 
-    if (t > epsilon) {
+    if (t > -epsilon) {
         return t;
     } else {
         return FLT_MAX;
@@ -409,9 +407,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             result.g += sky.g * weight * record.g;
             result.b += sky.b * weight * record.b;
 
-            /*result.r = ray_triangle_intersections * (2.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
+            result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
             result.g = 0;
-            result.b = traversals * (2.0f/device_scene.nodes_length);*/
+            result.b = traversals * (4.0f/device_scene.nodes_length);
 
             return result;
         } /*else {
@@ -513,9 +511,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         weight *= ((1.0f - smoothness) * 0.31830988618f) + (smoothness * 0.5f * 0.31830988618f);
     }
 
-    /*result.r = ray_triangle_intersections * (2.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
+    result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
     result.g = 0;
-    result.b = traversals * (2.0f/device_scene.nodes_length);*/
+    result.b = traversals * (4.0f/device_scene.nodes_length);
 
     return result;
 }
@@ -553,7 +551,7 @@ void trace_rays() {
 
     while (id < device_amount) {
         int x = id % device_width;
-        int y = (id - x) / device_width;
+        int y = id / device_width;
 
         curandStateXORWOW_t random;
 

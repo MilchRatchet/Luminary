@@ -19,7 +19,7 @@ int main() {
 
   Wavefront_Mesh* meshes;
 
-  int meshes_length = read_mesh_from_file("test_mesh.obj", &meshes, 0);
+  int meshes_length = read_mesh_from_file("Garage.obj", &meshes, 0);
 
   for (int i = 0; i < meshes_length; i++) {
     printf("Mesh %d\n", i);
@@ -41,7 +41,12 @@ int main() {
 
   int nodes_length;
 
-  Node* nodes = build_bvh_structure(&triangles, &triangle_count, 6, &nodes_length);
+  Node* nodes = build_bvh_structure(&triangles, &triangle_count, 14, &nodes_length);
+
+  /*for (int i = 0; i < nodes_length; i++) {
+    printf("Node: %d\n", i);
+    printf("  Triangle Count: %d\n", nodes[i].triangle_count);
+  }*/
 
   printf("Total Triangles: %u\n", triangle_count);
 
@@ -52,9 +57,9 @@ int main() {
   scene.far_clip_distance = 1000.0f;
 
   scene.camera.fov   = 1.0f;
-  scene.camera.pos.x = 5.0f;
-  scene.camera.pos.y = 2.0f;
-  scene.camera.pos.z = -7.0f;
+  scene.camera.pos.x = 9.0f;
+  scene.camera.pos.y = 3.0f;
+  scene.camera.pos.z = -12.0f;
 
   scene.camera.rotation.x = -0.3f;
   scene.camera.rotation.y = 2.5f;
@@ -68,7 +73,7 @@ int main() {
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 5, 10);
+  raytrace_instance* instance = init_raytracing(width, height, 5, 1);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
