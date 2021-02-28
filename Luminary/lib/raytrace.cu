@@ -309,7 +309,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         int mrpn_address = -1;
 
         while (node_address != -1) {
-            while (device_scene.nodes[node_address].triangle_count == 0) {
+            while (device_scene.nodes[node_address].triangles_address == -1) {
                 Node node = device_scene.nodes[node_address];
 
                 traversals++;
@@ -359,7 +359,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
                 }
             }
 
-            if (device_scene.nodes[node_address].triangle_count != 0) {
+            if (device_scene.nodes[node_address].triangles_address != -1) {
                 Node node = device_scene.nodes[node_address];
 
                 for (unsigned int i = 0; i < node.triangle_count; i++) {
@@ -407,9 +407,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             result.g += sky.g * weight * record.g;
             result.b += sky.b * weight * record.b;
 
-            result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
+            /*result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
             result.g = 0;
-            result.b = traversals * (4.0f/device_scene.nodes_length);
+            result.b = traversals * (4.0f/device_scene.nodes_length);*/
 
             return result;
         } /*else {
@@ -511,9 +511,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         weight *= ((1.0f - smoothness) * 0.31830988618f) + (smoothness * 0.5f * 0.31830988618f);
     }
 
-    result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
+    /*result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
     result.g = 0;
-    result.b = traversals * (4.0f/device_scene.nodes_length);
+    result.b = traversals * (4.0f/device_scene.nodes_length);*/
 
     return result;
 }

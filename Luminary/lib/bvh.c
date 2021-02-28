@@ -105,8 +105,7 @@ static void divide_along_x_axis(
 
     if (is_left)
       triangles_left[left++] = triangle;
-
-    if (is_right)
+    else if (is_right)
       triangles_right[right++] = triangle;
   }
 
@@ -135,8 +134,7 @@ static void divide_along_y_axis(
 
     if (is_left)
       triangles_left[left++] = triangle;
-
-    if (is_right)
+    else if (is_right)
       triangles_right[right++] = triangle;
   }
 
@@ -165,8 +163,7 @@ static void divide_along_z_axis(
 
     if (is_left)
       triangles_left[left++] = triangle;
-
-    if (is_right)
+    else if (is_right)
       triangles_right[right++] = triangle;
   }
 
@@ -174,6 +171,9 @@ static void divide_along_z_axis(
   *right_out = right;
 }
 
+/*
+ * Reduce memory footprint of nodes by not storing child addresses since they can be computed easily
+ */
 Node* build_bvh_structure(
   Triangle** triangles_io, unsigned int* triangles_length, const int max_depth,
   int* nodes_length_out) {
@@ -279,10 +279,8 @@ Node* build_bvh_structure(
             .y = high_right.y - low_right.y,
             .z = high_right.z - low_right.z};
 
-          const float cost_L =
-            diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
-          const float cost_R =
-            diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
+          const float cost_L = diff_left.x * diff_left.y * diff_left.z;
+          const float cost_R = diff_right.x * diff_right.y * diff_right.z;
 
           const float total_cost = cost_L * left + cost_R * right;
 
@@ -312,16 +310,6 @@ Node* build_bvh_structure(
 
       fit_bounds(new_triangles + triangles_ptr, left, &high, &low, &average);
 
-      if (axis == 0) {
-        high.x = min(optimal_split, high.x);
-      }
-      else if (axis == 1) {
-        high.y = min(optimal_split, high.y);
-      }
-      else {
-        high.z = min(optimal_split, high.z);
-      }
-
       node.left_address = 2 * node_ptr + 1;
       node.left_high    = high;
       node.left_low     = low;
@@ -339,16 +327,6 @@ Node* build_bvh_structure(
 
       fit_bounds(new_triangles + triangles_ptr, right, &high, &low, &average);
 
-      if (axis == 0) {
-        low.x = max(optimal_split, low.x);
-      }
-      else if (axis == 1) {
-        low.y = max(optimal_split, low.y);
-      }
-      else {
-        low.z = max(optimal_split, low.z);
-      }
-
       node.right_address = 2 * node_ptr + 2;
       node.right_high    = high;
       node.right_low     = low;
@@ -362,7 +340,8 @@ Node* build_bvh_structure(
 
       triangles_ptr += right;
 
-      node.triangle_count = 0;
+      node.triangle_count    = 0;
+      node.triangles_address = -1;
 
       nodes[node_ptr] = node;
 
