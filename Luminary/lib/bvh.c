@@ -175,7 +175,7 @@ static void divide_along_z_axis(
  * Reduce memory footprint of nodes by not storing child addresses since they can be computed easily
  */
 Node* build_bvh_structure(
-  Triangle** triangles_io, unsigned int* triangles_length, const int max_depth,
+  Triangle** triangles_io, unsigned int triangles_length, const int max_depth,
   int* nodes_length_out) {
   Triangle* triangles = *triangles_io;
   int pow             = 2;
@@ -188,12 +188,8 @@ Node* build_bvh_structure(
 
   Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
 
-  nodes[0].triangles_address   = 0;
-  nodes[0].triangle_count      = *triangles_length;
-  nodes[0].uncle_address       = 0;
-  nodes[0].grand_uncle_address = 0;
-
-  unsigned int new_triangles_length = *triangles_length;
+  nodes[0].triangles_address = 0;
+  nodes[0].triangle_count    = triangles_length;
 
   unsigned int nodes_at_depth = 1;
 
@@ -201,8 +197,8 @@ Node* build_bvh_structure(
 
   for (int i = 0; i < max_depth; i++) {
     unsigned int triangles_ptr = 0;
-    Triangle* new_triangles    = (Triangle*) malloc(sizeof(Triangle) * 2 * new_triangles_length);
-    Triangle* container        = (Triangle*) malloc(sizeof(Triangle) * 2 * new_triangles_length);
+    Triangle* new_triangles    = (Triangle*) malloc(sizeof(Triangle) * triangles_length);
+    Triangle* container        = (Triangle*) malloc(sizeof(Triangle) * triangles_length);
 
     for (int j = 0; j < nodes_at_depth; j++) {
       vec3 high, low, node_average, average;
@@ -223,24 +219,17 @@ Node* build_bvh_structure(
       optimal_cost = FLT_MAX;
 
       for (int a = 0; a < 3; a++) {
-        float lower_limit, higher_limit;
         if (a == 0) {
           split_spatial = (high.x + low.x) / 2.0f;
           split_object  = node_average.x;
-          lower_limit   = low.x;
-          higher_limit  = high.x;
         }
         else if (a == 1) {
           split_spatial = (high.y + low.y) / 2.0f;
           split_object  = node_average.y;
-          lower_limit   = low.y;
-          higher_limit  = high.y;
         }
         else {
           split_spatial = (high.z + low.z) / 2.0f;
           split_object  = node_average.z;
-          lower_limit   = low.z;
-          higher_limit  = high.z;
         }
 
         const float search_interval = (split_object - split_spatial) / samples_in_space;
@@ -310,16 +299,11 @@ Node* build_bvh_structure(
 
       fit_bounds(new_triangles + triangles_ptr, left, &high, &low, &average);
 
-      node.left_address = 2 * node_ptr + 1;
-      node.left_high    = high;
-      node.left_low     = low;
+      node.left_high = high;
+      node.left_low  = low;
 
-      nodes[node.left_address].uncle_address       = (node_ptr & 1)
-                                                       ? nodes[(node_ptr - 1) / 2].right_address
-                                                       : nodes[(node_ptr - 1) / 2].left_address;
-      nodes[node.left_address].grand_uncle_address = node.uncle_address;
-      nodes[node.left_address].triangle_count      = left;
-      nodes[node.left_address].triangles_address   = triangles_ptr;
+      nodes[2 * node_ptr + 1].triangle_count    = left;
+      nodes[2 * node_ptr + 1].triangles_address = triangles_ptr;
 
       triangles_ptr += left;
 
@@ -327,16 +311,11 @@ Node* build_bvh_structure(
 
       fit_bounds(new_triangles + triangles_ptr, right, &high, &low, &average);
 
-      node.right_address = 2 * node_ptr + 2;
-      node.right_high    = high;
-      node.right_low     = low;
+      node.right_high = high;
+      node.right_low  = low;
 
-      nodes[node.right_address].uncle_address       = (node_ptr & 1)
-                                                        ? nodes[(node_ptr - 1) / 2].right_address
-                                                        : nodes[(node_ptr - 1) / 2].left_address;
-      nodes[node.right_address].grand_uncle_address = node.uncle_address;
-      nodes[node.right_address].triangle_count      = right;
-      nodes[node.right_address].triangles_address   = triangles_ptr;
+      nodes[2 * node_ptr + 2].triangle_count    = right;
+      nodes[2 * node_ptr + 2].triangles_address = triangles_ptr;
 
       triangles_ptr += right;
 
@@ -353,16 +332,12 @@ Node* build_bvh_structure(
 
     triangles = new_triangles;
 
-    new_triangles_length = triangles_ptr;
-
     nodes_at_depth *= 2;
 
     printf("Depth %d build.\n", i);
   }
 
-  *triangles_io = (Triangle*) realloc(triangles, new_triangles_length * sizeof(Triangle));
-
-  *triangles_length = new_triangles_length;
+  *triangles_io = triangles;
 
   *nodes_length_out = node_count;
 

@@ -314,45 +314,31 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
                 traversals++;
 
-                if (mrpn_address == -1) {
-                    if (bit_trail & 0b110) {
-                        if (bit_trail & 0b10) {
-                            mrpn_address = node.uncle_address;
-                        }
-                        else {
-                            mrpn_address = node.grand_uncle_address;
-                        }
-                    }
-                }
-
                 const float L = ray_box_intersect(node.left_low, node.left_high, origin, ray);
                 const float R = ray_box_intersect(node.right_low, node.right_high, origin, ray);
                 const int R_is_closest = R < L;
 
                 if (L < depth || R < depth) {
 
-                    if (L >= depth || R_is_closest) {
-                        node_address = node.right_address;
-                    }
-                    else {
-                        node_address = node.left_address;
-                    }
-
                     node_key = node_key << 1;
                     bit_trail = bit_trail << 1;
+
+                    if (L >= depth || R_is_closest) {
+                        node_address = 2 * node_address + 2;
+                        node_key = node_key ^ 0b1;
+                    }
+                    else {
+                        node_address = 2 * node_address + 1;
+                    }
 
                     if (L < depth && R < depth) {
                         bit_trail = bit_trail ^ 0b1;
                         if (R_is_closest) {
-                            mrpn_address = node.left_address;
+                            mrpn_address = node_address - 1;
                         }
                         else {
-                            mrpn_address = node.right_address;
+                            mrpn_address = node_address + 1;
                         }
-                    }
-
-                    if (node_address == node.right_address) {
-                        node_key = node_key ^ 0b1;
                     }
                 } else {
                     break;
@@ -370,17 +356,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
                     if (d < depth) {
                         depth = d;
                         hit_id = node.triangles_address + i;
-                    }
-                }
-
-                if (mrpn_address == -1) {
-                    if (bit_trail & 0b110) {
-                        if (bit_trail & 0b10) {
-                            mrpn_address = node.uncle_address;
-                        }
-                        else {
-                            mrpn_address = node.grand_uncle_address;
-                        }
                     }
                 }
             }
@@ -434,7 +409,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         normal.x = 1.0f;
         normal.y = 1.0f;
         normal.z = 1.0f;
-        const float smoothness = 0.0f;
+        const float smoothness = 0.1f;
         RGBF emission;
         emission.r = 0.0f;
         emission.g = 0.0f;

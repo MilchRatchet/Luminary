@@ -41,14 +41,7 @@ int main() {
 
   int nodes_length;
 
-  Node* nodes = build_bvh_structure(&triangles, &triangle_count, 14, &nodes_length);
-
-  /*for (int i = 0; i < nodes_length; i++) {
-    printf("Node: %d\n", i);
-    printf("  Triangle Count: %d\n", nodes[i].triangle_count);
-  }*/
-
-  printf("Total Triangles: %u\n", triangle_count);
+  Node* nodes = build_bvh_structure(&triangles, triangle_count, 16, &nodes_length);
 
   printf("[%.3fs] BVH structure built.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -73,7 +66,7 @@ int main() {
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 5, 1);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 5000);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
