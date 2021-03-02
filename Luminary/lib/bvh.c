@@ -171,9 +171,6 @@ static void divide_along_z_axis(
   *right_out = right;
 }
 
-/*
- * Reduce memory footprint of nodes by not storing child addresses since they can be computed easily
- */
 Node* build_bvh_structure(
   Triangle** triangles_io, unsigned int triangles_length, const int max_depth,
   int* nodes_length_out) {
@@ -334,8 +331,10 @@ Node* build_bvh_structure(
 
     nodes_at_depth *= 2;
 
-    printf("Depth %d build.\n", i);
+    printf("\r                             \rBVH depth %d/%d built.", i + 1, max_depth);
   }
+
+  puts("");
 
   *triangles_io = triangles;
 

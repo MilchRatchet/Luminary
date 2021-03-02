@@ -2,6 +2,7 @@
 #define WAVEFRONT_H
 
 #include "mesh.h"
+#include <stdint.h>
 
 struct Wavefront_Vertex {
   float x;
@@ -30,6 +31,7 @@ struct Wavefront_Triangle {
   unsigned int vn1;
   unsigned int vn2;
   unsigned int vn3;
+  uint16_t object;
 } typedef Wavefront_Triangle;
 
 struct Wavefront_Mesh {

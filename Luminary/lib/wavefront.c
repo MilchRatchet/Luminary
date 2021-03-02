@@ -3,10 +3,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <stdint.h>
 
 #define LINE_SIZE 4096
 
-static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line) {
+static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line, const unsigned object_id) {
   fgets(line, LINE_SIZE, file);
   if (feof(file))
     return -1;
@@ -74,6 +75,8 @@ static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line) {
         line, "%*c %u/%u/%u %u/%u/%u %u/%u/%u", &face.v1, &face.vt1, &face.vn1, &face.v2, &face.vt2,
         &face.vn2, &face.v3, &face.vt3, &face.vn3);
 
+      face.object = (uint16_t) object_id;
+
       mesh->triangles[triangle_ptr++] = face;
 
       if (triangle_ptr == mesh->triangles_length) {
@@ -133,7 +136,7 @@ int read_mesh_from_file(const char* name, Wavefront_Mesh** meshes, const int pre
 
   while (!feof(file)) {
     if (line[0] == 'o') {
-      if (read_mesh(file, (*meshes) + mesh_ptr, line)) {
+      if (read_mesh(file, (*meshes) + mesh_ptr, line, mesh_ptr)) {
         free(*meshes);
         return -1;
       }
@@ -234,6 +237,8 @@ unsigned int convert_wavefront_mesh(
       triangle.edge2_normal.x = n.x * n_length - triangle.vertex_normal.x;
       triangle.edge2_normal.y = n.y * n_length - triangle.vertex_normal.y;
       triangle.edge2_normal.z = n.z * n_length - triangle.vertex_normal.z;
+
+      triangle.object_maps = t.object;
 
       (*triangles)[ptr++] = triangle;
     }

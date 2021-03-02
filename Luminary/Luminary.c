@@ -11,6 +11,7 @@
 #include "lib/mesh.h"
 #include "lib/wavefront.h"
 #include "lib/bvh.h"
+#include "lib/texture.h"
 
 int main() {
   display_gpu_information();
@@ -45,6 +46,31 @@ int main() {
 
   printf("[%.3fs] BVH structure built.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
+  TextureAssignment* texture_assignments =
+    (TextureAssignment*) malloc(sizeof(TextureAssignment) * meshes_length);
+
+  TextureRGBA* albedo_maps      = (TextureRGBA*) malloc(sizeof(TextureRGBA));
+  TextureRGBA* illuminance_maps = (TextureRGBA*) malloc(sizeof(TextureRGBA));
+  TextureRGBA* material_maps    = (TextureRGBA*) malloc(sizeof(TextureRGBA));
+
+  albedo_maps[0].width       = 1;
+  albedo_maps[0].height      = 1;
+  albedo_maps[0].data        = (RGBAF*) malloc(sizeof(RGBAF));
+  illuminance_maps[0].width  = 1;
+  illuminance_maps[0].height = 1;
+  illuminance_maps[0].data   = (RGBAF*) malloc(sizeof(RGBAF));
+  material_maps[0].width     = 1;
+  material_maps[0].height    = 1;
+  material_maps[0].data      = (RGBAF*) malloc(sizeof(RGBAF));
+
+  void* albedo_atlas      = initialize_textures(albedo_maps, 1);
+  void* illuminance_atlas = initialize_textures(illuminance_maps, 1);
+  void* material_atlas    = initialize_textures(material_maps, 1);
+
+  free_textures(albedo_atlas, 1);
+  free_textures(illuminance_atlas, 1);
+  free_textures(material_atlas, 1);
+
   Scene scene;
 
   scene.far_clip_distance = 1000.0f;
@@ -66,7 +92,7 @@ int main() {
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 10, 5000);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 10);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

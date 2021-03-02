@@ -2,6 +2,7 @@
 #define MESH_H
 
 #include "primitives.h"
+#include "stdint.h"
 
 struct UV {
   float u;
@@ -18,6 +19,7 @@ struct Triangle {
   vec3 vertex_normal;
   vec3 edge1_normal;
   vec3 edge2_normal;
+  uint16_t object_maps;
 } typedef Triangle;
 
 #endif /* MESH_H */

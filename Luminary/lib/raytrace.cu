@@ -622,8 +622,77 @@ extern "C" raytrace_instance* init_raytracing(const unsigned int width, const un
     return instance;
 }
 
+extern "C" void* initialize_textures(TextureRGBA* textures, const int textures_length) {
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop,0);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
+    cudaTextureObject_t* textures_gpu;
+
+    cudaMalloc((void**) &(textures_gpu), sizeof(cudaTextureObject_t) * textures_length);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    struct cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.addressMode[0]   = cudaAddressModeWrap;
+    texDesc.addressMode[1]   = cudaAddressModeWrap;
+    texDesc.filterMode       = cudaFilterModeLinear;
+    texDesc.readMode         = cudaReadModeElementType;
+    texDesc.normalizedCoords = 1;
+
+    for (int i = 0; i < textures_length; i++) {
+        TextureRGBA texture = textures[i];
+
+        const int num_rows = texture.height;
+        const int num_cols = texture.width;
+        RGBAF* data = texture.data;
+        RGBAF* data_gpu;
+        size_t pitch;
+        cudaMallocPitch((void**) &data_gpu, &pitch, num_cols * sizeof(RGBAF), num_rows);
+        puts(cudaGetErrorString(cudaGetLastError()));
+        cudaMemcpy2D(data_gpu, pitch, data, num_cols * sizeof(RGBAF), num_cols * sizeof(RGBAF), num_rows, cudaMemcpyHostToDevice);
+        puts(cudaGetErrorString(cudaGetLastError()));
+
+        struct cudaResourceDesc resDesc;
+        memset(&resDesc, 0, sizeof(resDesc));
+        resDesc.resType = cudaResourceTypePitch2D;
+        resDesc.res.pitch2D.devPtr = data_gpu;
+        resDesc.res.pitch2D.width = num_cols;
+        resDesc.res.pitch2D.height = num_rows;
+        resDesc.res.pitch2D.desc = cudaCreateChannelDesc<RGBAF>();
+        resDesc.res.pitch2D.pitchInBytes = pitch;
+
+        cudaCreateTextureObject(textures_cpu + i, &resDesc, &texDesc, NULL);
+        puts(cudaGetErrorString(cudaGetLastError()));
+    }
+
+    cudaMemcpy(textures_gpu, textures_cpu, sizeof(cudaTextureObject_t) * textures_length, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    free(textures_cpu);
+
+    return textures_gpu;
+}
+
+extern "C" void free_textures(void* texture_atlas, const int textures_length) {
+    cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
+    cudaMemcpy(textures_cpu, texture_atlas, sizeof(cudaTextureObject_t) * textures_length, cudaMemcpyDeviceToHost);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    for (int i = 0; i < textures_length; i++) {
+        cudaDestroyTextureObject(textures_cpu[i]);
+        puts(cudaGetErrorString(cudaGetLastError()));
+    }
+
+    cudaFree(texture_atlas);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    free(textures_cpu);
+}
+
 extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     Scene scene_gpu = scene;
+
 
     cudaMalloc((void**) &(scene_gpu.triangles), sizeof(Triangle) * scene_gpu.triangles_length);
     puts(cudaGetErrorString(cudaGetLastError()));
