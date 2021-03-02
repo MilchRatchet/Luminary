@@ -54,6 +54,15 @@ __device__
 curandStateXORWOW_t device_random;
 
 __device__
+cudaTextureObject_t* device_albedo_atlas;
+
+__device__
+cudaTextureObject_t* device_illuminance_atlas;
+
+__device__
+cudaTextureObject_t* device_material_atlas;
+
+__device__
 vec3 cross_product(const vec3 a, const vec3 b) {
     vec3 result;
 
@@ -113,6 +122,16 @@ vec3 lerp_normals(const Triangle triangle, const float lambda, const float mu) {
     result.x *= length;
     result.y *= length;
     result.z *= length;
+
+    return result;
+}
+
+__device__
+UV lerp_uv(const Triangle triangle, const float lambda, const float mu) {
+    UV result;
+
+    result.u = triangle.vertex_texture.u + lambda * triangle.edge1_texture.u + mu * triangle.edge2_texture.u;
+    result.v = triangle.vertex_texture.v + lambda * triangle.edge1_texture.v + mu * triangle.edge2_texture.v;
 
     return result;
 }
@@ -401,10 +420,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
         Triangle hit_triangle = device_scene.triangles[hit_id];
 
-        RGBF albedo;
-        albedo.r = 0.5f;
-        albedo.g = 0.5f;
-        albedo.b = 0.5f;
         vec3 normal;
         normal.x = 1.0f;
         normal.y = 1.0f;
@@ -423,6 +438,17 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         const float mu = normal.y;
 
         normal = lerp_normals(hit_triangle, lambda, mu);
+
+        UV tex_coords = lerp_uv(hit_triangle, lambda, mu);
+
+        RGBAF albedo;
+
+        float4 albedo_f = tex2D<float4>(device_albedo_atlas[hit_triangle.object_maps & 0b1], tex_coords.u, tex_coords.v);
+
+        albedo.r = albedo_f.x;
+        albedo.g = albedo_f.y;
+        albedo.b = albedo_f.z;
+        albedo.a = albedo_f.w;
 
         result.r += emission.r * intensity * weight * record.r;
         result.g += emission.g * intensity * weight * record.g;
@@ -660,7 +686,7 @@ extern "C" void* initialize_textures(TextureRGBA* textures, const int textures_l
         resDesc.res.pitch2D.devPtr = data_gpu;
         resDesc.res.pitch2D.width = num_cols;
         resDesc.res.pitch2D.height = num_rows;
-        resDesc.res.pitch2D.desc = cudaCreateChannelDesc<RGBAF>();
+        resDesc.res.pitch2D.desc = cudaCreateChannelDesc<float4>();
         resDesc.res.pitch2D.pitchInBytes = pitch;
 
         cudaCreateTextureObject(textures_cpu + i, &resDesc, &texDesc, NULL);
@@ -690,9 +716,8 @@ extern "C" void free_textures(void* texture_atlas, const int textures_length) {
     free(textures_cpu);
 }
 
-extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
+extern "C" void trace_scene(Scene scene, raytrace_instance* instance, void* albedo_atlas, void* illuminance_atlas, void* material_atlas) {
     Scene scene_gpu = scene;
-
 
     cudaMalloc((void**) &(scene_gpu.triangles), sizeof(Triangle) * scene_gpu.triangles_length);
     puts(cudaGetErrorString(cudaGetLastError()));
@@ -715,6 +740,12 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
     puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpyToSymbol(device_albedo_atlas, &(albedo_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpyToSymbol(device_illuminance_atlas, &(illuminance_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpyToSymbol(device_material_atlas, &(material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice);
     puts(cudaGetErrorString(cudaGetLastError()));
 
     set_up_raytracing_device<<<1,1>>>();

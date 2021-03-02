@@ -49,13 +49,32 @@ int main() {
   TextureAssignment* texture_assignments =
     (TextureAssignment*) malloc(sizeof(TextureAssignment) * meshes_length);
 
-  TextureRGBA* albedo_maps      = (TextureRGBA*) malloc(sizeof(TextureRGBA));
+  TextureRGBA* albedo_maps      = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 2);
   TextureRGBA* illuminance_maps = (TextureRGBA*) malloc(sizeof(TextureRGBA));
   TextureRGBA* material_maps    = (TextureRGBA*) malloc(sizeof(TextureRGBA));
 
-  albedo_maps[0].width       = 1;
-  albedo_maps[0].height      = 1;
-  albedo_maps[0].data        = (RGBAF*) malloc(sizeof(RGBAF));
+  albedo_maps[0].width  = 128;
+  albedo_maps[0].height = 128;
+  albedo_maps[0].data   = (RGBAF*) malloc(sizeof(RGBAF) * 128 * 128);
+  for (int i = 0; i < 128; i++) {
+    for (int j = 0; j < 128; j++) {
+      albedo_maps[0].data[i * 128 + j].r = 1.0f * (128.0f - j) / (128.0f);
+      albedo_maps[0].data[i * 128 + j].g = 0.0f;
+      albedo_maps[0].data[i * 128 + j].b = 1.0f * (128.0f - i) / (128.0f);
+      albedo_maps[0].data[i * 128 + j].a = 0.0f;
+    }
+  }
+  albedo_maps[1].width  = 256;
+  albedo_maps[1].height = 256;
+  albedo_maps[1].data   = (RGBAF*) malloc(sizeof(RGBAF) * 256 * 256);
+  for (int i = 0; i < 256; i++) {
+    for (int j = 0; j < 256; j++) {
+      albedo_maps[1].data[i * 256 + j].r = 1.0f * (256.0f - j) / (256.0f);
+      albedo_maps[1].data[i * 256 + j].g = 1.0f * (256.0f - i) / (256.0f);
+      albedo_maps[1].data[i * 256 + j].b = 0.0f;
+      albedo_maps[1].data[i * 256 + j].a = 0.0f;
+    }
+  }
   illuminance_maps[0].width  = 1;
   illuminance_maps[0].height = 1;
   illuminance_maps[0].data   = (RGBAF*) malloc(sizeof(RGBAF));
@@ -63,13 +82,9 @@ int main() {
   material_maps[0].height    = 1;
   material_maps[0].data      = (RGBAF*) malloc(sizeof(RGBAF));
 
-  void* albedo_atlas      = initialize_textures(albedo_maps, 1);
+  void* albedo_atlas      = initialize_textures(albedo_maps, 2);
   void* illuminance_atlas = initialize_textures(illuminance_maps, 1);
   void* material_atlas    = initialize_textures(material_maps, 1);
-
-  free_textures(albedo_atlas, 1);
-  free_textures(illuminance_atlas, 1);
-  free_textures(material_atlas, 1);
 
   Scene scene;
 
@@ -92,11 +107,11 @@ int main() {
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 10, 10);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 20);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
-  trace_scene(scene, instance);
+  trace_scene(scene, instance, albedo_atlas, illuminance_atlas, material_atlas);
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -116,6 +131,10 @@ int main() {
     PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
 
   printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
+  free_textures(albedo_atlas, 2);
+  free_textures(illuminance_atlas, 1);
+  free_textures(material_atlas, 1);
 
   free(triangles);
   free(nodes);
