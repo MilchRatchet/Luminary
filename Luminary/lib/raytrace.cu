@@ -2,13 +2,14 @@
 #include "primitives.h"
 #include "image.h"
 #include "raytrace.h"
+#include "mesh.h"
 #include <cuda_runtime_api.h>
 #include <curand_kernel.h>
 #include <float.h>
 #include <stdio.h>
 
-const int threads_per_block = 256;
-const int blocks_per_grid = 960;
+const int threads_per_block = 128;
+const int blocks_per_grid = 512;
 
 __device__
 const float epsilon = 0.001f;
@@ -52,27 +53,74 @@ Quaternion device_camera_rotation;
 __device__
 curandStateXORWOW_t device_random;
 
-
+__device__
+cudaTextureObject_t* device_albedo_atlas;
 
 __device__
-float sphere_dist(Sphere sphere, const vec3 pos) {
-    vec3 diff;
+cudaTextureObject_t* device_illuminance_atlas;
 
-    diff.x = sphere.pos.x-pos.x;
-    diff.y = sphere.pos.y-pos.y;
-    diff.z = sphere.pos.z-pos.z;
+__device__
+cudaTextureObject_t* device_material_atlas;
 
-    return sphere.sign * (norm3df(diff.x, diff.y, diff.z) - sphere.radius);
+__device__
+texture_assignment* device_texture_assignments;
+
+__device__
+vec3 cross_product(const vec3 a, const vec3 b) {
+    vec3 result;
+
+    result.x = a.y*b.z - a.z*b.y;
+    result.y = a.z*b.x - a.x*b.z;
+    result.z = a.x*b.y - a.y*b.x;
+
+    return result;
 }
 
 __device__
-vec3 sphere_normal(Sphere sphere, const vec3 pos) {
-    vec3 result;
-    result.x = pos.x - sphere.pos.x;
-    result.y = pos.y - sphere.pos.y;
-    result.z = pos.z - sphere.pos.z;
+float dot_product(const vec3 a, const vec3 b) {
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
 
-    const float length = __frsqrt_rn(result.x * result.x + result.y * result.y + result.z * result.z) * sphere.sign;
+__device__
+vec3 vec_diff(const vec3 a, const vec3 b) {
+    vec3 result;
+
+    result.x = a.x - b.x;
+    result.y = a.y - b.y;
+    result.z = a.z - b.z;
+
+    return result;
+}
+
+__device__
+vec3 get_coordinates_in_triangle(const Triangle triangle, const vec3 point) {
+    const vec3 diff = vec_diff(point, triangle.vertex);
+    const float d00 = dot_product(triangle.edge1,triangle.edge1);
+    const float d01 = dot_product(triangle.edge1,triangle.edge2);
+    const float d11 = dot_product(triangle.edge2,triangle.edge2);
+    const float d20 = dot_product(diff,triangle.edge1);
+    const float d21 = dot_product(diff,triangle.edge2);
+    const float denom = 1.0f / (d00 * d11 - d01 * d01);
+    vec3 result;
+    result.x = (d11 * d20 - d01 * d21) * denom;
+    result.y = (d00 * d21 - d01 * d20) * denom;
+    return result;
+}
+
+/*
+ * Normals should really be spherically lerped but in most cases
+ * the angle between the vertex normals is small enough, so that
+ * the performance advantage is probably worth it.
+ */
+__device__
+vec3 lerp_normals(const Triangle triangle, const float lambda, const float mu) {
+    vec3 result;
+
+    result.x = triangle.vertex_normal.x + lambda * triangle.edge1_normal.x + mu * triangle.edge2_normal.x;
+    result.y = triangle.vertex_normal.y + lambda * triangle.edge1_normal.y + mu * triangle.edge2_normal.y;
+    result.z = triangle.vertex_normal.z + lambda * triangle.edge1_normal.z + mu * triangle.edge2_normal.z;
+
+    const float length = 1.0f / sqrtf(dot_product(result, result));
 
     result.x *= length;
     result.y *= length;
@@ -82,78 +130,26 @@ vec3 sphere_normal(Sphere sphere, const vec3 pos) {
 }
 
 __device__
-float sphere_intersect(Sphere sphere, vec3 origin, vec3 ray) {
-    const float p = 2.0f * ((origin.x - sphere.pos.x) * ray.x + (origin.y - sphere.pos.y) * ray.y + (origin.z - sphere.pos.z) * ray.z);
-    const float q =
-        origin.x * origin.x + origin.y * origin.y + origin.z * origin.z +
-        sphere.pos.x * sphere.pos.x + sphere.pos.y * sphere.pos.y + sphere.pos.z * sphere.pos.z -
-        2.0f * (origin.x * sphere.pos.x + origin.y * sphere.pos.y + origin.z * sphere.pos.z) -
-        sphere.radius * sphere.radius;
+UV lerp_uv(const Triangle triangle, const float lambda, const float mu) {
+    UV result;
 
-    const float a = -p * 0.5f;
-    const float b = sqrtf((0.25f * p * p) - q);
+    result.u = triangle.vertex_texture.u + lambda * triangle.edge1_texture.u + mu * triangle.edge2_texture.u;
+    result.v = triangle.vertex_texture.v + lambda * triangle.edge1_texture.v + mu * triangle.edge2_texture.v;
 
-    if (isnan(b)) {
-        return FLT_MAX;
-    }
-
-    const float result = a - b;
-
-    return (result < 0.0f) ? FLT_MAX : result;
+    return result;
 }
 
 __device__
-float cuboid_dist(Cuboid cuboid, const vec3 pos) {
-    vec3 dist_vector;
+float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
+    origin.x -= (high.x + low.x) * 0.5f;
+    origin.y -= (high.y + low.y) * 0.5f;
+    origin.z -= (high.z + low.z) * 0.5f;
 
-    dist_vector.x = fmaxf(fabsf(cuboid.pos.x - pos.x) - cuboid.size.x, 0.0f);
-    dist_vector.y = fmaxf(fabsf(cuboid.pos.y - pos.y) - cuboid.size.y, 0.0f);
-    dist_vector.z = fmaxf(fabsf(cuboid.pos.z - pos.z) - cuboid.size.z, 0.0f);
+    const float size_x = (high.x - low.x) * 0.5f;
+    const float size_y = (high.y - low.y) * 0.5f;
+    const float size_z = (high.z - low.z) * 0.5f;
 
-    return cuboid.sign * norm3df(dist_vector.x, dist_vector.y, dist_vector.z);
-}
-
-__device__
-vec3 cuboid_normal(Cuboid cuboid, const vec3 pos) {
-    vec3 normal;
-    vec3 abs_norm;
-
-    normal.x = pos.x - cuboid.pos.x;
-    normal.y = pos.y - cuboid.pos.y;
-    normal.z = pos.z - cuboid.pos.z;
-
-    abs_norm.x = fmaxf(epsilon + fabsf(normal.x) - cuboid.size.x, 0.0f);
-    abs_norm.y = fmaxf(epsilon + fabsf(normal.y) - cuboid.size.y, 0.0f);
-    abs_norm.z = fmaxf(epsilon + fabsf(normal.z) - cuboid.size.z, 0.0f);
-
-    normal.x = copysignf(abs_norm.x, normal.x);
-    normal.y = copysignf(abs_norm.y, normal.y);
-    normal.z = copysignf(abs_norm.z, normal.z);
-
-    float length = __frsqrt_rn(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z) * cuboid.sign;
-
-    normal.x *= length;
-    normal.y *= length;
-    normal.z *= length;
-
-    return normal;
-}
-
-/*
- * Based on:
- * A. Majercik, C. Crassin, P. Shirley, M. McGuire,
- * "A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering",
- * Journal of Computer Graphics Techniques, 7(3), pp. 66-82, 2018
- *
- * This implementation is probably not quite sufficient
- *
- * Assumes that origin is not inside a box
- */
-__device__
-float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
-    origin.x -= cuboid.pos.x;
-    origin.y -= cuboid.pos.y;
-    origin.z -= cuboid.pos.z;
+    if ((fabsf(origin.x) < size_x) && (fabsf(origin.y) < size_y) && (fabsf(origin.z) < size_z)) return 0.0f;
 
     vec3 d;
 
@@ -163,17 +159,17 @@ float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
     sign.y = copysignf(1.0f, -ray.y);
     sign.z = copysignf(1.0f, -ray.z);
 
-    d.x = cuboid.size.x * sign.x - origin.x;
-    d.y = cuboid.size.y * sign.y - origin.y;
-    d.z = cuboid.size.z * sign.z - origin.z;
+    d.x = size_x * sign.x - origin.x;
+    d.y = size_y * sign.y - origin.y;
+    d.z = size_z * sign.z - origin.z;
 
     d.x /= ray.x;
     d.y /= ray.y;
     d.z /= ray.z;
 
-    const bool test_x = (d.x >= 0.0f) && (fabsf(origin.y + ray.y * d.x) < cuboid.size.y) && (fabsf(origin.z + ray.z * d.x) < cuboid.size.z);
-    const bool test_y = (d.y >= 0.0f) && (fabsf(origin.x + ray.x * d.y) < cuboid.size.x) && (fabsf(origin.z + ray.z * d.y) < cuboid.size.z);
-    const bool test_z = (d.z >= 0.0f) && (fabsf(origin.x + ray.x * d.z) < cuboid.size.x) && (fabsf(origin.y + ray.y * d.z) < cuboid.size.y);
+    const bool test_x = (d.x >= 0.0f) && (fabsf(origin.y + ray.y * d.x) < size_y) && (fabsf(origin.z + ray.z * d.x) < size_z);
+    const bool test_y = (d.y >= 0.0f) && (fabsf(origin.x + ray.x * d.y) < size_x) && (fabsf(origin.z + ray.z * d.y) < size_z);
+    const bool test_z = (d.z >= 0.0f) && (fabsf(origin.x + ray.x * d.z) < size_x) && (fabsf(origin.y + ray.y * d.z) < size_y);
 
     vec3 sgn;
 
@@ -205,12 +201,33 @@ float cuboid_intersect(Cuboid cuboid, vec3 origin, vec3 ray) {
     }
 }
 
-/*
- * Based on
- * J. Frisvad,
- * "Building an Orthonormal Basis from a 3D Unit Vector Without Normalization",
- * Journal of Graphics Tools, 16(3), pp. 151-159, 2012
- */
+__device__
+float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
+    const vec3 h = cross_product(ray, triangle.edge2);
+    const float a = dot_product(triangle.edge1, h);
+
+    if (a > -0.00000001 && a < 0.00000001) return FLT_MAX;
+
+    const float f = 1.0f / a;
+    const vec3 s = vec_diff(origin, triangle.vertex);
+    const float u = f * dot_product(s, h);
+
+    if (u < 0.0f || u > 1.0f) return FLT_MAX;
+
+    const vec3 q = cross_product(s, triangle.edge1);
+    const float v = f * dot_product(ray, q);
+
+    if (v < 0.0f || u + v > 1.0f) return FLT_MAX;
+
+    const float t = f * dot_product(triangle.edge2, q);
+
+    if (t > -epsilon) {
+        return t;
+    } else {
+        return FLT_MAX;
+    }
+}
+
 __device__
 vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const vec3 basis) {
     vec3 u1, u2;
@@ -248,6 +265,16 @@ vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const
     return result;
 }
 
+__device__
+int trailing_zeros(unsigned int n) {
+    int mask = 1;
+    for (int i = 0; i < 32; i++, mask <<= 1)
+        if ((n & mask) != 0)
+            return i;
+
+    return 32;
+}
+
 /*
  * Uses some self modified Blinn-Phong BRDF.
  */
@@ -269,74 +296,149 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     sky.g = 0.0f;
     sky.b = 0.0f;
 
-    for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
-        float depth = FLT_MAX;
+    int traversals = 0;
+    unsigned int ray_triangle_intersections = 0;
 
-        int hit_id = 0;
+    for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
+        float depth = device_scene.far_clip_distance;
+
+        unsigned int hit_id = 0xffffffff;
 
         vec3 curr;
 
-        for (int j = 0; j < device_scene.spheres_length; j++) {
-            const float d = sphere_intersect(device_scene.spheres[j], origin, ray);
+        int node_address = 0;
+        int node_key = 1;
+        int bit_trail = 0;
+        int mrpn_address = -1;
 
-            if (d < depth) {
-                depth = d;
-                hit_id = device_scene.spheres[j].id;
+        while (node_address != -1) {
+            while (device_scene.nodes[node_address].triangles_address == -1) {
+                Node node = device_scene.nodes[node_address];
+
+                traversals++;
+
+                const float L = ray_box_intersect(node.left_low, node.left_high, origin, ray);
+                const float R = ray_box_intersect(node.right_low, node.right_high, origin, ray);
+                const int R_is_closest = R < L;
+
+                if (L < depth || R < depth) {
+
+                    node_key = node_key << 1;
+                    bit_trail = bit_trail << 1;
+
+                    if (L >= depth || R_is_closest) {
+                        node_address = 2 * node_address + 2;
+                        node_key = node_key ^ 0b1;
+                    }
+                    else {
+                        node_address = 2 * node_address + 1;
+                    }
+
+                    if (L < depth && R < depth) {
+                        bit_trail = bit_trail ^ 0b1;
+                        if (R_is_closest) {
+                            mrpn_address = node_address - 1;
+                        }
+                        else {
+                            mrpn_address = node_address + 1;
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if (device_scene.nodes[node_address].triangles_address != -1) {
+                Node node = device_scene.nodes[node_address];
+
+                for (unsigned int i = 0; i < node.triangle_count; i++) {
+                    const float d = triangle_intersection(device_scene.triangles[node.triangles_address + i], origin, ray);
+
+                    ray_triangle_intersections++;
+
+                    if (d < depth) {
+                        depth = d;
+                        hit_id = node.triangles_address + i;
+                    }
+                }
+            }
+
+            if (bit_trail == 0) {
+                node_address = -1;
+            }
+            else {
+                int num_levels = trailing_zeros(bit_trail);
+                bit_trail = (bit_trail >> num_levels) ^ 0b1;
+                node_key = (node_key >> num_levels) ^ 0b1;
+                if (mrpn_address != -1) {
+                    node_address = mrpn_address;
+                    mrpn_address = -1;
+                }
+                else {
+                    node_address = node_key - 1;
+                }
             }
         }
 
-        for (int j = 0; j < device_scene.cuboids_length; j++) {
-            const float d = cuboid_intersect(device_scene.cuboids[j], origin, ray);
-
-            if (d < depth) {
-                depth = d;
-                hit_id = device_scene.cuboids[j].id;
-            }
-        }
-
-        if (hit_id == 0) {
+        if (hit_id == 0xffffffff) {
             result.r += sky.r * weight * record.r;
             result.g += sky.g * weight * record.g;
             result.b += sky.b * weight * record.b;
 
+            /*result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
+            result.g = 0;
+            result.b = traversals * (4.0f/device_scene.nodes_length);*/
+
             return result;
-        }
+        } /*else {
+            result.r += depth * 0.05f;
+            result.g += depth * 0.05f;
+            result.b += depth * 0.05f;
+
+            return result;
+        }*/
 
         curr.x = origin.x + ray.x * depth;
         curr.y = origin.y + ray.y * depth;
         curr.z = origin.z + ray.z * depth;
 
-        RGBF albedo;
-        vec3 normal;
-        float smoothness;
-        RGBF emission;
-        float intensity;
-        float metallic;
+        Triangle hit_triangle = device_scene.triangles[hit_id];
 
-        for (int i = 0; i < device_scene.spheres_length; i++) {
-            if (hit_id == device_scene.spheres[i].id) {
-                const Sphere sphere = device_scene.spheres[i];
-                albedo = sphere.color;
-                normal = sphere_normal(sphere, curr);
-                smoothness = sphere.smoothness;
-                emission = sphere.emission;
-                intensity = sphere.intensity;
-                metallic = sphere.metallic;
-                break;
-            }
-        }
-        for (int i = 0; i < device_scene.cuboids_length; i++) {
-            if (hit_id == device_scene.cuboids[i].id) {
-                const Cuboid cuboid = device_scene.cuboids[i];
-                albedo = cuboid.color;
-                normal = cuboid_normal(cuboid, curr);
-                smoothness = cuboid.smoothness;
-                emission = cuboid.emission;
-                intensity = cuboid.intensity;
-                metallic = cuboid.metallic;
-                break;
-            }
-        }
+        vec3 normal;
+        normal.x = 1.0f;
+        normal.y = 1.0f;
+        normal.z = 1.0f;
+
+
+        normal = get_coordinates_in_triangle(hit_triangle, curr);
+
+        const float lambda = normal.x;
+        const float mu = normal.y;
+
+        normal = lerp_normals(hit_triangle, lambda, mu);
+
+        UV tex_coords = lerp_uv(hit_triangle, lambda, mu);
+
+        RGBAF albedo;
+        RGBF emission;
+
+        float4 albedo_f = tex2D<float4>(device_albedo_atlas[device_texture_assignments[hit_triangle.object_maps].albedo_map], tex_coords.u, 1.0f - tex_coords.v);
+        float4 illumiance_f = tex2D<float4>(device_illuminance_atlas[device_texture_assignments[hit_triangle.object_maps].illuminance_map], tex_coords.u, 1.0f - tex_coords.v);
+        float4 material_f = tex2D<float4>(device_material_atlas[device_texture_assignments[hit_triangle.object_maps].material_map], tex_coords.u, 1.0f - tex_coords.v);
+
+        albedo.r = albedo_f.x;
+        albedo.g = albedo_f.y;
+        albedo.b = albedo_f.z;
+        albedo.a = albedo_f.w;
+
+        emission.r = illumiance_f.x;
+        emission.g = illumiance_f.y;
+        emission.b = illumiance_f.z;
+
+        const float smoothness = material_f.x;
+        const float metallic = material_f.y;
+        const float intensity = material_f.z;
+
 
         result.r += emission.r * intensity * weight * record.r;
         result.g += emission.g * intensity * weight * record.g;
@@ -363,7 +465,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         specular_ray.y *= specular_ray_length;
         specular_ray.z *= specular_ray_length;
 
-        const float specular = curand_uniform(&device_random);
+        const float specular = curand_uniform(random);
 
         if (specular < smoothness) {
             record.r *= (albedo.r * metallic + 1.0f - metallic);
@@ -399,6 +501,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
         weight *= ((1.0f - smoothness) * 0.31830988618f) + (smoothness * 0.5f * 0.31830988618f);
     }
+
+    /*result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
+    result.g = 0;
+    result.b = traversals * (4.0f/device_scene.nodes_length);*/
 
     return result;
 }
@@ -436,7 +542,7 @@ void trace_rays() {
 
     while (id < device_amount) {
         int x = id % device_width;
-        int y = (id - x) / device_width;
+        int y = id / device_width;
 
         curandStateXORWOW_t random;
 
@@ -453,7 +559,7 @@ void trace_rays() {
 
         for (int i = 0; i < device_diffuse_samples; i++) {
             default_ray.x = -device_scene.camera.fov + device_step * x + device_offset_x * curand_uniform(&random) * 2.0f;
-            default_ray.y = -device_vfov + device_step * y + device_offset_y * curand_uniform(&random) * 2.0f;
+            default_ray.y = device_vfov - device_step * y - device_offset_y * curand_uniform(&random) * 2.0f;
             default_ray.z = -1.0f;
 
             ray = rotate_vector_by_quaternion(default_ray, device_camera_rotation);
@@ -532,36 +638,132 @@ extern "C" raytrace_instance* init_raytracing(const unsigned int width, const un
     return instance;
 }
 
-extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
+extern "C" void* initialize_textures(TextureRGBA* textures, const int textures_length) {
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop,0);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
+    cudaTextureObject_t* textures_gpu;
+
+    cudaMalloc((void**) &(textures_gpu), sizeof(cudaTextureObject_t) * textures_length);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    struct cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.addressMode[0]   = cudaAddressModeWrap;
+    texDesc.addressMode[1]   = cudaAddressModeWrap;
+    texDesc.filterMode       = cudaFilterModeLinear;
+    texDesc.readMode         = cudaReadModeElementType;
+    texDesc.normalizedCoords = 1;
+
+    for (int i = 0; i < textures_length; i++) {
+        TextureRGBA texture = textures[i];
+
+        const int num_rows = texture.height;
+        const int num_cols = texture.width;
+        RGBAF* data = texture.data;
+        RGBAF* data_gpu;
+        size_t pitch;
+        cudaMallocPitch((void**) &data_gpu, &pitch, num_cols * sizeof(RGBAF), num_rows);
+        puts(cudaGetErrorString(cudaGetLastError()));
+        cudaMemcpy2D(data_gpu, pitch, data, num_cols * sizeof(RGBAF), num_cols * sizeof(RGBAF), num_rows, cudaMemcpyHostToDevice);
+        puts(cudaGetErrorString(cudaGetLastError()));
+
+        struct cudaResourceDesc resDesc;
+        memset(&resDesc, 0, sizeof(resDesc));
+        resDesc.resType = cudaResourceTypePitch2D;
+        resDesc.res.pitch2D.devPtr = data_gpu;
+        resDesc.res.pitch2D.width = num_cols;
+        resDesc.res.pitch2D.height = num_rows;
+        resDesc.res.pitch2D.desc = cudaCreateChannelDesc<float4>();
+        resDesc.res.pitch2D.pitchInBytes = pitch;
+
+        cudaCreateTextureObject(textures_cpu + i, &resDesc, &texDesc, NULL);
+        puts(cudaGetErrorString(cudaGetLastError()));
+    }
+
+    cudaMemcpy(textures_gpu, textures_cpu, sizeof(cudaTextureObject_t) * textures_length, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    free(textures_cpu);
+
+    return textures_gpu;
+}
+
+extern "C" void free_textures(void* texture_atlas, const int textures_length) {
+    cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
+    cudaMemcpy(textures_cpu, texture_atlas, sizeof(cudaTextureObject_t) * textures_length, cudaMemcpyDeviceToHost);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    for (int i = 0; i < textures_length; i++) {
+        cudaDestroyTextureObject(textures_cpu[i]);
+        puts(cudaGetErrorString(cudaGetLastError()));
+    }
+
+    cudaFree(texture_atlas);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    free(textures_cpu);
+}
+
+extern "C" void trace_scene(Scene scene, raytrace_instance* instance, void* albedo_atlas, void* illuminance_atlas, void* material_atlas, texture_assignment* texture_assignments, int meshes_count) {
     Scene scene_gpu = scene;
 
-    cudaMalloc((void**) &(scene_gpu.spheres), sizeof(Sphere) * scene_gpu.spheres_length);
-    cudaMalloc((void**) &(scene_gpu.cuboids), sizeof(Cuboid) * scene_gpu.cuboids_length);
+    texture_assignment* texture_assignments_gpu;
 
-    cudaMemcpy(scene_gpu.spheres, scene.spheres, sizeof(Sphere) * scene.spheres_length, cudaMemcpyHostToDevice);
-    cudaMemcpy(scene_gpu.cuboids, scene.cuboids, sizeof(Cuboid) * scene.cuboids_length, cudaMemcpyHostToDevice);
+    cudaMalloc((void**) &(texture_assignments_gpu), sizeof(texture_assignment) * meshes_count);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMalloc((void**) &(scene_gpu.triangles), sizeof(Triangle) * scene_gpu.triangles_length);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMalloc((void**) &(scene_gpu.nodes), sizeof(Node) * scene_gpu.nodes_length);
+    puts(cudaGetErrorString(cudaGetLastError()));
 
+    cudaMemcpy(texture_assignments_gpu, texture_assignments, sizeof(texture_assignment) * meshes_count, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpy(scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpy(scene_gpu.nodes, scene.nodes, sizeof(Node) * scene.nodes_length, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    cudaMemcpyToSymbol(device_texture_assignments, &(texture_assignments_gpu), sizeof(texture_assignment*), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_frame, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_scene, &scene_gpu, sizeof(Scene), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_reflection_depth, &(instance->reflection_depth), sizeof(int), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_diffuse_samples, &(instance->diffuse_samples), sizeof(int), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
     cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpyToSymbol(device_albedo_atlas, &(albedo_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpyToSymbol(device_illuminance_atlas, &(illuminance_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+    cudaMemcpyToSymbol(device_material_atlas, &(material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+
 
     set_up_raytracing_device<<<1,1>>>();
 
     cudaDeviceSynchronize();
+    puts(cudaGetErrorString(cudaGetLastError()));
 
     trace_rays<<<blocks_per_grid,threads_per_block>>>();
 
     cudaDeviceSynchronize();
-
-    cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost);
-
     puts(cudaGetErrorString(cudaGetLastError()));
 
-    cudaFree(scene_gpu.spheres);
-    cudaFree(scene_gpu.cuboids);
+    cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost);
+    puts(cudaGetErrorString(cudaGetLastError()));
+
+    cudaFree(texture_assignments_gpu);
+    cudaFree(scene_gpu.triangles);
+    cudaFree(scene_gpu.nodes);
 }
 
 extern "C" void frame_buffer_to_image(Camera camera, raytrace_instance* instance, RGB8* image) {

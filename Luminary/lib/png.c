@@ -8,6 +8,7 @@
 #include <string.h>
 #include "png.h"
 #include "zlib/zlib.h"
+#include "texture.h"
 
 static inline void write_int_big_endian(uint8_t* buffer, uint32_t value) {
   buffer[0] = value >> 24;
@@ -112,7 +113,7 @@ int store_as_png(
   uint8_t bytes_per_pixel;
   uint8_t bytes_per_channel;
 
-  if (bit_depth == 16) {
+  if (bit_depth == PNG_BITDEPTH_16) {
     bytes_per_channel = 2;
   }
   else {
@@ -120,23 +121,23 @@ int store_as_png(
   }
 
   switch (color_type) {
-  case 0:
+  case PNG_COLORTYPE_GRAYSCALE:
     bytes_per_pixel = 1 * bytes_per_channel;
     break;
 
-  case 2:
+  case PNG_COLORTYPE_TRUECOLOR:
     bytes_per_pixel = 3 * bytes_per_channel;
     break;
 
-  case 3:
+  case PNG_COLORTYPE_INDEXED:
     bytes_per_pixel = 1 * bytes_per_channel;
     break;
 
-  case 4:
+  case PNG_COLORTYPE_GRAYSCALE_ALPHA:
     bytes_per_pixel = 2 * bytes_per_channel;
     break;
 
-  case 6:
+  case PNG_COLORTYPE_TRUECOLOR_ALPHA:
     bytes_per_pixel = 4 * bytes_per_channel;
     break;
 
@@ -193,4 +194,335 @@ int store_as_png(
   free(filtered_image);
 
   return 0;
+}
+
+static inline uint32_t read_int_big_endian(uint8_t* buffer) {
+  uint32_t result = 0;
+
+  result += ((uint32_t) buffer[0]) << 24;
+  result += ((uint32_t) buffer[1]) << 16;
+  result += ((uint32_t) buffer[2]) << 8;
+  result += ((uint32_t) buffer[3]);
+
+  return result;
+}
+
+static int verify_header(FILE* file) {
+  uint8_t* header = (uint8_t*) malloc(8);
+
+  fread(header, 1, 8, file);
+
+  int result = 0;
+
+  result += header[0] ^ 0x89ui8;
+  result += header[1] ^ 0x50ui8;
+  result += header[2] ^ 0x4Eui8;
+  result += header[3] ^ 0x47ui8;
+  result += header[4] ^ 0x0Dui8;
+  result += header[5] ^ 0x0Aui8;
+  result += header[6] ^ 0x1Aui8;
+  result += header[7] ^ 0x0Aui8;
+
+  free(header);
+
+  return result;
+}
+
+static inline TextureRGBA default_failure() {
+  puts("png.c: File content is corrupted!");
+  TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
+  return fallback;
+}
+
+static void reconstruction_1_uint8(uint8_t* line, const uint32_t line_length) {
+  uint8_t a_r, a_g, a_b, a_a;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+  a_a = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    a_r += line[4 * j];
+    a_g += line[4 * j + 1];
+    a_b += line[4 * j + 2];
+    a_a += line[4 * j + 3];
+
+    line[4 * j]     = a_r;
+    line[4 * j + 1] = a_g;
+    line[4 * j + 2] = a_b;
+    line[4 * j + 3] = a_a;
+  }
+}
+
+static void reconstruction_2_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t b_r, b_g, b_b, b_a;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[4 * j];
+    b_g = prior_line[4 * j + 1];
+    b_b = prior_line[4 * j + 2];
+    b_a = prior_line[4 * j + 3];
+
+    line[4 * j] += b_r;
+    line[4 * j + 1] += b_g;
+    line[4 * j + 2] += b_b;
+    line[4 * j + 3] += b_a;
+  }
+}
+
+static void reconstruction_3_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t a_r, a_g, a_b, a_a;
+  uint8_t b_r, b_g, b_b, b_a;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+  a_a = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[4 * j];
+    b_g = prior_line[4 * j + 1];
+    b_b = prior_line[4 * j + 2];
+    b_a = prior_line[4 * j + 3];
+
+    line[4 * j] += ((uint16_t) a_r + (uint16_t) b_r) / 2;
+    line[4 * j + 1] += ((uint16_t) a_g + (uint16_t) b_g) / 2;
+    line[4 * j + 2] += ((uint16_t) a_b + (uint16_t) b_b) / 2;
+    line[4 * j + 3] += ((uint16_t) a_a + (uint16_t) b_a) / 2;
+
+    a_r = line[4 * j];
+    a_g = line[4 * j + 1];
+    a_b = line[4 * j + 2];
+    a_a = line[4 * j + 3];
+  }
+}
+
+static uint8_t paeth_uint8(uint8_t a, uint8_t b, uint8_t c) {
+  uint8_t pr;
+  const int16_t p  = (int16_t) a + (int16_t) b - (int16_t) c;
+  const int16_t pa = abs(p - (int16_t) a);
+  const int16_t pb = abs(p - (int16_t) b);
+  const int16_t pc = abs(p - (int16_t) c);
+  if (pa <= pb && pa <= pc) {
+    pr = a;
+  }
+  else if (pb <= pc) {
+    pr = b;
+  }
+  else {
+    pr = c;
+  }
+  return pr;
+}
+
+static void reconstruction_4_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t a_r, a_g, a_b, a_a;
+  uint8_t b_r, b_g, b_b, b_a;
+  uint8_t c_r, c_g, c_b, c_a;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+  a_a = 0;
+
+  c_r = 0;
+  c_g = 0;
+  c_b = 0;
+  c_a = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[4 * j];
+    b_g = prior_line[4 * j + 1];
+    b_b = prior_line[4 * j + 2];
+    b_a = prior_line[4 * j + 3];
+
+    line[4 * j] += paeth_uint8(a_r, b_r, c_r);
+    line[4 * j + 1] += paeth_uint8(a_g, b_g, c_g);
+    line[4 * j + 2] += paeth_uint8(a_b, b_b, c_b);
+    line[4 * j + 3] += paeth_uint8(a_a, b_a, c_a);
+
+    a_r = line[4 * j];
+    a_g = line[4 * j + 1];
+    a_b = line[4 * j + 2];
+    a_a = line[4 * j + 3];
+
+    c_r = prior_line[4 * j];
+    c_g = prior_line[4 * j + 1];
+    c_b = prior_line[4 * j + 2];
+    c_a = prior_line[4 * j + 3];
+  }
+}
+
+TextureRGBA load_texture_from_png(const char* filename) {
+  FILE* file = fopen(filename, "rb");
+
+  if (!file) {
+    puts("png.c: File could not be opened!");
+    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
+    return fallback;
+  }
+
+  if (verify_header(file)) {
+    puts("png.c: File header does not correspond to png!");
+    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
+    return fallback;
+  }
+
+  uint8_t* IHDR = (uint8_t*) malloc(25);
+
+  fread(IHDR, 1, 25, file);
+
+  if (read_int_big_endian(IHDR) != 13u) {
+    return default_failure();
+  }
+
+  if (read_int_big_endian(IHDR + 4) != 1229472850u) {
+    return default_failure();
+  }
+
+  const uint32_t width         = read_int_big_endian(IHDR + 8);
+  const uint32_t height        = read_int_big_endian(IHDR + 12);
+  const uint8_t bit_depth      = IHDR[16];
+  const uint8_t color_type     = IHDR[17];
+  const uint8_t interlace_type = IHDR[20];
+
+  if (
+    color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA || bit_depth != PNG_BITDEPTH_8
+    || interlace_type == PNG_INTERLACE_ADAM7) {
+    puts("png.c: File properties are not supported!");
+    printf("Width: %u, Height: %u\n", width, height);
+    printf(
+      "bit_depth: %u, color_type: %u, interlace_type: %u\n", bit_depth, color_type, interlace_type);
+    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
+    return fallback;
+  }
+
+  if ((uint32_t) crc32(0, IHDR + 4, 17) != read_int_big_endian(IHDR + 21)) {
+    return default_failure();
+  }
+
+  const uint32_t byte_per_pixel = (bit_depth == PNG_BITDEPTH_16) ? 8u : 4u;
+
+  free(IHDR);
+
+  TextureRGBA result = {.width = width, .height = height};
+
+  uint8_t* chunk = (uint8_t*) malloc(8);
+
+  fread(chunk, 1, 8, file);
+
+  if (read_int_big_endian(chunk + 4) == 1347179589u) {
+    puts("png.c: Color Palette found but is ignored!");
+    const uint32_t length = read_int_big_endian(chunk);
+    fseek(file, length + 4u, SEEK_CUR);
+
+    fread(chunk, 1, 8, file);
+  }
+
+  if (read_int_big_endian(chunk + 4) != 1229209940u) {
+    puts("png.c: File chunks are unexpected!");
+    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
+    return fallback;
+  }
+
+  uint8_t* filtered_data     = (uint8_t*) malloc(width * height * byte_per_pixel + height);
+  uint8_t* compressed_buffer = (uint8_t*) malloc(2 * (width * height * byte_per_pixel + height));
+
+  uint32_t combined_compressed_length = 0;
+
+  while (read_int_big_endian(chunk + 4) == 1229209940u) {
+    const int compressed_length = read_int_big_endian(chunk);
+
+    uint8_t* compressed_data = (uint8_t*) malloc(compressed_length + 4);
+
+    write_int_big_endian(compressed_data, 1229209940u);
+
+    fread(compressed_data + 4, 1, compressed_length, file);
+
+    fread(chunk, 1, 4, file);
+
+    if ((uint32_t) crc32(0, compressed_data, compressed_length + 4) != read_int_big_endian(chunk)) {
+      return default_failure();
+    }
+
+    memcpy(compressed_buffer + combined_compressed_length, compressed_data + 4, compressed_length);
+
+    combined_compressed_length += compressed_length;
+
+    free(compressed_data);
+
+    fread(chunk, 1, 8, file);
+  }
+
+  free(chunk);
+
+  z_stream defstream;
+  defstream.zalloc = Z_NULL;
+  defstream.zfree  = Z_NULL;
+  defstream.opaque = Z_NULL;
+
+  defstream.avail_in  = (uInt) combined_compressed_length;
+  defstream.next_in   = (Bytef*) compressed_buffer;
+  defstream.avail_out = (uInt) width * height * byte_per_pixel + height;
+  defstream.next_out  = (Bytef*) filtered_data;
+
+  inflateInit(&defstream);
+  inflate(&defstream, Z_FINISH);
+
+  inflateEnd(&defstream);
+
+  free(compressed_buffer);
+
+  uint8_t* data = (uint8_t*) malloc(width * height * byte_per_pixel);
+
+  uint8_t* line_buffer = (uint8_t*) malloc(width * byte_per_pixel);
+  memset(line_buffer, 0, width * byte_per_pixel);
+
+  for (uint32_t i = 0; i < height; i++) {
+    const uint8_t filter = filtered_data[i * (width * byte_per_pixel + 1)];
+
+    memcpy(
+      data + i * width * byte_per_pixel, filtered_data + 1 + i * (width * byte_per_pixel + 1),
+      width * byte_per_pixel);
+
+    if (filter == 1u) {
+      reconstruction_1_uint8(data + i * width * byte_per_pixel, width);
+    }
+    else if (filter == 2u) {
+      reconstruction_2_uint8(data + i * width * byte_per_pixel, width, line_buffer);
+    }
+    else if (filter == 3u) {
+      reconstruction_3_uint8(data + i * width * byte_per_pixel, width, line_buffer);
+    }
+    else if (filter == 4u) {
+      reconstruction_4_uint8(data + i * width * byte_per_pixel, width, line_buffer);
+    }
+
+    memcpy(line_buffer, data + i * width * byte_per_pixel, width * byte_per_pixel);
+  }
+
+  free(line_buffer);
+
+  RGBAF* float_data = (RGBAF*) malloc(width * height * sizeof(RGBAF));
+
+  for (uint32_t i = 0; i < width * height; i++) {
+    RGBAF pixel = {
+      .r = data[i * byte_per_pixel] / 255.0f,
+      .g = data[i * byte_per_pixel + 1] / 255.0f,
+      .b = data[i * byte_per_pixel + 2] / 255.0f,
+      .a = data[i * byte_per_pixel + 3] / 255.0f};
+
+    float_data[i] = pixel;
+  }
+
+  free(data);
+
+  result.data = float_data;
+
+  free(filtered_data);
+
+  fclose(file);
+
+  return result;
 }

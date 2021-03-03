@@ -22,4 +22,11 @@ struct RGBF {
   float b;
 } typedef RGBF;
 
+struct RGBAF {
+  float r;
+  float g;
+  float b;
+  float a;
+} typedef RGBAF;
+
 #endif /* IMAGE_H */
