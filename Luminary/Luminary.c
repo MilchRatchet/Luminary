@@ -14,6 +14,25 @@
 #include "lib/texture.h"
 
 int main() {
+  TextureRGBA testTex = load_texture_from_png("Type59_hull_01_AM_hd.png");
+
+  uint8_t* test_rawdata = (uint8_t*) malloc(4 * testTex.width * testTex.height);
+
+  for (uint32_t i = 0; i < testTex.height * testTex.width; i++) {
+    RGBAF pixel = testTex.data[i];
+
+    test_rawdata[i * 4]     = (uint8_t)(pixel.r * 255.9f);
+    test_rawdata[i * 4 + 1] = (uint8_t)(pixel.g * 255.9f);
+    test_rawdata[i * 4 + 2] = (uint8_t)(pixel.b * 255.9f);
+    test_rawdata[i * 4 + 3] = (uint8_t)(pixel.a * 255.9f);
+  }
+
+  store_as_png(
+    "testTexture.png", test_rawdata, testTex.height * testTex.width * 4, testTex.width,
+    testTex.height, PNG_COLORTYPE_TRUECOLOR_ALPHA, PNG_BITDEPTH_8);
+
+  return 0;
+
   display_gpu_information();
 
   clock_t time = clock();
@@ -53,7 +72,7 @@ int main() {
   TextureRGBA* illuminance_maps = (TextureRGBA*) malloc(sizeof(TextureRGBA));
   TextureRGBA* material_maps    = (TextureRGBA*) malloc(sizeof(TextureRGBA));
 
-  albedo_maps[0].width  = 128;
+  /*albedo_maps[0].width  = 128;
   albedo_maps[0].height = 128;
   albedo_maps[0].data   = (RGBAF*) malloc(sizeof(RGBAF) * 128 * 128);
   for (int i = 0; i < 128; i++) {
@@ -63,8 +82,8 @@ int main() {
       albedo_maps[0].data[i * 128 + j].b = 1.0f * (128.0f - i) / (128.0f);
       albedo_maps[0].data[i * 128 + j].a = 0.0f;
     }
-  }
-  albedo_maps[1].width  = 256;
+  }*/
+  /*albedo_maps[1].width  = 256;
   albedo_maps[1].height = 256;
   albedo_maps[1].data   = (RGBAF*) malloc(sizeof(RGBAF) * 256 * 256);
   for (int i = 0; i < 256; i++) {
@@ -74,7 +93,14 @@ int main() {
       albedo_maps[1].data[i * 256 + j].b = 0.0f;
       albedo_maps[1].data[i * 256 + j].a = 0.0f;
     }
+  }*/
+  for (int i = 0; i < 10; i++) {
+    RGBAF pixel = testTex.data[i];
+    printf("R:%.2f G:%.2f B:%.2f A:%.2f\n", pixel.r, pixel.g, pixel.b, pixel.a);
   }
+  albedo_maps[0] = load_texture_from_png("Type59_hull_01_AM_hd.png");
+  albedo_maps[1] = load_texture_from_png("Type59_hull_01_AM_hd.png");
+
   illuminance_maps[0].width  = 1;
   illuminance_maps[0].height = 1;
   illuminance_maps[0].data   = (RGBAF*) malloc(sizeof(RGBAF));
