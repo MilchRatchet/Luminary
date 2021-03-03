@@ -234,6 +234,126 @@ static inline TextureRGBA default_failure() {
   return fallback;
 }
 
+static void reconstruction_1_uint8(uint8_t* line, const uint32_t line_length) {
+  uint8_t a_r, a_g, a_b, a_a;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+  a_a = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    a_r += line[4 * j];
+    a_g += line[4 * j + 1];
+    a_b += line[4 * j + 2];
+    a_a += line[4 * j + 3];
+
+    line[4 * j]     = a_r;
+    line[4 * j + 1] = a_g;
+    line[4 * j + 2] = a_b;
+    line[4 * j + 3] = a_a;
+  }
+}
+
+static void reconstruction_2_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t b_r, b_g, b_b, b_a;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[4 * j];
+    b_g = prior_line[4 * j + 1];
+    b_b = prior_line[4 * j + 2];
+    b_a = prior_line[4 * j + 3];
+
+    line[4 * j] += b_r;
+    line[4 * j + 1] += b_g;
+    line[4 * j + 2] += b_b;
+    line[4 * j + 3] += b_a;
+  }
+}
+
+static void reconstruction_3_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t a_r, a_g, a_b, a_a;
+  uint8_t b_r, b_g, b_b, b_a;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+  a_a = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[4 * j];
+    b_g = prior_line[4 * j + 1];
+    b_b = prior_line[4 * j + 2];
+    b_a = prior_line[4 * j + 3];
+
+    line[4 * j] += ((uint16_t) a_r + (uint16_t) b_r) / 2;
+    line[4 * j + 1] += ((uint16_t) a_g + (uint16_t) b_g) / 2;
+    line[4 * j + 2] += ((uint16_t) a_b + (uint16_t) b_b) / 2;
+    line[4 * j + 3] += ((uint16_t) a_a + (uint16_t) b_a) / 2;
+
+    a_r = line[4 * j];
+    a_g = line[4 * j + 1];
+    a_b = line[4 * j + 2];
+    a_a = line[4 * j + 3];
+  }
+}
+
+static uint8_t paeth_uint8(uint8_t a, uint8_t b, uint8_t c) {
+  uint8_t pr;
+  const int16_t p  = (int16_t) a + (int16_t) b - (int16_t) c;
+  const int16_t pa = abs(p - (int16_t) a);
+  const int16_t pb = abs(p - (int16_t) b);
+  const int16_t pc = abs(p - (int16_t) c);
+  if (pa <= pb && pa <= pc) {
+    pr = a;
+  }
+  else if (pb <= pc) {
+    pr = b;
+  }
+  else {
+    pr = c;
+  }
+  return pr;
+}
+
+static void reconstruction_4_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t a_r, a_g, a_b, a_a;
+  uint8_t b_r, b_g, b_b, b_a;
+  uint8_t c_r, c_g, c_b, c_a;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+  a_a = 0;
+
+  c_r = 0;
+  c_g = 0;
+  c_b = 0;
+  c_a = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[4 * j];
+    b_g = prior_line[4 * j + 1];
+    b_b = prior_line[4 * j + 2];
+    b_a = prior_line[4 * j + 3];
+
+    line[4 * j] += paeth_uint8(a_r, b_r, c_r);
+    line[4 * j + 1] += paeth_uint8(a_g, b_g, c_g);
+    line[4 * j + 2] += paeth_uint8(a_b, b_b, c_b);
+    line[4 * j + 3] += paeth_uint8(a_a, b_a, c_a);
+
+    a_r = line[4 * j];
+    a_g = line[4 * j + 1];
+    a_b = line[4 * j + 2];
+    a_a = line[4 * j + 3];
+
+    c_r = prior_line[4 * j];
+    c_g = prior_line[4 * j + 1];
+    c_b = prior_line[4 * j + 2];
+    c_a = prior_line[4 * j + 3];
+  }
+}
+
 TextureRGBA load_texture_from_png(const char* filename) {
   FILE* file = fopen(filename, "rb");
 
@@ -356,48 +476,33 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   uint8_t* data = (uint8_t*) malloc(width * height * byte_per_pixel);
 
-  uint8_t filter_error = 0;
+  uint8_t* line_buffer = (uint8_t*) malloc(width * byte_per_pixel);
+  memset(line_buffer, 0, width * byte_per_pixel);
 
   for (uint32_t i = 0; i < height; i++) {
     const uint8_t filter = filtered_data[i * (width * byte_per_pixel + 1)];
-
-    if (filter != 0u && filter != 1u) {
-      filter_error++;
-      /*printf("Filter Used: %u in Line: %d\n", filter, i);
-      for (int k = -10; k < 10; k++) {
-        printf("At %d is byte %u\n", k, filtered_data[i * (width * byte_per_pixel + 1) - k]);
-      }*/
-    }
 
     memcpy(
       data + i * width * byte_per_pixel, filtered_data + 1 + i * (width * byte_per_pixel + 1),
       width * byte_per_pixel);
 
     if (filter == 1u) {
-      uint8_t predicted_r, predicted_g, predicted_b, predicted_a;
-
-      predicted_r = 0;
-      predicted_g = 0;
-      predicted_b = 0;
-      predicted_a = 0;
-
-      for (uint32_t j = 0; j < width; j++) {
-        predicted_r += data[i * width * byte_per_pixel + byte_per_pixel * j];
-        predicted_g += data[i * width * byte_per_pixel + byte_per_pixel * j + 1];
-        predicted_b += data[i * width * byte_per_pixel + byte_per_pixel * j + 2];
-        predicted_a += data[i * width * byte_per_pixel + byte_per_pixel * j + 3];
-
-        data[i * width * byte_per_pixel + byte_per_pixel * j]     = predicted_r;
-        data[i * width * byte_per_pixel + byte_per_pixel * j + 1] = predicted_g;
-        data[i * width * byte_per_pixel + byte_per_pixel * j + 2] = predicted_b;
-        data[i * width * byte_per_pixel + byte_per_pixel * j + 3] = predicted_a;
-      }
+      reconstruction_1_uint8(data + i * width * byte_per_pixel, width);
     }
+    else if (filter == 2u) {
+      reconstruction_2_uint8(data + i * width * byte_per_pixel, width, line_buffer);
+    }
+    else if (filter == 3u) {
+      reconstruction_3_uint8(data + i * width * byte_per_pixel, width, line_buffer);
+    }
+    else if (filter == 4u) {
+      reconstruction_4_uint8(data + i * width * byte_per_pixel, width, line_buffer);
+    }
+
+    memcpy(line_buffer, data + i * width * byte_per_pixel, width * byte_per_pixel);
   }
 
-  if (filter_error) {
-    puts("png.c: Unsupported filters were found! Texture may be corrupted!");
-  }
+  free(line_buffer);
 
   RGBAF* float_data = (RGBAF*) malloc(width * height * sizeof(RGBAF));
 

@@ -14,25 +14,6 @@
 #include "lib/texture.h"
 
 int main() {
-  TextureRGBA testTex = load_texture_from_png("Type59_hull_01_AM_hd.png");
-
-  uint8_t* test_rawdata = (uint8_t*) malloc(4 * testTex.width * testTex.height);
-
-  for (uint32_t i = 0; i < testTex.height * testTex.width; i++) {
-    RGBAF pixel = testTex.data[i];
-
-    test_rawdata[i * 4]     = (uint8_t)(pixel.r * 255.9f);
-    test_rawdata[i * 4 + 1] = (uint8_t)(pixel.g * 255.9f);
-    test_rawdata[i * 4 + 2] = (uint8_t)(pixel.b * 255.9f);
-    test_rawdata[i * 4 + 3] = (uint8_t)(pixel.a * 255.9f);
-  }
-
-  store_as_png(
-    "testTexture.png", test_rawdata, testTex.height * testTex.width * 4, testTex.width,
-    testTex.height, PNG_COLORTYPE_TRUECOLOR_ALPHA, PNG_BITDEPTH_8);
-
-  return 0;
-
   display_gpu_information();
 
   clock_t time = clock();
@@ -65,52 +46,132 @@ int main() {
 
   printf("[%.3fs] BVH structure built.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
-  TextureAssignment* texture_assignments =
-    (TextureAssignment*) malloc(sizeof(TextureAssignment) * meshes_length);
+  TextureRGBA* albedo_maps      = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 17);
+  TextureRGBA* illuminance_maps = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 3);
+  TextureRGBA* material_maps    = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 3);
 
-  TextureRGBA* albedo_maps      = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 2);
-  TextureRGBA* illuminance_maps = (TextureRGBA*) malloc(sizeof(TextureRGBA));
-  TextureRGBA* material_maps    = (TextureRGBA*) malloc(sizeof(TextureRGBA));
+  albedo_maps[0].width     = 1;
+  albedo_maps[0].height    = 1;
+  albedo_maps[0].data      = (RGBAF*) malloc(sizeof(RGBAF));
+  albedo_maps[0].data[0].r = 0.2f;
+  albedo_maps[0].data[0].g = 0.2f;
+  albedo_maps[0].data[0].b = 0.2f;
+  albedo_maps[0].data[0].a = 1.0f;
 
-  /*albedo_maps[0].width  = 128;
-  albedo_maps[0].height = 128;
-  albedo_maps[0].data   = (RGBAF*) malloc(sizeof(RGBAF) * 128 * 128);
-  for (int i = 0; i < 128; i++) {
-    for (int j = 0; j < 128; j++) {
-      albedo_maps[0].data[i * 128 + j].r = 1.0f * (128.0f - j) / (128.0f);
-      albedo_maps[0].data[i * 128 + j].g = 0.0f;
-      albedo_maps[0].data[i * 128 + j].b = 1.0f * (128.0f - i) / (128.0f);
-      albedo_maps[0].data[i * 128 + j].a = 0.0f;
-    }
-  }*/
-  /*albedo_maps[1].width  = 256;
-  albedo_maps[1].height = 256;
-  albedo_maps[1].data   = (RGBAF*) malloc(sizeof(RGBAF) * 256 * 256);
-  for (int i = 0; i < 256; i++) {
-    for (int j = 0; j < 256; j++) {
-      albedo_maps[1].data[i * 256 + j].r = 1.0f * (256.0f - j) / (256.0f);
-      albedo_maps[1].data[i * 256 + j].g = 1.0f * (256.0f - i) / (256.0f);
-      albedo_maps[1].data[i * 256 + j].b = 0.0f;
-      albedo_maps[1].data[i * 256 + j].a = 0.0f;
-    }
-  }*/
-  for (int i = 0; i < 10; i++) {
-    RGBAF pixel = testTex.data[i];
-    printf("R:%.2f G:%.2f B:%.2f A:%.2f\n", pixel.r, pixel.g, pixel.b, pixel.a);
+  illuminance_maps[0].width     = 1;
+  illuminance_maps[0].height    = 1;
+  illuminance_maps[0].data      = (RGBAF*) malloc(sizeof(RGBAF));
+  illuminance_maps[0].data[0].r = 0.0f;
+  illuminance_maps[0].data[0].g = 0.0f;
+  illuminance_maps[0].data[0].b = 0.0f;
+  illuminance_maps[0].data[0].a = 0.0f;
+  material_maps[0].width        = 1;
+  material_maps[0].height       = 1;
+  material_maps[0].data         = (RGBAF*) malloc(sizeof(RGBAF));
+  material_maps[0].data[0].r    = 0.1f;
+  material_maps[0].data[0].g    = 1.0f;
+  material_maps[0].data[0].b    = 1.0f;
+  material_maps[0].data[0].a    = 0.0f;
+
+  albedo_maps[1]  = load_texture_from_png("Textures/Type59_chassis_01_AM_hd.png");
+  albedo_maps[2]  = load_texture_from_png("Textures/Type59_guns_AM_hd.png");
+  albedo_maps[3]  = load_texture_from_png("Textures/Type59_hull_01_AM_hd.png");
+  albedo_maps[4]  = load_texture_from_png("Textures/Type59_turret_01_AM_hd.png");
+  albedo_maps[5]  = load_texture_from_png("Textures/Projet_4_1_chassis_01_AM_hd.png");
+  albedo_maps[6]  = load_texture_from_png("Textures/Projet_4_1_guns_AM_hd.png");
+  albedo_maps[7]  = load_texture_from_png("Textures/Projet_4_1_hull_01_2_AM_hd.png");
+  albedo_maps[8]  = load_texture_from_png("Textures/Projet_4_1_hull_01_AM_hd.png");
+  albedo_maps[9]  = load_texture_from_png("Textures/Projet_4_1_turret_01_AM_hd.png");
+  albedo_maps[10] = load_texture_from_png("Textures/Concept_1b_chassis_01_AM_hd.png");
+  albedo_maps[11] = load_texture_from_png("Textures/Concept_1b_guns_AM_hd.png");
+  albedo_maps[12] = load_texture_from_png("Textures/Concept_1b_hull_01_AM_hd.png");
+  albedo_maps[13] = load_texture_from_png("Textures/Concept_1b_track_AM_hd.png");
+  albedo_maps[14] = load_texture_from_png("Textures/Concept_1b_turret_01_AM_hd.png");
+  albedo_maps[15] = load_texture_from_png("Textures/WZ_111_track_AM_hd.png");
+  albedo_maps[16] = load_texture_from_png("Textures/Projet_4_1_track_AM_hd.png");
+
+  material_maps[1].width     = 1;
+  material_maps[1].height    = 1;
+  material_maps[1].data      = (RGBAF*) malloc(sizeof(RGBAF));
+  material_maps[1].data[0].r = 0.8f;
+  material_maps[1].data[0].g = 1.0f;
+  material_maps[1].data[0].b = 0.0f;
+  material_maps[1].data[0].a = 0.0f;
+
+  material_maps[2].width     = 1;
+  material_maps[2].height    = 1;
+  material_maps[2].data      = (RGBAF*) malloc(sizeof(RGBAF));
+  material_maps[2].data[0].r = 0.8f;
+  material_maps[2].data[0].g = 0.0f;
+  material_maps[2].data[0].b = 0.0f;
+  material_maps[2].data[0].a = 0.0f;
+
+  illuminance_maps[1].width     = 1;
+  illuminance_maps[1].height    = 1;
+  illuminance_maps[1].data      = (RGBAF*) malloc(sizeof(RGBAF));
+  illuminance_maps[1].data[0].r = 0.9f;
+  illuminance_maps[1].data[0].g = 0.9f;
+  illuminance_maps[1].data[0].b = 1.0f;
+  illuminance_maps[1].data[0].a = 0.0f;
+
+  illuminance_maps[2].width     = 1;
+  illuminance_maps[2].height    = 1;
+  illuminance_maps[2].data      = (RGBAF*) malloc(sizeof(RGBAF));
+  illuminance_maps[2].data[0].r = 1.0f;
+  illuminance_maps[2].data[0].g = 0.9f;
+  illuminance_maps[2].data[0].b = 0.9f;
+  illuminance_maps[2].data[0].a = 0.0f;
+
+  void* albedo_atlas      = initialize_textures(albedo_maps, 17);
+  void* illuminance_atlas = initialize_textures(illuminance_maps, 3);
+  void* material_atlas    = initialize_textures(material_maps, 3);
+
+  texture_assignment* texture_assignments =
+    (texture_assignment*) malloc(sizeof(texture_assignment) * meshes_length);
+
+  for (int i = 0; i < meshes_length; i++) {
+    texture_assignments[i].albedo_map      = 0;
+    texture_assignments[i].illuminance_map = 0;
+    texture_assignments[i].material_map    = 0;
   }
-  albedo_maps[0] = load_texture_from_png("Type59_hull_01_AM_hd.png");
-  albedo_maps[1] = load_texture_from_png("Type59_hull_01_AM_hd.png");
 
-  illuminance_maps[0].width  = 1;
-  illuminance_maps[0].height = 1;
-  illuminance_maps[0].data   = (RGBAF*) malloc(sizeof(RGBAF));
-  material_maps[0].width     = 1;
-  material_maps[0].height    = 1;
-  material_maps[0].data      = (RGBAF*) malloc(sizeof(RGBAF));
+  texture_assignments[0].albedo_map = 15;
+  texture_assignments[1].albedo_map = 15;
+  texture_assignments[2].albedo_map = 1;
+  texture_assignments[3].albedo_map = 1;
+  texture_assignments[4].albedo_map = 2;
+  texture_assignments[5].albedo_map = 3;
+  texture_assignments[6].albedo_map = 4;
 
-  void* albedo_atlas      = initialize_textures(albedo_maps, 2);
-  void* illuminance_atlas = initialize_textures(illuminance_maps, 1);
-  void* material_atlas    = initialize_textures(material_maps, 1);
+  texture_assignments[7].albedo_map  = 13;
+  texture_assignments[8].albedo_map  = 13;
+  texture_assignments[9].albedo_map  = 10;
+  texture_assignments[10].albedo_map = 10;
+  texture_assignments[11].albedo_map = 11;
+  texture_assignments[12].albedo_map = 12;
+  texture_assignments[13].albedo_map = 14;
+
+  texture_assignments[14].albedo_map = 16;
+  texture_assignments[15].albedo_map = 16;
+  texture_assignments[16].albedo_map = 5;
+  texture_assignments[17].albedo_map = 5;
+  texture_assignments[18].albedo_map = 6;
+  texture_assignments[19].albedo_map = 8;
+  texture_assignments[20].albedo_map = 7;
+  texture_assignments[21].albedo_map = 9;
+
+  texture_assignments[23].illuminance_map = 1;
+  texture_assignments[24].illuminance_map = 2;
+
+  texture_assignments[2].material_map = 1;
+  texture_assignments[3].material_map = 1;
+  texture_assignments[4].material_map = 1;
+  texture_assignments[5].material_map = 1;
+  texture_assignments[6].material_map = 1;
+
+  texture_assignments[22].material_map = 2;
+
+  printf("[%.3fs] Textures loaded.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   Scene scene;
 
@@ -118,7 +179,7 @@ int main() {
 
   scene.camera.fov   = 1.0f;
   scene.camera.pos.x = 9.0f;
-  scene.camera.pos.y = 3.0f;
+  scene.camera.pos.y = 4.0f;
   scene.camera.pos.z = -12.0f;
 
   scene.camera.rotation.x = -0.3f;
@@ -133,11 +194,13 @@ int main() {
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 10, 20);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 10);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
-  trace_scene(scene, instance, albedo_atlas, illuminance_atlas, material_atlas);
+  trace_scene(
+    scene, instance, albedo_atlas, illuminance_atlas, material_atlas, texture_assignments,
+    meshes_length);
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

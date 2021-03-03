@@ -3,11 +3,11 @@
 
 #include "image.h"
 
-struct TextureAssignment {
+struct texture_assignment {
   uint16_t albedo_map;
   uint16_t illuminance_map;
   uint16_t material_map;
-} typedef TextureAssignment;
+} typedef texture_assignment;
 
 struct TextureG {
   unsigned int width;

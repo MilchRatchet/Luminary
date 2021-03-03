@@ -25,7 +25,7 @@ raytrace_instance* init_raytracing(
   const int diffuse_samples);
 void trace_scene(
   Scene scene, raytrace_instance* instance, void* albedo_atlas, void* illuminance_atlas,
-  void* material_atlas);
+  void* material_atlas, texture_assignment* texture_assignments, int meshes_count);
 void frame_buffer_to_image(Camera camera, raytrace_instance* instance, RGB8* image);
 void free_raytracing(raytrace_instance* instance);
 void* initialize_textures(TextureRGBA* textures, const int textures_length);
