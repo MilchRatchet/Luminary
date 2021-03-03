@@ -139,12 +139,6 @@ UV lerp_uv(const Triangle triangle, const float lambda, const float mu) {
     return result;
 }
 
-/*
- * Based on:
- * A. Majercik, C. Crassin, P. Shirley, M. McGuire,
- * "A Ray-Box Intersection Algorithm and Efficient Dynamic Voxel Rendering",
- * Journal of Computer Graphics Techniques, 7(3), pp. 66-82, 2018
- */
 __device__
 float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
     origin.x -= (high.x + low.x) * 0.5f;
@@ -207,13 +201,6 @@ float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
     }
 }
 
-/*
- * Based on
- *
- * Möller, Tomas, Trumbore, Ben,
- * "Fast, Minimum Storage Ray-Triangle Intersection",
- * Journal of Graphics Tools, 2, pp. 21-28, 1997.
- */
 __device__
 float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
     const vec3 h = cross_product(ray, triangle.edge2);
@@ -241,12 +228,6 @@ float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
     }
 }
 
-/*
- * Based on
- * J. Frisvad,
- * "Building an Orthonormal Basis from a 3D Unit Vector Without Normalization",
- * Journal of Graphics Tools, 16(3), pp. 151-159, 2012
- */
 __device__
 vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const vec3 basis) {
     vec3 u1, u2;
