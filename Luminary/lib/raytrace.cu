@@ -219,7 +219,7 @@ float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
     const vec3 h = cross_product(ray, triangle.edge2);
     const float a = dot_product(triangle.edge1, h);
 
-    if (a > -epsilon && a < epsilon) return FLT_MAX;
+    if (a > -0.00000001 && a < 0.00000001) return FLT_MAX;
 
     const float f = 1.0f / a;
     const vec3 s = vec_diff(origin, triangle.vertex);

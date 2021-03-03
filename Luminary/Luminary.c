@@ -109,8 +109,8 @@ int main() {
   illuminance_maps[1].width     = 1;
   illuminance_maps[1].height    = 1;
   illuminance_maps[1].data      = (RGBAF*) malloc(sizeof(RGBAF));
-  illuminance_maps[1].data[0].r = 0.9f;
-  illuminance_maps[1].data[0].g = 0.9f;
+  illuminance_maps[1].data[0].r = 0.85f;
+  illuminance_maps[1].data[0].g = 0.85f;
   illuminance_maps[1].data[0].b = 1.0f;
   illuminance_maps[1].data[0].a = 0.0f;
 
@@ -118,8 +118,8 @@ int main() {
   illuminance_maps[2].height    = 1;
   illuminance_maps[2].data      = (RGBAF*) malloc(sizeof(RGBAF));
   illuminance_maps[2].data[0].r = 1.0f;
-  illuminance_maps[2].data[0].g = 0.9f;
-  illuminance_maps[2].data[0].b = 0.9f;
+  illuminance_maps[2].data[0].g = 0.85f;
+  illuminance_maps[2].data[0].b = 0.85f;
   illuminance_maps[2].data[0].a = 0.0f;
 
   void* albedo_atlas      = initialize_textures(albedo_maps, 17);
@@ -194,7 +194,7 @@ int main() {
   const int width  = 1920;
   const int height = 1080;
 
-  raytrace_instance* instance = init_raytracing(width, height, 10, 10);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 2000);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
