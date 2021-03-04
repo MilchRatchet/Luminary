@@ -452,10 +452,19 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         const float metallic = material_f.y;
         const float intensity = material_f.z;
 
-
         result.r += emission.r * intensity * weight * record.r;
         result.g += emission.g * intensity * weight * record.g;
         result.b += emission.b * intensity * weight * record.b;
+
+        const float transparent_pass = curand_uniform(random);
+
+        if (transparent_pass > albedo.a) {
+            origin.x = curr.x + 2.0f * epsilon * ray.x;
+            origin.y = curr.y + 2.0f * epsilon * ray.y;
+            origin.z = curr.z + 2.0f * epsilon * ray.z;
+
+            continue;
+        }
 
         curr.x += normal.x * epsilon * 2.0f;
         curr.y += normal.y * epsilon * 2.0f;
