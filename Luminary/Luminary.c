@@ -14,7 +14,7 @@
 #include "lib/texture.h"
 
 int main() {
-  display_gpu_information();
+  initialize_device();
 
   clock_t time = clock();
 
@@ -22,23 +22,15 @@ int main() {
 
   int meshes_length = read_mesh_from_file("Garage.obj", &meshes, 0);
 
-  for (int i = 0; i < meshes_length; i++) {
-    printf("Mesh %d\n", i);
-    printf("  Vertices %d\n", meshes[i].vertices_length);
-    printf("  UVs %d\n", meshes[i].uvs_length);
-    printf("  Normals %d\n", meshes[i].normals_length);
-    printf("  Triangles %d\n", meshes[i].triangles_length);
-  }
-
   printf("[%.3fs] Mesh loaded from file.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   Triangle* triangles;
 
   unsigned int triangle_count = convert_wavefront_mesh(&triangles, meshes, meshes_length);
 
-  printf("Total Triangles: %u\n", triangle_count);
-
-  printf("[%.3fs] Mesh converted.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+  printf(
+    "[%.3fs] Mesh converted. Total Triangles: %u\n", ((double) (clock() - time)) / CLOCKS_PER_SEC,
+    triangle_count);
 
   int nodes_length;
 
@@ -191,10 +183,10 @@ int main() {
   scene.nodes            = nodes;
   scene.nodes_length     = nodes_length;
 
-  const int width  = 1920;
-  const int height = 1080;
+  const int width  = 3840;
+  const int height = 2160;
 
-  raytrace_instance* instance = init_raytracing(width, height, 10, 2000);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 20);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

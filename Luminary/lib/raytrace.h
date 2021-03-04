@@ -20,6 +20,7 @@ struct raytrace_instance {
   int diffuse_samples;
 } typedef raytrace_instance;
 
+void initialize_device();
 raytrace_instance* init_raytracing(
   const unsigned int width, const unsigned int height, const int reflection_depth,
   const int diffuse_samples);

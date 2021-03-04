@@ -334,7 +334,7 @@ Node* build_bvh_structure(
     printf("\r                             \rBVH depth %d/%d built.", i + 1, max_depth);
   }
 
-  puts("");
+  printf("\r                             \r");
 
   *triangles_io = triangles;
 
