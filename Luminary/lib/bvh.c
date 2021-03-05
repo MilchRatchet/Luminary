@@ -238,6 +238,11 @@ Node* build_bvh_structure(
       int left, right;
       Node node = nodes[node_ptr];
 
+      if (node.triangle_count == 0) {
+        node_ptr++;
+        continue;
+      }
+
       fit_bounds(
         triangles + node.triangles_address, node.triangle_count, &high, &low, &node_average);
 
