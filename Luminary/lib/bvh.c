@@ -226,6 +226,8 @@ Node* build_bvh_structure(
 
   int node_ptr = 0;
 
+  const double compression_divisor = 1.0 / 255.0;
+
   for (int i = 0; i < max_depth; i++) {
     unsigned int triangles_ptr = 0;
     Triangle* new_triangles    = (Triangle*) malloc(sizeof(Triangle) * triangles_length);
@@ -238,6 +240,16 @@ Node* build_bvh_structure(
 
       fit_bounds(
         triangles + node.triangles_address, node.triangle_count, &high, &low, &node_average);
+
+      node.ex = (int8_t) ceil(log2((high.x - low.x) * compression_divisor));
+      node.ey = (int8_t) ceil(log2((high.y - low.y) * compression_divisor));
+      node.ez = (int8_t) ceil(log2((high.z - low.z) * compression_divisor));
+
+      node.p = low;
+
+      const float compression_x = 1.0f / powf(2.0, node.ex);
+      const float compression_y = 1.0f / powf(2.0, node.ey);
+      const float compression_z = 1.0f / powf(2.0, node.ez);
 
       int axis;
       float split_spatial, split_object;
@@ -324,10 +336,20 @@ Node* build_bvh_structure(
           triangles + node.triangles_address, node.triangle_count, i);
       }
 
+      compressed_vec3 compressed_low, compressed_high;
+
       fit_bounds(new_triangles + triangles_ptr, left, &high, &low, &average);
 
-      node.left_high = high;
-      node.left_low  = low;
+      compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
+      compressed_low.y = (uint8_t) floor((low.y - node.p.y) * compression_y);
+      compressed_low.z = (uint8_t) floor((low.z - node.p.z) * compression_z);
+
+      compressed_high.x = (uint8_t) ceil((high.x - node.p.x) * compression_x);
+      compressed_high.y = (uint8_t) ceil((high.y - node.p.y) * compression_y);
+      compressed_high.z = (uint8_t) ceil((high.z - node.p.z) * compression_z);
+
+      node.left_high = compressed_high;
+      node.left_low  = compressed_low;
 
       nodes[2 * node_ptr + 1].triangle_count    = left;
       nodes[2 * node_ptr + 1].triangles_address = triangles_ptr;
@@ -338,8 +360,16 @@ Node* build_bvh_structure(
 
       fit_bounds(new_triangles + triangles_ptr, right, &high, &low, &average);
 
-      node.right_high = high;
-      node.right_low  = low;
+      compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
+      compressed_low.y = (uint8_t) floor((low.y - node.p.y) * compression_y);
+      compressed_low.z = (uint8_t) floor((low.z - node.p.z) * compression_z);
+
+      compressed_high.x = (uint8_t) ceil((high.x - node.p.x) * compression_x);
+      compressed_high.y = (uint8_t) ceil((high.y - node.p.y) * compression_y);
+      compressed_high.z = (uint8_t) ceil((high.z - node.p.z) * compression_z);
+
+      node.right_high = compressed_high;
+      node.right_low  = compressed_low;
 
       nodes[2 * node_ptr + 2].triangle_count    = right;
       nodes[2 * node_ptr + 2].triangles_address = triangles_ptr;

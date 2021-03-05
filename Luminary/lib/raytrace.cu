@@ -153,7 +153,7 @@ UV lerp_uv(const Triangle triangle, const float lambda, const float mu) {
 }
 
 __device__
-float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
+float ray_box_intersect(const vec3 low, const vec3 high, vec3 origin, const vec3 ray) {
     origin.x -= (high.x + low.x) * 0.5f;
     origin.y -= (high.y + low.y) * 0.5f;
     origin.z -= (high.z + low.z) * 0.5f;
@@ -215,7 +215,7 @@ float ray_box_intersect(vec3 low, vec3 high, vec3 origin, vec3 ray) {
 }
 
 __device__
-float triangle_intersection(Triangle triangle, vec3 origin, vec3 ray) {
+float triangle_intersection(const Triangle triangle, const vec3 origin, const vec3 ray) {
     const vec3 h = cross_product(ray, triangle.edge2);
     const float a = dot_product(triangle.edge1, h);
 
@@ -279,13 +279,24 @@ vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const
 }
 
 __device__
-int trailing_zeros(unsigned int n) {
+int trailing_zeros(const unsigned int n) {
     int mask = 1;
     for (int i = 0; i < 32; i++, mask <<= 1)
         if ((n & mask) != 0)
             return i;
 
     return 32;
+}
+
+__device__
+vec3 decompress_vector(const compressed_vec3 vector, const vec3 p, const float ex, const float ey, const float ez) {
+    vec3 result;
+
+    result.x = p.x + ex * (float)vector.x;
+    result.y = p.y + ey * (float)vector.y;
+    result.z = p.z + ez * (float)vector.z;
+
+    return result;
 }
 
 /*
@@ -330,8 +341,17 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
                 traversals++;
 
-                const float L = ray_box_intersect(node.left_low, node.left_high, origin, ray);
-                const float R = ray_box_intersect(node.right_low, node.right_high, origin, ray);
+                const float decompression_x = __powf(2.0f, (float)node.ex);
+                const float decompression_y = __powf(2.0f, (float)node.ey);
+                const float decompression_z = __powf(2.0f, (float)node.ez);
+
+                const vec3 left_high = decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
+                const vec3 left_low = decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
+                const vec3 right_high = decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
+                const vec3 right_low = decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
+
+                const float L = ray_box_intersect(left_low, left_high, origin, ray);
+                const float R = ray_box_intersect(right_low, right_high, origin, ray);
                 const int R_is_closest = R < L;
 
                 if (L < depth || R < depth) {
