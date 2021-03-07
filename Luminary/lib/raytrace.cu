@@ -299,9 +299,102 @@ vec3 decompress_vector(const compressed_vec3 vector, const vec3 p, const float e
     return result;
 }
 
-/*
- * Uses some self modified Blinn-Phong BRDF.
- */
+__device__
+float get_optical_depth(const float origin, const float ray, const float length) {
+    if (ray == 0.0f) return 1.0f;
+
+    if (length == 0.0f) return 0.0f;
+
+    const float density_falloff = 4.0f;
+
+    return
+    (expf(density_falloff * (-ray * length - origin))*(density_falloff * (ray * length + origin - 1.0f)
+     + (density_falloff - density_falloff * origin - 1.0f) * expf(ray * length * density_falloff) + 1.0f))
+    / (density_falloff * density_falloff * ray);
+}
+
+__device__
+vec3 scale_vector(vec3 vector, const float scale) {
+    vector.x *= scale;
+    vector.y *= scale;
+    vector.z *= scale;
+
+    return vector;
+}
+
+__device__
+float get_length(const vec3 vector) {
+    return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+__device__
+vec3 normalize_vector(vec3 vector) {
+    const float inv_length = 1.0f / get_length(vector);
+
+    return scale_vector(vector, inv_length);
+}
+
+__device__
+RGBF get_sky_color(const vec3 ray) {
+    RGBF result;
+
+    const float angular_diameter = 0.009f;
+
+    RGBF scatter;
+
+    const float scattering_strength = 10.0f;
+
+    scatter.r = powf(400.0f / 700.0f, 4) * scattering_strength;
+    scatter.g = powf(400.0f / 530.0f, 4) * scattering_strength;
+    scatter.b = powf(400.0f / 440.0f, 4) * scattering_strength;
+
+    const float sun_dist = 4.0f;
+
+    RGBF sun_color;
+
+    sun_color.r = 1.0f;
+    sun_color.g = 0.9f;
+    sun_color.b = 0.8f;
+
+    vec3 sun;
+    sun.x = 0.2f;
+    sun.y = 1.0f;
+    sun.z = -1.0f;
+
+    const vec3 sun_normalized = normalize_vector(sun);
+    sun = scale_vector(sun_normalized, sun_dist);
+
+    const vec3 diff = vec_diff(sun, ray);
+    const vec3 diff_normalized = normalize_vector(diff);
+
+    const float length = 2.0f * __saturatef(-dot_product(ray, diff_normalized));
+
+    float cos_angle = dot_product(diff_normalized, ray);
+
+    cos_angle = cosf(fmaxf(acosf(cos_angle) - angular_diameter,0.0f));
+
+    const float rayleigh = 3.0f * (1.0f + cos_angle * cos_angle) / (16.0f * 3.1415926535f);
+
+    const float g = 0.7f;
+
+    const float mie = (1.0f - g * g) / (4.0f * 3.1415926535f * powf(1.0f + g * g - 2 * g * cos_angle, 1.5f));
+
+    const float optical_depth = get_optical_depth(0.1f, fabsf(ray.y) + epsilon, 1.0f);
+
+    RGBF transmittance;
+
+    transmittance.r = expf(-optical_depth * (scatter.r + 3.4126f * 0.04f));
+    transmittance.g = expf(-optical_depth * (scatter.g + 8.298f * 0.04f));
+    transmittance.b = expf(-optical_depth * (scatter.b + 0.356f * 0.04f));
+
+    result.r = sun_color.r * scatter.r * transmittance.r * rayleigh + sun_color.r * mie * transmittance.r + 10.0f * sun_color.r * (cos_angle == 1.0f) * transmittance.r;
+    result.g = sun_color.g * scatter.g * transmittance.g * rayleigh + sun_color.g * mie * transmittance.g + 10.0f * sun_color.r * (cos_angle == 1.0f) * transmittance.g;
+    result.b = sun_color.b * scatter.b * transmittance.b * rayleigh + sun_color.b * mie * transmittance.b + 10.0f * sun_color.r * (cos_angle == 1.0f) * transmittance.b;
+
+    return result;
+}
+
+
 __device__
 RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     RGBF result;
@@ -314,11 +407,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     record.r = 1.0f;
     record.g = 1.0f;
     record.b = 1.0f;
-
-    RGBF sky;
-    sky.r = 1.0f;
-    sky.g = 1.0f;
-    sky.b = 1.0f;
 
     int traversals = 0;
     unsigned int ray_triangle_intersections = 0;
@@ -414,6 +502,8 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         }
 
         if (hit_id == 0xffffffff) {
+            RGBF sky = get_sky_color(ray);
+
             result.r += sky.r * weight * record.r;
             result.g += sky.g * weight * record.g;
             result.b += sky.b * weight * record.b;
