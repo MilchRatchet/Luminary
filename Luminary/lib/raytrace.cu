@@ -326,10 +326,6 @@ __device__
 float get_length_to_border(const vec3 origin, const vec3 ray, const float atmosphere_end) {
     const float a = dot_product(origin,ray);
     return -a + sqrtf(a * a - dot_product(origin,origin) + atmosphere_end * atmosphere_end);
-    /*const float a = ray.x * origin.x + ray.y * omega * omega * origin.y + ray.z * origin.z;
-    const float b = ray.x * ray.x + ray.y * ray.y * omega * omega + ray.z * ray.z;
-    const float c = omega * omega * (origin.y * origin.y - 1.0f) + origin.x * origin.x + origin.z * origin.z;
-    return (sqrtf(a*a-b*c)-a)/b;*/
 }
 
 __device__
@@ -455,7 +451,6 @@ RGBF get_sky_color(const vec3 ray) {
 
         const float g = 0.8f;
         const float mie = (1.0f - g * g) / (4.0f * 3.1415926535f * powf(1.0f + g * g - 2 * g * cos_angle, 1.5f));
-        //const float mie = (1.0f - g * g) * (1.0f + cos_angle * cos_angle * cos_angle * cos_angle) / (8.0f * 3.1415926535f * (2.0f + g * g) * powf(1.0f + g * g - 2 * g * cos_angle * cos_angle, 1.5f));
 
         result.r += sun_color.r * transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie) * step_size;
         result.g += sun_color.g * transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie) * step_size;

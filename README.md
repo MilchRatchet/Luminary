@@ -5,7 +5,7 @@ Luminary is a CUDA based Pathtracing renderer.
 This project is for fun and to learn more about Computer Graphics. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
 - Implement custom scene description file format.
-- Implement transparent materials and refraction.
+- Implement refraction.
 - Implement better distribution function for Monte Carlo method.
 - Implement denoiser.
 - Implement volumetric lighting.
@@ -25,3 +25,4 @@ This is a list of papers I used for this project so far:
 - N. Binder, A. Keller, _Efficient Stackless Hierarchy Traversal on GPUs with Backtracking in Constant Time_, HPG '16: Proceedings of High Performance Graphics, pp. 41-50, 2016.
 - K. Booth, J. MacDonald, _Heuristics for ray tracing using space subdivision_, The Visual Computer, 6, pp. 153-166, 1990.
 - T. Karras, S. Laine, H. Ylitie, _Efficient Incoherent Ray Traversal on GPUs Through Compressed Wide BVHs_, HPG '17: Proceedings of High Performance Graphics, pp. 1-13, 2017.
+- S. Hillaire, _A Scalable and Production Ready Sky and Atmosphere Rendering Technique_, Computer Graphics Forum, 39(4), pp. 13-22, 2020.
