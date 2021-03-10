@@ -136,7 +136,7 @@ int main() {
   const int width  = 3840;
   const int height = 2160;
 
-  raytrace_instance* instance = init_raytracing(width, height, 10, 25);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 2500);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -148,7 +148,11 @@ int main() {
 
   RGB8* frame = (RGB8*) malloc(sizeof(RGB8) * instance->width * instance->height);
 
-  frame_buffer_to_image(scene.camera, instance, frame);
+  frame_buffer_to_8bit_image(scene.camera, instance, frame);
+
+  RGB16* frame_16 = (RGB16*) malloc(sizeof(RGB16) * instance->width * instance->height);
+
+  frame_buffer_to_16bit_image(scene.camera, instance, frame_16);
 
   printf(
     "[%.3fs] Converted frame buffer to image.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
@@ -160,6 +164,10 @@ int main() {
   store_as_png(
     "test.png", (uint8_t*) frame, sizeof(RGB8) * width * height, width, height,
     PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+
+  store_as_png(
+    "test16.png", (uint8_t*) frame_16, sizeof(RGB16) * width * height, width, height,
+    PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_16);
 
   printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
