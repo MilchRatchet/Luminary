@@ -219,6 +219,8 @@ Node* build_bvh_structure(
 
   Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
 
+  memset(nodes, 0, sizeof(Node) * node_count);
+
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = triangles_length;
 
