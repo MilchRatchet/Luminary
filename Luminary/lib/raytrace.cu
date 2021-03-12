@@ -372,7 +372,7 @@ RGBF get_sky_color(const vec3 ray) {
     result.g = 0.0f;
     result.b = 0.0f;
 
-    const float angular_diameter = 0.009f;
+    const float angular_diameter = 0.018f;
 
     const float overall_density = 1.0f;
 
@@ -381,18 +381,18 @@ RGBF get_sky_color(const vec3 ray) {
     scatter.g = 13.558f * 0.001f * overall_density;
     scatter.b = 33.1f * 0.001f * overall_density;
 
-    const float mie_scatter = 3.996f * 0.00105f * overall_density;;
+    const float mie_scatter = 3.996f * 0.001f * overall_density;
 
     RGBF ozone_absorbtion;
-    ozone_absorbtion.r = 0.65f * 0.001f * overall_density;;
-    ozone_absorbtion.g = 1.881f * 0.001f * overall_density;;
-    ozone_absorbtion.b = 0.085f * 0.001f * overall_density;;
+    ozone_absorbtion.r = 0.65f * 0.001f * overall_density;
+    ozone_absorbtion.g = 1.881f * 0.001f * overall_density;
+    ozone_absorbtion.b = 0.085f * 0.001f * overall_density;
 
     const float sun_dist = 150000000.0f;
 
     RGBF sun_color;
 
-    const float sun_intensity = 5.0f;
+    const float sun_intensity = 6.0f;
 
     sun_color.r = 1.0f * sun_intensity;
     sun_color.g = 0.9f * sun_intensity;
@@ -411,13 +411,13 @@ RGBF get_sky_color(const vec3 ray) {
 
     vec3 origin;
     origin.x = 0.0f;
-    origin.y = earth_radius + 1.0f;
+    origin.y = earth_radius + 0.0f;
     origin.z = 0.0f;
 
     const vec3 origin_default = origin;
 
     const float limit = get_length_to_border(origin, ray, earth_radius + atmosphere_height);
-    const int steps = 8;
+    const int steps = 10;
     const float step_size = limit/steps;
     float reach = 0.0f;
 
@@ -434,9 +434,10 @@ RGBF get_sky_color(const vec3 ray) {
 
         const float height = height_at_point(origin);
 
-        const float local_density = density_at_height(height, 0.06f);
-        const float mie_density = density_at_height(height, 0.125f);
-        const float ozone_density = fmaxf(0.0f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
+        const float local_density = density_at_height(height, 0.125f);
+        const float mie_density = density_at_height(height, 0.83333f);
+        //The tent function is disabled atm, first argument 0.0f to activate
+        const float ozone_density = fmaxf(1.0f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
 
         RGBF transmittance;
         transmittance.r = expf(-optical_depth * (scatter.r + ozone_density * ozone_absorbtion.r + 1.11f * mie_scatter));
@@ -450,7 +451,7 @@ RGBF get_sky_color(const vec3 ray) {
         const float rayleigh = 3.0f * (1.0f + cos_angle * cos_angle) / (16.0f * 3.1415926535f);
 
         const float g = 0.8f;
-        const float mie = (1.0f - g * g) / (4.0f * 3.1415926535f * powf(1.0f + g * g - 2 * g * cos_angle, 1.5f));
+        const float mie = 1.5f * (1.0f + cos_angle * cos_angle) * (1.0f - g * g) / (4.0f * 3.1415926535f * (2.0f + g * g) * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
 
         result.r += sun_color.r * transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie) * step_size;
         result.g += sun_color.g * transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie) * step_size;
@@ -461,6 +462,27 @@ RGBF get_sky_color(const vec3 ray) {
         origin.x += step_size * ray.x;
         origin.y += step_size * ray.y;
         origin.z += step_size * ray.z;
+    }
+    const vec3 ray_sun = normalize_vector(vec_diff(sun, origin_default));
+
+    float cos_angle = dot_product(ray, ray_sun);
+    cos_angle = cosf(fmaxf(0.0f,acosf(cos_angle) - angular_diameter));
+
+    if (cos_angle >= 0.99999f) {
+        const float optical_depth = get_optical_depth(origin_default, ray, limit);
+
+        const float height = height_at_point(origin_default);
+
+        const float ozone_density = fmaxf(0.0f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
+
+        RGBF transmittance;
+        transmittance.r = expf(-optical_depth * (scatter.r + ozone_density * ozone_absorbtion.r + 1.11f * mie_scatter));
+        transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
+        transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
+
+        result.r += sun_color.r * transmittance.r * cos_angle * 50.0f;
+        result.g += sun_color.g * transmittance.g * cos_angle * 50.0f;
+        result.b += sun_color.b * transmittance.b * cos_angle * 50.0f;
     }
 
     return result;
@@ -973,36 +995,106 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, void* albe
     gpuErrchk(cudaFree(scene_gpu.nodes));
 }
 
+static float linearRGB_to_SRGB(const float value) {
+    if (value <= 0.0031308f) {
+        return 12.92f * value;
+    } else {
+        return 1.055f * powf(value, 0.416666666667f) - 0.055f;
+    }
+}
+
 extern "C" void frame_buffer_to_8bit_image(Camera camera, raytrace_instance* instance, RGB8* image) {
+    RGBF* error_table = (RGBF*) malloc(sizeof(RGBF) * (instance->width + 2));
+
+    memset(error_table, 0, sizeof(RGBF) * (instance->width + 2));
+
     for (int j = 0; j < instance->height; j++) {
         for (int i = 0; i < instance->width; i++) {
             RGB8 pixel;
             RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
 
-            pixel.r = (uint8_t)(min(255.9f, pixel_float.r * 255.9f));
-            pixel.g = (uint8_t)(min(255.9f, pixel_float.g * 255.9f));
-            pixel.b = (uint8_t)(min(255.9f, pixel_float.b * 255.9f));
+            RGBF color;
+            color.r = min(255.9f, linearRGB_to_SRGB(pixel_float.r) * 255.9f + error_table[i + 1].r);
+            color.g = min(255.9f, linearRGB_to_SRGB(pixel_float.g) * 255.9f + error_table[i + 1].g);
+            color.b = min(255.9f, linearRGB_to_SRGB(pixel_float.b) * 255.9f + error_table[i + 1].b);
 
+            error_table[i + 1].r = 0.0f;
+            error_table[i + 1].g = 0.0f;
+            error_table[i + 1].b = 0.0f;
+
+            pixel.r = (uint8_t)color.r;
+            pixel.g = (uint8_t)color.g;
+            pixel.b = (uint8_t)color.b;
+
+            RGBF error;
+            error.r = 0.25f * (color.r - (float)pixel.r);
+            error.g = 0.25f * (color.g - (float)pixel.g);
+            error.b = 0.25f * (color.b - (float)pixel.b);
+
+            error_table[i].r += error.r;
+            error_table[i].g += error.g;
+            error_table[i].b += error.b;
+
+            error_table[i + 1].r += error.r;
+            error_table[i + 1].g += error.g;
+            error_table[i + 1].b += error.b;
+
+            error_table[i + 2].r += 2.0f * error.r;
+            error_table[i + 2].g += 2.0f * error.g;
+            error_table[i + 2].b += 2.0f * error.b;
 
             image[i + instance->width * j] = pixel;
         }
     }
+
+    free(error_table);
 }
 
 extern "C" void frame_buffer_to_16bit_image(Camera camera, raytrace_instance* instance, RGB16* image) {
+    RGBF* error_table = (RGBF*) malloc(sizeof(RGBF) * (instance->width + 2));
+
+    memset(error_table, 0, sizeof(RGBF) * (instance->width + 2));
+
     for (int j = 0; j < instance->height; j++) {
         for (int i = 0; i < instance->width; i++) {
             RGB16 pixel;
             RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
 
-            pixel.r = (uint16_t)(min(65535.9f, pixel_float.r * 65535.9f));
-            pixel.g = (uint16_t)(min(65535.9f, pixel_float.g * 65535.9f));
-            pixel.b = (uint16_t)(min(65535.9f, pixel_float.b * 65535.9f));
+            RGBF color;
+            color.r = min(65535.9f, linearRGB_to_SRGB(pixel_float.r) * 65535.9f + error_table[i + 1].r);
+            color.g = min(65535.9f, linearRGB_to_SRGB(pixel_float.g) * 65535.9f + error_table[i + 1].g);
+            color.b = min(65535.9f, linearRGB_to_SRGB(pixel_float.b) * 65535.9f + error_table[i + 1].b);
 
+            error_table[i + 1].r = 0.0f;
+            error_table[i + 1].g = 0.0f;
+            error_table[i + 1].b = 0.0f;
+
+            pixel.r = (uint16_t)color.r;
+            pixel.g = (uint16_t)color.g;
+            pixel.b = (uint16_t)color.b;
+
+            RGBF error;
+            error.r = 0.25f * (color.r - (float)pixel.r);
+            error.g = 0.25f * (color.g - (float)pixel.g);
+            error.b = 0.25f * (color.b - (float)pixel.b);
+
+            error_table[i].r += error.r;
+            error_table[i].g += error.g;
+            error_table[i].b += error.b;
+
+            error_table[i + 1].r += error.r;
+            error_table[i + 1].g += error.g;
+            error_table[i + 1].b += error.b;
+
+            error_table[i + 2].r += 2.0f * error.r;
+            error_table[i + 2].g += 2.0f * error.g;
+            error_table[i + 2].b += 2.0f * error.b;
 
             image[i + instance->width * j] = pixel;
         }
     }
+
+    free(error_table);
 
     int total = instance->width * instance->height;
     __m128i mask = _mm_setr_epi8(1, 0, 3, 2, 5, 4, 7, 6, 9, 8, 11, 10, 12, 13, 14, 15);
