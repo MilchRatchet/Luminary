@@ -219,6 +219,11 @@ Node* build_bvh_structure(
 
   Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
 
+  if (nodes == (Node*) 0) {
+    puts("Failed to allocate BVH nodes!");
+    return (Node*) 0;
+  }
+
   memset(nodes, 0, sizeof(Node) * node_count);
 
   nodes[0].triangles_address = 0;

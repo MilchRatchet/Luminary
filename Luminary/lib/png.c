@@ -210,6 +210,11 @@ static inline uint32_t read_int_big_endian(uint8_t* buffer) {
 static int verify_header(FILE* file) {
   uint8_t* header = (uint8_t*) malloc(8);
 
+  if (header == (uint8_t*) 0) {
+    puts("png.c: Failed to allocate memory!");
+    return 1;
+  }
+
   fread(header, 1, 8, file);
 
   int result = 0;
@@ -371,9 +376,16 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   uint8_t* IHDR = (uint8_t*) malloc(25);
 
+  if (IHDR == (uint8_t*) 0) {
+    puts("png.c: Failed to allocate memory!");
+    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
+    return fallback;
+  }
+
   fread(IHDR, 1, 25, file);
 
   if (read_int_big_endian(IHDR) != 13u) {
+    free(IHDR);
     return default_failure();
   }
 
@@ -409,6 +421,12 @@ TextureRGBA load_texture_from_png(const char* filename) {
   TextureRGBA result = {.width = width, .height = height};
 
   uint8_t* chunk = (uint8_t*) malloc(8);
+
+  if (chunk == (uint8_t*) 0) {
+    puts("png.c: Failed to allocate memory!");
+    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
+    return fallback;
+  }
 
   fread(chunk, 1, 8, file);
 
@@ -477,6 +495,15 @@ TextureRGBA load_texture_from_png(const char* filename) {
   uint8_t* data = (uint8_t*) malloc(width * height * byte_per_pixel);
 
   uint8_t* line_buffer = (uint8_t*) malloc(width * byte_per_pixel);
+
+  if (line_buffer == (uint8_t*) 0) {
+    puts("png.c: Failed to allocate memory!");
+    free(data);
+    free(filtered_data);
+    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
+    return fallback;
+  }
+
   memset(line_buffer, 0, width * byte_per_pixel);
 
   for (uint32_t i = 0; i < height; i++) {

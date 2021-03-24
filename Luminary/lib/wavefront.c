@@ -8,6 +8,9 @@
 #define LINE_SIZE 4096
 
 static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line, const unsigned object_id) {
+  if (line == (char*) 0)
+    return -1;
+
   fgets(line, LINE_SIZE, file);
   if (feof(file))
     return -1;
