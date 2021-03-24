@@ -1,3 +1,6 @@
+#ifndef LUMINARY_ERROR_H
+#define LUMINARY_ERROR_H
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <signal.h>
@@ -22,3 +25,5 @@ inline void ___assert(
 inline void ___error(const char* message, const char* file, const int line) {
   fprintf(stderr, "Error!\nFile: %s\nLine: %d\nMessage: %s\n", file, line, message);
 }
+
+#endif /* ERROR_H */

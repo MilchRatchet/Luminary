@@ -12,6 +12,8 @@
 #include "lib/wavefront.h"
 #include "lib/bvh.h"
 #include "lib/texture.h"
+#include "lib/error.h"
+#include "lib/processing.h"
 
 int main() {
   initialize_device();
@@ -133,10 +135,10 @@ int main() {
   scene.nodes            = nodes;
   scene.nodes_length     = nodes_length;
 
-  const int width  = 3840;
-  const int height = 2160;
+  const int width  = 2560;
+  const int height = 1440;
 
-  raytrace_instance* instance = init_raytracing(width, height, 10, 2500);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 25);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
