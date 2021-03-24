@@ -1,8 +1,9 @@
 #include "bvh.h"
 #include "mesh.h"
 #include "primitives.h"
-#include "float.h"
-#include "string.h"
+#include "error.h"
+#include <float.h>
+#include <string.h>
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -219,10 +220,7 @@ Node* build_bvh_structure(
 
   Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
 
-  if (nodes == (Node*) 0) {
-    puts("Failed to allocate BVH nodes!");
-    return (Node*) 0;
-  }
+  assert(nodes, "Failed to allocate BVH nodes!", 1);
 
   memset(nodes, 0, sizeof(Node) * node_count);
 

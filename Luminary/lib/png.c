@@ -9,6 +9,7 @@
 #include "png.h"
 #include "zlib/zlib.h"
 #include "texture.h"
+#include "error.h"
 
 static inline void write_int_big_endian(uint8_t* buffer, uint32_t value) {
   buffer[0] = value >> 24;
@@ -363,13 +364,13 @@ TextureRGBA load_texture_from_png(const char* filename) {
   FILE* file = fopen(filename, "rb");
 
   if (!file) {
-    puts("png.c: File could not be opened!");
+    print_error("File could not be opened!");
     TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
     return fallback;
   }
 
   if (verify_header(file)) {
-    puts("png.c: File header does not correspond to png!");
+    print_error("File header does not correspond to png!");
     TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
     return fallback;
   }
@@ -377,7 +378,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
   uint8_t* IHDR = (uint8_t*) malloc(25);
 
   if (IHDR == (uint8_t*) 0) {
-    puts("png.c: Failed to allocate memory!");
+    print_error("Failed to allocate memory!");
     TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
     return fallback;
   }
@@ -402,10 +403,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
   if (
     color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA || bit_depth != PNG_BITDEPTH_8
     || interlace_type == PNG_INTERLACE_ADAM7) {
-    puts("png.c: File properties are not supported!");
-    printf("Width: %u, Height: %u\n", width, height);
-    printf(
-      "bit_depth: %u, color_type: %u, interlace_type: %u\n", bit_depth, color_type, interlace_type);
+    print_error("File properties are not supported!");
     TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
     return fallback;
   }
@@ -423,25 +421,18 @@ TextureRGBA load_texture_from_png(const char* filename) {
   uint8_t* chunk = (uint8_t*) malloc(8);
 
   if (chunk == (uint8_t*) 0) {
-    puts("png.c: Failed to allocate memory!");
+    print_error("Failed to allocate memory!");
     TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
     return fallback;
   }
 
   fread(chunk, 1, 8, file);
 
-  if (read_int_big_endian(chunk + 4) == 1347179589u) {
-    puts("png.c: Color Palette found but is ignored!");
+  while (read_int_big_endian(chunk + 4) != 1229209940u) {
     const uint32_t length = read_int_big_endian(chunk);
     fseek(file, length + 4u, SEEK_CUR);
 
     fread(chunk, 1, 8, file);
-  }
-
-  if (read_int_big_endian(chunk + 4) != 1229209940u) {
-    puts("png.c: File chunks are unexpected!");
-    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
-    return fallback;
   }
 
   uint8_t* filtered_data     = (uint8_t*) malloc(width * height * byte_per_pixel + height);
@@ -497,7 +488,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
   uint8_t* line_buffer = (uint8_t*) malloc(width * byte_per_pixel);
 
   if (line_buffer == (uint8_t*) 0) {
-    puts("png.c: Failed to allocate memory!");
+    print_error("Failed to allocate memory!");
     free(data);
     free(filtered_data);
     TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
