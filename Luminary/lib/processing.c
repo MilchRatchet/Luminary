@@ -273,3 +273,27 @@ void post_bloom(raytrace_instance* instance, const float sigma) {
   _mm_free(illuminance);
   _mm_free(temp);
 }
+
+RGBF tonemap(RGBF pixel) {
+  const float a = 2.51f;
+  const float b = 0.03f;
+  const float c = 2.43f;
+  const float d = 0.59f;
+  const float e = 0.14f;
+
+  pixel.r = 1.25f * (pixel.r * (a * pixel.r + b)) / (pixel.r * (c * pixel.r + d) + e);
+  pixel.g = 1.25f * (pixel.g * (a * pixel.g + b)) / (pixel.g * (c * pixel.g + d) + e);
+  pixel.b = 1.25f * (pixel.b * (a * pixel.b + b)) / (pixel.b * (c * pixel.b + d) + e);
+
+  return pixel;
+}
+
+void post_tonemapping(raytrace_instance* instance) {
+  const unsigned int pixel_count = instance->width * instance->height;
+
+  RGBF* pixels = instance->frame_buffer;
+
+  for (unsigned int i = 0; i < pixel_count; i++) {
+    pixels[i] = tonemap(pixels[i]);
+  }
+}
