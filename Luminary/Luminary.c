@@ -138,7 +138,7 @@ int main() {
   const int width  = 2560;
   const int height = 1440;
 
-  raytrace_instance* instance = init_raytracing(width, height, 10, 25);
+  raytrace_instance* instance = init_raytracing(width, height, 10, 250);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -147,6 +147,10 @@ int main() {
     meshes_length);
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
+  post_bloom(instance, 2.0f);
+
+  printf("[%.3fs] Applied Bloom.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   RGB8* frame = (RGB8*) malloc(sizeof(RGB8) * instance->width * instance->height);
 

@@ -400,7 +400,7 @@ RGBF get_sky_color(const vec3 ray) {
 
     vec3 sun;
     sun.x = 0.2f;
-    sun.y = 1.05f;
+    sun.y = 0.05f;
     sun.z = -1.0f;
 
     const vec3 sun_normalized = normalize_vector(sun);
@@ -857,7 +857,7 @@ extern "C" raytrace_instance* init_raytracing(const unsigned int width, const un
 
     instance->width = width;
     instance->height = height;
-    instance->frame_buffer = (RGBF*)malloc(sizeof(RGBF) * width * height);
+    instance->frame_buffer = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
 
     cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height);
 
@@ -998,7 +998,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, void* albe
 extern "C" void free_raytracing(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->frame_buffer_gpu));
 
-    free(instance->frame_buffer);
+    _mm_free(instance->frame_buffer);
 
     free(instance);
 }
