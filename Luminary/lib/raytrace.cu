@@ -80,6 +80,9 @@ __device__
 texture_assignment* device_texture_assignments;
 
 __device__
+vec3 device_sun;
+
+__device__
 vec3 cross_product(const vec3 a, const vec3 b) {
     vec3 result;
 
@@ -372,7 +375,7 @@ RGBF get_sky_color(const vec3 ray) {
     result.g = 0.0f;
     result.b = 0.0f;
 
-    const float angular_diameter = 0.018f;
+    const float angular_diameter = 0.009f;
 
     const float overall_density = 1.0f;
 
@@ -398,13 +401,8 @@ RGBF get_sky_color(const vec3 ray) {
     sun_color.g = 0.9f * sun_intensity;
     sun_color.b = 0.8f * sun_intensity;
 
-    vec3 sun;
-    sun.x = 0.2f;
-    sun.y = 0.05f;
-    sun.z = -1.0f;
-
-    const vec3 sun_normalized = normalize_vector(sun);
-    sun = scale_vector(sun_normalized, sun_dist);
+    const vec3 sun_normalized = device_sun;
+    const vec3 sun = scale_vector(sun_normalized, sun_dist);
 
     const float earth_radius = 6371.0f;
     const float atmosphere_height = 100.0f;
@@ -691,6 +689,8 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         specular_ray.y *= specular_ray_length;
         specular_ray.z *= specular_ray_length;
 
+        const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+
         const float specular = curand_uniform(random);
 
         if (specular < smoothness) {
@@ -701,7 +701,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             const float n = 100.0f * smoothness / (1.0f + epsilon - smoothness);
 
             const float alpha = acosf(__powf(curand_uniform(random),(1.0f/(1.0f+n))));
-            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
             ray = sample_ray_from_angles_and_vector(alpha, gamma, specular_ray);
 
@@ -714,11 +713,18 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             record.b *= albedo.b;
 
             const float alpha = acosf(__fsqrt_rn(curand_uniform(random)));
-            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
-            ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
+            const float sun_sample = curand_uniform(random);
 
-            const float angle = normal.x * ray.x + normal.y * ray.y + normal.z * ray.z;
+            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * 0.003f, gamma, device_sun));
+
+            if (sun_sample > 0.5f && dot_product(ray, normal) >= 0.0f) {
+                weight *= 0.003f;
+            } else {
+                ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
+            }
+
+            const float angle = fmaxf(1.0f,fminf(normal.x * ray.x + normal.y * ray.y + normal.z * ray.z, 0.0f));
 
             weight *= 3.1415926535f / (angle + epsilon);
         }
@@ -849,6 +855,11 @@ void set_up_raytracing_device() {
     device_camera_rotation = q;
 
     curand_init(0,0,0,&device_random);
+
+    device_sun.x = -1.2f;
+    device_sun.y = 1.0f;
+    device_sun.z = -1.0f;
+    device_sun = normalize_vector(device_sun);
 }
 
 
