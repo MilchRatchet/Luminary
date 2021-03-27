@@ -4,20 +4,10 @@
 #include "primitives.h"
 #include "mesh.h"
 #include "bvh.h"
+#include "texture.h"
+#include "utils.h"
 
-struct Camera {
-  vec3 pos;
-  vec3 rotation;
-  float fov;  // As the ratio of grid width / 2 to grid distance from camera
-} typedef Camera;
-
-struct Scene {
-  Camera camera;
-  unsigned int far_clip_distance;
-  Triangle* triangles;
-  unsigned int triangles_length;
-  Node* nodes;
-  unsigned int nodes_length;
-} typedef Scene;
+Scene load_scene(const char* filename, raytrace_instance** instance, char** output_name);
+void free_scene(Scene scene, raytrace_instance* instance);
 
 #endif /* SCENE_H */

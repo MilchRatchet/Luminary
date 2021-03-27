@@ -415,7 +415,7 @@ RGBF get_sky_color(const vec3 ray) {
     const vec3 origin_default = origin;
 
     const float limit = get_length_to_border(origin, ray, earth_radius + atmosphere_height);
-    const int steps = 10;
+    const int steps = 8;
     const float step_size = limit/steps;
     float reach = 0.0f;
 
@@ -478,9 +478,9 @@ RGBF get_sky_color(const vec3 ray) {
         transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
         transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
 
-        result.r += sun_color.r * transmittance.r * cos_angle * 50.0f;
-        result.g += sun_color.g * transmittance.g * cos_angle * 50.0f;
-        result.b += sun_color.b * transmittance.b * cos_angle * 50.0f;
+        result.r += sun_color.r * transmittance.r * cos_angle * device_scene.sun_strength;
+        result.g += sun_color.g * transmittance.g * cos_angle * device_scene.sun_strength;
+        result.b += sun_color.b * transmittance.b * cos_angle * device_scene.sun_strength;
     }
 
     return result;
@@ -722,6 +722,8 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
                 weight *= 0.003f;
             } else {
                 ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
+
+                weight *= 2.0f;
             }
 
             const float angle = fmaxf(1.0f,fminf(normal.x * ray.x + normal.y * ray.y + normal.z * ray.z, 0.0f));
@@ -856,14 +858,17 @@ void set_up_raytracing_device() {
 
     curand_init(0,0,0,&device_random);
 
-    device_sun.x = -1.2f;
-    device_sun.y = 1.0f;
-    device_sun.z = -1.0f;
+    device_sun.x = sinf(device_scene.azimuth)*cosf(device_scene.altitude);
+    device_sun.y = sinf(device_scene.altitude);
+    device_sun.z = cosf(device_scene.azimuth)*cosf(device_scene.altitude);
     device_sun = normalize_vector(device_sun);
 }
 
 
-extern "C" raytrace_instance* init_raytracing(const unsigned int width, const unsigned int height, const int reflection_depth, const int diffuse_samples) {
+extern "C" raytrace_instance* init_raytracing(
+    const unsigned int width, const unsigned int height, const int reflection_depth,
+    const int diffuse_samples, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
+    int illuminance_atlas_length, void* material_atlas, int material_atlas_length) {
     raytrace_instance* instance = (raytrace_instance*)malloc(sizeof(raytrace_instance));
 
     instance->width = width;
@@ -874,6 +879,14 @@ extern "C" raytrace_instance* init_raytracing(const unsigned int width, const un
 
     instance->reflection_depth = reflection_depth;
     instance->diffuse_samples = diffuse_samples;
+
+    instance->albedo_atlas = albedo_atlas;
+    instance->illuminance_atlas = illuminance_atlas;
+    instance->material_atlas = material_atlas;
+
+    instance->albedo_atlas_length = albedo_atlas_length;
+    instance->illuminance_atlas_length = illuminance_atlas_length;
+    instance->material_atlas_length = material_atlas_length;
 
     return instance;
 }
@@ -938,7 +951,7 @@ extern "C" void free_textures(void* texture_atlas, const int textures_length) {
     free(textures_cpu);
 }
 
-extern "C" void trace_scene(Scene scene, raytrace_instance* instance, void* albedo_atlas, void* illuminance_atlas, void* material_atlas, texture_assignment* texture_assignments, int meshes_count) {
+extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
     Scene scene_gpu = scene;
 
     volatile uint32_t *progress_gpu, *progress_cpu;
@@ -952,11 +965,11 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, void* albe
 
     texture_assignment* texture_assignments_gpu;
 
-    gpuErrchk(cudaMalloc((void**) &(texture_assignments_gpu), sizeof(texture_assignment) * meshes_count));
+    gpuErrchk(cudaMalloc((void**) &(texture_assignments_gpu), sizeof(texture_assignment) * scene.meshes_length));
     gpuErrchk(cudaMalloc((void**) &(scene_gpu.triangles), sizeof(Triangle) * scene_gpu.triangles_length));
     gpuErrchk(cudaMalloc((void**) &(scene_gpu.nodes), sizeof(Node) * scene_gpu.nodes_length));
 
-    gpuErrchk(cudaMemcpy(texture_assignments_gpu, texture_assignments, sizeof(texture_assignment) * meshes_count, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(texture_assignments_gpu, scene.texture_assignments, sizeof(texture_assignment) * scene.meshes_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(scene_gpu.nodes, scene.nodes, sizeof(Node) * scene.nodes_length, cudaMemcpyHostToDevice));
 
@@ -967,9 +980,9 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, void* albe
     gpuErrchk(cudaMemcpyToSymbol(device_diffuse_samples, &(instance->diffuse_samples), sizeof(int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_albedo_atlas, &(albedo_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_illuminance_atlas, &(illuminance_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_albedo_atlas, &(instance->albedo_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_illuminance_atlas, &(instance->illuminance_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(instance->material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
 
 
     set_up_raytracing_device<<<1,1>>>();

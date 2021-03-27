@@ -220,7 +220,7 @@ Node* build_bvh_structure(
 
   Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
 
-  assert(nodes, "Failed to allocate BVH nodes!", 1);
+  assert((int)nodes, "Failed to allocate BVH nodes!", 1);
 
   memset(nodes, 0, sizeof(Node) * node_count);
 
