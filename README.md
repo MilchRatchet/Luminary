@@ -9,7 +9,7 @@ This project is for fun and to learn more about Computer Graphics. There is no e
 - Implement better distribution function for Monte Carlo method.
 - Implement denoiser.
 - Implement volumetric lighting.
-- Implement post processing routines (AA, DoF, Bloom).
+- Implement post processing routines (AA, DoF).
 - Implement realtime rendering mode.
 
 The licence for this code can be found in the `LICENCE` file.
@@ -26,3 +26,4 @@ This is a list of papers I used for this project so far:
 - K. Booth, J. MacDonald, _Heuristics for ray tracing using space subdivision_, The Visual Computer, 6, pp. 153-166, 1990.
 - T. Karras, S. Laine, H. Ylitie, _Efficient Incoherent Ray Traversal on GPUs Through Compressed Wide BVHs_, HPG '17: Proceedings of High Performance Graphics, pp. 1-13, 2017.
 - S. Hillaire, _A Scalable and Production Ready Sky and Atmosphere Rendering Technique_, Computer Graphics Forum, 39(4), pp. 13-22, 2020.
+- B. Smolka, M. Szczepanski, K.N. Plataniotis, A.N. Venetsanopoulos, _Fast Modified Vector Median Filter_, Canadian Conference on Electrical and Computer Engineering 2001, 2, pp. 1315-1320, 2001.

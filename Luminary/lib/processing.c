@@ -3,6 +3,7 @@
 #include <math.h>
 #include "processing.h"
 #include "raytrace.h"
+#include "error.h"
 
 static float linearRGB_to_SRGB(const float value) {
   if (value <= 0.0031308f) {
@@ -15,6 +16,8 @@ static float linearRGB_to_SRGB(const float value) {
 
 void frame_buffer_to_8bit_image(Camera camera, raytrace_instance* instance, RGB8* image) {
   RGBF* error_table = (RGBF*) malloc(sizeof(RGBF) * (instance->width + 2));
+
+  assert(error_table, "Failed to allocate memory!", 1);
 
   memset(error_table, 0, sizeof(RGBF) * (instance->width + 2));
 
@@ -62,6 +65,8 @@ void frame_buffer_to_8bit_image(Camera camera, raytrace_instance* instance, RGB8
 
 void frame_buffer_to_16bit_image(Camera camera, raytrace_instance* instance, RGB16* image) {
   RGBF* error_table = (RGBF*) malloc(sizeof(RGBF) * (instance->width + 2));
+
+  assert(error_table, "Failed to allocate memory!", 1);
 
   memset(error_table, 0, sizeof(RGBF) * (instance->width + 2));
 
@@ -185,8 +190,7 @@ void post_bloom(raytrace_instance* instance, const float sigma) {
 
   memset(temp_ptr, 0.0f, sizeof(float) * pixel_count * 3);
 
-  // higher values cause higher quality at higher cost
-  const float reference_pixel_count = 1920.0f;
+  const float reference_pixel_count = 1280.0f;
 
   const float pixel_size = reference_pixel_count / instance->width;
 
@@ -274,7 +278,7 @@ void post_bloom(raytrace_instance* instance, const float sigma) {
   _mm_free(temp);
 }
 
-RGBF tonemap(RGBF pixel) {
+static RGBF tonemap(RGBF pixel) {
   const float a = 2.51f;
   const float b = 0.03f;
   const float c = 2.43f;
@@ -296,4 +300,62 @@ void post_tonemapping(raytrace_instance* instance) {
   for (unsigned int i = 0; i < pixel_count; i++) {
     pixels[i] = tonemap(pixels[i]);
   }
+}
+
+static float color_distance(const RGBF a, const RGBF b) {
+  const float x = a.r - b.r;
+  const float y = a.g - b.g;
+  const float z = a.b - b.b;
+  return sqrtf(x * x + y * y + z * z);
+}
+
+void post_median_filter(raytrace_instance* instance, const float bias) {
+  const unsigned int pixel_count = instance->width * instance->height;
+  RGBF* pixels                   = instance->frame_buffer;
+  RGBF* new_pixels               = (RGBF*) _mm_malloc(sizeof(RGBF) * pixel_count, 32);
+
+  RGBF* window = (RGBF*) malloc(sizeof(RGBF) * 9);
+
+  float* distances = (float*) malloc(sizeof(float) * 9);
+
+  for (unsigned int i = 1; i < instance->height - 1; i++) {
+    for (unsigned int j = 1; j < instance->width - 1; j++) {
+      memcpy(window, pixels + j - 1 + (i - 1) * instance->width, sizeof(RGBF) * 3);
+      memcpy(window + 3, pixels + j - 1 + i * instance->width, sizeof(RGBF) * 3);
+      memcpy(window + 6, pixels + j - 1 + (i + 1) * instance->width, sizeof(RGBF) * 3);
+      memset(distances, 0.0f, sizeof(float) * 9);
+
+      for (int k = 0; k < 9; k++) {
+        float distance   = distances[k];
+        const RGBF pixel = window[k];
+        for (int l = k + 1; l < 9; l++) {
+          if (l == 4)
+            continue;
+          const float res = color_distance(window[l], pixel);
+          distance += res;
+          distances[l] += res;
+        }
+        distances[k] = distance;
+      }
+
+      int min        = 4;
+      float min_dist = distances[4] - bias;
+
+      for (int k = 0; k < 9; k++) {
+        if (distances[k] < min_dist) {
+          min_dist = distances[k];
+          min      = k;
+        }
+      }
+
+      new_pixels[j + i * instance->width] = window[min];
+    }
+  }
+
+  free(window);
+  free(distances);
+
+  instance->frame_buffer = new_pixels;
+
+  _mm_free(pixels);
 }
