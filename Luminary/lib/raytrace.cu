@@ -937,6 +937,11 @@ extern "C" void* initialize_textures(TextureRGBA* textures, const int textures_l
 
 extern "C" void initialize_device() {
     gpuErrchk(cudaSetDeviceFlags(cudaDeviceMapHost));
+
+    cudaDeviceProp prop;
+    cudaGetDeviceProperties(&prop, 0);
+
+    printf("Luminary - %s\n",prop.name);
 }
 
 extern "C" void free_textures(void* texture_atlas, const int textures_length) {
@@ -1003,10 +1008,10 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance) {
         uint32_t new_progress = *progress_cpu;
         if (new_progress > progress) {
             progress = new_progress;
-            clock_t curr_time = clock();
-            double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
-            printf("\r                                                                                         \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs",(float)progress * ratio * 100, time_elapsed, (total_pixels - progress) * (time_elapsed/progress));
         }
+        clock_t curr_time = clock();
+        double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
+        printf("\r                                                                                         \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs",(float)progress * ratio * 100, time_elapsed, (total_pixels - progress) * (time_elapsed/progress));
     }
 
     printf("\r                                                                             \r");
