@@ -17,7 +17,7 @@ static float linearRGB_to_SRGB(const float value) {
 void frame_buffer_to_8bit_image(Camera camera, raytrace_instance* instance, RGB8* image) {
   RGBF* error_table = (RGBF*) malloc(sizeof(RGBF) * (instance->width + 2));
 
-  assert((int)error_table, "Failed to allocate memory!", 1);
+  assert((int) error_table, "Failed to allocate memory!", 1);
 
   memset(error_table, 0, sizeof(RGBF) * (instance->width + 2));
 
@@ -66,7 +66,7 @@ void frame_buffer_to_8bit_image(Camera camera, raytrace_instance* instance, RGB8
 void frame_buffer_to_16bit_image(Camera camera, raytrace_instance* instance, RGB16* image) {
   RGBF* error_table = (RGBF*) malloc(sizeof(RGBF) * (instance->width + 2));
 
-  assert((int)error_table, "Failed to allocate memory!", 1);
+  assert((int) error_table, "Failed to allocate memory!", 1);
 
   memset(error_table, 0, sizeof(RGBF) * (instance->width + 2));
 
@@ -318,6 +318,8 @@ void post_median_filter(raytrace_instance* instance, const float bias) {
 
   float* distances = (float*) malloc(sizeof(float) * 9);
 
+  memcpy(new_pixels, pixels, sizeof(RGBF) * pixel_count);
+
   for (unsigned int i = 1; i < instance->height - 1; i++) {
     for (unsigned int j = 1; j < instance->width - 1; j++) {
       memcpy(window, pixels + j - 1 + (i - 1) * instance->width, sizeof(RGBF) * 3);
@@ -339,7 +341,7 @@ void post_median_filter(raytrace_instance* instance, const float bias) {
       }
 
       int min        = 4;
-      float min_dist = distances[4] - bias;
+      float min_dist = distances[4] * bias;
 
       for (int k = 0; k < 9; k++) {
         if (distances[k] < min_dist) {
