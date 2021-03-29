@@ -13,7 +13,8 @@ inline void ___assert(
   if (value == 0) {
     fprintf(stderr, "Assertion failed!\nFile: %s\nLine: %d\nMessage: %s\n", file, line, message);
     if (abort) {
-      puts("Terminating...");
+      puts("Press enter to close...");
+      getchar();
       exit(SIGABRT_COMPAT);
     }
   }
