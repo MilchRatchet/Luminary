@@ -9,7 +9,6 @@ This project is for fun and to learn more about Computer Graphics. There is no e
 - Implement denoiser.
 - Implement volumetric lighting.
 - Implement post processing routines (AA, DoF).
-- Implement realtime rendering mode.
 
 The licence for this code can be found in the `LICENCE` file.
 The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.

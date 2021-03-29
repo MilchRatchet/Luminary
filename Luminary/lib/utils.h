@@ -39,6 +39,7 @@ struct raytrace_instance {
   int material_atlas_length;
   int reflection_depth;
   int diffuse_samples;
+  Scene scene_gpu;
 } typedef raytrace_instance;
 
 #endif /* UTILS_H */

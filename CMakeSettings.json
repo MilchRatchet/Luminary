@@ -13,16 +13,27 @@
       "variables": []
     },
     {
-      "name": "x64-Release",
+      "name": "x64-Clang-Release",
       "generator": "Ninja",
-      "configurationType": "RelWithDebInfo",
+      "configurationType": "Release",
       "buildRoot": "${projectDir}\\out\\build\\${name}",
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "inheritEnvironments": [ "msvc_x64_x64" ],
-      "variables": []
+      "inheritEnvironments": [ "clang_cl_x64_x64" ],
+      "variables": [
+        {
+          "name": "CMAKE_CUDA_FLAGS_RELEASE",
+          "value": "-Xcompiler=\"-MD -O3 -Ob2 -march=native -ffp-contract=fast\" -DNDEBUG",
+          "type": "STRING"
+        },
+        {
+          "name": "CMAKE_C_FLAGS_RELEASE",
+          "value": "/MD /DNDEBUG -O2 -march=native",
+          "type": "STRING"
+        }
+      ]
     },
     {
       "name": "x64-Clang-Debug",
@@ -34,7 +45,18 @@
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
       "inheritEnvironments": [ "clang_cl_x64_x64" ],
-      "variables": []
+      "variables": [
+        {
+          "name": "CMAKE_CUDA_FLAGS_DEBUG",
+          "value": "-Xcompiler=\"-MDd -Zi -Ob0 -Od /RTC1 -march=native\" -G",
+          "type": "STRING"
+        },
+        {
+          "name": "CMAKE_C_FLAGS_DEBUG",
+          "value": "/MDd /Zi /Ob0 /Od /RTC1 -g -march=native",
+          "type": "STRING"
+        }
+      ]
     }
   ]
 }

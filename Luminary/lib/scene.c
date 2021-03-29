@@ -65,6 +65,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   float azimuth      = 3.141f;
   float altitude     = 0.5f;
   float sun_strength = 30.0f;
+  int bvh_depth      = 18;
 
   unsigned int albedo_maps_count      = 1;
   unsigned int illuminance_maps_count = 1;
@@ -176,6 +177,9 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
     else if (line[0] == 'o' && line[1] == ' ') {
       sscanf(line, "%*c %s\n", *output_name);
     }
+    else if (line[0] == 'b') {
+      sscanf(line, "%*c %d\n", &bvh_depth);
+    }
     else if (line[0] == '#') {
       continue;
     }
@@ -193,7 +197,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   int nodes_length;
 
-  Node* nodes = build_bvh_structure(&triangles, triangle_count, 18, &nodes_length);
+  Node* nodes = build_bvh_structure(&triangles, triangle_count, bvh_depth, &nodes_length);
 
   scene.triangles           = triangles;
   scene.triangles_length    = triangle_count;
@@ -212,7 +216,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   *instance = init_raytracing(
     width, height, bounces, samples, albedo_atlas, albedo_maps_count, illuminance_atlas,
-    illuminance_maps_count, material_atlas, material_maps_count);
+    illuminance_maps_count, material_atlas, material_maps_count, scene);
 
   free(source);
   free(line);

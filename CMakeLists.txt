@@ -3,6 +3,7 @@
 project ("Luminary" LANGUAGES CUDA C)
 
 set(CMAKE_CUDA_ARCHITECTURES 61)
+set(CMAKE_C_STANDARD 17)
 
 message(STATUS "SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
 
@@ -12,4 +13,11 @@ file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/lib/*.cu")
 message(STATUS "cpu_source_files: ${cpu_source_files}")
 message(STATUS "gpu_source_files: ${gpu_source_files}")
 
+set(SDL2_DIR "${PROJECT_SOURCE_DIR}/Luminary/lib/SDL")
+
+include_directories(${SDL2_DIR})
+link_directories(${SDL2_DIR})
+
 add_executable(Luminary ${cpu_source_files} ${gpu_source_files})
+
+target_link_libraries(Luminary SDL2main SDL2)
