@@ -2,7 +2,7 @@
 
 Luminary is a CUDA based Pathtracing renderer.
 
-![Sponza Example](https://github.com/MilchRatchet/Luminary/blob/master/demo-images/Sponza.png)
+![Sponza Example](https://github.com/MilchRatchet/Luminary/blob/main/demo_images/Sponza.png)
 
 This project is for fun and to learn more about Computer Graphics. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
