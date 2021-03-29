@@ -2,6 +2,8 @@
 
 Luminary is a CUDA based Pathtracing renderer.
 
+![Sponza Example](https://github.com/MilchRatchet/Luminary/blob/master/demo-images/Sponza.png)
+
 This project is for fun and to learn more about Computer Graphics. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
 - Implement refraction.
@@ -12,6 +14,86 @@ This project is for fun and to learn more about Computer Graphics. There is no e
 
 The licence for this code can be found in the `LICENCE` file.
 The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.
+
+# Usage
+
+Meshes need to be in `*.obj` file format. Only triangles are supported. Textures are required to be in 8bit RGBA `png` format. There are three texture types:
+
+ - Albedo Textures
+   - Red: Red Color
+   - Green: Green Color
+   - Blue: Blue Color
+   - Alpha: Transparency
+ - Illuminance Textures
+   - Red: Emission Red Color
+   - Green: Emission Green Color
+   - Blue: Emission Blue Color
+   - Alpha: Unused
+ - Material Textures
+   - Red: Smoothness
+   - Green: Metallic
+   - Blue: Emission Intensity
+
+A whole scene is arranged through `*.lum` files which are in the following format:
+```
+Luminary
+v 1
+# Comments start with a # symbol
+# Comments may only appear after the first two lines
+# This example demonstrates this particular version of lum
+#
+# m [Path to Obj file]
+m Meshes/Example.obj
+#
+# ta [Path to Albedo Texture file]
+ta Textures/Example.png
+#
+# ti [Path to Illuminance Texture file]
+ti Textures/Example_Emission.png
+#
+# tm [Path to Material Texture file]
+tm Textures/Example_Material.png
+#
+# Note that 0 refers to default Textures
+# a [Mesh | Albedo Texture | Illuminance Texture | Material Texture]
+a 0 1 1 1
+#
+# Camera parameters
+# c [Pos.x | Pos.y | Pos.z | Rotation.x | Rotation.y | Rotation.z | FOV]
+c 2.0 0.3 -0.06 0.0 1.570796 0.0 2.0
+#
+# Sun parameters
+# s [Azimuth | Altitude | Intensity]
+s 1.0 1.4 50.0
+#
+# Rendering parameters
+# i [Width | Height | Bounces | Samples per Pixel]
+i 1920 1080 6 50
+#
+# BVH depth
+# b [Depth]
+b 18
+#
+# Output path (Offline Mode only)
+# o [Path to Output file]
+o Results/image.png
+#
+# A *.lum file must contain an x
+x
+# Lines after the x are ignored
+```
+
+Run Luminary by passing the path to the `*.lum` file.
+
+```
+START "" Luminary.exe Scenes/Example.lum
+```
+
+Alternatively you can run Luminary in Realtime Mode using
+
+```
+START "" Luminary.exe Scenes/Example.lum r
+```
 
 # Literature
 
