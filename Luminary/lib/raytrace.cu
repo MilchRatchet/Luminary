@@ -7,6 +7,8 @@
 #include <curand_kernel.h>
 #include <float.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
 #include <time.h>
 #include <chrono>
 #include <thread>
@@ -326,7 +328,8 @@ vec3 normalize_vector(vec3 vector) {
 }
 
 __device__
-float get_length_to_border(const vec3 origin, const vec3 ray, const float atmosphere_end) {
+float get_length_to_border(const vec3 origin, vec3 ray, const float atmosphere_end) {
+    if (ray.y < 0.0f) ray = scale_vector(ray, -1.0f);
     const float a = dot_product(origin,ray);
     return -a + sqrtf(a * a - dot_product(origin,origin) + atmosphere_end * atmosphere_end);
 }
@@ -500,9 +503,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     record.g = 1.0f;
     record.b = 1.0f;
 
-    int traversals = 0;
-    unsigned int ray_triangle_intersections = 0;
-
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
         float depth = device_scene.far_clip_distance;
 
@@ -518,8 +518,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         while (node_address != -1) {
             while (device_scene.nodes[node_address].triangles_address == -1) {
                 Node node = device_scene.nodes[node_address];
-
-                traversals++;
 
                 const float decompression_x = __powf(2.0f, (float)node.ex);
                 const float decompression_y = __powf(2.0f, (float)node.ey);
@@ -567,8 +565,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
                 for (unsigned int i = 0; i < node.triangle_count; i++) {
                     const float d = triangle_intersection(device_scene.triangles[node.triangles_address + i], origin, ray);
 
-                    ray_triangle_intersections++;
-
                     if (d < depth) {
                         depth = d;
                         hit_id = node.triangles_address + i;
@@ -600,18 +596,8 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             result.g += sky.g * weight * record.g;
             result.b += sky.b * weight * record.b;
 
-            /*result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
-            result.g = 0;
-            result.b = traversals * (4.0f/device_scene.nodes_length);*/
-
             return result;
-        } /*else {
-            result.r += depth * 0.05f;
-            result.g += depth * 0.05f;
-            result.b += depth * 0.05f;
-
-            return result;
-        }*/
+        }
 
         curr.x = origin.x + ray.x * depth;
         curr.y = origin.y + ray.y * depth;
@@ -619,13 +605,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
         Triangle hit_triangle = device_scene.triangles[hit_id];
 
-        vec3 normal;
-        normal.x = 1.0f;
-        normal.y = 1.0f;
-        normal.z = 1.0f;
-
-
-        normal = get_coordinates_in_triangle(hit_triangle, curr);
+        vec3 normal = get_coordinates_in_triangle(hit_triangle, curr);
 
         const float lambda = normal.x;
         const float mu = normal.y;
@@ -726,7 +706,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
                 weight *= 2.0f;
             }
 
-            const float angle = fmaxf(1.0f,fminf(normal.x * ray.x + normal.y * ray.y + normal.z * ray.z, 0.0f));
+            const float angle = __saturatef(normal.x * ray.x + normal.y * ray.y + normal.z * ray.z);
 
             weight *= 3.1415926535f / (angle + epsilon);
         }
@@ -735,10 +715,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
         weight *= ((1.0f - smoothness) * 0.31830988618f) + (smoothness * 0.5f * 0.31830988618f);
     }
-
-    /*result.r = ray_triangle_intersections * (16.0f/device_scene.triangles_length) * (1.0f/device_reflection_depth);
-    result.g = 0;
-    result.b = traversals * (4.0f/device_scene.nodes_length);*/
 
     return result;
 }
