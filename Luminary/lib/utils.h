@@ -6,6 +6,14 @@
 #include "bvh.h"
 #include "texture.h"
 
+#ifndef PI
+#define PI 3.141592653589f
+#endif
+
+#ifndef ONE_OVER_PI
+#define ONE_OVER_PI 0.31830988618f
+#endif
+
 struct Camera {
   vec3 pos;
   vec3 rotation;

@@ -93,9 +93,9 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   material_maps[0].width        = 1;
   material_maps[0].height       = 1;
   material_maps[0].data         = (RGBAF*) malloc(sizeof(RGBAF));
-  material_maps[0].data[0].r    = 0.1f;
-  material_maps[0].data[0].g    = 1.0f;
-  material_maps[0].data[0].b    = 1.0f;
+  material_maps[0].data[0].r    = 0.2f;
+  material_maps[0].data[0].g    = 0.0f;
+  material_maps[0].data[0].b    = 1.0f / 255.0f;
   material_maps[0].data[0].a    = 0.0f;
 
   char* source = (char*) malloc(LINE_SIZE);

@@ -84,6 +84,10 @@ texture_assignment* device_texture_assignments;
 __device__
 vec3 device_sun;
 
+//---------------------------------
+// Vector Utilities
+//---------------------------------
+
 __device__
 vec3 cross_product(const vec3 a, const vec3 b) {
     vec3 result;
@@ -101,6 +105,11 @@ float dot_product(const vec3 a, const vec3 b) {
 }
 
 __device__
+float lerp(const float a, const float b, const float t) {
+    return a + t * (b - a);
+}
+
+__device__
 vec3 vec_diff(const vec3 a, const vec3 b) {
     vec3 result;
 
@@ -109,6 +118,69 @@ vec3 vec_diff(const vec3 a, const vec3 b) {
     result.z = a.z - b.z;
 
     return result;
+}
+
+__device__
+vec3 reflect_vector(const vec3 v, const vec3 n) {
+    vec3 result;
+
+    const float dot = dot_product(v, n);
+
+    result.x = v.x - 2.0f * dot * n.x;
+    result.y = v.y - 2.0f * dot * n.y;
+    result.z = v.z - 2.0f * dot * n.z;
+
+    return result;
+}
+
+__device__
+vec3 scale_vector(vec3 vector, const float scale) {
+    vector.x *= scale;
+    vector.y *= scale;
+    vector.z *= scale;
+
+    return vector;
+}
+
+__device__
+float get_length(const vec3 vector) {
+    return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+__device__
+vec3 normalize_vector(vec3 vector) {
+    const float inv_length = 1.0f / get_length(vector);
+
+    return scale_vector(vector, inv_length);
+}
+
+__device__
+vec3 Fresnel_Schlick(const vec3 f0, const float f90, const float NdotS) {
+    vec3 result;
+
+    const float t = powf(1.0f - NdotS, 5.0f);
+
+    result.x = lerp(f0.x, f90, t);
+    result.y = lerp(f0.y, f90, t);
+    result.z = lerp(f0.z, f90, t);
+
+    return result;
+}
+
+__device__
+float luminance(const vec3 v) {
+    vec3 w;
+    w.x = 0.2126f;
+    w.y = 0.7152f;
+    w.z = 0.0722f;
+
+    return dot_product(v,w);
+}
+
+__device__
+float shadowed_F90(const vec3 f0) {
+    const float t = 1.0f / 0.04f;
+    return fminf(1.0f, t * luminance(f0));
 }
 
 __device__
@@ -126,11 +198,6 @@ vec3 get_coordinates_in_triangle(const Triangle triangle, const vec3 point) {
     return result;
 }
 
-/*
- * Normals should really be spherically lerped but in most cases
- * the angle between the vertex normals is small enough, so that
- * the performance advantage is probably worth it.
- */
 __device__
 vec3 lerp_normals(const Triangle triangle, const float lambda, const float mu) {
     vec3 result;
@@ -139,13 +206,7 @@ vec3 lerp_normals(const Triangle triangle, const float lambda, const float mu) {
     result.y = triangle.vertex_normal.y + lambda * triangle.edge1_normal.y + mu * triangle.edge2_normal.y;
     result.z = triangle.vertex_normal.z + lambda * triangle.edge1_normal.z + mu * triangle.edge2_normal.z;
 
-    const float length = 1.0f / sqrtf(dot_product(result, result));
-
-    result.x *= length;
-    result.y *= length;
-    result.z *= length;
-
-    return result;
+    return normalize_vector(result);
 }
 
 __device__
@@ -305,27 +366,74 @@ vec3 decompress_vector(const compressed_vec3 vector, const vec3 p, const float e
     return result;
 }
 
+//---------------------------------
+// Quaternion Utilities
+//---------------------------------
 
 __device__
-vec3 scale_vector(vec3 vector, const float scale) {
-    vector.x *= scale;
-    vector.y *= scale;
-    vector.z *= scale;
-
-    return vector;
+Quaternion inverse_quaternion(const Quaternion q) {
+    Quaternion result;
+    result.x = -q.x;
+    result.y = -q.y;
+    result.z = -q.z;
+    result.w = q.w;
+    return result;
 }
 
 __device__
-float get_length(const vec3 vector) {
-    return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+Quaternion get_rotation_to_z_canonical(const vec3 v) {
+    Quaternion res;
+    if (v.z < -1.0f + epsilon) {
+        res.x = 1.0f;
+        res.y = 0.0f;
+        res.z = 0.0f;
+        res.w = 0.0f;
+        return res;
+    }
+    res.x = v.y;
+    res.y = -v.x;
+    res.z = 0.0f;
+    res.w = 1.0f + v.z;
+
+    const float norm = 1.0f / sqrtf(res.x * res.x + res.y * res.y + res.w * res.w);
+
+    res.x *= norm;
+    res.y *= norm;
+    res.w *= norm;
+
+    return res;
 }
 
 __device__
-vec3 normalize_vector(vec3 vector) {
-    const float inv_length = 1.0f / get_length(vector);
+vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
+    vec3 result;
 
-    return scale_vector(vector, inv_length);
+    vec3 u;
+    u.x = q.x;
+    u.y = q.y;
+    u.z = q.z;
+
+    const float s = q.w;
+
+    const float dot_uv = u.x * v.x + u.y * v.y + u.z * v.z;
+    const float dot_uu = u.x * u.x + u.y * u.y + u.z * u.z;
+
+    vec3 cross;
+
+    cross.x = u.y*v.z - u.z*v.y;
+    cross.y = u.z*v.x - u.x*v.z;
+    cross.z = u.x*v.y - u.y*v.x;
+
+    result.x = 2.0f * dot_uv * u.x + ((s*s)-dot_uu) * v.x + 2.0f * s * cross.x;
+    result.y = 2.0f * dot_uv * u.y + ((s*s)-dot_uu) * v.y + 2.0f * s * cross.y;
+    result.z = 2.0f * dot_uv * u.z + ((s*s)-dot_uu) * v.z + 2.0f * s * cross.z;
+
+    return result;
 }
+
+//---------------------------------
+// Procedural Sky
+//---------------------------------
 
 __device__
 float get_length_to_border(const vec3 origin, vec3 ray, const float atmosphere_end) {
@@ -377,6 +485,10 @@ RGBF get_sky_color(const vec3 ray) {
     result.r = 0.0f;
     result.g = 0.0f;
     result.b = 0.0f;
+
+    if (ray.y < 0.0f) {
+        return result;
+    }
 
     const float angular_diameter = 0.009f;
 
@@ -489,6 +601,65 @@ RGBF get_sky_color(const vec3 ray) {
     return result;
 }
 
+//---------------------------------
+// Microfacet BRDF
+//---------------------------------
+
+__device__
+float Smith_G1_GGX(const float alpha2, const float NdotS2) {
+    return 2.0f / (sqrtf(((alpha2 * (1.0f - NdotS2)) + NdotS2) / NdotS2) + 1.0f);
+}
+
+__device__
+float Smith_G2_over_G1_height_correlated(const float alpha, const float alpha2, const float NdotL, const float NdotV) {
+    const float G1V = Smith_G1_GGX(alpha2, NdotV * NdotV);
+    const float G1L = Smith_G1_GGX(alpha2, NdotL * NdotL);
+    return G1L / (G1V + G1L - G1V * G1L);
+}
+
+__device__
+vec3 sample_GGX_VNDF(const vec3 v, const float alpha, const float random1, const float random2) {
+    vec3 v_hemi;
+
+    v_hemi.x = alpha * v.x;
+    v_hemi.y = alpha * v.y;
+    v_hemi.z = v.z;
+
+    const float length_squared = v_hemi.x * v_hemi.x + v_hemi.y * v_hemi.y;
+    vec3 T1;
+
+    if (length_squared == 0.0f) {
+        T1.x = 1.0f;
+        T1.y = 0.0f;
+        T1.z = 0.0f;
+    } else {
+        const float length = 1.0f / sqrtf(length_squared);
+        T1.x = -v_hemi.y * length;
+        T1.y = v_hemi.x * length;
+        T1.z = 0.0f;
+    }
+
+    const vec3 T2 = cross_product(v_hemi, T1);
+
+    const float r = sqrtf(random1);
+    const float phi = 2.0f * PI * random2;
+    const float t1 = r * cosf(phi);
+    const float s = 0.5f * (1.0f + v_hemi.z);
+    const float t2 = lerp(sqrtf(1.0f - t1 * t1), r * sinf(phi), s);
+
+    vec3 normal_hemi;
+
+    const float scalar = sqrtf(fmaxf(0.0f, 1.0f - t1 * t1 - t2 * t2));
+    normal_hemi.x = alpha * (t1 * T1.x + t2 * T2.x + scalar * v_hemi.x);
+    normal_hemi.y = alpha * (t1 * T1.y + t2 * T2.y + scalar * v_hemi.y);
+    normal_hemi.z = fmaxf(0.0f, t1 * T1.z + t2 * T2.z + scalar * v_hemi.z);
+
+    return normalize_vector(normal_hemi);
+}
+
+//---------------------------------
+// Path Tracing
+//---------------------------------
 
 __device__
 RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
@@ -630,9 +801,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         emission.g = illumiance_f.y;
         emission.b = illumiance_f.z;
 
-        const float smoothness = material_f.x;
+        const float roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
         const float metallic = material_f.y;
-        const float intensity = material_f.z;
+        const float intensity = material_f.z * 255.0f;
 
         result.r += emission.r * intensity * weight * record.r;
         result.g += emission.g * intensity * weight * record.g;
@@ -656,35 +827,74 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         origin.y = curr.y;
         origin.z = curr.z;
 
-        vec3 specular_ray;
-        const float projected_length = ray.x * normal.x + ray.y * normal.y + ray.z * normal.z;
-
-        specular_ray.x = ray.x - 2.0f * projected_length * normal.x;
-        specular_ray.y = ray.y - 2.0f * projected_length * normal.y;
-        specular_ray.z = ray.z - 2.0f * projected_length * normal.z;
-
-        const float specular_ray_length = rsqrtf(specular_ray.x * specular_ray.x + specular_ray.y * specular_ray.y + specular_ray.z * specular_ray.z);
-
-        specular_ray.x *= specular_ray_length;
-        specular_ray.y *= specular_ray_length;
-        specular_ray.z *= specular_ray_length;
-
-        const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
-
         const float specular = curand_uniform(random);
+        const float specular_probability = lerp(0.5f, 1.0f - epsilon, metallic);
 
-        if (specular < smoothness) {
-            record.r *= (albedo.r * metallic + 1.0f - metallic);
-            record.g *= (albedo.g * metallic + 1.0f - metallic);
-            record.b *= (albedo.b * metallic + 1.0f - metallic);
+        const vec3 V = scale_vector(ray, -1.0f);
 
-            const float n = 100.0f * smoothness / (1.0f + epsilon - smoothness);
+        if (dot_product(normal, V) <= 0.0f) {
+            normal = scale_vector(normal, -1.0f);
+        }
 
-            const float alpha = acosf(__powf(curand_uniform(random),(1.0f/(1.0f+n))));
+        if (specular < specular_probability) {
+            const float alpha = roughness * roughness;
 
-            ray = sample_ray_from_angles_and_vector(alpha, gamma, specular_ray);
+            const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
-            weight *= 2.0f * 3.1415926535f;
+            const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
+
+            const float sun_sample = curand_uniform(random);
+
+            vec3 H_local;
+
+            const float beta = acosf(curand_uniform(random));
+            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+
+            const vec3 S_local = rotate_vector_by_quaternion(
+                normalize_vector(sample_ray_from_angles_and_vector(beta * 0.0045f, gamma, device_sun)),
+                rotation_to_z);
+
+            if (sun_sample < 0.5f && S_local.z >= 0.0f) {
+                H_local.x = S_local.x + V_local.x;
+                H_local.y = S_local.y + V_local.y;
+                H_local.z = S_local.z + V_local.z;
+
+                H_local = normalize_vector(H_local);
+
+                weight *= 2.0f * 0.0045f;
+            } else {
+                if (alpha == 0.0f) {
+                    H_local.x = 0.0f;
+                    H_local.y = 0.0f;
+                    H_local.z = 1.0f;
+                } else {
+                    H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
+                }
+
+                weight *= ((S_local.z >= 0.0f) ? 2.0f : 1.0f);
+            }
+
+            const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
+
+            const float HdotR = fmaxf(epsilon, fminf(1.0f, dot_product(H_local, ray_local)));
+            const float NdotR = fmaxf(epsilon, fminf(1.0f, ray_local.z));
+            const float NdotV = fmaxf(epsilon, fminf(1.0f, V_local.z));
+            const float NdotH = fmaxf(epsilon, fminf(1.0f, H_local.z));
+
+            vec3 specular_f0;
+            specular_f0.x = lerp(0.04f, albedo.r, metallic);
+            specular_f0.y = lerp(0.04f, albedo.g, metallic);
+            specular_f0.z = lerp(0.04f, albedo.b, metallic);
+
+            const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
+
+            weight *= Smith_G2_over_G1_height_correlated(alpha, alpha * alpha, NdotR, NdotV) / specular_probability;
+
+            record.r *= F.x;
+            record.g *= F.y;
+            record.b *= F.z;
+
+            ray = normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
         }
         else
         {
@@ -692,56 +902,42 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             record.g *= albedo.g;
             record.b *= albedo.b;
 
-            const float alpha = acosf(__fsqrt_rn(curand_uniform(random)));
+            const float alpha = acosf(curand_uniform(random));
+            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
             const float sun_sample = curand_uniform(random);
+            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * 0.0045f, gamma, device_sun));
 
-            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * 0.003f, gamma, device_sun));
+            const float sun_feasible = dot_product(ray, normal);
 
-            if (sun_sample > 0.5f && dot_product(ray, normal) >= 0.0f) {
-                weight *= 0.003f;
+            if (sun_sample < 0.5f && sun_feasible >= 0.0f) {
+                weight *= 2.0f * 0.0045f;
             } else {
                 ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
-                weight *= 2.0f;
+                weight *= ((sun_feasible >= 0.0f) ? 2.0f : 1.0f);
             }
 
-            const float angle = __saturatef(normal.x * ray.x + normal.y * ray.y + normal.z * ray.z);
+            const float angle = fmaxf(epsilon, fminf(dot_product(normal, ray),1.0f));
+            const float previous_angle = fmaxf(epsilon, fminf(dot_product(V, normal),1.0f));
 
-            weight *= 3.1415926535f / (angle + epsilon);
+            vec3 H;
+            H.x = V.x + ray.x;
+            H.y = V.y + ray.y;
+            H.z = V.z + ray.z;
+            H = normalize_vector(H);
+
+            const float half_angle = fmaxf(epsilon, fminf(dot_product(H,ray),1.0f));
+            const float energyFactor = lerp(1.0f, 1.0f/1.51f, roughness);
+
+            const float FD90MinusOne = 0.5f * roughness + 2.0f * half_angle * half_angle * roughness - 1.0f;
+
+            const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
+            const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
+
+            weight *= FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
         }
-
-        const float angle = specular_ray.x * ray.x + specular_ray.y * ray.y + specular_ray.z * ray.z;
-
-        weight *= ((1.0f - smoothness) * 0.31830988618f) + (smoothness * 0.5f * 0.31830988618f);
     }
-
-    return result;
-}
-
-__device__
-vec3 rotate_vector_by_quaternion(vec3 v, Quaternion q) {
-    vec3 result;
-
-    vec3 u;
-    u.x = q.x;
-    u.y = q.y;
-    u.z = q.z;
-
-    float s = q.w;
-
-    float dot_uv = u.x * v.x + u.y * v.y + u.z * v.z;
-    float dot_uu = u.x * u.x + u.y * u.y + u.z * u.z;
-
-    vec3 cross;
-
-    cross.x = u.y*v.z - u.z*v.y;
-    cross.y = u.z*v.x - u.x*v.z;
-    cross.z = u.x*v.y - u.y*v.x;
-
-    result.x = 2.0f * dot_uv * u.x + ((s*s)-dot_uu) * v.x + 2.0f * s * cross.x;
-    result.y = 2.0f * dot_uv * u.y + ((s*s)-dot_uu) * v.y + 2.0f * s * cross.y;
-    result.z = 2.0f * dot_uv * u.z + ((s*s)-dot_uu) * v.z + 2.0f * s * cross.z;
 
     return result;
 }
