@@ -819,14 +819,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             continue;
         }
 
-        curr.x += normal.x * epsilon * 2.0f;
-        curr.y += normal.y * epsilon * 2.0f;
-        curr.z += normal.z * epsilon * 2.0f;
-
-        origin.x = curr.x;
-        origin.y = curr.y;
-        origin.z = curr.z;
-
         const float specular = curand_uniform(random);
         const float specular_probability = lerp(0.5f, 1.0f - epsilon, metallic);
 
@@ -835,6 +827,14 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         if (dot_product(normal, V) <= 0.0f) {
             normal = scale_vector(normal, -1.0f);
         }
+
+        curr.x += normal.x * epsilon * 2.0f;
+        curr.y += normal.y * epsilon * 2.0f;
+        curr.z += normal.z * epsilon * 2.0f;
+
+        origin.x = curr.x;
+        origin.y = curr.y;
+        origin.z = curr.z;
 
         if (specular < specular_probability) {
             const float alpha = roughness * roughness;
