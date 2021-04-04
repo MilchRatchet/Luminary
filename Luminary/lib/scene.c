@@ -5,6 +5,7 @@
 #include "error.h"
 #include "png.h"
 #include "wavefront.h"
+#include "light.h"
 
 static const int LINE_SIZE       = 4096;
 static const int CURRENT_VERSION = 1;
@@ -209,6 +210,8 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   scene.altitude     = altitude;
   scene.azimuth      = azimuth;
   scene.sun_strength = sun_strength;
+
+  process_lights(&scene);
 
   void* albedo_atlas      = initialize_textures(albedo_maps, albedo_maps_count);
   void* illuminance_atlas = initialize_textures(illuminance_maps, illuminance_maps_count);

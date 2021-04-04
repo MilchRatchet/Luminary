@@ -20,6 +20,11 @@ struct Camera {
   float fov;
 } typedef Camera;
 
+struct Light {
+  vec3 pos;
+  float radius;
+} typedef Light;
+
 struct Scene {
   Camera camera;
   unsigned int far_clip_distance;
@@ -32,6 +37,8 @@ struct Scene {
   float azimuth;
   float altitude;
   float sun_strength;
+  Light* lights;
+  unsigned int lights_length;
 } typedef Scene;
 
 struct raytrace_instance {

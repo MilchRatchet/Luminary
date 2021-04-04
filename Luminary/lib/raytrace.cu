@@ -450,7 +450,6 @@ float density_at_height(const float height, const float density_falloff) {
 __device__
 float height_at_point(const vec3 point) {
     const float earth_radius = 6371.0f;
-    const float atmosphere_height = 100.0f;
     return (get_length(point) - earth_radius);
 }
 
@@ -662,6 +661,12 @@ vec3 sample_GGX_VNDF(const vec3 v, const float alpha, const float random1, const
 //---------------------------------
 
 __device__
+float get_light_angle(Light light, vec3 pos) {
+    const float d = get_length(vec_diff(pos, light.pos)) + epsilon;
+    return atanf(light.radius / d);
+}
+
+__device__
 RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     RGBF result;
     result.r = 0.0f;
@@ -836,6 +841,16 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         origin.y = curr.y;
         origin.z = curr.z;
 
+        const float light_sample = curand_uniform(random);
+        float light_angle;
+        vec3 light_source;
+
+        if (light_sample < 0.5f) {
+            const uint32_t light = (uint32_t)(curand_uniform(random) * device_scene.lights_length);
+            light_source = normalize_vector(vec_diff(device_scene.lights[light].pos, origin));
+            light_angle = get_light_angle(device_scene.lights[light], origin);
+        }
+
         if (specular < specular_probability) {
             const float alpha = roughness * roughness;
 
@@ -843,25 +858,23 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
             const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
 
-            const float sun_sample = curand_uniform(random);
-
             vec3 H_local;
 
             const float beta = acosf(curand_uniform(random));
             const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
             const vec3 S_local = rotate_vector_by_quaternion(
-                normalize_vector(sample_ray_from_angles_and_vector(beta * 0.0045f, gamma, device_sun)),
+                normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle * 2.0f / PI, gamma, light_source)),
                 rotation_to_z);
 
-            if (sun_sample < 0.5f && S_local.z >= 0.0f) {
+            if (light_sample < 0.5f && S_local.z >= 0.0f) {
                 H_local.x = S_local.x + V_local.x;
                 H_local.y = S_local.y + V_local.y;
                 H_local.z = S_local.z + V_local.z;
 
                 H_local = normalize_vector(H_local);
 
-                weight *= 2.0f * 0.0045f;
+                weight *= 2.0f * light_angle * device_scene.lights_length;
             } else {
                 if (alpha == 0.0f) {
                     H_local.x = 0.0f;
@@ -905,17 +918,16 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             const float alpha = acosf(curand_uniform(random));
             const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
-            const float sun_sample = curand_uniform(random);
-            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * 0.0045f, gamma, device_sun));
+            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle * 2.0f / PI, gamma, light_source));
 
-            const float sun_feasible = dot_product(ray, normal);
+            const float light_feasible = dot_product(ray, normal);
 
-            if (sun_sample < 0.5f && sun_feasible >= 0.0f) {
-                weight *= 2.0f * 0.0045f;
+            if (light_sample < 0.5f && light_feasible >= 0.0f) {
+                weight *= 2.0f * light_angle * device_scene.lights_length;
             } else {
                 ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
-                weight *= ((sun_feasible >= 0.0f) ? 2.0f : 1.0f);
+                weight *= ((light_feasible >= 0.0f) ? 2.0f : 1.0f);
             }
 
             const float angle = fmaxf(epsilon, fminf(dot_product(normal, ray),1.0f));
@@ -1075,10 +1087,12 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment) * scene.meshes_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.nodes), sizeof(Node) * instance->scene_gpu.nodes_length));
+    gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.lights), sizeof(Light) * instance->scene_gpu.lights_length));
 
     gpuErrchk(cudaMemcpy(instance->scene_gpu.texture_assignments, scene.texture_assignments, sizeof(texture_assignment) * scene.meshes_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(instance->scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene.nodes, sizeof(Node) * scene.nodes_length, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(instance->scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice));
 
     gpuErrchk(cudaMemcpyToSymbol(device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_frame, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
@@ -1207,6 +1221,7 @@ extern "C" void free_raytracing(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.texture_assignments));
     gpuErrchk(cudaFree(instance->scene_gpu.triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.nodes));
+    gpuErrchk(cudaFree(instance->scene_gpu.lights));
 
     _mm_free(instance->frame_buffer);
 
