@@ -978,6 +978,16 @@ void trace_rays(volatile uint32_t* progress) {
 
             RGBF color = trace_ray_iterative(device_scene.camera.pos, ray, &random);
 
+            if (isnan(color.r) || isinf(color.r)) {
+                color.r = 0.0f;
+            }
+            if (isnan(color.g) || isinf(color.g)) {
+                color.g = 0.0f;
+            }
+            if (isnan(color.b) || isinf(color.b)) {
+                color.b = 0.0f;
+            }
+
             result.r += color.r;
             result.g += color.g;
             result.b += color.b;
