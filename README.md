@@ -7,13 +7,16 @@ Luminary is a CUDA based Pathtracing renderer.
 This project is for fun and to learn more about Computer Graphics. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
 - Implement refraction.
-- Implement better Importance Sampling which considers all light sources.
+- Implement better Importance Sampling.
 - Implement denoiser.
 - Implement volumetric lighting.
 - Implement post processing routines (AA, DoF).
 
 The licence for this code can be found in the `LICENCE` file.
+
 The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.
+
+The `SDL2` library is used for the realtime mode. Details about its authors and its licence can be found in `Luminary/lib/SDL/SDL.h`.
 
 # Usage
 
