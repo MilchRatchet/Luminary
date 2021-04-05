@@ -1056,6 +1056,8 @@ void set_up_raytracing_device() {
     device_sun.y = sinf(device_scene.altitude);
     device_sun.z = cosf(device_scene.azimuth)*cosf(device_scene.altitude);
     device_sun = normalize_vector(device_sun);
+
+    device_scene.lights[0].pos = scale_vector(device_sun, 149630000000.0f);
 }
 
 
