@@ -848,7 +848,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
         if (light_sample < 0.5f) {
             const uint32_t light = (uint32_t)(curand_uniform(random) * device_scene.lights_length);
             light_source = normalize_vector(vec_diff(device_scene.lights[light].pos, origin));
-            light_angle = get_light_angle(device_scene.lights[light], origin);
+            light_angle = get_light_angle(device_scene.lights[light], origin) * 2.0f / PI;
         }
 
         if (specular < specular_probability) {
@@ -864,7 +864,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
             const vec3 S_local = rotate_vector_by_quaternion(
-                normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle * 2.0f / PI, gamma, light_source)),
+                normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
                 rotation_to_z);
 
             if (light_sample < 0.5f && S_local.z >= 0.0f) {
@@ -918,7 +918,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             const float alpha = acosf(curand_uniform(random));
             const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
-            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle * 2.0f / PI, gamma, light_source));
+            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
 
             const float light_feasible = dot_product(ray, normal);
 
