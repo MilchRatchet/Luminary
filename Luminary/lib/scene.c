@@ -255,4 +255,5 @@ void free_scene(Scene scene, raytrace_instance* instance) {
 
   free(scene.triangles);
   free(scene.nodes);
+  free(scene.lights);
 }

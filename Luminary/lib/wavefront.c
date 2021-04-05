@@ -1,4 +1,5 @@
 #include "wavefront.h"
+#include "error.h"
 #include <immintrin.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -42,7 +43,7 @@ static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line, const unsigne
 
       if (vertex_ptr == mesh->vertices_length) {
         mesh->vertices_length *= 2;
-        mesh->vertices = (Wavefront_Vertex*) realloc(
+        mesh->vertices = (Wavefront_Vertex*) safe_realloc(
           mesh->vertices, sizeof(Wavefront_Vertex) * mesh->vertices_length);
       }
     }
@@ -55,7 +56,8 @@ static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line, const unsigne
 
       if (uv_ptr == mesh->uvs_length) {
         mesh->uvs_length *= 2;
-        mesh->uvs = (Wavefront_UV*) realloc(mesh->uvs, sizeof(Wavefront_UV) * mesh->uvs_length);
+        mesh->uvs =
+          (Wavefront_UV*) safe_realloc(mesh->uvs, sizeof(Wavefront_UV) * mesh->uvs_length);
       }
     }
     else if (line[0] == 'v' && line[1] == 'n') {
@@ -67,7 +69,7 @@ static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line, const unsigne
 
       if (normal_ptr == mesh->normals_length) {
         mesh->normals_length *= 2;
-        mesh->normals = (Wavefront_Normal*) realloc(
+        mesh->normals = (Wavefront_Normal*) safe_realloc(
           mesh->normals, sizeof(Wavefront_Normal) * mesh->normals_length);
       }
     }
@@ -84,7 +86,7 @@ static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line, const unsigne
 
       if (triangle_ptr == mesh->triangles_length) {
         mesh->triangles_length *= 2;
-        mesh->triangles = (Wavefront_Triangle*) realloc(
+        mesh->triangles = (Wavefront_Triangle*) safe_realloc(
           mesh->triangles, sizeof(Wavefront_Triangle) * mesh->triangles_length);
       }
     }
@@ -96,18 +98,18 @@ static int read_mesh(FILE* file, Wavefront_Mesh* mesh, char* line, const unsigne
   }
 
   mesh->vertices_length = vertex_ptr;
-  mesh->vertices =
-    (Wavefront_Vertex*) realloc(mesh->vertices, sizeof(Wavefront_Vertex) * mesh->vertices_length);
+  mesh->vertices        = (Wavefront_Vertex*) safe_realloc(
+    mesh->vertices, sizeof(Wavefront_Vertex) * mesh->vertices_length);
 
   mesh->uvs_length = uv_ptr;
-  mesh->uvs        = (Wavefront_UV*) realloc(mesh->uvs, sizeof(Wavefront_UV) * mesh->uvs_length);
+  mesh->uvs = (Wavefront_UV*) safe_realloc(mesh->uvs, sizeof(Wavefront_UV) * mesh->uvs_length);
 
   mesh->normals_length = normal_ptr;
-  mesh->normals =
-    (Wavefront_Normal*) realloc(mesh->normals, sizeof(Wavefront_Normal) * mesh->normals_length);
+  mesh->normals        = (Wavefront_Normal*) safe_realloc(
+    mesh->normals, sizeof(Wavefront_Normal) * mesh->normals_length);
 
   mesh->triangles_length = triangle_ptr;
-  mesh->triangles        = (Wavefront_Triangle*) realloc(
+  mesh->triangles        = (Wavefront_Triangle*) safe_realloc(
     mesh->triangles, sizeof(Wavefront_Triangle) * mesh->triangles_length);
 
   return 0;
@@ -123,7 +125,7 @@ int read_mesh_from_file(const char* name, Wavefront_Mesh** meshes, const int pre
   int mesh_count = 8 + previous_length;
 
   if (previous_length) {
-    *meshes = (Wavefront_Mesh*) realloc(*meshes, sizeof(Wavefront_Mesh) * mesh_count);
+    *meshes = (Wavefront_Mesh*) safe_realloc(*meshes, sizeof(Wavefront_Mesh) * mesh_count);
   }
   else {
     *meshes = (Wavefront_Mesh*) malloc(sizeof(Wavefront_Mesh) * mesh_count);

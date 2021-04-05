@@ -1,5 +1,6 @@
 #include "utils.h"
 #include "light.h"
+#include "error.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -26,7 +27,7 @@ void process_lights(Scene* scene) {
       light_count++;
       if (light_count == lights_length) {
         lights_length *= 2;
-        lights = realloc(lights, sizeof(Light) * lights_length);
+        lights = safe_realloc(lights, sizeof(Light) * lights_length);
       }
 
       vec3 vertex2;
@@ -72,7 +73,7 @@ void process_lights(Scene* scene) {
     }
   }
 
-  lights = realloc(lights, sizeof(Light) * light_count);
+  lights = safe_realloc(lights, sizeof(Light) * light_count);
 
   unsigned int light_groups_length = 16;
   Light* light_groups              = (Light*) malloc(sizeof(Light) * lights_length);
@@ -89,7 +90,7 @@ void process_lights(Scene* scene) {
   while (light_count != 0) {
     if (light_group_count == light_groups_length) {
       light_groups_length *= 2;
-      light_groups = realloc(light_groups, sizeof(Light) * light_groups_length);
+      light_groups = safe_realloc(light_groups, sizeof(Light) * light_groups_length);
     }
 
     printf("\r                                  \r%d Lights left to process.", light_count);
@@ -152,7 +153,7 @@ void process_lights(Scene* scene) {
 
   free(lights);
 
-  light_groups = realloc(light_groups, sizeof(Light) * light_group_count);
+  light_groups = safe_realloc(light_groups, sizeof(Light) * light_group_count);
 
   data.lights        = light_groups;
   data.lights_length = light_group_count;
