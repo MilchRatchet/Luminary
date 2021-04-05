@@ -27,7 +27,7 @@ struct Light {
 
 struct Scene {
   Camera camera;
-  unsigned int far_clip_distance;
+  float far_clip_distance;
   Triangle* triangles;
   unsigned int triangles_length;
   Node* nodes;

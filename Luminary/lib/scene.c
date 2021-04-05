@@ -59,14 +59,15 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   Scene scene;
 
-  int width          = 1280;
-  int height         = 720;
-  int bounces        = 5;
-  int samples        = 16;
-  float azimuth      = 3.141f;
-  float altitude     = 0.5f;
-  float sun_strength = 30.0f;
-  int bvh_depth      = 18;
+  int width           = 1280;
+  int height          = 720;
+  int bounces         = 5;
+  int samples         = 16;
+  float azimuth       = 3.141f;
+  float altitude      = 0.5f;
+  float sun_strength  = 30.0f;
+  int bvh_depth       = 18;
+  float clip_distance = 1000000.0f;
 
   unsigned int albedo_maps_count      = 1;
   unsigned int illuminance_maps_count = 1;
@@ -181,6 +182,9 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
     else if (line[0] == 'b') {
       sscanf(line, "%*c %d\n", &bvh_depth);
     }
+    else if (line[0] == 'f') {
+      sscanf(line, "%*c %f\n", &clip_distance);
+    }
     else if (line[0] == '#') {
       continue;
     }
@@ -206,6 +210,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   scene.nodes_length        = nodes_length;
   scene.meshes_length       = meshes_length;
   scene.texture_assignments = texture_assignments;
+  scene.far_clip_distance   = clip_distance;
 
   scene.altitude     = altitude;
   scene.azimuth      = azimuth;
