@@ -3,6 +3,7 @@
 #include "image.h"
 #include "raytrace.h"
 #include "mesh.h"
+#include "SDL/SDL.h"
 #include <cuda_runtime_api.h>
 #include <curand_kernel.h>
 #include <float.h>
@@ -955,12 +956,12 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 }
 
 __global__
-void trace_rays(volatile uint32_t* progress) {
+void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int size_x, int size_y, int limit) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-    while (id < device_amount) {
-        int x = id % device_width;
-        int y = id / device_width;
+    while (id < device_amount && id < limit) {
+        int x = offset_x + id % size_x;
+        int y = offset_y + id / size_x;
 
         curandStateXORWOW_t random;
 
@@ -1011,7 +1012,7 @@ void trace_rays(volatile uint32_t* progress) {
         result.g *= weight;
         result.b *= weight;
 
-        device_frame[id] = result;
+        device_frame[x + y * device_width] = result;
 
         id += blockDim.x * gridDim.x;
 
@@ -1174,6 +1175,15 @@ extern "C" void free_textures(void* texture_atlas, const int textures_length) {
     free(textures_cpu);
 }
 
+static float linearRGB_to_SRGB(const float value) {
+    if (value <= 0.0031308f) {
+      return 12.92f * value;
+    }
+    else {
+      return 1.055f * powf(value, 0.416666666667f) - 0.055f;
+    }
+  }
+
 extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int progress) {
     volatile uint32_t *progress_gpu, *progress_cpu;
 
@@ -1191,9 +1201,121 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     clock_t t = clock();
 
-    trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu);
 
-    if (progress) {
+
+    if (progress == 2) {
+        SDL_Init(SDL_INIT_VIDEO);
+        SDL_Window* window = SDL_CreateWindow(
+          "Luminary", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, instance->width, instance->height,
+          SDL_WINDOW_SHOWN);
+
+        SDL_Surface* window_surface = SDL_GetWindowSurface(window);
+
+        Uint32 rmask, gmask, bmask, amask;
+
+      #if SDL_BYTEORDER == SDL_BIG_ENDIAN
+        rmask = 0xff000000;
+        gmask = 0x00ff0000;
+        bmask = 0x0000ff00;
+        amask = 0x000000ff;
+      #else
+        rmask = 0x000000ff;
+        gmask = 0x0000ff00;
+        bmask = 0x00ff0000;
+        amask = 0xff000000;
+      #endif
+
+        SDL_Surface* surface =
+          SDL_CreateRGBSurface(0, instance->width, instance->height, 24, rmask, gmask, bmask, amask);
+
+        RGB8* buffer = (RGB8*) surface->pixels;
+
+        int exit = 0;
+
+        char* title = (char*) malloc(4096);
+
+        int block_counter = 0;
+        const int blocks_per_row = (instance->width / 64) + 1;
+        const int total_blocks = blocks_per_row * ((instance->height / 64) + 1);
+
+        while (!exit && block_counter < total_blocks) {
+          SDL_Event event;
+
+          const int block_x = block_counter % blocks_per_row;
+          const int block_y = block_counter / blocks_per_row;
+          const int offset_x = block_x * 64;
+          const int offset_y = block_y * 64;
+
+          const int block_width = (offset_x + 64 > instance->width) ? instance->width - offset_x : 64;
+          const int block_height = (offset_y + 64 > instance->height) ? instance->height - offset_y : 64;
+
+          for (int j = offset_y; j < offset_y + block_height; j++) {
+            for (int i = offset_x; i < offset_x + block_width; i++) {
+              RGB8 pixel;
+              pixel.r = 255;
+              pixel.g = 255;
+              pixel.b = 255;
+
+              buffer[i + instance->width * j] = pixel;
+            }
+          }
+
+          SDL_BlitSurface(surface, 0, window_surface, 0);
+          SDL_UpdateWindowSurface(window);
+
+          trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, offset_x , offset_y, block_width, block_height, block_width * block_height);
+
+          gpuErrchk(cudaDeviceSynchronize());
+
+          gpuErrchk(cudaMemcpy(
+              instance->frame_buffer + offset_x + offset_y * instance->width,
+              instance->frame_buffer_gpu + offset_x + offset_y * instance->width,
+              sizeof(RGBF) * instance->width * block_height,
+              cudaMemcpyDeviceToHost));
+
+          for (int j = offset_y; j < offset_y + block_height; j++) {
+              for (int i = offset_x; i < offset_x + block_width; i++) {
+                RGB8 pixel;
+                RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
+
+                RGBF color;
+                color.r = min(255.9f, linearRGB_to_SRGB(pixel_float.r) * 255.9f);
+                color.g = min(255.9f, linearRGB_to_SRGB(pixel_float.g) * 255.9f);
+                color.b = min(255.9f, linearRGB_to_SRGB(pixel_float.b) * 255.9f);
+
+                pixel.r = (uint8_t) color.r;
+                pixel.g = (uint8_t) color.g;
+                pixel.b = (uint8_t) color.b;
+
+                buffer[i + instance->width * j] = pixel;
+              }
+          }
+
+          SDL_BlitSurface(surface, 0, window_surface, 0);
+
+          clock_t curr_time = clock();
+          const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
+          sprintf(title, "Luminary - Progress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs", (((float)block_counter) / total_blocks) * 100.0f, time_elapsed, (total_blocks - block_counter) * (time_elapsed/block_counter));
+
+          SDL_SetWindowTitle(window, title);
+          SDL_UpdateWindowSurface(window);
+
+          while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_QUIT) {
+              exit = 1;
+            }
+          }
+
+          block_counter++;
+        }
+
+        free(title);
+
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+    } else if (progress == 1) {
+        trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, 0, 0, instance->width, instance->height, instance->width * instance->height);
+
         gpuErrchk(cudaEventRecord(kernelFinished));
 
         uint32_t progress = 0;
@@ -1206,12 +1328,14 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
                 progress = new_progress;
             }
             clock_t curr_time = clock();
-            double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
+            const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
             printf("\r                                                                                         \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs",(float)progress * ratio * 100, time_elapsed, (total_pixels - progress) * (time_elapsed/progress));
         }
 
         printf("\r                                                                             \r");
     }
+
+
 
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
