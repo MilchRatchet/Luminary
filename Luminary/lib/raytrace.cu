@@ -901,7 +901,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
             const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
 
-            weight *= Smith_G2_over_G1_height_correlated(alpha, alpha * alpha, NdotR, NdotV) / specular_probability;
+            weight *= 2.0f * Smith_G2_over_G1_height_correlated(alpha, alpha * alpha, NdotR, NdotV) / specular_probability;
 
             record.r *= F.x;
             record.g *= F.y;
@@ -947,7 +947,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
             const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
 
-            weight *= FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
+            weight *= 2.0f * FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
         }
     }
 
