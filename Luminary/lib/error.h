@@ -30,6 +30,8 @@ inline void ___error(const char* message, const char* file, const int line) {
 #define safe_realloc(ptr, size) ___s_realloc((ptr), (size));
 
 inline void* ___s_realloc(const void* ptr, const size_t size) {
+  if (size == 0)
+    return (void*) 0;
   void* new_ptr = realloc(ptr, size);
   assert((int) new_ptr, "Reallocation failed!", 1);
   return new_ptr;
