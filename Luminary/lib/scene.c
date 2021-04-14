@@ -69,6 +69,8 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   int bvh_depth       = 18;
   float clip_distance = 1000000.0f;
 
+  int denoiser = 1;
+
   unsigned int albedo_maps_count      = 1;
   unsigned int illuminance_maps_count = 1;
   unsigned int material_maps_count    = 1;
@@ -185,6 +187,9 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
     else if (line[0] == 'f') {
       sscanf(line, "%*c %f\n", &clip_distance);
     }
+    else if (line[0] == 'd') {
+      sscanf(line, "%*c %d\n", &denoiser);
+    }
     else if (line[0] == '#') {
       continue;
     }
@@ -224,7 +229,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   *instance = init_raytracing(
     width, height, bounces, samples, albedo_atlas, albedo_maps_count, illuminance_atlas,
-    illuminance_maps_count, material_atlas, material_maps_count, scene);
+    illuminance_maps_count, material_atlas, material_maps_count, scene, denoiser);
 
   free(source);
   free(line);

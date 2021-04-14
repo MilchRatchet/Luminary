@@ -44,6 +44,18 @@ __device__
 RGBF* device_frame;
 
 __device__
+RGBF* device_denoiser;
+
+__device__
+RGBF* device_albedo_buffer;
+
+__device__
+RGBF* device_normal_buffer;
+
+__device__
+Quaternion device_camera_space;
+
+__device__
 unsigned int device_width;
 
 __device__
@@ -955,6 +967,145 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
     return result;
 }
 
+__device__
+void get_denoising_buffer_information(vec3 origin, vec3 ray, int buffer_index) {
+    float depth = device_scene.far_clip_distance;
+
+    unsigned int hit_id = 0xffffffff;
+
+    int node_address = 0;
+    int node_key = 1;
+    int bit_trail = 0;
+    int mrpn_address = -1;
+
+    while (node_address != -1) {
+        while (device_scene.nodes[node_address].triangles_address == -1) {
+            Node node = device_scene.nodes[node_address];
+
+            const float decompression_x = __powf(2.0f, (float)node.ex);
+            const float decompression_y = __powf(2.0f, (float)node.ey);
+            const float decompression_z = __powf(2.0f, (float)node.ez);
+
+            const vec3 left_high = decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
+            const vec3 left_low = decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
+            const vec3 right_high = decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
+            const vec3 right_low = decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
+
+            const float L = ray_box_intersect(left_low, left_high, origin, ray);
+            const float R = ray_box_intersect(right_low, right_high, origin, ray);
+            const int R_is_closest = R < L;
+
+            if (L < depth || R < depth) {
+
+                node_key = node_key << 1;
+                bit_trail = bit_trail << 1;
+
+                if (L >= depth || R_is_closest) {
+                    node_address = 2 * node_address + 2;
+                    node_key = node_key ^ 0b1;
+                }
+                else {
+                    node_address = 2 * node_address + 1;
+                }
+
+                if (L < depth && R < depth) {
+                    bit_trail = bit_trail ^ 0b1;
+                    if (R_is_closest) {
+                        mrpn_address = node_address - 1;
+                    }
+                    else {
+                        mrpn_address = node_address + 1;
+                    }
+                }
+            } else {
+                break;
+            }
+        }
+
+        if (device_scene.nodes[node_address].triangles_address != -1) {
+            Node node = device_scene.nodes[node_address];
+
+            for (unsigned int i = 0; i < node.triangle_count; i++) {
+                const float d = triangle_intersection(device_scene.triangles[node.triangles_address + i], origin, ray);
+
+                if (d < depth) {
+                    depth = d;
+                    hit_id = node.triangles_address + i;
+                }
+            }
+        }
+
+        if (bit_trail == 0) {
+            node_address = -1;
+        }
+        else {
+            int num_levels = trailing_zeros(bit_trail);
+            bit_trail = (bit_trail >> num_levels) ^ 0b1;
+            node_key = (node_key >> num_levels) ^ 0b1;
+            if (mrpn_address != -1) {
+                node_address = mrpn_address;
+                mrpn_address = -1;
+            }
+            else {
+                node_address = node_key - 1;
+            }
+        }
+    }
+
+    RGBF normal_RGB, albedo;
+
+    if (hit_id == 0xffffffff) {
+        device_albedo_buffer[buffer_index] = get_sky_color(ray);
+
+        normal_RGB.r = 0.0f;
+        normal_RGB.g = 0.0f;
+        normal_RGB.b = 1.0f;
+        device_normal_buffer[buffer_index] = normal_RGB;
+
+        return;
+    }
+
+    origin.x += ray.x * depth;
+    origin.y += ray.y * depth;
+    origin.z += ray.z * depth;
+
+    Triangle hit_triangle = device_scene.triangles[hit_id];
+
+    vec3 normal = get_coordinates_in_triangle(hit_triangle, origin);
+
+    const float lambda = normal.x;
+    const float mu = normal.y;
+
+    normal = lerp_normals(hit_triangle, lambda, mu);
+
+    UV tex_coords = lerp_uv(hit_triangle, lambda, mu);
+
+    float4 albedo_f = tex2D<float4>(device_albedo_atlas[device_texture_assignments[hit_triangle.object_maps].albedo_map], tex_coords.u, 1.0f - tex_coords.v);
+
+    /*if (albedo_f.w > 0.5f) {
+        origin.x += 2.0f * epsilon * ray.x;
+        origin.y += 2.0f * epsilon * ray.y;
+        origin.z += 2.0f * epsilon * ray.z;
+
+        get_denoising_buffer_information(origin, ray, buffer_index);
+
+        return;
+    }*/
+
+    albedo.r = albedo_f.x;
+    albedo.g = albedo_f.y;
+    albedo.b = albedo_f.z;
+
+    normal = rotate_vector_by_quaternion(normal, device_camera_space);
+
+    normal_RGB.r = normal.x;
+    normal_RGB.g = normal.y;
+    normal_RGB.b = normal.z;
+
+    device_albedo_buffer[buffer_index] = albedo;
+    device_normal_buffer[buffer_index] = normal_RGB;
+}
+
 __global__
 void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int size_x, int size_y, int limit) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -1006,6 +1157,22 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
             result.b += color.b;
         }
 
+        if (device_denoiser) {
+            default_ray.x = -device_scene.camera.fov + device_step * x + device_offset_x;
+            default_ray.y = device_vfov - device_step * y - device_offset_y;
+            default_ray.z = -1.0f;
+
+            ray = rotate_vector_by_quaternion(default_ray, device_camera_rotation);
+
+            float ray_length = __frsqrt_rn(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
+
+            ray.x *= ray_length;
+            ray.y *= ray_length;
+            ray.z *= ray_length;
+
+            get_denoising_buffer_information(device_scene.camera.pos, ray, x + y * device_width);
+        }
+
         float weight = 1.0f/(float)device_diffuse_samples;
 
         result.r *= weight;
@@ -1051,6 +1218,8 @@ void set_up_raytracing_device() {
 
     device_camera_rotation = q;
 
+    device_camera_space = inverse_quaternion(q);
+
     curand_init(0,0,0,&device_random);
 
     device_sun.x = sinf(device_scene.azimuth)*cosf(device_scene.altitude);
@@ -1065,14 +1234,14 @@ void set_up_raytracing_device() {
 extern "C" raytrace_instance* init_raytracing(
     const unsigned int width, const unsigned int height, const int reflection_depth,
     const int diffuse_samples, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
-    int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene) {
+    int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene, int denoiser) {
     raytrace_instance* instance = (raytrace_instance*)malloc(sizeof(raytrace_instance));
 
     instance->width = width;
     instance->height = height;
     instance->frame_buffer = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
 
-    cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height);
+    gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height));
 
     instance->reflection_depth = reflection_depth;
     instance->diffuse_samples = diffuse_samples;
@@ -1106,6 +1275,17 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMemcpyToSymbol(device_albedo_atlas, &(instance->albedo_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_illuminance_atlas, &(instance->illuminance_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(instance->material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
+
+    instance->denoiser = denoiser;
+
+    if (instance->denoiser) {
+        gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * width * height));
+        gpuErrchk(cudaMalloc((void**) &(instance->normal_buffer_gpu), sizeof(RGBF) * width * height));
+        gpuErrchk(cudaMemcpyToSymbol(device_albedo_buffer, &(instance->albedo_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpyToSymbol(device_normal_buffer, &(instance->normal_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
+        gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
+    }
+
 
     return instance;
 }
@@ -1361,6 +1541,11 @@ extern "C" void free_raytracing(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
 
     _mm_free(instance->frame_buffer);
+
+    if (instance->denoiser) {
+        gpuErrchk(cudaFree(instance->albedo_buffer_gpu));
+        gpuErrchk(cudaFree(instance->normal_buffer_gpu));
+    }
 
     free(instance);
 }

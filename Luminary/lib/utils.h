@@ -55,6 +55,9 @@ struct raytrace_instance {
   int reflection_depth;
   int diffuse_samples;
   Scene scene_gpu;
+  int denoiser;
+  RGBF* albedo_buffer_gpu;
+  RGBF* normal_buffer_gpu;
 } typedef raytrace_instance;
 
 #endif /* UTILS_H */

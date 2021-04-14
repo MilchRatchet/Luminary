@@ -16,7 +16,8 @@ void initialize_device();
 raytrace_instance* init_raytracing(
   const unsigned int width, const unsigned int height, const int reflection_depth,
   const int diffuse_samples, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
-  int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene);
+  int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene,
+  int denoiser);
 void trace_scene(Scene scene, raytrace_instance* instance, const int progress);
 void free_raytracing(raytrace_instance* instance);
 void* initialize_textures(TextureRGBA* textures, const int textures_length);

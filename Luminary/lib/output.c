@@ -2,6 +2,7 @@
 #include "SDL/SDL.h"
 #include "processing.h"
 #include "raytrace.h"
+#include "denoiser.h"
 #include "png.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,9 +14,18 @@ void offline_output(Scene scene, raytrace_instance* instance, char* output_name,
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
-  post_median_filter(instance, 0.9f);
-
-  printf("[%.3fs] Applied Median Filter.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+  switch (instance->denoiser) {
+  case 0: {
+    post_median_filter(instance, 0.9f);
+    printf("[%.3fs] Applied Median Filter.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+    break;
+  }
+  case 1: {
+    denoise_with_optix(instance);
+    printf("[%.3fs] Applied Optix Denoiser.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+    break;
+  }
+  }
 
   post_bloom(instance, 3.0f);
 

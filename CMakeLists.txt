@@ -5,7 +5,13 @@ project ("Luminary" LANGUAGES CUDA C)
 set(CMAKE_CUDA_ARCHITECTURES 61)
 set(CMAKE_C_STANDARD 17)
 
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Luminary/CMake" ${CMAKE_MODULE_PATH})
+
 message(STATUS "SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
+
+find_package(OptiX REQUIRED)
+
+include_directories("${OptiX_INCLUDE}")
 
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/zlib/*.c")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/lib/*.cu")
