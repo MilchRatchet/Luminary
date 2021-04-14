@@ -8,9 +8,12 @@ This project is for fun and to learn more about Computer Graphics. There is no e
 
 - Implement refraction.
 - Implement better Importance Sampling.
-- Implement denoiser.
 - Implement volumetric lighting.
 - Implement post processing routines (AA, DoF).
+
+As a denoiser I use Optix since any non machine learning denoiser is quite frankly not all that great and machine learning is out of the scope of this project.
+
+# Licences
 
 The licence for this code can be found in the `LICENCE` file.
 
@@ -76,6 +79,9 @@ i 1920 1080 6 50
 # BVH depth
 # b [Depth]
 b 18
+# Denoiser (0 = 3x3 Mean, 1 = Optix)
+# d [Denoiser]
+d 1
 #
 # Output path (Offline Mode only)
 # o [Path to Output file]
@@ -97,6 +103,15 @@ Alternatively you can run Luminary in Realtime Mode using
 ```
 START "" Luminary.exe Scenes/Example.lum r
 ```
+
+# Building
+
+This project is a bit of a mess when it comes to building. Some hints to get it to run are however:
+
+- You require the libraries for SDL to reside in the same folder as the executable (I plan to link them statically in the future once I figure out how)
+- You need a modern version of CUDA installed, 10+ should work
+- You need to change the CUDA compatibility version in the CMakeLists.txt to your specific version or lower
+- You need Optix 7 SDK and you will need to specify the installation directory in `Luminary/CMake/FindOptix.cmake`
 
 # Literature
 
