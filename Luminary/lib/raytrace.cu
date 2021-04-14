@@ -1204,6 +1204,10 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
 
     if (progress == 2) {
+        const int max_block_width = 128;
+        const int max_block_height = 128;
+
+
         SDL_Init(SDL_INIT_VIDEO);
         SDL_Window* window = SDL_CreateWindow(
           "Luminary", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, instance->width, instance->height,
@@ -1234,23 +1238,38 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
         char* title = (char*) malloc(4096);
 
+        int offset_x = 0;
+        int offset_y = 0;
+        int block_width = 0;
+        int block_height = 0;
+
         int block_counter = 0;
-        const int blocks_per_row = (instance->width / 64) + 1;
-        const int total_blocks = blocks_per_row * ((instance->height / 64) + 1);
+        const int blocks_per_row = (instance->width / max_block_width) + 1;
+        const int total_blocks = blocks_per_row * ((instance->height / max_block_height) + 1);
 
         while (!exit && block_counter < total_blocks) {
           SDL_Event event;
 
+          for (int i = 0; i < block_height; i++) {
+            gpuErrchk(cudaMemcpy(
+                instance->frame_buffer + offset_x + (offset_y + i) * instance->width,
+                instance->frame_buffer_gpu + offset_x + (offset_y + i) * instance->width,
+                sizeof(RGBF) * block_width,
+                cudaMemcpyDeviceToHost));
+          }
+
           const int block_x = block_counter % blocks_per_row;
           const int block_y = block_counter / blocks_per_row;
-          const int offset_x = block_x * 64;
-          const int offset_y = block_y * 64;
+          const int new_offset_x = block_x * max_block_width;
+          const int new_offset_y = block_y * max_block_height;
 
-          const int block_width = (offset_x + 64 > instance->width) ? instance->width - offset_x : 64;
-          const int block_height = (offset_y + 64 > instance->height) ? instance->height - offset_y : 64;
+          const int new_block_width = (new_offset_x + max_block_width > instance->width) ? instance->width - new_offset_x : max_block_width;
+          const int new_block_height = (new_offset_y + max_block_height > instance->height) ? instance->height - new_offset_y : max_block_height;
 
-          for (int j = offset_y; j < offset_y + block_height; j++) {
-            for (int i = offset_x; i < offset_x + block_width; i++) {
+          trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, new_offset_x , new_offset_y, new_block_width, new_block_height, new_block_width * new_block_height);
+
+          for (int j = new_offset_y; j < new_offset_y + new_block_height; j++) {
+            for (int i = new_offset_x; i < new_offset_x + new_block_width; i++) {
               RGB8 pixel;
               pixel.r = 255;
               pixel.g = 255;
@@ -1259,19 +1278,6 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
               buffer[i + instance->width * j] = pixel;
             }
           }
-
-          SDL_BlitSurface(surface, 0, window_surface, 0);
-          SDL_UpdateWindowSurface(window);
-
-          trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, offset_x , offset_y, block_width, block_height, block_width * block_height);
-
-          gpuErrchk(cudaDeviceSynchronize());
-
-          gpuErrchk(cudaMemcpy(
-              instance->frame_buffer + offset_x + offset_y * instance->width,
-              instance->frame_buffer_gpu + offset_x + offset_y * instance->width,
-              sizeof(RGBF) * instance->width * block_height,
-              cudaMemcpyDeviceToHost));
 
           for (int j = offset_y; j < offset_y + block_height; j++) {
               for (int i = offset_x; i < offset_x + block_width; i++) {
@@ -1305,6 +1311,11 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
               exit = 1;
             }
           }
+
+          offset_x = new_offset_x;
+          offset_y = new_offset_y;
+          block_width = new_block_width;
+          block_height = new_block_height;
 
           block_counter++;
         }
