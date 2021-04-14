@@ -680,7 +680,9 @@ float get_light_angle(Light light, vec3 pos) {
 }
 
 __device__
-RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
+RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int buffer_index) {
+    int albedo_buffer_written = 0;
+
     RGBF result;
     result.r = 0.0f;
     result.g = 0.0f;
@@ -837,6 +839,16 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
             continue;
         }
 
+        if (device_denoiser && !albedo_buffer_written) {
+            RGBF sum = device_albedo_buffer[buffer_index];
+            sum.r += albedo.r;
+            sum.g += albedo.g;
+            sum.b += albedo.b;
+            device_albedo_buffer[buffer_index] = sum;
+
+            albedo_buffer_written++;
+        }
+
         const float specular = curand_uniform(random);
         const float specular_probability = lerp(0.5f, 1.0f - epsilon, metallic);
 
@@ -969,128 +981,131 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random) {
 
 __device__
 void get_denoising_buffer_information(vec3 origin, vec3 ray, int buffer_index) {
-    float depth = device_scene.far_clip_distance;
+    float4 albedo_f;
+    vec3 normal;
 
-    unsigned int hit_id = 0xffffffff;
+    for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
+        float depth = device_scene.far_clip_distance;
 
-    int node_address = 0;
-    int node_key = 1;
-    int bit_trail = 0;
-    int mrpn_address = -1;
+        unsigned int hit_id = 0xffffffff;
 
-    while (node_address != -1) {
-        while (device_scene.nodes[node_address].triangles_address == -1) {
-            Node node = device_scene.nodes[node_address];
+        int node_address = 0;
+        int node_key = 1;
+        int bit_trail = 0;
+        int mrpn_address = -1;
 
-            const float decompression_x = __powf(2.0f, (float)node.ex);
-            const float decompression_y = __powf(2.0f, (float)node.ey);
-            const float decompression_z = __powf(2.0f, (float)node.ez);
+        while (node_address != -1) {
+            while (device_scene.nodes[node_address].triangles_address == -1) {
+                Node node = device_scene.nodes[node_address];
 
-            const vec3 left_high = decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
-            const vec3 left_low = decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
-            const vec3 right_high = decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
-            const vec3 right_low = decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
+                const float decompression_x = __powf(2.0f, (float)node.ex);
+                const float decompression_y = __powf(2.0f, (float)node.ey);
+                const float decompression_z = __powf(2.0f, (float)node.ez);
 
-            const float L = ray_box_intersect(left_low, left_high, origin, ray);
-            const float R = ray_box_intersect(right_low, right_high, origin, ray);
-            const int R_is_closest = R < L;
+                const vec3 left_high = decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
+                const vec3 left_low = decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
+                const vec3 right_high = decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
+                const vec3 right_low = decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
 
-            if (L < depth || R < depth) {
+                const float L = ray_box_intersect(left_low, left_high, origin, ray);
+                const float R = ray_box_intersect(right_low, right_high, origin, ray);
+                const int R_is_closest = R < L;
 
-                node_key = node_key << 1;
-                bit_trail = bit_trail << 1;
+                if (L < depth || R < depth) {
 
-                if (L >= depth || R_is_closest) {
-                    node_address = 2 * node_address + 2;
-                    node_key = node_key ^ 0b1;
-                }
-                else {
-                    node_address = 2 * node_address + 1;
-                }
+                    node_key = node_key << 1;
+                    bit_trail = bit_trail << 1;
 
-                if (L < depth && R < depth) {
-                    bit_trail = bit_trail ^ 0b1;
-                    if (R_is_closest) {
-                        mrpn_address = node_address - 1;
+                    if (L >= depth || R_is_closest) {
+                        node_address = 2 * node_address + 2;
+                        node_key = node_key ^ 0b1;
                     }
                     else {
-                        mrpn_address = node_address + 1;
+                        node_address = 2 * node_address + 1;
+                    }
+
+                    if (L < depth && R < depth) {
+                        bit_trail = bit_trail ^ 0b1;
+                        if (R_is_closest) {
+                            mrpn_address = node_address - 1;
+                        }
+                        else {
+                            mrpn_address = node_address + 1;
+                        }
+                    }
+                } else {
+                    break;
+                }
+            }
+
+            if (device_scene.nodes[node_address].triangles_address != -1) {
+                Node node = device_scene.nodes[node_address];
+
+                for (unsigned int i = 0; i < node.triangle_count; i++) {
+                    const float d = triangle_intersection(device_scene.triangles[node.triangles_address + i], origin, ray);
+
+                    if (d < depth) {
+                        depth = d;
+                        hit_id = node.triangles_address + i;
                     }
                 }
-            } else {
-                break;
             }
-        }
 
-        if (device_scene.nodes[node_address].triangles_address != -1) {
-            Node node = device_scene.nodes[node_address];
-
-            for (unsigned int i = 0; i < node.triangle_count; i++) {
-                const float d = triangle_intersection(device_scene.triangles[node.triangles_address + i], origin, ray);
-
-                if (d < depth) {
-                    depth = d;
-                    hit_id = node.triangles_address + i;
+            if (bit_trail == 0) {
+                node_address = -1;
+            }
+            else {
+                int num_levels = trailing_zeros(bit_trail);
+                bit_trail = (bit_trail >> num_levels) ^ 0b1;
+                node_key = (node_key >> num_levels) ^ 0b1;
+                if (mrpn_address != -1) {
+                    node_address = mrpn_address;
+                    mrpn_address = -1;
+                }
+                else {
+                    node_address = node_key - 1;
                 }
             }
         }
 
-        if (bit_trail == 0) {
-            node_address = -1;
+        
+
+        if (hit_id == 0xffffffff) {
+            device_albedo_buffer[buffer_index] = get_sky_color(ray);
+
+            RGBF normal_RGB;
+
+            normal_RGB.r = 0.0f;
+            normal_RGB.g = 0.0f;
+            normal_RGB.b = 1.0f;
+            device_normal_buffer[buffer_index] = normal_RGB;
+
+            return;
         }
-        else {
-            int num_levels = trailing_zeros(bit_trail);
-            bit_trail = (bit_trail >> num_levels) ^ 0b1;
-            node_key = (node_key >> num_levels) ^ 0b1;
-            if (mrpn_address != -1) {
-                node_address = mrpn_address;
-                mrpn_address = -1;
-            }
-            else {
-                node_address = node_key - 1;
-            }
+
+        origin.x += ray.x * depth + 2.0f * epsilon * ray.x;
+        origin.y += ray.y * depth + 2.0f * epsilon * ray.y;
+        origin.z += ray.z * depth + 2.0f * epsilon * ray.z;
+
+        Triangle hit_triangle = device_scene.triangles[hit_id];
+
+        vec3 normal = get_coordinates_in_triangle(hit_triangle, origin);
+
+        const float lambda = normal.x;
+        const float mu = normal.y;
+
+        normal = lerp_normals(hit_triangle, lambda, mu);
+
+        UV tex_coords = lerp_uv(hit_triangle, lambda, mu);
+
+        albedo_f = tex2D<float4>(device_albedo_atlas[device_texture_assignments[hit_triangle.object_maps].albedo_map], tex_coords.u, 1.0f - tex_coords.v);
+
+        if (albedo_f.w >= 0.0f) {
+            break;
         }
     }
 
     RGBF normal_RGB, albedo;
-
-    if (hit_id == 0xffffffff) {
-        device_albedo_buffer[buffer_index] = get_sky_color(ray);
-
-        normal_RGB.r = 0.0f;
-        normal_RGB.g = 0.0f;
-        normal_RGB.b = 1.0f;
-        device_normal_buffer[buffer_index] = normal_RGB;
-
-        return;
-    }
-
-    origin.x += ray.x * depth;
-    origin.y += ray.y * depth;
-    origin.z += ray.z * depth;
-
-    Triangle hit_triangle = device_scene.triangles[hit_id];
-
-    vec3 normal = get_coordinates_in_triangle(hit_triangle, origin);
-
-    const float lambda = normal.x;
-    const float mu = normal.y;
-
-    normal = lerp_normals(hit_triangle, lambda, mu);
-
-    UV tex_coords = lerp_uv(hit_triangle, lambda, mu);
-
-    float4 albedo_f = tex2D<float4>(device_albedo_atlas[device_texture_assignments[hit_triangle.object_maps].albedo_map], tex_coords.u, 1.0f - tex_coords.v);
-
-    /*if (albedo_f.w > 0.5f) {
-        origin.x += 2.0f * epsilon * ray.x;
-        origin.y += 2.0f * epsilon * ray.y;
-        origin.z += 2.0f * epsilon * ray.z;
-
-        get_denoising_buffer_information(origin, ray, buffer_index);
-
-        return;
-    }*/
 
     albedo.r = albedo_f.x;
     albedo.g = albedo_f.y;
@@ -1102,7 +1117,7 @@ void get_denoising_buffer_information(vec3 origin, vec3 ray, int buffer_index) {
     normal_RGB.g = normal.y;
     normal_RGB.b = normal.z;
 
-    device_albedo_buffer[buffer_index] = albedo;
+    //device_albedo_buffer[buffer_index] = albedo;
     device_normal_buffer[buffer_index] = normal_RGB;
 }
 
@@ -1140,7 +1155,7 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
             ray.y *= ray_length;
             ray.z *= ray_length;
 
-            RGBF color = trace_ray_iterative(device_scene.camera.pos, ray, &random);
+            RGBF color = trace_ray_iterative(device_scene.camera.pos, ray, &random, x + y * device_width);
 
             if (isnan(color.r) || isinf(color.r)) {
                 color.r = 0.0f;
@@ -1157,7 +1172,19 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
             result.b += color.b;
         }
 
+        float weight = 1.0f/(float)device_diffuse_samples;
+
+        result.r *= weight;
+        result.g *= weight;
+        result.b *= weight;
+
         if (device_denoiser) {
+            RGBF sum = device_albedo_buffer[x + y * device_width];
+            sum.r *= weight;
+            sum.g *= weight;
+            sum.b *= weight;
+            device_albedo_buffer[x + y * device_width] = sum;
+
             default_ray.x = -device_scene.camera.fov + device_step * x + device_offset_x;
             default_ray.y = device_vfov - device_step * y - device_offset_y;
             default_ray.z = -1.0f;
@@ -1172,12 +1199,6 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
 
             get_denoising_buffer_information(device_scene.camera.pos, ray, x + y * device_width);
         }
-
-        float weight = 1.0f/(float)device_diffuse_samples;
-
-        result.r *= weight;
-        result.g *= weight;
-        result.b *= weight;
 
         device_frame[x + y * device_width] = result;
 
