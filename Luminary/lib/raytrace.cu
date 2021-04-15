@@ -8,6 +8,7 @@
 #include "cuda/math.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/brdf.cuh"
+#include "cuda/bvh.cuh"
 #include <cuda_runtime_api.h>
 #include <curand_kernel.h>
 #include <float.h>
@@ -48,92 +49,11 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
     record.b = 1.0f;
 
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
-        float depth = device_scene.far_clip_distance;
-
-        unsigned int hit_id = 0xffffffff;
-
         vec3 curr;
 
-        int node_address = 0;
-        int node_key = 1;
-        int bit_trail = 0;
-        int mrpn_address = -1;
+        traversal_result traversal = traverse_bvh(origin, ray);
 
-        while (node_address != -1) {
-            while (device_scene.nodes[node_address].triangles_address == -1) {
-                Node node = device_scene.nodes[node_address];
-
-                const float decompression_x = __powf(2.0f, (float)node.ex);
-                const float decompression_y = __powf(2.0f, (float)node.ey);
-                const float decompression_z = __powf(2.0f, (float)node.ez);
-
-                const vec3 left_high = decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
-                const vec3 left_low = decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
-                const vec3 right_high = decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
-                const vec3 right_low = decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
-
-                const float L = ray_box_intersect(left_low, left_high, origin, ray);
-                const float R = ray_box_intersect(right_low, right_high, origin, ray);
-                const int R_is_closest = R < L;
-
-                if (L < depth || R < depth) {
-
-                    node_key = node_key << 1;
-                    bit_trail = bit_trail << 1;
-
-                    if (L >= depth || R_is_closest) {
-                        node_address = 2 * node_address + 2;
-                        node_key = node_key ^ 0b1;
-                    }
-                    else {
-                        node_address = 2 * node_address + 1;
-                    }
-
-                    if (L < depth && R < depth) {
-                        bit_trail = bit_trail ^ 0b1;
-                        if (R_is_closest) {
-                            mrpn_address = node_address - 1;
-                        }
-                        else {
-                            mrpn_address = node_address + 1;
-                        }
-                    }
-                } else {
-                    break;
-                }
-            }
-
-            if (device_scene.nodes[node_address].triangles_address != -1) {
-                Node node = device_scene.nodes[node_address];
-
-                for (unsigned int i = 0; i < node.triangle_count; i++) {
-                    const float d = triangle_intersection(device_scene.triangles[node.triangles_address + i], origin, ray);
-
-                    if (d < depth) {
-                        depth = d;
-                        hit_id = node.triangles_address + i;
-                    }
-                }
-            }
-
-            if (bit_trail == 0) {
-                node_address = -1;
-            }
-            else {
-                int num_levels = trailing_zeros(bit_trail);
-                bit_trail = (bit_trail >> num_levels) ^ 0b1;
-                node_key = (node_key >> num_levels) ^ 0b1;
-                if (mrpn_address != -1) {
-                    node_address = mrpn_address;
-                    mrpn_address = -1;
-                }
-                else {
-                    node_address = node_key - 1;
-                }
-            }
-        }
-
-        if (hit_id == 0xffffffff) {
+        if (traversal.hit_id == 0xffffffff) {
             RGBF sky = get_sky_color(ray);
 
             result.r += sky.r * weight * record.r;
@@ -143,11 +63,11 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
             return result;
         }
 
-        curr.x = origin.x + ray.x * depth;
-        curr.y = origin.y + ray.y * depth;
-        curr.z = origin.z + ray.z * depth;
+        curr.x = origin.x + ray.x * traversal.depth;
+        curr.y = origin.y + ray.y * traversal.depth;
+        curr.z = origin.z + ray.z * traversal.depth;
 
-        Triangle hit_triangle = device_scene.triangles[hit_id];
+        Triangle hit_triangle = device_scene.triangles[traversal.hit_id];
 
         vec3 normal = get_coordinates_in_triangle(hit_triangle, curr);
 
@@ -336,90 +256,9 @@ __device__
 void get_denoising_buffer_information(vec3 origin, vec3 ray, int buffer_index) {
     vec3 normal;
 
-    float depth = device_scene.far_clip_distance;
+    traversal_result traversal = traverse_bvh(origin, ray);
 
-    unsigned int hit_id = 0xffffffff;
-
-    int node_address = 0;
-    int node_key = 1;
-    int bit_trail = 0;
-    int mrpn_address = -1;
-
-    while (node_address != -1) {
-        while (device_scene.nodes[node_address].triangles_address == -1) {
-            Node node = device_scene.nodes[node_address];
-
-            const float decompression_x = __powf(2.0f, (float)node.ex);
-            const float decompression_y = __powf(2.0f, (float)node.ey);
-            const float decompression_z = __powf(2.0f, (float)node.ez);
-
-            const vec3 left_high = decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
-            const vec3 left_low = decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
-            const vec3 right_high = decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
-            const vec3 right_low = decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
-
-            const float L = ray_box_intersect(left_low, left_high, origin, ray);
-            const float R = ray_box_intersect(right_low, right_high, origin, ray);
-            const int R_is_closest = R < L;
-
-            if (L < depth || R < depth) {
-
-                node_key = node_key << 1;
-                bit_trail = bit_trail << 1;
-
-                if (L >= depth || R_is_closest) {
-                    node_address = 2 * node_address + 2;
-                    node_key = node_key ^ 0b1;
-                }
-                else {
-                    node_address = 2 * node_address + 1;
-                }
-
-                if (L < depth && R < depth) {
-                    bit_trail = bit_trail ^ 0b1;
-                    if (R_is_closest) {
-                        mrpn_address = node_address - 1;
-                    }
-                    else {
-                        mrpn_address = node_address + 1;
-                    }
-                }
-            } else {
-                break;
-            }
-        }
-
-        if (device_scene.nodes[node_address].triangles_address != -1) {
-            Node node = device_scene.nodes[node_address];
-
-            for (unsigned int i = 0; i < node.triangle_count; i++) {
-                const float d = triangle_intersection(device_scene.triangles[node.triangles_address + i], origin, ray);
-
-                if (d < depth) {
-                    depth = d;
-                    hit_id = node.triangles_address + i;
-                }
-            }
-        }
-
-        if (bit_trail == 0) {
-            node_address = -1;
-        }
-        else {
-            int num_levels = trailing_zeros(bit_trail);
-            bit_trail = (bit_trail >> num_levels) ^ 0b1;
-            node_key = (node_key >> num_levels) ^ 0b1;
-            if (mrpn_address != -1) {
-                node_address = mrpn_address;
-                mrpn_address = -1;
-            }
-            else {
-                node_address = node_key - 1;
-            }
-        }
-    }
-
-    if (hit_id == 0xffffffff) {
+    if (traversal.hit_id == 0xffffffff) {
         RGBF normal_RGB;
 
         normal_RGB.r = 0.0f;
@@ -430,7 +269,7 @@ void get_denoising_buffer_information(vec3 origin, vec3 ray, int buffer_index) {
         return;
     }
 
-    Triangle hit_triangle = device_scene.triangles[hit_id];
+    Triangle hit_triangle = device_scene.triangles[traversal.hit_id];
 
     normal = get_coordinates_in_triangle(hit_triangle, origin);
 
