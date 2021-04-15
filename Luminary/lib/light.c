@@ -101,6 +101,7 @@ void process_lights(Scene* scene) {
     light_group.radius = lights[0].radius;
 
     vec3 sum_pos                 = light_group.pos;
+    float sum_radius_weight      = light_group.radius;
     unsigned int lights_in_group = 1;
 
     for (unsigned int i = 1; i < light_count; i++) {
@@ -112,21 +113,20 @@ void process_lights(Scene* scene) {
       const float dist = vector_distance(light.pos, light_group.pos) - light_group.radius;
 
       if (dist <= light.radius) {
-        sum_pos.x += light.pos.x;
-        sum_pos.y += light.pos.y;
-        sum_pos.z += light.pos.z;
+        const float shift_weight = sum_radius_weight / (sum_radius_weight + light.radius);
+        sum_radius_weight += light.radius;
+        const float weight = light.radius / sum_radius_weight;
+
+        sum_pos.x = sum_pos.x * shift_weight + light.pos.x * weight;
+        sum_pos.y = sum_pos.y * shift_weight + light.pos.y * weight;
+        sum_pos.z = sum_pos.z * shift_weight + light.pos.z * weight;
 
         lights_in_group++;
 
-        vec3 new_pos;
-        new_pos.x = sum_pos.x / lights_in_group;
-        new_pos.y = sum_pos.y / lights_in_group;
-        new_pos.z = sum_pos.z / lights_in_group;
-
-        const float min_radius_increase = vector_distance(new_pos, light_group.pos);
+        const float min_radius_increase = vector_distance(sum_pos, light_group.pos);
         light_group.radius += (min_radius_increase < dist) ? dist : min_radius_increase;
 
-        light_group.pos  = new_pos;
+        light_group.pos  = sum_pos;
         lights[i].radius = -1.0f;
 
         i = 1;
@@ -150,6 +150,16 @@ void process_lights(Scene* scene) {
   }
 
   printf("\r                                      \r");
+
+  /*printf("Light Groups: %d\n", light_group_count);
+
+  for (int i = 0; i < light_group_count; i++) {
+    printf("Light: %d\n", i);
+    printf(
+      "Pos: X: %f Y: %f Z: %f\n", light_groups[i].pos.x, light_groups[i].pos.y,
+      light_groups[i].pos.z);
+    printf("Radius: %f\n", light_groups[i].radius);
+  }*/
 
   free(lights);
 
