@@ -324,7 +324,7 @@ float triangle_intersection(const Triangle triangle, const vec3 origin, const ve
 __device__
 vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const vec3 basis) {
     vec3 u1, u2;
-    if (basis.z < -0.9999999f) {
+    if (basis.z < -1.0f + 2.0f * epsilon) {
         u1.x = 0.0f;
         u1.y = -1.0f;
         u1.z = 0.0f;
@@ -344,7 +344,6 @@ vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const
         u2.z = -basis.y;
     }
 
-
     const float c1 = sinf(theta) * cosf(phi);
     const float c2 = sinf(theta) * sinf(phi);
     const float c3 = cosf(theta);
@@ -355,7 +354,7 @@ vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const
     result.y = c1 * u1.y + c2 * u2.y + c3 * basis.y;
     result.z = c1 * u1.z + c2 * u2.z + c3 * basis.z;
 
-    return result;
+    return normalize_vector(result);
 }
 
 __device__
@@ -1067,8 +1066,6 @@ void get_denoising_buffer_information(vec3 origin, vec3 ray, int buffer_index) {
                 }
             }
         }
-
-        
 
         if (hit_id == 0xffffffff) {
             device_albedo_buffer[buffer_index] = get_sky_color(ray);
