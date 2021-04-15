@@ -1,8 +1,6 @@
 #ifndef PRIMITIVES_H
 #define PRIMITIVES_H
 
-#include "image.h"
-
 struct vec3 {
   float x;
   float y;
