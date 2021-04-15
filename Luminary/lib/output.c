@@ -9,8 +9,9 @@
 #include <string.h>
 #include <time.h>
 
-void offline_output(Scene scene, raytrace_instance* instance, char* output_name, clock_t time) {
-  trace_scene(scene, instance, 1);
+void offline_output(
+  Scene scene, raytrace_instance* instance, char* output_name, int progress, clock_t time) {
+  trace_scene(scene, instance, progress);
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 

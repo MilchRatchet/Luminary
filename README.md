@@ -98,6 +98,12 @@ Run Luminary by passing the path to the `*.lum` file.
 START "" Luminary.exe Scenes/Example.lum
 ```
 
+You can enable a preview window which shows the current progress using
+
+```
+START "" Luminary.exe Scenes/Example.lum p
+```
+
 Alternatively you can run Luminary in Realtime Mode using
 
 ```
