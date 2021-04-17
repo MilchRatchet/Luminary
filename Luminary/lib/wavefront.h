@@ -2,6 +2,7 @@
 #define WAVEFRONT_H
 
 #include "mesh.h"
+#include "texture.h"
 #include <stdint.h>
 
 struct Wavefront_Vertex {
@@ -34,7 +35,14 @@ struct Wavefront_Triangle {
   uint16_t object;
 } typedef Wavefront_Triangle;
 
-struct Wavefront_Mesh {
+struct Wavefront_Material {
+  size_t hash;
+  uint16_t albedo_texture;
+  uint16_t illuminance_texture;
+  uint16_t material_texture;
+} typedef Wavefront_Material;
+
+struct Wavefront_Content {
   Wavefront_Vertex* vertices;
   unsigned int vertices_length;
   Wavefront_Normal* normals;
@@ -43,9 +51,19 @@ struct Wavefront_Mesh {
   unsigned int uvs_length;
   Wavefront_Triangle* triangles;
   unsigned int triangles_length;
-} typedef Wavefront_Mesh;
+  Wavefront_Material* materials;
+  unsigned int materials_length;
+  TextureRGBA* albedo_maps;
+  unsigned int albedo_maps_length;
+  TextureRGBA* illuminance_maps;
+  unsigned int illuminance_maps_length;
+  TextureRGBA* material_maps;
+  unsigned int material_maps_length;
+} typedef Wavefront_Content;
 
-int read_mesh_from_file(const char* name, Wavefront_Mesh** meshes, const int previous_length);
-unsigned int convert_wavefront_mesh(Triangle** triangles, Wavefront_Mesh* meshes, const int length);
+Wavefront_Content create_wavefront_content();
+void free_wavefront_content(Wavefront_Content content);
+int read_wavefront_file(const char* filename, Wavefront_Content* io_content);
+texture_assignment* get_texture_assignments(Wavefront_Content content);
 
 #endif /* WAVEFRONT_H */
