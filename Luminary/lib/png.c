@@ -235,7 +235,7 @@ static int verify_header(FILE* file) {
 }
 
 static inline TextureRGBA default_failure() {
-  puts("png.c: File content is corrupted!");
+  print_error("File content is corrupted!");
   TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
   return fallback;
 }

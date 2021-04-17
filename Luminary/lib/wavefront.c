@@ -97,6 +97,7 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
   FILE* file = fopen(filename, "r");
 
   if (!file) {
+    print_error("Could not read material file!");
     return;
   }
 
@@ -236,7 +237,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
           safe_realloc(content.normals, sizeof(Wavefront_Normal) * content.normals_length);
       }
       Wavefront_Normal n;
-      sscanf(line, "%*c %f %f %f\n", &n.x, &n.y, &n.z);
+      sscanf(line, "%*2c %f %f %f\n", &n.x, &n.y, &n.z);
       content.normals[normals_count] = n;
       normals_count++;
     }
@@ -247,7 +248,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
         content.uvs = safe_realloc(content.uvs, sizeof(Wavefront_UV) * content.uvs_length);
       }
       Wavefront_UV uv;
-      sscanf(line, "%*c %f %f\n", &uv.u, &uv.v);
+      sscanf(line, "%*2c %f %f\n", &uv.u, &uv.v);
       content.uvs[uvs_count] = uv;
       uvs_count++;
     }
