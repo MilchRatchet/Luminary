@@ -57,7 +57,6 @@ struct raytrace_instance {
   Scene scene_gpu;
   int denoiser;
   RGBF* albedo_buffer_gpu;
-  RGBF* normal_buffer_gpu;
 } typedef raytrace_instance;
 
 #endif /* UTILS_H */

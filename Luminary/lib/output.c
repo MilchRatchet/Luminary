@@ -37,7 +37,6 @@ void offline_output(
   printf("[%.3fs] Applied Tonemapping.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   RGB8* frame = (RGB8*) malloc(sizeof(RGB8) * instance->width * instance->height);
-
   frame_buffer_to_8bit_image(scene.camera, instance, frame);
 
   printf(

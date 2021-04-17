@@ -57,9 +57,6 @@ __device__
 RGBF* device_albedo_buffer;
 
 __device__
-RGBF* device_normal_buffer;
-
-__device__
 Quaternion device_camera_space;
 
 __device__

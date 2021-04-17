@@ -56,6 +56,16 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
         if (traversal.hit_id == 0xffffffff) {
             RGBF sky = get_sky_color(ray);
 
+            if (device_denoiser && !albedo_buffer_written) {
+                RGBF sum = device_albedo_buffer[buffer_index];
+                sum.r += sky.r;
+                sum.g += sky.g;
+                sum.b += sky.b;
+                device_albedo_buffer[buffer_index] = sum;
+
+                albedo_buffer_written++;
+            }
+
             result.r += sky.r * weight * record.r;
             result.g += sky.g * weight * record.g;
             result.b += sky.b * weight * record.b;
@@ -252,41 +262,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
     return result;
 }
 
-__device__
-void get_denoising_buffer_information(vec3 origin, vec3 ray, int buffer_index) {
-    vec3 normal;
-
-    traversal_result traversal = traverse_bvh(origin, ray);
-
-    if (traversal.hit_id == 0xffffffff) {
-        RGBF normal_RGB;
-
-        normal_RGB.r = 0.0f;
-        normal_RGB.g = 0.0f;
-        normal_RGB.b = 1.0f;
-        device_normal_buffer[buffer_index] = normal_RGB;
-
-        return;
-    }
-
-    Triangle hit_triangle = device_scene.triangles[traversal.hit_id];
-
-    normal = get_coordinates_in_triangle(hit_triangle, origin);
-
-    const float lambda = normal.x;
-    const float mu = normal.y;
-
-    normal = lerp_normals(hit_triangle, lambda, mu);
-    normal = rotate_vector_by_quaternion(normal, device_camera_space);
-
-    RGBF normal_RGB;
-    normal_RGB.r = normal.x;
-    normal_RGB.g = normal.y;
-    normal_RGB.b = normal.z;
-
-    device_normal_buffer[buffer_index] = normal_RGB;
-}
-
 __global__
 void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int size_x, int size_y, int limit) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -350,20 +325,6 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
             sum.g *= weight;
             sum.b *= weight;
             device_albedo_buffer[x + y * device_width] = sum;
-
-            default_ray.x = -device_scene.camera.fov + device_step * x + device_offset_x;
-            default_ray.y = device_vfov - device_step * y - device_offset_y;
-            default_ray.z = -1.0f;
-
-            ray = rotate_vector_by_quaternion(default_ray, device_camera_rotation);
-
-            float ray_length = __frsqrt_rn(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
-
-            ray.x *= ray_length;
-            ray.y *= ray_length;
-            ray.z *= ray_length;
-
-            get_denoising_buffer_information(device_scene.camera.pos, ray, x + y * device_width);
         }
 
         device_frame[x + y * device_width] = result;
@@ -409,9 +370,9 @@ void set_up_raytracing_device() {
 
     curand_init(0,0,0,&device_random);
 
-    device_sun.x = sinf(device_scene.azimuth)*cosf(device_scene.altitude);
+    device_sun.x = sinf(device_scene.azimuth) * cosf(device_scene.altitude);
     device_sun.y = sinf(device_scene.altitude);
-    device_sun.z = cosf(device_scene.azimuth)*cosf(device_scene.altitude);
+    device_sun.z = cosf(device_scene.azimuth) * cosf(device_scene.altitude);
     device_sun = normalize_vector(device_sun);
 
     device_scene.lights[0].pos = scale_vector(device_sun, 149630000000.0f);
@@ -467,9 +428,7 @@ extern "C" raytrace_instance* init_raytracing(
 
     if (instance->denoiser) {
         gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * width * height));
-        gpuErrchk(cudaMalloc((void**) &(instance->normal_buffer_gpu), sizeof(RGBF) * width * height));
         gpuErrchk(cudaMemcpyToSymbol(device_albedo_buffer, &(instance->albedo_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
-        gpuErrchk(cudaMemcpyToSymbol(device_normal_buffer, &(instance->normal_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
     }
 
@@ -731,7 +690,6 @@ extern "C" void free_raytracing(raytrace_instance* instance) {
 
     if (instance->denoiser) {
         gpuErrchk(cudaFree(instance->albedo_buffer_gpu));
-        gpuErrchk(cudaFree(instance->normal_buffer_gpu));
     }
 
     free(instance);

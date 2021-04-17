@@ -36,7 +36,7 @@ extern "C" void denoise_with_optix(raytrace_instance* instance) {
   OptixDenoiser denoiser;
 
   OptixDenoiserOptions opt;
-  opt.inputKind = OPTIX_DENOISER_INPUT_RGB_ALBEDO_NORMAL;
+  opt.inputKind = OPTIX_DENOISER_INPUT_RGB_ALBEDO;
 
   OPTIX_CHECK(optixDenoiserCreate(ctx, &opt, &denoiser));
   OPTIX_CHECK(optixDenoiserSetModel(denoiser, OPTIX_DENOISER_MODEL_KIND_HDR, nullptr, 0));
@@ -64,7 +64,7 @@ extern "C" void denoise_with_optix(raytrace_instance* instance) {
 
   gpuErrchk(cudaMemcpy(instance->frame_buffer_gpu, instance->frame_buffer, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyHostToDevice));
 
-  OptixImage2D inputLayer[3];
+  OptixImage2D inputLayer[2];
 
   inputLayer[0].data = (CUdeviceptr)instance->frame_buffer_gpu;
   inputLayer[0].width = instance->width;
@@ -79,13 +79,6 @@ extern "C" void denoise_with_optix(raytrace_instance* instance) {
   inputLayer[1].rowStrideInBytes = instance->width * sizeof(RGBF);
   inputLayer[1].pixelStrideInBytes = sizeof(RGBF);
   inputLayer[1].format = OPTIX_PIXEL_FORMAT_FLOAT3;
-
-  inputLayer[2].data = (CUdeviceptr)instance->normal_buffer_gpu;
-  inputLayer[2].width = instance->width;
-  inputLayer[2].height = instance->height;
-  inputLayer[2].rowStrideInBytes = instance->width * sizeof(RGBF);
-  inputLayer[2].pixelStrideInBytes = sizeof(RGBF);
-  inputLayer[2].format = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   RGBF* output;
   gpuErrchk(cudaMalloc((void**) &output, sizeof(RGBF) * instance->width * instance->height));
@@ -121,7 +114,7 @@ extern "C" void denoise_with_optix(raytrace_instance* instance) {
     denoiserState,
     denoiserReturnSizes.stateSizeInBytes,
     &inputLayer[0],
-    3,
+    2,
     0,
     0,
     &outputLayer,
