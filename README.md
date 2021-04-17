@@ -40,29 +40,22 @@ Meshes need to be in `*.obj` file format. Only triangles are supported. Textures
    - Green: Metallic
    - Blue: Emission Intensity
 
+Textures are associated to meshes through `*.mtl` files where
+
+- map_Kd = Albedo Textures
+- map_Ke = Illuminance Textures
+- map_Ns = Material Textures
+
 A whole scene is arranged through `*.lum` files which are in the following format:
 ```
 Luminary
-v 1
+v 2
 # Comments start with a # symbol
 # Comments may only appear after the first two lines
 # This example demonstrates this particular version of lum
 #
 # m [Path to Obj file]
 m Meshes/Example.obj
-#
-# ta [Path to Albedo Texture file]
-ta Textures/Example.png
-#
-# ti [Path to Illuminance Texture file]
-ti Textures/Example_Emission.png
-#
-# tm [Path to Material Texture file]
-tm Textures/Example_Material.png
-#
-# Note that 0 refers to default Textures
-# a [Mesh | Albedo Texture | Illuminance Texture | Material Texture]
-a 0 1 1 1
 #
 # Camera parameters
 # c [Pos.x | Pos.y | Pos.z | Rotation.x | Rotation.y | Rotation.z | FOV]
