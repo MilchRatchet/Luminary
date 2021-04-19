@@ -344,4 +344,42 @@ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
     return result;
 }
 
+__device__
+float get_displacement_from_normals(const Triangle triangle, const float lambda, const float mu) {
+    vec3 point;
+    point.x = triangle.vertex_normal.x + lambda * triangle.edge1_normal.x + mu * triangle.edge2_normal.x;
+    point.y = triangle.vertex_normal.y + lambda * triangle.edge1_normal.y + mu * triangle.edge2_normal.y;
+    point.z = triangle.vertex_normal.z + lambda * triangle.edge1_normal.z + mu * triangle.edge2_normal.z;
+
+    vec3 normal2;
+    normal2.x = triangle.vertex_normal.x + triangle.edge1_normal.x;
+    normal2.y = triangle.vertex_normal.y + triangle.edge1_normal.y;
+    normal2.z = triangle.vertex_normal.z + triangle.edge1_normal.z;
+
+    vec3 normal3;
+    normal3.x = triangle.vertex_normal.x + triangle.edge2_normal.x;
+    normal3.y = triangle.vertex_normal.y + triangle.edge2_normal.y;
+    normal3.z = triangle.vertex_normal.z + triangle.edge2_normal.z;
+
+    float angle1 = sinf(0.5f * acosf(dot_product(triangle.vertex_normal,normal2)));
+    float angle2 = sinf(0.5f * acosf(dot_product(triangle.vertex_normal,normal3)));
+    float angle3 = sinf(0.5f * acosf(dot_product(normal2,normal3)));
+
+    const float e1 = get_length(triangle.edge1) / angle1;
+    const float e2 = get_length(triangle.edge2) / angle2;
+    const float e3 = get_length(vec_diff(triangle.edge1,triangle.edge2)) / angle3;
+
+    float diameter = 0.0f;
+
+    if (e1 > e2 && e1 > e3 && angle1 > 2.0f * epsilon) {
+        diameter = e1;
+    } else if (e2 > e3 && angle2 > 2.0f * epsilon) {
+        diameter = e2;
+    } else if (angle3 > 2.0f * epsilon) {
+        diameter = e3;
+    }
+
+    return 0.5f * diameter * (1.0f - get_length(point));
+}
+
 #endif /* CU_MATH_H */
