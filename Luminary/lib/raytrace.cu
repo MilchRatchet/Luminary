@@ -135,19 +135,22 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
         const float specular = curand_uniform(random);
         const float specular_probability = lerp(0.5f, 1.0f - epsilon, metallic);
 
-        const vec3 face_normal = cross_product(hit_triangle.edge1,hit_triangle.edge2);
+        vec3 face_normal = normalize_vector(cross_product(hit_triangle.edge1,hit_triangle.edge2));
+
+        if (dot_product(normal, face_normal) < 0.0f) {
+            face_normal = scale_vector(face_normal, -1.0f);
+        }
 
         const vec3 V = scale_vector(ray, -1.0f);
 
         if (dot_product(face_normal, V) < 0.0f) {
             normal = scale_vector(normal, -1.0f);
+            face_normal = scale_vector(face_normal, -1.0f);
         }
 
-        float displacement = get_displacement_from_normals(hit_triangle, lambda, mu);
-
-        origin.x = curr.x + normal.x * (displacement + epsilon * 2.0f);
-        origin.y = curr.y + normal.y * (displacement + epsilon * 2.0f);
-        origin.z = curr.z + normal.z * (displacement + epsilon * 2.0f);
+        origin.x = curr.x + face_normal.x * (epsilon * 8.0f);
+        origin.y = curr.y + face_normal.y * (epsilon * 8.0f);
+        origin.z = curr.z + face_normal.z * (epsilon * 8.0f);
 
         const float light_sample = curand_uniform(random);
         float light_angle;
