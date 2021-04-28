@@ -65,5 +65,6 @@ Wavefront_Content create_wavefront_content();
 void free_wavefront_content(Wavefront_Content content);
 int read_wavefront_file(const char* filename, Wavefront_Content* io_content);
 texture_assignment* get_texture_assignments(Wavefront_Content content);
+unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content content);
 
 #endif /* WAVEFRONT_H */

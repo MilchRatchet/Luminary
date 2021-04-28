@@ -157,41 +157,21 @@ float ray_box_intersect(const vec3 low, const vec3 high, vec3 origin, const vec3
     sign.y = copysignf(1.0f, -ray.y);
     sign.z = copysignf(1.0f, -ray.z);
 
-    d.x = size_x * sign.x - origin.x;
-    d.y = size_y * sign.y - origin.y;
-    d.z = size_z * sign.z - origin.z;
-
-    d.x /= ray.x;
-    d.y /= ray.y;
-    d.z /= ray.z;
+    d.x = (size_x * sign.x - origin.x) / ray.x;
+    d.y = (size_y * sign.y - origin.y) / ray.y;
+    d.z = (size_z * sign.z - origin.z) / ray.z;
 
     const bool test_x = (d.x >= 0.0f) && (fabsf(origin.y + ray.y * d.x) < size_y) && (fabsf(origin.z + ray.z * d.x) < size_z);
     const bool test_y = (d.y >= 0.0f) && (fabsf(origin.x + ray.x * d.y) < size_x) && (fabsf(origin.z + ray.z * d.y) < size_z);
     const bool test_z = (d.z >= 0.0f) && (fabsf(origin.x + ray.x * d.z) < size_x) && (fabsf(origin.y + ray.y * d.z) < size_y);
 
-    vec3 sgn;
-
-    sgn.x = 0.0f;
-    sgn.y = 0.0f;
-    sgn.z = 0.0f;
-
     if (test_x) {
-        sgn.x = sign.x;
-    }
-    else if (test_y) {
-        sgn.y = sign.y;
-    }
-    else if (test_z) {
-        sgn.z = sign.z;
-    }
-
-    if (sgn.x != 0.0f) {
         return d.x;
     }
-    else if (sgn.y != 0.0f) {
+    else if (test_y) {
         return d.y;
     }
-    else if (sgn.z != 0.0f) {
+    else if (test_z) {
         return d.z;
     }
     else {

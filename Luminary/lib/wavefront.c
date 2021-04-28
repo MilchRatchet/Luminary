@@ -103,8 +103,6 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
 
   Wavefront_Content content = *io_content;
 
-  const unsigned int materials_offset = content.materials_length;
-
   unsigned int materials_count        = content.materials_length;
   unsigned int albedo_maps_count      = content.albedo_maps_length;
   unsigned int illuminance_maps_count = content.illuminance_maps_length;
