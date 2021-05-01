@@ -28,13 +28,13 @@ bool bvh_ray_box_intersect(const vec3 low, const vec3 high, const vec3 inv_ray, 
 	const float slab_min = max7(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, eps);
 	const float slab_max = min7(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, depth);
 
-	out_dist = slabMin;
+	out_dist = slab_min;
 
-	return slabMin <= slabMax;
+	return slab_min <= slab_max;
 }
 
 __device__
-vec3 decompress_vector(const compressed_vec3 vector, const vec3 p, const float ex, const float ey, const float ez) {
+vec3 bvh_decompress_vector(const compressed_vec3 vector, const vec3 p, const float ex, const float ey, const float ez) {
     vec3 result;
 
     result.x = p.x + ex * (float)vector.x;
@@ -77,19 +77,19 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
           const float decompression_y = exp2f((float)node.ey);
           const float decompression_z = exp2f((float)node.ez);
 
-          const vec3 left_high = decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
-          const vec3 left_low = decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
-          const vec3 right_high = decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
-          const vec3 right_low = decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
+          const vec3 left_high = bvh_decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
+          const vec3 left_low = bvh_decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
+          const vec3 right_high = bvh_decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
+          const vec3 right_low = bvh_decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
 
           float L,R;
           const bool L_hit = bvh_ray_box_intersect(left_low, left_high, inv_ray, pso, depth, L);
           const bool R_hit = bvh_ray_box_intersect(right_low, right_high, inv_ray, pso, depth, R);
-          const int R_is_closest = (R_hit) && (R < L);
 
           if (L_hit || R_hit) {
               node_key = node_key << 1;
               bit_trail = bit_trail << 1;
+              const bool R_is_closest = (R_hit) && (R < L);
 
               if (!L_hit || R_is_closest) {
                   node_address = 2 * node_address + 2;
@@ -114,7 +114,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
                 break;
             }
             else {
-                int num_levels = trailing_zeros(bit_trail);
+                const int num_levels = trailing_zeros(bit_trail);
                 bit_trail = (bit_trail >> num_levels) ^ 0b1;
                 node_key = (node_key >> num_levels) ^ 0b1;
                 if (mrpn_address != -1) {
@@ -143,7 +143,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
           node_address = -1;
       }
       else {
-          int num_levels = trailing_zeros(bit_trail);
+          const int num_levels = trailing_zeros(bit_trail);
           bit_trail = (bit_trail >> num_levels) ^ 0b1;
           node_key = (node_key >> num_levels) ^ 0b1;
           if (mrpn_address != -1) {
