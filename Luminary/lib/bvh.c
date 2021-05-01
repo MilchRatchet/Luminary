@@ -220,7 +220,7 @@ Node* build_bvh_structure(
 
   Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
 
-  assert((int)nodes, "Failed to allocate BVH nodes!", 1);
+  assert((int) nodes, "Failed to allocate BVH nodes!", 1);
 
   memset(nodes, 0, sizeof(Node) * node_count);
 
@@ -251,15 +251,15 @@ Node* build_bvh_structure(
       fit_bounds(
         triangles + node.triangles_address, node.triangle_count, &high, &low, &node_average);
 
-      node.ex = (int8_t) ceil(log2((high.x - low.x) * compression_divisor));
-      node.ey = (int8_t) ceil(log2((high.y - low.y) * compression_divisor));
-      node.ez = (int8_t) ceil(log2((high.z - low.z) * compression_divisor));
+      node.ex = (int8_t) ceil(log2f((high.x - low.x) * compression_divisor));
+      node.ey = (int8_t) ceil(log2f((high.y - low.y) * compression_divisor));
+      node.ez = (int8_t) ceil(log2f((high.z - low.z) * compression_divisor));
 
       node.p = low;
 
-      const float compression_x = 1.0f / powf(2.0, node.ex);
-      const float compression_y = 1.0f / powf(2.0, node.ey);
-      const float compression_z = 1.0f / powf(2.0, node.ez);
+      const float compression_x = 1.0f / exp2f(node.ex);
+      const float compression_y = 1.0f / exp2f(node.ey);
+      const float compression_z = 1.0f / exp2f(node.ez);
 
       int axis;
       float split_spatial, split_object;

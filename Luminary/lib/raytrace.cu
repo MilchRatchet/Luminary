@@ -29,7 +29,7 @@ const static int blocks_per_grid = 512;
 
 __device__
 float get_light_angle(Light light, vec3 pos) {
-    const float d = get_length(vec_diff(pos, light.pos)) + epsilon;
+    const float d = get_length(vec_diff(pos, light.pos)) + eps;
     return atanf(light.radius / d);
 }
 
@@ -51,7 +51,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
         vec3 curr;
 
-        traversal_result traversal = traverse_bvh(origin, ray);
+        traversal_result traversal = traverse_bvh(origin, ray, device_scene.nodes, device_scene.triangles);
 
         if (traversal.hit_id == 0xffffffff) {
             RGBF sky = get_sky_color(ray);
@@ -115,9 +115,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
         const float transparent_pass = curand_uniform(random);
 
         if (transparent_pass > albedo.a) {
-            origin.x = curr.x + 2.0f * epsilon * ray.x;
-            origin.y = curr.y + 2.0f * epsilon * ray.y;
-            origin.z = curr.z + 2.0f * epsilon * ray.z;
+            origin.x = curr.x + 2.0f * eps * ray.x;
+            origin.y = curr.y + 2.0f * eps * ray.y;
+            origin.z = curr.z + 2.0f * eps * ray.z;
 
             continue;
         }
@@ -133,7 +133,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
         }
 
         const float specular = curand_uniform(random);
-        const float specular_probability = lerp(0.5f, 1.0f - epsilon, metallic);
+        const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
 
         vec3 face_normal = normalize_vector(cross_product(hit_triangle.edge1,hit_triangle.edge2));
 
@@ -148,9 +148,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
             face_normal = scale_vector(face_normal, -1.0f);
         }
 
-        origin.x = curr.x + face_normal.x * (epsilon * 8.0f);
-        origin.y = curr.y + face_normal.y * (epsilon * 8.0f);
-        origin.z = curr.z + face_normal.z * (epsilon * 8.0f);
+        origin.x = curr.x + face_normal.x * (eps * 8.0f);
+        origin.y = curr.y + face_normal.y * (eps * 8.0f);
+        origin.z = curr.z + face_normal.z * (eps * 8.0f);
 
         const float light_sample = curand_uniform(random);
         float light_angle;
@@ -200,10 +200,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
 
             const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
 
-            const float HdotR = fmaxf(epsilon, fminf(1.0f, dot_product(H_local, ray_local)));
-            const float NdotR = fmaxf(epsilon, fminf(1.0f, ray_local.z));
-            const float NdotV = fmaxf(epsilon, fminf(1.0f, V_local.z));
-            const float NdotH = fmaxf(epsilon, fminf(1.0f, H_local.z));
+            const float HdotR = fmaxf(eps, fminf(1.0f, dot_product(H_local, ray_local)));
+            const float NdotR = fmaxf(eps, fminf(1.0f, ray_local.z));
+            const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
+            const float NdotH = fmaxf(eps, fminf(1.0f, H_local.z));
 
             vec3 specular_f0;
             specular_f0.x = lerp(0.04f, albedo.r, metallic);
@@ -241,8 +241,8 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
                 weight *= ((light_feasible >= 0.0f) ? 2.0f : 1.0f);
             }
 
-            const float angle = fmaxf(epsilon, fminf(dot_product(normal, ray),1.0f));
-            const float previous_angle = fmaxf(epsilon, fminf(dot_product(V, normal),1.0f));
+            const float angle = fmaxf(eps, fminf(dot_product(normal, ray),1.0f));
+            const float previous_angle = fmaxf(eps, fminf(dot_product(V, normal),1.0f));
 
             vec3 H;
             H.x = V.x + ray.x;
@@ -250,7 +250,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
             H.z = V.z + ray.z;
             H = normalize_vector(H);
 
-            const float half_angle = fmaxf(epsilon, fminf(dot_product(H,ray),1.0f));
+            const float half_angle = fmaxf(eps, fminf(dot_product(H,ray),1.0f));
             const float energyFactor = lerp(1.0f, 1.0f/1.51f, roughness);
 
             const float FD90MinusOne = 0.5f * roughness + 2.0f * half_angle * half_angle * roughness - 1.0f;

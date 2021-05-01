@@ -138,48 +138,6 @@ UV lerp_uv(const Triangle triangle, const float lambda, const float mu) {
 }
 
 __device__
-float ray_box_intersect(const vec3 low, const vec3 high, vec3 origin, const vec3 ray) {
-    origin.x -= (high.x + low.x) * 0.5f;
-    origin.y -= (high.y + low.y) * 0.5f;
-    origin.z -= (high.z + low.z) * 0.5f;
-
-    const float size_x = (high.x - low.x) * 0.5f;
-    const float size_y = (high.y - low.y) * 0.5f;
-    const float size_z = (high.z - low.z) * 0.5f;
-
-    if ((fabsf(origin.x) < size_x) && (fabsf(origin.y) < size_y) && (fabsf(origin.z) < size_z)) return 0.0f;
-
-    vec3 d;
-
-    vec3 sign;
-
-    sign.x = copysignf(1.0f, -ray.x);
-    sign.y = copysignf(1.0f, -ray.y);
-    sign.z = copysignf(1.0f, -ray.z);
-
-    d.x = (size_x * sign.x - origin.x) / ray.x;
-    d.y = (size_y * sign.y - origin.y) / ray.y;
-    d.z = (size_z * sign.z - origin.z) / ray.z;
-
-    const bool test_x = (d.x >= 0.0f) && (fabsf(origin.y + ray.y * d.x) < size_y) && (fabsf(origin.z + ray.z * d.x) < size_z);
-    const bool test_y = (d.y >= 0.0f) && (fabsf(origin.x + ray.x * d.y) < size_x) && (fabsf(origin.z + ray.z * d.y) < size_z);
-    const bool test_z = (d.z >= 0.0f) && (fabsf(origin.x + ray.x * d.z) < size_x) && (fabsf(origin.y + ray.y * d.z) < size_y);
-
-    if (test_x) {
-        return d.x;
-    }
-    else if (test_y) {
-        return d.y;
-    }
-    else if (test_z) {
-        return d.z;
-    }
-    else {
-        return FLT_MAX;
-    }
-}
-
-__device__
 float triangle_intersection(const Triangle triangle, const vec3 origin, const vec3 ray) {
     const vec3 h = cross_product(ray, triangle.edge2);
     const float a = dot_product(triangle.edge1, h);
@@ -199,7 +157,7 @@ float triangle_intersection(const Triangle triangle, const vec3 origin, const ve
 
     const float t = f * dot_product(triangle.edge2, q);
 
-    if (t > -epsilon) {
+    if (t > -eps) {
         return t;
     } else {
         return FLT_MAX;
@@ -209,7 +167,7 @@ float triangle_intersection(const Triangle triangle, const vec3 origin, const ve
 __device__
 vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const vec3 basis) {
     vec3 u1, u2;
-    if (basis.z < -1.0f + 2.0f * epsilon) {
+    if (basis.z < -1.0f + 2.0f * eps) {
         u1.x = 0.0f;
         u1.y = -1.0f;
         u1.z = 0.0f;
@@ -253,17 +211,6 @@ int trailing_zeros(const unsigned int n) {
 }
 
 __device__
-vec3 decompress_vector(const compressed_vec3 vector, const vec3 p, const float ex, const float ey, const float ez) {
-    vec3 result;
-
-    result.x = p.x + ex * (float)vector.x;
-    result.y = p.y + ey * (float)vector.y;
-    result.z = p.z + ez * (float)vector.z;
-
-    return result;
-}
-
-__device__
 Quaternion inverse_quaternion(const Quaternion q) {
     Quaternion result;
     result.x = -q.x;
@@ -276,7 +223,7 @@ Quaternion inverse_quaternion(const Quaternion q) {
 __device__
 Quaternion get_rotation_to_z_canonical(const vec3 v) {
     Quaternion res;
-    if (v.z < -1.0f + epsilon) {
+    if (v.z < -1.0f + eps) {
         res.x = 1.0f;
         res.y = 0.0f;
         res.z = 0.0f;

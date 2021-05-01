@@ -7,6 +7,9 @@ set(CMAKE_C_STANDARD 17)
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Luminary/CMake" ${CMAKE_MODULE_PATH})
 
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math --ptxas-options=-v --gpu-architecture=compute_61 --gpu-code=sm_61,compute_61")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -march=native")
+
 message(STATUS "SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
 
 find_package(OptiX REQUIRED)

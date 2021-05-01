@@ -16,6 +16,10 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
+#ifndef eps
+#define eps 0.001f
+#endif /* eps */
+
 #ifndef PRIMITIVES_H
 struct vec3 {
   float x;
@@ -34,9 +38,6 @@ struct Quaternion {
 //===========================================================================================
 // Device Variables
 //===========================================================================================
-
-__device__
-const float epsilon = 0.001f;
 
 __device__
 int device_reflection_depth;
