@@ -281,31 +281,39 @@ Node* build_bvh_structure(
           split_object  = node_average.z;
         }
 
-        const float search_interval = (split_object - split_spatial) / samples_in_space;
+        const float search_interval = fabsf((split_object - split_spatial) / samples_in_space);
+        const float search_start    = min(split_object, split_spatial);
+
+        int total_right = node.triangle_count;
+        memcpy(container, triangles + node.triangles_address, sizeof(Triangle) * total_right);
+        int total_left = 0;
 
         for (int k = -space_extension * samples_in_space;
              k <= (1 + space_extension) * samples_in_space; k++) {
-          const float split = split_spatial + k * search_interval;
+          const float split = search_start + k * search_interval;
           vec3 high_left, high_right, low_left, low_right;
 
           if (a == 0) {
             divide_along_x_axis(
-              split, &left, &right, new_triangles + triangles_ptr, container,
-              triangles + node.triangles_address, node.triangle_count, i);
+              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+              container, total_right, i);
           }
           else if (a == 1) {
             divide_along_y_axis(
-              split, &left, &right, new_triangles + triangles_ptr, container,
-              triangles + node.triangles_address, node.triangle_count, i);
+              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+              container, total_right, i);
           }
           else {
             divide_along_z_axis(
-              split, &left, &right, new_triangles + triangles_ptr, container,
-              triangles + node.triangles_address, node.triangle_count, i);
+              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+              container, total_right, i);
           }
 
-          fit_bounds(new_triangles + triangles_ptr, left, &high_left, &low_left, &average);
-          fit_bounds(container, right, &high_right, &low_right, &average);
+          total_left += left;
+          total_right -= left;
+
+          fit_bounds(new_triangles + triangles_ptr, total_left, &high_left, &low_left, &average);
+          fit_bounds(container, total_right, &high_right, &low_right, &average);
 
           vec3 diff_left = {
             .x = high_left.x - low_left.x,
@@ -320,7 +328,7 @@ Node* build_bvh_structure(
           const float cost_L = diff_left.x * diff_left.y * diff_left.z;
           const float cost_R = diff_right.x * diff_right.y * diff_right.z;
 
-          const float total_cost = cost_L * left + cost_R * right;
+          const float total_cost = cost_L * total_left + cost_R * total_right;
 
           if (total_cost < optimal_cost) {
             optimal_cost  = total_cost;
