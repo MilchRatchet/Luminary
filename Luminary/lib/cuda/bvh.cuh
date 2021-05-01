@@ -13,7 +13,7 @@ struct traversal_result {
 } typedef traversal_result;
 
 __device__
-bool bvh_ray_box_intersect(const vec3 low, const vec3 high, const vec3 inv_ray, const vec3 pso, const float depth, float& out_dist)
+int bvh_ray_box_intersect(const vec3 low, const vec3 high, const vec3 inv_ray, const vec3 pso, const float depth, float& out_dist)
 {
     vec3 lo;
     lo.x = low.x * inv_ray.x - pso.x;
@@ -83,20 +83,21 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
           const vec3 right_low = bvh_decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
 
           float L,R;
-          const bool L_hit = bvh_ray_box_intersect(left_low, left_high, inv_ray, pso, depth, L);
-          const bool R_hit = bvh_ray_box_intersect(right_low, right_high, inv_ray, pso, depth, R);
+          const int L_hit = bvh_ray_box_intersect(left_low, left_high, inv_ray, pso, depth, L);
+          const int R_hit = bvh_ray_box_intersect(right_low, right_high, inv_ray, pso, depth, R);
 
           if (L_hit || R_hit) {
               node_key = node_key << 1;
               bit_trail = bit_trail << 1;
-              const bool R_is_closest = (R_hit) && (R < L);
+              const int R_is_closest = (R_hit) && (R < L);
+              node_address *= 2;
 
               if (!L_hit || R_is_closest) {
-                  node_address = 2 * node_address + 2;
+                  node_address += 2;
                   node_key = node_key ^ 0b1;
               }
               else {
-                  node_address = 2 * node_address + 1;
+                  node_address += 1;
               }
 
               if (L_hit && R_hit) {

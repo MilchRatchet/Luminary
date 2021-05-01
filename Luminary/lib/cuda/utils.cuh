@@ -39,31 +39,31 @@ struct Quaternion {
 // Device Variables
 //===========================================================================================
 
-__device__
+__constant__
 int device_reflection_depth;
 
-__device__
+__constant__
 Scene device_scene;
 
-__device__
+__constant__
 int device_diffuse_samples;
 
-__device__
+__constant__
 RGBF* device_frame;
 
-__device__
+__constant__
 RGBF* device_denoiser;
 
-__device__
+__constant__
 RGBF* device_albedo_buffer;
 
 __device__
 Quaternion device_camera_space;
 
-__device__
+__constant__
 unsigned int device_width;
 
-__device__
+__constant__
 unsigned int device_height;
 
 __device__
@@ -87,16 +87,16 @@ Quaternion device_camera_rotation;
 __device__
 curandStateXORWOW_t device_random;
 
-__device__
+__constant__
 cudaTextureObject_t* device_albedo_atlas;
 
-__device__
+__constant__
 cudaTextureObject_t* device_illuminance_atlas;
 
-__device__
+__constant__
 cudaTextureObject_t* device_material_atlas;
 
-__device__
+__constant__
 texture_assignment* device_texture_assignments;
 
 __device__

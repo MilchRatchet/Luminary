@@ -669,10 +669,13 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
             }
             clock_t curr_time = clock();
             const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
-            printf("\r                                                                                         \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs",(float)progress * ratio * 100, time_elapsed, (total_pixels - progress) * (time_elapsed/progress));
+            printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
+                (float)progress * ratio * 100, time_elapsed,
+                (total_pixels - progress) * (time_elapsed/progress),
+                0.000001 * instance->diffuse_samples * instance->reflection_depth * progress / time_elapsed);
         }
 
-        printf("\r                                                                             \r");
+        printf("\r                                                                                                              \r");
     }
 
 
