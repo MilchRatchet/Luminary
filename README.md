@@ -6,6 +6,7 @@ Luminary is a CUDA based Pathtracing renderer.
 
 This project is for fun and to learn more about Computer Graphics. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
+- Implement interactive realtime mode.
 - Implement refraction.
 - Implement better Importance Sampling.
 - Implement volumetric lighting.

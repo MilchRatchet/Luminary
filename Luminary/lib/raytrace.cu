@@ -530,8 +530,6 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     clock_t t = clock();
 
-
-
     if (progress == 2) {
         const unsigned int max_block_width = 128;
         const unsigned int max_block_height = 128;
@@ -676,9 +674,9 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
         }
 
         printf("\r                                                                                                              \r");
+    } else {
+        trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, 0, 0, instance->width, instance->height, instance->width * instance->height);
     }
-
-
 
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
