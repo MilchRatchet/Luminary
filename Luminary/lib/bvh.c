@@ -7,88 +7,87 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <immintrin.h>
 
 static const int samples_in_space    = 25;
 static const int space_extension     = 2;
 static const int threshold_triangles = 8;
 
+struct vec3_p {
+  float x;
+  float y;
+  float z;
+  float _p;
+} typedef vec3_p;
+
+struct bvh_triangle {
+  vec3_p edge1;
+  vec3_p edge2;
+  vec3_p vertex;
+  uint32_t id;
+  uint32_t _p1;
+  uint64_t _p2;
+} typedef bvh_triangle;
+
 static void fit_bounds(
-  const Triangle* triangles, const int triangles_length, vec3* high_out, vec3* low_out,
-  vec3* average_out) {
-  vec3 high    = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
-  vec3 low     = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
-  vec3 average = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
+  const bvh_triangle* triangles, const int triangles_length, vec3_p* high_out, vec3_p* low_out,
+  vec3_p* average_out) {
+  __m256 high             = _mm256_set1_ps(-FLT_MAX);
+  __m256 low              = _mm256_set1_ps(FLT_MAX);
+  __m256 average          = _mm256_set1_ps(0.0f);
+  __m256 one_over_three   = _mm256_set1_ps(1.0f / 3.0f);
+  __m128 high_a           = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
+  __m128 low_a            = _mm_setr_ps(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
+  __m128 average_a        = _mm_setr_ps(0.0f, 0.0f, 0.0f, 0.0f);
+  __m128 one_over_three_a = _mm_setr_ps(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f);
 
   for (unsigned int i = 0; i < triangles_length; i++) {
-    Triangle triangle = triangles[i];
+    const float* baseptr = (float*) (triangles + i);
 
-    vec3 vertex = triangle.vertex;
+    __m256 bc = _mm256_load_ps(baseptr);
+    __m128 a  = _mm_load_ps(baseptr + 8);
 
-    high.x = max(high.x, vertex.x);
-    high.y = max(high.y, vertex.y);
-    high.z = max(high.z, vertex.z);
+    __m256 a_ext = _mm256_castps128_ps256(a);
+    a_ext        = _mm256_insertf128_ps(a_ext, a, 0b1);
+    bc           = _mm256_add_ps(a_ext, bc);
 
-    low.x = min(low.x, vertex.x);
-    low.y = min(low.y, vertex.y);
-    low.z = min(low.z, vertex.z);
-
-    vec3 centroid = vertex;
-
-    vertex.x += triangle.edge1.x;
-    vertex.y += triangle.edge1.y;
-    vertex.z += triangle.edge1.z;
-
-    high.x = max(high.x, vertex.x);
-    high.y = max(high.y, vertex.y);
-    high.z = max(high.z, vertex.z);
-
-    low.x = min(low.x, vertex.x);
-    low.y = min(low.y, vertex.y);
-    low.z = min(low.z, vertex.z);
-
-    centroid.x += vertex.x;
-    centroid.y += vertex.y;
-    centroid.z += vertex.z;
-
-    vertex = triangle.vertex;
-
-    vertex.x += triangle.edge2.x;
-    vertex.y += triangle.edge2.y;
-    vertex.z += triangle.edge2.z;
-
-    high.x = max(high.x, vertex.x);
-    high.y = max(high.y, vertex.y);
-    high.z = max(high.z, vertex.z);
-
-    low.x = min(low.x, vertex.x);
-    low.y = min(low.y, vertex.y);
-    low.z = min(low.z, vertex.z);
-
-    centroid.x += vertex.x;
-    centroid.y += vertex.y;
-    centroid.z += vertex.z;
-
-    centroid.x /= 3.0f;
-    centroid.y /= 3.0f;
-    centroid.z /= 3.0f;
-
-    average.x += centroid.x;
-    average.y += centroid.y;
-    average.z += centroid.z;
+    high      = _mm256_max_ps(bc, high);
+    low       = _mm256_min_ps(bc, low);
+    average   = _mm256_fmadd_ps(bc, one_over_three, average);
+    high_a    = _mm_max_ps(a, high_a);
+    low_a     = _mm_min_ps(a, low_a);
+    average_a = _mm_fmadd_ps(a, one_over_three_a, average_a);
   }
 
-  average.x /= (triangles_length);
-  average.y /= (triangles_length);
-  average.z /= (triangles_length);
+  __m128 high_b = _mm256_castps256_ps128(high);
+  high          = _mm256_permute2f128_ps(high, high, 0b00000001);
+  __m128 high_c = _mm256_castps256_ps128(high);
+  high_a        = _mm_max_ps(high_a, high_b);
+  high_a        = _mm_max_ps(high_a, high_c);
 
-  *high_out    = high;
-  *low_out     = low;
-  *average_out = average;
+  __m128 low_b = _mm256_castps256_ps128(low);
+  low          = _mm256_permute2f128_ps(low, low, 0b00000001);
+  __m128 low_c = _mm256_castps256_ps128(low);
+  low_a        = _mm_min_ps(low_a, low_b);
+  low_a        = _mm_min_ps(low_a, low_c);
+
+  __m128 average_b = _mm256_castps256_ps128(average);
+  average          = _mm256_permute2f128_ps(average, average, 0b00000001);
+  __m128 average_c = _mm256_castps256_ps128(average);
+  average_a        = _mm_add_ps(average_a, average_b);
+  average_a        = _mm_add_ps(average_a, average_c);
+
+  const float divisor = 1.0f / (triangles_length);
+  average_a           = _mm_mul_ps(average_a, _mm_setr_ps(divisor, divisor, divisor, divisor));
+
+  _mm_storeu_ps((float*) high_out, high_a);
+  _mm_storeu_ps((float*) low_out, low_a);
+  _mm_storeu_ps((float*) average_out, average_a);
 }
 
 static void divide_along_x_axis(
-  const float split, int* left_out, int* right_out, Triangle* triangles_left,
-  Triangle* triangles_right, Triangle* triangles, const unsigned int triangles_length,
+  const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
   const int left_right_bias) {
   int left  = 0;
   int right = 0;
@@ -96,7 +95,7 @@ static void divide_along_x_axis(
   const int bias = left_right_bias % 2;
 
   for (int i = 0; i < triangles_length; i++) {
-    Triangle triangle = triangles[i];
+    bvh_triangle triangle = triangles[i];
 
     int is_right = 0;
     int is_left  = 0;
@@ -127,8 +126,8 @@ static void divide_along_x_axis(
 }
 
 static void divide_along_y_axis(
-  const float split, int* left_out, int* right_out, Triangle* triangles_left,
-  Triangle* triangles_right, Triangle* triangles, const unsigned int triangles_length,
+  const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
   const int left_right_bias) {
   int left  = 0;
   int right = 0;
@@ -136,7 +135,7 @@ static void divide_along_y_axis(
   const int bias = left_right_bias % 2;
 
   for (int i = 0; i < triangles_length; i++) {
-    Triangle triangle = triangles[i];
+    bvh_triangle triangle = triangles[i];
 
     int is_right = 0;
     int is_left  = 0;
@@ -167,8 +166,8 @@ static void divide_along_y_axis(
 }
 
 static void divide_along_z_axis(
-  const float split, int* left_out, int* right_out, Triangle* triangles_left,
-  Triangle* triangles_right, Triangle* triangles, const unsigned int triangles_length,
+  const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
   const int left_right_bias) {
   int left  = 0;
   int right = 0;
@@ -176,7 +175,7 @@ static void divide_along_z_axis(
   const int bias = left_right_bias % 2;
 
   for (int i = 0; i < triangles_length; i++) {
-    Triangle triangle = triangles[i];
+    bvh_triangle triangle = triangles[i];
 
     int is_right = 0;
     int is_left  = 0;
@@ -227,6 +226,18 @@ Node* build_bvh_structure(
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = triangles_length;
 
+  bvh_triangle* bvh_triangles = _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
+
+  for (unsigned int i = 0; i < triangles_length; i++) {
+    Triangle t      = triangles[i];
+    bvh_triangle bt = {
+      .vertex = {.x = t.vertex.x, .y = t.vertex.y, .z = t.vertex.z},
+      .edge1  = {.x = t.edge1.x, .y = t.edge1.y, .z = t.edge1.z},
+      .edge2  = {.x = t.edge2.x, .y = t.edge2.y, .z = t.edge2.z},
+      .id     = i};
+    bvh_triangles[i] = bt;
+  }
+
   unsigned int nodes_at_depth = 1;
 
   int node_ptr = 0;
@@ -235,11 +246,13 @@ Node* build_bvh_structure(
 
   for (int i = 0; i < max_depth; i++) {
     unsigned int triangles_ptr = 0;
-    Triangle* new_triangles    = (Triangle*) malloc(sizeof(Triangle) * triangles_length);
-    Triangle* container        = (Triangle*) malloc(sizeof(Triangle) * triangles_length);
+    bvh_triangle* new_triangles =
+      (bvh_triangle*) _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
+    bvh_triangle* container =
+      (bvh_triangle*) _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
 
     for (int j = 0; j < nodes_at_depth; j++) {
-      vec3 high, low, node_average, average;
+      vec3_p high, low, node_average, average;
       int left, right;
       Node node = nodes[node_ptr];
 
@@ -249,13 +262,14 @@ Node* build_bvh_structure(
       }
 
       fit_bounds(
-        triangles + node.triangles_address, node.triangle_count, &high, &low, &node_average);
+        bvh_triangles + node.triangles_address, node.triangle_count, &high, &low, &node_average);
 
       node.ex = (int8_t) ceil(log2f((high.x - low.x) * compression_divisor));
       node.ey = (int8_t) ceil(log2f((high.y - low.y) * compression_divisor));
       node.ez = (int8_t) ceil(log2f((high.z - low.z) * compression_divisor));
 
-      node.p = low;
+      vec3 tp = {.x = low.x, .y = low.y, .z = low.z};
+      node.p  = tp;
 
       const float compression_x = 1.0f / exp2f(node.ex);
       const float compression_y = 1.0f / exp2f(node.ey);
@@ -285,13 +299,14 @@ Node* build_bvh_structure(
         const float search_start    = min(split_object, split_spatial);
 
         int total_right = node.triangle_count;
-        memcpy(container, triangles + node.triangles_address, sizeof(Triangle) * total_right);
+        memcpy(
+          container, bvh_triangles + node.triangles_address, sizeof(bvh_triangle) * total_right);
         int total_left = 0;
 
         for (int k = -space_extension * samples_in_space;
              k <= (1 + space_extension) * samples_in_space; k++) {
           const float split = search_start + k * search_interval;
-          vec3 high_left, high_right, low_left, low_right;
+          vec3_p high_left, high_right, low_left, low_right;
 
           if (a == 0) {
             divide_along_x_axis(
@@ -340,18 +355,18 @@ Node* build_bvh_structure(
 
       if (axis == 0) {
         divide_along_x_axis(
-          optimal_split, &left, &right, new_triangles + triangles_ptr, triangles,
-          triangles + node.triangles_address, node.triangle_count, i);
+          optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
+          bvh_triangles + node.triangles_address, node.triangle_count, i);
       }
       else if (axis == 1) {
         divide_along_y_axis(
-          optimal_split, &left, &right, new_triangles + triangles_ptr, triangles,
-          triangles + node.triangles_address, node.triangle_count, i);
+          optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
+          bvh_triangles + node.triangles_address, node.triangle_count, i);
       }
       else {
         divide_along_z_axis(
-          optimal_split, &left, &right, new_triangles + triangles_ptr, triangles,
-          triangles + node.triangles_address, node.triangle_count, i);
+          optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
+          bvh_triangles + node.triangles_address, node.triangle_count, i);
       }
 
       compressed_vec3 compressed_low, compressed_high;
@@ -374,7 +389,7 @@ Node* build_bvh_structure(
 
       triangles_ptr += left;
 
-      memcpy(new_triangles + triangles_ptr, triangles, right * sizeof(Triangle));
+      memcpy(new_triangles + triangles_ptr, bvh_triangles, right * sizeof(bvh_triangle));
 
       fit_bounds(new_triangles + triangles_ptr, right, &high, &low, &average);
 
@@ -404,10 +419,10 @@ Node* build_bvh_structure(
       node_ptr++;
     }
 
-    free(triangles);
-    free(container);
+    _mm_free(bvh_triangles);
+    _mm_free(container);
 
-    triangles = new_triangles;
+    bvh_triangles = new_triangles;
 
     nodes_at_depth *= 2;
 
@@ -416,9 +431,19 @@ Node* build_bvh_structure(
 
   printf("\r                             \r");
 
+  Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
+  memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
+
+  for (unsigned int i = 0; i < triangles_length; i++) {
+    triangles[i] = triangles_swap[bvh_triangles[i].id];
+  }
+
   *triangles_io = triangles;
 
   *nodes_length_out = node_count;
+
+  _mm_free(bvh_triangles);
+  free(triangles_swap);
 
   return nodes;
 }

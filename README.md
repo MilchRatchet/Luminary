@@ -109,9 +109,10 @@ START "" Luminary.exe Scenes/Example.lum r
 This project is a bit of a mess when it comes to building. Some hints to get it to run are however:
 
 - You require the libraries for SDL to reside in the same folder as the executable (I plan to link them statically in the future once I figure out how)
-- You need a modern version of CUDA installed, 10+ should work
+- You need to change the CUDA toolkit version to the one installed on your system
 - You need to change the CUDA compatibility version in the CMakeLists.txt to your specific version or lower
 - You need Optix 7 SDK and you will need to specify the installation directory in `Luminary/CMake/FindOptix.cmake`
+- You need an AVX compatible CPU
 
 # Literature
 
