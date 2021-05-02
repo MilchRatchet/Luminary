@@ -34,18 +34,64 @@ int bvh_ray_box_intersect(const vec3 low, const vec3 high, const vec3 inv_ray, c
 }
 
 __device__
-vec3 bvh_decompress_vector(const compressed_vec3 vector, const vec3 p, const float ex, const float ey, const float ez) {
+float bvh_triangle_intersection(const float4* triangles, const vec3 origin, const vec3 ray) {
+    const float4 v1 = __ldg(triangles);
+    const float4 v2 = __ldg(triangles + 1);
+    const float4 v3 = __ldg(triangles + 2);
+
+    vec3 vertex;
+    vertex.x = v1.x;
+    vertex.y = v1.y;
+    vertex.z = v1.z;
+
+    vec3 edge1;
+    edge1.x = v2.x;
+    edge1.y = v2.y;
+    edge1.z = v2.z;
+
+    vec3 edge2;
+    edge2.x = v3.x;
+    edge2.y = v3.y;
+    edge2.z = v3.z;
+
+    const vec3 h = cross_product(ray, edge2);
+    const float a = dot_product(edge1, h);
+
+    if (__builtin_expect(a > -0.00000001f && a < 0.00000001f, 0)) return FLT_MAX;
+
+    const float f = 1.0f / a;
+    const vec3 s = vec_diff(origin, vertex);
+    const float u = f * dot_product(s, h);
+
+    if (u < 0.0f || u > 1.0f) return FLT_MAX;
+
+    const vec3 q = cross_product(s, edge1);
+    const float v = f * dot_product(ray, q);
+
+    if (v < 0.0f || u + v > 1.0f) return FLT_MAX;
+
+    const float t = f * dot_product(edge2, q);
+
+    if (t > -eps) {
+        return t;
+    } else {
+        return FLT_MAX;
+    }
+}
+
+__device__
+vec3 bvh_decompress_vector(const unsigned char x, const unsigned char y, const unsigned char z, const float4 p, const float ex, const float ey, const float ez) {
     vec3 result;
 
-    result.x = p.x + ex * (float)vector.x;
-    result.y = p.y + ey * (float)vector.y;
-    result.z = p.z + ez * (float)vector.z;
+    result.x = p.x + ex * (float)x;
+    result.y = p.y + ey * (float)y;
+    result.z = p.z + ez * (float)z;
 
     return result;
 }
 
 __device__
-traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nodes, const Triangle* triangles) {
+traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nodes, const Traversal_Triangle* triangles) {
   float depth = device_scene.far_clip_distance;
 
   unsigned int hit_id = 0xffffffff;
@@ -65,28 +111,31 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
   int bit_trail = 0;
   int mrpn_address = -1;
 
-  Node node;
-
   while (node_address != -1) {
       while (true) {
-          node = nodes[node_address];
+          const int* address = (int*)(nodes + node_address);
+          const float4 p = __ldg((float4*)address);
+          const char4 e = __ldg((char4*)(address + 4));
+          const uchar4 b1 = __ldg((uchar4*)(address + 5));
+          const uchar4 b2 = __ldg((uchar4*)(address + 6));
+          const uchar4 b3 = __ldg((uchar4*)(address + 7));
 
-          if (node.triangles_address != -1) break;
+          if (!signbit(p.w)) break;
 
-          const float decompression_x = exp2f((float)node.ex);
-          const float decompression_y = exp2f((float)node.ey);
-          const float decompression_z = exp2f((float)node.ez);
+          const float decompression_x = exp2f((float)e.x);
+          const float decompression_y = exp2f((float)e.y);
+          const float decompression_z = exp2f((float)e.z);
 
-          const vec3 left_high = bvh_decompress_vector(node.left_high, node.p, decompression_x, decompression_y, decompression_z);
-          const vec3 left_low = bvh_decompress_vector(node.left_low, node.p, decompression_x, decompression_y, decompression_z);
-          const vec3 right_high = bvh_decompress_vector(node.right_high, node.p, decompression_x, decompression_y, decompression_z);
-          const vec3 right_low = bvh_decompress_vector(node.right_low, node.p, decompression_x, decompression_y, decompression_z);
+          const vec3 left_low = bvh_decompress_vector(b1.x, b1.y, b1.z, p, decompression_x, decompression_y, decompression_z);
+          const vec3 left_high = bvh_decompress_vector(b1.w, b2.x, b2.y, p, decompression_x, decompression_y, decompression_z);
+          const vec3 right_low = bvh_decompress_vector(b2.z, b2.w, b3.x, p, decompression_x, decompression_y, decompression_z);
+          const vec3 right_high = bvh_decompress_vector(b3.y, b3.z, b3.w, p, decompression_x, decompression_y, decompression_z);
 
           float L,R;
           const int L_hit = bvh_ray_box_intersect(left_low, left_high, inv_ray, pso, depth, L);
           const int R_hit = bvh_ray_box_intersect(right_low, right_high, inv_ray, pso, depth, R);
 
-          if (L_hit || R_hit) {
+          if (__builtin_expect(L_hit || R_hit, 1)) {
               node_key = node_key << 1;
               bit_trail = bit_trail << 1;
               const int R_is_closest = (R_hit) && (R < L);
@@ -111,7 +160,6 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
               }
           } else {
             if (bit_trail == 0) {
-                node_address = 0;
                 break;
             }
             else {
@@ -129,19 +177,22 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
           }
       }
 
-      if (node.triangles_address != -1) {
-          for (unsigned int i = 0; i < node.triangle_count; i++) {
-              const float d = triangle_intersection(triangles[node.triangles_address + i], origin, ray);
+      const int triangles_address = __ldg(((int*)(nodes + node_address) + 3));
 
-              if (d < depth) {
-                  depth = d;
-                  hit_id = node.triangles_address + i;
-              }
-          }
+      if (triangles_address != -1) {
+        const int triangles_count = __ldg(((int*)(nodes + node_address) + 8));
+        for (unsigned int i = 0; i < triangles_count; i++) {
+            const float d = bvh_triangle_intersection((float4*)(triangles + triangles_address + i), origin, ray);
+
+            if (d < depth) {
+                depth = d;
+                hit_id = triangles_address + i;
+            }
+        }
       }
 
       if (bit_trail == 0) {
-          node_address = -1;
+          break;
       }
       else {
           const int num_levels = trailing_zeros(bit_trail);

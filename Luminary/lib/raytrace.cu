@@ -60,7 +60,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
         vec3 curr;
 
-        traversal_result traversal = traverse_bvh(origin, ray, device_scene.nodes, device_scene.triangles);
+        traversal_result traversal = traverse_bvh(origin, ray, device_scene.nodes, device_scene.traversal_triangles);
 
         if (traversal.hit_id == 0xffffffff) {
             RGBF sky = get_sky_color(ray);
@@ -424,11 +424,13 @@ extern "C" raytrace_instance* init_raytracing(
 
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment) * scene.materials_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length));
+    gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(Traversal_Triangle) * instance->scene_gpu.triangles_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.nodes), sizeof(Node) * instance->scene_gpu.nodes_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.lights), sizeof(Light) * instance->scene_gpu.lights_length));
 
     gpuErrchk(cudaMemcpy(instance->scene_gpu.texture_assignments, scene.texture_assignments, sizeof(texture_assignment) * scene.materials_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(instance->scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(instance->scene_gpu.traversal_triangles, scene.traversal_triangles, sizeof(Traversal_Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene.nodes, sizeof(Node) * scene.nodes_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(instance->scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice));
 
@@ -702,6 +704,7 @@ extern "C" void free_raytracing(raytrace_instance* instance) {
 
     gpuErrchk(cudaFree(instance->scene_gpu.texture_assignments));
     gpuErrchk(cudaFree(instance->scene_gpu.triangles));
+    gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.nodes));
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
 

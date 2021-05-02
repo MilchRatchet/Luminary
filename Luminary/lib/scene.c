@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <immintrin.h>
 #include "scene.h"
 #include "raytrace.h"
 #include "error.h"
@@ -119,7 +120,31 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   Node* nodes = build_bvh_structure(&triangles, triangle_count, bvh_depth, &nodes_length);
 
+  Traversal_Triangle* traversal_triangles = malloc(sizeof(Traversal_Triangle) * triangle_count);
+
+  for (unsigned int i = 0; i < triangle_count; i++) {
+    Triangle triangle     = triangles[i];
+    Traversal_Triangle tt = {
+      .vertex =
+        {.x = triangle.vertex.x,
+         .y = triangle.vertex.y,
+         .z = triangle.vertex.z,
+         .w = triangle.vertex.x},
+      .edge1 =
+        {.x = triangle.edge1.x,
+         .y = triangle.edge1.y,
+         .z = triangle.edge1.z,
+         .w = triangle.edge1.x},
+      .edge2 = {
+        .x = triangle.edge2.x,
+        .y = triangle.edge2.y,
+        .z = triangle.edge2.z,
+        .w = triangle.edge2.x}};
+    traversal_triangles[i] = tt;
+  }
+
   scene.triangles           = triangles;
+  scene.traversal_triangles = traversal_triangles;
   scene.triangles_length    = triangle_count;
   scene.nodes               = nodes;
   scene.nodes_length        = nodes_length;

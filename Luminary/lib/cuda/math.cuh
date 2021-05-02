@@ -138,33 +138,6 @@ UV lerp_uv(const Triangle triangle, const float lambda, const float mu) {
 }
 
 __device__
-float triangle_intersection(const Triangle triangle, const vec3 origin, const vec3 ray) {
-    const vec3 h = cross_product(ray, triangle.edge2);
-    const float a = dot_product(triangle.edge1, h);
-
-    if (a > -0.00000001 && a < 0.00000001) return FLT_MAX;
-
-    const float f = 1.0f / a;
-    const vec3 s = vec_diff(origin, triangle.vertex);
-    const float u = f * dot_product(s, h);
-
-    if (u < 0.0f || u > 1.0f) return FLT_MAX;
-
-    const vec3 q = cross_product(s, triangle.edge1);
-    const float v = f * dot_product(ray, q);
-
-    if (v < 0.0f || u + v > 1.0f) return FLT_MAX;
-
-    const float t = f * dot_product(triangle.edge2, q);
-
-    if (t > -eps) {
-        return t;
-    } else {
-        return FLT_MAX;
-    }
-}
-
-__device__
 vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const vec3 basis) {
     vec3 u1, u2;
     if (basis.z < -1.0f + 2.0f * eps) {

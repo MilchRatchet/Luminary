@@ -22,13 +22,16 @@
      if (code != cudaSuccess)
      {
         fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-        if (abort) exit(code);
+        if (abort) {
+          system("pause");
+          exit(code);
+        }
      }
   }
 
 extern "C" void denoise_with_optix(raytrace_instance* instance) {
 
-  optixInit();
+  OPTIX_CHECK(optixInit());
 
   OptixDeviceContext ctx;
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext)0,(OptixDeviceContextOptions*)0, &ctx));

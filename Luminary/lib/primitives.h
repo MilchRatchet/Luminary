@@ -7,6 +7,13 @@ struct vec3 {
   float z;
 } typedef vec3;
 
+struct vec4 {
+  float x;
+  float y;
+  float z;
+  float w;
+} typedef vec4;
+
 struct Quaternion {
   float w;
   float x;

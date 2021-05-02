@@ -22,4 +22,10 @@ struct Triangle {
   uint16_t object_maps;
 } typedef Triangle;
 
+struct Traversal_Triangle {
+  vec4 vertex;
+  vec4 edge1;
+  vec4 edge2;
+} typedef Traversal_Triangle;
+
 #endif /* MESH_H */

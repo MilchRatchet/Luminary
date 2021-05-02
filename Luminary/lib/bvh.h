@@ -12,16 +12,19 @@ struct compressed_vec3 {
 } typedef compressed_vec3;
 
 struct Node {
-  int32_t triangles_address;
-  uint32_t triangle_count;
   vec3 p;
+  int32_t triangles_address;
   int8_t ex;
   int8_t ey;
   int8_t ez;
+  int8_t _p;
   compressed_vec3 left_low;
   compressed_vec3 left_high;
   compressed_vec3 right_low;
   compressed_vec3 right_high;
+  uint32_t triangle_count;
+  uint32_t _p1;
+  uint64_t _p2;
 } typedef Node;
 
 Node* build_bvh_structure(

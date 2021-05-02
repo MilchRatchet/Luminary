@@ -29,6 +29,7 @@ struct Scene {
   Camera camera;
   float far_clip_distance;
   Triangle* triangles;
+  Traversal_Triangle* traversal_triangles;
   unsigned int triangles_length;
   Node* nodes;
   unsigned int nodes_length;
