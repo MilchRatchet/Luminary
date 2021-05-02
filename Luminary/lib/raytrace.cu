@@ -23,6 +23,16 @@
 const static int threads_per_block = 128;
 const static int blocks_per_grid = 512;
 
+/*
+ * Rays with an accumulated weight below the cutoff are cancelled
+ * Higher values provide better performance at the cost of extreme bright lights not being shaded properly
+ *
+ * Change BRIGHTEST_EMISSION to the intensity of the brightest light for best performance without
+ * visual degradation
+ */
+ #define BRIGHTEST_EMISSION 40.0f
+#define CUTOFF ((1.0f)/(BRIGHTEST_EMISSION * 255.0f))
+
 //---------------------------------
 // Path Tracing
 //---------------------------------
@@ -42,7 +52,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
     result.g = 0.0f;
     result.b = 0.0f;
 
-    float weight = 1.0f;
     RGBF record;
     record.r = 1.0f;
     record.g = 1.0f;
@@ -66,9 +75,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
                 albedo_buffer_written++;
             }
 
-            result.r += sky.r * weight * record.r;
-            result.g += sky.g * weight * record.g;
-            result.b += sky.b * weight * record.b;
+            result.r += sky.r * record.r;
+            result.g += sky.g * record.g;
+            result.b += sky.b * record.b;
 
             return result;
         }
@@ -108,9 +117,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
         const float metallic = material_f.y;
         const float intensity = material_f.z * 255.0f;
 
-        result.r += emission.r * intensity * weight * record.r;
-        result.g += emission.g * intensity * weight * record.g;
-        result.b += emission.b * intensity * weight * record.b;
+        result.r += emission.r * intensity * record.r;
+        result.g += emission.g * intensity * record.g;
+        result.b += emission.b * intensity * record.b;
 
         const float transparent_pass = curand_uniform(random);
 
@@ -178,6 +187,8 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
                 normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
                 rotation_to_z);
 
+            float weight;
+
             if (light_sample < 0.5f && S_local.z >= 0.0f) {
                 H_local.x = S_local.x + V_local.x;
                 H_local.y = S_local.y + V_local.y;
@@ -185,7 +196,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
 
                 H_local = normalize_vector(H_local);
 
-                weight *= 2.0f * light_angle * device_scene.lights_length;
+                weight = 2.0f * light_angle * device_scene.lights_length;
             } else {
                 if (alpha == 0.0f) {
                     H_local.x = 0.0f;
@@ -195,7 +206,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
                     H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
                 }
 
-                weight *= ((S_local.z >= 0.0f) ? 2.0f : 1.0f);
+                weight = ((S_local.z >= 0.0f) ? 2.0f : 1.0f);
             }
 
             const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
@@ -214,18 +225,14 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
 
             weight *= 2.0f * Smith_G2_over_G1_height_correlated(alpha, alpha * alpha, NdotR, NdotV) / specular_probability;
 
-            record.r *= F.x;
-            record.g *= F.y;
-            record.b *= F.z;
+            record.r *= F.x * weight;
+            record.g *= F.y * weight;
+            record.b *= F.z * weight;
 
             ray = normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
         }
         else
         {
-            record.r *= albedo.r;
-            record.g *= albedo.g;
-            record.b *= albedo.b;
-
             const float alpha = acosf(curand_uniform(random));
             const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
@@ -233,12 +240,14 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
 
             const float light_feasible = dot_product(ray, normal);
 
+            float weight;
+
             if (light_sample < 0.5f && light_feasible >= 0.0f) {
-                weight *= 2.0f * light_angle * device_scene.lights_length;
+                weight = 2.0f * light_angle * device_scene.lights_length;
             } else {
                 ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
-                weight *= ((light_feasible >= 0.0f) ? 2.0f : 1.0f);
+                weight = ((light_feasible >= 0.0f) ? 2.0f : 1.0f);
             }
 
             const float angle = fmaxf(eps, fminf(dot_product(normal, ray),1.0f));
@@ -259,7 +268,13 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* random, int
             const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
 
             weight *= 2.0f * FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
+
+            record.r *= albedo.r * weight;
+            record.g *= albedo.g * weight;
+            record.b *= albedo.b * weight;
         }
+
+        if (record.r < CUTOFF && record.g < CUTOFF && record.b < CUTOFF) break;
     }
 
     return result;
