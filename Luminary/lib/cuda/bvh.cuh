@@ -91,6 +91,11 @@ vec3 bvh_decompress_vector(const unsigned char x, const unsigned char y, const u
 }
 
 __device__
+unsigned char get_8bit(const unsigned int input, const unsigned int bitshift) {
+    return (input >> bitshift) & 0x000000FF;
+}
+
+__device__
 traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nodes, const Traversal_Triangle* triangles) {
   float depth = device_scene.far_clip_distance;
 
@@ -113,23 +118,19 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
 
   while (node_address != -1) {
       while (true) {
-          const int* address = (int*)(nodes + node_address);
-          const float4 p = __ldg((float4*)address);
-          const char4 e = __ldg((char4*)(address + 4));
-          const uchar4 b1 = __ldg((uchar4*)(address + 5));
-          const uchar4 b2 = __ldg((uchar4*)(address + 6));
-          const uchar4 b3 = __ldg((uchar4*)(address + 7));
+          const float4 p = __ldg((float4*)((int*)(nodes + node_address)));
+          const uint4 data = __ldg((uint4*)(((int*)(nodes + node_address)) + 4));
 
           if (!signbit(p.w)) break;
 
-          const float decompression_x = exp2f((float)e.x);
-          const float decompression_y = exp2f((float)e.y);
-          const float decompression_z = exp2f((float)e.z);
+          const float decompression_x = exp2f((float)((char)get_8bit(data.x, 0)));
+          const float decompression_y = exp2f((float)((char)get_8bit(data.x, 8)));
+          const float decompression_z = exp2f((float)((char)get_8bit(data.x, 16)));
 
-          const vec3 left_low = bvh_decompress_vector(b1.x, b1.y, b1.z, p, decompression_x, decompression_y, decompression_z);
-          const vec3 left_high = bvh_decompress_vector(b1.w, b2.x, b2.y, p, decompression_x, decompression_y, decompression_z);
-          const vec3 right_low = bvh_decompress_vector(b2.z, b2.w, b3.x, p, decompression_x, decompression_y, decompression_z);
-          const vec3 right_high = bvh_decompress_vector(b3.y, b3.z, b3.w, p, decompression_x, decompression_y, decompression_z);
+          const vec3 left_low = bvh_decompress_vector(get_8bit(data.y, 0), get_8bit(data.y, 8), get_8bit(data.y, 16), p, decompression_x, decompression_y, decompression_z);
+          const vec3 left_high = bvh_decompress_vector(get_8bit(data.y, 24), get_8bit(data.z, 0), get_8bit(data.z, 8), p, decompression_x, decompression_y, decompression_z);
+          const vec3 right_low = bvh_decompress_vector(get_8bit(data.z, 16), get_8bit(data.z, 24), get_8bit(data.w, 0), p, decompression_x, decompression_y, decompression_z);
+          const vec3 right_high = bvh_decompress_vector(get_8bit(data.w, 8), get_8bit(data.w, 16), get_8bit(data.w, 24), p, decompression_x, decompression_y, decompression_z);
 
           float L,R;
           const int L_hit = bvh_ray_box_intersect(left_low, left_high, inv_ray, pso, depth, L);
