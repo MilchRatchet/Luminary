@@ -9,6 +9,7 @@
 #include "cuda/sky.cuh"
 #include "cuda/brdf.cuh"
 #include "cuda/bvh.cuh"
+#include "cuda/directives.cuh"
 #include <cuda_runtime_api.h>
 #include <curand_kernel.h>
 #include <float.h>
@@ -22,16 +23,6 @@
 
 const static int threads_per_block = 128;
 const static int blocks_per_grid = 512;
-
-/*
- * Rays with an accumulated weight below the cutoff are cancelled
- * Higher values provide better performance at the cost of extreme bright lights not being shaded properly
- *
- * Change BRIGHTEST_EMISSION to the intensity of the brightest light for best performance without
- * visual degradation
- */
- #define BRIGHTEST_EMISSION 40.0f
-#define CUTOFF ((1.0f)/(BRIGHTEST_EMISSION * 255.0f))
 
 //---------------------------------
 // Path Tracing
@@ -325,7 +316,18 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             record.b *= albedo.b * weight;
         }
 
-        if (record.r < CUTOFF && record.g < CUTOFF && record.b < CUTOFF) break;
+        #ifdef WEIGHT_BASED_EXIT
+        const double max_record = fmaxf(record.r, fmaxf(record.g, record.b));
+        if (max_record < CUTOFF ||
+        (max_record < PROBABILISTIC_CUTOFF && curand_uniform(random) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
+        {
+            break;
+        }
+        #endif
+
+        #ifdef LOW_QUALITY_LONG_BOUNCES
+        if (reflection_number >= MIN_BOUNCES && curand_uniform(random) < 1.0f/device_reflection_depth) break;
+        #endif
     }
 
     return result;

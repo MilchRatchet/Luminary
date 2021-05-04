@@ -114,6 +114,8 @@ This project is a bit of a mess when it comes to building. Some hints to get it 
 - You need Optix 7 SDK and you will need to specify the installation directory in `Luminary/CMake/FindOptix.cmake`
 - You need an AVX compatible CPU
 
+In `Luminary/lib/cuda/directives.cuh` are some preprocessor directives that can be used to tune performance to quality in the CUDA kernel.
+
 # Literature
 
 This is a list of papers I used for this project so far:
