@@ -26,6 +26,34 @@ static int validate_filetype(const char* line) {
   return result;
 }
 
+static vec3 cross_product(const vec3 a, const vec3 b) {
+  vec3 result;
+
+  result.x = a.y * b.z - a.z * b.y;
+  result.y = a.z * b.x - a.x * b.z;
+  result.z = a.x * b.y - a.y * b.x;
+
+  return result;
+}
+
+static vec3 scale_vector(vec3 vector, const float scale) {
+  vector.x *= scale;
+  vector.y *= scale;
+  vector.z *= scale;
+
+  return vector;
+}
+
+static float get_length(const vec3 vector) {
+  return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
+}
+
+static vec3 normalize_vector(vec3 vector) {
+  const float inv_length = 1.0f / get_length(vector);
+
+  return scale_vector(vector, inv_length);
+}
+
 Scene load_scene(const char* filename, raytrace_instance** instance, char** output_name) {
   FILE* file = fopen(filename, "rb");
 
@@ -140,7 +168,9 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
         .y = triangle.edge2.y,
         .z = triangle.edge2.z,
         .w = triangle.edge2.x}};
+    triangle.face_normal   = normalize_vector(cross_product(triangle.edge1, triangle.edge2));
     traversal_triangles[i] = tt;
+    triangles[i]           = triangle;
   }
 
   scene.triangles           = triangles;
