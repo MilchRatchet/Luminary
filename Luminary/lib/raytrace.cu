@@ -58,8 +58,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
     record.b = 1.0f;
 
     for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
-        vec3 curr;
-
         traversal_result traversal = traverse_bvh(origin, ray, device_scene.nodes, device_scene.traversal_triangles);
 
         if (traversal.hit_id == 0xffffffff) {
@@ -82,67 +80,57 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             return result;
         }
 
+        vec3 curr;
         curr.x = origin.x + ray.x * traversal.depth;
         curr.y = origin.y + ray.y * traversal.depth;
         curr.z = origin.z + ray.z * traversal.depth;
 
         const float4* hit_address = (float4*)(device_scene.triangles + traversal.hit_id);
 
+        const float4 t1 = __ldg(hit_address);
+        const float4 t2 = __ldg(hit_address + 1);
         const float4 t3 = __ldg(hit_address + 2);
+        const float4 t4 = __ldg(hit_address + 3);
+        const float4 t5 = __ldg(hit_address + 4);
+        const float4 t6 = __ldg(hit_address + 5);
+        const float4 t7 = __ldg(hit_address + 6);
 
-        vec3 normal;
+        vec3 vertex;
+        vertex.x = t1.x;
+        vertex.y = t1.y;
+        vertex.z = t1.z;
 
-        {
-            const float4 t1 = __ldg(hit_address);
-            const float4 t2 = __ldg(hit_address + 1);
+        vec3 edge1;
+        edge1.x = t1.w;
+        edge1.y = t2.x;
+        edge1.z = t2.y;
 
-            vec3 vertex;
-            vertex.x = t1.x;
-            vertex.y = t1.y;
-            vertex.z = t1.z;
+        vec3 edge2;
+        edge2.x = t2.z;
+        edge2.y = t2.w;
+        edge2.z = t3.x;
 
-            vec3 edge1;
-            edge1.x = t1.w;
-            edge1.y = t2.x;
-            edge1.z = t2.y;
+        vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, curr);
 
-            vec3 edge2;
-            edge2.x = t2.z;
-            edge2.y = t2.w;
-            edge2.z = t3.x;
-
-            normal = get_coordinates_in_triangle(vertex, edge1, edge2, curr);
-        }
-
-        UV tex_coords;
-
-        {
         const float lambda = normal.x;
         const float mu = normal.y;
 
-        const float4 t4 = __ldg(hit_address + 3);
-        const float4 t5 = __ldg(hit_address + 4);
+        vec3 vertex_normal;
+        vertex_normal.x = t3.y;
+        vertex_normal.y = t3.z;
+        vertex_normal.z = t3.w;
 
-        {
-            vec3 vertex_normal;
-            vertex_normal.x = t3.y;
-            vertex_normal.y = t3.z;
-            vertex_normal.z = t3.w;
+        vec3 edge1_normal;
+        edge1_normal.x = t4.x;
+        edge1_normal.y = t4.y;
+        edge1_normal.z = t4.z;
 
-            vec3 edge1_normal;
-            edge1_normal.x = t4.x;
-            edge1_normal.y = t4.y;
-            edge1_normal.z = t4.z;
+        vec3 edge2_normal;
+        edge2_normal.x = t4.w;
+        edge2_normal.y = t5.x;
+        edge2_normal.z = t5.y;
 
-            vec3 edge2_normal;
-            edge2_normal.x = t4.w;
-            edge2_normal.y = t5.x;
-            edge2_normal.z = t5.y;
-
-            normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
-        }
-
-        const float4 t6 = __ldg(hit_address + 5);
+        normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
 
         UV vertex_texture;
         vertex_texture.u = t5.z;
@@ -156,42 +144,33 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         edge2_texture.u = t6.z;
         edge2_texture.v = t6.w;
 
-        tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
-        }
+        const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
 
         vec3 face_normal;
+        face_normal.x = t7.x;
+        face_normal.y = t7.y;
+        face_normal.z = t7.z;
+
+        const int texture_object = __float_as_int(t7.w);
+
+        const float4 albedo_f = tex2D<float4>(device_albedo_atlas[device_texture_assignments[texture_object].albedo_map], tex_coords.u, 1.0f - tex_coords.v);
+        const float4 illumiance_f = tex2D<float4>(device_illuminance_atlas[device_texture_assignments[texture_object].illuminance_map], tex_coords.u, 1.0f - tex_coords.v);
+        const float4 material_f = tex2D<float4>(device_material_atlas[device_texture_assignments[texture_object].material_map], tex_coords.u, 1.0f - tex_coords.v);
+
         RGBAF albedo;
+        albedo.r = albedo_f.x;
+        albedo.g = albedo_f.y;
+        albedo.b = albedo_f.z;
+        albedo.a = albedo_f.w;
+
         RGBF emission;
-        float roughness;
-        float metallic;
-        float intensity;
+        emission.r = illumiance_f.x;
+        emission.g = illumiance_f.y;
+        emission.b = illumiance_f.z;
 
-        {
-            const float4 t7 = __ldg(hit_address + 6);
-
-            face_normal.x = t7.x;
-            face_normal.y = t7.y;
-            face_normal.z = t7.z;
-
-            const int texture_object = __float_as_int(t7.w);
-
-            const float4 albedo_f = tex2D<float4>(device_albedo_atlas[device_texture_assignments[texture_object].albedo_map], tex_coords.u, 1.0f - tex_coords.v);
-            const float4 illumiance_f = tex2D<float4>(device_illuminance_atlas[device_texture_assignments[texture_object].illuminance_map], tex_coords.u, 1.0f - tex_coords.v);
-            const float4 material_f = tex2D<float4>(device_material_atlas[device_texture_assignments[texture_object].material_map], tex_coords.u, 1.0f - tex_coords.v);
-
-            albedo.r = albedo_f.x;
-            albedo.g = albedo_f.y;
-            albedo.b = albedo_f.z;
-            albedo.a = albedo_f.w;
-
-            emission.r = illumiance_f.x;
-            emission.g = illumiance_f.y;
-            emission.b = illumiance_f.z;
-
-            roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
-            metallic = material_f.y;
-            intensity = material_f.z * 255.0f;
-        }
+        const float roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
+        const float metallic = material_f.y;
+        const float intensity = material_f.z * 255.0f;
 
         result.r += emission.r * intensity * record.r;
         result.g += emission.g * intensity * record.g;
@@ -248,23 +227,19 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         if (specular < specular_probability) {
             const float alpha = roughness * roughness;
 
+            const float beta = acosf(curand_uniform(random));
+            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+
             const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
-            vec3 H_local;
-            vec3 S_local;
-
-            {
-                const float beta = acosf(curand_uniform(random));
-                const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
-
-                S_local = rotate_vector_by_quaternion(
-                    normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
-                    rotation_to_z);
-            }
+            const vec3 S_local = rotate_vector_by_quaternion(
+                normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
+                rotation_to_z);
 
             float weight;
 
             const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
+            vec3 H_local;
 
             if (light_sample < 0.5f && S_local.z >= 0.0f) {
                 H_local.x = S_local.x + V_local.x;
@@ -311,21 +286,19 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         {
             float weight;
 
-            {
-                const float alpha = acosf(curand_uniform(random));
-                const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+            const float alpha = acosf(curand_uniform(random));
+            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
-                ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
+            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
 
-                const float light_feasible = dot_product(ray, normal);
+            const float light_feasible = dot_product(ray, normal);
 
-                if (light_sample < 0.5f && light_feasible >= 0.0f) {
-                    weight = 2.0f * light_angle * device_scene.lights_length;
-                } else {
-                    ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
+            if (light_sample < 0.5f && light_feasible >= 0.0f) {
+                weight = 2.0f * light_angle * device_scene.lights_length;
+            } else {
+                ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
-                    weight = ((light_feasible >= 0.0f) ? 2.0f : 1.0f);
-                }
+                weight = ((light_feasible >= 0.0f) ? 2.0f : 1.0f);
             }
 
             vec3 H;
