@@ -192,7 +192,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         if (max_result > eps) break;
         #endif
 
-        const float specular = curand_uniform(random);
         const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
 
         if (dot_product(normal, face_normal) < 0.0f) {
@@ -216,11 +215,18 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
 
         if (light_sample < 0.5f) {
             const uint32_t light = (uint32_t)(curand_uniform(random) * device_scene.lights_length);
-            light_source = normalize_vector(vec_diff(device_scene.lights[light].pos, origin));
-            light_angle = get_light_angle(device_scene.lights[light], origin) * 2.0f / PI;
+            const float4 light_data = __ldg((float4*)(device_scene.lights + light));
+            vec3 light_pos;
+            light_pos.x = light_data.x;
+            light_pos.y = light_data.y;
+            light_pos.z = light_data.z;
+            light_pos = vec_diff(light_pos, origin);
+            light_source = normalize_vector(light_pos);
+            const float d = get_length(light_pos) + eps;
+            light_angle = fminf(PI/2.0f,asinf(light_data.w / d)) * 2.0f / PI;
         }
 
-        if (specular < specular_probability) {
+        if (curand_uniform(random) < specular_probability) {
             const float alpha = roughness * roughness;
 
             const float beta = acosf(curand_uniform(random));
@@ -237,7 +243,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
             vec3 H_local;
 
-            if (light_sample < 0.5f && S_local.z >= 0.0f) {
+            if (light_sample < 0.5f && S_local.z > 0.0f) {
                 H_local.x = S_local.x + V_local.x;
                 H_local.y = S_local.y + V_local.y;
                 H_local.z = S_local.z + V_local.z;
@@ -254,7 +260,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
                     H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
                 }
 
-                if (S_local.z >= 0.0f) weight = 2.0f;
+                if (S_local.z > 0.0f) weight = 2.0f;
             }
 
             const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
@@ -758,15 +764,16 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     gpuErrchk(cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 
-extern "C" void free_raytracing(raytrace_instance* instance) {
-    gpuErrchk(cudaFree(instance->frame_buffer_gpu));
-
+extern "C" void free_inputs(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.texture_assignments));
     gpuErrchk(cudaFree(instance->scene_gpu.triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.nodes));
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
+}
 
+extern "C" void free_outputs(raytrace_instance* instance) {
+    gpuErrchk(cudaFree(instance->frame_buffer_gpu));
     _mm_free(instance->frame_buffer);
 
     if (instance->denoiser) {

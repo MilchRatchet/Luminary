@@ -15,6 +15,8 @@ void offline_output(
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
+  free_inputs(instance);
+
   switch (instance->denoiser) {
   case 0: {
     post_median_filter(instance, 0.9f);

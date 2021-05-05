@@ -19,7 +19,8 @@ raytrace_instance* init_raytracing(
   int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene,
   int denoiser);
 void trace_scene(Scene scene, raytrace_instance* instance, const int progress);
-void free_raytracing(raytrace_instance* instance);
+void free_inputs(raytrace_instance* instance);
+void free_outputs(raytrace_instance* instance);
 void* initialize_textures(TextureRGBA* textures, const int textures_length);
 void free_textures(void* texture_atlas, const int textures_length);
 #if __cplusplus
