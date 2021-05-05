@@ -16,7 +16,7 @@
  * Setting PROBABILISTIC_CUTOFF >= CUTOFF will deactivate this option
  */
  #define WEIGHT_BASED_EXIT
- #define BRIGHTEST_EMISSION 40.0f
+ #define BRIGHTEST_EMISSION 20.0f
  #define CUTOFF ((1.0f)/(BRIGHTEST_EMISSION * 255.0f))
  #define PROBABILISTIC_CUTOFF ((1.0f)/(255.0f))
 
@@ -28,7 +28,15 @@
   *
   * MIN_BOUNCES controls the minimum amount of bounces that have to happen before this may happen
   */
- #define LOW_QUALITY_LONG_BOUNCES
- #define MIN_BOUNCES 0
+ //#define LOW_QUALITY_LONG_BOUNCES
+ #define MIN_BOUNCES 1
+
+
+  /*
+  * Define FIRST_LIGHT_ONLY for the following to apply
+  *
+  * Samples exit early if some light data was already gathered
+  */
+ #define FIRST_LIGHT_ONLY
 
 #endif /* CU_DIRECTIVES_H */

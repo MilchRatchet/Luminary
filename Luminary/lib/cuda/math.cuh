@@ -73,35 +73,6 @@ vec3 normalize_vector(vec3 vector) {
 }
 
 __device__
-vec3 Fresnel_Schlick(const vec3 f0, const float f90, const float NdotS) {
-    vec3 result;
-
-    const float t = powf(1.0f - NdotS, 5.0f);
-
-    result.x = lerp(f0.x, f90, t);
-    result.y = lerp(f0.y, f90, t);
-    result.z = lerp(f0.z, f90, t);
-
-    return result;
-}
-
-__device__
-float luminance(const vec3 v) {
-    vec3 w;
-    w.x = 0.2126f;
-    w.y = 0.7152f;
-    w.z = 0.0722f;
-
-    return dot_product(v,w);
-}
-
-__device__
-float shadowed_F90(const vec3 f0) {
-    const float t = 1.0f / 0.04f;
-    return fminf(1.0f, t * luminance(f0));
-}
-
-__device__
 vec3 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
     const vec3 diff = vec_diff(point, vertex);
     const float d00 = dot_product(edge1,edge1);

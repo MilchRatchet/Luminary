@@ -31,7 +31,7 @@ const static int blocks_per_grid = 512;
 __device__
 float get_light_angle(Light light, vec3 pos) {
     const float d = get_length(vec_diff(pos, light.pos)) + eps;
-    return atanf(light.radius / d);
+    return fminf(PI/2.0f,asinf(light.radius / d));
 }
 
 __device__
@@ -187,6 +187,11 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             albedo_buffer_written++;
         }
 
+        #ifdef FIRST_LIGHT_ONLY
+        const double max_result = fmaxf(result.r, fmaxf(result.g, result.b));
+        if (max_result > eps) break;
+        #endif
+
         const float specular = curand_uniform(random);
         const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
 
@@ -227,7 +232,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
                 normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
                 rotation_to_z);
 
-            float weight;
+            float weight = 1.0f;
 
             const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
             vec3 H_local;
@@ -241,7 +246,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
 
                 weight = 2.0f * light_angle * device_scene.lights_length;
             } else {
-                if (alpha == 0.0f) {
+                if (alpha < eps) {
                     H_local.x = 0.0f;
                     H_local.y = 0.0f;
                     H_local.z = 1.0f;
@@ -249,7 +254,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
                     H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
                 }
 
-                weight = ((S_local.z >= 0.0f) ? 2.0f : 1.0f);
+                if (S_local.z >= 0.0f) weight = 2.0f;
             }
 
             const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
@@ -267,7 +272,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
 
             const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
 
-            weight *= 2.0f * Smith_G2_over_G1_height_correlated(alpha, alpha * alpha, NdotR, NdotV) / specular_probability;
+            const float milchs_energy_recovery = lerp(1.0f, 1.51f + 1.51f * NdotV, roughness);
+
+            weight *= milchs_energy_recovery * Smith_G2_over_G1_height_correlated(alpha * alpha, NdotR, NdotV) / specular_probability;
 
             record.r *= F.x * weight;
             record.g *= F.y * weight;
@@ -275,13 +282,12 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         }
         else
         {
-            float weight;
+            float weight = 1.0f;
 
-            const float alpha = acosf(curand_uniform(random));
-            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+            const float alpha = acosf(sqrtf(curand_uniform(random)));
+            const float gamma = 2.0f * PI * curand_uniform(random);
 
             ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
-
             const float light_feasible = dot_product(ray, normal);
 
             if (light_sample < 0.5f && light_feasible >= 0.0f) {
@@ -289,7 +295,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             } else {
                 ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
-                weight = ((light_feasible >= 0.0f) ? 2.0f : 1.0f);
+                if (light_feasible >=0.0f) weight = 2.0f;
             }
 
             vec3 H;
@@ -309,7 +315,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
             const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
 
-            weight *= 2.0f * FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
+            weight *= FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
 
             record.r *= albedo.r * weight;
             record.g *= albedo.g * weight;
@@ -370,7 +376,7 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
             RGBF color = trace_ray_iterative(device_scene.camera.pos, ray, &random, x + y * device_width);
 
             if (isnan(color.r) || isinf(color.r)) {
-                color.r = 0.0f;
+                color.r = 1.0f;
             }
             if (isnan(color.g) || isinf(color.g)) {
                 color.g = 0.0f;
