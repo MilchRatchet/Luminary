@@ -16,9 +16,9 @@
  * Setting PROBABILISTIC_CUTOFF >= CUTOFF will deactivate this option
  */
  #define WEIGHT_BASED_EXIT
- #define BRIGHTEST_EMISSION 20.0f
+ #define BRIGHTEST_EMISSION 40.0f
  #define CUTOFF ((1.0f)/(BRIGHTEST_EMISSION * 255.0f))
- #define PROBABILISTIC_CUTOFF ((1.0f)/(255.0f))
+ #define PROBABILISTIC_CUTOFF ((1.0f)/(2.0f * BRIGHTEST_EMISSION * 255.0f))
 
  /*
   * Define LOW_QUALITY_LONG_BOUNCES for the following to apply

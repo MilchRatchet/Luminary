@@ -144,32 +144,58 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
 
         const int texture_object = __float_as_int(t7.w);
 
-        const float4 albedo_f = tex2D<float4>(device_albedo_atlas[device_texture_assignments[texture_object].albedo_map], tex_coords.u, 1.0f - tex_coords.v);
-        const float4 illumiance_f = tex2D<float4>(device_illuminance_atlas[device_texture_assignments[texture_object].illuminance_map], tex_coords.u, 1.0f - tex_coords.v);
-        const float4 material_f = tex2D<float4>(device_material_atlas[device_texture_assignments[texture_object].material_map], tex_coords.u, 1.0f - tex_coords.v);
+        const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
+
+        float roughness;
+        float metallic;
+        float intensity;
+
+        if (maps.z) {
+            const float4 material_f = tex2D<float4>(device_material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
+
+            roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
+            metallic = material_f.y;
+            intensity = material_f.z * 255.0f;
+        } else {
+            roughness = 0.81f;
+            metallic = 0.0f;
+            intensity = 1.0f;
+        }
+
+        if (maps.y) {
+            const float4 illumiance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
+
+            RGBF emission;
+            emission.r = illumiance_f.x;
+            emission.g = illumiance_f.y;
+            emission.b = illumiance_f.z;
+
+            result.r += emission.r * intensity * record.r;
+            result.g += emission.g * intensity * record.g;
+            result.b += emission.b * intensity * record.b;
+
+            #ifdef FIRST_LIGHT_ONLY
+            const double max_result = fmaxf(result.r, fmaxf(result.g, result.b));
+            if (max_result > eps) break;
+            #endif
+        }
 
         RGBAF albedo;
-        albedo.r = albedo_f.x;
-        albedo.g = albedo_f.y;
-        albedo.b = albedo_f.z;
-        albedo.a = albedo_f.w;
 
-        RGBF emission;
-        emission.r = illumiance_f.x;
-        emission.g = illumiance_f.y;
-        emission.b = illumiance_f.z;
+        if (maps.x) {
+            const float4 albedo_f = tex2D<float4>(device_albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
+            albedo.r = albedo_f.x;
+            albedo.g = albedo_f.y;
+            albedo.b = albedo_f.z;
+            albedo.a = albedo_f.w;
+        } else {
+            albedo.r = 0.9f;
+            albedo.g = 0.9f;
+            albedo.b = 0.9f;
+            albedo.a = 1.0f;
+        }
 
-        const float roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
-        const float metallic = material_f.y;
-        const float intensity = material_f.z * 255.0f;
-
-        result.r += emission.r * intensity * record.r;
-        result.g += emission.g * intensity * record.g;
-        result.b += emission.b * intensity * record.b;
-
-        const float transparent_pass = curand_uniform(random);
-
-        if (transparent_pass > albedo.a) {
+        if (curand_uniform(random) > albedo.a) {
             origin.x = curr.x + 2.0f * eps * ray.x;
             origin.y = curr.y + 2.0f * eps * ray.y;
             origin.z = curr.z + 2.0f * eps * ray.z;
@@ -186,11 +212,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
 
             albedo_buffer_written++;
         }
-
-        #ifdef FIRST_LIGHT_ONLY
-        const double max_result = fmaxf(result.r, fmaxf(result.g, result.b));
-        if (max_result > eps) break;
-        #endif
 
         const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
 
