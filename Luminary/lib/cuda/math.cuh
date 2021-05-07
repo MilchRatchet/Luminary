@@ -146,12 +146,7 @@ vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const
 
 __device__
 int trailing_zeros(const unsigned int n) {
-    int mask = 1;
-    for (int i = 0; i < 32; i++, mask <<= 1)
-        if ((n & mask) != 0)
-            return i;
-
-    return 32;
+    return __clz(__brev(n));
 }
 
 __device__
