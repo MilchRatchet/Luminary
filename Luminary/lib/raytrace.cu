@@ -255,34 +255,38 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
 
             const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
-            const vec3 S_local = rotate_vector_by_quaternion(
-                normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
-                rotation_to_z);
+
 
             float weight = 1.0f;
 
             const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
             vec3 H_local;
 
-            if (light_sample < 0.5f && S_local.z > 0.0f) {
-                H_local.x = S_local.x + V_local.x;
-                H_local.y = S_local.y + V_local.y;
-                H_local.z = S_local.z + V_local.z;
-
-                H_local = normalize_vector(H_local);
-
-                weight = 2.0f * light_angle * device_scene.lights_length;
+            if (alpha < eps) {
+                H_local.x = 0.0f;
+                H_local.y = 0.0f;
+                H_local.z = 1.0f;
             } else {
-                if (alpha < eps) {
-                    H_local.x = 0.0f;
-                    H_local.y = 0.0f;
-                    H_local.z = 1.0f;
+                const vec3 S_local = rotate_vector_by_quaternion(
+                    normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
+                    rotation_to_z);
+
+                if (light_sample < 0.5f && S_local.z > 0.0f) {
+                    H_local.x = S_local.x + V_local.x;
+                    H_local.y = S_local.y + V_local.y;
+                    H_local.z = S_local.z + V_local.z;
+
+                    H_local = normalize_vector(H_local);
+
+                    weight = 2.0f * light_angle * device_scene.lights_length;
                 } else {
                     H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
-                }
 
-                if (S_local.z > 0.0f) weight = 2.0f;
+                    if (S_local.z > 0.0f) weight = 2.0f;
+                }
             }
+
+
 
             const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
 
@@ -352,14 +356,14 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         #ifdef WEIGHT_BASED_EXIT
         const double max_record = fmaxf(record.r, fmaxf(record.g, record.b));
         if (max_record < CUTOFF ||
-        (max_record < PROBABILISTIC_CUTOFF && curand_uniform(random) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
+        (max_record < PROBABILISTIC_CUTOFF && curand_uniform(&device_random) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
         {
             break;
         }
         #endif
 
         #ifdef LOW_QUALITY_LONG_BOUNCES
-        if (reflection_number >= MIN_BOUNCES && curand_uniform(random) < 1.0f/device_reflection_depth) break;
+        if (reflection_number >= MIN_BOUNCES && curand_uniform(&device_random) < 1.0f/device_reflection_depth) break;
         #endif
     }
 
@@ -442,25 +446,34 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
 
 __global__
 void set_up_raytracing_device() {
-    device_amount = device_width * device_height;
+    curand_init(0,0,0,&device_random);
+}
 
-    device_step = 2.0f * (device_scene.camera.fov / device_width);
+static void update_sun(const Scene scene) {
+    vec3 sun;
+    sun.x = sinf(scene.azimuth) * cosf(scene.altitude);
+    sun.y = sinf(scene.altitude);
+    sun.z = cosf(scene.azimuth) * cosf(scene.altitude);
+    sun = normalize_vector(sun);
 
-    device_vfov = device_step * device_height / 2.0f;
+    gpuErrchk(cudaMemcpyToSymbol(device_sun, &(sun), sizeof(vec3), 0, cudaMemcpyHostToDevice));
 
-    device_offset_x = (device_step / 2.0f);
-    device_offset_y = (device_step / 2.0f);
+    const vec3 light_source_sun = scale_vector(sun, 149630000000.0f);
 
-    float alpha = device_scene.camera.rotation.x;
-    float beta = device_scene.camera.rotation.y;
-    float gamma = device_scene.camera.rotation.z;
+    gpuErrchk(cudaMemcpy(scene.lights, &light_source_sun, sizeof(vec3), cudaMemcpyHostToDevice));
+}
 
-    double cy = __cosf(gamma * 0.5);
-    double sy = __sinf(gamma * 0.5);
-    double cp = __cosf(beta * 0.5);
-    double sp = __sinf(beta * 0.5);
-    double cr = __cosf(alpha * 0.5);
-    double sr = __sinf(alpha * 0.5);
+static void update_camera_pos(const Scene scene) {
+    const float alpha = scene.camera.rotation.x;
+    const float beta = scene.camera.rotation.y;
+    const float gamma = scene.camera.rotation.z;
+
+    const float cy = cosf(gamma * 0.5f);
+    const float sy = sinf(gamma * 0.5f);
+    const float cp = cosf(beta * 0.5f);
+    const float sp = sinf(beta * 0.5f);
+    const float cr = cosf(alpha * 0.5f);
+    const float sr = sinf(alpha * 0.5f);
 
     Quaternion q;
     q.w = cr * cp * cy + sr * sp * sy;
@@ -468,30 +481,27 @@ void set_up_raytracing_device() {
     q.y = cr * sp * cy + sr * cp * sy;
     q.z = cr * cp * sy - sr * sp * cy;
 
-    device_camera_rotation = q;
-
-    device_camera_space = inverse_quaternion(q);
-
-    curand_init(0,0,0,&device_random);
-
-    device_sun.x = sinf(device_scene.azimuth) * cosf(device_scene.altitude);
-    device_sun.y = sinf(device_scene.altitude);
-    device_sun.z = cosf(device_scene.azimuth) * cosf(device_scene.altitude);
-    device_sun = normalize_vector(device_sun);
-
-    device_scene.lights[0].pos = scale_vector(device_sun, 149630000000.0f);
+    gpuErrchk(cudaMemcpyToSymbol(device_camera_rotation, &(q), sizeof(Quaternion), 0, cudaMemcpyHostToDevice));
 }
-
 
 extern "C" raytrace_instance* init_raytracing(
     const unsigned int width, const unsigned int height, const int reflection_depth,
     const int diffuse_samples, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
     int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene, int denoiser) {
+
     raytrace_instance* instance = (raytrace_instance*)malloc(sizeof(raytrace_instance));
 
     instance->width = width;
     instance->height = height;
     instance->frame_buffer = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
+
+    const unsigned int amount = width * height;
+    const float step = 2.0f * (scene.camera.fov / width);
+    const float vfov = step * height / 2.0f;
+    const float offset_x = (step / 2.0f);
+    const float offset_y = (step / 2.0f);
+
+    set_up_raytracing_device<<<1,1>>>();
 
     gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height));
 
@@ -531,6 +541,11 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMemcpyToSymbol(device_albedo_atlas, &(instance->albedo_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_illuminance_atlas, &(instance->illuminance_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(instance->material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_amount, &(amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_step, &(step), sizeof(float), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_vfov, &(vfov), sizeof(float), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_offset_x, &(offset_x), sizeof(float), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_offset_y, &(offset_y), sizeof(float), 0, cudaMemcpyHostToDevice));
 
     instance->denoiser = denoiser;
 
@@ -539,7 +554,6 @@ extern "C" raytrace_instance* init_raytracing(
         gpuErrchk(cudaMemcpyToSymbol(device_albedo_buffer, &(instance->albedo_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
     }
-
 
     return instance;
 }
@@ -631,7 +645,8 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     set_up_raytracing_device<<<1,1>>>();
 
-    gpuErrchk(cudaDeviceSynchronize());
+    update_sun(instance->scene_gpu);
+    update_camera_pos(instance->scene_gpu);
 
     clock_t t = clock();
 
@@ -766,6 +781,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
         const float ratio = 1.0f/((float)instance->width * (float)instance->height);
         while (cudaEventQuery(kernelFinished) != cudaSuccess) {
             std::this_thread::sleep_for(std::chrono::microseconds(100000));
+            gpuErrchk(cudaPeekAtLastError());
             uint32_t new_progress = *progress_cpu;
             if (new_progress > progress) {
                 progress = new_progress;

@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <immintrin.h>
 
-static const int samples_in_space    = 500;
+static const int samples_in_space    = 250;
 static const int threshold_triangles = 4;
 
 struct vec3_p {
@@ -29,7 +29,8 @@ struct bvh_triangle {
 } typedef bvh_triangle;
 
 static void fit_bounds(
-  const bvh_triangle* triangles, const int triangles_length, vec3_p* high_out, vec3_p* low_out) {
+  const bvh_triangle* triangles, const int triangles_length, vec3_p* high_out, vec3_p* low_out,
+  vec3_p* high_out_inner, vec3_p* low_out_inner) {
   __m256 high   = _mm256_set1_ps(-FLT_MAX);
   __m256 low    = _mm256_set1_ps(FLT_MAX);
   __m128 high_a = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
@@ -54,17 +55,31 @@ static void fit_bounds(
   __m128 high_b = _mm256_castps256_ps128(high);
   high          = _mm256_permute2f128_ps(high, high, 0b00000001);
   __m128 high_c = _mm256_castps256_ps128(high);
-  high_a        = _mm_max_ps(high_a, high_b);
-  high_a        = _mm_max_ps(high_a, high_c);
+
+  __m128 high_inner = _mm_min_ps(high_a, high_b);
+  high_inner        = _mm_min_ps(high_inner, high_c);
+
+  high_a = _mm_max_ps(high_a, high_b);
+  high_a = _mm_max_ps(high_a, high_c);
 
   __m128 low_b = _mm256_castps256_ps128(low);
   low          = _mm256_permute2f128_ps(low, low, 0b00000001);
   __m128 low_c = _mm256_castps256_ps128(low);
-  low_a        = _mm_min_ps(low_a, low_b);
-  low_a        = _mm_min_ps(low_a, low_c);
 
-  _mm_storeu_ps((float*) high_out, high_a);
-  _mm_storeu_ps((float*) low_out, low_a);
+  __m128 low_inner = _mm_max_ps(low_a, low_b);
+  low_inner        = _mm_max_ps(low_inner, low_c);
+
+  low_a = _mm_min_ps(low_a, low_b);
+  low_a = _mm_min_ps(low_a, low_c);
+
+  if (high_out)
+    _mm_storeu_ps((float*) high_out, high_a);
+  if (low_out)
+    _mm_storeu_ps((float*) low_out, low_a);
+  if (high_out_inner)
+    _mm_storeu_ps((float*) high_out_inner, high_inner);
+  if (low_out_inner)
+    _mm_storeu_ps((float*) low_out_inner, low_inner);
 }
 
 static void divide_along_x_axis(
@@ -269,7 +284,11 @@ Node* build_bvh_structure(
         continue;
       }
 
-      fit_bounds(bvh_triangles + node.triangles_address, node.triangle_count, &high, &low);
+      vec3_p high_inner, low_inner;
+
+      fit_bounds(
+        bvh_triangles + node.triangles_address, node.triangle_count, &high, &low, &high_inner,
+        &low_inner);
 
       node.ex = (int8_t) ceil(log2f((high.x - low.x) * compression_divisor));
       node.ey = (int8_t) ceil(log2f((high.y - low.y) * compression_divisor));
@@ -290,17 +309,20 @@ Node* build_bvh_structure(
 
       for (int a = 0; a < 3; a++) {
         if (a == 0) {
-          search_start = low.x;
-          search_end   = high.x;
+          search_start = low_inner.x;
+          search_end   = high_inner.x;
         }
         else if (a == 1) {
-          search_start = low.y;
-          search_end   = high.y;
+          search_start = low_inner.y;
+          search_end   = high_inner.y;
         }
         else {
-          search_start = low.z;
-          search_end   = high.z;
+          search_start = low_inner.z;
+          search_end   = high_inner.z;
         }
+
+        if (search_end < search_start)
+          continue;
 
         const float search_interval = (search_end - search_start) / samples_in_space;
 
@@ -340,8 +362,10 @@ Node* build_bvh_structure(
           total_left += left;
           total_right -= left;
 
-          fit_bounds(new_triangles + triangles_ptr, total_left, &high_left, &low_left);
-          fit_bounds(container, total_right, &high_right, &low_right);
+          fit_bounds(
+            new_triangles + triangles_ptr, total_left, &high_left, &low_left, (vec3_p*) 0,
+            (vec3_p*) 0);
+          fit_bounds(container, total_right, &high_right, &low_right, (vec3_p*) 0, (vec3_p*) 0);
 
           vec3 diff_left = {
             .x = high_left.x - low_left.x,
@@ -404,7 +428,7 @@ Node* build_bvh_structure(
 
       compressed_vec3 compressed_low, compressed_high;
 
-      fit_bounds(new_triangles + triangles_ptr, left, &high, &low);
+      fit_bounds(new_triangles + triangles_ptr, left, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
 
       compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
       compressed_low.y = (uint8_t) floor((low.y - node.p.y) * compression_y);
@@ -425,7 +449,7 @@ Node* build_bvh_structure(
 
       memcpy(new_triangles + triangles_ptr, bvh_triangles, right * sizeof(bvh_triangle));
 
-      fit_bounds(new_triangles + triangles_ptr, right, &high, &low);
+      fit_bounds(new_triangles + triangles_ptr, right, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
 
       compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
       compressed_low.y = (uint8_t) floor((low.y - node.p.y) * compression_y);

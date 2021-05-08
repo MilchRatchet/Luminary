@@ -13,17 +13,19 @@ struct traversal_result {
 } typedef traversal_result;
 
 __device__
-int bvh_ray_box_intersect(const vec3 low, const vec3 high, const vec3 inv_ray, const vec3 pso, const float depth, float& out_dist)
+int bvh_ray_box_intersect(const unsigned char lx, const unsigned char ly, const unsigned char lz,
+                          const unsigned char hx, const unsigned char hy, const unsigned char hz,
+                          const vec3 scaled_inv_ray, const vec3 shifted_origin, const float depth, float& out_dist)
 {
     vec3 lo;
-    lo.x = low.x * inv_ray.x - pso.x;
-    lo.y = low.y * inv_ray.y - pso.y;
-    lo.z = low.z * inv_ray.z - pso.z;
+    lo.x = (float)lx * scaled_inv_ray.x + shifted_origin.x;
+    lo.y = (float)ly * scaled_inv_ray.y + shifted_origin.y;
+    lo.z = (float)lz * scaled_inv_ray.z + shifted_origin.z;
 
     vec3 hi;
-    hi.x = high.x * inv_ray.x - pso.x;
-    hi.y = high.y * inv_ray.y - pso.y;
-    hi.z = high.z * inv_ray.z - pso.z;
+    hi.x = (float)hx * scaled_inv_ray.x + shifted_origin.x;
+    hi.y = (float)hy * scaled_inv_ray.y + shifted_origin.y;
+    hi.z = (float)hz * scaled_inv_ray.z + shifted_origin.z;
 
 	const float slab_min = max7(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, eps);
 	const float slab_max = min7(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, depth);
@@ -108,11 +110,6 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
     inv_ray.y = 1.0f / (fabsf(ray.y) > eps ? ray.y : copysignf(eps, ray.y));
     inv_ray.z = 1.0f / (fabsf(ray.z) > eps ? ray.z : copysignf(eps, ray.z));
 
-    vec3 pso;
-    pso.x = origin.x * inv_ray.x;
-    pso.y = origin.y * inv_ray.y;
-    pso.z = origin.z * inv_ray.z;
-
     int node_address = 0;
     int node_key = 1;
     int bit_trail = 0;
@@ -125,18 +122,21 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
 
             if (get_8bit(data.x, 24)) break;
 
-            const float decompression_x = exp2f((float)((char)get_8bit(data.x, 0)));
-            const float decompression_y = exp2f((float)((char)get_8bit(data.x, 8)));
-            const float decompression_z = exp2f((float)((char)get_8bit(data.x, 16)));
+            vec3 scaled_inv_ray;
+            scaled_inv_ray.x = uint_as_float(((int)(*((char*)&data.x + 0)) + 127) << 23) * inv_ray.x;
+            scaled_inv_ray.y = uint_as_float(((int)(*((char*)&data.x + 1)) + 127) << 23) * inv_ray.y;
+            scaled_inv_ray.z = uint_as_float(((int)(*((char*)&data.x + 2)) + 127) << 23) * inv_ray.z;
 
-            const vec3 left_low = bvh_decompress_vector(get_8bit(data.y, 0), get_8bit(data.y, 8), get_8bit(data.y, 16), p, decompression_x, decompression_y, decompression_z);
-            const vec3 left_high = bvh_decompress_vector(get_8bit(data.y, 24), get_8bit(data.z, 0), get_8bit(data.z, 8), p, decompression_x, decompression_y, decompression_z);
-            const vec3 right_low = bvh_decompress_vector(get_8bit(data.z, 16), get_8bit(data.z, 24), get_8bit(data.w, 0), p, decompression_x, decompression_y, decompression_z);
-            const vec3 right_high = bvh_decompress_vector(get_8bit(data.w, 8), get_8bit(data.w, 16), get_8bit(data.w, 24), p, decompression_x, decompression_y, decompression_z);
+            vec3 shifted_origin;
+            shifted_origin.x = (p.x - origin.x) * inv_ray.x;
+            shifted_origin.y = (p.y - origin.y) * inv_ray.y;
+            shifted_origin.z = (p.z - origin.z) * inv_ray.z;
 
             float L,R;
-            const int L_hit = bvh_ray_box_intersect(left_low, left_high, inv_ray, pso, depth, L);
-            const int R_hit = bvh_ray_box_intersect(right_low, right_high, inv_ray, pso, depth, R);
+            const int L_hit = bvh_ray_box_intersect(get_8bit(data.y, 0), get_8bit(data.y, 8), get_8bit(data.y, 16),
+              get_8bit(data.y, 24), get_8bit(data.z, 0), get_8bit(data.z, 8), scaled_inv_ray, shifted_origin, depth, L);
+            const int R_hit = bvh_ray_box_intersect(get_8bit(data.z, 16), get_8bit(data.z, 24), get_8bit(data.w, 0),
+              get_8bit(data.w, 8), get_8bit(data.w, 16), get_8bit(data.w, 24), scaled_inv_ray, shifted_origin, depth, R);
 
             if (__builtin_expect(L_hit || R_hit, 1)) {
                 node_key = node_key << 1;

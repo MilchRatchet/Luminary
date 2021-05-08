@@ -57,31 +57,28 @@ RGBF* device_denoiser;
 __constant__
 RGBF* device_albedo_buffer;
 
-__device__
-Quaternion device_camera_space;
-
 __constant__
 unsigned int device_width;
 
 __constant__
 unsigned int device_height;
 
-__device__
+__constant__
 unsigned int device_amount;
 
-__device__
+__constant__
 float device_step;
 
-__device__
+__constant__
 float device_vfov;
 
-__device__
+__constant__
 float device_offset_x;
 
-__device__
+__constant__
 float device_offset_y;
 
-__device__
+__constant__
 Quaternion device_camera_rotation;
 
 __device__
@@ -99,7 +96,7 @@ cudaTextureObject_t* device_material_atlas;
 __constant__
 texture_assignment* device_texture_assignments;
 
-__device__
+__constant__
 vec3 device_sun;
 
 

@@ -51,7 +51,7 @@ vec3 reflect_vector(const vec3 v, const vec3 n) {
     return result;
 }
 
-__device__
+__device__ __host__
 vec3 scale_vector(vec3 vector, const float scale) {
     vector.x *= scale;
     vector.y *= scale;
@@ -60,12 +60,12 @@ vec3 scale_vector(vec3 vector, const float scale) {
     return vector;
 }
 
-__device__
+__device__ __host__
 float get_length(const vec3 vector) {
     return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
 }
 
-__device__
+__device__ __host__
 vec3 normalize_vector(vec3 vector) {
     const float inv_length = 1.0f / get_length(vector);
 
