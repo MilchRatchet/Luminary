@@ -57,7 +57,7 @@ static vec3 normalize_vector(vec3 vector) {
 Scene load_scene(const char* filename, raytrace_instance** instance, char** output_name) {
   FILE* file = fopen(filename, "rb");
 
-  assert(file, "Scene file could not be opened", 1);
+  assert((unsigned long long) file, "Scene file could not be opened", 1);
 
   char* line = (char*) malloc(LINE_SIZE);
 
@@ -145,8 +145,11 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   unsigned int triangle_count = convert_wavefront_content(&triangles, content);
 
   int nodes_length;
+  int* addresses;
+  int addresses_length;
 
-  Node* nodes = build_bvh_structure(&triangles, triangle_count, bvh_depth, &nodes_length);
+  Node* nodes = build_bvh_structure(
+    &triangles, triangle_count, bvh_depth, &nodes_length, &addresses, &addresses_length);
 
   Traversal_Triangle* traversal_triangles = malloc(sizeof(Traversal_Triangle) * triangle_count);
 
@@ -173,14 +176,16 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
     triangles[i]           = triangle;
   }
 
-  scene.triangles           = triangles;
-  scene.traversal_triangles = traversal_triangles;
-  scene.triangles_length    = triangle_count;
-  scene.nodes               = nodes;
-  scene.nodes_length        = nodes_length;
-  scene.materials_length    = content.materials_length;
-  scene.texture_assignments = get_texture_assignments(content);
-  scene.far_clip_distance   = clip_distance;
+  scene.triangles             = triangles;
+  scene.traversal_triangles   = traversal_triangles;
+  scene.triangles_length      = triangle_count;
+  scene.nodes                 = nodes;
+  scene.nodes_length          = nodes_length;
+  scene.node_addresses        = addresses;
+  scene.node_addresses_length = addresses_length;
+  scene.materials_length      = content.materials_length;
+  scene.texture_assignments   = get_texture_assignments(content);
+  scene.far_clip_distance     = clip_distance;
 
   scene.altitude     = altitude;
   scene.azimuth      = azimuth;

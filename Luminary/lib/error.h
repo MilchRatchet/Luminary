@@ -9,8 +9,9 @@
   { ___assert((ans), (message), __FILE__, __LINE__, (_abort)); }
 
 inline void ___assert(
-  const int value, const char* message, const char* file, const int line, const int abort) {
-  if (value == 0) {
+  const unsigned long long value, const char* message, const char* file, const int line,
+  const int abort) {
+  if (!value) {
     fprintf(stderr, "Assertion failed!\nFile: %s\nLine: %d\nMessage: %s\n", file, line, message);
     if (abort) {
       puts("Press enter to close...");
@@ -29,11 +30,11 @@ inline void ___error(const char* message, const char* file, const int line) {
 
 #define safe_realloc(ptr, size) ___s_realloc((ptr), (size));
 
-inline void* ___s_realloc(const void* ptr, const size_t size) {
+inline void* ___s_realloc(void* ptr, const size_t size) {
   if (size == 0)
     return (void*) 0;
   void* new_ptr = realloc(ptr, size);
-  assert((int) new_ptr, "Reallocation failed!", 1);
+  assert((unsigned long long) new_ptr, "Reallocation failed!", 1);
   return new_ptr;
 }
 

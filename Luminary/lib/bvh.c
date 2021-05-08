@@ -9,9 +9,8 @@
 #include <stdio.h>
 #include <immintrin.h>
 
-static const int samples_in_space    = 25;
-static const int space_extension     = 2;
-static const int threshold_triangles = 8;
+static const int samples_in_space    = 500;
+static const int threshold_triangles = 4;
 
 struct vec3_p {
   float x;
@@ -30,16 +29,11 @@ struct bvh_triangle {
 } typedef bvh_triangle;
 
 static void fit_bounds(
-  const bvh_triangle* triangles, const int triangles_length, vec3_p* high_out, vec3_p* low_out,
-  vec3_p* average_out) {
-  __m256 high             = _mm256_set1_ps(-FLT_MAX);
-  __m256 low              = _mm256_set1_ps(FLT_MAX);
-  __m256 average          = _mm256_set1_ps(0.0f);
-  __m256 one_over_three   = _mm256_set1_ps(1.0f / 3.0f);
-  __m128 high_a           = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
-  __m128 low_a            = _mm_setr_ps(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
-  __m128 average_a        = _mm_setr_ps(0.0f, 0.0f, 0.0f, 0.0f);
-  __m128 one_over_three_a = _mm_setr_ps(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f);
+  const bvh_triangle* triangles, const int triangles_length, vec3_p* high_out, vec3_p* low_out) {
+  __m256 high   = _mm256_set1_ps(-FLT_MAX);
+  __m256 low    = _mm256_set1_ps(FLT_MAX);
+  __m128 high_a = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
+  __m128 low_a  = _mm_setr_ps(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
 
   for (unsigned int i = 0; i < triangles_length; i++) {
     const float* baseptr = (float*) (triangles + i);
@@ -51,12 +45,10 @@ static void fit_bounds(
     a_ext        = _mm256_insertf128_ps(a_ext, a, 0b1);
     bc           = _mm256_add_ps(a_ext, bc);
 
-    high      = _mm256_max_ps(bc, high);
-    low       = _mm256_min_ps(bc, low);
-    average   = _mm256_fmadd_ps(bc, one_over_three, average);
-    high_a    = _mm_max_ps(a, high_a);
-    low_a     = _mm_min_ps(a, low_a);
-    average_a = _mm_fmadd_ps(a, one_over_three_a, average_a);
+    high   = _mm256_max_ps(bc, high);
+    low    = _mm256_min_ps(bc, low);
+    high_a = _mm_max_ps(a, high_a);
+    low_a  = _mm_min_ps(a, low_a);
   }
 
   __m128 high_b = _mm256_castps256_ps128(high);
@@ -71,18 +63,8 @@ static void fit_bounds(
   low_a        = _mm_min_ps(low_a, low_b);
   low_a        = _mm_min_ps(low_a, low_c);
 
-  __m128 average_b = _mm256_castps256_ps128(average);
-  average          = _mm256_permute2f128_ps(average, average, 0b00000001);
-  __m128 average_c = _mm256_castps256_ps128(average);
-  average_a        = _mm_add_ps(average_a, average_b);
-  average_a        = _mm_add_ps(average_a, average_c);
-
-  const float divisor = 1.0f / (triangles_length);
-  average_a           = _mm_mul_ps(average_a, _mm_setr_ps(divisor, divisor, divisor, divisor));
-
   _mm_storeu_ps((float*) high_out, high_a);
   _mm_storeu_ps((float*) low_out, low_a);
-  _mm_storeu_ps((float*) average_out, average_a);
 }
 
 static void divide_along_x_axis(
@@ -207,7 +189,7 @@ static void divide_along_z_axis(
 
 Node* build_bvh_structure(
   Triangle** triangles_io, unsigned int triangles_length, const int max_depth,
-  int* nodes_length_out) {
+  int* nodes_length_out, int** addresses_out, int* address_length_out) {
   Triangle* triangles = *triangles_io;
   int pow             = 2;
   int node_count      = 1;
@@ -219,12 +201,13 @@ Node* build_bvh_structure(
 
   Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
 
-  assert((int) nodes, "Failed to allocate BVH nodes!", 1);
+  assert((unsigned long long) nodes, "Failed to allocate BVH nodes!", 1);
 
   memset(nodes, 0, sizeof(Node) * node_count);
 
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = triangles_length;
+  nodes[0].leaf_node         = 1;
 
   bvh_triangle* bvh_triangles = _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
 
@@ -252,17 +235,41 @@ Node* build_bvh_structure(
       (bvh_triangle*) _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
 
     for (int j = 0; j < nodes_at_depth; j++) {
-      vec3_p high, low, node_average, average;
+      vec3_p high, low;
       int left, right;
       Node node = nodes[node_ptr];
 
-      if (node.triangle_count == 0) {
+      if (node.leaf_node == 2) {
+        memcpy(
+          new_triangles + triangles_ptr, bvh_triangles + triangles_ptr,
+          sizeof(bvh_triangle) * node.triangle_count);
+        triangles_ptr += node.triangle_count;
+        nodes[2 * node_ptr + 1].leaf_node      = 2;
+        nodes[2 * node_ptr + 1].triangle_count = (i != max_depth - 1) ? node.triangle_count : -1;
+        nodes[2 * node_ptr + 2].leaf_node      = 2;
+        nodes[2 * node_ptr + 2].triangle_count = (i != max_depth - 1) ? 0 : -1;
+        node.triangle_count                    = -1;
+        nodes[node_ptr]                        = node;
+
         node_ptr++;
         continue;
       }
 
-      fit_bounds(
-        bvh_triangles + node.triangles_address, node.triangle_count, &high, &low, &node_average);
+      if (node.triangle_count > 0 && node.triangle_count <= threshold_triangles) {
+        memcpy(
+          new_triangles + triangles_ptr, bvh_triangles + triangles_ptr,
+          sizeof(bvh_triangle) * node.triangle_count);
+        triangles_ptr += node.triangle_count;
+        nodes[2 * node_ptr + 1].leaf_node      = 2;
+        nodes[2 * node_ptr + 1].triangle_count = node.triangle_count;
+        nodes[2 * node_ptr + 2].leaf_node      = 2;
+        nodes[2 * node_ptr + 2].triangle_count = 0;
+
+        node_ptr++;
+        continue;
+      }
+
+      fit_bounds(bvh_triangles + node.triangles_address, node.triangle_count, &high, &low);
 
       node.ex = (int8_t) ceil(log2f((high.x - low.x) * compression_divisor));
       node.ey = (int8_t) ceil(log2f((high.y - low.y) * compression_divisor));
@@ -276,35 +283,33 @@ Node* build_bvh_structure(
       const float compression_z = 1.0f / exp2f(node.ez);
 
       int axis;
-      float split_spatial, split_object;
+      float search_start, search_end;
       float optimal_split, optimal_cost;
 
       optimal_cost = FLT_MAX;
 
       for (int a = 0; a < 3; a++) {
         if (a == 0) {
-          split_spatial = (high.x + low.x) / 2.0f;
-          split_object  = node_average.x;
+          search_start = low.x;
+          search_end   = high.x;
         }
         else if (a == 1) {
-          split_spatial = (high.y + low.y) / 2.0f;
-          split_object  = node_average.y;
+          search_start = low.y;
+          search_end   = high.y;
         }
         else {
-          split_spatial = (high.z + low.z) / 2.0f;
-          split_object  = node_average.z;
+          search_start = low.z;
+          search_end   = high.z;
         }
 
-        const float search_interval = fabsf((split_object - split_spatial) / samples_in_space);
-        const float search_start    = min(split_object, split_spatial);
+        const float search_interval = (search_end - search_start) / samples_in_space;
 
         int total_right = node.triangle_count;
         memcpy(
           container, bvh_triangles + node.triangles_address, sizeof(bvh_triangle) * total_right);
         int total_left = 0;
 
-        for (int k = -space_extension * samples_in_space;
-             k <= (1 + space_extension) * samples_in_space; k++) {
+        for (int k = 0; k < samples_in_space; k++) {
           const float split = search_start + k * search_interval;
           vec3_p high_left, high_right, low_left, low_right;
 
@@ -324,11 +329,19 @@ Node* build_bvh_structure(
               container, total_right, i);
           }
 
+          if (left == 0) {
+            continue;
+          }
+
+          if (right == 0) {
+            break;
+          }
+
           total_left += left;
           total_right -= left;
 
-          fit_bounds(new_triangles + triangles_ptr, total_left, &high_left, &low_left, &average);
-          fit_bounds(container, total_right, &high_right, &low_right, &average);
+          fit_bounds(new_triangles + triangles_ptr, total_left, &high_left, &low_left);
+          fit_bounds(container, total_right, &high_right, &low_right);
 
           vec3 diff_left = {
             .x = high_left.x - low_left.x,
@@ -340,8 +353,11 @@ Node* build_bvh_structure(
             .y = high_right.y - low_right.y,
             .z = high_right.z - low_right.z};
 
-          const float cost_L = diff_left.x * diff_left.y * diff_left.z;
-          const float cost_R = diff_right.x * diff_right.y * diff_right.z;
+          const float cost_L =
+            diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
+
+          const float cost_R =
+            diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
 
           const float total_cost = cost_L * total_left + cost_R * total_right;
 
@@ -349,6 +365,9 @@ Node* build_bvh_structure(
             optimal_cost  = total_cost;
             optimal_split = split;
             axis          = a;
+          }
+          else {
+            k += samples_in_space / 10;
           }
         }
       }
@@ -369,9 +388,23 @@ Node* build_bvh_structure(
           bvh_triangles + node.triangles_address, node.triangle_count, i);
       }
 
+      if (left == 0 || right == 0) {
+        memcpy(
+          new_triangles + triangles_ptr, bvh_triangles + triangles_ptr,
+          sizeof(bvh_triangle) * node.triangle_count);
+        triangles_ptr += node.triangle_count;
+        nodes[2 * node_ptr + 1].leaf_node      = 2;
+        nodes[2 * node_ptr + 1].triangle_count = (i != max_depth - 1) ? node.triangle_count : -1;
+        nodes[2 * node_ptr + 2].leaf_node      = 2;
+        nodes[2 * node_ptr + 2].triangle_count = (i != max_depth - 1) ? 0 : -1;
+
+        node_ptr++;
+        continue;
+      }
+
       compressed_vec3 compressed_low, compressed_high;
 
-      fit_bounds(new_triangles + triangles_ptr, left, &high, &low, &average);
+      fit_bounds(new_triangles + triangles_ptr, left, &high, &low);
 
       compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
       compressed_low.y = (uint8_t) floor((low.y - node.p.y) * compression_y);
@@ -386,12 +419,13 @@ Node* build_bvh_structure(
 
       nodes[2 * node_ptr + 1].triangle_count    = left;
       nodes[2 * node_ptr + 1].triangles_address = triangles_ptr;
+      nodes[2 * node_ptr + 1].leaf_node         = 1;
 
       triangles_ptr += left;
 
       memcpy(new_triangles + triangles_ptr, bvh_triangles, right * sizeof(bvh_triangle));
 
-      fit_bounds(new_triangles + triangles_ptr, right, &high, &low, &average);
+      fit_bounds(new_triangles + triangles_ptr, right, &high, &low);
 
       compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
       compressed_low.y = (uint8_t) floor((low.y - node.p.y) * compression_y);
@@ -406,13 +440,13 @@ Node* build_bvh_structure(
 
       nodes[2 * node_ptr + 2].triangle_count    = right;
       nodes[2 * node_ptr + 2].triangles_address = triangles_ptr;
+      nodes[2 * node_ptr + 2].leaf_node         = 1;
 
       triangles_ptr += right;
 
-      if (node.triangle_count > threshold_triangles) {
-        node.triangle_count    = 0;
-        node.triangles_address = -1;
-      }
+      node.triangle_count    = 0;
+      node.triangles_address = -1;
+      node.leaf_node         = 0;
 
       nodes[node_ptr] = node;
 
@@ -426,7 +460,8 @@ Node* build_bvh_structure(
 
     nodes_at_depth *= 2;
 
-    printf("\r                             \rBVH depth %d/%d built.", i + 1, max_depth);
+    printf(
+      "\r                                              \rBVH depth %d/%d built.", i + 1, max_depth);
   }
 
   printf("\r                             \r");
@@ -438,12 +473,58 @@ Node* build_bvh_structure(
     triangles[i] = triangles_swap[bvh_triangles[i].id];
   }
 
+  free(triangles_swap);
+  _mm_free(bvh_triangles);
+
+  int* node_address_lookup = malloc(sizeof(int) * node_count);
+  memset(node_address_lookup, 0, sizeof(int) * node_count);
+  Node* culled_nodes = malloc(sizeof(Node) * node_count);
+  int culled_count   = 0;
+
+  for (int i = 0; i < node_count; i++) {
+    Node node = nodes[i];
+    if (node.leaf_node != 2) {
+      node.child_address         = 2 * i + 1;
+      node.uncle_address         = (((i + 1) >> 1) ^ 0b1) - 1;
+      node.grand_uncle_address   = (((i + 1) >> 2) ^ 0b1) - 1;
+      culled_nodes[culled_count] = node;
+      node_address_lookup[i]     = culled_count++;
+    }
+  }
+
+  free(nodes);
+  nodes = safe_realloc(culled_nodes, sizeof(Node) * culled_count);
+
+  for (int i = 0; i < culled_count; i++) {
+    Node node = nodes[i];
+    if (node.leaf_node == 0) {
+      node.child_address = node_address_lookup[node.child_address];
+    }
+    if (node.uncle_address > 0) {
+      node.uncle_address = node_address_lookup[node.uncle_address];
+    }
+    if (node.grand_uncle_address > 0) {
+      node.grand_uncle_address = node_address_lookup[node.grand_uncle_address];
+    }
+    nodes[i] = node;
+  }
+
+  pow               = 2;
+  int address_count = 1;
+
+  for (int i = 0; i < max_depth - 2; i++) {
+    address_count += pow;
+    pow *= 2;
+  }
+
+  node_address_lookup = safe_realloc(node_address_lookup, sizeof(int) * address_count);
+
+  *addresses_out      = node_address_lookup;
+  *address_length_out = address_count;
+
   *triangles_io = triangles;
 
-  *nodes_length_out = node_count;
-
-  _mm_free(bvh_triangles);
-  free(triangles_swap);
+  *nodes_length_out = culled_count;
 
   return nodes;
 }

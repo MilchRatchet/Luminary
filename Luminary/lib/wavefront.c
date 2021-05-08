@@ -124,7 +124,7 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
           safe_realloc(content.materials, sizeof(Wavefront_Material) * content.materials_length);
       }
       sscanf(line, "%*s %s\n", path);
-      size_t hash = hash_djb2(path);
+      size_t hash = hash_djb2((unsigned char*) path);
 
       content.materials[materials_count].hash                = hash;
       content.materials[materials_count].albedo_texture      = 0;
@@ -287,7 +287,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
       line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't'
       && line[5] == 'l') {
       sscanf(line, "%*s %s\n", path);
-      size_t hash      = hash_djb2(path);
+      size_t hash      = hash_djb2((unsigned char*) path);
       current_material = 0;
       for (int i = 1; i < materials_count; i++) {
         if (content.materials[i].hash == hash) {

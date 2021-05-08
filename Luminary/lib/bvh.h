@@ -13,22 +13,23 @@ struct compressed_vec3 {
 
 struct Node {
   vec3 p;
-  int32_t triangles_address;
+  int32_t child_address;
   int8_t ex;
   int8_t ey;
   int8_t ez;
-  int8_t _p;
+  int8_t leaf_node;
   compressed_vec3 left_low;
   compressed_vec3 left_high;
   compressed_vec3 right_low;
   compressed_vec3 right_high;
-  uint32_t triangle_count;
-  uint32_t _p1;
-  uint64_t _p2;
+  int32_t triangle_count;
+  int32_t triangles_address;
+  int32_t uncle_address;
+  int32_t grand_uncle_address;
 } typedef Node;
 
 Node* build_bvh_structure(
   Triangle** triangles_io, unsigned int triangles_length, const int max_depth,
-  int* nodes_length_out);
+  int* nodes_length_out, int** addresses_out, int* address_length_out);
 
 #endif /* BVH_H */

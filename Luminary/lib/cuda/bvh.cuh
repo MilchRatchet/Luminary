@@ -97,123 +97,122 @@ unsigned char get_8bit(const unsigned int input, const unsigned int bitshift) {
 
 __device__
 traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nodes, const Traversal_Triangle* triangles) {
-  float depth = device_scene.far_clip_distance;
+    float depth = device_scene.far_clip_distance;
 
-  unsigned int hit_id = 0xffffffff;
+    const int* node_addresses = device_scene.node_addresses;
 
-  vec3 inv_ray;
-  inv_ray.x = 1.0f / (fabsf(ray.x) > eps ? ray.x : copysignf(eps, ray.x));
-  inv_ray.y = 1.0f / (fabsf(ray.y) > eps ? ray.y : copysignf(eps, ray.y));
-  inv_ray.z = 1.0f / (fabsf(ray.z) > eps ? ray.z : copysignf(eps, ray.z));
+    unsigned int hit_id = 0xffffffff;
 
-  vec3 pso;
-  pso.x = origin.x * inv_ray.x;
-  pso.y = origin.y * inv_ray.y;
-  pso.z = origin.z * inv_ray.z;
+    vec3 inv_ray;
+    inv_ray.x = 1.0f / (fabsf(ray.x) > eps ? ray.x : copysignf(eps, ray.x));
+    inv_ray.y = 1.0f / (fabsf(ray.y) > eps ? ray.y : copysignf(eps, ray.y));
+    inv_ray.z = 1.0f / (fabsf(ray.z) > eps ? ray.z : copysignf(eps, ray.z));
 
-  int node_address = 0;
-  int node_key = 1;
-  int bit_trail = 0;
-  int mrpn_address = -1;
+    vec3 pso;
+    pso.x = origin.x * inv_ray.x;
+    pso.y = origin.y * inv_ray.y;
+    pso.z = origin.z * inv_ray.z;
 
-  while (node_address != -1) {
-      while (true) {
-          const float4 p = __ldg((float4*)((int*)(nodes + node_address)));
-          const uint4 data = __ldg((uint4*)(((int*)(nodes + node_address)) + 4));
+    int node_address = 0;
+    int node_key = 1;
+    int bit_trail = 0;
+    int mrpn_address = -1;
 
-          if (!signbit(p.w)) break;
+    while (node_address != -1) {
+        while (true) {
+            const float4 p = __ldg((float4*)((int*)(nodes + node_address)));
+            const uint4 data = __ldg((uint4*)(((int*)(nodes + node_address)) + 4));
 
-          const float decompression_x = exp2f((float)((char)get_8bit(data.x, 0)));
-          const float decompression_y = exp2f((float)((char)get_8bit(data.x, 8)));
-          const float decompression_z = exp2f((float)((char)get_8bit(data.x, 16)));
+            if (get_8bit(data.x, 24)) break;
 
-          const vec3 left_low = bvh_decompress_vector(get_8bit(data.y, 0), get_8bit(data.y, 8), get_8bit(data.y, 16), p, decompression_x, decompression_y, decompression_z);
-          const vec3 left_high = bvh_decompress_vector(get_8bit(data.y, 24), get_8bit(data.z, 0), get_8bit(data.z, 8), p, decompression_x, decompression_y, decompression_z);
-          const vec3 right_low = bvh_decompress_vector(get_8bit(data.z, 16), get_8bit(data.z, 24), get_8bit(data.w, 0), p, decompression_x, decompression_y, decompression_z);
-          const vec3 right_high = bvh_decompress_vector(get_8bit(data.w, 8), get_8bit(data.w, 16), get_8bit(data.w, 24), p, decompression_x, decompression_y, decompression_z);
+            const float decompression_x = exp2f((float)((char)get_8bit(data.x, 0)));
+            const float decompression_y = exp2f((float)((char)get_8bit(data.x, 8)));
+            const float decompression_z = exp2f((float)((char)get_8bit(data.x, 16)));
 
-          float L,R;
-          const int L_hit = bvh_ray_box_intersect(left_low, left_high, inv_ray, pso, depth, L);
-          const int R_hit = bvh_ray_box_intersect(right_low, right_high, inv_ray, pso, depth, R);
+            const vec3 left_low = bvh_decompress_vector(get_8bit(data.y, 0), get_8bit(data.y, 8), get_8bit(data.y, 16), p, decompression_x, decompression_y, decompression_z);
+            const vec3 left_high = bvh_decompress_vector(get_8bit(data.y, 24), get_8bit(data.z, 0), get_8bit(data.z, 8), p, decompression_x, decompression_y, decompression_z);
+            const vec3 right_low = bvh_decompress_vector(get_8bit(data.z, 16), get_8bit(data.z, 24), get_8bit(data.w, 0), p, decompression_x, decompression_y, decompression_z);
+            const vec3 right_high = bvh_decompress_vector(get_8bit(data.w, 8), get_8bit(data.w, 16), get_8bit(data.w, 24), p, decompression_x, decompression_y, decompression_z);
 
-          if (__builtin_expect(L_hit || R_hit, 1)) {
-              node_key = node_key << 1;
-              bit_trail = bit_trail << 1;
-              const int R_is_closest = (R_hit) && (R < L);
-              node_address *= 2;
+            float L,R;
+            const int L_hit = bvh_ray_box_intersect(left_low, left_high, inv_ray, pso, depth, L);
+            const int R_hit = bvh_ray_box_intersect(right_low, right_high, inv_ray, pso, depth, R);
 
-              if (!L_hit || R_is_closest) {
-                  node_address += 2;
-                  node_key = node_key ^ 0b1;
-              }
-              else {
-                  node_address += 1;
-              }
+            if (__builtin_expect(L_hit || R_hit, 1)) {
+                node_key = node_key << 1;
+                bit_trail = bit_trail << 1;
+                const int R_is_closest = (R_hit) && (R < L);
+                node_address = __float_as_int(p.w);
 
-              if (L_hit && R_hit) {
-                  bit_trail = bit_trail ^ 0b1;
-                  if (R_is_closest) {
-                      mrpn_address = node_address - 1;
-                  }
-                  else {
-                      mrpn_address = node_address + 1;
-                  }
-              }
-          } else {
-            if (bit_trail == 0) {
+                if (!L_hit || R_is_closest) {
+                    node_address += 1;
+                    node_key = node_key ^ 0b1;
+                }
+
+                if (L_hit && R_hit) {
+                    bit_trail = bit_trail ^ 0b1;
+                    if (R_is_closest) {
+                        mrpn_address = node_address - 1;
+                    }
+                    else {
+                        mrpn_address = node_address + 1;
+                    }
+                }
+            } else {
                 break;
             }
-            else {
-                const int num_levels = trailing_zeros(bit_trail);
-                bit_trail = (bit_trail >> num_levels) ^ 0b1;
-                node_key = (node_key >> num_levels) ^ 0b1;
-                if (mrpn_address != -1) {
-                    node_address = mrpn_address;
-                    mrpn_address = -1;
+        }
+
+        const int4 addresses = __ldg((int4*)(((int*)(nodes + node_address)) + 8));
+
+        const int triangle_count = addresses.x;
+        const int triangles_address = addresses.y;
+        const int uncle = addresses.z;
+        const int grand_uncle = addresses.w;
+
+        if (triangles_address != -1) {
+            for (int i = 0; i < triangle_count; i++) {
+                const float d = bvh_triangle_intersection((float4*)(triangles + triangles_address + i), origin, ray);
+
+                if (d < depth) {
+                    depth = d;
+                    hit_id = triangles_address + i;
                 }
-                else {
-                    node_address = node_key - 1;
-                }
-            }
-          }
-      }
-
-      const int triangles_address = __ldg(((int*)(nodes + node_address) + 3));
-
-      if (triangles_address != -1) {
-        const int triangles_count = __ldg(((int*)(nodes + node_address) + 8));
-        for (unsigned int i = 0; i < triangles_count; i++) {
-            const float d = bvh_triangle_intersection((float4*)(triangles + triangles_address + i), origin, ray);
-
-            if (d < depth) {
-                depth = d;
-                hit_id = triangles_address + i;
             }
         }
-      }
 
-      if (bit_trail == 0) {
-          break;
-      }
-      else {
-          const int num_levels = trailing_zeros(bit_trail);
-          bit_trail = (bit_trail >> num_levels) ^ 0b1;
-          node_key = (node_key >> num_levels) ^ 0b1;
-          if (mrpn_address != -1) {
-              node_address = mrpn_address;
-              mrpn_address = -1;
-          }
-          else {
-              node_address = node_key - 1;
-          }
-      }
-  }
+        if (mrpn_address == -1) {
+            if (bit_trail & 0b110) {
+                if (bit_trail & 0b10) {
+                    mrpn_address = uncle;
+                } else {
+                    mrpn_address = grand_uncle;
+                }
+            }
+        }
 
-  traversal_result result;
-  result.hit_id = hit_id;
-  result.depth = depth;
+        if (bit_trail == 0) {
+            break;
+        }
+        else {
+            const int num_levels = trailing_zeros(bit_trail);
+            bit_trail = (bit_trail >> num_levels) ^ 0b1;
+            node_key = (node_key >> num_levels) ^ 0b1;
+            if (mrpn_address != -1) {
+                node_address = mrpn_address;
+                mrpn_address = -1;
+            }
+            else {
+                node_address = __ldg(node_addresses + node_key - 1);
+            }
+        }
+    }
 
-  return result;
+    traversal_result result;
+    result.hit_id = hit_id;
+    result.depth = depth;
+
+    return result;
 }
 
 #endif /* CU_BVH_H */
