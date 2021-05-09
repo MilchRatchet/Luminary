@@ -15,28 +15,37 @@
  * Higher values provide much better performance at the cost of noisy/too dark areas
  * Setting PROBABILISTIC_CUTOFF >= CUTOFF will deactivate this option
  */
- #define WEIGHT_BASED_EXIT
- #define BRIGHTEST_EMISSION 40.0f
- #define CUTOFF ((1.0f)/(BRIGHTEST_EMISSION * 255.0f))
- #define PROBABILISTIC_CUTOFF ((1.0f)/(2.0f * BRIGHTEST_EMISSION * 255.0f))
+#define WEIGHT_BASED_EXIT
+#define BRIGHTEST_EMISSION 40.0f
+#define CUTOFF ((1.0f)/(BRIGHTEST_EMISSION * 255.0f))
+#define PROBABILISTIC_CUTOFF ((1.0f)/(0.5f * BRIGHTEST_EMISSION * 255.0f))
 
- /*
-  * Define LOW_QUALITY_LONG_BOUNCES for the following to apply
-  *
-  * After each bounce there is a 1/(max_depth) chance for the sample to exit early
-  * This provides much better performance at the cost of noisy indirectly lit areas
-  *
-  * MIN_BOUNCES controls the minimum amount of bounces that have to happen before this may happen
-  */
- //#define LOW_QUALITY_LONG_BOUNCES
- #define MIN_BOUNCES 1
+/*
+ * Define LOW_QUALITY_LONG_BOUNCES for the following to apply
+ *
+ * After each bounce there is a 1/(max_depth) chance for the sample to exit early
+ * This provides much better performance at the cost of noisy indirectly lit areas
+ *
+ * MIN_BOUNCES controls the minimum amount of bounces that have to happen before this may happen
+ */
+#define LOW_QUALITY_LONG_BOUNCES
+#define MIN_BOUNCES 1
 
 
-  /*
-  * Define FIRST_LIGHT_ONLY for the following to apply
-  *
-  * Samples exit early if some light data was already gathered
-  */
- #define FIRST_LIGHT_ONLY
+/*
+ * Define FIRST_LIGHT_ONLY for the following to apply
+ *
+ * Samples exit early if some light data was already gathered
+ */
+#define FIRST_LIGHT_ONLY
+
+/*
+ * Define LIGHTS_AT_NIGHT_ONLY for the following to apply
+ *
+ * Emissive textures are only active if the sun's y position is above NIGHT_THRESHOLD
+ */
+#define LIGHTS_AT_NIGHT_ONLY
+#define NIGHT_THRESHOLD 0.0f
+
 
 #endif /* CU_DIRECTIVES_H */

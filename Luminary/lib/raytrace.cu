@@ -163,6 +163,9 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         }
 
         if (maps.y) {
+            #ifdef LIGHTS_AT_NIGHT_ONLY
+            if (device_sun.y < NIGHT_THRESHOLD) {
+            #endif
             const float4 illumiance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
             RGBF emission;
@@ -177,6 +180,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             #ifdef FIRST_LIGHT_ONLY
             const double max_result = fmaxf(result.r, fmaxf(result.g, result.b));
             if (max_result > eps) break;
+            #endif
+
+            #ifdef LIGHTS_AT_NIGHT_ONLY
+            }
             #endif
         }
 
@@ -233,9 +240,15 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         const float light_sample = curand_uniform(random);
         float light_angle;
         vec3 light_source;
+        #ifdef LIGHTS_AT_NIGHT_ONLY
+        const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length : 1;
+        #else
+        const int light_count = device_scene.lights_length;
+        #endif
+
 
         if (light_sample < 0.5f) {
-            const uint32_t light = (uint32_t)(curand_uniform(random) * device_scene.lights_length);
+            const uint32_t light = (uint32_t)(curand_uniform(random) * light_count);
             const float4 light_data = __ldg((float4*)(device_scene.lights + light));
             vec3 light_pos;
             light_pos.x = light_data.x;
@@ -254,8 +267,6 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
             const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
-
-
 
             float weight = 1.0f;
 
@@ -278,15 +289,13 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
 
                     H_local = normalize_vector(H_local);
 
-                    weight = 2.0f * light_angle * device_scene.lights_length;
+                    weight = 2.0f * light_angle * light_count;
                 } else {
                     H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
 
                     if (S_local.z > 0.0f) weight = 2.0f;
                 }
             }
-
-
 
             const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
 
@@ -322,7 +331,7 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             const float light_feasible = dot_product(ray, normal);
 
             if (light_sample < 0.5f && light_feasible >= 0.0f) {
-                weight = 2.0f * light_angle * device_scene.lights_length;
+                weight = 2.0f * light_angle * light_count;
             } else {
                 ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
@@ -463,7 +472,7 @@ static void update_sun(const Scene scene) {
     gpuErrchk(cudaMemcpy(scene.lights, &light_source_sun, sizeof(vec3), cudaMemcpyHostToDevice));
 }
 
-static void update_camera_pos(const Scene scene) {
+static void update_camera_pos(const Scene scene, const unsigned int width, const unsigned int height) {
     const float alpha = scene.camera.rotation.x;
     const float beta = scene.camera.rotation.y;
     const float gamma = scene.camera.rotation.z;
@@ -482,6 +491,16 @@ static void update_camera_pos(const Scene scene) {
     q.z = cr * cp * sy - sr * sp * cy;
 
     gpuErrchk(cudaMemcpyToSymbol(device_camera_rotation, &(q), sizeof(Quaternion), 0, cudaMemcpyHostToDevice));
+
+    const float step = 2.0f * (scene.camera.fov / width);
+    const float vfov = step * height / 2.0f;
+    const float offset_x = (step / 2.0f);
+    const float offset_y = (step / 2.0f);
+
+    gpuErrchk(cudaMemcpyToSymbol(device_step, &(step), sizeof(float), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_vfov, &(vfov), sizeof(float), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_offset_x, &(offset_x), sizeof(float), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_offset_y, &(offset_y), sizeof(float), 0, cudaMemcpyHostToDevice));
 }
 
 extern "C" raytrace_instance* init_raytracing(
@@ -496,11 +515,6 @@ extern "C" raytrace_instance* init_raytracing(
     instance->frame_buffer = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
 
     const unsigned int amount = width * height;
-    const float step = 2.0f * (scene.camera.fov / width);
-    const float vfov = step * height / 2.0f;
-    const float offset_x = (step / 2.0f);
-    const float offset_y = (step / 2.0f);
-
     set_up_raytracing_device<<<1,1>>>();
 
     gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height));
@@ -542,10 +556,6 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMemcpyToSymbol(device_illuminance_atlas, &(instance->illuminance_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(instance->material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_amount, &(amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_step, &(step), sizeof(float), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_vfov, &(vfov), sizeof(float), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_offset_x, &(offset_x), sizeof(float), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_offset_y, &(offset_y), sizeof(float), 0, cudaMemcpyHostToDevice));
 
     instance->denoiser = denoiser;
 
@@ -651,7 +661,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     set_up_raytracing_device<<<1,1>>>();
 
     update_sun(instance->scene_gpu);
-    update_camera_pos(instance->scene_gpu);
+    update_camera_pos(instance->scene_gpu, instance->width, instance->height);
 
     clock_t t = clock();
 
