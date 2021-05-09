@@ -49,6 +49,7 @@ struct raytrace_instance {
   unsigned int height;
   RGBF* frame_buffer;
   RGBF* frame_buffer_gpu;
+  RGB8* buffer_8bit_gpu;
   void* albedo_atlas;
   int albedo_atlas_length;
   void* illuminance_atlas;

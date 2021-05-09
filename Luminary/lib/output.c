@@ -16,6 +16,7 @@ void offline_output(
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   free_inputs(instance);
+  copy_framebuffer_to_cpu(instance);
 
   switch (instance->denoiser) {
   case 0: {
@@ -86,6 +87,8 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
   char* title = (char*) malloc(4096);
 
+  initiliaze_realtime(instance);
+
   while (!exit) {
     SDL_Event event;
 
@@ -93,12 +96,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     trace_scene(scene, instance, 0);
 
-    if (filters) {
-      post_median_filter(instance, 0.9f);
-      post_tonemapping(instance);
-    }
-
-    frame_buffer_to_8bit_image(scene.camera, instance, buffer);
+    copy_framebuffer_to_8bit(buffer, instance);
 
     SDL_BlitSurface(surface, 0, window_surface, 0);
 
@@ -117,6 +115,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   }
 
   free(title);
+  free_realtime(instance);
 
   SDL_DestroyWindow(window);
   SDL_Quit();
