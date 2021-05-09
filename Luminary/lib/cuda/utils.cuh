@@ -17,6 +17,17 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    }
 }
 
+#define OPTIX_CHECK( call )                                             \
+  {                                                                     \
+    OptixResult res = call;                                             \
+    if( res != OPTIX_SUCCESS )                                          \
+      {                                                                 \
+        fprintf( stderr, "Optix returned error %d in call (%s) (line %d)\n", res, #call, __LINE__ ); \
+        system("pause");                                                \
+        exit(-1);                                                       \
+      }                                                                 \
+  }
+
 #ifndef eps
 #define eps 0.001f
 #endif /* eps */

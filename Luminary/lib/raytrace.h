@@ -26,7 +26,10 @@ void* initialize_textures(TextureRGBA* textures, const int textures_length);
 void free_textures(void* texture_atlas, const int textures_length);
 void initiliaze_realtime(raytrace_instance* instance);
 void free_realtime(raytrace_instance* instance);
-void copy_framebuffer_to_8bit(RGB8* buffer, raytrace_instance* instance);
+void copy_framebuffer_to_8bit(RGB8* buffer, RGBF* source, raytrace_instance* instance);
+void* initialize_optix_denoise_for_realtime(raytrace_instance* instance);
+RGBF* denoise_with_optix_realtime(void* input);
+void free_realtime_denoise(void* input);
 
 #if __cplusplus
 }

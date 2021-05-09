@@ -107,6 +107,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   char* title = (char*) malloc(4096);
 
   initiliaze_realtime(instance);
+  void* optix_setup = initialize_optix_denoise_for_realtime(instance);
 
   SDL_SetRelativeMouseMode(SDL_TRUE);
 
@@ -115,7 +116,13 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     trace_scene(scene, instance, 0);
 
-    copy_framebuffer_to_8bit(buffer, instance);
+    if (instance->denoiser) {
+      RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
+      copy_framebuffer_to_8bit(buffer, denoised_image, instance);
+    }
+    else {
+      copy_framebuffer_to_8bit(buffer, instance->frame_buffer_gpu, instance);
+    }
 
     SDL_BlitSurface(surface, 0, window_surface, 0);
 
@@ -205,6 +212,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
   free(title);
   free_realtime(instance);
+  free_realtime_denoise(optix_setup);
 
   SDL_DestroyWindow(window);
   SDL_Quit();

@@ -12,6 +12,8 @@
 #include "cuda/directives.cuh"
 #include <cuda_runtime_api.h>
 #include <curand_kernel.h>
+#include <optix.h>
+#include <optix_stubs.h>
 #include <float.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -241,14 +243,19 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         float light_angle;
         vec3 light_source;
         #ifdef LIGHTS_AT_NIGHT_ONLY
-        const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length : 1;
+        const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
         #else
         const int light_count = device_scene.lights_length;
         #endif
 
 
         if (light_sample < 0.5f) {
-            const uint32_t light = (uint32_t)(curand_uniform(random) * light_count);
+            #ifdef LIGHTS_AT_NIGHT_ONLY
+                const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(curand_uniform(random) * light_count) : 0;
+            #else
+                const uint32_t light = (uint32_t)(curand_uniform(random) * light_count);
+            #endif
+
             const float4 light_data = __ldg((float4*)(device_scene.lights + light));
             vec3 light_pos;
             light_pos.x = light_data.x;
@@ -365,14 +372,14 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
         #ifdef WEIGHT_BASED_EXIT
         const double max_record = fmaxf(record.r, fmaxf(record.g, record.b));
         if (max_record < CUTOFF ||
-        (max_record < PROBABILISTIC_CUTOFF && curand_uniform(&device_random) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
+        (max_record < PROBABILISTIC_CUTOFF && curand_uniform(random) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
         {
             break;
         }
         #endif
 
         #ifdef LOW_QUALITY_LONG_BOUNCES
-        if (reflection_number >= MIN_BOUNCES && curand_uniform(&device_random) < 1.0f/device_reflection_depth) break;
+        if (reflection_number >= MIN_BOUNCES && curand_uniform(random) < 1.0f/device_reflection_depth) break;
         #endif
     }
 
@@ -383,13 +390,13 @@ __global__
 void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int size_x, int size_y, int limit) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
+    curandStateXORWOW_t random;
+
+    curand_init(id + clock(), 0, 0, &random);
+
     while (id < device_amount && id < limit) {
         int x = offset_x + id % size_x;
         int y = offset_y + id / size_x;
-
-        curandStateXORWOW_t random;
-
-        curand_init(id, 0, 0, &random);
 
         vec3 ray;
         vec3 default_ray;
@@ -856,7 +863,7 @@ RGBF tonemap(RGBF pixel) {
 }
 
 __global__
-void convert_RGBF_to_RGB8() {
+void convert_RGBF_to_RGB8(const RGBF* source) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const unsigned int amount = device_width * device_height;
@@ -865,7 +872,7 @@ void convert_RGBF_to_RGB8() {
     int x = id % device_width;
     int y = id / device_width;
 
-    RGBF pixel = device_frame[x + y * device_width];
+    RGBF pixel = source[x + y * device_width];
 
     pixel = tonemap(pixel);
 
@@ -887,13 +894,133 @@ void convert_RGBF_to_RGB8() {
 extern "C" void initiliaze_realtime(raytrace_instance* instance) {
     gpuErrchk(cudaMalloc((void**) &(instance->buffer_8bit_gpu), sizeof(RGB8) * instance->width * instance->height));
     gpuErrchk(cudaMemcpyToSymbol(device_frame_8bit, &(instance->buffer_8bit_gpu), sizeof(RGB8*), 0, cudaMemcpyHostToDevice));
-  }
+}
 
-  extern "C" void free_realtime(raytrace_instance* instance) {
+extern "C" void free_realtime(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->buffer_8bit_gpu));
-  }
+}
 
-  extern "C" void copy_framebuffer_to_8bit(RGB8* buffer, raytrace_instance* instance) {
-    convert_RGBF_to_RGB8<<<blocks_per_grid,threads_per_block>>>();
+extern "C" void copy_framebuffer_to_8bit(RGB8* buffer, RGBF* source, raytrace_instance* instance) {
+    convert_RGBF_to_RGB8<<<blocks_per_grid,threads_per_block>>>(source);
     gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(RGB8) * instance->width * instance->height, cudaMemcpyDeviceToHost));
-  }
+}
+
+struct realtime_denoise {
+    OptixDeviceContext ctx;
+    OptixDenoiser denoiser;
+    OptixDenoiserOptions opt;
+    OptixDenoiserSizes denoiserReturnSizes;
+    CUdeviceptr denoiserState;
+    CUdeviceptr denoiserScratch;
+    OptixImage2D inputLayer[2];
+    OptixImage2D outputLayer;
+    CUdeviceptr hdr_intensity;
+    CUdeviceptr avg_color;
+} typedef realtime_denoise;
+
+extern "C" void* initialize_optix_denoise_for_realtime(raytrace_instance* instance) {
+    OPTIX_CHECK(optixInit());
+
+    realtime_denoise* denoise_setup = (realtime_denoise*)malloc(sizeof(realtime_denoise));
+
+    OPTIX_CHECK(optixDeviceContextCreate((CUcontext)0,(OptixDeviceContextOptions*)0, &denoise_setup->ctx));
+
+    denoise_setup->opt.inputKind = OPTIX_DENOISER_INPUT_RGB_ALBEDO;
+
+    OPTIX_CHECK(optixDenoiserCreate(denoise_setup->ctx, &denoise_setup->opt, &denoise_setup->denoiser));
+    OPTIX_CHECK(optixDenoiserSetModel(denoise_setup->denoiser, OPTIX_DENOISER_MODEL_KIND_HDR, nullptr, 0));
+
+    OPTIX_CHECK(optixDenoiserComputeMemoryResources(denoise_setup->denoiser, instance->width, instance->height, &denoise_setup->denoiserReturnSizes));
+
+    gpuErrchk(cudaMalloc((void**) &denoise_setup->denoiserState, denoise_setup->denoiserReturnSizes.stateSizeInBytes));
+
+    const size_t scratchSize = (denoise_setup->denoiserReturnSizes.withoutOverlapScratchSizeInBytes > denoise_setup->denoiserReturnSizes.withOverlapScratchSizeInBytes) ?
+                                denoise_setup->denoiserReturnSizes.withoutOverlapScratchSizeInBytes :
+                                denoise_setup->denoiserReturnSizes.withOverlapScratchSizeInBytes;
+
+    gpuErrchk(cudaMalloc((void**) &denoise_setup->denoiserScratch, scratchSize));
+
+
+    OPTIX_CHECK(optixDenoiserSetup(denoise_setup->denoiser, 0,
+      instance->width, instance->height,
+      denoise_setup->denoiserState,
+      denoise_setup->denoiserReturnSizes.stateSizeInBytes,
+      denoise_setup->denoiserScratch,
+      scratchSize));
+
+    denoise_setup->inputLayer[0].data = (CUdeviceptr)instance->frame_buffer_gpu;
+    denoise_setup->inputLayer[0].width = instance->width;
+    denoise_setup->inputLayer[0].height = instance->height;
+    denoise_setup->inputLayer[0].rowStrideInBytes = instance->width * sizeof(RGBF);
+    denoise_setup->inputLayer[0].pixelStrideInBytes = sizeof(RGBF);
+    denoise_setup->inputLayer[0].format = OPTIX_PIXEL_FORMAT_FLOAT3;
+
+    denoise_setup->inputLayer[1].data = (CUdeviceptr)instance->albedo_buffer_gpu;
+    denoise_setup->inputLayer[1].width = instance->width;
+    denoise_setup->inputLayer[1].height = instance->height;
+    denoise_setup->inputLayer[1].rowStrideInBytes = instance->width * sizeof(RGBF);
+    denoise_setup->inputLayer[1].pixelStrideInBytes = sizeof(RGBF);
+    denoise_setup->inputLayer[1].format = OPTIX_PIXEL_FORMAT_FLOAT3;
+
+    RGBF* output;
+    gpuErrchk(cudaMalloc((void**) &output, sizeof(RGBF) * instance->width * instance->height));
+
+    denoise_setup->outputLayer.data = (CUdeviceptr)output;
+    denoise_setup->outputLayer.width = instance->width;
+    denoise_setup->outputLayer.height = instance->height;
+    denoise_setup->outputLayer.rowStrideInBytes = instance->width * sizeof(RGBF);
+    denoise_setup->outputLayer.pixelStrideInBytes = sizeof(RGBF);
+    denoise_setup->outputLayer.format = OPTIX_PIXEL_FORMAT_FLOAT3;
+
+    gpuErrchk(cudaMalloc((void**) &denoise_setup->hdr_intensity, sizeof(float)));
+
+    gpuErrchk(cudaMalloc((void**) &denoise_setup->avg_color, sizeof(float) * 3));
+
+    return denoise_setup;
+}
+
+extern "C" RGBF* denoise_with_optix_realtime(void* input) {
+    realtime_denoise* denoise_setup = (realtime_denoise*) input;
+
+    const size_t scratchSize = (denoise_setup->denoiserReturnSizes.withoutOverlapScratchSizeInBytes > denoise_setup->denoiserReturnSizes.withOverlapScratchSizeInBytes) ?
+                                denoise_setup->denoiserReturnSizes.withoutOverlapScratchSizeInBytes :
+                                denoise_setup->denoiserReturnSizes.withOverlapScratchSizeInBytes;
+
+    OPTIX_CHECK(optixDenoiserComputeIntensity(denoise_setup->denoiser, 0, &denoise_setup->inputLayer[0], denoise_setup->hdr_intensity, denoise_setup->denoiserScratch, scratchSize));
+
+    OPTIX_CHECK(optixDenoiserComputeAverageColor(denoise_setup->denoiser, 0, &denoise_setup->inputLayer[0], denoise_setup->avg_color, denoise_setup->denoiserScratch, scratchSize));
+
+    OptixDenoiserParams denoiserParams;
+    denoiserParams.denoiseAlpha = 0;
+    denoiserParams.hdrIntensity = denoise_setup->hdr_intensity;
+    denoiserParams.blendFactor = 0.0f;
+    denoiserParams.hdrAverageColor = denoise_setup->avg_color;
+
+    OPTIX_CHECK(optixDenoiserInvoke(denoise_setup->denoiser,
+        0,
+        &denoiserParams,
+        denoise_setup->denoiserState,
+        denoise_setup->denoiserReturnSizes.stateSizeInBytes,
+        &denoise_setup->inputLayer[0],
+        2,
+        0,
+        0,
+        &denoise_setup->outputLayer,
+        denoise_setup->denoiserScratch,
+        scratchSize));
+
+    return (RGBF*)denoise_setup->outputLayer.data;
+}
+
+extern "C" void free_realtime_denoise(void* input) {
+    realtime_denoise denoise_setup = *(realtime_denoise*) input;
+
+    OPTIX_CHECK(optixDeviceContextDestroy(denoise_setup.ctx));
+    OPTIX_CHECK(optixDenoiserDestroy(denoise_setup.denoiser));
+
+    gpuErrchk(cudaFree((void*)denoise_setup.outputLayer.data));
+    gpuErrchk(cudaFree((void*)denoise_setup.hdr_intensity));
+    gpuErrchk(cudaFree((void*)denoise_setup.avg_color));
+    gpuErrchk(cudaFree((void*)denoise_setup.denoiserState));
+    gpuErrchk(cudaFree((void*)denoise_setup.denoiserScratch));
+}
