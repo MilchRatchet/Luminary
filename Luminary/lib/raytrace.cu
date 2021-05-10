@@ -26,6 +26,16 @@
 const static int threads_per_block = 128;
 const static int blocks_per_grid = 512;
 
+struct Sample {
+    vec3 origin;
+    vec3 ray;
+    RGBF record;
+    RGBF result;
+    int depth;
+    int state; //1st bit (finished?) 2nd bit (albedo buffer written?)
+    int buffer_index;
+} typedef Sample;
+
 //---------------------------------
 // Path Tracing
 //---------------------------------
@@ -37,20 +47,21 @@ float get_light_angle(Light light, vec3 pos) {
 }
 
 __device__
-RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict__ random, int buffer_index) {
-    int albedo_buffer_written = 0;
+Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __restrict__ random) {
+    int albedo_buffer_written = input_sample.state & 0b10;
+    const int buffer_index = input_sample.buffer_index;
 
-    RGBF result;
-    result.r = 0.0f;
-    result.g = 0.0f;
-    result.b = 0.0f;
+    RGBF result = input_sample.result;
+    RGBF record = input_sample.record;
 
-    RGBF record;
-    record.r = 1.0f;
-    record.g = 1.0f;
-    record.b = 1.0f;
+    vec3 ray = input_sample.ray;
+    vec3 origin = input_sample.origin;
 
-    for (int reflection_number = 0; reflection_number < device_reflection_depth; reflection_number++) {
+    int reflection_number;
+    int state = input_sample.state;
+    const int starting_threads = __popc(__activemask());
+
+    for (reflection_number = input_sample.depth; reflection_number < device_reflection_depth; reflection_number++) {
         traversal_result traversal = traverse_bvh(origin, ray, device_scene.nodes, device_scene.traversal_triangles);
 
         if (traversal.hit_id == 0xffffffff) {
@@ -64,13 +75,16 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
                 device_albedo_buffer[buffer_index] = sum;
 
                 albedo_buffer_written++;
+                state |= 0b10;
             }
 
             result.r += sky.r * record.r;
             result.g += sky.g * record.g;
             result.b += sky.b * record.b;
 
-            return result;
+            state |= 0b1;
+
+            break;
         }
 
         vec3 curr;
@@ -168,12 +182,12 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             #ifdef LIGHTS_AT_NIGHT_ONLY
             if (device_sun.y < NIGHT_THRESHOLD) {
             #endif
-            const float4 illumiance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
+            const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
             RGBF emission;
-            emission.r = illumiance_f.x;
-            emission.g = illumiance_f.y;
-            emission.b = illumiance_f.z;
+            emission.r = illuminance_f.x;
+            emission.g = illuminance_f.y;
+            emission.b = illuminance_f.z;
 
             result.r += emission.r * intensity * record.r;
             result.g += emission.g * intensity * record.g;
@@ -181,7 +195,10 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
 
             #ifdef FIRST_LIGHT_ONLY
             const double max_result = fmaxf(result.r, fmaxf(result.g, result.b));
-            if (max_result > eps) break;
+            if (max_result > eps) {
+                state |= 0b1;
+                break;
+            }
             #endif
 
             #ifdef LIGHTS_AT_NIGHT_ONLY
@@ -208,182 +225,200 @@ RGBF trace_ray_iterative(vec3 origin, vec3 ray, curandStateXORWOW_t* __restrict_
             origin.x = curr.x + 2.0f * eps * ray.x;
             origin.y = curr.y + 2.0f * eps * ray.y;
             origin.z = curr.z + 2.0f * eps * ray.z;
+        } else {
+            if (device_denoiser && !albedo_buffer_written) {
+                RGBF sum = device_albedo_buffer[buffer_index];
+                sum.r += albedo.r;
+                sum.g += albedo.g;
+                sum.b += albedo.b;
+                device_albedo_buffer[buffer_index] = sum;
 
-            continue;
-        }
+                albedo_buffer_written++;
+                state |= 0b10;
+            }
 
-        if (device_denoiser && !albedo_buffer_written) {
-            RGBF sum = device_albedo_buffer[buffer_index];
-            sum.r += albedo.r;
-            sum.g += albedo.g;
-            sum.b += albedo.b;
-            device_albedo_buffer[buffer_index] = sum;
+            const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
 
-            albedo_buffer_written++;
-        }
+            if (dot_product(normal, face_normal) < 0.0f) {
+                face_normal = scale_vector(face_normal, -1.0f);
+            }
 
-        const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
+            const vec3 V = scale_vector(ray, -1.0f);
 
-        if (dot_product(normal, face_normal) < 0.0f) {
-            face_normal = scale_vector(face_normal, -1.0f);
-        }
+            if (dot_product(face_normal, V) < 0.0f) {
+                normal = scale_vector(normal, -1.0f);
+                face_normal = scale_vector(face_normal, -1.0f);
+            }
 
-        const vec3 V = scale_vector(ray, -1.0f);
+            origin.x = curr.x + face_normal.x * (eps * 8.0f);
+            origin.y = curr.y + face_normal.y * (eps * 8.0f);
+            origin.z = curr.z + face_normal.z * (eps * 8.0f);
 
-        if (dot_product(face_normal, V) < 0.0f) {
-            normal = scale_vector(normal, -1.0f);
-            face_normal = scale_vector(face_normal, -1.0f);
-        }
-
-        origin.x = curr.x + face_normal.x * (eps * 8.0f);
-        origin.y = curr.y + face_normal.y * (eps * 8.0f);
-        origin.z = curr.z + face_normal.z * (eps * 8.0f);
-
-        const float light_sample = curand_uniform(random);
-        float light_angle;
-        vec3 light_source;
-        #ifdef LIGHTS_AT_NIGHT_ONLY
-        const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
-        #else
-        const int light_count = device_scene.lights_length;
-        #endif
-
-
-        if (light_sample < 0.5f) {
+            const float light_sample = curand_uniform(random);
+            float light_angle;
+            vec3 light_source;
             #ifdef LIGHTS_AT_NIGHT_ONLY
-                const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(curand_uniform(random) * light_count) : 0;
+            const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
             #else
-                const uint32_t light = (uint32_t)(curand_uniform(random) * light_count);
+            const int light_count = device_scene.lights_length;
             #endif
 
-            const float4 light_data = __ldg((float4*)(device_scene.lights + light));
-            vec3 light_pos;
-            light_pos.x = light_data.x;
-            light_pos.y = light_data.y;
-            light_pos.z = light_data.z;
-            light_pos = vec_diff(light_pos, origin);
-            light_source = normalize_vector(light_pos);
-            const float d = get_length(light_pos) + eps;
-            light_angle = fminf(PI/2.0f,asinf(light_data.w / d)) * 2.0f / PI;
-        }
 
-        if (curand_uniform(random) < specular_probability) {
-            const float alpha = roughness * roughness;
+            if (light_sample < 0.5f) {
+                #ifdef LIGHTS_AT_NIGHT_ONLY
+                    const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(curand_uniform(random) * light_count) : 0;
+                #else
+                    const uint32_t light = (uint32_t)(curand_uniform(random) * light_count);
+                #endif
 
-            const float beta = acosf(curand_uniform(random));
-            const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+                const float4 light_data = __ldg((float4*)(device_scene.lights + light));
+                vec3 light_pos;
+                light_pos.x = light_data.x;
+                light_pos.y = light_data.y;
+                light_pos.z = light_data.z;
+                light_pos = vec_diff(light_pos, origin);
+                light_source = normalize_vector(light_pos);
+                const float d = get_length(light_pos) + eps;
+                light_angle = fminf(PI/2.0f,asinf(light_data.w / d)) * 2.0f / PI;
+            }
 
-            const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
+            if (curand_uniform(random) < specular_probability) {
+                const float alpha = roughness * roughness;
 
-            float weight = 1.0f;
+                const float beta = acosf(curand_uniform(random));
+                const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
 
-            const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
-            vec3 H_local;
+                const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
-            if (alpha < eps) {
-                H_local.x = 0.0f;
-                H_local.y = 0.0f;
-                H_local.z = 1.0f;
-            } else {
-                const vec3 S_local = rotate_vector_by_quaternion(
-                    normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
-                    rotation_to_z);
+                float weight = 1.0f;
 
-                if (light_sample < 0.5f && S_local.z > 0.0f) {
-                    H_local.x = S_local.x + V_local.x;
-                    H_local.y = S_local.y + V_local.y;
-                    H_local.z = S_local.z + V_local.z;
+                const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
+                vec3 H_local;
 
-                    H_local = normalize_vector(H_local);
+                if (alpha < eps) {
+                    H_local.x = 0.0f;
+                    H_local.y = 0.0f;
+                    H_local.z = 1.0f;
+                } else {
+                    const vec3 S_local = rotate_vector_by_quaternion(
+                        normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
+                        rotation_to_z);
 
+                    if (light_sample < 0.5f && S_local.z > 0.0f) {
+                        H_local.x = S_local.x + V_local.x;
+                        H_local.y = S_local.y + V_local.y;
+                        H_local.z = S_local.z + V_local.z;
+
+                        H_local = normalize_vector(H_local);
+
+                        weight = 2.0f * light_angle * light_count;
+                    } else {
+                        H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
+
+                        if (S_local.z > 0.0f) weight = 2.0f;
+                    }
+                }
+
+                const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
+
+                const float HdotR = fmaxf(eps, fminf(1.0f, dot_product(H_local, ray_local)));
+                const float NdotR = fmaxf(eps, fminf(1.0f, ray_local.z));
+                const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
+
+                ray = normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+
+                vec3 specular_f0;
+                specular_f0.x = lerp(0.04f, albedo.r, metallic);
+                specular_f0.y = lerp(0.04f, albedo.g, metallic);
+                specular_f0.z = lerp(0.04f, albedo.b, metallic);
+
+                const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
+
+                const float milchs_energy_recovery = lerp(1.0f, 1.51f + 1.51f * NdotV, roughness);
+
+                weight *= milchs_energy_recovery * Smith_G2_over_G1_height_correlated(alpha * alpha, NdotR, NdotV) / specular_probability;
+
+                record.r *= F.x * weight;
+                record.g *= F.y * weight;
+                record.b *= F.z * weight;
+            }
+            else
+            {
+                float weight = 1.0f;
+
+                const float alpha = acosf(sqrtf(curand_uniform(random)));
+                const float gamma = 2.0f * PI * curand_uniform(random);
+
+                ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
+                const float light_feasible = dot_product(ray, normal);
+
+                if (light_sample < 0.5f && light_feasible >= 0.0f) {
                     weight = 2.0f * light_angle * light_count;
                 } else {
-                    H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
+                    ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
-                    if (S_local.z > 0.0f) weight = 2.0f;
+                    if (light_feasible >=0.0f) weight = 2.0f;
                 }
+
+                vec3 H;
+                H.x = V.x + ray.x;
+                H.y = V.y + ray.y;
+                H.z = V.z + ray.z;
+                H = normalize_vector(H);
+
+                const float half_angle = fmaxf(eps, fminf(dot_product(H,ray),1.0f));
+                const float energyFactor = lerp(1.0f, 1.0f/1.51f, roughness);
+
+                const float FD90MinusOne = 0.5f * roughness + 2.0f * half_angle * half_angle * roughness - 1.0f;
+
+                const float angle = fmaxf(eps, fminf(dot_product(normal, ray),1.0f));
+                const float previous_angle = fmaxf(eps, fminf(dot_product(V, normal),1.0f));
+
+                const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
+                const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
+
+                weight *= FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
+
+                record.r *= albedo.r * weight;
+                record.g *= albedo.g * weight;
+                record.b *= albedo.b * weight;
             }
-
-            const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
-
-            const float HdotR = fmaxf(eps, fminf(1.0f, dot_product(H_local, ray_local)));
-            const float NdotR = fmaxf(eps, fminf(1.0f, ray_local.z));
-            const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
-
-            ray = normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
-
-            vec3 specular_f0;
-            specular_f0.x = lerp(0.04f, albedo.r, metallic);
-            specular_f0.y = lerp(0.04f, albedo.g, metallic);
-            specular_f0.z = lerp(0.04f, albedo.b, metallic);
-
-            const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
-
-            const float milchs_energy_recovery = lerp(1.0f, 1.51f + 1.51f * NdotV, roughness);
-
-            weight *= milchs_energy_recovery * Smith_G2_over_G1_height_correlated(alpha * alpha, NdotR, NdotV) / specular_probability;
-
-            record.r *= F.x * weight;
-            record.g *= F.y * weight;
-            record.b *= F.z * weight;
         }
-        else
-        {
-            float weight = 1.0f;
 
-            const float alpha = acosf(sqrtf(curand_uniform(random)));
-            const float gamma = 2.0f * PI * curand_uniform(random);
 
-            ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
-            const float light_feasible = dot_product(ray, normal);
-
-            if (light_sample < 0.5f && light_feasible >= 0.0f) {
-                weight = 2.0f * light_angle * light_count;
-            } else {
-                ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
-
-                if (light_feasible >=0.0f) weight = 2.0f;
-            }
-
-            vec3 H;
-            H.x = V.x + ray.x;
-            H.y = V.y + ray.y;
-            H.z = V.z + ray.z;
-            H = normalize_vector(H);
-
-            const float half_angle = fmaxf(eps, fminf(dot_product(H,ray),1.0f));
-            const float energyFactor = lerp(1.0f, 1.0f/1.51f, roughness);
-
-            const float FD90MinusOne = 0.5f * roughness + 2.0f * half_angle * half_angle * roughness - 1.0f;
-
-            const float angle = fmaxf(eps, fminf(dot_product(normal, ray),1.0f));
-            const float previous_angle = fmaxf(eps, fminf(dot_product(V, normal),1.0f));
-
-            const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
-            const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
-
-            weight *= FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
-
-            record.r *= albedo.r * weight;
-            record.g *= albedo.g * weight;
-            record.b *= albedo.b * weight;
-        }
 
         #ifdef WEIGHT_BASED_EXIT
         const double max_record = fmaxf(record.r, fmaxf(record.g, record.b));
         if (max_record < CUTOFF ||
         (max_record < PROBABILISTIC_CUTOFF && curand_uniform(random) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
         {
+            state |= 0b1;
             break;
         }
         #endif
 
         #ifdef LOW_QUALITY_LONG_BOUNCES
-        if (reflection_number >= MIN_BOUNCES && curand_uniform(random) < 1.0f/device_reflection_depth) break;
+        if (reflection_number >= MIN_BOUNCES && curand_uniform(random) < 1.0f/device_reflection_depth) {
+            state |= 0b1;
+            break;
+        }
         #endif
+
+        if (__popc(__activemask()) < 0.0f *  starting_threads) break;
     }
 
-    return result;
+    if (reflection_number >= device_reflection_depth - 1) state |= 0b1;
+
+    Sample output_sample;
+    output_sample.origin = origin;
+    output_sample.ray = ray;
+    output_sample.result = result;
+    output_sample.record = record;
+    output_sample.state = state;
+    output_sample.depth = reflection_number;
+    output_sample.buffer_index = buffer_index;
+
+    return output_sample;
 }
 
 __global__
@@ -393,70 +428,94 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
     curandStateXORWOW_t random;
 
     curand_init(id + clock(), 0, 0, &random);
+    Sample sample;
+    sample.state = 0b11;
+    int i = 0;
+
+    RGBF pixel;
+    pixel.r = 0.0f;
+    pixel.g = 0.0f;
+    pixel.b = 0.0f;
 
     while (id < device_amount && id < limit) {
-        int x = offset_x + id % size_x;
-        int y = offset_y + id / size_x;
+        if (sample.state & 0b1) {
+            vec3 ray;
+            vec3 default_ray;
 
-        vec3 ray;
-        vec3 default_ray;
+            const int x = offset_x + (id / 8) % size_x;
+            const int y = offset_y + (id % 8) + 8 * (id / (8 * size_x));
 
-        RGBF result;
-
-        result.r = 0.0f;
-        result.g = 0.0f;
-        result.b = 0.0f;
-
-        for (int i = 0; i < device_diffuse_samples; i++) {
             default_ray.x = -device_scene.camera.fov + device_step * x + device_offset_x * curand_uniform(&random) * 2.0f;
             default_ray.y = device_vfov - device_step * y - device_offset_y * curand_uniform(&random) * 2.0f;
             default_ray.z = -1.0f;
 
-            ray = rotate_vector_by_quaternion(default_ray, device_camera_rotation);
+            ray = normalize_vector(rotate_vector_by_quaternion(default_ray, device_camera_rotation));
 
-            float ray_length = __frsqrt_rn(ray.x * ray.x + ray.y * ray.y + ray.z * ray.z);
-
-            ray.x *= ray_length;
-            ray.y *= ray_length;
-            ray.z *= ray_length;
-
-            RGBF color = trace_ray_iterative(device_scene.camera.pos, ray, &random, x + y * device_width);
-
-            if (isnan(color.r) || isinf(color.r)) {
-                color.r = 1.0f;
-            }
-            if (isnan(color.g) || isinf(color.g)) {
-                color.g = 0.0f;
-            }
-            if (isnan(color.b) || isinf(color.b)) {
-                color.b = 0.0f;
-            }
-
-            result.r += color.r;
-            result.g += color.g;
-            result.b += color.b;
+            sample.ray = ray;
+            sample.origin = device_scene.camera.pos;
+            sample.buffer_index = x + y * device_width;
+            sample.state = 0;
+            sample.depth = 0;
+            sample.record.r = 1.0f;
+            sample.record.g = 1.0f;
+            sample.record.b = 1.0f;
+            sample.result.r = 0.0f;
+            sample.result.g = 0.0f;
+            sample.result.b = 0.0f;
         }
 
-        float weight = 1.0f/(float)device_diffuse_samples;
+        sample = trace_ray_iterative(sample, &random);
 
-        result.r *= weight;
-        result.g *= weight;
-        result.b *= weight;
+        if (sample.state & 0b1) {
+            if (isnan(sample.result.r) || isinf(sample.result.r)) {
+                sample.result.r = 1.0f;
+            }
+            if (isnan(sample.result.g) || isinf(sample.result.g)) {
+                sample.result.g = 0.0f;
+            }
+            if (isnan(sample.result.b) || isinf(sample.result.b)) {
+                sample.result.b = 0.0f;
+            }
 
-        if (device_denoiser) {
-            RGBF sum = device_albedo_buffer[x + y * device_width];
-            sum.r *= weight;
-            sum.g *= weight;
-            sum.b *= weight;
-            device_albedo_buffer[x + y * device_width] = sum;
+            pixel.r += sample.result.r;
+            pixel.g += sample.result.g;
+            pixel.b += sample.result.b;
+
+            i++;
         }
 
-        device_frame[x + y * device_width] = result;
+        if (i == device_diffuse_samples) {
+            const float weight = 1.0f/(float)device_diffuse_samples;
 
-        id += blockDim.x * gridDim.x;
+            pixel.r *= weight;
+            pixel.g *= weight;
+            pixel.b *= weight;
 
-        atomicAdd((uint32_t*)progress, 1);
-        __threadfence_system();
+            const int x = offset_x + (id / 8) % size_x;
+            const int y = offset_y + (id % 8) + 8 * (id / (8 * size_x));
+
+            const int buffer_index = x + y * device_width;
+
+            if (device_denoiser) {
+                RGBF sum = device_albedo_buffer[buffer_index];
+                sum.r *= weight;
+                sum.g *= weight;
+                sum.b *= weight;
+                device_albedo_buffer[buffer_index] = sum;
+            }
+
+            device_frame[buffer_index] = pixel;
+
+            id += blockDim.x * gridDim.x;
+            i = 0;
+
+            pixel.r = 0.0f;
+            pixel.g = 0.0f;
+            pixel.b = 0.0f;
+
+            atomicAdd((uint32_t*)progress, 1);
+            __threadfence_system();
+        }
     }
 }
 
@@ -664,8 +723,6 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     *progress_cpu = 0;
 
     gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
-
-    set_up_raytracing_device<<<1,1>>>();
 
     update_sun(instance->scene_gpu);
     update_camera_pos(instance->scene_gpu, instance->width, instance->height);

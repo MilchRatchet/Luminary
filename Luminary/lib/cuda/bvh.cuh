@@ -115,10 +115,13 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
     int bit_trail = 0;
     int mrpn_address = -1;
 
+    int4 addresses;
+
     while (node_address != -1) {
         while (true) {
             const float4 p = __ldg((float4*)((int*)(nodes + node_address)));
             const uint4 data = __ldg((uint4*)(((int*)(nodes + node_address)) + 4));
+            addresses = __ldg((int4*)(((int*)(nodes + node_address)) + 8));
 
             if (get_8bit(data.x, 24)) break;
 
@@ -162,8 +165,6 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
                 break;
             }
         }
-
-        const int4 addresses = __ldg((int4*)(((int*)(nodes + node_address)) + 8));
 
         const int triangle_count = addresses.x;
         const int triangles_address = addresses.y;
