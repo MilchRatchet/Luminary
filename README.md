@@ -6,11 +6,11 @@ Luminary is a CUDA based Pathtracing renderer.
 
 This project is for fun and to learn more about Computer Graphics. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
-- Implement interactive realtime mode.
+- Implement wide BVH.
+- Implement Clouds.
+- Implement volumetric lighting.
 - Implement refraction.
 - Implement better Importance Sampling.
-- Implement volumetric lighting.
-- Implement post processing routines (AA, DoF).
 
 As a denoiser I use Optix since any non machine learning denoiser is quite frankly not all that great and machine learning is out of the scope of this project.
 
@@ -61,6 +61,9 @@ m Meshes/Example.obj
 # Camera parameters
 # c [Pos.x | Pos.y | Pos.z | Rotation.x | Rotation.y | Rotation.z | FOV]
 c 2.0 0.3 -0.06 0.0 1.570796 0.0 2.0
+# Camera lens parameters
+# l [Focal Length | Aperture Size] (Default Aperture Size=0.0)
+l 20.0 0.4
 #
 # Sun parameters
 # s [Azimuth | Altitude | Intensity]
@@ -74,7 +77,7 @@ i 1920 1080 6 50
 # b [Depth]
 b 18
 # Denoiser (0 = 3x3 Mean, 1 = Optix)
-# d [Denoiser]
+# d [Denoiser] (Default=1)
 d 1
 #
 # Output path (Offline Mode only)
@@ -103,6 +106,8 @@ Alternatively you can run Luminary in Realtime Mode using
 ```
 START "" Luminary.exe Scenes/Example.lum r
 ```
+
+You can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. The focal length can be changed by pressing `F` and moving the mouse horizontally. The aperture size can be changed similarly through `G`.
 
 # Building
 

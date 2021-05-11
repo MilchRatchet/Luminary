@@ -442,17 +442,29 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
             vec3 ray;
             vec3 default_ray;
 
-            const int x = offset_x + (id / 8) % size_x;
-            const int y = offset_y + (id % 8) + 8 * (id / (8 * size_x));
+            const int x = offset_x + (id / 1) % size_x;
+            const int y = offset_y + (id % 1) + 1 * (id / (1 * size_x));
 
-            default_ray.x = -device_scene.camera.fov + device_step * x + device_offset_x * curand_uniform(&random) * 2.0f;
-            default_ray.y = device_vfov - device_step * y - device_offset_y * curand_uniform(&random) * 2.0f;
-            default_ray.z = -1.0f;
+            default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * x + device_offset_x * curand_uniform(&random) * 2.0f);
+            default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * y - device_offset_y * curand_uniform(&random) * 2.0f);
+            default_ray.z = -device_scene.camera.focal_length;
 
+            const float alpha = curand_uniform(&random) * 2.0f * PI;
+            const float beta  = curand_uniform(&random) * device_scene.camera.aperture_size;
+
+            vec3 point_on_aperture;
+            point_on_aperture.x = cosf(alpha) * beta;
+            point_on_aperture.y = sinf(alpha) * beta;
+            point_on_aperture.z = 0.0f;
+
+            default_ray = vec_diff(default_ray, point_on_aperture);
             ray = normalize_vector(rotate_vector_by_quaternion(default_ray, device_camera_rotation));
+            point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device_camera_rotation);
 
             sample.ray = ray;
-            sample.origin = device_scene.camera.pos;
+            sample.origin.x = device_scene.camera.pos.x + point_on_aperture.x;
+            sample.origin.y = device_scene.camera.pos.y + point_on_aperture.y;
+            sample.origin.z = device_scene.camera.pos.z + point_on_aperture.z;
             sample.buffer_index = x + y * device_width;
             sample.state = 0;
             sample.depth = 0;
@@ -491,8 +503,8 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
             pixel.g *= weight;
             pixel.b *= weight;
 
-            const int x = offset_x + (id / 8) % size_x;
-            const int y = offset_y + (id % 8) + 8 * (id / (8 * size_x));
+            const int x = offset_x + (id / 1) % size_x;
+            const int y = offset_y + (id % 1) + 1 * (id / (1 * size_x));
 
             const int buffer_index = x + y * device_width;
 

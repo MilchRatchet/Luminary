@@ -80,6 +80,16 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   Scene scene;
 
+  scene.camera.pos.x         = 0.0f;
+  scene.camera.pos.y         = 0.0f;
+  scene.camera.pos.z         = 0.0f;
+  scene.camera.rotation.x    = 0.0f;
+  scene.camera.rotation.y    = 0.0f;
+  scene.camera.rotation.z    = 0.0f;
+  scene.camera.fov           = 1.0f;
+  scene.camera.focal_length  = 1.0f;
+  scene.camera.aperture_size = 0.00f;
+
   int width           = 1280;
   int height          = 720;
   int bounces         = 5;
@@ -110,6 +120,9 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
         line, "%*c %f %f %f %f %f %f %f\n", &scene.camera.pos.x, &scene.camera.pos.y,
         &scene.camera.pos.z, &scene.camera.rotation.x, &scene.camera.rotation.y,
         &scene.camera.rotation.z, &scene.camera.fov);
+    }
+    else if (line[0] == 'l' && line[1] == ' ') {
+      sscanf(line, "%*c %f %f\n", &scene.camera.focal_length, &scene.camera.aperture_size);
     }
     else if (line[0] == 's' && line[1] == ' ') {
       sscanf(line, "%*c %f %f %f\n", &azimuth, &altitude, &sun_strength);

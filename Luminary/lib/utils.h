@@ -18,6 +18,8 @@ struct Camera {
   vec3 pos;
   vec3 rotation;
   float fov;
+  float focal_length;
+  float aperture_size;
 } typedef Camera;
 
 struct Light {

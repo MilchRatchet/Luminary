@@ -137,10 +137,21 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     SDL_SetWindowTitle(window, title);
     SDL_UpdateWindowSurface(window);
 
+    SDL_PumpEvents();
+    const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
+
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_MOUSEMOTION) {
-        instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
-        instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
+        if (keystate[SDL_SCANCODE_F]) {
+          instance->scene_gpu.camera.focal_length += 0.01f * event.motion.xrel;
+        }
+        else if (keystate[SDL_SCANCODE_G]) {
+          instance->scene_gpu.camera.aperture_size += 0.001f * event.motion.xrel;
+        }
+        else {
+          instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
+          instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
+        }
       }
       else if (event.type == SDL_MOUSEWHEEL) {
         instance->scene_gpu.camera.fov -= event.wheel.y * 0.005f * normalized_time;
@@ -168,9 +179,6 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     q.z = cr * cp * sy - sr * sp * cy;
 
     vec3 movement_vector = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
-
-    SDL_PumpEvents();
-    const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
 
     int shift_pressed = 1;
 
@@ -201,6 +209,12 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;
     }
+
+    if (instance->scene_gpu.camera.aperture_size < 0.0f)
+      instance->scene_gpu.camera.aperture_size = 0.0f;
+
+    if (instance->scene_gpu.camera.focal_length < 0.0f)
+      instance->scene_gpu.camera.focal_length = 0.0f;
 
     const float movement_speed = 0.5f * shift_pressed * normalized_time;
 
