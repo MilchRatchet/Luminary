@@ -32,3 +32,8 @@ link_directories(${SDL2_DIR})
 add_executable(Luminary ${cpu_source_files} ${gpu_source_files})
 
 target_link_libraries(Luminary SDL2main SDL2)
+
+add_custom_command(TARGET Luminary POST_BUILD 
+               COMMAND ${CMAKE_COMMAND} -E copy_if_different
+               "${SDL2_DIR}/SDL2.dll"              
+                ${CMAKE_BINARY_DIR})

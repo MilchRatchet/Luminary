@@ -4,7 +4,7 @@ Luminary is a CUDA based Pathtracing renderer.
 
 ![Sponza Example](https://github.com/MilchRatchet/Luminary/blob/main/demo_images/Sponza.png)
 
-This project is for fun and to learn more about Computer Graphics. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
+This project is for fun and to learn more about `Computer Graphics`. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
 - Implement wide BVH.
 - Implement Clouds.
@@ -12,15 +12,7 @@ This project is for fun and to learn more about Computer Graphics. There is no e
 - Implement refraction.
 - Implement better Importance Sampling.
 
-As a denoiser I use Optix since any non machine learning denoiser is quite frankly not all that great and machine learning is out of the scope of this project.
-
-# Licences
-
-The licence for this code can be found in the `LICENCE` file.
-
-The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.
-
-The `SDL2` library is used for the realtime mode. Details about its authors and its licence can be found in `Luminary/lib/SDL/SDL.h`.
+As a denoiser I use `Optix` since any non machine learning denoiser is quite frankly not all that great and machine learning is out of the scope of this project.
 
 # Usage
 
@@ -40,12 +32,15 @@ Meshes need to be in `*.obj` file format. Only triangles are supported. Textures
    - Red: Smoothness
    - Green: Metallic
    - Blue: Emission Intensity
+   - Alpha: Unused
 
 Textures are associated to meshes through `*.mtl` files where
 
 - map_Kd = Albedo Textures
 - map_Ke = Illuminance Textures
 - map_Ns = Material Textures
+
+You can get `Blender` to link the material textures to `map_Ns` by setting them as the input texture for roughness.
 
 A whole scene is arranged through `*.lum` files which are in the following format:
 ```
@@ -101,7 +96,7 @@ You can enable a preview window which shows the current progress using
 START "" Luminary.exe Scenes/Example.lum p
 ```
 
-Alternatively you can run Luminary in Realtime Mode using
+Alternatively you can run Luminary in `Realtime Mode` using
 
 ```
 START "" Luminary.exe Scenes/Example.lum r
@@ -109,17 +104,27 @@ START "" Luminary.exe Scenes/Example.lum r
 
 You can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. The focal length can be changed by pressing `F` and moving the mouse horizontally. The aperture size can be changed similarly through `G`.
 
+Note that bad performance is to be expected. Path tracing is very computationally expensive, `Luminary` is not very performant yet and `Luminary` does not make use of `RT-Cores` found on `Turing` or `Ampere` architecture graphics cards. The latter would be considered if they would be exposed through `CUDA`.
+
 # Building
 
-This project is a bit of a mess when it comes to building. Some hints to get it to run are however:
+This project is a bit of a mess when it comes to building. It was only ever built on `Windows` so changes may have to be made for `Linus/OSX`. Some hints to get it to run are however:
 
-- You require the libraries for SDL to reside in the same folder as the executable (I plan to link them statically in the future once I figure out how)
-- You need to change the CUDA toolkit version to the one installed on your system
-- You need to change the CUDA compatibility version in the CMakeLists.txt to your specific version or lower
-- You need Optix 7 SDK and you will need to specify the installation directory in `Luminary/CMake/FindOptix.cmake`
-- You need an AVX compatible CPU
+- You need to change the `CUDA toolkit` version in the `CMakeLists.txt` to the one installed on your system.
+- You need to change the `CUDA compatibility` version in the `CMakeLists.txt` to your specific version or lower.
+- You need to install the `Optix 7.2 SDK` and specify the installation directory in `Luminary/CMake/FindOptix.cmake`.
+- You need an `AVX` compatible CPU.
+- You need to download the development libraries from http://www.libsdl.org/ and extract the libraries to `Luminary/lib/SDL/`. `SDL2.dll` will automatically be copied to the build directory and has to reside in the same folder as the executable for it to run.
 
 In `Luminary/lib/cuda/directives.cuh` are some preprocessor directives that can be used to tune performance to quality in the CUDA kernel.
+
+# Licences
+
+The licence for this code can be found in the `LICENCE` file.
+
+The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.
+
+The `SDL2` library is used for the realtime mode. Details about its authors and its licence can be found in `Luminary/lib/SDL/SDL.h`.
 
 # Literature
 
