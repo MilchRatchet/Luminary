@@ -10,7 +10,7 @@
 #include <immintrin.h>
 
 static const int samples_in_space    = 250;
-static const int threshold_triangles = 4;
+static const int threshold_triangles = 8;
 
 struct vec3_p {
   float x;
@@ -165,15 +165,9 @@ static void divide_along_z_axis(
 
 Node* build_bvh_structure(
   Triangle** triangles_io, unsigned int triangles_length, const int max_depth,
-  int* nodes_length_out, int** addresses_out, int* address_length_out) {
+  int* nodes_length_out) {
   Triangle* triangles = *triangles_io;
-  int pow             = 2;
-  int node_count      = 1;
-
-  for (int i = 0; i < max_depth; i++) {
-    node_count += pow;
-    pow *= 2;
-  }
+  int node_count      = 1 + triangles_length / 10;
 
   Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
 
@@ -197,54 +191,33 @@ Node* build_bvh_structure(
     bvh_triangles[i] = bt;
   }
 
-  unsigned int nodes_at_depth = 1;
-
-  int node_ptr = 0;
-
   const double compression_divisor = 1.0 / 255.0;
 
-  for (int i = 0; i < max_depth; i++) {
-    unsigned int triangles_ptr = 0;
-    bvh_triangle* new_triangles =
-      (bvh_triangle*) _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
-    bvh_triangle* container =
-      (bvh_triangle*) _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
+  int node_ptr               = 0;
+  int begin_of_current_nodes = 0;
+  int end_of_current_nodes   = 1;
+  int write_ptr              = 1;
 
-    for (int j = 0; j < nodes_at_depth; j++) {
-      vec3_p high, low;
+  bvh_triangle* new_triangles =
+    (bvh_triangle*) _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
+  bvh_triangle* container = (bvh_triangle*) _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
+
+  memcpy(new_triangles, bvh_triangles, sizeof(bvh_triangle) * triangles_length);
+
+  while (begin_of_current_nodes != end_of_current_nodes) {
+    int triangles_ptr = 0;
+
+    for (int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
       int left, right;
       Node node = nodes[node_ptr];
 
-      if (node.leaf_node == 2) {
-        memcpy(
-          new_triangles + triangles_ptr, bvh_triangles + triangles_ptr,
-          sizeof(bvh_triangle) * node.triangle_count);
-        triangles_ptr += node.triangle_count;
-        nodes[2 * node_ptr + 1].leaf_node      = 2;
-        nodes[2 * node_ptr + 1].triangle_count = (i != max_depth - 1) ? node.triangle_count : -1;
-        nodes[2 * node_ptr + 2].leaf_node      = 2;
-        nodes[2 * node_ptr + 2].triangle_count = (i != max_depth - 1) ? 0 : -1;
-        node.triangle_count                    = -1;
-        nodes[node_ptr]                        = node;
+      triangles_ptr = node.triangles_address;
 
-        node_ptr++;
+      if (node.triangle_count <= threshold_triangles) {
         continue;
       }
 
-      if (node.triangle_count > 0 && node.triangle_count <= threshold_triangles) {
-        memcpy(
-          new_triangles + triangles_ptr, bvh_triangles + triangles_ptr,
-          sizeof(bvh_triangle) * node.triangle_count);
-        triangles_ptr += node.triangle_count;
-        nodes[2 * node_ptr + 1].leaf_node      = 2;
-        nodes[2 * node_ptr + 1].triangle_count = node.triangle_count;
-        nodes[2 * node_ptr + 2].leaf_node      = 2;
-        nodes[2 * node_ptr + 2].triangle_count = 0;
-
-        node_ptr++;
-        continue;
-      }
-
+      vec3_p high, low;
       vec3_p high_inner, low_inner;
 
       fit_bounds(
@@ -374,16 +347,12 @@ Node* build_bvh_structure(
       }
 
       if (left == 0 || right == 0) {
-        memcpy(
-          new_triangles + triangles_ptr, bvh_triangles + triangles_ptr,
-          sizeof(bvh_triangle) * node.triangle_count);
-        triangles_ptr += node.triangle_count;
-        nodes[2 * node_ptr + 1].leaf_node      = 2;
-        nodes[2 * node_ptr + 1].triangle_count = (i != max_depth - 1) ? node.triangle_count : -1;
-        nodes[2 * node_ptr + 2].leaf_node      = 2;
-        nodes[2 * node_ptr + 2].triangle_count = (i != max_depth - 1) ? 0 : -1;
+        if (left == 0) {
+          memcpy(
+            new_triangles + triangles_ptr, bvh_triangles + triangles_ptr,
+            sizeof(bvh_triangle) * node.triangle_count);
+        }
 
-        node_ptr++;
         continue;
       }
 
@@ -402,11 +371,17 @@ Node* build_bvh_structure(
       node.left_high = compressed_high;
       node.left_low  = compressed_low;
 
-      nodes[2 * node_ptr + 1].triangle_count    = left;
-      nodes[2 * node_ptr + 1].triangles_address = triangles_ptr;
-      nodes[2 * node_ptr + 1].leaf_node         = 1;
+      nodes[write_ptr].triangle_count    = left;
+      nodes[write_ptr].triangles_address = triangles_ptr;
+      nodes[write_ptr].leaf_node         = 1;
 
+      write_ptr++;
       triangles_ptr += left;
+
+      if (write_ptr == node_count) {
+        node_count += triangles_length;
+        nodes = safe_realloc(nodes, sizeof(Node) * node_count);
+      }
 
       memcpy(new_triangles + triangles_ptr, bvh_triangles, right * sizeof(bvh_triangle));
 
@@ -423,33 +398,39 @@ Node* build_bvh_structure(
       node.right_high = compressed_high;
       node.right_low  = compressed_low;
 
-      nodes[2 * node_ptr + 2].triangle_count    = right;
-      nodes[2 * node_ptr + 2].triangles_address = triangles_ptr;
-      nodes[2 * node_ptr + 2].leaf_node         = 1;
+      nodes[write_ptr].triangle_count    = right;
+      nodes[write_ptr].triangles_address = triangles_ptr;
+      nodes[write_ptr].leaf_node         = 1;
 
+      write_ptr++;
       triangles_ptr += right;
+
+      if (write_ptr == node_count) {
+        node_count += triangles_length;
+        nodes = safe_realloc(nodes, sizeof(Node) * node_count);
+      }
 
       node.triangle_count    = 0;
       node.triangles_address = -1;
       node.leaf_node         = 0;
 
       nodes[node_ptr] = node;
-
-      node_ptr++;
     }
 
-    _mm_free(bvh_triangles);
-    _mm_free(container);
+    begin_of_current_nodes = end_of_current_nodes;
+    end_of_current_nodes   = write_ptr;
 
-    bvh_triangles = new_triangles;
-
-    nodes_at_depth *= 2;
-
-    printf(
-      "\r                                              \rBVH depth %d/%d built.", i + 1, max_depth);
+    memcpy(bvh_triangles, new_triangles, sizeof(bvh_triangle) * triangles_length);
   }
 
-  printf("\r                             \r");
+  _mm_free(new_triangles);
+  _mm_free(container);
+
+  node_count = write_ptr;
+
+  printf("BVH with %d Nodes built.", node_count);
+
+  nodes = safe_realloc(nodes, sizeof(Node) * node_count);
 
   Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
   memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
@@ -461,55 +442,9 @@ Node* build_bvh_structure(
   free(triangles_swap);
   _mm_free(bvh_triangles);
 
-  int* node_address_lookup = malloc(sizeof(int) * node_count);
-  memset(node_address_lookup, 0, sizeof(int) * node_count);
-  Node* culled_nodes = malloc(sizeof(Node) * node_count);
-  int culled_count   = 0;
-
-  for (int i = 0; i < node_count; i++) {
-    Node node = nodes[i];
-    if (node.leaf_node != 2) {
-      node.child_address         = 2 * i + 1;
-      node.uncle_address         = (((i + 1) >> 1) ^ 0b1) - 1;
-      node.grand_uncle_address   = (((i + 1) >> 2) ^ 0b1) - 1;
-      culled_nodes[culled_count] = node;
-      node_address_lookup[i]     = culled_count++;
-    }
-  }
-
-  free(nodes);
-  nodes = safe_realloc(culled_nodes, sizeof(Node) * culled_count);
-
-  for (int i = 0; i < culled_count; i++) {
-    Node node = nodes[i];
-    if (node.leaf_node == 0) {
-      node.child_address = node_address_lookup[node.child_address];
-    }
-    if (node.uncle_address > 0) {
-      node.uncle_address = node_address_lookup[node.uncle_address];
-    }
-    if (node.grand_uncle_address > 0) {
-      node.grand_uncle_address = node_address_lookup[node.grand_uncle_address];
-    }
-    nodes[i] = node;
-  }
-
-  pow               = 2;
-  int address_count = 1;
-
-  for (int i = 0; i < max_depth - 2; i++) {
-    address_count += pow;
-    pow *= 2;
-  }
-
-  node_address_lookup = safe_realloc(node_address_lookup, sizeof(int) * address_count);
-
-  *addresses_out      = node_address_lookup;
-  *address_length_out = address_count;
-
   *triangles_io = triangles;
 
-  *nodes_length_out = culled_count;
+  *nodes_length_out = node_count;
 
   return nodes;
 }
