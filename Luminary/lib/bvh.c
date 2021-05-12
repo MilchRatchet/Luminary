@@ -84,38 +84,25 @@ static void fit_bounds(
 
 static void divide_along_x_axis(
   const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
-  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
-  const int left_right_bias) {
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length) {
   int left  = 0;
   int right = 0;
-
-  const int bias = left_right_bias % 2;
 
   for (int i = 0; i < triangles_length; i++) {
     bvh_triangle triangle = triangles[i];
 
     int is_right = 0;
-    int is_left  = 0;
 
-    is_right += triangle.vertex.x >= split;
-    is_left += triangle.vertex.x <= split;
-    is_right += triangle.vertex.x + triangle.edge1.x >= split;
-    is_left += triangle.vertex.x + triangle.edge1.x <= split;
-    is_right += triangle.vertex.x + triangle.edge2.x >= split;
-    is_left += triangle.vertex.x + triangle.edge2.x <= split;
+    const float shifted_split = split - triangle.vertex.x;
 
-    if (bias) {
-      if (is_left)
-        triangles_left[left++] = triangle;
-      else if (is_right)
-        triangles_right[right++] = triangle;
-    }
-    else {
-      if (is_right)
-        triangles_right[right++] = triangle;
-      else if (is_left)
-        triangles_left[left++] = triangle;
-    }
+    is_right += 0.0f >= shifted_split;
+    is_right += triangle.edge1.x >= shifted_split;
+    is_right += triangle.edge2.x >= shifted_split;
+
+    if (is_right)
+      triangles_right[right++] = triangle;
+    else
+      triangles_left[left++] = triangle;
   }
 
   *left_out  = left;
@@ -124,38 +111,25 @@ static void divide_along_x_axis(
 
 static void divide_along_y_axis(
   const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
-  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
-  const int left_right_bias) {
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length) {
   int left  = 0;
   int right = 0;
-
-  const int bias = left_right_bias % 2;
 
   for (int i = 0; i < triangles_length; i++) {
     bvh_triangle triangle = triangles[i];
 
     int is_right = 0;
-    int is_left  = 0;
 
-    is_right += triangle.vertex.y >= split;
-    is_left += triangle.vertex.y <= split;
-    is_right += triangle.vertex.y + triangle.edge1.y >= split;
-    is_left += triangle.vertex.y + triangle.edge1.y <= split;
-    is_right += triangle.vertex.y + triangle.edge2.y >= split;
-    is_left += triangle.vertex.y + triangle.edge2.y <= split;
+    const float shifted_split = split - triangle.vertex.y;
 
-    if (bias) {
-      if (is_left)
-        triangles_left[left++] = triangle;
-      else if (is_right)
-        triangles_right[right++] = triangle;
-    }
-    else {
-      if (is_right)
-        triangles_right[right++] = triangle;
-      else if (is_left)
-        triangles_left[left++] = triangle;
-    }
+    is_right += 0.0f >= shifted_split;
+    is_right += triangle.edge1.y >= shifted_split;
+    is_right += triangle.edge2.y >= shifted_split;
+
+    if (is_right)
+      triangles_right[right++] = triangle;
+    else
+      triangles_left[left++] = triangle;
   }
 
   *left_out  = left;
@@ -164,38 +138,25 @@ static void divide_along_y_axis(
 
 static void divide_along_z_axis(
   const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
-  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
-  const int left_right_bias) {
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length) {
   int left  = 0;
   int right = 0;
-
-  const int bias = left_right_bias % 2;
 
   for (int i = 0; i < triangles_length; i++) {
     bvh_triangle triangle = triangles[i];
 
     int is_right = 0;
-    int is_left  = 0;
 
-    is_right += triangle.vertex.z >= split;
-    is_left += triangle.vertex.z <= split;
-    is_right += triangle.vertex.z + triangle.edge1.z >= split;
-    is_left += triangle.vertex.z + triangle.edge1.z <= split;
-    is_right += triangle.vertex.z + triangle.edge2.z >= split;
-    is_left += triangle.vertex.z + triangle.edge2.z <= split;
+    const float shifted_split = split - triangle.vertex.z;
 
-    if (bias) {
-      if (is_left)
-        triangles_left[left++] = triangle;
-      else if (is_right)
-        triangles_right[right++] = triangle;
-    }
-    else {
-      if (is_right)
-        triangles_right[right++] = triangle;
-      else if (is_left)
-        triangles_left[left++] = triangle;
-    }
+    is_right += 0.0f >= shifted_split;
+    is_right += triangle.edge1.z >= shifted_split;
+    is_right += triangle.edge2.z >= shifted_split;
+
+    if (is_right)
+      triangles_right[right++] = triangle;
+    else
+      triangles_left[left++] = triangle;
   }
 
   *left_out  = left;
@@ -338,17 +299,17 @@ Node* build_bvh_structure(
           if (a == 0) {
             divide_along_x_axis(
               split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-              container, total_right, i);
+              container, total_right);
           }
           else if (a == 1) {
             divide_along_y_axis(
               split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-              container, total_right, i);
+              container, total_right);
           }
           else {
             divide_along_z_axis(
               split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-              container, total_right, i);
+              container, total_right);
           }
 
           if (left == 0) {
@@ -399,17 +360,17 @@ Node* build_bvh_structure(
       if (axis == 0) {
         divide_along_x_axis(
           optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count, i);
+          bvh_triangles + node.triangles_address, node.triangle_count);
       }
       else if (axis == 1) {
         divide_along_y_axis(
           optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count, i);
+          bvh_triangles + node.triangles_address, node.triangle_count);
       }
       else {
         divide_along_z_axis(
           optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count, i);
+          bvh_triangles + node.triangles_address, node.triangle_count);
       }
 
       if (left == 0 || right == 0) {
