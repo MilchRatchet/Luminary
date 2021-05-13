@@ -159,7 +159,12 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   int nodes_length;
 
-  Node* nodes = build_bvh_structure(&triangles, triangle_count, bvh_depth, &nodes_length);
+  Node2* initial_nodes = build_bvh_structure(&triangles, triangle_count, &nodes_length);
+
+  Node8* nodes =
+    collapse_bvh(initial_nodes, nodes_length, &triangles, triangle_count, &nodes_length);
+
+  free(initial_nodes);
 
   Traversal_Triangle* traversal_triangles = malloc(sizeof(Traversal_Triangle) * triangle_count);
 

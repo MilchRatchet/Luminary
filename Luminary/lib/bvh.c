@@ -163,17 +163,16 @@ static void divide_along_z_axis(
   *right_out = right;
 }
 
-Node* build_bvh_structure(
-  Triangle** triangles_io, unsigned int triangles_length, const int max_depth,
-  int* nodes_length_out) {
+Node2* build_bvh_structure(
+  Triangle** triangles_io, unsigned int triangles_length, int* nodes_length_out) {
   Triangle* triangles = *triangles_io;
-  int node_count      = 1 + triangles_length / 10;
+  int node_count      = 1 + triangles_length / threshold_triangles;
 
-  Node* nodes = (Node*) malloc(sizeof(Node) * node_count);
+  Node2* nodes = (Node2*) malloc(sizeof(Node2) * node_count);
 
   assert((unsigned long long) nodes, "Failed to allocate BVH nodes!", 1);
 
-  memset(nodes, 0, sizeof(Node) * node_count);
+  memset(nodes, 0, sizeof(Node2) * node_count);
 
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = triangles_length;
@@ -191,9 +190,8 @@ Node* build_bvh_structure(
     bvh_triangles[i] = bt;
   }
 
-  const double compression_divisor = 1.0 / 255.0;
+  // const double compression_divisor = 1.0 / 255.0;
 
-  int node_ptr               = 0;
   int begin_of_current_nodes = 0;
   int end_of_current_nodes   = 1;
   int write_ptr              = 1;
@@ -209,7 +207,7 @@ Node* build_bvh_structure(
 
     for (int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
       int left, right;
-      Node node = nodes[node_ptr];
+      Node2 node = nodes[node_ptr];
 
       triangles_ptr = node.triangles_address;
 
@@ -224,16 +222,16 @@ Node* build_bvh_structure(
         bvh_triangles + node.triangles_address, node.triangle_count, &high, &low, &high_inner,
         &low_inner);
 
-      node.ex = (int8_t) ceil(log2f((high.x - low.x) * compression_divisor));
+      /*node.ex = (int8_t) ceil(log2f((high.x - low.x) * compression_divisor));
       node.ey = (int8_t) ceil(log2f((high.y - low.y) * compression_divisor));
-      node.ez = (int8_t) ceil(log2f((high.z - low.z) * compression_divisor));
+      node.ez = (int8_t) ceil(log2f((high.z - low.z) * compression_divisor));*/
 
-      vec3 tp = {.x = low.x, .y = low.y, .z = low.z};
-      node.p  = tp;
+      // vec3 tp = {.x = low.x, .y = low.y, .z = low.z};
+      // node.p  = tp;
 
-      const float compression_x = 1.0f / exp2f(node.ex);
-      const float compression_y = 1.0f / exp2f(node.ey);
-      const float compression_z = 1.0f / exp2f(node.ez);
+      // const float compression_x = 1.0f / exp2f(node.ex);
+      // const float compression_y = 1.0f / exp2f(node.ey);
+      // const float compression_z = 1.0f / exp2f(node.ez);
 
       int axis;
       float search_start, search_end;
@@ -356,20 +354,25 @@ Node* build_bvh_structure(
         continue;
       }
 
-      compressed_vec3 compressed_low, compressed_high;
+      // compressed_vec3 compressed_low, compressed_high;
 
       fit_bounds(new_triangles + triangles_ptr, left, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
 
-      compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
+      /*compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
       compressed_low.y = (uint8_t) floor((low.y - node.p.y) * compression_y);
       compressed_low.z = (uint8_t) floor((low.z - node.p.z) * compression_z);
 
       compressed_high.x = (uint8_t) ceil((high.x - node.p.x) * compression_x);
       compressed_high.y = (uint8_t) ceil((high.y - node.p.y) * compression_y);
-      compressed_high.z = (uint8_t) ceil((high.z - node.p.z) * compression_z);
+      compressed_high.z = (uint8_t) ceil((high.z - node.p.z) * compression_z);*/
 
-      node.left_high = compressed_high;
-      node.left_low  = compressed_low;
+      node.left_high.x   = high.x;
+      node.left_high.y   = high.y;
+      node.left_high.z   = high.z;
+      node.left_low.x    = low.x;
+      node.left_low.y    = low.y;
+      node.left_low.z    = low.z;
+      node.child_address = write_ptr;
 
       nodes[write_ptr].triangle_count    = left;
       nodes[write_ptr].triangles_address = triangles_ptr;
@@ -379,24 +382,28 @@ Node* build_bvh_structure(
       triangles_ptr += left;
 
       if (write_ptr == node_count) {
-        node_count += triangles_length;
-        nodes = safe_realloc(nodes, sizeof(Node) * node_count);
+        node_count += triangles_length / threshold_triangles;
+        nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
       }
 
       memcpy(new_triangles + triangles_ptr, bvh_triangles, right * sizeof(bvh_triangle));
 
       fit_bounds(new_triangles + triangles_ptr, right, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
 
-      compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
+      /*compressed_low.x = (uint8_t) floor((low.x - node.p.x) * compression_x);
       compressed_low.y = (uint8_t) floor((low.y - node.p.y) * compression_y);
       compressed_low.z = (uint8_t) floor((low.z - node.p.z) * compression_z);
 
       compressed_high.x = (uint8_t) ceil((high.x - node.p.x) * compression_x);
       compressed_high.y = (uint8_t) ceil((high.y - node.p.y) * compression_y);
-      compressed_high.z = (uint8_t) ceil((high.z - node.p.z) * compression_z);
+      compressed_high.z = (uint8_t) ceil((high.z - node.p.z) * compression_z);*/
 
-      node.right_high = compressed_high;
-      node.right_low  = compressed_low;
+      node.right_high.x = high.x;
+      node.right_high.y = high.y;
+      node.right_high.z = high.z;
+      node.right_low.x  = low.x;
+      node.right_low.y  = low.y;
+      node.right_low.z  = low.z;
 
       nodes[write_ptr].triangle_count    = right;
       nodes[write_ptr].triangles_address = triangles_ptr;
@@ -406,8 +413,8 @@ Node* build_bvh_structure(
       triangles_ptr += right;
 
       if (write_ptr == node_count) {
-        node_count += triangles_length;
-        nodes = safe_realloc(nodes, sizeof(Node) * node_count);
+        node_count += triangles_length / threshold_triangles;
+        nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
       }
 
       node.triangle_count    = 0;
@@ -430,7 +437,7 @@ Node* build_bvh_structure(
 
   printf("BVH with %d Nodes built.", node_count);
 
-  nodes = safe_realloc(nodes, sizeof(Node) * node_count);
+  nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
 
   Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
   memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
@@ -447,4 +454,189 @@ Node* build_bvh_structure(
   *nodes_length_out = node_count;
 
   return nodes;
+}
+
+#define BINARY_NODE_IS_LEAF_NODE 0b11
+#define BINARY_NODE_IS_NULL 0b10
+
+Node8* collapse_bvh(
+  Node2* binary_nodes, const int binary_nodes_length, Triangle** triangles_io,
+  const int triangles_length, int* nodes_length_out) {
+  Triangle* triangles = *triangles_io;
+  int node_count      = binary_nodes_length;
+
+  Node8* nodes = (Node8*) malloc(sizeof(Node8) * node_count);
+
+  assert((unsigned long long) nodes, "Failed to allocate BVH nodes!", 1);
+
+  memset(nodes, 0, sizeof(Node8) * node_count);
+
+  bvh_triangle* bvh_triangles = _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
+  bvh_triangle* new_triangles = _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
+
+  for (unsigned int i = 0; i < triangles_length; i++) {
+    Triangle t      = triangles[i];
+    bvh_triangle bt = {
+      .vertex = {.x = t.vertex.x, .y = t.vertex.y, .z = t.vertex.z},
+      .edge1  = {.x = t.edge1.x, .y = t.edge1.y, .z = t.edge1.z},
+      .edge2  = {.x = t.edge2.x, .y = t.edge2.y, .z = t.edge2.z},
+      .id     = i};
+    bvh_triangles[i] = bt;
+  }
+
+  memcpy(new_triangles, bvh_triangles, sizeof(bvh_triangle) * triangles_length);
+
+  nodes[0].triangle_base_index   = 0;
+  nodes[0].child_node_base_index = 0;
+
+  int begin_of_current_nodes = 0;
+  int end_of_current_nodes   = 1;
+  int write_ptr              = 1;
+  int triangles_ptr          = 0;
+
+  while (begin_of_current_nodes != end_of_current_nodes) {
+    for (int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
+      Node8 node = nodes[node_ptr];
+
+      int binary_index = node.child_node_base_index;
+
+      node.child_node_base_index = write_ptr;
+
+      Node2 binary_children[8];
+      vec3 low[8];
+      vec3 high[8];
+      int binary_addresses[8];
+      binary_children[0] = binary_nodes[binary_index];
+
+      int offset      = 8;
+      int half_offset = 4;
+
+      for (int j = 0; j < 3; j++) {
+        for (int i = 0; i < 8; i += offset) {
+          Node2 base_child = binary_children[i];
+
+          if (base_child.leaf_node & 0b10 || base_child.triangle_count == 0) {
+            binary_children[i + half_offset].leaf_node = BINARY_NODE_IS_NULL;
+            if (base_child.leaf_node != BINARY_NODE_IS_NULL) {
+              binary_children[i].leaf_node = BINARY_NODE_IS_LEAF_NODE;
+            }
+          }
+          else {
+            binary_children[i]               = binary_nodes[base_child.child_address];
+            low[i]                           = base_child.left_low;
+            high[i]                          = base_child.left_high;
+            binary_children[i + half_offset] = binary_nodes[base_child.child_address + 1];
+            low[i + half_offset]             = base_child.right_low;
+            high[i + half_offset]            = base_child.right_high;
+          }
+        }
+        offset >> 1;
+        half_offset >> 1;
+      }
+
+      vec3 node_low  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
+      vec3 node_high = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
+
+      for (int i = 0; i < 8; i++) {
+        if (binary_children[i].leaf_node != BINARY_NODE_IS_NULL) {
+          vec3 lo    = low[i];
+          node_low.x = min(node_low.x, lo.x);
+          node_low.y = min(node_low.y, lo.y);
+          node_low.z = min(node_low.z, lo.z);
+
+          vec3 hi     = high[i];
+          node_high.x = max(node_high.x, hi.x);
+          node_high.y = max(node_high.y, hi.y);
+          node_high.z = max(node_high.z, hi.z);
+        }
+      }
+
+      node.p = node_low;
+
+      node.ex = (int8_t) ceil(log2f((node_high.x - node_low.x) * 1.0 / 255.0));
+      node.ey = (int8_t) ceil(log2f((node_high.y - node_low.y) * 1.0 / 255.0));
+      node.ez = (int8_t) ceil(log2f((node_high.z - node_low.z) * 1.0 / 255.0));
+
+      const float compression_x = 1.0f / exp2f(node.ex);
+      const float compression_y = 1.0f / exp2f(node.ey);
+      const float compression_z = 1.0f / exp2f(node.ez);
+
+      node.imask           = 0;
+      uint8_t mask_creator = 0b1;
+      int child_slot_index = 0;
+
+      if (write_ptr + 8 >= node_count) {
+        node_count += binary_nodes_length;
+        nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
+      }
+
+      for (int i = 0; i < 8; i++) {
+        Node2 base_child = binary_children[i];
+        if (!(base_child.leaf_node & 0b1)) {
+          node.imask |= mask_creator;
+          nodes[write_ptr++].child_node_base_index = binary_addresses[i];
+          node.meta[i]                             = 128 + child_slot_index++;
+        }
+        else if (base_child.leaf_node == BINARY_NODE_IS_NULL) {
+          node.meta[i] = 0;
+        }
+        else {
+          assert(
+            base_child.triangle_count < 128,
+            "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
+          node.meta[i] = base_child.triangle_count;
+          memcpy(
+            new_triangles + triangles_ptr, bvh_triangles + base_child.triangles_address,
+            sizeof(bvh_triangle) * base_child.triangle_count);
+          triangles_ptr += base_child.triangle_count;
+        }
+
+        mask_creator << 1;
+      }
+
+      for (int i = 0; i < 8; i++) {
+        vec3 lo       = low[i];
+        vec3 hi       = high[i];
+        node.low_x[i] = (uint8_t) floor((lo.x - node.p.x) * compression_x);
+        node.low_y[i] = (uint8_t) floor((lo.y - node.p.y) * compression_y);
+        node.low_z[i] = (uint8_t) floor((lo.z - node.p.z) * compression_z);
+
+        node.high_x[i] = (uint8_t) ceil((hi.x - node.p.x) * compression_x);
+        node.high_y[i] = (uint8_t) ceil((hi.y - node.p.y) * compression_y);
+        node.high_z[i] = (uint8_t) ceil((hi.z - node.p.z) * compression_z);
+      }
+
+      nodes[node_ptr] = node;
+    }
+
+    begin_of_current_nodes = end_of_current_nodes;
+    end_of_current_nodes   = write_ptr;
+  }
+
+  Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
+  memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
+
+  for (unsigned int i = 0; i < triangles_length; i++) {
+    triangles[i] = triangles_swap[bvh_triangles[i].id];
+  }
+
+  free(triangles_swap);
+  _mm_free(bvh_triangles);
+  _mm_free(new_triangles);
+
+  node_count = write_ptr;
+
+  printf("BVH collapsed to %d Nodes.", node_count);
+
+  nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
+
+  *triangles_io = triangles;
+
+  *nodes_length_out = node_count;
+
+  return nodes;
+}
+
+void reorder_child_nodes(Node8* nodes, const int node_count) {
+  float cost_table[64];
 }

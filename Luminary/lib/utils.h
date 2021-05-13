@@ -33,10 +33,8 @@ struct Scene {
   Triangle* triangles;
   Traversal_Triangle* traversal_triangles;
   unsigned int triangles_length;
-  Node* nodes;
+  Node8* nodes;
   unsigned int nodes_length;
-  int* node_addresses;
-  int node_addresses_length;
   uint16_t materials_length;
   texture_assignment* texture_assignments;
   float azimuth;
