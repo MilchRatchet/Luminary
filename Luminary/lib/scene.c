@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <immintrin.h>
+#include <math.h>
 #include "scene.h"
 #include "raytrace.h"
 #include "error.h"

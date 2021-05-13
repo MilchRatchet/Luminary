@@ -44,6 +44,6 @@ Node2* build_bvh_structure(
 
 Node8* collapse_bvh(
   Node2* binary_nodes, const int binary_nodes_length, Triangle** triangles_io,
-  const int triangles_length, int* nodes_length_out)
+  const int triangles_length, int* nodes_length_out);
 
 #endif /* BVH_H */
