@@ -201,8 +201,6 @@ Node2* build_bvh_structure(
 
   memcpy(new_triangles, bvh_triangles, sizeof(bvh_triangle) * triangles_length);
 
-  int axis = 0;
-
   while (begin_of_current_nodes != end_of_current_nodes) {
     int triangles_ptr = 0;
 
@@ -225,91 +223,98 @@ Node2* build_bvh_structure(
 
       float search_start, search_end;
       float optimal_split, optimal_cost;
+      int axis;
 
       optimal_cost = FLT_MAX;
 
-      if (axis == 0) {
-        search_start = low_inner.x;
-        search_end   = high_inner.x;
-      }
-      else if (axis == 1) {
-        search_start = low_inner.y;
-        search_end   = high_inner.y;
-      }
-      else {
-        search_start = low_inner.z;
-        search_end   = high_inner.z;
-      }
-
-      if (search_end < search_start)
-        continue;
-
-      const float search_interval = (search_end - search_start) / samples_in_space;
-
-      int total_right = node.triangle_count;
-      memcpy(container, bvh_triangles + node.triangles_address, sizeof(bvh_triangle) * total_right);
-      int total_left = 0;
-
-      for (int k = 0; k < samples_in_space; k++) {
-        const float split = search_start + k * search_interval;
-        vec3_p high_left, high_right, low_left, low_right;
-
-        if (axis == 0) {
-          divide_along_x_axis(
-            split, &left, &right, new_triangles + triangles_ptr + total_left, container, container,
-            total_right);
+      for (int a = 0; a < 3; a++) {
+        if (a == 0) {
+          search_start = low_inner.x;
+          search_end   = high_inner.x;
         }
-        else if (axis == 1) {
-          divide_along_y_axis(
-            split, &left, &right, new_triangles + triangles_ptr + total_left, container, container,
-            total_right);
+        else if (a == 1) {
+          search_start = low_inner.y;
+          search_end   = high_inner.y;
         }
         else {
-          divide_along_z_axis(
-            split, &left, &right, new_triangles + triangles_ptr + total_left, container, container,
-            total_right);
+          search_start = low_inner.z;
+          search_end   = high_inner.z;
         }
 
-        if (left == 0) {
-          continue;
-        }
-
-        if (right == 0) {
-          break;
-        }
-
-        total_left += left;
-        total_right -= left;
-
-        fit_bounds(
-          new_triangles + triangles_ptr, total_left, &high_left, &low_left, (vec3_p*) 0,
-          (vec3_p*) 0);
-        fit_bounds(container, total_right, &high_right, &low_right, (vec3_p*) 0, (vec3_p*) 0);
-
-        vec3 diff_left = {
-          .x = high_left.x - low_left.x,
-          .y = high_left.y - low_left.y,
-          .z = high_left.z - low_left.z};
-
-        vec3 diff_right = {
-          .x = high_right.x - low_right.x,
-          .y = high_right.y - low_right.y,
-          .z = high_right.z - low_right.z};
-
-        const float cost_L =
-          diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
-
-        const float cost_R =
-          diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
-
-        const float total_cost = cost_L * total_left + cost_R * total_right;
-
-        if (total_cost < optimal_cost) {
-          optimal_cost  = total_cost;
-          optimal_split = split;
+        if (search_end < search_start) {
+          optimal_split = search_start;
         }
         else {
-          k += samples_in_space / 10;
+          const float search_interval = (search_end - search_start) / samples_in_space;
+
+          int total_right = node.triangle_count;
+          memcpy(
+            container, bvh_triangles + node.triangles_address, sizeof(bvh_triangle) * total_right);
+          int total_left = 0;
+
+          for (int k = 0; k < samples_in_space; k++) {
+            const float split = search_start + k * search_interval;
+            vec3_p high_left, high_right, low_left, low_right;
+
+            if (a == 0) {
+              divide_along_x_axis(
+                split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+                container, total_right);
+            }
+            else if (a == 1) {
+              divide_along_y_axis(
+                split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+                container, total_right);
+            }
+            else {
+              divide_along_z_axis(
+                split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+                container, total_right);
+            }
+
+            if (left == 0) {
+              continue;
+            }
+
+            if (right == 0) {
+              break;
+            }
+
+            total_left += left;
+            total_right -= left;
+
+            fit_bounds(
+              new_triangles + triangles_ptr, total_left, &high_left, &low_left, (vec3_p*) 0,
+              (vec3_p*) 0);
+            fit_bounds(container, total_right, &high_right, &low_right, (vec3_p*) 0, (vec3_p*) 0);
+
+            vec3 diff_left = {
+              .x = high_left.x - low_left.x,
+              .y = high_left.y - low_left.y,
+              .z = high_left.z - low_left.z};
+
+            vec3 diff_right = {
+              .x = high_right.x - low_right.x,
+              .y = high_right.y - low_right.y,
+              .z = high_right.z - low_right.z};
+
+            const float cost_L =
+              diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
+
+            const float cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z
+                                 + diff_right.y * diff_right.z;
+
+            const float total_cost = cost_L * total_left + cost_R * total_right;
+
+            if (total_cost < optimal_cost) {
+              optimal_cost  = total_cost;
+              optimal_split = split;
+              axis          = a;
+            }
+            else {
+              k += samples_in_space / 10;
+            }
+          }
         }
       }
 
@@ -398,8 +403,6 @@ Node2* build_bvh_structure(
       nodes[node_ptr] = node;
     }
 
-    axis = (axis + 1) % 3;
-
     begin_of_current_nodes = end_of_current_nodes;
     end_of_current_nodes   = write_ptr;
 
@@ -481,6 +484,7 @@ Node8* collapse_bvh(
       int binary_index = node.child_node_base_index;
 
       node.child_node_base_index = write_ptr;
+      node.triangle_base_index   = triangles_ptr;
 
       Node2 binary_children[8];
       vec3 low[8];
@@ -555,16 +559,15 @@ Node8* collapse_bvh(
 
       for (int i = 0; i < 8; i++) {
         Node2 base_child = binary_children[i];
-        if (!(base_child.leaf_node & 0b1)) {
+        if (!(base_child.leaf_node & 0b10)) {
           node.imask |= mask_creator;
           nodes[write_ptr++].child_node_base_index = binary_addresses[i];
-          node.meta[i]                             = 0b100000 + 0b11000 + child_slot_index++;
+          node.meta[i]                             = 0b00100000 + 0b11000 + child_slot_index++;
         }
         else if (base_child.leaf_node == BINARY_NODE_IS_NULL) {
           node.meta[i] = 0;
         }
         else {
-          printf("Leaf Node with Triangles: %d\n", base_child.triangle_count);
           assert(
             base_child.triangle_count < 4,
             "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
@@ -613,8 +616,11 @@ Node8* collapse_bvh(
     end_of_current_nodes   = write_ptr;
 
     printf("BVH8 iteration done! Nodes: %d\n", write_ptr);
-    // getchar();
   }
+
+  printf("Triangles Now: %d\n", triangles_ptr);
+
+  memcpy(bvh_triangles, new_triangles, sizeof(bvh_triangle) * triangles_length);
 
   Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
   memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);

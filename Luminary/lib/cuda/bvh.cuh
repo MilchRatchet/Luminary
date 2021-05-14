@@ -116,14 +116,14 @@ unsigned int __bfind(unsigned int a)
 #define STACK_POP(X) {                                               \
     stack_ptr--;                                                     \
     if (stack_ptr < stack_size_sm)                                   \
-        X = traversal_stack_sm[threadIdx.x][threadIdx.y][stack_ptr]; \
+        X = traversal_stack_sm[threadIdx.x][stack_ptr];              \
     else                                                             \
         X = traversal_stack[stack_ptr - stack_size_sm];              \
 }
 
 #define STACK_PUSH(X) {                                              \
     if (stack_ptr < stack_size_sm)                                   \
-        traversal_stack_sm[threadIdx.x][threadIdx.y][stack_ptr] = X; \
+        traversal_stack_sm[threadIdx.x][stack_ptr] = X;              \
     else                                                             \
         traversal_stack[stack_ptr - stack_size_sm] = X;              \
     stack_ptr++;                                                     \
@@ -136,8 +136,8 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
     const int stack_size = 32;
 	uint2 traversal_stack[stack_size];
 
-    const int stack_size_sm = 8;
-    __shared__ uint2 traversal_stack_sm[32][2][stack_size_sm];
+    const int stack_size_sm = 12;
+    __shared__ uint2 traversal_stack_sm[128][stack_size_sm];
 
     char stack_ptr = 0;
 
@@ -154,6 +154,8 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
     unsigned int inverse_octant = ((ray.x < 0.0f ? 1 : 0) << 2) | ((ray.y < 0.0f ? 1 : 0) << 1) | ((ray.z < 0.0f ? 1 : 0) << 0);
     inverse_octant = 7 - inverse_octant;
 
+    int traversed_nodes = 0;
+
     while (1) {
         if (node_task.y > 0x00ffffff) {
             const unsigned int hits = node_task.y;
@@ -168,6 +170,8 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
             }
 
             {
+                traversed_nodes++;
+
                 const unsigned int slot_index = (child_bit_index - 24) ^ inverse_octant;
                 const unsigned int inverse_octant4 = inverse_octant * 0x01010101u;
                 const unsigned int relative_index = __popc(imask & ~(0xffffffff << slot_index));
@@ -175,13 +179,11 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
 
                 float4* data_ptr = (float4*)(nodes + child_node_index);
 
-                float4 data0, data1, data2, data3, data4;
-
-                data0 = __ldg(data_ptr + 0);
-                data1 = __ldg(data_ptr + 1);
-                data2 = __ldg(data_ptr + 2);
-                data3 = __ldg(data_ptr + 3);
-                data4 = __ldg(data_ptr + 4);
+                const float4 data0 = __ldg(data_ptr + 0);
+                const float4 data1 = __ldg(data_ptr + 1);
+                const float4 data2 = __ldg(data_ptr + 2);
+                const float4 data3 = __ldg(data_ptr + 3);
+                const float4 data4 = __ldg(data_ptr + 4);
 
                 vec3 p;
                 p.x = data0.x;
@@ -215,12 +217,12 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
                     const unsigned int bit_index4 = (meta4 ^ (inverse_octant4 & inner_mask4)) & 0x1f1f1f1f;
                     const unsigned int child_bits4 = (meta4 >> 5) & 0x07070707;
 
-                    unsigned int low_x = (inv_ray.x < 0.0f) ? float_as_uint(data3.z) : float_as_uint(data2.x);
-                    unsigned int high_x = (inv_ray.x < 0.0f) ? float_as_uint(data2.x) : float_as_uint(data3.z);
-                    unsigned int low_y = (inv_ray.y < 0.0f) ? float_as_uint(data4.x) : float_as_uint(data2.z);
-                    unsigned int high_y = (inv_ray.y < 0.0f) ? float_as_uint(data2.z) : float_as_uint(data4.x);
-                    unsigned int low_z = (inv_ray.z < 0.0f) ? float_as_uint(data4.z) : float_as_uint(data3.x);
-                    unsigned int high_z = (inv_ray.z < 0.0f) ? float_as_uint(data3.x) : float_as_uint(data4.z);
+                    const unsigned int low_x = (inv_ray.x < 0.0f) ? float_as_uint(data3.z) : float_as_uint(data2.x);
+                    const unsigned int high_x = (inv_ray.x < 0.0f) ? float_as_uint(data2.x) : float_as_uint(data3.z);
+                    const unsigned int low_y = (inv_ray.y < 0.0f) ? float_as_uint(data4.x) : float_as_uint(data2.z);
+                    const unsigned int high_y = (inv_ray.y < 0.0f) ? float_as_uint(data2.z) : float_as_uint(data4.x);
+                    const unsigned int low_z = (inv_ray.z < 0.0f) ? float_as_uint(data4.z) : float_as_uint(data3.x);
+                    const unsigned int high_z = (inv_ray.z < 0.0f) ? float_as_uint(data3.x) : float_as_uint(data4.z);
 
                     float min_x[4];
                     float max_x[4];
@@ -263,7 +265,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
                         const float slab_min = fmaxf(fmax_fmax(min_x[i], min_y[i], min_z[i]), eps);
                         const float slab_max = fminf(fmin_fmin(max_x[i], max_y[i], max_z[i]), depth);
 
-                        int intersection = slab_min <= slab_max;
+                        const int intersection = slab_min <= slab_max;
 
                         if (intersection) {
                             const unsigned int child_bits = get_8bit(child_bits4, i * 8);
@@ -280,12 +282,12 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
                     const unsigned int bit_index4 = (meta4 ^ (inverse_octant4 & inner_mask4)) & 0x1f1f1f1f;
                     const unsigned int child_bits4 = (meta4 >> 5) & 0x07070707;
 
-                    unsigned int low_x = (inv_ray.x < 0.0f) ? float_as_uint(data3.w) : float_as_uint(data2.y);
-                    unsigned int high_x = (inv_ray.x < 0.0f) ? float_as_uint(data2.y) : float_as_uint(data3.w);
-                    unsigned int low_y = (inv_ray.y < 0.0f) ? float_as_uint(data4.y) : float_as_uint(data2.w);
-                    unsigned int high_y = (inv_ray.y < 0.0f) ? float_as_uint(data2.w) : float_as_uint(data4.y);
-                    unsigned int low_z = (inv_ray.z < 0.0f) ? float_as_uint(data4.w) : float_as_uint(data3.y);
-                    unsigned int high_z = (inv_ray.z < 0.0f) ? float_as_uint(data3.y) : float_as_uint(data4.w);
+                    const unsigned int low_x = (inv_ray.x < 0.0f) ? float_as_uint(data3.w) : float_as_uint(data2.y);
+                    const unsigned int high_x = (inv_ray.x < 0.0f) ? float_as_uint(data2.y) : float_as_uint(data3.w);
+                    const unsigned int low_y = (inv_ray.y < 0.0f) ? float_as_uint(data4.y) : float_as_uint(data2.w);
+                    const unsigned int high_y = (inv_ray.y < 0.0f) ? float_as_uint(data2.w) : float_as_uint(data4.y);
+                    const unsigned int low_z = (inv_ray.z < 0.0f) ? float_as_uint(data4.w) : float_as_uint(data3.y);
+                    const unsigned int high_z = (inv_ray.z < 0.0f) ? float_as_uint(data3.y) : float_as_uint(data4.w);
 
                     float min_x[4];
                     float max_x[4];
@@ -328,7 +330,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
                         const float slab_min = fmaxf(fmax_fmax(min_x[i], min_y[i], min_z[i]), eps);
                         const float slab_max = fminf(fmin_fmin(max_x[i], max_y[i], max_z[i]), depth);
 
-                        int intersection = slab_min <= slab_max;
+                        const int intersection = slab_min <= slab_max;
 
                         if (intersection) {
                             const unsigned int child_bits = get_8bit(child_bits4, i * 8);
@@ -338,7 +340,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
                     }
                 }
 
-                node_task.y = (hit_mask & 0xff000000) | (*((char*)&data0.w + 3));
+                node_task.y = (hit_mask & 0xff000000) | (*((unsigned char*)&data0.w + 3));
                 triangle_task.y = hit_mask & 0x00ffffff;
             }
         }
@@ -368,6 +370,8 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
             }
         }
     }
+
+    //printf("TRAVERSED_NODES: %d\n",traversed_nodes);
 
     traversal_result result;
     result.hit_id = hit_id;
