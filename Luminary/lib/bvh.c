@@ -340,7 +340,7 @@ Node2* build_bvh_structure(
         actual_split = 0;
         if (left == 0) {
           memcpy(
-            new_triangles + triangles_ptr, bvh_triangles + triangles_ptr,
+            new_triangles + triangles_ptr, bvh_triangles,
             sizeof(bvh_triangle) * node.triangle_count);
         }
 
@@ -437,7 +437,8 @@ Node2* build_bvh_structure(
   return nodes;
 }
 
-#define BINARY_NODE_IS_LEAF_NODE 0b11
+#define BINARY_NODE_IS_INTERNAL_NODE 0b0
+#define BINARY_NODE_IS_LEAF_NODE 0b1
 #define BINARY_NODE_IS_NULL 0b10
 
 Node8* collapse_bvh(
@@ -499,11 +500,8 @@ Node8* collapse_bvh(
         for (int i = 0; i < 8; i += offset) {
           Node2 base_child = binary_children[i];
 
-          if (base_child.leaf_node & 0b10 || base_child.triangle_count != 0) {
+          if (base_child.leaf_node != BINARY_NODE_IS_INTERNAL_NODE) {
             binary_children[i + half_offset].leaf_node = BINARY_NODE_IS_NULL;
-            if (base_child.leaf_node != BINARY_NODE_IS_NULL) {
-              binary_children[i].leaf_node = BINARY_NODE_IS_LEAF_NODE;
-            }
           }
           else {
             binary_children[i]                = binary_nodes[base_child.child_address];
@@ -539,17 +537,15 @@ Node8* collapse_bvh(
 
       node.p = node_low;
 
-      node.ex = (int8_t) ceil(log2f((node_high.x - node_low.x) * 1.0 / 255.0));
-      node.ey = (int8_t) ceil(log2f((node_high.y - node_low.y) * 1.0 / 255.0));
-      node.ez = (int8_t) ceil(log2f((node_high.z - node_low.z) * 1.0 / 255.0));
+      node.ex = (int8_t) ceilf(log2f((node_high.x - node_low.x) * 1.0 / 255.0));
+      node.ey = (int8_t) ceilf(log2f((node_high.y - node_low.y) * 1.0 / 255.0));
+      node.ez = (int8_t) ceilf(log2f((node_high.z - node_low.z) * 1.0 / 255.0));
 
       const float compression_x = 1.0f / exp2f(node.ex);
       const float compression_y = 1.0f / exp2f(node.ey);
       const float compression_z = 1.0f / exp2f(node.ez);
 
       node.imask                    = 0;
-      uint8_t mask_creator          = 0b1;
-      int child_slot_index          = 0;
       int triangle_counting_address = 0;
 
       if (write_ptr + 8 >= node_count) {
@@ -559,15 +555,12 @@ Node8* collapse_bvh(
 
       for (int i = 0; i < 8; i++) {
         Node2 base_child = binary_children[i];
-        if (!(base_child.leaf_node & 0b10)) {
-          node.imask |= mask_creator;
+        if (base_child.leaf_node == BINARY_NODE_IS_INTERNAL_NODE) {
+          node.imask |= 1 << i;
           nodes[write_ptr++].child_node_base_index = binary_addresses[i];
-          node.meta[i]                             = 0b00100000 + 0b11000 + child_slot_index++;
+          node.meta[i]                             = 0b00100000 + 0b11000 + i;
         }
-        else if (base_child.leaf_node == BINARY_NODE_IS_NULL) {
-          node.meta[i] = 0;
-        }
-        else {
+        else if (base_child.leaf_node == BINARY_NODE_IS_LEAF_NODE) {
           assert(
             base_child.triangle_count < 4,
             "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
@@ -585,28 +578,42 @@ Node8* collapse_bvh(
           }
           meta = meta << 5;
           meta += triangle_counting_address;
-          triangle_counting_address += base_child.triangle_count;
+
           node.meta[i] = meta;
 
           memcpy(
             new_triangles + triangles_ptr, bvh_triangles + base_child.triangles_address,
             sizeof(bvh_triangle) * base_child.triangle_count);
-          triangles_ptr += base_child.triangle_count;
-        }
 
-        mask_creator = mask_creator << 1;
+          triangles_ptr += base_child.triangle_count;
+          triangle_counting_address += base_child.triangle_count;
+        }
+        else {
+          node.meta[i] = 0;
+        }
       }
 
       for (int i = 0; i < 8; i++) {
-        vec3 lo       = low[i];
-        vec3 hi       = high[i];
-        node.low_x[i] = (uint8_t) floor((lo.x - node.p.x) * compression_x);
-        node.low_y[i] = (uint8_t) floor((lo.y - node.p.y) * compression_y);
-        node.low_z[i] = (uint8_t) floor((lo.z - node.p.z) * compression_z);
+        if (binary_children[i].leaf_node == BINARY_NODE_IS_NULL) {
+          node.low_x[i] = 0;
+          node.low_y[i] = 0;
+          node.low_z[i] = 0;
 
-        node.high_x[i] = (uint8_t) ceil((hi.x - node.p.x) * compression_x);
-        node.high_y[i] = (uint8_t) ceil((hi.y - node.p.y) * compression_y);
-        node.high_z[i] = (uint8_t) ceil((hi.z - node.p.z) * compression_z);
+          node.high_x[i] = 0;
+          node.high_y[i] = 0;
+          node.high_z[i] = 0;
+        }
+        else {
+          vec3 lo       = low[i];
+          vec3 hi       = high[i];
+          node.low_x[i] = (uint8_t) floorf((lo.x - node.p.x) * compression_x);
+          node.low_y[i] = (uint8_t) floorf((lo.y - node.p.y) * compression_y);
+          node.low_z[i] = (uint8_t) floorf((lo.z - node.p.z) * compression_z);
+
+          node.high_x[i] = (uint8_t) ceilf((hi.x - node.p.x) * compression_x);
+          node.high_y[i] = (uint8_t) ceilf((hi.y - node.p.y) * compression_y);
+          node.high_z[i] = (uint8_t) ceilf((hi.z - node.p.z) * compression_z);
+        }
       }
 
       nodes[node_ptr] = node;
@@ -620,7 +627,8 @@ Node8* collapse_bvh(
 
   printf("Triangles Now: %d\n", triangles_ptr);
 
-  memcpy(bvh_triangles, new_triangles, sizeof(bvh_triangle) * triangles_length);
+  _mm_free(bvh_triangles);
+  bvh_triangles = new_triangles;
 
   Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
   memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
@@ -630,12 +638,12 @@ Node8* collapse_bvh(
   }
 
   free(triangles_swap);
-  _mm_free(bvh_triangles);
+
   _mm_free(new_triangles);
 
   node_count = write_ptr;
 
-  printf("BVH collapsed to %d Nodes.", node_count);
+  printf("BVH collapsed to %d Nodes.\n", node_count);
 
   nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
 

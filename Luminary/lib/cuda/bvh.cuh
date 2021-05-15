@@ -151,10 +151,8 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
     uint2 node_task = make_uint2(0, 0b10000000000000000000000000000000);
     uint2 triangle_task = make_uint2(0, 0);
 
-    unsigned int inverse_octant = ((ray.x < 0.0f ? 1 : 0) << 2) | ((ray.y < 0.0f ? 1 : 0) << 1) | ((ray.z < 0.0f ? 1 : 0) << 0);
+    unsigned int inverse_octant = (((ray.x < 0.0f) ? 1 : 0) << 2) | (((ray.y < 0.0f) ? 1 : 0) << 1) | (((ray.z < 0.0f) ? 1 : 0) << 0);
     inverse_octant = 7 - inverse_octant;
-
-    int traversed_nodes = 0;
 
     while (1) {
         if (node_task.y > 0x00ffffff) {
@@ -170,8 +168,6 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
             }
 
             {
-                traversed_nodes++;
-
                 const unsigned int slot_index = (child_bit_index - 24) ^ inverse_octant;
                 const unsigned int inverse_octant4 = inverse_octant * 0x01010101u;
                 const unsigned int relative_index = __popc(imask & ~(0xffffffff << slot_index));
@@ -349,7 +345,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
             node_task = make_uint2(0, 0);
         }
 
-        while(triangle_task.y != 0) {
+        while (triangle_task.y != 0) {
             int triangle_index = __bfind(triangle_task.y);
 
             const float d = bvh_triangle_intersection((float4*)(triangles + triangle_index + triangle_task.x), origin, ray);
@@ -370,8 +366,6 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
             }
         }
     }
-
-    //printf("TRAVERSED_NODES: %d\n",traversed_nodes);
 
     traversal_result result;
     result.hit_id = hit_id;

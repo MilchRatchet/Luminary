@@ -27,7 +27,7 @@ struct Node8 {
   int8_t ex;
   int8_t ey;
   int8_t ez;
-  int8_t imask;
+  uint8_t imask;
   int32_t child_node_base_index;
   int32_t triangle_base_index;
   uint8_t meta[8];
