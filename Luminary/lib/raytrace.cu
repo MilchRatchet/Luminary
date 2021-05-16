@@ -255,6 +255,7 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
             origin.z = curr.z + face_normal.z * (eps * 8.0f);
 
             const float light_sample = curand_uniform(random);
+
             float light_angle;
             vec3 light_source;
             #ifdef LIGHTS_AT_NIGHT_ONLY
@@ -263,8 +264,10 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
             const int light_count = device_scene.lights_length;
             #endif
 
+            const float light_sample_probability = 1.0f - 1.0f/(light_count + 1);
 
-            if (light_sample < 0.5f) {
+
+            if (light_sample < light_sample_probability) {
                 #ifdef LIGHTS_AT_NIGHT_ONLY
                     const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(curand_uniform(random) * light_count) : 0;
                 #else
@@ -304,18 +307,18 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
                         normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
                         rotation_to_z);
 
-                    if (light_sample < 0.5f && S_local.z > 0.0f) {
+                    if (light_sample < light_sample_probability && S_local.z > 0.0f) {
                         H_local.x = S_local.x + V_local.x;
                         H_local.y = S_local.y + V_local.y;
                         H_local.z = S_local.z + V_local.z;
 
                         H_local = normalize_vector(H_local);
 
-                        weight = 2.0f * light_angle * light_count;
+                        weight = (1.0f/light_sample_probability) * light_angle * light_count;
                     } else {
                         H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
 
-                        if (S_local.z > 0.0f) weight = 2.0f;
+                        if (S_local.z > 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
                     }
                 }
 
@@ -352,12 +355,12 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
                 ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
                 const float light_feasible = dot_product(ray, normal);
 
-                if (light_sample < 0.5f && light_feasible >= 0.0f) {
-                    weight = 2.0f * light_angle * light_count;
+                if (light_sample < light_sample_probability && light_feasible >= 0.0f) {
+                    weight = (1.0f/light_sample_probability) * light_angle * light_count;
                 } else {
                     ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
-                    if (light_feasible >=0.0f) weight = 2.0f;
+                    if (light_feasible >=0.0f) weight = (1.0f/(1.0f-light_sample_probability));
                 }
 
                 vec3 H;
