@@ -6,7 +6,6 @@ Luminary is a CUDA based Pathtracing renderer.
 
 This project is for fun and to learn more about `Computer Graphics`. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
-- Implement wide BVH.
 - Implement Clouds.
 - Implement volumetric lighting.
 - Implement refraction.
@@ -68,9 +67,6 @@ s 1.0 1.4 50.0
 # i [Width | Height | Bounces | Samples per Pixel]
 i 1920 1080 6 50
 #
-# BVH depth
-# b [Depth]
-b 18
 # Denoiser (0 = 3x3 Mean, 1 = Optix)
 # d [Denoiser] (Default=1)
 d 1
