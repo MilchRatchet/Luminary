@@ -7,11 +7,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <math.h>
 #include <time.h>
 
 void offline_output(
   Scene scene, raytrace_instance* instance, char* output_name, int progress, clock_t time) {
-  trace_scene(scene, instance, progress);
+  trace_scene(scene, instance, progress, 0);
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -102,7 +103,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
   clock_t time = clock();
 
-  int frame_count = 0;
+  int temporal_frames = 0;
 
   char* title = (char*) malloc(4096);
 
@@ -114,7 +115,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   while (!exit) {
     SDL_Event event;
 
-    trace_scene(scene, instance, 0);
+    trace_scene(scene, instance, 0, temporal_frames);
 
     if (instance->denoiser) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
@@ -126,7 +127,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     SDL_BlitSurface(surface, 0, window_surface, 0);
 
-    frame_count++;
+    temporal_frames++;
     const double frame_time = 1000.0 * ((double) (clock() - time)) / CLOCKS_PER_SEC;
     time                    = clock();
 
@@ -152,9 +153,13 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
           instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
           instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
         }
+
+        if (event.motion.xrel || event.motion.yrel)
+          temporal_frames = 0;
       }
       else if (event.type == SDL_MOUSEWHEEL) {
         instance->scene_gpu.camera.fov -= event.wheel.y * 0.005f * normalized_time;
+        temporal_frames = 0;
       }
       else if (event.type == SDL_QUIT) {
         exit = 1;
@@ -184,27 +189,35 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     if (keystate[SDL_SCANCODE_LEFT]) {
       instance->scene_gpu.azimuth += 0.005f * normalized_time;
+      temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_RIGHT]) {
       instance->scene_gpu.azimuth -= 0.005f * normalized_time;
+      temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_UP]) {
       instance->scene_gpu.altitude += 0.005f * normalized_time;
+      temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_DOWN]) {
       instance->scene_gpu.altitude -= 0.005f * normalized_time;
+      temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_W]) {
       movement_vector.z -= 1.0f;
+      temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_A]) {
       movement_vector.x -= 1.0f;
+      temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_S]) {
       movement_vector.z += 1.0f;
+      temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_D]) {
       movement_vector.x += 1.0f;
+      temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;

@@ -422,7 +422,7 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
 }
 
 __global__
-void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int size_x, int size_y, int limit) {
+void trace_rays(volatile uint32_t* progress, const int temporal_frames) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
     curandStateXORWOW_t random;
@@ -437,13 +437,13 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
     pixel.g = 0.0f;
     pixel.b = 0.0f;
 
-    while (id < device_amount && id < limit) {
+    while (id < device_amount) {
         if (sample.state & 0b1) {
             vec3 ray;
             vec3 default_ray;
 
-            const int x = offset_x + (id / 1) % size_x;
-            const int y = offset_y + (id % 1) + 1 * (id / (1 * size_x));
+            const int x = (id / 1) % device_width;
+            const int y = (id % 1) + 1 * (id / (1 * device_width));
 
             default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * x + device_offset_x * curand_uniform(&random) * 2.0f);
             default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * y - device_offset_y * curand_uniform(&random) * 2.0f);
@@ -503,8 +503,8 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
             pixel.g *= weight;
             pixel.b *= weight;
 
-            const int x = offset_x + (id / 1) % size_x;
-            const int y = offset_y + (id % 1) + 1 * (id / (1 * size_x));
+            const int x = (id / 1) % device_width;
+            const int y = (id % 1) + 1 * (id / (1 * device_width));
 
             const int buffer_index = x + y * device_width;
 
@@ -514,6 +514,13 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
                 sum.g *= weight;
                 sum.b *= weight;
                 device_albedo_buffer[buffer_index] = sum;
+            }
+
+            if (temporal_frames) {
+                RGBF temporal_pixel = device_frame[buffer_index];
+                pixel.r = (pixel.r + temporal_pixel.r * temporal_frames) / (temporal_frames + 1);
+                pixel.g = (pixel.g + temporal_pixel.g * temporal_frames) / (temporal_frames + 1);
+                pixel.b = (pixel.b + temporal_pixel.b * temporal_frames) / (temporal_frames + 1);
             }
 
             device_frame[buffer_index] = pixel;
@@ -717,7 +724,7 @@ extern "C" void copy_framebuffer_to_cpu(raytrace_instance* instance) {
     gpuErrchk(cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 
-extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int progress) {
+extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int progress, const int temporal_frames) {
     volatile uint32_t *progress_gpu, *progress_cpu;
 
     cudaEvent_t kernelFinished;
@@ -733,130 +740,9 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     clock_t t = clock();
 
-    if (progress == 2) {
-        const unsigned int max_block_width = 128;
-        const unsigned int max_block_height = 128;
+    trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, temporal_frames);
 
-
-        SDL_Init(SDL_INIT_VIDEO);
-        SDL_Window* window = SDL_CreateWindow(
-          "Luminary", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, instance->width, instance->height,
-          SDL_WINDOW_SHOWN);
-
-        SDL_Surface* window_surface = SDL_GetWindowSurface(window);
-
-        Uint32 rmask, gmask, bmask, amask;
-
-      #if SDL_BYTEORDER == SDL_BIG_ENDIAN
-        rmask = 0xff000000;
-        gmask = 0x00ff0000;
-        bmask = 0x0000ff00;
-        amask = 0x000000ff;
-      #else
-        rmask = 0x000000ff;
-        gmask = 0x0000ff00;
-        bmask = 0x00ff0000;
-        amask = 0xff000000;
-      #endif
-
-        SDL_Surface* surface =
-          SDL_CreateRGBSurface(0, instance->width, instance->height, 24, rmask, gmask, bmask, amask);
-
-        RGB8* buffer = (RGB8*) surface->pixels;
-
-        int exit = 0;
-
-        char* title = (char*) malloc(4096);
-
-        unsigned int offset_x = 0;
-        unsigned int offset_y = 0;
-        unsigned int block_width = 0;
-        unsigned int block_height = 0;
-
-        unsigned int block_counter = 0;
-        const unsigned int blocks_per_row = (instance->width / max_block_width) + 1;
-        const unsigned int total_blocks = blocks_per_row * ((instance->height / max_block_height) + 1);
-
-        while (!exit && block_counter < total_blocks) {
-          SDL_Event event;
-
-          for (unsigned int i = 0; i < block_height; i++) {
-            gpuErrchk(cudaMemcpy(
-                instance->frame_buffer + offset_x + (offset_y + i) * instance->width,
-                instance->frame_buffer_gpu + offset_x + (offset_y + i) * instance->width,
-                sizeof(RGBF) * block_width,
-                cudaMemcpyDeviceToHost));
-          }
-
-          const unsigned int block_x = block_counter % blocks_per_row;
-          const unsigned int block_y = block_counter / blocks_per_row;
-          const unsigned int new_offset_x = block_x * max_block_width;
-          const unsigned int new_offset_y = block_y * max_block_height;
-
-          const unsigned int new_block_width = (new_offset_x + max_block_width > instance->width) ? instance->width - new_offset_x : max_block_width;
-          const unsigned int new_block_height = (new_offset_y + max_block_height > instance->height) ? instance->height - new_offset_y : max_block_height;
-
-          trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, new_offset_x , new_offset_y, new_block_width, new_block_height, new_block_width * new_block_height);
-
-          for (unsigned int j = new_offset_y; j < new_offset_y + new_block_height; j++) {
-            for (unsigned int i = new_offset_x; i < new_offset_x + new_block_width; i++) {
-              RGB8 pixel;
-              pixel.r = 255;
-              pixel.g = 255;
-              pixel.b = 255;
-
-              buffer[i + instance->width * j] = pixel;
-            }
-          }
-
-          for (unsigned int j = offset_y; j < offset_y + block_height; j++) {
-              for (unsigned int i = offset_x; i < offset_x + block_width; i++) {
-                RGB8 pixel;
-                RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
-
-                RGBF color;
-                color.r = min(255.9f, linearRGB_to_SRGB(pixel_float.r) * 255.9f);
-                color.g = min(255.9f, linearRGB_to_SRGB(pixel_float.g) * 255.9f);
-                color.b = min(255.9f, linearRGB_to_SRGB(pixel_float.b) * 255.9f);
-
-                pixel.r = (uint8_t) color.r;
-                pixel.g = (uint8_t) color.g;
-                pixel.b = (uint8_t) color.b;
-
-                buffer[i + instance->width * j] = pixel;
-              }
-          }
-
-          SDL_BlitSurface(surface, 0, window_surface, 0);
-
-          clock_t curr_time = clock();
-          const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
-          sprintf(title, "Luminary - Progress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs", (((float)block_counter) / total_blocks) * 100.0f, time_elapsed, (total_blocks - block_counter) * (time_elapsed/block_counter));
-
-          SDL_SetWindowTitle(window, title);
-          SDL_UpdateWindowSurface(window);
-
-          while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-              exit = 1;
-            }
-          }
-
-          offset_x = new_offset_x;
-          offset_y = new_offset_y;
-          block_width = new_block_width;
-          block_height = new_block_height;
-
-          block_counter++;
-        }
-
-        free(title);
-
-        SDL_DestroyWindow(window);
-        SDL_Quit();
-    } else if (progress == 1) {
-        trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, 0, 0, instance->width, instance->height, instance->width * instance->height);
-
+    if (progress == 1) {
         gpuErrchk(cudaEventRecord(kernelFinished));
 
         uint32_t progress = 0;
@@ -878,8 +764,6 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
         }
 
         printf("\r                                                                                                              \r");
-    } else {
-        trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, 0, 0, instance->width, instance->height, instance->width * instance->height);
     }
 
     gpuErrchk(cudaDeviceSynchronize());

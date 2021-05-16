@@ -39,9 +39,6 @@ int main(int argc, char* argv[]) {
       realtime_output(scene, instance, 0);
     }
   }
-  else if (argc > 2 && argv[2][0] == 'p') {
-    offline_output(scene, instance, output_name, 2, time);
-  }
   else {
     offline_output(scene, instance, output_name, 1, time);
   }
