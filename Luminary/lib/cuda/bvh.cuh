@@ -13,29 +13,6 @@ struct traversal_result {
 } typedef traversal_result;
 
 __device__
-int bvh_ray_box_intersect(const unsigned char lx, const unsigned char ly, const unsigned char lz,
-                          const unsigned char hx, const unsigned char hy, const unsigned char hz,
-                          const vec3 scaled_inv_ray, const vec3 shifted_origin, const float depth, float& out_dist)
-{
-    vec3 lo;
-    lo.x = (float)lx * scaled_inv_ray.x + shifted_origin.x;
-    lo.y = (float)ly * scaled_inv_ray.y + shifted_origin.y;
-    lo.z = (float)lz * scaled_inv_ray.z + shifted_origin.z;
-
-    vec3 hi;
-    hi.x = (float)hx * scaled_inv_ray.x + shifted_origin.x;
-    hi.y = (float)hy * scaled_inv_ray.y + shifted_origin.y;
-    hi.z = (float)hz * scaled_inv_ray.z + shifted_origin.z;
-
-	const float slab_min = max7(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, eps);
-	const float slab_max = min7(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, depth);
-
-	out_dist = slab_min;
-
-	return slab_min <= slab_max;
-}
-
-__device__
 float bvh_triangle_intersection(const float4* triangles, const vec3 origin, const vec3 ray) {
     const float4 v1 = __ldg(triangles);
     const float4 v2 = __ldg(triangles + 1);
@@ -79,17 +56,6 @@ float bvh_triangle_intersection(const float4* triangles, const vec3 origin, cons
     } else {
         return FLT_MAX;
     }
-}
-
-__device__
-vec3 bvh_decompress_vector(const unsigned char x, const unsigned char y, const unsigned char z, const float4 p, const float ex, const float ey, const float ez) {
-    vec3 result;
-
-    result.x = p.x + ex * (float)x;
-    result.y = p.y + ey * (float)y;
-    result.z = p.z + ez * (float)z;
-
-    return result;
 }
 
 __device__
@@ -384,7 +350,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* __
         const int active_threads = __popc(__activemask());
 
         while (triangle_task.y != 0) {
-            const int threshold = active_threads * 0.2f;
+            const int threshold = active_threads * 0.4f;
             const int triangle_threads = __popc(__activemask());
 
             if (triangle_threads < threshold) {

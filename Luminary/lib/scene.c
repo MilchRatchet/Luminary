@@ -98,7 +98,6 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   float azimuth       = 3.141f;
   float altitude      = 0.5f;
   float sun_strength  = 30.0f;
-  int bvh_depth       = 18;
   float clip_distance = 1000000.0f;
 
   int denoiser = 1;
@@ -134,9 +133,6 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
     else if (line[0] == 'o' && line[1] == ' ') {
       sscanf(line, "%*c %s\n", *output_name);
     }
-    else if (line[0] == 'b') {
-      sscanf(line, "%*c %d\n", &bvh_depth);
-    }
     else if (line[0] == 'f') {
       sscanf(line, "%*c %f\n", &clip_distance);
     }
@@ -150,7 +146,8 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
       break;
     }
     else {
-      print_error("Scene file contains illegal lines!");
+      sprintf(source, "Scene file contains unknown line!\n Content: %s\n", line);
+      print_error(source);
     }
   }
 

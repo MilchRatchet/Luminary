@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <immintrin.h>
 
-static const int samples_in_space    = 250;
-static const int threshold_triangles = 3;
+#define THRESHOLD_TRIANGLES 3
+#define SAH_SAMPLES 500
 
 struct vec3_p {
   float x;
@@ -165,9 +165,8 @@ static void divide_along_z_axis(
 
 Node2* build_bvh_structure(
   Triangle** triangles_io, unsigned int triangles_length, int* nodes_length_out) {
-  printf("Triangle Count: %d\n", triangles_length);
   Triangle* triangles = *triangles_io;
-  int node_count      = 1 + triangles_length / threshold_triangles;
+  int node_count      = 1 + triangles_length / THRESHOLD_TRIANGLES;
 
   Node2* nodes = (Node2*) malloc(sizeof(Node2) * node_count);
 
@@ -210,7 +209,7 @@ Node2* build_bvh_structure(
 
       triangles_ptr = node.triangles_address;
 
-      if (node.triangle_count <= threshold_triangles) {
+      if (node.triangle_count <= THRESHOLD_TRIANGLES) {
         continue;
       }
 
@@ -245,14 +244,14 @@ Node2* build_bvh_structure(
           optimal_split = search_start;
         }
         else {
-          const float search_interval = (search_end - search_start) / samples_in_space;
+          const float search_interval = (search_end - search_start) / SAH_SAMPLES;
 
           int total_right = node.triangle_count;
           memcpy(
             container, bvh_triangles + node.triangles_address, sizeof(bvh_triangle) * total_right);
           int total_left = 0;
 
-          for (int k = 0; k < samples_in_space; k++) {
+          for (int k = 0; k < SAH_SAMPLES; k++) {
             const float split = search_start + k * search_interval;
             vec3_p high_left, high_right, low_left, low_right;
 
@@ -312,7 +311,7 @@ Node2* build_bvh_structure(
               axis          = a;
             }
             else {
-              k += samples_in_space / 10;
+              k += SAH_SAMPLES / 10;
             }
           }
         }
@@ -367,7 +366,7 @@ Node2* build_bvh_structure(
       triangles_ptr += left;
 
       if (write_ptr == node_count) {
-        node_count += triangles_length / threshold_triangles;
+        node_count += triangles_length / THRESHOLD_TRIANGLES;
         nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
       }
 
@@ -392,7 +391,7 @@ Node2* build_bvh_structure(
       triangles_ptr += right;
 
       if (write_ptr == node_count) {
-        node_count += triangles_length / threshold_triangles;
+        node_count += triangles_length / THRESHOLD_TRIANGLES;
         nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
       }
 
@@ -408,15 +407,13 @@ Node2* build_bvh_structure(
 
     memcpy(bvh_triangles, new_triangles, sizeof(bvh_triangle) * triangles_length);
 
-    printf("BVH2 iteration done! Nodes: %d\n", write_ptr);
+    printf("\r                                                      \rBVH Nodes: %d", write_ptr);
   }
 
   _mm_free(new_triangles);
   _mm_free(container);
 
   node_count = write_ptr;
-
-  printf("BVH with %d Nodes built.\n", node_count);
 
   nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
 
@@ -475,8 +472,6 @@ Node8* collapse_bvh(
   int end_of_current_nodes   = 1;
   int write_ptr              = 1;
   int triangles_ptr          = 0;
-
-  printf("Starting BVH8 collapsing!\n");
 
   while (begin_of_current_nodes != end_of_current_nodes) {
     for (int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
@@ -712,11 +707,7 @@ Node8* collapse_bvh(
 
     begin_of_current_nodes = end_of_current_nodes;
     end_of_current_nodes   = write_ptr;
-
-    printf("BVH8 iteration done! Nodes: %d\n", write_ptr);
   }
-
-  printf("Triangles Now: %d\n", triangles_ptr);
 
   _mm_free(bvh_triangles);
   bvh_triangles = new_triangles;
@@ -734,7 +725,7 @@ Node8* collapse_bvh(
 
   node_count = write_ptr;
 
-  printf("BVH collapsed to %d Nodes.\n", node_count);
+  printf("\r                                                         \r");
 
   nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
 
