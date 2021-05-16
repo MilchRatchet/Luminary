@@ -80,7 +80,7 @@ x
 # Lines after the x are ignored
 ```
 
-Run Luminary by passing the path to the `*.lum` file.
+Run Luminary by passing the path of the `*.lum` file.
 
 ```
 START "" Luminary.exe Scenes/Example.lum

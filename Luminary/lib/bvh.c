@@ -347,8 +347,7 @@ Node2* build_bvh_structure(
         right = node.triangle_count - left;
       }
 
-      if (actual_split)
-        fit_bounds(new_triangles + triangles_ptr, left, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
+      fit_bounds(new_triangles + triangles_ptr, left, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
 
       node.left_high.x   = high.x;
       node.left_high.y   = high.y;
@@ -373,8 +372,7 @@ Node2* build_bvh_structure(
       if (actual_split)
         memcpy(new_triangles + triangles_ptr, bvh_triangles, right * sizeof(bvh_triangle));
 
-      if (actual_split)
-        fit_bounds(new_triangles + triangles_ptr, right, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
+      fit_bounds(new_triangles + triangles_ptr, right, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
 
       node.right_high.x = high.x;
       node.right_high.y = high.y;
