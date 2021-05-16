@@ -130,13 +130,13 @@ unsigned int __bfind(unsigned int a)
 }
 
 __device__
-traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* nodes, const Traversal_Triangle* triangles) {
+traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* __restrict__ nodes, const Traversal_Triangle* __restrict__ triangles) {
     float depth = device_scene.far_clip_distance;
 
     const int stack_size = 32;
 	uint2 traversal_stack[stack_size];
 
-    const int stack_size_sm = 12;
+    const int stack_size_sm = 8;
     __shared__ uint2 traversal_stack_sm[128][stack_size_sm];
 
     char stack_ptr = 0;

@@ -545,6 +545,97 @@ Node8* collapse_bvh(
       const float compression_y = 1.0f / exp2f(node.ey);
       const float compression_z = 1.0f / exp2f(node.ez);
 
+      vec3 centroid = {
+        .x = (node_high.x + node_low.x) * 0.5f,
+        .y = (node_high.y + node_low.y) * 0.5f,
+        .z = (node_high.z + node_low.z) * 0.5f};
+
+      float cost_table[8][8];
+      int order[8];
+      int slot_empty[8];
+
+      for (int i = 0; i < 8; i++) {
+        slot_empty[i] = 1;
+        order[i]      = -1;
+      }
+
+      for (int i = 0; i < 8; i++) {
+        vec3 direction = {
+          .x = ((i >> 2) & 0b1) ? -1.0f : 1.0f,
+          .y = ((i >> 1) & 0b1) ? -1.0f : 1.0f,
+          .z = ((i >> 0) & 0b1) ? -1.0f : 1.0f};
+
+        for (int j = 0; j < 8; j++) {
+          if (binary_children[j].leaf_node == BINARY_NODE_IS_NULL) {
+            cost_table[i][j] = FLT_MAX;
+          }
+          else {
+            vec3 child_centroid = {
+              .x = ((high[j].x + low[j].x) * 0.5f) - centroid.x,
+              .y = ((high[j].y + low[j].y) * 0.5f) - centroid.y,
+              .z = ((high[j].z + low[j].z) * 0.5f) - centroid.z};
+
+            cost_table[i][j] = child_centroid.x * direction.x + child_centroid.y * direction.y
+                               + child_centroid.z * direction.z;
+          }
+        }
+      }
+
+      while (1) {
+        float min_cost = FLT_MAX;
+        int slot       = -1;
+        int child      = -1;
+
+        for (int i = 0; i < 8; i++) {
+          for (int j = 0; j < 8; j++) {
+            if (order[j] == -1 && slot_empty[i] && cost_table[i][j] < min_cost) {
+              min_cost = cost_table[i][j];
+              slot     = i;
+              child    = j;
+            }
+          }
+        }
+
+        if (slot != -1 || child != -1) {
+          slot_empty[slot] = 0;
+          order[child]     = slot;
+        }
+        else {
+          break;
+        }
+      }
+
+      for (int i = 0; i < 8; i++) {
+        if (order[i] == -1) {
+          for (int j = 0; j < 8; j++) {
+            if (slot_empty[j]) {
+              slot_empty[j] = 0;
+              order[i]      = j;
+              break;
+            }
+          }
+        }
+      }
+
+      Node2 old_binary_children[8];
+      vec3 old_low[8];
+      vec3 old_high[8];
+      int old_binary_addresses[8];
+
+      for (int i = 0; i < 8; i++) {
+        old_binary_children[i]  = binary_children[i];
+        old_low[i]              = low[i];
+        old_high[i]             = high[i];
+        old_binary_addresses[i] = binary_addresses[i];
+      }
+
+      for (int i = 0; i < 8; i++) {
+        binary_children[order[i]]  = old_binary_children[i];
+        low[order[i]]              = old_low[i];
+        high[order[i]]             = old_high[i];
+        binary_addresses[order[i]] = old_binary_addresses[i];
+      }
+
       node.imask                    = 0;
       int triangle_counting_address = 0;
 
@@ -655,5 +746,4 @@ Node8* collapse_bvh(
 }
 
 void reorder_child_nodes(Node8* nodes, const int node_count) {
-  float cost_table[64];
 }

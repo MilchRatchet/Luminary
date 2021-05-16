@@ -404,7 +404,7 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
         }
         #endif
 
-        if (__popc(__activemask()) < 0.0f *  starting_threads) break;
+        if (__popc(__activemask()) < 0.1f *  starting_threads) break;
     }
 
     if (reflection_number >= device_reflection_depth - 1) state |= 0b1;
@@ -531,11 +531,6 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
     }
 }
 
-__global__
-void set_up_raytracing_device() {
-    curand_init(0,0,0,&device_random);
-}
-
 static void update_sun(const Scene scene) {
     vec3 sun;
     sun.x = sinf(scene.azimuth) * cosf(scene.altitude);
@@ -593,7 +588,6 @@ extern "C" raytrace_instance* init_raytracing(
     instance->frame_buffer = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
 
     const unsigned int amount = width * height;
-    set_up_raytracing_device<<<1,1>>>();
 
     gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height));
 
