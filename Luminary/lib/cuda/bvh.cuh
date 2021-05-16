@@ -257,18 +257,36 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
                     max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin.z;
                     max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin.z;
 
-                    for (int i = 0; i < 4; i++) {
-                        const float slab_min = fmaxf(fmax_fmax(min_x[i], min_y[i], min_z[i]), eps);
-                        const float slab_max = fminf(fmin_fmin(max_x[i], max_y[i], max_z[i]), depth);
+                    float slab_min, slab_max;
+                    int intersection;
 
-                        const int intersection = slab_min <= slab_max;
+                    slab_min = fmaxf(fmax_fmax(min_x[0], min_y[0], min_z[0]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[0], max_y[0], max_z[0]), depth);
+                    intersection = slab_min <= slab_max;
 
-                        if (intersection) {
-                            const unsigned int child_bits = get_8bit(child_bits4, i * 8);
-                            const unsigned int bit_index = get_8bit(bit_index4, i * 8);
-                            hit_mask |= child_bits << bit_index;
-                        }
-                    }
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[1], min_y[1], min_z[1]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[1], max_y[1], max_z[1]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[2], min_y[2], min_z[2]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[2], max_y[2], max_z[2]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[3], min_y[3], min_z[3]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[3], max_y[3], max_z[3]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b3, %2.b3, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
                 }
 
                 {
@@ -322,18 +340,36 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
                     max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin.z;
                     max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin.z;
 
-                    for (int i = 0; i < 4; i++) {
-                        const float slab_min = fmaxf(fmax_fmax(min_x[i], min_y[i], min_z[i]), eps);
-                        const float slab_max = fminf(fmin_fmin(max_x[i], max_y[i], max_z[i]), depth);
+                    float slab_min, slab_max;
+                    int intersection;
 
-                        const int intersection = slab_min <= slab_max;
+                    slab_min = fmaxf(fmax_fmax(min_x[0], min_y[0], min_z[0]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[0], max_y[0], max_z[0]), depth);
+                    intersection = slab_min <= slab_max;
 
-                        if (intersection) {
-                            const unsigned int child_bits = get_8bit(child_bits4, i * 8);
-                            const unsigned int bit_index = get_8bit(bit_index4, i * 8);
-                            hit_mask |= child_bits << bit_index;
-                        }
-                    }
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[1], min_y[1], min_z[1]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[1], max_y[1], max_z[1]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[2], min_y[2], min_z[2]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[2], max_y[2], max_z[2]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[3], min_y[3], min_z[3]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[3], max_y[3], max_z[3]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b3, %2.b3, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
                 }
 
                 node_task.y = (hit_mask & 0xff000000) | (*((unsigned char*)&data0.w + 3));
