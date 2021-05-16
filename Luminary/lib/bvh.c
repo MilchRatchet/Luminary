@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <immintrin.h>
 
-#define THRESHOLD_TRIANGLES 3
+#define THRESHOLD_TRIANGLES 1
 #define SAH_SAMPLES 500
 
 struct vec3_p {
@@ -84,7 +84,8 @@ static void fit_bounds(
 
 static void divide_along_x_axis(
   const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
-  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length) {
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
+  const int use_centroid) {
   int left  = 0;
   int right = 0;
 
@@ -93,11 +94,16 @@ static void divide_along_x_axis(
 
     int is_right = 0;
 
-    const float shifted_split = split - triangle.vertex.x;
+    if (use_centroid) {
+      is_right = (split < triangle.vertex.x + 0.5f * triangle.edge1.x + 0.5f * triangle.edge2.x);
+    }
+    else {
+      const float shifted_split = split - triangle.vertex.x;
 
-    is_right += 0.0f >= shifted_split;
-    is_right += triangle.edge1.x >= shifted_split;
-    is_right += triangle.edge2.x >= shifted_split;
+      is_right += 0.0f >= shifted_split;
+      is_right += triangle.edge1.x >= shifted_split;
+      is_right += triangle.edge2.x >= shifted_split;
+    }
 
     if (is_right)
       triangles_right[right++] = triangle;
@@ -111,7 +117,8 @@ static void divide_along_x_axis(
 
 static void divide_along_y_axis(
   const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
-  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length) {
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
+  const int use_centroid) {
   int left  = 0;
   int right = 0;
 
@@ -120,11 +127,16 @@ static void divide_along_y_axis(
 
     int is_right = 0;
 
-    const float shifted_split = split - triangle.vertex.y;
+    if (use_centroid) {
+      is_right = (split < triangle.vertex.y + 0.5f * triangle.edge1.y + 0.5f * triangle.edge2.y);
+    }
+    else {
+      const float shifted_split = split - triangle.vertex.y;
 
-    is_right += 0.0f >= shifted_split;
-    is_right += triangle.edge1.y >= shifted_split;
-    is_right += triangle.edge2.y >= shifted_split;
+      is_right += 0.0f >= shifted_split;
+      is_right += triangle.edge1.y >= shifted_split;
+      is_right += triangle.edge2.y >= shifted_split;
+    }
 
     if (is_right)
       triangles_right[right++] = triangle;
@@ -138,7 +150,8 @@ static void divide_along_y_axis(
 
 static void divide_along_z_axis(
   const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
-  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length) {
+  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
+  const int use_centroid) {
   int left  = 0;
   int right = 0;
 
@@ -147,11 +160,16 @@ static void divide_along_z_axis(
 
     int is_right = 0;
 
-    const float shifted_split = split - triangle.vertex.z;
+    if (use_centroid) {
+      is_right = (split < triangle.vertex.z + 0.5f * triangle.edge1.z + 0.5f * triangle.edge2.z);
+    }
+    else {
+      const float shifted_split = split - triangle.vertex.z;
 
-    is_right += 0.0f >= shifted_split;
-    is_right += triangle.edge1.z >= shifted_split;
-    is_right += triangle.edge2.z >= shifted_split;
+      is_right += 0.0f >= shifted_split;
+      is_right += triangle.edge1.z >= shifted_split;
+      is_right += triangle.edge2.z >= shifted_split;
+    }
 
     if (is_right)
       triangles_right[right++] = triangle;
@@ -222,7 +240,7 @@ Node2* build_bvh_structure(
 
       float search_start, search_end;
       float optimal_split, optimal_cost;
-      int axis;
+      int axis, optimal_method;
 
       optimal_cost = FLT_MAX;
 
@@ -240,79 +258,93 @@ Node2* build_bvh_structure(
           search_end   = high_inner.z;
         }
 
-        if (search_end < search_start) {
-          optimal_split = search_start;
+        int method = 0;
+
+        if (search_end <= search_start) {
+          if (a == 0) {
+            search_start = low.x;
+            search_end   = high.x;
+          }
+          else if (a == 1) {
+            search_start = low.y;
+            search_end   = high.y;
+          }
+          else {
+            search_start = low.z;
+            search_end   = high.z;
+          }
+          method = 1;
         }
-        else {
-          const float search_interval = (search_end - search_start) / SAH_SAMPLES;
 
-          int total_right = node.triangle_count;
-          memcpy(
-            container, bvh_triangles + node.triangles_address, sizeof(bvh_triangle) * total_right);
-          int total_left = 0;
+        const float search_interval = (search_end - search_start) / SAH_SAMPLES;
 
-          for (int k = 0; k < SAH_SAMPLES; k++) {
-            const float split = search_start + k * search_interval;
-            vec3_p high_left, high_right, low_left, low_right;
+        int total_right = node.triangle_count;
+        memcpy(
+          container, bvh_triangles + node.triangles_address, sizeof(bvh_triangle) * total_right);
+        int total_left = 0;
 
-            if (a == 0) {
-              divide_along_x_axis(
-                split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-                container, total_right);
-            }
-            else if (a == 1) {
-              divide_along_y_axis(
-                split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-                container, total_right);
-            }
-            else {
-              divide_along_z_axis(
-                split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-                container, total_right);
-            }
+        for (int k = 0; k < SAH_SAMPLES; k++) {
+          const float split = search_start + k * search_interval;
+          vec3_p high_left, high_right, low_left, low_right;
 
-            if (left == 0) {
-              continue;
-            }
+          if (a == 0) {
+            divide_along_x_axis(
+              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+              container, total_right, method);
+          }
+          else if (a == 1) {
+            divide_along_y_axis(
+              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+              container, total_right, method);
+          }
+          else {
+            divide_along_z_axis(
+              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
+              container, total_right, method);
+          }
 
-            if (right == 0) {
-              break;
-            }
+          if (left == 0) {
+            continue;
+          }
 
-            total_left += left;
-            total_right -= left;
+          if (right == 0) {
+            break;
+          }
 
-            fit_bounds(
-              new_triangles + triangles_ptr, total_left, &high_left, &low_left, (vec3_p*) 0,
-              (vec3_p*) 0);
-            fit_bounds(container, total_right, &high_right, &low_right, (vec3_p*) 0, (vec3_p*) 0);
+          total_left += left;
+          total_right -= left;
 
-            vec3 diff_left = {
-              .x = high_left.x - low_left.x,
-              .y = high_left.y - low_left.y,
-              .z = high_left.z - low_left.z};
+          fit_bounds(
+            new_triangles + triangles_ptr, total_left, &high_left, &low_left, (vec3_p*) 0,
+            (vec3_p*) 0);
+          fit_bounds(container, total_right, &high_right, &low_right, (vec3_p*) 0, (vec3_p*) 0);
 
-            vec3 diff_right = {
-              .x = high_right.x - low_right.x,
-              .y = high_right.y - low_right.y,
-              .z = high_right.z - low_right.z};
+          vec3 diff_left = {
+            .x = high_left.x - low_left.x,
+            .y = high_left.y - low_left.y,
+            .z = high_left.z - low_left.z};
 
-            const float cost_L =
-              diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
+          vec3 diff_right = {
+            .x = high_right.x - low_right.x,
+            .y = high_right.y - low_right.y,
+            .z = high_right.z - low_right.z};
 
-            const float cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z
-                                 + diff_right.y * diff_right.z;
+          const float cost_L =
+            diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
 
-            const float total_cost = cost_L * total_left + cost_R * total_right;
+          const float cost_R =
+            diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
 
-            if (total_cost < optimal_cost) {
-              optimal_cost  = total_cost;
-              optimal_split = split;
-              axis          = a;
-            }
-            else {
-              k += SAH_SAMPLES / 10;
-            }
+          const float total_cost = cost_L * total_left + cost_R * total_right;
+
+          if (total_cost < optimal_cost) {
+            optimal_cost   = total_cost;
+            optimal_split  = split;
+            axis           = a;
+            optimal_method = method;
+          }
+          else {
+            k += SAH_SAMPLES / 10;
           }
         }
       }
@@ -320,31 +352,31 @@ Node2* build_bvh_structure(
       if (axis == 0) {
         divide_along_x_axis(
           optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count);
+          bvh_triangles + node.triangles_address, node.triangle_count, optimal_method);
       }
       else if (axis == 1) {
         divide_along_y_axis(
           optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count);
+          bvh_triangles + node.triangles_address, node.triangle_count, optimal_method);
       }
       else {
         divide_along_z_axis(
           optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count);
+          bvh_triangles + node.triangles_address, node.triangle_count, optimal_method);
       }
 
       int actual_split = 1;
 
       if (left == 0 || right == 0) {
-        actual_split = 0;
         if (left == 0) {
           memcpy(
             new_triangles + triangles_ptr, bvh_triangles,
             sizeof(bvh_triangle) * node.triangle_count);
         }
 
-        left  = node.triangle_count / 2;
-        right = node.triangle_count - left;
+        left         = node.triangle_count / 2;
+        right        = node.triangle_count - left;
+        actual_split = 0;
       }
 
       fit_bounds(new_triangles + triangles_ptr, left, &high, &low, (vec3_p*) 0, (vec3_p*) 0);
