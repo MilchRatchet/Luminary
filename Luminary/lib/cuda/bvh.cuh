@@ -13,29 +13,6 @@ struct traversal_result {
 } typedef traversal_result;
 
 __device__
-int bvh_ray_box_intersect(const unsigned char lx, const unsigned char ly, const unsigned char lz,
-                          const unsigned char hx, const unsigned char hy, const unsigned char hz,
-                          const vec3 scaled_inv_ray, const vec3 shifted_origin, const float depth, float& out_dist)
-{
-    vec3 lo;
-    lo.x = (float)lx * scaled_inv_ray.x + shifted_origin.x;
-    lo.y = (float)ly * scaled_inv_ray.y + shifted_origin.y;
-    lo.z = (float)lz * scaled_inv_ray.z + shifted_origin.z;
-
-    vec3 hi;
-    hi.x = (float)hx * scaled_inv_ray.x + shifted_origin.x;
-    hi.y = (float)hy * scaled_inv_ray.y + shifted_origin.y;
-    hi.z = (float)hz * scaled_inv_ray.z + shifted_origin.z;
-
-	const float slab_min = max7(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, eps);
-	const float slab_max = min7(lo.x, hi.x, lo.y, hi.y, lo.z, hi.z, depth);
-
-	out_dist = slab_min;
-
-	return slab_min <= slab_max;
-}
-
-__device__
 float bvh_triangle_intersection(const float4* triangles, const vec3 origin, const vec3 ray) {
     const float4 v1 = __ldg(triangles);
     const float4 v2 = __ldg(triangles + 1);
@@ -82,26 +59,53 @@ float bvh_triangle_intersection(const float4* triangles, const vec3 origin, cons
 }
 
 __device__
-vec3 bvh_decompress_vector(const unsigned char x, const unsigned char y, const unsigned char z, const float4 p, const float ex, const float ey, const float ez) {
-    vec3 result;
-
-    result.x = p.x + ex * (float)x;
-    result.y = p.y + ey * (float)y;
-    result.z = p.z + ez * (float)z;
-
-    return result;
-}
-
-__device__
 unsigned char get_8bit(const unsigned int input, const unsigned int bitshift) {
     return (input >> bitshift) & 0x000000FF;
 }
 
 __device__
-traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nodes, const Traversal_Triangle* triangles) {
+unsigned int sign_extend_s8x4(unsigned int a)
+{
+    unsigned int result;
+    asm("prmt.b32 %0, %1, 0x0, 0x0000BA98;" : "=r"(result) : "r"(a));
+    return result;
+}
+
+__device__
+unsigned int __bfind(unsigned int a)
+{
+    unsigned int result;
+    asm volatile("bfind.u32 %0, %1; " : "=r"(result) : "r"(a));
+    return result;
+}
+
+#define STACK_POP(X) {                                               \
+    stack_ptr--;                                                     \
+    if (stack_ptr < stack_size_sm)                                   \
+        X = traversal_stack_sm[threadIdx.x][stack_ptr];              \
+    else                                                             \
+        X = traversal_stack[stack_ptr - stack_size_sm];              \
+}
+
+#define STACK_PUSH(X) {                                              \
+    if (stack_ptr < stack_size_sm)                                   \
+        traversal_stack_sm[threadIdx.x][stack_ptr] = X;              \
+    else                                                             \
+        traversal_stack[stack_ptr - stack_size_sm] = X;              \
+    stack_ptr++;                                                     \
+}
+
+__device__
+traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* __restrict__ nodes, const Traversal_Triangle* __restrict__ triangles) {
     float depth = device_scene.far_clip_distance;
 
-    const int* node_addresses = device_scene.node_addresses;
+    const int stack_size = 32;
+	uint2 traversal_stack[stack_size];
+
+    const int stack_size_sm = 8;
+    __shared__ uint2 traversal_stack_sm[128][stack_size_sm];
+
+    char stack_ptr = 0;
 
     unsigned int hit_id = 0xffffffff;
 
@@ -110,101 +114,267 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node* nod
     inv_ray.y = 1.0f / (fabsf(ray.y) > eps ? ray.y : copysignf(eps, ray.y));
     inv_ray.z = 1.0f / (fabsf(ray.z) > eps ? ray.z : copysignf(eps, ray.z));
 
-    int node_address = 0;
-    int node_key = 1;
-    int bit_trail = 0;
-    int mrpn_address = -1;
+    uint2 node_task = make_uint2(0, 0b10000000000000000000000000000000);
+    uint2 triangle_task = make_uint2(0, 0);
 
-    int4 addresses;
+    unsigned int inverse_octant = (((ray.x < 0.0f) ? 1 : 0) << 2) | (((ray.y < 0.0f) ? 1 : 0) << 1) | (((ray.z < 0.0f) ? 1 : 0) << 0);
+    inverse_octant = 7 - inverse_octant;
 
-    while (node_address != -1) {
-        while (true) {
-            const float4 p = __ldg((float4*)((int*)(nodes + node_address)));
-            const uint4 data = __ldg((uint4*)(((int*)(nodes + node_address)) + 4));
-            addresses = __ldg((int4*)(((int*)(nodes + node_address)) + 8));
+    while (1) {
+        if (node_task.y > 0x00ffffff) {
+            const unsigned int hits = node_task.y;
+            const unsigned int imask = node_task.y;
+            const unsigned int child_bit_index = __bfind(hits);
+            const unsigned int child_node_base_index = node_task.x;
 
-            if (get_8bit(data.x, 24)) break;
+            node_task.y &= ~(1 << child_bit_index);
 
-            vec3 scaled_inv_ray;
-            scaled_inv_ray.x = uint_as_float(((int)(*((char*)&data.x + 0)) + 127) << 23) * inv_ray.x;
-            scaled_inv_ray.y = uint_as_float(((int)(*((char*)&data.x + 1)) + 127) << 23) * inv_ray.y;
-            scaled_inv_ray.z = uint_as_float(((int)(*((char*)&data.x + 2)) + 127) << 23) * inv_ray.z;
-
-            vec3 shifted_origin;
-            shifted_origin.x = (p.x - origin.x) * inv_ray.x;
-            shifted_origin.y = (p.y - origin.y) * inv_ray.y;
-            shifted_origin.z = (p.z - origin.z) * inv_ray.z;
-
-            float L,R;
-            const int L_hit = bvh_ray_box_intersect(get_8bit(data.y, 0), get_8bit(data.y, 8), get_8bit(data.y, 16),
-              get_8bit(data.y, 24), get_8bit(data.z, 0), get_8bit(data.z, 8), scaled_inv_ray, shifted_origin, depth, L);
-            const int R_hit = bvh_ray_box_intersect(get_8bit(data.z, 16), get_8bit(data.z, 24), get_8bit(data.w, 0),
-              get_8bit(data.w, 8), get_8bit(data.w, 16), get_8bit(data.w, 24), scaled_inv_ray, shifted_origin, depth, R);
-
-            if (__builtin_expect(L_hit || R_hit, 1)) {
-                node_key = node_key << 1;
-                bit_trail = bit_trail << 1;
-                const int R_is_closest = (R_hit) && (R < L);
-                node_address = __float_as_int(p.w);
-
-                if (!L_hit || R_is_closest) {
-                    node_address += 1;
-                    node_key = node_key ^ 0b1;
-                }
-
-                if (L_hit && R_hit) {
-                    bit_trail = bit_trail ^ 0b1;
-                    if (R_is_closest) {
-                        mrpn_address = node_address - 1;
-                    }
-                    else {
-                        mrpn_address = node_address + 1;
-                    }
-                }
-            } else {
-                break;
+            if (node_task.y > 0x00ffffff) {
+                STACK_PUSH(node_task);
             }
-        }
 
-        const int triangle_count = addresses.x;
-        const int triangles_address = addresses.y;
-        const int uncle = addresses.z;
-        const int grand_uncle = addresses.w;
+            {
+                const unsigned int slot_index = (child_bit_index - 24) ^ inverse_octant;
+                const unsigned int inverse_octant4 = inverse_octant * 0x01010101u;
+                const unsigned int relative_index = __popc(imask & ~(0xffffffff << slot_index));
+                const unsigned int child_node_index = child_node_base_index + relative_index;
 
-        if (triangles_address != -1) {
-            for (int i = 0; i < triangle_count; i++) {
-                const float d = bvh_triangle_intersection((float4*)(triangles + triangles_address + i), origin, ray);
+                float4* data_ptr = (float4*)(nodes + child_node_index);
 
-                if (d < depth) {
-                    depth = d;
-                    hit_id = triangles_address + i;
+                const float4 data0 = __ldg(data_ptr + 0);
+                const float4 data1 = __ldg(data_ptr + 1);
+                const float4 data2 = __ldg(data_ptr + 2);
+                const float4 data3 = __ldg(data_ptr + 3);
+                const float4 data4 = __ldg(data_ptr + 4);
+
+                vec3 p;
+                p.x = data0.x;
+                p.y = data0.y;
+                p.z = data0.z;
+
+                int3 e;
+                e.x = *((char*)&data0.w + 0);
+                e.y = *((char*)&data0.w + 1);
+                e.z = *((char*)&data0.w + 2);
+
+                node_task.x = float_as_uint(data1.x);
+                triangle_task.x = float_as_uint(data1.y);
+                triangle_task.y = 0;
+                unsigned int hit_mask = 0;
+
+                vec3 scaled_inv_ray;
+                scaled_inv_ray.x = uint_as_float((e.x + 127) << 23) * inv_ray.x;
+                scaled_inv_ray.y = uint_as_float((e.y + 127) << 23) * inv_ray.y;
+                scaled_inv_ray.z = uint_as_float((e.z + 127) << 23) * inv_ray.z;
+
+                vec3 shifted_origin;
+                shifted_origin.x = (p.x - origin.x) * inv_ray.x;
+                shifted_origin.y = (p.y - origin.y) * inv_ray.y;
+                shifted_origin.z = (p.z - origin.z) * inv_ray.z;
+
+                {
+                    const unsigned int meta4 = float_as_int(data1.z);
+                    const unsigned int is_inner4 = (meta4 & (meta4 << 1)) & 0x10101010;
+                    const unsigned int inner_mask4 = sign_extend_s8x4(is_inner4 << 3);
+                    const unsigned int bit_index4 = (meta4 ^ (inverse_octant4 & inner_mask4)) & 0x1f1f1f1f;
+                    const unsigned int child_bits4 = (meta4 >> 5) & 0x07070707;
+
+                    const unsigned int low_x = (inv_ray.x < 0.0f) ? float_as_uint(data3.z) : float_as_uint(data2.x);
+                    const unsigned int high_x = (inv_ray.x < 0.0f) ? float_as_uint(data2.x) : float_as_uint(data3.z);
+                    const unsigned int low_y = (inv_ray.y < 0.0f) ? float_as_uint(data4.x) : float_as_uint(data2.z);
+                    const unsigned int high_y = (inv_ray.y < 0.0f) ? float_as_uint(data2.z) : float_as_uint(data4.x);
+                    const unsigned int low_z = (inv_ray.z < 0.0f) ? float_as_uint(data4.z) : float_as_uint(data3.x);
+                    const unsigned int high_z = (inv_ray.z < 0.0f) ? float_as_uint(data3.x) : float_as_uint(data4.z);
+
+                    float min_x[4];
+                    float max_x[4];
+                    float min_y[4];
+                    float max_y[4];
+                    float min_z[4];
+                    float max_z[4];
+
+                    min_x[0] = get_8bit(low_x, 0) * scaled_inv_ray.x + shifted_origin.x;
+                    min_x[1] = get_8bit(low_x, 8) * scaled_inv_ray.x + shifted_origin.x;
+                    min_x[2] = get_8bit(low_x, 16) * scaled_inv_ray.x + shifted_origin.x;
+                    min_x[3] = get_8bit(low_x, 24) * scaled_inv_ray.x + shifted_origin.x;
+
+                    max_x[0] = get_8bit(high_x, 0) * scaled_inv_ray.x + shifted_origin.x;
+                    max_x[1] = get_8bit(high_x, 8) * scaled_inv_ray.x + shifted_origin.x;
+                    max_x[2] = get_8bit(high_x, 16) * scaled_inv_ray.x + shifted_origin.x;
+                    max_x[3] = get_8bit(high_x, 24) * scaled_inv_ray.x + shifted_origin.x;
+
+                    min_y[0] = get_8bit(low_y, 0) * scaled_inv_ray.y + shifted_origin.y;
+                    min_y[1] = get_8bit(low_y, 8) * scaled_inv_ray.y + shifted_origin.y;
+                    min_y[2] = get_8bit(low_y, 16) * scaled_inv_ray.y + shifted_origin.y;
+                    min_y[3] = get_8bit(low_y, 24) * scaled_inv_ray.y + shifted_origin.y;
+
+                    max_y[0] = get_8bit(high_y, 0) * scaled_inv_ray.y + shifted_origin.y;
+                    max_y[1] = get_8bit(high_y, 8) * scaled_inv_ray.y + shifted_origin.y;
+                    max_y[2] = get_8bit(high_y, 16) * scaled_inv_ray.y + shifted_origin.y;
+                    max_y[3] = get_8bit(high_y, 24) * scaled_inv_ray.y + shifted_origin.y;
+
+                    min_z[0] = get_8bit(low_z, 0) * scaled_inv_ray.z + shifted_origin.z;
+                    min_z[1] = get_8bit(low_z, 8) * scaled_inv_ray.z + shifted_origin.z;
+                    min_z[2] = get_8bit(low_z, 16) * scaled_inv_ray.z + shifted_origin.z;
+                    min_z[3] = get_8bit(low_z, 24) * scaled_inv_ray.z + shifted_origin.z;
+
+                    max_z[0] = get_8bit(high_z, 0) * scaled_inv_ray.z + shifted_origin.z;
+                    max_z[1] = get_8bit(high_z, 8) * scaled_inv_ray.z + shifted_origin.z;
+                    max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin.z;
+                    max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin.z;
+
+                    float slab_min, slab_max;
+                    int intersection;
+
+                    slab_min = fmaxf(fmax_fmax(min_x[0], min_y[0], min_z[0]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[0], max_y[0], max_z[0]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[1], min_y[1], min_z[1]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[1], max_y[1], max_z[1]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[2], min_y[2], min_z[2]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[2], max_y[2], max_z[2]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[3], min_y[3], min_z[3]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[3], max_y[3], max_z[3]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b3, %2.b3, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
                 }
-            }
-        }
 
-        if (mrpn_address == -1) {
-            if (bit_trail & 0b110) {
-                if (bit_trail & 0b10) {
-                    mrpn_address = uncle;
-                } else {
-                    mrpn_address = grand_uncle;
+                {
+                    const unsigned int meta4 = float_as_int(data1.w);
+                    const unsigned int is_inner4 = (meta4 & (meta4 << 1)) & 0x10101010;
+                    const unsigned int inner_mask4 = sign_extend_s8x4(is_inner4 << 3);
+                    const unsigned int bit_index4 = (meta4 ^ (inverse_octant4 & inner_mask4)) & 0x1f1f1f1f;
+                    const unsigned int child_bits4 = (meta4 >> 5) & 0x07070707;
+
+                    const unsigned int low_x = (inv_ray.x < 0.0f) ? float_as_uint(data3.w) : float_as_uint(data2.y);
+                    const unsigned int high_x = (inv_ray.x < 0.0f) ? float_as_uint(data2.y) : float_as_uint(data3.w);
+                    const unsigned int low_y = (inv_ray.y < 0.0f) ? float_as_uint(data4.y) : float_as_uint(data2.w);
+                    const unsigned int high_y = (inv_ray.y < 0.0f) ? float_as_uint(data2.w) : float_as_uint(data4.y);
+                    const unsigned int low_z = (inv_ray.z < 0.0f) ? float_as_uint(data4.w) : float_as_uint(data3.y);
+                    const unsigned int high_z = (inv_ray.z < 0.0f) ? float_as_uint(data3.y) : float_as_uint(data4.w);
+
+                    float min_x[4];
+                    float max_x[4];
+                    float min_y[4];
+                    float max_y[4];
+                    float min_z[4];
+                    float max_z[4];
+
+                    min_x[0] = get_8bit(low_x, 0) * scaled_inv_ray.x + shifted_origin.x;
+                    min_x[1] = get_8bit(low_x, 8) * scaled_inv_ray.x + shifted_origin.x;
+                    min_x[2] = get_8bit(low_x, 16) * scaled_inv_ray.x + shifted_origin.x;
+                    min_x[3] = get_8bit(low_x, 24) * scaled_inv_ray.x + shifted_origin.x;
+
+                    max_x[0] = get_8bit(high_x, 0) * scaled_inv_ray.x + shifted_origin.x;
+                    max_x[1] = get_8bit(high_x, 8) * scaled_inv_ray.x + shifted_origin.x;
+                    max_x[2] = get_8bit(high_x, 16) * scaled_inv_ray.x + shifted_origin.x;
+                    max_x[3] = get_8bit(high_x, 24) * scaled_inv_ray.x + shifted_origin.x;
+
+                    min_y[0] = get_8bit(low_y, 0) * scaled_inv_ray.y + shifted_origin.y;
+                    min_y[1] = get_8bit(low_y, 8) * scaled_inv_ray.y + shifted_origin.y;
+                    min_y[2] = get_8bit(low_y, 16) * scaled_inv_ray.y + shifted_origin.y;
+                    min_y[3] = get_8bit(low_y, 24) * scaled_inv_ray.y + shifted_origin.y;
+
+                    max_y[0] = get_8bit(high_y, 0) * scaled_inv_ray.y + shifted_origin.y;
+                    max_y[1] = get_8bit(high_y, 8) * scaled_inv_ray.y + shifted_origin.y;
+                    max_y[2] = get_8bit(high_y, 16) * scaled_inv_ray.y + shifted_origin.y;
+                    max_y[3] = get_8bit(high_y, 24) * scaled_inv_ray.y + shifted_origin.y;
+
+                    min_z[0] = get_8bit(low_z, 0) * scaled_inv_ray.z + shifted_origin.z;
+                    min_z[1] = get_8bit(low_z, 8) * scaled_inv_ray.z + shifted_origin.z;
+                    min_z[2] = get_8bit(low_z, 16) * scaled_inv_ray.z + shifted_origin.z;
+                    min_z[3] = get_8bit(low_z, 24) * scaled_inv_ray.z + shifted_origin.z;
+
+                    max_z[0] = get_8bit(high_z, 0) * scaled_inv_ray.z + shifted_origin.z;
+                    max_z[1] = get_8bit(high_z, 8) * scaled_inv_ray.z + shifted_origin.z;
+                    max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin.z;
+                    max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin.z;
+
+                    float slab_min, slab_max;
+                    int intersection;
+
+                    slab_min = fmaxf(fmax_fmax(min_x[0], min_y[0], min_z[0]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[0], max_y[0], max_z[0]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[1], min_y[1], min_z[1]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[1], max_y[1], max_z[1]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[2], min_y[2], min_z[2]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[2], max_y[2], max_z[2]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+
+                    slab_min = fmaxf(fmax_fmax(min_x[3], min_y[3], min_z[3]), eps);
+                    slab_max = fminf(fmin_fmin(max_x[3], max_y[3], max_z[3]), depth);
+                    intersection = slab_min <= slab_max;
+
+                    if (intersection)
+                        asm("vshl.u32.u32.u32.wrap.add %0, %1.b3, %2.b3, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
                 }
-            }
-        }
 
-        if (bit_trail == 0) {
-            break;
+                node_task.y = (hit_mask & 0xff000000) | (*((unsigned char*)&data0.w + 3));
+                triangle_task.y = hit_mask & 0x00ffffff;
+            }
         }
         else {
-            const int num_levels = trailing_zeros(bit_trail);
-            bit_trail = (bit_trail >> num_levels) ^ 0b1;
-            node_key = (node_key >> num_levels) ^ 0b1;
-            if (mrpn_address != -1) {
-                node_address = mrpn_address;
-                mrpn_address = -1;
+            triangle_task = node_task;
+            node_task = make_uint2(0, 0);
+        }
+
+        const int active_threads = __popc(__activemask());
+
+        while (triangle_task.y != 0) {
+            const int threshold = active_threads * 0.4f;
+            const int triangle_threads = __popc(__activemask());
+
+            if (triangle_threads < threshold) {
+                STACK_PUSH(triangle_task);
+                break;
             }
-            else {
-                node_address = __ldg(node_addresses + node_key - 1);
+
+            int triangle_index = __bfind(triangle_task.y);
+
+            const float d = bvh_triangle_intersection((float4*)(triangles + triangle_index + triangle_task.x), origin, ray);
+
+            if (d < depth) {
+                depth = d;
+                hit_id = triangle_index + triangle_task.x;
+            }
+
+            triangle_task.y &= ~(1 << triangle_index);
+        }
+
+        if (node_task.y <= 0x00ffffff) {
+            if (stack_ptr > 0) {
+                STACK_POP(node_task);
+            } else {
+                break;
             }
         }
     }

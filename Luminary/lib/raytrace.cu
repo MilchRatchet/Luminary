@@ -404,7 +404,7 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
         }
         #endif
 
-        if (__popc(__activemask()) < 0.0f *  starting_threads) break;
+        if (__popc(__activemask()) < 0.1f *  starting_threads) break;
     }
 
     if (reflection_number >= device_reflection_depth - 1) state |= 0b1;
@@ -531,11 +531,6 @@ void trace_rays(volatile uint32_t* progress, int offset_x, int offset_y, int siz
     }
 }
 
-__global__
-void set_up_raytracing_device() {
-    curand_init(0,0,0,&device_random);
-}
-
 static void update_sun(const Scene scene) {
     vec3 sun;
     sun.x = sinf(scene.azimuth) * cosf(scene.altitude);
@@ -593,7 +588,6 @@ extern "C" raytrace_instance* init_raytracing(
     instance->frame_buffer = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
 
     const unsigned int amount = width * height;
-    set_up_raytracing_device<<<1,1>>>();
 
     gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height));
 
@@ -613,15 +607,13 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment) * scene.materials_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(Traversal_Triangle) * instance->scene_gpu.triangles_length));
-    gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.nodes), sizeof(Node) * instance->scene_gpu.nodes_length));
-    gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.node_addresses), sizeof(int) * instance->scene_gpu.node_addresses_length));
+    gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.nodes), sizeof(Node8) * instance->scene_gpu.nodes_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.lights), sizeof(Light) * instance->scene_gpu.lights_length));
 
     gpuErrchk(cudaMemcpy(instance->scene_gpu.texture_assignments, scene.texture_assignments, sizeof(texture_assignment) * scene.materials_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(instance->scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(instance->scene_gpu.traversal_triangles, scene.traversal_triangles, sizeof(Traversal_Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene.nodes, sizeof(Node) * scene.nodes_length, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpy(instance->scene_gpu.node_addresses, scene.node_addresses, sizeof(int) * scene.node_addresses_length, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene.nodes, sizeof(Node8) * scene.nodes_length, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpy(instance->scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice));
 
     gpuErrchk(cudaMemcpyToSymbol(device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment*), 0, cudaMemcpyHostToDevice));
@@ -898,7 +890,6 @@ extern "C" void free_inputs(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.nodes));
-    gpuErrchk(cudaFree(instance->scene_gpu.node_addresses));
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
 }
 

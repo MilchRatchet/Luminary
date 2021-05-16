@@ -93,9 +93,6 @@ float device_offset_y;
 __constant__
 Quaternion device_camera_rotation;
 
-__device__
-curandStateXORWOW_t device_random;
-
 __constant__
 cudaTextureObject_t* device_albedo_atlas;
 

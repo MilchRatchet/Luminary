@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <immintrin.h>
+#include <math.h>
 #include "scene.h"
 #include "raytrace.h"
 #include "error.h"
@@ -97,7 +98,6 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   float azimuth       = 3.141f;
   float altitude      = 0.5f;
   float sun_strength  = 30.0f;
-  int bvh_depth       = 18;
   float clip_distance = 1000000.0f;
 
   int denoiser = 1;
@@ -133,9 +133,6 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
     else if (line[0] == 'o' && line[1] == ' ') {
       sscanf(line, "%*c %s\n", *output_name);
     }
-    else if (line[0] == 'b') {
-      sscanf(line, "%*c %d\n", &bvh_depth);
-    }
     else if (line[0] == 'f') {
       sscanf(line, "%*c %f\n", &clip_distance);
     }
@@ -149,7 +146,8 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
       break;
     }
     else {
-      print_error("Scene file contains illegal lines!");
+      sprintf(source, "Scene file contains unknown line!\n Content: %s\n", line);
+      print_error(source);
     }
   }
 
@@ -158,11 +156,13 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   unsigned int triangle_count = convert_wavefront_content(&triangles, content);
 
   int nodes_length;
-  int* addresses;
-  int addresses_length;
 
-  Node* nodes = build_bvh_structure(
-    &triangles, triangle_count, bvh_depth, &nodes_length, &addresses, &addresses_length);
+  Node2* initial_nodes = build_bvh_structure(&triangles, triangle_count, &nodes_length);
+
+  Node8* nodes =
+    collapse_bvh(initial_nodes, nodes_length, &triangles, triangle_count, &nodes_length);
+
+  free(initial_nodes);
 
   Traversal_Triangle* traversal_triangles = malloc(sizeof(Traversal_Triangle) * triangle_count);
 
@@ -189,16 +189,14 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
     triangles[i]           = triangle;
   }
 
-  scene.triangles             = triangles;
-  scene.traversal_triangles   = traversal_triangles;
-  scene.triangles_length      = triangle_count;
-  scene.nodes                 = nodes;
-  scene.nodes_length          = nodes_length;
-  scene.node_addresses        = addresses;
-  scene.node_addresses_length = addresses_length;
-  scene.materials_length      = content.materials_length;
-  scene.texture_assignments   = get_texture_assignments(content);
-  scene.far_clip_distance     = clip_distance;
+  scene.triangles           = triangles;
+  scene.traversal_triangles = traversal_triangles;
+  scene.triangles_length    = triangle_count;
+  scene.nodes               = nodes;
+  scene.nodes_length        = nodes_length;
+  scene.materials_length    = content.materials_length;
+  scene.texture_assignments = get_texture_assignments(content);
+  scene.far_clip_distance   = clip_distance;
 
   scene.altitude     = altitude;
   scene.azimuth      = azimuth;
