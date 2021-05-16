@@ -381,7 +381,17 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* no
             node_task = make_uint2(0, 0);
         }
 
+        const int active_threads = __popc(__activemask());
+
         while (triangle_task.y != 0) {
+            const int threshold = active_threads * 0.2f;
+            const int triangle_threads = __popc(__activemask());
+
+            if (triangle_threads < threshold) {
+                STACK_PUSH(triangle_task);
+                break;
+            }
+
             int triangle_index = __bfind(triangle_task.y);
 
             const float d = bvh_triangle_intersection((float4*)(triangles + triangle_index + triangle_task.x), origin, ray);
