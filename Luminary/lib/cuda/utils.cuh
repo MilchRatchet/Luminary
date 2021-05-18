@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime_api.h>
-#include <curand_kernel.h>
 #include "utils.h"
 
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }

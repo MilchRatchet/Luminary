@@ -4,7 +4,6 @@
 #include "utils.cuh"
 #include "math.cuh"
 #include <cuda_runtime_api.h>
-#include <curand_kernel.h>
 
 __device__
 float luminance(const vec3 v) {

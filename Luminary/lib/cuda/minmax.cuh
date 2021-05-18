@@ -49,22 +49,4 @@ float fmax_fmax(const float a, const float b, const float c) {
     return __int_as_float(max_max(__float_as_int(a), __float_as_int(b), __float_as_int(c)));
 }
 
-__device__
-float max7(const float a0, const float a1, const float b0, const float b1, const float c0, const float c1, const float d)
-{
-	const float t1 = fmin_fmax(a0, a1, d);
-	const float t2 = fmin_fmax(b0, b1, t1);
-	const float t3 = fmin_fmax(c0, c1, t2);
-	return t3;
-}
-
-__device__
-float min7(const float a0, const float a1, const float b0, const float b1, const float c0, const float c1, const float d)
-{
-	const float t1 = fmax_fmin(a0, a1, d);
-	const float t2 = fmax_fmin(b0, b1, t1);
-	const float t3 = fmax_fmin(c0, c1, t2);
-	return t3;
-}
-
 #endif /* CU_MINMAX_H */

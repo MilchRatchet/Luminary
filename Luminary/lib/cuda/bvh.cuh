@@ -5,7 +5,6 @@
 #include "math.cuh"
 #include "minmax.cuh"
 #include <cuda_runtime_api.h>
-#include <curand_kernel.h>
 
 struct traversal_result {
   unsigned int hit_id;
@@ -79,33 +78,31 @@ unsigned int __bfind(unsigned int a)
     return result;
 }
 
+#define STACK_SIZE_SM 8
+#define STACK_SIZE 32
+
 #define STACK_POP(X) {                                               \
-    stack_ptr--;                                                     \
-    if (stack_ptr < stack_size_sm)                                   \
-        X = traversal_stack_sm[threadIdx.x][stack_ptr];              \
+    packed_stptr_invoct.x--;                                         \
+    if (packed_stptr_invoct.x < STACK_SIZE_SM)                       \
+        X = traversal_stack_sm[threadIdx.x][packed_stptr_invoct.x];  \
     else                                                             \
-        X = traversal_stack[stack_ptr - stack_size_sm];              \
+        X = traversal_stack[packed_stptr_invoct.x - STACK_SIZE_SM];  \
 }
 
 #define STACK_PUSH(X) {                                              \
-    if (stack_ptr < stack_size_sm)                                   \
-        traversal_stack_sm[threadIdx.x][stack_ptr] = X;              \
+    if (packed_stptr_invoct.x < STACK_SIZE_SM)                       \
+        traversal_stack_sm[threadIdx.x][packed_stptr_invoct.x] = X;  \
     else                                                             \
-        traversal_stack[stack_ptr - stack_size_sm] = X;              \
-    stack_ptr++;                                                     \
+        traversal_stack[packed_stptr_invoct.x - STACK_SIZE_SM] = X;  \
+        packed_stptr_invoct.x++;                                     \
 }
 
 __device__
 traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* __restrict__ nodes, const Traversal_Triangle* __restrict__ triangles) {
     float depth = device_scene.far_clip_distance;
 
-    const int stack_size = 32;
-	uint2 traversal_stack[stack_size];
-
-    const int stack_size_sm = 8;
-    __shared__ uint2 traversal_stack_sm[128][stack_size_sm];
-
-    char stack_ptr = 0;
+	uint2 traversal_stack[STACK_SIZE];
+    __shared__ uint2 traversal_stack_sm[128][STACK_SIZE_SM];
 
     unsigned int hit_id = 0xffffffff;
 
@@ -117,8 +114,10 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* __
     uint2 node_task = make_uint2(0, 0b10000000000000000000000000000000);
     uint2 triangle_task = make_uint2(0, 0);
 
-    unsigned int inverse_octant = (((ray.x < 0.0f) ? 1 : 0) << 2) | (((ray.y < 0.0f) ? 1 : 0) << 1) | (((ray.z < 0.0f) ? 1 : 0) << 0);
-    inverse_octant = 7 - inverse_octant;
+    ushort2 packed_stptr_invoct;
+    packed_stptr_invoct.y = (((ray.x < 0.0f) ? 1 : 0) << 2) | (((ray.y < 0.0f) ? 1 : 0) << 1) | (((ray.z < 0.0f) ? 1 : 0) << 0);
+    packed_stptr_invoct.y = 7 - packed_stptr_invoct.y;
+    packed_stptr_invoct.x = 0;
 
     while (1) {
         if (node_task.y > 0x00ffffff) {
@@ -134,8 +133,8 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* __
             }
 
             {
-                const unsigned int slot_index = (child_bit_index - 24) ^ inverse_octant;
-                const unsigned int inverse_octant4 = inverse_octant * 0x01010101u;
+                const unsigned int slot_index = (child_bit_index - 24) ^ (unsigned int)packed_stptr_invoct.y;
+                const unsigned int inverse_octant4 = (unsigned int)packed_stptr_invoct.y * 0x01010101u;
                 const unsigned int relative_index = __popc(imask & ~(0xffffffff << slot_index));
                 const unsigned int child_node_index = child_node_base_index + relative_index;
 
@@ -358,7 +357,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* __
                 break;
             }
 
-            int triangle_index = __bfind(triangle_task.y);
+            const int triangle_index = __bfind(triangle_task.y);
 
             const float d = bvh_triangle_intersection((float4*)(triangles + triangle_index + triangle_task.x), origin, ray);
 
@@ -371,7 +370,7 @@ traversal_result traverse_bvh(const vec3 origin, const vec3 ray, const Node8* __
         }
 
         if (node_task.y <= 0x00ffffff) {
-            if (stack_ptr > 0) {
+            if (packed_stptr_invoct.x > 0) {
                 STACK_POP(node_task);
             } else {
                 break;

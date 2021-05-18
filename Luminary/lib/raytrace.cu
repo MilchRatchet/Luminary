@@ -10,8 +10,8 @@
 #include "cuda/brdf.cuh"
 #include "cuda/bvh.cuh"
 #include "cuda/directives.cuh"
+#include "cuda/random.cuh"
 #include <cuda_runtime_api.h>
-#include <curand_kernel.h>
 #include <optix.h>
 #include <optix_stubs.h>
 #include <float.h>
@@ -31,9 +31,9 @@ struct Sample {
     vec3 ray;
     RGBF record;
     RGBF result;
-    int depth;
-    int state; //1st bit (finished?) 2nd bit (albedo buffer written?)
-    int buffer_index;
+    short2 state; //x = depth, y = 1st bit (finished?) 2nd bit (albedo buffer written?)
+    ushort2 index;
+    int random_index;
 } typedef Sample;
 
 //---------------------------------
@@ -47,9 +47,10 @@ float get_light_angle(Light light, vec3 pos) {
 }
 
 __device__
-Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __restrict__ random) {
-    int albedo_buffer_written = input_sample.state & 0b10;
-    const int buffer_index = input_sample.buffer_index;
+Sample trace_ray_iterative(const Sample input_sample) {
+    int albedo_buffer_written = input_sample.state.y & 0b10;
+    const ushort2 index = input_sample.index;
+    int random_index = input_sample.random_index;
 
     RGBF result = input_sample.result;
     RGBF record = input_sample.record;
@@ -57,32 +58,31 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
     vec3 ray = input_sample.ray;
     vec3 origin = input_sample.origin;
 
-    int reflection_number;
-    int state = input_sample.state;
+    short2 state = input_sample.state;
     const int starting_threads = __popc(__activemask());
 
-    for (reflection_number = input_sample.depth; reflection_number < device_reflection_depth; reflection_number++) {
+    for (; state.x < device_reflection_depth; state.x++) {
         traversal_result traversal = traverse_bvh(origin, ray, device_scene.nodes, device_scene.traversal_triangles);
 
         if (traversal.hit_id == 0xffffffff) {
             RGBF sky = get_sky_color(ray);
 
             if (device_denoiser && !albedo_buffer_written) {
-                RGBF sum = device_albedo_buffer[buffer_index];
+                RGBF sum = device_albedo_buffer[index.x + index.y * device_width];
                 sum.r += sky.r;
                 sum.g += sky.g;
                 sum.b += sky.b;
-                device_albedo_buffer[buffer_index] = sum;
+                device_albedo_buffer[index.x + index.y * device_width] = sum;
 
                 albedo_buffer_written++;
-                state |= 0b10;
+                state.y |= 0b10;
             }
 
             result.r += sky.r * record.r;
             result.g += sky.g * record.g;
             result.b += sky.b * record.b;
 
-            state |= 0b1;
+            state.y |= 0b1;
 
             break;
         }
@@ -196,7 +196,7 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
             #ifdef FIRST_LIGHT_ONLY
             const double max_result = fmaxf(result.r, fmaxf(result.g, result.b));
             if (max_result > eps) {
-                state |= 0b1;
+                state.y |= 0b1;
                 break;
             }
             #endif
@@ -221,20 +221,20 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
             albedo.a = 1.0f;
         }
 
-        if (curand_uniform(random) > albedo.a) {
+        if (sample_blue_noise(index.x, index.y, random_index, 40) > albedo.a) {
             origin.x = curr.x + 2.0f * eps * ray.x;
             origin.y = curr.y + 2.0f * eps * ray.y;
             origin.z = curr.z + 2.0f * eps * ray.z;
         } else {
             if (device_denoiser && !albedo_buffer_written) {
-                RGBF sum = device_albedo_buffer[buffer_index];
+                RGBF sum = device_albedo_buffer[index.x + index.y * device_width];
                 sum.r += albedo.r;
                 sum.g += albedo.g;
                 sum.b += albedo.b;
-                device_albedo_buffer[buffer_index] = sum;
+                device_albedo_buffer[index.x + index.y * device_width] = sum;
 
                 albedo_buffer_written++;
-                state |= 0b10;
+                state.y |= 0b10;
             }
 
             const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
@@ -254,7 +254,7 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
             origin.y = curr.y + face_normal.y * (eps * 8.0f);
             origin.z = curr.z + face_normal.z * (eps * 8.0f);
 
-            const float light_sample = curand_uniform(random);
+            const float light_sample = sample_blue_noise(index.x, index.y, random_index, 50);
 
             float light_angle;
             vec3 light_source;
@@ -269,9 +269,9 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
 
             if (light_sample < light_sample_probability) {
                 #ifdef LIGHTS_AT_NIGHT_ONLY
-                    const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(curand_uniform(random) * light_count) : 0;
+                    const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(sample_blue_noise(index.x, index.y, random_index, 51) * light_count) : 0;
                 #else
-                    const uint32_t light = (uint32_t)(curand_uniform(random) * light_count);
+                    const uint32_t light = (uint32_t)(sample_blue_noise(index.x, index.y, random_index, 51) * light_count);
                 #endif
 
                 const float4 light_data = __ldg((float4*)(device_scene.lights + light));
@@ -285,11 +285,11 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
                 light_angle = fminf(PI/2.0f,asinf(light_data.w / d)) * 2.0f / PI;
             }
 
-            if (curand_uniform(random) < specular_probability) {
+            if (sample_blue_noise(index.x, index.y, random_index, 10) < specular_probability) {
                 const float alpha = roughness * roughness;
 
-                const float beta = acosf(curand_uniform(random));
-                const float gamma = 2.0f * 3.1415926535f * curand_uniform(random);
+                const float beta = sample_blue_noise(index.x, index.y, random_index, 2);
+                const float gamma = 2.0f * 3.1415926535f * sample_blue_noise(index.x, index.y, random_index, 3);
 
                 const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
@@ -316,7 +316,7 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
 
                         weight = (1.0f/light_sample_probability) * light_angle * light_count;
                     } else {
-                        H_local = sample_GGX_VNDF(V_local, alpha, curand_uniform(random), curand_uniform(random));
+                        H_local = sample_GGX_VNDF(V_local, alpha, sample_blue_noise(index.x, index.y, random_index, 4), sample_blue_noise(index.x, index.y, random_index, 5));
 
                         if (S_local.z > 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
                     }
@@ -349,8 +349,8 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
             {
                 float weight = 1.0f;
 
-                const float alpha = acosf(sqrtf(curand_uniform(random)));
-                const float gamma = 2.0f * PI * curand_uniform(random);
+                const float alpha = acosf(sqrtf(sample_blue_noise(index.x, index.y, random_index, 2)));
+                const float gamma = 2.0f * PI * sample_blue_noise(index.x, index.y, random_index, 3);
 
                 ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
                 const float light_feasible = dot_product(ray, normal);
@@ -388,29 +388,29 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
             }
         }
 
-
-
         #ifdef WEIGHT_BASED_EXIT
         const double max_record = fmaxf(record.r, fmaxf(record.g, record.b));
         if (max_record < CUTOFF ||
-        (max_record < PROBABILISTIC_CUTOFF && curand_uniform(random) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
+        (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(index.x, index.y, random_index, 20) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
         {
-            state |= 0b1;
+            state.y |= 0b1;
             break;
         }
         #endif
 
         #ifdef LOW_QUALITY_LONG_BOUNCES
-        if (reflection_number >= MIN_BOUNCES && curand_uniform(random) < 1.0f/device_reflection_depth) {
-            state |= 0b1;
+        if (state.x >= MIN_BOUNCES && sample_blue_noise(index.x, index.y, random_index, 21) < 1.0f/device_reflection_depth) {
+            state.y |= 0b1;
             break;
         }
         #endif
 
         if (__popc(__activemask()) < 0.1f *  starting_threads) break;
+
+        random_index++;
     }
 
-    if (reflection_number >= device_reflection_depth - 1) state |= 0b1;
+    if (state.x >= device_reflection_depth - 1) state.y |= 0b1;
 
     Sample output_sample;
     output_sample.origin = origin;
@@ -418,8 +418,8 @@ Sample trace_ray_iterative(const Sample input_sample, curandStateXORWOW_t* __res
     output_sample.result = result;
     output_sample.record = record;
     output_sample.state = state;
-    output_sample.depth = reflection_number;
-    output_sample.buffer_index = buffer_index;
+    output_sample.index = index;
+    output_sample.random_index = random_index + 1;
 
     return output_sample;
 }
@@ -428,11 +428,8 @@ __global__
 void trace_rays(volatile uint32_t* progress, const int temporal_frames) {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-    curandStateXORWOW_t random;
-
-    curand_init(id + clock(), 0, 0, &random);
     Sample sample;
-    sample.state = 0b11;
+    sample.state.y = 0b11;
     int i = 0;
 
     RGBF pixel;
@@ -441,19 +438,21 @@ void trace_rays(volatile uint32_t* progress, const int temporal_frames) {
     pixel.b = 0.0f;
 
     while (id < device_amount) {
-        if (sample.state & 0b1) {
+        if (sample.state.y & 0b1) {
             vec3 ray;
             vec3 default_ray;
 
             const int x = (id / 1) % device_width;
             const int y = (id % 1) + 1 * (id / (1 * device_width));
 
-            default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * x + device_offset_x * curand_uniform(&random) * 2.0f);
-            default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * y - device_offset_y * curand_uniform(&random) * 2.0f);
+            const int random_index = temporal_frames + ((id * 3) << 10);
+
+            default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * x + device_offset_x * sample_blue_noise(x,y,random_index,8) * 2.0f);
+            default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * y - device_offset_y * sample_blue_noise(x,y,random_index,9) * 2.0f);
             default_ray.z = -device_scene.camera.focal_length;
 
-            const float alpha = curand_uniform(&random) * 2.0f * PI;
-            const float beta  = curand_uniform(&random) * device_scene.camera.aperture_size;
+            const float alpha = sample_blue_noise(x,y,random_index,0) * 2.0f * PI;
+            const float beta  = sample_blue_noise(x,y,random_index,1) * device_scene.camera.aperture_size;
 
             vec3 point_on_aperture;
             point_on_aperture.x = cosf(alpha) * beta;
@@ -468,9 +467,11 @@ void trace_rays(volatile uint32_t* progress, const int temporal_frames) {
             sample.origin.x = device_scene.camera.pos.x + point_on_aperture.x;
             sample.origin.y = device_scene.camera.pos.y + point_on_aperture.y;
             sample.origin.z = device_scene.camera.pos.z + point_on_aperture.z;
-            sample.buffer_index = x + y * device_width;
-            sample.state = 0;
-            sample.depth = 0;
+            sample.index.x = x;
+            sample.index.y = y;
+            sample.random_index = random_index;
+            sample.state.x = 0;
+            sample.state.y = 0;
             sample.record.r = 1.0f;
             sample.record.g = 1.0f;
             sample.record.b = 1.0f;
@@ -479,9 +480,9 @@ void trace_rays(volatile uint32_t* progress, const int temporal_frames) {
             sample.result.b = 0.0f;
         }
 
-        sample = trace_ray_iterative(sample, &random);
+        sample = trace_ray_iterative(sample);
 
-        if (sample.state & 0b1) {
+        if (sample.state.y & 0b1) {
             if (isnan(sample.result.r) || isinf(sample.result.r)) {
                 sample.result.r = 1.0f;
             }
@@ -506,10 +507,7 @@ void trace_rays(volatile uint32_t* progress, const int temporal_frames) {
             pixel.g *= weight;
             pixel.b *= weight;
 
-            const int x = (id / 1) % device_width;
-            const int y = (id % 1) + 1 * (id / (1 * device_width));
-
-            const int buffer_index = x + y * device_width;
+            const int buffer_index = sample.index.x + sample.index.y * device_width;
 
             if (device_denoiser) {
                 RGBF sum = device_albedo_buffer[buffer_index];

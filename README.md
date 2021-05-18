@@ -130,3 +130,4 @@ This is a list of papers I used for this project so far:
 - B. Smolka, M. Szczepanski, K.N. Plataniotis, A.N. Venetsanopoulos, _Fast Modified Vector Median Filter_, Canadian Conference on Electrical and Computer Engineering 2001, 2, pp. 1315-1320, 2001.
 - J. Boksansky, _Crash Course in BRDF Implementation_, https://boksajak.github.io/blog/BRDF, 2021.
 - S. Lagarde, C. de Rousiers, _Moving Frostbite to Physically Based Rendering_, 2014.
+- E. Heitz, L. Belcour, V. Ostromoukhov, D. Coeurjolly and J. Iehl, _A Low-Discrepancy Sampler that Distributes Monte Carlo Errors as a Blue Noise in Screen Space_, SIGGRAPH'19 Talks, 2019.

@@ -4,7 +4,6 @@
 #include "utils.cuh"
 #include "math.cuh"
 #include <cuda_runtime_api.h>
-#include <curand_kernel.h>
 
 __device__
 float get_length_to_border(const vec3 origin, vec3 ray, const float atmosphere_end) {

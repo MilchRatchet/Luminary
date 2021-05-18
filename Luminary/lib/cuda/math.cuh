@@ -4,7 +4,6 @@
 #include "utils.cuh"
 #include <float.h>
 #include <cuda_runtime_api.h>
-#include <curand_kernel.h>
 
 __device__
 vec3 cross_product(const vec3 a, const vec3 b) {

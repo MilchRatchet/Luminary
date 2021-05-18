@@ -765,6 +765,3 @@ Node8* collapse_bvh(
 
   return nodes;
 }
-
-void reorder_child_nodes(Node8* nodes, const int node_count) {
-}
