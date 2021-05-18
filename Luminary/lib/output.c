@@ -131,7 +131,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     const double frame_time = 1000.0 * ((double) (clock() - time)) / CLOCKS_PER_SEC;
     time                    = clock();
 
-    sprintf(title, "Luminary - FPS: %.1f - FPS: %.0fms", 1000.0 / frame_time, frame_time);
+    sprintf(title, "Luminary - FPS: %.1f - Frametime: %.0fms", 1000.0 / frame_time, frame_time);
 
     const double normalized_time = frame_time / 16.66667;
 

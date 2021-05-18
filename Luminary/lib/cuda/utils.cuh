@@ -46,6 +46,19 @@ struct Quaternion {
 } typedef Quaternion;
 #endif
 
+struct Sample {
+  vec3 origin;
+  vec3 ray;
+  uchar4 state; //x = depth, y = 1st bit (active?) 2nd bit (albedo buffer written?), z = positional counter
+  int random_index;
+  RGBF record;
+  RGBF result;
+  uint2 index;
+  float depth;
+  unsigned int hit_id;
+  uint2 padding;
+} typedef Sample;
+
 //===========================================================================================
 // Device Variables
 //===========================================================================================
@@ -55,6 +68,18 @@ int device_reflection_depth;
 
 __constant__
 Scene device_scene;
+
+__constant__
+unsigned int device_samples_length;
+
+__constant__
+Sample* device_samples;
+
+__device__
+unsigned int device_sample_offset;
+
+__constant__
+int device_temporal_frames;
 
 __constant__
 int device_diffuse_samples;
@@ -67,6 +92,9 @@ RGBF* device_denoiser;
 
 __constant__
 RGBF* device_albedo_buffer;
+
+__constant__
+RGBF* device_internal_frame;
 
 __constant__
 unsigned int device_width;

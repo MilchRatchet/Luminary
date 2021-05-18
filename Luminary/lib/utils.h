@@ -50,6 +50,7 @@ struct raytrace_instance {
   RGBF* frame_buffer;
   RGBF* frame_buffer_gpu;
   RGB8* buffer_8bit_gpu;
+  RGBF* internal_frame_buffer_gpu;
   void* albedo_atlas;
   int albedo_atlas_length;
   void* illuminance_atlas;
@@ -60,6 +61,7 @@ struct raytrace_instance {
   int diffuse_samples;
   Scene scene_gpu;
   int denoiser;
+  void* samples_gpu;
   RGBF* albedo_buffer_gpu;
 } typedef raytrace_instance;
 
