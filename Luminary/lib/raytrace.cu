@@ -120,9 +120,6 @@ extern "C" raytrace_instance* init_raytracing(
 
     const unsigned int actual_samples_length = (unsigned int)samples_length;
 
-    printf("A: %zu B: %d\n", samples_length, actual_samples_length);
-    printf("SAMPLE_SIZE: %zu\n", sizeof(Sample));
-
     gpuErrchk(cudaMalloc((void**) &(instance->samples_gpu), sizeof(Sample) * samples_length));
     gpuErrchk(cudaMemcpyToSymbol(device_samples, &(instance->samples_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_samples_length, &(actual_samples_length), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
@@ -266,6 +263,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     uint32_t curr_progress = 0;
     const uint32_t total_samples = instance->width * instance->height * instance->diffuse_samples;
+    const float ratio = 1.0f/(total_samples);
 
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaMemset(instance->internal_frame_buffer_gpu, 0, sizeof(RGBF) * instance->width * instance->height));
@@ -280,25 +278,22 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
         gpuErrchk(cudaDeviceSynchronize());
         trace_samples<<<blocks_per_grid,threads_per_block>>>();
         gpuErrchk(cudaDeviceSynchronize());
-        shade_samples<<<blocks_per_grid,threads_per_block>>>(progress_gpu);
+        shade_samples<<<blocks_per_grid,threads_per_block>>>();
         gpuErrchk(cudaDeviceSynchronize());
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
 
         if (progress == 1) {
-            const uint32_t total_pixels = instance->width * instance->height;
-            const float ratio = 1.0f/((float)instance->width * (float)instance->height);
             clock_t curr_time = clock();
             const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
             printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
                 (float)curr_progress * ratio * 100, time_elapsed,
-                (total_pixels - curr_progress) * (time_elapsed/curr_progress),
-                0.000001 * instance->diffuse_samples * instance->reflection_depth * curr_progress / time_elapsed);
-
-            printf("\r                                                                                                              \r");
+                (total_samples - curr_progress) * (time_elapsed/curr_progress),
+                0.000001 * instance->reflection_depth * curr_progress / time_elapsed);
         }
     }
 
+    printf("\r                                                                                                              \r");
     finalize_samples<<<blocks_per_grid,threads_per_block>>>();
     gpuErrchk(cudaDeviceSynchronize());
 }

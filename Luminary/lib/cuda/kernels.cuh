@@ -69,7 +69,7 @@ void generate_samples() {
     const int x = pixel_index % device_width;
     const int y = pixel_index / device_width;
 
-    const int random_index = device_temporal_frames + (((device_sample_offset + id) * 3) << 10);
+    const int random_index = device_temporal_frames * device_diffuse_samples + sample_index;
 
     default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * x + device_offset_x * sample_blue_noise(x,y,random_index,8) * 2.0f);
     default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * y - device_offset_y * sample_blue_noise(x,y,random_index,9) * 2.0f);
@@ -104,43 +104,6 @@ void generate_samples() {
     sample.result.b = 0.0f;
 
     device_samples[id] = sample;
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
-__global__
-void trace_samples() {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  while (id < device_samples_length && id < device_diffuse_samples * device_amount) {
-    float4* ptr = (float4*)(device_samples + id);
-
-    float4 data0 = __ldg(ptr + 0);
-    float4 data1 = __ldg(ptr + 1);
-
-    if (!(float_as_uint(data1.z) & 0x0000ff00)) {
-      id += blockDim.x * gridDim.x;
-      continue;
-    }
-
-    vec3 origin;
-    origin.x = data0.x;
-    origin.y = data0.y;
-    origin.z = data0.z;
-
-    vec3 ray;
-    ray.x = data0.w;
-    ray.y = data1.x;
-    ray.z = data1.y;
-
-    traversal_result result = traverse_bvh(origin, ray, device_scene.nodes, device_scene.traversal_triangles);
-
-    float4 write_back;
-    write_back.x = result.depth;
-    write_back.y = uint_as_float(result.hit_id);
-
-    __stwt(ptr + 4, write_back);
 
     id += blockDim.x * gridDim.x;
   }
@@ -201,7 +164,7 @@ float get_light_angle(Light light, vec3 pos) {
 }
 
 __global__
-void shade_samples(volatile uint32_t* progress) {
+void shade_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   while (id < device_samples_length && id < device_diffuse_samples * device_amount) {
