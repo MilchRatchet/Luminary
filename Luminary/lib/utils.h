@@ -62,6 +62,7 @@ struct raytrace_instance {
   Scene scene_gpu;
   int denoiser;
   void* samples_gpu;
+  int iterations_per_sample;
   RGBF* albedo_buffer_gpu;
 } typedef raytrace_instance;
 

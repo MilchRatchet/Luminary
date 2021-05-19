@@ -118,10 +118,11 @@ extern "C" raytrace_instance* init_raytracing(
     samples_length /= 4;
     samples_length /= sizeof(Sample);
 
-    int iterations_per_sample = samples_length / (width * height);
-    iterations_per_sample = (iterations_per_sample > instance->diffuse_samples) ? instance->diffuse_samples : iterations_per_sample;
-    samples_length = width * height * iterations_per_sample;
-    gpuErrchk(cudaMemcpyToSymbol(device_iterations_per_sample, &(iterations_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
+    instance->iterations_per_sample = (unsigned int)samples_length / (width * height);
+    instance->iterations_per_sample = (instance->iterations_per_sample > instance->diffuse_samples) ? instance->diffuse_samples : instance->iterations_per_sample;
+    samples_length = width * height * instance->iterations_per_sample;
+    printf("L: %zu\n",samples_length);
+    gpuErrchk(cudaMemcpyToSymbol(device_iterations_per_sample, &(instance->iterations_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
 
     const unsigned int actual_samples_length = (unsigned int)samples_length;
 
@@ -255,9 +256,9 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     gpuErrchk(cudaHostGetDevicePointer((uint32_t**)&progress_gpu, (uint32_t*)progress_cpu, 0));
     *progress_cpu = 0;
 
-    const int zero = 0;
+    const int total_iterations = instance->width * instance->height * instance->iterations_per_sample;
 
-    gpuErrchk(cudaMemcpyToSymbol(device_sample_offset, &(zero), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_sample_offset, &(total_iterations), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
 
@@ -266,7 +267,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     clock_t t = clock();
 
-    uint32_t curr_progress = 0;
+    uint32_t curr_progress = total_iterations;
     const uint32_t total_samples = instance->width * instance->height * instance->diffuse_samples;
     const float ratio = 1.0f/(total_samples);
 
@@ -279,7 +280,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     generate_samples<<<blocks_per_grid,threads_per_block>>>();
     gpuErrchk(cudaDeviceSynchronize());
 
-    while (curr_progress < total_samples) {
+    while (curr_progress > 0) {
         trace_samples<<<blocks_per_grid,threads_per_block>>>();
         gpuErrchk(cudaDeviceSynchronize());
         shade_samples<<<blocks_per_grid,threads_per_block>>>();

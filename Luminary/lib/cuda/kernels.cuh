@@ -59,19 +59,12 @@ void generate_samples() {
 
   int iterations_for_pixel = device_diffuse_samples;
   int pixel_index = id;
-  int iterations_per_sample_per_pixel = iterations_for_pixel/device_iterations_per_sample;
+  int iterations_per_sample_per_pixel = (iterations_for_pixel + device_iterations_per_sample - 1)/device_iterations_per_sample;
 
   while (id < device_samples_length) {
     Sample sample;
 
-    if (iterations_for_pixel <= 0) {
-      iterations_for_pixel = device_diffuse_samples;
-      pixel_index += blockDim.x * gridDim.x;
-    }
-
     sample.state.y = (iterations_for_pixel < iterations_per_sample_per_pixel) ? iterations_for_pixel : iterations_per_sample_per_pixel;
-
-    iterations_for_pixel -= iterations_per_sample_per_pixel;
 
     const int x = pixel_index % device_width;
     const int y = pixel_index / device_width;
@@ -92,6 +85,13 @@ void generate_samples() {
     sample.result.b = 0.0f;
 
     device_samples[id] = sample;
+
+    iterations_for_pixel -= iterations_per_sample_per_pixel;
+
+    if (iterations_for_pixel <= 0) {
+      iterations_for_pixel = device_diffuse_samples;
+      pixel_index += blockDim.x * gridDim.x;
+    }
 
     id += blockDim.x * gridDim.x;
   }
@@ -131,9 +131,8 @@ Sample write_result(Sample sample) {
 
   if (sample.state.y == 0) {
     sample.state.x &= 0x0200;
+    atomicSub((int32_t*)&device_sample_offset, 1);
   }
-
-  atomicAdd((uint32_t*)&device_sample_offset, 1);
 
   sample.record.r = 1.0f;
   sample.record.g = 1.0f;
@@ -318,6 +317,10 @@ void shade_samples() {
       sample.origin.x += 2.0f * eps * sample.ray.x;
       sample.origin.y += 2.0f * eps * sample.ray.y;
       sample.origin.z += 2.0f * eps * sample.ray.z;
+
+      sample.record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
+      sample.record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
+      sample.record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
     } else {
         const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
 
@@ -503,7 +506,7 @@ void finalize_samples() {
 
   int iterations_for_pixel = device_diffuse_samples;
   int pixel_index = id;
-  int iterations_per_sample_per_pixel = iterations_for_pixel/device_iterations_per_sample;
+  int iterations_per_sample_per_pixel = (iterations_for_pixel + device_iterations_per_sample - 1)/device_iterations_per_sample;
 
   RGBF pixel;
   pixel.r = 0.0f;
@@ -511,6 +514,14 @@ void finalize_samples() {
   pixel.b = 0.0f;
 
   while (id < device_samples_length) {
+    iterations_for_pixel -= iterations_per_sample_per_pixel;
+
+    Sample sample = device_samples[id];
+
+    pixel.r += sample.result.r;
+    pixel.g += sample.result.g;
+    pixel.b += sample.result.b;
+
     if (iterations_for_pixel <= 0) {
       const float weight = 1.0f/device_diffuse_samples;
 
@@ -528,14 +539,6 @@ void finalize_samples() {
       iterations_for_pixel = device_diffuse_samples;
       pixel_index += blockDim.x * gridDim.x;
     }
-
-    iterations_for_pixel -= iterations_per_sample_per_pixel;
-
-    Sample sample = device_samples[id];
-
-    pixel.r += sample.result.r;
-    pixel.g += sample.result.g;
-    pixel.b += sample.result.b;
 
     id += blockDim.x * gridDim.x;
   }
