@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <immintrin.h>
 
-#define THRESHOLD_TRIANGLES 1
+#define THRESHOLD_TRIANGLES 3
 #define SAH_SAMPLES 500
 
 struct vec3_p {

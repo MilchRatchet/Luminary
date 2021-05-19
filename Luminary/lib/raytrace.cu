@@ -118,6 +118,11 @@ extern "C" raytrace_instance* init_raytracing(
     samples_length /= 4;
     samples_length /= sizeof(Sample);
 
+    int iterations_per_sample = samples_length / (width * height);
+    iterations_per_sample = (iterations_per_sample > instance->diffuse_samples) ? instance->diffuse_samples : iterations_per_sample;
+    samples_length = width * height * iterations_per_sample;
+    gpuErrchk(cudaMemcpyToSymbol(device_iterations_per_sample, &(iterations_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
+
     const unsigned int actual_samples_length = (unsigned int)samples_length;
 
     gpuErrchk(cudaMalloc((void**) &(instance->samples_gpu), sizeof(Sample) * samples_length));
@@ -270,12 +275,11 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     if (instance->denoiser) {
         gpuErrchk(cudaMemset(instance->albedo_buffer_gpu, 0, sizeof(RGBF) * instance->width * instance->height));
     }
-    initialize_samples<<<blocks_per_grid,threads_per_block>>>();
+
+    generate_samples<<<blocks_per_grid,threads_per_block>>>();
     gpuErrchk(cudaDeviceSynchronize());
 
     while (curr_progress < total_samples) {
-        generate_samples<<<blocks_per_grid,threads_per_block>>>();
-        gpuErrchk(cudaDeviceSynchronize());
         trace_samples<<<blocks_per_grid,threads_per_block>>>();
         gpuErrchk(cudaDeviceSynchronize());
         shade_samples<<<blocks_per_grid,threads_per_block>>>();

@@ -26,76 +26,64 @@
 #include <thread>
 #include <immintrin.h>
 
-__global__
-void initialize_samples() {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+__device__
+Sample get_starting_ray(Sample sample) {
+  vec3 default_ray;
 
-  Sample sample;
-  sample.state.y = 0;
-  sample.state.z = 0;
+  default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * sample.index.x + device_offset_x * sample_blue_noise(sample.index.x,sample.index.y,sample.random_index,8) * 2.0f);
+  default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * sample.index.y - device_offset_y * sample_blue_noise(sample.index.x,sample.index.y,sample.random_index,9) * 2.0f);
+  default_ray.z = -device_scene.camera.focal_length;
 
-  RGBF pixel;
-  pixel.r = 0.0f;
-  pixel.g = 0.0f;
-  pixel.b = 0.0f;
+  const float alpha = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index, 0) * 2.0f * PI;
+  const float beta  = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index, 1) * device_scene.camera.aperture_size;
 
-  while (id < device_samples_length && id < device_diffuse_samples * device_amount) {
-    device_samples[id] = sample;
-    id += blockDim.x * gridDim.x;
-  }
+  vec3 point_on_aperture;
+  point_on_aperture.x = cosf(alpha) * beta;
+  point_on_aperture.y = sinf(alpha) * beta;
+  point_on_aperture.z = 0.0f;
+
+  default_ray = vec_diff(default_ray, point_on_aperture);
+  point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device_camera_rotation);
+
+  sample.ray = normalize_vector(rotate_vector_by_quaternion(default_ray, device_camera_rotation));
+  sample.origin.x = device_scene.camera.pos.x + point_on_aperture.x;
+  sample.origin.y = device_scene.camera.pos.y + point_on_aperture.y;
+  sample.origin.z = device_scene.camera.pos.z + point_on_aperture.z;
+
+  return sample;
 }
 
 __global__
 void generate_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  Sample sample;
+  int iterations_for_pixel = device_diffuse_samples;
+  int pixel_index = id;
+  int iterations_per_sample_per_pixel = iterations_for_pixel/device_iterations_per_sample;
 
-  while (id < device_samples_length && id < device_diffuse_samples * device_amount) {
-    int sample_index;
+  while (id < device_samples_length) {
+    Sample sample;
 
-    while (1) {
-      if (id >= device_samples_length || id >= device_diffuse_samples * device_amount) return;
-      sample = device_samples[id];
-      sample_index = id + sample.state.z * device_samples_length;
-      if (!(sample.state.y & 0b1) && sample_index < device_diffuse_samples * device_amount) break;
-      id += blockDim.x * gridDim.x;
+    if (iterations_for_pixel <= 0) {
+      iterations_for_pixel = device_diffuse_samples;
+      pixel_index += blockDim.x * gridDim.x;
     }
 
-    vec3 default_ray;
+    sample.state.y = (iterations_for_pixel < iterations_per_sample_per_pixel) ? iterations_for_pixel : iterations_per_sample_per_pixel;
 
-    const unsigned int pixel_index = sample_index / device_diffuse_samples;
+    iterations_for_pixel -= iterations_per_sample_per_pixel;
 
     const int x = pixel_index % device_width;
     const int y = pixel_index / device_width;
 
-    const int random_index = device_temporal_frames * device_diffuse_samples + sample_index;
-
-    default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * x + device_offset_x * sample_blue_noise(x,y,random_index,8) * 2.0f);
-    default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * y - device_offset_y * sample_blue_noise(x,y,random_index,9) * 2.0f);
-    default_ray.z = -device_scene.camera.focal_length;
-
-    const float alpha = sample_blue_noise(x, y, random_index, 0) * 2.0f * PI;
-    const float beta  = sample_blue_noise(x, y, random_index, 1) * device_scene.camera.aperture_size;
-
-    vec3 point_on_aperture;
-    point_on_aperture.x = cosf(alpha) * beta;
-    point_on_aperture.y = sinf(alpha) * beta;
-    point_on_aperture.z = 0.0f;
-
-    default_ray = vec_diff(default_ray, point_on_aperture);
-    point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device_camera_rotation);
-
-    sample.ray = normalize_vector(rotate_vector_by_quaternion(default_ray, device_camera_rotation));
-    sample.origin.x = device_scene.camera.pos.x + point_on_aperture.x;
-    sample.origin.y = device_scene.camera.pos.y + point_on_aperture.y;
-    sample.origin.z = device_scene.camera.pos.z + point_on_aperture.z;
     sample.index.x = x;
     sample.index.y = y;
-    sample.random_index = random_index;
-    sample.state.x = 0;
-    sample.state.y = 0b11;
-    sample.state.z++;
+
+    sample.random_index = device_temporal_frames * device_diffuse_samples + iterations_for_pixel * device_reflection_depth;
+
+    sample = get_starting_ray(sample);
+
+    sample.state.x = 0b11 << 8;
     sample.record.r = 1.0f;
     sample.record.g = 1.0f;
     sample.record.b = 1.0f;
@@ -111,50 +99,47 @@ void generate_samples() {
 
 __device__
 int write_albedo_buffer(RGBF value, Sample sample) {
-  if (device_denoiser && sample.state.y & 0b10) {
+  if (device_denoiser && (sample.state.x & 0x0200)) {
     const int buffer_index = sample.index.x + sample.index.y * device_width;
     atomicAdd((float*)(device_albedo_buffer + buffer_index) + 0, value.r / device_diffuse_samples);
     atomicAdd((float*)(device_albedo_buffer + buffer_index) + 1, value.g / device_diffuse_samples);
     atomicAdd((float*)(device_albedo_buffer + buffer_index) + 2, value.b / device_diffuse_samples);
   }
 
-  return sample.state.y & 0b01;
+  return sample.state.x & 0x01ff;
 }
 
 __device__
 int write_albedo_buffer(RGBAF value, Sample sample) {
-  if (device_denoiser && sample.state.y & 0b10) {
+  if (device_denoiser && (sample.state.x & 0x0200)) {
     const int buffer_index = sample.index.x + sample.index.y * device_width;
     atomicAdd((float*)(device_albedo_buffer + buffer_index) + 0, value.r / device_diffuse_samples);
     atomicAdd((float*)(device_albedo_buffer + buffer_index) + 1, value.g / device_diffuse_samples);
     atomicAdd((float*)(device_albedo_buffer + buffer_index) + 2, value.b / device_diffuse_samples);
   }
 
-  return sample.state.y & 0b01;
+  return sample.state.x & 0x01ff;
 }
 
 __device__
 Sample write_result(Sample sample) {
-  sample.state.y &= 0b10;
+  sample.state.y--;
+
+  sample.state.x |= 0x0200;
+
+  sample.state.x &= 0xff00;
+
+  if (sample.state.y == 0) {
+    sample.state.x &= 0x0200;
+  }
+
   atomicAdd((uint32_t*)&device_sample_offset, 1);
 
-  if (isnan(sample.result.r) || isinf(sample.result.r)) {
-    sample.result.r = 0.0f;
-  }
-  if (isnan(sample.result.g) || isinf(sample.result.g)) {
-    sample.result.g = 0.0f;
-  }
-  if (isnan(sample.result.b) || isinf(sample.result.b)) {
-    sample.result.b = 0.0f;
-  }
+  sample.record.r = 1.0f;
+  sample.record.g = 1.0f;
+  sample.record.b = 1.0f;
 
-  const int buffer_index = sample.index.x + sample.index.y * device_width;
-
-  atomicAdd((float*)(device_internal_frame + buffer_index) + 0, sample.result.r / device_diffuse_samples);
-  atomicAdd((float*)(device_internal_frame + buffer_index) + 1, sample.result.g / device_diffuse_samples);
-  atomicAdd((float*)(device_internal_frame + buffer_index) + 2, sample.result.b / device_diffuse_samples);
-
-  return sample;
+  return get_starting_ray(sample);
 }
 
 __device__
@@ -167,18 +152,20 @@ __global__
 void shade_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  while (id < device_samples_length && id < device_diffuse_samples * device_amount) {
-    Sample sample = device_samples[id];
+  while (id < device_samples_length) {
+    Sample sample;
 
-    if (!(sample.state.y & 0b1)) {
+    while (1) {
+      if (id >= device_samples_length) return;
+      sample = device_samples[id];
+      if (sample.state.x & 0x0100) break;
       id += blockDim.x * gridDim.x;
-      continue;
     }
 
     if (sample.hit_id == 0xffffffff) {
       RGBF sky = get_sky_color(sample.ray);
 
-      sample.state.y = write_albedo_buffer(sky, sample);
+      sample.state.x = write_albedo_buffer(sky, sample);
 
       sample.result.r += sky.r * sample.record.r;
       sample.result.g += sky.g * sample.record.g;
@@ -290,7 +277,7 @@ void shade_samples() {
         emission.g = illuminance_f.y;
         emission.b = illuminance_f.z;
 
-        sample.state.y = write_albedo_buffer(emission, sample);
+        sample.state.x = write_albedo_buffer(emission, sample);
 
         sample.result.r += emission.r * intensity * sample.record.r;
         sample.result.g += emission.g * intensity * sample.record.g;
@@ -325,7 +312,7 @@ void shade_samples() {
         albedo.a = 1.0f;
     }
 
-    sample.state.y = write_albedo_buffer(albedo, sample);
+    sample.state.x = write_albedo_buffer(albedo, sample);
 
     if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 40) > albedo.a) {
       sample.origin.x += 2.0f * eps * sample.ray.x;
@@ -487,20 +474,20 @@ void shade_samples() {
     if (max_record < CUTOFF ||
     (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 20) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
     {
-      sample.state.x = device_reflection_depth;
+      sample.state.x = (sample.state.x & 0xff00) + device_reflection_depth;
     }
     #endif
 
     #ifdef LOW_QUALITY_LONG_BOUNCES
-    if (sample.state.x >= MIN_BOUNCES && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 21) < 1.0f/device_reflection_depth) {
-      sample.state.x = device_reflection_depth;
+    if (sample.state.x & 0x00ff >= MIN_BOUNCES && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 21) < 1.0f/device_reflection_depth) {
+      sample.state.x = (sample.state.x & 0xff00) + device_reflection_depth;
     }
     #endif
 
     sample.random_index++;
     sample.state.x++;
 
-    if (sample.state.x >= device_reflection_depth) {
+    if ((sample.state.x & 0x00ff) >= device_reflection_depth) {
       sample = write_result(sample);
     }
 
@@ -514,15 +501,41 @@ __global__
 void finalize_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  while (id < device_amount) {
-    RGBF new_pixel = device_internal_frame[id];
-    RGBF old_pixel = device_frame[id];
+  int iterations_for_pixel = device_diffuse_samples;
+  int pixel_index = id;
+  int iterations_per_sample_per_pixel = iterations_for_pixel/device_iterations_per_sample;
 
-    new_pixel.r = (new_pixel.r + old_pixel.r * device_temporal_frames) / (device_temporal_frames + 1);
-    new_pixel.g = (new_pixel.g + old_pixel.g * device_temporal_frames) / (device_temporal_frames + 1);
-    new_pixel.b = (new_pixel.b + old_pixel.b * device_temporal_frames) / (device_temporal_frames + 1);
+  RGBF pixel;
+  pixel.r = 0.0f;
+  pixel.g = 0.0f;
+  pixel.b = 0.0f;
 
-    device_frame[id] = new_pixel;
+  while (id < device_samples_length) {
+    if (iterations_for_pixel <= 0) {
+      const float weight = 1.0f/device_diffuse_samples;
+
+      RGBF temporal_pixel = device_frame[pixel_index];
+      pixel.r = (pixel.r * weight + temporal_pixel.r * device_temporal_frames) / (device_temporal_frames + 1);
+      pixel.g = (pixel.g * weight + temporal_pixel.g * device_temporal_frames) / (device_temporal_frames + 1);
+      pixel.b = (pixel.b * weight + temporal_pixel.b * device_temporal_frames) / (device_temporal_frames + 1);
+
+      device_frame[pixel_index] = pixel;
+
+      pixel.r = 0.0f;
+      pixel.g = 0.0f;
+      pixel.b = 0.0f;
+
+      iterations_for_pixel = device_diffuse_samples;
+      pixel_index += blockDim.x * gridDim.x;
+    }
+
+    iterations_for_pixel -= iterations_per_sample_per_pixel;
+
+    Sample sample = device_samples[id];
+
+    pixel.r += sample.result.r;
+    pixel.g += sample.result.g;
+    pixel.b += sample.result.b;
 
     id += blockDim.x * gridDim.x;
   }

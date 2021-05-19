@@ -122,10 +122,8 @@ void trace_samples() {
     packed_stptr_invoct.x = 0;
 
     while (1) {
-        int current_sample_finished = packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0;
-
-        if (current_sample_finished) {
-            if (id >= device_samples_length || id >= device_diffuse_samples * device_amount) break;
+        while (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
+            if (id >= device_samples_length) return;
 
             ptr = (float4*)(device_samples + id);
 
@@ -143,7 +141,7 @@ void trace_samples() {
             ray.y = data1.x;
             ray.z = data1.y;
 
-            if (!(float_as_uint(data1.z) & 0x0000ff00)) {
+            if (!(float_as_uint(data1.z) & 0x0100)) {
                 node_task = make_uint2(0, 0);
                 triangle_task = make_uint2(0, 0);
             }
