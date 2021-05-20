@@ -58,7 +58,7 @@ void generate_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   int pixel_index = id;
-  id *= device_diffuse_samples;
+  id *= device_samples_per_sample;
   int sample_offset = 0;
   int iterations_for_pixel = device_diffuse_samples;
 
@@ -507,7 +507,7 @@ void finalize_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   int pixel_index = id;
-  id *= device_diffuse_samples;
+  id *= device_samples_per_sample;
   int sample_offset = 0;
 
   RGBF pixel;

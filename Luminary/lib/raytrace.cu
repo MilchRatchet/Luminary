@@ -271,8 +271,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     clock_t t = clock();
 
     uint32_t curr_progress = total_iterations;
-    const uint32_t total_samples = instance->width * instance->height * instance->diffuse_samples;
-    const float ratio = 1.0f/(total_samples);
+    const float ratio = 1.0f/(total_iterations);
 
     gpuErrchk(cudaDeviceSynchronize());
     gpuErrchk(cudaMemset(instance->internal_frame_buffer_gpu, 0, sizeof(RGBF) * instance->width * instance->height));
@@ -293,11 +292,12 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
         if (progress == 1) {
             clock_t curr_time = clock();
+            const int samples_done = total_iterations - curr_progress;
             const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
             printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
-                (float)curr_progress * ratio * 100, time_elapsed,
-                (total_samples - curr_progress) * (time_elapsed/curr_progress),
-                0.000001 * instance->reflection_depth * curr_progress / time_elapsed);
+                (float)samples_done * ratio * 100, time_elapsed,
+                (total_iterations - samples_done) * (time_elapsed/samples_done),
+                0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->iterations_per_sample) * samples_done / time_elapsed);
         }
     }
 
