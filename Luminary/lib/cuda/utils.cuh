@@ -53,10 +53,10 @@ struct Sample {
   int random_index;
   RGBF record;
   RGBF result;
-  uint2 index;
+  RGBF albedo_buffer;
+  ushort2 index;
   float depth;
   unsigned int hit_id;
-  uint2 padding;
 } typedef Sample;
 
 //===========================================================================================

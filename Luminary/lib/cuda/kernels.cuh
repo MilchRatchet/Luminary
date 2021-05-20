@@ -68,8 +68,8 @@ void generate_samples() {
     sample.state.y = (iterations_for_pixel < device_iterations_per_sample) ? iterations_for_pixel : device_iterations_per_sample;
     iterations_for_pixel -= sample.state.y;
 
-    const int x = pixel_index % device_width;
-    const int y = pixel_index / device_width;
+    const unsigned short x = (unsigned short)(pixel_index % device_width);
+    const unsigned short y = (unsigned short)(pixel_index / device_width);
 
     sample.index.x = x;
     sample.index.y = y;
@@ -85,6 +85,9 @@ void generate_samples() {
     sample.result.r = 0.0f;
     sample.result.g = 0.0f;
     sample.result.b = 0.0f;
+    sample.albedo_buffer.r = 0.0f;
+    sample.albedo_buffer.g = 0.0f;
+    sample.albedo_buffer.b = 0.0f;
 
     device_samples[id + sample_offset] = sample;
 
@@ -100,27 +103,29 @@ void generate_samples() {
 }
 
 __device__
-int write_albedo_buffer(RGBF value, Sample sample) {
+Sample write_albedo_buffer(RGBF value, Sample sample) {
   if (device_denoiser && (sample.state.x & 0x0200)) {
-    const int buffer_index = sample.index.x + sample.index.y * device_width;
-    atomicAdd((float*)(device_albedo_buffer + buffer_index) + 0, value.r / device_diffuse_samples);
-    atomicAdd((float*)(device_albedo_buffer + buffer_index) + 1, value.g / device_diffuse_samples);
-    atomicAdd((float*)(device_albedo_buffer + buffer_index) + 2, value.b / device_diffuse_samples);
+    sample.albedo_buffer.r += value.r;
+    sample.albedo_buffer.g += value.g;
+    sample.albedo_buffer.b += value.b;
   }
 
-  return sample.state.x & 0x01ff;
+  sample.state.x &= 0x01ff;
+
+  return sample;
 }
 
 __device__
-int write_albedo_buffer(RGBAF value, Sample sample) {
+Sample write_albedo_buffer(RGBAF value, Sample sample) {
   if (device_denoiser && (sample.state.x & 0x0200)) {
-    const int buffer_index = sample.index.x + sample.index.y * device_width;
-    atomicAdd((float*)(device_albedo_buffer + buffer_index) + 0, value.r / device_diffuse_samples);
-    atomicAdd((float*)(device_albedo_buffer + buffer_index) + 1, value.g / device_diffuse_samples);
-    atomicAdd((float*)(device_albedo_buffer + buffer_index) + 2, value.b / device_diffuse_samples);
+    sample.albedo_buffer.r += value.r;
+    sample.albedo_buffer.g += value.g;
+    sample.albedo_buffer.b += value.b;
   }
 
-  return sample.state.x & 0x01ff;
+  sample.state.x &= 0x01ff;
+
+  return sample;
 }
 
 __device__
@@ -166,7 +171,7 @@ void shade_samples() {
     if (sample.hit_id == 0xffffffff) {
       RGBF sky = get_sky_color(sample.ray);
 
-      sample.state.x = write_albedo_buffer(sky, sample);
+      sample = write_albedo_buffer(sky, sample);
 
       sample.result.r += sky.r * sample.record.r;
       sample.result.g += sky.g * sample.record.g;
@@ -278,7 +283,7 @@ void shade_samples() {
         emission.g = illuminance_f.y;
         emission.b = illuminance_f.z;
 
-        sample.state.x = write_albedo_buffer(emission, sample);
+        sample = write_albedo_buffer(emission, sample);
 
         sample.result.r += emission.r * intensity * sample.record.r;
         sample.result.g += emission.g * intensity * sample.record.g;
@@ -313,7 +318,7 @@ void shade_samples() {
         albedo.a = 1.0f;
     }
 
-    sample.state.x = write_albedo_buffer(albedo, sample);
+    sample = write_albedo_buffer(albedo, sample);
 
     if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 40) > albedo.a) {
       sample.origin.x += 2.0f * eps * sample.ray.x;
@@ -515,12 +520,21 @@ void finalize_samples() {
   pixel.g = 0.0f;
   pixel.b = 0.0f;
 
+  RGBF albedo;
+  albedo.r = 0.0f;
+  albedo.g = 0.0f;
+  albedo.b = 0.0f;
+
   while (id < device_samples_length) {
     Sample sample = device_samples[id + sample_offset];
 
     pixel.r += sample.result.r;
     pixel.g += sample.result.g;
     pixel.b += sample.result.b;
+
+    albedo.r += sample.albedo_buffer.r;
+    albedo.g += sample.albedo_buffer.g;
+    albedo.b += sample.albedo_buffer.b;
 
     sample_offset++;
 
@@ -534,9 +548,20 @@ void finalize_samples() {
 
       device_frame[pixel_index] = pixel;
 
+      if (device_denoiser) {
+        RGBF temporal_albedo = device_frame[pixel_index];
+        albedo.r = (albedo.r / device_diffuse_samples + temporal_albedo.r * device_temporal_frames) / (device_temporal_frames + 1);
+        albedo.g = (albedo.g / device_diffuse_samples + temporal_albedo.g * device_temporal_frames) / (device_temporal_frames + 1);
+        albedo.b = (albedo.b / device_diffuse_samples + temporal_albedo.b * device_temporal_frames) / (device_temporal_frames + 1);
+        device_albedo_buffer[pixel_index] = albedo;
+      }
+
       pixel.r = 0.0f;
       pixel.g = 0.0f;
       pixel.b = 0.0f;
+      albedo.r = 0.0f;
+      albedo.g = 0.0f;
+      albedo.b = 0.0f;
 
       sample_offset = 0;
       id += device_samples_per_sample * blockDim.x * gridDim.x;

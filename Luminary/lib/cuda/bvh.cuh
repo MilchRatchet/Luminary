@@ -391,7 +391,7 @@ void trace_samples() {
             const int active_threads = __popc(__activemask());
 
             while (triangle_task.y != 0) {
-                const int threshold = active_threads * 0.4f;
+                const int threshold = active_threads * 0.2f;
                 const int triangle_threads = __popc(__activemask());
 
                 if (triangle_threads < threshold) {
@@ -415,11 +415,11 @@ void trace_samples() {
                 if (packed_stptr_invoct.x > 0) {
                     STACK_POP(node_task);
                 } else {
-                    float4 write_back;
+                    float2 write_back;
                     write_back.x = depth;
                     write_back.y = uint_as_float(hit_id);
 
-                    __stwt(ptr + 4, write_back);
+                    __stcs((float2*)(ptr + 4) + 1, write_back);
                     break;
                 }
             }
