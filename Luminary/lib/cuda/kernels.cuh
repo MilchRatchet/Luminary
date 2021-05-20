@@ -525,7 +525,7 @@ void finalize_samples() {
     sample_offset++;
 
     if (sample_offset == device_samples_per_sample) {
-      const float weight = 1.0f/device_diffuse_samples;
+      const float weight = device_scene.camera.exposure/device_diffuse_samples;
 
       RGBF temporal_pixel = device_frame[pixel_index];
       pixel.r = (pixel.r * weight + temporal_pixel.r * device_temporal_frames) / (device_temporal_frames + 1);
