@@ -24,11 +24,6 @@
 #include <thread>
 #include <immintrin.h>
 
-const static int threads_per_block = 128;
-const static int blocks_per_grid = 512;
-
-
-
 //---------------------------------
 // Path Tracing
 //---------------------------------
@@ -279,13 +274,13 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
         gpuErrchk(cudaMemset(instance->albedo_buffer_gpu, 0, sizeof(RGBF) * instance->width * instance->height));
     }
 
-    generate_samples<<<blocks_per_grid,threads_per_block>>>();
+    generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     gpuErrchk(cudaDeviceSynchronize());
 
     while (curr_progress > 0) {
-        trace_samples<<<blocks_per_grid,threads_per_block>>>();
+        trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
         gpuErrchk(cudaDeviceSynchronize());
-        shade_samples<<<blocks_per_grid,threads_per_block>>>();
+        shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
         gpuErrchk(cudaDeviceSynchronize());
         gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
@@ -302,7 +297,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     }
 
     printf("\r                                                                                                              \r");
-    finalize_samples<<<blocks_per_grid,threads_per_block>>>();
+    finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     gpuErrchk(cudaDeviceSynchronize());
 }
 
@@ -384,7 +379,7 @@ extern "C" void free_realtime(raytrace_instance* instance) {
 }
 
 extern "C" void copy_framebuffer_to_8bit(RGB8* buffer, RGBF* source, raytrace_instance* instance) {
-    convert_RGBF_to_RGB8<<<blocks_per_grid,threads_per_block>>>(source);
+    convert_RGBF_to_RGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(source);
     gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(RGB8) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 

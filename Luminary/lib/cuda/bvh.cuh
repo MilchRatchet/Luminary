@@ -97,7 +97,7 @@ unsigned int __bfind(unsigned int a)
         packed_stptr_invoct.x++;                                     \
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK)
 void trace_samples() {
     vec3 origin, ray;
     const Node8* nodes = device_scene.nodes;

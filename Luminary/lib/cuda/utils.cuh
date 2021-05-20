@@ -6,6 +6,9 @@
 #include <cuda_runtime_api.h>
 #include "utils.h"
 
+#define THREADS_PER_BLOCK 128
+#define BLOCKS_PER_GRID 512
+
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {

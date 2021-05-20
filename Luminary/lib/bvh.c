@@ -10,7 +10,7 @@
 #include <immintrin.h>
 
 #define THRESHOLD_TRIANGLES 3
-#define SAH_SAMPLES 500
+#define SAH_SAMPLES 250
 
 struct vec3_p {
   float x;

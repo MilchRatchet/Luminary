@@ -154,7 +154,7 @@ float get_light_angle(Light light, vec3 pos) {
     return fminf(PI/2.0f,asinf(light.radius / d));
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK)
 void shade_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -549,10 +549,6 @@ void finalize_samples() {
       device_frame[pixel_index] = pixel;
 
       if (device_denoiser) {
-        RGBF temporal_albedo = device_frame[pixel_index];
-        albedo.r = (albedo.r / device_diffuse_samples + temporal_albedo.r * device_temporal_frames) / (device_temporal_frames + 1);
-        albedo.g = (albedo.g / device_diffuse_samples + temporal_albedo.g * device_temporal_frames) / (device_temporal_frames + 1);
-        albedo.b = (albedo.b / device_diffuse_samples + temporal_albedo.b * device_temporal_frames) / (device_temporal_frames + 1);
         device_albedo_buffer[pixel_index] = albedo;
       }
 
