@@ -78,6 +78,9 @@ Sample* device_samples;
 __constant__
 int device_iterations_per_sample;
 
+__constant__
+int device_samples_per_sample;
+
 __device__
 unsigned int device_sample_offset;
 

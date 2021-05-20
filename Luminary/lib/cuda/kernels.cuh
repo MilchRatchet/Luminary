@@ -57,14 +57,16 @@ __global__
 void generate_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  int iterations_for_pixel = device_diffuse_samples;
   int pixel_index = id;
-  int iterations_per_sample_per_pixel = (iterations_for_pixel + device_iterations_per_sample - 1)/device_iterations_per_sample;
+  id *= device_diffuse_samples;
+  int sample_offset = 0;
+  int iterations_for_pixel = device_diffuse_samples;
 
   while (id < device_samples_length) {
     Sample sample;
 
-    sample.state.y = (iterations_for_pixel < iterations_per_sample_per_pixel) ? iterations_for_pixel : iterations_per_sample_per_pixel;
+    sample.state.y = (iterations_for_pixel < device_iterations_per_sample) ? iterations_for_pixel : device_iterations_per_sample;
+    iterations_for_pixel -= sample.state.y;
 
     const int x = pixel_index % device_width;
     const int y = pixel_index / device_width;
@@ -84,16 +86,16 @@ void generate_samples() {
     sample.result.g = 0.0f;
     sample.result.b = 0.0f;
 
-    device_samples[id] = sample;
+    device_samples[id + sample_offset] = sample;
 
-    iterations_for_pixel -= iterations_per_sample_per_pixel;
+    sample_offset++;
 
-    if (iterations_for_pixel <= 0) {
-      iterations_for_pixel = device_diffuse_samples;
+    if (sample_offset == device_samples_per_sample) {
+      sample_offset = 0;
+      id += device_samples_per_sample * blockDim.x * gridDim.x;
       pixel_index += blockDim.x * gridDim.x;
+      iterations_for_pixel = device_diffuse_samples;
     }
-
-    id += blockDim.x * gridDim.x;
   }
 }
 
@@ -129,7 +131,7 @@ Sample write_result(Sample sample) {
 
   sample.state.x &= 0xff00;
 
-  if (sample.state.y == 0) {
+  if (sample.state.y <= 0) {
     sample.state.x &= 0x0200;
     atomicSub((int32_t*)&device_sample_offset, 1);
   }
@@ -504,9 +506,9 @@ __global__
 void finalize_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  int iterations_for_pixel = device_diffuse_samples;
   int pixel_index = id;
-  int iterations_per_sample_per_pixel = (iterations_for_pixel + device_iterations_per_sample - 1)/device_iterations_per_sample;
+  id *= device_diffuse_samples;
+  int sample_offset = 0;
 
   RGBF pixel;
   pixel.r = 0.0f;
@@ -514,15 +516,15 @@ void finalize_samples() {
   pixel.b = 0.0f;
 
   while (id < device_samples_length) {
-    iterations_for_pixel -= iterations_per_sample_per_pixel;
-
-    Sample sample = device_samples[id];
+    Sample sample = device_samples[id + sample_offset];
 
     pixel.r += sample.result.r;
     pixel.g += sample.result.g;
     pixel.b += sample.result.b;
 
-    if (iterations_for_pixel <= 0) {
+    sample_offset++;
+
+    if (sample_offset == device_samples_per_sample) {
       const float weight = 1.0f/device_diffuse_samples;
 
       RGBF temporal_pixel = device_frame[pixel_index];
@@ -536,11 +538,10 @@ void finalize_samples() {
       pixel.g = 0.0f;
       pixel.b = 0.0f;
 
-      iterations_for_pixel = device_diffuse_samples;
+      sample_offset = 0;
+      id += device_samples_per_sample * blockDim.x * gridDim.x;
       pixel_index += blockDim.x * gridDim.x;
     }
-
-    id += blockDim.x * gridDim.x;
   }
 }
 

@@ -120,9 +120,12 @@ extern "C" raytrace_instance* init_raytracing(
 
     instance->iterations_per_sample = (unsigned int)samples_length / (width * height);
     instance->iterations_per_sample = (instance->iterations_per_sample > instance->diffuse_samples) ? instance->diffuse_samples : instance->iterations_per_sample;
+    gpuErrchk(cudaMemcpyToSymbol(device_samples_per_sample, &(instance->iterations_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
     samples_length = width * height * instance->iterations_per_sample;
-    printf("L: %zu\n",samples_length);
-    gpuErrchk(cudaMemcpyToSymbol(device_iterations_per_sample, &(instance->iterations_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
+    printf("SAMPLES_PER_SAMPLE: %d\n",instance->iterations_per_sample);
+    unsigned int temp = (instance->diffuse_samples + instance->iterations_per_sample - 1)/instance->iterations_per_sample;
+    gpuErrchk(cudaMemcpyToSymbol(device_iterations_per_sample, &(temp ), sizeof(int), 0, cudaMemcpyHostToDevice));
+    printf("ITERATIONS_PER_SAMPLE: %d\n",temp);
 
     const unsigned int actual_samples_length = (unsigned int)samples_length;
 
