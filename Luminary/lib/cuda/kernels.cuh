@@ -369,11 +369,11 @@ void shade_samples() {
             light_angle = fminf(PI/2.0f,asinf(light_data.w / d)) * 2.0f / PI;
         }
 
+        const float gamma = 2.0f * PI * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 3);
+        const float beta = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 2);
+
         if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 10) < specular_probability) {
             const float alpha = roughness * roughness;
-
-            const float beta = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 2);
-            const float gamma = 2.0f * 3.1415926535f * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 3);
 
             const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
@@ -433,8 +433,7 @@ void shade_samples() {
         {
             float weight = 1.0f;
 
-            const float alpha = acosf(sqrtf(sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 2)));
-            const float gamma = 2.0f * PI * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 3);
+            const float alpha = acosf(sqrtf(beta));
 
             sample.ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
             const float light_feasible = dot_product(sample.ray, normal);

@@ -6,10 +6,10 @@ Luminary is a CUDA based Pathtracing renderer.
 
 This project is for fun and to learn more about `Computer Graphics`. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
+- Implement faster and higher quality binary BVH construction.
 - Implement Clouds.
 - Implement volumetric lighting.
 - Implement refraction.
-- Implement better Importance Sampling.
 
 As a denoiser I use `Optix` since any non machine learning denoiser is quite frankly not all that great and machine learning is out of the scope of this project.
 
@@ -92,7 +92,7 @@ Alternatively you can run Luminary in `Realtime Mode` using
 START "" Luminary.exe Scenes/Example.lum r
 ```
 
-You can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. The focal length can be changed by pressing `F` and moving the mouse horizontally. The aperture size can be changed similarly through `G`.
+You can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. The focal length can be changed by pressing `F` and moving the mouse horizontally. The aperture size can be changed similarly through `G`. The exposure is adjustable in a similar way through `E`.
 
 Note that bad performance is to be expected. Path tracing is very computationally expensive, `Luminary` is not very performant yet and `Luminary` does not make use of `RT-Cores` found on `Turing` or `Ampere` architecture graphics cards. The latter would be considered if they would be exposed through `CUDA`.
 
