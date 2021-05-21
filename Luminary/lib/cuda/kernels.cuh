@@ -159,8 +159,6 @@ void shade_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   while (id < device_samples_length) {
-    Sample sample;
-
     while (1) {
       if (id >= device_samples_length) return;
       unsigned short state = __ldcs((unsigned short*)(device_samples + id) + 12);
