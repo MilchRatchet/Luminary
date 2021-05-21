@@ -125,7 +125,7 @@ void trace_samples() {
         while (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
             if (id >= device_samples_length) return;
 
-            ptr = (float4*)(device_samples + id);
+            ptr = (float4*)(device_active_samples + id);
 
             float4 data0 = __ldg(ptr + 0);
             float4 data1 = __ldg(ptr + 1);
@@ -142,8 +142,7 @@ void trace_samples() {
             ray.z = data1.y;
 
             if (!(float_as_uint(data1.z) & 0x0100)) {
-                node_task = make_uint2(0, 0);
-                triangle_task = make_uint2(0, 0);
+                return;
             }
 
             inv_ray.x = 1.0f / (fabsf(ray.x) > eps ? ray.x : copysignf(eps, ray.x));

@@ -52,7 +52,7 @@ struct Quaternion {
 struct Sample {
   vec3 origin;
   vec3 ray;
-  ushort2 state; //x = (high 8bits) 1st bit (active?) 2nd bit (albedo buffer written?) | (low 8 bits) depth, y = iterations left
+  ushort2 state; //x = (high 8bits) 1st bit (active?) 2nd bit (albedo buffer written?) other 6bits give sample offset | (low 8 bits) depth, y = iterations left
   int random_index;
   RGBF record;
   RGBF result;
@@ -76,7 +76,10 @@ __constant__
 unsigned int device_samples_length;
 
 __constant__
-Sample* device_samples;
+Sample* device_active_samples;
+
+__constant__
+Sample* device_finished_samples;
 
 __constant__
 int device_iterations_per_sample;
@@ -85,7 +88,7 @@ __constant__
 int device_samples_per_sample;
 
 __device__
-unsigned int device_sample_offset;
+int device_sample_offset;
 
 __constant__
 int device_temporal_frames;

@@ -3,6 +3,7 @@
 #include "image.h"
 #include "raytrace.h"
 #include "mesh.h"
+#include "error.h"
 #include "SDL/SDL.h"
 #include "cuda/utils.cuh"
 #include "cuda/math.cuh"
@@ -101,33 +102,6 @@ extern "C" raytrace_instance* init_raytracing(
 
     instance->scene_gpu = scene;
 
-    cudaDeviceProp prop;
-    cudaGetDeviceProperties(&prop, 0);
-    size_t samples_length = prop.totalGlobalMem;
-    samples_length -= sizeof(texture_assignment) * scene.materials_length;
-    samples_length -= sizeof(Triangle) * instance->scene_gpu.triangles_length;
-    samples_length -= sizeof(Traversal_Triangle) * instance->scene_gpu.triangles_length;
-    samples_length -= sizeof(Node8) * instance->scene_gpu.nodes_length;
-    samples_length -= sizeof(Light) * instance->scene_gpu.lights_length;
-    samples_length -= sizeof(RGBF) * width * height;
-    samples_length /= 4;
-    samples_length /= sizeof(Sample);
-
-    instance->iterations_per_sample = (unsigned int)samples_length / (width * height);
-    instance->iterations_per_sample = (instance->iterations_per_sample > instance->diffuse_samples) ? instance->diffuse_samples : instance->iterations_per_sample;
-    gpuErrchk(cudaMemcpyToSymbol(device_samples_per_sample, &(instance->iterations_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
-    samples_length = width * height * instance->iterations_per_sample;
-    printf("SAMPLES_PER_SAMPLE: %d\n",instance->iterations_per_sample);
-    unsigned int temp = (instance->diffuse_samples + instance->iterations_per_sample - 1)/instance->iterations_per_sample;
-    gpuErrchk(cudaMemcpyToSymbol(device_iterations_per_sample, &(temp ), sizeof(int), 0, cudaMemcpyHostToDevice));
-    printf("ITERATIONS_PER_SAMPLE: %d\n",temp);
-
-    const unsigned int actual_samples_length = (unsigned int)samples_length;
-
-    gpuErrchk(cudaMalloc((void**) &(instance->samples_gpu), sizeof(Sample) * samples_length));
-    gpuErrchk(cudaMemcpyToSymbol(device_samples, &(instance->samples_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_samples_length, &(actual_samples_length), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment) * scene.materials_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(Traversal_Triangle) * instance->scene_gpu.triangles_length));
@@ -151,10 +125,6 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(instance->material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_amount, &(amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
 
-    gpuErrchk(cudaMalloc((void**) &(instance->internal_frame_buffer_gpu), sizeof(RGBF) * width * height));
-    gpuErrchk(cudaMemcpyToSymbol(device_internal_frame, &(instance->internal_frame_buffer_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
-
-
     instance->denoiser = denoiser;
 
     if (instance->denoiser) {
@@ -162,6 +132,28 @@ extern "C" raytrace_instance* init_raytracing(
         gpuErrchk(cudaMemcpyToSymbol(device_albedo_buffer, &(instance->albedo_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
     }
+
+    size_t samples_length;
+    gpuErrchk(cudaMemGetInfo(&samples_length, 0));
+    samples_length /= 3;
+    samples_length /= sizeof(Sample);
+
+    instance->samples_per_sample = (64 < (unsigned int)samples_length / (width * height)) ? 64 : (unsigned int)samples_length / (width * height);
+    assert(instance->samples_per_sample, "Not enough memory to alocate samples buffer", 1);
+    instance->samples_per_sample = 1;
+    instance->samples_per_sample = (instance->samples_per_sample > instance->diffuse_samples) ? instance->diffuse_samples : instance->samples_per_sample;
+    gpuErrchk(cudaMemcpyToSymbol(device_samples_per_sample, &(instance->samples_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
+    samples_length = width * height * instance->samples_per_sample;
+    unsigned int temp = (instance->diffuse_samples + instance->samples_per_sample - 1)/instance->samples_per_sample;
+    gpuErrchk(cudaMemcpyToSymbol(device_samples_per_sample, &(temp ), sizeof(int), 0, cudaMemcpyHostToDevice));
+
+    const unsigned int actual_samples_length = (unsigned int)samples_length;
+
+    gpuErrchk(cudaMalloc((void**) &(instance->samples_gpu), sizeof(Sample) * samples_length));
+    gpuErrchk(cudaMemcpyToSymbol(device_active_samples, &(instance->samples_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void**) &(instance->samples_finished_gpu), sizeof(Sample) * samples_length));
+    gpuErrchk(cudaMemcpyToSymbol(device_finished_samples, &(instance->samples_finished_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_samples_length, &(actual_samples_length), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
 
     return instance;
 }
@@ -246,15 +238,7 @@ extern "C" void copy_framebuffer_to_cpu(raytrace_instance* instance) {
 }
 
 extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int progress, const int temporal_frames) {
-    volatile uint32_t *progress_gpu, *progress_cpu;
-
-    cudaEvent_t kernelFinished;
-    gpuErrchk(cudaEventCreate(&kernelFinished));
-    gpuErrchk(cudaHostAlloc((void**)&progress_cpu, sizeof(uint32_t), cudaHostAllocMapped));
-    gpuErrchk(cudaHostGetDevicePointer((uint32_t**)&progress_gpu, (uint32_t*)progress_cpu, 0));
-    *progress_cpu = 0;
-
-    const int total_iterations = instance->width * instance->height * instance->iterations_per_sample;
+    const int total_iterations = instance->width * instance->height * instance->samples_per_sample;
 
     gpuErrchk(cudaMemcpyToSymbol(device_sample_offset, &(total_iterations), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
@@ -265,24 +249,14 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     clock_t t = clock();
 
-    uint32_t curr_progress = total_iterations;
+    int32_t curr_progress = total_iterations;
     const float ratio = 1.0f/(total_iterations);
 
-    gpuErrchk(cudaDeviceSynchronize());
-    gpuErrchk(cudaMemset(instance->internal_frame_buffer_gpu, 0, sizeof(RGBF) * instance->width * instance->height));
-    if (instance->denoiser) {
-        gpuErrchk(cudaMemset(instance->albedo_buffer_gpu, 0, sizeof(RGBF) * instance->width * instance->height));
-    }
-
     generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    gpuErrchk(cudaDeviceSynchronize());
 
     while (curr_progress > 0) {
         trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-        gpuErrchk(cudaDeviceSynchronize());
         shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-        gpuErrchk(cudaDeviceSynchronize());
-        gpuErrchk(cudaPeekAtLastError());
         gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
 
         if (progress == 1) {
@@ -291,14 +265,15 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
             const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
             printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
                 (float)samples_done * ratio * 100, time_elapsed,
-                (total_iterations - samples_done) * (time_elapsed/samples_done),
-                0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->iterations_per_sample) * samples_done / time_elapsed);
+                curr_progress * (time_elapsed/samples_done),
+                0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->samples_per_sample) * samples_done / time_elapsed);
         }
     }
 
-    printf("\r                                                                                                              \r");
+    if (progress == 1)
+        printf("\r                                                                                                              \r");
+
     finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    gpuErrchk(cudaDeviceSynchronize());
 }
 
 extern "C" void free_inputs(raytrace_instance* instance) {
@@ -308,7 +283,7 @@ extern "C" void free_inputs(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.nodes));
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
     gpuErrchk(cudaFree(instance->samples_gpu));
-    gpuErrchk(cudaFree(instance->internal_frame_buffer_gpu));
+    gpuErrchk(cudaFree(instance->samples_finished_gpu));
 }
 
 extern "C" void free_outputs(raytrace_instance* instance) {

@@ -78,7 +78,7 @@ void generate_samples() {
 
     sample = get_starting_ray(sample);
 
-    sample.state.x = 0b11 << 8;
+    sample.state.x = (0b11 << 8) | (sample_offset << 10);
     sample.record.r = 1.0f;
     sample.record.g = 1.0f;
     sample.record.b = 1.0f;
@@ -89,7 +89,7 @@ void generate_samples() {
     sample.albedo_buffer.g = 0.0f;
     sample.albedo_buffer.b = 0.0f;
 
-    device_samples[id + sample_offset] = sample;
+    device_active_samples[id + sample_offset] = sample;
 
     sample_offset++;
 
@@ -110,7 +110,7 @@ Sample write_albedo_buffer(RGBF value, Sample sample) {
     sample.albedo_buffer.b += value.b;
   }
 
-  sample.state.x &= 0x01ff;
+  sample.state.x &= 0xfdff;
 
   return sample;
 }
@@ -123,7 +123,7 @@ Sample write_albedo_buffer(RGBAF value, Sample sample) {
     sample.albedo_buffer.b += value.b;
   }
 
-  sample.state.x &= 0x01ff;
+  sample.state.x &= 0xfdff;
 
   return sample;
 }
@@ -137,8 +137,7 @@ Sample write_result(Sample sample) {
   sample.state.x &= 0xff00;
 
   if (sample.state.y <= 0) {
-    sample.state.x &= 0x0200;
-    atomicSub((int32_t*)&device_sample_offset, 1);
+    sample.state.x &= 0xfe00;
   }
 
   sample.record.r = 1.0f;
@@ -157,16 +156,12 @@ float get_light_angle(Light light, vec3 pos) {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 8)
 void shade_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int store_id = id;
 
   while (id < device_samples_length) {
-    while (1) {
-      if (id >= device_samples_length) return;
-      unsigned short state = __ldcs((unsigned short*)(device_samples + id) + 12);
-      if (state & 0x0100) break;
-      id += blockDim.x * gridDim.x;
-    }
+    Sample sample = device_active_samples[id];
 
-    Sample sample = device_samples[id];
+    if (!(sample.state.x & 0x0100)) return;
 
     if (sample.hit_id == 0xffffffff) {
       RGBF sky = get_sky_color(sample.ray);
@@ -177,9 +172,8 @@ void shade_samples() {
       sample.result.g += sky.g * sample.record.g;
       sample.result.b += sky.b * sample.record.b;
 
-      device_samples[id] = write_result(sample);
-      id += blockDim.x * gridDim.x;
-      continue;
+      sample = write_result(sample);
+      goto store_back_sample;
     }
 
     sample.origin.x += sample.ray.x * sample.depth;
@@ -292,9 +286,8 @@ void shade_samples() {
         #ifdef FIRST_LIGHT_ONLY
         const double max_result = fmaxf(sample.result.r, fmaxf(sample.result.g, sample.result.b));
         if (max_result > eps) {
-            device_samples[id] = write_result(sample);
-            id += blockDim.x * gridDim.x;
-            continue;
+            sample = write_result(sample);
+            goto store_back_sample;
         }
         #endif
 
@@ -501,7 +494,18 @@ void shade_samples() {
       sample = write_result(sample);
     }
 
-    device_samples[id] = sample;
+    store_back_sample:;
+
+    if (sample.state.x & 0x0100) {
+      if (store_id < id) __stcs((unsigned short*)(device_active_samples + id) + 12, 0);
+      device_active_samples[store_id] = sample;
+      store_id += blockDim.x * gridDim.x;
+    } else {
+      const unsigned int address = (sample.index.x + sample.index.y * device_width) * device_samples_per_sample + ((sample.state.x & 0xfc00) >> 10);
+      device_finished_samples[address] = sample;
+      atomicSub((int32_t*)&device_sample_offset, 1);
+      __stcs((unsigned short*)(device_active_samples + id) + 12, 0);
+    }
 
     id += blockDim.x * gridDim.x;
   }
@@ -526,7 +530,7 @@ void finalize_samples() {
   albedo.b = 0.0f;
 
   while (id < device_samples_length) {
-    Sample sample = device_samples[id + sample_offset];
+    Sample sample = device_finished_samples[id + sample_offset];
 
     pixel.r += sample.result.r;
     pixel.g += sample.result.g;
