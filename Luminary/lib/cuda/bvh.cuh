@@ -97,7 +97,7 @@ unsigned int __bfind(unsigned int a)
         packed_stptr_invoct.x++;                                     \
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK)
+__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
 void trace_samples() {
     vec3 origin, ray;
     const Node8* nodes = device_scene.nodes;
@@ -160,6 +160,9 @@ void trace_samples() {
 
             id += blockDim.x * gridDim.x;
         }
+
+        int lost_loop_iterations = 0;
+        const int starting_threads = __popc(__activemask());
 
         while (1) {
             if (node_task.y > 0x00ffffff) {
@@ -423,6 +426,11 @@ void trace_samples() {
                     break;
                 }
             }
+
+            const int Nd = 4;
+            const int Nw = 16;
+            lost_loop_iterations += starting_threads - __popc(__activemask()) - Nd;
+            if (lost_loop_iterations >= Nw) break;
         }
     }
 }

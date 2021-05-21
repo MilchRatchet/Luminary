@@ -154,7 +154,7 @@ float get_light_angle(Light light, vec3 pos) {
     return fminf(PI/2.0f,asinf(light.radius / d));
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK)
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 8)
 void shade_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -163,10 +163,12 @@ void shade_samples() {
 
     while (1) {
       if (id >= device_samples_length) return;
-      sample = device_samples[id];
-      if (sample.state.x & 0x0100) break;
+      unsigned short state = __ldcs((unsigned short*)(device_samples + id) + 12);
+      if (state & 0x0100) break;
       id += blockDim.x * gridDim.x;
     }
+
+    Sample sample = device_samples[id];
 
     if (sample.hit_id == 0xffffffff) {
       RGBF sky = get_sky_color(sample.ray);
