@@ -4,6 +4,7 @@
 #include "utils.cuh"
 #include "math.cuh"
 #include "minmax.cuh"
+#include "memory.cuh"
 #include <cuda_runtime_api.h>
 
 struct traversal_result {
@@ -422,6 +423,7 @@ void trace_samples() {
                     write_back.y = uint_as_float(hit_id);
 
                     __stcs((float2*)(ptr + 4) + 1, write_back);
+                    __prefetch_global_l1(device_active_samples + id);
                     break;
                 }
             }

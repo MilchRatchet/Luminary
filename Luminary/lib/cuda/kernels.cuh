@@ -14,6 +14,7 @@
 #include "cuda/bvh.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/random.cuh"
+#include "cuda/memory.cuh"
 #include <cuda_runtime_api.h>
 #include <optix.h>
 #include <optix_stubs.h>
@@ -159,9 +160,11 @@ void shade_samples() {
   unsigned int store_id = id;
 
   while (id < device_samples_length) {
-    Sample sample = device_active_samples[id];
+    Sample sample = load_active_sample_no_temporal_hint(device_active_samples + id);
 
     if (!(sample.state.x & 0x0100)) return;
+
+    __prefetch_global_l1(device_scene.triangles + sample.hit_id);
 
     if (sample.hit_id == 0xffffffff) {
       RGBF sky = get_sky_color(sample.ray);
@@ -369,6 +372,8 @@ void shade_samples() {
             light_angle = fminf(1.0f,asinf(light_data.w / d) * 2.0f / PI);
         }
 
+        __prefetch_global_l1(device_active_samples + id + blockDim.x * gridDim.x);
+
         const float gamma = 2.0f * PI * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 3);
         const float beta = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 2);
 
@@ -497,11 +502,11 @@ void shade_samples() {
 
     if (sample.state.x & 0x0100) {
       if (store_id < id) __stcs((unsigned short*)(device_active_samples + id) + 12, 0);
-      device_active_samples[store_id] = sample;
+      store_active_sample_no_temporal_hint(sample, device_active_samples + store_id);
       store_id += blockDim.x * gridDim.x;
     } else {
       const unsigned int address = (sample.index.x + sample.index.y * device_width) * device_samples_per_sample + ((sample.state.x & 0xfc00) >> 10);
-      device_finished_samples[address] = sample;
+      store_finished_sample_no_temporal_hint(sample, device_finished_samples + address);
       atomicSub((int32_t*)&device_sample_offset, 1);
       __stcs((unsigned short*)(device_active_samples + id) + 12, 0);
     }
@@ -529,7 +534,7 @@ void finalize_samples() {
   albedo.b = 0.0f;
 
   while (id < device_samples_length) {
-    Sample sample = device_finished_samples[id + sample_offset];
+    Sample sample = load_finished_sample_no_temporal_hint(device_finished_samples + id + sample_offset);
 
     pixel.r += sample.result.r;
     pixel.g += sample.result.g;
