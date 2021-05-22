@@ -131,7 +131,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     const double frame_time = 1000.0 * ((double) (clock() - time)) / CLOCKS_PER_SEC;
     time                    = clock();
 
-    sprintf(title, "Luminary - FPS: %.1f - FPS: %.0fms", 1000.0 / frame_time, frame_time);
+    sprintf(title, "Luminary - FPS: %.1f - Frametime: %.0fms", 1000.0 / frame_time, frame_time);
 
     const double normalized_time = frame_time / 16.66667;
 
@@ -148,6 +148,10 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
         }
         else if (keystate[SDL_SCANCODE_G]) {
           instance->scene_gpu.camera.aperture_size += 0.001f * event.motion.xrel;
+        }
+        else if (keystate[SDL_SCANCODE_E]) {
+          instance->scene_gpu.camera.exposure +=
+            max(1.0f, instance->scene_gpu.camera.exposure) * 0.005f * event.motion.xrel;
         }
         else {
           instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
@@ -228,6 +232,9 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     if (instance->scene_gpu.camera.focal_length < 0.0f)
       instance->scene_gpu.camera.focal_length = 0.0f;
+
+    if (instance->scene_gpu.camera.exposure < 0.0f)
+      instance->scene_gpu.camera.exposure = 0.0f;
 
     const float movement_speed = 0.5f * shift_pressed * normalized_time;
 

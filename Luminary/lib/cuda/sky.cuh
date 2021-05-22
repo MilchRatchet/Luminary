@@ -82,8 +82,8 @@ RGBF get_sky_color(const vec3 ray) {
     const float sun_intensity = 6.0f;
 
     sun_color.r = 1.0f * sun_intensity;
-    sun_color.g = 0.9f * sun_intensity;
-    sun_color.b = 0.8f * sun_intensity;
+    sun_color.g = 1.0f * sun_intensity;
+    sun_color.b = 1.0f * sun_intensity;
 
     const vec3 sun_normalized = device_sun;
     const vec3 sun = scale_vector(sun_normalized, sun_dist);

@@ -90,6 +90,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   scene.camera.fov           = 1.0f;
   scene.camera.focal_length  = 1.0f;
   scene.camera.aperture_size = 0.00f;
+  scene.camera.exposure      = 1.0f;
 
   int width           = 1280;
   int height          = 720;

@@ -20,6 +20,7 @@ struct Camera {
   float fov;
   float focal_length;
   float aperture_size;
+  float exposure;
 } typedef Camera;
 
 struct Light {
@@ -60,6 +61,9 @@ struct raytrace_instance {
   int diffuse_samples;
   Scene scene_gpu;
   int denoiser;
+  void* samples_gpu;
+  void* samples_finished_gpu;
+  int samples_per_sample;
   RGBF* albedo_buffer_gpu;
 } typedef raytrace_instance;
 

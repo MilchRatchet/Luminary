@@ -3,6 +3,7 @@
 #include "image.h"
 #include "raytrace.h"
 #include "mesh.h"
+#include "error.h"
 #include "SDL/SDL.h"
 #include "cuda/utils.cuh"
 #include "cuda/math.cuh"
@@ -11,6 +12,7 @@
 #include "cuda/bvh.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/random.cuh"
+#include "cuda/kernels.cuh"
 #include <cuda_runtime_api.h>
 #include <optix.h>
 #include <optix_stubs.h>
@@ -23,528 +25,19 @@
 #include <thread>
 #include <immintrin.h>
 
-const static int threads_per_block = 128;
-const static int blocks_per_grid = 512;
-
-struct Sample {
-    vec3 origin;
-    vec3 ray;
-    RGBF record;
-    RGBF result;
-    short2 state; //x = depth, y = 1st bit (finished?) 2nd bit (albedo buffer written?)
-    ushort2 index;
-    int random_index;
-} typedef Sample;
-
 //---------------------------------
 // Path Tracing
 //---------------------------------
-
-__device__
-float get_light_angle(Light light, vec3 pos) {
-    const float d = get_length(vec_diff(pos, light.pos)) + eps;
-    return fminf(PI/2.0f,asinf(light.radius / d));
-}
-
-__device__
-Sample trace_ray_iterative(const Sample input_sample) {
-    int albedo_buffer_written = input_sample.state.y & 0b10;
-    const ushort2 index = input_sample.index;
-    int random_index = input_sample.random_index;
-
-    RGBF result = input_sample.result;
-    RGBF record = input_sample.record;
-
-    vec3 ray = input_sample.ray;
-    vec3 origin = input_sample.origin;
-
-    short2 state = input_sample.state;
-    const int starting_threads = __popc(__activemask());
-
-    for (; state.x < device_reflection_depth; state.x++) {
-        traversal_result traversal = traverse_bvh(origin, ray, device_scene.nodes, device_scene.traversal_triangles);
-
-        if (traversal.hit_id == 0xffffffff) {
-            RGBF sky = get_sky_color(ray);
-
-            if (device_denoiser && !albedo_buffer_written) {
-                RGBF sum = device_albedo_buffer[index.x + index.y * device_width];
-                sum.r += sky.r;
-                sum.g += sky.g;
-                sum.b += sky.b;
-                device_albedo_buffer[index.x + index.y * device_width] = sum;
-
-                albedo_buffer_written++;
-                state.y |= 0b10;
-            }
-
-            result.r += sky.r * record.r;
-            result.g += sky.g * record.g;
-            result.b += sky.b * record.b;
-
-            state.y |= 0b1;
-
-            break;
-        }
-
-        vec3 curr;
-        curr.x = origin.x + ray.x * traversal.depth;
-        curr.y = origin.y + ray.y * traversal.depth;
-        curr.z = origin.z + ray.z * traversal.depth;
-
-        const float4* hit_address = (float4*)(device_scene.triangles + traversal.hit_id);
-
-        const float4 t1 = __ldg(hit_address);
-        const float4 t2 = __ldg(hit_address + 1);
-        const float4 t3 = __ldg(hit_address + 2);
-        const float4 t4 = __ldg(hit_address + 3);
-        const float4 t5 = __ldg(hit_address + 4);
-        const float4 t6 = __ldg(hit_address + 5);
-        const float4 t7 = __ldg(hit_address + 6);
-
-        vec3 vertex;
-        vertex.x = t1.x;
-        vertex.y = t1.y;
-        vertex.z = t1.z;
-
-        vec3 edge1;
-        edge1.x = t1.w;
-        edge1.y = t2.x;
-        edge1.z = t2.y;
-
-        vec3 edge2;
-        edge2.x = t2.z;
-        edge2.y = t2.w;
-        edge2.z = t3.x;
-
-        vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, curr);
-
-        const float lambda = normal.x;
-        const float mu = normal.y;
-
-        vec3 vertex_normal;
-        vertex_normal.x = t3.y;
-        vertex_normal.y = t3.z;
-        vertex_normal.z = t3.w;
-
-        vec3 edge1_normal;
-        edge1_normal.x = t4.x;
-        edge1_normal.y = t4.y;
-        edge1_normal.z = t4.z;
-
-        vec3 edge2_normal;
-        edge2_normal.x = t4.w;
-        edge2_normal.y = t5.x;
-        edge2_normal.z = t5.y;
-
-        normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
-
-        UV vertex_texture;
-        vertex_texture.u = t5.z;
-        vertex_texture.v = t5.w;
-
-        UV edge1_texture;
-        edge1_texture.u = t6.x;
-        edge1_texture.v = t6.y;
-
-        UV edge2_texture;
-        edge2_texture.u = t6.z;
-        edge2_texture.v = t6.w;
-
-        const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
-
-        vec3 face_normal;
-        face_normal.x = t7.x;
-        face_normal.y = t7.y;
-        face_normal.z = t7.z;
-
-        const int texture_object = __float_as_int(t7.w);
-
-        const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
-
-        float roughness;
-        float metallic;
-        float intensity;
-
-        if (maps.z) {
-            const float4 material_f = tex2D<float4>(device_material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
-
-            roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
-            metallic = material_f.y;
-            intensity = material_f.z * 255.0f;
-        } else {
-            roughness = 0.81f;
-            metallic = 0.0f;
-            intensity = 1.0f;
-        }
-
-        if (maps.y) {
-            #ifdef LIGHTS_AT_NIGHT_ONLY
-            if (device_sun.y < NIGHT_THRESHOLD) {
-            #endif
-            const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
-
-            RGBF emission;
-            emission.r = illuminance_f.x;
-            emission.g = illuminance_f.y;
-            emission.b = illuminance_f.z;
-
-            result.r += emission.r * intensity * record.r;
-            result.g += emission.g * intensity * record.g;
-            result.b += emission.b * intensity * record.b;
-
-            #ifdef FIRST_LIGHT_ONLY
-            const double max_result = fmaxf(result.r, fmaxf(result.g, result.b));
-            if (max_result > eps) {
-                state.y |= 0b1;
-                break;
-            }
-            #endif
-
-            #ifdef LIGHTS_AT_NIGHT_ONLY
-            }
-            #endif
-        }
-
-        RGBAF albedo;
-
-        if (maps.x) {
-            const float4 albedo_f = tex2D<float4>(device_albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
-            albedo.r = albedo_f.x;
-            albedo.g = albedo_f.y;
-            albedo.b = albedo_f.z;
-            albedo.a = albedo_f.w;
-        } else {
-            albedo.r = 0.9f;
-            albedo.g = 0.9f;
-            albedo.b = 0.9f;
-            albedo.a = 1.0f;
-        }
-
-        if (sample_blue_noise(index.x, index.y, random_index, 40) > albedo.a) {
-            origin.x = curr.x + 2.0f * eps * ray.x;
-            origin.y = curr.y + 2.0f * eps * ray.y;
-            origin.z = curr.z + 2.0f * eps * ray.z;
-        } else {
-            if (device_denoiser && !albedo_buffer_written) {
-                RGBF sum = device_albedo_buffer[index.x + index.y * device_width];
-                sum.r += albedo.r;
-                sum.g += albedo.g;
-                sum.b += albedo.b;
-                device_albedo_buffer[index.x + index.y * device_width] = sum;
-
-                albedo_buffer_written++;
-                state.y |= 0b10;
-            }
-
-            const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
-
-            if (dot_product(normal, face_normal) < 0.0f) {
-                face_normal = scale_vector(face_normal, -1.0f);
-            }
-
-            const vec3 V = scale_vector(ray, -1.0f);
-
-            if (dot_product(face_normal, V) < 0.0f) {
-                normal = scale_vector(normal, -1.0f);
-                face_normal = scale_vector(face_normal, -1.0f);
-            }
-
-            origin.x = curr.x + face_normal.x * (eps * 8.0f);
-            origin.y = curr.y + face_normal.y * (eps * 8.0f);
-            origin.z = curr.z + face_normal.z * (eps * 8.0f);
-
-            const float light_sample = sample_blue_noise(index.x, index.y, random_index, 50);
-
-            float light_angle;
-            vec3 light_source;
-            #ifdef LIGHTS_AT_NIGHT_ONLY
-            const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
-            #else
-            const int light_count = device_scene.lights_length;
-            #endif
-
-            const float light_sample_probability = 1.0f - 1.0f/(light_count + 1);
-
-
-            if (light_sample < light_sample_probability) {
-                #ifdef LIGHTS_AT_NIGHT_ONLY
-                    const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(sample_blue_noise(index.x, index.y, random_index, 51) * light_count) : 0;
-                #else
-                    const uint32_t light = (uint32_t)(sample_blue_noise(index.x, index.y, random_index, 51) * light_count);
-                #endif
-
-                const float4 light_data = __ldg((float4*)(device_scene.lights + light));
-                vec3 light_pos;
-                light_pos.x = light_data.x;
-                light_pos.y = light_data.y;
-                light_pos.z = light_data.z;
-                light_pos = vec_diff(light_pos, origin);
-                light_source = normalize_vector(light_pos);
-                const float d = get_length(light_pos) + eps;
-                light_angle = fminf(PI/2.0f,asinf(light_data.w / d)) * 2.0f / PI;
-            }
-
-            if (sample_blue_noise(index.x, index.y, random_index, 10) < specular_probability) {
-                const float alpha = roughness * roughness;
-
-                const float beta = sample_blue_noise(index.x, index.y, random_index, 2);
-                const float gamma = 2.0f * 3.1415926535f * sample_blue_noise(index.x, index.y, random_index, 3);
-
-                const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
-
-                float weight = 1.0f;
-
-                const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
-                vec3 H_local;
-
-                if (alpha < eps) {
-                    H_local.x = 0.0f;
-                    H_local.y = 0.0f;
-                    H_local.z = 1.0f;
-                } else {
-                    const vec3 S_local = rotate_vector_by_quaternion(
-                        normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
-                        rotation_to_z);
-
-                    if (light_sample < light_sample_probability && S_local.z > 0.0f) {
-                        H_local.x = S_local.x + V_local.x;
-                        H_local.y = S_local.y + V_local.y;
-                        H_local.z = S_local.z + V_local.z;
-
-                        H_local = normalize_vector(H_local);
-
-                        weight = (1.0f/light_sample_probability) * light_angle * light_count;
-                    } else {
-                        H_local = sample_GGX_VNDF(V_local, alpha, sample_blue_noise(index.x, index.y, random_index, 4), sample_blue_noise(index.x, index.y, random_index, 5));
-
-                        if (S_local.z > 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
-                    }
-                }
-
-                const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
-
-                const float HdotR = fmaxf(eps, fminf(1.0f, dot_product(H_local, ray_local)));
-                const float NdotR = fmaxf(eps, fminf(1.0f, ray_local.z));
-                const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
-
-                ray = normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
-
-                vec3 specular_f0;
-                specular_f0.x = lerp(0.04f, albedo.r, metallic);
-                specular_f0.y = lerp(0.04f, albedo.g, metallic);
-                specular_f0.z = lerp(0.04f, albedo.b, metallic);
-
-                const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
-
-                const float milchs_energy_recovery = lerp(1.0f, 1.51f + 1.51f * NdotV, roughness);
-
-                weight *= milchs_energy_recovery * Smith_G2_over_G1_height_correlated(alpha * alpha, NdotR, NdotV) / specular_probability;
-
-                record.r *= F.x * weight;
-                record.g *= F.y * weight;
-                record.b *= F.z * weight;
-            }
-            else
-            {
-                float weight = 1.0f;
-
-                const float alpha = acosf(sqrtf(sample_blue_noise(index.x, index.y, random_index, 2)));
-                const float gamma = 2.0f * PI * sample_blue_noise(index.x, index.y, random_index, 3);
-
-                ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
-                const float light_feasible = dot_product(ray, normal);
-
-                if (light_sample < light_sample_probability && light_feasible >= 0.0f) {
-                    weight = (1.0f/light_sample_probability) * light_angle * light_count;
-                } else {
-                    ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
-
-                    if (light_feasible >=0.0f) weight = (1.0f/(1.0f-light_sample_probability));
-                }
-
-                vec3 H;
-                H.x = V.x + ray.x;
-                H.y = V.y + ray.y;
-                H.z = V.z + ray.z;
-                H = normalize_vector(H);
-
-                const float half_angle = fmaxf(eps, fminf(dot_product(H,ray),1.0f));
-                const float energyFactor = lerp(1.0f, 1.0f/1.51f, roughness);
-
-                const float FD90MinusOne = 0.5f * roughness + 2.0f * half_angle * half_angle * roughness - 1.0f;
-
-                const float angle = fmaxf(eps, fminf(dot_product(normal, ray),1.0f));
-                const float previous_angle = fmaxf(eps, fminf(dot_product(V, normal),1.0f));
-
-                const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
-                const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
-
-                weight *= FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
-
-                record.r *= albedo.r * weight;
-                record.g *= albedo.g * weight;
-                record.b *= albedo.b * weight;
-            }
-        }
-
-        #ifdef WEIGHT_BASED_EXIT
-        const double max_record = fmaxf(record.r, fmaxf(record.g, record.b));
-        if (max_record < CUTOFF ||
-        (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(index.x, index.y, random_index, 20) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
-        {
-            state.y |= 0b1;
-            break;
-        }
-        #endif
-
-        #ifdef LOW_QUALITY_LONG_BOUNCES
-        if (state.x >= MIN_BOUNCES && sample_blue_noise(index.x, index.y, random_index, 21) < 1.0f/device_reflection_depth) {
-            state.y |= 0b1;
-            break;
-        }
-        #endif
-
-        if (__popc(__activemask()) < 0.1f *  starting_threads) break;
-
-        random_index++;
-    }
-
-    if (state.x >= device_reflection_depth - 1) state.y |= 0b1;
-
-    Sample output_sample;
-    output_sample.origin = origin;
-    output_sample.ray = ray;
-    output_sample.result = result;
-    output_sample.record = record;
-    output_sample.state = state;
-    output_sample.index = index;
-    output_sample.random_index = random_index + 1;
-
-    return output_sample;
-}
-
-__global__
-void trace_rays(volatile uint32_t* progress, const int temporal_frames) {
-    unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-    Sample sample;
-    sample.state.y = 0b11;
-    int i = 0;
-
-    RGBF pixel;
-    pixel.r = 0.0f;
-    pixel.g = 0.0f;
-    pixel.b = 0.0f;
-
-    while (id < device_amount) {
-        if (sample.state.y & 0b1) {
-            vec3 ray;
-            vec3 default_ray;
-
-            const int x = (id / 1) % device_width;
-            const int y = (id % 1) + 1 * (id / (1 * device_width));
-
-            const int random_index = temporal_frames + ((id * 3) << 10);
-
-            default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * x + device_offset_x * sample_blue_noise(x,y,random_index,8) * 2.0f);
-            default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * y - device_offset_y * sample_blue_noise(x,y,random_index,9) * 2.0f);
-            default_ray.z = -device_scene.camera.focal_length;
-
-            const float alpha = sample_blue_noise(x,y,random_index,0) * 2.0f * PI;
-            const float beta  = sample_blue_noise(x,y,random_index,1) * device_scene.camera.aperture_size;
-
-            vec3 point_on_aperture;
-            point_on_aperture.x = cosf(alpha) * beta;
-            point_on_aperture.y = sinf(alpha) * beta;
-            point_on_aperture.z = 0.0f;
-
-            default_ray = vec_diff(default_ray, point_on_aperture);
-            ray = normalize_vector(rotate_vector_by_quaternion(default_ray, device_camera_rotation));
-            point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device_camera_rotation);
-
-            sample.ray = ray;
-            sample.origin.x = device_scene.camera.pos.x + point_on_aperture.x;
-            sample.origin.y = device_scene.camera.pos.y + point_on_aperture.y;
-            sample.origin.z = device_scene.camera.pos.z + point_on_aperture.z;
-            sample.index.x = x;
-            sample.index.y = y;
-            sample.random_index = random_index;
-            sample.state.x = 0;
-            sample.state.y = 0;
-            sample.record.r = 1.0f;
-            sample.record.g = 1.0f;
-            sample.record.b = 1.0f;
-            sample.result.r = 0.0f;
-            sample.result.g = 0.0f;
-            sample.result.b = 0.0f;
-        }
-
-        sample = trace_ray_iterative(sample);
-
-        if (sample.state.y & 0b1) {
-            if (isnan(sample.result.r) || isinf(sample.result.r)) {
-                sample.result.r = 1.0f;
-            }
-            if (isnan(sample.result.g) || isinf(sample.result.g)) {
-                sample.result.g = 0.0f;
-            }
-            if (isnan(sample.result.b) || isinf(sample.result.b)) {
-                sample.result.b = 0.0f;
-            }
-
-            pixel.r += sample.result.r;
-            pixel.g += sample.result.g;
-            pixel.b += sample.result.b;
-
-            i++;
-        }
-
-        if (i == device_diffuse_samples) {
-            const float weight = 1.0f/(float)device_diffuse_samples;
-
-            pixel.r *= weight;
-            pixel.g *= weight;
-            pixel.b *= weight;
-
-            const int buffer_index = sample.index.x + sample.index.y * device_width;
-
-            if (device_denoiser) {
-                RGBF sum = device_albedo_buffer[buffer_index];
-                sum.r *= weight;
-                sum.g *= weight;
-                sum.b *= weight;
-                device_albedo_buffer[buffer_index] = sum;
-            }
-
-            if (temporal_frames) {
-                RGBF temporal_pixel = device_frame[buffer_index];
-                pixel.r = (pixel.r + temporal_pixel.r * temporal_frames) / (temporal_frames + 1);
-                pixel.g = (pixel.g + temporal_pixel.g * temporal_frames) / (temporal_frames + 1);
-                pixel.b = (pixel.b + temporal_pixel.b * temporal_frames) / (temporal_frames + 1);
-            }
-
-            device_frame[buffer_index] = pixel;
-
-            id += blockDim.x * gridDim.x;
-            i = 0;
-
-            pixel.r = 0.0f;
-            pixel.g = 0.0f;
-            pixel.b = 0.0f;
-
-            atomicAdd((uint32_t*)progress, 1);
-            __threadfence_system();
-        }
-    }
-}
 
 static void update_sun(const Scene scene) {
     vec3 sun;
     sun.x = sinf(scene.azimuth) * cosf(scene.altitude);
     sun.y = sinf(scene.altitude);
     sun.z = cosf(scene.azimuth) * cosf(scene.altitude);
-    sun = normalize_vector(sun);
+    const float scale = 1.0f / (sqrtf(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z));
+    sun.x *= scale;
+    sun.y *= scale;
+    sun.z *= scale;
 
     gpuErrchk(cudaMemcpyToSymbol(device_sun, &(sun), sizeof(vec3), 0, cudaMemcpyHostToDevice));
 
@@ -643,6 +136,28 @@ extern "C" raytrace_instance* init_raytracing(
         gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
     }
 
+    size_t samples_length;
+    gpuErrchk(cudaMemGetInfo(&samples_length, 0));
+    samples_length /= 3;
+    samples_length /= sizeof(Sample);
+
+    instance->samples_per_sample = (64 < (unsigned int)samples_length / (width * height)) ? 64 : (unsigned int)samples_length / (width * height);
+    assert(instance->samples_per_sample, "Not enough memory to alocate samples buffer", 1);
+    instance->samples_per_sample = (instance->samples_per_sample < 10) ? instance->samples_per_sample : 10;
+    instance->samples_per_sample = (instance->samples_per_sample < instance->diffuse_samples) ? instance->samples_per_sample : instance->diffuse_samples;
+    gpuErrchk(cudaMemcpyToSymbol(device_samples_per_sample, &(instance->samples_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
+    samples_length = width * height * instance->samples_per_sample;
+    unsigned int temp = (instance->diffuse_samples + instance->samples_per_sample - 1)/instance->samples_per_sample;
+    gpuErrchk(cudaMemcpyToSymbol(device_iterations_per_sample, &(temp), sizeof(int), 0, cudaMemcpyHostToDevice));
+
+    const unsigned int actual_samples_length = (unsigned int)samples_length;
+
+    gpuErrchk(cudaMalloc((void**) &(instance->samples_gpu), sizeof(Sample) * samples_length));
+    gpuErrchk(cudaMemcpyToSymbol(device_active_samples, &(instance->samples_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void**) &(instance->samples_finished_gpu), sizeof(Sample) * samples_length));
+    gpuErrchk(cudaMemcpyToSymbol(device_finished_samples, &(instance->samples_finished_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_samples_length, &(actual_samples_length), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+
     return instance;
 }
 
@@ -726,48 +241,42 @@ extern "C" void copy_framebuffer_to_cpu(raytrace_instance* instance) {
 }
 
 extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int progress, const int temporal_frames) {
-    volatile uint32_t *progress_gpu, *progress_cpu;
+    const int total_iterations = instance->width * instance->height * instance->samples_per_sample;
 
-    cudaEvent_t kernelFinished;
-    gpuErrchk(cudaEventCreate(&kernelFinished));
-    gpuErrchk(cudaHostAlloc((void**)&progress_cpu, sizeof(uint32_t), cudaHostAllocMapped));
-    gpuErrchk(cudaHostGetDevicePointer((uint32_t**)&progress_gpu, (uint32_t*)progress_cpu, 0));
-    *progress_cpu = 0;
-
+    gpuErrchk(cudaMemcpyToSymbol(device_sample_offset, &(total_iterations), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
 
     update_sun(instance->scene_gpu);
     update_camera_pos(instance->scene_gpu, instance->width, instance->height);
 
     clock_t t = clock();
 
-    trace_rays<<<blocks_per_grid,threads_per_block>>>(progress_gpu, temporal_frames);
+    int32_t curr_progress = total_iterations;
+    const float ratio = 1.0f/(total_iterations);
 
-    if (progress == 1) {
-        gpuErrchk(cudaEventRecord(kernelFinished));
+    generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-        uint32_t progress = 0;
-        const uint32_t total_pixels = instance->width * instance->height;
-        const float ratio = 1.0f/((float)instance->width * (float)instance->height);
-        while (cudaEventQuery(kernelFinished) != cudaSuccess) {
-            std::this_thread::sleep_for(std::chrono::microseconds(100000));
-            gpuErrchk(cudaPeekAtLastError());
-            uint32_t new_progress = *progress_cpu;
-            if (new_progress > progress) {
-                progress = new_progress;
-            }
+    while (curr_progress > 0) {
+        trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
+
+        if (progress == 1) {
             clock_t curr_time = clock();
+            const int samples_done = total_iterations - curr_progress;
             const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
             printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
-                (float)progress * ratio * 100, time_elapsed,
-                (total_pixels - progress) * (time_elapsed/progress),
-                0.000001 * instance->diffuse_samples * instance->reflection_depth * progress / time_elapsed);
+                (float)samples_done * ratio * 100, time_elapsed,
+                curr_progress * (time_elapsed/samples_done),
+                0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->samples_per_sample) * samples_done / time_elapsed);
         }
-
-        printf("\r                                                                                                              \r");
     }
 
-    gpuErrchk(cudaDeviceSynchronize());
+    if (progress == 1)
+        printf("\r                                                                                                              \r");
+
+    finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
 extern "C" void free_inputs(raytrace_instance* instance) {
@@ -776,6 +285,8 @@ extern "C" void free_inputs(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.nodes));
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
+    gpuErrchk(cudaFree(instance->samples_gpu));
+    gpuErrchk(cudaFree(instance->samples_finished_gpu));
 }
 
 extern "C" void free_outputs(raytrace_instance* instance) {
@@ -846,7 +357,7 @@ extern "C" void free_realtime(raytrace_instance* instance) {
 }
 
 extern "C" void copy_framebuffer_to_8bit(RGB8* buffer, RGBF* source, raytrace_instance* instance) {
-    convert_RGBF_to_RGB8<<<blocks_per_grid,threads_per_block>>>(source);
+    convert_RGBF_to_RGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(source);
     gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(RGB8) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 

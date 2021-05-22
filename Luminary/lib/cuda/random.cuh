@@ -28,15 +28,13 @@ float sample_blue_noise(int x, int y, int sample_index, int sample_dimension) {
 	sample_index = sample_index & 255;
   sample_dimension = sample_dimension & 255;
 
-  int ranking_index = sample_dimension + (x + y * 128) * 8;
+  const int ranking_index = (sample_dimension + (x + y * 128) * 8) & 131071;
 
-  if (ranking_index >= 128 * 128 * 8) ranking_index -= 128 * 128 * 8;
+	const int ranked_sample_index = sample_index ^ __ldg(ranking_tile + ranking_index);
 
-	const int ranked_sample_index = sample_index ^ ranking_tile[ranking_index];
+	int value = __ldg(sobol_256spp_256d + sample_dimension + ranked_sample_index * 256);
 
-	int value = sobol_256spp_256d[sample_dimension + ranked_sample_index * 256];
-
-	value = value ^ scrambling_tile[(sample_dimension % 8) + (x + y * 128) * 8];
+	value = value ^ __ldg(scrambling_tile + (sample_dimension % 8) + (x + y * 128) * 8);
 
 	return (0.5f + value) / 256.0f;
 }

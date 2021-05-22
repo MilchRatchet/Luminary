@@ -6,6 +6,9 @@
 #include <cuda_runtime_api.h>
 #include "utils.h"
 
+#define THREADS_PER_BLOCK 128
+#define BLOCKS_PER_GRID 512
+
 #define gpuErrchk(ans) { gpuAssert((ans), __FILE__, __LINE__); }
 inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=true)
 {
@@ -46,6 +49,19 @@ struct Quaternion {
 } typedef Quaternion;
 #endif
 
+struct Sample {
+  vec3 origin;
+  vec3 ray;
+  ushort2 state; //x = (high 8bits) 1st bit (active?) 2nd bit (albedo buffer written?) other 6bits give sample offset | (low 8 bits) depth, y = iterations left
+  int random_index;
+  RGBF record;
+  RGBF result;
+  RGBF albedo_buffer;
+  ushort2 index;
+  float depth;
+  unsigned int hit_id;
+} typedef Sample;
+
 //===========================================================================================
 // Device Variables
 //===========================================================================================
@@ -55,6 +71,27 @@ int device_reflection_depth;
 
 __constant__
 Scene device_scene;
+
+__constant__
+unsigned int device_samples_length;
+
+__constant__
+Sample* device_active_samples;
+
+__constant__
+Sample* device_finished_samples;
+
+__constant__
+int device_iterations_per_sample;
+
+__constant__
+int device_samples_per_sample;
+
+__device__
+int device_sample_offset;
+
+__constant__
+int device_temporal_frames;
 
 __constant__
 int device_diffuse_samples;
@@ -67,6 +104,9 @@ RGBF* device_denoiser;
 
 __constant__
 RGBF* device_albedo_buffer;
+
+__constant__
+RGBF* device_internal_frame;
 
 __constant__
 unsigned int device_width;
