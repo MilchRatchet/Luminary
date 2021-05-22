@@ -366,7 +366,7 @@ void shade_samples() {
             light_pos = vec_diff(light_pos, sample.origin);
             light_source = normalize_vector(light_pos);
             const float d = get_length(light_pos) + eps;
-            light_angle = fminf(PI/2.0f,asinf(light_data.w / d)) * 2.0f / PI;
+            light_angle = fminf(1.0f,asinf(light_data.w / d) * 2.0f / PI);
         }
 
         const float gamma = 2.0f * PI * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 3);
@@ -400,7 +400,7 @@ void shade_samples() {
 
                     weight = (1.0f/light_sample_probability) * light_angle * light_count;
                 } else {
-                    H_local = sample_GGX_VNDF(V_local, alpha, sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 4), sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 5));
+                    H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
 
                     if (S_local.z > 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
                 }

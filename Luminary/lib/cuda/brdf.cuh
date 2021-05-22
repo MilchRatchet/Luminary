@@ -71,7 +71,7 @@ vec3 sample_GGX_VNDF(const vec3 v, const float alpha, const float random1, const
     const vec3 T2 = cross_product(v_hemi, T1);
 
     const float r = sqrtf(random1);
-    const float phi = 2.0f * PI * random2;
+    const float phi = random2;
     const float t1 = r * cosf(phi);
     const float s = 0.5f * (1.0f + v_hemi.z);
     const float t2 = lerp(sqrtf(1.0f - t1 * t1), r * sinf(phi), s);

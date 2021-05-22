@@ -34,7 +34,10 @@ static void update_sun(const Scene scene) {
     sun.x = sinf(scene.azimuth) * cosf(scene.altitude);
     sun.y = sinf(scene.altitude);
     sun.z = cosf(scene.azimuth) * cosf(scene.altitude);
-    sun = normalize_vector(sun);
+    const float scale = 1.0f / (sqrtf(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z));
+    sun.x *= scale;
+    sun.y *= scale;
+    sun.z *= scale;
 
     gpuErrchk(cudaMemcpyToSymbol(device_sun, &(sun), sizeof(vec3), 0, cudaMemcpyHostToDevice));
 
@@ -140,8 +143,8 @@ extern "C" raytrace_instance* init_raytracing(
 
     instance->samples_per_sample = (64 < (unsigned int)samples_length / (width * height)) ? 64 : (unsigned int)samples_length / (width * height);
     assert(instance->samples_per_sample, "Not enough memory to alocate samples buffer", 1);
-    instance->samples_per_sample = 1;
-    instance->samples_per_sample = (instance->samples_per_sample > instance->diffuse_samples) ? instance->diffuse_samples : instance->samples_per_sample;
+    instance->samples_per_sample = (instance->samples_per_sample < 10) ? instance->samples_per_sample : 10;
+    instance->samples_per_sample = (instance->samples_per_sample < instance->diffuse_samples) ? instance->samples_per_sample : instance->diffuse_samples;
     gpuErrchk(cudaMemcpyToSymbol(device_samples_per_sample, &(instance->samples_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
     samples_length = width * height * instance->samples_per_sample;
     unsigned int temp = (instance->diffuse_samples + instance->samples_per_sample - 1)/instance->samples_per_sample;

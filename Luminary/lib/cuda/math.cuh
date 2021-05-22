@@ -64,11 +64,15 @@ float get_length(const vec3 vector) {
     return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
 }
 
-__device__ __host__
+__device__
 vec3 normalize_vector(vec3 vector) {
-    const float inv_length = 1.0f / get_length(vector);
+    const float scale = rnorm3df(vector.x, vector.y, vector.z);
 
-    return scale_vector(vector, inv_length);
+    vector.x *= scale;
+    vector.y *= scale;
+    vector.z *= scale;
+
+    return vector;
 }
 
 __device__
