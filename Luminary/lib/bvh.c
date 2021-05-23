@@ -28,6 +28,10 @@ struct bvh_triangle {
   uint64_t _p2;
 } typedef bvh_triangle;
 
+static float get_value_by_axis(const vec3_p p, const int axis) {
+  return (axis) ? ((axis == 1) ? p.y : p.z) : p.x;
+}
+
 static void fit_bounds(
   const bvh_triangle* triangles, const int triangles_length, vec3_p* high_out, vec3_p* low_out,
   vec3_p* high_out_inner, vec3_p* low_out_inner) {
@@ -82,8 +86,8 @@ static void fit_bounds(
     _mm_storeu_ps((float*) low_out_inner, low_inner);
 }
 
-static void divide_along_x_axis(
-  const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
+static void divide_along_axis(
+  const float split, const int axis, int* left_out, int* right_out, bvh_triangle* triangles_left,
   bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
   const int use_centroid) {
   int left  = 0;
@@ -95,80 +99,17 @@ static void divide_along_x_axis(
     int is_right = 0;
 
     if (use_centroid) {
-      is_right = (split < triangle.vertex.x + 0.5f * triangle.edge1.x + 0.5f * triangle.edge2.x);
+      is_right =
+        (split < get_value_by_axis(triangle.vertex, axis)
+                   + 0.5f * get_value_by_axis(triangle.edge1, axis)
+                   + 0.5f * get_value_by_axis(triangle.edge2, axis));
     }
     else {
-      const float shifted_split = split - triangle.vertex.x;
+      const float shifted_split = split - get_value_by_axis(triangle.vertex, axis);
 
       is_right += 0.0f >= shifted_split;
-      is_right += triangle.edge1.x >= shifted_split;
-      is_right += triangle.edge2.x >= shifted_split;
-    }
-
-    if (is_right)
-      triangles_right[right++] = triangle;
-    else
-      triangles_left[left++] = triangle;
-  }
-
-  *left_out  = left;
-  *right_out = right;
-}
-
-static void divide_along_y_axis(
-  const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
-  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
-  const int use_centroid) {
-  int left  = 0;
-  int right = 0;
-
-  for (int i = 0; i < triangles_length; i++) {
-    bvh_triangle triangle = triangles[i];
-
-    int is_right = 0;
-
-    if (use_centroid) {
-      is_right = (split < triangle.vertex.y + 0.5f * triangle.edge1.y + 0.5f * triangle.edge2.y);
-    }
-    else {
-      const float shifted_split = split - triangle.vertex.y;
-
-      is_right += 0.0f >= shifted_split;
-      is_right += triangle.edge1.y >= shifted_split;
-      is_right += triangle.edge2.y >= shifted_split;
-    }
-
-    if (is_right)
-      triangles_right[right++] = triangle;
-    else
-      triangles_left[left++] = triangle;
-  }
-
-  *left_out  = left;
-  *right_out = right;
-}
-
-static void divide_along_z_axis(
-  const float split, int* left_out, int* right_out, bvh_triangle* triangles_left,
-  bvh_triangle* triangles_right, bvh_triangle* triangles, const unsigned int triangles_length,
-  const int use_centroid) {
-  int left  = 0;
-  int right = 0;
-
-  for (int i = 0; i < triangles_length; i++) {
-    bvh_triangle triangle = triangles[i];
-
-    int is_right = 0;
-
-    if (use_centroid) {
-      is_right = (split < triangle.vertex.z + 0.5f * triangle.edge1.z + 0.5f * triangle.edge2.z);
-    }
-    else {
-      const float shifted_split = split - triangle.vertex.z;
-
-      is_right += 0.0f >= shifted_split;
-      is_right += triangle.edge1.z >= shifted_split;
-      is_right += triangle.edge2.z >= shifted_split;
+      is_right += get_value_by_axis(triangle.edge1, axis) >= shifted_split;
+      is_right += get_value_by_axis(triangle.edge2, axis) >= shifted_split;
     }
 
     if (is_right)
@@ -287,21 +228,9 @@ Node2* build_bvh_structure(
           const float split = search_start + k * search_interval;
           vec3_p high_left, high_right, low_left, low_right;
 
-          if (a == 0) {
-            divide_along_x_axis(
-              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-              container, total_right, method);
-          }
-          else if (a == 1) {
-            divide_along_y_axis(
-              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-              container, total_right, method);
-          }
-          else {
-            divide_along_z_axis(
-              split, &left, &right, new_triangles + triangles_ptr + total_left, container,
-              container, total_right, method);
-          }
+          divide_along_axis(
+            split, a, &left, &right, new_triangles + triangles_ptr + total_left, container,
+            container, total_right, method);
 
           if (left == 0) {
             continue;
@@ -349,21 +278,9 @@ Node2* build_bvh_structure(
         }
       }
 
-      if (axis == 0) {
-        divide_along_x_axis(
-          optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count, optimal_method);
-      }
-      else if (axis == 1) {
-        divide_along_y_axis(
-          optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count, optimal_method);
-      }
-      else {
-        divide_along_z_axis(
-          optimal_split, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
-          bvh_triangles + node.triangles_address, node.triangle_count, optimal_method);
-      }
+      divide_along_axis(
+        optimal_split, axis, &left, &right, new_triangles + triangles_ptr, bvh_triangles,
+        bvh_triangles + node.triangles_address, node.triangle_count, optimal_method);
 
       int actual_split = 1;
 
