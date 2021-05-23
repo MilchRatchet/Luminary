@@ -128,8 +128,8 @@ void trace_samples() {
 
             ptr = (float4*)(device_active_samples + id);
 
-            float4 data0 = __ldg(ptr + 0);
-            float4 data1 = __ldg(ptr + 1);
+            float4 data0 = __ldcs(ptr + 0);
+            float4 data1 = __ldcs(ptr + 1);
 
             node_task = make_uint2(0, 0b10000000000000000000000000000000);
             triangle_task = make_uint2(0, 0);
