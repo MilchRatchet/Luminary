@@ -38,8 +38,22 @@ static void __swap_bvh_triangle(bvh_triangle* a, bvh_triangle* b) {
 }
 
 static int __partition(bvh_triangle* triangles, int bottom, int top, const int axis) {
-  const int r = (int) round((((((double) rand()) / RAND_MAX) * (top - bottom)) + bottom));
-  __swap_bvh_triangle(triangles + r, triangles + top);
+  const int mid = (top - bottom) / 2 + bottom;
+  if (
+    get_sweeping_bound_by_axis(triangles[top], axis)
+    < get_sweeping_bound_by_axis(triangles[bottom], axis)) {
+    __swap_bvh_triangle(triangles + bottom, triangles + top);
+  }
+  if (
+    get_sweeping_bound_by_axis(triangles[mid], axis)
+    < get_sweeping_bound_by_axis(triangles[bottom], axis)) {
+    __swap_bvh_triangle(triangles + mid, triangles + bottom);
+  }
+  if (
+    get_sweeping_bound_by_axis(triangles[top], axis)
+    > get_sweeping_bound_by_axis(triangles[mid], axis)) {
+    __swap_bvh_triangle(triangles + mid, triangles + top);
+  }
 
   const float x = get_sweeping_bound_by_axis(triangles[top], axis);
   int i         = bottom - 1;
@@ -218,10 +232,9 @@ Node2* build_bvh_structure(
       vec3_p high, low;
 
       float optimal_cost = FLT_MAX;
-      int axis, optimal_method, optimal_split;
+      int axis, optimal_split;
 
       for (int a = 0; a < 3; a++) {
-        int method = 0;
         quick_sort_bvh_triangles(bvh_triangles + triangles_ptr, node.triangle_count, a);
 
         vec3_p high_left  = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
@@ -255,18 +268,20 @@ Node2* build_bvh_structure(
           const float total_cost = cost_L * k + cost_R * (node.triangle_count - k);
 
           if (total_cost < optimal_cost) {
-            optimal_cost   = total_cost;
-            optimal_split  = k;
-            axis           = a;
-            optimal_method = method;
+            optimal_cost  = total_cost;
+            optimal_split = k;
+            axis          = a;
           }
         }
       }
 
-      // printf("SPLIT: %f\n", ((float) optimal_split) / node.triangle_count);
-
       if (axis != 2) {
         quick_sort_bvh_triangles(bvh_triangles + triangles_ptr, node.triangle_count, axis);
+      }
+
+      if (write_ptr + 2 >= node_count) {
+        node_count += triangles_length / THRESHOLD_TRIANGLES;
+        nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
       }
 
       fit_bounds(bvh_triangles + triangles_ptr, optimal_split, &high, &low);
@@ -286,11 +301,6 @@ Node2* build_bvh_structure(
       write_ptr++;
       triangles_ptr += optimal_split;
 
-      if (write_ptr == node_count) {
-        node_count += triangles_length / THRESHOLD_TRIANGLES;
-        nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
-      }
-
       fit_bounds(bvh_triangles + triangles_ptr, node.triangle_count - optimal_split, &high, &low);
 
       node.right_high.x = high.x;
@@ -306,11 +316,6 @@ Node2* build_bvh_structure(
 
       write_ptr++;
       triangles_ptr += node.triangle_count - optimal_split;
-
-      if (write_ptr == node_count) {
-        node_count += triangles_length / THRESHOLD_TRIANGLES;
-        nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
-      }
 
       node.triangle_count    = 0;
       node.triangles_address = -1;
