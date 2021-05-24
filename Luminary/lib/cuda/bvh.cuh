@@ -123,7 +123,8 @@ void trace_samples() {
     packed_stptr_invoct.x = 0;
 
     while (1) {
-        while (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
+        //node_task.y == 0 gives exact result but is much slower, this here causes some minor glitches
+        if (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
             if (id >= device_samples_length) return;
 
             ptr = (float4*)(device_active_samples + id);
