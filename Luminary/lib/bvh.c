@@ -109,10 +109,6 @@ static void fit_bounds(
     __m256 bc = _mm256_load_ps(baseptr);
     __m128 a  = _mm_load_ps(baseptr + 8);
 
-    __m256 a_ext = _mm256_castps128_ps256(a);
-    a_ext        = _mm256_insertf128_ps(a_ext, a, 0b1);
-    bc           = _mm256_add_ps(a_ext, bc);
-
     high   = _mm256_max_ps(bc, high);
     low    = _mm256_min_ps(bc, low);
     high_a = _mm_max_ps(a, high_a);
@@ -149,10 +145,6 @@ static void update_bounds(const bvh_triangle* triangle, vec3_p* high_out, vec3_p
 
   __m256 bc = _mm256_load_ps(baseptr);
   __m128 a  = _mm_load_ps(baseptr + 8);
-
-  __m256 a_ext = _mm256_castps128_ps256(a);
-  a_ext        = _mm256_insertf128_ps(a_ext, a, 0b1);
-  bc           = _mm256_add_ps(a_ext, bc);
 
   high   = _mm256_max_ps(bc, high);
   low    = _mm256_min_ps(bc, low);
@@ -205,9 +197,17 @@ Node2* build_bvh_structure(
 
     bvh_triangle bt = {
       .vertex = {.x = t.vertex.x, .y = t.vertex.y, .z = t.vertex.z, ._p = maximum.x},
-      .edge1  = {.x = t.edge1.x, .y = t.edge1.y, .z = t.edge1.z, ._p = maximum.y},
-      .edge2  = {.x = t.edge2.x, .y = t.edge2.y, .z = t.edge2.z, ._p = maximum.z},
-      .id     = i};
+      .edge1 =
+        {.x  = t.vertex.x + t.edge1.x,
+         .y  = t.vertex.y + t.edge1.y,
+         .z  = t.vertex.z + t.edge1.z,
+         ._p = maximum.y},
+      .edge2 =
+        {.x  = t.vertex.x + t.edge2.x,
+         .y  = t.vertex.y + t.edge2.y,
+         .z  = t.vertex.z + t.edge2.z,
+         ._p = maximum.z},
+      .id = i};
     bvh_triangles[i] = bt;
   }
 
