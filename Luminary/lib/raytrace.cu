@@ -141,7 +141,7 @@ extern "C" raytrace_instance* init_raytracing(
     samples_length /= 3;
     samples_length /= sizeof(Sample);
 
-    instance->samples_per_sample = (64 < (unsigned int)samples_length / (width * height)) ? 64 : (unsigned int)samples_length / (width * height);
+    instance->samples_per_sample = (32 < (unsigned int)samples_length / (width * height)) ? 32 : (unsigned int)samples_length / (width * height);
     assert(instance->samples_per_sample, "Not enough memory to alocate samples buffer", 1);
     instance->samples_per_sample = (instance->samples_per_sample < 10) ? instance->samples_per_sample : 10;
     instance->samples_per_sample = (instance->samples_per_sample < instance->diffuse_samples) ? instance->samples_per_sample : instance->diffuse_samples;

@@ -79,7 +79,7 @@ void generate_samples() {
 
     sample = get_starting_ray(sample);
 
-    sample.state.x = (0b11 << 8) | (sample_offset << 10);
+    sample.state.x = (0b111 << 8) | (sample_offset << 11);
     sample.record.r = 1.0f;
     sample.record.g = 1.0f;
     sample.record.b = 1.0f;
@@ -133,7 +133,7 @@ __device__
 Sample write_result(Sample sample) {
   sample.state.y--;
 
-  sample.state.x |= 0x0200;
+  sample.state.x |= 0x0600;
 
   sample.state.x &= 0xff00;
 
@@ -170,6 +170,12 @@ void shade_samples() {
       RGBF sky = get_sky_color(sample.ray);
 
       sample = write_albedo_buffer(sky, sample);
+
+      if (!(sample.state.x &= 0x0400)) {
+        sky.r = (sky.r > 1.0f) ? 0.0f : sky.r;
+        sky.g = (sky.g > 1.0f) ? 0.0f : sky.g;
+        sky.b = (sky.b > 1.0f) ? 0.0f : sky.b;
+      }
 
       sample.result.r += sky.r * sample.record.r;
       sample.result.g += sky.g * sample.record.g;
@@ -282,9 +288,11 @@ void shade_samples() {
 
         sample = write_albedo_buffer(emission, sample);
 
-        sample.result.r += emission.r * intensity * sample.record.r;
-        sample.result.g += emission.g * intensity * sample.record.g;
-        sample.result.b += emission.b * intensity * sample.record.b;
+        if (sample.state.x &= 0x0400) {
+          sample.result.r += emission.r * intensity * sample.record.r;
+          sample.result.g += emission.g * intensity * sample.record.g;
+          sample.result.b += emission.b * intensity * sample.record.b;
+        }
 
         #ifdef FIRST_LIGHT_ONLY
         const double max_result = fmaxf(sample.result.r, fmaxf(sample.result.g, sample.result.b));
@@ -445,10 +453,14 @@ void shade_samples() {
 
             if (light_sample < light_sample_probability && light_feasible >= 0.0f) {
                 weight = (1.0f/light_sample_probability) * light_angle * light_count;
+
+                sample.state.x |= 0x0400;
             } else {
                 sample.ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
-                if (light_feasible >=0.0f) weight = (1.0f/(1.0f-light_sample_probability));
+                if (light_feasible >= 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
+
+                sample.state.x &= 0xfbff;
             }
 
             vec3 H;
@@ -505,7 +517,7 @@ void shade_samples() {
       store_active_sample_no_temporal_hint(sample, device_active_samples + store_id);
       store_id += blockDim.x * gridDim.x;
     } else {
-      const unsigned int address = (sample.index.x + sample.index.y * device_width) * device_samples_per_sample + ((sample.state.x & 0xfc00) >> 10);
+      const unsigned int address = (sample.index.x + sample.index.y * device_width) * device_samples_per_sample + (sample.state.x >> 11);
       store_finished_sample_no_temporal_hint(sample, device_finished_samples + address);
       atomicSub((int32_t*)&device_sample_offset, 1);
       __stcs((unsigned short*)(device_active_samples + id) + 12, 0);

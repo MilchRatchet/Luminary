@@ -52,7 +52,7 @@ struct Quaternion {
 struct Sample {
   vec3 origin;
   vec3 ray;
-  ushort2 state; //x = (high 8bits) 1st bit (active?) 2nd bit (albedo buffer written?) other 6bits give sample offset | (low 8 bits) depth, y = iterations left
+  ushort2 state; //x = (high 8bits) 1st bit (active?) 2nd bit (albedo buffer written?) 3rd bit (is light sample?) other 5bits give sample offset | (low 8 bits) depth, y = iterations left
   int random_index;
   RGBF record;
   RGBF result;
