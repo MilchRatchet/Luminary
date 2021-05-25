@@ -10,6 +10,7 @@
 #include <immintrin.h>
 
 #define THRESHOLD_TRIANGLES 3
+#define MAXIMUM_BIN_COUNT 1024
 
 struct vec3_p {
   float x;
@@ -26,6 +27,11 @@ struct bvh_triangle {
   uint32_t _p1;
   uint64_t _p2;
 } typedef bvh_triangle;
+
+struct bin {
+  vec3_p high;
+  vec3_p low;
+} typedef bin;
 
 static float get_sweeping_bound_by_axis(const bvh_triangle triangle, const int axis) {
   return (axis) ? ((axis == 1) ? triangle.edge1._p : triangle.edge2._p) : triangle.vertex._p;
@@ -135,35 +141,55 @@ static void fit_bounds(
     _mm_storeu_ps((float*) low_out, low_a);
 }
 
-static void update_bounds(const bvh_triangle* triangle, vec3_p* high_out, vec3_p* low_out) {
-  __m256 high   = _mm256_set1_ps(-FLT_MAX);
-  __m256 low    = _mm256_set1_ps(FLT_MAX);
-  __m128 high_a = _mm_loadu_ps((float*) high_out);
-  __m128 low_a  = _mm_loadu_ps((float*) low_out);
+static void fit_bounds_of_bins(
+  const bin* bins, const int bins_length, vec3_p* high_out, vec3_p* low_out) {
+  __m256 high = _mm256_set1_ps(-FLT_MAX);
+  __m256 low  = _mm256_set1_ps(FLT_MAX);
 
-  const float* baseptr = (float*) triangle;
+  for (unsigned int i = 0; i < bins_length; i++) {
+    const float* baseptr = (float*) (bins + i);
 
-  __m256 bc = _mm256_load_ps(baseptr);
-  __m128 a  = _mm_load_ps(baseptr + 8);
+    __m256 b = _mm256_load_ps(baseptr);
 
-  high   = _mm256_max_ps(bc, high);
-  low    = _mm256_min_ps(bc, low);
-  high_a = _mm_max_ps(a, high_a);
-  low_a  = _mm_min_ps(a, low_a);
+    high = _mm256_max_ps(b, high);
+    low  = _mm256_min_ps(b, low);
+  }
 
-  __m128 high_b = _mm256_castps256_ps128(high);
+  __m128 high_a = _mm256_castps256_ps128(high);
   high          = _mm256_permute2f128_ps(high, high, 0b00000001);
-  __m128 high_c = _mm256_castps256_ps128(high);
+  __m128 high_b = _mm256_castps256_ps128(high);
 
   high_a = _mm_max_ps(high_a, high_b);
-  high_a = _mm_max_ps(high_a, high_c);
 
-  __m128 low_b = _mm256_castps256_ps128(low);
+  __m128 low_a = _mm256_castps256_ps128(low);
   low          = _mm256_permute2f128_ps(low, low, 0b00000001);
-  __m128 low_c = _mm256_castps256_ps128(low);
+  __m128 low_b = _mm256_castps256_ps128(low);
 
   low_a = _mm_min_ps(low_a, low_b);
-  low_a = _mm_min_ps(low_a, low_c);
+
+  if (high_out)
+    _mm_storeu_ps((float*) high_out, high_a);
+  if (low_out)
+    _mm_storeu_ps((float*) low_out, low_a);
+}
+
+static void update_bounds_of_bins(const bin* bins, vec3_p* high_out, vec3_p* low_out) {
+  __m128 high_a = _mm_loadu_ps((float*) high_out);
+  __m128 low_a  = _mm_loadu_ps((float*) low_out);
+  __m128 high_b = _mm_set1_ps(-FLT_MAX);
+  __m128 low_b  = _mm_set1_ps(FLT_MAX);
+
+  const float* baseptr = (float*) (bins);
+
+  __m128 a = _mm_load_ps(baseptr);
+  __m128 b = _mm_load_ps(baseptr + 4);
+
+  high_a = _mm_max_ps(a, high_a);
+  low_a  = _mm_min_ps(a, low_a);
+  high_b = _mm_max_ps(b, high_b);
+  low_b  = _mm_min_ps(b, low_b);
+  high_a = _mm_max_ps(high_a, high_b);
+  low_a  = _mm_min_ps(low_a, low_b);
 
   if (high_out)
     _mm_storeu_ps((float*) high_out, high_a);
@@ -211,6 +237,8 @@ Node2* build_bvh_structure(
     bvh_triangles[i] = bt;
   }
 
+  bin* bins = (bin*) _mm_malloc(sizeof(bin) * MAXIMUM_BIN_COUNT, 32);
+
   int begin_of_current_nodes = 0;
   int end_of_current_nodes   = 1;
   int write_ptr              = 1;
@@ -227,7 +255,9 @@ Node2* build_bvh_structure(
         continue;
       }
 
-      const int binning_size = 1 + node.triangle_count / 1024;
+      const int binning_size  = 1 + node.triangle_count / MAXIMUM_BIN_COUNT;
+      const int bin_count     = (node.triangle_count + binning_size - 1) / binning_size;
+      const int last_bin_size = node.triangle_count - (bin_count - 1) * binning_size;
 
       vec3_p high, low;
 
@@ -237,15 +267,21 @@ Node2* build_bvh_structure(
       for (int a = 0; a < 3; a++) {
         quick_sort_bvh_triangles(bvh_triangles + triangles_ptr, node.triangle_count, a);
 
+        for (int k = 0; k < bin_count; k++) {
+          const int size = (k == bin_count - 1) ? last_bin_size : binning_size;
+          fit_bounds(bvh_triangles + triangles_ptr + k * binning_size, size, &high, &low);
+          bin b   = {.high = high, .low = low};
+          bins[k] = b;
+        }
+
         vec3_p high_left  = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
         vec3_p high_right = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
         vec3_p low_left   = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
         vec3_p low_right  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
 
-        for (int k = 1; k < node.triangle_count - 1; k += binning_size) {
-          update_bounds(bvh_triangles + triangles_ptr + k - 1, &high_left, &low_left);
-          fit_bounds(
-            bvh_triangles + triangles_ptr + k, node.triangle_count - k, &high_right, &low_right);
+        for (int k = 1; k < bin_count - 1; k++) {
+          update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
+          fit_bounds_of_bins(bins + k, bin_count - k, &high_right, &low_right);
 
           vec3_p diff_left = {
             .x  = high_left.x - low_left.x,
@@ -265,11 +301,12 @@ Node2* build_bvh_structure(
           const float cost_R =
             diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
 
-          const float total_cost = cost_L * k + cost_R * (node.triangle_count - k);
+          const float total_cost = cost_L * k * binning_size
+                                   + cost_R * ((bin_count - k - 1) * binning_size + last_bin_size);
 
           if (total_cost < optimal_cost) {
             optimal_cost  = total_cost;
-            optimal_split = k;
+            optimal_split = k * binning_size;
             axis          = a;
           }
         }
@@ -343,6 +380,7 @@ Node2* build_bvh_structure(
 
   free(triangles_swap);
   _mm_free(bvh_triangles);
+  _mm_free(bins);
 
   *triangles_io = triangles;
 
