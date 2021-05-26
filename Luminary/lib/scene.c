@@ -158,7 +158,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   int nodes_length;
 
-  Node2* initial_nodes = build_bvh_structure(&triangles, triangle_count, &nodes_length);
+  Node2* initial_nodes = build_bvh_structure(&triangles, &triangle_count, &nodes_length);
 
   Node8* nodes =
     collapse_bvh(initial_nodes, nodes_length, &triangles, triangle_count, &nodes_length);
