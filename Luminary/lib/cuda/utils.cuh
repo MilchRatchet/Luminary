@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda_runtime_api.h>
+#include <curand_kernel.h>
 #include "utils.h"
 
 #define THREADS_PER_BLOCK 128
@@ -89,6 +90,9 @@ int device_samples_per_sample;
 
 __device__
 int device_sample_offset;
+
+__constant__
+curandStateXORWOW_t* device_sample_randoms;
 
 __constant__
 int device_temporal_frames;

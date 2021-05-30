@@ -28,15 +28,15 @@
 #include <immintrin.h>
 
 __device__
-Sample get_starting_ray(Sample sample) {
+Sample get_starting_ray(Sample sample, int id) {
   vec3 default_ray;
 
-  default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * sample.index.x + device_offset_x * sample_blue_noise(sample.index.x,sample.index.y,sample.random_index++,8) * 2.0f);
-  default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * sample.index.y - device_offset_y * sample_blue_noise(sample.index.x,sample.index.y,sample.random_index++,9) * 2.0f);
+  default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * sample.index.x + device_offset_x * sample_blue_noise(sample.index.x,sample.index.y,sample.random_index,8, id) * 2.0f);
+  default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * sample.index.y - device_offset_y * sample_blue_noise(sample.index.x,sample.index.y,sample.random_index,9, id) * 2.0f);
   default_ray.z = -device_scene.camera.focal_length;
 
-  const float alpha = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index++, 0) * 2.0f * PI;
-  const float beta  = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index++, 1) * device_scene.camera.aperture_size;
+  const float alpha = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index, 0, id) * 2.0f * PI;
+  const float beta  = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index, 1, id) * device_scene.camera.aperture_size;
 
   vec3 point_on_aperture;
   point_on_aperture.x = cosf(alpha) * beta;
@@ -77,7 +77,7 @@ void generate_samples() {
 
     sample.random_index = device_temporal_frames * device_diffuse_samples + iterations_for_pixel * device_reflection_depth;
 
-    sample = get_starting_ray(sample);
+    sample = get_starting_ray(sample, id + sample_offset);
 
     sample.state.x = (0b111 << 8) | (sample_offset << 11);
     sample.record.r = 1.0f;
@@ -91,6 +91,10 @@ void generate_samples() {
     sample.albedo_buffer.b = 0.0f;
 
     device_active_samples[id + sample_offset] = sample;
+
+    curandStateXORWOW_t state;
+    curand_init(sample.random_index + x + y * device_width + clock(), 0, 0, &state);
+    device_sample_randoms[id + sample_offset] = state;
 
     sample_offset++;
 
@@ -130,7 +134,7 @@ Sample write_albedo_buffer(RGBAF value, Sample sample) {
 }
 
 __device__
-Sample write_result(Sample sample) {
+Sample write_result(Sample sample, int id) {
   sample.state.y--;
 
   sample.random_index -= (sample.state.x & 0x00ff) + 1;
@@ -147,7 +151,7 @@ Sample write_result(Sample sample) {
   sample.record.g = 1.0f;
   sample.record.b = 1.0f;
 
-  return get_starting_ray(sample);
+  return get_starting_ray(sample, id);
 }
 
 __device__
@@ -179,11 +183,13 @@ void shade_samples() {
         sky.b = (sky.b > 1.0f) ? 0.0f : sky.b;
       }
 
-      sample.result.r += sky.r * sample.record.r;
-      sample.result.g += sky.g * sample.record.g;
-      sample.result.b += sky.b * sample.record.b;
+      if (!isnan(sample.record.r) && !isinf(sample.record.r) && !isnan(sample.record.g) && !isinf(sample.record.g) && !isnan(sample.record.b) && !isinf(sample.record.b)) {
+        sample.result.r += sky.r * sample.record.r;
+        sample.result.g += sky.g * sample.record.g;
+        sample.result.b += sky.b * sample.record.b;
+      }
 
-      sample = write_result(sample);
+      sample = write_result(sample, id);
       goto store_back_sample;
     }
 
@@ -291,15 +297,17 @@ void shade_samples() {
         sample = write_albedo_buffer(emission, sample);
 
         if (sample.state.x &= 0x0400) {
-          sample.result.r += emission.r * intensity * sample.record.r;
-          sample.result.g += emission.g * intensity * sample.record.g;
-          sample.result.b += emission.b * intensity * sample.record.b;
+          if (!isnan(sample.record.r) && !isinf(sample.record.r) && !isnan(sample.record.g) && !isinf(sample.record.g) && !isnan(sample.record.b) && !isinf(sample.record.b)) {
+            sample.result.r += emission.r * intensity * sample.record.r;
+            sample.result.g += emission.g * intensity * sample.record.g;
+            sample.result.b += emission.b * intensity * sample.record.b;
+          }
         }
 
         #ifdef FIRST_LIGHT_ONLY
         const double max_result = fmaxf(sample.result.r, fmaxf(sample.result.g, sample.result.b));
         if (max_result > eps) {
-            sample = write_result(sample);
+            sample = write_result(sample, id);
             goto store_back_sample;
         }
         #endif
@@ -326,7 +334,7 @@ void shade_samples() {
 
     sample = write_albedo_buffer(albedo, sample);
 
-    if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 40) > albedo.a) {
+    if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 40, id) > albedo.a) {
       sample.origin.x += 2.0f * eps * sample.ray.x;
       sample.origin.y += 2.0f * eps * sample.ray.y;
       sample.origin.z += 2.0f * eps * sample.ray.z;
@@ -352,7 +360,7 @@ void shade_samples() {
         sample.origin.y += face_normal.y * (eps * 8.0f);
         sample.origin.z += face_normal.z * (eps * 8.0f);
 
-        const float light_sample = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 50);
+        const float light_sample = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 50, id);
 
         float light_angle;
         vec3 light_source;
@@ -366,9 +374,9 @@ void shade_samples() {
 
         if (light_sample < light_sample_probability) {
             #ifdef LIGHTS_AT_NIGHT_ONLY
-                const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 51) * light_count) : 0;
+                const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 51, id) * light_count) : 0;
             #else
-                const uint32_t light = (uint32_t)(sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 51) * light_count);
+                const uint32_t light = (uint32_t)(sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 51, id) * light_count);
             #endif
 
             const float4 light_data = __ldg((float4*)(device_scene.lights + light));
@@ -384,10 +392,10 @@ void shade_samples() {
 
         __prefetch_global_l1(device_active_samples + id + blockDim.x * gridDim.x);
 
-        const float gamma = 2.0f * PI * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 3);
-        const float beta = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 2);
+        const float gamma = 2.0f * PI * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 3, id);
+        const float beta = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 2, id);
 
-        if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 10) < specular_probability) {
+        if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 10, id) < specular_probability) {
             const float alpha = roughness * roughness;
 
             const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
@@ -493,14 +501,14 @@ void shade_samples() {
     #ifdef WEIGHT_BASED_EXIT
     const double max_record = fmaxf(sample.record.r, fmaxf(sample.record.g, sample.record.b));
     if (max_record < CUTOFF ||
-    (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 20) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
+    (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 20, id) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
     {
       sample.state.x = (sample.state.x & 0xff00) + device_reflection_depth;
     }
     #endif
 
     #ifdef LOW_QUALITY_LONG_BOUNCES
-    if (sample.state.x & 0x00ff >= MIN_BOUNCES && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index++, 21) < 1.0f/device_reflection_depth) {
+    if (sample.state.x & 0x00ff >= MIN_BOUNCES && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 21, id) < 1.0f/device_reflection_depth) {
       sample.state.x = (sample.state.x & 0xff00) + device_reflection_depth;
     }
     #endif
@@ -509,7 +517,7 @@ void shade_samples() {
     sample.state.x++;
 
     if ((sample.state.x & 0x00ff) >= device_reflection_depth) {
-      sample = write_result(sample);
+      sample = write_result(sample, id);
     }
 
     store_back_sample:;

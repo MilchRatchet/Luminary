@@ -142,7 +142,7 @@ extern "C" raytrace_instance* init_raytracing(
     samples_length /= sizeof(Sample);
 
     instance->samples_per_sample = (32 < (unsigned int)samples_length / (width * height)) ? 32 : (unsigned int)samples_length / (width * height);
-    assert(instance->samples_per_sample, "Not enough memory to alocate samples buffer", 1);
+    assert(instance->samples_per_sample, "Not enough memory to allocate samples buffer", 1);
     instance->samples_per_sample = (instance->samples_per_sample < 10) ? instance->samples_per_sample : 10;
     instance->samples_per_sample = (instance->samples_per_sample < instance->diffuse_samples) ? instance->samples_per_sample : instance->diffuse_samples;
     gpuErrchk(cudaMemcpyToSymbol(device_samples_per_sample, &(instance->samples_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
@@ -157,6 +157,8 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMalloc((void**) &(instance->samples_finished_gpu), sizeof(Sample) * samples_length));
     gpuErrchk(cudaMemcpyToSymbol(device_finished_samples, &(instance->samples_finished_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_samples_length, &(actual_samples_length), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void**) &(instance->randoms_gpu), sizeof(curandStateXORWOW_t) * samples_length));
+    gpuErrchk(cudaMemcpyToSymbol(device_sample_randoms, &(instance->randoms_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
     return instance;
 }
@@ -287,6 +289,7 @@ extern "C" void free_inputs(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
     gpuErrchk(cudaFree(instance->samples_gpu));
     gpuErrchk(cudaFree(instance->samples_finished_gpu));
+    gpuErrchk(cudaFree(instance->randoms_gpu));
 }
 
 extern "C" void free_outputs(raytrace_instance* instance) {
