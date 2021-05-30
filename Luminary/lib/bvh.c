@@ -10,9 +10,9 @@
 #include <immintrin.h>
 
 #define THRESHOLD_TRIANGLES 3
-#define OBJECT_SPLIT_BIN_COUNT 64
-#define SPATIAL_SPLIT_THRESHOLD 0.0001f
-#define SPATIAL_SPLIT_BIN_COUNT 64
+#define OBJECT_SPLIT_BIN_COUNT 32
+#define SPATIAL_SPLIT_THRESHOLD 0.00001f
+#define SPATIAL_SPLIT_BIN_COUNT 32
 #define COST_OF_TRIANGLE 0.4f
 #define COST_OF_NODE 1.0f
 
@@ -503,8 +503,6 @@ Node2* build_bvh_structure(
       optimal_method = 0;
 
       for (int a = 0; a < 3; a++) {
-        // quick_sort_fragments(fragments + fragments_ptr, node.triangle_count, a);
-
         float low_split;
         const float interval =
           construct_bins(bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
@@ -671,7 +669,7 @@ Node2* build_bvh_structure(
         fragments_buffer_count += duplicated_triangles;
 
         for (int k = 0; k < leaf_node_count; k++) {
-          if (nodes[leaf_nodes[k]].triangles_address > fragments_ptr)
+          if (nodes[leaf_nodes[k]].triangles_address > buffer_ptr)
             nodes[leaf_nodes[k]].triangles_address += duplicated_triangles;
         }
 
