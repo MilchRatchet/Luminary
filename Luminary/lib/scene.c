@@ -10,7 +10,7 @@
 #include "light.h"
 
 static const int LINE_SIZE       = 4096;
-static const int CURRENT_VERSION = 2;
+static const int CURRENT_VERSION = 3;
 
 static int validate_filetype(const char* line) {
   int result = 0;
@@ -123,7 +123,9 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
         &scene.camera.rotation.z, &scene.camera.fov);
     }
     else if (line[0] == 'l' && line[1] == ' ') {
-      sscanf(line, "%*c %f %f\n", &scene.camera.focal_length, &scene.camera.aperture_size);
+      sscanf(
+        line, "%*c %f %f %f\n", &scene.camera.focal_length, &scene.camera.aperture_size,
+        &scene.camera.exposure);
     }
     else if (line[0] == 's' && line[1] == ' ') {
       sscanf(line, "%*c %f %f %f\n", &azimuth, &altitude, &sun_strength);
@@ -158,7 +160,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   int nodes_length;
 
-  Node2* initial_nodes = build_bvh_structure(&triangles, triangle_count, &nodes_length);
+  Node2* initial_nodes = build_bvh_structure(&triangles, &triangle_count, &nodes_length);
 
   Node8* nodes =
     collapse_bvh(initial_nodes, nodes_length, &triangles, triangle_count, &nodes_length);
