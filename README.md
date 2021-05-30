@@ -94,6 +94,7 @@ START "" Luminary.exe Scenes/Example.lum r
 ```
 
 You can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. The focal length can be changed by pressing `F` and moving the mouse horizontally. The aperture size can be changed similarly through `G`. The exposure is adjustable in a similar way through `E`.
+Different shading modes can be accessed through `V`. The information shown in the title of the window can be switched with `T`.
 
 Note that bad performance is to be expected. Path tracing is very computationally expensive, `Luminary` is not very performant yet and `Luminary` does not make use of `RT-Cores` found on `Turing` or `Ampere` architecture graphics cards. The latter would be considered if they would be exposed through `CUDA`.
 

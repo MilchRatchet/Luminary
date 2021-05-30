@@ -151,5 +151,8 @@ texture_assignment* device_texture_assignments;
 __constant__
 vec3 device_sun;
 
+__constant__
+int device_shading_mode;
+
 
 #endif /* CU_UTILS_H */

@@ -14,6 +14,14 @@
 #define ONE_OVER_PI 0.31830988618f
 #endif
 
+#ifndef LUMINARY_SHADING_MODES
+#define LUMINARY_SHADING_MODES
+#define SHADING_DEFAULT 0
+#define SHADING_ALBEDO 1
+#define SHADING_DEPTH 2
+#define SHADING_NORMAL 3
+#endif
+
 struct Camera {
   vec3 pos;
   vec3 rotation;
@@ -66,6 +74,7 @@ struct raytrace_instance {
   int samples_per_sample;
   void* randoms_gpu;
   RGBF* albedo_buffer_gpu;
+  int shading_mode;
 } typedef raytrace_instance;
 
 #endif /* UTILS_H */

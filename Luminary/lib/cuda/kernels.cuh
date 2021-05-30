@@ -596,5 +596,187 @@ void finalize_samples() {
   }
 }
 
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10)
+void special_shade_samples() {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int store_id = id;
+
+  while (id < device_samples_length) {
+    Sample sample;
+
+    if (device_shading_mode == SHADING_ALBEDO) {
+      sample = load_active_sample_no_temporal_hint(device_active_samples + id);
+      if (!(sample.state.x & 0x0100)) return;
+
+      if (sample.hit_id == 0xffffffff) {
+        RGBF sky = get_sky_color(sample.ray);
+
+        sample.result.r = sky.r;
+        sample.result.g = sky.g;
+        sample.result.b = sky.b;
+      } else {
+        sample.origin.x += sample.ray.x * sample.depth;
+        sample.origin.y += sample.ray.y * sample.depth;
+        sample.origin.z += sample.ray.z * sample.depth;
+
+        const float4* hit_address = (float4*)(device_scene.triangles + sample.hit_id);
+        const float4 t1 = __ldg(hit_address);
+        const float4 t2 = __ldg(hit_address + 1);
+        const float4 t3 = __ldg(hit_address + 2);
+        const float4 t5 = __ldg(hit_address + 4);
+        const float4 t6 = __ldg(hit_address + 5);
+        const float4 t7 = __ldg(hit_address + 6);
+
+        vec3 vertex;
+        vertex.x = t1.x;
+        vertex.y = t1.y;
+        vertex.z = t1.z;
+
+        vec3 edge1;
+        edge1.x = t1.w;
+        edge1.y = t2.x;
+        edge1.z = t2.y;
+
+        vec3 edge2;
+        edge2.x = t2.z;
+        edge2.y = t2.w;
+        edge2.z = t3.x;
+
+        vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, sample.origin);
+
+        const float lambda = normal.x;
+        const float mu = normal.y;
+
+        UV vertex_texture;
+        vertex_texture.u = t5.z;
+        vertex_texture.v = t5.w;
+
+        UV edge1_texture;
+        edge1_texture.u = t6.x;
+        edge1_texture.v = t6.y;
+
+        UV edge2_texture;
+        edge2_texture.u = t6.z;
+        edge2_texture.v = t6.w;
+
+        const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
+
+        const int texture_object = __float_as_int(t7.w);
+
+        const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
+
+        if (maps.y) {
+          const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
+          sample.result.r = illuminance_f.x;
+          sample.result.g = illuminance_f.y;
+          sample.result.b = illuminance_f.z;
+        } else if (maps.x) {
+          const float4 albedo_f = tex2D<float4>(device_albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
+          sample.result.r = albedo_f.x;
+          sample.result.g = albedo_f.y;
+          sample.result.b = albedo_f.z;
+        } else {
+          sample.result.r = 0.9f;
+          sample.result.g = 0.9f;
+          sample.result.b = 0.9f;
+        }
+      }
+    } else if (device_shading_mode == SHADING_DEPTH) {
+      sample = load_active_sample_no_temporal_hint(device_active_samples + id);
+      if (!(sample.state.x & 0x0100)) return;
+
+      const float value = __saturatef((1.0f/sample.depth) * 2.0f);
+      sample.result.r = value;
+      sample.result.g = value;
+      sample.result.b = value;
+    } else if (device_shading_mode == SHADING_NORMAL) {
+      sample = load_active_sample_no_temporal_hint(device_active_samples + id);
+      if (!(sample.state.x & 0x0100)) return;
+
+      if (sample.hit_id == 0xffffffff) {
+        sample.result.r = 0.0f;
+        sample.result.g = 0.0f;
+        sample.result.b = 0.0f;
+      } else {
+        const float4* hit_address = (float4*)(device_scene.triangles + sample.hit_id);
+
+        const float4 t1 = __ldg(hit_address);
+        const float4 t2 = __ldg(hit_address + 1);
+        const float4 t3 = __ldg(hit_address + 2);
+        const float4 t4 = __ldg(hit_address + 3);
+        const float4 t5 = __ldg(hit_address + 4);
+
+        vec3 vertex;
+        vertex.x = t1.x;
+        vertex.y = t1.y;
+        vertex.z = t1.z;
+
+        vec3 edge1;
+        edge1.x = t1.w;
+        edge1.y = t2.x;
+        edge1.z = t2.y;
+
+        vec3 edge2;
+        edge2.x = t2.z;
+        edge2.y = t2.w;
+        edge2.z = t3.x;
+
+        vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, sample.origin);
+
+        const float lambda = normal.x;
+        const float mu = normal.y;
+
+        vec3 vertex_normal;
+        vertex_normal.x = t3.y;
+        vertex_normal.y = t3.z;
+        vertex_normal.z = t3.w;
+
+        vec3 edge1_normal;
+        edge1_normal.x = t4.x;
+        edge1_normal.y = t4.y;
+        edge1_normal.z = t4.z;
+
+        vec3 edge2_normal;
+        edge2_normal.x = t4.w;
+        edge2_normal.y = t5.x;
+        edge2_normal.z = t5.y;
+
+        normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+
+        sample.result.r = __saturatef(normal.x);
+        sample.result.g = __saturatef(normal.y);
+        sample.result.b = __saturatef(normal.z);
+      }
+    }
+
+    sample.albedo_buffer.r = 0.0f;
+    sample.albedo_buffer.g = 0.0f;
+    sample.albedo_buffer.b = 0.0f;
+
+    sample.random_index++;
+
+    sample.state.y--;
+
+    if (sample.state.y <= 0) {
+      sample.state.x &= 0;
+    }
+
+    sample = get_starting_ray(sample, id);
+
+    if (sample.state.x & 0x0100) {
+      if (store_id < id) __stcs((unsigned short*)(device_active_samples + id) + 12, 0);
+      store_active_sample_no_temporal_hint(sample, device_active_samples + store_id);
+      store_id += blockDim.x * gridDim.x;
+    } else {
+      const unsigned int address = (sample.index.x + sample.index.y * device_width) * device_samples_per_sample + (sample.state.x >> 11);
+      store_finished_sample_no_temporal_hint(sample, device_finished_samples + address);
+      atomicSub((int32_t*)&device_sample_offset, 1);
+      __stcs((unsigned short*)(device_active_samples + id) + 12, 0);
+    }
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
 
 #endif /* CU_KERNELS_H */

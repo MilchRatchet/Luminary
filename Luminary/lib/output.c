@@ -72,6 +72,8 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   return result;
 }
 
+static char* SHADING_MODE_STRING[4] = {"", "[ALBEDO] ", "[DEPTH] ", "[NORMAL] "};
+
 void realtime_output(Scene scene, raytrace_instance* instance, const int filters) {
   SDL_Init(SDL_INIT_VIDEO);
   SDL_Window* window = SDL_CreateWindow(
@@ -103,7 +105,8 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
   clock_t time = clock();
 
-  int temporal_frames = 0;
+  int temporal_frames  = 0;
+  int information_mode = 0;
 
   char* title = (char*) malloc(4096);
 
@@ -131,7 +134,31 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     const double frame_time = 1000.0 * ((double) (clock() - time)) / CLOCKS_PER_SEC;
     time                    = clock();
 
-    sprintf(title, "Luminary - FPS: %.1f - Frametime: %.0fms", 1000.0 / frame_time, frame_time);
+    if (information_mode == 0) {
+      sprintf(
+        title, "Luminary %s - FPS: %.1f - Frametime: %.0fms",
+        SHADING_MODE_STRING[instance->shading_mode], 1000.0 / frame_time, frame_time);
+    }
+    else if (information_mode == 1) {
+      sprintf(
+        title, "Luminary %s - Pos: (%.2f,%.2f,%.2f) Rot: (%.2f,%.2f,%.2f) FOV: %.2f",
+        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.camera.pos.x,
+        instance->scene_gpu.camera.pos.y, instance->scene_gpu.camera.pos.z,
+        instance->scene_gpu.camera.rotation.x, instance->scene_gpu.camera.rotation.y,
+        instance->scene_gpu.camera.rotation.z, instance->scene_gpu.camera.fov);
+    }
+    else if (information_mode == 2) {
+      sprintf(
+        title, "Luminary %s - Focal Length: %.2f Aperture Size: %.2f Exposure: %.2f",
+        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.camera.focal_length,
+        instance->scene_gpu.camera.aperture_size, instance->scene_gpu.camera.exposure);
+    }
+    else if (information_mode == 3) {
+      sprintf(
+        title, "Luminary %s - Azimuth: %.3f Altitude: %.3f",
+        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.azimuth,
+        instance->scene_gpu.altitude);
+    }
 
     const double normalized_time = frame_time / 16.66667;
 
@@ -164,6 +191,15 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       else if (event.type == SDL_MOUSEWHEEL) {
         instance->scene_gpu.camera.fov -= event.wheel.y * 0.005f * normalized_time;
         temporal_frames = 0;
+      }
+      else if (event.type == SDL_KEYDOWN) {
+        if (event.key.keysym.scancode == SDL_SCANCODE_T) {
+          information_mode = (information_mode + 1) % 4;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_V) {
+          instance->shading_mode = (instance->shading_mode + 1) % 4;
+          temporal_frames        = 0;
+        }
       }
       else if (event.type == SDL_QUIT) {
         exit = 1;

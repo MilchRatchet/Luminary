@@ -104,6 +104,7 @@ extern "C" raytrace_instance* init_raytracing(
     instance->material_atlas_length = material_atlas_length;
 
     instance->scene_gpu = scene;
+    instance->shading_mode = 0;
 
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment) * scene.materials_length));
     gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length));
@@ -248,6 +249,7 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     gpuErrchk(cudaMemcpyToSymbol(device_sample_offset, &(total_iterations), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
 
     update_sun(instance->scene_gpu);
     update_camera_pos(instance->scene_gpu, instance->width, instance->height);
@@ -261,7 +263,12 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     while (curr_progress > 0) {
         trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-        shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        if (instance->shading_mode) {
+            special_shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        } else {
+            shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        }
+
         gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
 
         if (progress == 1) {
