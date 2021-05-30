@@ -6,9 +6,10 @@ Luminary is a CUDA based Pathtracing renderer.
 
 This project is for fun and to learn more about `Computer Graphics`. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
 
-- Implement faster and higher quality binary BVH construction.
 - Implement Clouds.
 - Implement volumetric lighting.
+- Implement parallel BVH construction.
+- Implement SAH based node collapsing.
 - Implement refraction.
 
 As a denoiser I use `Optix` since any non machine learning denoiser is quite frankly not all that great and machine learning is out of the scope of this project.
@@ -44,7 +45,7 @@ You can get `Blender` to link the material textures to `map_Ns` by setting them 
 A whole scene is arranged through `*.lum` files which are in the following format:
 ```
 Luminary
-v 2
+v 3
 # Comments start with a # symbol
 # Comments may only appear after the first two lines
 # This example demonstrates this particular version of lum
@@ -56,8 +57,8 @@ m Meshes/Example.obj
 # c [Pos.x | Pos.y | Pos.z | Rotation.x | Rotation.y | Rotation.z | FOV]
 c 2.0 0.3 -0.06 0.0 1.570796 0.0 2.0
 # Camera lens parameters
-# l [Focal Length | Aperture Size] (Default Aperture Size=0.0)
-l 20.0 0.4
+# l [Focal Length | Aperture Size | Exposure] (Default Aperture Size=0.0)
+l 20.0 0.4 2.0
 #
 # Sun parameters
 # s [Azimuth | Altitude | Intensity]
@@ -118,7 +119,7 @@ The `SDL2` library is used for the realtime mode. Details about its authors and 
 
 # Literature
 
-This is a list of papers I used for this project so far:
+This is a list of papers I used for this project so far. Note that some techniques presented in these papers are not implemented at the moment but their ideas were helpful nonetheless:
 
 - J. Frisvad, _Building an Orthonormal Basis from a 3D Unit Vector Without Normalization_, Journal of Graphics Tools, 16(3), pp. 151-159, 2012
 - T. Möller, B. Trumbore, _Fast, Minimum Storage Ray-Triangle Intersection_, Journal of Graphics Tools, 2, pp. 21-28, 1997.
@@ -130,4 +131,6 @@ This is a list of papers I used for this project so far:
 - B. Smolka, M. Szczepanski, K.N. Plataniotis, A.N. Venetsanopoulos, _Fast Modified Vector Median Filter_, Canadian Conference on Electrical and Computer Engineering 2001, 2, pp. 1315-1320, 2001.
 - J. Boksansky, _Crash Course in BRDF Implementation_, https://boksajak.github.io/blog/BRDF, 2021.
 - S. Lagarde, C. de Rousiers, _Moving Frostbite to Physically Based Rendering_, 2014.
-- E. Heitz, L. Belcour, V. Ostromoukhov, D. Coeurjolly and J. Iehl, _A Low-Discrepancy Sampler that Distributes Monte Carlo Errors as a Blue Noise in Screen Space_, SIGGRAPH'19 Talks, 2019.
+- L. Belcour, D. Coeurjolly, E. Heitz, J. Iehl and V. Ostromoukhov, _A Low-Discrepancy Sampler that Distributes Monte Carlo Errors as a Blue Noise in Screen Space_, SIGGRAPH'19 Talks, 2019.
+- A. Dietrich, H. Friedrich and M. Stich, _Spatial splits in bounding volume hierarchies_, HPG '09: Proceedings of the Conference on High Performance Graphics 2009, pp. 7-13, 2009.
+- A. Ebert, V. Fuetterling, C. Lojewski and F. Pfreundt, _Parallel Spatial Splits in Bounding Volume Hierarchies_, Eurographics Symposium on Parallel Graphics and Visualization, 2016.
