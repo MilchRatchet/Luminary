@@ -698,6 +698,10 @@ void special_shade_samples() {
         sample.result.g = 0.0f;
         sample.result.b = 0.0f;
       } else {
+        sample.origin.x += sample.ray.x * sample.depth;
+        sample.origin.y += sample.ray.y * sample.depth;
+        sample.origin.z += sample.ray.z * sample.depth;
+
         const float4* hit_address = (float4*)(device_scene.triangles + sample.hit_id);
 
         const float4 t1 = __ldg(hit_address);
