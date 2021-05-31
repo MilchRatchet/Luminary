@@ -63,6 +63,11 @@ struct Sample {
   unsigned int hit_id;
 } typedef Sample;
 
+struct Sample_Result {
+  RGBF result;
+  RGBF albedo_buffer;
+} typedef Sample_Result;
+
 //===========================================================================================
 // Device Variables
 //===========================================================================================
@@ -80,7 +85,7 @@ __constant__
 Sample* device_active_samples;
 
 __constant__
-Sample* device_finished_samples;
+Sample_Result* device_finished_samples;
 
 __constant__
 int device_iterations_per_sample;

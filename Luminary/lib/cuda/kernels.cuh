@@ -556,7 +556,7 @@ void finalize_samples() {
   albedo.b = 0.0f;
 
   while (id < device_samples_length) {
-    Sample sample = load_finished_sample_no_temporal_hint(device_finished_samples + id + sample_offset);
+    Sample_Result sample = load_finished_sample_no_temporal_hint(device_finished_samples + id + sample_offset);
 
     pixel.r += sample.result.r;
     pixel.g += sample.result.g;

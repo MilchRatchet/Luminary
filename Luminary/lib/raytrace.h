@@ -20,7 +20,8 @@ raytrace_instance* init_raytracing(
   int denoiser);
 void copy_framebuffer_to_cpu(raytrace_instance* instance);
 void trace_scene(
-  Scene scene, raytrace_instance* instance, const int progress, const int temporal_frames);
+  Scene scene, raytrace_instance* instance, const int progress, const int temporal_frames,
+  const int update_mask);
 void free_inputs(raytrace_instance* instance);
 void free_outputs(raytrace_instance* instance);
 void* initialize_textures(TextureRGBA* textures, const int textures_length);

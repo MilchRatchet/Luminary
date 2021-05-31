@@ -12,7 +12,7 @@
 
 void offline_output(
   Scene scene, raytrace_instance* instance, char* output_name, int progress, clock_t time) {
-  trace_scene(scene, instance, progress, 0);
+  trace_scene(scene, instance, progress, 0, 0xffffffff);
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -107,6 +107,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
   int temporal_frames  = 0;
   int information_mode = 0;
+  int update_mask      = 0b1111;
 
   char* title = (char*) malloc(4096);
 
@@ -118,7 +119,8 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   while (!exit) {
     SDL_Event event;
 
-    trace_scene(scene, instance, 0, temporal_frames);
+    trace_scene(scene, instance, 0, temporal_frames, update_mask);
+    update_mask = 0;
 
     if (instance->denoiser) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
@@ -136,12 +138,12 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     if (information_mode == 0) {
       sprintf(
-        title, "Luminary %s - FPS: %.1f - Frametime: %.0fms",
+        title, "Luminary %s- FPS: %.1f - Frametime: %.0fms",
         SHADING_MODE_STRING[instance->shading_mode], 1000.0 / frame_time, frame_time);
     }
     else if (information_mode == 1) {
       sprintf(
-        title, "Luminary %s - Pos: (%.2f,%.2f,%.2f) Rot: (%.2f,%.2f,%.2f) FOV: %.2f",
+        title, "Luminary %s- Pos: (%.2f,%.2f,%.2f) Rot: (%.2f,%.2f,%.2f) FOV: %.2f",
         SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.camera.pos.x,
         instance->scene_gpu.camera.pos.y, instance->scene_gpu.camera.pos.z,
         instance->scene_gpu.camera.rotation.x, instance->scene_gpu.camera.rotation.y,
@@ -149,13 +151,13 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     }
     else if (information_mode == 2) {
       sprintf(
-        title, "Luminary %s - Focal Length: %.2f Aperture Size: %.2f Exposure: %.2f",
+        title, "Luminary %s- Focal Length: %.2f Aperture Size: %.2f Exposure: %.2f",
         SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.camera.focal_length,
         instance->scene_gpu.camera.aperture_size, instance->scene_gpu.camera.exposure);
     }
     else if (information_mode == 3) {
       sprintf(
-        title, "Luminary %s - Azimuth: %.3f Altitude: %.3f",
+        title, "Luminary %s- Azimuth: %.3f Altitude: %.3f",
         SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.azimuth,
         instance->scene_gpu.altitude);
     }
@@ -172,17 +174,21 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       if (event.type == SDL_MOUSEMOTION) {
         if (keystate[SDL_SCANCODE_F]) {
           instance->scene_gpu.camera.focal_length += 0.01f * event.motion.xrel;
+          update_mask |= 0b1;
         }
         else if (keystate[SDL_SCANCODE_G]) {
           instance->scene_gpu.camera.aperture_size += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
         }
         else if (keystate[SDL_SCANCODE_E]) {
           instance->scene_gpu.camera.exposure +=
             max(1.0f, instance->scene_gpu.camera.exposure) * 0.005f * event.motion.xrel;
+          update_mask |= 0b1;
         }
         else {
           instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
           instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
+          update_mask |= 0b1000;
         }
 
         if (event.motion.xrel || event.motion.yrel)
@@ -190,6 +196,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       }
       else if (event.type == SDL_MOUSEWHEEL) {
         instance->scene_gpu.camera.fov -= event.wheel.y * 0.005f * normalized_time;
+        update_mask |= 0b1000;
         temporal_frames = 0;
       }
       else if (event.type == SDL_KEYDOWN) {
@@ -198,7 +205,8 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_V) {
           instance->shading_mode = (instance->shading_mode + 1) % 4;
-          temporal_frames        = 0;
+          update_mask |= 0b10;
+          temporal_frames = 0;
         }
       }
       else if (event.type == SDL_QUIT) {
@@ -229,34 +237,42 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     if (keystate[SDL_SCANCODE_LEFT]) {
       instance->scene_gpu.azimuth += 0.005f * normalized_time;
+      update_mask |= 0b100;
       temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_RIGHT]) {
       instance->scene_gpu.azimuth -= 0.005f * normalized_time;
+      update_mask |= 0b100;
       temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_UP]) {
       instance->scene_gpu.altitude += 0.005f * normalized_time;
+      update_mask |= 0b100;
       temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_DOWN]) {
       instance->scene_gpu.altitude -= 0.005f * normalized_time;
+      update_mask |= 0b100;
       temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_W]) {
       movement_vector.z -= 1.0f;
+      update_mask |= 0b1;
       temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_A]) {
       movement_vector.x -= 1.0f;
+      update_mask |= 0b1;
       temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_S]) {
       movement_vector.z += 1.0f;
+      update_mask |= 0b1;
       temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_D]) {
       movement_vector.x += 1.0f;
+      update_mask |= 0b1;
       temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_LSHIFT]) {

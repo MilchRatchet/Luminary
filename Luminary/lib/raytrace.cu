@@ -139,7 +139,7 @@ extern "C" raytrace_instance* init_raytracing(
 
     size_t samples_length;
     gpuErrchk(cudaMemGetInfo(&samples_length, 0));
-    samples_length /= 3;
+    samples_length /= 2;
     samples_length /= sizeof(Sample);
 
     instance->samples_per_sample = (32 < (unsigned int)samples_length / (width * height)) ? 32 : (unsigned int)samples_length / (width * height);
@@ -155,7 +155,7 @@ extern "C" raytrace_instance* init_raytracing(
 
     gpuErrchk(cudaMalloc((void**) &(instance->samples_gpu), sizeof(Sample) * samples_length));
     gpuErrchk(cudaMemcpyToSymbol(device_active_samples, &(instance->samples_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMalloc((void**) &(instance->samples_finished_gpu), sizeof(Sample) * samples_length));
+    gpuErrchk(cudaMalloc((void**) &(instance->samples_finished_gpu), sizeof(Sample_Result) * samples_length));
     gpuErrchk(cudaMemcpyToSymbol(device_finished_samples, &(instance->samples_finished_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_samples_length, &(actual_samples_length), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMalloc((void**) &(instance->randoms_gpu), sizeof(curandStateXORWOW_t) * samples_length));
@@ -243,16 +243,20 @@ extern "C" void copy_framebuffer_to_cpu(raytrace_instance* instance) {
     gpuErrchk(cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 
-extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int progress, const int temporal_frames) {
+extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int progress, const int temporal_frames, const int update_mask) {
     const int total_iterations = instance->width * instance->height * instance->samples_per_sample;
 
-    gpuErrchk(cudaMemcpyToSymbol(device_sample_offset, &(total_iterations), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_sample_offset, &(total_iterations), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
 
-    update_sun(instance->scene_gpu);
-    update_camera_pos(instance->scene_gpu, instance->width, instance->height);
+    if (update_mask & 0b1)
+        gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
+    if (update_mask & 0b10)
+        gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+    if (update_mask & 0b100)
+        update_sun(instance->scene_gpu);
+    if (update_mask & 0b1000)
+        update_camera_pos(instance->scene_gpu, instance->width, instance->height);
 
     clock_t t = clock();
 
@@ -261,26 +265,41 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
 
     generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-    while (curr_progress > 0) {
-        trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-        if (instance->shading_mode) {
+    if (instance->shading_mode) {
+        while (curr_progress > 0) {
+            trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
             special_shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-        } else {
-            shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
+
+            if (progress == 1) {
+                clock_t curr_time = clock();
+                const int samples_done = total_iterations - curr_progress;
+                const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
+                printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
+                    (float)samples_done * ratio * 100, time_elapsed,
+                    curr_progress * (time_elapsed/samples_done),
+                    0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->samples_per_sample) * samples_done / time_elapsed);
+            }
         }
+    } else {
+        while (curr_progress > 0) {
+            trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
 
-        gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
-
-        if (progress == 1) {
-            clock_t curr_time = clock();
-            const int samples_done = total_iterations - curr_progress;
-            const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
-            printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
-                (float)samples_done * ratio * 100, time_elapsed,
-                curr_progress * (time_elapsed/samples_done),
-                0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->samples_per_sample) * samples_done / time_elapsed);
+            if (progress == 1) {
+                clock_t curr_time = clock();
+                const int samples_done = total_iterations - curr_progress;
+                const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
+                printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
+                    (float)samples_done * ratio * 100, time_elapsed,
+                    curr_progress * (time_elapsed/samples_done),
+                    0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->samples_per_sample) * samples_done / time_elapsed);
+            }
         }
     }
+
+
 
     if (progress == 1)
         printf("\r                                                                                                              \r");

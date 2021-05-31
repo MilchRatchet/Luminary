@@ -96,17 +96,20 @@ void store_active_sample_no_temporal_hint(Sample sample, void* _ptr) {
 }
 
 __device__
-Sample load_finished_sample_no_temporal_hint(void* _ptr) {
+Sample_Result load_finished_sample_no_temporal_hint(void* _ptr) {
   float* ptr = (float*)_ptr;
-  Sample sample;
+  Sample_Result sample;
 
-  sample.result.r = __ldlu((float*)(ptr + 11));
-  const float4 data4 = __ldlu((float4*)(ptr + 12));
-  sample.result.g = data4.x;
-  sample.result.b = data4.y;
-  sample.albedo_buffer.r = data4.z;
-  sample.albedo_buffer.g = data4.w;
-  sample.albedo_buffer.b = __ldlu((float*)(ptr + 16));
+  const float2 data1 = __ldlu((float2*)(ptr + 0));
+  const float2 data2 = __ldlu((float2*)(ptr + 2));
+  const float2 data3 = __ldlu((float2*)(ptr + 4));
+
+  sample.result.r = data1.x;
+  sample.result.g = data1.y;
+  sample.result.b = data2.x;
+  sample.albedo_buffer.r = data2.y;
+  sample.albedo_buffer.g = data3.x;
+  sample.albedo_buffer.b = data3.y;
 
   return sample;
 }
@@ -114,14 +117,20 @@ Sample load_finished_sample_no_temporal_hint(void* _ptr) {
 __device__
 void store_finished_sample_no_temporal_hint(Sample sample, void* _ptr) {
   float* ptr = (float*)_ptr;
-  __stcs((float*)(ptr + 11), sample.result.r);
-  float4 data4;
-  data4.x = sample.result.g;
-  data4.y = sample.result.b;
-  data4.z = sample.albedo_buffer.r;
-  data4.w = sample.albedo_buffer.g;
-  __stcs((float4*)(ptr + 12), data4);
-  __stcs((float*)(ptr + 16), sample.albedo_buffer.b);
+
+  float2 data1;
+  data1.x = sample.result.r;
+  data1.y = sample.result.g;
+  float2 data2;
+  data2.x = sample.result.b;
+  data2.y = sample.albedo_buffer.r;
+  float2 data3;
+  data3.x = sample.albedo_buffer.g;
+  data3.y = sample.albedo_buffer.b;
+
+  __stcs((float2*)(ptr + 0), data1);
+  __stcs((float2*)(ptr + 2), data2);
+  __stcs((float2*)(ptr + 4), data3);
 }
 
 #endif /* CU_MEMORY_H */
