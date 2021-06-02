@@ -17,6 +17,11 @@ vec3 cross_product(const vec3 a, const vec3 b) {
 }
 
 __device__
+float fractf(const float x) {
+    return x - floorf(x);
+}
+
+__device__
 float dot_product(const vec3 a, const vec3 b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }

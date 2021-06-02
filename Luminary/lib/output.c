@@ -108,6 +108,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   int temporal_frames  = 0;
   int information_mode = 0;
   int update_mask      = 0b1111;
+  int update_ocean     = 0;
 
   char* title = (char*) malloc(4096);
 
@@ -161,6 +162,12 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
         SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.azimuth,
         instance->scene_gpu.altitude);
     }
+    else if (information_mode == 4) {
+      sprintf(
+        title, "Luminary %s- Ocean Height: %.3f Ocean Amplitude: %.3f",
+        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.ocean.height,
+        instance->scene_gpu.ocean.amplitude);
+    }
 
     const double normalized_time = frame_time / 16.66667;
 
@@ -185,6 +192,14 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
             max(1.0f, instance->scene_gpu.camera.exposure) * 0.005f * event.motion.xrel;
           update_mask |= 0b1;
         }
+        else if (keystate[SDL_SCANCODE_L]) {
+          instance->scene_gpu.ocean.height += 0.005f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
+        else if (keystate[SDL_SCANCODE_K]) {
+          instance->scene_gpu.ocean.amplitude += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
         else {
           instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
           instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
@@ -201,12 +216,15 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       }
       else if (event.type == SDL_KEYDOWN) {
         if (event.key.keysym.scancode == SDL_SCANCODE_T) {
-          information_mode = (information_mode + 1) % 4;
+          information_mode = (information_mode + 1) % 5;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_V) {
           instance->shading_mode = (instance->shading_mode + 1) % 4;
           update_mask |= 0b10;
           temporal_frames = 0;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_O) {
+          update_ocean ^= 0b1;
         }
       }
       else if (event.type == SDL_QUIT) {
@@ -288,12 +306,21 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     if (instance->scene_gpu.camera.exposure < 0.0f)
       instance->scene_gpu.camera.exposure = 0.0f;
 
+    if (instance->scene_gpu.ocean.amplitude < 0.0f)
+      instance->scene_gpu.ocean.amplitude = 0.0f;
+
     const float movement_speed = 0.5f * shift_pressed * normalized_time;
 
     movement_vector = rotate_vector_by_quaternion(movement_vector, q);
     instance->scene_gpu.camera.pos.x += movement_speed * movement_vector.x;
     instance->scene_gpu.camera.pos.y += movement_speed * movement_vector.y;
     instance->scene_gpu.camera.pos.z += movement_speed * movement_vector.z;
+
+    if (update_ocean) {
+      temporal_frames = 0;
+      update_mask |= 0b1;
+      instance->scene_gpu.ocean.time += frame_time * 0.001f;
+    }
   }
 
   free(title);

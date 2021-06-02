@@ -92,6 +92,19 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   scene.camera.aperture_size = 0.00f;
   scene.camera.exposure      = 1.0f;
 
+  scene.ocean.active     = 0;
+  scene.ocean.emissive   = 0;
+  scene.ocean.height     = 0.0f;
+  scene.ocean.amplitude  = 0.6f;
+  scene.ocean.frequency  = 0.16f;
+  scene.ocean.choppyness = 4.0f;
+  scene.ocean.speed      = 0.8f;
+  scene.ocean.time       = 0.0f;
+  scene.ocean.albedo.r   = 0.0f;
+  scene.ocean.albedo.g   = 0.0f;
+  scene.ocean.albedo.b   = 0.0f;
+  scene.ocean.albedo.a   = 0.9f;
+
   int width           = 1280;
   int height          = 720;
   int bounces         = 5;
@@ -138,6 +151,13 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
     }
     else if (line[0] == 'f') {
       sscanf(line, "%*c %f\n", &clip_distance);
+    }
+    else if (line[0] == 'w') {
+      sscanf(
+        line, "%*c %d %d %f %f %f %f %f %f %f %f %f\n", &scene.ocean.active, &scene.ocean.emissive,
+        &scene.ocean.albedo.r, &scene.ocean.albedo.g, &scene.ocean.albedo.b, &scene.ocean.albedo.a,
+        &scene.ocean.height, &scene.ocean.amplitude, &scene.ocean.frequency,
+        &scene.ocean.choppyness, &scene.ocean.speed);
     }
     else if (line[0] == 'd') {
       sscanf(line, "%*c %d\n", &denoiser);

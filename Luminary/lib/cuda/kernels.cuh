@@ -15,6 +15,7 @@
 #include "cuda/directives.cuh"
 #include "cuda/random.cuh"
 #include "cuda/memory.cuh"
+#include "cuda/ocean.cuh"
 #include <cuda_runtime_api.h>
 #include <optix.h>
 #include <optix_stubs.h>
@@ -537,6 +538,422 @@ void shade_samples() {
   }
 }
 
+/*
+ * Same kernel as shade_samples but it includes ocean
+ */
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 8)
+void shade_samples_ocean() {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int store_id = id;
+
+  while (id < device_samples_length) {
+    Sample sample = load_active_sample_no_temporal_hint(device_active_samples + id);
+
+    if (!(sample.state.x & 0x0100)) return;
+
+    __prefetch_global_l1(device_scene.triangles + sample.hit_id);
+
+    const float ocean_intersection = get_intersection_ocean(sample.origin, sample.ray, sample.depth);
+
+    vec3 normal;
+    RGBAF albedo;
+    float roughness;
+    float metallic;
+    float intensity;
+    vec3 face_normal;
+    int water_material = 0;
+
+    if (ocean_intersection < sample.depth) {
+      sample.origin.x += sample.ray.x * ocean_intersection;
+      sample.origin.y += sample.ray.y * ocean_intersection;
+      sample.origin.z += sample.ray.z * ocean_intersection;
+
+      normal = get_ocean_normal(sample.origin, ocean_intersection * 0.1f / device_width);
+
+      albedo = device_scene.ocean.albedo;
+
+      face_normal.x = 0.0f;
+      face_normal.y = 1.0f;
+      face_normal.z = 0.0f;
+
+      roughness = 0.05f;
+      metallic = 0.0f;
+      water_material = 1;
+
+      if (device_scene.ocean.emissive) {
+        RGBF emission;
+        emission.r = albedo.r;
+        emission.g = albedo.g;
+        emission.b = albedo.b;
+        intensity = 2.0f;
+
+        sample = write_albedo_buffer(emission, sample);
+
+        if (!isnan(sample.record.r) && !isinf(sample.record.r) && !isnan(sample.record.g) && !isinf(sample.record.g) && !isnan(sample.record.b) && !isinf(sample.record.b)) {
+          sample.result.r += emission.r * intensity * sample.record.r;
+          sample.result.g += emission.g * intensity * sample.record.g;
+          sample.result.b += emission.b * intensity * sample.record.b;
+        }
+      }
+
+    } else if (sample.hit_id == 0xffffffff) {
+      RGBF sky = get_sky_color(sample.ray);
+
+      sample = write_albedo_buffer(sky, sample);
+
+      if (!(sample.state.x & 0x0400)) {
+        sky.r = (sky.r > 1.0f) ? 0.0f : sky.r;
+        sky.g = (sky.g > 1.0f) ? 0.0f : sky.g;
+        sky.b = (sky.b > 1.0f) ? 0.0f : sky.b;
+      }
+
+      if (!isnan(sample.record.r) && !isinf(sample.record.r) && !isnan(sample.record.g) && !isinf(sample.record.g) && !isnan(sample.record.b) && !isinf(sample.record.b)) {
+        sample.result.r += sky.r * sample.record.r;
+        sample.result.g += sky.g * sample.record.g;
+        sample.result.b += sky.b * sample.record.b;
+      }
+
+      sample = write_result(sample, id);
+      goto store_back_sample;
+    } else {
+      sample.origin.x += sample.ray.x * sample.depth;
+      sample.origin.y += sample.ray.y * sample.depth;
+      sample.origin.z += sample.ray.z * sample.depth;
+
+      const float4* hit_address = (float4*)(device_scene.triangles + sample.hit_id);
+
+      const float4 t1 = __ldg(hit_address);
+      const float4 t2 = __ldg(hit_address + 1);
+      const float4 t3 = __ldg(hit_address + 2);
+      const float4 t4 = __ldg(hit_address + 3);
+      const float4 t5 = __ldg(hit_address + 4);
+      const float4 t6 = __ldg(hit_address + 5);
+      const float4 t7 = __ldg(hit_address + 6);
+
+      vec3 vertex;
+      vertex.x = t1.x;
+      vertex.y = t1.y;
+      vertex.z = t1.z;
+
+      vec3 edge1;
+      edge1.x = t1.w;
+      edge1.y = t2.x;
+      edge1.z = t2.y;
+
+      vec3 edge2;
+      edge2.x = t2.z;
+      edge2.y = t2.w;
+      edge2.z = t3.x;
+
+      normal = get_coordinates_in_triangle(vertex, edge1, edge2, sample.origin);
+
+      const float lambda = normal.x;
+      const float mu = normal.y;
+
+      vec3 vertex_normal;
+      vertex_normal.x = t3.y;
+      vertex_normal.y = t3.z;
+      vertex_normal.z = t3.w;
+
+      vec3 edge1_normal;
+      edge1_normal.x = t4.x;
+      edge1_normal.y = t4.y;
+      edge1_normal.z = t4.z;
+
+      vec3 edge2_normal;
+      edge2_normal.x = t4.w;
+      edge2_normal.y = t5.x;
+      edge2_normal.z = t5.y;
+
+      normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+
+      UV vertex_texture;
+      vertex_texture.u = t5.z;
+      vertex_texture.v = t5.w;
+
+      UV edge1_texture;
+      edge1_texture.u = t6.x;
+      edge1_texture.v = t6.y;
+
+      UV edge2_texture;
+      edge2_texture.u = t6.z;
+      edge2_texture.v = t6.w;
+
+      const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
+
+      face_normal.x = t7.x;
+      face_normal.y = t7.y;
+      face_normal.z = t7.z;
+
+      const int texture_object = __float_as_int(t7.w);
+
+      const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
+
+      if (maps.z) {
+          const float4 material_f = tex2D<float4>(device_material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
+
+          roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
+          metallic = material_f.y;
+          intensity = material_f.z * 255.0f;
+      } else {
+          roughness = 0.81f;
+          metallic = 0.0f;
+          intensity = 1.0f;
+      }
+
+      if (maps.y) {
+          #ifdef LIGHTS_AT_NIGHT_ONLY
+          if (device_sun.y < NIGHT_THRESHOLD) {
+          #endif
+          const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
+
+          RGBF emission;
+          emission.r = illuminance_f.x;
+          emission.g = illuminance_f.y;
+          emission.b = illuminance_f.z;
+
+          sample = write_albedo_buffer(emission, sample);
+
+          if (sample.state.x &= 0x0400) {
+            if (!isnan(sample.record.r) && !isinf(sample.record.r) && !isnan(sample.record.g) && !isinf(sample.record.g) && !isnan(sample.record.b) && !isinf(sample.record.b)) {
+              sample.result.r += emission.r * intensity * sample.record.r;
+              sample.result.g += emission.g * intensity * sample.record.g;
+              sample.result.b += emission.b * intensity * sample.record.b;
+            }
+          }
+
+          #ifdef FIRST_LIGHT_ONLY
+          const double max_result = fmaxf(sample.result.r, fmaxf(sample.result.g, sample.result.b));
+          if (max_result > eps) {
+              sample = write_result(sample, id);
+              goto store_back_sample;
+          }
+          #endif
+
+          #ifdef LIGHTS_AT_NIGHT_ONLY
+          }
+          #endif
+      }
+
+      if (maps.x) {
+          const float4 albedo_f = tex2D<float4>(device_albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
+          albedo.r = albedo_f.x;
+          albedo.g = albedo_f.y;
+          albedo.b = albedo_f.z;
+          albedo.a = albedo_f.w;
+      } else {
+          albedo.r = 0.9f;
+          albedo.g = 0.9f;
+          albedo.b = 0.9f;
+          albedo.a = 1.0f;
+      }
+    }
+
+    sample = write_albedo_buffer(albedo, sample);
+
+    if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 40, id) > albedo.a) {
+      sample.origin.x += 2.0f * eps * sample.ray.x;
+      sample.origin.y += 2.0f * eps * sample.ray.y;
+      sample.origin.z += 2.0f * eps * sample.ray.z;
+
+      sample.record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
+      sample.record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
+      sample.record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
+    } else {
+        const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
+
+        if (dot_product(normal, face_normal) < 0.0f) {
+            face_normal = scale_vector(face_normal, -1.0f);
+        }
+
+        const vec3 V = scale_vector(sample.ray, -1.0f);
+
+        if (dot_product(face_normal, V) < 0.0f) {
+            normal = scale_vector(normal, -1.0f);
+            face_normal = scale_vector(face_normal, -1.0f);
+        }
+
+        sample.origin.x += face_normal.x * (eps * 8.0f);
+        sample.origin.y += face_normal.y * (eps * 8.0f);
+        sample.origin.z += face_normal.z * (eps * 8.0f);
+
+        const float light_sample = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 50, id);
+
+        float light_angle;
+        vec3 light_source;
+        #ifdef LIGHTS_AT_NIGHT_ONLY
+        const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
+        #else
+        const int light_count = device_scene.lights_length;
+        #endif
+
+        const float light_sample_probability = 1.0f - 1.0f/(light_count + 1);
+
+        if (light_sample < light_sample_probability) {
+            #ifdef LIGHTS_AT_NIGHT_ONLY
+                const uint32_t light = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 51, id) * light_count) : 0;
+            #else
+                const uint32_t light = (uint32_t)(sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 51, id) * light_count);
+            #endif
+
+            const float4 light_data = __ldg((float4*)(device_scene.lights + light));
+            vec3 light_pos;
+            light_pos.x = light_data.x;
+            light_pos.y = light_data.y;
+            light_pos.z = light_data.z;
+            light_pos = vec_diff(light_pos, sample.origin);
+            light_source = normalize_vector(light_pos);
+            const float d = get_length(light_pos) + eps;
+            light_angle = fminf(1.0f,asinf(light_data.w / d) * 2.0f / PI);
+        }
+
+        __prefetch_global_l1(device_active_samples + id + blockDim.x * gridDim.x);
+
+        const float gamma = 2.0f * PI * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 3, id);
+        const float beta = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 2, id);
+
+        if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 10, id) < specular_probability) {
+            const float alpha = roughness * roughness;
+
+            const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
+
+            float weight = 1.0f;
+
+            const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
+            vec3 H_local;
+
+            if (alpha < eps) {
+                H_local.x = 0.0f;
+                H_local.y = 0.0f;
+                H_local.z = 1.0f;
+            } else {
+                const vec3 S_local = rotate_vector_by_quaternion(
+                    normalize_vector(sample_ray_from_angles_and_vector(beta * light_angle, gamma, light_source)),
+                    rotation_to_z);
+
+                if (light_sample < light_sample_probability && S_local.z > 0.0f) {
+                    H_local.x = S_local.x + V_local.x;
+                    H_local.y = S_local.y + V_local.y;
+                    H_local.z = S_local.z + V_local.z;
+
+                    H_local = normalize_vector(H_local);
+
+                    weight = (1.0f/light_sample_probability) * light_angle * light_count;
+                } else {
+                    H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
+
+                    if (S_local.z > 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
+                }
+            }
+
+            const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
+
+            const float HdotR = fmaxf(eps, fminf(1.0f, dot_product(H_local, ray_local)));
+            const float NdotR = fmaxf(eps, fminf(1.0f, ray_local.z));
+            const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
+
+            sample.ray = normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+
+            vec3 specular_f0;
+            specular_f0.x = (water_material) ? 0.02f : lerp(0.04f, albedo.r, metallic);
+            specular_f0.y = (water_material) ? 0.02f : lerp(0.04f, albedo.g, metallic);
+            specular_f0.z = (water_material) ? 0.02f : lerp(0.04f, albedo.b, metallic);
+
+            const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
+
+            const float milchs_energy_recovery = lerp(1.0f, 1.51f + 1.51f * NdotV, roughness);
+
+            weight *= milchs_energy_recovery * Smith_G2_over_G1_height_correlated(alpha * alpha, NdotR, NdotV) / specular_probability;
+
+            sample.record.r *= F.x * weight;
+            sample.record.g *= F.y * weight;
+            sample.record.b *= F.z * weight;
+        }
+        else
+        {
+            float weight = 1.0f;
+
+            const float alpha = acosf(sqrtf(beta));
+
+            sample.ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light_angle, gamma, light_source));
+            const float light_feasible = dot_product(sample.ray, normal);
+
+            if (light_sample < light_sample_probability && light_feasible >= 0.0f) {
+                weight = (1.0f/light_sample_probability) * light_angle * light_count;
+
+                sample.state.x |= 0x0400;
+            } else {
+                sample.ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
+
+                if (light_feasible >= 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
+
+                sample.state.x &= 0xfbff;
+            }
+
+            vec3 H;
+            H.x = V.x + sample.ray.x;
+            H.y = V.y + sample.ray.y;
+            H.z = V.z + sample.ray.z;
+            H = normalize_vector(H);
+
+            const float half_angle = fmaxf(eps, fminf(dot_product(H, sample.ray),1.0f));
+            const float energyFactor = lerp(1.0f, 1.0f/1.51f, roughness);
+
+            const float FD90MinusOne = 0.5f * roughness + 2.0f * half_angle * half_angle * roughness - 1.0f;
+
+            const float angle = fmaxf(eps, fminf(dot_product(normal, sample.ray),1.0f));
+            const float previous_angle = fmaxf(eps, fminf(dot_product(V, normal),1.0f));
+
+            const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
+            const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
+
+            weight *= FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
+
+            sample.record.r *= albedo.r * weight;
+            sample.record.g *= albedo.g * weight;
+            sample.record.b *= albedo.b * weight;
+        }
+    }
+
+    #ifdef WEIGHT_BASED_EXIT
+    const double max_record = fmaxf(sample.record.r, fmaxf(sample.record.g, sample.record.b));
+    if (max_record < CUTOFF ||
+    (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 20, id) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
+    {
+      sample.state.x = (sample.state.x & 0xff00) + device_reflection_depth;
+    }
+    #endif
+
+    #ifdef LOW_QUALITY_LONG_BOUNCES
+    if (sample.state.x & 0x00ff >= MIN_BOUNCES && sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 21, id) < 1.0f/device_reflection_depth) {
+      sample.state.x = (sample.state.x & 0xff00) + device_reflection_depth;
+    }
+    #endif
+
+    sample.random_index++;
+    sample.state.x++;
+
+    if ((sample.state.x & 0x00ff) >= device_reflection_depth) {
+      sample = write_result(sample, id);
+    }
+
+    store_back_sample:;
+
+    if (sample.state.x & 0x0100) {
+      if (store_id < id) __stcs((unsigned short*)(device_active_samples + id) + 12, 0);
+      store_active_sample_no_temporal_hint(sample, device_active_samples + store_id);
+      store_id += blockDim.x * gridDim.x;
+    } else {
+      const unsigned int address = (sample.index.x + sample.index.y * device_width) * device_samples_per_sample + (sample.state.x >> 11);
+      store_finished_sample_no_temporal_hint(sample, device_finished_samples + address);
+      atomicSub((int32_t*)&device_sample_offset, 1);
+      __stcs((unsigned short*)(device_active_samples + id) + 12, 0);
+    }
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
 __global__
 void finalize_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -570,6 +987,10 @@ void finalize_samples() {
 
     if (sample_offset == device_samples_per_sample) {
       const float weight = device_scene.camera.exposure/device_diffuse_samples;
+
+      if (isnan(pixel.r) || isinf(pixel.r)) pixel.r = 0.0f;
+      if (isnan(pixel.g) || isinf(pixel.g)) pixel.g = 0.0f;
+      if (isnan(pixel.b) || isinf(pixel.b)) pixel.b = 0.0f;
 
       RGBF temporal_pixel = device_frame[pixel_index];
       pixel.r = (pixel.r * weight + temporal_pixel.r * device_temporal_frames) / (device_temporal_frames + 1);

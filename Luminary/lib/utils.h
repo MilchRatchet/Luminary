@@ -36,6 +36,18 @@ struct Light {
   float radius;
 } typedef Light;
 
+struct Ocean {
+  int active;
+  int emissive;
+  float height;
+  float amplitude;
+  float frequency;
+  float choppyness;
+  float speed;
+  float time;
+  RGBAF albedo;
+} typedef Ocean;
+
 struct Scene {
   Camera camera;
   float far_clip_distance;
@@ -51,6 +63,7 @@ struct Scene {
   float sun_strength;
   Light* lights;
   unsigned int lights_length;
+  Ocean ocean;
 } typedef Scene;
 
 struct raytrace_instance {

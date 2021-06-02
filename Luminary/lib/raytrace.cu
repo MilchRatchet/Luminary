@@ -284,7 +284,12 @@ extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int 
     } else {
         while (curr_progress > 0) {
             trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-            shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            if (instance->scene_gpu.ocean.active) {
+                shade_samples_ocean<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            } else {
+                shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            }
+
             gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
 
             if (progress == 1) {
