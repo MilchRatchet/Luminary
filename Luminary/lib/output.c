@@ -12,7 +12,7 @@
 
 void offline_output(
   Scene scene, raytrace_instance* instance, char* output_name, int progress, clock_t time) {
-  trace_scene(scene, instance, progress, 0, 0xffffffff);
+  trace_scene(instance, progress, 0, 0xffffffff);
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -105,14 +105,14 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
   clock_t time = clock();
 
-  int temporal_frames  = 0;
-  int information_mode = 0;
-  int update_mask      = 0b1111;
-  int update_ocean     = 0;
+  int temporal_frames      = 0;
+  int information_mode     = 0;
+  unsigned int update_mask = 0b1111;
+  int update_ocean         = 0;
 
   char* title = (char*) malloc(4096);
 
-  initiliaze_realtime(instance);
+  initiliaze_8bit_frame(instance);
   void* optix_setup = initialize_optix_denoise_for_realtime(instance);
 
   SDL_SetRelativeMouseMode(SDL_TRUE);
@@ -120,7 +120,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   while (!exit) {
     SDL_Event event;
 
-    trace_scene(scene, instance, 0, temporal_frames, update_mask);
+    trace_scene(instance, 0, temporal_frames, update_mask);
     update_mask = 0;
 
     if (instance->denoiser) {
@@ -211,7 +211,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       }
       else if (event.type == SDL_MOUSEWHEEL) {
         instance->scene_gpu.camera.fov -= event.wheel.y * 0.005f * normalized_time;
-        update_mask |= 0b1000;
+        update_mask |= 0b1001;
         temporal_frames = 0;
       }
       else if (event.type == SDL_KEYDOWN) {
@@ -324,7 +324,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   }
 
   free(title);
-  free_realtime(instance);
+  free_8bit_frame(instance);
   free_realtime_denoise(optix_setup);
 
   SDL_DestroyWindow(window);

@@ -243,7 +243,7 @@ extern "C" void copy_framebuffer_to_cpu(raytrace_instance* instance) {
     gpuErrchk(cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 
-extern "C" void trace_scene(Scene scene, raytrace_instance* instance, const int progress, const int temporal_frames, const int update_mask) {
+extern "C" void trace_scene(raytrace_instance* instance, const int progress, const int temporal_frames, const unsigned int update_mask) {
     const int total_iterations = instance->width * instance->height * instance->samples_per_sample;
 
     gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
@@ -381,12 +381,12 @@ void convert_RGBF_to_RGB8(const RGBF* source) {
   }
 }
 
-extern "C" void initiliaze_realtime(raytrace_instance* instance) {
+extern "C" void initiliaze_8bit_frame(raytrace_instance* instance) {
     gpuErrchk(cudaMalloc((void**) &(instance->buffer_8bit_gpu), sizeof(RGB8) * instance->width * instance->height));
     gpuErrchk(cudaMemcpyToSymbol(device_frame_8bit, &(instance->buffer_8bit_gpu), sizeof(RGB8*), 0, cudaMemcpyHostToDevice));
 }
 
-extern "C" void free_realtime(raytrace_instance* instance) {
+extern "C" void free_8bit_frame(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->buffer_8bit_gpu));
 }
 

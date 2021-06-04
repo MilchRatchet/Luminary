@@ -76,7 +76,7 @@ void generate_samples() {
     sample.index.x = x;
     sample.index.y = y;
 
-    sample.random_index = device_temporal_frames * device_diffuse_samples + iterations_for_pixel * device_reflection_depth;
+    sample.random_index = device_temporal_frames * device_diffuse_samples + iterations_for_pixel;
 
     sample = get_starting_ray(sample, id + sample_offset);
 
@@ -297,7 +297,7 @@ void shade_samples() {
 
         sample = write_albedo_buffer(emission, sample);
 
-        if (sample.state.x &= 0x0400) {
+        if (sample.state.x & 0x0400) {
           if (!isnan(sample.record.r) && !isinf(sample.record.r) && !isnan(sample.record.g) && !isinf(sample.record.g) && !isnan(sample.record.b) && !isinf(sample.record.b)) {
             sample.result.r += emission.r * intensity * sample.record.r;
             sample.result.g += emission.g * intensity * sample.record.g;
@@ -306,8 +306,8 @@ void shade_samples() {
         }
 
         #ifdef FIRST_LIGHT_ONLY
-        const double max_result = fmaxf(sample.result.r, fmaxf(sample.result.g, sample.result.b));
-        if (max_result > eps) {
+        const double max_emission = intensity * fmaxf(emission.r, fmaxf(emission.g, emission.b));
+        if (max_emission > eps) {
             sample = write_result(sample, id);
             goto store_back_sample;
         }
@@ -423,10 +423,14 @@ void shade_samples() {
                     H_local = normalize_vector(H_local);
 
                     weight = (1.0f/light_sample_probability) * light_angle * light_count;
+
+                    sample.state.x |= 0x0400;
                 } else {
                     H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
 
                     if (S_local.z > 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
+
+                    sample.state.x &= 0xfbff;
                 }
             }
 
@@ -568,7 +572,7 @@ void shade_samples_ocean() {
       sample.origin.y += sample.ray.y * ocean_intersection;
       sample.origin.z += sample.ray.z * ocean_intersection;
 
-      normal = get_ocean_normal(sample.origin, ocean_intersection * 0.1f / device_width);
+      normal = get_ocean_normal(sample.origin, fmaxf(0.1f * eps, ocean_intersection * 0.1f / device_width));
 
       albedo = device_scene.ocean.albedo;
 
@@ -714,7 +718,7 @@ void shade_samples_ocean() {
 
           sample = write_albedo_buffer(emission, sample);
 
-          if (sample.state.x &= 0x0400) {
+          if (sample.state.x & 0x0400) {
             if (!isnan(sample.record.r) && !isinf(sample.record.r) && !isnan(sample.record.g) && !isinf(sample.record.g) && !isnan(sample.record.b) && !isinf(sample.record.b)) {
               sample.result.r += emission.r * intensity * sample.record.r;
               sample.result.g += emission.g * intensity * sample.record.g;
@@ -723,8 +727,8 @@ void shade_samples_ocean() {
           }
 
           #ifdef FIRST_LIGHT_ONLY
-          const double max_result = fmaxf(sample.result.r, fmaxf(sample.result.g, sample.result.b));
-          if (max_result > eps) {
+          const double max_emission = intensity * fmaxf(emission.r, fmaxf(emission.g, emission.b));
+          if (max_emission > eps) {
               sample = write_result(sample, id);
               goto store_back_sample;
           }
@@ -839,10 +843,14 @@ void shade_samples_ocean() {
                     H_local = normalize_vector(H_local);
 
                     weight = (1.0f/light_sample_probability) * light_angle * light_count;
+
+                    sample.state.x |= 0x0400;
                 } else {
                     H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
 
                     if (S_local.z > 0.0f) weight = (1.0f/(1.0f-light_sample_probability));
+
+                    sample.state.x &= 0xfbff;
                 }
             }
 
@@ -992,10 +1000,16 @@ void finalize_samples() {
       if (isnan(pixel.g) || isinf(pixel.g)) pixel.g = 0.0f;
       if (isnan(pixel.b) || isinf(pixel.b)) pixel.b = 0.0f;
 
-      RGBF temporal_pixel = device_frame[pixel_index];
-      pixel.r = (pixel.r * weight + temporal_pixel.r * device_temporal_frames) / (device_temporal_frames + 1);
-      pixel.g = (pixel.g * weight + temporal_pixel.g * device_temporal_frames) / (device_temporal_frames + 1);
-      pixel.b = (pixel.b * weight + temporal_pixel.b * device_temporal_frames) / (device_temporal_frames + 1);
+      if (device_temporal_frames) {
+        RGBF temporal_pixel = device_frame[pixel_index];
+        pixel.r = (pixel.r * weight + temporal_pixel.r * device_temporal_frames) / (device_temporal_frames + 1);
+        pixel.g = (pixel.g * weight + temporal_pixel.g * device_temporal_frames) / (device_temporal_frames + 1);
+        pixel.b = (pixel.b * weight + temporal_pixel.b * device_temporal_frames) / (device_temporal_frames + 1);
+      } else {
+        pixel.r *= weight;
+        pixel.g *= weight;
+        pixel.b *= weight;
+      }
 
       device_frame[pixel_index] = pixel;
 
