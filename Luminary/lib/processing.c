@@ -139,7 +139,7 @@ void frame_buffer_to_16bit_image(Camera camera, raytrace_instance* instance, RGB
   }
 }
 
-void post_bloom(raytrace_instance* instance, const float sigma) {
+void post_bloom(raytrace_instance* instance, const float sigma, const float strength) {
   unsigned int pixel_count = instance->width * instance->height;
 
   RGBF* image = instance->frame_buffer;
@@ -203,7 +203,7 @@ void post_bloom(raytrace_instance* instance, const float sigma) {
 
   for (int i = 0; i < kernel_size; i++) {
     const float x   = i * pixel_size;
-    gauss_kernel[i] = gauss_factor2 * expf(-x * x * gauss_factor1);
+    gauss_kernel[i] = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
   }
 
   for (unsigned int i = 0; i < instance->height; i++) {

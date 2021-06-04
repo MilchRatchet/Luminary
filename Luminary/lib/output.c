@@ -32,7 +32,7 @@ void offline_output(
   }
   }
 
-  post_bloom(instance, 3.0f);
+  post_bloom(instance, 3.0f, 4.0f);
 
   printf("[%.3fs] Applied Bloom.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
