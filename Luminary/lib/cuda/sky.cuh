@@ -33,16 +33,12 @@ float get_optical_depth(const vec3 origin, const vec3 ray, const float length) {
     float depth = 0.0f;
     vec3 point = origin;
 
-    point.x += step_size * ray.x * 0.125f;
-    point.y += step_size * ray.y * 0.125f;
-    point.z += step_size * ray.z * 0.125f;
+    point = add_vector(point, scale_vector(ray, 0.125f * step_size));
 
     for (int i = 0; i < steps; i++) {
         depth += density_at_height(height_at_point(point),0.125f) * step_size;
 
-        point.x += step_size * ray.x;
-        point.y += step_size * ray.y;
-        point.z += step_size * ray.z;
+        point = add_vector(point, scale_vector(ray, step_size));
     }
 
     return depth;
@@ -50,10 +46,7 @@ float get_optical_depth(const vec3 origin, const vec3 ray, const float length) {
 
 __device__
 RGBF get_sky_color(const vec3 ray) {
-    RGBF result;
-    result.r = 0.0f;
-    result.g = 0.0f;
-    result.b = 0.0f;
+    RGBF result = get_color(0.0f, 0.0f, 0.0f);;
 
     if (ray.y < 0.0f) {
         return result;
@@ -91,10 +84,7 @@ RGBF get_sky_color(const vec3 ray) {
     const float earth_radius = 6371.0f;
     const float atmosphere_height = 100.0f;
 
-    vec3 origin;
-    origin.x = 0.0f;
-    origin.y = earth_radius + 0.0f;
-    origin.z = 0.0f;
+    vec3 origin = get_vector(0.0f, earth_radius, 0.0f);
 
     const vec3 origin_default = origin;
 
@@ -105,12 +95,10 @@ RGBF get_sky_color(const vec3 ray) {
 
     reach += step_size * 0.125f;
 
-    origin.x += step_size * ray.x * 0.125f;
-    origin.y += step_size * ray.y * 0.125f;
-    origin.z += step_size * ray.z * 0.125f;
+    origin = add_vector(origin, scale_vector(ray, 0.125f * step_size));
 
     for (int i = 0; i < steps; i++) {
-        const vec3 ray_scatter = normalize_vector(vec_diff(sun, origin));
+        const vec3 ray_scatter = normalize_vector(sub_vector(sun, origin));
 
         const float optical_depth = get_optical_depth(origin_default, ray, reach) + get_optical_depth(origin, ray_scatter, get_length_to_border(origin, ray_scatter, earth_radius + atmosphere_height));
 
@@ -141,11 +129,9 @@ RGBF get_sky_color(const vec3 ray) {
 
         reach += step_size;
 
-        origin.x += step_size * ray.x;
-        origin.y += step_size * ray.y;
-        origin.z += step_size * ray.z;
+        origin = add_vector(origin, scale_vector(ray, step_size));
     }
-    const vec3 ray_sun = normalize_vector(vec_diff(sun, origin_default));
+    const vec3 ray_sun = normalize_vector(sub_vector(sun, origin_default));
 
     float cos_angle = dot_product(ray, ray_sun);
     cos_angle = cosf(fmaxf(0.0f,acosf(cos_angle) - angular_diameter));

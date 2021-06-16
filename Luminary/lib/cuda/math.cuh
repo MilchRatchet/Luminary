@@ -32,7 +32,29 @@ float lerp(const float a, const float b, const float t) {
 }
 
 __device__
-vec3 vec_diff(const vec3 a, const vec3 b) {
+vec3 get_vector(const float x, const float y, const float z) {
+    vec3 result;
+
+    result.x = x;
+    result.y = y;
+    result.z = z;
+
+    return result;
+}
+
+__device__
+vec3 add_vector(const vec3 a, const vec3 b) {
+    vec3 result;
+
+    result.x = a.x + b.x;
+    result.y = a.y + b.y;
+    result.z = a.z + b.z;
+
+    return result;
+}
+
+__device__
+vec3 sub_vector(const vec3 a, const vec3 b) {
     vec3 result;
 
     result.x = a.x - b.x;
@@ -82,7 +104,7 @@ vec3 normalize_vector(vec3 vector) {
 
 __device__
 vec3 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
-    const vec3 diff = vec_diff(point, vertex);
+    const vec3 diff = sub_vector(point, vertex);
     const float d00 = dot_product(edge1,edge1);
     const float d01 = dot_product(edge1,edge2);
     const float d11 = dot_product(edge2,edge2);
@@ -104,6 +126,16 @@ vec3 lerp_normals(const vec3 vertex_normal, const vec3 edge1_normal, const vec3 
     result.z = vertex_normal.z + lambda * edge1_normal.z + mu * edge2_normal.z;
 
     return normalize_vector(result);
+}
+
+__device__
+UV get_UV(const float u, const float v) {
+    UV result;
+
+    result.u = u;
+    result.v = v;
+
+    return result;
 }
 
 __device__
@@ -217,5 +249,29 @@ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
 
     return result;
 }
+
+__device__
+RGBF get_color(const float r, const float g, const float b) {
+    RGBF result;
+
+    result.r = r;
+    result.g = g;
+    result.b = b;
+
+    return result;
+}
+
+__device__
+RGBF add_color(const RGBF a, const RGBF b) {
+    RGBF result;
+
+    result.r = a.r + b.r;
+    result.g = a.g + b.g;
+    result.b = a.b + b.b;
+
+    return result;
+}
+
+
 
 #endif /* CU_MATH_H */
