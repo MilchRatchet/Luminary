@@ -4,13 +4,7 @@ Luminary is a CUDA based Pathtracing renderer.
 
 ![Sponza Example](https://github.com/MilchRatchet/Luminary/blob/main/demo_images/Sponza.png)
 
-This project is for fun and to learn more about `Computer Graphics`. There is no end goal, I will add whatever I feel like. The following is a list of things that I may do in the future.
-
-- Implement Clouds.
-- Implement volumetric lighting.
-- Implement parallel BVH construction.
-- Implement SAH based node collapsing.
-- Implement refraction.
+This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
 
 As a denoiser I use `Optix` since any non machine learning denoiser is quite frankly not all that great and machine learning is out of the scope of this project.
 
@@ -104,6 +98,8 @@ You can control the camera through `WASD` and the mouse. The sun can be rotated 
 - `[E]` exposure
 - `[L]` ocean height
 - `[K]` ocean amplitude
+- `[N]` default material roughness
+- `[M]` default material metallic
 
 Ocean animation can be toggled with `[O]`. Different shading modes can be accessed through `[V]`. The information shown in the title of the window can be switched with `[T]`.
 

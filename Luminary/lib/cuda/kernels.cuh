@@ -181,7 +181,7 @@ void shade_samples() {
 
       face_normal = normal;
 
-      roughness = 0.01f;
+      roughness = 0.0f;
       metallic = 0.0f;
 
       if (device_scene.ocean.emissive) {
@@ -203,9 +203,9 @@ void shade_samples() {
       sample = write_albedo_buffer(sky, sample);
 
       if (!(sample.state.x & 0x0400)) {
-        sky.r = (sky.r > 1.0f) ? 0.0f : sky.r;
-        sky.g = (sky.g > 1.0f) ? 0.0f : sky.g;
-        sky.b = (sky.b > 1.0f) ? 0.0f : sky.b;
+        if (sky.r > 1.0f || sky.g > 1.0f || sky.b > 1.0f) {
+          sky = get_color(0.0f, 0.0f, 0.0f);
+        }
       }
 
       if (!isnan(sample.record.r) && !isinf(sample.record.r) && !isnan(sample.record.g) && !isinf(sample.record.g) && !isnan(sample.record.b) && !isinf(sample.record.b)) {
@@ -263,9 +263,9 @@ void shade_samples() {
           metallic = material_f.y;
           intensity = material_f.z * 255.0f;
       } else {
-          roughness = 0.81f;
-          metallic = 0.0f;
-          intensity = 1.0f;
+          roughness = device_default_material.r;
+          metallic = device_default_material.g;
+          intensity = device_default_material.b;
       }
 
       if (maps.y) {

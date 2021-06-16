@@ -103,6 +103,10 @@ extern "C" raytrace_instance* init_raytracing(
     instance->illuminance_atlas_length = illuminance_atlas_length;
     instance->material_atlas_length = material_atlas_length;
 
+    instance->default_material.r = 0.81f;
+    instance->default_material.g = 0.0f;
+    instance->default_material.b = 1.0f;
+
     instance->scene_gpu = scene;
     instance->shading_mode = 0;
 
@@ -257,6 +261,8 @@ extern "C" void trace_scene(raytrace_instance* instance, const int progress, con
         update_sun(instance->scene_gpu);
     if (update_mask & 0b1000)
         update_camera_pos(instance->scene_gpu, instance->width, instance->height);
+    if (update_mask & 0b10000)
+        gpuErrchk(cudaMemcpyToSymbol(device_default_material, &(instance->default_material), sizeof(RGBF), 0, cudaMemcpyHostToDevice));
 
     clock_t t = clock();
 

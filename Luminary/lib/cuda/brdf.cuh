@@ -88,8 +88,10 @@ vec3 sample_GGX_VNDF(const vec3 v, const float alpha, const float random1, const
 }
 
 __device__
-Sample specular_BRDF(Sample sample, const vec3 normal, const vec3 V, const Light light, const float light_sample, const float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability) {
+Sample specular_BRDF(Sample sample, const vec3 normal, const vec3 V, const Light light, const float light_sample, float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability) {
     const float alpha = roughness * roughness;
+
+    light_sample_probability *= alpha;
 
     const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
@@ -97,6 +99,8 @@ Sample specular_BRDF(Sample sample, const vec3 normal, const vec3 V, const Light
 
     const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
     vec3 H_local;
+
+    sample.state.x |= 0x0400;
 
     if (alpha < eps) {
         H_local.x = 0.0f;
@@ -115,14 +119,10 @@ Sample specular_BRDF(Sample sample, const vec3 normal, const vec3 V, const Light
             H_local = normalize_vector(H_local);
 
             weight = (1.0f/light_sample_probability) * light.radius * light_count;
-
-            sample.state.x |= 0x0400;
         } else {
             H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
 
             if (S_local.z > 0.0f) weight = (1.0f/(1.0f - light_sample_probability));
-
-            sample.state.x &= 0xfbff;
         }
     }
 

@@ -107,7 +107,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
   int temporal_frames      = 0;
   int information_mode     = 0;
-  unsigned int update_mask = 0b1111;
+  unsigned int update_mask = 0xffffffff;
   int update_ocean         = 0;
 
   char* title = (char*) malloc(4096);
@@ -199,6 +199,14 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
         else if (keystate[SDL_SCANCODE_K]) {
           instance->scene_gpu.ocean.amplitude += 0.001f * event.motion.xrel;
           update_mask |= 0b1;
+        }
+        else if (keystate[SDL_SCANCODE_M]) {
+          instance->default_material.g += 0.001f * event.motion.xrel;
+          update_mask |= 0b10000;
+        }
+        else if (keystate[SDL_SCANCODE_N]) {
+          instance->default_material.r += 0.001f * event.motion.xrel;
+          update_mask |= 0b10000;
         }
         else {
           instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
@@ -308,6 +316,18 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     if (instance->scene_gpu.ocean.amplitude < 0.0f)
       instance->scene_gpu.ocean.amplitude = 0.0f;
+
+    if (instance->default_material.r < 0.0f)
+      instance->default_material.r = 0.0f;
+
+    if (instance->default_material.g < 0.0f)
+      instance->default_material.g = 0.0f;
+
+    if (instance->default_material.r > 1.0f)
+      instance->default_material.r = 1.0f;
+
+    if (instance->default_material.g > 1.0f)
+      instance->default_material.g = 1.0f;
 
     const float movement_speed = 0.5f * shift_pressed * normalized_time;
 

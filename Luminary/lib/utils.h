@@ -87,6 +87,7 @@ struct raytrace_instance {
   int samples_per_sample;
   void* randoms_gpu;
   RGBF* albedo_buffer_gpu;
+  RGBF default_material;
   int shading_mode;
 } typedef raytrace_instance;
 
