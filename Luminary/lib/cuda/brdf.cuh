@@ -88,7 +88,7 @@ vec3 sample_GGX_VNDF(const vec3 v, const float alpha, const float random1, const
 }
 
 __device__
-Sample specular_BRDF(Sample sample, const vec3 normal, const vec3 V, const Light light, const float light_sample, const float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability, const int water_material) {
+Sample specular_BRDF(Sample sample, const vec3 normal, const vec3 V, const Light light, const float light_sample, const float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability) {
     const float alpha = roughness * roughness;
 
     const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
@@ -135,9 +135,9 @@ Sample specular_BRDF(Sample sample, const vec3 normal, const vec3 V, const Light
     sample.ray = normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
 
     vec3 specular_f0;
-    specular_f0.x = (water_material) ? 0.02f : lerp(0.04f, albedo.r, metallic);
-    specular_f0.y = (water_material) ? 0.02f : lerp(0.04f, albedo.g, metallic);
-    specular_f0.z = (water_material) ? 0.02f : lerp(0.04f, albedo.b, metallic);
+    specular_f0.x = lerp(0.04f, albedo.r, metallic);
+    specular_f0.y = lerp(0.04f, albedo.g, metallic);
+    specular_f0.z = lerp(0.04f, albedo.b, metallic);
 
     const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
 

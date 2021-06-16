@@ -171,7 +171,6 @@ void shade_samples() {
     float metallic;
     float intensity;
     vec3 face_normal;
-    int water_material = 0;
 
     if (ocean_intersection < sample.depth) {
       sample.origin = add_vector(sample.origin, scale_vector(sample.ray, ocean_intersection));
@@ -182,9 +181,8 @@ void shade_samples() {
 
       face_normal = normal;
 
-      roughness = 0.05f;
+      roughness = 0.01f;
       metallic = 0.0f;
-      water_material = 1;
 
       if (device_scene.ocean.emissive) {
         RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
@@ -360,7 +358,7 @@ void shade_samples() {
         const float beta = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 2, id);
 
         if (sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 10, id) < specular_probability) {
-          sample = specular_BRDF(sample, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic, beta, gamma, specular_probability, water_material);
+          sample = specular_BRDF(sample, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic, beta, gamma, specular_probability);
         }
         else
         {
