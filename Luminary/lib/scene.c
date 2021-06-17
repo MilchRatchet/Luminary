@@ -91,6 +91,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   scene.camera.focal_length  = 1.0f;
   scene.camera.aperture_size = 0.00f;
   scene.camera.exposure      = 1.0f;
+  scene.camera.auto_exposure = 0;
 
   scene.ocean.active     = 0;
   scene.ocean.emissive   = 0;

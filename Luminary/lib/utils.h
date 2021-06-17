@@ -29,6 +29,7 @@ struct Camera {
   float focal_length;
   float aperture_size;
   float exposure;
+  int auto_exposure;
 } typedef Camera;
 
 struct Light {

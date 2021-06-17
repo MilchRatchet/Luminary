@@ -152,9 +152,10 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     }
     else if (information_mode == 2) {
       sprintf(
-        title, "Luminary %s- Focal Length: %.2f Aperture Size: %.2f Exposure: %.2f",
+        title, "Luminary %s- Focal Length: %.2f Aperture Size: %.2f Exposure: %.2f %s",
         SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.camera.focal_length,
-        instance->scene_gpu.camera.aperture_size, instance->scene_gpu.camera.exposure);
+        instance->scene_gpu.camera.aperture_size, instance->scene_gpu.camera.exposure,
+        (instance->scene_gpu.camera.auto_exposure && instance->denoiser) ? "[AutoExp]" : "");
     }
     else if (information_mode == 3) {
       sprintf(
@@ -233,6 +234,9 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_O) {
           update_ocean ^= 0b1;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_R) {
+          instance->scene_gpu.camera.auto_exposure ^= 0b1;
         }
       }
       else if (event.type == SDL_QUIT) {
@@ -340,6 +344,12 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       temporal_frames = 0;
       update_mask |= 0b1;
       instance->scene_gpu.ocean.time += frame_time * 0.001f;
+    }
+
+    if (instance->scene_gpu.camera.auto_exposure && instance->denoiser && !temporal_frames) {
+      instance->scene_gpu.camera.exposure =
+        get_auto_exposure_from_optix(optix_setup, instance->scene_gpu.camera.exposure);
+      update_mask |= 0b1;
     }
   }
 
