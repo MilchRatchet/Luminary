@@ -54,7 +54,7 @@ RGBF get_sky_color(const vec3 ray) {
 
     const float angular_diameter = 0.009f;
 
-    const float overall_density = 1.0f;
+    const float overall_density = device_scene.sky.base_density;
 
     RGBF scatter;
     scatter.r = 5.8f * 0.001f * overall_density;
@@ -104,10 +104,10 @@ RGBF get_sky_color(const vec3 ray) {
 
         const float height = height_at_point(origin);
 
-        const float local_density = density_at_height(height, 0.125f);
-        const float mie_density = density_at_height(height, 0.83333f);
+        const float local_density = density_at_height(height, device_scene.sky.rayleigh_falloff);
+        const float mie_density = density_at_height(height, device_scene.sky.mie_falloff);
         //The tent function is disabled atm, first argument 0.0f to activate
-        const float ozone_density = fmaxf(1.0f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
+        const float ozone_density = fmaxf(0.0f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
 
         RGBF transmittance;
         transmittance.r = expf(-optical_depth * (scatter.r + ozone_density * ozone_absorbtion.r + 1.11f * mie_scatter));

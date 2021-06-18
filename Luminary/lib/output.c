@@ -165,9 +165,16 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     }
     else if (information_mode == 4) {
       sprintf(
-        title, "Luminary %s- Ocean Height: %.3f Ocean Amplitude: %.3f",
+        title, "Luminary %s- Ocean Height: %.3f Amplitude: %.3f Frequency: %.3f Choppyness: %.3f",
         SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.ocean.height,
-        instance->scene_gpu.ocean.amplitude);
+        instance->scene_gpu.ocean.amplitude, instance->scene_gpu.ocean.frequency,
+        instance->scene_gpu.ocean.choppyness);
+    }
+    else if (information_mode == 5) {
+      sprintf(
+        title, "Luminary %s- Sky Density: %.3f Rayleigh: %.3f Mie: %.3f",
+        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.sky.base_density,
+        instance->scene_gpu.sky.rayleigh_falloff, instance->scene_gpu.sky.mie_falloff);
     }
 
     const double normalized_time = frame_time / 16.66667;
@@ -201,6 +208,26 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
           instance->scene_gpu.ocean.amplitude += 0.001f * event.motion.xrel;
           update_mask |= 0b1;
         }
+        else if (keystate[SDL_SCANCODE_J]) {
+          instance->scene_gpu.ocean.frequency += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
+        else if (keystate[SDL_SCANCODE_H]) {
+          instance->scene_gpu.ocean.choppyness += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
+        else if (keystate[SDL_SCANCODE_Z]) {
+          instance->scene_gpu.sky.base_density += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
+        else if (keystate[SDL_SCANCODE_U]) {
+          instance->scene_gpu.sky.rayleigh_falloff += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
+        else if (keystate[SDL_SCANCODE_I]) {
+          instance->scene_gpu.sky.mie_falloff += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
         else if (keystate[SDL_SCANCODE_M]) {
           instance->default_material.g += 0.001f * event.motion.xrel;
           update_mask |= 0b10000;
@@ -225,7 +252,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       }
       else if (event.type == SDL_KEYDOWN) {
         if (event.key.keysym.scancode == SDL_SCANCODE_T) {
-          information_mode = (information_mode + 1) % 5;
+          information_mode = (information_mode + 1) % 6;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_V) {
           instance->shading_mode = (instance->shading_mode + 1) % 4;
@@ -320,6 +347,12 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     if (instance->scene_gpu.ocean.amplitude < 0.0f)
       instance->scene_gpu.ocean.amplitude = 0.0f;
+
+    if (instance->scene_gpu.ocean.frequency < 0.0f)
+      instance->scene_gpu.ocean.frequency = 0.0f;
+
+    if (instance->scene_gpu.ocean.choppyness < 0.0f)
+      instance->scene_gpu.ocean.choppyness = 0.0f;
 
     if (instance->default_material.r < 0.0f)
       instance->default_material.r = 0.0f;

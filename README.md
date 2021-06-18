@@ -98,6 +98,11 @@ You can control the camera through `WASD` and the mouse. The sun can be rotated 
 - `[E]` exposure
 - `[L]` ocean height
 - `[K]` ocean amplitude
+- `[J]` ocean frequency
+- `[H]` ocean choppyness
+- `[Z]` sky density
+- `[U]` sky rayleigh falloff
+- `[I]` sky mie falloff
 - `[N]` default material roughness
 - `[M]` default material metallic
 

@@ -106,6 +106,10 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   scene.ocean.albedo.b   = 0.0f;
   scene.ocean.albedo.a   = 0.9f;
 
+  scene.sky.base_density     = 0.8f;
+  scene.sky.rayleigh_falloff = 0.125f;
+  scene.sky.mie_falloff      = 0.833333f;
+
   int width           = 1280;
   int height          = 720;
   int bounces         = 5;

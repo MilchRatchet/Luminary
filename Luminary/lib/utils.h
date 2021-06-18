@@ -37,6 +37,12 @@ struct Light {
   float radius;
 } typedef Light;
 
+struct Sky {
+  float base_density;
+  float rayleigh_falloff;
+  float mie_falloff;
+} typedef Sky;
+
 struct Ocean {
   int active;
   int emissive;
@@ -65,6 +71,7 @@ struct Scene {
   Light* lights;
   unsigned int lights_length;
   Ocean ocean;
+  Sky sky;
 } typedef Scene;
 
 struct raytrace_instance {
