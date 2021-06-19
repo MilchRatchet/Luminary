@@ -109,6 +109,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   int information_mode     = 0;
   unsigned int update_mask = 0xffffffff;
   int update_ocean         = 0;
+  int use_bloom            = 0;
 
   char* title = (char*) malloc(4096);
 
@@ -125,6 +126,8 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     if (instance->denoiser) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
+      if (use_bloom)
+        apply_bloom(instance, denoised_image);
       copy_framebuffer_to_8bit(buffer, denoised_image, instance);
     }
     else {
@@ -261,6 +264,9 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_O) {
           update_ocean ^= 0b1;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_B) {
+          use_bloom ^= 0b1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_R) {
           instance->scene_gpu.camera.auto_exposure ^= 0b1;

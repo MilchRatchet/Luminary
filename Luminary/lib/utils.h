@@ -97,6 +97,7 @@ struct raytrace_instance {
   RGBF* albedo_buffer_gpu;
   RGBF default_material;
   int shading_mode;
+  RGBF* bloom_scratch_gpu;
 } typedef raytrace_instance;
 
 #endif /* UTILS_H */

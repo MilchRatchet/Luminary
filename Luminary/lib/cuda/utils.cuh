@@ -115,9 +115,6 @@ __constant__
 RGBF* device_albedo_buffer;
 
 __constant__
-RGBF* device_internal_frame;
-
-__constant__
 unsigned int device_width;
 
 __constant__
@@ -161,6 +158,9 @@ RGBF device_default_material;
 
 __constant__
 int device_shading_mode;
+
+__constant__
+RGBF* device_bloom_scratch;
 
 
 #endif /* CU_UTILS_H */

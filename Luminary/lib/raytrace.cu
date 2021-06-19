@@ -76,6 +76,7 @@ static void update_camera_pos(const Scene scene, const unsigned int width, const
     gpuErrchk(cudaMemcpyToSymbol(device_offset_y, &(offset_y), sizeof(float), 0, cudaMemcpyHostToDevice));
 }
 
+
 extern "C" raytrace_instance* init_raytracing(
     const unsigned int width, const unsigned int height, const int reflection_depth,
     const int diffuse_samples, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
@@ -138,6 +139,9 @@ extern "C" raytrace_instance* init_raytracing(
         gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * width * height));
         gpuErrchk(cudaMemcpyToSymbol(device_albedo_buffer, &(instance->albedo_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
         gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
+
+        gpuErrchk(cudaMalloc((void**) &(instance->bloom_scratch_gpu), sizeof(RGBF) * width * height));
+        gpuErrchk(cudaMemcpyToSymbol(device_bloom_scratch, &(instance->bloom_scratch_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     }
 
     size_t samples_length;
@@ -305,12 +309,18 @@ extern "C" void trace_scene(raytrace_instance* instance, const int progress, con
         }
     }
 
-
-
     if (progress == 1)
         printf("\r                                                                                                              \r");
 
     finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+}
+
+extern "C" void apply_bloom(raytrace_instance* instance, RGBF* image) {
+    if (instance->denoiser) {
+        //bloom_kernel_split<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image);
+        bloom_kernel_blur_vertical<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image);
+        bloom_kernel_blur_horizontal<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image);
+    }
 }
 
 extern "C" void free_inputs(raytrace_instance* instance) {
@@ -330,6 +340,7 @@ extern "C" void free_outputs(raytrace_instance* instance) {
 
     if (instance->denoiser) {
         gpuErrchk(cudaFree(instance->albedo_buffer_gpu));
+        gpuErrchk(cudaFree(instance->bloom_scratch_gpu));
     }
 
     free(instance);

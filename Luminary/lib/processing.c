@@ -153,7 +153,7 @@ void post_bloom(raytrace_instance* instance, const float sigma, const float stre
   float* image_ptr       = (float*) image;
   float* illuminance_ptr = (float*) illuminance;
 
-  for (; i < pixel_count * 3; i += 8) {
+  for (; i + 8 < pixel_count * 3; i += 8) {
     __m256 pixels = _mm256_load_ps(image_ptr);
 
     __m256 truncated_pixels = _mm256_min_ps(pixels, ones);
@@ -249,7 +249,7 @@ void post_bloom(raytrace_instance* instance, const float sigma, const float stre
 
   i = 0;
 
-  for (; i < pixel_count * 3; i += 8) {
+  for (; i + 8 < pixel_count * 3; i += 8) {
     __m256 pixels = _mm256_load_ps(image_ptr);
 
     __m256 blurred_illuminance = _mm256_load_ps(illuminance_ptr);

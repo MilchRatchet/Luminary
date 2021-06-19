@@ -458,6 +458,133 @@ void finalize_samples() {
   }
 }
 
+/*__global__
+void bloom_kernel_split(RGBF* image) {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  while (id < device_amount) {
+    RGBF pixel = image[id];
+    RGBF truncated_pixel = get_color(fminf(0.0f, pixel.r),fminf(0.0f, pixel.g),fminf(0.0f, pixel.b));
+    //image[id] = truncated_pixel;
+
+    pixel.r -= truncated_pixel.r;
+    pixel.g -= truncated_pixel.g;
+    pixel.b -= truncated_pixel.b;
+
+    device_albedo_buffer[id] = pixel;
+
+    id += blockDim.x * gridDim.x;
+  }
+}*/
+
+__global__
+void bloom_kernel_blur_vertical(RGBF* image) {
+  const int stride_length = 4;
+
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int stride = id % device_width + device_width * stride_length * (id/device_width);
+
+  const float sigma = 3.0f;
+  const float strength = 2.0f;
+
+  const float reference_pixel_count = 1280.0f;
+  const float pixel_size = reference_pixel_count / device_width;
+  const int kernel_size = (int) ((sigma * 3.0f) / pixel_size) + 1;
+
+  const float gauss_factor1 = 1.0f / (2.0f * sigma * sigma);
+  const float gauss_factor2 = gauss_factor1 / 3.14159265358979323846f;
+
+  __shared__ RGBF reuse[THREADS_PER_BLOCK][stride_length];
+
+  while (stride < device_amount) {
+    for (int i = 0; i < stride_length; i++) {
+      if (stride + i * device_width >= device_amount) break;
+      reuse[threadIdx.x][i] = image[stride + i * device_width];
+    }
+
+    for (int j = 0; j < stride_length; j++) {
+      if (stride + j * device_width >= device_amount) break;
+
+      RGBF collector = get_color(0.0f,0.0f,0.0f);
+
+      for (int i = -kernel_size + 1; i < kernel_size; i+=2) {
+        const int index = stride + (i + j) * device_width;
+        if (index < 0) continue;
+        if (index >= device_amount) break;
+
+        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i+j] : image[index];
+
+        const float x   = abs(i) * pixel_size;
+        const float gauss = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
+
+        collector.r += value.r * gauss;
+        collector.g += value.g * gauss;
+        collector.b += value.b * gauss;
+      }
+
+      device_bloom_scratch[stride + j * device_width] = collector;
+    }
+
+    id += blockDim.x * gridDim.x;
+    stride = id % device_width + device_width * stride_length * (id/device_width);
+  }
+}
+
+__global__
+void bloom_kernel_blur_horizontal(RGBF* image) {
+  const int stride_length = 4;
+
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int stride = stride_length * id;
+
+  const float sigma = 3.0f;
+  const float strength = 2.0f;
+
+  const float reference_pixel_count = 1280.0f;
+  const float pixel_size = reference_pixel_count / device_width;
+  const int kernel_size = (int) ((sigma * 3.0f) / pixel_size) + 1;
+
+  const float gauss_factor1 = 1.0f / (2.0f * sigma * sigma);
+  const float gauss_factor2 = gauss_factor1 / 3.14159265358979323846f;
+
+  __shared__ RGBF reuse[THREADS_PER_BLOCK][stride_length];
+
+  while (stride < device_amount) {
+    for (int i = 0; i < stride_length; i++) {
+      if (stride + i >= device_amount) break;
+      reuse[threadIdx.x][i] = device_bloom_scratch[stride + i];
+    }
+
+    for (int j = 0; j < stride_length; j++) {
+      if (stride + j >= device_amount) break;
+
+      RGBF collector = get_color(0.0f,0.0f,0.0f);
+
+      for (int i = -kernel_size + 1; i < kernel_size; i+=2) {
+        const int index = stride + i + j;
+        if (index < 0) continue;
+        if (index >= device_amount) break;
+
+        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i+j] : device_bloom_scratch[index];
+
+        const float x   = abs(i) * pixel_size;
+        const float gauss = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
+
+        collector.r += value.r * gauss;
+        collector.g += value.g * gauss;
+        collector.b += value.b * gauss;
+      }
+
+      RGBF pixel = image[stride + j];
+
+      image[stride + j] = add_color(pixel, collector);
+    }
+
+    id += blockDim.x * gridDim.x;
+    stride = stride_length * id;
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10)
 void special_shade_samples() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -583,6 +710,8 @@ void special_shade_samples() {
     id += blockDim.x * gridDim.x;
   }
 }
+
+
 
 
 #endif /* CU_KERNELS_H */

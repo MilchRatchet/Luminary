@@ -22,6 +22,7 @@ void copy_framebuffer_to_cpu(raytrace_instance* instance);
 void trace_scene(
   raytrace_instance* instance, const int progress, const int temporal_frames,
   const unsigned int update_mask);
+void apply_bloom(raytrace_instance* instance, RGBF* image);
 void free_inputs(raytrace_instance* instance);
 void free_outputs(raytrace_instance* instance);
 void* initialize_textures(TextureRGBA* textures, const int textures_length);
