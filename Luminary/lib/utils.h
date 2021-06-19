@@ -1,6 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <stdlib.h>
 #include "primitives.h"
 #include "mesh.h"
 #include "bvh.h"
@@ -99,5 +100,8 @@ struct raytrace_instance {
   int shading_mode;
   RGBF* bloom_scratch_gpu;
 } typedef raytrace_instance;
+
+#define clamp(value, low, high) \
+  { (value) = min((high), max((value), (low))); }
 
 #endif /* UTILS_H */

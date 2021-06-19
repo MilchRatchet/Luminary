@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <float.h>
 #include <time.h>
 
 void offline_output(
@@ -342,35 +343,18 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       shift_pressed = 2;
     }
 
-    if (instance->scene_gpu.camera.aperture_size < 0.0f)
-      instance->scene_gpu.camera.aperture_size = 0.0f;
-
-    if (instance->scene_gpu.camera.focal_length < 0.0f)
-      instance->scene_gpu.camera.focal_length = 0.0f;
-
-    if (instance->scene_gpu.camera.exposure < 0.0f)
-      instance->scene_gpu.camera.exposure = 0.0f;
-
-    if (instance->scene_gpu.ocean.amplitude < 0.0f)
-      instance->scene_gpu.ocean.amplitude = 0.0f;
-
-    if (instance->scene_gpu.ocean.frequency < 0.0f)
-      instance->scene_gpu.ocean.frequency = 0.0f;
-
-    if (instance->scene_gpu.ocean.choppyness < 0.0f)
-      instance->scene_gpu.ocean.choppyness = 0.0f;
-
-    if (instance->default_material.r < 0.0f)
-      instance->default_material.r = 0.0f;
-
-    if (instance->default_material.g < 0.0f)
-      instance->default_material.g = 0.0f;
-
-    if (instance->default_material.r > 1.0f)
-      instance->default_material.r = 1.0f;
-
-    if (instance->default_material.g > 1.0f)
-      instance->default_material.g = 1.0f;
+    clamp(instance->scene_gpu.camera.aperture_size, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.camera.focal_length, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.camera.exposure, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.ocean.choppyness, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.ocean.amplitude, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.ocean.frequency, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.ocean.choppyness, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.sky.base_density, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.sky.rayleigh_falloff, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.sky.mie_falloff, 0.0f, FLT_MAX);
+    clamp(instance->default_material.r, 0.0f, 1.0f);
+    clamp(instance->default_material.g, 0.0f, 1.0f);
 
     const float movement_speed = 0.5f * shift_pressed * normalized_time;
 

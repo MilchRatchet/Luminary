@@ -485,7 +485,7 @@ void bloom_kernel_blur_vertical(RGBF* image) {
   unsigned int stride = id % device_width + device_width * stride_length * (id/device_width);
 
   const float sigma = 3.0f;
-  const float strength = 2.0f;
+  const float strength = 4.0f;
 
   const float reference_pixel_count = 1280.0f;
   const float pixel_size = reference_pixel_count / device_width;
@@ -538,7 +538,7 @@ void bloom_kernel_blur_horizontal(RGBF* image) {
   unsigned int stride = stride_length * id;
 
   const float sigma = 3.0f;
-  const float strength = 2.0f;
+  const float strength = 4.0f;
 
   const float reference_pixel_count = 1280.0f;
   const float pixel_size = reference_pixel_count / device_width;
