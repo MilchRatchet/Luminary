@@ -103,7 +103,7 @@ extern "C" raytrace_instance* init_raytracing(
     instance->illuminance_atlas_length = illuminance_atlas_length;
     instance->material_atlas_length = material_atlas_length;
 
-    instance->default_material.r = 0.81f;
+    instance->default_material.r = 0.5f;
     instance->default_material.g = 0.0f;
     instance->default_material.b = 1.0f;
 

@@ -555,15 +555,16 @@ void bloom_kernel_blur_horizontal(RGBF* image) {
       reuse[threadIdx.x][i] = device_bloom_scratch[stride + i];
     }
 
-    for (int j = 0; j < stride_length; j++) {
-      if (stride + j >= device_amount) break;
+    const int column = stride % device_width;
+    const int begin = max(-kernel_size + 1, -column);
+    const int end = min(kernel_size, device_width - column - 3);
+    const int valid_stride_length = min(stride_length, device_amount - stride);
 
+    for (int j = 0; j < valid_stride_length; j++) {
       RGBF collector = get_color(0.0f,0.0f,0.0f);
 
-      for (int i = -kernel_size + 1; i < kernel_size; i+=2) {
+      for (int i = begin; i < end; i+=2) {
         const int index = stride + i + j;
-        if (index < 0) continue;
-        if (index >= device_amount) break;
 
         RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i+j] : device_bloom_scratch[index];
 
