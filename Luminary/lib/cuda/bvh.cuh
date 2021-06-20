@@ -114,7 +114,6 @@ void trace_samples() {
     packed_stptr_invoct.x = 0;
 
     while (1) {
-        //node_task.y == 0 gives exact result but is much slower, this here causes some minor glitches
         if (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
             if (id >= device_samples_length) return;
 
@@ -376,10 +375,6 @@ void trace_samples() {
                 node_task.y = (hit_mask & 0xff000000) | (*((unsigned char*)&data0.w + 3));
                 triangle_task.y = hit_mask & 0x00ffffff;
             }
-            else {
-                triangle_task = node_task;
-                node_task = make_uint2(0, 0);
-            }
 
             const int active_threads = __popc(__activemask());
 
@@ -407,13 +402,18 @@ void trace_samples() {
             if (node_task.y <= 0x00ffffff) {
                 if (packed_stptr_invoct.x > 0) {
                     STACK_POP(node_task);
+
+                    if (node_task.y <= 0x00ffffff) {
+                        triangle_task = node_task;
+                        node_task = make_uint2(0, 0);
+                    }
                 } else {
                     float2 write_back;
                     write_back.x = depth;
                     write_back.y = uint_as_float(hit_id);
 
                     __stcs((float2*)(ptr + 4) + 1, write_back);
-                    __prefetch_global_l1(device_active_samples + id);
+                    //__prefetch_global_l1(device_active_samples + id);
                     break;
                 }
             }

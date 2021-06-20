@@ -156,7 +156,7 @@ void shade_samples() {
 
     if (!(sample.state.x & 0x0100)) return;
 
-    __prefetch_global_l1(device_scene.triangles + sample.hit_id);
+    //__prefetch_global_l1(device_scene.triangles + sample.hit_id);
 
     float ocean_intersection;
     if (device_scene.ocean.active) {
@@ -352,7 +352,7 @@ void shade_samples() {
           light = sample_light(sample, light_count, sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 51, id));
         }
 
-        __prefetch_global_l1(device_active_samples + id + blockDim.x * gridDim.x);
+        //__prefetch_global_l1(device_active_samples + id + blockDim.x * gridDim.x);
 
         const float gamma = 2.0f * PI * sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 3, id);
         const float beta = sample_blue_noise(sample.index.x, sample.index.y, sample.random_index, 2, id);
@@ -477,7 +477,7 @@ void bloom_kernel_split(RGBF* image) {
   }
 }*/
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 15)
 void bloom_kernel_blur_vertical(RGBF* image) {
   const int stride_length = 4;
 
@@ -530,7 +530,7 @@ void bloom_kernel_blur_vertical(RGBF* image) {
   }
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 15)
 void bloom_kernel_blur_horizontal(RGBF* image) {
   const int stride_length = 4;
 
