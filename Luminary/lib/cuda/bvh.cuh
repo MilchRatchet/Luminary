@@ -68,7 +68,7 @@ unsigned int __bfind(unsigned int a)
     return result;
 }
 
-#define STACK_SIZE_SM 8
+#define STACK_SIZE_SM 9
 #define STACK_SIZE 32
 
 #define STACK_POP(X)                                                    \
