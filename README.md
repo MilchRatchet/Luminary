@@ -50,6 +50,7 @@ m Meshes/Example.obj
 # Camera parameters
 # c [Pos.x | Pos.y | Pos.z | Rotation.x | Rotation.y | Rotation.z | FOV]
 c 2.0 0.3 -0.06 0.0 1.570796 0.0 2.0
+#
 # Camera lens parameters
 # l [Focal Length | Aperture Size | Exposure] (Default Aperture Size=0.0)
 l 20.0 0.4 2.0
@@ -100,7 +101,7 @@ You can control the camera through `WASD` and the mouse. The sun can be rotated 
 - `[K]` ocean amplitude
 - `[J]` ocean frequency
 - `[H]` ocean choppyness
-- `[Z]` sky density
+- `[Y]` sky density
 - `[U]` sky rayleigh falloff
 - `[I]` sky mie falloff
 - `[N]` default material roughness

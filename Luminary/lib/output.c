@@ -220,7 +220,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
           instance->scene_gpu.ocean.choppyness += 0.001f * event.motion.xrel;
           update_mask |= 0b1;
         }
-        else if (keystate[SDL_SCANCODE_Z]) {
+        else if (keystate[SDL_SCANCODE_Y]) {
           instance->scene_gpu.sky.base_density += 0.001f * event.motion.xrel;
           update_mask |= 0b1;
         }
