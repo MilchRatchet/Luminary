@@ -369,9 +369,8 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       instance->scene_gpu.ocean.time += frame_time * 0.001f;
     }
 
-    if (instance->scene_gpu.camera.auto_exposure && instance->denoiser && !temporal_frames) {
-      instance->scene_gpu.camera.exposure =
-        get_auto_exposure_from_optix(optix_setup, instance->scene_gpu.camera.exposure);
+    if (instance->scene_gpu.camera.auto_exposure) {
+      instance->scene_gpu.camera.exposure = get_auto_exposure_from_optix(optix_setup);
       update_mask |= 0b1;
     }
   }

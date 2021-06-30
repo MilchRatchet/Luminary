@@ -238,16 +238,6 @@ extern "C" void free_textures(void* texture_atlas, const int textures_length) {
     free(textures_cpu);
 }
 
-__device__ __host__
-static float linearRGB_to_SRGB(const float value) {
-    if (value <= 0.0031308f) {
-      return 12.92f * value;
-    }
-    else {
-      return 1.055f * powf(value, 0.416666666667f) - 0.055f;
-    }
-  }
-
 extern "C" void copy_framebuffer_to_cpu(raytrace_instance* instance) {
     gpuErrchk(cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
@@ -346,53 +336,6 @@ extern "C" void free_outputs(raytrace_instance* instance) {
     }
 
     free(instance);
-}
-
-__device__
-RGB8* device_frame_8bit;
-
-__device__
-RGBF tonemap(RGBF pixel) {
-  const float a = 2.51f;
-  const float b = 0.03f;
-  const float c = 2.43f;
-  const float d = 0.59f;
-  const float e = 0.14f;
-
-  pixel.r = 1.25f * (pixel.r * (a * pixel.r + b)) / (pixel.r * (c * pixel.r + d) + e);
-  pixel.g = 1.25f * (pixel.g * (a * pixel.g + b)) / (pixel.g * (c * pixel.g + d) + e);
-  pixel.b = 1.25f * (pixel.b * (a * pixel.b + b)) / (pixel.b * (c * pixel.b + d) + e);
-
-  return pixel;
-}
-
-__global__
-void convert_RGBF_to_RGB8(const RGBF* source) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const unsigned int amount = device_width * device_height;
-
-  while (id < amount) {
-    int x = id % device_width;
-    int y = id / device_width;
-
-    RGBF pixel = source[x + y * device_width];
-
-    pixel = tonemap(pixel);
-
-    pixel.r = fminf(255.9f, 255.9f * linearRGB_to_SRGB(pixel.r));
-    pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(pixel.g));
-    pixel.b = fminf(255.9f, 255.9f * linearRGB_to_SRGB(pixel.b));
-
-    RGB8 converted_pixel;
-    converted_pixel.r = (uint8_t)pixel.r;
-    converted_pixel.g = (uint8_t)pixel.g;
-    converted_pixel.b = (uint8_t)pixel.b;
-
-    device_frame_8bit[x + y * device_width] = converted_pixel;
-
-    id += blockDim.x * gridDim.x;
-  }
 }
 
 extern "C" void initiliaze_8bit_frame(raytrace_instance* instance) {

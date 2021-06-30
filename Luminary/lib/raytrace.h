@@ -31,7 +31,7 @@ void initiliaze_8bit_frame(raytrace_instance* instance);
 void free_8bit_frame(raytrace_instance* instance);
 void copy_framebuffer_to_8bit(RGB8* buffer, RGBF* source, raytrace_instance* instance);
 void* initialize_optix_denoise_for_realtime(raytrace_instance* instance);
-float get_auto_exposure_from_optix(void* input, const float exposure);
+float get_auto_exposure_from_optix(void* input);
 RGBF* denoise_with_optix_realtime(void* input);
 void free_realtime_denoise(void* input);
 

@@ -409,7 +409,7 @@ void finalize_samples() {
     sample_offset++;
 
     if (sample_offset == device_samples_per_sample) {
-      const float weight = device_scene.camera.exposure/device_diffuse_samples;
+      const float weight = 1.0f/device_diffuse_samples;
 
       if (isnan(pixel.r) || isinf(pixel.r)) pixel.r = 0.0f;
       if (isnan(pixel.g) || isinf(pixel.g)) pixel.g = 0.0f;
@@ -567,6 +567,35 @@ void bloom_kernel_blur_horizontal(RGBF* image) {
 
     id += blockDim.x * gridDim.x;
     stride = stride_length * id;
+  }
+}
+
+__global__
+void convert_RGBF_to_RGB8(const RGBF* source) {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const unsigned int amount = device_width * device_height;
+
+  while (id < amount) {
+    int x = id % device_width;
+    int y = id / device_width;
+
+    RGBF pixel = source[x + y * device_width];
+
+    pixel = tonemap(pixel);
+
+    pixel.r = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.r));
+    pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.g));
+    pixel.b = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.b));
+
+    RGB8 converted_pixel;
+    converted_pixel.r = (uint8_t)pixel.r;
+    converted_pixel.g = (uint8_t)pixel.g;
+    converted_pixel.b = (uint8_t)pixel.b;
+
+    device_frame_8bit[x + y * device_width] = converted_pixel;
+
+    id += blockDim.x * gridDim.x;
   }
 }
 

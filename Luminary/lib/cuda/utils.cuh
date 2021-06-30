@@ -115,6 +115,9 @@ __constant__
 RGBF* device_albedo_buffer;
 
 __constant__
+RGB8* device_frame_8bit;
+
+__constant__
 unsigned int device_width;
 
 __constant__

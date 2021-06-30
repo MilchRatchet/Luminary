@@ -272,6 +272,31 @@ RGBF add_color(const RGBF a, const RGBF b) {
     return result;
 }
 
+__device__
+float linearRGB_to_SRGB(const float value) {
+    if (value <= 0.0031308f) {
+        return 12.92f * value;
+    }
+    else {
+        return 1.055f * powf(value, 0.416666666667f) - 0.055f;
+    }
+}
+
+__device__
+RGBF tonemap(RGBF pixel) {
+  const float a = 2.51f;
+  const float b = 0.03f;
+  const float c = 2.43f;
+  const float d = 0.59f;
+  const float e = 0.14f;
+
+  pixel.r = 1.25f * (pixel.r * (a * pixel.r + b)) / (pixel.r * (c * pixel.r + d) + e);
+  pixel.g = 1.25f * (pixel.g * (a * pixel.g + b)) / (pixel.g * (c * pixel.g + d) + e);
+  pixel.b = 1.25f * (pixel.b * (a * pixel.b + b)) / (pixel.b * (c * pixel.b + d) + e);
+
+  return pixel;
+}
+
 
 
 #endif /* CU_MATH_H */

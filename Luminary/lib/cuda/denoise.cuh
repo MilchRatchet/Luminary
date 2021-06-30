@@ -3,6 +3,7 @@
 
 #include <optix.h>
 #include <optix_stubs.h>
+#include <math.h>
 
 struct realtime_denoise {
   OptixDeviceContext ctx;
@@ -111,13 +112,13 @@ extern "C" RGBF* denoise_with_optix_realtime(void* input) {
   return (RGBF*)denoise_setup->outputLayer.data;
 }
 
-extern "C" float get_auto_exposure_from_optix(void* input, const float exposure) {
+extern "C" float get_auto_exposure_from_optix(void* input) {
   realtime_denoise denoise_setup = *(realtime_denoise*) input;
 
   float brightness;
   gpuErrchk(cudaMemcpy(&brightness, (void*)denoise_setup.hdr_intensity, sizeof(float), cudaMemcpyDeviceToHost));
 
-  return min(10.0f, max(1.00f, exposure + (1.0f - 2.0f/brightness)));
+  return min(100.0f, max(0.10f, sqrtf(brightness)));
 }
 
 extern "C" void free_realtime_denoise(void* input) {
