@@ -4,12 +4,13 @@ project ("Luminary" LANGUAGES CUDA C)
 
 set(CMAKE_CUDA_ARCHITECTURES 61)
 set(CMAKE_C_STANDARD 17)
+set(CMAKE_CXX_STANDARD 11)
 
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Luminary/CMake" ${CMAKE_MODULE_PATH})
 
 find_package(CUDAToolkit 11.3 REQUIRED)
 
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math --ptxas-options=-v --extra-device-vectorization")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math --ptxas-options=-v --extra-device-vectorization --generate-line-info --compiler-options -O2 -fp:fast -arch:AVX2")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -march=native")
 
 message(STATUS "SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
@@ -33,7 +34,7 @@ add_executable(Luminary ${cpu_source_files} ${gpu_source_files})
 
 target_link_libraries(Luminary SDL2main SDL2)
 
-add_custom_command(TARGET Luminary POST_BUILD 
+add_custom_command(TARGET Luminary POST_BUILD
                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-               "${SDL2_DIR}/SDL2.dll"              
+               "${SDL2_DIR}/SDL2.dll"
                 ${CMAKE_BINARY_DIR})

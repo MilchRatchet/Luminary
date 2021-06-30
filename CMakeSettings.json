@@ -9,8 +9,7 @@
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
-      "ctestCommandArgs": "",
-      "variables": []
+      "ctestCommandArgs": ""
     },
     {
       "name": "x64-Clang-Release",
@@ -21,11 +20,11 @@
       "cmakeCommandArgs": "",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "inheritEnvironments": [ "clang_cl_x64_x64" ],
+      "inheritEnvironments": [ "clang_cl_x64" ],
       "variables": [
         {
           "name": "CMAKE_CUDA_FLAGS_RELEASE",
-          "value": "-Xcompiler=\"-MD -O3 -Ob2 -march=native -ffp-contract=fast\" -DNDEBUG",
+          "value": "",
           "type": "STRING"
         },
         {
