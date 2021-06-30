@@ -112,6 +112,9 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   int update_ocean         = 0;
   int use_bloom            = 0;
 
+  int make_png  = 0;
+  int png_count = 0;
+
   char* title = (char*) malloc(4096);
 
   initiliaze_8bit_frame(instance);
@@ -133,6 +136,16 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     }
     else {
       copy_framebuffer_to_8bit(buffer, instance->frame_buffer_gpu, instance);
+    }
+
+    if (make_png) {
+      make_png       = 0;
+      char* filename = malloc(4096);
+      sprintf(filename, "%d.png", png_count++);
+      store_as_png(
+        filename, (uint8_t*) buffer, sizeof(RGB8) * instance->width * instance->height,
+        instance->width, instance->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+      free(filename);
     }
 
     SDL_BlitSurface(surface, 0, window_surface, 0);
@@ -338,6 +351,9 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       movement_vector.x += 1.0f;
       update_mask |= 0b1;
       temporal_frames = 0;
+    }
+    if (keystate[SDL_SCANCODE_F12]) {
+      make_png = 1;
     }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;

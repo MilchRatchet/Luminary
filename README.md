@@ -107,7 +107,7 @@ You can control the camera through `WASD` and the mouse. The sun can be rotated 
 - `[N]` default material roughness
 - `[M]` default material metallic
 
-Ocean animation can be toggled with `[O]`. Different shading modes can be accessed through `[V]`. The information shown in the title of the window can be switched with `[T]`. Auto Exposure can be toggled with `[R]`. Bloom is toggled by `[B]`.
+Ocean animation can be toggled with `[O]`. Different shading modes can be accessed through `[V]`. The information shown in the title of the window can be switched with `[T]`. Auto Exposure can be toggled with `[R]`. Bloom is toggled by `[B]`. Create an image by pressing `[F12]`.
 
 Note that bad performance is to be expected. Path tracing is very computationally expensive, `Luminary` is not very performant yet and `Luminary` does not make use of `RT-Cores` found on `Turing` or `Ampere` architecture graphics cards. The latter would be considered if they would be exposed through `CUDA`.
 
