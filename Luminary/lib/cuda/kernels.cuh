@@ -32,12 +32,14 @@ __device__
 Sample get_starting_ray(Sample sample, const int id) {
   vec3 default_ray;
 
-  default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * sample.index.x + device_offset_x * sample_blue_noise(sample.index.x,sample.index.y,sample.random_index,8, id) * 2.0f);
-  default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * sample.index.y - device_offset_y * sample_blue_noise(sample.index.x,sample.index.y,sample.random_index,9, id) * 2.0f);
+  const float random_offset = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index,8,id);
+
+  default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * sample.index.x + device_offset_x * random_offset * 2.0f);
+  default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * sample.index.y - device_offset_y * fractf(random_offset * 10.0f) * 2.0f);
   default_ray.z = -device_scene.camera.focal_length;
 
-  const float alpha = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index, 0, id) * 2.0f * PI;
-  const float beta  = sample_blue_noise(sample.index.x,sample.index.y,sample.random_index, 1, id) * device_scene.camera.aperture_size;
+  const float alpha = (device_scene.camera.aperture_size == 0.0f) ? 0.0f : sample_blue_noise(sample.index.x,sample.index.y,sample.random_index, 0, id) * 2.0f * PI;
+  const float beta  = (device_scene.camera.aperture_size == 0.0f) ? 0.0f : sample_blue_noise(sample.index.x,sample.index.y,sample.random_index, 1, id) * device_scene.camera.aperture_size;
 
   vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 
@@ -48,6 +50,19 @@ Sample get_starting_ray(Sample sample, const int id) {
   sample.origin = add_vector(device_scene.camera.pos, point_on_aperture);
 
   return sample;
+}
+
+__global__
+void initialize_randoms() {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  while (id < device_samples_length) {
+    curandStateXORWOW_t state;
+    curand_init(id, 0, 0, &state);
+    device_sample_randoms[id] = state;
+
+    id += blockDim.x * gridDim.x;
+  }
 }
 
 __global__
@@ -71,7 +86,7 @@ void generate_samples() {
     sample.index.x = x;
     sample.index.y = y;
 
-    sample.random_index = device_temporal_frames * device_diffuse_samples + iterations_for_pixel;
+    sample.random_index = device_temporal_frames * device_diffuse_samples + sample_offset;
 
     sample = get_starting_ray(sample, id + sample_offset);
 
@@ -80,11 +95,7 @@ void generate_samples() {
     sample.result = get_color(0.0f, 0.0f, 0.0f);
     sample.albedo_buffer = get_color(0.0f, 0.0f, 0.0f);
 
-    device_active_samples[id + sample_offset] = sample;
-
-    curandStateXORWOW_t state;
-    curand_init(sample.random_index + x + y * device_width + clock(), 0, 0, &state);
-    device_sample_randoms[id + sample_offset] = state;
+    store_active_sample_no_temporal_hint(sample, device_active_samples + id + sample_offset);
 
     sample_offset++;
 
@@ -113,8 +124,6 @@ Sample write_albedo_buffer(RGBAF value, Sample sample) {
 __device__
 Sample write_result(Sample sample, int id) {
   sample.state.y--;
-
-  sample.random_index -= (sample.state.x & 0x00ff) + 1;
 
   sample.state.x |= 0x0600;
 

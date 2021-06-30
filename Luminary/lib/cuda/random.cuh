@@ -24,7 +24,7 @@ const int ranking_tile[128*128*8] = {73,73,255,255,189,189,229,229,51,51,199,199
  */
 __device__
 float sample_blue_noise(int x, int y, int sample_index, int sample_dimension, int sample_id) {
-	if (sample_index >= 255) {
+	if (sample_index >= 256) {
 		return curand_uniform(device_sample_randoms + sample_id);
 	}
 

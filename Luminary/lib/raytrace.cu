@@ -168,6 +168,8 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMalloc((void**) &(instance->randoms_gpu), sizeof(curandStateXORWOW_t) * samples_length));
     gpuErrchk(cudaMemcpyToSymbol(device_sample_randoms, &(instance->randoms_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
+    initialize_randoms<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
     return instance;
 }
 
