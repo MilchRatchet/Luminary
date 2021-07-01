@@ -69,14 +69,7 @@ RGBF get_sky_color(const vec3 ray) {
     ozone_absorbtion.b = 0.085f * 0.001f * overall_density;
 
     const float sun_dist = 150000000.0f;
-
-    RGBF sun_color;
-
     const float sun_intensity = 6.0f;
-
-    sun_color.r = 1.0f * sun_intensity;
-    sun_color.g = 1.0f * sun_intensity;
-    sun_color.b = 1.0f * sun_intensity;
 
     const vec3 sun_normalized = device_sun;
     const vec3 sun = scale_vector(sun_normalized, sun_dist);
@@ -123,14 +116,19 @@ RGBF get_sky_color(const vec3 ray) {
         const float g = 0.8f;
         const float mie = 1.5f * (1.0f + cos_angle * cos_angle) * (1.0f - g * g) / (4.0f * 3.1415926535f * (2.0f + g * g) * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
 
-        result.r += sun_color.r * transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie) * step_size;
-        result.g += sun_color.g * transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie) * step_size;
-        result.b += sun_color.b * transmittance.b * (local_density * scatter.b * rayleigh + mie_density * mie_scatter * mie) * step_size;
+        result.r += transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie);
+        result.g += transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie);
+        result.b += transmittance.b * (local_density * scatter.b * rayleigh + mie_density * mie_scatter * mie);
 
         reach += step_size;
 
         origin = add_vector(origin, scale_vector(ray, step_size));
     }
+
+    result.r *= step_size;
+    result.g *= step_size;
+    result.b *= step_size;
+
     const vec3 ray_sun = normalize_vector(sub_vector(sun, origin_default));
 
     float cos_angle = dot_product(ray, ray_sun);
@@ -148,10 +146,14 @@ RGBF get_sky_color(const vec3 ray) {
         transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
         transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
 
-        result.r += sun_color.r * transmittance.r * cos_angle * device_scene.sun_strength;
-        result.g += sun_color.g * transmittance.g * cos_angle * device_scene.sun_strength;
-        result.b += sun_color.b * transmittance.b * cos_angle * device_scene.sun_strength;
+        result.r += transmittance.r * cos_angle * device_scene.sun_strength;
+        result.g += transmittance.g * cos_angle * device_scene.sun_strength;
+        result.b += transmittance.b * cos_angle * device_scene.sun_strength;
     }
+
+    result.r *= sun_intensity;
+    result.g *= sun_intensity;
+    result.b *= sun_intensity;
 
     return result;
 }
