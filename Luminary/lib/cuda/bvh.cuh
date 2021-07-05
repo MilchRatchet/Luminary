@@ -5,6 +5,7 @@
 #include "math.cuh"
 #include "minmax.cuh"
 #include "memory.cuh"
+#include "ocean.cuh"
 #include <cuda_runtime_api.h>
 
 struct traversal_result {
@@ -89,21 +90,21 @@ unsigned int __bfind(unsigned int a)
         packed_stptr_invoct.x++;                                        \
     }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
-void trace_samples() {
-    vec3 origin, ray;
-    const Node8* nodes = device_scene.nodes;
-    const Traversal_Triangle* triangles = device_scene.traversal_triangles;
-
-    float4* ptr;
-
-    float depth;
+__global__ //__launch_bounds__(THREADS_PER_BLOCK,10)
+void process_trace_tasks() {
     unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+    uint16_t trace_task_count = device_task_counts[4 * id];
+    uint16_t offset = 0;
+    uint16_t geometry_task_count = 0;
+    uint16_t sky_task_count = 0;
+    uint16_t ocean_task_count = 0;
 
 	uint2 traversal_stack[STACK_SIZE];
     __shared__ uint2 traversal_stack_sm[THREADS_PER_BLOCK][STACK_SIZE_SM];
 
     unsigned int hit_id;
+    float depth;
 
     vec3 inv_ray;
 
@@ -113,43 +114,36 @@ void trace_samples() {
     ushort2 packed_stptr_invoct;
     packed_stptr_invoct.x = 0;
 
+    TraceTask task;
+
     while (1) {
         if (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
-            if (id >= device_samples_length) return;
+            if (offset >= trace_task_count) break;
 
-            ptr = (float4*)(device_active_samples + id);
-
-            float4 data0 = __ldcs(ptr + 0);
-            float4 data1 = __ldcs(ptr + 1);
+            task = device_trace_tasks[get_task_address(offset++)];
 
             node_task = make_uint2(0, 0x80000000);
             triangle_task = make_uint2(0, 0);
 
-            origin.x = data0.x;
-            origin.y = data0.y;
-            origin.z = data0.z;
+            depth = device_scene.far_clip_distance;
+            hit_id = SKY_HIT;
 
-            ray.x = data0.w;
-            ray.y = data1.x;
-            ray.z = data1.y;
+            inv_ray.x = 1.0f / (fabsf(task.ray.x) > eps ? task.ray.x : copysignf(eps, task.ray.x));
+            inv_ray.y = 1.0f / (fabsf(task.ray.y) > eps ? task.ray.y : copysignf(eps, task.ray.y));
+            inv_ray.z = 1.0f / (fabsf(task.ray.z) > eps ? task.ray.z : copysignf(eps, task.ray.z));
 
-            if (!(float_as_uint(data1.z) & 0x0100)) {
-                return;
-            }
-
-            inv_ray.x = 1.0f / (fabsf(ray.x) > eps ? ray.x : copysignf(eps, ray.x));
-            inv_ray.y = 1.0f / (fabsf(ray.y) > eps ? ray.y : copysignf(eps, ray.y));
-            inv_ray.z = 1.0f / (fabsf(ray.z) > eps ? ray.z : copysignf(eps, ray.z));
-
-            packed_stptr_invoct.y = (((ray.x < 0.0f) ? 1 : 0) << 2) | (((ray.y < 0.0f) ? 1 : 0) << 1) | (((ray.z < 0.0f) ? 1 : 0) << 0);
+            packed_stptr_invoct.y = (((task.ray.x < 0.0f) ? 1 : 0) << 2) | (((task.ray.y < 0.0f) ? 1 : 0) << 1) | (((task.ray.z < 0.0f) ? 1 : 0) << 0);
             packed_stptr_invoct.y = 7 - packed_stptr_invoct.y;
             packed_stptr_invoct.x = 0;
 
-            depth = device_scene.far_clip_distance;
+            /*if (device_scene.ocean.active) {
+                const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
 
-            hit_id = 0xffffffff;
-
-            id += blockDim.x * gridDim.x;
+                if (ocean_dist < depth) {
+                    depth = ocean_dist;
+                    hit_id = OCEAN_HIT;
+                }
+            }*/
         }
 
         int lost_loop_iterations = 0;
@@ -173,7 +167,7 @@ void trace_samples() {
                 const unsigned int relative_index = __popc(imask & ~(0xffffffff << slot_index));
                 const unsigned int child_node_index = child_node_base_index + relative_index;
 
-                float4* data_ptr = (float4*)(nodes + child_node_index);
+                float4* data_ptr = (float4*)(device_scene.nodes + child_node_index);
 
                 const float4 data0 = __ldg(data_ptr + 0);
                 const float4 data1 = __ldg(data_ptr + 1);
@@ -202,9 +196,9 @@ void trace_samples() {
                 scaled_inv_ray.z = uint_as_float((e.z + 127) << 23) * inv_ray.z;
 
                 vec3 shifted_origin;
-                shifted_origin.x = (p.x - origin.x) * inv_ray.x;
-                shifted_origin.y = (p.y - origin.y) * inv_ray.y;
-                shifted_origin.z = (p.z - origin.z) * inv_ray.z;
+                shifted_origin.x = (p.x - task.origin.x) * inv_ray.x;
+                shifted_origin.y = (p.y - task.origin.y) * inv_ray.y;
+                shifted_origin.z = (p.z - task.origin.z) * inv_ray.z;
 
                 {
                     const unsigned int meta4 = float_as_int(data1.z);
@@ -389,7 +383,7 @@ void trace_samples() {
 
                 const int triangle_index = __bfind(triangle_task.y);
 
-                const float d = bvh_triangle_intersection((float4*)(triangles + triangle_index + triangle_task.x), origin, ray);
+                const float d = bvh_triangle_intersection((float4*)(device_scene.traversal_triangles + triangle_index + triangle_task.x), task.origin, task.ray);
 
                 if (d < depth) {
                     depth = d;
@@ -408,12 +402,43 @@ void trace_samples() {
                         node_task = make_uint2(0, 0);
                     }
                 } else {
-                    float2 write_back;
-                    write_back.x = depth;
-                    write_back.y = uint_as_float(hit_id);
+                    float4* ptr;
+                    float4 data0;
+                    float4 data1;
 
-                    __stcs((float2*)(ptr + 4) + 1, write_back);
-                    //__prefetch_global_l1(device_active_samples + id);
+                    if (hit_id == SKY_HIT) {
+                        ptr = (float4*) (device_sky_tasks + get_task_address(sky_task_count++));
+                        data0.x = task.ray.x;
+                        data0.y = task.ray.y;
+                        data0.z = task.ray.z;
+                        data0.w = *((float*)(&task.index));
+                    } else {
+                        task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+                        data0.x = task.origin.x;
+                        data0.y = task.origin.y;
+                        data0.z = task.origin.z;
+
+                        if (hit_id == OCEAN_HIT) {
+                            ptr = (float4*) (device_ocean_tasks + get_task_address(ocean_task_count++));
+                            task.ray = scale_vector(task.ray, depth);
+                            data0.w = task.ray.x;
+                            data1.x = task.ray.y;
+                            data1.y = task.ray.z;
+                        } else {
+                            ptr = (float4*) (device_geometry_tasks + get_task_address(geometry_task_count++));
+                            data0.w = asinf(task.ray.y);
+                            data1.x = atan2f(task.ray.z, task.ray.x);
+                            data1.y = uint_as_float(hit_id);
+                        }
+
+                        data1.z = *((float*)&task.index);
+                        data1.w = *((float*)&task.state);
+
+                        *(ptr + 1) = data1;
+                    }
+
+                    *(ptr) = data0;
+
                     break;
                 }
             }
@@ -424,6 +449,16 @@ void trace_samples() {
             if (lost_loop_iterations >= Nw) break;
         }
     }
+
+    ushort4 task_counts;
+    task_counts.x = 0;
+    task_counts.y = geometry_task_count;
+    task_counts.z = ocean_task_count;
+    task_counts.w = sky_task_count;
+
+    //printf("GEO_TASKS: %d\n", geometry_task_count);
+
+    *((ushort4*)(device_task_counts + 4 * id)) = task_counts;
 }
 
 #endif /* CU_BVH_H */

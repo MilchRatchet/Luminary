@@ -273,6 +273,17 @@ RGBF add_color(const RGBF a, const RGBF b) {
 }
 
 __device__
+RGBF mul_color(const RGBF a, const RGBF b) {
+    RGBF result;
+
+    result.r = a.r * b.r;
+    result.g = a.g * b.g;
+    result.b = a.b * b.b;
+
+    return result;
+}
+
+__device__
 float linearRGB_to_SRGB(const float value) {
     if (value <= 0.0031308f) {
         return 12.92f * value;

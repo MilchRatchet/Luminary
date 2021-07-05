@@ -135,7 +135,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       copy_framebuffer_to_8bit(buffer, denoised_image, instance);
     }
     else {
-      copy_framebuffer_to_8bit(buffer, instance->frame_buffer_gpu, instance);
+      copy_framebuffer_to_8bit(buffer, instance->frame_output_gpu, instance);
     }
 
     if (make_png) {

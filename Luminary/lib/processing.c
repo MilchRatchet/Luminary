@@ -24,7 +24,7 @@ void frame_buffer_to_8bit_image(Camera camera, raytrace_instance* instance, RGB8
   for (int j = 0; j < instance->height; j++) {
     for (int i = 0; i < instance->width; i++) {
       RGB8 pixel;
-      RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
+      RGBF pixel_float = instance->frame_output[i + instance->width * j];
 
       RGBF color;
       color.r = min(255.9f, linearRGB_to_SRGB(pixel_float.r) * 255.9f + error_table[i + 1].r);
@@ -73,7 +73,7 @@ void frame_buffer_to_16bit_image(Camera camera, raytrace_instance* instance, RGB
   for (int j = 0; j < instance->height; j++) {
     for (int i = 0; i < instance->width; i++) {
       RGB16 pixel;
-      RGBF pixel_float = instance->frame_buffer[i + instance->width * j];
+      RGBF pixel_float = instance->frame_output[i + instance->width * j];
 
       RGBF color;
       color.r = min(65535.9f, linearRGB_to_SRGB(pixel_float.r) * 65535.9f + error_table[i + 1].r);
@@ -142,7 +142,7 @@ void frame_buffer_to_16bit_image(Camera camera, raytrace_instance* instance, RGB
 void post_bloom(raytrace_instance* instance, const float sigma, const float strength) {
   unsigned int pixel_count = instance->width * instance->height;
 
-  RGBF* image = instance->frame_buffer;
+  RGBF* image = instance->frame_output;
 
   RGBF* illuminance = (RGBF*) _mm_malloc(sizeof(RGBF) * pixel_count, 32);
 
@@ -295,7 +295,7 @@ static RGBF tonemap(RGBF pixel) {
 void post_tonemapping(raytrace_instance* instance) {
   const unsigned int pixel_count = instance->width * instance->height;
 
-  RGBF* pixels = instance->frame_buffer;
+  RGBF* pixels = instance->frame_output;
 
   for (unsigned int i = 0; i < pixel_count; i++) {
     pixels[i] = tonemap(pixels[i]);
@@ -311,7 +311,7 @@ static float color_distance(const RGBF a, const RGBF b) {
 
 void post_median_filter(raytrace_instance* instance, const float bias) {
   const unsigned int pixel_count = instance->width * instance->height;
-  RGBF* pixels                   = instance->frame_buffer;
+  RGBF* pixels                   = instance->frame_output;
   RGBF* new_pixels               = (RGBF*) _mm_malloc(sizeof(RGBF) * pixel_count, 32);
 
   RGBF* window = (RGBF*) malloc(sizeof(RGBF) * 9);
@@ -357,7 +357,7 @@ void post_median_filter(raytrace_instance* instance, const float bias) {
   free(window);
   free(distances);
 
-  instance->frame_buffer = new_pixels;
+  instance->frame_output = new_pixels;
 
   _mm_free(pixels);
 }

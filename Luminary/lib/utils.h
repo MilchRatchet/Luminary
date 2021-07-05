@@ -78,8 +78,16 @@ struct Scene {
 struct raytrace_instance {
   unsigned int width;
   unsigned int height;
-  RGBF* frame_buffer;
+  void* geometry_tasks_gpu;
+  void* sky_tasks_gpu;
+  void* ocean_tasks_gpu;
+  void* trace_tasks_gpu;
+  void* task_counts_gpu;
+  RGBF* frame_output;
+  RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
+  RGBF* albedo_buffer_gpu;
+  RGBF* records_gpu;
   RGB8* buffer_8bit_gpu;
   void* albedo_atlas;
   int albedo_atlas_length;
@@ -87,15 +95,10 @@ struct raytrace_instance {
   int illuminance_atlas_length;
   void* material_atlas;
   int material_atlas_length;
-  int reflection_depth;
-  int diffuse_samples;
+  int max_ray_depth;
   Scene scene_gpu;
   int denoiser;
-  void* samples_gpu;
-  void* samples_finished_gpu;
-  int samples_per_sample;
   void* randoms_gpu;
-  RGBF* albedo_buffer_gpu;
   RGBF default_material;
   int shading_mode;
   RGBF* bloom_scratch_gpu;

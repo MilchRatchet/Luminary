@@ -78,22 +78,22 @@ static void update_camera_pos(const Scene scene, const unsigned int width, const
 
 
 extern "C" raytrace_instance* init_raytracing(
-    const unsigned int width, const unsigned int height, const int reflection_depth,
-    const int diffuse_samples, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
+    const unsigned int width, const unsigned int height, const int max_ray_depth, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
     int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene, int denoiser) {
 
     raytrace_instance* instance = (raytrace_instance*)malloc(sizeof(raytrace_instance));
 
     instance->width = width;
     instance->height = height;
-    instance->frame_buffer = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
+    instance->frame_output = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
 
     const unsigned int amount = width * height;
 
     gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height));
+    gpuErrchk(cudaMalloc((void**) &(instance->frame_output_gpu), sizeof(RGBF) * width * height));
+    gpuErrchk(cudaMalloc((void**) &(instance->records_gpu), sizeof(RGBF) * width * height));
 
-    instance->reflection_depth = reflection_depth;
-    instance->diffuse_samples = diffuse_samples;
+    instance->max_ray_depth = max_ray_depth;
 
     instance->albedo_atlas = albedo_atlas;
     instance->illuminance_atlas = illuminance_atlas;
@@ -123,11 +123,12 @@ extern "C" raytrace_instance* init_raytracing(
     gpuErrchk(cudaMemcpy(instance->scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice));
 
     gpuErrchk(cudaMemcpyToSymbol(device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment*), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_frame, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_frame_buffer, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_frame_output, &(instance->frame_output_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_records, &(instance->records_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_reflection_depth, &(instance->reflection_depth), sizeof(int), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_diffuse_samples, &(instance->diffuse_samples), sizeof(int), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_max_ray_depth, &(instance->max_ray_depth), sizeof(int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_albedo_atlas, &(instance->albedo_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_illuminance_atlas, &(instance->illuminance_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(instance->material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
@@ -144,28 +145,25 @@ extern "C" raytrace_instance* init_raytracing(
         gpuErrchk(cudaMemcpyToSymbol(device_bloom_scratch, &(instance->bloom_scratch_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     }
 
-    size_t samples_length;
-    gpuErrchk(cudaMemGetInfo(&samples_length, 0));
-    samples_length /= 2;
-    samples_length /= sizeof(Sample);
+    const int thread_count = THREADS_PER_BLOCK * BLOCKS_PER_GRID;
+    const int pixels_per_thread = (amount + thread_count - 1) / thread_count;
+    gpuErrchk(cudaMemcpyToSymbol(device_pixels_per_thread, &(pixels_per_thread), sizeof(int), 0, cudaMemcpyHostToDevice));
 
-    instance->samples_per_sample = (32 < (unsigned int)samples_length / (width * height)) ? 32 : (unsigned int)samples_length / (width * height);
-    assert(instance->samples_per_sample, "Not enough memory to allocate samples buffer", 1);
-    instance->samples_per_sample = (instance->samples_per_sample < 10) ? instance->samples_per_sample : 10;
-    instance->samples_per_sample = (instance->samples_per_sample < instance->diffuse_samples) ? instance->samples_per_sample : instance->diffuse_samples;
-    gpuErrchk(cudaMemcpyToSymbol(device_samples_per_sample, &(instance->samples_per_sample), sizeof(int), 0, cudaMemcpyHostToDevice));
-    samples_length = width * height * instance->samples_per_sample;
-    unsigned int temp = (instance->diffuse_samples + instance->samples_per_sample - 1)/instance->samples_per_sample;
-    gpuErrchk(cudaMemcpyToSymbol(device_iterations_per_sample, &(temp), sizeof(int), 0, cudaMemcpyHostToDevice));
+    const int max_task_count = pixels_per_thread * thread_count;
 
-    const unsigned int actual_samples_length = (unsigned int)samples_length;
+    gpuErrchk(cudaMalloc((void**) &(instance->geometry_tasks_gpu), sizeof(GeometryTask) * max_task_count));
+    gpuErrchk(cudaMemcpyToSymbol(device_geometry_tasks, &(instance->geometry_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void**) &(instance->sky_tasks_gpu), sizeof(SkyTask) * max_task_count));
+    gpuErrchk(cudaMemcpyToSymbol(device_sky_tasks, &(instance->sky_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void**) &(instance->ocean_tasks_gpu), sizeof(OceanTask) * max_task_count));
+    gpuErrchk(cudaMemcpyToSymbol(device_ocean_tasks, &(instance->ocean_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void**) &(instance->trace_tasks_gpu), sizeof(TraceTask) * max_task_count));
+    gpuErrchk(cudaMemcpyToSymbol(device_trace_tasks, &(instance->trace_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
-    gpuErrchk(cudaMalloc((void**) &(instance->samples_gpu), sizeof(Sample) * samples_length));
-    gpuErrchk(cudaMemcpyToSymbol(device_active_samples, &(instance->samples_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMalloc((void**) &(instance->samples_finished_gpu), sizeof(Sample_Result) * samples_length));
-    gpuErrchk(cudaMemcpyToSymbol(device_finished_samples, &(instance->samples_finished_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_samples_length, &(actual_samples_length), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMalloc((void**) &(instance->randoms_gpu), sizeof(curandStateXORWOW_t) * samples_length));
+    gpuErrchk(cudaMalloc((void**) &(instance->task_counts_gpu), 4 * sizeof(uint16_t) * thread_count));
+    gpuErrchk(cudaMemcpyToSymbol(device_task_counts, &(instance->task_counts_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+
+    gpuErrchk(cudaMalloc((void**) &(instance->randoms_gpu), sizeof(curandStateXORWOW_t) * thread_count));
     gpuErrchk(cudaMemcpyToSymbol(device_sample_randoms, &(instance->randoms_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
     initialize_randoms<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -239,14 +237,14 @@ extern "C" void free_textures(void* texture_atlas, const int textures_length) {
 }
 
 extern "C" void copy_framebuffer_to_cpu(raytrace_instance* instance) {
-    gpuErrchk(cudaMemcpy(instance->frame_buffer, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(instance->frame_output, instance->frame_output_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 
 extern "C" void trace_scene(raytrace_instance* instance, const int progress, const int temporal_frames, const unsigned int update_mask) {
-    const int total_iterations = instance->width * instance->height * instance->samples_per_sample;
+    const int amount = instance->width * instance->height;
 
-    gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMemcpyToSymbol(device_sample_offset, &(total_iterations), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_pixels_left, &(amount), sizeof(int), 0, cudaMemcpyHostToDevice));
 
     if (update_mask & 0b1)
         gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
@@ -261,43 +259,27 @@ extern "C" void trace_scene(raytrace_instance* instance, const int progress, con
 
     clock_t t = clock();
 
-    int32_t curr_progress = total_iterations;
-    const float ratio = 1.0f/(total_iterations);
+    int pixels_left = amount;
+    const float ratio = 1.0f/(amount);
 
-    generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    generate_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-    if (instance->shading_mode) {
-        while (curr_progress > 0) {
-            trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-            special_shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-            gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
+    while (pixels_left > 0) {
+        process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-            if (progress == 1) {
-                clock_t curr_time = clock();
-                const int samples_done = total_iterations - curr_progress;
-                const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
-                printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
-                    (float)samples_done * ratio * 100, time_elapsed,
-                    curr_progress * (time_elapsed/samples_done),
-                    0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->samples_per_sample) * samples_done / time_elapsed);
-            }
-        }
-    } else {
-        while (curr_progress > 0) {
-            trace_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-            shade_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        gpuErrchk(cudaMemcpyFromSymbol(&(pixels_left), device_pixels_left, sizeof(int), 0, cudaMemcpyDeviceToHost));
 
-            gpuErrchk(cudaMemcpyFromSymbol(&curr_progress, device_sample_offset, sizeof(unsigned int), 0, cudaMemcpyDeviceToHost));
-
-            if (progress == 1) {
-                clock_t curr_time = clock();
-                const int samples_done = total_iterations - curr_progress;
-                const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
-                printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
-                    (float)samples_done * ratio * 100, time_elapsed,
-                    curr_progress * (time_elapsed/samples_done),
-                    0.000001 * instance->reflection_depth * (float)(instance->diffuse_samples)/(instance->samples_per_sample) * samples_done / time_elapsed);
-            }
+        if (progress == 1) {
+            clock_t curr_time = clock();
+            const int pixels_done = amount - pixels_left;
+            const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
+            printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
+                (float)pixels_done * ratio * 100, time_elapsed,
+                pixels_left * (time_elapsed/pixels_done),
+                0.000001 * instance->max_ray_depth * pixels_done / time_elapsed);
         }
     }
 
@@ -321,14 +303,17 @@ extern "C" void free_inputs(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.nodes));
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
-    gpuErrchk(cudaFree(instance->samples_gpu));
-    gpuErrchk(cudaFree(instance->samples_finished_gpu));
+    gpuErrchk(cudaFree(instance->geometry_tasks_gpu));
+    gpuErrchk(cudaFree(instance->ocean_tasks_gpu));
+    gpuErrchk(cudaFree(instance->sky_tasks_gpu));
+    gpuErrchk(cudaFree(instance->trace_tasks_gpu));
+    gpuErrchk(cudaFree(instance->frame_buffer_gpu));
     gpuErrchk(cudaFree(instance->randoms_gpu));
 }
 
 extern "C" void free_outputs(raytrace_instance* instance) {
-    gpuErrchk(cudaFree(instance->frame_buffer_gpu));
-    _mm_free(instance->frame_buffer);
+    gpuErrchk(cudaFree(instance->frame_output_gpu));
+    _mm_free(instance->frame_output);
 
     if (instance->denoiser) {
         gpuErrchk(cudaFree(instance->albedo_buffer_gpu));

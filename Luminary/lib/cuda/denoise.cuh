@@ -48,7 +48,7 @@ extern "C" void* initialize_optix_denoise_for_realtime(raytrace_instance* instan
     denoise_setup->denoiserScratch,
     scratchSize));
 
-  denoise_setup->inputLayer[0].data = (CUdeviceptr)instance->frame_buffer_gpu;
+  denoise_setup->inputLayer[0].data = (CUdeviceptr)instance->frame_output_gpu;
   denoise_setup->inputLayer[0].width = instance->width;
   denoise_setup->inputLayer[0].height = instance->height;
   denoise_setup->inputLayer[0].rowStrideInBytes = instance->width * sizeof(RGBF);
