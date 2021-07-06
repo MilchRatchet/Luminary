@@ -266,7 +266,7 @@ void process_geometry_tasks() {
       albedo.a = 1.0f;
     }
 
-    RGBF emission;
+    RGBF emission = get_color(0.0f, 0.0f, 0.0f);
 
     if (maps.y) {
       #ifdef LIGHTS_AT_NIGHT_ONLY
@@ -279,8 +279,6 @@ void process_geometry_tasks() {
       #ifdef LIGHTS_AT_NIGHT_ONLY
       }
       #endif
-    } else {
-      emission = get_color(0.0f, 0.0f, 0.0f);
     }
 
     RGBF record = device_records[pixel];
@@ -545,11 +543,6 @@ void finalize_samples() {
     buffer.y -= firefly_rejection.y;
     buffer.z -= firefly_rejection.z;
     buffer.w -= firefly_rejection.w;
-
-    if (isnan(buffer.x) || isinf(buffer.x)) buffer.x = output.x;
-    if (isnan(buffer.y) || isinf(buffer.y)) buffer.y = output.y;
-    if (isnan(buffer.z) || isinf(buffer.z)) buffer.z = output.z;
-    if (isnan(buffer.w) || isinf(buffer.w)) buffer.w = output.w;
 
     output.x = (buffer.x + output.x * device_temporal_frames) / (device_temporal_frames + 1);
     output.y = (buffer.y + output.y * device_temporal_frames) / (device_temporal_frames + 1);
