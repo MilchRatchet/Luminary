@@ -90,15 +90,10 @@ unsigned int __bfind(unsigned int a)
         packed_stptr_invoct.x++;                                        \
     }
 
-__global__ //__launch_bounds__(THREADS_PER_BLOCK,10)
+__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
 void process_trace_tasks() {
-    unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-    uint16_t trace_task_count = device_task_counts[4 * id];
+    const uint16_t trace_task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
     uint16_t offset = 0;
-    uint16_t geometry_task_count = 0;
-    uint16_t sky_task_count = 0;
-    uint16_t ocean_task_count = 0;
 
 	uint2 traversal_stack[STACK_SIZE];
     __shared__ uint2 traversal_stack_sm[THREADS_PER_BLOCK][STACK_SIZE_SM];
@@ -107,6 +102,8 @@ void process_trace_tasks() {
     float depth;
 
     vec3 inv_ray;
+    vec3 origin;
+    vec3 ray;
 
     uint2 node_task = make_uint2(0, 0);
     uint2 triangle_task = make_uint2(0, 0);
@@ -114,19 +111,21 @@ void process_trace_tasks() {
     ushort2 packed_stptr_invoct;
     packed_stptr_invoct.x = 0;
 
-    TraceTask task;
-
     while (1) {
         if (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
             if (offset >= trace_task_count) break;
 
-            task = device_trace_tasks[get_task_address(offset++)];
+            TraceTask task = device_trace_tasks[get_task_address(offset)];
+            TraceResult result = device_trace_results[get_task_address(offset)];
 
             node_task = make_uint2(0, 0x80000000);
             triangle_task = make_uint2(0, 0);
 
-            depth = device_scene.far_clip_distance;
-            hit_id = SKY_HIT;
+            depth = result.depth;
+            hit_id = result.hit_id;
+
+            origin = task.origin;
+            ray = task.ray;
 
             inv_ray.x = 1.0f / (fabsf(task.ray.x) > eps ? task.ray.x : copysignf(eps, task.ray.x));
             inv_ray.y = 1.0f / (fabsf(task.ray.y) > eps ? task.ray.y : copysignf(eps, task.ray.y));
@@ -135,15 +134,6 @@ void process_trace_tasks() {
             packed_stptr_invoct.y = (((task.ray.x < 0.0f) ? 1 : 0) << 2) | (((task.ray.y < 0.0f) ? 1 : 0) << 1) | (((task.ray.z < 0.0f) ? 1 : 0) << 0);
             packed_stptr_invoct.y = 7 - packed_stptr_invoct.y;
             packed_stptr_invoct.x = 0;
-
-            if (device_scene.ocean.active) {
-                const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
-
-                if (ocean_dist < depth) {
-                    depth = ocean_dist;
-                    hit_id = OCEAN_HIT;
-                }
-            }
         }
 
         int lost_loop_iterations = 0;
@@ -196,9 +186,9 @@ void process_trace_tasks() {
                 scaled_inv_ray.z = uint_as_float((e.z + 127) << 23) * inv_ray.z;
 
                 vec3 shifted_origin;
-                shifted_origin.x = (p.x - task.origin.x) * inv_ray.x;
-                shifted_origin.y = (p.y - task.origin.y) * inv_ray.y;
-                shifted_origin.z = (p.z - task.origin.z) * inv_ray.z;
+                shifted_origin.x = (p.x - origin.x) * inv_ray.x;
+                shifted_origin.y = (p.y - origin.y) * inv_ray.y;
+                shifted_origin.z = (p.z - origin.z) * inv_ray.z;
 
                 {
                     const unsigned int meta4 = float_as_int(data1.z);
@@ -383,7 +373,7 @@ void process_trace_tasks() {
 
                 const int triangle_index = __bfind(triangle_task.y);
 
-                const float d = bvh_triangle_intersection((float4*)(device_scene.traversal_triangles + triangle_index + triangle_task.x), task.origin, task.ray);
+                const float d = bvh_triangle_intersection((float4*)(device_scene.traversal_triangles + triangle_index + triangle_task.x), origin, ray);
 
                 if (d < depth) {
                     depth = d;
@@ -402,39 +392,13 @@ void process_trace_tasks() {
                         node_task = make_uint2(0, 0);
                     }
                 } else {
-                    float4* ptr;
-                    float4 data0;
-                    float4 data1;
+                    float2 result;
+                    result.x = depth;
+                    result.y = uint_as_float(hit_id);
 
-                    if (hit_id == SKY_HIT) {
-                        ptr = (float4*) (device_sky_tasks + get_task_address(sky_task_count++));
-                        data0.x = task.ray.x;
-                        data0.y = task.ray.y;
-                        data0.z = task.ray.z;
-                        data0.w = *((float*)(&task.index));
-                    } else {
-                        task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
-                        data0.x = task.origin.x;
-                        data0.y = task.origin.y;
-                        data0.z = task.origin.z;
-                        data0.w = asinf(task.ray.y);
-                        data1.x = atan2f(task.ray.z, task.ray.x);
+                    __stcs((float2*)(device_trace_results + get_task_address(offset)), result);
 
-                        if (hit_id == OCEAN_HIT) {
-                            ptr = (float4*) (device_ocean_tasks + get_task_address(ocean_task_count++));
-                            data1.y = depth;
-                        } else {
-                            ptr = (float4*) (device_geometry_tasks + get_task_address(geometry_task_count++));
-                            data1.y = uint_as_float(hit_id);
-                        }
-
-                        data1.z = *((float*)&task.index);
-                        data1.w = *((float*)&task.state);
-
-                        *(ptr + 1) = data1;
-                    }
-
-                    *(ptr) = data0;
+                    offset++;
 
                     break;
                 }
@@ -446,16 +410,6 @@ void process_trace_tasks() {
             if (lost_loop_iterations >= Nw) break;
         }
     }
-
-    ushort4 task_counts;
-    task_counts.x = 0;
-    task_counts.y = geometry_task_count;
-    task_counts.z = ocean_task_count;
-    task_counts.w = sky_task_count;
-
-    //printf("GEO_TASKS: %d\n", geometry_task_count);
-
-    *((ushort4*)(device_task_counts + 4 * id)) = task_counts;
 }
 
 #endif /* CU_BVH_H */

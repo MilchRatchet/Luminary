@@ -84,6 +84,11 @@ struct TraceTask {
   uint32_t state;
 } typedef TraceTask;
 
+struct TraceResult {
+  float depth;
+  uint32_t hit_id;
+} typedef TraceResult;
+
 //===========================================================================================
 // Bit Masks
 //===========================================================================================
@@ -121,6 +126,9 @@ OceanTask* device_ocean_tasks;
 
 __constant__
 TraceTask* device_trace_tasks;
+
+__constant__
+TraceResult* device_trace_results;
 
 // 0: TraceCount 1: GeoCount 2: OceanCount 3: SkyCount
 __constant__

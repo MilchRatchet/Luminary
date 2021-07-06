@@ -88,6 +88,90 @@ void generate_trace_tasks() {
 }
 
 __global__
+void preprocess_trace_tasks() {
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset = get_task_address(i);
+    TraceTask task = device_trace_tasks[offset];
+
+    float depth = device_scene.far_clip_distance;
+    uint32_t hit_id = SKY_HIT;
+
+    if (device_scene.ocean.active) {
+      const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
+
+      if (ocean_dist < depth) {
+          depth = ocean_dist;
+          hit_id = OCEAN_HIT;
+      }
+    }
+
+    float2 result;
+    result.x = depth;
+    result.y = uint_as_float(hit_id);
+
+    __stcs((float2*)(device_trace_results + offset), result);
+  }
+}
+
+__global__
+void postprocess_trace_tasks() {
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
+  uint16_t geometry_task_count = 0;
+  uint16_t sky_task_count = 0;
+  uint16_t ocean_task_count = 0;
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset = get_task_address(i);
+    TraceTask task = device_trace_tasks[offset];
+    TraceResult result = device_trace_results[offset];
+
+    float4* ptr;
+    float4 data0;
+    float4 data1;
+
+    if (result.hit_id == SKY_HIT) {
+        ptr = (float4*) (device_sky_tasks + get_task_address(sky_task_count++));
+        data0.x = task.ray.x;
+        data0.y = task.ray.y;
+        data0.z = task.ray.z;
+        data0.w = *((float*)(&task.index));
+    } else {
+        task.origin = add_vector(task.origin, scale_vector(task.ray, result.depth));
+        data0.x = task.origin.x;
+        data0.y = task.origin.y;
+        data0.z = task.origin.z;
+        data0.w = asinf(task.ray.y);
+        data1.x = atan2f(task.ray.z, task.ray.x);
+
+        if (result.hit_id == OCEAN_HIT) {
+            ptr = (float4*) (device_ocean_tasks + get_task_address(ocean_task_count++));
+            data1.y = result.depth;
+        } else {
+            ptr = (float4*) (device_geometry_tasks + get_task_address(geometry_task_count++));
+            data1.y = uint_as_float(result.hit_id);
+        }
+
+        data1.z = *((float*)&task.index);
+        data1.w = *((float*)&task.state);
+
+        __stcs(ptr + 1, data1);
+    }
+
+    __stcs(ptr, data0);
+  }
+
+  ushort4 task_counts;
+  task_counts.x = 0;
+  task_counts.y = geometry_task_count;
+  task_counts.z = ocean_task_count;
+  task_counts.w = sky_task_count;
+
+  __stcs((ushort4*) (device_task_counts + (threadIdx.x + blockIdx.x * blockDim.x) * 4), task_counts);
+}
+
+__global__
 void process_geometry_tasks() {
   int trace_count = 0;
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];

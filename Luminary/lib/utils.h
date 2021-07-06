@@ -82,6 +82,7 @@ struct raytrace_instance {
   void* sky_tasks_gpu;
   void* ocean_tasks_gpu;
   void* trace_tasks_gpu;
+  void* trace_results_gpu;
   void* task_counts_gpu;
   RGBF* frame_output;
   RGBF* frame_output_gpu;
