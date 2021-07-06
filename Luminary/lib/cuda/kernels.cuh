@@ -312,11 +312,14 @@ void process_ocean_tasks() {
     OceanTask task = device_ocean_tasks[get_task_address(i)];
     const int pixel = task.index.y * device_width + task.index.x;
 
-    const float distance = get_length(task.ray);
-    task.ray = normalize_vector(task.ray);
+    vec3 ray;
+    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+    ray.y = sinf(task.ray_y);
+    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
     task.state = (task.state & ~DEPTH_LEFT) | ((task.state & DEPTH_LEFT) - 1);
 
-    const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, distance * 0.1f / device_width));
+    const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
 
     RGBAF albedo = device_scene.ocean.albedo;
     RGBF record = device_records[pixel];
@@ -338,7 +341,7 @@ void process_ocean_tasks() {
       atomicSub(&device_pixels_left, 1);
     } else if (task.state & DEPTH_LEFT) {
       if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
-        task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps));
+        task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
         record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
         record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
@@ -346,7 +349,7 @@ void process_ocean_tasks() {
       } else {
         const float specular_probability = 0.5f;
 
-        const vec3 V = scale_vector(task.ray, -1.0f);
+        const vec3 V = scale_vector(ray, -1.0f);
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
@@ -369,11 +372,11 @@ void process_ocean_tasks() {
         const float beta = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
         if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < specular_probability) {
-          task.ray = specular_BRDF(record, normal, V, light, light_sample, light_sample_probability, light_count, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
+          ray = specular_BRDF(record, normal, V, light, light_sample, light_sample_probability, light_count, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
         }
         else
         {
-          task.ray = diffuse_BRDF(record, normal, V, light, light_sample, light_sample_probability, light_count, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
+          ray = diffuse_BRDF(record, normal, V, light, light_sample, light_sample_probability, light_count, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
         }
       }
 
@@ -399,7 +402,7 @@ void process_ocean_tasks() {
       if (remains_active) {
         TraceTask next_task;
         next_task.origin = task.position;
-        next_task.ray = task.ray;
+        next_task.ray = ray;
         next_task.index = task.index;
         next_task.state = task.state;
 

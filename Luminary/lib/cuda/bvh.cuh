@@ -136,14 +136,14 @@ void process_trace_tasks() {
             packed_stptr_invoct.y = 7 - packed_stptr_invoct.y;
             packed_stptr_invoct.x = 0;
 
-            /*if (device_scene.ocean.active) {
+            if (device_scene.ocean.active) {
                 const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
 
                 if (ocean_dist < depth) {
                     depth = ocean_dist;
                     hit_id = OCEAN_HIT;
                 }
-            }*/
+            }
         }
 
         int lost_loop_iterations = 0;
@@ -417,17 +417,14 @@ void process_trace_tasks() {
                         data0.x = task.origin.x;
                         data0.y = task.origin.y;
                         data0.z = task.origin.z;
+                        data0.w = asinf(task.ray.y);
+                        data1.x = atan2f(task.ray.z, task.ray.x);
 
                         if (hit_id == OCEAN_HIT) {
                             ptr = (float4*) (device_ocean_tasks + get_task_address(ocean_task_count++));
-                            task.ray = scale_vector(task.ray, depth);
-                            data0.w = task.ray.x;
-                            data1.x = task.ray.y;
-                            data1.y = task.ray.z;
+                            data1.y = depth;
                         } else {
                             ptr = (float4*) (device_geometry_tasks + get_task_address(geometry_task_count++));
-                            data0.w = asinf(task.ray.y);
-                            data1.x = atan2f(task.ray.z, task.ray.x);
                             data1.y = uint_as_float(hit_id);
                         }
 

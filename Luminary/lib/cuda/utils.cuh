@@ -70,7 +70,9 @@ struct SkyTask {
 // Magnitude of ray gives distance
 struct OceanTask {
   vec3 position;
-  vec3 ray;
+  float ray_y;
+  float ray_xz;
+  float distance;
   ushort2 index;
   uint32_t state;
 } typedef OceanTask;
