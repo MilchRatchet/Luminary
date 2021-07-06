@@ -17,11 +17,11 @@ __device__
 float bvh_triangle_intersection(const float4* triangles, const vec3 origin, const vec3 ray) {
     const float4 v1 = __ldg(triangles);
     const float4 v2 = __ldg(triangles + 1);
-    const float4 v3 = __ldg(triangles + 2);
+    const float v3 = __ldg((float*)(triangles + 2));
 
     vec3 vertex = get_vector(v1.x, v1.y, v1.z);
-    vec3 edge1 = get_vector(v2.x, v2.y, v2.z);
-    vec3 edge2 = get_vector(v3.x, v3.y, v3.z);
+    vec3 edge1 = get_vector(v1.w, v2.x, v2.y);
+    vec3 edge2 = get_vector(v2.z, v2.w, v3);
 
     const vec3 h = cross_product(ray, edge2);
     const float a = dot_product(edge1, h);
@@ -115,14 +115,14 @@ void process_trace_tasks() {
         if (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
             if (offset >= trace_task_count) break;
 
-            TraceTask task = device_trace_tasks[get_task_address(offset)];
-            TraceResult result = device_trace_results[get_task_address(offset)];
+            const TraceTask task = load_trace_task_essentials(device_trace_tasks + get_task_address(offset));
+            const float2 result = __ldcs((float2*)(device_trace_results + get_task_address(offset)));
 
             node_task = make_uint2(0, 0x80000000);
             triangle_task = make_uint2(0, 0);
 
-            depth = result.depth;
-            hit_id = result.hit_id;
+            depth = result.x;
+            hit_id = float_as_uint(result.y);
 
             origin = task.origin;
             ray = task.ray;
@@ -132,7 +132,7 @@ void process_trace_tasks() {
             inv_ray.z = 1.0f / (fabsf(task.ray.z) > eps ? task.ray.z : copysignf(eps, task.ray.z));
 
             packed_stptr_invoct.y = (((task.ray.x < 0.0f) ? 1 : 0) << 2) | (((task.ray.y < 0.0f) ? 1 : 0) << 1) | (((task.ray.z < 0.0f) ? 1 : 0) << 0);
-            packed_stptr_invoct.y = 7 - packed_stptr_invoct.y;
+            packed_stptr_invoct.y = 0b111 - packed_stptr_invoct.y;
             packed_stptr_invoct.x = 0;
         }
 

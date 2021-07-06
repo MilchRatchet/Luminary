@@ -87,13 +87,13 @@ void generate_trace_tasks() {
   device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = offset;
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK,12)
 void preprocess_trace_tasks() {
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
 
   for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
-    TraceTask task = device_trace_tasks[offset];
+    TraceTask task = load_trace_task_essentials(device_trace_tasks + offset);
 
     float depth = device_scene.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
@@ -124,33 +124,36 @@ void postprocess_trace_tasks() {
 
   for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
-    TraceTask task = device_trace_tasks[offset];
-    TraceResult result = device_trace_results[offset];
+    TraceTask task = load_trace_task(device_trace_tasks + offset);
+    const float2 result = __ldcs((float2*)(device_trace_results + offset));
+
+    const float depth = result.x;
+    const uint32_t hit_id = float_as_uint(result.y);
 
     float4* ptr;
     float4 data0;
     float4 data1;
 
-    if (result.hit_id == SKY_HIT) {
+    if (hit_id == SKY_HIT) {
         ptr = (float4*) (device_sky_tasks + get_task_address(sky_task_count++));
         data0.x = task.ray.x;
         data0.y = task.ray.y;
         data0.z = task.ray.z;
         data0.w = *((float*)(&task.index));
     } else {
-        task.origin = add_vector(task.origin, scale_vector(task.ray, result.depth));
+        task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
         data0.x = task.origin.x;
         data0.y = task.origin.y;
         data0.z = task.origin.z;
         data0.w = asinf(task.ray.y);
         data1.x = atan2f(task.ray.z, task.ray.x);
 
-        if (result.hit_id == OCEAN_HIT) {
+        if (hit_id == OCEAN_HIT) {
             ptr = (float4*) (device_ocean_tasks + get_task_address(ocean_task_count++));
-            data1.y = result.depth;
+            data1.y = depth;
         } else {
             ptr = (float4*) (device_geometry_tasks + get_task_address(geometry_task_count++));
-            data1.y = uint_as_float(result.hit_id);
+            data1.y = uint_as_float(hit_id);
         }
 
         data1.z = *((float*)&task.index);
@@ -171,13 +174,13 @@ void postprocess_trace_tasks() {
   __stcs((ushort4*) (device_task_counts + (threadIdx.x + blockIdx.x * blockDim.x) * 4), task_counts);
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK,9)
 void process_geometry_tasks() {
   int trace_count = 0;
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = device_geometry_tasks[get_task_address(i)];
+    GeometryTask task = load_geometry_task(device_geometry_tasks + get_task_address(i));
     const int pixel = task.index.y * device_width + task.index.x;
 
     vec3 ray;
@@ -385,7 +388,7 @@ void process_geometry_tasks() {
   device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = trace_count;
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
 void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -393,7 +396,7 @@ void process_ocean_tasks() {
   const int task_count = device_task_counts[id * 4 + 2];
 
   for (int i = 0; i < task_count; i++) {
-    OceanTask task = device_ocean_tasks[get_task_address(i)];
+    OceanTask task = load_ocean_task(device_ocean_tasks + get_task_address(i));
     const int pixel = task.index.y * device_width + task.index.x;
 
     vec3 ray;
@@ -437,30 +440,17 @@ void process_ocean_tasks() {
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
-        const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
-
-        Light light;
-        #ifdef LIGHTS_AT_NIGHT_ONLY
-          const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
-        #else
-          const int light_count = device_scene.lights_length;
-        #endif
-
-        const float light_sample_probability = 0.0f;//1.0f - 1.0f/(light_count + 1);
-
-        if (light_sample < light_sample_probability) {
-          light = sample_light(task.position, light_count, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
-        }
-
         const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
         const float beta = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
+        Light light;
+
         if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < specular_probability) {
-          ray = specular_BRDF(record, normal, V, light, light_sample, light_sample_probability, light_count, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
+          ray = specular_BRDF(record, normal, V, light, -1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
         }
         else
         {
-          ray = diffuse_BRDF(record, normal, V, light, light_sample, light_sample_probability, light_count, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
+          ray = diffuse_BRDF(record, normal, V, light, -1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
         }
       }
 
@@ -504,12 +494,12 @@ void process_ocean_tasks() {
   device_task_counts[id * 4] = trace_count;
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
 void process_sky_tasks() {
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
 
   for (int i = 0; i < task_count; i++) {
-    const SkyTask task = device_sky_tasks[get_task_address(i)];
+    const SkyTask task = load_sky_task(device_sky_tasks + get_task_address(i));
     const int pixel = task.index.y * device_width + task.index.x;
 
     const RGBF record = device_records[pixel];
@@ -532,6 +522,15 @@ void finalize_samples() {
   for (; offset < 3 * device_amount - 4; offset += 4 * blockDim.x * gridDim.x) {
     float4 buffer = __ldcs((float4*)(frame_buffer + offset));
     float4 output = __ldcs((float4*)(frame_output + offset));
+
+    if (device_temporal_frames > 10) {
+      const float tolerance = 10.0f;
+      buffer.x = fminf(output.x + tolerance, buffer.x);
+      buffer.y = fminf(output.y + tolerance, buffer.y);
+      buffer.z = fminf(output.z + tolerance, buffer.z);
+      buffer.w = fminf(output.w + tolerance, buffer.w);
+    }
+
     output.x = (buffer.x + output.x * device_temporal_frames) / (device_temporal_frames + 1);
     output.y = (buffer.y + output.y * device_temporal_frames) / (device_temporal_frames + 1);
     output.z = (buffer.z + output.z * device_temporal_frames) / (device_temporal_frames + 1);
