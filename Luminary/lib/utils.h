@@ -87,6 +87,7 @@ struct raytrace_instance {
   RGBF* frame_output;
   RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
+  RGBF* frame_variance_gpu;
   RGBF* albedo_buffer_gpu;
   RGBF* records_gpu;
   RGB8* buffer_8bit_gpu;

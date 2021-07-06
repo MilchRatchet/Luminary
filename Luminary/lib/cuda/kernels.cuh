@@ -518,31 +518,64 @@ void finalize_samples() {
 
   float* frame_buffer = (float*)device_frame_buffer;
   float* frame_output = (float*)device_frame_output;
+  float* frame_variance = (float*)device_frame_variance;
 
   for (; offset < 3 * device_amount - 4; offset += 4 * blockDim.x * gridDim.x) {
     float4 buffer = __ldcs((float4*)(frame_buffer + offset));
     float4 output = __ldcs((float4*)(frame_output + offset));
+    float4 variance = __ldcs((float4*)(frame_variance + offset));
 
-    if (device_temporal_frames > 10) {
-      const float tolerance = 10.0f;
-      buffer.x = fminf(output.x + tolerance, buffer.x);
-      buffer.y = fminf(output.y + tolerance, buffer.y);
-      buffer.z = fminf(output.z + tolerance, buffer.z);
-      buffer.w = fminf(output.w + tolerance, buffer.w);
-    }
+    float4 firefly_rejection;
+    firefly_rejection.x = sqrtf(fmaxf(eps, variance.x));
+    firefly_rejection.y = sqrtf(fmaxf(eps, variance.y));
+    firefly_rejection.z = sqrtf(fmaxf(eps, variance.z));
+    firefly_rejection.w = sqrtf(fmaxf(eps, variance.w));
+
+    firefly_rejection.x = 0.1f + output.x + firefly_rejection.x * 8.0f;
+    firefly_rejection.y = 0.1f + output.y + firefly_rejection.y * 8.0f;
+    firefly_rejection.z = 0.1f + output.z + firefly_rejection.z * 8.0f;
+    firefly_rejection.w = 0.1f + output.w + firefly_rejection.w * 8.0f;
+
+    firefly_rejection.x = fmaxf(0.0f, buffer.x - firefly_rejection.x);
+    firefly_rejection.y = fmaxf(0.0f, buffer.y - firefly_rejection.y);
+    firefly_rejection.z = fmaxf(0.0f, buffer.z - firefly_rejection.z);
+    firefly_rejection.w = fmaxf(0.0f, buffer.w - firefly_rejection.w);
+
+    buffer.x -= firefly_rejection.x;
+    buffer.y -= firefly_rejection.y;
+    buffer.z -= firefly_rejection.z;
+    buffer.w -= firefly_rejection.w;
+
+    if (isnan(buffer.x) || isinf(buffer.x)) buffer.x = output.x;
+    if (isnan(buffer.y) || isinf(buffer.y)) buffer.y = output.y;
+    if (isnan(buffer.z) || isinf(buffer.z)) buffer.z = output.z;
+    if (isnan(buffer.w) || isinf(buffer.w)) buffer.w = output.w;
 
     output.x = (buffer.x + output.x * device_temporal_frames) / (device_temporal_frames + 1);
     output.y = (buffer.y + output.y * device_temporal_frames) / (device_temporal_frames + 1);
     output.z = (buffer.z + output.z * device_temporal_frames) / (device_temporal_frames + 1);
     output.w = (buffer.w + output.w * device_temporal_frames) / (device_temporal_frames + 1);
     __stcs((float4*)(frame_output + offset), output);
+
+    variance.x = ((buffer.x - output.x) * (buffer.x - output.x) + variance.x * device_temporal_frames) / (device_temporal_frames + 1);
+    variance.y = ((buffer.y - output.y) * (buffer.y - output.y) + variance.y * device_temporal_frames) / (device_temporal_frames + 1);
+    variance.z = ((buffer.z - output.z) * (buffer.z - output.z) + variance.z * device_temporal_frames) / (device_temporal_frames + 1);
+    variance.w = ((buffer.w - output.w) * (buffer.w - output.w) + variance.w * device_temporal_frames) / (device_temporal_frames + 1);
+    __stcs((float4*)(frame_variance + offset), variance);
   }
 
   for (; offset < 3 * device_amount; offset++) {
     float buffer = __ldcs(frame_buffer + offset);
     float output = __ldcs(frame_output + offset);
+    float variance = __ldcs(frame_variance + offset);
+    float firefly_rejection = sqrtf(fmaxf(eps, variance));
+    firefly_rejection = 0.1f + output + firefly_rejection * 8.0f;
+    firefly_rejection = fmaxf(0.0f, buffer - firefly_rejection);
+    buffer -= firefly_rejection;
     output = (buffer + output * device_temporal_frames) / (device_temporal_frames + 1);
     __stcs(frame_output + offset, output);
+    variance = ((buffer - output) * (buffer - output) + variance * device_temporal_frames) / (device_temporal_frames + 1);
+    __stcs(frame_variance + offset, variance);
   }
 }
 

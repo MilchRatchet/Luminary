@@ -147,6 +147,9 @@ __constant__
 RGBF* device_frame_output;
 
 __constant__
+RGBF* device_frame_variance;
+
+__constant__
 RGBF* device_records;
 
 __constant__
