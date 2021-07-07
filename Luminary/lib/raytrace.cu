@@ -269,6 +269,8 @@ extern "C" void trace_scene(raytrace_instance* instance, const int progress, con
     generate_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
     while (pixels_left > 0) {
+        if (pixels_left < amount)
+            balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
         preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
         process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
         postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -277,20 +279,8 @@ extern "C" void trace_scene(raytrace_instance* instance, const int progress, con
         process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
         gpuErrchk(cudaMemcpyFromSymbol(&(pixels_left), device_pixels_left, sizeof(int), 0, cudaMemcpyDeviceToHost));
-
-        if (progress == 1) {
-            clock_t curr_time = clock();
-            const int pixels_done = amount - pixels_left;
-            const double time_elapsed = (((double)curr_time - t)/CLOCKS_PER_SEC);
-            printf("\r                                                                                                          \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
-                (float)pixels_done * ratio * 100, time_elapsed,
-                pixels_left * (time_elapsed/pixels_done),
-                0.000001 * instance->max_ray_depth * pixels_done / time_elapsed);
-        }
+        gpuErrchk(cudaDeviceSynchronize());
     }
-
-    if (progress == 1)
-        printf("\r                                                                                                              \r");
 
     finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }

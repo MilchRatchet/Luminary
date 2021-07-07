@@ -61,7 +61,7 @@ void initialize_randoms() {
   device_sample_randoms[id] = state;
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK,15)
 void generate_trace_tasks() {
   int offset = 0;
 
@@ -85,6 +85,60 @@ void generate_trace_tasks() {
   }
 
   device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = offset;
+}
+
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
+void balance_trace_tasks() {
+  const int warp = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
+
+  if (warp >= (THREADS_PER_BLOCK * BLOCKS_PER_GRID) >> 5) return;
+
+  __shared__ uint16_t counts[THREADS_PER_BLOCK][32];
+  uint16_t average = 0;
+
+  for (int i = 0; i < 32; i++) {
+    const uint16_t c = device_task_counts[4 * (32 * warp + i)];
+    counts[threadIdx.x][i] = c;
+    average += c;
+  }
+
+  average = average >> 5;
+
+  for (int i = 0; i < 32; i++) {
+    uint16_t count = counts[threadIdx.x][i];
+    int source_index = -1;
+    uint16_t source_count = 0;
+
+    if (count >= average) continue;
+
+    for (int j = 0; j < 32; j++) {
+      uint16_t c = counts[threadIdx.x][j];
+      if (c > average && c > count + 1 && c > source_count) {
+        source_count = c;
+        source_index = j;
+      }
+    }
+
+    if (source_index != -1) {
+      const int swaps = (source_count - count) >> 1;
+      for (int j = 0; j < swaps; j++) {
+        source_count--;
+        float4* source_ptr = (float4*)(device_trace_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + source_index, warp >> 2, source_count));
+        float4* sink_ptr = (float4*)(device_trace_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + i, warp >> 2, count));
+        count++;
+
+        __stwb(sink_ptr, __ldca(source_ptr));
+        __stwb(sink_ptr + 1, __ldca(source_ptr + 1));
+      }
+      counts[threadIdx.x][i] = count;
+      counts[threadIdx.x][source_index] = source_count;
+    }
+  }
+
+  for (int i = 0; i < 32; i++) {
+    device_task_counts[4 * (32 * warp + i)] = counts[threadIdx.x][i];
+  }
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK,12)

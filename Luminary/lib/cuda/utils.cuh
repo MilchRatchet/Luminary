@@ -214,11 +214,15 @@ RGBF* device_bloom_scratch;
 //===========================================================================================
 
 __device__
-int get_task_address(const int number) {
-  const int warp_id = (((threadIdx.x & 0x60) >> 5) + blockIdx.x * (THREADS_PER_BLOCK / 32));
-  const int thread_id = (threadIdx.x & 0x1f);
-  return 32 * device_pixels_per_thread * warp_id + 32 * number + thread_id;
+int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
+  const int warp_id = (((thread_id & 0x60) >> 5) + block_id * (THREADS_PER_BLOCK / 32));
+  const int thread_offset = (thread_id & 0x1f);
+  return 32 * device_pixels_per_thread * warp_id + 32 * number + thread_offset;
 }
 
+__device__
+int get_task_address(const int number) {
+  return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
+}
 
 #endif /* CU_UTILS_H */
