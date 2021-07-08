@@ -458,7 +458,7 @@ void process_ocean_tasks() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    task.state = (task.state & ~DEPTH_LEFT) | ((task.state & DEPTH_LEFT) - 1);
+    task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
     const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
 
@@ -488,8 +488,6 @@ void process_ocean_tasks() {
         record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
         record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
       } else {
-        const float specular_probability = 0.5f;
-
         const vec3 V = scale_vector(ray, -1.0f);
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
@@ -499,12 +497,12 @@ void process_ocean_tasks() {
 
         Light light;
 
-        if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < specular_probability) {
-          ray = specular_BRDF(record, normal, V, light, -1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
+        if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < 0.5f) {
+          ray = specular_BRDF(record, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
         }
         else
         {
-          ray = diffuse_BRDF(record, normal, V, light, -1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, specular_probability);
+          ray = diffuse_BRDF(record, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
         }
       }
 
