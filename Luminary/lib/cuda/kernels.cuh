@@ -335,9 +335,11 @@ void process_geometry_tasks() {
       #endif
     }
 
+    if (albedo.a < device_scene.camera.alpha_cutoff) albedo.a = 0.0f;
+
     RGBF record = device_records[pixel];
 
-    if (emission.r > 0.0f || emission.g > 0.0f || emission.b > 0.0f) {
+    if (albedo.a > 0.0f && (emission.r > 0.0f || emission.g > 0.0f || emission.b > 0.0f)) {
       if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
         device_albedo_buffer[pixel] = emission;
         task.state ^= ALBEDO_BUFFER_STATE;
@@ -413,7 +415,7 @@ void process_geometry_tasks() {
       #endif
 
       #ifdef LOW_QUALITY_LONG_BOUNCES
-      if (((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES) && sample_blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f/device_max_ray_depth) {
+      if (albedo.a > 0.0f && ((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES) && sample_blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f/device_max_ray_depth) {
         remains_active = 0;
       }
       #endif

@@ -253,6 +253,10 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
           instance->default_material.r += 0.001f * event.motion.xrel;
           update_mask |= 0b10000;
         }
+        else if (keystate[SDL_SCANCODE_C]) {
+          instance->scene_gpu.camera.alpha_cutoff += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
         else {
           instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
           instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
@@ -362,6 +366,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     clamp(instance->scene_gpu.camera.aperture_size, 0.0f, FLT_MAX);
     clamp(instance->scene_gpu.camera.focal_length, 0.0f, FLT_MAX);
     clamp(instance->scene_gpu.camera.exposure, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.camera.alpha_cutoff, 0.0f, 1.0f);
     clamp(instance->scene_gpu.ocean.choppyness, 0.0f, FLT_MAX);
     clamp(instance->scene_gpu.ocean.amplitude, 0.0f, FLT_MAX);
     clamp(instance->scene_gpu.ocean.frequency, 0.0f, FLT_MAX);

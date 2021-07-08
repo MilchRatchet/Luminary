@@ -31,6 +31,7 @@ struct Camera {
   float aperture_size;
   float exposure;
   int auto_exposure;
+  float alpha_cutoff;
 } typedef Camera;
 
 struct Light {

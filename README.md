@@ -97,6 +97,7 @@ You can control the camera through `WASD` and the mouse. The sun can be rotated 
 - `[F]` focal length
 - `[G]` aperture size
 - `[E]` exposure
+- `[C]` alpha cutoff
 - `[L]` ocean height
 - `[K]` ocean amplitude
 - `[J]` ocean frequency
