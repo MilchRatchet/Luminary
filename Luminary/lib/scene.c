@@ -55,7 +55,7 @@ static vec3 normalize_vector(vec3 vector) {
   return scale_vector(vector, inv_length);
 }
 
-Scene load_scene(const char* filename, raytrace_instance** instance, char** output_name) {
+Scene load_scene(const char* filename, RaytraceInstance** instance, char** output_name) {
   FILE* file = fopen(filename, "rb");
 
   assert((unsigned long long) file, "Scene file could not be opened", 1);
@@ -240,7 +240,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   return scene;
 }
 
-void free_scene(Scene scene, raytrace_instance* instance) {
+void free_scene(Scene scene, RaytraceInstance* instance) {
   free_textures(instance->albedo_atlas, instance->albedo_atlas_length);
   free_textures(instance->illuminance_atlas, instance->illuminance_atlas_length);
   free_textures(instance->material_atlas, instance->material_atlas_length);

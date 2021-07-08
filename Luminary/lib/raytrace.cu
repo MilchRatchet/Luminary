@@ -77,11 +77,11 @@ static void update_camera_pos(const Scene scene, const unsigned int width, const
 }
 
 
-extern "C" raytrace_instance* init_raytracing(
+extern "C" RaytraceInstance* init_raytracing(
     const unsigned int width, const unsigned int height, const int max_ray_depth, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
     int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene, int denoiser) {
 
-    raytrace_instance* instance = (raytrace_instance*)malloc(sizeof(raytrace_instance));
+    RaytraceInstance* instance = (RaytraceInstance*)malloc(sizeof(RaytraceInstance));
 
     instance->width = width;
     instance->height = height;
@@ -240,11 +240,11 @@ extern "C" void free_textures(void* texture_atlas, const int textures_length) {
     free(textures_cpu);
 }
 
-extern "C" void copy_framebuffer_to_cpu(raytrace_instance* instance) {
+extern "C" void copy_framebuffer_to_cpu(RaytraceInstance* instance) {
     gpuErrchk(cudaMemcpy(instance->frame_output, instance->frame_output_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 
-extern "C" void trace_scene(raytrace_instance* instance, const int progress, const int temporal_frames, const unsigned int update_mask) {
+extern "C" void trace_scene(RaytraceInstance* instance, const int progress, const int temporal_frames, const unsigned int update_mask) {
     const int amount = instance->width * instance->height;
 
     gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
@@ -285,7 +285,7 @@ extern "C" void trace_scene(raytrace_instance* instance, const int progress, con
     finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
-extern "C" void apply_bloom(raytrace_instance* instance, RGBF* image) {
+extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
     if (instance->denoiser) {
         //bloom_kernel_split<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image);
         bloom_kernel_blur_vertical<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image);
@@ -293,7 +293,7 @@ extern "C" void apply_bloom(raytrace_instance* instance, RGBF* image) {
     }
 }
 
-extern "C" void free_inputs(raytrace_instance* instance) {
+extern "C" void free_inputs(RaytraceInstance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.texture_assignments));
     gpuErrchk(cudaFree(instance->scene_gpu.triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
@@ -308,7 +308,7 @@ extern "C" void free_inputs(raytrace_instance* instance) {
     gpuErrchk(cudaFree(instance->randoms_gpu));
 }
 
-extern "C" void free_outputs(raytrace_instance* instance) {
+extern "C" void free_outputs(RaytraceInstance* instance) {
     gpuErrchk(cudaFree(instance->frame_output_gpu));
     _mm_free(instance->frame_output);
 
@@ -320,16 +320,16 @@ extern "C" void free_outputs(raytrace_instance* instance) {
     free(instance);
 }
 
-extern "C" void initiliaze_8bit_frame(raytrace_instance* instance) {
-    gpuErrchk(cudaMalloc((void**) &(instance->buffer_8bit_gpu), sizeof(RGB8) * instance->width * instance->height));
+extern "C" void initialize_8bit_frame(RaytraceInstance* instance, const int width, const int height) {
+    gpuErrchk(cudaMalloc((void**) &(instance->buffer_8bit_gpu), sizeof(RGB8) * width * height));
     gpuErrchk(cudaMemcpyToSymbol(device_frame_8bit, &(instance->buffer_8bit_gpu), sizeof(RGB8*), 0, cudaMemcpyHostToDevice));
 }
 
-extern "C" void free_8bit_frame(raytrace_instance* instance) {
+extern "C" void free_8bit_frame(RaytraceInstance* instance) {
     gpuErrchk(cudaFree(instance->buffer_8bit_gpu));
 }
 
-extern "C" void copy_framebuffer_to_8bit(RGB8* buffer, RGBF* source, raytrace_instance* instance) {
-    convert_RGBF_to_RGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(source);
-    gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(RGB8) * instance->width * instance->height, cudaMemcpyDeviceToHost));
+extern "C" void copy_framebuffer_to_8bit(RGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance) {
+    convert_RGBF_to_RGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(width, height, source);
+    gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(RGB8) * width * height, cudaMemcpyDeviceToHost));
 }

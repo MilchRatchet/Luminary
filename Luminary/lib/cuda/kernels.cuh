@@ -757,16 +757,62 @@ void bloom_kernel_blur_horizontal(RGBF* image) {
 }
 
 __global__
-void convert_RGBF_to_RGB8(const RGBF* source) {
+void convert_RGBF_to_RGB8(const int width, const int height, const RGBF* source) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const unsigned int amount = device_width * device_height;
+  const int amount = width * height;
+  const float scale_x = ((float)device_width / width);
+  const float scale_y = ((float)device_height / height);
 
   while (id < amount) {
-    int x = id % device_width;
-    int y = id / device_width;
+    const int x = id % width;
+    const int y = id / width;
 
-    RGBF pixel = source[x + y * device_width];
+    const float source_x = x * scale_x;
+    const float source_y = y * scale_y;
+
+    const int source_x_0 = max((int)0, (int)floorf(source_x));
+    const int source_x_1 = min((int)device_width - 1, (int)ceilf(source_x));
+    const int source_y_0 = max((int)0, (int)floorf(source_y));
+    const int source_y_1 = min((int)device_height - 1, (int)ceilf(source_y));
+
+    RGBF pixel;
+
+    if (source_x_0 == source_x_1 && source_y_0 == source_y_1) {
+      pixel = source[source_x_0 + source_y_0 * device_width];
+    } else {
+      RGBF pixel00;
+      RGBF pixel10;
+      RGBF pixel01;
+      RGBF pixel11;
+      RGBF pixel_x_0;
+      RGBF pixel_x_1;
+
+      if (source_x_0 == source_x_1) {
+        pixel_x_0 = source[source_x_0 + source_y_0 * device_width];
+        pixel_x_1 = source[source_x_0 + source_y_1 * device_width];
+      } else {
+        pixel00 = source[source_x_0 + source_y_0 * device_width];
+        pixel10 = source[source_x_1 + source_y_0 * device_width];
+        pixel_x_0.r = (source_x_1 - source_x) * pixel00.r + (source_x - source_x_0) * pixel10.r;
+        pixel_x_0.g = (source_x_1 - source_x) * pixel00.g + (source_x - source_x_0) * pixel10.g;
+        pixel_x_0.b = (source_x_1 - source_x) * pixel00.b + (source_x - source_x_0) * pixel10.b;
+
+        pixel01 = source[source_x_0 + source_y_1 * device_width];
+        pixel11 = source[source_x_1 + source_y_1 * device_width];
+        pixel_x_1.r = (source_x_1 - source_x) * pixel01.r + (source_x - source_x_0) * pixel11.r;
+        pixel_x_1.g = (source_x_1 - source_x) * pixel01.g + (source_x - source_x_0) * pixel11.g;
+        pixel_x_1.b = (source_x_1 - source_x) * pixel01.b + (source_x - source_x_0) * pixel11.b;
+      }
+
+      if (source_y_0 == source_y_1) {
+        pixel = pixel_x_0;
+      } else {
+        pixel.r = (source_y_1 - source_y) * pixel_x_0.r + (source_y - source_y_0) * pixel_x_1.r;
+        pixel.g = (source_y_1 - source_y) * pixel_x_0.g + (source_y - source_y_0) * pixel_x_1.g;
+        pixel.b = (source_y_1 - source_y) * pixel_x_0.b + (source_y - source_y_0) * pixel_x_1.b;
+      }
+    }
 
     pixel = tonemap(pixel);
 
@@ -779,7 +825,7 @@ void convert_RGBF_to_RGB8(const RGBF* source) {
     converted_pixel.g = (uint8_t)pixel.g;
     converted_pixel.b = (uint8_t)pixel.b;
 
-    device_frame_8bit[x + y * device_width] = converted_pixel;
+    device_frame_8bit[x + y * width] = converted_pixel;
 
     id += blockDim.x * gridDim.x;
   }

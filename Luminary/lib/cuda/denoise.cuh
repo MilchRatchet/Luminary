@@ -18,7 +18,7 @@ struct realtime_denoise {
   CUdeviceptr avg_color;
 } typedef realtime_denoise;
 
-extern "C" void* initialize_optix_denoise_for_realtime(raytrace_instance* instance) {
+extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance) {
   OPTIX_CHECK(optixInit());
 
   realtime_denoise* denoise_setup = (realtime_denoise*)malloc(sizeof(realtime_denoise));

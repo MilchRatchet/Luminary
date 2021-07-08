@@ -4,6 +4,7 @@
 #include "raytrace.h"
 #include "denoiser.h"
 #include "png.h"
+#include "output.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,7 +13,7 @@
 #include <time.h>
 
 void offline_output(
-  Scene scene, raytrace_instance* instance, char* output_name, int progress, clock_t time) {
+  Scene scene, RaytraceInstance* instance, char* output_name, int progress, clock_t time) {
   trace_scene(instance, progress, 0, 0xffffffff);
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
@@ -73,15 +74,39 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   return result;
 }
 
-static char* SHADING_MODE_STRING[4] = {"", "[ALBEDO] ", "[DEPTH] ", "[NORMAL] "};
+static RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
+  RealtimeInstance* realtime = (RealtimeInstance*) malloc(sizeof(RealtimeInstance));
 
-void realtime_output(Scene scene, raytrace_instance* instance, const int filters) {
   SDL_Init(SDL_INIT_VIDEO);
-  SDL_Window* window = SDL_CreateWindow(
-    "Luminary", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, instance->width, instance->height,
-    SDL_WINDOW_SHOWN);
 
-  SDL_Surface* window_surface = SDL_GetWindowSurface(window);
+  SDL_Rect rect;
+  SDL_Rect screen_size;
+
+  SDL_GetDisplayUsableBounds(0, &rect);
+  SDL_GetDisplayBounds(0, &screen_size);
+
+  rect.y += screen_size.h - rect.h;
+  rect.h -= screen_size.h - rect.h;
+
+  // It seems SDL window dimensions must be a multiple of 4
+  rect.h = rect.h & 0xfffffffc;
+
+  rect.w = rect.h * ((float) instance->width) / instance->height;
+
+  rect.w = rect.w & 0xfffffffc;
+
+  if (rect.w > screen_size.w) {
+    rect.w = screen_size.w;
+    rect.h = rect.w * ((float) instance->height) / instance->width;
+  }
+
+  realtime->width  = rect.w;
+  realtime->height = rect.h;
+
+  realtime->window =
+    SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN);
+
+  realtime->window_surface = SDL_GetWindowSurface(realtime->window);
 
   Uint32 rmask, gmask, bmask, amask;
 
@@ -97,10 +122,25 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   amask = 0xff000000;
 #endif
 
-  SDL_Surface* surface =
-    SDL_CreateRGBSurface(0, instance->width, instance->height, 24, rmask, gmask, bmask, amask);
+  realtime->surface = SDL_CreateRGBSurface(0, rect.w, rect.h, 24, rmask, gmask, bmask, amask);
 
-  RGB8* buffer = (RGB8*) surface->pixels;
+  realtime->buffer = (RGB8*) realtime->surface->pixels;
+  initialize_8bit_frame(instance, rect.w, rect.h);
+
+  return realtime;
+}
+
+static void free_realtime_instance(RealtimeInstance* realtime) {
+  free(realtime->buffer);
+  SDL_DestroyWindow(realtime->window);
+  SDL_Quit();
+  free(realtime);
+}
+
+static char* SHADING_MODE_STRING[4] = {"", "[ALBEDO] ", "[DEPTH] ", "[NORMAL] "};
+
+void realtime_output(Scene scene, RaytraceInstance* instance, const int filters) {
+  RealtimeInstance* realtime = init_realtime_instance(instance);
 
   int exit = 0;
 
@@ -117,7 +157,6 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
   char* title = (char*) malloc(4096);
 
-  initiliaze_8bit_frame(instance);
   void* optix_setup = initialize_optix_denoise_for_realtime(instance);
 
   SDL_SetRelativeMouseMode(SDL_TRUE);
@@ -132,10 +171,12 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
       if (use_bloom)
         apply_bloom(instance, denoised_image);
-      copy_framebuffer_to_8bit(buffer, denoised_image, instance);
+      copy_framebuffer_to_8bit(
+        realtime->buffer, realtime->width, realtime->height, denoised_image, instance);
     }
     else {
-      copy_framebuffer_to_8bit(buffer, instance->frame_output_gpu, instance);
+      copy_framebuffer_to_8bit(
+        realtime->buffer, realtime->width, realtime->height, instance->frame_output_gpu, instance);
     }
 
     if (make_png) {
@@ -143,12 +184,12 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       char* filename = malloc(4096);
       sprintf(filename, "%d.png", png_count++);
       store_as_png(
-        filename, (uint8_t*) buffer, sizeof(RGB8) * instance->width * instance->height,
-        instance->width, instance->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+        filename, (uint8_t*) realtime->buffer, sizeof(RGB8) * realtime->width * realtime->height,
+        realtime->width, realtime->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
       free(filename);
     }
 
-    SDL_BlitSurface(surface, 0, window_surface, 0);
+    SDL_BlitSurface(realtime->surface, 0, realtime->window_surface, 0);
 
     temporal_frames++;
     const double frame_time = 1000.0 * ((double) (clock() - time)) / CLOCKS_PER_SEC;
@@ -196,8 +237,8 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
 
     const double normalized_time = frame_time / 16.66667;
 
-    SDL_SetWindowTitle(window, title);
-    SDL_UpdateWindowSurface(window);
+    SDL_SetWindowTitle(realtime->window, title);
+    SDL_UpdateWindowSurface(realtime->window);
 
     SDL_PumpEvents();
     const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
@@ -399,7 +440,5 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   free(title);
   free_8bit_frame(instance);
   free_realtime_denoise(optix_setup);
-
-  SDL_DestroyWindow(window);
-  SDL_Quit();
+  free_realtime_instance(realtime);
 }

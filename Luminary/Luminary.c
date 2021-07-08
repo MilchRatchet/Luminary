@@ -23,7 +23,7 @@ int main(int argc, char* argv[]) {
 
   clock_t time = clock();
 
-  raytrace_instance* instance;
+  RaytraceInstance* instance;
 
   char* output_name = (char*) malloc(4096);
 

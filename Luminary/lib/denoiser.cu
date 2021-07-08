@@ -29,7 +29,7 @@
      }
   }
 
-extern "C" void denoise_with_optix(raytrace_instance* instance) {
+extern "C" void denoise_with_optix(RaytraceInstance* instance) {
 
   OPTIX_CHECK(optixInit());
 

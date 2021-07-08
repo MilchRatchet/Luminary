@@ -76,7 +76,7 @@ struct Scene {
   Sky sky;
 } typedef Scene;
 
-struct raytrace_instance {
+struct RaytraceInstance {
   unsigned int width;
   unsigned int height;
   void* geometry_tasks_gpu;
@@ -105,7 +105,7 @@ struct raytrace_instance {
   RGBF default_material;
   int shading_mode;
   RGBF* bloom_scratch_gpu;
-} typedef raytrace_instance;
+} typedef RaytraceInstance;
 
 #define clamp(value, low, high) \
   { (value) = min((high), max((value), (low))); }

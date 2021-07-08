@@ -7,7 +7,7 @@
 extern "C" {
 #endif
 
-void denoise_with_optix(raytrace_instance* instance);
+void denoise_with_optix(RaytraceInstance* instance);
 
 #if __cplusplus
 }
