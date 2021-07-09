@@ -151,6 +151,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   unsigned int update_mask = 0xffffffff;
   int update_ocean         = 0;
   int use_bloom            = 0;
+  int use_denoiser         = 1;
 
   int make_png  = 0;
   int png_count = 0;
@@ -167,7 +168,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     trace_scene(instance, 0, temporal_frames, update_mask);
     update_mask = 0;
 
-    if (instance->denoiser) {
+    if (instance->denoiser && use_denoiser) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
       if (use_bloom)
         apply_bloom(instance, denoised_image);
@@ -327,6 +328,12 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         else if (event.key.keysym.scancode == SDL_SCANCODE_B) {
           use_bloom ^= 0b1;
         }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
+          make_png = 1;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
+          use_denoiser ^= 1;
+        }
         else if (event.key.keysym.scancode == SDL_SCANCODE_R) {
           instance->scene_gpu.camera.auto_exposure ^= 0b1;
         }
@@ -396,9 +403,6 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
       movement_vector.x += 1.0f;
       update_mask |= 0b1;
       temporal_frames = 0;
-    }
-    if (keystate[SDL_SCANCODE_F12]) {
-      make_png = 1;
     }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;
