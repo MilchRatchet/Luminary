@@ -14,45 +14,52 @@
 
 void offline_output(
   Scene scene, RaytraceInstance* instance, char* output_name, int progress, clock_t time) {
-  trace_scene(instance, progress, 0, 0xffffffff);
+  clock_t start_of_rt = clock();
+  trace_scene(instance, 0, 0xffffffff);
+  for (int i = 1; i < instance->offline_samples; i++) {
+    trace_scene(instance, i, 0x0);
+    const double progress     = ((double) i) / instance->offline_samples;
+    const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
+    const double time_left    = (time_elapsed / progress) - time_elapsed;
+    printf(
+      "\r                                                                                          "
+      "                \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - "
+      "Performance: %.1f Mrays/s",
+      100.0 * progress, time_elapsed, time_left,
+      0.000001 * instance->max_ray_depth * instance->width * instance->height * i / time_elapsed);
+  }
+
+  printf(
+    "\r                                                                                            "
+    "                  \r");
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   free_inputs(instance);
-  copy_framebuffer_to_cpu(instance);
 
-  switch (instance->denoiser) {
-  case 0: {
-    post_median_filter(instance, 0.9f);
-    printf("[%.3fs] Applied Median Filter.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-    break;
-  }
-  case 1: {
+  if (instance->denoiser) {
     denoise_with_optix(instance);
     printf("[%.3fs] Applied Optix Denoiser.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-    break;
-  }
   }
 
-  post_bloom(instance, 3.0f, 4.0f);
+  apply_bloom(instance, instance->frame_output_gpu);
 
-  printf("[%.3fs] Applied Bloom.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-
-  post_tonemapping(instance);
-
-  printf("[%.3fs] Applied Tonemapping.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-
+  initialize_8bit_frame(instance, instance->width, instance->height);
   RGB8* frame = (RGB8*) malloc(sizeof(RGB8) * instance->width * instance->height);
-  frame_buffer_to_8bit_image(scene.camera, instance, frame);
-
-  printf(
-    "[%.3fs] Converted frame buffer to image.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+  copy_framebuffer_to_8bit(
+    frame, instance->width, instance->height, instance->frame_output_gpu, instance);
 
   store_as_png(
     output_name, (uint8_t*) frame, sizeof(RGB8) * instance->width * instance->height,
     instance->width, instance->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
 
   printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
+  free(frame);
+  free_outputs(instance);
+
+  printf("[Done] Luminary can now be closed.\n");
+  getchar();
 }
 
 static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
@@ -85,7 +92,7 @@ static RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
   SDL_GetDisplayUsableBounds(0, &rect);
   SDL_GetDisplayBounds(0, &screen_size);
 
-  rect.y += screen_size.h - rect.h;
+  rect.y *= 2;
   rect.h -= screen_size.h - rect.h;
 
   // It seems SDL window dimensions must be a multiple of 4
@@ -165,7 +172,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   while (!exit) {
     SDL_Event event;
 
-    trace_scene(instance, 0, temporal_frames, update_mask);
+    trace_scene(instance, temporal_frames, update_mask);
     update_mask = 0;
 
     if (instance->denoiser && use_denoiser) {

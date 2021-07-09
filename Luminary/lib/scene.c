@@ -227,7 +227,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   void* material_atlas = initialize_textures(content.material_maps, content.material_maps_length);
 
   *instance = init_raytracing(
-    width, height, bounces, albedo_atlas, content.albedo_maps_length, illuminance_atlas,
+    width, height, bounces, samples, albedo_atlas, content.albedo_maps_length, illuminance_atlas,
     content.illuminance_maps_length, material_atlas, content.material_maps_length, scene, denoiser);
 
   free(source);
