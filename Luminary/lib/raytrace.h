@@ -14,13 +14,13 @@ extern "C" {
 
 void initialize_device();
 RaytraceInstance* init_raytracing(
-  const unsigned int width, const unsigned int height, const int max_ray_depth, void* albedo_atlas,
-  int albedo_atlas_length, void* illuminance_atlas, int illuminance_atlas_length,
-  void* material_atlas, int material_atlas_length, Scene scene, int denoiser);
+  const unsigned int width, const unsigned int height, const int max_ray_depth, const int samples,
+  void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
+  int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene,
+  int denoiser);
 void copy_framebuffer_to_cpu(RaytraceInstance* instance);
 void trace_scene(
-  RaytraceInstance* instance, const int progress, const int temporal_frames,
-  const unsigned int update_mask);
+  RaytraceInstance* instance, const int temporal_frames, const unsigned int update_mask);
 void apply_bloom(RaytraceInstance* instance, RGBF* image);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);

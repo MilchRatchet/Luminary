@@ -78,7 +78,7 @@ static void update_camera_pos(const Scene scene, const unsigned int width, const
 
 
 extern "C" RaytraceInstance* init_raytracing(
-    const unsigned int width, const unsigned int height, const int max_ray_depth, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
+    const unsigned int width, const unsigned int height, const int max_ray_depth, const int samples, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
     int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene, int denoiser) {
 
     RaytraceInstance* instance = (RaytraceInstance*)malloc(sizeof(RaytraceInstance));
@@ -92,9 +92,11 @@ extern "C" RaytraceInstance* init_raytracing(
     gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height));
     gpuErrchk(cudaMalloc((void**) &(instance->frame_output_gpu), sizeof(RGBF) * width * height));
     gpuErrchk(cudaMalloc((void**) &(instance->frame_variance_gpu), sizeof(RGBF) * width * height));
+    gpuErrchk(cudaMalloc((void**) &(instance->frame_bias_cache_gpu), sizeof(RGBF) * width * height));
     gpuErrchk(cudaMalloc((void**) &(instance->records_gpu), sizeof(RGBF) * width * height));
 
     instance->max_ray_depth = max_ray_depth;
+    instance->offline_samples = samples;
 
     instance->albedo_atlas = albedo_atlas;
     instance->illuminance_atlas = illuminance_atlas;
@@ -127,6 +129,7 @@ extern "C" RaytraceInstance* init_raytracing(
     gpuErrchk(cudaMemcpyToSymbol(device_frame_buffer, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_frame_output, &(instance->frame_output_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_frame_variance, &(instance->frame_variance_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMemcpyToSymbol(device_frame_bias_cache, &(instance->frame_bias_cache_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_records, &(instance->records_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
@@ -244,7 +247,7 @@ extern "C" void copy_framebuffer_to_cpu(RaytraceInstance* instance) {
     gpuErrchk(cudaMemcpy(instance->frame_output, instance->frame_output_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
 }
 
-extern "C" void trace_scene(RaytraceInstance* instance, const int progress, const int temporal_frames, const unsigned int update_mask) {
+extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frames, const unsigned int update_mask) {
     const int amount = instance->width * instance->height;
 
     gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
@@ -305,6 +308,7 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
     gpuErrchk(cudaFree(instance->trace_tasks_gpu));
     gpuErrchk(cudaFree(instance->frame_buffer_gpu));
     gpuErrchk(cudaFree(instance->frame_variance_gpu));
+    gpuErrchk(cudaFree(instance->frame_bias_cache_gpu));
     gpuErrchk(cudaFree(instance->randoms_gpu));
 }
 

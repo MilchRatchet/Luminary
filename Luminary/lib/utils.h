@@ -89,6 +89,7 @@ struct RaytraceInstance {
   RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
   RGBF* frame_variance_gpu;
+  RGBF* frame_bias_cache_gpu;
   RGBF* albedo_buffer_gpu;
   RGBF* records_gpu;
   RGB8* buffer_8bit_gpu;
@@ -99,6 +100,7 @@ struct RaytraceInstance {
   void* material_atlas;
   int material_atlas_length;
   int max_ray_depth;
+  int offline_samples;
   Scene scene_gpu;
   int denoiser;
   void* randoms_gpu;

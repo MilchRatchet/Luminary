@@ -568,61 +568,97 @@ __global__
 void finalize_samples() {
   int offset = 4 * (threadIdx.x + blockIdx.x * blockDim.x);
 
-  float* frame_buffer = (float*)device_frame_buffer;
-  float* frame_output = (float*)device_frame_output;
-  float* frame_variance = (float*)device_frame_variance;
-
   for (; offset < 3 * device_amount - 4; offset += 4 * blockDim.x * gridDim.x) {
-    float4 buffer = __ldcs((float4*)(frame_buffer + offset));
-    float4 output = __ldcs((float4*)(frame_output + offset));
-    float4 variance = __ldcs((float4*)(frame_variance + offset));
+    float4 buffer = __ldcs((float4*)((float*)device_frame_buffer + offset));
+    float4 output = __ldcs((float4*)((float*)device_frame_output + offset));
+    float4 variance = __ldcs((float4*)((float*)device_frame_variance + offset));
+    float4 bias_cache = __ldcs((float4*)((float*)device_frame_bias_cache + offset));
+
+    if (device_temporal_frames == 0) {
+      bias_cache.x = 0.0f;
+      bias_cache.y = 0.0f;
+      bias_cache.z = 0.0f;
+      bias_cache.w = 0.0f;
+    }
+
+    float4 deviation;
+    deviation.x = sqrtf(fmaxf(eps, variance.x));
+    deviation.y = sqrtf(fmaxf(eps, variance.y));
+    deviation.z = sqrtf(fmaxf(eps, variance.z));
+    deviation.w = sqrtf(fmaxf(eps, variance.w));
+
+    variance.x = ((buffer.x - output.x) * (buffer.x - output.x) + variance.x * device_temporal_frames) / (device_temporal_frames + 1);
+    variance.y = ((buffer.y - output.y) * (buffer.y - output.y) + variance.y * device_temporal_frames) / (device_temporal_frames + 1);
+    variance.z = ((buffer.z - output.z) * (buffer.z - output.z) + variance.z * device_temporal_frames) / (device_temporal_frames + 1);
+    variance.w = ((buffer.w - output.w) * (buffer.w - output.w) + variance.w * device_temporal_frames) / (device_temporal_frames + 1);
+    __stcs((float4*)((float*)device_frame_variance + offset), variance);
 
     float4 firefly_rejection;
-    firefly_rejection.x = sqrtf(fmaxf(eps, variance.x));
-    firefly_rejection.y = sqrtf(fmaxf(eps, variance.y));
-    firefly_rejection.z = sqrtf(fmaxf(eps, variance.z));
-    firefly_rejection.w = sqrtf(fmaxf(eps, variance.w));
-
-    firefly_rejection.x = 0.1f + output.x + firefly_rejection.x * 8.0f;
-    firefly_rejection.y = 0.1f + output.y + firefly_rejection.y * 8.0f;
-    firefly_rejection.z = 0.1f + output.z + firefly_rejection.z * 8.0f;
-    firefly_rejection.w = 0.1f + output.w + firefly_rejection.w * 8.0f;
+    firefly_rejection.x = 0.1f + output.x + deviation.x * 4.0f;
+    firefly_rejection.y = 0.1f + output.y + deviation.y * 4.0f;
+    firefly_rejection.z = 0.1f + output.z + deviation.z * 4.0f;
+    firefly_rejection.w = 0.1f + output.w + deviation.w * 4.0f;
 
     firefly_rejection.x = fmaxf(0.0f, buffer.x - firefly_rejection.x);
     firefly_rejection.y = fmaxf(0.0f, buffer.y - firefly_rejection.y);
     firefly_rejection.z = fmaxf(0.0f, buffer.z - firefly_rejection.z);
     firefly_rejection.w = fmaxf(0.0f, buffer.w - firefly_rejection.w);
 
+    bias_cache.x += firefly_rejection.x;
+    bias_cache.y += firefly_rejection.y;
+    bias_cache.z += firefly_rejection.z;
+    bias_cache.w += firefly_rejection.w;
+
     buffer.x -= firefly_rejection.x;
     buffer.y -= firefly_rejection.y;
     buffer.z -= firefly_rejection.z;
     buffer.w -= firefly_rejection.w;
 
+    float4 debias;
+    debias.x = fmaxf(0.0f, fminf(bias_cache.x, output.x - deviation.x * 2.0f - buffer.x));
+    debias.y = fmaxf(0.0f, fminf(bias_cache.y, output.y - deviation.y * 2.0f - buffer.y));
+    debias.z = fmaxf(0.0f, fminf(bias_cache.z, output.z - deviation.z * 2.0f - buffer.z));
+    debias.w = fmaxf(0.0f, fminf(bias_cache.w, output.w - deviation.w * 2.0f - buffer.w));
+
+    buffer.x += debias.x;
+    buffer.y += debias.y;
+    buffer.z += debias.z;
+    buffer.w += debias.w;
+
+    bias_cache.x -= debias.x;
+    bias_cache.y -= debias.y;
+    bias_cache.z -= debias.z;
+    bias_cache.w -= debias.w;
+    __stcs((float4*)((float*)device_frame_bias_cache + offset), bias_cache);
+
     output.x = (buffer.x + output.x * device_temporal_frames) / (device_temporal_frames + 1);
     output.y = (buffer.y + output.y * device_temporal_frames) / (device_temporal_frames + 1);
     output.z = (buffer.z + output.z * device_temporal_frames) / (device_temporal_frames + 1);
     output.w = (buffer.w + output.w * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float4*)(frame_output + offset), output);
-
-    variance.x = ((buffer.x - output.x) * (buffer.x - output.x) + variance.x * device_temporal_frames) / (device_temporal_frames + 1);
-    variance.y = ((buffer.y - output.y) * (buffer.y - output.y) + variance.y * device_temporal_frames) / (device_temporal_frames + 1);
-    variance.z = ((buffer.z - output.z) * (buffer.z - output.z) + variance.z * device_temporal_frames) / (device_temporal_frames + 1);
-    variance.w = ((buffer.w - output.w) * (buffer.w - output.w) + variance.w * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float4*)(frame_variance + offset), variance);
+    __stcs((float4*)((float*)device_frame_output + offset), output);
   }
 
   for (; offset < 3 * device_amount; offset++) {
-    float buffer = __ldcs(frame_buffer + offset);
-    float output = __ldcs(frame_output + offset);
-    float variance = __ldcs(frame_variance + offset);
-    float firefly_rejection = sqrtf(fmaxf(eps, variance));
-    firefly_rejection = 0.1f + output + firefly_rejection * 8.0f;
-    firefly_rejection = fmaxf(0.0f, buffer - firefly_rejection);
-    buffer -= firefly_rejection;
-    output = (buffer + output * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs(frame_output + offset, output);
+    float buffer = __ldcs((float*)device_frame_buffer + offset);
+    float output = __ldcs((float*)device_frame_output + offset);
+    float variance = __ldcs((float*)device_frame_variance + offset);
+    float bias_cache = __ldcs(((float*)device_frame_bias_cache + offset));
+    if (device_temporal_frames == 0) {
+      bias_cache = 0.0f;
+    }
+    float deviation = sqrtf(fmaxf(eps, variance));
     variance = ((buffer - output) * (buffer - output) + variance * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs(frame_variance + offset, variance);
+    __stcs((float*)device_frame_variance + offset, variance);
+    float firefly_rejection = 0.1f + output + deviation * 8.0f;
+    firefly_rejection = fmaxf(0.0f, buffer - firefly_rejection);
+    bias_cache += firefly_rejection;
+    buffer -= firefly_rejection;
+    float debias = fmaxf(0.0f, fminf(bias_cache, output - deviation * 2.0f - buffer));
+    buffer += debias;
+    bias_cache -= debias;
+    __stcs(((float*)device_frame_bias_cache + offset), bias_cache);
+    output = (buffer + output * device_temporal_frames) / (device_temporal_frames + 1);
+    __stcs((float*)device_frame_output + offset, output);
   }
 }
 
