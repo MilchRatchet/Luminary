@@ -342,7 +342,6 @@ void process_geometry_tasks() {
     if (albedo.a > 0.0f && (emission.r > 0.0f || emission.g > 0.0f || emission.b > 0.0f)) {
       if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
         device_albedo_buffer[pixel] = emission;
-        task.state ^= ALBEDO_BUFFER_STATE;
       }
 
       if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
@@ -468,8 +467,9 @@ void process_ocean_tasks() {
     if (device_scene.ocean.emissive) {
       RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
 
-      if (device_denoiser && task.state & ALBEDO_BUFFER_STATE)
+      if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
         device_albedo_buffer[pixel] = emission;
+      }
 
       if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
         emission.r *= 2.0f * record.r;
@@ -481,6 +481,12 @@ void process_ocean_tasks() {
 
       atomicSub(&device_pixels_left, 1);
     } else if (task.state & DEPTH_LEFT) {
+
+      if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
+        device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
+        task.state ^= ALBEDO_BUFFER_STATE;
+      }
+
       if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
         task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
