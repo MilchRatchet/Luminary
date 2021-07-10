@@ -156,14 +156,12 @@ extern "C" RaytraceInstance* init_raytracing(
 
     const int max_task_count = pixels_per_thread * thread_count;
 
-    gpuErrchk(cudaMalloc((void**) &(instance->geometry_tasks_gpu), sizeof(GeometryTask) * max_task_count));
-    gpuErrchk(cudaMemcpyToSymbol(device_geometry_tasks, &(instance->geometry_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void**) &(instance->tracegeometry_tasks_gpu), sizeof(GeometryTask) * max_task_count));
+    gpuErrchk(cudaMemcpyToSymbol(device_tracegeometry_tasks, &(instance->tracegeometry_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMalloc((void**) &(instance->sky_tasks_gpu), sizeof(SkyTask) * max_task_count));
     gpuErrchk(cudaMemcpyToSymbol(device_sky_tasks, &(instance->sky_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMalloc((void**) &(instance->ocean_tasks_gpu), sizeof(OceanTask) * max_task_count));
     gpuErrchk(cudaMemcpyToSymbol(device_ocean_tasks, &(instance->ocean_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
-    gpuErrchk(cudaMalloc((void**) &(instance->trace_tasks_gpu), sizeof(TraceTask) * max_task_count));
-    gpuErrchk(cudaMemcpyToSymbol(device_trace_tasks, &(instance->trace_tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMalloc((void**) &(instance->trace_results_gpu), sizeof(TraceResult) * max_task_count));
     gpuErrchk(cudaMemcpyToSymbol(device_trace_results, &(instance->trace_results_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
@@ -302,10 +300,9 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
     gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
     gpuErrchk(cudaFree(instance->scene_gpu.nodes));
     gpuErrchk(cudaFree(instance->scene_gpu.lights));
-    gpuErrchk(cudaFree(instance->geometry_tasks_gpu));
+    gpuErrchk(cudaFree(instance->tracegeometry_tasks_gpu));
     gpuErrchk(cudaFree(instance->ocean_tasks_gpu));
     gpuErrchk(cudaFree(instance->sky_tasks_gpu));
-    gpuErrchk(cudaFree(instance->trace_tasks_gpu));
     gpuErrchk(cudaFree(instance->frame_buffer_gpu));
     gpuErrchk(cudaFree(instance->frame_variance_gpu));
     gpuErrchk(cudaFree(instance->frame_bias_cache_gpu));

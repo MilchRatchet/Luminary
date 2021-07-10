@@ -116,19 +116,16 @@ __device__
 int device_pixels_left;
 
 __constant__
-GeometryTask* device_geometry_tasks;
+GeometryTask* device_tracegeometry_tasks;
+
+__constant__
+TraceResult* device_trace_results;
 
 __constant__
 SkyTask* device_sky_tasks;
 
 __constant__
 OceanTask* device_ocean_tasks;
-
-__constant__
-TraceTask* device_trace_tasks;
-
-__constant__
-TraceResult* device_trace_results;
 
 // 0: TraceCount 1: GeoCount 2: OceanCount 3: SkyCount
 __constant__

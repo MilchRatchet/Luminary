@@ -79,10 +79,9 @@ struct Scene {
 struct RaytraceInstance {
   unsigned int width;
   unsigned int height;
-  void* geometry_tasks_gpu;
+  void* tracegeometry_tasks_gpu;
   void* sky_tasks_gpu;
   void* ocean_tasks_gpu;
-  void* trace_tasks_gpu;
   void* trace_results_gpu;
   void* task_counts_gpu;
   RGBF* frame_output;

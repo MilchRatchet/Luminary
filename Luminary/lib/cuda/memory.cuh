@@ -44,6 +44,23 @@ TraceTask load_trace_task(const void* ptr) {
 }
 
 __device__
+void store_trace_task(const void* ptr, const TraceTask task) {
+  float4 data0;
+  data0.x = task.origin.x;
+  data0.y = task.origin.y;
+  data0.z = task.origin.z;
+  data0.w = task.ray.x;
+  __stcs((float4*)ptr, data0);
+
+  float4 data1;
+  data1.x = task.ray.y;
+  data1.y = task.ray.z;
+  data1.z = uint_as_float((task.index.x & 0xffff) | (task.index.y << 16));
+  data1.w = uint_as_float(task.state);
+  __stcs(((float4*)ptr) + 1, data1);
+}
+
+__device__
 TraceTask load_trace_task_essentials(const void* ptr) {
   const float4 data0 = __ldcs((float4*)ptr);
   const float2 data1 = __ldcs(((float2*)ptr) + 2);
