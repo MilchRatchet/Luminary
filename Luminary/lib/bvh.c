@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <immintrin.h>
 
-#define THRESHOLD_TRIANGLES 3
+#define THRESHOLD_TRIANGLES 2
 #define OBJECT_SPLIT_BIN_COUNT 32
 #define SPATIAL_SPLIT_THRESHOLD 0.00001f
 #define SPATIAL_SPLIT_BIN_COUNT 32
@@ -732,7 +732,6 @@ Node2* build_bvh_structure(
       write_ptr++;
       buffer_ptr += optimal_total_triangles - optimal_split;
 
-      node.triangle_count    = 0;
       node.triangles_address = -1;
       node.leaf_node         = 0;
 
@@ -864,6 +863,37 @@ Node8* collapse_bvh(
         }
         offset      = offset >> 1;
         half_offset = half_offset >> 1;
+      }
+
+      // naive optimization to improve childs per node count
+      // this gives 5% better child slot occupation
+      for (int i = 0; i < 8; i++) {
+        if (binary_children[i].leaf_node == BINARY_NODE_IS_NULL) {
+          int best_index      = -1;
+          int least_triangles = INT_MAX;
+
+          for (int j = 0; j < 8; j++) {
+            Node2 base_child = binary_children[j];
+            if (
+              base_child.leaf_node == BINARY_NODE_IS_INTERNAL_NODE
+              && base_child.triangle_count < least_triangles) {
+              best_index      = j;
+              least_triangles = base_child.triangle_count;
+            }
+          }
+
+          if (best_index != -1) {
+            Node2 base_child             = binary_children[best_index];
+            binary_children[i]           = binary_nodes[base_child.child_address];
+            low[i]                       = base_child.left_low;
+            high[i]                      = base_child.left_high;
+            binary_addresses[i]          = base_child.child_address;
+            binary_children[best_index]  = binary_nodes[base_child.child_address + 1];
+            low[best_index]              = base_child.right_low;
+            high[best_index]             = base_child.right_high;
+            binary_addresses[best_index] = base_child.child_address + 1;
+          }
+        }
       }
 
       vec3 node_low  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
@@ -1085,6 +1115,40 @@ Node8* collapse_bvh(
   *triangles_io = triangles;
 
   *nodes_length_out = node_count;
+
+  /*
+  // BVH Statistics
+  int childs_per_node[9];
+
+  for (int i = 0; i < 9; i++) {
+    childs_per_node[i] = 0;
+  }
+
+  for (int i = 0; i < node_count; i++) {
+    int count = 0;
+    for (int j = 0; j < 8; j++) {
+      count += nodes[i].meta[j] != 0;
+    }
+    childs_per_node[count]++;
+  }
+
+  double average = 0.0;
+
+  printf("+----------+---------------------------------------+\n");
+  printf("| Children | Count\n");
+  printf("+----------+---------------------------------------+\n");
+
+  for (int i = 0; i < 9; i++) {
+    printf("|        %d | %d\n", i, childs_per_node[i]);
+    average += i * childs_per_node[i];
+  }
+
+  printf("+----------+---------------------------------------+\n");
+
+  printf("| Average: %f\n", average / node_count);
+
+  printf("+--------------------------------------------------+\n");
+  */
 
   return nodes;
 }
