@@ -5,6 +5,7 @@
 #include "denoiser.h"
 #include "png.h"
 #include "output.h"
+#include "frametime.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -151,7 +152,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
 
   int exit = 0;
 
-  clock_t time = clock();
+  Frametime frametime = init_frametime();
 
   int temporal_frames      = 0;
   int information_mode     = 0;
@@ -200,13 +201,13 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     SDL_BlitSurface(realtime->surface, 0, realtime->window_surface, 0);
 
     temporal_frames++;
-    const double frame_time = 1000.0 * ((double) (clock() - time)) / CLOCKS_PER_SEC;
-    time                    = clock();
+    sample_frametime(&frametime);
+    const double time = get_frametime(&frametime);
 
     if (information_mode == 0) {
       sprintf(
-        title, "Luminary %s- FPS: %.1f - Frametime: %.0fms",
-        SHADING_MODE_STRING[instance->shading_mode], 1000.0 / frame_time, frame_time);
+        title, "Luminary %s- FPS: %.0f - Frametime: %.2fms",
+        SHADING_MODE_STRING[instance->shading_mode], 1000.0 / time, time);
     }
     else if (information_mode == 1) {
       sprintf(
@@ -243,7 +244,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         instance->scene_gpu.sky.rayleigh_falloff, instance->scene_gpu.sky.mie_falloff);
     }
 
-    const double normalized_time = frame_time / 16.66667;
+    const double normalized_time = time / 16.66667;
 
     SDL_SetWindowTitle(realtime->window, title);
     SDL_UpdateWindowSurface(realtime->window);
@@ -439,7 +440,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     if (update_ocean) {
       temporal_frames = 0;
       update_mask |= 0b1;
-      instance->scene_gpu.ocean.time += frame_time * 0.001f;
+      instance->scene_gpu.ocean.time += time * 0.001f;
     }
 
     if (instance->scene_gpu.camera.auto_exposure) {
