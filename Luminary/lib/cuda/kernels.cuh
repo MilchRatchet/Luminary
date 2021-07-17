@@ -367,23 +367,23 @@ void process_geometry_tasks() {
         record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
         record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
       } else {
-        const float specular_probability = lerp(0.5f, 1.0f - eps, metallic);
+        const float specular_probability = lerp(0.5f, 1.0f, metallic);
 
         const vec3 V = scale_vector(ray, -1.0f);
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
-        const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
-
-        Light light;
         #ifdef LIGHTS_AT_NIGHT_ONLY
           const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
         #else
           const int light_count = device_scene.lights_length;
         #endif
 
+        const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
+
         const float light_sample_probability = 1.0f - 1.0f/(light_count + 1);
 
+        Light light;
         if (light_sample < light_sample_probability) {
           light = sample_light(task.position, light_count, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
         }
@@ -432,7 +432,6 @@ void process_geometry_tasks() {
       } else {
         atomicSub(&device_pixels_left, 1);
       }
-
     } else {
       atomicSub(&device_pixels_left, 1);
     }
@@ -514,36 +513,15 @@ void process_ocean_tasks() {
 
       task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      int remains_active = 1;
+      TraceTask next_task;
+      next_task.origin = task.position;
+      next_task.ray = ray;
+      next_task.index = task.index;
+      next_task.state = task.state;
 
-      #ifdef WEIGHT_BASED_EXIT
-      const float max_record = fmaxf(record.r, fmaxf(record.g, record.b));
-      if (max_record < CUTOFF ||
-      (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(task.index.x, task.index.y, task.state, 20) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
-      {
-        remains_active = 0;
-      }
-      #endif
+      store_trace_task(device_tracegeometry_tasks + get_task_address(trace_count++), next_task);
 
-      #ifdef LOW_QUALITY_LONG_BOUNCES
-      if (((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES) && sample_blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f/device_max_ray_depth) {
-        remains_active = 0;
-      }
-      #endif
-
-      if (remains_active) {
-        TraceTask next_task;
-        next_task.origin = task.position;
-        next_task.ray = ray;
-        next_task.index = task.index;
-        next_task.state = task.state;
-
-        store_trace_task(device_tracegeometry_tasks + get_task_address(trace_count++), next_task);
-
-        device_records[pixel] = record;
-      } else {
-        atomicSub(&device_pixels_left, 1);
-      }
+      device_records[pixel] = record;
     } else {
       atomicSub(&device_pixels_left, 1);
     }
@@ -581,6 +559,11 @@ void finalize_samples() {
     float4 bias_cache = __ldcs((float4*)((float*)device_frame_bias_cache + offset));
 
     if (device_temporal_frames == 0) {
+      variance.x = 1.0f;
+      variance.y = 1.0f;
+      variance.z = 1.0f;
+      variance.w = 1.0f;
+      __stcs((float4*)((float*)device_frame_variance + offset), variance);
       bias_cache.x = 0.0f;
       bias_cache.y = 0.0f;
       bias_cache.z = 0.0f;
@@ -593,11 +576,13 @@ void finalize_samples() {
     deviation.z = sqrtf(fmaxf(eps, variance.z));
     deviation.w = sqrtf(fmaxf(eps, variance.w));
 
-    variance.x = ((buffer.x - output.x) * (buffer.x - output.x) + variance.x * device_temporal_frames) / (device_temporal_frames + 1);
-    variance.y = ((buffer.y - output.y) * (buffer.y - output.y) + variance.y * device_temporal_frames) / (device_temporal_frames + 1);
-    variance.z = ((buffer.z - output.z) * (buffer.z - output.z) + variance.z * device_temporal_frames) / (device_temporal_frames + 1);
-    variance.w = ((buffer.w - output.w) * (buffer.w - output.w) + variance.w * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float4*)((float*)device_frame_variance + offset), variance);
+    if (device_temporal_frames) {
+      variance.x = ((buffer.x - output.x) * (buffer.x - output.x) + variance.x * (device_temporal_frames - 1)) / device_temporal_frames;
+      variance.y = ((buffer.y - output.y) * (buffer.y - output.y) + variance.y * (device_temporal_frames - 1)) / device_temporal_frames;
+      variance.z = ((buffer.z - output.z) * (buffer.z - output.z) + variance.z * (device_temporal_frames - 1)) / device_temporal_frames;
+      variance.w = ((buffer.w - output.w) * (buffer.w - output.w) + variance.w * (device_temporal_frames - 1)) / device_temporal_frames;
+      __stcs((float4*)((float*)device_frame_variance + offset), variance);
+    }
 
     float4 firefly_rejection;
     firefly_rejection.x = 0.1f + output.x + deviation.x * 4.0f;
