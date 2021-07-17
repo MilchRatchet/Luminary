@@ -91,8 +91,6 @@ __device__
 vec3 specular_BRDF(RGBF &record, const vec3 normal, const vec3 V, const Light light, const float light_sample, float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability) {
     const float alpha = roughness * roughness;
 
-    light_sample_probability *= alpha;
-
     const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
     float weight = 1.0f;

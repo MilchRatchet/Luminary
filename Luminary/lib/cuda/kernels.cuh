@@ -381,7 +381,8 @@ void process_geometry_tasks() {
 
         const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
 
-        const float light_sample_probability = 1.0f - 1.0f/(light_count + 1);
+        const float light_sample_depth_bias = powf(0.1f, device_max_ray_depth - ((task.state & DEPTH_LEFT) >> 16));
+        const float light_sample_probability = fmaxf(1.0f - 1.0f/(light_count + 1), 1.0f - (1 + device_temporal_frames) * light_sample_depth_bias);
 
         Light light;
         if (light_sample < light_sample_probability) {
