@@ -81,7 +81,7 @@ void generate_trace_tasks() {
     if (device_denoiser)
       device_albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
 
-    store_trace_task(device_tracegeometry_tasks + get_task_address(offset++), task);
+    store_trace_task(device_tasks + get_task_address(offset++), task);
   }
 
   device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = offset;
@@ -124,8 +124,8 @@ void balance_trace_tasks() {
       const int swaps = (source_count - count) >> 1;
       for (int j = 0; j < swaps; j++) {
         source_count--;
-        float4* source_ptr = (float4*)(device_tracegeometry_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + source_index, warp >> 2, source_count));
-        float4* sink_ptr = (float4*)(device_tracegeometry_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + i, warp >> 2, count));
+        float4* source_ptr = (float4*)(device_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + source_index, warp >> 2, source_count));
+        float4* sink_ptr = (float4*)(device_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + i, warp >> 2, count));
         count++;
 
         __stwb(sink_ptr, __ldca(source_ptr));
@@ -147,7 +147,7 @@ void preprocess_trace_tasks() {
 
   for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
-    TraceTask task = load_trace_task_essentials(device_tracegeometry_tasks + offset);
+    TraceTask task = load_trace_task_essentials(device_tasks + offset);
 
     float depth = device_scene.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
@@ -169,27 +169,80 @@ void preprocess_trace_tasks() {
   }
 }
 
-__global__
+__global__ __launch_bounds__(THREADS_PER_BLOCK,14)
 void postprocess_trace_tasks() {
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
   uint16_t geometry_task_count = 0;
   uint16_t sky_task_count = 0;
   uint16_t ocean_task_count = 0;
 
+  const int number_shared_hit_ids = 12;
+
+  __shared__ uint32_t last_hit_ids[THREADS_PER_BLOCK][number_shared_hit_ids];
+
+  const int actual_shared = min(task_count, number_shared_hit_ids);
+  const int shared_offset = task_count - actual_shared;
+
+  for (int i = 0; i < actual_shared; i++) {
+    const int offset = get_task_address(i + shared_offset);
+    last_hit_ids[threadIdx.x][i] = __ldcs((uint32_t*)(device_trace_results + offset) + 1);
+  }
+
+  //sorting tasks
+  for (int i = 0; i < task_count - 1; i++) {
+    const int offset = get_task_address(i);
+    const float2 temp = __ldca((float2*)(device_trace_results + offset));
+    const float4 data0 = __ldcs((float4*)(device_tasks + offset));
+    const float4 data1 = __ldcs((float4*)(device_tasks + offset) + 1);
+
+    uint32_t hit_id = __ldca((uint32_t*)(device_trace_results + offset) + 1);
+    int min = i;
+
+    int j = i + 1;
+
+    for (; j < shared_offset; j++) {
+      const int offset_j = get_task_address(j);
+      const uint32_t hit_id_j = __ldca((uint32_t*)(device_trace_results + offset_j) + 1);
+      if (hit_id_j < hit_id) {
+        hit_id = hit_id_j;
+        min = j;
+      }
+    }
+
+    for (; j < task_count; j++) {
+      const uint32_t hit_id_j = last_hit_ids[threadIdx.x][j - shared_offset];
+      if (hit_id_j < hit_id) {
+        hit_id = hit_id_j;
+        min = j;
+      }
+    }
+
+    const int offset_min = get_task_address(min);
+    if (min >= shared_offset) {
+      last_hit_ids[threadIdx.x][min - shared_offset] = float_as_uint(temp.y);
+    }
+    stream_float2((float2*)(device_trace_results + offset_min), (float2*)(device_trace_results + offset));
+    stream_float4((float4*)(device_tasks + offset_min), (float4*)(device_tasks + offset));
+    stream_float4((float4*)(device_tasks + offset_min) + 1, (float4*)(device_tasks + offset) + 1);
+    __stcs((float2*)(device_trace_results + offset_min), temp);
+    __stcs((float4*)(device_tasks + offset_min), data0);
+    __stcs((float4*)(device_tasks + offset_min) + 1, data1);
+  }
+
   for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
-    TraceTask task = load_trace_task(device_tracegeometry_tasks + offset);
+    TraceTask task = load_trace_task(device_tasks + offset);
     const float2 result = __ldcs((float2*)(device_trace_results + offset));
 
     const float depth = result.x;
     const uint32_t hit_id = float_as_uint(result.y);
 
-    float4* ptr;
+    float4* ptr = (float4*)(device_tasks + offset);
     float4 data0;
     float4 data1;
 
     if (hit_id == SKY_HIT) {
-        ptr = (float4*) (device_sky_tasks + get_task_address(sky_task_count++));
+        sky_task_count++;
         data0.x = task.ray.x;
         data0.y = task.ray.y;
         data0.z = task.ray.z;
@@ -203,10 +256,10 @@ void postprocess_trace_tasks() {
         data1.x = atan2f(task.ray.z, task.ray.x);
 
         if (hit_id == OCEAN_HIT) {
-            ptr = (float4*) (device_ocean_tasks + get_task_address(ocean_task_count++));
+            ocean_task_count++;
             data1.y = depth;
         } else {
-            ptr = (float4*) (device_tracegeometry_tasks + get_task_address(geometry_task_count++));
+            geometry_task_count++;
             data1.y = uint_as_float(hit_id);
         }
 
@@ -234,7 +287,7 @@ void process_geometry_tasks() {
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device_tracegeometry_tasks + get_task_address(i));
+    GeometryTask task = load_geometry_task(device_tasks + get_task_address(i));
     const int pixel = task.index.y * device_width + task.index.x;
 
     vec3 ray;
@@ -427,7 +480,7 @@ void process_geometry_tasks() {
         next_task.index = task.index;
         next_task.state = task.state;
 
-        store_trace_task(device_tracegeometry_tasks + get_task_address(trace_count++), next_task);
+        store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
 
         device_records[pixel] = record;
       } else {
@@ -446,10 +499,13 @@ void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   int trace_count = device_task_counts[id * 4];
+  const int geometry_count = device_task_counts[id * 4 + 1];
   const int task_count = device_task_counts[id * 4 + 2];
 
+  const int task_offset = geometry_count;
+
   for (int i = 0; i < task_count; i++) {
-    OceanTask task = load_ocean_task(device_ocean_tasks + get_task_address(i));
+    OceanTask task = load_ocean_task(device_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device_width + task.index.x;
 
     vec3 ray;
@@ -520,7 +576,7 @@ void process_ocean_tasks() {
       next_task.index = task.index;
       next_task.state = task.state;
 
-      store_trace_task(device_tracegeometry_tasks + get_task_address(trace_count++), next_task);
+      store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
 
       device_records[pixel] = record;
     } else {
@@ -533,10 +589,14 @@ void process_ocean_tasks() {
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK,10)
 void process_sky_tasks() {
+  const int geometry_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
+  const int ocean_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
 
+  const int task_offset = geometry_count + ocean_count;
+
   for (int i = 0; i < task_count; i++) {
-    const SkyTask task = load_sky_task(device_sky_tasks + get_task_address(i));
+    const SkyTask task = load_sky_task(device_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device_width + task.index.x;
 
     const RGBF record = device_records[pixel];

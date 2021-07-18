@@ -24,6 +24,16 @@ void __prefetch_global_l2(const void* const ptr)
 //===========================================================================================
 
 __device__
+void stream_float2(const float2* source, float2* target) {
+  __stcs(target, __ldcs(source));
+}
+
+__device__
+void stream_float4(const float4* source, float4* target) {
+  __stcs(target, __ldcs(source));
+}
+
+__device__
 TraceTask load_trace_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*)ptr);
   const float4 data1 = __ldcs(((float4*)ptr) + 1);
