@@ -176,59 +176,56 @@ void postprocess_trace_tasks() {
   uint16_t sky_task_count = 0;
   uint16_t ocean_task_count = 0;
 
-  const int number_shared_hit_ids = 12;
-
-  __shared__ uint32_t last_hit_ids[THREADS_PER_BLOCK][number_shared_hit_ids];
-
-  const int actual_shared = min(task_count, number_shared_hit_ids);
-  const int shared_offset = task_count - actual_shared;
-
-  for (int i = 0; i < actual_shared; i++) {
-    const int offset = get_task_address(i + shared_offset);
-    last_hit_ids[threadIdx.x][i] = __ldcs((uint32_t*)(device_trace_results + offset) + 1);
-  }
-
-  //sorting tasks
-  for (int i = 0; i < task_count - 1; i++) {
+  //count data
+  for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
-    const float2 temp = __ldca((float2*)(device_trace_results + offset));
-    const float4 data0 = __ldcs((float4*)(device_tasks + offset));
-    const float4 data1 = __ldcs((float4*)(device_tasks + offset) + 1);
+    const uint32_t hit_id = __ldca((uint32_t*)(device_trace_results + offset) + 1);
 
-    uint32_t hit_id = __ldca((uint32_t*)(device_trace_results + offset) + 1);
-    int min = i;
-
-    int j = i + 1;
-
-    for (; j < shared_offset; j++) {
-      const int offset_j = get_task_address(j);
-      const uint32_t hit_id_j = __ldca((uint32_t*)(device_trace_results + offset_j) + 1);
-      if (hit_id_j < hit_id) {
-        hit_id = hit_id_j;
-        min = j;
-      }
+    if (hit_id == SKY_HIT) {
+      sky_task_count++;
+    } else if (hit_id == OCEAN_HIT) {
+      ocean_task_count++;
+    } else {
+      geometry_task_count++;
     }
-
-    for (; j < task_count; j++) {
-      const uint32_t hit_id_j = last_hit_ids[threadIdx.x][j - shared_offset];
-      if (hit_id_j < hit_id) {
-        hit_id = hit_id_j;
-        min = j;
-      }
-    }
-
-    const int offset_min = get_task_address(min);
-    if (min >= shared_offset) {
-      last_hit_ids[threadIdx.x][min - shared_offset] = float_as_uint(temp.y);
-    }
-    stream_float2((float2*)(device_trace_results + offset_min), (float2*)(device_trace_results + offset));
-    stream_float4((float4*)(device_tasks + offset_min), (float4*)(device_tasks + offset));
-    stream_float4((float4*)(device_tasks + offset_min) + 1, (float4*)(device_tasks + offset) + 1);
-    __stcs((float2*)(device_trace_results + offset_min), temp);
-    __stcs((float4*)(device_tasks + offset_min), data0);
-    __stcs((float4*)(device_tasks + offset_min) + 1, data1);
   }
 
+  int geometry_offset = 0;
+  int ocean_offset = geometry_task_count;
+  int sky_offset = geometry_task_count + ocean_task_count;
+  int k = 0;
+
+  //order data
+  while (k < task_count) {
+    const int offset = get_task_address(k);
+    const uint32_t hit_id = __ldca((uint32_t*)(device_trace_results + offset) + 1);
+
+    int index;
+    int needs_swapping;
+
+    if (hit_id == SKY_HIT) {
+      index = sky_offset++;
+      needs_swapping = (k < geometry_task_count + ocean_task_count);
+    } else if (hit_id == OCEAN_HIT) {
+      index = ocean_offset++;
+      needs_swapping = (k < geometry_task_count) || (k >= geometry_task_count + ocean_task_count);
+    } else {
+      index = geometry_offset++;
+      needs_swapping = (k >= geometry_task_count);
+    }
+
+    if (needs_swapping) {
+      swap_trace_data(k, index);
+    } else {
+      k++;
+    }
+  }
+
+  geometry_task_count = 0;
+  sky_task_count = 0;
+  ocean_task_count = 0;
+
+  //process data
   for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
     TraceTask task = load_trace_task(device_tasks + offset);

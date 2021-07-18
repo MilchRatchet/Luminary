@@ -34,6 +34,22 @@ void stream_float4(const float4* source, float4* target) {
 }
 
 __device__
+void swap_trace_data(const int index0, const int index1) {
+  const int offset0 = get_task_address(index0);
+  const float2 temp = __ldca((float2*)(device_trace_results + offset0));
+  const float4 data0 = __ldcs((float4*)(device_tasks + offset0));
+  const float4 data1 = __ldcs((float4*)(device_tasks + offset0) + 1);
+
+  const int offset1 = get_task_address(index1);
+  stream_float2((float2*)(device_trace_results + offset1), (float2*)(device_trace_results + offset0));
+  stream_float4((float4*)(device_tasks + offset1), (float4*)(device_tasks + offset0));
+  stream_float4((float4*)(device_tasks + offset1) + 1, (float4*)(device_tasks + offset0) + 1);
+  __stcs((float2*)(device_trace_results + offset1), temp);
+  __stcs((float4*)(device_tasks + offset1), data0);
+  __stcs((float4*)(device_tasks + offset1) + 1, data1);
+}
+
+__device__
 TraceTask load_trace_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*)ptr);
   const float4 data1 = __ldcs(((float4*)ptr) + 1);
