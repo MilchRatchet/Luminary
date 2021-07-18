@@ -10,7 +10,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Luminary/CMake" ${CMAKE_MODULE_PATH})
 
 find_package(CUDAToolkit 11.3 REQUIRED)
 
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math --ptxas-options=-v --extra-device-vectorization --generate-line-info --compiler-options -O2 -fp:fast -arch:AVX2")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --use_fast_math --ptxas-options=-v --ptxas-options=-warn-double-usage --extra-device-vectorization --generate-line-info --source-in-ptx --compiler-options -O2 -fp:fast -arch:AVX2 -g")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -march=native")
 
 message(STATUS "SOURCE_DIR: ${CMAKE_SOURCE_DIR}")
