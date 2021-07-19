@@ -93,7 +93,7 @@ static RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
   SDL_GetDisplayUsableBounds(0, &rect);
   SDL_GetDisplayBounds(0, &screen_size);
 
-  rect.y *= 2;
+  rect.y += screen_size.h - rect.h;
   rect.h -= screen_size.h - rect.h;
 
   // It seems SDL window dimensions must be a multiple of 4
