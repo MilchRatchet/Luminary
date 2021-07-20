@@ -98,6 +98,7 @@ struct TraceResult {
 #define ALBEDO_BUFFER_STATE 0x80000000
 #define SKY_HIT 0xffffffff
 #define OCEAN_HIT 0xfffffffe
+#define ANY_LIGHT 0xffffffff
 
 //===========================================================================================
 // Device Variables
@@ -124,6 +125,9 @@ TraceResult* device_trace_results;
 // 0: TraceCount 1: GeoCount 2: OceanCount 3: SkyCount
 __constant__
 uint16_t* device_task_counts;
+
+__constant__
+uint32_t* device_light_sample_history;
 
 __constant__
 curandStateXORWOW_t* device_sample_randoms;

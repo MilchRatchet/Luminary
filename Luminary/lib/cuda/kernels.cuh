@@ -77,6 +77,7 @@ void generate_trace_tasks() {
 
     device_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
     device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+    device_light_sample_history[pixel] = ANY_LIGHT;
 
     if (device_denoiser)
       device_albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
@@ -302,7 +303,7 @@ void process_geometry_tasks() {
     const float4 t4 = __ldg(hit_address + 3);
     const float4 t5 = __ldg(hit_address + 4);
     const float4 t6 = __ldg(hit_address + 5);
-    const float t7 = __ldg((float*)(hit_address + 6));
+    const float2 t7 = __ldg((float2*)(hit_address + 6));
 
     vec3 vertex = get_vector(t1.x, t1.y, t1.z);
     vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
@@ -335,7 +336,8 @@ void process_geometry_tasks() {
       normal = scale_vector(normal, -1.0f);
     }
 
-    const int texture_object = __float_as_int(t7);
+    const int texture_object = __float_as_int(t7.x);
+    const uint32_t triangle_light_id = __float_as_uint(t7.y);
 
     const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
 
@@ -399,7 +401,11 @@ void process_geometry_tasks() {
         emission.g *= intensity * record.g;
         emission.b *= intensity * record.b;
 
-        device_frame_buffer[pixel] = emission;
+        const uint32_t light = device_light_sample_history[pixel];
+
+        if (light == ANY_LIGHT || light == triangle_light_id) {
+          device_frame_buffer[pixel] = emission;
+        }
       }
 
       atomicSub(&device_pixels_left, 1);
@@ -410,12 +416,16 @@ void process_geometry_tasks() {
         task.state ^= ALBEDO_BUFFER_STATE;
       }
 
+      uint32_t light_sample_id;
+
       if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
         task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
         record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
         record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
         record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
+
+        light_sample_id = device_light_sample_history[pixel];
       } else {
         const float specular_probability = lerp(0.5f, 1.0f, metallic);
 
@@ -436,18 +446,18 @@ void process_geometry_tasks() {
 
         Light light;
         if (light_sample < light_sample_probability) {
-          light = sample_light(task.position, light_count, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
+          light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
         }
 
         const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
         const float beta = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
         if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < specular_probability) {
-          ray = specular_BRDF(record, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic, beta, gamma, specular_probability);
+          ray = specular_BRDF(record, light_sample_id, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic, beta, gamma, specular_probability);
         }
         else
         {
-          ray = diffuse_BRDF(record, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic, beta, gamma, specular_probability);
+          ray = diffuse_BRDF(record, light_sample_id, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic, beta, gamma, specular_probability);
         }
       }
 
@@ -480,6 +490,7 @@ void process_geometry_tasks() {
         store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
 
         device_records[pixel] = record;
+        device_light_sample_history[pixel] = light_sample_id;
       } else {
         atomicSub(&device_pixels_left, 1);
       }
@@ -555,13 +566,13 @@ void process_ocean_tasks() {
         const float beta = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
         Light light;
-
+        uint32_t light_sample_id;
         if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < 0.5f) {
-          ray = specular_BRDF(record, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
+          ray = specular_BRDF(record, light_sample_id, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
         }
         else
         {
-          ray = diffuse_BRDF(record, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
+          ray = diffuse_BRDF(record, light_sample_id, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
         }
       }
 
@@ -576,6 +587,7 @@ void process_ocean_tasks() {
       store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
 
       device_records[pixel] = record;
+      device_light_sample_history[pixel] = ANY_LIGHT;
     } else {
       atomicSub(&device_pixels_left, 1);
     }
@@ -600,7 +612,11 @@ void process_sky_tasks() {
     RGBF sky = get_sky_color(task.ray);
     sky = mul_color(sky, record);
 
-    device_frame_buffer[pixel] = sky;
+    const uint32_t light = device_light_sample_history[pixel];
+
+    if (light == ANY_LIGHT || light == 0) {
+      device_frame_buffer[pixel] = sky;
+    }
 
     atomicSub(&device_pixels_left, 1);
   }

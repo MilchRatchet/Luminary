@@ -88,7 +88,7 @@ vec3 sample_GGX_VNDF(const vec3 v, const float alpha, const float random1, const
 }
 
 __device__
-vec3 specular_BRDF(RGBF &record, const vec3 normal, const vec3 V, const Light light, const float light_sample, float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability) {
+vec3 specular_BRDF(RGBF &record, uint32_t &light_sample_id, const vec3 normal, const vec3 V, const Light light, const float light_sample, float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability) {
     const float alpha = roughness * roughness;
 
     const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
@@ -102,6 +102,8 @@ vec3 specular_BRDF(RGBF &record, const vec3 normal, const vec3 V, const Light li
         H_local.x = 0.0f;
         H_local.y = 0.0f;
         H_local.z = 1.0f;
+
+        light_sample_id = ANY_LIGHT;
     } else {
         const vec3 S_local = rotate_vector_by_quaternion(
             normalize_vector(sample_ray_from_angles_and_vector(beta * light.radius, gamma, light.pos)),
@@ -117,6 +119,8 @@ vec3 specular_BRDF(RGBF &record, const vec3 normal, const vec3 V, const Light li
             weight = (1.0f/light_sample_probability) * light.radius * light_count;
         } else {
             H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
+
+            light_sample_id = ANY_LIGHT;
 
             if (S_local.z > 0.0f) weight = (1.0f/(1.0f - light_sample_probability));
         }
@@ -149,7 +153,7 @@ vec3 specular_BRDF(RGBF &record, const vec3 normal, const vec3 V, const Light li
 }
 
 __device__
-vec3 diffuse_BRDF(RGBF &record, const vec3 normal, const vec3 V, const Light light, const float light_sample, const float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability) {
+vec3 diffuse_BRDF(RGBF &record, uint32_t &light_sample_id, const vec3 normal, const vec3 V, const Light light, const float light_sample, const float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta, const float gamma, const float specular_probability) {
     float weight = 1.0f;
 
     const float alpha = acosf(sqrtf(beta));
@@ -161,6 +165,8 @@ vec3 diffuse_BRDF(RGBF &record, const vec3 normal, const vec3 V, const Light lig
         weight = (1.0f/light_sample_probability) * light.radius * light_count;
     } else {
         ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
+
+        light_sample_id = ANY_LIGHT;
 
         if (light_feasible >= 0.0f) weight = (1.0f/(1.0f - light_sample_probability));
     }
@@ -192,12 +198,14 @@ vec3 diffuse_BRDF(RGBF &record, const vec3 normal, const vec3 V, const Light lig
 }
 
 __device__
-Light sample_light(const vec3 position, const int light_count, const float r) {
+Light sample_light(const vec3 position, const int light_count, uint32_t &light_sample_id, const float r) {
     #ifdef LIGHTS_AT_NIGHT_ONLY
         const uint32_t light_index = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(r * light_count) : 0;
     #else
         const uint32_t light_index = (uint32_t)(r * light_count);
     #endif
+
+    light_sample_id = light_index;
 
     const float4 light_data = __ldg((float4*)(device_scene.lights + light_index));
     vec3 light_pos;

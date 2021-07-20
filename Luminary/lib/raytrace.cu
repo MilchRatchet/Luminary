@@ -139,6 +139,9 @@ extern "C" RaytraceInstance* init_raytracing(
     gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(instance->material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_amount, &(amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
 
+    gpuErrchk(cudaMalloc((void**) &(instance->light_sample_history_gpu), sizeof(uint32_t) * width * height));
+    gpuErrchk(cudaMemcpyToSymbol(device_light_sample_history, &(instance->light_sample_history_gpu), sizeof(uint32_t*), 0, cudaMemcpyHostToDevice));
+
     instance->denoiser = denoiser;
 
     if (instance->denoiser) {
@@ -301,6 +304,7 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
     gpuErrchk(cudaFree(instance->frame_variance_gpu));
     gpuErrchk(cudaFree(instance->frame_bias_cache_gpu));
     gpuErrchk(cudaFree(instance->randoms_gpu));
+    gpuErrchk(cudaFree(instance->light_sample_history_gpu));
 }
 
 extern "C" void free_outputs(RaytraceInstance* instance) {

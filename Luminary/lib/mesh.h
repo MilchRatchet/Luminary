@@ -20,7 +20,7 @@ struct Triangle {
   UV edge1_texture;
   UV edge2_texture;
   uint32_t object_maps;
-  float padding0;
+  uint32_t light_id;
   float padding1;
   float padding2;
 } typedef Triangle;
