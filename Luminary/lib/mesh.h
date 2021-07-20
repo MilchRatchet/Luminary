@@ -19,8 +19,10 @@ struct Triangle {
   UV vertex_texture;
   UV edge1_texture;
   UV edge2_texture;
-  vec3 face_normal;
   uint32_t object_maps;
+  float padding0;
+  float padding1;
+  float padding2;
 } typedef Triangle;
 
 struct Traversal_Triangle {

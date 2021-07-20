@@ -61,7 +61,7 @@ void initialize_randoms() {
   device_sample_randoms[id] = state;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,15)
+__global__ __launch_bounds__(THREADS_PER_BLOCK,12)
 void generate_trace_tasks() {
   int offset = 0;
 
@@ -169,7 +169,7 @@ void preprocess_trace_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,14)
+__global__ __launch_bounds__(THREADS_PER_BLOCK,12)
 void postprocess_trace_tasks() {
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
   uint16_t geometry_task_count = 0;
@@ -302,11 +302,13 @@ void process_geometry_tasks() {
     const float4 t4 = __ldg(hit_address + 3);
     const float4 t5 = __ldg(hit_address + 4);
     const float4 t6 = __ldg(hit_address + 5);
-    const float4 t7 = __ldg(hit_address + 6);
+    const float t7 = __ldg((float*)(hit_address + 6));
 
     vec3 vertex = get_vector(t1.x, t1.y, t1.z);
     vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
     vec3 edge2 = get_vector(t2.z, t2.w, t3.x);
+
+    vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
     vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
@@ -325,8 +327,6 @@ void process_geometry_tasks() {
 
     const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
 
-    vec3 face_normal = get_vector(t7.x, t7.y, t7.z);
-
     if (dot_product(normal, face_normal) < 0.0f) {
       face_normal = scale_vector(face_normal, -1.0f);
     }
@@ -335,7 +335,7 @@ void process_geometry_tasks() {
       normal = scale_vector(normal, -1.0f);
     }
 
-    const int texture_object = __float_as_int(t7.w);
+    const int texture_object = __float_as_int(t7);
 
     const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
 
@@ -730,7 +730,7 @@ void bloom_kernel_split(RGBF* image) {
   }
 }*/
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 15)
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12)
 void bloom_kernel_blur_vertical(RGBF* image) {
   const int stride_length = 4;
 
@@ -783,7 +783,7 @@ void bloom_kernel_blur_vertical(RGBF* image) {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 15)
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12)
 void bloom_kernel_blur_horizontal(RGBF* image) {
   const int stride_length = 4;
 
@@ -897,7 +897,7 @@ void convert_RGBF_to_RGB8(const int width, const int height, const RGBF* source)
       }
     }
 
-    pixel = tonemap(pixel);
+    //pixel = tonemap(pixel);
 
     pixel.r = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.r));
     pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.g));

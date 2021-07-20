@@ -69,7 +69,7 @@ unsigned int __bfind(unsigned int a)
     return result;
 }
 
-#define STACK_SIZE_SM 9
+#define STACK_SIZE_SM 10
 #define STACK_SIZE 32
 
 #define STACK_POP(X)                                                    \
@@ -90,7 +90,7 @@ unsigned int __bfind(unsigned int a)
         packed_stptr_invoct.x++;                                        \
     }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
+__global__ __launch_bounds__(THREADS_PER_BLOCK,9)
 void process_trace_tasks() {
     const uint16_t trace_task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
     uint16_t offset = 0;

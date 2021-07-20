@@ -201,7 +201,6 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
       .vertex = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
       .edge1  = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
       .edge2  = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z}};
-    triangle.face_normal   = normalize_vector(cross_product(triangle.edge1, triangle.edge2));
     traversal_triangles[i] = tt;
     triangles[i]           = triangle;
   }
