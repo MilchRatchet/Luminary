@@ -294,7 +294,7 @@ float linearRGB_to_SRGB(const float value) {
 }
 
 __device__
-RGBF tonemap(RGBF pixel) {
+RGBF aces_tonemap(RGBF pixel) {
   const float a = 2.51f;
   const float b = 0.03f;
   const float c = 2.43f;
@@ -308,6 +308,19 @@ RGBF tonemap(RGBF pixel) {
   return pixel;
 }
 
+__device__
+float luminance(const RGBF v) {
+    return 0.2126f * v.r + 0.7152f * v.g + 0.0722f * v.b;
+}
 
+__device__
+RGBF reinhard_tonemap(RGBF pixel) {
+  const float factor = 1.0f / (1.0f + luminance(pixel));
+  pixel.r *= factor;
+  pixel.g *= factor;
+  pixel.b *= factor;
+
+  return pixel;
+}
 
 #endif /* CU_MATH_H */

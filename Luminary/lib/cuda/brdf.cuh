@@ -7,30 +7,20 @@
 #include <cuda_runtime_api.h>
 
 __device__
-float luminance(const vec3 v) {
-    vec3 w;
-    w.x = 0.2126f;
-    w.y = 0.7152f;
-    w.z = 0.0722f;
-
-    return dot_product(v,w);
-}
-
-__device__
-float shadowed_F90(const vec3 f0) {
+float shadowed_F90(const RGBF f0) {
     const float t = 1.0f / 0.04f;
     return fminf(1.0f, t * luminance(f0));
 }
 
 __device__
-vec3 Fresnel_Schlick(const vec3 f0, const float f90, const float NdotS) {
-    vec3 result;
+RGBF Fresnel_Schlick(const RGBF f0, const float f90, const float NdotS) {
+    RGBF result;
 
     const float t = powf(1.0f - NdotS, 5.0f);
 
-    result.x = lerp(f0.x, f90, t);
-    result.y = lerp(f0.y, f90, t);
-    result.z = lerp(f0.z, f90, t);
+    result.r = lerp(f0.r, f90, t);
+    result.g = lerp(f0.g, f90, t);
+    result.b = lerp(f0.b, f90, t);
 
     return result;
 }
@@ -134,20 +124,20 @@ vec3 specular_BRDF(RGBF &record, uint32_t &light_sample_id, const vec3 normal, c
 
     vec3 ray = normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
 
-    vec3 specular_f0;
-    specular_f0.x = lerp(0.04f, albedo.r, metallic);
-    specular_f0.y = lerp(0.04f, albedo.g, metallic);
-    specular_f0.z = lerp(0.04f, albedo.b, metallic);
+    RGBF specular_f0;
+    specular_f0.r = lerp(0.04f, albedo.r, metallic);
+    specular_f0.g = lerp(0.04f, albedo.g, metallic);
+    specular_f0.b = lerp(0.04f, albedo.b, metallic);
 
-    const vec3 F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
+    const RGBF F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotR);
 
     const float milchs_energy_recovery = lerp(1.0f, 1.51f + 1.51f * NdotV, roughness);
 
     weight *= milchs_energy_recovery * Smith_G2_over_G1_height_correlated(alpha * alpha, NdotR, NdotV) / specular_probability;
 
-    record.r *= F.x * weight;
-    record.g *= F.y * weight;
-    record.b *= F.z * weight;
+    record.r *= F.r * weight;
+    record.g *= F.g * weight;
+    record.b *= F.b * weight;
 
     return ray;
 }

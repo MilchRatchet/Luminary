@@ -913,7 +913,7 @@ void convert_RGBF_to_RGB8(const int width, const int height, const RGBF* source)
       }
     }
 
-    //pixel = tonemap(pixel);
+    pixel = reinhard_tonemap(pixel);
 
     pixel.r = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.r));
     pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.g));
