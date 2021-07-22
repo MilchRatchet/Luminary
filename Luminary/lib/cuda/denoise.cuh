@@ -18,7 +18,7 @@ struct realtime_denoise {
   CUdeviceptr avg_color;
 } typedef realtime_denoise;
 
-extern "C" void* initialize_optix_denoise_for_realtime(raytrace_instance* instance) {
+extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance) {
   OPTIX_CHECK(optixInit());
 
   realtime_denoise* denoise_setup = (realtime_denoise*)malloc(sizeof(realtime_denoise));
@@ -48,7 +48,7 @@ extern "C" void* initialize_optix_denoise_for_realtime(raytrace_instance* instan
     denoise_setup->denoiserScratch,
     scratchSize));
 
-  denoise_setup->inputLayer[0].data = (CUdeviceptr)instance->frame_buffer_gpu;
+  denoise_setup->inputLayer[0].data = (CUdeviceptr)instance->frame_output_gpu;
   denoise_setup->inputLayer[0].width = instance->width;
   denoise_setup->inputLayer[0].height = instance->height;
   denoise_setup->inputLayer[0].rowStrideInBytes = instance->width * sizeof(RGBF);
@@ -118,7 +118,7 @@ extern "C" float get_auto_exposure_from_optix(void* input) {
   float brightness;
   gpuErrchk(cudaMemcpy(&brightness, (void*)denoise_setup.hdr_intensity, sizeof(float), cudaMemcpyDeviceToHost));
 
-  return min(100.0f, max(0.10f, powf(brightness,0.2f)));
+  return min(100.0f, max(0.01f, powf(brightness,0.5f)));
 }
 
 extern "C" void free_realtime_denoise(void* input) {

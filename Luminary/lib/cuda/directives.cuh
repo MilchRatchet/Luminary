@@ -31,14 +31,6 @@
 #define LOW_QUALITY_LONG_BOUNCES
 #define MIN_BOUNCES 1
 
-
-/*
- * Define FIRST_LIGHT_ONLY for the following to apply
- *
- * Samples exit early if some light data was already gathered
- */
-#define FIRST_LIGHT_ONLY
-
 /*
  * Define LIGHTS_AT_NIGHT_ONLY for the following to apply
  *

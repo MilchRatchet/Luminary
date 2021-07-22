@@ -13,11 +13,17 @@ static float vector_distance(const vec3 a, const vec3 b) {
   return sqrtf(x * x + y * y + z * z);
 }
 
+struct Triangle_Light {
+  vec3 pos;
+  float radius;
+  uint32_t triangle_id;
+} typedef Triangle_Light;
+
 void process_lights(Scene* scene) {
   Scene data = *scene;
 
   unsigned int lights_length = 16;
-  Light* lights              = (Light*) malloc(sizeof(Light) * lights_length);
+  Triangle_Light* lights     = (Triangle_Light*) malloc(sizeof(Triangle_Light) * lights_length);
   unsigned int light_count   = 0;
 
   for (unsigned int i = 0; i < data.triangles_length; i++) {
@@ -27,7 +33,7 @@ void process_lights(Scene* scene) {
       light_count++;
       if (light_count == lights_length) {
         lights_length *= 2;
-        lights = safe_realloc(lights, sizeof(Light) * lights_length);
+        lights = safe_realloc(lights, sizeof(Triangle_Light) * lights_length);
       }
 
       vec3 vertex2;
@@ -69,11 +75,12 @@ void process_lights(Scene* scene) {
       l2 = vertex2.y - middle.y;
       l3 = vertex2.z - middle.z;
 
-      lights[light_count - 1].radius = sqrtf(l1 * l1 + l2 * l2 + l3 * l3);
+      lights[light_count - 1].radius      = sqrtf(l1 * l1 + l2 * l2 + l3 * l3);
+      lights[light_count - 1].triangle_id = i;
     }
   }
 
-  lights = safe_realloc(lights, sizeof(Light) * light_count);
+  lights = safe_realloc(lights, sizeof(Triangle_Light) * light_count);
 
   unsigned int light_groups_length = 16;
   Light* light_groups              = (Light*) malloc(sizeof(Light) * lights_length);
@@ -100,12 +107,10 @@ void process_lights(Scene* scene) {
     light_group.pos    = lights[0].pos;
     light_group.radius = lights[0].radius;
 
-    vec3 sum_pos                 = light_group.pos;
-    float sum_radius_weight      = light_group.radius;
     unsigned int lights_in_group = 1;
 
     for (unsigned int i = 1; i < light_count; i++) {
-      Light light = lights[i];
+      Triangle_Light light = lights[i];
 
       if (light.radius < 0.0f)
         continue;
@@ -113,20 +118,17 @@ void process_lights(Scene* scene) {
       const float dist = vector_distance(light.pos, light_group.pos) - light_group.radius;
 
       if (dist <= light.radius) {
-        const float shift_weight = sum_radius_weight / (sum_radius_weight + light.radius);
-        sum_radius_weight += light.radius;
-        const float weight = light.radius / sum_radius_weight;
+        if (dist > 0.0f) {
+          const float pos_dist = dist + light_group.radius;
+          light_group.pos.x += 0.5f * dist * (light.pos.x - light_group.pos.x) / pos_dist;
+          light_group.pos.y += 0.5f * dist * (light.pos.y - light_group.pos.y) / pos_dist;
+          light_group.pos.z += 0.5f * dist * (light.pos.z - light_group.pos.z) / pos_dist;
+          light_group.radius += 0.5f * dist;
+        }
 
-        sum_pos.x = sum_pos.x * shift_weight + light.pos.x * weight;
-        sum_pos.y = sum_pos.y * shift_weight + light.pos.y * weight;
-        sum_pos.z = sum_pos.z * shift_weight + light.pos.z * weight;
+        data.triangles[light.triangle_id].light_id = light_group_count;
 
         lights_in_group++;
-
-        const float min_radius_increase = vector_distance(sum_pos, light_group.pos);
-        light_group.radius += (min_radius_increase < dist) ? dist : min_radius_increase;
-
-        light_group.pos  = sum_pos;
         lights[i].radius = -1.0f;
 
         i = 1;
@@ -136,7 +138,7 @@ void process_lights(Scene* scene) {
     unsigned int new_light_count = 0;
 
     for (unsigned int i = 1; i < light_count; i++) {
-      Light light = lights[i];
+      Triangle_Light light = lights[i];
 
       if (light.radius >= 0.0f) {
         lights[new_light_count++] = light;
@@ -145,8 +147,7 @@ void process_lights(Scene* scene) {
 
     light_count = new_light_count;
 
-    light_groups[light_group_count] = light_group;
-    light_group_count++;
+    light_groups[light_group_count++] = light_group;
   }
 
   printf("\r                                      \r");

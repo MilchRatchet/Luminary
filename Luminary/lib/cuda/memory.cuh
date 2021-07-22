@@ -24,113 +24,139 @@ void __prefetch_global_l2(const void* const ptr)
 //===========================================================================================
 
 __device__
-Sample load_active_sample_no_temporal_hint(void* _ptr) {
-  float* ptr = (float*)_ptr;
-  Sample sample;
-
-  const float4 data4 = __ldcs((float4*)ptr);
-  sample.origin.x = data4.x;
-  sample.origin.y = data4.y;
-  sample.origin.z = data4.z;
-  sample.ray.x = data4.w;
-
-  const float2 data2 = __ldcs((float2*)(ptr + 4));
-  sample.ray.y = data2.x;
-  sample.ray.z = data2.y;
-
-  sample.state = __ldcs((ushort2*)(ptr + 6));
-  sample.random_index = __ldcs((int*)(ptr + 7));
-
-  const float4 data4_2 =  __ldcs((float4*)(ptr + 8));
-  sample.record.r = data4_2.x;
-  sample.record.g = data4_2.y;
-  sample.record.b = data4_2.z;
-  sample.result.r = data4_2.w;
-
-  const float4 data4_3 = __ldcs((float4*)(ptr + 12));
-  sample.result.g = data4_3.x;
-  sample.result.b = data4_3.y;
-  sample.albedo_buffer.r = data4_3.z;
-  sample.albedo_buffer.g = data4_3.w;
-
-  sample.albedo_buffer.b = __ldcs((float*)(ptr + 16));
-  sample.index = __ldcs((ushort2*)(ptr + 17));
-
-  const float2 data2_2 = __ldcs((float2*)(ptr + 18));
-  sample.depth = data2_2.x;
-  sample.hit_id = float_as_uint(data2_2.y);
-
-  return sample;
+void stream_float2(const float2* source, float2* target) {
+  __stcs(target, __ldcs(source));
 }
 
 __device__
-void store_active_sample_no_temporal_hint(Sample sample, void* _ptr) {
-  float* ptr = (float*)_ptr;
-  float4 data4;
-  data4.x = sample.origin.x;
-  data4.y = sample.origin.y;
-  data4.z = sample.origin.z;
-  data4.w = sample.ray.x;
-  __stcs((float4*)ptr, data4);
-  float2 data2;
-  data2.x = sample.ray.y;
-  data2.y = sample.ray.z;
-  __stcs((float2*)(ptr + 4), data2);
-  __stcs((ushort2*)(ptr + 6), sample.state);
-  __stcs((int*)(ptr + 7), sample.random_index);
-  data4.x = sample.record.r;
-  data4.y = sample.record.g;
-  data4.z = sample.record.b;
-  data4.w = sample.result.r;
-  __stcs((float4*)(ptr + 8), data4);
-  data4.x = sample.result.g;
-  data4.y = sample.result.b;
-  data4.z = sample.albedo_buffer.r;
-  data4.w = sample.albedo_buffer.g;
-  __stcs((float4*)(ptr + 12), data4);
-  __stcs((float*)(ptr + 16), sample.albedo_buffer.b);
-  __stcs((ushort2*)(ptr + 17), sample.index);
-  data2.x = sample.depth;
-  data2.y = uint_as_float(sample.hit_id);
-  __stcs((float2*)(ptr + 18), data2);
+void stream_float4(const float4* source, float4* target) {
+  __stcs(target, __ldcs(source));
 }
 
 __device__
-Sample_Result load_finished_sample_no_temporal_hint(void* _ptr) {
-  float* ptr = (float*)_ptr;
-  Sample_Result sample;
+void swap_trace_data(const int index0, const int index1) {
+  const int offset0 = get_task_address(index0);
+  const float2 temp = __ldca((float2*)(device_trace_results + offset0));
+  const float4 data0 = __ldcs((float4*)(device_tasks + offset0));
+  const float4 data1 = __ldcs((float4*)(device_tasks + offset0) + 1);
 
-  const float2 data1 = __ldlu((float2*)(ptr + 0));
-  const float2 data2 = __ldlu((float2*)(ptr + 2));
-  const float2 data3 = __ldlu((float2*)(ptr + 4));
-
-  sample.result.r = data1.x;
-  sample.result.g = data1.y;
-  sample.result.b = data2.x;
-  sample.albedo_buffer.r = data2.y;
-  sample.albedo_buffer.g = data3.x;
-  sample.albedo_buffer.b = data3.y;
-
-  return sample;
+  const int offset1 = get_task_address(index1);
+  stream_float2((float2*)(device_trace_results + offset1), (float2*)(device_trace_results + offset0));
+  stream_float4((float4*)(device_tasks + offset1), (float4*)(device_tasks + offset0));
+  stream_float4((float4*)(device_tasks + offset1) + 1, (float4*)(device_tasks + offset0) + 1);
+  __stcs((float2*)(device_trace_results + offset1), temp);
+  __stcs((float4*)(device_tasks + offset1), data0);
+  __stcs((float4*)(device_tasks + offset1) + 1, data1);
 }
 
 __device__
-void store_finished_sample_no_temporal_hint(Sample sample, void* _ptr) {
-  float* ptr = (float*)_ptr;
+TraceTask load_trace_task(const void* ptr) {
+  const float4 data0 = __ldcs((float4*)ptr);
+  const float4 data1 = __ldcs(((float4*)ptr) + 1);
 
-  float2 data1;
-  data1.x = sample.result.r;
-  data1.y = sample.result.g;
-  float2 data2;
-  data2.x = sample.result.b;
-  data2.y = sample.albedo_buffer.r;
-  float2 data3;
-  data3.x = sample.albedo_buffer.g;
-  data3.y = sample.albedo_buffer.b;
+  TraceTask task;
+  task.origin.x = data0.x;
+  task.origin.y = data0.y;
+  task.origin.z = data0.z;
+  task.ray.x = data0.w;
 
-  __stcs((float2*)(ptr + 0), data1);
-  __stcs((float2*)(ptr + 2), data2);
-  __stcs((float2*)(ptr + 4), data3);
+  task.ray.y = data1.x;
+  task.ray.z = data1.y;
+  task.index.x = float_as_uint(data1.z) & 0xffff;
+  task.index.y = (float_as_uint(data1.z) >> 16);
+  task.state = float_as_uint(data1.w);
+
+  return task;
 }
+
+__device__
+void store_trace_task(const void* ptr, const TraceTask task) {
+  float4 data0;
+  data0.x = task.origin.x;
+  data0.y = task.origin.y;
+  data0.z = task.origin.z;
+  data0.w = task.ray.x;
+  __stcs((float4*)ptr, data0);
+
+  float4 data1;
+  data1.x = task.ray.y;
+  data1.y = task.ray.z;
+  data1.z = uint_as_float((task.index.x & 0xffff) | (task.index.y << 16));
+  data1.w = uint_as_float(task.state);
+  __stcs(((float4*)ptr) + 1, data1);
+}
+
+__device__
+TraceTask load_trace_task_essentials(const void* ptr) {
+  const float4 data0 = __ldcs((float4*)ptr);
+  const float2 data1 = __ldcs(((float2*)ptr) + 2);
+
+  TraceTask task;
+  task.origin.x = data0.x;
+  task.origin.y = data0.y;
+  task.origin.z = data0.z;
+  task.ray.x = data0.w;
+
+  task.ray.y = data1.x;
+  task.ray.z = data1.y;
+
+  return task;
+}
+
+__device__
+GeometryTask load_geometry_task(const void* ptr) {
+  const float4 data0 = __ldcs((float4*)ptr);
+  const float4 data1 = __ldcs(((float4*)ptr) + 1);
+
+  GeometryTask task;
+  task.position.x = data0.x;
+  task.position.y = data0.y;
+  task.position.z = data0.z;
+  task.ray_y = data0.w;
+
+  task.ray_xz = data1.x;
+  task.hit_id = float_as_uint(data1.y);
+  task.index.x = float_as_uint(data1.z) & 0xffff;
+  task.index.y = (float_as_uint(data1.z) >> 16);
+  task.state = float_as_uint(data1.w);
+
+  return task;
+}
+
+__device__
+OceanTask load_ocean_task(const void* ptr) {
+  const float4 data0 = __ldcs((float4*)ptr);
+  const float4 data1 = __ldcs(((float4*)ptr) + 1);
+
+  OceanTask task;
+  task.position.x = data0.x;
+  task.position.y = data0.y;
+  task.position.z = data0.z;
+  task.ray_y = data0.w;
+
+  task.ray_xz = data1.x;
+  task.distance = data1.y;
+  task.index.x = float_as_uint(data1.z) & 0xffff;
+  task.index.y = (float_as_uint(data1.z) >> 16);
+  task.state = float_as_uint(data1.w);
+
+  return task;
+}
+
+__device__
+SkyTask load_sky_task(const void* ptr) {
+  const float4 data = __ldcs((float4*)ptr);
+
+  SkyTask task;
+  task.ray.x = data.x;
+  task.ray.y = data.y;
+  task.ray.z = data.z;
+  task.index.x = float_as_uint(data.w) & 0xffff;
+  task.index.y = (float_as_uint(data.w) >> 16);
+
+  return task;
+}
+
+
 
 #endif /* CU_MEMORY_H */

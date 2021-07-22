@@ -97,6 +97,7 @@ You can control the camera through `WASD` and the mouse. The sun can be rotated 
 - `[F]` focal length
 - `[G]` aperture size
 - `[E]` exposure
+- `[C]` alpha cutoff
 - `[L]` ocean height
 - `[K]` ocean amplitude
 - `[J]` ocean frequency
@@ -107,7 +108,7 @@ You can control the camera through `WASD` and the mouse. The sun can be rotated 
 - `[N]` default material roughness
 - `[M]` default material metallic
 
-Ocean animation can be toggled with `[O]`. Different shading modes can be accessed through `[V]`. The information shown in the title of the window can be switched with `[T]`. Auto Exposure can be toggled with `[R]`. Bloom is toggled by `[B]`. Create an image by pressing `[F12]`.
+Ocean animation can be toggled with `[O]`. Different shading modes can be accessed through `[V]`. The information shown in the title of the window can be switched with `[T]`. Auto Exposure can be toggled with `[R]`. Bloom is toggled by `[B]`. Create an image by pressing `[F12]`. Denoiser can be toggled with `[~]`.
 
 Note that bad performance is to be expected. Path tracing is very computationally expensive, `Luminary` is not very performant yet and `Luminary` does not make use of `RT-Cores` found on `Turing` or `Ampere` architecture graphics cards. The latter would be considered if they would be exposed through `CUDA`.
 
@@ -148,3 +149,4 @@ This is a list of papers I used for this project so far. Note that some techniqu
 - L. Belcour, D. Coeurjolly, E. Heitz, J. Iehl and V. Ostromoukhov, _A Low-Discrepancy Sampler that Distributes Monte Carlo Errors as a Blue Noise in Screen Space_, SIGGRAPH'19 Talks, 2019.
 - A. Dietrich, H. Friedrich and M. Stich, _Spatial splits in bounding volume hierarchies_, HPG '09: Proceedings of the Conference on High Performance Graphics 2009, pp. 7-13, 2009.
 - A. Ebert, V. Fuetterling, C. Lojewski and F. Pfreundt, _Parallel Spatial Splits in Bounding Volume Hierarchies_, Eurographics Symposium on Parallel Graphics and Visualization, 2016.
+- E. Haines, T. Akenine-Möller, "Ray Tracing Gems", Apress, 2019.

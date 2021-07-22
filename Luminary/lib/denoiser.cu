@@ -29,8 +29,7 @@
      }
   }
 
-extern "C" void denoise_with_optix(raytrace_instance* instance) {
-
+extern "C" void denoise_with_optix(RaytraceInstance* instance) {
   OPTIX_CHECK(optixInit());
 
   OptixDeviceContext ctx;
@@ -65,11 +64,9 @@ extern "C" void denoise_with_optix(raytrace_instance* instance) {
     denoiserScratch,
     scratchSize));
 
-  gpuErrchk(cudaMemcpy(instance->frame_buffer_gpu, instance->frame_buffer, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyHostToDevice));
-
   OptixImage2D inputLayer[2];
 
-  inputLayer[0].data = (CUdeviceptr)instance->frame_buffer_gpu;
+  inputLayer[0].data = (CUdeviceptr)instance->frame_output_gpu;
   inputLayer[0].width = instance->width;
   inputLayer[0].height = instance->height;
   inputLayer[0].rowStrideInBytes = instance->width * sizeof(RGBF);
@@ -124,8 +121,7 @@ extern "C" void denoise_with_optix(raytrace_instance* instance) {
     denoiserScratch,
     scratchSize));
 
-
-  gpuErrchk(cudaMemcpy(instance->frame_buffer, output, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
+  gpuErrchk(cudaMemcpy(instance->frame_output_gpu, output, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToDevice));
 
   OPTIX_CHECK(optixDeviceContextDestroy(ctx));
   OPTIX_CHECK(optixDenoiserDestroy(denoiser));

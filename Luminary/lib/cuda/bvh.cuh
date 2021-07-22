@@ -5,6 +5,7 @@
 #include "math.cuh"
 #include "minmax.cuh"
 #include "memory.cuh"
+#include "ocean.cuh"
 #include <cuda_runtime_api.h>
 
 struct traversal_result {
@@ -16,11 +17,11 @@ __device__
 float bvh_triangle_intersection(const float4* triangles, const vec3 origin, const vec3 ray) {
     const float4 v1 = __ldg(triangles);
     const float4 v2 = __ldg(triangles + 1);
-    const float4 v3 = __ldg(triangles + 2);
+    const float v3 = __ldg((float*)(triangles + 2));
 
     vec3 vertex = get_vector(v1.x, v1.y, v1.z);
-    vec3 edge1 = get_vector(v2.x, v2.y, v2.z);
-    vec3 edge2 = get_vector(v3.x, v3.y, v3.z);
+    vec3 edge1 = get_vector(v1.w, v2.x, v2.y);
+    vec3 edge2 = get_vector(v2.z, v2.w, v3);
 
     const vec3 h = cross_product(ray, edge2);
     const float a = dot_product(edge1, h);
@@ -68,7 +69,7 @@ unsigned int __bfind(unsigned int a)
     return result;
 }
 
-#define STACK_SIZE_SM 9
+#define STACK_SIZE_SM 10
 #define STACK_SIZE 32
 
 #define STACK_POP(X)                                                    \
@@ -89,23 +90,20 @@ unsigned int __bfind(unsigned int a)
         packed_stptr_invoct.x++;                                        \
     }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
-void trace_samples() {
-    vec3 origin, ray;
-    const Node8* nodes = device_scene.nodes;
-    const Traversal_Triangle* triangles = device_scene.traversal_triangles;
-
-    float4* ptr;
-
-    float depth;
-    unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+__global__ __launch_bounds__(THREADS_PER_BLOCK,9)
+void process_trace_tasks() {
+    const uint16_t trace_task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
+    uint16_t offset = 0;
 
 	uint2 traversal_stack[STACK_SIZE];
     __shared__ uint2 traversal_stack_sm[THREADS_PER_BLOCK][STACK_SIZE_SM];
 
     unsigned int hit_id;
+    float depth;
 
     vec3 inv_ray;
+    vec3 origin;
+    vec3 ray;
 
     uint2 node_task = make_uint2(0, 0);
     uint2 triangle_task = make_uint2(0, 0);
@@ -115,41 +113,27 @@ void trace_samples() {
 
     while (1) {
         if (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
-            if (id >= device_samples_length) return;
+            if (offset >= trace_task_count) break;
 
-            ptr = (float4*)(device_active_samples + id);
-
-            float4 data0 = __ldcs(ptr + 0);
-            float4 data1 = __ldcs(ptr + 1);
+            const TraceTask task = load_trace_task_essentials(device_tasks + get_task_address(offset));
+            const float2 result = __ldcs((float2*)(device_trace_results + get_task_address(offset)));
 
             node_task = make_uint2(0, 0x80000000);
             triangle_task = make_uint2(0, 0);
 
-            origin.x = data0.x;
-            origin.y = data0.y;
-            origin.z = data0.z;
+            depth = result.x;
+            hit_id = float_as_uint(result.y);
 
-            ray.x = data0.w;
-            ray.y = data1.x;
-            ray.z = data1.y;
+            origin = task.origin;
+            ray = task.ray;
 
-            if (!(float_as_uint(data1.z) & 0x0100)) {
-                return;
-            }
+            inv_ray.x = 1.0f / (fabsf(task.ray.x) > eps ? task.ray.x : copysignf(eps, task.ray.x));
+            inv_ray.y = 1.0f / (fabsf(task.ray.y) > eps ? task.ray.y : copysignf(eps, task.ray.y));
+            inv_ray.z = 1.0f / (fabsf(task.ray.z) > eps ? task.ray.z : copysignf(eps, task.ray.z));
 
-            inv_ray.x = 1.0f / (fabsf(ray.x) > eps ? ray.x : copysignf(eps, ray.x));
-            inv_ray.y = 1.0f / (fabsf(ray.y) > eps ? ray.y : copysignf(eps, ray.y));
-            inv_ray.z = 1.0f / (fabsf(ray.z) > eps ? ray.z : copysignf(eps, ray.z));
-
-            packed_stptr_invoct.y = (((ray.x < 0.0f) ? 1 : 0) << 2) | (((ray.y < 0.0f) ? 1 : 0) << 1) | (((ray.z < 0.0f) ? 1 : 0) << 0);
-            packed_stptr_invoct.y = 7 - packed_stptr_invoct.y;
+            packed_stptr_invoct.y = (((task.ray.x < 0.0f) ? 1 : 0) << 2) | (((task.ray.y < 0.0f) ? 1 : 0) << 1) | (((task.ray.z < 0.0f) ? 1 : 0) << 0);
+            packed_stptr_invoct.y = 0b111 - packed_stptr_invoct.y;
             packed_stptr_invoct.x = 0;
-
-            depth = device_scene.far_clip_distance;
-
-            hit_id = 0xffffffff;
-
-            id += blockDim.x * gridDim.x;
         }
 
         int lost_loop_iterations = 0;
@@ -173,7 +157,7 @@ void trace_samples() {
                 const unsigned int relative_index = __popc(imask & ~(0xffffffff << slot_index));
                 const unsigned int child_node_index = child_node_base_index + relative_index;
 
-                float4* data_ptr = (float4*)(nodes + child_node_index);
+                float4* data_ptr = (float4*)(device_scene.nodes + child_node_index);
 
                 const float4 data0 = __ldg(data_ptr + 0);
                 const float4 data1 = __ldg(data_ptr + 1);
@@ -389,7 +373,7 @@ void trace_samples() {
 
                 const int triangle_index = __bfind(triangle_task.y);
 
-                const float d = bvh_triangle_intersection((float4*)(triangles + triangle_index + triangle_task.x), origin, ray);
+                const float d = bvh_triangle_intersection((float4*)(device_scene.traversal_triangles + triangle_index + triangle_task.x), origin, ray);
 
                 if (d < depth) {
                     depth = d;
@@ -408,12 +392,14 @@ void trace_samples() {
                         node_task = make_uint2(0, 0);
                     }
                 } else {
-                    float2 write_back;
-                    write_back.x = depth;
-                    write_back.y = uint_as_float(hit_id);
+                    float2 result;
+                    result.x = depth;
+                    result.y = uint_as_float(hit_id);
 
-                    __stcs((float2*)(ptr + 4) + 1, write_back);
-                    //__prefetch_global_l1(device_active_samples + id);
+                    __stcs((float2*)(device_trace_results + get_task_address(offset)), result);
+
+                    offset++;
+
                     break;
                 }
             }

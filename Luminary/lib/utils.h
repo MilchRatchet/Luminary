@@ -31,6 +31,8 @@ struct Camera {
   float aperture_size;
   float exposure;
   int auto_exposure;
+  float alpha_cutoff;
+  float far_clip_distance;
 } typedef Camera;
 
 struct Light {
@@ -58,7 +60,6 @@ struct Ocean {
 
 struct Scene {
   Camera camera;
-  float far_clip_distance;
   Triangle* triangles;
   Traversal_Triangle* traversal_triangles;
   unsigned int triangles_length;
@@ -75,11 +76,20 @@ struct Scene {
   Sky sky;
 } typedef Scene;
 
-struct raytrace_instance {
+struct RaytraceInstance {
   unsigned int width;
   unsigned int height;
-  RGBF* frame_buffer;
+  void* tasks_gpu;
+  void* trace_results_gpu;
+  void* task_counts_gpu;
+  uint32_t* light_sample_history_gpu;
+  RGBF* frame_output;
+  RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
+  RGBF* frame_variance_gpu;
+  RGBF* frame_bias_cache_gpu;
+  RGBF* albedo_buffer_gpu;
+  RGBF* records_gpu;
   RGB8* buffer_8bit_gpu;
   void* albedo_atlas;
   int albedo_atlas_length;
@@ -87,19 +97,15 @@ struct raytrace_instance {
   int illuminance_atlas_length;
   void* material_atlas;
   int material_atlas_length;
-  int reflection_depth;
-  int diffuse_samples;
+  int max_ray_depth;
+  int offline_samples;
   Scene scene_gpu;
   int denoiser;
-  void* samples_gpu;
-  void* samples_finished_gpu;
-  int samples_per_sample;
   void* randoms_gpu;
-  RGBF* albedo_buffer_gpu;
   RGBF default_material;
   int shading_mode;
   RGBF* bloom_scratch_gpu;
-} typedef raytrace_instance;
+} typedef RaytraceInstance;
 
 #define clamp(value, low, high) \
   { (value) = min((high), max((value), (low))); }

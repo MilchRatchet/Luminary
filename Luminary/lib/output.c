@@ -4,6 +4,8 @@
 #include "raytrace.h"
 #include "denoiser.h"
 #include "png.h"
+#include "output.h"
+#include "frametime.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -12,46 +14,53 @@
 #include <time.h>
 
 void offline_output(
-  Scene scene, raytrace_instance* instance, char* output_name, int progress, clock_t time) {
-  trace_scene(instance, progress, 0, 0xffffffff);
+  Scene scene, RaytraceInstance* instance, char* output_name, int progress, clock_t time) {
+  clock_t start_of_rt = clock();
+  trace_scene(instance, 0, 0xffffffff);
+  for (int i = 1; i < instance->offline_samples; i++) {
+    trace_scene(instance, i, 0x0);
+    const double progress     = ((double) i) / instance->offline_samples;
+    const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
+    const double time_left    = (time_elapsed / progress) - time_elapsed;
+    printf(
+      "\r                                                                                          "
+      "                \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - "
+      "Performance: %.1f Mrays/s",
+      100.0 * progress, time_elapsed, time_left,
+      0.000001 * instance->max_ray_depth * instance->width * instance->height * i / time_elapsed);
+  }
+
+  printf(
+    "\r                                                                                            "
+    "                  \r");
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   free_inputs(instance);
-  copy_framebuffer_to_cpu(instance);
 
-  switch (instance->denoiser) {
-  case 0: {
-    post_median_filter(instance, 0.9f);
-    printf("[%.3fs] Applied Median Filter.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-    break;
-  }
-  case 1: {
+  if (instance->denoiser) {
     denoise_with_optix(instance);
     printf("[%.3fs] Applied Optix Denoiser.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-    break;
-  }
   }
 
-  post_bloom(instance, 3.0f, 4.0f);
+  apply_bloom(instance, instance->frame_output_gpu);
 
-  printf("[%.3fs] Applied Bloom.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-
-  post_tonemapping(instance);
-
-  printf("[%.3fs] Applied Tonemapping.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-
+  initialize_8bit_frame(instance, instance->width, instance->height);
   RGB8* frame = (RGB8*) malloc(sizeof(RGB8) * instance->width * instance->height);
-  frame_buffer_to_8bit_image(scene.camera, instance, frame);
-
-  printf(
-    "[%.3fs] Converted frame buffer to image.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+  copy_framebuffer_to_8bit(
+    frame, instance->width, instance->height, instance->frame_output_gpu, instance);
 
   store_as_png(
     output_name, (uint8_t*) frame, sizeof(RGB8) * instance->width * instance->height,
     instance->width, instance->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
 
   printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+
+  free(frame);
+  free_outputs(instance);
+
+  printf("[Done] Luminary can now be closed.\n");
+  getchar();
 }
 
 static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
@@ -73,15 +82,39 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   return result;
 }
 
-static char* SHADING_MODE_STRING[4] = {"", "[ALBEDO] ", "[DEPTH] ", "[NORMAL] "};
+static RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
+  RealtimeInstance* realtime = (RealtimeInstance*) malloc(sizeof(RealtimeInstance));
 
-void realtime_output(Scene scene, raytrace_instance* instance, const int filters) {
   SDL_Init(SDL_INIT_VIDEO);
-  SDL_Window* window = SDL_CreateWindow(
-    "Luminary", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, instance->width, instance->height,
-    SDL_WINDOW_SHOWN);
 
-  SDL_Surface* window_surface = SDL_GetWindowSurface(window);
+  SDL_Rect rect;
+  SDL_Rect screen_size;
+
+  SDL_GetDisplayUsableBounds(0, &rect);
+  SDL_GetDisplayBounds(0, &screen_size);
+
+  rect.y += screen_size.h - rect.h;
+  rect.h -= screen_size.h - rect.h;
+
+  // It seems SDL window dimensions must be a multiple of 4
+  rect.h = rect.h & 0xfffffffc;
+
+  rect.w = rect.h * ((float) instance->width) / instance->height;
+
+  rect.w = rect.w & 0xfffffffc;
+
+  if (rect.w > screen_size.w) {
+    rect.w = screen_size.w;
+    rect.h = rect.w * ((float) instance->height) / instance->width;
+  }
+
+  realtime->width  = rect.w;
+  realtime->height = rect.h;
+
+  realtime->window =
+    SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN);
+
+  realtime->window_surface = SDL_GetWindowSurface(realtime->window);
 
   Uint32 rmask, gmask, bmask, amask;
 
@@ -97,27 +130,42 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   amask = 0xff000000;
 #endif
 
-  SDL_Surface* surface =
-    SDL_CreateRGBSurface(0, instance->width, instance->height, 24, rmask, gmask, bmask, amask);
+  realtime->surface = SDL_CreateRGBSurface(0, rect.w, rect.h, 24, rmask, gmask, bmask, amask);
 
-  RGB8* buffer = (RGB8*) surface->pixels;
+  realtime->buffer = (RGB8*) realtime->surface->pixels;
+  initialize_8bit_frame(instance, rect.w, rect.h);
+
+  return realtime;
+}
+
+static void free_realtime_instance(RealtimeInstance* realtime) {
+  free(realtime->buffer);
+  SDL_DestroyWindow(realtime->window);
+  SDL_Quit();
+  free(realtime);
+}
+
+static char* SHADING_MODE_STRING[4] = {"", "[ALBEDO] ", "[DEPTH] ", "[NORMAL] "};
+
+void realtime_output(Scene scene, RaytraceInstance* instance, const int filters) {
+  RealtimeInstance* realtime = init_realtime_instance(instance);
 
   int exit = 0;
 
-  clock_t time = clock();
+  Frametime frametime = init_frametime();
 
   int temporal_frames      = 0;
   int information_mode     = 0;
   unsigned int update_mask = 0xffffffff;
   int update_ocean         = 0;
   int use_bloom            = 0;
+  int use_denoiser         = 1;
 
   int make_png  = 0;
   int png_count = 0;
 
   char* title = (char*) malloc(4096);
 
-  initiliaze_8bit_frame(instance);
   void* optix_setup = initialize_optix_denoise_for_realtime(instance);
 
   SDL_SetRelativeMouseMode(SDL_TRUE);
@@ -125,17 +173,19 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   while (!exit) {
     SDL_Event event;
 
-    trace_scene(instance, 0, temporal_frames, update_mask);
+    trace_scene(instance, temporal_frames, update_mask);
     update_mask = 0;
 
-    if (instance->denoiser) {
+    if (instance->denoiser && use_denoiser) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
       if (use_bloom)
         apply_bloom(instance, denoised_image);
-      copy_framebuffer_to_8bit(buffer, denoised_image, instance);
+      copy_framebuffer_to_8bit(
+        realtime->buffer, realtime->width, realtime->height, denoised_image, instance);
     }
     else {
-      copy_framebuffer_to_8bit(buffer, instance->frame_buffer_gpu, instance);
+      copy_framebuffer_to_8bit(
+        realtime->buffer, realtime->width, realtime->height, instance->frame_output_gpu, instance);
     }
 
     if (make_png) {
@@ -143,21 +193,21 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       char* filename = malloc(4096);
       sprintf(filename, "%d.png", png_count++);
       store_as_png(
-        filename, (uint8_t*) buffer, sizeof(RGB8) * instance->width * instance->height,
-        instance->width, instance->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+        filename, (uint8_t*) realtime->buffer, sizeof(RGB8) * realtime->width * realtime->height,
+        realtime->width, realtime->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
       free(filename);
     }
 
-    SDL_BlitSurface(surface, 0, window_surface, 0);
+    SDL_BlitSurface(realtime->surface, 0, realtime->window_surface, 0);
 
     temporal_frames++;
-    const double frame_time = 1000.0 * ((double) (clock() - time)) / CLOCKS_PER_SEC;
-    time                    = clock();
+    sample_frametime(&frametime);
+    const double time = get_frametime(&frametime);
 
     if (information_mode == 0) {
       sprintf(
-        title, "Luminary %s- FPS: %.1f - Frametime: %.0fms",
-        SHADING_MODE_STRING[instance->shading_mode], 1000.0 / frame_time, frame_time);
+        title, "Luminary %s- FPS: %.0f - Frametime: %.2fms",
+        SHADING_MODE_STRING[instance->shading_mode], 1000.0 / time, time);
     }
     else if (information_mode == 1) {
       sprintf(
@@ -194,10 +244,10 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
         instance->scene_gpu.sky.rayleigh_falloff, instance->scene_gpu.sky.mie_falloff);
     }
 
-    const double normalized_time = frame_time / 16.66667;
+    const double normalized_time = time / 16.66667;
 
-    SDL_SetWindowTitle(window, title);
-    SDL_UpdateWindowSurface(window);
+    SDL_SetWindowTitle(realtime->window, title);
+    SDL_UpdateWindowSurface(realtime->window);
 
     SDL_PumpEvents();
     const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
@@ -253,6 +303,10 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
           instance->default_material.r += 0.001f * event.motion.xrel;
           update_mask |= 0b10000;
         }
+        else if (keystate[SDL_SCANCODE_C]) {
+          instance->scene_gpu.camera.alpha_cutoff += 0.001f * event.motion.xrel;
+          update_mask |= 0b1;
+        }
         else {
           instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
           instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
@@ -281,6 +335,12 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_B) {
           use_bloom ^= 0b1;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
+          make_png = 1;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
+          use_denoiser ^= 1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_R) {
           instance->scene_gpu.camera.auto_exposure ^= 0b1;
@@ -352,9 +412,6 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
       update_mask |= 0b1;
       temporal_frames = 0;
     }
-    if (keystate[SDL_SCANCODE_F12]) {
-      make_png = 1;
-    }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;
     }
@@ -362,6 +419,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     clamp(instance->scene_gpu.camera.aperture_size, 0.0f, FLT_MAX);
     clamp(instance->scene_gpu.camera.focal_length, 0.0f, FLT_MAX);
     clamp(instance->scene_gpu.camera.exposure, 0.0f, FLT_MAX);
+    clamp(instance->scene_gpu.camera.alpha_cutoff, 0.0f, 1.0f);
     clamp(instance->scene_gpu.ocean.choppyness, 0.0f, FLT_MAX);
     clamp(instance->scene_gpu.ocean.amplitude, 0.0f, FLT_MAX);
     clamp(instance->scene_gpu.ocean.frequency, 0.0f, FLT_MAX);
@@ -382,7 +440,7 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
     if (update_ocean) {
       temporal_frames = 0;
       update_mask |= 0b1;
-      instance->scene_gpu.ocean.time += frame_time * 0.001f;
+      instance->scene_gpu.ocean.time += time * 0.001f;
     }
 
     if (instance->scene_gpu.camera.auto_exposure) {
@@ -394,7 +452,5 @@ void realtime_output(Scene scene, raytrace_instance* instance, const int filters
   free(title);
   free_8bit_frame(instance);
   free_realtime_denoise(optix_setup);
-
-  SDL_DestroyWindow(window);
-  SDL_Quit();
+  free_realtime_instance(realtime);
 }

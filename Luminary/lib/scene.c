@@ -55,7 +55,7 @@ static vec3 normalize_vector(vec3 vector) {
   return scale_vector(vector, inv_length);
 }
 
-Scene load_scene(const char* filename, raytrace_instance** instance, char** output_name) {
+Scene load_scene(const char* filename, RaytraceInstance** instance, char** output_name) {
   FILE* file = fopen(filename, "rb");
 
   assert((unsigned long long) file, "Scene file could not be opened", 1);
@@ -81,17 +81,19 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
 
   Scene scene;
 
-  scene.camera.pos.x         = 0.0f;
-  scene.camera.pos.y         = 0.0f;
-  scene.camera.pos.z         = 0.0f;
-  scene.camera.rotation.x    = 0.0f;
-  scene.camera.rotation.y    = 0.0f;
-  scene.camera.rotation.z    = 0.0f;
-  scene.camera.fov           = 1.0f;
-  scene.camera.focal_length  = 1.0f;
-  scene.camera.aperture_size = 0.00f;
-  scene.camera.exposure      = 1.0f;
-  scene.camera.auto_exposure = 0;
+  scene.camera.pos.x             = 0.0f;
+  scene.camera.pos.y             = 0.0f;
+  scene.camera.pos.z             = 0.0f;
+  scene.camera.rotation.x        = 0.0f;
+  scene.camera.rotation.y        = 0.0f;
+  scene.camera.rotation.z        = 0.0f;
+  scene.camera.fov               = 1.0f;
+  scene.camera.focal_length      = 1.0f;
+  scene.camera.aperture_size     = 0.00f;
+  scene.camera.exposure          = 1.0f;
+  scene.camera.auto_exposure     = 0;
+  scene.camera.alpha_cutoff      = 0.0f;
+  scene.camera.far_clip_distance = 1000000.0f;
 
   scene.ocean.active     = 0;
   scene.ocean.emissive   = 0;
@@ -110,14 +112,13 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
 
-  int width           = 1280;
-  int height          = 720;
-  int bounces         = 5;
-  int samples         = 16;
-  float azimuth       = 3.141f;
-  float altitude      = 0.5f;
-  float sun_strength  = 30.0f;
-  float clip_distance = 1000000.0f;
+  int width          = 1280;
+  int height         = 720;
+  int bounces        = 5;
+  int samples        = 16;
+  float azimuth      = 3.141f;
+  float altitude     = 0.5f;
+  float sun_strength = 30.0f;
 
   int denoiser = 1;
 
@@ -155,7 +156,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
       sscanf(line, "%*c %s\n", *output_name);
     }
     else if (line[0] == 'f') {
-      sscanf(line, "%*c %f\n", &clip_distance);
+      sscanf(line, "%*c %f\n", &scene.camera.far_clip_distance);
     }
     else if (line[0] == 'w') {
       sscanf(
@@ -197,22 +198,9 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   for (unsigned int i = 0; i < triangle_count; i++) {
     Triangle triangle     = triangles[i];
     Traversal_Triangle tt = {
-      .vertex =
-        {.x = triangle.vertex.x,
-         .y = triangle.vertex.y,
-         .z = triangle.vertex.z,
-         .w = triangle.vertex.x},
-      .edge1 =
-        {.x = triangle.edge1.x,
-         .y = triangle.edge1.y,
-         .z = triangle.edge1.z,
-         .w = triangle.edge1.x},
-      .edge2 = {
-        .x = triangle.edge2.x,
-        .y = triangle.edge2.y,
-        .z = triangle.edge2.z,
-        .w = triangle.edge2.x}};
-    triangle.face_normal   = normalize_vector(cross_product(triangle.edge1, triangle.edge2));
+      .vertex = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
+      .edge1  = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
+      .edge2  = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z}};
     traversal_triangles[i] = tt;
     triangles[i]           = triangle;
   }
@@ -224,7 +212,6 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   scene.nodes_length        = nodes_length;
   scene.materials_length    = content.materials_length;
   scene.texture_assignments = get_texture_assignments(content);
-  scene.far_clip_distance   = clip_distance;
 
   scene.altitude     = altitude;
   scene.azimuth      = azimuth;
@@ -251,7 +238,7 @@ Scene load_scene(const char* filename, raytrace_instance** instance, char** outp
   return scene;
 }
 
-void free_scene(Scene scene, raytrace_instance* instance) {
+void free_scene(Scene scene, RaytraceInstance* instance) {
   free_textures(instance->albedo_atlas, instance->albedo_atlas_length);
   free_textures(instance->illuminance_atlas, instance->illuminance_atlas_length);
   free_textures(instance->material_atlas, instance->material_atlas_length);
