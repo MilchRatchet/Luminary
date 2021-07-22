@@ -150,7 +150,7 @@ void preprocess_trace_tasks() {
     const int offset = get_task_address(i);
     TraceTask task = load_trace_task_essentials(device_tasks + offset);
 
-    float depth = device_scene.far_clip_distance;
+    float depth = device_scene.camera.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
 
     if (device_scene.ocean.active) {
@@ -502,6 +502,102 @@ void process_geometry_tasks() {
   device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = trace_count;
 }
 
+__global__ __launch_bounds__(THREADS_PER_BLOCK,9)
+void process_debug_geometry_tasks() {
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
+
+  for (int i = 0; i < task_count; i++) {
+    GeometryTask task = load_geometry_task(device_tasks + get_task_address(i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    if (device_shading_mode == SHADING_ALBEDO) {
+      const float4* hit_address = (float4*)(device_scene.triangles + task.hit_id);
+
+      const float4 t1 = __ldg(hit_address);
+      const float4 t2 = __ldg(hit_address + 1);
+      const float4 t3 = __ldg(hit_address + 2);
+      const float4 t4 = __ldg(hit_address + 3);
+      const float4 t5 = __ldg(hit_address + 4);
+      const float4 t6 = __ldg(hit_address + 5);
+      const float2 t7 = __ldg((float2*)(hit_address + 6));
+
+      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
+      vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
+      vec3 edge2 = get_vector(t2.z, t2.w, t3.x);
+
+      vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+
+      const float lambda = normal.x;
+      const float mu = normal.y;
+
+      UV vertex_texture = get_UV(t5.z, t5.w);
+      UV edge1_texture = get_UV(t6.x, t6.y);
+      UV edge2_texture = get_UV(t6.z, t6.w);
+
+      const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
+
+      const int texture_object = __float_as_int(t7.x);
+
+      const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
+
+      RGBF color = get_color(0.0f, 0.0f, 0.0f);
+
+      if (maps.x) {
+        const float4 albedo_f = tex2D<float4>(device_albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
+        color = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
+      } else {
+        color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
+      }
+
+      if (maps.y) {
+        #ifdef LIGHTS_AT_NIGHT_ONLY
+        if (device_sun.y < NIGHT_THRESHOLD) {
+        #endif
+        const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
+
+        color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
+
+        #ifdef LIGHTS_AT_NIGHT_ONLY
+        }
+        #endif
+      }
+
+      device_frame_buffer[pixel] = color;
+    } else if (device_shading_mode == SHADING_DEPTH) {
+      const float dist = get_length(sub_vector(device_scene.camera.pos, task.position));
+      const float value = __saturatef((1.0f/dist) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value,value,value);
+    } else if (device_shading_mode == SHADING_NORMAL) {
+      const float4* hit_address = (float4*)(device_scene.triangles + task.hit_id);
+
+      const float4 t1 = __ldg(hit_address);
+      const float4 t2 = __ldg(hit_address + 1);
+      const float4 t3 = __ldg(hit_address + 2);
+      const float4 t4 = __ldg(hit_address + 3);
+      const float4 t5 = __ldg(hit_address + 4);
+
+      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
+      vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
+      vec3 edge2 = get_vector(t2.z, t2.w, t3.x);
+
+      vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+
+      const float lambda = normal.x;
+      const float mu = normal.y;
+
+      vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
+      vec3 edge1_normal = get_vector(t4.x, t4.y, t4.z);
+      vec3 edge2_normal = get_vector(t4.w, t5.x, t5.y);
+
+      normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+
+      device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+    }
+
+    atomicSub(&device_pixels_left, 1);
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK,10)
 void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -597,6 +693,35 @@ void process_ocean_tasks() {
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK,10)
+void process_debug_ocean_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int geometry_count = device_task_counts[id * 4 + 1];
+  const int task_count = device_task_counts[id * 4 + 2];
+
+  const int task_offset = geometry_count;
+
+  for (int i = 0; i < task_count; i++) {
+    OceanTask task = load_ocean_task(device_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    if (device_shading_mode == SHADING_ALBEDO) {
+      RGBAF albedo = device_scene.ocean.albedo;
+      device_frame_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
+    } else if (device_shading_mode == SHADING_DEPTH) {
+      const float value = __saturatef((1.0f/task.distance) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value,value,value);
+    } else if (device_shading_mode == SHADING_NORMAL) {
+      const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+
+      device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+    }
+
+    atomicSub(&device_pixels_left, 1);
+  }
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
 void process_sky_tasks() {
   const int geometry_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
   const int ocean_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
@@ -616,6 +741,31 @@ void process_sky_tasks() {
 
     if (light == ANY_LIGHT || light == 0) {
       device_frame_buffer[pixel] = sky;
+    }
+
+    atomicSub(&device_pixels_left, 1);
+  }
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
+void process_debug_sky_tasks() {
+  const int geometry_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
+  const int ocean_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
+
+  const int task_offset = geometry_count + ocean_count;
+
+  for (int i = 0; i < task_count; i++) {
+    const SkyTask task = load_sky_task(device_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    if (device_shading_mode == SHADING_ALBEDO) {
+      device_frame_buffer[pixel] = get_sky_color(task.ray);
+    } else if (device_shading_mode == SHADING_DEPTH) {
+      const float value = __saturatef((1.0f/device_scene.camera.far_clip_distance) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value,value,value);
+    } else if (device_shading_mode == SHADING_NORMAL) {
+      device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
 
     atomicSub(&device_pixels_left, 1);

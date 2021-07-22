@@ -268,18 +268,27 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
 
     generate_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-    while (pixels_left > 0) {
-        if (pixels_left < amount)
-            balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    if (instance->shading_mode) {
         preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
         process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
         postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-        process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-        process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-        process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+        process_debug_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    } else {
+        while (pixels_left > 0) {
+            if (pixels_left < amount)
+                balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+            process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-        gpuErrchk(cudaMemcpyFromSymbol(&(pixels_left), device_pixels_left, sizeof(int), 0, cudaMemcpyDeviceToHost));
-        gpuErrchk(cudaDeviceSynchronize());
+            gpuErrchk(cudaMemcpyFromSymbol(&(pixels_left), device_pixels_left, sizeof(int), 0, cudaMemcpyDeviceToHost));
+            gpuErrchk(cudaDeviceSynchronize());
+        }
     }
 
     finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

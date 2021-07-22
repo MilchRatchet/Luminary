@@ -81,18 +81,19 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
 
   Scene scene;
 
-  scene.camera.pos.x         = 0.0f;
-  scene.camera.pos.y         = 0.0f;
-  scene.camera.pos.z         = 0.0f;
-  scene.camera.rotation.x    = 0.0f;
-  scene.camera.rotation.y    = 0.0f;
-  scene.camera.rotation.z    = 0.0f;
-  scene.camera.fov           = 1.0f;
-  scene.camera.focal_length  = 1.0f;
-  scene.camera.aperture_size = 0.00f;
-  scene.camera.exposure      = 1.0f;
-  scene.camera.auto_exposure = 0;
-  scene.camera.alpha_cutoff  = 0.0f;
+  scene.camera.pos.x             = 0.0f;
+  scene.camera.pos.y             = 0.0f;
+  scene.camera.pos.z             = 0.0f;
+  scene.camera.rotation.x        = 0.0f;
+  scene.camera.rotation.y        = 0.0f;
+  scene.camera.rotation.z        = 0.0f;
+  scene.camera.fov               = 1.0f;
+  scene.camera.focal_length      = 1.0f;
+  scene.camera.aperture_size     = 0.00f;
+  scene.camera.exposure          = 1.0f;
+  scene.camera.auto_exposure     = 0;
+  scene.camera.alpha_cutoff      = 0.0f;
+  scene.camera.far_clip_distance = 1000000.0f;
 
   scene.ocean.active     = 0;
   scene.ocean.emissive   = 0;
@@ -111,14 +112,13 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
 
-  int width           = 1280;
-  int height          = 720;
-  int bounces         = 5;
-  int samples         = 16;
-  float azimuth       = 3.141f;
-  float altitude      = 0.5f;
-  float sun_strength  = 30.0f;
-  float clip_distance = 1000000.0f;
+  int width          = 1280;
+  int height         = 720;
+  int bounces        = 5;
+  int samples        = 16;
+  float azimuth      = 3.141f;
+  float altitude     = 0.5f;
+  float sun_strength = 30.0f;
 
   int denoiser = 1;
 
@@ -156,7 +156,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
       sscanf(line, "%*c %s\n", *output_name);
     }
     else if (line[0] == 'f') {
-      sscanf(line, "%*c %f\n", &clip_distance);
+      sscanf(line, "%*c %f\n", &scene.camera.far_clip_distance);
     }
     else if (line[0] == 'w') {
       sscanf(
@@ -212,7 +212,6 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.nodes_length        = nodes_length;
   scene.materials_length    = content.materials_length;
   scene.texture_assignments = get_texture_assignments(content);
-  scene.far_clip_distance   = clip_distance;
 
   scene.altitude     = altitude;
   scene.azimuth      = azimuth;

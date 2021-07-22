@@ -32,6 +32,7 @@ struct Camera {
   float exposure;
   int auto_exposure;
   float alpha_cutoff;
+  float far_clip_distance;
 } typedef Camera;
 
 struct Light {
@@ -59,7 +60,6 @@ struct Ocean {
 
 struct Scene {
   Camera camera;
-  float far_clip_distance;
   Triangle* triangles;
   Traversal_Triangle* traversal_triangles;
   unsigned int triangles_length;
