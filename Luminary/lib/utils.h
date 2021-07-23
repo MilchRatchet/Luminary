@@ -110,4 +110,13 @@ struct RaytraceInstance {
 #define clamp(value, low, high) \
   { (value) = min((high), max((value), (low))); }
 
+#define ensure_capacity(ptr, count, length, size) \
+  {                                               \
+    if (count == length) {                        \
+      length += 1;                                \
+      length *= 2;                                \
+      ptr = safe_realloc(ptr, size * length);     \
+    }                                             \
+  }
+
 #endif /* UTILS_H */

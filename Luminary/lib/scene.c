@@ -27,40 +27,14 @@ static int validate_filetype(const char* line) {
   return result;
 }
 
-static vec3 cross_product(const vec3 a, const vec3 b) {
-  vec3 result;
-
-  result.x = a.y * b.z - a.z * b.y;
-  result.y = a.z * b.x - a.x * b.z;
-  result.z = a.x * b.y - a.y * b.x;
-
-  return result;
-}
-
-static vec3 scale_vector(vec3 vector, const float scale) {
-  vector.x *= scale;
-  vector.y *= scale;
-  vector.z *= scale;
-
-  return vector;
-}
-
-static float get_length(const vec3 vector) {
-  return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
-}
-
-static vec3 normalize_vector(vec3 vector) {
-  const float inv_length = 1.0f / get_length(vector);
-
-  return scale_vector(vector, inv_length);
-}
-
 Scene load_scene(const char* filename, RaytraceInstance** instance, char** output_name) {
   FILE* file = fopen(filename, "rb");
 
-  assert((unsigned long long) file, "Scene file could not be opened", 1);
-
   char* line = (char*) malloc(LINE_SIZE);
+
+  sprintf(line, "Scene file \"%s\" could not be opened.", filename);
+
+  assert((unsigned long long) file, line, 1);
 
   fgets(line, LINE_SIZE, file);
 

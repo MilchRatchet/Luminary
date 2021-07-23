@@ -1,7 +1,3 @@
-/*
- * png.c - Store image in png format
- */
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -234,10 +230,15 @@ static int verify_header(FILE* file) {
   return result;
 }
 
+static inline TextureRGBA default_texture() {
+  TextureRGBA fallback = {.data = malloc(sizeof(RGBAF) * 16), .height = 4, .width = 4};
+  memset(fallback.data, 0, sizeof(RGBAF) * 16);
+  return fallback;
+}
+
 static inline TextureRGBA default_failure() {
   print_error("File content is corrupted!");
-  TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
-  return fallback;
+  return default_texture();
 }
 
 static void reconstruction_1_uint8(uint8_t* line, const uint32_t line_length) {
@@ -365,22 +366,19 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   if (!file) {
     print_error("File could not be opened!");
-    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
-    return fallback;
+    return default_texture();
   }
 
   if (verify_header(file)) {
     print_error("File header does not correspond to png!");
-    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
-    return fallback;
+    return default_texture();
   }
 
   uint8_t* IHDR = (uint8_t*) malloc(25);
 
   if (IHDR == (uint8_t*) 0) {
     print_error("Failed to allocate memory!");
-    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
-    return fallback;
+    return default_texture();
   }
 
   fread(IHDR, 1, 25, file);
@@ -404,8 +402,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
     color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA || bit_depth != PNG_BITDEPTH_8
     || interlace_type == PNG_INTERLACE_ADAM7) {
     print_error("File properties are not supported!");
-    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
-    return fallback;
+    return default_texture();
   }
 
   if ((uint32_t) crc32(0, IHDR + 4, 17) != read_int_big_endian(IHDR + 21)) {
@@ -422,17 +419,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   if (chunk == (uint8_t*) 0) {
     print_error("Failed to allocate memory!");
-    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
-    return fallback;
-  }
-
-  fread(chunk, 1, 8, file);
-
-  while (read_int_big_endian(chunk + 4) != 1229209940u) {
-    const uint32_t length = read_int_big_endian(chunk);
-    fseek(file, length + 4u, SEEK_CUR);
-
-    fread(chunk, 1, 8, file);
+    return default_texture();
   }
 
   uint8_t* filtered_data     = (uint8_t*) malloc(width * height * byte_per_pixel + height);
@@ -440,30 +427,38 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   uint32_t combined_compressed_length = 0;
 
-  while (read_int_big_endian(chunk + 4) == 1229209940u) {
-    const int compressed_length = read_int_big_endian(chunk);
+  int data_left = (fread(chunk, 1, 8, file) == 8);
 
-    uint8_t* compressed_data = (uint8_t*) malloc(compressed_length + 4);
+  while (data_left) {
+    const int length = read_int_big_endian(chunk);
 
-    write_int_big_endian(compressed_data, 1229209940u);
+    if (read_int_big_endian(chunk + 4) == 1229209940u) {
+      uint8_t* compressed_data = (uint8_t*) malloc(length + 4);
 
-    fread(compressed_data + 4, 1, compressed_length, file);
+      write_int_big_endian(compressed_data, 1229209940u);
 
-    fread(chunk, 1, 4, file);
+      fread(compressed_data + 4, 1, length, file);
 
-    if ((uint32_t) crc32(0, compressed_data, compressed_length + 4) != read_int_big_endian(chunk)) {
-      return default_failure();
+      fread(chunk, 1, 4, file);
+
+      if ((uint32_t) crc32(0, compressed_data, length + 4) != read_int_big_endian(chunk)) {
+        return default_failure();
+      }
+
+      memcpy(compressed_buffer + combined_compressed_length, compressed_data + 4, length);
+
+      combined_compressed_length += length;
+
+      free(compressed_data);
+    }
+    else {
+      fseek(file, length + 4u, SEEK_CUR);
     }
 
-    memcpy(compressed_buffer + combined_compressed_length, compressed_data + 4, compressed_length);
-
-    combined_compressed_length += compressed_length;
-
-    free(compressed_data);
-
-    fread(chunk, 1, 8, file);
+    data_left = (fread(chunk, 1, 8, file) == 8);
   }
 
+  fclose(file);
   free(chunk);
 
   z_stream defstream;
@@ -491,8 +486,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
     print_error("Failed to allocate memory!");
     free(data);
     free(filtered_data);
-    TextureRGBA fallback = {.data = 0, .height = 0, .width = 0};
-    return fallback;
+    return default_texture();
   }
 
   memset(line_buffer, 0, width * byte_per_pixel);
@@ -539,8 +533,6 @@ TextureRGBA load_texture_from_png(const char* filename) {
   result.data = float_data;
 
   free(filtered_data);
-
-  fclose(file);
 
   return result;
 }
