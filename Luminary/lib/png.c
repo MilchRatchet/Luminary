@@ -151,7 +151,8 @@ int store_as_png(
       width * bytes_per_pixel);
   }
 
-  FILE* file = fopen(filename, "wb");
+  FILE* file;
+  fopen_s(&file, filename, "wb");
 
   if (!file) {
     puts("png.c: File could not be opened!");
@@ -362,7 +363,8 @@ static void reconstruction_4_uint8(uint8_t* line, const uint32_t line_length, ui
 }
 
 TextureRGBA load_texture_from_png(const char* filename) {
-  FILE* file = fopen(filename, "rb");
+  FILE* file;
+  fopen_s(&file, filename, "rb");
 
   if (!file) {
     print_error("File could not be opened!");

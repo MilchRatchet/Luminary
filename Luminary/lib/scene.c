@@ -28,7 +28,8 @@ static int validate_filetype(const char* line) {
 }
 
 Scene load_scene(const char* filename, RaytraceInstance** instance, char** output_name) {
-  FILE* file = fopen(filename, "rb");
+  FILE* file;
+  fopen_s(&file, filename, "rb");
 
   char* line = (char*) malloc(LINE_SIZE);
 
@@ -44,7 +45,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
 
   if (line[0] == 'v') {
     int version = 0;
-    sscanf(line, "%*c %d\n", &version);
+    sscanf_s(line, "%*c %d\n", &version);
     assert(
       version == CURRENT_VERSION,
       "Incompatible Scene version! Update the file or use an older version of Luminary!", 1);
@@ -104,43 +105,43 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
     fgets(line, LINE_SIZE, file);
 
     if (line[0] == 'm' && line[1] == ' ') {
-      sscanf(line, "%*c %s\n", source);
+      sscanf_s(line, "%*c %s\n", source, LINE_SIZE);
       if (read_wavefront_file(source, &content)) {
         print_error("Mesh file could not be loaded!");
       }
     }
     else if (line[0] == 'c' && line[1] == ' ') {
-      sscanf(
+      sscanf_s(
         line, "%*c %f %f %f %f %f %f %f\n", &scene.camera.pos.x, &scene.camera.pos.y,
         &scene.camera.pos.z, &scene.camera.rotation.x, &scene.camera.rotation.y,
         &scene.camera.rotation.z, &scene.camera.fov);
     }
     else if (line[0] == 'l' && line[1] == ' ') {
-      sscanf(
+      sscanf_s(
         line, "%*c %f %f %f\n", &scene.camera.focal_length, &scene.camera.aperture_size,
         &scene.camera.exposure);
     }
     else if (line[0] == 's' && line[1] == ' ') {
-      sscanf(line, "%*c %f %f %f\n", &azimuth, &altitude, &sun_strength);
+      sscanf_s(line, "%*c %f %f %f\n", &azimuth, &altitude, &sun_strength);
     }
     else if (line[0] == 'i' && line[1] == ' ') {
-      sscanf(line, "%*c %d %d %d %d\n", &width, &height, &bounces, &samples);
+      sscanf_s(line, "%*c %d %d %d %d\n", &width, &height, &bounces, &samples);
     }
     else if (line[0] == 'o' && line[1] == ' ') {
-      sscanf(line, "%*c %s\n", *output_name);
+      sscanf_s(line, "%*c %s\n", *output_name, 4096);
     }
     else if (line[0] == 'f') {
-      sscanf(line, "%*c %f\n", &scene.camera.far_clip_distance);
+      sscanf_s(line, "%*c %f\n", &scene.camera.far_clip_distance);
     }
     else if (line[0] == 'w') {
-      sscanf(
+      sscanf_s(
         line, "%*c %d %d %f %f %f %f %f %f %f %f %f\n", &scene.ocean.active, &scene.ocean.emissive,
         &scene.ocean.albedo.r, &scene.ocean.albedo.g, &scene.ocean.albedo.b, &scene.ocean.albedo.a,
         &scene.ocean.height, &scene.ocean.amplitude, &scene.ocean.frequency,
         &scene.ocean.choppyness, &scene.ocean.speed);
     }
     else if (line[0] == 'd') {
-      sscanf(line, "%*c %d\n", &denoiser);
+      sscanf_s(line, "%*c %d\n", &denoiser);
     }
     else if (line[0] == '#') {
       continue;
