@@ -323,4 +323,16 @@ RGBF reinhard_tonemap(RGBF pixel) {
   return pixel;
 }
 
+__device__
+RGBAF saturate_albedo(RGBAF color, float change) {
+    const float max_value = fmaxf(color.r, fmaxf(color.g, color.b));
+    const float min_value = fminf(color.r, fminf(color.g, color.b));
+    const float diff = 0.01f + max_value - min_value;
+    color.r = fmaxf(0.0f, color.r - change * ((max_value - color.r) / diff) * min_value);
+    color.g = fmaxf(0.0f, color.g - change * ((max_value - color.g) / diff) * min_value);
+    color.b = fmaxf(0.0f, color.b - change * ((max_value - color.b) / diff) * min_value);
+
+    return color;
+}
+
 #endif /* CU_MATH_H */
