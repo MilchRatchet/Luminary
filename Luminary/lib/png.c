@@ -232,8 +232,12 @@ static int verify_header(FILE* file) {
 }
 
 static inline TextureRGBA default_texture() {
-  TextureRGBA fallback = {.data = malloc(sizeof(RGBAF) * 16), .height = 4, .width = 4};
-  memset(fallback.data, 0, sizeof(RGBAF) * 16);
+  TextureRGBA fallback = {.data = malloc(sizeof(RGBAF) * 4), .height = 2, .width = 2};
+  RGBAF default_pixel  = {.r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f};
+  fallback.data[0]     = default_pixel;
+  fallback.data[1]     = default_pixel;
+  fallback.data[2]     = default_pixel;
+  fallback.data[3]     = default_pixel;
   return fallback;
 }
 
@@ -373,6 +377,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   if (verify_header(file)) {
     print_error("File header does not correspond to png!");
+    fclose(file);
     return default_texture();
   }
 
@@ -380,6 +385,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   if (IHDR == (uint8_t*) 0) {
     print_error("Failed to allocate memory!");
+    fclose(file);
     return default_texture();
   }
 
@@ -387,10 +393,13 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   if (read_int_big_endian(IHDR) != 13u) {
     free(IHDR);
+    fclose(file);
     return default_failure();
   }
 
   if (read_int_big_endian(IHDR + 4) != 1229472850u) {
+    free(IHDR);
+    fclose(file);
     return default_failure();
   }
 
@@ -400,14 +409,31 @@ TextureRGBA load_texture_from_png(const char* filename) {
   const uint8_t color_type     = IHDR[17];
   const uint8_t interlace_type = IHDR[20];
 
-  if (
-    color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA || bit_depth != PNG_BITDEPTH_8
-    || interlace_type == PNG_INTERLACE_ADAM7) {
-    print_error("File properties are not supported!");
+  if (color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA) {
+    free(IHDR);
+    print_error("Texture is not in RGBA format!");
+    fclose(file);
+    return default_texture();
+  }
+
+  if (bit_depth != PNG_BITDEPTH_8) {
+    free(IHDR);
+    print_error("Texture does not have 8 bit depth!");
+    fclose(file);
+    return default_texture();
+  }
+
+  if (interlace_type == PNG_INTERLACE_ADAM7) {
+    free(IHDR);
+    print_error("Interlaced textures are not supported!");
+    fclose(file);
     return default_texture();
   }
 
   if ((uint32_t) crc32(0, IHDR + 4, 17) != read_int_big_endian(IHDR + 21)) {
+    free(IHDR);
+    print_error("Texture is corrupted!");
+    fclose(file);
     return default_failure();
   }
 

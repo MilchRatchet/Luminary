@@ -174,6 +174,8 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
     safe_realloc(content.material_maps, sizeof(TextureRGBA) * content.material_maps_length);
 
   *io_content = content;
+
+  fclose(file);
 }
 
 int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
@@ -196,6 +198,10 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   unsigned int normals_count   = content.normals_length;
   unsigned int uvs_count       = content.uvs_length;
   unsigned int materials_count = content.materials_length;
+
+  size_t* loaded_mtls             = malloc(sizeof(size_t) * 16);
+  unsigned int loaded_mtls_count  = 0;
+  unsigned int loaded_mtls_length = 16;
 
   uint16_t current_material = 0;
 
@@ -254,8 +260,21 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
       line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i'
       && line[5] == 'b') {
       sscanf_s(line, "%*s %s\n", path, LINE_SIZE);
-      read_materials_file(path, &content);
-      materials_count = content.materials_length;
+      size_t hash = hash_djb2((unsigned char*) path);
+
+      int already_loaded = 0;
+
+      for (unsigned int i = 0; i < loaded_mtls_count; i++) {
+        if (loaded_mtls[i] == hash)
+          already_loaded = 1;
+      }
+
+      if (!already_loaded) {
+        ensure_capacity(loaded_mtls, loaded_mtls_count, loaded_mtls_length, sizeof(size_t));
+        loaded_mtls[loaded_mtls_count++] = hash;
+        read_materials_file(path, &content);
+        materials_count = content.materials_length;
+      }
     }
     else if (
       line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't'
@@ -285,6 +304,8 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
     safe_realloc(content.triangles, sizeof(Wavefront_Triangle) * content.triangles_length);
 
   *io_content = content;
+
+  free(loaded_mtls);
 
   return 0;
 }
