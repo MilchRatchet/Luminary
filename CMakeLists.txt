@@ -19,7 +19,7 @@ find_package(OptiX REQUIRED)
 
 include_directories("${OptiX_INCLUDE}")
 
-file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/zlib/*.c")
+file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/zlib/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/UI/*.c")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/lib/*.cu")
 
 message(STATUS "cpu_source_files: ${cpu_source_files}")

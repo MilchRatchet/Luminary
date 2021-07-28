@@ -6,6 +6,7 @@
 #include "png.h"
 #include "output.h"
 #include "frametime.h"
+#include "UI/UI.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -153,6 +154,8 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   int exit = 0;
 
   Frametime frametime = init_frametime();
+  UI ui               = init_UI();
+  render_UI(&ui);
 
   int temporal_frames      = 0;
   int information_mode     = 0;
@@ -160,6 +163,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   int update_ocean         = 0;
   int use_bloom            = 0;
   int use_denoiser         = 1;
+  int show_menu            = 1;
 
   int make_png  = 0;
   int png_count = 0;
@@ -187,6 +191,9 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
       copy_framebuffer_to_8bit(
         realtime->buffer, realtime->width, realtime->height, instance->frame_output_gpu, instance);
     }
+
+    if (show_menu)
+      blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width, realtime->height);
 
     if (make_png) {
       make_png       = 0;
@@ -342,6 +349,9 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         else if (event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
           use_denoiser ^= 1;
         }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
+          show_menu ^= 1;
+        }
         else if (event.key.keysym.scancode == SDL_SCANCODE_R) {
           instance->scene_gpu.camera.auto_exposure ^= 0b1;
         }
@@ -453,4 +463,5 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   free_8bit_frame(instance);
   free_realtime_denoise(optix_setup);
   free_realtime_instance(realtime);
+  free_UI(&ui);
 }
