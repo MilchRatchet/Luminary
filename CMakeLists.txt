@@ -25,16 +25,16 @@ file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/lib/*.cu")
 message(STATUS "cpu_source_files: ${cpu_source_files}")
 message(STATUS "gpu_source_files: ${gpu_source_files}")
 
-set(SDL2_DIR "${PROJECT_SOURCE_DIR}/Luminary/lib/SDL")
+set(SDL2_DIR "${CMAKE_SOURCE_DIR}/Luminary/lib/SDL")
 
 include_directories(${SDL2_DIR})
 link_directories(${SDL2_DIR})
 
 add_executable(Luminary ${cpu_source_files} ${gpu_source_files})
 
-target_link_libraries(Luminary SDL2main SDL2)
+target_link_libraries(Luminary SDL2main SDL2 SDL2_ttf)
 
 add_custom_command(TARGET Luminary POST_BUILD
                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-               "${SDL2_DIR}/SDL2.dll"
+               "${SDL2_DIR}/SDL2.dll" "${SDL2_DIR}/SDL2_ttf.dll" "${SDL2_DIR}/libfreetype-6.dll" "${CMAKE_SOURCE_DIR}/Luminary/lib/UI/LuminaryFont.ttf"
                 ${CMAKE_BINARY_DIR})

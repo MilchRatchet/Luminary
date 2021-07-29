@@ -2,6 +2,7 @@
 #define UI_H
 
 #include <stdint.h>
+#include "SDL_ttf.h"
 
 #define UI_WIDTH 320
 #define UI_HEIGHT 600
@@ -10,6 +11,7 @@ struct UI {
   int active;
   int x;
   int y;
+  TTF_Font* font;
   uint8_t* pixels;
   float alpha;
   void* scratch;
