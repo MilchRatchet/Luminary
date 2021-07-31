@@ -18,8 +18,8 @@ struct UI {
   int y;
   TTF_Font* font;
   uint8_t* pixels;
+  uint8_t* pixels_mask;
   UIPanel* general_panels;
-  float alpha;
   void* scratch;
 } typedef UI;
 

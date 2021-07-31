@@ -6,11 +6,18 @@
 #include "UI_panel.h"
 #include "UI_structs.h"
 
+/*
+ * Must be a multiple of 32
+ */
 #define UI_WIDTH 320
 #define UI_HEIGHT 600
 
 #define UI_PANELS_GENERAL_TAB 0x1
 #define UI_PANELS_GENERAL_COUNT 1
+
+#if !defined(__AVX2__)
+#warning Using non AVX2 version of Luminary UI.
+#endif
 
 UI init_UI();
 void render_UI(UI* ui);
