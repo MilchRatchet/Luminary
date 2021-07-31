@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <math.h>
+#include "UI.h"
 #include "UI_blur.h"
 
 #define SCALE 5
