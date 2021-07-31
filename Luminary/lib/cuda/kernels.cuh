@@ -320,7 +320,7 @@ void process_geometry_tasks() {
     vec3 edge1_normal = get_vector(t4.x, t4.y, t4.z);
     vec3 edge2_normal = get_vector(t4.w, t5.x, t5.y);
 
-    normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+    normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
 
     UV vertex_texture = get_UV(t5.z, t5.w);
     UV edge1_texture = get_UV(t6.x, t6.y);
@@ -582,6 +582,8 @@ void process_debug_geometry_tasks() {
       vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
       vec3 edge2 = get_vector(t2.z, t2.w, t3.x);
 
+      vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
+
       vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
       const float lambda = normal.x;
@@ -591,7 +593,7 @@ void process_debug_geometry_tasks() {
       vec3 edge1_normal = get_vector(t4.x, t4.y, t4.z);
       vec3 edge2_normal = get_vector(t4.w, t5.x, t5.y);
 
-      normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+      normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
 
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }

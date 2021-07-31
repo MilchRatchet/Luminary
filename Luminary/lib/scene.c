@@ -155,6 +155,10 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
     }
   }
 
+  fclose(file);
+  free(source);
+  free(line);
+
   Triangle* triangles;
 
   unsigned int triangle_count = convert_wavefront_content(&triangles, content);
@@ -203,12 +207,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
     width, height, bounces, samples, albedo_atlas, content.albedo_maps_length, illuminance_atlas,
     content.illuminance_maps_length, material_atlas, content.material_maps_length, scene, denoiser);
 
-  free(source);
-  free(line);
-
   free_wavefront_content(content);
-
-  fclose(file);
 
   return scene;
 }

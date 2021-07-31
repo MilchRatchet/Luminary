@@ -118,14 +118,16 @@ vec3 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3
 }
 
 __device__
-vec3 lerp_normals(const vec3 vertex_normal, const vec3 edge1_normal, const vec3 edge2_normal, const float lambda, const float mu) {
+vec3 lerp_normals(const vec3 vertex_normal, const vec3 edge1_normal, const vec3 edge2_normal, const float lambda, const float mu, const vec3 face_normal) {
     vec3 result;
 
     result.x = vertex_normal.x + lambda * edge1_normal.x + mu * edge2_normal.x;
     result.y = vertex_normal.y + lambda * edge1_normal.y + mu * edge2_normal.y;
     result.z = vertex_normal.z + lambda * edge1_normal.z + mu * edge2_normal.z;
 
-    return normalize_vector(result);
+    const float length = get_length(result);
+
+    return (length < eps) ? face_normal : scale_vector(result, 1.0f / length);
 }
 
 __device__
