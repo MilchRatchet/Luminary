@@ -44,6 +44,10 @@ Frametime init_frametime() {
   return frametime;
 }
 
+void start_frametime(Frametime* frametime) {
+  frametime->last = sample_time();
+}
+
 void sample_frametime(Frametime* frametime) {
   const uint64_t curr_time = sample_time();
   const double diff_time   = time_diff(frametime->last, curr_time);

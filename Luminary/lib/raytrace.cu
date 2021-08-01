@@ -143,6 +143,7 @@ extern "C" RaytraceInstance* init_raytracing(
     gpuErrchk(cudaMemcpyToSymbol(device_light_sample_history, &(instance->light_sample_history_gpu), sizeof(uint32_t*), 0, cudaMemcpyHostToDevice));
 
     instance->denoiser = denoiser;
+    instance->use_denoiser = denoiser;
 
     if (instance->denoiser) {
         gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * width * height));

@@ -153,17 +153,17 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
 
   int exit = 0;
 
-  Frametime frametime = init_frametime();
-  UI ui               = init_UI();
-  render_UI(&ui);
+  Frametime frametime_trace = init_frametime();
+  Frametime frametime_UI    = init_frametime();
+  Frametime frametime_post  = init_frametime();
+  Frametime frametime_total = init_frametime();
+  UI ui                     = init_UI(instance);
 
   int temporal_frames      = 0;
   int information_mode     = 0;
   unsigned int update_mask = 0xffffffff;
   int update_ocean         = 0;
   int use_bloom            = 0;
-  int use_denoiser         = 1;
-  int show_menu            = 1;
 
   int make_png  = 0;
   int png_count = 0;
@@ -172,15 +172,17 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
 
   void* optix_setup = initialize_optix_denoise_for_realtime(instance);
 
-  SDL_SetRelativeMouseMode(SDL_TRUE);
-
   while (!exit) {
     SDL_Event event;
 
+    start_frametime(&frametime_trace);
     trace_scene(instance, temporal_frames, update_mask);
+    sample_frametime(&frametime_trace);
+
     update_mask = 0;
 
-    if (instance->denoiser && use_denoiser) {
+    start_frametime(&frametime_post);
+    if (instance->denoiser && instance->use_denoiser) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
       if (use_bloom)
         apply_bloom(instance, denoised_image);
@@ -191,9 +193,12 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
       copy_framebuffer_to_8bit(
         realtime->buffer, realtime->width, realtime->height, instance->frame_output_gpu, instance);
     }
+    sample_frametime(&frametime_post);
 
-    if (show_menu)
-      blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width, realtime->height);
+    start_frametime(&frametime_UI);
+    render_UI(&ui);
+    blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width, realtime->height);
+    sample_frametime(&frametime_UI);
 
     if (make_png) {
       make_png       = 0;
@@ -208,13 +213,18 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     SDL_BlitSurface(realtime->surface, 0, realtime->window_surface, 0);
 
     temporal_frames++;
-    sample_frametime(&frametime);
-    const double time = get_frametime(&frametime);
+    sample_frametime(&frametime_total);
+    start_frametime(&frametime_total);
+    const double trace_time = get_frametime(&frametime_trace);
+    const double ui_time    = get_frametime(&frametime_UI);
+    const double post_time  = get_frametime(&frametime_post);
+    const double total_time = get_frametime(&frametime_total);
 
     if (information_mode == 0) {
       sprintf(
-        title, "Luminary %s- FPS: %.0f - Frametime: %.2fms",
-        SHADING_MODE_STRING[instance->shading_mode], 1000.0 / time, time);
+        title, "Luminary %s- FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms",
+        SHADING_MODE_STRING[instance->shading_mode], 1000.0 / total_time, total_time, trace_time,
+        ui_time, post_time);
     }
     else if (information_mode == 1) {
       sprintf(
@@ -251,7 +261,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         instance->scene_gpu.sky.rayleigh_falloff, instance->scene_gpu.sky.mie_falloff);
     }
 
-    const double normalized_time = time / 16.66667;
+    const double normalized_time = total_time / 16.66667;
 
     SDL_SetWindowTitle(realtime->window, title);
     SDL_UpdateWindowSurface(realtime->window);
@@ -260,7 +270,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
 
     while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_MOUSEMOTION) {
+      if (event.type == SDL_MOUSEMOTION && !ui.active) {
         if (keystate[SDL_SCANCODE_F]) {
           instance->scene_gpu.camera.focal_length += 0.01f * event.motion.xrel;
           update_mask |= 0b1;
@@ -347,10 +357,10 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
           make_png = 1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
-          use_denoiser ^= 1;
+          instance->use_denoiser ^= 1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
-          show_menu ^= 1;
+          toggle_UI(&ui);
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_R) {
           instance->scene_gpu.camera.auto_exposure ^= 0b1;
@@ -450,7 +460,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     if (update_ocean) {
       temporal_frames = 0;
       update_mask |= 0b1;
-      instance->scene_gpu.ocean.time += time * 0.001f;
+      instance->scene_gpu.ocean.time += total_time * 0.001f;
     }
 
     if (instance->scene_gpu.camera.auto_exposure) {

@@ -19,18 +19,23 @@ static size_t compute_scratch_space() {
 /*
  * Requires the font of the UI to be initialized.
  */
-static UIPanel* create_general_panels(UI* ui) {
+static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_GENERAL_COUNT);
 
-  panels[0] = create_slider(ui, "Far Clip Distance", 0);
+  panels[0] = create_slider(ui, 0, "Far Clip Distance", 0);
+  panels[1] = create_check(ui, 1, "Optix Denoiser", &(instance->use_denoiser));
+  panels[2] = create_check(ui, 2, "Lights", &(instance->use_denoiser));
 
   return panels;
 }
 
-UI init_UI() {
+UI init_UI(RaytraceInstance* instance) {
   UI ui;
-  ui.x = 100;
-  ui.y = 100;
+  ui.active = 0;
+
+  ui.x          = 100;
+  ui.y          = 100;
+  ui.scroll_pos = 0;
 
   ui.pixels      = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
   ui.pixels_mask = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
@@ -39,20 +44,28 @@ UI init_UI() {
   ui.scratch          = malloc(scratch_size);
   init_text(&ui);
 
-  ui.general_panels = create_general_panels(&ui);
+  ui.general_panels = create_general_panels(&ui, instance);
+
+  SDL_SetRelativeMouseMode(!ui.active);
 
   return ui;
 }
 
+void toggle_UI(UI* ui) {
+  ui->active ^= 1;
+  SDL_SetRelativeMouseMode(!ui->active);
+}
+
 void render_UI(UI* ui) {
+  if (!ui->active)
+    return;
+
   memset(ui->pixels, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
   memset(ui->pixels_mask, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
 
-  SDL_Surface* text = render_text(ui, "General");
-
-  blit_text(ui, text, 50, 50);
-
-  SDL_FreeSurface(text);
+  for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
+    render_UIPanel(ui, ui->general_panels + i);
+  }
 }
 
 #if defined(__AVX2__)
@@ -140,6 +153,9 @@ static void blit_to_target(UI* ui, uint8_t* target, int width, int height) {
 #endif
 
 void blit_UI(UI* ui, uint8_t* target, int width, int height) {
+  if (!ui->active)
+    return;
+
   blur_background(ui, target, width, height);
   blit_to_target(ui, target, width, height);
 }

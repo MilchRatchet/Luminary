@@ -6,6 +6,8 @@
 
 struct UIPanel {
   int type;
+  int y;
+  int hover;
   void* data;
   SDL_Surface* title;
   SDL_Surface* data_text;
@@ -16,6 +18,7 @@ struct UI {
   int tab;
   int x;
   int y;
+  int scroll_pos;
   TTF_Font* font;
   uint8_t* pixels;
   uint8_t* pixels_mask;

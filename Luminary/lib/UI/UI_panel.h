@@ -8,10 +8,13 @@
 #define PANEL_CHECK 0x2
 #define PANEL_DROPDOWN 0x3
 #define PANEL_COLOR 0x4
+#define PANEL_INFO 0x5
 
 #define PANEL_HEIGHT 40
 
-UIPanel create_slider(UI* ui, const char* text, float* data_binding);
+UIPanel create_slider(UI* ui, int num, const char* text, float* data_binding);
+UIPanel create_check(UI* ui, int num, const char* text, int* data_binding);
+void render_UIPanel(UI* ui, UIPanel* panel);
 void free_UIPanel(UIPanel* panel);
 
 #endif /* UI_PANEL_H */

@@ -1,0 +1,29 @@
+#include "UI_check.h"
+#include "UI_structs.h"
+#include "UI_text.h"
+#include "UI_blit.h"
+
+void render_UIPanel_check(UI* ui, UIPanel* panel) {
+  blit_text(ui, panel->title, 5, ui->scroll_pos + panel->y + 10);
+
+  const int top  = (PANEL_HEIGHT - PANEL_CHECK_BOX_SIZE) >> 1;
+  const int left = UI_WIDTH - 5 - PANEL_CHECK_BOX_SIZE;
+
+  blit_gray(
+    ui->pixels, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
+    PANEL_CHECK_BOX_SIZE, 255);
+
+  blit_gray(
+    ui->pixels_mask, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
+    PANEL_CHECK_BOX_SIZE, 0xff);
+
+  const int checked = *((int*) panel->data);
+
+  if (!checked) {
+    blit_gray(
+      ui->pixels_mask, left + PANEL_CHECK_BOX_BORDER,
+      ui->scroll_pos + panel->y + top + PANEL_CHECK_BOX_BORDER, UI_WIDTH,
+      PANEL_CHECK_BOX_SIZE - 2 * PANEL_CHECK_BOX_BORDER,
+      PANEL_CHECK_BOX_SIZE - 2 * PANEL_CHECK_BOX_BORDER, 0x00);
+  }
+}

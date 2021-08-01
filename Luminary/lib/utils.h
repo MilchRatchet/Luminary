@@ -101,6 +101,7 @@ struct RaytraceInstance {
   int offline_samples;
   Scene scene_gpu;
   int denoiser;
+  int use_denoiser;
   void* randoms_gpu;
   RGBF default_material;
   int shading_mode;

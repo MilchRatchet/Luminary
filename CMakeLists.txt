@@ -25,6 +25,8 @@ file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/lib/*.cu")
 message(STATUS "cpu_source_files: ${cpu_source_files}")
 message(STATUS "gpu_source_files: ${gpu_source_files}")
 
+include_directories("${CMAKE_SOURCE_DIR}/Luminary/lib")
+
 set(SDL2_DIR "${CMAKE_SOURCE_DIR}/Luminary/lib/SDL")
 
 include_directories(${SDL2_DIR})
