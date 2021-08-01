@@ -6,6 +6,7 @@
 #include "png.h"
 #include "output.h"
 #include "frametime.h"
+#include "realtime.h"
 #include "UI/UI.h"
 #include <stdlib.h>
 #include <stdio.h>
@@ -83,69 +84,6 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   return result;
 }
 
-static RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
-  RealtimeInstance* realtime = (RealtimeInstance*) malloc(sizeof(RealtimeInstance));
-
-  SDL_Init(SDL_INIT_VIDEO);
-
-  SDL_Rect rect;
-  SDL_Rect screen_size;
-
-  SDL_GetDisplayUsableBounds(0, &rect);
-  SDL_GetDisplayBounds(0, &screen_size);
-
-  rect.y += screen_size.h - rect.h;
-  rect.h -= screen_size.h - rect.h;
-
-  // It seems SDL window dimensions must be a multiple of 4
-  rect.h = rect.h & 0xfffffffc;
-
-  rect.w = rect.h * ((float) instance->width) / instance->height;
-
-  rect.w = rect.w & 0xfffffffc;
-
-  if (rect.w > screen_size.w) {
-    rect.w = screen_size.w;
-    rect.h = rect.w * ((float) instance->height) / instance->width;
-  }
-
-  realtime->width  = rect.w;
-  realtime->height = rect.h;
-
-  realtime->window =
-    SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN);
-
-  realtime->window_surface = SDL_GetWindowSurface(realtime->window);
-
-  Uint32 rmask, gmask, bmask, amask;
-
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-  rmask = 0xff000000;
-  gmask = 0x00ff0000;
-  bmask = 0x0000ff00;
-  amask = 0x000000ff;
-#else
-  rmask = 0x000000ff;
-  gmask = 0x0000ff00;
-  bmask = 0x00ff0000;
-  amask = 0xff000000;
-#endif
-
-  realtime->surface = SDL_CreateRGBSurface(0, rect.w, rect.h, 24, rmask, gmask, bmask, amask);
-
-  realtime->buffer = (RGB8*) realtime->surface->pixels;
-  initialize_8bit_frame(instance, rect.w, rect.h);
-
-  return realtime;
-}
-
-static void free_realtime_instance(RealtimeInstance* realtime) {
-  free(realtime->buffer);
-  SDL_DestroyWindow(realtime->window);
-  SDL_Quit();
-  free(realtime);
-}
-
 static char* SHADING_MODE_STRING[4] = {"", "[ALBEDO] ", "[DEPTH] ", "[NORMAL] "};
 
 void realtime_output(Scene scene, RaytraceInstance* instance, const int filters) {
@@ -157,13 +95,13 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   Frametime frametime_UI    = init_frametime();
   Frametime frametime_post  = init_frametime();
   Frametime frametime_total = init_frametime();
-  UI ui                     = init_UI(instance);
+  UI ui                     = init_UI(instance, realtime);
 
-  int temporal_frames      = 0;
-  int information_mode     = 0;
-  unsigned int update_mask = 0xffffffff;
-  int update_ocean         = 0;
-  int use_bloom            = 0;
+  instance->temporal_frames = 0;
+  int information_mode      = 0;
+  unsigned int update_mask  = 0xffffffff;
+  int update_ocean          = 0;
+  int use_bloom             = 0;
 
   int make_png  = 0;
   int png_count = 0;
@@ -176,7 +114,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     SDL_Event event;
 
     start_frametime(&frametime_trace);
-    trace_scene(instance, temporal_frames, update_mask);
+    trace_scene(instance, instance->temporal_frames, update_mask);
     sample_frametime(&frametime_trace);
 
     update_mask = 0;
@@ -213,7 +151,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
 
     SDL_BlitSurface(realtime->surface, 0, realtime->window_surface, 0);
 
-    temporal_frames++;
+    instance->temporal_frames++;
     sample_frametime(&frametime_total);
     start_frametime(&frametime_total);
     const double trace_time = get_frametime(&frametime_trace);
@@ -332,12 +270,12 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         }
 
         if (event.motion.xrel || event.motion.yrel)
-          temporal_frames = 0;
+          instance->temporal_frames = 0;
       }
       else if (event.type == SDL_MOUSEWHEEL) {
         instance->scene_gpu.camera.fov -= event.wheel.y * 0.005f * normalized_time;
         update_mask |= 0b1001;
-        temporal_frames = 0;
+        instance->temporal_frames = 0;
       }
       else if (event.type == SDL_KEYDOWN) {
         if (event.key.keysym.scancode == SDL_SCANCODE_T) {
@@ -346,7 +284,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         else if (event.key.keysym.scancode == SDL_SCANCODE_V) {
           instance->shading_mode = (instance->shading_mode + 1) % 4;
           update_mask |= 0b10;
-          temporal_frames = 0;
+          instance->temporal_frames = 0;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_O) {
           update_ocean ^= 0b1;
@@ -396,42 +334,42 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     if (keystate[SDL_SCANCODE_LEFT]) {
       instance->scene_gpu.azimuth += 0.005f * normalized_time;
       update_mask |= 0b100;
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_RIGHT]) {
       instance->scene_gpu.azimuth -= 0.005f * normalized_time;
       update_mask |= 0b100;
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_UP]) {
       instance->scene_gpu.altitude += 0.005f * normalized_time;
       update_mask |= 0b100;
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_DOWN]) {
       instance->scene_gpu.altitude -= 0.005f * normalized_time;
       update_mask |= 0b100;
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_W]) {
       movement_vector.z -= 1.0f;
       update_mask |= 0b1;
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_A]) {
       movement_vector.x -= 1.0f;
       update_mask |= 0b1;
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_S]) {
       movement_vector.z += 1.0f;
       update_mask |= 0b1;
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_D]) {
       movement_vector.x += 1.0f;
       update_mask |= 0b1;
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;
@@ -459,7 +397,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     instance->scene_gpu.camera.pos.z += movement_speed * movement_vector.z;
 
     if (update_ocean) {
-      temporal_frames = 0;
+      instance->temporal_frames = 0;
       update_mask |= 0b1;
       instance->scene_gpu.ocean.time += total_time * 0.001f;
     }

@@ -22,6 +22,9 @@ struct UI {
   int panel_hover;
   int x;
   int y;
+  int max_x;
+  int max_y;
+  int mouse_flags;
   int scroll_pos;
   TTF_Font* font;
   uint8_t* pixels;

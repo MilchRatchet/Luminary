@@ -8,6 +8,9 @@
 #include "UI_panel.h"
 #include "UI_info.h"
 
+#define MOUSE_LEFT_BLOCKED 0b1
+#define MOUSE_DRAGGING_WINDOW 0b10
+
 static size_t compute_scratch_space() {
   size_t val = blur_scratch_needed();
 
@@ -20,7 +23,8 @@ static size_t compute_scratch_space() {
 static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_GENERAL_COUNT);
 
-  panels[0] = create_slider(ui, 0, "Far Clip Distance", 0);
+  panels[0] =
+    create_slider(ui, 0, "Far Clip Distance", &(instance->scene_gpu.camera.far_clip_distance));
   panels[1] = create_check(ui, 1, "Optix Denoiser", &(instance->use_denoiser));
   panels[2] = create_check(ui, 2, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure));
   panels[3] = create_info(
@@ -29,17 +33,24 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   panels[4] = create_info(
     ui, 4, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32,
     PANEL_INFO_STATIC);
+  panels[5] = create_info(
+    ui, 5, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32,
+    PANEL_INFO_DYNAMIC);
 
   return panels;
 }
 
-UI init_UI(RaytraceInstance* instance) {
+UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
   UI ui;
   ui.active = 0;
 
-  ui.x          = 100;
-  ui.y          = 100;
-  ui.scroll_pos = 0;
+  ui.x     = 100;
+  ui.y     = 100;
+  ui.max_x = realtime->width - UI_WIDTH;
+  ui.max_y = realtime->height - UI_HEIGHT - UI_BORDER_SIZE;
+
+  ui.mouse_flags = 0;
+  ui.scroll_pos  = 0;
 
   ui.panel_hover  = -1;
   ui.border_hover = 0;
@@ -64,9 +75,29 @@ void toggle_UI(UI* ui) {
 }
 
 void handle_mouse_UI(UI* ui) {
+  if (!ui->active)
+    return;
+
   int x, y;
+  int d_x, d_y;
 
   uint32_t state = SDL_GetMouseState(&x, &y);
+  SDL_GetRelativeMouseState(&d_x, &d_y);
+
+  if (!(SDL_BUTTON_LMASK & state)) {
+    ui->mouse_flags &= ~MOUSE_LEFT_BLOCKED;
+  }
+
+  if (ui->mouse_flags & MOUSE_DRAGGING_WINDOW) {
+    ui->x += d_x;
+    ui->y += d_y;
+
+    clamp(ui->x, 0, ui->max_x);
+    clamp(ui->y, 0, ui->max_y);
+
+    ui->mouse_flags |= MOUSE_LEFT_BLOCKED;
+    ui->mouse_flags ^= MOUSE_DRAGGING_WINDOW;
+  }
 
   x -= ui->x;
   y -= ui->y;
@@ -75,16 +106,30 @@ void handle_mouse_UI(UI* ui) {
     if (y < UI_BORDER_SIZE) {
       ui->panel_hover  = -1;
       ui->border_hover = 1;
+
+      if (SDL_BUTTON_LMASK & state) {
+        ui->mouse_flags |= MOUSE_DRAGGING_WINDOW;
+      }
     }
     else {
       y -= UI_BORDER_SIZE;
       ui->panel_hover  = y / PANEL_HEIGHT;
       ui->border_hover = 0;
+
+      if (ui->mouse_flags & MOUSE_LEFT_BLOCKED) {
+        state &= ~SDL_BUTTON_LMASK;
+      }
+
+      handle_mouse_UIPanel(ui, ui->general_panels + ui->panel_hover, state, x, y % PANEL_HEIGHT);
     }
   }
   else {
     ui->panel_hover  = -1;
     ui->border_hover = 0;
+  }
+
+  if (SDL_BUTTON_LMASK & state) {
+    ui->mouse_flags |= MOUSE_LEFT_BLOCKED;
   }
 }
 

@@ -3,8 +3,17 @@
 #include "UI_text.h"
 #include "UI_blit.h"
 
+void handle_mouse_UIPanel_check(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
+  if (SDL_BUTTON_LMASK & mouse_state) {
+    int checked = *((int*) panel->data);
+    checked ^= 1;
+    *((int*) panel->data) = checked;
+  }
+}
+
 void render_UIPanel_check(UI* ui, UIPanel* panel) {
-  blit_text(ui, panel->title, 5, ui->scroll_pos + panel->y + 10);
+  blit_text(
+    ui, panel->title, 5, ui->scroll_pos + panel->y + ((PANEL_HEIGHT - panel->title->h) >> 1));
 
   const int top  = (PANEL_HEIGHT - PANEL_CHECK_BOX_SIZE) >> 1;
   const int left = UI_WIDTH - 5 - PANEL_CHECK_BOX_SIZE;

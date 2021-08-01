@@ -6,6 +6,7 @@
 #include "UI_panel.h"
 #include "UI_structs.h"
 #include "utils.h"
+#include "realtime.h"
 
 /*
  * Must be a multiple of 32
@@ -15,13 +16,13 @@
 #define UI_BORDER_SIZE 20
 
 #define UI_PANELS_GENERAL_TAB 0x1
-#define UI_PANELS_GENERAL_COUNT 5
+#define UI_PANELS_GENERAL_COUNT 6
 
 #if !defined(__AVX2__)
 #warning Using non AVX2 version of Luminary UI.
 #endif
 
-UI init_UI(RaytraceInstance* instance);
+UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime);
 void toggle_UI(UI* ui);
 void handle_mouse_UI(UI* ui);
 void render_UI(UI* ui);

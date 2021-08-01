@@ -8,11 +8,12 @@
 static UIPanel init_UIPanel(UI* ui, int num, int type, const char* text, void* data_binding) {
   UIPanel panel;
 
-  panel.type  = type;
-  panel.hover = 0;
-  panel.title = render_text(ui, text);
-  panel.data  = data_binding;
-  panel.y     = num * PANEL_HEIGHT;
+  panel.type      = type;
+  panel.hover     = 0;
+  panel.title     = render_text(ui, text);
+  panel.data_text = (SDL_Surface*) 0;
+  panel.data      = data_binding;
+  panel.y         = num * PANEL_HEIGHT;
 
   return panel;
 }
@@ -37,6 +38,23 @@ UIPanel create_info(
   info.prop2 = kind;
 
   return info;
+}
+
+void handle_mouse_UIPanel(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
+  switch (panel->type) {
+  case PANEL_SLIDER:
+    handle_mouse_UIPanel_slider(ui, panel, mouse_state, x, y);
+    break;
+  case PANEL_CHECK:
+    handle_mouse_UIPanel_check(ui, panel, mouse_state, x, y);
+    break;
+  case PANEL_DROPDOWN:
+    break;
+  case PANEL_COLOR:
+    break;
+  case PANEL_INFO:
+    break;
+  }
 }
 
 void render_UIPanel(UI* ui, UIPanel* panel) {
