@@ -5,7 +5,7 @@
 
 #define SCALE 5
 #define BLUR_WIDTH UI_WIDTH / SCALE
-#define BLUR_HEIGHT UI_HEIGHT / SCALE
+#define BLUR_HEIGHT (UI_HEIGHT + UI_BORDER_SIZE) / SCALE
 
 #define SIGMA 3.0f
 #define STRENGTH (8.0f)
@@ -82,7 +82,7 @@ void blur_background(UI* ui, uint8_t* target, int width, int height) {
     }
   }
 
-  for (int i = 0; i < UI_HEIGHT; i++) {
+  for (int i = 0; i < UI_HEIGHT + UI_BORDER_SIZE; i++) {
     for (int j = 0; j < UI_WIDTH; j++) {
       target[off + i * width * 3 + 3 * j] =
         target_convolution[(i / SCALE) * BLUR_WIDTH * 3 + 3 * (j / SCALE)];

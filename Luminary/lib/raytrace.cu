@@ -293,6 +293,7 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
     }
 
     finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    gpuErrchk(cudaDeviceSynchronize());
 }
 
 extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {

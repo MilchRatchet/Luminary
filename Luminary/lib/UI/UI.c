@@ -3,13 +3,10 @@
 #include <immintrin.h>
 #include "UI.h"
 #include "UI_blur.h"
+#include "UI_blit.h"
 #include "UI_text.h"
 #include "UI_panel.h"
 #include "UI_info.h"
-
-#define BG_RED 20
-#define BG_GREEN 30
-#define BG_BLUE 40
 
 static size_t compute_scratch_space() {
   size_t val = blur_scratch_needed();
@@ -44,6 +41,9 @@ UI init_UI(RaytraceInstance* instance) {
   ui.y          = 100;
   ui.scroll_pos = 0;
 
+  ui.panel_hover  = -1;
+  ui.border_hover = 0;
+
   ui.pixels      = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
   ui.pixels_mask = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
 
@@ -63,6 +63,31 @@ void toggle_UI(UI* ui) {
   SDL_SetRelativeMouseMode(!ui->active);
 }
 
+void handle_mouse_UI(UI* ui) {
+  int x, y;
+
+  uint32_t state = SDL_GetMouseState(&x, &y);
+
+  x -= ui->x;
+  y -= ui->y;
+
+  if (x > 0 && x < UI_WIDTH && y > 0 && y < UI_HEIGHT + UI_BORDER_SIZE) {
+    if (y < UI_BORDER_SIZE) {
+      ui->panel_hover  = -1;
+      ui->border_hover = 1;
+    }
+    else {
+      y -= UI_BORDER_SIZE;
+      ui->panel_hover  = y / PANEL_HEIGHT;
+      ui->border_hover = 0;
+    }
+  }
+  else {
+    ui->panel_hover  = -1;
+    ui->border_hover = 0;
+  }
+}
+
 void render_UI(UI* ui) {
   if (!ui->active)
     return;
@@ -75,96 +100,12 @@ void render_UI(UI* ui) {
   }
 }
 
-#if defined(__AVX2__)
-static void blit_to_target(UI* ui, uint8_t* target, int width, int height) {
-  const int k       = UI_WIDTH / 32;
-  const __m256i bg1 = _mm256_setr_epi8(
-    BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED,
-    BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN,
-    BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE,
-    BG_RED, BG_GREEN);
-  const __m256i bg2 = _mm256_setr_epi8(
-    BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE,
-    BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED,
-    BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN,
-    BG_BLUE, BG_RED);
-  const __m256i bg3 = _mm256_setr_epi8(
-    BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN,
-    BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE,
-    BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED,
-    BG_GREEN, BG_BLUE);
-  for (int i = 0; i < UI_HEIGHT; i++) {
-    for (int j = 0; j < k; j++) {
-      const int target_index = (i + ui->y) * 3 * width + 3 * ui->x + j * 96;
-      const int ui_index     = j * 96 + i * UI_WIDTH * 3;
-
-      __m256i ui1     = _mm256_loadu_si256((__m256i*) (ui->pixels + ui_index));
-      __m256i mask1   = _mm256_loadu_si256((__m256i*) (ui->pixels_mask + ui_index));
-      __m256i target1 = _mm256_loadu_si256((__m256i*) (target + target_index));
-      target1         = _mm256_avg_epu8(bg1, target1);
-      target1         = _mm256_blendv_epi8(target1, ui1, mask1);
-      _mm256_storeu_si256((__m256i*) (target + target_index), target1);
-      __m256i ui2     = _mm256_loadu_si256((__m256i*) (ui->pixels + ui_index + 32));
-      __m256i mask2   = _mm256_loadu_si256((__m256i*) (ui->pixels_mask + ui_index + 32));
-      __m256i target2 = _mm256_loadu_si256((__m256i*) (target + target_index + 32));
-      target2         = _mm256_avg_epu8(bg2, target2);
-      target2         = _mm256_blendv_epi8(target2, ui2, mask2);
-      _mm256_storeu_si256((__m256i*) (target + target_index + 32), target2);
-      __m256i ui3     = _mm256_loadu_si256((__m256i*) (ui->pixels + ui_index + 64));
-      __m256i mask3   = _mm256_loadu_si256((__m256i*) (ui->pixels_mask + ui_index + 64));
-      __m256i target3 = _mm256_loadu_si256((__m256i*) (target + target_index + 64));
-      target3         = _mm256_avg_epu8(bg3, target3);
-      target3         = _mm256_blendv_epi8(target3, ui3, mask3);
-      _mm256_storeu_si256((__m256i*) (target + target_index + 64), target3);
-    }
-  }
-}
-#else
-static void blit_to_target(UI* ui, uint8_t* target, int width, int height) {
-  const int k       = UI_WIDTH / 16;
-  const __m128i bg1 = _mm_setr_epi8(
-    BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED,
-    BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED);
-  const __m128i bg2 = _mm_setr_epi8(
-    BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN,
-    BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN);
-  const __m128i bg3 = _mm_setr_epi8(
-    BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE,
-    BG_RED, BG_GREEN, BG_BLUE, BG_RED, BG_GREEN, BG_BLUE);
-  for (int i = 0; i < UI_HEIGHT; i++) {
-    for (int j = 0; j < k; j++) {
-      const int target_index = (i + ui->y) * 3 * width + 3 * ui->x + j * 48;
-      const int ui_index     = j * 48 + i * UI_WIDTH * 3;
-
-      __m128i ui1     = _mm_loadu_si128(ui->pixels + ui_index);
-      __m128i mask1   = _mm_loadu_si128(ui->pixels_mask + ui_index);
-      __m128i target1 = _mm_loadu_si128(target + target_index);
-      target1         = _mm_avg_epu8(bg1, target1);
-      target1         = _mm_blendv_epi8(target1, ui1, mask1);
-      _mm256_storeu_si128(target + target_index, target1);
-      __m128i ui2     = _mm_loadu_si128(ui->pixels + ui_index + 16);
-      __m128i mask2   = _mm_loadu_si128(ui->pixels_mask + ui_index + 16);
-      __m128i target2 = _mm_loadu_si128(target + target_index + 16);
-      target2         = _mm_avg_epu8(bg2, target2);
-      target2         = _mm_blendv_epi8(target2, ui2, mask2);
-      _mm256_storeu_si128(target + target_index + 16, target2);
-      __m128i ui3     = _mm_loadu_si128(ui->pixels + ui_index + 32);
-      __m128i mask3   = _mm_loadu_si128(ui->pixels_mask + ui_index + 32);
-      __m128i target3 = _mm_loadu_si128(target + target_index + 32);
-      target3         = _mm_avg_epu8(bg3, target3);
-      target3         = _mm_blendv_epi8(target3, ui3, mask3);
-      _mm_storeu_si128(target + target_index + 32, target3);
-    }
-  }
-}
-#endif
-
 void blit_UI(UI* ui, uint8_t* target, int width, int height) {
   if (!ui->active)
     return;
 
   blur_background(ui, target, width, height);
-  blit_to_target(ui, target, width, height);
+  blit_UI_internal(ui, target, width, height);
 }
 
 void free_UI(UI* ui) {

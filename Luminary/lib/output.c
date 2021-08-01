@@ -196,6 +196,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     sample_frametime(&frametime_post);
 
     start_frametime(&frametime_UI);
+    handle_mouse_UI(&ui);
     render_UI(&ui);
     blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width, realtime->height);
     sample_frametime(&frametime_UI);

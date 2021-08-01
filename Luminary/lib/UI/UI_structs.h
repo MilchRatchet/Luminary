@@ -18,6 +18,8 @@ struct UIPanel {
 struct UI {
   int active;
   int tab;
+  int border_hover;
+  int panel_hover;
   int x;
   int y;
   int scroll_pos;

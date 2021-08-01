@@ -12,6 +12,7 @@
  */
 #define UI_WIDTH 320
 #define UI_HEIGHT 600
+#define UI_BORDER_SIZE 20
 
 #define UI_PANELS_GENERAL_TAB 0x1
 #define UI_PANELS_GENERAL_COUNT 5
@@ -22,6 +23,7 @@
 
 UI init_UI(RaytraceInstance* instance);
 void toggle_UI(UI* ui);
+void handle_mouse_UI(UI* ui);
 void render_UI(UI* ui);
 void blit_UI(UI* ui, uint8_t* target, int width, int height);
 void free_UI(UI* ui);
