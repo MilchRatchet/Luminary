@@ -14,6 +14,7 @@
 
 UIPanel create_slider(UI* ui, int num, const char* text, float* data_binding);
 UIPanel create_check(UI* ui, int num, const char* text, int* data_binding);
+UIPanel create_info(UI* ui, int num, const char* text, void* data_binding, int data_type, int kind);
 void render_UIPanel(UI* ui, UIPanel* panel);
 void free_UIPanel(UIPanel* panel);
 

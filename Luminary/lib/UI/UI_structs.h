@@ -8,6 +8,8 @@ struct UIPanel {
   int type;
   int y;
   int hover;
+  int prop1;
+  int prop2;
   void* data;
   SDL_Surface* title;
   SDL_Surface* data_text;

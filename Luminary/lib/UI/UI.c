@@ -5,6 +5,7 @@
 #include "UI_blur.h"
 #include "UI_text.h"
 #include "UI_panel.h"
+#include "UI_info.h"
 
 #define BG_RED 20
 #define BG_GREEN 30
@@ -24,7 +25,13 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
 
   panels[0] = create_slider(ui, 0, "Far Clip Distance", 0);
   panels[1] = create_check(ui, 1, "Optix Denoiser", &(instance->use_denoiser));
-  panels[2] = create_check(ui, 2, "Lights", &(instance->use_denoiser));
+  panels[2] = create_check(ui, 2, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure));
+  panels[3] = create_info(
+    ui, 3, "Exposure", &(instance->scene_gpu.camera.exposure), PANEL_INFO_TYPE_FP32,
+    PANEL_INFO_DYNAMIC);
+  panels[4] = create_info(
+    ui, 4, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32,
+    PANEL_INFO_STATIC);
 
   return panels;
 }

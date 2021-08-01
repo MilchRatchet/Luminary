@@ -14,7 +14,7 @@
 #define UI_HEIGHT 600
 
 #define UI_PANELS_GENERAL_TAB 0x1
-#define UI_PANELS_GENERAL_COUNT 3
+#define UI_PANELS_GENERAL_COUNT 5
 
 #if !defined(__AVX2__)
 #warning Using non AVX2 version of Luminary UI.
