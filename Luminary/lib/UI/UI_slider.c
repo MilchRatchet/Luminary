@@ -2,6 +2,8 @@
 #include "UI_slider.h"
 
 void handle_mouse_UIPanel_slider(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
+  if (panel->voids_frames)
+    *(ui->temporal_frames) = 0;
 }
 
 void render_UIPanel_slider(UI* ui, UIPanel* panel) {

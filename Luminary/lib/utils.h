@@ -102,7 +102,9 @@ struct RaytraceInstance {
   Scene scene_gpu;
   int denoiser;
   int use_denoiser;
+  int use_bloom;
   int temporal_frames;
+  int lights_active;
   void* randoms_gpu;
   RGBF default_material;
   int shading_mode;

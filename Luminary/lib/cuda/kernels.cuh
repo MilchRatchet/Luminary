@@ -376,17 +376,10 @@ void process_geometry_tasks() {
 
     RGBF emission = get_color(0.0f, 0.0f, 0.0f);
 
-    if (maps.y) {
-      #ifdef LIGHTS_AT_NIGHT_ONLY
-      if (device_sun.y < NIGHT_THRESHOLD) {
-      #endif
+    if (maps.y && device_lights_active) {
       const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
       emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
-
-      #ifdef LIGHTS_AT_NIGHT_ONLY
-      }
-      #endif
     }
 
     if (albedo.a < device_scene.camera.alpha_cutoff) albedo.a = 0.0f;
@@ -435,11 +428,11 @@ void process_geometry_tasks() {
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
-        #ifdef LIGHTS_AT_NIGHT_ONLY
-          const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
-        #else
-          const int light_count = device_scene.lights_length;
-        #endif
+        int light_count = 1;
+
+        if (device_lights_active) {
+          light_count = device_scene.lights_length;
+        }
 
         const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
 
@@ -551,17 +544,10 @@ void process_debug_geometry_tasks() {
         color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
       }
 
-      if (maps.y) {
-        #ifdef LIGHTS_AT_NIGHT_ONLY
-        if (device_sun.y < NIGHT_THRESHOLD) {
-        #endif
+      if (maps.y && device_lights_active) {
         const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
         color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
-
-        #ifdef LIGHTS_AT_NIGHT_ONLY
-        }
-        #endif
       }
 
       device_frame_buffer[pixel] = color;
@@ -782,11 +768,15 @@ void finalize_samples() {
 
   for (; offset < 3 * device_amount - 4; offset += 4 * blockDim.x * gridDim.x) {
     float4 buffer = __ldcs((float4*)((float*)device_frame_buffer + offset));
-    float4 output = __ldcs((float4*)((float*)device_frame_output + offset));
-    float4 variance = __ldcs((float4*)((float*)device_frame_variance + offset));
-    float4 bias_cache = __ldcs((float4*)((float*)device_frame_bias_cache + offset));
+    float4 output;
+    float4 variance;
+    float4 bias_cache;
 
     if (device_temporal_frames == 0) {
+      output.x = buffer.x;
+      output.y = buffer.y;
+      output.z = buffer.z;
+      output.w = buffer.w;
       variance.x = 1.0f;
       variance.y = 1.0f;
       variance.z = 1.0f;
@@ -796,6 +786,10 @@ void finalize_samples() {
       bias_cache.y = 0.0f;
       bias_cache.z = 0.0f;
       bias_cache.w = 0.0f;
+    } else {
+      output = __ldcs((float4*)((float*)device_frame_output + offset));
+      variance = __ldcs((float4*)((float*)device_frame_variance + offset));
+      bias_cache = __ldcs((float4*)((float*)device_frame_bias_cache + offset));
     }
 
     float4 deviation;

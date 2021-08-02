@@ -10,6 +10,7 @@ struct UIPanel {
   int hover;
   int prop1;
   int prop2;
+  int voids_frames;
   void* data;
   SDL_Surface* title;
   SDL_Surface* data_text;
@@ -30,6 +31,7 @@ struct UI {
   uint8_t* pixels;
   uint8_t* pixels_mask;
   UIPanel* general_panels;
+  int* temporal_frames;
   void* scratch;
 } typedef UI;
 

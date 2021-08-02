@@ -8,6 +8,9 @@ void handle_mouse_UIPanel_check(UI* ui, UIPanel* panel, int mouse_state, int x, 
     int checked = *((int*) panel->data);
     checked ^= 1;
     *((int*) panel->data) = checked;
+
+    if (panel->voids_frames)
+      *(ui->temporal_frames) = 0;
   }
 }
 

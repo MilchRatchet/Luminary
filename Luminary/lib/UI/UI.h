@@ -16,7 +16,7 @@
 #define UI_BORDER_SIZE 20
 
 #define UI_PANELS_GENERAL_TAB 0x1
-#define UI_PANELS_GENERAL_COUNT 6
+#define UI_PANELS_GENERAL_COUNT 8
 
 #if !defined(__AVX2__)
 #warning Using non AVX2 version of Luminary UI.

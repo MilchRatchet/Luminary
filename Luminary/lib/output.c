@@ -101,7 +101,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   int information_mode      = 0;
   unsigned int update_mask  = 0xffffffff;
   int update_ocean          = 0;
-  int use_bloom             = 0;
+  instance->use_bloom       = 1;
 
   int make_png  = 0;
   int png_count = 0;
@@ -114,7 +114,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     SDL_Event event;
 
     start_frametime(&frametime_trace);
-    trace_scene(instance, instance->temporal_frames, update_mask);
+    trace_scene(instance, instance->temporal_frames, 0xffffffff);
     sample_frametime(&frametime_trace);
 
     update_mask = 0;
@@ -122,7 +122,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     start_frametime(&frametime_post);
     if (instance->denoiser && instance->use_denoiser) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
-      if (use_bloom)
+      if (instance->use_bloom)
         apply_bloom(instance, denoised_image);
       copy_framebuffer_to_8bit(
         realtime->buffer, realtime->width, realtime->height, denoised_image, instance);
@@ -132,6 +132,8 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         realtime->buffer, realtime->width, realtime->height, instance->frame_output_gpu, instance);
     }
     sample_frametime(&frametime_post);
+
+    instance->temporal_frames++;
 
     start_frametime(&frametime_UI);
     handle_mouse_UI(&ui);
@@ -151,7 +153,6 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
 
     SDL_BlitSurface(realtime->surface, 0, realtime->window_surface, 0);
 
-    instance->temporal_frames++;
     sample_frametime(&frametime_total);
     start_frametime(&frametime_total);
     const double trace_time = get_frametime(&frametime_trace);
@@ -288,9 +289,6 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_O) {
           update_ocean ^= 0b1;
-        }
-        else if (event.key.keysym.scancode == SDL_SCANCODE_B) {
-          use_bloom ^= 0b1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
           make_png = 1;

@@ -139,6 +139,9 @@ __constant__
 int device_temporal_frames;
 
 __constant__
+int device_lights_active;
+
+__constant__
 RGBF* device_frame_buffer;
 
 __constant__

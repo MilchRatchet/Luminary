@@ -144,6 +144,7 @@ extern "C" RaytraceInstance* init_raytracing(
 
     instance->denoiser = denoiser;
     instance->use_denoiser = denoiser;
+    instance->lights_active = (scene.altitude < 0.0f);
 
     if (instance->denoiser) {
         gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * width * height));
@@ -262,7 +263,7 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
     if (update_mask & 0b10000)
         gpuErrchk(cudaMemcpyToSymbol(device_default_material, &(instance->default_material), sizeof(RGBF), 0, cudaMemcpyHostToDevice));
 
-    clock_t t = clock();
+    gpuErrchk(cudaMemcpyToSymbol(device_lights_active, &(instance->lights_active), sizeof(int), 0, cudaMemcpyHostToDevice));
 
     int pixels_left = amount;
     const float ratio = 1.0f/(amount);

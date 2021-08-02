@@ -188,11 +188,11 @@ vec3 diffuse_BRDF(RGBF &record, uint32_t &light_sample_id, const vec3 normal, co
 
 __device__
 Light sample_light(const vec3 position, const int light_count, uint32_t &light_sample_id, const float r) {
-    #ifdef LIGHTS_AT_NIGHT_ONLY
-        const uint32_t light_index = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(r * light_count) : 0;
-    #else
-        const uint32_t light_index = (uint32_t)(r * light_count);
-    #endif
+    uint32_t light_index = 0;
+
+    if (device_lights_active) {
+        light_index = (uint32_t)(r * light_count);
+    }
 
     light_sample_id = light_index;
 

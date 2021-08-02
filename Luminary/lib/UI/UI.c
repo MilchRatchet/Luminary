@@ -23,10 +23,9 @@ static size_t compute_scratch_space() {
 static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_GENERAL_COUNT);
 
-  panels[0] =
-    create_slider(ui, 0, "Far Clip Distance", &(instance->scene_gpu.camera.far_clip_distance));
-  panels[1] = create_check(ui, 1, "Optix Denoiser", &(instance->use_denoiser));
-  panels[2] = create_check(ui, 2, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure));
+  panels[0] = create_tab(ui, 0, &(ui->tab), UI_PANELS_GENERAL_TAB);
+  panels[1] = create_check(ui, 1, "Optix Denoiser", &(instance->use_denoiser), 0);
+  panels[2] = create_check(ui, 2, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure), 0);
   panels[3] = create_info(
     ui, 3, "Exposure", &(instance->scene_gpu.camera.exposure), PANEL_INFO_TYPE_FP32,
     PANEL_INFO_DYNAMIC);
@@ -36,6 +35,8 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   panels[5] = create_info(
     ui, 5, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32,
     PANEL_INFO_DYNAMIC);
+  panels[6] = create_check(ui, 6, "Lights", &(instance->lights_active), 1);
+  panels[7] = create_check(ui, 7, "Bloom", &(instance->use_bloom), 0);
 
   return panels;
 }
@@ -43,6 +44,7 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
 UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
   UI ui;
   ui.active = 0;
+  ui.tab    = UI_PANELS_GENERAL_TAB;
 
   ui.x     = 100;
   ui.y     = 100;
@@ -57,6 +59,8 @@ UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
 
   ui.pixels      = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
   ui.pixels_mask = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
+
+  ui.temporal_frames = &(instance->temporal_frames);
 
   size_t scratch_size = compute_scratch_space();
   ui.scratch          = malloc(scratch_size);
@@ -120,7 +124,8 @@ void handle_mouse_UI(UI* ui) {
         state &= ~SDL_BUTTON_LMASK;
       }
 
-      handle_mouse_UIPanel(ui, ui->general_panels + ui->panel_hover, state, x, y % PANEL_HEIGHT);
+      if (ui->panel_hover < UI_PANELS_GENERAL_COUNT)
+        handle_mouse_UIPanel(ui, ui->general_panels + ui->panel_hover, state, x, y % PANEL_HEIGHT);
     }
   }
   else {
@@ -140,8 +145,12 @@ void render_UI(UI* ui) {
   memset(ui->pixels, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
   memset(ui->pixels_mask, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
 
-  for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
-    render_UIPanel(ui, ui->general_panels + i);
+  switch (ui->tab) {
+  case UI_PANELS_GENERAL_TAB:
+    for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
+      render_UIPanel(ui, ui->general_panels + i);
+    }
+    break;
   }
 }
 
