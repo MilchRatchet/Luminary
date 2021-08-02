@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
+#include <float.h>
 #include <immintrin.h>
 #include "UI.h"
 #include "UI_blur.h"
@@ -10,6 +11,7 @@
 
 #define MOUSE_LEFT_BLOCKED 0b1
 #define MOUSE_DRAGGING_WINDOW 0b10
+#define MOUSE_DRAGGING_SLIDER 0b100
 
 static size_t compute_scratch_space() {
   size_t val = blur_scratch_needed();
@@ -37,6 +39,8 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
     PANEL_INFO_DYNAMIC);
   panels[6] = create_check(ui, 6, "Lights", &(instance->lights_active), 1);
   panels[7] = create_check(ui, 7, "Bloom", &(instance->use_bloom), 0);
+  panels[8] = create_slider(
+    ui, 8, "Ocean Height", &(instance->scene_gpu.ocean.height), 1, 0.005f, -FLT_MAX, FLT_MAX);
 
   return panels;
 }
@@ -56,6 +60,8 @@ UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
 
   ui.panel_hover  = -1;
   ui.border_hover = 0;
+
+  ui.last_panel = (UIPanel*) 0;
 
   ui.pixels      = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
   ui.pixels_mask = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
@@ -82,6 +88,8 @@ void handle_mouse_UI(UI* ui) {
   if (!ui->active)
     return;
 
+  SDL_PumpEvents();
+
   int x, y;
   int d_x, d_y;
 
@@ -90,6 +98,9 @@ void handle_mouse_UI(UI* ui) {
 
   if (!(SDL_BUTTON_LMASK & state)) {
     ui->mouse_flags &= ~MOUSE_LEFT_BLOCKED;
+    ui->mouse_flags &= ~MOUSE_DRAGGING_SLIDER;
+
+    SDL_SetRelativeMouseMode(SDL_FALSE);
   }
 
   if (ui->mouse_flags & MOUSE_DRAGGING_WINDOW) {
@@ -110,7 +121,12 @@ void handle_mouse_UI(UI* ui) {
   x -= ui->x;
   y -= ui->y;
 
-  if (x > 0 && x < UI_WIDTH && y > 0 && y < UI_HEIGHT + UI_BORDER_SIZE) {
+  UIPanel* panel = (UIPanel*) 0;
+
+  if (ui->mouse_flags & MOUSE_DRAGGING_SLIDER) {
+    panel = ui->last_panel;
+  }
+  else if (x > 0 && x < UI_WIDTH && y > 0 && y < UI_HEIGHT + UI_BORDER_SIZE) {
     if (y < UI_BORDER_SIZE) {
       ui->panel_hover  = -1;
       ui->border_hover = 1;
@@ -129,7 +145,7 @@ void handle_mouse_UI(UI* ui) {
       }
 
       if (ui->panel_hover < UI_PANELS_GENERAL_COUNT)
-        handle_mouse_UIPanel(ui, ui->general_panels + ui->panel_hover, state, x, y % PANEL_HEIGHT);
+        panel = ui->general_panels + ui->panel_hover;
     }
   }
   else {
@@ -139,6 +155,19 @@ void handle_mouse_UI(UI* ui) {
 
   if (SDL_BUTTON_LMASK & state) {
     ui->mouse_flags |= MOUSE_LEFT_BLOCKED;
+  }
+
+  if (panel) {
+    handle_mouse_UIPanel(ui, panel, state, x, y % PANEL_HEIGHT);
+    if (panel->type == PANEL_SLIDER) {
+      ui->mouse_flags &= ~MOUSE_LEFT_BLOCKED;
+
+      if (SDL_BUTTON_LMASK & state) {
+        ui->mouse_flags |= MOUSE_DRAGGING_SLIDER;
+      }
+    }
+
+    ui->last_panel = panel;
   }
 }
 
@@ -162,7 +191,7 @@ void blit_UI(UI* ui, uint8_t* target, int width, int height) {
   if (!ui->active)
     return;
 
-  blur_background(ui, target, width, height);
+  // blur_background(ui, target, width, height);
   blit_UI_internal(ui, target, width, height);
 }
 

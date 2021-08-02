@@ -35,6 +35,21 @@ void blit_color(
   }
 }
 
+void blit_color_shaded(
+  uint8_t* dst, int x, int y, int ldd, int width, int height, uint8_t red, uint8_t green,
+  uint8_t blue) {
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      const uint8_t value_r                      = dst[(y + i) * 3 * ldd + 3 * x + 3 * j];
+      const uint8_t value_g                      = dst[(y + i) * 3 * ldd + 3 * x + 3 * j + 1];
+      const uint8_t value_b                      = dst[(y + i) * 3 * ldd + 3 * x + 3 * j + 2];
+      dst[(y + i) * 3 * ldd + 3 * x + 3 * j]     = min(red, value_r);
+      dst[(y + i) * 3 * ldd + 3 * x + 3 * j + 1] = min(green, value_g);
+      dst[(y + i) * 3 * ldd + 3 * x + 3 * j + 2] = min(blue, value_b);
+    }
+  }
+}
+
 #if defined(__AVX2__)
 void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
   const int k       = UI_WIDTH / 32;

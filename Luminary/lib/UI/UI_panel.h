@@ -13,7 +13,9 @@
 
 #define PANEL_HEIGHT 40
 
-UIPanel create_slider(UI* ui, int num, const char* text, float* data_binding, int voids_frames);
+UIPanel create_slider(
+  UI* ui, int num, const char* text, float* data_binding, int voids_frames, float scale, float min,
+  float max);
 UIPanel create_check(UI* ui, int num, const char* text, int* data_binding, int voids_frames);
 UIPanel create_info(UI* ui, int num, const char* text, void* data_binding, int data_type, int kind);
 UIPanel create_tab(UI* ui, int num, int* data_binding, int kind);

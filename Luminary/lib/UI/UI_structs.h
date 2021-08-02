@@ -10,6 +10,7 @@ struct UIPanel {
   int hover;
   int prop1;
   int prop2;
+  int prop3;
   int voids_frames;
   void* data;
   SDL_Surface* title;
@@ -21,6 +22,7 @@ struct UI {
   int tab;
   int border_hover;
   int panel_hover;
+  UIPanel* last_panel;
   int x;
   int y;
   int max_x;

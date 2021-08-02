@@ -21,8 +21,14 @@ static UIPanel init_UIPanel(
   return panel;
 }
 
-UIPanel create_slider(UI* ui, int num, const char* text, float* data_binding, int voids_frames) {
+UIPanel create_slider(
+  UI* ui, int num, const char* text, float* data_binding, int voids_frames, float scale, float min,
+  float max) {
   UIPanel slider = init_UIPanel(ui, num, PANEL_SLIDER, text, data_binding, voids_frames);
+
+  slider.prop1 = *((int*) &scale);
+  slider.prop2 = *((int*) &min);
+  slider.prop3 = *((int*) &max);
 
   return slider;
 }
@@ -48,8 +54,7 @@ UIPanel create_tab(UI* ui, int num, int* data_binding, int kind) {
 
   switch (kind) {
   case UI_PANELS_GENERAL_TAB:
-    tab           = init_UIPanel(ui, num, PANEL_TAB, "General", data_binding, 0);
-    tab.data_text = render_text(ui, "C | O | A | T");
+    tab = init_UIPanel(ui, num, PANEL_TAB, "General | Camera | Sky | Ocean | Toy", data_binding, 0);
     break;
   }
 
