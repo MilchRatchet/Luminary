@@ -4,6 +4,8 @@
 #include "UI_blit.h"
 
 void handle_mouse_UIPanel_check(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
+  panel->hover = 1;
+
   if (SDL_BUTTON_LMASK & mouse_state) {
     int checked = *((int*) panel->data);
     checked ^= 1;
@@ -21,9 +23,16 @@ void render_UIPanel_check(UI* ui, UIPanel* panel) {
   const int top  = (PANEL_HEIGHT - PANEL_CHECK_BOX_SIZE) >> 1;
   const int left = UI_WIDTH - 5 - PANEL_CHECK_BOX_SIZE;
 
-  blit_gray(
-    ui->pixels, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
-    PANEL_CHECK_BOX_SIZE, 255);
+  if (panel->hover) {
+    blit_color(
+      ui->pixels, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
+      PANEL_CHECK_BOX_SIZE, 0xff, 0xb0, 0x00);
+  }
+  else {
+    blit_gray(
+      ui->pixels, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
+      PANEL_CHECK_BOX_SIZE, 255);
+  }
 
   blit_gray(
     ui->pixels_mask, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,

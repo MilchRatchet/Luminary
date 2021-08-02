@@ -23,6 +23,18 @@ void blit_gray(uint8_t* dst, int x, int y, int ldd, int width, int height, uint8
   }
 }
 
+void blit_color(
+  uint8_t* dst, int x, int y, int ldd, int width, int height, uint8_t red, uint8_t green,
+  uint8_t blue) {
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < width; j++) {
+      dst[(y + i) * 3 * ldd + 3 * x + 3 * j]     = red;
+      dst[(y + i) * 3 * ldd + 3 * x + 3 * j + 1] = green;
+      dst[(y + i) * 3 * ldd + 3 * x + 3 * j + 2] = blue;
+    }
+  }
+}
+
 #if defined(__AVX2__)
 void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
   const int k       = UI_WIDTH / 32;

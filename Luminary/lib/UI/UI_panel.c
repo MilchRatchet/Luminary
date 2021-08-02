@@ -49,7 +49,7 @@ UIPanel create_tab(UI* ui, int num, int* data_binding, int kind) {
   switch (kind) {
   case UI_PANELS_GENERAL_TAB:
     tab           = init_UIPanel(ui, num, PANEL_TAB, "General", data_binding, 0);
-    tab.data_text = render_text(ui, "C|O|A|T");
+    tab.data_text = render_text(ui, "C | O | A | T");
     break;
   }
 

@@ -103,6 +103,10 @@ void handle_mouse_UI(UI* ui) {
     ui->mouse_flags ^= MOUSE_DRAGGING_WINDOW;
   }
 
+  for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
+    ui->general_panels[i].hover = 0;
+  }
+
   x -= ui->x;
   y -= ui->y;
 
