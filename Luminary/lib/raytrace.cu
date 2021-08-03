@@ -30,9 +30,9 @@
 
 static void update_sun(const Scene scene) {
     vec3 sun;
-    sun.x = sinf(scene.azimuth) * cosf(scene.altitude);
-    sun.y = sinf(scene.altitude);
-    sun.z = cosf(scene.azimuth) * cosf(scene.altitude);
+    sun.x = sinf(scene.sky.azimuth) * cosf(scene.sky.altitude);
+    sun.y = sinf(scene.sky.altitude);
+    sun.z = cosf(scene.sky.azimuth) * cosf(scene.sky.altitude);
     const float scale = 1.0f / (sqrtf(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z));
     sun.x *= scale;
     sun.y *= scale;
@@ -106,7 +106,7 @@ extern "C" RaytraceInstance* init_raytracing(
     instance->illuminance_atlas_length = illuminance_atlas_length;
     instance->material_atlas_length = material_atlas_length;
 
-    instance->default_material.r = 0.5f;
+    instance->default_material.r = 0.3f;
     instance->default_material.g = 0.0f;
     instance->default_material.b = 1.0f;
 
@@ -144,7 +144,7 @@ extern "C" RaytraceInstance* init_raytracing(
 
     instance->denoiser = denoiser;
     instance->use_denoiser = denoiser;
-    instance->lights_active = (scene.altitude < 0.0f);
+    instance->lights_active = (scene.sky.altitude < 0.0f);
 
     if (instance->denoiser) {
         gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * width * height));

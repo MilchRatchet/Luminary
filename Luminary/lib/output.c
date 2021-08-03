@@ -84,8 +84,6 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   return result;
 }
 
-static char* SHADING_MODE_STRING[4] = {"", "[ALBEDO] ", "[DEPTH] ", "[NORMAL] "};
-
 void realtime_output(Scene scene, RaytraceInstance* instance, const int filters) {
   RealtimeInstance* realtime = init_realtime_instance(instance);
 
@@ -98,9 +96,6 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   UI ui                     = init_UI(instance, realtime);
 
   instance->temporal_frames = 0;
-  int information_mode      = 0;
-  unsigned int update_mask  = 0xffffffff;
-  int update_ocean          = 0;
   instance->use_bloom       = 1;
 
   int make_png  = 0;
@@ -116,8 +111,6 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     start_frametime(&frametime_trace);
     trace_scene(instance, instance->temporal_frames, 0xffffffff);
     sample_frametime(&frametime_trace);
-
-    update_mask = 0;
 
     start_frametime(&frametime_post);
     if (instance->denoiser && instance->use_denoiser) {
@@ -161,9 +154,8 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     const double total_time = get_frametime(&frametime_total);
 
     sprintf(
-      title, "Luminary %s- FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms",
-      SHADING_MODE_STRING[instance->shading_mode], 1000.0 / total_time, total_time, trace_time,
-      ui_time, post_time);
+      title, "Luminary - FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms",
+      1000.0 / total_time, total_time, trace_time, ui_time, post_time);
 
     const double normalized_time = total_time / 16.66667;
 
@@ -175,96 +167,22 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
 
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_MOUSEMOTION && !ui.active) {
-        if (keystate[SDL_SCANCODE_F]) {
-          instance->scene_gpu.camera.focal_length += 0.01f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_G]) {
-          instance->scene_gpu.camera.aperture_size += 0.001f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_E]) {
-          instance->scene_gpu.camera.exposure +=
-            max(1.0f, instance->scene_gpu.camera.exposure) * 0.005f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_L]) {
-          instance->scene_gpu.ocean.height += 0.005f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_K]) {
-          instance->scene_gpu.ocean.amplitude += 0.001f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_J]) {
-          instance->scene_gpu.ocean.frequency += 0.001f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_H]) {
-          instance->scene_gpu.ocean.choppyness += 0.001f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_Y]) {
-          instance->scene_gpu.sky.base_density += 0.001f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_U]) {
-          instance->scene_gpu.sky.rayleigh_falloff += 0.001f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_I]) {
-          instance->scene_gpu.sky.mie_falloff += 0.001f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else if (keystate[SDL_SCANCODE_M]) {
-          instance->default_material.g += 0.001f * event.motion.xrel;
-          update_mask |= 0b10000;
-        }
-        else if (keystate[SDL_SCANCODE_N]) {
-          instance->default_material.r += 0.001f * event.motion.xrel;
-          update_mask |= 0b10000;
-        }
-        else if (keystate[SDL_SCANCODE_C]) {
-          instance->scene_gpu.camera.alpha_cutoff += 0.001f * event.motion.xrel;
-          update_mask |= 0b1;
-        }
-        else {
-          instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
-          instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
-          update_mask |= 0b1000;
-        }
+        instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
+        instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
 
         if (event.motion.xrel || event.motion.yrel)
           instance->temporal_frames = 0;
       }
-      else if (event.type == SDL_MOUSEWHEEL) {
-        instance->scene_gpu.camera.fov -= event.wheel.y * 0.005f * normalized_time;
-        update_mask |= 0b1001;
-        instance->temporal_frames = 0;
-      }
       else if (event.type == SDL_KEYDOWN) {
-        if (event.key.keysym.scancode == SDL_SCANCODE_T) {
-          information_mode = (information_mode + 1) % 6;
-        }
-        else if (event.key.keysym.scancode == SDL_SCANCODE_V) {
-          instance->shading_mode = (instance->shading_mode + 1) % 4;
-          update_mask |= 0b10;
+        if (event.key.keysym.scancode == SDL_SCANCODE_V) {
+          instance->shading_mode    = (instance->shading_mode + 1) % 4;
           instance->temporal_frames = 0;
-        }
-        else if (event.key.keysym.scancode == SDL_SCANCODE_O) {
-          update_ocean ^= 0b1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
           make_png = 1;
         }
-        else if (event.key.keysym.scancode == SDL_SCANCODE_GRAVE) {
-          instance->use_denoiser ^= 1;
-        }
         else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
           toggle_UI(&ui);
-        }
-        else if (event.key.keysym.scancode == SDL_SCANCODE_R) {
-          instance->scene_gpu.camera.auto_exposure ^= 0b1;
         }
       }
       else if (event.type == SDL_QUIT) {
@@ -294,62 +212,40 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     int shift_pressed = 1;
 
     if (keystate[SDL_SCANCODE_LEFT]) {
-      instance->scene_gpu.azimuth += 0.005f * normalized_time;
-      update_mask |= 0b100;
+      instance->scene_gpu.sky.azimuth += 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_RIGHT]) {
-      instance->scene_gpu.azimuth -= 0.005f * normalized_time;
-      update_mask |= 0b100;
+      instance->scene_gpu.sky.azimuth -= 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_UP]) {
-      instance->scene_gpu.altitude += 0.005f * normalized_time;
-      update_mask |= 0b100;
+      instance->scene_gpu.sky.altitude += 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_DOWN]) {
-      instance->scene_gpu.altitude -= 0.005f * normalized_time;
-      update_mask |= 0b100;
+      instance->scene_gpu.sky.altitude -= 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_W]) {
       movement_vector.z -= 1.0f;
-      update_mask |= 0b1;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_A]) {
       movement_vector.x -= 1.0f;
-      update_mask |= 0b1;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_S]) {
       movement_vector.z += 1.0f;
-      update_mask |= 0b1;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_D]) {
       movement_vector.x += 1.0f;
-      update_mask |= 0b1;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;
     }
-
-    clamp(instance->scene_gpu.camera.aperture_size, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.camera.focal_length, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.camera.exposure, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.camera.alpha_cutoff, 0.0f, 1.0f);
-    clamp(instance->scene_gpu.ocean.choppyness, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.ocean.amplitude, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.ocean.frequency, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.ocean.choppyness, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.sky.base_density, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.sky.rayleigh_falloff, 0.0f, FLT_MAX);
-    clamp(instance->scene_gpu.sky.mie_falloff, 0.0f, FLT_MAX);
-    clamp(instance->default_material.r, 0.0f, 1.0f);
-    clamp(instance->default_material.g, 0.0f, 1.0f);
 
     const float movement_speed = 0.5f * shift_pressed * normalized_time;
 
@@ -358,15 +254,13 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     instance->scene_gpu.camera.pos.y += movement_speed * movement_vector.y;
     instance->scene_gpu.camera.pos.z += movement_speed * movement_vector.z;
 
-    if (update_ocean) {
+    if (instance->scene_gpu.ocean.update) {
       instance->temporal_frames = 0;
-      update_mask |= 0b1;
-      instance->scene_gpu.ocean.time += total_time * 0.001f;
+      instance->scene_gpu.ocean.time += total_time * 0.001f * instance->scene_gpu.ocean.speed;
     }
 
     if (instance->scene_gpu.camera.auto_exposure) {
       instance->scene_gpu.camera.exposure = get_auto_exposure_from_optix(optix_setup);
-      update_mask |= 0b1;
     }
   }
 

@@ -72,28 +72,29 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
 
   scene.ocean.active     = 0;
   scene.ocean.emissive   = 0;
+  scene.ocean.update     = 0;
   scene.ocean.height     = 0.0f;
   scene.ocean.amplitude  = 0.6f;
   scene.ocean.frequency  = 0.16f;
   scene.ocean.choppyness = 4.0f;
-  scene.ocean.speed      = 0.8f;
+  scene.ocean.speed      = 1.0f;
   scene.ocean.time       = 0.0f;
   scene.ocean.albedo.r   = 0.0f;
   scene.ocean.albedo.g   = 0.0f;
   scene.ocean.albedo.b   = 0.0f;
   scene.ocean.albedo.a   = 0.9f;
 
+  scene.sky.altitude         = 0.5f;
+  scene.sky.azimuth          = 3.141f;
+  scene.sky.sun_strength     = 30.0f;
   scene.sky.base_density     = 0.8f;
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
 
-  int width          = 1280;
-  int height         = 720;
-  int bounces        = 5;
-  int samples        = 16;
-  float azimuth      = 3.141f;
-  float altitude     = 0.5f;
-  float sun_strength = 30.0f;
+  int width   = 1280;
+  int height  = 720;
+  int bounces = 5;
+  int samples = 16;
 
   int denoiser = 1;
 
@@ -122,7 +123,8 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
         &scene.camera.exposure);
     }
     else if (line[0] == 's' && line[1] == ' ') {
-      sscanf_s(line, "%*c %f %f %f\n", &azimuth, &altitude, &sun_strength);
+      sscanf_s(
+        line, "%*c %f %f %f\n", &scene.sky.azimuth, &scene.sky.altitude, &scene.sky.sun_strength);
     }
     else if (line[0] == 'i' && line[1] == ' ') {
       sscanf_s(line, "%*c %d %d %d %d\n", &width, &height, &bounces, &samples);
@@ -191,10 +193,6 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.nodes_length        = nodes_length;
   scene.materials_length    = content.materials_length;
   scene.texture_assignments = get_texture_assignments(content);
-
-  scene.altitude     = altitude;
-  scene.azimuth      = azimuth;
-  scene.sun_strength = sun_strength;
 
   process_lights(&scene);
 

@@ -352,7 +352,7 @@ void process_geometry_tasks() {
         metallic = material_f.y;
         intensity = material_f.z * 255.0f;
     } else {
-        roughness = device_default_material.r;
+        roughness = (1.0f - device_default_material.r) * (1.0f - device_default_material.r);
         metallic = device_default_material.g;
         intensity = device_default_material.b;
     }
