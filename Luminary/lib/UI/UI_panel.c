@@ -3,6 +3,7 @@
 #include "UI_text.h"
 #include "UI_slider.h"
 #include "UI_check.h"
+#include "UI_color.h"
 #include "UI_info.h"
 #include "UI_tab.h"
 
@@ -35,6 +36,12 @@ UIPanel create_slider(
 
 UIPanel create_check(UI* ui, int num, const char* text, int* data_binding, int voids_frames) {
   UIPanel check = init_UIPanel(ui, num, PANEL_CHECK, text, data_binding, voids_frames);
+
+  return check;
+}
+
+UIPanel create_color(UI* ui, int num, const char* text, float* data_binding) {
+  UIPanel check = init_UIPanel(ui, num, PANEL_COLOR, text, data_binding, 0);
 
   return check;
 }
@@ -115,6 +122,7 @@ void render_UIPanel(UI* ui, UIPanel* panel) {
   case PANEL_DROPDOWN:
     break;
   case PANEL_COLOR:
+    render_UIPanel_color(ui, panel);
     break;
   case PANEL_INFO:
     render_UIPanel_info(ui, panel);

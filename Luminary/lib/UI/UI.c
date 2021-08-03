@@ -26,20 +26,27 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_GENERAL_COUNT);
 
   panels[0] = create_tab(ui, 0, &(ui->tab));
-  panels[1] = create_info(
-    ui, 1, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32,
-    PANEL_INFO_STATIC);
-  panels[2] = create_check(ui, 2, "Optix Denoiser", &(instance->use_denoiser), 0);
+  panels[1] =
+    create_info(ui, 1, "Width", &(instance->width), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
+  panels[2] =
+    create_info(ui, 2, "Height", &(instance->height), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[3] = create_info(
-    ui, 3, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32,
+    ui, 3, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32,
+    PANEL_INFO_STATIC);
+  panels[4] = create_check(ui, 4, "Optix Denoiser", &(instance->use_denoiser), 0);
+  panels[5] = create_info(
+    ui, 5, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32,
     PANEL_INFO_DYNAMIC);
-  panels[4] = create_check(ui, 4, "Lights", &(instance->lights_active), 1);
-  panels[5] = create_slider(
-    ui, 5, "Default Smoothness", &(instance->default_material.r), 1, 0.001f, 0.0f, 1.0f);
-  panels[6] = create_slider(
-    ui, 6, "Default Metallic", &(instance->default_material.g), 1, 0.001f, 0.0f, 1.0f);
-  panels[7] = create_slider(
-    ui, 7, "Default Light Intensity", &(instance->default_material.b), 1, 0.001f, 0.0f, FLT_MAX);
+  panels[6] = create_info(
+    ui, 6, "Light Source Count", &(instance->scene_gpu.lights_length), PANEL_INFO_TYPE_INT32,
+    PANEL_INFO_STATIC);
+  panels[7] = create_check(ui, 7, "Lights", &(instance->lights_active), 1);
+  panels[8] = create_slider(
+    ui, 8, "Default Smoothness", &(instance->default_material.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[9] = create_slider(
+    ui, 9, "Default Metallic", &(instance->default_material.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[10] = create_slider(
+    ui, 10, "Default Light Intensity", &(instance->default_material.b), 1, 0.001f, 0.0f, FLT_MAX);
 
   return panels;
 }
@@ -122,18 +129,19 @@ static UIPanel* create_ocean_panels(UI* ui, RaytraceInstance* instance) {
     ui, 4, "Choppyness", &(instance->scene_gpu.ocean.choppyness), 1, 0.005f, 0.0f, FLT_MAX);
   panels[5] = create_slider(
     ui, 5, "Frequency", &(instance->scene_gpu.ocean.frequency), 1, 0.005f, 0.0f, FLT_MAX);
-  panels[6] =
-    create_slider(ui, 6, "  Red", &(instance->scene_gpu.ocean.albedo.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[6] = create_color(ui, 6, "Albedo", (float*) &(instance->scene_gpu.ocean.albedo));
   panels[7] =
-    create_slider(ui, 7, "  Green", &(instance->scene_gpu.ocean.albedo.g), 1, 0.001f, 0.0f, 1.0f);
+    create_slider(ui, 7, "  Red", &(instance->scene_gpu.ocean.albedo.r), 1, 0.001f, 0.0f, 1.0f);
   panels[8] =
-    create_slider(ui, 8, "  Blue", &(instance->scene_gpu.ocean.albedo.b), 1, 0.001f, 0.0f, 1.0f);
-  panels[9] = create_check(ui, 9, "Emissive", &(instance->scene_gpu.ocean.emissive), 1);
-  panels[10] =
-    create_slider(ui, 10, "Alpha", &(instance->scene_gpu.ocean.albedo.a), 1, 0.001f, 0.0f, 1.0f);
-  panels[11] = create_check(ui, 11, "Animated", &(instance->scene_gpu.ocean.update), 1);
-  panels[12] =
-    create_slider(ui, 12, "Speed", &(instance->scene_gpu.ocean.speed), 1, 0.005f, 0.0f, FLT_MAX);
+    create_slider(ui, 8, "  Green", &(instance->scene_gpu.ocean.albedo.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[9] =
+    create_slider(ui, 9, "  Blue", &(instance->scene_gpu.ocean.albedo.b), 1, 0.001f, 0.0f, 1.0f);
+  panels[10] = create_check(ui, 10, "Emissive", &(instance->scene_gpu.ocean.emissive), 1);
+  panels[11] =
+    create_slider(ui, 11, "Alpha", &(instance->scene_gpu.ocean.albedo.a), 1, 0.001f, 0.0f, 1.0f);
+  panels[12] = create_check(ui, 12, "Animated", &(instance->scene_gpu.ocean.update), 1);
+  panels[13] =
+    create_slider(ui, 13, "Speed", &(instance->scene_gpu.ocean.speed), 1, 0.005f, 0.0f, FLT_MAX);
 
   return panels;
 }
