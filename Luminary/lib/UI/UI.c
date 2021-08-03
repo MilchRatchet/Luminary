@@ -172,8 +172,8 @@ UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
 
   ui.last_panel = (UIPanel*) 0;
 
-  ui.pixels      = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
-  ui.pixels_mask = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
+  ui.pixels      = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 4);
+  ui.pixels_mask = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 4);
 
   ui.temporal_frames = &(instance->temporal_frames);
 
@@ -336,8 +336,8 @@ void render_UI(UI* ui) {
   if (!ui->active)
     return;
 
-  memset(ui->pixels, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
-  memset(ui->pixels_mask, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
+  memset(ui->pixels, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 4);
+  memset(ui->pixels_mask, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 4);
 
   switch (ui->tab) {
   case UI_PANELS_GENERAL_TAB: {

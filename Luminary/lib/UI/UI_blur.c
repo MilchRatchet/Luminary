@@ -12,7 +12,7 @@
 #define KERNEL_SIZE ((int) (SIGMA * 3.0f) + 1)
 
 void blur_background(UI* ui, uint8_t* target, int width, int height) {
-  const int off = 3 * width * ui->y + 3 * ui->x;
+  const int off = 4 * width * ui->y + 4 * ui->x;
   float* temp   = (float*) ui->scratch;
 
   float* gauss_kernel         = temp + (BLUR_HEIGHT * BLUR_WIDTH * 3);
@@ -21,11 +21,11 @@ void blur_background(UI* ui, uint8_t* target, int width, int height) {
   for (int i = 0; i < BLUR_HEIGHT; i++) {
     for (int j = 0; j < BLUR_WIDTH; j++) {
       target_convolution[i * BLUR_WIDTH * 3 + j * 3] =
-        target[off + SCALE * i * width * 3 + 3 * SCALE * j];
+        target[off + SCALE * i * width * 4 + 4 * SCALE * j + 2];
       target_convolution[i * BLUR_WIDTH * 3 + j * 3 + 1] =
-        target[off + SCALE * i * width * 3 + 3 * SCALE * j + 1];
+        target[off + SCALE * i * width * 4 + 4 * SCALE * j + 1];
       target_convolution[i * BLUR_WIDTH * 3 + j * 3 + 2] =
-        target[off + SCALE * i * width * 3 + 3 * SCALE * j + 2];
+        target[off + SCALE * i * width * 4 + 4 * SCALE * j];
     }
   }
 
@@ -84,11 +84,11 @@ void blur_background(UI* ui, uint8_t* target, int width, int height) {
 
   for (int i = 0; i < UI_HEIGHT + UI_BORDER_SIZE; i++) {
     for (int j = 0; j < UI_WIDTH; j++) {
-      target[off + i * width * 3 + 3 * j] =
+      target[off + i * width * 4 + 4 * j + 2] =
         target_convolution[(i / SCALE) * BLUR_WIDTH * 3 + 3 * (j / SCALE)];
-      target[off + i * width * 3 + 3 * j + 1] =
+      target[off + i * width * 4 + 4 * j + 1] =
         target_convolution[(i / SCALE) * BLUR_WIDTH * 3 + 3 * (j / SCALE) + 1];
-      target[off + i * width * 3 + 3 * j + 2] =
+      target[off + i * width * 4 + 4 * j] =
         target_convolution[(i / SCALE) * BLUR_WIDTH * 3 + 3 * (j / SCALE) + 2];
     }
   }

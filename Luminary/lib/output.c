@@ -48,13 +48,11 @@ void offline_output(
   apply_bloom(instance, instance->frame_output_gpu);
 
   initialize_8bit_frame(instance, instance->width, instance->height);
-  RGB8* frame = (RGB8*) malloc(sizeof(RGB8) * instance->width * instance->height);
+  XRGB8* frame = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
   copy_framebuffer_to_8bit(
     frame, instance->width, instance->height, instance->frame_output_gpu, instance);
 
-  store_as_png(
-    output_name, (uint8_t*) frame, sizeof(RGB8) * instance->width * instance->height,
-    instance->width, instance->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+  store_XRGB8_png(output_name, frame, instance->width, instance->height);
 
   printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -98,8 +96,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
   instance->temporal_frames = 0;
   instance->use_bloom       = 1;
 
-  int make_png  = 0;
-  int png_count = 0;
+  int make_png = 0;
 
   char* title = (char*) malloc(4096);
 
@@ -135,16 +132,24 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     sample_frametime(&frametime_UI);
 
     if (make_png) {
-      make_png       = 0;
-      char* filename = malloc(4096);
-      sprintf(filename, "%d.png", png_count++);
-      store_as_png(
-        filename, (uint8_t*) realtime->buffer, sizeof(RGB8) * realtime->width * realtime->height,
-        realtime->width, realtime->height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
-      free(filename);
-    }
+      make_png         = 0;
+      char* filename   = malloc(4096);
+      char* timestring = malloc(4096);
+      time_t rawtime;
+      struct tm timeinfo;
 
-    SDL_BlitSurface(realtime->surface, 0, realtime->window_surface, 0);
+      time(&rawtime);
+      localtime_s(&timeinfo, &rawtime);
+      strftime(timestring, 4096, "%Y-%m-%d-%H-%M-%S.png", &timeinfo);
+
+      printf("Snap-%s.png", timestring);
+
+      sprintf(filename, "Snap-%s.png", timestring);
+      store_XRGB8_png(filename, realtime->buffer, realtime->width, realtime->height);
+
+      free(filename);
+      free(timestring);
+    }
 
     sample_frametime(&frametime_total);
     start_frametime(&frametime_total);

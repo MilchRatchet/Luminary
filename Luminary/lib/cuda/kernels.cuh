@@ -1067,7 +1067,8 @@ void convert_RGBF_to_RGB8(const int width, const int height, const RGBF* source)
     pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.g));
     pixel.b = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.b));
 
-    RGB8 converted_pixel;
+    XRGB8 converted_pixel;
+    converted_pixel.ignore = 0;
     converted_pixel.r = (uint8_t)pixel.r;
     converted_pixel.g = (uint8_t)pixel.g;
     converted_pixel.b = (uint8_t)pixel.b;

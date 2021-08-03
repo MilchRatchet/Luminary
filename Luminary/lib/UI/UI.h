@@ -9,7 +9,7 @@
 #include "realtime.h"
 
 /*
- * Must be a multiple of 32
+ * Must be a multiple of 8
  */
 #define UI_WIDTH 320
 #define UI_HEIGHT 600

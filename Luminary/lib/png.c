@@ -687,3 +687,21 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   return result;
 }
+
+int store_XRGB8_png(const char* filename, const XRGB8* image, const int width, const int height) {
+  uint8_t* buffer = (uint8_t*) malloc(width * height * 3);
+
+  RGB8* buffer_rgb8 = (RGB8*) buffer;
+  for (int i = 0; i < height * width; i++) {
+    XRGB8 a        = image[i];
+    RGB8 result    = {.r = a.r, .g = a.g, .b = a.b};
+    buffer_rgb8[i] = result;
+  }
+
+  int ret = store_as_png(
+    filename, buffer, width * height * 3, width, height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+
+  free(buffer);
+
+  return ret;
+}

@@ -7,10 +7,10 @@
 struct RealtimeInstance {
   int width;
   int height;
+  int ld;
   SDL_Window* window;
   SDL_Surface* window_surface;
-  SDL_Surface* surface;
-  RGB8* buffer;
+  XRGB8* buffer;
 } typedef RealtimeInstance;
 
 RealtimeInstance* init_realtime_instance(RaytraceInstance* instance);

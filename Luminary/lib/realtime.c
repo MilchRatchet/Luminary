@@ -50,16 +50,14 @@ RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
   amask = 0xff000000;
 #endif
 
-  realtime->surface = SDL_CreateRGBSurface(0, rect.w, rect.h, 24, rmask, gmask, bmask, amask);
-
-  realtime->buffer = (RGB8*) realtime->surface->pixels;
+  realtime->buffer = (XRGB8*) realtime->window_surface->pixels;
+  realtime->ld     = realtime->window_surface->pitch;
   initialize_8bit_frame(instance, rect.w, rect.h);
 
   return realtime;
 }
 
 void free_realtime_instance(RealtimeInstance* realtime) {
-  free(realtime->buffer);
   SDL_DestroyWindow(realtime->window);
   SDL_Quit();
   free(realtime);

@@ -332,15 +332,15 @@ extern "C" void free_outputs(RaytraceInstance* instance) {
 }
 
 extern "C" void initialize_8bit_frame(RaytraceInstance* instance, const int width, const int height) {
-    gpuErrchk(cudaMalloc((void**) &(instance->buffer_8bit_gpu), sizeof(RGB8) * width * height));
-    gpuErrchk(cudaMemcpyToSymbol(device_frame_8bit, &(instance->buffer_8bit_gpu), sizeof(RGB8*), 0, cudaMemcpyHostToDevice));
+    gpuErrchk(cudaMalloc((void**) &(instance->buffer_8bit_gpu), sizeof(XRGB8) * width * height));
+    gpuErrchk(cudaMemcpyToSymbol(device_frame_8bit, &(instance->buffer_8bit_gpu), sizeof(uint8_t*), 0, cudaMemcpyHostToDevice));
 }
 
 extern "C" void free_8bit_frame(RaytraceInstance* instance) {
     gpuErrchk(cudaFree(instance->buffer_8bit_gpu));
 }
 
-extern "C" void copy_framebuffer_to_8bit(RGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance) {
+extern "C" void copy_framebuffer_to_8bit(XRGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance) {
     convert_RGBF_to_RGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(width, height, source);
-    gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(RGB8) * width * height, cudaMemcpyDeviceToHost));
+    gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(XRGB8) * width * height, cudaMemcpyDeviceToHost));
 }
