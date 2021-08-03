@@ -160,46 +160,10 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     const double post_time  = get_frametime(&frametime_post);
     const double total_time = get_frametime(&frametime_total);
 
-    if (information_mode == 0) {
-      sprintf(
-        title, "Luminary %s- FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms",
-        SHADING_MODE_STRING[instance->shading_mode], 1000.0 / total_time, total_time, trace_time,
-        ui_time, post_time);
-    }
-    else if (information_mode == 1) {
-      sprintf(
-        title, "Luminary %s- Pos: (%.2f,%.2f,%.2f) Rot: (%.2f,%.2f,%.2f) FOV: %.2f",
-        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.camera.pos.x,
-        instance->scene_gpu.camera.pos.y, instance->scene_gpu.camera.pos.z,
-        instance->scene_gpu.camera.rotation.x, instance->scene_gpu.camera.rotation.y,
-        instance->scene_gpu.camera.rotation.z, instance->scene_gpu.camera.fov);
-    }
-    else if (information_mode == 2) {
-      sprintf(
-        title, "Luminary %s- Focal Length: %.2f Aperture Size: %.2f Exposure: %.2f %s",
-        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.camera.focal_length,
-        instance->scene_gpu.camera.aperture_size, instance->scene_gpu.camera.exposure,
-        (instance->scene_gpu.camera.auto_exposure && instance->denoiser) ? "[AutoExp]" : "");
-    }
-    else if (information_mode == 3) {
-      sprintf(
-        title, "Luminary %s- Azimuth: %.3f Altitude: %.3f",
-        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.azimuth,
-        instance->scene_gpu.altitude);
-    }
-    else if (information_mode == 4) {
-      sprintf(
-        title, "Luminary %s- Ocean Height: %.3f Amplitude: %.3f Frequency: %.3f Choppyness: %.3f",
-        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.ocean.height,
-        instance->scene_gpu.ocean.amplitude, instance->scene_gpu.ocean.frequency,
-        instance->scene_gpu.ocean.choppyness);
-    }
-    else if (information_mode == 5) {
-      sprintf(
-        title, "Luminary %s- Sky Density: %.3f Rayleigh: %.3f Mie: %.3f",
-        SHADING_MODE_STRING[instance->shading_mode], instance->scene_gpu.sky.base_density,
-        instance->scene_gpu.sky.rayleigh_falloff, instance->scene_gpu.sky.mie_falloff);
-    }
+    sprintf(
+      title, "Luminary %s- FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms",
+      SHADING_MODE_STRING[instance->shading_mode], 1000.0 / total_time, total_time, trace_time,
+      ui_time, post_time);
 
     const double normalized_time = total_time / 16.66667;
 

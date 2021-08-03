@@ -24,8 +24,11 @@ SDL_Surface* render_text(UI* ui, const char* text) {
 
 void blit_text(UI* ui, SDL_Surface* text, int x, int y) {
   uint8_t* text_pixels = (uint8_t*) text->pixels;
+
+  const int width = (x + text->w > UI_WIDTH) ? UI_WIDTH - x : text->w;
+
   for (int i = 0; i < text->h; i++) {
-    for (int j = 0; j < 3 * text->w; j++) {
+    for (int j = 0; j < 3 * width; j++) {
       const int ui_index        = 3 * x + j + (i + y) * UI_WIDTH * 3;
       const float alpha         = text_pixels[j / 3 + i * text->pitch] / 255.0f;
       const uint8_t ui_pixel    = ui->pixels[ui_index];

@@ -25,7 +25,7 @@ static size_t compute_scratch_space() {
 static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_GENERAL_COUNT);
 
-  panels[0] = create_tab(ui, 0, &(ui->tab), UI_PANELS_GENERAL_TAB);
+  panels[0] = create_tab(ui, 0, &(ui->tab));
   panels[1] = create_check(ui, 1, "Optix Denoiser", &(instance->use_denoiser), 0);
   panels[2] = create_check(ui, 2, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure), 0);
   panels[3] = create_info(
@@ -41,6 +41,38 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   panels[7] = create_check(ui, 7, "Bloom", &(instance->use_bloom), 0);
   panels[8] = create_slider(
     ui, 8, "Ocean Height", &(instance->scene_gpu.ocean.height), 1, 0.005f, -FLT_MAX, FLT_MAX);
+
+  return panels;
+}
+
+static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_CAMERA_COUNT);
+
+  panels[0] = create_tab(ui, 0, &(ui->tab));
+
+  return panels;
+}
+
+static UIPanel* create_sky_panels(UI* ui, RaytraceInstance* instance) {
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_SKY_COUNT);
+
+  panels[0] = create_tab(ui, 0, &(ui->tab));
+
+  return panels;
+}
+
+static UIPanel* create_ocean_panels(UI* ui, RaytraceInstance* instance) {
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_OCEAN_COUNT);
+
+  panels[0] = create_tab(ui, 0, &(ui->tab));
+
+  return panels;
+}
+
+static UIPanel* create_toy_panels(UI* ui, RaytraceInstance* instance) {
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_TOY_COUNT);
+
+  panels[0] = create_tab(ui, 0, &(ui->tab));
 
   return panels;
 }
@@ -73,6 +105,10 @@ UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
   init_text(&ui);
 
   ui.general_panels = create_general_panels(&ui, instance);
+  ui.camera_panels  = create_camera_panels(&ui, instance);
+  ui.sky_panels     = create_sky_panels(&ui, instance);
+  ui.ocean_panels   = create_ocean_panels(&ui, instance);
+  ui.toy_panels     = create_toy_panels(&ui, instance);
 
   SDL_SetRelativeMouseMode(!ui.active);
 
@@ -87,8 +123,6 @@ void toggle_UI(UI* ui) {
 void handle_mouse_UI(UI* ui) {
   if (!ui->active)
     return;
-
-  SDL_PumpEvents();
 
   int x, y;
   int d_x, d_y;
@@ -114,8 +148,32 @@ void handle_mouse_UI(UI* ui) {
     ui->mouse_flags ^= MOUSE_DRAGGING_WINDOW;
   }
 
-  for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
-    ui->general_panels[i].hover = 0;
+  switch (ui->tab) {
+  case UI_PANELS_GENERAL_TAB: {
+    for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
+      ui->general_panels[i].hover = 0;
+    }
+  } break;
+  case UI_PANELS_CAMERA_TAB: {
+    for (int i = 0; i < UI_PANELS_CAMERA_COUNT; i++) {
+      ui->camera_panels[i].hover = 0;
+    }
+  } break;
+  case UI_PANELS_SKY_TAB: {
+    for (int i = 0; i < UI_PANELS_SKY_COUNT; i++) {
+      ui->sky_panels[i].hover = 0;
+    }
+  } break;
+  case UI_PANELS_OCEAN_TAB: {
+    for (int i = 0; i < UI_PANELS_OCEAN_COUNT; i++) {
+      ui->ocean_panels[i].hover = 0;
+    }
+  } break;
+  case UI_PANELS_TOY_TAB: {
+    for (int i = 0; i < UI_PANELS_TOY_COUNT; i++) {
+      ui->toy_panels[i].hover = 0;
+    }
+  } break;
   }
 
   x -= ui->x;
@@ -144,8 +202,34 @@ void handle_mouse_UI(UI* ui) {
         state &= ~SDL_BUTTON_LMASK;
       }
 
-      if (ui->panel_hover < UI_PANELS_GENERAL_COUNT)
-        panel = ui->general_panels + ui->panel_hover;
+      UIPanel* panels_tab = ui->general_panels;
+      int panel_count     = UI_PANELS_GENERAL_COUNT;
+
+      switch (ui->tab) {
+      case UI_PANELS_GENERAL_TAB: {
+        panels_tab  = ui->general_panels;
+        panel_count = UI_PANELS_GENERAL_COUNT;
+      } break;
+      case UI_PANELS_CAMERA_TAB: {
+        panels_tab  = ui->camera_panels;
+        panel_count = UI_PANELS_CAMERA_COUNT;
+      } break;
+      case UI_PANELS_SKY_TAB: {
+        panels_tab  = ui->sky_panels;
+        panel_count = UI_PANELS_SKY_COUNT;
+      } break;
+      case UI_PANELS_OCEAN_TAB: {
+        panels_tab  = ui->ocean_panels;
+        panel_count = UI_PANELS_OCEAN_COUNT;
+      } break;
+      case UI_PANELS_TOY_TAB: {
+        panels_tab  = ui->toy_panels;
+        panel_count = UI_PANELS_TOY_COUNT;
+      } break;
+      }
+
+      if (ui->panel_hover < panel_count)
+        panel = panels_tab + ui->panel_hover;
     }
   }
   else {
@@ -179,11 +263,31 @@ void render_UI(UI* ui) {
   memset(ui->pixels_mask, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT * 3);
 
   switch (ui->tab) {
-  case UI_PANELS_GENERAL_TAB:
+  case UI_PANELS_GENERAL_TAB: {
     for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
       render_UIPanel(ui, ui->general_panels + i);
     }
-    break;
+  } break;
+  case UI_PANELS_CAMERA_TAB: {
+    for (int i = 0; i < UI_PANELS_CAMERA_COUNT; i++) {
+      render_UIPanel(ui, ui->camera_panels + i);
+    }
+  } break;
+  case UI_PANELS_SKY_TAB: {
+    for (int i = 0; i < UI_PANELS_SKY_COUNT; i++) {
+      render_UIPanel(ui, ui->sky_panels + i);
+    }
+  } break;
+  case UI_PANELS_OCEAN_TAB: {
+    for (int i = 0; i < UI_PANELS_OCEAN_COUNT; i++) {
+      render_UIPanel(ui, ui->ocean_panels + i);
+    }
+  } break;
+  case UI_PANELS_TOY_TAB: {
+    for (int i = 0; i < UI_PANELS_TOY_COUNT; i++) {
+      render_UIPanel(ui, ui->toy_panels + i);
+    }
+  } break;
   }
 }
 
@@ -191,7 +295,7 @@ void blit_UI(UI* ui, uint8_t* target, int width, int height) {
   if (!ui->active)
     return;
 
-  // blur_background(ui, target, width, height);
+  blur_background(ui, target, width, height);
   blit_UI_internal(ui, target, width, height);
 }
 

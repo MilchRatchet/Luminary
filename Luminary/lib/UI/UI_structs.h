@@ -33,6 +33,10 @@ struct UI {
   uint8_t* pixels;
   uint8_t* pixels_mask;
   UIPanel* general_panels;
+  UIPanel* camera_panels;
+  UIPanel* sky_panels;
+  UIPanel* ocean_panels;
+  UIPanel* toy_panels;
   int* temporal_frames;
   void* scratch;
 } typedef UI;

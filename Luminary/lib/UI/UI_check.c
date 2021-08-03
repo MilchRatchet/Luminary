@@ -26,7 +26,7 @@ void render_UIPanel_check(UI* ui, UIPanel* panel) {
   if (panel->hover) {
     blit_color(
       ui->pixels, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
-      PANEL_CHECK_BOX_SIZE, 0xff, 0xb0, 0x00);
+      PANEL_CHECK_BOX_SIZE, HOVER_R, HOVER_G, HOVER_B);
   }
   else {
     blit_gray(
