@@ -125,7 +125,46 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
 
     instance->temporal_frames++;
 
+    SDL_PumpEvents();
+
+    int mwheel  = 0;
+    int mmotion = 0;
+
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_MOUSEMOTION) {
+        if (ui.active) {
+          mmotion += event.motion.xrel;
+        }
+        else {
+          instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
+          instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
+
+          if (event.motion.xrel || event.motion.yrel)
+            instance->temporal_frames = 0;
+        }
+      }
+      else if (event.type == SDL_MOUSEWHEEL) {
+        mwheel += event.wheel.y;
+      }
+      else if (event.type == SDL_KEYDOWN) {
+        if (event.key.keysym.scancode == SDL_SCANCODE_V) {
+          instance->shading_mode    = (instance->shading_mode + 1) % 4;
+          instance->temporal_frames = 0;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
+          make_png = 1;
+        }
+        else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
+          toggle_UI(&ui);
+        }
+      }
+      else if (event.type == SDL_QUIT) {
+        exit = 1;
+      }
+    }
+
     start_frametime(&frametime_UI);
+    set_input_events_UI(&ui, mmotion, mwheel);
     handle_mouse_UI(&ui);
     render_UI(&ui);
     blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width, realtime->height);
@@ -167,34 +206,6 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     SDL_SetWindowTitle(realtime->window, title);
     SDL_UpdateWindowSurface(realtime->window);
 
-    SDL_PumpEvents();
-    const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
-
-    while (SDL_PollEvent(&event)) {
-      if (event.type == SDL_MOUSEMOTION && !ui.active) {
-        instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
-        instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
-
-        if (event.motion.xrel || event.motion.yrel)
-          instance->temporal_frames = 0;
-      }
-      else if (event.type == SDL_KEYDOWN) {
-        if (event.key.keysym.scancode == SDL_SCANCODE_V) {
-          instance->shading_mode    = (instance->shading_mode + 1) % 4;
-          instance->temporal_frames = 0;
-        }
-        else if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
-          make_png = 1;
-        }
-        else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
-          toggle_UI(&ui);
-        }
-      }
-      else if (event.type == SDL_QUIT) {
-        exit = 1;
-      }
-    }
-
     const float alpha = instance->scene_gpu.camera.rotation.x;
     const float beta  = instance->scene_gpu.camera.rotation.y;
     const float gamma = instance->scene_gpu.camera.rotation.z;
@@ -215,6 +226,8 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
     vec3 movement_vector = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
 
     int shift_pressed = 1;
+
+    const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
 
     if (keystate[SDL_SCANCODE_LEFT]) {
       instance->scene_gpu.sky.azimuth += 0.005f * normalized_time;

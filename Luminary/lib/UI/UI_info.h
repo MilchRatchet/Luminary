@@ -13,6 +13,6 @@
 #define PANEL_INFO_STATIC 0x0
 #define PANEL_INFO_DYNAMIC 0x1
 
-void render_UIPanel_info(UI* ui, UIPanel* panel);
+void render_UIPanel_info(UI* ui, UIPanel* panel, int y);
 
 #endif /* UI_INFO_H */

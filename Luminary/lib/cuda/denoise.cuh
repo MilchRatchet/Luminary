@@ -118,7 +118,7 @@ extern "C" float get_auto_exposure_from_optix(void* input) {
   float brightness;
   gpuErrchk(cudaMemcpy(&brightness, (void*)denoise_setup.hdr_intensity, sizeof(float), cudaMemcpyDeviceToHost));
 
-  return min(100.0f, max(0.01f, powf(brightness,0.5f)));
+  return log2f(1.0f + brightness);//min(100.0f, max(0.01f, powf(brightness,0.5f)));
 }
 
 extern "C" void free_realtime_denoise(void* input) {

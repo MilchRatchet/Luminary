@@ -45,14 +45,13 @@ static void rerender_data_text(UI* ui, UIPanel* panel) {
   free(buffer);
 }
 
-void render_UIPanel_info(UI* ui, UIPanel* panel) {
-  blit_text(
-    ui, panel->title, 5, ui->scroll_pos + panel->y + ((PANEL_HEIGHT - panel->title->h) >> 1));
+void render_UIPanel_info(UI* ui, UIPanel* panel, int y) {
+  blit_text(ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1));
 
   if (panel->data) {
     rerender_data_text(ui, panel);
     blit_text(
       ui, panel->data_text, UI_WIDTH - 5 - panel->data_text->w,
-      ui->scroll_pos + panel->y + ((PANEL_HEIGHT - panel->data_text->h) >> 1));
+      y + ((PANEL_HEIGHT - panel->data_text->h) >> 1));
   }
 }

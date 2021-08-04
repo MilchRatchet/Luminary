@@ -8,7 +8,7 @@
 #include "UI_tab.h"
 
 static UIPanel init_UIPanel(
-  UI* ui, int num, int type, const char* text, void* data_binding, int voids_frames) {
+  UI* ui, int type, const char* text, void* data_binding, int voids_frames) {
   UIPanel panel;
 
   panel.type         = type;
@@ -16,16 +16,15 @@ static UIPanel init_UIPanel(
   panel.title        = render_text(ui, text);
   panel.data_text    = (SDL_Surface*) 0;
   panel.data         = data_binding;
-  panel.y            = num * PANEL_HEIGHT;
   panel.voids_frames = voids_frames;
 
   return panel;
 }
 
 UIPanel create_slider(
-  UI* ui, int num, const char* text, float* data_binding, int voids_frames, float scale, float min,
+  UI* ui, const char* text, float* data_binding, int voids_frames, float scale, float min,
   float max) {
-  UIPanel slider = init_UIPanel(ui, num, PANEL_SLIDER, text, data_binding, voids_frames);
+  UIPanel slider = init_UIPanel(ui, PANEL_SLIDER, text, data_binding, voids_frames);
 
   slider.prop1 = *((int*) &scale);
   slider.prop2 = *((int*) &min);
@@ -34,21 +33,20 @@ UIPanel create_slider(
   return slider;
 }
 
-UIPanel create_check(UI* ui, int num, const char* text, int* data_binding, int voids_frames) {
-  UIPanel check = init_UIPanel(ui, num, PANEL_CHECK, text, data_binding, voids_frames);
+UIPanel create_check(UI* ui, const char* text, int* data_binding, int voids_frames) {
+  UIPanel check = init_UIPanel(ui, PANEL_CHECK, text, data_binding, voids_frames);
 
   return check;
 }
 
-UIPanel create_color(UI* ui, int num, const char* text, float* data_binding) {
-  UIPanel check = init_UIPanel(ui, num, PANEL_COLOR, text, data_binding, 0);
+UIPanel create_color(UI* ui, const char* text, float* data_binding) {
+  UIPanel check = init_UIPanel(ui, PANEL_COLOR, text, data_binding, 0);
 
   return check;
 }
 
-UIPanel create_info(
-  UI* ui, int num, const char* text, void* data_binding, int data_type, int kind) {
-  UIPanel info = init_UIPanel(ui, num, PANEL_INFO, text, data_binding, 0);
+UIPanel create_info(UI* ui, const char* text, void* data_binding, int data_type, int kind) {
+  UIPanel info = init_UIPanel(ui, PANEL_INFO, text, data_binding, 0);
 
   info.prop1 = data_type;
   info.prop2 = kind;
@@ -56,10 +54,10 @@ UIPanel create_info(
   return info;
 }
 
-UIPanel create_tab(UI* ui, int num, int* data_binding) {
+UIPanel create_tab(UI* ui, int* data_binding) {
   UIPanel tab;
 
-  tab = init_UIPanel(ui, num, PANEL_TAB, "", data_binding, 0);
+  tab = init_UIPanel(ui, PANEL_TAB, "", data_binding, 0);
 
   tab.data_text = (SDL_Surface*) malloc(sizeof(SDL_Surface*) * UI_PANELS_TAB_COUNT);
 
@@ -111,21 +109,21 @@ void handle_mouse_UIPanel(UI* ui, UIPanel* panel, int mouse_state, int x, int y)
   }
 }
 
-void render_UIPanel(UI* ui, UIPanel* panel) {
+void render_UIPanel(UI* ui, UIPanel* panel, int y) {
   switch (panel->type) {
   case PANEL_SLIDER:
-    render_UIPanel_slider(ui, panel);
+    render_UIPanel_slider(ui, panel, y);
     break;
   case PANEL_CHECK:
-    render_UIPanel_check(ui, panel);
+    render_UIPanel_check(ui, panel, y);
     break;
   case PANEL_DROPDOWN:
     break;
   case PANEL_COLOR:
-    render_UIPanel_color(ui, panel);
+    render_UIPanel_color(ui, panel, y);
     break;
   case PANEL_INFO:
-    render_UIPanel_info(ui, panel);
+    render_UIPanel_info(ui, panel, y);
     break;
   case PANEL_TAB:
     render_UIPanel_tab(ui, panel);

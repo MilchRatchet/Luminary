@@ -16,34 +16,29 @@ void handle_mouse_UIPanel_check(UI* ui, UIPanel* panel, int mouse_state, int x, 
   }
 }
 
-void render_UIPanel_check(UI* ui, UIPanel* panel) {
-  blit_text(
-    ui, panel->title, 5, ui->scroll_pos + panel->y + ((PANEL_HEIGHT - panel->title->h) >> 1));
+void render_UIPanel_check(UI* ui, UIPanel* panel, int y) {
+  blit_text(ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1));
 
   const int top  = (PANEL_HEIGHT - PANEL_CHECK_BOX_SIZE) >> 1;
   const int left = UI_WIDTH - 5 - PANEL_CHECK_BOX_SIZE;
 
   if (panel->hover) {
     blit_color(
-      ui->pixels, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
-      PANEL_CHECK_BOX_SIZE, HOVER_R, HOVER_G, HOVER_B);
+      ui->pixels, left, y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE, PANEL_CHECK_BOX_SIZE, HOVER_R,
+      HOVER_G, HOVER_B);
   }
   else {
-    blit_gray(
-      ui->pixels, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
-      PANEL_CHECK_BOX_SIZE, 255);
+    blit_gray(ui->pixels, left, y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE, PANEL_CHECK_BOX_SIZE, 255);
   }
 
   blit_gray(
-    ui->pixels_mask, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE,
-    PANEL_CHECK_BOX_SIZE, 0xff);
+    ui->pixels_mask, left, y + top, UI_WIDTH, PANEL_CHECK_BOX_SIZE, PANEL_CHECK_BOX_SIZE, 0xff);
 
   const int checked = *((int*) panel->data);
 
   if (!checked) {
     blit_gray(
-      ui->pixels_mask, left + PANEL_CHECK_BOX_BORDER,
-      ui->scroll_pos + panel->y + top + PANEL_CHECK_BOX_BORDER, UI_WIDTH,
+      ui->pixels_mask, left + PANEL_CHECK_BOX_BORDER, y + top + PANEL_CHECK_BOX_BORDER, UI_WIDTH,
       PANEL_CHECK_BOX_SIZE - 2 * PANEL_CHECK_BOX_BORDER,
       PANEL_CHECK_BOX_SIZE - 2 * PANEL_CHECK_BOX_BORDER, 0x00);
   }

@@ -6,7 +6,6 @@
 
 struct UIPanel {
   int type;
-  int y;
   int hover;
   int prop1;
   int prop2;
@@ -29,6 +28,8 @@ struct UI {
   int max_y;
   int mouse_flags;
   int scroll_pos;
+  int mouse_xrel;
+  int mouse_wheel;
   TTF_Font* font;
   uint8_t* pixels;
   uint8_t* pixels_mask;

@@ -4,20 +4,16 @@
 #include "UI_color.h"
 #include "UI_text.h"
 
-void render_UIPanel_color(UI* ui, UIPanel* panel) {
-  blit_text(
-    ui, panel->title, 5, ui->scroll_pos + panel->y + ((PANEL_HEIGHT - panel->title->h) >> 1));
+void render_UIPanel_color(UI* ui, UIPanel* panel, int y) {
+  blit_text(ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1));
 
   const int top  = (PANEL_HEIGHT - PANEL_COLOR_BOX_SIZE) >> 1;
   const int left = UI_WIDTH - 5 - PANEL_COLOR_BOX_SIZE;
 
-  blit_gray(
-    ui->pixels, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_COLOR_BOX_SIZE,
-    PANEL_COLOR_BOX_SIZE, 255);
+  blit_gray(ui->pixels, left, y + top, UI_WIDTH, PANEL_COLOR_BOX_SIZE, PANEL_COLOR_BOX_SIZE, 255);
 
   blit_gray(
-    ui->pixels_mask, left, ui->scroll_pos + panel->y + top, UI_WIDTH, PANEL_COLOR_BOX_SIZE,
-    PANEL_COLOR_BOX_SIZE, 0xff);
+    ui->pixels_mask, left, y + top, UI_WIDTH, PANEL_COLOR_BOX_SIZE, PANEL_COLOR_BOX_SIZE, 0xff);
 
   float* colors = (float*) panel->data;
 
@@ -26,8 +22,7 @@ void render_UIPanel_color(UI* ui, UIPanel* panel) {
   const uint8_t blue  = 255.0f * colors[2];
 
   blit_color(
-    ui->pixels, left + PANEL_COLOR_BOX_BORDER,
-    ui->scroll_pos + panel->y + top + PANEL_COLOR_BOX_BORDER, UI_WIDTH,
+    ui->pixels, left + PANEL_COLOR_BOX_BORDER, y + top + PANEL_COLOR_BOX_BORDER, UI_WIDTH,
     PANEL_COLOR_BOX_SIZE - 2 * PANEL_COLOR_BOX_BORDER,
     PANEL_COLOR_BOX_SIZE - 2 * PANEL_COLOR_BOX_BORDER, red, green, blue);
 }
