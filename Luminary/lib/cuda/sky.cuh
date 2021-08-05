@@ -28,13 +28,38 @@ __device__
 float get_earth_intersection(const vec3 origin, const vec3 ray) {
     const float a = dot_product(origin, ray);
     const float b = get_length(origin);
-    const float delta = a * a - b * b + EARTH_RADIUS * EARTH_RADIUS;
-
-    if (delta < 0.0f) return 1.0f;
-
-    return (-a-sqrtf(delta) >= 0.0f) ? 0.0f : 1.0f;
+    return a * a - b * b + EARTH_RADIUS * EARTH_RADIUS;
 }
 
+__device__
+float get_earth_shadowing(const vec3 origin, const vec3 ray, const vec3 sun, const float atmosphere_length) {
+    if (sun.y >= 0.0f) return 1.0f;
+
+    const int steps = 8;
+    float a = atmosphere_length * 0.5f;
+    float step_size = a;
+
+    vec3 p = add_vector(origin, scale_vector(ray, a));
+
+    for (int i = 0; i < steps; i++) {
+        const vec3 ray_scatter = normalize_vector(sub_vector(sun, p));
+
+        float delta = get_earth_intersection(p, ray_scatter);
+
+        if (fabsf(delta) < eps) break;
+
+        a += (delta > 0.0f) ? step_size : -step_size;
+        step_size *= 0.5f;
+
+        if (a < 0.0f) {
+            return 1.0f;
+        }
+
+        p = add_vector(origin, scale_vector(ray, a));
+    }
+
+    return fmaxf(0.0f, 1.0f - (a/atmosphere_length));
+}
 
 __device__
 float get_optical_depth(const vec3 origin, const vec3 ray, const float length) {
@@ -93,6 +118,7 @@ RGBF get_sky_color(const vec3 ray) {
     const vec3 origin_default = origin;
 
     const float limit = get_length_to_border(origin, ray, EARTH_RADIUS + atmosphere_height);
+    const float earth_shadowing = get_earth_shadowing(origin, ray, sun, limit);
     const int steps = 8;
     const float step_size = limit/steps;
     float reach = 0.0f;
@@ -103,8 +129,6 @@ RGBF get_sky_color(const vec3 ray) {
 
     for (int i = 0; i < steps; i++) {
         const vec3 ray_scatter = normalize_vector(sub_vector(sun, origin));
-
-        const float earth_shadowing = get_earth_intersection(origin, ray_scatter);
 
         const float optical_depth = get_optical_depth(origin_default, ray, reach) + get_optical_depth(origin, ray_scatter, get_length_to_border(origin, ray_scatter, EARTH_RADIUS + atmosphere_height));
 
@@ -129,18 +153,18 @@ RGBF get_sky_color(const vec3 ray) {
         const float g = 0.8f;
         const float mie = 1.5f * (1.0f + cos_angle * cos_angle) * (1.0f - g * g) / (4.0f * 3.1415926535f * (2.0f + g * g) * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
 
-        result.r += earth_shadowing * transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie);
-        result.g += earth_shadowing * transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie);
-        result.b += earth_shadowing * transmittance.b * (local_density * scatter.b * rayleigh + mie_density * mie_scatter * mie);
+        result.r += transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie);
+        result.g += transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie);
+        result.b += transmittance.b * (local_density * scatter.b * rayleigh + mie_density * mie_scatter * mie);
 
         reach += step_size;
 
         origin = add_vector(origin, scale_vector(ray, step_size));
     }
 
-    result.r *= step_size;
-    result.g *= step_size;
-    result.b *= step_size;
+    result.r *= step_size * earth_shadowing;
+    result.g *= step_size * earth_shadowing;
+    result.b *= step_size * earth_shadowing;
 
     const vec3 ray_sun = normalize_vector(sub_vector(sun, origin_default));
 
