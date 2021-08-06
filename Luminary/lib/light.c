@@ -87,9 +87,9 @@ void process_lights(Scene* scene) {
   unsigned int light_group_count   = 1;
 
   vec3 sun;
-  sun.x = sinf(data.azimuth) * cosf(data.altitude) * 149630000000.0f;
-  sun.y = sinf(data.altitude) * 149630000000.0f;
-  sun.z = cosf(data.azimuth) * cosf(data.altitude) * 149630000000.0f;
+  sun.x = sinf(data.sky.azimuth) * cosf(data.sky.altitude) * 149630000000.0f;
+  sun.y = sinf(data.sky.altitude) * 149630000000.0f;
+  sun.z = cosf(data.sky.azimuth) * cosf(data.sky.altitude) * 149630000000.0f;
 
   light_groups[0].pos    = sun;
   light_groups[0].radius = 696340000.0f;

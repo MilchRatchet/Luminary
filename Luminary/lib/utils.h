@@ -41,6 +41,9 @@ struct Light {
 } typedef Light;
 
 struct Sky {
+  float azimuth;
+  float altitude;
+  float sun_strength;
   float base_density;
   float rayleigh_falloff;
   float mie_falloff;
@@ -49,6 +52,7 @@ struct Sky {
 struct Ocean {
   int active;
   int emissive;
+  int update;
   float height;
   float amplitude;
   float frequency;
@@ -67,9 +71,6 @@ struct Scene {
   unsigned int nodes_length;
   uint16_t materials_length;
   texture_assignment* texture_assignments;
-  float azimuth;
-  float altitude;
-  float sun_strength;
   Light* lights;
   unsigned int lights_length;
   Ocean ocean;
@@ -101,6 +102,10 @@ struct RaytraceInstance {
   int offline_samples;
   Scene scene_gpu;
   int denoiser;
+  int use_denoiser;
+  int use_bloom;
+  int temporal_frames;
+  int lights_active;
   void* randoms_gpu;
   RGBF default_material;
   int shading_mode;

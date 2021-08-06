@@ -16,7 +16,10 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort=t
    if (code != cudaSuccess)
    {
       fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-      if (abort) exit(code);
+      if (abort) {
+        system("pause");
+        exit(code);
+      }
    }
 }
 
@@ -136,6 +139,9 @@ __constant__
 int device_temporal_frames;
 
 __constant__
+int device_lights_active;
+
+__constant__
 RGBF* device_frame_buffer;
 
 __constant__
@@ -157,7 +163,7 @@ __constant__
 RGBF* device_albedo_buffer;
 
 __constant__
-RGB8* device_frame_8bit;
+XRGB8* device_frame_8bit;
 
 __constant__
 int device_width;

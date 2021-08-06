@@ -99,7 +99,7 @@ vec3 specular_BRDF(RGBF &record, uint32_t &light_sample_id, const vec3 normal, c
             normalize_vector(sample_ray_from_angles_and_vector(beta * light.radius, gamma, light.pos)),
             rotation_to_z);
 
-        if (light_sample < light_sample_probability && S_local.z > 0.0f) {
+        if (light_sample < light_sample_probability) {
             H_local.x = S_local.x + V_local.x;
             H_local.y = S_local.y + V_local.y;
             H_local.z = S_local.z + V_local.z;
@@ -112,7 +112,7 @@ vec3 specular_BRDF(RGBF &record, uint32_t &light_sample_id, const vec3 normal, c
 
             light_sample_id = ANY_LIGHT;
 
-            if (S_local.z > 0.0f) weight = (1.0f/(1.0f - light_sample_probability));
+            weight = (1.0f/(1.0f - light_sample_probability));
         }
     }
 
@@ -149,16 +149,15 @@ vec3 diffuse_BRDF(RGBF &record, uint32_t &light_sample_id, const vec3 normal, co
     const float alpha = acosf(sqrtf(beta));
 
     vec3 ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
-    const float light_feasible = dot_product(ray, normal);
 
-    if (light_sample < light_sample_probability && light_feasible >= 0.0f) {
+    if (light_sample < light_sample_probability) {
         weight = (1.0f/light_sample_probability) * light.radius * light_count;
     } else {
         ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
         light_sample_id = ANY_LIGHT;
 
-        if (light_feasible >= 0.0f) weight = (1.0f/(1.0f - light_sample_probability));
+        weight = (1.0f/(1.0f - light_sample_probability));
     }
 
     vec3 H;
@@ -189,11 +188,11 @@ vec3 diffuse_BRDF(RGBF &record, uint32_t &light_sample_id, const vec3 normal, co
 
 __device__
 Light sample_light(const vec3 position, const int light_count, uint32_t &light_sample_id, const float r) {
-    #ifdef LIGHTS_AT_NIGHT_ONLY
-        const uint32_t light_index = (device_sun.y < NIGHT_THRESHOLD && light_count > 0) ? 1 + (uint32_t)(r * light_count) : 0;
-    #else
-        const uint32_t light_index = (uint32_t)(r * light_count);
-    #endif
+    uint32_t light_index = 0;
+
+    if (device_lights_active) {
+        light_index = (uint32_t)(r * light_count);
+    }
 
     light_sample_id = light_index;
 

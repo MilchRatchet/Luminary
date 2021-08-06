@@ -320,7 +320,7 @@ void process_geometry_tasks() {
     vec3 edge1_normal = get_vector(t4.x, t4.y, t4.z);
     vec3 edge2_normal = get_vector(t4.w, t5.x, t5.y);
 
-    normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+    normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
 
     UV vertex_texture = get_UV(t5.z, t5.w);
     UV edge1_texture = get_UV(t6.x, t6.y);
@@ -352,7 +352,7 @@ void process_geometry_tasks() {
         metallic = material_f.y;
         intensity = material_f.z * 255.0f;
     } else {
-        roughness = device_default_material.r;
+        roughness = (1.0f - device_default_material.r) * (1.0f - device_default_material.r);
         metallic = device_default_material.g;
         intensity = device_default_material.b;
     }
@@ -376,17 +376,10 @@ void process_geometry_tasks() {
 
     RGBF emission = get_color(0.0f, 0.0f, 0.0f);
 
-    if (maps.y) {
-      #ifdef LIGHTS_AT_NIGHT_ONLY
-      if (device_sun.y < NIGHT_THRESHOLD) {
-      #endif
+    if (maps.y && device_lights_active) {
       const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
       emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
-
-      #ifdef LIGHTS_AT_NIGHT_ONLY
-      }
-      #endif
     }
 
     if (albedo.a < device_scene.camera.alpha_cutoff) albedo.a = 0.0f;
@@ -435,11 +428,11 @@ void process_geometry_tasks() {
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
-        #ifdef LIGHTS_AT_NIGHT_ONLY
-          const int light_count = (device_sun.y < NIGHT_THRESHOLD) ? device_scene.lights_length - 1 : 1;
-        #else
-          const int light_count = device_scene.lights_length;
-        #endif
+        int light_count = 1;
+
+        if (device_lights_active) {
+          light_count = device_scene.lights_length;
+        }
 
         const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
 
@@ -551,17 +544,10 @@ void process_debug_geometry_tasks() {
         color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
       }
 
-      if (maps.y) {
-        #ifdef LIGHTS_AT_NIGHT_ONLY
-        if (device_sun.y < NIGHT_THRESHOLD) {
-        #endif
+      if (maps.y && device_lights_active) {
         const float4 illuminance_f = tex2D<float4>(device_illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
         color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
-
-        #ifdef LIGHTS_AT_NIGHT_ONLY
-        }
-        #endif
       }
 
       device_frame_buffer[pixel] = color;
@@ -582,6 +568,8 @@ void process_debug_geometry_tasks() {
       vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
       vec3 edge2 = get_vector(t2.z, t2.w, t3.x);
 
+      vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
+
       vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
       const float lambda = normal.x;
@@ -591,7 +579,7 @@ void process_debug_geometry_tasks() {
       vec3 edge1_normal = get_vector(t4.x, t4.y, t4.z);
       vec3 edge2_normal = get_vector(t4.w, t5.x, t5.y);
 
-      normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+      normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
 
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
@@ -780,11 +768,15 @@ void finalize_samples() {
 
   for (; offset < 3 * device_amount - 4; offset += 4 * blockDim.x * gridDim.x) {
     float4 buffer = __ldcs((float4*)((float*)device_frame_buffer + offset));
-    float4 output = __ldcs((float4*)((float*)device_frame_output + offset));
-    float4 variance = __ldcs((float4*)((float*)device_frame_variance + offset));
-    float4 bias_cache = __ldcs((float4*)((float*)device_frame_bias_cache + offset));
+    float4 output;
+    float4 variance;
+    float4 bias_cache;
 
     if (device_temporal_frames == 0) {
+      output.x = buffer.x;
+      output.y = buffer.y;
+      output.z = buffer.z;
+      output.w = buffer.w;
       variance.x = 1.0f;
       variance.y = 1.0f;
       variance.z = 1.0f;
@@ -794,6 +786,10 @@ void finalize_samples() {
       bias_cache.y = 0.0f;
       bias_cache.z = 0.0f;
       bias_cache.w = 0.0f;
+    } else {
+      output = __ldcs((float4*)((float*)device_frame_output + offset));
+      variance = __ldcs((float4*)((float*)device_frame_variance + offset));
+      bias_cache = __ldcs((float4*)((float*)device_frame_bias_cache + offset));
     }
 
     float4 deviation;
@@ -1071,7 +1067,8 @@ void convert_RGBF_to_RGB8(const int width, const int height, const RGBF* source)
     pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.g));
     pixel.b = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.b));
 
-    RGB8 converted_pixel;
+    XRGB8 converted_pixel;
+    converted_pixel.ignore = 0;
     converted_pixel.r = (uint8_t)pixel.r;
     converted_pixel.g = (uint8_t)pixel.g;
     converted_pixel.b = (uint8_t)pixel.b;

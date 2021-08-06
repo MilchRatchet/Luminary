@@ -246,7 +246,7 @@ static inline TextureRGBA default_failure() {
   return default_texture();
 }
 
-static void reconstruction_1_uint8(uint8_t* line, const uint32_t line_length) {
+static void reconstruction_1_uint8_RGBA(uint8_t* line, const uint32_t line_length) {
   uint8_t a_r, a_g, a_b, a_a;
 
   a_r = 0;
@@ -267,7 +267,26 @@ static void reconstruction_1_uint8(uint8_t* line, const uint32_t line_length) {
   }
 }
 
-static void reconstruction_2_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_1_uint8_RGB(uint8_t* line, const uint32_t line_length) {
+  uint8_t a_r, a_g, a_b;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    a_r += line[3 * j];
+    a_g += line[3 * j + 1];
+    a_b += line[3 * j + 2];
+
+    line[3 * j]     = a_r;
+    line[3 * j + 1] = a_g;
+    line[3 * j + 2] = a_b;
+  }
+}
+
+static void reconstruction_2_uint8_RGBA(
+  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t b_r, b_g, b_b, b_a;
 
   for (uint32_t j = 0; j < line_length; j++) {
@@ -283,7 +302,23 @@ static void reconstruction_2_uint8(uint8_t* line, const uint32_t line_length, ui
   }
 }
 
-static void reconstruction_3_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_2_uint8_RGB(
+  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t b_r, b_g, b_b;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[3 * j];
+    b_g = prior_line[3 * j + 1];
+    b_b = prior_line[3 * j + 2];
+
+    line[3 * j] += b_r;
+    line[3 * j + 1] += b_g;
+    line[3 * j + 2] += b_b;
+  }
+}
+
+static void reconstruction_3_uint8_RGBA(
+  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t a_r, a_g, a_b, a_a;
   uint8_t b_r, b_g, b_b, b_a;
 
@@ -310,6 +345,30 @@ static void reconstruction_3_uint8(uint8_t* line, const uint32_t line_length, ui
   }
 }
 
+static void reconstruction_3_uint8_RGB(
+  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t a_r, a_g, a_b;
+  uint8_t b_r, b_g, b_b;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[3 * j];
+    b_g = prior_line[3 * j + 1];
+    b_b = prior_line[3 * j + 2];
+
+    line[3 * j] += ((uint16_t) a_r + (uint16_t) b_r) / 2;
+    line[3 * j + 1] += ((uint16_t) a_g + (uint16_t) b_g) / 2;
+    line[3 * j + 2] += ((uint16_t) a_b + (uint16_t) b_b) / 2;
+
+    a_r = line[3 * j];
+    a_g = line[3 * j + 1];
+    a_b = line[3 * j + 2];
+  }
+}
+
 static uint8_t paeth_uint8(uint8_t a, uint8_t b, uint8_t c) {
   uint8_t pr;
   const int16_t p  = (int16_t) a + (int16_t) b - (int16_t) c;
@@ -328,7 +387,8 @@ static uint8_t paeth_uint8(uint8_t a, uint8_t b, uint8_t c) {
   return pr;
 }
 
-static void reconstruction_4_uint8(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_4_uint8_RGBA(
+  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t a_r, a_g, a_b, a_a;
   uint8_t b_r, b_g, b_b, b_a;
   uint8_t c_r, c_g, c_b, c_a;
@@ -363,6 +423,39 @@ static void reconstruction_4_uint8(uint8_t* line, const uint32_t line_length, ui
     c_g = prior_line[4 * j + 1];
     c_b = prior_line[4 * j + 2];
     c_a = prior_line[4 * j + 3];
+  }
+}
+
+static void reconstruction_4_uint8_RGB(
+  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+  uint8_t a_r, a_g, a_b;
+  uint8_t b_r, b_g, b_b;
+  uint8_t c_r, c_g, c_b;
+
+  a_r = 0;
+  a_g = 0;
+  a_b = 0;
+
+  c_r = 0;
+  c_g = 0;
+  c_b = 0;
+
+  for (uint32_t j = 0; j < line_length; j++) {
+    b_r = prior_line[3 * j];
+    b_g = prior_line[3 * j + 1];
+    b_b = prior_line[3 * j + 2];
+
+    line[3 * j] += paeth_uint8(a_r, b_r, c_r);
+    line[3 * j + 1] += paeth_uint8(a_g, b_g, c_g);
+    line[3 * j + 2] += paeth_uint8(a_b, b_b, c_b);
+
+    a_r = line[3 * j];
+    a_g = line[3 * j + 1];
+    a_b = line[3 * j + 2];
+
+    c_r = prior_line[3 * j];
+    c_g = prior_line[3 * j + 1];
+    c_b = prior_line[3 * j + 2];
   }
 }
 
@@ -409,9 +502,9 @@ TextureRGBA load_texture_from_png(const char* filename) {
   const uint8_t color_type     = IHDR[17];
   const uint8_t interlace_type = IHDR[20];
 
-  if (color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA) {
+  if (color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA && color_type != PNG_COLORTYPE_TRUECOLOR) {
     free(IHDR);
-    print_error("Texture is not in RGBA format!");
+    print_error("Texture is not in RGB/RGBA format!");
     fclose(file);
     return default_texture();
   }
@@ -437,7 +530,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
     return default_failure();
   }
 
-  const uint32_t byte_per_pixel = (bit_depth == PNG_BITDEPTH_16) ? 8u : 4u;
+  const uint32_t byte_per_pixel = (color_type == PNG_COLORTYPE_TRUECOLOR) ? 3u : 4u;
 
   free(IHDR);
 
@@ -508,7 +601,8 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   uint8_t* data = (uint8_t*) malloc(width * height * byte_per_pixel);
 
-  uint8_t* line_buffer = (uint8_t*) malloc(width * byte_per_pixel);
+  uint8_t* line_buffer    = (uint8_t*) malloc(width * byte_per_pixel);
+  uint8_t* buffer_address = line_buffer;
 
   if (line_buffer == (uint8_t*) 0) {
     print_error("Failed to allocate memory!");
@@ -526,34 +620,63 @@ TextureRGBA load_texture_from_png(const char* filename) {
       data + i * width * byte_per_pixel, filtered_data + 1 + i * (width * byte_per_pixel + 1),
       width * byte_per_pixel);
 
-    if (filter == 1u) {
-      reconstruction_1_uint8(data + i * width * byte_per_pixel, width);
+    if (color_type == PNG_COLORTYPE_TRUECOLOR) {
+      if (filter == 1u) {
+        reconstruction_1_uint8_RGB(data + i * width * byte_per_pixel, width);
+      }
+      else if (filter == 2u) {
+        reconstruction_2_uint8_RGB(data + i * width * byte_per_pixel, width, line_buffer);
+      }
+      else if (filter == 3u) {
+        reconstruction_3_uint8_RGB(data + i * width * byte_per_pixel, width, line_buffer);
+      }
+      else if (filter == 4u) {
+        reconstruction_4_uint8_RGB(data + i * width * byte_per_pixel, width, line_buffer);
+      }
     }
-    else if (filter == 2u) {
-      reconstruction_2_uint8(data + i * width * byte_per_pixel, width, line_buffer);
-    }
-    else if (filter == 3u) {
-      reconstruction_3_uint8(data + i * width * byte_per_pixel, width, line_buffer);
-    }
-    else if (filter == 4u) {
-      reconstruction_4_uint8(data + i * width * byte_per_pixel, width, line_buffer);
+    else {
+      if (filter == 1u) {
+        reconstruction_1_uint8_RGBA(data + i * width * byte_per_pixel, width);
+      }
+      else if (filter == 2u) {
+        reconstruction_2_uint8_RGBA(data + i * width * byte_per_pixel, width, line_buffer);
+      }
+      else if (filter == 3u) {
+        reconstruction_3_uint8_RGBA(data + i * width * byte_per_pixel, width, line_buffer);
+      }
+      else if (filter == 4u) {
+        reconstruction_4_uint8_RGBA(data + i * width * byte_per_pixel, width, line_buffer);
+      }
     }
 
-    memcpy(line_buffer, data + i * width * byte_per_pixel, width * byte_per_pixel);
+    line_buffer = data + i * width * byte_per_pixel;
   }
 
-  free(line_buffer);
+  free(buffer_address);
 
   RGBAF* float_data = (RGBAF*) malloc(width * height * sizeof(RGBAF));
 
-  for (uint32_t i = 0; i < width * height; i++) {
-    RGBAF pixel = {
-      .r = data[i * byte_per_pixel] / 255.0f,
-      .g = data[i * byte_per_pixel + 1] / 255.0f,
-      .b = data[i * byte_per_pixel + 2] / 255.0f,
-      .a = data[i * byte_per_pixel + 3] / 255.0f};
+  if (color_type == PNG_COLORTYPE_TRUECOLOR) {
+    for (uint32_t i = 0; i < width * height; i++) {
+      RGBAF pixel = {
+        .r = data[i * byte_per_pixel] / 255.0f,
+        .g = data[i * byte_per_pixel + 1] / 255.0f,
+        .b = data[i * byte_per_pixel + 2] / 255.0f,
+        .a = 1.0f};
 
-    float_data[i] = pixel;
+      float_data[i] = pixel;
+    }
+  }
+  else {
+    for (uint32_t i = 0; i < width * height; i++) {
+      RGBAF pixel = {
+        .r = data[i * byte_per_pixel] / 255.0f,
+        .g = data[i * byte_per_pixel + 1] / 255.0f,
+        .b = data[i * byte_per_pixel + 2] / 255.0f,
+        .a = data[i * byte_per_pixel + 3] / 255.0f};
+
+      float_data[i] = pixel;
+    }
   }
 
   free(data);
@@ -563,4 +686,22 @@ TextureRGBA load_texture_from_png(const char* filename) {
   free(filtered_data);
 
   return result;
+}
+
+int store_XRGB8_png(const char* filename, const XRGB8* image, const int width, const int height) {
+  uint8_t* buffer = (uint8_t*) malloc(width * height * 3);
+
+  RGB8* buffer_rgb8 = (RGB8*) buffer;
+  for (int i = 0; i < height * width; i++) {
+    XRGB8 a        = image[i];
+    RGB8 result    = {.r = a.r, .g = a.g, .b = a.b};
+    buffer_rgb8[i] = result;
+  }
+
+  int ret = store_as_png(
+    filename, buffer, width * height * 3, width, height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+
+  free(buffer);
+
+  return ret;
 }

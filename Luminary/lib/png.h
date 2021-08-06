@@ -23,6 +23,7 @@
 #define PNG_INTERLACE_OFF 0
 #define PNG_INTERLACE_ADAM7 1
 
+int store_XRGB8_png(const char* filename, const XRGB8* image, const int width, const int height);
 int store_as_png(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width,
   const uint32_t height, const uint8_t color_type, const uint8_t bit_depth);

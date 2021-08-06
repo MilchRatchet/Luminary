@@ -14,6 +14,7 @@ struct Frametime {
 } typedef Frametime;
 
 Frametime init_frametime();
+void start_frametime(Frametime* frametime);
 void sample_frametime(Frametime* frametime);
 double get_frametime(Frametime* frametime);
 double get_variance(Frametime* frametime);

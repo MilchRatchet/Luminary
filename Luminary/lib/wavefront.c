@@ -410,53 +410,86 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
 
     if (t.vn1 > content.normals_length) {
       n.x = 0.0f;
-      n.y = 1.0f;
+      n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
       n = content.normals[t.vn1 - 1];
+
+      const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
+
+      if (isnan(n_length) || isinf(n_length)) {
+        n.x = 0.0f;
+        n.y = 0.0f;
+        n.z = 0.0f;
+      }
+      else {
+        n.x *= n_length;
+        n.y *= n_length;
+        n.z *= n_length;
+      }
     }
 
-    float n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
-
-    triangle.vertex_normal.x = n.x * n_length;
-    triangle.vertex_normal.y = n.y * n_length;
-    triangle.vertex_normal.z = n.z * n_length;
+    triangle.vertex_normal.x = n.x;
+    triangle.vertex_normal.y = n.y;
+    triangle.vertex_normal.z = n.z;
 
     if (t.vn2 > content.normals_length) {
       n.x = 0.0f;
-      n.y = 1.0f;
+      n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
       n = content.normals[t.vn2 - 1];
+
+      const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
+
+      if (isnan(n_length) || isinf(n_length)) {
+        n.x = 0.0f;
+        n.y = 0.0f;
+        n.z = 0.0f;
+      }
+      else {
+        n.x *= n_length;
+        n.y *= n_length;
+        n.z *= n_length;
+      }
     }
 
-    n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
-
-    triangle.edge1_normal.x = n.x * n_length - triangle.vertex_normal.x;
-    triangle.edge1_normal.y = n.y * n_length - triangle.vertex_normal.y;
-    triangle.edge1_normal.z = n.z * n_length - triangle.vertex_normal.z;
+    triangle.edge1_normal.x = n.x - triangle.vertex_normal.x;
+    triangle.edge1_normal.y = n.y - triangle.vertex_normal.y;
+    triangle.edge1_normal.z = n.z - triangle.vertex_normal.z;
 
     if (t.vn3 > content.normals_length) {
       n.x = 0.0f;
-      n.y = 1.0f;
+      n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
       n = content.normals[t.vn3 - 1];
+
+      const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
+
+      if (isnan(n_length) || isinf(n_length)) {
+        n.x = 0.0f;
+        n.y = 0.0f;
+        n.z = 0.0f;
+      }
+      else {
+        n.x *= n_length;
+        n.y *= n_length;
+        n.z *= n_length;
+      }
     }
 
-    n_length = 1.0f / sqrt(n.x * n.x + n.y * n.y + n.z * n.z);
-
-    triangle.edge2_normal.x = n.x * n_length - triangle.vertex_normal.x;
-    triangle.edge2_normal.y = n.y * n_length - triangle.vertex_normal.y;
-    triangle.edge2_normal.z = n.z * n_length - triangle.vertex_normal.z;
+    triangle.edge2_normal.x = n.x - triangle.vertex_normal.x;
+    triangle.edge2_normal.y = n.y - triangle.vertex_normal.y;
+    triangle.edge2_normal.z = n.z - triangle.vertex_normal.z;
 
     triangle.object_maps = t.object;
 
     (*triangles)[ptr++] = triangle;
   }
 
-  return count;
+  return ptr;
 }

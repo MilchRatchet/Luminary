@@ -29,7 +29,7 @@ void free_textures(void* texture_atlas, const int textures_length);
 void initialize_8bit_frame(RaytraceInstance* instance, const int width, const int height);
 void free_8bit_frame(RaytraceInstance* instance);
 void copy_framebuffer_to_8bit(
-  RGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance);
+  XRGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance);
 void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance);
 float get_auto_exposure_from_optix(void* input);
 RGBF* denoise_with_optix_realtime(void* input);

@@ -31,13 +31,5 @@
 #define LOW_QUALITY_LONG_BOUNCES
 #define MIN_BOUNCES 1
 
-/*
- * Define LIGHTS_AT_NIGHT_ONLY for the following to apply
- *
- * Emissive textures are only active if the sun's y position is above NIGHT_THRESHOLD
- */
-#define LIGHTS_AT_NIGHT_ONLY
-#define NIGHT_THRESHOLD 0.0f
-
 
 #endif /* CU_DIRECTIVES_H */

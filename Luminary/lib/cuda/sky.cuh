@@ -5,6 +5,8 @@
 #include "math.cuh"
 #include <cuda_runtime_api.h>
 
+#define EARTH_RADIUS 6371.0f
+
 __device__
 float get_length_to_border(const vec3 origin, vec3 ray, const float atmosphere_end) {
     if (ray.y < 0.0f) ray = scale_vector(ray, -1.0f);
@@ -19,10 +21,45 @@ float density_at_height(const float height, const float density_falloff) {
 
 __device__
 float height_at_point(const vec3 point) {
-    const float earth_radius = 6371.0f;
-    return (get_length(point) - earth_radius);
+    return (get_length(point) - EARTH_RADIUS);
 }
 
+__device__
+float get_earth_intersection(const vec3 origin, const vec3 ray) {
+    const float a = dot_product(origin, ray);
+    const float b = get_length(origin);
+    return a * a - b * b + EARTH_RADIUS * EARTH_RADIUS;
+}
+
+__device__
+float get_earth_shadowing(const vec3 origin, const vec3 ray, const vec3 sun, const float atmosphere_length) {
+    if (sun.y >= 0.0f) return 1.0f;
+
+    const int steps = 8;
+    float a = atmosphere_length * 0.5f;
+    float step_size = a;
+
+    vec3 p = add_vector(origin, scale_vector(ray, a));
+
+    for (int i = 0; i < steps; i++) {
+        const vec3 ray_scatter = normalize_vector(sub_vector(sun, p));
+
+        float delta = get_earth_intersection(p, ray_scatter);
+
+        if (fabsf(delta) < eps) break;
+
+        a += (delta > 0.0f) ? step_size : -step_size;
+        step_size *= 0.5f;
+
+        if (a < 0.0f) {
+            return 1.0f;
+        }
+
+        p = add_vector(origin, scale_vector(ray, a));
+    }
+
+    return fmaxf(0.0f, 1.0f - (a/atmosphere_length));
+}
 
 __device__
 float get_optical_depth(const vec3 origin, const vec3 ray, const float length) {
@@ -74,14 +111,14 @@ RGBF get_sky_color(const vec3 ray) {
     const vec3 sun_normalized = device_sun;
     const vec3 sun = scale_vector(sun_normalized, sun_dist);
 
-    const float earth_radius = 6371.0f;
     const float atmosphere_height = 100.0f;
 
-    vec3 origin = get_vector(0.0f, earth_radius, 0.0f);
+    vec3 origin = get_vector(0.0f, EARTH_RADIUS, 0.0f);
 
     const vec3 origin_default = origin;
 
-    const float limit = get_length_to_border(origin, ray, earth_radius + atmosphere_height);
+    const float limit = get_length_to_border(origin, ray, EARTH_RADIUS + atmosphere_height);
+    const float earth_shadowing = get_earth_shadowing(origin, ray, sun, limit);
     const int steps = 8;
     const float step_size = limit/steps;
     float reach = 0.0f;
@@ -93,7 +130,7 @@ RGBF get_sky_color(const vec3 ray) {
     for (int i = 0; i < steps; i++) {
         const vec3 ray_scatter = normalize_vector(sub_vector(sun, origin));
 
-        const float optical_depth = get_optical_depth(origin_default, ray, reach) + get_optical_depth(origin, ray_scatter, get_length_to_border(origin, ray_scatter, earth_radius + atmosphere_height));
+        const float optical_depth = get_optical_depth(origin_default, ray, reach) + get_optical_depth(origin, ray_scatter, get_length_to_border(origin, ray_scatter, EARTH_RADIUS + atmosphere_height));
 
         const float height = height_at_point(origin);
 
@@ -125,9 +162,9 @@ RGBF get_sky_color(const vec3 ray) {
         origin = add_vector(origin, scale_vector(ray, step_size));
     }
 
-    result.r *= step_size;
-    result.g *= step_size;
-    result.b *= step_size;
+    result.r *= step_size * earth_shadowing;
+    result.g *= step_size * earth_shadowing;
+    result.b *= step_size * earth_shadowing;
 
     const vec3 ray_sun = normalize_vector(sub_vector(sun, origin_default));
 
@@ -146,9 +183,9 @@ RGBF get_sky_color(const vec3 ray) {
         transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
         transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
 
-        result.r += transmittance.r * cos_angle * device_scene.sun_strength;
-        result.g += transmittance.g * cos_angle * device_scene.sun_strength;
-        result.b += transmittance.b * cos_angle * device_scene.sun_strength;
+        result.r += transmittance.r * cos_angle * device_scene.sky.sun_strength;
+        result.g += transmittance.g * cos_angle * device_scene.sky.sun_strength;
+        result.b += transmittance.b * cos_angle * device_scene.sky.sun_strength;
     }
 
     result.r *= sun_intensity;
