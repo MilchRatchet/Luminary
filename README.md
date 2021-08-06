@@ -2,115 +2,30 @@
 
 Luminary is a CUDA based Pathtracing renderer.
 
-![Sponza Example](https://github.com/MilchRatchet/Luminary/blob/main/demo_images/Sponza.png)
+![Sponza Example](/demo_images/Sponza.png)
 
 This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
 
-As a denoiser I use `Optix` since any non machine learning denoiser is quite frankly not all that great and machine learning is out of the scope of this project.
+The goal is to use as few libraries as feasible. Currently these include `SDL2`, `zlib` and `Optix`. However, only the denoiser is used from the Optix library.
 
 # Usage
 
-Meshes need to be in `*.obj` file format. Only triangles are supported. Textures are required to be in 8bit RGBA `png` format. There are three texture types:
+The scene is decribed through the Luminary Scene Description format (`*.lum`). The format is documented in [Luminary File Documentations](LumFileDocs.md).
 
- - Albedo Textures
-   - Red: Red Color
-   - Green: Green Color
-   - Blue: Blue Color
-   - Alpha: Transparency
- - Illuminance Textures
-   - Red: Emission Red Color
-   - Green: Emission Green Color
-   - Blue: Emission Blue Color
-   - Alpha: Unused
- - Material Textures
-   - Red: Smoothness
-   - Green: Metallic
-   - Blue: Emission Intensity
-   - Alpha: Unused
-
-Textures are associated to meshes through `*.mtl` files where
-
-- map_Kd = Albedo Textures
-- map_Ke = Illuminance Textures
-- map_Ns = Material Textures
-
-You can get `Blender` to link the material textures to `map_Ns` by setting them as the input texture for roughness.
-
-A whole scene is arranged through `*.lum` files which are in the following format:
-```
-Luminary
-v 3
-# Comments start with a # symbol
-# Comments may only appear after the first two lines
-# This example demonstrates this particular version of lum
-#
-# m [Path to Obj file]
-m Meshes/Example.obj
-#
-# Camera parameters
-# c [Pos.x | Pos.y | Pos.z | Rotation.x | Rotation.y | Rotation.z | FOV]
-c 2.0 0.3 -0.06 0.0 1.570796 0.0 2.0
-#
-# Camera lens parameters
-# l [Focal Length | Aperture Size | Exposure] (Default Aperture Size=0.0)
-l 20.0 0.4 2.0
-#
-# Sun parameters
-# s [Azimuth | Altitude | Intensity]
-s 1.0 1.4 50.0
-#
-# Ocean parameters
-# w [Active? | Emissive? | Red | Green | Blue | Alpha | Height | Amplitude | Frequency | Choppyness | Speed]
-w 1 0 0.0 0.0 0.0 0.9 222.0 0.5 0.16 4.0 0.8
-#
-# Rendering parameters
-# i [Width | Height | Bounces | Samples per Pixel]
-i 1920 1080 6 50
-#
-# Denoiser (0 = 3x3 Mean, 1 = Optix)
-# d [Denoiser] (Default=1)
-d 1
-#
-# Output path (Offline Mode only)
-# o [Path to Output file]
-o Results/image.png
-#
-# A *.lum file must contain an x
-x
-# Lines after the x are ignored
-```
-
-Run Luminary by passing the path of the `*.lum` file.
+You can start as:
 
 ```
-START "" Luminary.exe Scenes/Example.lum
+Luminary [File] [Option]
 ```
 
-Alternatively you can run Luminary in `Realtime Mode` using
+where `File` is a relative or absolute path and Option is one or more of:
 
 ```
-START "" Luminary.exe Scenes/Example.lum r
+-r, --realtime
+        start in realtime mode
 ```
 
-You can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. You can change parameters by moving the mouse horizontally and pressing the following button:
-
-- `[F]` focal length
-- `[G]` aperture size
-- `[E]` exposure
-- `[C]` alpha cutoff
-- `[L]` ocean height
-- `[K]` ocean amplitude
-- `[J]` ocean frequency
-- `[H]` ocean choppyness
-- `[Y]` sky density
-- `[U]` sky rayleigh falloff
-- `[I]` sky mie falloff
-- `[N]` default material roughness
-- `[M]` default material metallic
-
-Ocean animation can be toggled with `[O]`. Different shading modes can be accessed through `[V]`. The information shown in the title of the window can be switched with `[T]`. Auto Exposure can be toggled with `[R]`. Bloom is toggled by `[B]`. Create an image by pressing `[F12]`. Denoiser can be toggled with `[~]`.
-
-Note that bad performance is to be expected. Path tracing is very computationally expensive, `Luminary` is not very performant yet and `Luminary` does not make use of `RT-Cores` found on `Turing` or `Ampere` architecture graphics cards. The latter would be considered if they would be exposed through `CUDA`.
+In realtime mode you can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
 
 # Building
 
