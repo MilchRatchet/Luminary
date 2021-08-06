@@ -6,6 +6,6 @@
 
 void offline_output(
   Scene scene, RaytraceInstance* instance, char* output_name, int progress, clock_t time);
-void realtime_output(Scene scene, RaytraceInstance* instance, const int filters);
+void realtime_output(Scene scene, RaytraceInstance* instance);
 
 #endif /* OUTPUT_H */

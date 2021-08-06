@@ -82,7 +82,7 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   return result;
 }
 
-void realtime_output(Scene scene, RaytraceInstance* instance, const int filters) {
+void realtime_output(Scene scene, RaytraceInstance* instance) {
   RealtimeInstance* realtime = init_realtime_instance(instance);
 
   int exit = 0;
