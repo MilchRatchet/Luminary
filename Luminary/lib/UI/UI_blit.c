@@ -11,21 +11,19 @@
 #define BG_GREEN_H 90
 #define BG_BLUE_H 90
 
-void blit_fast(uint8_t* src, int lds, uint8_t* dst, int ldd, int width, int height) {
-  for (int i = 0; i < height; i++) {
-    memcpy(dst + i * 3 * ldd, src + i * 3 * lds, 3 * width);
-  }
-}
-
-void blit_gray(uint8_t* dst, int x, int y, int ldd, int width, int height, uint8_t value) {
+void blit_gray(uint8_t* dst, int x, int y, int ldd, int hd, int width, int height, uint8_t value) {
+  height = min(height, hd - y);
+  width  = min(width, ldd - x);
   for (int i = 0; i < height; i++) {
     memset(dst + (y + i) * 4 * ldd + 4 * x, value, 4 * width);
   }
 }
 
 void blit_color(
-  uint8_t* dst, int x, int y, int ldd, int width, int height, uint8_t red, uint8_t green,
+  uint8_t* dst, int x, int y, int ldd, int hd, int width, int height, uint8_t red, uint8_t green,
   uint8_t blue) {
+  height = min(height, hd - y);
+  width  = min(width, ldd - x);
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
       dst[(y + i) * 4 * ldd + 4 * x + 4 * j]     = blue;
@@ -37,8 +35,10 @@ void blit_color(
 }
 
 void blit_color_shaded(
-  uint8_t* dst, int x, int y, int ldd, int width, int height, uint8_t red, uint8_t green,
+  uint8_t* dst, int x, int y, int ldd, int hd, int width, int height, uint8_t red, uint8_t green,
   uint8_t blue) {
+  height = min(height, hd - y);
+  width  = min(width, ldd - x);
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
       const uint8_t value_b                      = dst[(y + i) * 4 * ldd + 4 * x + 4 * j];
@@ -248,3 +248,20 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width, int height, int offset
   }
 }
 #endif
+
+void blit_text(UI* ui, SDL_Surface* text, int x, int y, int ldd, int hd) {
+  uint8_t* text_pixels = (uint8_t*) text->pixels;
+
+  int height = min(text->h, hd - y);
+  int width  = min(text->w, ldd - x);
+
+  for (int i = 0; i < height; i++) {
+    for (int j = 0; j < 4 * width; j++) {
+      const int ui_index        = 4 * x + j + (i + y) * ldd * 4;
+      const float alpha         = text_pixels[j / 4 + i * text->pitch] / 255.0f;
+      const uint8_t ui_pixel    = ui->pixels[ui_index];
+      ui->pixels[ui_index]      = alpha * 255.0f + (1.0f - alpha) * ui_pixel;
+      ui->pixels_mask[ui_index] = (alpha > 0.0f) ? 0xff : 0;
+    }
+  }
+}

@@ -10,6 +10,8 @@ struct UIPanel {
   int prop1;
   int prop2;
   int prop3;
+  int prop4;
+  int prop5;
   int voids_frames;
   void* data;
   SDL_Surface* title;
@@ -22,6 +24,7 @@ struct UI {
   int border_hover;
   int panel_hover;
   UIPanel* last_panel;
+  UIPanel* dropdown;
   int x;
   int y;
   int max_x;

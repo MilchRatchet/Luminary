@@ -33,7 +33,8 @@ void render_UIPanel_tab(UI* ui, UIPanel* panel) {
   SDL_Surface** texts = (SDL_Surface**) panel->data_text;
 
   for (int i = 0; i < UI_PANELS_TAB_COUNT; i++) {
-    blit_text(ui, texts[i], 5 + offset, ((PANEL_HEIGHT - texts[i]->h) >> 1));
+    blit_text(
+      ui, texts[i], 5 + offset, ((PANEL_HEIGHT - texts[i]->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
 
     offset += texts[i]->w + panel->prop2;
   }
@@ -44,7 +45,8 @@ void render_UIPanel_tab(UI* ui, UIPanel* panel) {
       x += texts[i]->w + panel->prop2;
     }
     blit_color_shaded(
-      ui->pixels, x, 0, UI_WIDTH, texts[panel->prop1]->w, PANEL_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
+      ui->pixels, x, 0, UI_WIDTH, UI_HEIGHT_BUFFER, texts[panel->prop1]->w, PANEL_HEIGHT, HOVER_R,
+      HOVER_G, HOVER_B);
   }
 
   {
@@ -52,11 +54,14 @@ void render_UIPanel_tab(UI* ui, UIPanel* panel) {
     for (int i = 0; i < ui->tab; i++) {
       x += texts[i]->w + panel->prop2;
     }
-    blit_gray(ui->pixels_mask, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, texts[ui->tab]->w + 10, 2, 0xff);
+    blit_gray(
+      ui->pixels_mask, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w + 10,
+      2, 0xff);
     blit_color(
-      ui->pixels, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, texts[ui->tab]->w + 10, 2, TAB_R, TAB_G,
-      TAB_B);
+      ui->pixels, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w + 10, 2,
+      TAB_R, TAB_G, TAB_B);
     blit_color_shaded(
-      ui->pixels, x, 0, UI_WIDTH, texts[ui->tab]->w, PANEL_HEIGHT, TAB_R, TAB_G, TAB_B);
+      ui->pixels, x, 0, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w, PANEL_HEIGHT, TAB_R, TAB_G,
+      TAB_B);
   }
 }

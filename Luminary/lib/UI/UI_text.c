@@ -21,19 +21,3 @@ SDL_Surface* render_text(UI* ui, const char* text) {
   SDL_Color color2 = {0, 0, 0};
   return TTF_RenderText_Shaded(ui->font, text, color1, color2);
 }
-
-void blit_text(UI* ui, SDL_Surface* text, int x, int y) {
-  uint8_t* text_pixels = (uint8_t*) text->pixels;
-
-  const int width = (x + text->w > UI_WIDTH) ? UI_WIDTH - x : text->w;
-
-  for (int i = 0; i < text->h; i++) {
-    for (int j = 0; j < 4 * width; j++) {
-      const int ui_index        = 4 * x + j + (i + y) * UI_WIDTH * 4;
-      const float alpha         = text_pixels[j / 4 + i * text->pitch] / 255.0f;
-      const uint8_t ui_pixel    = ui->pixels[ui_index];
-      ui->pixels[ui_index]      = alpha * 255 + (1.0f - alpha) * ui_pixel;
-      ui->pixels_mask[ui_index] = (alpha > 0.0f) ? 0xff : 0;
-    }
-  }
-}

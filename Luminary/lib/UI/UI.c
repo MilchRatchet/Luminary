@@ -8,6 +8,7 @@
 #include "UI_text.h"
 #include "UI_panel.h"
 #include "UI_info.h"
+#include "UI_dropdown.h"
 
 #define MOUSE_LEFT_BLOCKED 0b1
 #define MOUSE_DRAGGING_WINDOW 0b10
@@ -42,11 +43,13 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
     ui, "Light Source Count", &(instance->scene_gpu.lights_length), PANEL_INFO_TYPE_INT32,
     PANEL_INFO_STATIC);
   panels[7] = create_check(ui, "Lights", &(instance->lights_active), 1);
-  panels[8] =
-    create_slider(ui, "Default Smoothness", &(instance->default_material.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[8] = create_dropdown(
+    ui, "Shading Mode", &(instance->shading_mode), 1, 4, "Default\0Albedo\0Depth\0Normal", 8);
   panels[9] =
+    create_slider(ui, "Default Smoothness", &(instance->default_material.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[10] =
     create_slider(ui, "Default Metallic", &(instance->default_material.g), 1, 0.001f, 0.0f, 1.0f);
-  panels[10] = create_slider(
+  panels[11] = create_slider(
     ui, "Default Light Intensity", &(instance->default_material.b), 1, 0.001f, 0.0f, FLT_MAX);
 
   return panels;
@@ -169,6 +172,7 @@ UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
   ui.border_hover = 0;
 
   ui.last_panel = (UIPanel*) 0;
+  ui.dropdown   = (UIPanel*) 0;
 
   ui.pixels      = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT_BUFFER * 4);
   ui.pixels_mask = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT_BUFFER * 4);
@@ -292,6 +296,15 @@ void handle_mouse_UI(UI* ui) {
   if (ui->mouse_flags & MOUSE_DRAGGING_SLIDER) {
     panel = ui->last_panel;
   }
+  else if (ui->dropdown && get_intersection_dropdown(ui, ui->dropdown, x, ui->scroll_pos + y)) {
+    if (ui->mouse_flags & MOUSE_LEFT_BLOCKED) {
+      state &= ~SDL_BUTTON_LMASK;
+    }
+
+    handle_mouse_UIPanel(ui, ui->dropdown, state, x, (ui->scroll_pos + y));
+
+    ui->panel_hover = -1;
+  }
   else if (x > 0 && x < UI_WIDTH && y > 0 && y < UI_HEIGHT + UI_BORDER_SIZE) {
     if (y < UI_BORDER_SIZE) {
       ui->panel_hover  = -1;
@@ -361,6 +374,13 @@ void handle_mouse_UI(UI* ui) {
 
     ui->last_panel = panel;
   }
+
+  if (SDL_BUTTON_LMASK & state && ui->dropdown) {
+    if (!panel || panel->type != PANEL_DROPDOWN) {
+      ui->dropdown->prop2 = 0;
+      ui->dropdown        = (UIPanel*) 0;
+    }
+  }
 }
 
 void render_UI(UI* ui) {
@@ -411,6 +431,10 @@ void render_UI(UI* ui) {
     }
   } break;
   }
+
+  if (ui->dropdown) {
+    render_dropdown(ui, ui->dropdown, first_panel - 1);
+  }
 }
 
 void blit_UI(UI* ui, uint8_t* target, int width, int height) {
@@ -429,6 +453,22 @@ void free_UI(UI* ui) {
   for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
     free_UIPanel(ui->general_panels + i);
   }
+  for (int i = 0; i < UI_PANELS_CAMERA_COUNT; i++) {
+    free_UIPanel(ui->camera_panels + i);
+  }
+  for (int i = 0; i < UI_PANELS_SKY_COUNT; i++) {
+    free_UIPanel(ui->sky_panels + i);
+  }
+  for (int i = 0; i < UI_PANELS_OCEAN_COUNT; i++) {
+    free_UIPanel(ui->ocean_panels + i);
+  }
+  for (int i = 0; i < UI_PANELS_TOY_COUNT; i++) {
+    free_UIPanel(ui->toy_panels + i);
+  }
 
   free(ui->general_panels);
+  free(ui->camera_panels);
+  free(ui->sky_panels);
+  free(ui->ocean_panels);
+  free(ui->toy_panels);
 }

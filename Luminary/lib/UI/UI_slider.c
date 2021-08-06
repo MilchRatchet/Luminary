@@ -19,7 +19,8 @@ void handle_mouse_UIPanel_slider(UI* ui, UIPanel* panel, int mouse_state, int x,
 }
 
 void render_UIPanel_slider(UI* ui, UIPanel* panel, int y) {
-  blit_text(ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1));
+  blit_text(
+    ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
 
   if (panel->hover || !panel->data_text) {
     if (panel->data_text)
@@ -34,11 +35,11 @@ void render_UIPanel_slider(UI* ui, UIPanel* panel, int y) {
 
   blit_text(
     ui, panel->data_text, UI_WIDTH - 5 - panel->data_text->w,
-    y + ((PANEL_HEIGHT - panel->data_text->h) >> 1));
+    y + ((PANEL_HEIGHT - panel->data_text->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
 
   if (panel->hover) {
     blit_color_shaded(
-      ui->pixels, UI_WIDTH - 5 - panel->data_text->w, y, UI_WIDTH, panel->data_text->w,
-      PANEL_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
+      ui->pixels, UI_WIDTH - 5 - panel->data_text->w, y, UI_WIDTH, UI_HEIGHT_BUFFER,
+      panel->data_text->w, PANEL_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
   }
 }

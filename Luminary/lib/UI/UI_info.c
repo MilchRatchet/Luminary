@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "SDL.h"
+#include "UI.h"
+#include "UI_blit.h"
 #include "UI_text.h"
 #include "UI_info.h"
 
@@ -46,12 +48,13 @@ static void rerender_data_text(UI* ui, UIPanel* panel) {
 }
 
 void render_UIPanel_info(UI* ui, UIPanel* panel, int y) {
-  blit_text(ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1));
+  blit_text(
+    ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
 
   if (panel->data) {
     rerender_data_text(ui, panel);
     blit_text(
       ui, panel->data_text, UI_WIDTH - 5 - panel->data_text->w,
-      y + ((PANEL_HEIGHT - panel->data_text->h) >> 1));
+      y + ((PANEL_HEIGHT - panel->data_text->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
   }
 }

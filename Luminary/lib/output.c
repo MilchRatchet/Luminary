@@ -147,11 +147,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance, const int filters)
         mwheel += event.wheel.y;
       }
       else if (event.type == SDL_KEYDOWN) {
-        if (event.key.keysym.scancode == SDL_SCANCODE_V) {
-          instance->shading_mode    = (instance->shading_mode + 1) % 4;
-          instance->temporal_frames = 0;
-        }
-        else if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
+        if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
           make_png = 1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
