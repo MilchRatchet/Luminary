@@ -1,12 +1,16 @@
 # Luminary
 
-Luminary is a CUDA based Pathtracing renderer.
+![Daxx Example](/demo_images/Daxx.png)
 
-![Sponza Example](/demo_images/Sponza.png)
+![Pokitaru Example](/demo_images/Pokitaru.png)
+
+Luminary is a CUDA based Pathtracing renderer.
 
 This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
 
 The goal is to use as few libraries as feasible. Currently these include `SDL2`, `zlib` and `Optix`. However, only the denoiser is used from the Optix library.
+
+Meshes and textures in the example images are taken from the Ratchet and Clank HD Trilogy and were exported using [Replanetizer](https://github.com/RatchetModding/Replanetizer).
 
 # Usage
 
