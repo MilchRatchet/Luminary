@@ -4,17 +4,17 @@
 
 ![Pokitaru Example](/demo_images/Pokitaru.png)
 
-Luminary is a CUDA based Pathtracing renderer.
+Luminary is a CUDA based pathtracing renderer.
 
 This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
 
-The goal is to use as few libraries as feasible. Currently these include `SDL2`, `zlib` and `Optix`. However, only the denoiser is used from the Optix library.
+The goal is to use as few libraries as feasible. Currently, these include `SDL2`, `zlib` and `Optix`. However, only the denoiser is used from the Optix library.
 
 Meshes and textures in the example images are taken from the Ratchet and Clank HD Trilogy and were exported using [Replanetizer](https://github.com/RatchetModding/Replanetizer).
 
 # Usage
 
-The scene is decribed through the Luminary Scene Description format (`*.lum`). The format is documented in [Luminary File Documentations](LumFileDocs.md).
+The scene is described through the Luminary Scene Description format (`*.lum`). The format is documented in the [Luminary File Documentations](LumFileDocs.md).
 
 You can start as:
 
@@ -29,11 +29,11 @@ where `File` is a relative or absolute path and Option is one or more of:
         start in realtime mode
 ```
 
-In realtime mode you can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
+In realtime mode, you can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
 
 # Building
 
-This project is a bit of a mess when it comes to building. It was only ever built on `Windows` so changes may have to be made for `Linus/OSX`. Some hints to get it to run are however:
+This project is a bit of a mess when it comes to building. It was only ever built on `Windows` so changes may have to be made for `Linus/OSX`. Some hints to get it to run are:
 
 - You need to change the `CUDA toolkit` version in the `CMakeLists.txt` to the one installed on your system.
 - You need to change the `CUDA compatibility` version in the `CMakeLists.txt` to your specific version or lower.
@@ -56,7 +56,7 @@ The default font provided by `Luminary` is the font `Tuffy` by Ulrich Thatcher w
 
 # Literature
 
-This is a list of papers I used for this project so far. Note that some techniques presented in these papers are not implemented at the moment but their ideas were helpful nonetheless:
+This is a list of papers I have used for this project so far. Note that some techniques presented in these papers are not implemented at the moment but their ideas were helpful nonetheless:
 
 - J. Frisvad, _Building an Orthonormal Basis from a 3D Unit Vector Without Normalization_, Journal of Graphics Tools, 16(3), pp. 151-159, 2012
 - T. Möller, B. Trumbore, _Fast, Minimum Storage Ray-Triangle Intersection_, Journal of Graphics Tools, 2, pp. 21-28, 1997.
