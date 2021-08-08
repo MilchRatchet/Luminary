@@ -1004,12 +1004,12 @@ void bloom_kernel_blur_horizontal(RGBF* image) {
 }
 
 __global__
-void convert_RGBF_to_RGB8(const int width, const int height, const RGBF* source) {
+void convert_RGBF_to_XRGB8(const int width, const int height, const RGBF* source) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int amount = width * height;
-  const float scale_x = ((float)device_width / width);
-  const float scale_y = ((float)device_height / height);
+  const float scale_x = (((float)device_width - 1.0f) / width);
+  const float scale_y = (((float)device_height - 1.0f) / height);
 
   while (id < amount) {
     const int x = id % width;
@@ -1018,48 +1018,32 @@ void convert_RGBF_to_RGB8(const int width, const int height, const RGBF* source)
     const float source_x = x * scale_x;
     const float source_y = y * scale_y;
 
-    const int source_x_0 = max((int)0, (int)floorf(source_x));
-    const int source_x_1 = min((int)device_width - 1, (int)ceilf(source_x));
-    const int source_y_0 = max((int)0, (int)floorf(source_y));
-    const int source_y_1 = min((int)device_height - 1, (int)ceilf(source_y));
+    const int index_x = source_x;
+    const int index_y = source_y;
+
+    const int index_0 = index_x + index_y * device_width;
+    const int index_1 = index_x + (index_y + 1) * device_width;
 
     RGBF pixel;
 
-    if (source_x_0 == source_x_1 && source_y_0 == source_y_1) {
-      pixel = source[source_x_0 + source_y_0 * device_width];
-    } else {
-      RGBF pixel00;
-      RGBF pixel10;
-      RGBF pixel01;
-      RGBF pixel11;
-      RGBF pixel_x_0;
-      RGBF pixel_x_1;
+    RGBF pixel_00 = source[index_0];
+    RGBF pixel_10 = source[index_0 + 1];
+    RGBF pixel_01 = source[index_1];
+    RGBF pixel_11 = source[index_1 + 1];
 
-      if (source_x_0 == source_x_1) {
-        pixel_x_0 = source[source_x_0 + source_y_0 * device_width];
-        pixel_x_1 = source[source_x_0 + source_y_1 * device_width];
-      } else {
-        pixel00 = source[source_x_0 + source_y_0 * device_width];
-        pixel10 = source[source_x_1 + source_y_0 * device_width];
-        pixel_x_0.r = (source_x_1 - source_x) * pixel00.r + (source_x - source_x_0) * pixel10.r;
-        pixel_x_0.g = (source_x_1 - source_x) * pixel00.g + (source_x - source_x_0) * pixel10.g;
-        pixel_x_0.b = (source_x_1 - source_x) * pixel00.b + (source_x - source_x_0) * pixel10.b;
+    const float fx = source_x - index_x;
+    const float ifx = 1.0f - fx;
+    const float fy = source_y - index_y;
+    const float ify = 1.0f - fy;
 
-        pixel01 = source[source_x_0 + source_y_1 * device_width];
-        pixel11 = source[source_x_1 + source_y_1 * device_width];
-        pixel_x_1.r = (source_x_1 - source_x) * pixel01.r + (source_x - source_x_0) * pixel11.r;
-        pixel_x_1.g = (source_x_1 - source_x) * pixel01.g + (source_x - source_x_0) * pixel11.g;
-        pixel_x_1.b = (source_x_1 - source_x) * pixel01.b + (source_x - source_x_0) * pixel11.b;
-      }
+    const float f00 = ifx * ify;
+    const float f10 = fx * ify;
+    const float f01 = ifx * fy;
+    const float f11 = fx * fy;
 
-      if (source_y_0 == source_y_1) {
-        pixel = pixel_x_0;
-      } else {
-        pixel.r = (source_y_1 - source_y) * pixel_x_0.r + (source_y - source_y_0) * pixel_x_1.r;
-        pixel.g = (source_y_1 - source_y) * pixel_x_0.g + (source_y - source_y_0) * pixel_x_1.g;
-        pixel.b = (source_y_1 - source_y) * pixel_x_0.b + (source_y - source_y_0) * pixel_x_1.b;
-      }
-    }
+    pixel.r = pixel_00.r * f00 + pixel_10.r * f10 + pixel_01.r * f01 + pixel_11.r * f11;
+    pixel.g = pixel_00.g * f00 + pixel_10.g * f10 + pixel_01.g * f01 + pixel_11.g * f11;
+    pixel.b = pixel_00.b * f00 + pixel_10.b * f10 + pixel_01.b * f01 + pixel_11.b * f11;
 
     pixel = reinhard_tonemap(pixel);
 

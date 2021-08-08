@@ -131,7 +131,7 @@ void process_trace_tasks() {
             inv_ray.y = 1.0f / (fabsf(task.ray.y) > eps ? task.ray.y : copysignf(eps, task.ray.y));
             inv_ray.z = 1.0f / (fabsf(task.ray.z) > eps ? task.ray.z : copysignf(eps, task.ray.z));
 
-            packed_stptr_invoct.y = (((task.ray.x < 0.0f) ? 1 : 0) << 2) | (((task.ray.y < 0.0f) ? 1 : 0) << 1) | (((task.ray.z < 0.0f) ? 1 : 0) << 0);
+            packed_stptr_invoct.y = ((task.ray.x < 0.0f) ? 0b100 : 0) | ((task.ray.y < 0.0f) ? 0b10 : 0) | ((task.ray.z < 0.0f) ? 0b1 : 0);
             packed_stptr_invoct.y = 0b111 - packed_stptr_invoct.y;
             packed_stptr_invoct.x = 0;
         }
@@ -146,7 +146,7 @@ void process_trace_tasks() {
                 const unsigned int child_bit_index = __bfind(hits);
                 const unsigned int child_node_base_index = node_task.x;
 
-                node_task.y &= ~(1 << child_bit_index);
+                node_task.y ^= (1 << child_bit_index);
 
                 if (node_task.y > 0x00ffffff) {
                     STACK_PUSH(node_task);
@@ -170,7 +170,7 @@ void process_trace_tasks() {
                 p.y = data0.y;
                 p.z = data0.z;
 
-                int3 e;
+                float3 e;
                 e.x = *((char*)&data0.w + 0);
                 e.y = *((char*)&data0.w + 1);
                 e.z = *((char*)&data0.w + 2);
@@ -181,9 +181,9 @@ void process_trace_tasks() {
                 unsigned int hit_mask = 0;
 
                 vec3 scaled_inv_ray;
-                scaled_inv_ray.x = uint_as_float((e.x + 127) << 23) * inv_ray.x;
-                scaled_inv_ray.y = uint_as_float((e.y + 127) << 23) * inv_ray.y;
-                scaled_inv_ray.z = uint_as_float((e.z + 127) << 23) * inv_ray.z;
+                scaled_inv_ray.x = exp2f(e.x) * inv_ray.x;
+                scaled_inv_ray.y = exp2f(e.y) * inv_ray.y;
+                scaled_inv_ray.z = exp2f(e.z) * inv_ray.z;
 
                 vec3 shifted_origin;
                 shifted_origin.x = (p.x - origin.x) * inv_ray.x;
@@ -380,7 +380,7 @@ void process_trace_tasks() {
                     hit_id = triangle_index + triangle_task.x;
                 }
 
-                triangle_task.y &= ~(1 << triangle_index);
+                triangle_task.y ^= (1 << triangle_index);
             }
 
             if (node_task.y <= 0x00ffffff) {

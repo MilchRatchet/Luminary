@@ -341,6 +341,6 @@ extern "C" void free_8bit_frame(RaytraceInstance* instance) {
 }
 
 extern "C" void copy_framebuffer_to_8bit(XRGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance) {
-    convert_RGBF_to_RGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(width, height, source);
+    convert_RGBF_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(width, height, source);
     gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(XRGB8) * width * height, cudaMemcpyDeviceToHost));
 }
