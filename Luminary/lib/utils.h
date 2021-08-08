@@ -84,7 +84,6 @@ struct RaytraceInstance {
   void* trace_results_gpu;
   void* task_counts_gpu;
   uint32_t* light_sample_history_gpu;
-  RGBF* frame_output;
   RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
   RGBF* frame_variance_gpu;

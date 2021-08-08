@@ -2,18 +2,9 @@
 #include <stdio.h>
 #include <math.h>
 #include <time.h>
-#include "Luminary.h"
-#include "lib/png.h"
-#include "lib/image.h"
-#include "lib/device.h"
 #include "lib/scene.h"
 #include "lib/raytrace.h"
-#include "lib/mesh.h"
-#include "lib/wavefront.h"
-#include "lib/bvh.h"
-#include "lib/texture.h"
 #include "lib/error.h"
-#include "lib/processing.h"
 #include "lib/output.h"
 
 static int parse_command(char* arg, char* opt1, char* opt2) {

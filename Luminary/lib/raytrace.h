@@ -18,7 +18,6 @@ RaytraceInstance* init_raytracing(
   void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas,
   int illuminance_atlas_length, void* material_atlas, int material_atlas_length, Scene scene,
   int denoiser);
-void copy_framebuffer_to_cpu(RaytraceInstance* instance);
 void trace_scene(
   RaytraceInstance* instance, const int temporal_frames, const unsigned int update_mask);
 void apply_bloom(RaytraceInstance* instance, RGBF* image);

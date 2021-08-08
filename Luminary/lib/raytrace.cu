@@ -85,7 +85,6 @@ extern "C" RaytraceInstance* init_raytracing(
 
     instance->width = width;
     instance->height = height;
-    instance->frame_output = (RGBF*)_mm_malloc(sizeof(RGBF) * width * height, 32);
 
     const unsigned int amount = width * height;
 
@@ -242,10 +241,6 @@ extern "C" void free_textures(void* texture_atlas, const int textures_length) {
     free(textures_cpu);
 }
 
-extern "C" void copy_framebuffer_to_cpu(RaytraceInstance* instance) {
-    gpuErrchk(cudaMemcpy(instance->frame_output, instance->frame_output_gpu, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToHost));
-}
-
 extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frames, const unsigned int update_mask) {
     const int amount = instance->width * instance->height;
 
@@ -321,7 +316,6 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
 
 extern "C" void free_outputs(RaytraceInstance* instance) {
     gpuErrchk(cudaFree(instance->frame_output_gpu));
-    _mm_free(instance->frame_output);
 
     if (instance->denoiser) {
         gpuErrchk(cudaFree(instance->albedo_buffer_gpu));

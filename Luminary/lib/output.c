@@ -1,6 +1,5 @@
 #include "utils.h"
 #include "SDL/SDL.h"
-#include "processing.h"
 #include "raytrace.h"
 #include "denoiser.h"
 #include "png.h"
@@ -57,10 +56,9 @@ void offline_output(
   printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   free(frame);
-  free_outputs(instance);
 
   printf("[Done] Luminary can now be closed.\n");
-  getchar();
+  system("Pause");
 }
 
 static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
