@@ -173,9 +173,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
 
       time(&rawtime);
       localtime_s(&timeinfo, &rawtime);
-      strftime(timestring, 4096, "%Y-%m-%d-%H-%M-%S.png", &timeinfo);
-
-      printf("Snap-%s.png", timestring);
+      strftime(timestring, 4096, "%Y-%m-%d-%H-%M-%S", &timeinfo);
 
       sprintf(filename, "Snap-%s.png", timestring);
       store_XRGB8_png(filename, realtime->buffer, realtime->width, realtime->height);
