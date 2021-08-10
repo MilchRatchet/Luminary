@@ -28,28 +28,30 @@ static size_t compute_scratch_space() {
 static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_GENERAL_COUNT);
 
-  panels[0] = create_tab(ui, &(ui->tab));
-  panels[1] =
+  int i = 0;
+
+  panels[i++] = create_tab(ui, &(ui->tab));
+  panels[i++] =
     create_info(ui, "Width", &(instance->width), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[2] =
+  panels[i++] =
     create_info(ui, "Height", &(instance->height), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[3] = create_info(
+  panels[i++] = create_info(
     ui, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32,
     PANEL_INFO_STATIC);
-  panels[4] = create_check(ui, "Optix Denoiser", &(instance->use_denoiser), 0);
-  panels[5] = create_info(
+  panels[i++] = create_check(ui, "Optix Denoiser", &(instance->use_denoiser), 0);
+  panels[i++] = create_info(
     ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
-  panels[6] = create_info(
+  panels[i++] = create_info(
     ui, "Light Source Count", &(instance->scene_gpu.lights_length), PANEL_INFO_TYPE_INT32,
     PANEL_INFO_STATIC);
-  panels[7] = create_check(ui, "Lights", &(instance->lights_active), 1);
-  panels[8] = create_dropdown(
+  panels[i++] = create_check(ui, "Lights", &(instance->lights_active), 1);
+  panels[i++] = create_dropdown(
     ui, "Shading Mode", &(instance->shading_mode), 1, 4, "Default\0Albedo\0Depth\0Normal", 8);
-  panels[9] =
+  panels[i++] =
     create_slider(ui, "Default Smoothness", &(instance->default_material.r), 1, 0.001f, 0.0f, 1.0f);
-  panels[10] =
+  panels[i++] =
     create_slider(ui, "Default Metallic", &(instance->default_material.g), 1, 0.001f, 0.0f, 1.0f);
-  panels[11] = create_slider(
+  panels[i++] = create_slider(
     ui, "Default Light Intensity", &(instance->default_material.b), 1, 0.001f, 0.0f, FLT_MAX);
 
   return panels;
@@ -58,40 +60,42 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
 static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_CAMERA_COUNT);
 
-  panels[0] = create_tab(ui, &(ui->tab));
-  panels[1] = create_info(
+  int i = 0;
+
+  panels[i++] = create_tab(ui, &(ui->tab));
+  panels[i++] = create_info(
     ui, "Position X", &(instance->scene_gpu.camera.pos.x), PANEL_INFO_TYPE_FP32,
     PANEL_INFO_DYNAMIC);
-  panels[2] = create_info(
+  panels[i++] = create_info(
     ui, "Position Y", &(instance->scene_gpu.camera.pos.y), PANEL_INFO_TYPE_FP32,
     PANEL_INFO_DYNAMIC);
-  panels[3] = create_info(
+  panels[i++] = create_info(
     ui, "Position Z", &(instance->scene_gpu.camera.pos.z), PANEL_INFO_TYPE_FP32,
     PANEL_INFO_DYNAMIC);
-  panels[4] = create_info(
+  panels[i++] = create_info(
     ui, "Rotation X", &(instance->scene_gpu.camera.rotation.x), PANEL_INFO_TYPE_FP32,
     PANEL_INFO_DYNAMIC);
-  panels[5] = create_info(
+  panels[i++] = create_info(
     ui, "Rotation Y", &(instance->scene_gpu.camera.rotation.y), PANEL_INFO_TYPE_FP32,
     PANEL_INFO_DYNAMIC);
-  panels[6] = create_info(
+  panels[i++] = create_info(
     ui, "Rotation Z", &(instance->scene_gpu.camera.rotation.z), PANEL_INFO_TYPE_FP32,
     PANEL_INFO_DYNAMIC);
-  panels[7] = create_slider(
+  panels[i++] = create_slider(
     ui, "Field of View", &(instance->scene_gpu.camera.fov), 1, 0.001f, 0.0001f, FLT_MAX);
-  panels[8] = create_check(ui, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure), 0);
-  panels[9] = create_info(
+  panels[i++] = create_check(ui, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure), 0);
+  panels[i++] = create_info(
     ui, "Exposure", &(instance->scene_gpu.camera.exposure), PANEL_INFO_TYPE_FP32,
     PANEL_INFO_DYNAMIC);
-  panels[10] = create_slider(
+  panels[i++] = create_slider(
     ui, "Aperture Size", &(instance->scene_gpu.camera.aperture_size), 1, 0.0005f, 0.0f, FLT_MAX);
-  panels[11] = create_slider(
+  panels[i++] = create_slider(
     ui, "Focal Length", &(instance->scene_gpu.camera.focal_length), 1, 0.001f, 0.0f, FLT_MAX);
-  panels[12] = create_slider(
+  panels[i++] = create_slider(
     ui, "Far Clip Distance", &(instance->scene_gpu.camera.far_clip_distance), 1, 0.05f, 0.0f,
     FLT_MAX);
-  panels[13] = create_check(ui, "Bloom", &(instance->use_bloom), 0);
-  panels[14] = create_slider(
+  panels[i++] = create_check(ui, "Bloom", &(instance->use_bloom), 0);
+  panels[i++] = create_slider(
     ui, "Alpha Cutoff", &(instance->scene_gpu.camera.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f);
 
   return panels;
@@ -100,18 +104,20 @@ static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
 static UIPanel* create_sky_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_SKY_COUNT);
 
-  panels[0] = create_tab(ui, &(ui->tab));
-  panels[1] = create_info(
+  int i = 0;
+
+  panels[i++] = create_tab(ui, &(ui->tab));
+  panels[i++] = create_info(
     ui, "Azimuth", &(instance->scene_gpu.sky.azimuth), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
-  panels[2] = create_info(
+  panels[i++] = create_info(
     ui, "Altitude", &(instance->scene_gpu.sky.altitude), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
-  panels[3] =
+  panels[i++] =
     create_slider(ui, "Density", &(instance->scene_gpu.sky.base_density), 1, 0.001f, 0.0f, FLT_MAX);
-  panels[4] = create_slider(
+  panels[i++] = create_slider(
     ui, "Rayleigh Falloff", &(instance->scene_gpu.sky.rayleigh_falloff), 1, 0.001f, 0.0f, FLT_MAX);
-  panels[5] = create_slider(
+  panels[i++] = create_slider(
     ui, "Mie Falloff", &(instance->scene_gpu.sky.mie_falloff), 1, 0.001f, 0.0f, FLT_MAX);
-  panels[6] = create_slider(
+  panels[i++] = create_slider(
     ui, "Sun Intensity", &(instance->scene_gpu.sky.sun_strength), 1, 0.001f, 0.0f, FLT_MAX);
 
   return panels;
@@ -120,28 +126,30 @@ static UIPanel* create_sky_panels(UI* ui, RaytraceInstance* instance) {
 static UIPanel* create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_OCEAN_COUNT);
 
-  panels[0] = create_tab(ui, &(ui->tab));
-  panels[1] = create_check(ui, "Active", &(instance->scene_gpu.ocean.active), 1);
-  panels[2] =
+  int i = 0;
+
+  panels[i++] = create_tab(ui, &(ui->tab));
+  panels[i++] = create_check(ui, "Active", &(instance->scene_gpu.ocean.active), 1);
+  panels[i++] =
     create_slider(ui, "Height", &(instance->scene_gpu.ocean.height), 1, 0.005f, -FLT_MAX, FLT_MAX);
-  panels[3] = create_slider(
+  panels[i++] = create_slider(
     ui, "Amplitude", &(instance->scene_gpu.ocean.amplitude), 1, 0.005f, 0.0f, FLT_MAX);
-  panels[4] = create_slider(
+  panels[i++] = create_slider(
     ui, "Choppyness", &(instance->scene_gpu.ocean.choppyness), 1, 0.005f, 0.0f, FLT_MAX);
-  panels[5] = create_slider(
+  panels[i++] = create_slider(
     ui, "Frequency", &(instance->scene_gpu.ocean.frequency), 1, 0.005f, 0.0f, FLT_MAX);
-  panels[6] = create_color(ui, "Albedo", (float*) &(instance->scene_gpu.ocean.albedo));
-  panels[7] =
+  panels[i++] = create_color(ui, "Albedo", (float*) &(instance->scene_gpu.ocean.albedo));
+  panels[i++] =
     create_slider(ui, "  Red", &(instance->scene_gpu.ocean.albedo.r), 1, 0.001f, 0.0f, 1.0f);
-  panels[8] =
+  panels[i++] =
     create_slider(ui, "  Green", &(instance->scene_gpu.ocean.albedo.g), 1, 0.001f, 0.0f, 1.0f);
-  panels[9] =
+  panels[i++] =
     create_slider(ui, "  Blue", &(instance->scene_gpu.ocean.albedo.b), 1, 0.001f, 0.0f, 1.0f);
-  panels[10] = create_check(ui, "Emissive", &(instance->scene_gpu.ocean.emissive), 1);
-  panels[11] =
+  panels[i++] = create_check(ui, "Emissive", &(instance->scene_gpu.ocean.emissive), 1);
+  panels[i++] =
     create_slider(ui, "Alpha", &(instance->scene_gpu.ocean.albedo.a), 1, 0.001f, 0.0f, 1.0f);
-  panels[12] = create_check(ui, "Animated", &(instance->scene_gpu.ocean.update), 1);
-  panels[13] =
+  panels[i++] = create_check(ui, "Animated", &(instance->scene_gpu.ocean.update), 1);
+  panels[i++] =
     create_slider(ui, "Speed", &(instance->scene_gpu.ocean.speed), 1, 0.005f, 0.0f, FLT_MAX);
 
   return panels;
@@ -150,7 +158,9 @@ static UIPanel* create_ocean_panels(UI* ui, RaytraceInstance* instance) {
 static UIPanel* create_toy_panels(UI* ui, RaytraceInstance* instance) {
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * UI_PANELS_TOY_COUNT);
 
-  panels[0] = create_tab(ui, &(ui->tab));
+  int i = 0;
+
+  panels[i++] = create_tab(ui, &(ui->tab));
 
   return panels;
 }
