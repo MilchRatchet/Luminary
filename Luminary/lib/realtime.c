@@ -1,5 +1,7 @@
-#include <stdlib.h>
 #include "realtime.h"
+
+#include <stdlib.h>
+
 #include "raytrace.h"
 
 RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
@@ -31,8 +33,7 @@ RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
   realtime->width  = rect.w;
   realtime->height = rect.h;
 
-  realtime->window =
-    SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN);
+  realtime->window = SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN);
 
   realtime->window_surface = SDL_GetWindowSurface(realtime->window);
 

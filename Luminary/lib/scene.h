@@ -1,9 +1,9 @@
 #ifndef SCENE_H
 #define SCENE_H
 
-#include "primitives.h"
-#include "mesh.h"
 #include "bvh.h"
+#include "mesh.h"
+#include "primitives.h"
 #include "texture.h"
 #include "utils.h"
 

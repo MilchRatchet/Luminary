@@ -1,39 +1,37 @@
-#include "utils.h"
-#include "SDL/SDL.h"
-#include "raytrace.h"
-#include "denoiser.h"
-#include "png.h"
 #include "output.h"
-#include "frametime.h"
-#include "realtime.h"
-#include "UI/UI.h"
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <math.h>
+
 #include <float.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
-void offline_output(
-  Scene scene, RaytraceInstance* instance, char* output_name, int progress, clock_t time) {
+#include "SDL/SDL.h"
+#include "UI/UI.h"
+#include "denoiser.h"
+#include "frametime.h"
+#include "png.h"
+#include "raytrace.h"
+#include "realtime.h"
+#include "utils.h"
+
+void offline_output(Scene scene, RaytraceInstance* instance, char* output_name, clock_t time) {
   clock_t start_of_rt = clock();
-  trace_scene(instance, 0, 0xffffffff);
+  trace_scene(instance, 0);
   for (int i = 1; i < instance->offline_samples; i++) {
-    trace_scene(instance, i, 0x0);
+    trace_scene(instance, i);
     const double progress     = ((double) i) / instance->offline_samples;
     const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
     const double time_left    = (time_elapsed / progress) - time_elapsed;
     printf(
-      "\r                                                                                          "
-      "                \rProgress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - "
-      "Performance: %.1f Mrays/s",
+      "\r                                                                                                          \rProgress: "
+      "%2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
       100.0 * progress, time_elapsed, time_left,
       0.000001 * instance->max_ray_depth * instance->width * instance->height * i / time_elapsed);
   }
 
-  printf(
-    "\r                                                                                            "
-    "                  \r");
+  printf("\r                                                                                                              \r");
 
   printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -48,8 +46,7 @@ void offline_output(
 
   initialize_8bit_frame(instance, instance->width, instance->height);
   XRGB8* frame = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
-  copy_framebuffer_to_8bit(
-    frame, instance->width, instance->height, instance->frame_output_gpu, instance);
+  copy_framebuffer_to_8bit(frame, instance->width, instance->height, instance->frame_output_gpu, instance);
 
   store_XRGB8_png(output_name, frame, instance->width, instance->height);
 
@@ -69,8 +66,7 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   const float dot_uv = u.x * v.x + u.y * v.y + u.z * v.z;
   const float dot_uu = u.x * u.x + u.y * u.y + u.z * u.z;
 
-  const vec3 cross = {
-    .x = u.y * v.z - u.z * v.y, .y = u.z * v.x - u.x * v.z, .z = u.x * v.y - u.y * v.x};
+  const vec3 cross = {.x = u.y * v.z - u.z * v.y, .y = u.z * v.x - u.x * v.z, .z = u.x * v.y - u.y * v.x};
 
   const vec3 result = {
     .x = 2.0f * dot_uv * u.x + ((s * s) - dot_uu) * v.x + 2.0f * s * cross.x,
@@ -104,7 +100,8 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
     SDL_Event event;
 
     start_frametime(&frametime_trace);
-    trace_scene(instance, instance->temporal_frames, 0xffffffff);
+    update_scene(instance);
+    trace_scene(instance, instance->temporal_frames);
     sample_frametime(&frametime_trace);
 
     start_frametime(&frametime_post);
@@ -112,12 +109,10 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
       if (instance->use_bloom)
         apply_bloom(instance, denoised_image);
-      copy_framebuffer_to_8bit(
-        realtime->buffer, realtime->width, realtime->height, denoised_image, instance);
+      copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, denoised_image, instance);
     }
     else {
-      copy_framebuffer_to_8bit(
-        realtime->buffer, realtime->width, realtime->height, instance->frame_output_gpu, instance);
+      copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, instance->frame_output_gpu, instance);
     }
     sample_frametime(&frametime_post);
 
@@ -190,8 +185,8 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
     const double total_time = get_frametime(&frametime_total);
 
     sprintf(
-      title, "Luminary - FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms",
-      1000.0 / total_time, total_time, trace_time, ui_time, post_time);
+      title, "Luminary - FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms", 1000.0 / total_time, total_time, trace_time,
+      ui_time, post_time);
 
     const double normalized_time = total_time / 16.66667;
 

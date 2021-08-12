@@ -1,7 +1,9 @@
-#include <stdlib.h>
-#include <math.h>
-#include "UI.h"
 #include "UI_blur.h"
+
+#include <math.h>
+#include <stdlib.h>
+
+#include "UI.h"
 
 #define SCALE 5
 #define BLUR_WIDTH UI_WIDTH / SCALE
@@ -92,8 +94,7 @@ void blur_background(UI* ui, uint8_t* target, int width, int height) {
   }
 
   const int scale_x = (int) ((double) FACTOR * (BLUR_WIDTH - 1) / UI_WIDTH + 0.5);
-  const int scale_y =
-    (int) ((double) FACTOR * (BLUR_HEIGHT - 1) / (UI_HEIGHT + UI_BORDER_SIZE) + 0.5);
+  const int scale_y = (int) ((double) FACTOR * (BLUR_HEIGHT - 1) / (UI_HEIGHT + UI_BORDER_SIZE) + 0.5);
 
   for (int i = 0; i < UI_HEIGHT + UI_BORDER_SIZE; i++) {
     const int source_y = i * scale_y;
@@ -112,20 +113,14 @@ void blur_background(UI* ui, uint8_t* target, int width, int height) {
       const int index2 = 3 * ((y0 + 1) * BLUR_WIDTH + x0);
       const int index3 = 3 * ((y0 + 1) * BLUR_WIDTH + x0 + 1);
 
-      target[off + i * width * 4 + 4 * j + 2] = (uint8_t)(
-        (internal[index0] * ifx * ify + internal[index1] * fx * ify + internal[index2] * ifx * fy
-         + internal[index3] * fx * fy + (FACTOR * FACTOR / 2))
-        >> (2 * SHIFT));
+      target[off + i * width * 4 + 4 * j + 2] =
+        (uint8_t) ((internal[index0] * ifx * ify + internal[index1] * fx * ify + internal[index2] * ifx * fy + internal[index3] * fx * fy + (FACTOR * FACTOR / 2)) >> (2 * SHIFT));
 
-      target[off + i * width * 4 + 4 * j + 1] = (uint8_t)(
-        (internal[index0 + 1] * ifx * ify + internal[index1 + 1] * fx * ify
-         + internal[index2 + 1] * ifx * fy + internal[index3 + 1] * fx * fy + (FACTOR * FACTOR / 2))
-        >> (2 * SHIFT));
+      target[off + i * width * 4 + 4 * j + 1] =
+        (uint8_t) ((internal[index0 + 1] * ifx * ify + internal[index1 + 1] * fx * ify + internal[index2 + 1] * ifx * fy + internal[index3 + 1] * fx * fy + (FACTOR * FACTOR / 2)) >> (2 * SHIFT));
 
-      target[off + i * width * 4 + 4 * j] = (uint8_t)(
-        (internal[index0 + 2] * ifx * ify + internal[index1 + 2] * fx * ify
-         + internal[index2 + 2] * ifx * fy + internal[index3 + 2] * fx * fy + (FACTOR * FACTOR / 2))
-        >> (2 * SHIFT));
+      target[off + i * width * 4 + 4 * j] =
+        (uint8_t) ((internal[index0 + 2] * ifx * ify + internal[index1 + 2] * fx * ify + internal[index2 + 2] * ifx * fy + internal[index3 + 2] * fx * fy + (FACTOR * FACTOR / 2)) >> (2 * SHIFT));
     }
   }
 }

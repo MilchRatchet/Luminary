@@ -1,8 +1,9 @@
 #ifndef PNG_H
 #define PNG_H
 
-#include "texture.h"
 #include <stdint.h>
+
+#include "texture.h"
 
 #define PNG_COLORTYPE_GRAYSCALE 0
 #define PNG_COLORTYPE_TRUECOLOR 2
@@ -25,8 +26,8 @@
 
 int store_XRGB8_png(const char* filename, const XRGB8* image, const int width, const int height);
 int store_as_png(
-  const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width,
-  const uint32_t height, const uint8_t color_type, const uint8_t bit_depth);
+  const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
+  const uint8_t color_type, const uint8_t bit_depth);
 TextureRGBA load_texture_from_png(const char* filename);
 
 #endif /* PNG_H */

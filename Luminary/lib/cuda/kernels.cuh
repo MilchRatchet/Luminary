@@ -28,32 +28,35 @@
 #include <thread>
 #include <immintrin.h>
 
-__device__
-TraceTask get_starting_ray(TraceTask task) {
+__device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 default_ray;
 
-  const float random_offset = sample_blue_noise(task.index.x,task.index.y,task.state,8);
+  const float random_offset = sample_blue_noise(task.index.x, task.index.y, task.state, 8);
 
-  default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * task.index.x + device_offset_x * random_offset * 2.0f);
-  default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * task.index.y - device_offset_y * fractf(random_offset * 10.0f) * 2.0f);
+  default_ray.x =
+    device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * task.index.x + device_offset_x * random_offset * 2.0f);
+  default_ray.y =
+    device_scene.camera.focal_length * (device_vfov - device_step * task.index.y - device_offset_y * fractf(random_offset * 10.0f) * 2.0f);
   default_ray.z = -device_scene.camera.focal_length;
 
-  const float alpha = (device_scene.camera.aperture_size == 0.0f) ? 0.0f : sample_blue_noise(task.index.x,task.index.y,task.state, 0) * 2.0f * PI;
-  const float beta  = (device_scene.camera.aperture_size == 0.0f) ? 0.0f : sample_blue_noise(task.index.x,task.index.y,task.state, 1) * device_scene.camera.aperture_size;
+  const float alpha =
+    (device_scene.camera.aperture_size == 0.0f) ? 0.0f : sample_blue_noise(task.index.x, task.index.y, task.state, 0) * 2.0f * PI;
+  const float beta = (device_scene.camera.aperture_size == 0.0f)
+                       ? 0.0f
+                       : sample_blue_noise(task.index.x, task.index.y, task.state, 1) * device_scene.camera.aperture_size;
 
   vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 
-  default_ray = sub_vector(default_ray, point_on_aperture);
+  default_ray       = sub_vector(default_ray, point_on_aperture);
   point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device_camera_rotation);
 
-  task.ray = normalize_vector(rotate_vector_by_quaternion(default_ray, device_camera_rotation));
+  task.ray    = normalize_vector(rotate_vector_by_quaternion(default_ray, device_camera_rotation));
   task.origin = add_vector(device_scene.camera.pos, point_on_aperture);
 
   return task;
 }
 
-__global__
-void initialize_randoms() {
+__global__ void initialize_randoms() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   curandStateXORWOW_t state;
@@ -61,22 +64,21 @@ void initialize_randoms() {
   device_sample_randoms[id] = state;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,12)
-void generate_trace_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() {
   int offset = 0;
 
   for (int pixel = threadIdx.x + blockIdx.x * blockDim.x; pixel < device_amount; pixel += blockDim.x * gridDim.x) {
     TraceTask task;
 
-    task.index.x = (uint16_t)(pixel % device_width);
-    task.index.y = (uint16_t)(pixel / device_width);
+    task.index.x = (uint16_t) (pixel % device_width);
+    task.index.y = (uint16_t) (pixel / device_width);
 
     task.state = (1 << 31) | (device_max_ray_depth << 16) | (device_temporal_frames & RANDOM_INDEX);
 
     task = get_starting_ray(task);
 
-    device_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
-    device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+    device_records[pixel]              = get_color(1.0f, 1.0f, 1.0f);
+    device_frame_buffer[pixel]         = get_color(0.0f, 0.0f, 0.0f);
     device_light_sample_history[pixel] = ANY_LIGHT;
 
     if (device_denoiser)
@@ -88,18 +90,17 @@ void generate_trace_tasks() {
   device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = offset;
 }
 
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
-void balance_trace_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
   const int warp = (threadIdx.x + blockIdx.x * blockDim.x) >> 5;
 
-  if (warp >= (THREADS_PER_BLOCK * BLOCKS_PER_GRID) >> 5) return;
+  if (warp >= (THREADS_PER_BLOCK * BLOCKS_PER_GRID) >> 5)
+    return;
 
   __shared__ uint16_t counts[THREADS_PER_BLOCK][32];
   uint16_t average = 0;
 
   for (int i = 0; i < 32; i++) {
-    const uint16_t c = device_task_counts[4 * (32 * warp + i)];
+    const uint16_t c       = device_task_counts[4 * (32 * warp + i)];
     counts[threadIdx.x][i] = c;
     average += c;
   }
@@ -107,11 +108,12 @@ void balance_trace_tasks() {
   average = average >> 5;
 
   for (int i = 0; i < 32; i++) {
-    uint16_t count = counts[threadIdx.x][i];
-    int source_index = -1;
+    uint16_t count        = counts[threadIdx.x][i];
+    int source_index      = -1;
     uint16_t source_count = 0;
 
-    if (count >= average) continue;
+    if (count >= average)
+      continue;
 
     for (int j = 0; j < 32; j++) {
       uint16_t c = counts[threadIdx.x][j];
@@ -125,14 +127,15 @@ void balance_trace_tasks() {
       const int swaps = (source_count - count) >> 1;
       for (int j = 0; j < swaps; j++) {
         source_count--;
-        float4* source_ptr = (float4*)(device_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + source_index, warp >> 2, source_count));
-        float4* sink_ptr = (float4*)(device_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + i, warp >> 2, count));
+        float4* source_ptr =
+          (float4*) (device_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + source_index, warp >> 2, source_count));
+        float4* sink_ptr = (float4*) (device_tasks + get_task_address_of_thread(((warp & 0b11) << 5) + i, warp >> 2, count));
         count++;
 
         __stwb(sink_ptr, __ldca(source_ptr));
         __stwb(sink_ptr + 1, __ldca(source_ptr + 1));
       }
-      counts[threadIdx.x][i] = count;
+      counts[threadIdx.x][i]            = count;
       counts[threadIdx.x][source_index] = source_count;
     }
   }
@@ -142,23 +145,22 @@ void balance_trace_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,12)
-void preprocess_trace_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks() {
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
 
   for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
-    TraceTask task = load_trace_task_essentials(device_tasks + offset);
+    TraceTask task   = load_trace_task_essentials(device_tasks + offset);
 
-    float depth = device_scene.camera.far_clip_distance;
+    float depth     = device_scene.camera.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
 
     if (device_scene.ocean.active) {
       const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
 
       if (ocean_dist < depth) {
-          depth = ocean_dist;
-          hit_id = OCEAN_HIT;
+        depth  = ocean_dist;
+        hit_id = OCEAN_HIT;
       }
     }
 
@@ -166,105 +168,111 @@ void preprocess_trace_tasks() {
     result.x = depth;
     result.y = uint_as_float(hit_id);
 
-    __stcs((float2*)(device_trace_results + offset), result);
+    __stcs((float2*) (device_trace_results + offset), result);
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,12)
-void postprocess_trace_tasks() {
-  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {
+  const int task_count         = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
   uint16_t geometry_task_count = 0;
-  uint16_t sky_task_count = 0;
-  uint16_t ocean_task_count = 0;
+  uint16_t sky_task_count      = 0;
+  uint16_t ocean_task_count    = 0;
 
-  //count data
+  // count data
   for (int i = 0; i < task_count; i++) {
-    const int offset = get_task_address(i);
-    const uint32_t hit_id = __ldca((uint32_t*)(device_trace_results + offset) + 1);
+    const int offset      = get_task_address(i);
+    const uint32_t hit_id = __ldca((uint32_t*) (device_trace_results + offset) + 1);
 
     if (hit_id == SKY_HIT) {
       sky_task_count++;
-    } else if (hit_id == OCEAN_HIT) {
+    }
+    else if (hit_id == OCEAN_HIT) {
       ocean_task_count++;
-    } else {
+    }
+    else {
       geometry_task_count++;
     }
   }
 
   int geometry_offset = 0;
-  int ocean_offset = geometry_task_count;
-  int sky_offset = geometry_task_count + ocean_task_count;
-  int k = 0;
+  int ocean_offset    = geometry_task_count;
+  int sky_offset      = geometry_task_count + ocean_task_count;
+  int k               = 0;
 
-  //order data
+  // order data
   while (k < task_count) {
-    const int offset = get_task_address(k);
-    const uint32_t hit_id = __ldca((uint32_t*)(device_trace_results + offset) + 1);
+    const int offset      = get_task_address(k);
+    const uint32_t hit_id = __ldca((uint32_t*) (device_trace_results + offset) + 1);
 
     int index;
     int needs_swapping;
 
     if (hit_id == SKY_HIT) {
-      index = sky_offset++;
+      index          = sky_offset++;
       needs_swapping = (k < geometry_task_count + ocean_task_count);
-    } else if (hit_id == OCEAN_HIT) {
-      index = ocean_offset++;
+    }
+    else if (hit_id == OCEAN_HIT) {
+      index          = ocean_offset++;
       needs_swapping = (k < geometry_task_count) || (k >= geometry_task_count + ocean_task_count);
-    } else {
-      index = geometry_offset++;
+    }
+    else {
+      index          = geometry_offset++;
       needs_swapping = (k >= geometry_task_count);
     }
 
     if (needs_swapping) {
       swap_trace_data(k, index);
-    } else {
+    }
+    else {
       k++;
     }
   }
 
   geometry_task_count = 0;
-  sky_task_count = 0;
-  ocean_task_count = 0;
+  sky_task_count      = 0;
+  ocean_task_count    = 0;
 
-  //process data
+  // process data
   for (int i = 0; i < task_count; i++) {
-    const int offset = get_task_address(i);
-    TraceTask task = load_trace_task(device_tasks + offset);
-    const float2 result = __ldcs((float2*)(device_trace_results + offset));
+    const int offset    = get_task_address(i);
+    TraceTask task      = load_trace_task(device_tasks + offset);
+    const float2 result = __ldcs((float2*) (device_trace_results + offset));
 
-    const float depth = result.x;
+    const float depth     = result.x;
     const uint32_t hit_id = float_as_uint(result.y);
 
-    float4* ptr = (float4*)(device_tasks + offset);
+    float4* ptr = (float4*) (device_tasks + offset);
     float4 data0;
     float4 data1;
 
     if (hit_id == SKY_HIT) {
-        sky_task_count++;
-        data0.x = task.ray.x;
-        data0.y = task.ray.y;
-        data0.z = task.ray.z;
-        data0.w = *((float*)(&task.index));
-    } else {
-        task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
-        data0.x = task.origin.x;
-        data0.y = task.origin.y;
-        data0.z = task.origin.z;
-        data0.w = asinf(task.ray.y);
-        data1.x = atan2f(task.ray.z, task.ray.x);
+      sky_task_count++;
+      data0.x = task.ray.x;
+      data0.y = task.ray.y;
+      data0.z = task.ray.z;
+      data0.w = *((float*) (&task.index));
+    }
+    else {
+      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+      data0.x     = task.origin.x;
+      data0.y     = task.origin.y;
+      data0.z     = task.origin.z;
+      data0.w     = asinf(task.ray.y);
+      data1.x     = atan2f(task.ray.z, task.ray.x);
 
-        if (hit_id == OCEAN_HIT) {
-            ocean_task_count++;
-            data1.y = depth;
-        } else {
-            geometry_task_count++;
-            data1.y = uint_as_float(hit_id);
-        }
+      if (hit_id == OCEAN_HIT) {
+        ocean_task_count++;
+        data1.y = depth;
+      }
+      else {
+        geometry_task_count++;
+        data1.y = uint_as_float(hit_id);
+      }
 
-        data1.z = *((float*)&task.index);
-        data1.w = *((float*)&task.state);
+      data1.z = *((float*) &task.index);
+      data1.w = *((float*) &task.state);
 
-        __stcs(ptr + 1, data1);
+      __stcs(ptr + 1, data1);
     }
 
     __stcs(ptr, data0);
@@ -279,14 +287,13 @@ void postprocess_trace_tasks() {
   __stcs((ushort4*) (device_task_counts + (threadIdx.x + blockIdx.x * blockDim.x) * 4), task_counts);
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,9)
-void process_geometry_tasks() {
-  int trace_count = 0;
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_geometry_tasks() {
+  int trace_count      = 0;
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device_tasks + get_task_address(i));
-    const int pixel = task.index.y * device_width + task.index.x;
+    const int pixel   = task.index.y * device_width + task.index.x;
 
     vec3 ray;
     ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
@@ -295,7 +302,7 @@ void process_geometry_tasks() {
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    const float4* hit_address = (float4*)(device_scene.triangles + task.hit_id);
+    const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
 
     const float4 t1 = __ldg(hit_address);
     const float4 t2 = __ldg(hit_address + 1);
@@ -303,28 +310,28 @@ void process_geometry_tasks() {
     const float4 t4 = __ldg(hit_address + 3);
     const float4 t5 = __ldg(hit_address + 4);
     const float4 t6 = __ldg(hit_address + 5);
-    const float2 t7 = __ldg((float2*)(hit_address + 6));
+    const float2 t7 = __ldg((float2*) (hit_address + 6));
 
     vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-    vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
-    vec3 edge2 = get_vector(t2.z, t2.w, t3.x);
+    vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+    vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
     vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
     vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
     const float lambda = normal.x;
-    const float mu = normal.y;
+    const float mu     = normal.y;
 
     vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
-    vec3 edge1_normal = get_vector(t4.x, t4.y, t4.z);
-    vec3 edge2_normal = get_vector(t4.w, t5.x, t5.y);
+    vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
+    vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
     normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
 
     UV vertex_texture = get_UV(t5.z, t5.w);
-    UV edge1_texture = get_UV(t6.x, t6.y);
-    UV edge2_texture = get_UV(t6.z, t6.w);
+    UV edge1_texture  = get_UV(t6.x, t6.y);
+    UV edge2_texture  = get_UV(t6.z, t6.w);
 
     const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
 
@@ -336,38 +343,40 @@ void process_geometry_tasks() {
       normal = scale_vector(normal, -1.0f);
     }
 
-    const int texture_object = __float_as_int(t7.x);
+    const int texture_object         = __float_as_int(t7.x);
     const uint32_t triangle_light_id = __float_as_uint(t7.y);
 
-    const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
+    const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 
     float roughness;
     float metallic;
     float intensity;
 
     if (maps.z) {
-        const float4 material_f = tex2D<float4>(device_material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
+      const float4 material_f = tex2D<float4>(device_material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
 
-        roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
-        metallic = material_f.y;
-        intensity = material_f.z * 255.0f;
-    } else {
-        roughness = (1.0f - device_default_material.r) * (1.0f - device_default_material.r);
-        metallic = device_default_material.g;
-        intensity = device_default_material.b;
+      roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
+      metallic  = material_f.y;
+      intensity = material_f.z * 255.0f;
+    }
+    else {
+      roughness = (1.0f - device_default_material.r) * (1.0f - device_default_material.r);
+      metallic  = device_default_material.g;
+      intensity = device_default_material.b;
     }
 
     RGBAF albedo;
 
     if (maps.x) {
       const float4 albedo_f = tex2D<float4>(device_albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
-      albedo.r = albedo_f.x;
-      albedo.g = albedo_f.y;
-      albedo.b = albedo_f.z;
-      albedo.a = albedo_f.w;
+      albedo.r              = albedo_f.x;
+      albedo.g              = albedo_f.y;
+      albedo.b              = albedo_f.z;
+      albedo.a              = albedo_f.w;
 
       albedo = saturate_albedo(albedo, 0.0f);
-    } else {
+    }
+    else {
       albedo.r = 0.9f;
       albedo.g = 0.9f;
       albedo.b = 0.9f;
@@ -382,7 +391,8 @@ void process_geometry_tasks() {
       emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
     }
 
-    if (albedo.a < device_scene.camera.alpha_cutoff) albedo.a = 0.0f;
+    if (albedo.a < device_scene.camera.alpha_cutoff)
+      albedo.a = 0.0f;
 
     RGBF record = device_records[pixel];
 
@@ -404,8 +414,8 @@ void process_geometry_tasks() {
       }
 
       atomicSub(&device_pixels_left, 1);
-    } else if (task.state & DEPTH_LEFT) {
-
+    }
+    else if (task.state & DEPTH_LEFT) {
       if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
         device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
         task.state ^= ALBEDO_BUFFER_STATE;
@@ -421,7 +431,8 @@ void process_geometry_tasks() {
         record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
 
         light_sample_id = device_light_sample_history[pixel];
-      } else {
+      }
+      else {
         const float specular_probability = lerp(0.5f, 1.0f, metallic);
 
         const vec3 V = scale_vector(ray, -1.0f);
@@ -437,7 +448,8 @@ void process_geometry_tasks() {
         const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
 
         const float light_sample_depth_bias = powf(0.1f, device_max_ray_depth - ((task.state & DEPTH_LEFT) >> 16));
-        const float light_sample_probability = fmaxf(1.0f - 1.0f/(light_count + 1), 1.0f - (1 + device_temporal_frames) * light_sample_depth_bias);
+        const float light_sample_probability =
+          fmaxf(1.0f - 1.0f / (light_count + 1), 1.0f - (1 + device_temporal_frames) * light_sample_depth_bias);
 
         Light light;
         if (light_sample < light_sample_probability) {
@@ -445,14 +457,17 @@ void process_geometry_tasks() {
         }
 
         const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
-        const float beta = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
+        const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
         if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < specular_probability) {
-          ray = specular_BRDF(record, light_sample_id, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic, beta, gamma, specular_probability);
+          ray = specular_BRDF(
+            record, light_sample_id, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic,
+            beta, gamma, specular_probability);
         }
-        else
-        {
-          ray = diffuse_BRDF(record, light_sample_id, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic, beta, gamma, specular_probability);
+        else {
+          ray = diffuse_BRDF(
+            record, light_sample_id, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic,
+            beta, gamma, specular_probability);
         }
       }
 
@@ -460,36 +475,40 @@ void process_geometry_tasks() {
 
       int remains_active = 1;
 
-      #ifdef WEIGHT_BASED_EXIT
+#ifdef WEIGHT_BASED_EXIT
       const float max_record = fmaxf(record.r, fmaxf(record.g, record.b));
-      if (max_record < CUTOFF ||
-      (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(task.index.x, task.index.y, task.state, 20) > (max_record - CUTOFF)/(CUTOFF-PROBABILISTIC_CUTOFF)))
-      {
+      if (
+        max_record < CUTOFF
+        || (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(task.index.x, task.index.y, task.state, 20) > (max_record - CUTOFF) / (CUTOFF - PROBABILISTIC_CUTOFF))) {
         remains_active = 0;
       }
-      #endif
+#endif
 
-      #ifdef LOW_QUALITY_LONG_BOUNCES
-      if (albedo.a > 0.0f && ((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES) && sample_blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f/device_max_ray_depth) {
+#ifdef LOW_QUALITY_LONG_BOUNCES
+      if (
+        albedo.a > 0.0f && ((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES)
+        && sample_blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f / device_max_ray_depth) {
         remains_active = 0;
       }
-      #endif
+#endif
 
       if (remains_active) {
         TraceTask next_task;
         next_task.origin = task.position;
-        next_task.ray = ray;
-        next_task.index = task.index;
-        next_task.state = task.state;
+        next_task.ray    = ray;
+        next_task.index  = task.index;
+        next_task.state  = task.state;
 
         store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
 
-        device_records[pixel] = record;
+        device_records[pixel]              = record;
         device_light_sample_history[pixel] = light_sample_id;
-      } else {
+      }
+      else {
         atomicSub(&device_pixels_left, 1);
       }
-    } else {
+    }
+    else {
       atomicSub(&device_pixels_left, 1);
     }
   }
@@ -497,16 +516,15 @@ void process_geometry_tasks() {
   device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = trace_count;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,9)
-void process_debug_geometry_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_tasks() {
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device_tasks + get_task_address(i));
-    const int pixel = task.index.y * device_width + task.index.x;
+    const int pixel   = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO) {
-      const float4* hit_address = (float4*)(device_scene.triangles + task.hit_id);
+      const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
 
       const float4 t1 = __ldg(hit_address);
       const float4 t2 = __ldg(hit_address + 1);
@@ -514,33 +532,34 @@ void process_debug_geometry_tasks() {
       const float4 t4 = __ldg(hit_address + 3);
       const float4 t5 = __ldg(hit_address + 4);
       const float4 t6 = __ldg(hit_address + 5);
-      const float2 t7 = __ldg((float2*)(hit_address + 6));
+      const float2 t7 = __ldg((float2*) (hit_address + 6));
 
       vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-      vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
-      vec3 edge2 = get_vector(t2.z, t2.w, t3.x);
+      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+      vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
       vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
       const float lambda = normal.x;
-      const float mu = normal.y;
+      const float mu     = normal.y;
 
       UV vertex_texture = get_UV(t5.z, t5.w);
-      UV edge1_texture = get_UV(t6.x, t6.y);
-      UV edge2_texture = get_UV(t6.z, t6.w);
+      UV edge1_texture  = get_UV(t6.x, t6.y);
+      UV edge2_texture  = get_UV(t6.z, t6.w);
 
       const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
 
       const int texture_object = __float_as_int(t7.x);
 
-      const ushort4 maps = __ldg((ushort4*)(device_texture_assignments + texture_object));
+      const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 
       RGBF color = get_color(0.0f, 0.0f, 0.0f);
 
       if (maps.x) {
         const float4 albedo_f = tex2D<float4>(device_albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
-        color = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
-      } else {
+        color                 = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
+      }
+      else {
         color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
       }
 
@@ -551,12 +570,14 @@ void process_debug_geometry_tasks() {
       }
 
       device_frame_buffer[pixel] = color;
-    } else if (device_shading_mode == SHADING_DEPTH) {
-      const float dist = get_length(sub_vector(device_scene.camera.pos, task.position));
-      const float value = __saturatef((1.0f/dist) * 2.0f);
-      device_frame_buffer[pixel] = get_color(value,value,value);
-    } else if (device_shading_mode == SHADING_NORMAL) {
-      const float4* hit_address = (float4*)(device_scene.triangles + task.hit_id);
+    }
+    else if (device_shading_mode == SHADING_DEPTH) {
+      const float dist           = get_length(sub_vector(device_scene.camera.pos, task.position));
+      const float value          = __saturatef((1.0f / dist) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value, value, value);
+    }
+    else if (device_shading_mode == SHADING_NORMAL) {
+      const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
 
       const float4 t1 = __ldg(hit_address);
       const float4 t2 = __ldg(hit_address + 1);
@@ -565,19 +586,19 @@ void process_debug_geometry_tasks() {
       const float4 t5 = __ldg(hit_address + 4);
 
       vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-      vec3 edge1 = get_vector(t1.w, t2.x, t2.y);
-      vec3 edge2 = get_vector(t2.z, t2.w, t3.x);
+      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+      vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
       vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
       vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
       const float lambda = normal.x;
-      const float mu = normal.y;
+      const float mu     = normal.y;
 
       vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
-      vec3 edge1_normal = get_vector(t4.x, t4.y, t4.z);
-      vec3 edge2_normal = get_vector(t4.w, t5.x, t5.y);
+      vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
+      vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
       normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
 
@@ -588,18 +609,17 @@ void process_debug_geometry_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
-void process_ocean_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  int trace_count = device_task_counts[id * 4];
+  int trace_count          = device_task_counts[id * 4];
   const int geometry_count = device_task_counts[id * 4 + 1];
-  const int task_count = device_task_counts[id * 4 + 2];
+  const int task_count     = device_task_counts[id * 4 + 2];
 
   const int task_offset = geometry_count;
 
   for (int i = 0; i < task_count; i++) {
-    OceanTask task = load_ocean_task(device_tasks + get_task_address(task_offset + i));
+    OceanTask task  = load_ocean_task(device_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device_width + task.index.x;
 
     vec3 ray;
@@ -612,7 +632,7 @@ void process_ocean_tasks() {
     const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
 
     RGBAF albedo = device_scene.ocean.albedo;
-    RGBF record = device_records[pixel];
+    RGBF record  = device_records[pixel];
 
     if (device_scene.ocean.emissive) {
       RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
@@ -630,8 +650,8 @@ void process_ocean_tasks() {
       }
 
       atomicSub(&device_pixels_left, 1);
-    } else if (task.state & DEPTH_LEFT) {
-
+    }
+    else if (task.state & DEPTH_LEFT) {
       if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
         device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
         task.state ^= ALBEDO_BUFFER_STATE;
@@ -643,21 +663,21 @@ void process_ocean_tasks() {
         record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
         record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
         record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
-      } else {
+      }
+      else {
         const vec3 V = scale_vector(ray, -1.0f);
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
         const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
-        const float beta = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
+        const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
         Light light;
         uint32_t light_sample_id;
         if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < 0.5f) {
           ray = specular_BRDF(record, light_sample_id, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
         }
-        else
-        {
+        else {
           ray = diffuse_BRDF(record, light_sample_id, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
         }
       }
@@ -666,15 +686,16 @@ void process_ocean_tasks() {
 
       TraceTask next_task;
       next_task.origin = task.position;
-      next_task.ray = ray;
-      next_task.index = task.index;
-      next_task.state = task.state;
+      next_task.ray    = ray;
+      next_task.index  = task.index;
+      next_task.state  = task.state;
 
       store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
 
-      device_records[pixel] = record;
+      device_records[pixel]              = record;
       device_light_sample_history[pixel] = ANY_LIGHT;
-    } else {
+    }
+    else {
       atomicSub(&device_pixels_left, 1);
     }
   }
@@ -682,26 +703,27 @@ void process_ocean_tasks() {
   device_task_counts[id * 4] = trace_count;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
-void process_debug_ocean_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int geometry_count = device_task_counts[id * 4 + 1];
-  const int task_count = device_task_counts[id * 4 + 2];
+  const int task_count     = device_task_counts[id * 4 + 2];
 
   const int task_offset = geometry_count;
 
   for (int i = 0; i < task_count; i++) {
-    OceanTask task = load_ocean_task(device_tasks + get_task_address(task_offset + i));
+    OceanTask task  = load_ocean_task(device_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO) {
-      RGBAF albedo = device_scene.ocean.albedo;
+      RGBAF albedo               = device_scene.ocean.albedo;
       device_frame_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
-    } else if (device_shading_mode == SHADING_DEPTH) {
-      const float value = __saturatef((1.0f/task.distance) * 2.0f);
-      device_frame_buffer[pixel] = get_color(value,value,value);
-    } else if (device_shading_mode == SHADING_NORMAL) {
+    }
+    else if (device_shading_mode == SHADING_DEPTH) {
+      const float value          = __saturatef((1.0f / task.distance) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value, value, value);
+    }
+    else if (device_shading_mode == SHADING_NORMAL) {
       const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
 
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
@@ -711,21 +733,20 @@ void process_debug_ocean_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
-void process_sky_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
   const int geometry_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
-  const int ocean_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
-  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
+  const int ocean_count    = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
+  const int task_count     = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
 
   const int task_offset = geometry_count + ocean_count;
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device_width + task.index.x;
+    const int pixel    = task.index.y * device_width + task.index.x;
 
     const RGBF record = device_records[pixel];
-    RGBF sky = get_sky_color(task.ray);
-    sky = mul_color(sky, record);
+    RGBF sky          = get_sky_color(task.ray);
+    sky               = mul_color(sky, record);
 
     const uint32_t light = device_light_sample_history[pixel];
 
@@ -737,24 +758,25 @@ void process_sky_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK,10)
-void process_debug_sky_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks() {
   const int geometry_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
-  const int ocean_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
-  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
+  const int ocean_count    = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
+  const int task_count     = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
 
   const int task_offset = geometry_count + ocean_count;
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device_width + task.index.x;
+    const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO) {
       device_frame_buffer[pixel] = get_sky_color(task.ray);
-    } else if (device_shading_mode == SHADING_DEPTH) {
-      const float value = __saturatef((1.0f/device_scene.camera.far_clip_distance) * 2.0f);
-      device_frame_buffer[pixel] = get_color(value,value,value);
-    } else if (device_shading_mode == SHADING_NORMAL) {
+    }
+    else if (device_shading_mode == SHADING_DEPTH) {
+      const float value          = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value, value, value);
+    }
+    else if (device_shading_mode == SHADING_NORMAL) {
       device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
 
@@ -762,34 +784,34 @@ void process_debug_sky_tasks() {
   }
 }
 
-__global__
-void finalize_samples() {
+__global__ void finalize_samples() {
   int offset = 4 * (threadIdx.x + blockIdx.x * blockDim.x);
 
   for (; offset < 3 * device_amount - 4; offset += 4 * blockDim.x * gridDim.x) {
-    float4 buffer = __ldcs((float4*)((float*)device_frame_buffer + offset));
+    float4 buffer = __ldcs((float4*) ((float*) device_frame_buffer + offset));
     float4 output;
     float4 variance;
     float4 bias_cache;
 
     if (device_temporal_frames == 0) {
-      output.x = buffer.x;
-      output.y = buffer.y;
-      output.z = buffer.z;
-      output.w = buffer.w;
+      output.x   = buffer.x;
+      output.y   = buffer.y;
+      output.z   = buffer.z;
+      output.w   = buffer.w;
       variance.x = 1.0f;
       variance.y = 1.0f;
       variance.z = 1.0f;
       variance.w = 1.0f;
-      __stcs((float4*)((float*)device_frame_variance + offset), variance);
+      __stcs((float4*) ((float*) device_frame_variance + offset), variance);
       bias_cache.x = 0.0f;
       bias_cache.y = 0.0f;
       bias_cache.z = 0.0f;
       bias_cache.w = 0.0f;
-    } else {
-      output = __ldcs((float4*)((float*)device_frame_output + offset));
-      variance = __ldcs((float4*)((float*)device_frame_variance + offset));
-      bias_cache = __ldcs((float4*)((float*)device_frame_bias_cache + offset));
+    }
+    else {
+      output     = __ldcs((float4*) ((float*) device_frame_output + offset));
+      variance   = __ldcs((float4*) ((float*) device_frame_variance + offset));
+      bias_cache = __ldcs((float4*) ((float*) device_frame_bias_cache + offset));
     }
 
     float4 deviation;
@@ -803,7 +825,7 @@ void finalize_samples() {
       variance.y = ((buffer.y - output.y) * (buffer.y - output.y) + variance.y * (device_temporal_frames - 1)) / device_temporal_frames;
       variance.z = ((buffer.z - output.z) * (buffer.z - output.z) + variance.z * (device_temporal_frames - 1)) / device_temporal_frames;
       variance.w = ((buffer.w - output.w) * (buffer.w - output.w) + variance.w * (device_temporal_frames - 1)) / device_temporal_frames;
-      __stcs((float4*)((float*)device_frame_variance + offset), variance);
+      __stcs((float4*) ((float*) device_frame_variance + offset), variance);
     }
 
     float4 firefly_rejection;
@@ -842,36 +864,36 @@ void finalize_samples() {
     bias_cache.y -= debias.y;
     bias_cache.z -= debias.z;
     bias_cache.w -= debias.w;
-    __stcs((float4*)((float*)device_frame_bias_cache + offset), bias_cache);
+    __stcs((float4*) ((float*) device_frame_bias_cache + offset), bias_cache);
 
     output.x = (buffer.x + output.x * device_temporal_frames) / (device_temporal_frames + 1);
     output.y = (buffer.y + output.y * device_temporal_frames) / (device_temporal_frames + 1);
     output.z = (buffer.z + output.z * device_temporal_frames) / (device_temporal_frames + 1);
     output.w = (buffer.w + output.w * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float4*)((float*)device_frame_output + offset), output);
+    __stcs((float4*) ((float*) device_frame_output + offset), output);
   }
 
   for (; offset < 3 * device_amount; offset++) {
-    float buffer = __ldcs((float*)device_frame_buffer + offset);
-    float output = __ldcs((float*)device_frame_output + offset);
-    float variance = __ldcs((float*)device_frame_variance + offset);
-    float bias_cache = __ldcs(((float*)device_frame_bias_cache + offset));
+    float buffer     = __ldcs((float*) device_frame_buffer + offset);
+    float output     = __ldcs((float*) device_frame_output + offset);
+    float variance   = __ldcs((float*) device_frame_variance + offset);
+    float bias_cache = __ldcs(((float*) device_frame_bias_cache + offset));
     if (device_temporal_frames == 0) {
       bias_cache = 0.0f;
     }
     float deviation = sqrtf(fmaxf(eps, variance));
-    variance = ((buffer - output) * (buffer - output) + variance * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float*)device_frame_variance + offset, variance);
+    variance        = ((buffer - output) * (buffer - output) + variance * device_temporal_frames) / (device_temporal_frames + 1);
+    __stcs((float*) device_frame_variance + offset, variance);
     float firefly_rejection = 0.1f + output + deviation * 8.0f;
-    firefly_rejection = fmaxf(0.0f, buffer - firefly_rejection);
+    firefly_rejection       = fmaxf(0.0f, buffer - firefly_rejection);
     bias_cache += firefly_rejection;
     buffer -= firefly_rejection;
     float debias = fmaxf(0.0f, fminf(bias_cache, output - deviation * 2.0f - buffer));
     buffer += debias;
     bias_cache -= debias;
-    __stcs(((float*)device_frame_bias_cache + offset), bias_cache);
+    __stcs(((float*) device_frame_bias_cache + offset), bias_cache);
     output = (buffer + output * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float*)device_frame_output + offset, output);
+    __stcs((float*) device_frame_output + offset, output);
   }
 }
 
@@ -894,19 +916,18 @@ void bloom_kernel_split(RGBF* image) {
   }
 }*/
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12)
-void bloom_kernel_blur_vertical(RGBF* image) {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void bloom_kernel_blur_vertical(RGBF* image) {
   const int stride_length = 4;
 
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-  unsigned int stride = id % device_width + device_width * stride_length * (id/device_width);
+  unsigned int id     = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int stride = id % device_width + device_width * stride_length * (id / device_width);
 
-  const float sigma = 3.0f;
+  const float sigma    = 3.0f;
   const float strength = 4.0f;
 
   const float reference_pixel_count = 1280.0f;
-  const float pixel_size = reference_pixel_count / device_width;
-  const int kernel_size = (int) ((sigma * 3.0f) / pixel_size) + 1;
+  const float pixel_size            = reference_pixel_count / device_width;
+  const int kernel_size             = (int) ((sigma * 3.0f) / pixel_size) + 1;
 
   const float gauss_factor1 = 1.0f / (2.0f * sigma * sigma);
   const float gauss_factor2 = gauss_factor1 / 3.14159265358979323846f;
@@ -915,23 +936,27 @@ void bloom_kernel_blur_vertical(RGBF* image) {
 
   while (stride < device_amount) {
     for (int i = 0; i < stride_length; i++) {
-      if (stride + i * device_width >= device_amount) break;
+      if (stride + i * device_width >= device_amount)
+        break;
       reuse[threadIdx.x][i] = image[stride + i * device_width];
     }
 
     for (int j = 0; j < stride_length; j++) {
-      if (stride + j * device_width >= device_amount) break;
+      if (stride + j * device_width >= device_amount)
+        break;
 
-      RGBF collector = get_color(0.0f,0.0f,0.0f);
+      RGBF collector = get_color(0.0f, 0.0f, 0.0f);
 
-      for (int i = -kernel_size + 1; i < kernel_size; i+=2) {
+      for (int i = -kernel_size + 1; i < kernel_size; i += 2) {
         const int index = stride + (i + j) * device_width;
-        if (index < 0) continue;
-        if (index >= device_amount) break;
+        if (index < 0)
+          continue;
+        if (index >= device_amount)
+          break;
 
-        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i+j] : image[index];
+        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i + j] : image[index];
 
-        const float x   = abs(i) * pixel_size;
+        const float x     = abs(i) * pixel_size;
         const float gauss = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
 
         collector.r += value.r * gauss;
@@ -943,23 +968,22 @@ void bloom_kernel_blur_vertical(RGBF* image) {
     }
 
     id += blockDim.x * gridDim.x;
-    stride = id % device_width + device_width * stride_length * (id/device_width);
+    stride = id % device_width + device_width * stride_length * (id / device_width);
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12)
-void bloom_kernel_blur_horizontal(RGBF* image) {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void bloom_kernel_blur_horizontal(RGBF* image) {
   const int stride_length = 4;
 
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id     = threadIdx.x + blockIdx.x * blockDim.x;
   unsigned int stride = stride_length * id;
 
-  const float sigma = 3.0f;
+  const float sigma    = 3.0f;
   const float strength = 4.0f;
 
   const float reference_pixel_count = 1280.0f;
-  const float pixel_size = reference_pixel_count / device_width;
-  const int kernel_size = (int) ((sigma * 3.0f) / pixel_size) + 1;
+  const float pixel_size            = reference_pixel_count / device_width;
+  const int kernel_size             = (int) ((sigma * 3.0f) / pixel_size) + 1;
 
   const float gauss_factor1 = 1.0f / (2.0f * sigma * sigma);
   const float gauss_factor2 = gauss_factor1 / 3.14159265358979323846f;
@@ -968,24 +992,25 @@ void bloom_kernel_blur_horizontal(RGBF* image) {
 
   while (stride < device_amount) {
     for (int i = 0; i < stride_length; i++) {
-      if (stride + i >= device_amount) break;
+      if (stride + i >= device_amount)
+        break;
       reuse[threadIdx.x][i] = device_bloom_scratch[stride + i];
     }
 
-    const int column = stride % device_width;
-    const int begin = max(-kernel_size + 1, -column);
-    const int end = min(kernel_size, device_width - column - 3);
+    const int column              = stride % device_width;
+    const int begin               = max(-kernel_size + 1, -column);
+    const int end                 = min(kernel_size, device_width - column - 3);
     const int valid_stride_length = min(stride_length, device_amount - stride);
 
     for (int j = 0; j < valid_stride_length; j++) {
-      RGBF collector = get_color(0.0f,0.0f,0.0f);
+      RGBF collector = get_color(0.0f, 0.0f, 0.0f);
 
-      for (int i = begin; i < end; i+=2) {
+      for (int i = begin; i < end; i += 2) {
         const int index = stride + i + j;
 
-        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i+j] : device_bloom_scratch[index];
+        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i + j] : device_bloom_scratch[index];
 
-        const float x   = abs(i) * pixel_size;
+        const float x     = abs(i) * pixel_size;
         const float gauss = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
 
         collector.r += value.r * gauss;
@@ -1003,13 +1028,12 @@ void bloom_kernel_blur_horizontal(RGBF* image) {
   }
 }
 
-__global__
-void convert_RGBF_to_XRGB8(const int width, const int height, const RGBF* source) {
+__global__ void convert_RGBF_to_XRGB8(const int width, const int height, const RGBF* source) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int amount = width * height;
-  const float scale_x = (((float)device_width - 1.0f) / width);
-  const float scale_y = (((float)device_height - 1.0f) / height);
+  const int amount    = width * height;
+  const float scale_x = (((float) device_width - 1.0f) / width);
+  const float scale_y = (((float) device_height - 1.0f) / height);
 
   while (id < amount) {
     const int x = id % width;
@@ -1031,9 +1055,9 @@ void convert_RGBF_to_XRGB8(const int width, const int height, const RGBF* source
     RGBF pixel_01 = source[index_1];
     RGBF pixel_11 = source[index_1 + 1];
 
-    const float fx = source_x - index_x;
+    const float fx  = source_x - index_x;
     const float ifx = 1.0f - fx;
-    const float fy = source_y - index_y;
+    const float fy  = source_y - index_y;
     const float ify = 1.0f - fy;
 
     const float f00 = ifx * ify;
@@ -1053,9 +1077,9 @@ void convert_RGBF_to_XRGB8(const int width, const int height, const RGBF* source
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;
-    converted_pixel.r = (uint8_t)pixel.r;
-    converted_pixel.g = (uint8_t)pixel.g;
-    converted_pixel.b = (uint8_t)pixel.b;
+    converted_pixel.r      = (uint8_t) pixel.r;
+    converted_pixel.g      = (uint8_t) pixel.g;
+    converted_pixel.b      = (uint8_t) pixel.b;
 
     device_frame_8bit[x + y * width] = converted_pixel;
 

@@ -1,6 +1,7 @@
+#include "UI_dropdown.h"
+
 #include "UI.h"
 #include "UI_blit.h"
-#include "UI_dropdown.h"
 #include "UI_panel.h"
 #include "UI_text.h"
 
@@ -47,8 +48,7 @@ int get_intersection_dropdown(UI* ui, UIPanel* panel, int x, int y) {
 }
 
 void render_UIPanel_dropdown(UI* ui, UIPanel* panel, int y) {
-  blit_text(
-    ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
+  blit_text(ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
 
   int selected             = *((int*) panel->data);
   SDL_Surface** texts      = (SDL_Surface**) panel->data_text;
@@ -58,29 +58,16 @@ void render_UIPanel_dropdown(UI* ui, UIPanel* panel, int y) {
   const int left = UI_WIDTH - 10 - panel->prop4;
 
   if (panel->hover || panel->prop2) {
-    blit_gray(
-      ui->pixels, left - 5, y + top, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 10,
-      PANEL_DROPDOWN_BOX_HEIGHT, 0xff);
-    blit_gray(
-      ui->pixels_mask, left - 5, y + top, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 10,
-      PANEL_DROPDOWN_BOX_HEIGHT, 0xff);
-    blit_gray(
-      ui->pixels, left - 4, y + top + 1, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 8,
-      PANEL_DROPDOWN_BOX_HEIGHT - 2, 0x00);
-    blit_gray(
-      ui->pixels_mask, left - 4, y + top + 1, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 8,
-      PANEL_DROPDOWN_BOX_HEIGHT - 2, 0x00);
-    blit_text(
-      ui, option_text, left, y + ((PANEL_HEIGHT - option_text->h) >> 1), UI_WIDTH,
-      UI_HEIGHT_BUFFER);
+    blit_gray(ui->pixels, left - 5, y + top, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 10, PANEL_DROPDOWN_BOX_HEIGHT, 0xff);
+    blit_gray(ui->pixels_mask, left - 5, y + top, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 10, PANEL_DROPDOWN_BOX_HEIGHT, 0xff);
+    blit_gray(ui->pixels, left - 4, y + top + 1, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 8, PANEL_DROPDOWN_BOX_HEIGHT - 2, 0x00);
+    blit_gray(ui->pixels_mask, left - 4, y + top + 1, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 8, PANEL_DROPDOWN_BOX_HEIGHT - 2, 0x00);
+    blit_text(ui, option_text, left, y + ((PANEL_HEIGHT - option_text->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
     blit_color_shaded(
-      ui->pixels, left - 5, y + top, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 10,
-      PANEL_DROPDOWN_BOX_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
+      ui->pixels, left - 5, y + top, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 10, PANEL_DROPDOWN_BOX_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
   }
   else {
-    blit_text(
-      ui, option_text, left, y + ((PANEL_HEIGHT - option_text->h) >> 1), UI_WIDTH,
-      UI_HEIGHT_BUFFER);
+    blit_text(ui, option_text, left, y + ((PANEL_HEIGHT - option_text->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
   }
 }
 
@@ -96,28 +83,25 @@ void render_dropdown(UI* ui, UIPanel* panel, int offset) {
   const int left = UI_WIDTH - 10 - panel->prop4;
 
   blit_gray(
-    ui->pixels, left - 5, y + PANEL_DROPDOWN_BOX_HEIGHT + 5, UI_WIDTH, UI_HEIGHT_BUFFER,
-    panel->prop4 + 10, panel->prop1 * PANEL_DROPDOWN_BOX_HEIGHT, 0xff);
+    ui->pixels, left - 5, y + PANEL_DROPDOWN_BOX_HEIGHT + 5, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 10,
+    panel->prop1 * PANEL_DROPDOWN_BOX_HEIGHT, 0xff);
   blit_gray(
-    ui->pixels_mask, left - 5, y + PANEL_DROPDOWN_BOX_HEIGHT + 5, UI_WIDTH, UI_HEIGHT_BUFFER,
-    panel->prop4 + 10, panel->prop1 * PANEL_DROPDOWN_BOX_HEIGHT, 0xff);
+    ui->pixels_mask, left - 5, y + PANEL_DROPDOWN_BOX_HEIGHT + 5, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 10,
+    panel->prop1 * PANEL_DROPDOWN_BOX_HEIGHT, 0xff);
   blit_gray(
-    ui->pixels, left - 4, y + PANEL_DROPDOWN_BOX_HEIGHT + 6, UI_WIDTH, UI_HEIGHT_BUFFER,
-    panel->prop4 + 8, panel->prop1 * PANEL_DROPDOWN_BOX_HEIGHT - 2, 0x00);
+    ui->pixels, left - 4, y + PANEL_DROPDOWN_BOX_HEIGHT + 6, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 8,
+    panel->prop1 * PANEL_DROPDOWN_BOX_HEIGHT - 2, 0x00);
   blit_gray(
-    ui->pixels_mask, left - 4, y + PANEL_DROPDOWN_BOX_HEIGHT + 6, UI_WIDTH, UI_HEIGHT_BUFFER,
-    panel->prop4 + 8, panel->prop1 * PANEL_DROPDOWN_BOX_HEIGHT - 2, 0x00);
+    ui->pixels_mask, left - 4, y + PANEL_DROPDOWN_BOX_HEIGHT + 6, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 8,
+    panel->prop1 * PANEL_DROPDOWN_BOX_HEIGHT - 2, 0x00);
 
   for (int i = 0; i < panel->prop1; i++) {
-    blit_text(
-      ui, texts[i], left, y + top + (i + 1) * PANEL_DROPDOWN_BOX_HEIGHT + 5, UI_WIDTH,
-      UI_HEIGHT_BUFFER);
+    blit_text(ui, texts[i], left, y + top + (i + 1) * PANEL_DROPDOWN_BOX_HEIGHT + 5, UI_WIDTH, UI_HEIGHT_BUFFER);
 
     if (panel->prop5 == i) {
       blit_color_shaded(
-        ui->pixels, left - 4, y + (i + 1) * PANEL_DROPDOWN_BOX_HEIGHT + 6, UI_WIDTH,
-        UI_HEIGHT_BUFFER, panel->prop4 + 8, PANEL_DROPDOWN_BOX_HEIGHT - 2, HOVER_R, HOVER_G,
-        HOVER_B);
+        ui->pixels, left - 4, y + (i + 1) * PANEL_DROPDOWN_BOX_HEIGHT + 6, UI_WIDTH, UI_HEIGHT_BUFFER, panel->prop4 + 8,
+        PANEL_DROPDOWN_BOX_HEIGHT - 2, HOVER_R, HOVER_G, HOVER_B);
     }
   }
 

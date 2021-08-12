@@ -1,9 +1,10 @@
 #ifndef WAVEFRONT_H
 #define WAVEFRONT_H
 
+#include <stdint.h>
+
 #include "mesh.h"
 #include "texture.h"
-#include <stdint.h>
 
 struct Wavefront_Vertex {
   float x;

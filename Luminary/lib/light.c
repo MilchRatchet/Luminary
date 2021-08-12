@@ -1,9 +1,11 @@
-#include "utils.h"
 #include "light.h"
-#include "error.h"
-#include <stdlib.h>
-#include <stdio.h>
+
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+#include "error.h"
+#include "utils.h"
 
 static float vector_distance(const vec3 a, const vec3 b) {
   const float x = a.x - b.x;
@@ -46,9 +48,8 @@ void process_lights(Scene* scene) {
       vertex3.y = triangle.vertex.y + triangle.edge2.y;
       vertex3.z = triangle.vertex.z + triangle.edge2.z;
 
-      float l1 = sqrtf(
-        triangle.vertex.x * triangle.vertex.x + triangle.vertex.y * triangle.vertex.y
-        + triangle.vertex.z * triangle.vertex.z);
+      float l1 =
+        sqrtf(triangle.vertex.x * triangle.vertex.x + triangle.vertex.y * triangle.vertex.y + triangle.vertex.z * triangle.vertex.z);
 
       float l2 = sqrtf(vertex2.x * vertex2.x + vertex2.y * vertex2.y + vertex2.z * vertex2.z);
 

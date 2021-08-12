@@ -176,7 +176,7 @@ BreakConstructorInitializers: BeforeComma
 BreakStringLiterals: true
 
 # The column limit
-ColumnLimit: 100
+ColumnLimit: 140
 
 # If the initializers do not fit into one line, put every one on its own
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
@@ -208,7 +208,7 @@ DisableFormat: false
 # default:
 #     plop();
 # }
-IndentCaseLabels: false
+IndentCaseLabels: true
 
 # LoooooooooooooooooooooooooooooooooooooooongReturnType
 #     LoooooooooooooooooooooooooooooooongFunctionDeclaration();
@@ -229,7 +229,7 @@ PointerAlignment: Left
 ReflowComments: true
 
 # I want to keep the includes in my order
-SortIncludes: false
+SortIncludes: true
 
 # (int) i;
 SpaceAfterCStyleCast: true

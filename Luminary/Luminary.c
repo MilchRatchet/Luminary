@@ -59,7 +59,7 @@ int main(int argc, char* argv[]) {
     realtime_output(scene, instance);
   }
   else {
-    offline_output(scene, instance, output_name, 1, time);
+    offline_output(scene, instance, output_name, time);
   }
 
   free(output_name);

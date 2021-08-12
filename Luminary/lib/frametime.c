@@ -1,8 +1,13 @@
 #include "frametime.h"
+
 #include <math.h>
 
+// windows.h must be included before any other windows header
 #ifdef _WIN32
 #include <windows.h>
+#endif
+
+#ifdef _WIN32
 #include <profileapi.h>
 #else
 #include <time.h>
@@ -53,9 +58,8 @@ void sample_frametime(Frametime* frametime) {
   const double diff_time   = time_diff(frametime->last, curr_time);
   const double variance    = (frametime->average - diff_time) * (frametime->average - diff_time);
   frametime->last          = curr_time;
-  frametime->average = diff_time * FRAMETIME_WEIGHT + frametime->average * (1.0 - FRAMETIME_WEIGHT);
-  frametime->variance =
-    variance * FRAMETIME_WEIGHT + frametime->variance * (1.0 - FRAMETIME_WEIGHT);
+  frametime->average       = diff_time * FRAMETIME_WEIGHT + frametime->average * (1.0 - FRAMETIME_WEIGHT);
+  frametime->variance      = variance * FRAMETIME_WEIGHT + frametime->variance * (1.0 - FRAMETIME_WEIGHT);
 }
 
 double get_frametime(Frametime* frametime) {

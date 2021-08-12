@@ -1,15 +1,15 @@
-#include "UI.h"
 #include "UI_panel.h"
-#include "UI_text.h"
-#include "UI_slider.h"
-#include "UI_check.h"
-#include "UI_dropdown.h"
-#include "UI_color.h"
-#include "UI_info.h"
-#include "UI_tab.h"
 
-static UIPanel init_UIPanel(
-  UI* ui, int type, const char* text, void* data_binding, int voids_frames) {
+#include "UI.h"
+#include "UI_check.h"
+#include "UI_color.h"
+#include "UI_dropdown.h"
+#include "UI_info.h"
+#include "UI_slider.h"
+#include "UI_tab.h"
+#include "UI_text.h"
+
+static UIPanel init_UIPanel(UI* ui, int type, const char* text, void* data_binding, int voids_frames) {
   UIPanel panel;
 
   panel.type         = type;
@@ -22,9 +22,7 @@ static UIPanel init_UIPanel(
   return panel;
 }
 
-UIPanel create_slider(
-  UI* ui, const char* text, float* data_binding, int voids_frames, float scale, float min,
-  float max) {
+UIPanel create_slider(UI* ui, const char* text, float* data_binding, int voids_frames, float scale, float min, float max) {
   UIPanel slider = init_UIPanel(ui, PANEL_SLIDER, text, data_binding, voids_frames);
 
   slider.prop1 = *((int*) &scale);
@@ -40,9 +38,7 @@ UIPanel create_check(UI* ui, const char* text, int* data_binding, int voids_fram
   return check;
 }
 
-UIPanel create_dropdown(
-  UI* ui, const char* text, int* data_binding, int voids_frames, int option_count, char* options,
-  int index) {
+UIPanel create_dropdown(UI* ui, const char* text, int* data_binding, int voids_frames, int option_count, char* options, int index) {
   UIPanel dropdown = init_UIPanel(ui, PANEL_DROPDOWN, text, data_binding, voids_frames);
 
   dropdown.prop1 = option_count;
@@ -130,45 +126,45 @@ UIPanel create_tab(UI* ui, int* data_binding) {
 
 void handle_mouse_UIPanel(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
   switch (panel->type) {
-  case PANEL_SLIDER:
-    handle_mouse_UIPanel_slider(ui, panel, mouse_state, x, y);
-    break;
-  case PANEL_CHECK:
-    handle_mouse_UIPanel_check(ui, panel, mouse_state, x, y);
-    break;
-  case PANEL_DROPDOWN:
-    handle_mouse_UIPanel_dropdown(ui, panel, mouse_state, x, y);
-    break;
-  case PANEL_COLOR:
-    break;
-  case PANEL_INFO:
-    break;
-  case PANEL_TAB:
-    handle_mouse_UIPanel_tab(ui, panel, mouse_state, x, y);
-    break;
+    case PANEL_SLIDER:
+      handle_mouse_UIPanel_slider(ui, panel, mouse_state, x, y);
+      break;
+    case PANEL_CHECK:
+      handle_mouse_UIPanel_check(ui, panel, mouse_state, x, y);
+      break;
+    case PANEL_DROPDOWN:
+      handle_mouse_UIPanel_dropdown(ui, panel, mouse_state, x, y);
+      break;
+    case PANEL_COLOR:
+      break;
+    case PANEL_INFO:
+      break;
+    case PANEL_TAB:
+      handle_mouse_UIPanel_tab(ui, panel, mouse_state, x, y);
+      break;
   }
 }
 
 void render_UIPanel(UI* ui, UIPanel* panel, int y) {
   switch (panel->type) {
-  case PANEL_SLIDER:
-    render_UIPanel_slider(ui, panel, y);
-    break;
-  case PANEL_CHECK:
-    render_UIPanel_check(ui, panel, y);
-    break;
-  case PANEL_DROPDOWN:
-    render_UIPanel_dropdown(ui, panel, y);
-    break;
-  case PANEL_COLOR:
-    render_UIPanel_color(ui, panel, y);
-    break;
-  case PANEL_INFO:
-    render_UIPanel_info(ui, panel, y);
-    break;
-  case PANEL_TAB:
-    render_UIPanel_tab(ui, panel);
-    break;
+    case PANEL_SLIDER:
+      render_UIPanel_slider(ui, panel, y);
+      break;
+    case PANEL_CHECK:
+      render_UIPanel_check(ui, panel, y);
+      break;
+    case PANEL_DROPDOWN:
+      render_UIPanel_dropdown(ui, panel, y);
+      break;
+    case PANEL_COLOR:
+      render_UIPanel_color(ui, panel, y);
+      break;
+    case PANEL_INFO:
+      render_UIPanel_info(ui, panel, y);
+      break;
+    case PANEL_TAB:
+      render_UIPanel_tab(ui, panel);
+      break;
   }
 }
 

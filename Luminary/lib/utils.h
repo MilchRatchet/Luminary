@@ -2,9 +2,10 @@
 #define UTILS_H
 
 #include <stdlib.h>
-#include "primitives.h"
-#include "mesh.h"
+
 #include "bvh.h"
+#include "mesh.h"
+#include "primitives.h"
 #include "texture.h"
 
 #ifndef PI

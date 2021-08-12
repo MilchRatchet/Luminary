@@ -1,12 +1,14 @@
+#include "wavefront.h"
+
 #include <immintrin.h>
-#include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 #include <stdint.h>
-#include "wavefront.h"
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "error.h"
-#include "texture.h"
 #include "png.h"
+#include "texture.h"
 #include "utils.h"
 
 #define LINE_SIZE 4096
@@ -116,11 +118,8 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
   while (!feof(file)) {
     fgets(line, LINE_SIZE, file);
 
-    if (
-      line[0] == 'n' && line[1] == 'e' && line[2] == 'w' && line[3] == 'm' && line[4] == 't'
-      && line[5] == 'l') {
-      ensure_capacity(
-        content.materials, materials_count, content.materials_length, sizeof(Wavefront_Material));
+    if (line[0] == 'n' && line[1] == 'e' && line[2] == 'w' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
+      ensure_capacity(content.materials, materials_count, content.materials_length, sizeof(Wavefront_Material));
       sscanf_s(line, "%*s %s\n", path, LINE_SIZE);
       size_t hash = hash_djb2((unsigned char*) path);
 
@@ -132,26 +131,21 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
     }
     else if (line[0] == 'm' && line[1] == 'a' && line[2] == 'p' && line[3] == '_') {
       if (line[4] == 'K' && line[5] == 'd') {
-        ensure_capacity(
-          content.albedo_maps, albedo_maps_count, content.albedo_maps_length, sizeof(TextureRGBA));
+        ensure_capacity(content.albedo_maps, albedo_maps_count, content.albedo_maps_length, sizeof(TextureRGBA));
         sscanf_s(line, "%*s %s\n", path, LINE_SIZE);
         content.albedo_maps[albedo_maps_count]                = load_texture_from_png(path);
         content.materials[materials_count - 1].albedo_texture = albedo_maps_count;
         albedo_maps_count++;
       }
       else if (line[4] == 'K' && line[5] == 'e') {
-        ensure_capacity(
-          content.illuminance_maps, illuminance_maps_count, content.illuminance_maps_length,
-          sizeof(TextureRGBA));
+        ensure_capacity(content.illuminance_maps, illuminance_maps_count, content.illuminance_maps_length, sizeof(TextureRGBA));
         sscanf_s(line, "%*s %s\n", path, LINE_SIZE);
         content.illuminance_maps[illuminance_maps_count]           = load_texture_from_png(path);
         content.materials[materials_count - 1].illuminance_texture = illuminance_maps_count;
         illuminance_maps_count++;
       }
       else if (line[4] == 'N' && line[5] == 's') {
-        ensure_capacity(
-          content.material_maps, material_maps_count, content.material_maps_length,
-          sizeof(TextureRGBA));
+        ensure_capacity(content.material_maps, material_maps_count, content.material_maps_length, sizeof(TextureRGBA));
         sscanf_s(line, "%*s %s\n", path, LINE_SIZE);
         content.material_maps[material_maps_count]              = load_texture_from_png(path);
         content.materials[materials_count - 1].material_texture = material_maps_count;
@@ -160,18 +154,14 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
     }
   }
 
-  content.materials_length = materials_count;
-  content.materials =
-    safe_realloc(content.materials, sizeof(Wavefront_Material) * content.materials_length);
-  content.albedo_maps_length = albedo_maps_count;
-  content.albedo_maps =
-    safe_realloc(content.albedo_maps, sizeof(TextureRGBA) * content.albedo_maps_length);
+  content.materials_length        = materials_count;
+  content.materials               = safe_realloc(content.materials, sizeof(Wavefront_Material) * content.materials_length);
+  content.albedo_maps_length      = albedo_maps_count;
+  content.albedo_maps             = safe_realloc(content.albedo_maps, sizeof(TextureRGBA) * content.albedo_maps_length);
   content.illuminance_maps_length = illuminance_maps_count;
-  content.illuminance_maps =
-    safe_realloc(content.illuminance_maps, sizeof(TextureRGBA) * content.illuminance_maps_length);
-  content.material_maps_length = material_maps_count;
-  content.material_maps =
-    safe_realloc(content.material_maps, sizeof(TextureRGBA) * content.material_maps_length);
+  content.illuminance_maps        = safe_realloc(content.illuminance_maps, sizeof(TextureRGBA) * content.illuminance_maps_length);
+  content.material_maps_length    = material_maps_count;
+  content.material_maps           = safe_realloc(content.material_maps, sizeof(TextureRGBA) * content.material_maps_length);
 
   *io_content = content;
 
@@ -212,16 +202,14 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
     fgets(line, LINE_SIZE, file);
 
     if (line[0] == 'v' && line[1] == ' ') {
-      ensure_capacity(
-        content.vertices, vertices_count, content.vertices_length, sizeof(Wavefront_Vertex));
+      ensure_capacity(content.vertices, vertices_count, content.vertices_length, sizeof(Wavefront_Vertex));
       Wavefront_Vertex v;
       sscanf_s(line, "%*c %f %f %f\n", &v.x, &v.y, &v.z);
       content.vertices[vertices_count] = v;
       vertices_count++;
     }
     else if (line[0] == 'v' && line[1] == 'n') {
-      ensure_capacity(
-        content.normals, normals_count, content.normals_length, sizeof(Wavefront_Normal));
+      ensure_capacity(content.normals, normals_count, content.normals_length, sizeof(Wavefront_Normal));
       Wavefront_Normal n;
       sscanf_s(line, "%*2c %f %f %f\n", &n.x, &n.y, &n.z);
       content.normals[normals_count] = n;
@@ -235,12 +223,11 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
       uvs_count++;
     }
     else if (line[0] == 'f') {
-      ensure_capacity(
-        content.triangles, triangles_count, content.triangles_length, sizeof(Wavefront_Triangle));
+      ensure_capacity(content.triangles, triangles_count, content.triangles_length, sizeof(Wavefront_Triangle));
       Wavefront_Triangle face;
       sscanf_s(
-        line, "%*c %u/%u/%u %u/%u/%u %u/%u/%u", &face.v1, &face.vt1, &face.vn1, &face.v2, &face.vt2,
-        &face.vn2, &face.v3, &face.vt3, &face.vn3);
+        line, "%*c %u/%u/%u %u/%u/%u %u/%u/%u", &face.v1, &face.vt1, &face.vn1, &face.v2, &face.vt2, &face.vn2, &face.v3, &face.vt3,
+        &face.vn3);
       face.object = current_material;
 
       face.v1 += vertices_offset;
@@ -256,9 +243,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
       content.triangles[triangles_count] = face;
       triangles_count++;
     }
-    else if (
-      line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i'
-      && line[5] == 'b') {
+    else if (line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i' && line[5] == 'b') {
       sscanf_s(line, "%*s %s\n", path, LINE_SIZE);
       size_t hash = hash_djb2((unsigned char*) path);
 
@@ -276,9 +261,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
         materials_count = content.materials_length;
       }
     }
-    else if (
-      line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't'
-      && line[5] == 'l') {
+    else if (line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
       sscanf_s(line, "%*s %s\n", path, LINE_SIZE);
       size_t hash      = hash_djb2((unsigned char*) path);
       current_material = 0;
@@ -291,17 +274,14 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
     }
   }
 
-  content.vertices_length = vertices_count;
-  content.vertices =
-    safe_realloc(content.vertices, sizeof(Wavefront_Vertex) * content.vertices_length);
-  content.normals_length = normals_count;
-  content.normals =
-    safe_realloc(content.normals, sizeof(Wavefront_Normal) * content.normals_length);
+  content.vertices_length  = vertices_count;
+  content.vertices         = safe_realloc(content.vertices, sizeof(Wavefront_Vertex) * content.vertices_length);
+  content.normals_length   = normals_count;
+  content.normals          = safe_realloc(content.normals, sizeof(Wavefront_Normal) * content.normals_length);
   content.uvs_length       = uvs_count;
   content.uvs              = safe_realloc(content.uvs, sizeof(Wavefront_UV) * content.uvs_length);
   content.triangles_length = triangles_count;
-  content.triangles =
-    safe_realloc(content.triangles, sizeof(Wavefront_Triangle) * content.triangles_length);
+  content.triangles        = safe_realloc(content.triangles, sizeof(Wavefront_Triangle) * content.triangles_length);
 
   *io_content = content;
 
@@ -311,8 +291,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
 }
 
 texture_assignment* get_texture_assignments(Wavefront_Content content) {
-  texture_assignment* texture_assignments =
-    malloc(sizeof(texture_assignment) * content.materials_length);
+  texture_assignment* texture_assignments = malloc(sizeof(texture_assignment) * content.materials_length);
 
   for (int i = 0; i < content.materials_length; i++) {
     texture_assignment assignment;

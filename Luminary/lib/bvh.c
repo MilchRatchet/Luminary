@@ -1,13 +1,15 @@
 #include "bvh.h"
+
+#include <float.h>
+#include <immintrin.h>
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "error.h"
 #include "mesh.h"
 #include "primitives.h"
-#include "error.h"
-#include <float.h>
-#include <string.h>
-#include <math.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <immintrin.h>
 
 #define THRESHOLD_TRIANGLES 2
 #define OBJECT_SPLIT_BIN_COUNT 32
@@ -61,19 +63,13 @@ static void __swap_fragments(fragment* a, fragment* b) {
 
 static int __partition(fragment* fragments, int bottom, int top, const int axis) {
   const int mid = (top - bottom) / 2 + bottom;
-  if (
-    get_entry_by_axis(fragments[top].middle, axis)
-    < get_entry_by_axis(fragments[bottom].middle, axis)) {
+  if (get_entry_by_axis(fragments[top].middle, axis) < get_entry_by_axis(fragments[bottom].middle, axis)) {
     __swap_fragments(fragments + bottom, fragments + top);
   }
-  if (
-    get_entry_by_axis(fragments[mid].middle, axis)
-    < get_entry_by_axis(fragments[bottom].middle, axis)) {
+  if (get_entry_by_axis(fragments[mid].middle, axis) < get_entry_by_axis(fragments[bottom].middle, axis)) {
     __swap_fragments(fragments + mid, fragments + bottom);
   }
-  if (
-    get_entry_by_axis(fragments[top].middle, axis)
-    > get_entry_by_axis(fragments[mid].middle, axis)) {
+  if (get_entry_by_axis(fragments[top].middle, axis) > get_entry_by_axis(fragments[mid].middle, axis)) {
     __swap_fragments(fragments + mid, fragments + top);
   }
 
@@ -91,8 +87,7 @@ static int __partition(fragment* fragments, int bottom, int top, const int axis)
   return (i + 1);
 }
 
-static void quick_sort_fragments(
-  fragment* fragments, const unsigned int fragments_length, const int axis) {
+static void quick_sort_fragments(fragment* fragments, const unsigned int fragments_length, const int axis) {
   int ptr = 1;
 
   int quick_sort_stack[64];
@@ -118,9 +113,7 @@ static void quick_sort_fragments(
   }
 }
 
-static void fit_bounds(
-  const fragment* fragments, const unsigned int fragments_length, vec3_p* high_out,
-  vec3_p* low_out) {
+static void fit_bounds(const fragment* fragments, const unsigned int fragments_length, vec3_p* high_out, vec3_p* low_out) {
   __m128 high = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
   __m128 low  = _mm_setr_ps(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
 
@@ -140,8 +133,7 @@ static void fit_bounds(
     _mm_storeu_ps((float*) low_out, low);
 }
 
-static void fit_bounds_of_bins(
-  const bin* bins, const int bins_length, vec3_p* high_out, vec3_p* low_out) {
+static void fit_bounds_of_bins(const bin* bins, const int bins_length, vec3_p* high_out, vec3_p* low_out) {
   __m128 high = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
   __m128 low  = _mm_setr_ps(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
 
@@ -180,8 +172,7 @@ static void update_bounds_of_bins(const bin* bins, vec3_p* high_out, vec3_p* low
 }
 
 static float construct_bins(
-  bin* restrict bins, const fragment* restrict fragments, const unsigned int fragments_length,
-  const int axis, float* offset) {
+  bin* restrict bins, const fragment* restrict fragments, const unsigned int fragments_length, const int axis, float* offset) {
   vec3_p high, low;
   fit_bounds(fragments, fragments_length, &high, &low);
   const float span     = get_entry_by_axis(high, axis) - get_entry_by_axis(low, axis);
@@ -235,8 +226,7 @@ static float construct_bins(
 }
 
 static float construct_chopped_bins(
-  bin* restrict bins, const fragment* restrict fragments, const unsigned int fragments_length,
-  const int axis, float* offset) {
+  bin* restrict bins, const fragment* restrict fragments, const unsigned int fragments_length, const int axis, float* offset) {
   vec3_p high, low;
   fit_bounds(fragments, fragments_length, &high, &low);
   const float span     = get_entry_by_axis(high, axis) - get_entry_by_axis(low, axis);
@@ -321,8 +311,8 @@ static float construct_chopped_bins(
 }
 
 static void divide_middles_along_axis(
-  const float split, const int axis, fragment* fragments_out, fragment* fragments_in,
-  const unsigned int fragments_length, const int right_offset) {
+  const float split, const int axis, fragment* fragments_out, fragment* fragments_in, const unsigned int fragments_length,
+  const int right_offset) {
   int left  = 0;
   int right = 0;
 
@@ -341,8 +331,8 @@ static void divide_middles_along_axis(
 }
 
 static void divide_along_axis(
-  const float split, const int axis, fragment* fragments_out, fragment* fragments_in,
-  const unsigned int fragments_length, const int right_offset) {
+  const float split, const int axis, fragment* fragments_out, fragment* fragments_in, const unsigned int fragments_length,
+  const int right_offset) {
   int left  = 0;
   int right = 0;
 
@@ -385,8 +375,7 @@ static void divide_along_axis(
   }
 }
 
-Node2* build_bvh_structure(
-  Triangle** triangles_io, unsigned int* triangles_length_io, int* nodes_length_out) {
+Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, int* nodes_length_out) {
   unsigned int triangles_length = *triangles_length_io;
   Triangle* triangles           = *triangles_io;
   unsigned int node_count       = 1 + triangles_length / THRESHOLD_TRIANGLES;
@@ -419,8 +408,7 @@ Node2* build_bvh_structure(
       .x = min(t.vertex.x, min(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
       .y = min(t.vertex.y, min(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
       .z = min(t.vertex.z, min(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
-    vec3_p middle = {
-      .x = (high.x + low.x) / 2.0f, .y = (high.y + low.y) / 2.0f, .z = (high.z + low.z) / 2.0f};
+    vec3_p middle = {.x = (high.x + low.x) / 2.0f, .y = (high.y + low.y) / 2.0f, .z = (high.z + low.z) / 2.0f};
 
     fragment frag = {.high = high, .low = low, .middle = middle, .id = i};
     fragments[i]  = frag;
@@ -435,16 +423,12 @@ Node2* build_bvh_structure(
   {
     fit_bounds(fragments, fragments_length, &high_root, &low_root);
     vec3_p diff = {
-      .x  = high_root.x - low_root.x,
-      .y  = high_root.y - low_root.y,
-      .z  = high_root.z - low_root.z,
-      ._p = high_root._p - low_root._p};
+      .x = high_root.x - low_root.x, .y = high_root.y - low_root.y, .z = high_root.z - low_root.z, ._p = high_root._p - low_root._p};
 
     root_surface_area = diff.x * diff.y + diff.x * diff.z + diff.y * diff.z;
   }
 
-  bin* bins =
-    (bin*) _mm_malloc(sizeof(bin) * max(OBJECT_SPLIT_BIN_COUNT, SPATIAL_SPLIT_BIN_COUNT), 32);
+  bin* bins = (bin*) _mm_malloc(sizeof(bin) * max(OBJECT_SPLIT_BIN_COUNT, SPATIAL_SPLIT_BIN_COUNT), 32);
 
   unsigned int begin_of_current_nodes = 0;
   unsigned int end_of_current_nodes   = 1;
@@ -455,14 +439,11 @@ Node2* build_bvh_structure(
     unsigned int buffer_ptr              = 0;
     unsigned int leaf_nodes_in_iteration = 0;
 
-    for (unsigned int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes;
-         node_ptr++) {
+    for (unsigned int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
       Node2 node = nodes[node_ptr];
 
       if (fragments_ptr != node.triangles_address) {
-        memcpy(
-          fragments_buffer + buffer_ptr, fragments + fragments_ptr,
-          sizeof(fragment) * (node.triangles_address - fragments_ptr));
+        memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * (node.triangles_address - fragments_ptr));
         buffer_ptr += node.triangles_address - fragments_ptr;
         fragments_ptr += node.triangles_address - fragments_ptr;
       }
@@ -470,9 +451,7 @@ Node2* build_bvh_structure(
       if (node.triangle_count <= THRESHOLD_TRIANGLES) {
         nodes[node_ptr].triangles_address = buffer_ptr;
 
-        memcpy(
-          fragments_buffer + buffer_ptr, fragments + fragments_ptr,
-          sizeof(fragment) * node.triangle_count);
+        memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * node.triangle_count);
         buffer_ptr += node.triangle_count;
         fragments_ptr += node.triangle_count;
         leaf_nodes[leaf_node_count + leaf_nodes_in_iteration++] = node_ptr;
@@ -483,10 +462,7 @@ Node2* build_bvh_structure(
       {
         vec3_p high_parent, low_parent;
         fit_bounds(fragments + fragments_ptr, node.triangle_count, &high_parent, &low_parent);
-        vec3 diff = {
-          .x = high_parent.x - low_parent.x,
-          .y = high_parent.y - low_parent.y,
-          .z = high_parent.z - low_parent.z};
+        vec3 diff = {.x = high_parent.x - low_parent.x, .y = high_parent.y - low_parent.y, .z = high_parent.z - low_parent.z};
 
         parent_surface_area = diff.x * diff.y + diff.x * diff.z + diff.y * diff.z;
       }
@@ -504,8 +480,7 @@ Node2* build_bvh_structure(
 
       for (int a = 0; a < 3; a++) {
         float low_split;
-        const float interval =
-          construct_bins(bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
+        const float interval = construct_bins(bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
 
         if (interval == 0.0f)
           continue;
@@ -527,10 +502,7 @@ Node2* build_bvh_structure(
           fit_bounds_of_bins(bins + k, OBJECT_SPLIT_BIN_COUNT - k, &high_right, &low_right);
 
           vec3_p diff_left = {
-            .x  = high_left.x - low_left.x,
-            .y  = high_left.y - low_left.y,
-            .z  = high_left.z - low_left.z,
-            ._p = high_left._p - low_left._p};
+            .x = high_left.x - low_left.x, .y = high_left.y - low_left.y, .z = high_left.z - low_left.z, ._p = high_left._p - low_left._p};
 
           vec3_p diff_right = {
             .x  = high_right.x - low_right.x,
@@ -538,18 +510,15 @@ Node2* build_bvh_structure(
             .z  = high_right.z - low_right.z,
             ._p = high_right._p - low_right._p};
 
-          const float cost_L =
-            diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
+          const float cost_L = diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
 
-          const float cost_R =
-            diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
+          const float cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
 
           left += bins[k - 1].entry;
           right -= bins[k - 1].exit;
 
-          const float total_cost = COST_OF_NODE
-                                   + COST_OF_TRIANGLE * cost_L / parent_surface_area * left
-                                   + COST_OF_TRIANGLE * cost_R / parent_surface_area * right;
+          const float total_cost =
+            COST_OF_NODE + COST_OF_TRIANGLE * cost_L / parent_surface_area * left + COST_OF_TRIANGLE * cost_R / parent_surface_area * right;
 
           if (total_cost < optimal_cost) {
             optimal_cost            = total_cost;
@@ -568,14 +537,10 @@ Node2* build_bvh_structure(
       int do_spatial_splits;
 
       vec3_p overlap = {
-        .x = min(optimal_high_left.x, optimal_high_right.x)
-             - max(optimal_low_left.x, optimal_low_right.x),
-        .y = min(optimal_high_left.y, optimal_high_right.y)
-             - max(optimal_low_left.y, optimal_low_right.y),
-        .z = min(optimal_high_left.z, optimal_high_right.z)
-             - max(optimal_low_left.z, optimal_low_right.z),
-        ._p = min(optimal_high_left._p, optimal_high_right._p)
-              - max(optimal_low_left._p, optimal_low_right._p),
+        .x  = min(optimal_high_left.x, optimal_high_right.x) - max(optimal_low_left.x, optimal_low_right.x),
+        .y  = min(optimal_high_left.y, optimal_high_right.y) - max(optimal_low_left.y, optimal_low_right.y),
+        .z  = min(optimal_high_left.z, optimal_high_right.z) - max(optimal_low_left.z, optimal_low_right.z),
+        ._p = min(optimal_high_left._p, optimal_high_right._p) - max(optimal_low_left._p, optimal_low_right._p),
       };
 
       const float o = overlap.x * overlap.y + overlap.x * overlap.z + overlap.y * overlap.z;
@@ -590,8 +555,7 @@ Node2* build_bvh_structure(
       if (do_spatial_splits) {
         for (int a = 0; a < 3; a++) {
           float low_split;
-          const float interval = construct_chopped_bins(
-            bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
+          const float interval = construct_chopped_bins(bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
 
           if (interval == 0.0f)
             continue;
@@ -624,17 +588,14 @@ Node2* build_bvh_structure(
               .z  = high_right.z - low_right.z,
               ._p = high_right._p - low_right._p};
 
-            const float cost_L =
-              diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
+            const float cost_L = diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
 
-            const float cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z
-                                 + diff_right.y * diff_right.z;
+            const float cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
 
             left += bins[k - 1].entry;
             right -= bins[k - 1].exit;
 
-            const float total_cost = COST_OF_NODE
-                                     + COST_OF_TRIANGLE * cost_L / parent_surface_area * left
+            const float total_cost = COST_OF_NODE + COST_OF_TRIANGLE * cost_L / parent_surface_area * left
                                      + COST_OF_TRIANGLE * cost_R / parent_surface_area * right;
 
             if (total_cost < optimal_cost && total_cost < sequential_cost) {
@@ -661,8 +622,7 @@ Node2* build_bvh_structure(
 
       if (optimal_method == 0) {
         divide_middles_along_axis(
-          optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr,
-          node.triangle_count, optimal_split);
+          optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr, node.triangle_count, optimal_split);
       }
       else if (optimal_method == 1) {
         const unsigned int duplicated_triangles = optimal_total_triangles - node.triangle_count;
@@ -675,19 +635,15 @@ Node2* build_bvh_structure(
 
         if (fragments_buffer_count >= fragments_buffer_length) {
           fragments_buffer_length += triangles_length / 2 + 1;
-          fragments_buffer =
-            safe_realloc(fragments_buffer, sizeof(fragment) * fragments_buffer_length);
+          fragments_buffer = safe_realloc(fragments_buffer, sizeof(fragment) * fragments_buffer_length);
         }
 
         divide_along_axis(
-          optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr,
-          node.triangle_count, optimal_split);
+          optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr, node.triangle_count, optimal_split);
       }
       else {
         quick_sort_fragments(fragments + fragments_ptr, node.triangle_count, axis);
-        memcpy(
-          fragments_buffer + buffer_ptr, fragments + fragments_ptr,
-          sizeof(fragment) * node.triangle_count);
+        memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * node.triangle_count);
       }
 
       fragments_ptr += node.triangle_count;
@@ -715,8 +671,7 @@ Node2* build_bvh_structure(
       write_ptr++;
       buffer_ptr += optimal_split;
 
-      fit_bounds(
-        fragments_buffer + buffer_ptr, optimal_total_triangles - optimal_split, &high, &low);
+      fit_bounds(fragments_buffer + buffer_ptr, optimal_total_triangles - optimal_split, &high, &low);
 
       node.right_high.x = high.x;
       node.right_high.y = high.y;
@@ -743,9 +698,7 @@ Node2* build_bvh_structure(
     leaf_node_count += leaf_nodes_in_iteration;
 
     if (fragments_ptr != fragments_length) {
-      memcpy(
-        fragments_buffer + buffer_ptr, fragments + fragments_ptr,
-        sizeof(fragment) * (fragments_length - fragments_ptr));
+      memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * (fragments_length - fragments_ptr));
       buffer_ptr += fragments_length - fragments_ptr;
       fragments_ptr += fragments_length - fragments_ptr;
     }
@@ -791,8 +744,7 @@ Node2* build_bvh_structure(
 #define BINARY_NODE_IS_NULL 0b10
 
 Node8* collapse_bvh(
-  Node2* binary_nodes, const int binary_nodes_length, Triangle** triangles_io,
-  const int triangles_length, int* nodes_length_out) {
+  Node2* binary_nodes, const int binary_nodes_length, Triangle** triangles_io, const int triangles_length, int* nodes_length_out) {
   Triangle* triangles = *triangles_io;
   int node_count      = binary_nodes_length;
 
@@ -874,9 +826,7 @@ Node8* collapse_bvh(
 
           for (int j = 0; j < 8; j++) {
             Node2 base_child = binary_children[j];
-            if (
-              base_child.leaf_node == BINARY_NODE_IS_INTERNAL_NODE
-              && base_child.triangle_count < least_triangles) {
+            if (base_child.leaf_node == BINARY_NODE_IS_INTERNAL_NODE && base_child.triangle_count < least_triangles) {
               best_index      = j;
               least_triangles = base_child.triangle_count;
             }
@@ -924,9 +874,7 @@ Node8* collapse_bvh(
       const float compression_z = 1.0f / exp2f(node.ez);
 
       vec3 centroid = {
-        .x = (node_high.x + node_low.x) * 0.5f,
-        .y = (node_high.y + node_low.y) * 0.5f,
-        .z = (node_high.z + node_low.z) * 0.5f};
+        .x = (node_high.x + node_low.x) * 0.5f, .y = (node_high.y + node_low.y) * 0.5f, .z = (node_high.z + node_low.z) * 0.5f};
 
       float cost_table[8][8];
       int order[8];
@@ -938,10 +886,7 @@ Node8* collapse_bvh(
       }
 
       for (int i = 0; i < 8; i++) {
-        vec3 direction = {
-          .x = ((i >> 2) & 0b1) ? -1.0f : 1.0f,
-          .y = ((i >> 1) & 0b1) ? -1.0f : 1.0f,
-          .z = ((i >> 0) & 0b1) ? -1.0f : 1.0f};
+        vec3 direction = {.x = ((i >> 2) & 0b1) ? -1.0f : 1.0f, .y = ((i >> 1) & 0b1) ? -1.0f : 1.0f, .z = ((i >> 0) & 0b1) ? -1.0f : 1.0f};
 
         for (int j = 0; j < 8; j++) {
           if (binary_children[j].leaf_node == BINARY_NODE_IS_NULL) {
@@ -953,8 +898,7 @@ Node8* collapse_bvh(
               .y = ((high[j].y + low[j].y) * 0.5f) - centroid.y,
               .z = ((high[j].z + low[j].z) * 0.5f) - centroid.z};
 
-            cost_table[i][j] = child_centroid.x * direction.x + child_centroid.y * direction.y
-                               + child_centroid.z * direction.z;
+            cost_table[i][j] = child_centroid.x * direction.x + child_centroid.y * direction.y + child_centroid.z * direction.z;
           }
         }
       }
@@ -1030,20 +974,18 @@ Node8* collapse_bvh(
           node.meta[i]                             = 0b00100000 + 0b11000 + i;
         }
         else if (base_child.leaf_node == BINARY_NODE_IS_LEAF_NODE) {
-          assert(
-            base_child.triangle_count < 4,
-            "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
+          assert(base_child.triangle_count < 4, "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
           int meta = 0;
           switch (base_child.triangle_count) {
-          case 3:
-            meta = 0b111;
-            break;
-          case 2:
-            meta = 0b11;
-            break;
-          case 1:
-            meta = 0b1;
-            break;
+            case 3:
+              meta = 0b111;
+              break;
+            case 2:
+              meta = 0b11;
+              break;
+            case 1:
+              meta = 0b1;
+              break;
           }
           meta = meta << 5;
           meta += triangle_counting_address;
@@ -1051,8 +993,7 @@ Node8* collapse_bvh(
           node.meta[i] = meta;
 
           memcpy(
-            new_triangles + triangles_ptr, bvh_triangles + base_child.triangles_address,
-            sizeof(bvh_triangle) * base_child.triangle_count);
+            new_triangles + triangles_ptr, bvh_triangles + base_child.triangles_address, sizeof(bvh_triangle) * base_child.triangle_count);
 
           triangles_ptr += base_child.triangle_count;
           triangle_counting_address += base_child.triangle_count;

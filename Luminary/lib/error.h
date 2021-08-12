@@ -1,16 +1,14 @@
 #ifndef LUMINARY_ERROR_H
 #define LUMINARY_ERROR_H
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 
 #define assert(ans, message, _abort) \
   { ___assert((ans), (message), __FILE__, __LINE__, (_abort)); }
 
-inline void ___assert(
-  const unsigned long long value, const char* message, const char* file, const int line,
-  const int abort) {
+inline void ___assert(const unsigned long long value, const char* message, const char* file, const int line, const int abort) {
   if (!value) {
     fprintf(stderr, "Assertion failed!\nFile: %s\nLine: %d\nMessage: %s\n", file, line, message);
     if (abort) {

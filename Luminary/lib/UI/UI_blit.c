@@ -1,7 +1,9 @@
-#include <string.h>
-#include <immintrin.h>
-#include "UI.h"
 #include "UI_blit.h"
+
+#include <immintrin.h>
+#include <string.h>
+
+#include "UI.h"
 
 #define BG_RED 20
 #define BG_GREEN 30
@@ -19,9 +21,7 @@ void blit_gray(uint8_t* dst, int x, int y, int ldd, int hd, int width, int heigh
   }
 }
 
-void blit_color(
-  uint8_t* dst, int x, int y, int ldd, int hd, int width, int height, uint8_t red, uint8_t green,
-  uint8_t blue) {
+void blit_color(uint8_t* dst, int x, int y, int ldd, int hd, int width, int height, uint8_t red, uint8_t green, uint8_t blue) {
   height = min(height, hd - y);
   width  = min(width, ldd - x);
   for (int i = 0; i < height; i++) {
@@ -34,9 +34,7 @@ void blit_color(
   }
 }
 
-void blit_color_shaded(
-  uint8_t* dst, int x, int y, int ldd, int hd, int width, int height, uint8_t red, uint8_t green,
-  uint8_t blue) {
+void blit_color_shaded(uint8_t* dst, int x, int y, int ldd, int hd, int width, int height, uint8_t red, uint8_t green, uint8_t blue) {
   height = min(height, hd - y);
   width  = min(width, ldd - x);
   for (int i = 0; i < height; i++) {
@@ -57,14 +55,12 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
   const int offset = ui->scroll_pos % PANEL_HEIGHT;
 
   const __m256i bg = _mm256_setr_epi8(
-    BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0,
-    BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0,
-    BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0);
+    BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE,
+    BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0);
   const __m256i bg_h = _mm256_setr_epi8(
-    BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H,
-    BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H,
-    BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H,
-    0);
+    BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H,
+    BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H,
+    BG_GREEN_H, BG_RED_H, 0);
 
   if (ui->border_hover) {
     for (int i = 0; i < UI_BORDER_SIZE; i++) {
@@ -169,13 +165,12 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
 }
 #else
 void blit_UI_internal(UI* ui, uint8_t* target, int width, int height, int offset) {
-  const int k      = UI_WIDTH / 4;
-  const __m128i bg = _mm_setr_epi8(
-    BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0,
-    BG_BLUE, BG_GREEN, BG_RED, 0);
+  const int k = UI_WIDTH / 4;
+  const __m128i bg =
+    _mm_setr_epi8(BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0);
   const __m128i bg_h = _mm_setr_epi8(
-    BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H,
-    BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0);
+    BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H, BG_RED_H, 0, BG_BLUE_H, BG_GREEN_H,
+    BG_RED_H, 0);
 
   if (ui->border_hover) {
     for (int i = 0; i < UI_BORDER_SIZE; i++) {

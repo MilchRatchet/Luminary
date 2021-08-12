@@ -2,11 +2,12 @@
 #define UI_H
 
 #include <stdint.h>
+
 #include "SDL_ttf.h"
 #include "UI_panel.h"
 #include "UI_structs.h"
-#include "utils.h"
 #include "realtime.h"
+#include "utils.h"
 
 #define UI_HEIGHT_IN_PANELS 14
 

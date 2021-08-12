@@ -1,5 +1,6 @@
-#include <stdio.h>
 #include "UI_text.h"
+
+#include <stdio.h>
 
 #define TTF_FONT_LOCATION "LuminaryFont.ttf"
 

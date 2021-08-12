@@ -10,14 +10,12 @@
 #define FAST_ITERATIONS 3
 #define SLOW_ITERATIONS 5
 
-__device__
-float ocean_hash(const UV uv) {
+__device__ float ocean_hash(const UV uv) {
   const float x = uv.u * 127.1f + uv.v * 311.7f;
   return fractf(sinf(x) * 43758.5453123f);
 }
 
-__device__
-float ocean_noise(const UV uv) {
+__device__ float ocean_noise(const UV uv) {
   UV integral;
   integral.u = floorf(uv.u);
   integral.v = floorf(uv.v);
@@ -43,8 +41,7 @@ float ocean_noise(const UV uv) {
   return -1.0f + 2.0f * lerp(a, b, fractional.v);
 }
 
-__device__
-float ocean_octave(UV uv, const float choppyness) {
+__device__ float ocean_octave(UV uv, const float choppyness) {
   const float offset = ocean_noise(uv);
   uv.u += offset;
   uv.v += offset;
@@ -63,11 +60,10 @@ float ocean_octave(UV uv, const float choppyness) {
   return powf(1.0f - powf(wave1.u * wave1.v, 0.65f), choppyness);
 }
 
-__device__
-float get_ocean_height(const vec3 p, const int steps) {
-  float amplitude = device_scene.ocean.amplitude;
+__device__ float get_ocean_height(const vec3 p, const int steps) {
+  float amplitude  = device_scene.ocean.amplitude;
   float choppyness = device_scene.ocean.choppyness;
-  float frequency = device_scene.ocean.frequency;
+  float frequency  = device_scene.ocean.frequency;
 
   UV uv;
   uv.u = p.x * 0.75f;
@@ -82,7 +78,7 @@ float get_ocean_height(const vec3 p, const int steps) {
     UV temp;
     temp.u = (uv.u + t) * frequency;
     temp.v = (uv.v + t) * frequency;
-    d = ocean_octave(temp, choppyness);
+    d      = ocean_octave(temp, choppyness);
 
     temp.u = (uv.u - t) * frequency;
     temp.v = (uv.v - t) * frequency;
@@ -92,8 +88,8 @@ float get_ocean_height(const vec3 p, const int steps) {
 
     const float u = uv.u;
     const float v = uv.v;
-    uv.u = 1.6f * u + -1.2f * v;
-    uv.v = 1.2f * u + 1.6f * v;
+    uv.u          = 1.6f * u + -1.2f * v;
+    uv.v          = 1.2f * u + 1.6f * v;
 
     frequency *= 1.9f;
     amplitude *= 0.22f;
@@ -103,8 +99,7 @@ float get_ocean_height(const vec3 p, const int steps) {
   return p.y - h - device_scene.ocean.height;
 }
 
-__device__
-vec3 get_ocean_normal(vec3 p, const float diff) {
+__device__ vec3 get_ocean_normal(vec3 p, const float diff) {
   vec3 normal;
   normal.y = get_ocean_height(p, SLOW_ITERATIONS);
   p.x += diff;
@@ -117,9 +112,7 @@ vec3 get_ocean_normal(vec3 p, const float diff) {
   return normalize_vector(normal);
 }
 
-
-__device__
-float get_intersection_ocean(const vec3 origin, const vec3 ray, float max) {
+__device__ float get_intersection_ocean(const vec3 origin, const vec3 ray, float max) {
   float min = 0.0f;
 
   vec3 p;
@@ -128,10 +121,12 @@ float get_intersection_ocean(const vec3 origin, const vec3 ray, float max) {
   p.z = origin.z + max * ray.z;
 
   float height_at_max = get_ocean_height(p, FAST_ITERATIONS);
-  if (height_at_max > 0.0f) return FLT_MAX;
+  if (height_at_max > 0.0f)
+    return FLT_MAX;
 
   float height_at_min = get_ocean_height(origin, FAST_ITERATIONS);
-  if (height_at_min < 0.0f) return FLT_MAX;
+  if (height_at_min < 0.0f)
+    return FLT_MAX;
 
   float mid = 0.0f;
 
@@ -144,10 +139,11 @@ float get_intersection_ocean(const vec3 origin, const vec3 ray, float max) {
     float height_at_mid = get_ocean_height(p, FAST_ITERATIONS);
 
     if (height_at_mid < 0.0f) {
-      max = mid;
+      max           = mid;
       height_at_max = height_at_mid;
-    } else {
-      min = mid;
+    }
+    else {
+      min           = mid;
       height_at_min = height_at_mid;
     }
   }

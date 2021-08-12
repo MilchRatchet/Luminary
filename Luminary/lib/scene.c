@@ -1,13 +1,15 @@
-#include <stdlib.h>
-#include <stdio.h>
+#include "scene.h"
+
 #include <immintrin.h>
 #include <math.h>
-#include "scene.h"
-#include "raytrace.h"
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "error.h"
-#include "png.h"
-#include "wavefront.h"
 #include "light.h"
+#include "png.h"
+#include "raytrace.h"
+#include "wavefront.h"
 
 static const int LINE_SIZE       = 4096;
 static const int CURRENT_VERSION = 3;
@@ -46,9 +48,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   if (line[0] == 'v') {
     int version = 0;
     sscanf_s(line, "%*c %d\n", &version);
-    assert(
-      version == CURRENT_VERSION,
-      "Incompatible Scene version! Update the file or use an older version of Luminary!", 1);
+    assert(version == CURRENT_VERSION, "Incompatible Scene version! Update the file or use an older version of Luminary!", 1);
   }
   else {
     print_error("Scene file has no version information, assuming version!")
@@ -113,18 +113,14 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
     }
     else if (line[0] == 'c' && line[1] == ' ') {
       sscanf_s(
-        line, "%*c %f %f %f %f %f %f %f\n", &scene.camera.pos.x, &scene.camera.pos.y,
-        &scene.camera.pos.z, &scene.camera.rotation.x, &scene.camera.rotation.y,
-        &scene.camera.rotation.z, &scene.camera.fov);
+        line, "%*c %f %f %f %f %f %f %f\n", &scene.camera.pos.x, &scene.camera.pos.y, &scene.camera.pos.z, &scene.camera.rotation.x,
+        &scene.camera.rotation.y, &scene.camera.rotation.z, &scene.camera.fov);
     }
     else if (line[0] == 'l' && line[1] == ' ') {
-      sscanf_s(
-        line, "%*c %f %f %f\n", &scene.camera.focal_length, &scene.camera.aperture_size,
-        &scene.camera.exposure);
+      sscanf_s(line, "%*c %f %f %f\n", &scene.camera.focal_length, &scene.camera.aperture_size, &scene.camera.exposure);
     }
     else if (line[0] == 's' && line[1] == ' ') {
-      sscanf_s(
-        line, "%*c %f %f %f\n", &scene.sky.azimuth, &scene.sky.altitude, &scene.sky.sun_strength);
+      sscanf_s(line, "%*c %f %f %f\n", &scene.sky.azimuth, &scene.sky.altitude, &scene.sky.sun_strength);
     }
     else if (line[0] == 'i' && line[1] == ' ') {
       sscanf_s(line, "%*c %d %d %d %d\n", &width, &height, &bounces, &samples);
@@ -137,10 +133,9 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
     }
     else if (line[0] == 'w') {
       sscanf_s(
-        line, "%*c %d %d %f %f %f %f %f %f %f %f %f\n", &scene.ocean.active, &scene.ocean.emissive,
-        &scene.ocean.albedo.r, &scene.ocean.albedo.g, &scene.ocean.albedo.b, &scene.ocean.albedo.a,
-        &scene.ocean.height, &scene.ocean.amplitude, &scene.ocean.frequency,
-        &scene.ocean.choppyness, &scene.ocean.speed);
+        line, "%*c %d %d %f %f %f %f %f %f %f %f %f\n", &scene.ocean.active, &scene.ocean.emissive, &scene.ocean.albedo.r,
+        &scene.ocean.albedo.g, &scene.ocean.albedo.b, &scene.ocean.albedo.a, &scene.ocean.height, &scene.ocean.amplitude,
+        &scene.ocean.frequency, &scene.ocean.choppyness, &scene.ocean.speed);
     }
     else if (line[0] == 'd') {
       sscanf_s(line, "%*c %d\n", &denoiser);
@@ -169,8 +164,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
 
   Node2* initial_nodes = build_bvh_structure(&triangles, &triangle_count, &nodes_length);
 
-  Node8* nodes =
-    collapse_bvh(initial_nodes, nodes_length, &triangles, triangle_count, &nodes_length);
+  Node8* nodes = collapse_bvh(initial_nodes, nodes_length, &triangles, triangle_count, &nodes_length);
 
   free(initial_nodes);
 
@@ -196,14 +190,13 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
 
   process_lights(&scene);
 
-  void* albedo_atlas = initialize_textures(content.albedo_maps, content.albedo_maps_length);
-  void* illuminance_atlas =
-    initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
-  void* material_atlas = initialize_textures(content.material_maps, content.material_maps_length);
+  void* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
+  void* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
+  void* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
 
   *instance = init_raytracing(
-    width, height, bounces, samples, albedo_atlas, content.albedo_maps_length, illuminance_atlas,
-    content.illuminance_maps_length, material_atlas, content.material_maps_length, scene, denoiser);
+    width, height, bounces, samples, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length,
+    material_atlas, content.material_maps_length, scene, denoiser);
 
   free_wavefront_content(content);
 

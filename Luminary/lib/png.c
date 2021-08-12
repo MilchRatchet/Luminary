@@ -1,11 +1,13 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
 #include "png.h"
-#include "zlib/zlib.h"
-#include "texture.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
 #include "error.h"
+#include "texture.h"
+#include "zlib/zlib.h"
 
 static inline void write_int_big_endian(uint8_t* buffer, uint32_t value) {
   buffer[0] = value >> 24;
@@ -36,8 +38,8 @@ static void write_header_to_file(FILE* file) {
 }
 
 static void write_IHDR_chunk_to_file(
-  FILE* file, const uint32_t width, const uint32_t height, const uint8_t bit_depth,
-  const uint8_t color_type, const uint8_t interlace_method) {
+  FILE* file, const uint32_t width, const uint32_t height, const uint8_t bit_depth, const uint8_t color_type,
+  const uint8_t interlace_method) {
   uint8_t* chunk = (uint8_t*) malloc(25);
 
   write_int_big_endian(chunk, 13u);
@@ -63,8 +65,7 @@ static void write_IHDR_chunk_to_file(
   free(chunk);
 }
 
-static void write_IDAT_chunk_to_file(
-  FILE* file, const uint8_t* compressed_image, const uint32_t compressed_length) {
+static void write_IDAT_chunk_to_file(FILE* file, const uint8_t* compressed_image, const uint32_t compressed_length) {
   uint8_t* chunk = (uint8_t*) malloc(12 + compressed_length);
 
   write_int_big_endian(chunk, compressed_length);
@@ -76,8 +77,7 @@ static void write_IDAT_chunk_to_file(
 
   memcpy(chunk + 8, compressed_image, compressed_length);
 
-  write_int_big_endian(
-    chunk + 8 + compressed_length, (uint32_t) crc32(0, chunk + 4, 4 + compressed_length));
+  write_int_big_endian(chunk + 8 + compressed_length, (uint32_t) crc32(0, chunk + 4, 4 + compressed_length));
 
   fwrite(chunk, 1, 12 + compressed_length, file);
 
@@ -105,8 +105,8 @@ static void write_IEND_chunk_to_file(FILE* file) {
  * Does not support filter yet.
  */
 int store_as_png(
-  const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width,
-  const uint32_t height, const uint8_t color_type, const uint8_t bit_depth) {
+  const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
+  const uint8_t color_type, const uint8_t bit_depth) {
   uint8_t bytes_per_pixel;
   uint8_t bytes_per_channel;
 
@@ -118,37 +118,35 @@ int store_as_png(
   }
 
   switch (color_type) {
-  case PNG_COLORTYPE_GRAYSCALE:
-    bytes_per_pixel = 1 * bytes_per_channel;
-    break;
+    case PNG_COLORTYPE_GRAYSCALE:
+      bytes_per_pixel = 1 * bytes_per_channel;
+      break;
 
-  case PNG_COLORTYPE_TRUECOLOR:
-    bytes_per_pixel = 3 * bytes_per_channel;
-    break;
+    case PNG_COLORTYPE_TRUECOLOR:
+      bytes_per_pixel = 3 * bytes_per_channel;
+      break;
 
-  case PNG_COLORTYPE_INDEXED:
-    bytes_per_pixel = 1 * bytes_per_channel;
-    break;
+    case PNG_COLORTYPE_INDEXED:
+      bytes_per_pixel = 1 * bytes_per_channel;
+      break;
 
-  case PNG_COLORTYPE_GRAYSCALE_ALPHA:
-    bytes_per_pixel = 2 * bytes_per_channel;
-    break;
+    case PNG_COLORTYPE_GRAYSCALE_ALPHA:
+      bytes_per_pixel = 2 * bytes_per_channel;
+      break;
 
-  case PNG_COLORTYPE_TRUECOLOR_ALPHA:
-    bytes_per_pixel = 4 * bytes_per_channel;
-    break;
+    case PNG_COLORTYPE_TRUECOLOR_ALPHA:
+      bytes_per_pixel = 4 * bytes_per_channel;
+      break;
 
-  default:
-    return 1;
+    default:
+      return 1;
   }
 
   /* Adding filter byte at the beginning of each scanline */
   uint8_t* filtered_image = (uint8_t*) malloc(image_length + height);
   for (int i = 0; i < height; i++) {
     filtered_image[i * width * bytes_per_pixel + i] = 0;
-    memcpy(
-      filtered_image + i * width * bytes_per_pixel + i + 1, image + i * width * bytes_per_pixel,
-      width * bytes_per_pixel);
+    memcpy(filtered_image + i * width * bytes_per_pixel + i + 1, image + i * width * bytes_per_pixel, width * bytes_per_pixel);
   }
 
   FILE* file;
@@ -285,8 +283,7 @@ static void reconstruction_1_uint8_RGB(uint8_t* line, const uint32_t line_length
   }
 }
 
-static void reconstruction_2_uint8_RGBA(
-  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_2_uint8_RGBA(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t b_r, b_g, b_b, b_a;
 
   for (uint32_t j = 0; j < line_length; j++) {
@@ -302,8 +299,7 @@ static void reconstruction_2_uint8_RGBA(
   }
 }
 
-static void reconstruction_2_uint8_RGB(
-  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_2_uint8_RGB(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t b_r, b_g, b_b;
 
   for (uint32_t j = 0; j < line_length; j++) {
@@ -317,8 +313,7 @@ static void reconstruction_2_uint8_RGB(
   }
 }
 
-static void reconstruction_3_uint8_RGBA(
-  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_3_uint8_RGBA(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t a_r, a_g, a_b, a_a;
   uint8_t b_r, b_g, b_b, b_a;
 
@@ -345,8 +340,7 @@ static void reconstruction_3_uint8_RGBA(
   }
 }
 
-static void reconstruction_3_uint8_RGB(
-  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_3_uint8_RGB(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t a_r, a_g, a_b;
   uint8_t b_r, b_g, b_b;
 
@@ -387,8 +381,7 @@ static uint8_t paeth_uint8(uint8_t a, uint8_t b, uint8_t c) {
   return pr;
 }
 
-static void reconstruction_4_uint8_RGBA(
-  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_4_uint8_RGBA(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t a_r, a_g, a_b, a_a;
   uint8_t b_r, b_g, b_b, b_a;
   uint8_t c_r, c_g, c_b, c_a;
@@ -426,8 +419,7 @@ static void reconstruction_4_uint8_RGBA(
   }
 }
 
-static void reconstruction_4_uint8_RGB(
-  uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
+static void reconstruction_4_uint8_RGB(uint8_t* line, const uint32_t line_length, uint8_t* prior_line) {
   uint8_t a_r, a_g, a_b;
   uint8_t b_r, b_g, b_b;
   uint8_t c_r, c_g, c_b;
@@ -616,9 +608,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
   for (uint32_t i = 0; i < height; i++) {
     const uint8_t filter = filtered_data[i * (width * byte_per_pixel + 1)];
 
-    memcpy(
-      data + i * width * byte_per_pixel, filtered_data + 1 + i * (width * byte_per_pixel + 1),
-      width * byte_per_pixel);
+    memcpy(data + i * width * byte_per_pixel, filtered_data + 1 + i * (width * byte_per_pixel + 1), width * byte_per_pixel);
 
     if (color_type == PNG_COLORTYPE_TRUECOLOR) {
       if (filter == 1u) {
@@ -698,8 +688,7 @@ int store_XRGB8_png(const char* filename, const XRGB8* image, const int width, c
     buffer_rgb8[i] = result;
   }
 
-  int ret = store_as_png(
-    filename, buffer, width * height * 3, width, height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+  int ret = store_as_png(filename, buffer, width * height * 3, width, height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
 
   free(buffer);
 

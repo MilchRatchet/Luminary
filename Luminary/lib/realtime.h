@@ -1,8 +1,8 @@
 #ifndef REALTIME_H
 #define REALTIME_H
 
-#include "utils.h"
 #include "SDL/SDL.h"
+#include "utils.h"
 
 struct RealtimeInstance {
   int width;
