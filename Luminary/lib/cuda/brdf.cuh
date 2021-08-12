@@ -78,7 +78,8 @@ __device__ vec3 specular_BRDF(
   RGBF& record, uint32_t& light_sample_id, const vec3 normal, const vec3 V, const Light light, const float light_sample,
   float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta,
   const float gamma, const float specular_probability) {
-  const float alpha = roughness * roughness;
+  const float alpha        = roughness * roughness;
+  light_sample_probability = lerp(0.0f, light_sample_probability * alpha, metallic);
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
@@ -87,7 +88,7 @@ __device__ vec3 specular_BRDF(
   const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
   vec3 H_local;
 
-  if (alpha < eps) {
+  if (alpha < eps * eps) {
     H_local.x = 0.0f;
     H_local.y = 0.0f;
     H_local.z = 1.0f;

@@ -1,32 +1,34 @@
 #ifndef CU_KERNELS_H
 #define CU_KERNELS_H
 
-#include "scene.h"
-#include "primitives.h"
-#include "image.h"
-#include "raytrace.h"
-#include "mesh.h"
+#include <cuda_runtime_api.h>
+#include <float.h>
+#include <immintrin.h>
+#include <math.h>
+#include <optix.h>
+#include <optix_stubs.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#include <chrono>
+#include <thread>
+
 #include "SDL/SDL.h"
-#include "cuda/utils.cuh"
-#include "cuda/math.cuh"
-#include "cuda/sky.cuh"
 #include "cuda/brdf.cuh"
 #include "cuda/bvh.cuh"
 #include "cuda/directives.cuh"
-#include "cuda/random.cuh"
+#include "cuda/math.cuh"
 #include "cuda/memory.cuh"
 #include "cuda/ocean.cuh"
-#include <cuda_runtime_api.h>
-#include <optix.h>
-#include <optix_stubs.h>
-#include <float.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
-#include <time.h>
-#include <chrono>
-#include <thread>
-#include <immintrin.h>
+#include "cuda/random.cuh"
+#include "cuda/sky.cuh"
+#include "cuda/utils.cuh"
+#include "image.h"
+#include "mesh.h"
+#include "primitives.h"
+#include "raytrace.h"
+#include "scene.h"
 
 __device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 default_ray;
@@ -672,7 +674,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
         const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
         const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
-        Light light;
+        Light light = {};
         uint32_t light_sample_id;
         if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < 0.5f) {
           ray = specular_BRDF(record, light_sample_id, normal, V, light, 1.0f, 0.0f, 0, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
