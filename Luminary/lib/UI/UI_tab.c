@@ -4,10 +4,6 @@
 #include "UI_blit.h"
 #include "UI_text.h"
 
-#define TAB_R 0x00
-#define TAB_G 0xff
-#define TAB_B 0xa5
-
 void handle_mouse_UIPanel_tab(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
   panel->hover = 1;
 
@@ -53,7 +49,7 @@ void render_UIPanel_tab(UI* ui, UIPanel* panel) {
       x += texts[i]->w + panel->prop2;
     }
     blit_gray(ui->pixels_mask, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w + 10, 2, 0xff);
-    blit_color(ui->pixels, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w + 10, 2, TAB_R, TAB_G, TAB_B);
-    blit_color_shaded(ui->pixels, x, 0, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w, PANEL_HEIGHT, TAB_R, TAB_G, TAB_B);
+    blit_color(ui->pixels, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w + 10, 2, HOVER_R, HOVER_G, HOVER_B);
+    blit_color_shaded(ui->pixels, x, 0, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w, PANEL_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
   }
 }

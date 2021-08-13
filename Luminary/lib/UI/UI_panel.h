@@ -13,9 +13,9 @@
 
 #define PANEL_HEIGHT 40
 
-#define HOVER_R 0xff
-#define HOVER_G 0xa5
-#define HOVER_B 0x00
+#define HOVER_R 0x00
+#define HOVER_G 0xff
+#define HOVER_B 0xa5
 
 UIPanel create_slider(UI* ui, const char* text, float* data_binding, int voids_frames, float scale, float min, float max);
 UIPanel create_check(UI* ui, const char* text, int* data_binding, int voids_frames);
