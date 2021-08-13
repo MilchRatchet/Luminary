@@ -45,7 +45,7 @@ __device__ TraceTask get_starting_ray(TraceTask task) {
     (device_scene.camera.aperture_size == 0.0f) ? 0.0f : sample_blue_noise(task.index.x, task.index.y, task.state, 0) * 2.0f * PI;
   const float beta = (device_scene.camera.aperture_size == 0.0f)
                        ? 0.0f
-                       : sample_blue_noise(task.index.x, task.index.y, task.state, 1) * device_scene.camera.aperture_size;
+                       : sqrtf(sample_blue_noise(task.index.x, task.index.y, task.state, 1)) * device_scene.camera.aperture_size;
 
   vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 
