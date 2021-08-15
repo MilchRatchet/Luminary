@@ -117,6 +117,28 @@ static UIPanel* create_toy_panels(UI* ui, RaytraceInstance* instance) {
   int i = 0;
 
   panels[i++] = create_tab(ui, &(ui->tab));
+  panels[i++] = create_check(ui, "Active", &(instance->scene_gpu.toy.active), 1);
+  panels[i++] = create_dropdown(ui, "Shape", &(instance->scene_gpu.toy.shape), 1, 1, "Sphere", 2);
+  panels[i++] = create_slider(ui, "Position X", &(instance->scene_gpu.toy.position.x), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Position Y", &(instance->scene_gpu.toy.position.y), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Position Z", &(instance->scene_gpu.toy.position.z), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Rotation X", &(instance->scene_gpu.toy.rotation.x), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Rotation Y", &(instance->scene_gpu.toy.rotation.y), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Rotation Z", &(instance->scene_gpu.toy.rotation.z), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Scale", &(instance->scene_gpu.toy.scale), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_color(ui, "Albedo", (float*) &(instance->scene_gpu.toy.albedo));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.toy.albedo.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.toy.albedo.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.toy.albedo.b), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Alpha", &(instance->scene_gpu.toy.albedo.a), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "Smoothness", &(instance->scene_gpu.toy.material.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "Metallic", &(instance->scene_gpu.toy.material.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_check(ui, "Emissive", &(instance->scene_gpu.toy.emissive), 1);
+  panels[i++] = create_color(ui, "Emission", (float*) &(instance->scene_gpu.toy.emission));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.toy.emission.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.toy.emission.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.toy.emission.b), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "Light Intensity", &(instance->scene_gpu.toy.material.b), 1, 0.001f, 0.0f, FLT_MAX);
 
   return panels;
 }

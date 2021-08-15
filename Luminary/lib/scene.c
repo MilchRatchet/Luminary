@@ -84,6 +84,29 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.ocean.albedo.b   = 0.0f;
   scene.ocean.albedo.a   = 0.9f;
 
+  scene.toy.active     = 0;
+  scene.toy.emissive   = 0;
+  scene.toy.shape      = TOY_SPHERE;
+  scene.toy.position.x = 0.0f;
+  scene.toy.position.y = 0.0f;
+  scene.toy.position.z = 0.0f;
+  scene.toy.rotation.x = 0.0f;
+  scene.toy.rotation.y = 0.0f;
+  scene.toy.rotation.z = 0.0f;
+  scene.toy.scale      = 1.0f;
+  scene.toy.albedo.r   = 0.9f;
+  scene.toy.albedo.g   = 0.9f;
+  scene.toy.albedo.b   = 0.9f;
+  scene.toy.albedo.a   = 1.0f;
+  scene.toy.material.r = 0.3f;
+  scene.toy.material.g = 0.0f;
+  scene.toy.material.b = 1.0f;
+  scene.toy.material.a = 0.0f;
+  scene.toy.emission.r = 0.0f;
+  scene.toy.emission.g = 0.0f;
+  scene.toy.emission.b = 0.0f;
+  scene.toy.emission.a = 0.0f;
+
   scene.sky.altitude         = 0.5f;
   scene.sky.azimuth          = 3.141f;
   scene.sky.sun_strength     = 30.0f;

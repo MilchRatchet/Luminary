@@ -79,6 +79,13 @@ struct OceanTask {
   uint32_t state;
 } typedef OceanTask;
 
+struct ToyTask {
+  vec3 position;
+  vec3 ray;
+  ushort2 index;
+  uint32_t state;
+} typedef ToyTask;
+
 struct TraceTask {
   vec3 origin;
   vec3 ray;
@@ -100,7 +107,9 @@ struct TraceResult {
 #define ALBEDO_BUFFER_STATE 0x80000000
 #define SKY_HIT 0xffffffff
 #define OCEAN_HIT 0xfffffffe
+#define TOY_HIT 0xfffffffd
 #define ANY_LIGHT 0xffffffff
+#define TOY_LIGHT 0xfffffffd
 
 //===========================================================================================
 // Device Variables
@@ -118,8 +127,11 @@ __constant__ TraceTask* device_tasks;
 
 __constant__ TraceResult* device_trace_results;
 
-// 0: TraceCount 1: GeoCount 2: OceanCount 3: SkyCount
+// 0: TraceCount/GeoCount 1: OceanCount 2: SkyCount 3: ToyCount
 __constant__ uint16_t* device_task_counts;
+
+// 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount
+__constant__ uint16_t* device_task_offsets;
 
 __constant__ uint32_t* device_light_sample_history;
 

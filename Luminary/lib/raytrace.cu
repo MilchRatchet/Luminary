@@ -176,6 +176,8 @@ extern "C" RaytraceInstance* init_raytracing(
 
   gpuErrchk(cudaMalloc((void**) &(instance->task_counts_gpu), 4 * sizeof(uint16_t) * thread_count));
   gpuErrchk(cudaMemcpyToSymbol(device_task_counts, &(instance->task_counts_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**) &(instance->task_offsets_gpu), 4 * sizeof(uint16_t) * thread_count));
+  gpuErrchk(cudaMemcpyToSymbol(device_task_offsets, &(instance->task_offsets_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMalloc((void**) &(instance->randoms_gpu), sizeof(curandStateXORWOW_t) * thread_count));
   gpuErrchk(cudaMemcpyToSymbol(device_sample_randoms, &(instance->randoms_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
@@ -292,6 +294,7 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
       process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
       process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
       process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
       gpuErrchk(cudaMemcpyFromSymbol(&(pixels_left), device_pixels_left, sizeof(int), 0, cudaMemcpyDeviceToHost));
       gpuErrchk(cudaDeviceSynchronize());

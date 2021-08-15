@@ -24,6 +24,11 @@
 #define SHADING_NORMAL 3
 #endif
 
+#ifndef LUMINARY_TOY_SHAPES
+#define LUMINARY_TOY_SHAPES
+#define TOY_SPHERE 0
+#endif
+
 struct Camera {
   vec3 pos;
   vec3 rotation;
@@ -40,6 +45,18 @@ struct Light {
   vec3 pos;
   float radius;
 } typedef Light;
+
+struct Toy {
+  int active;
+  int shape;
+  int emissive;
+  vec3 position;
+  vec3 rotation;
+  float scale;
+  RGBAF albedo;
+  RGBAF material;
+  RGBAF emission;
+} typedef Toy;
 
 struct Sky {
   float azimuth;
@@ -76,6 +93,7 @@ struct Scene {
   unsigned int lights_length;
   Ocean ocean;
   Sky sky;
+  Toy toy;
 } typedef Scene;
 
 struct RaytraceInstance {
@@ -84,6 +102,7 @@ struct RaytraceInstance {
   void* tasks_gpu;
   void* trace_results_gpu;
   void* task_counts_gpu;
+  void* task_offsets_gpu;
   uint32_t* light_sample_history_gpu;
   RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
