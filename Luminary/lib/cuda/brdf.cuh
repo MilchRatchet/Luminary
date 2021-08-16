@@ -193,15 +193,9 @@ __device__ vec3 diffuse_BRDF(
 __device__ vec3 refraction_BRDF(RGBF& record, const vec3 normal, const vec3 ray, const float roughness, const float index) {
   const float a = dot_product(ray, normal);
   const vec3 n  = scale_vector(normal, -1.0f);
-  const float b = 1.0f - index * index * (1.0f - fabsf(a) * fabsf(a));
+  const float b = fmaxf(0.0f, 1.0f - index * index * (1.0f - fabsf(a) * fabsf(a)));
 
-  if (b < 0.0f) {
-    const vec3 V = scale_vector(ray, -1.0f);
-    return normalize_vector(reflect_vector(V, normal));
-  }
-  else {
-    return normalize_vector(add_vector(scale_vector(ray, index), scale_vector(n, index * fabsf(a) - sqrtf(b))));
-  }
+  return normalize_vector(add_vector(scale_vector(ray, index), scale_vector(n, index * fabsf(a) - sqrtf(b))));
 }
 
 __device__ Light sample_light(const vec3 position, const int light_count, uint32_t& light_sample_id, const float r) {
