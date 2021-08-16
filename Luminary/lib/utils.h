@@ -29,6 +29,13 @@
 #define TOY_SPHERE 0
 #endif
 
+#ifndef LUMINARY_TONEMAPS
+#define LUMINARY_TONEMAPS
+#define TONEMAP_NONE 0
+#define TONEMAP_ACES 1
+#define TONEMAP_REINHARD 2
+#endif
+
 struct Camera {
   vec3 pos;
   vec3 rotation;
@@ -39,6 +46,7 @@ struct Camera {
   int auto_exposure;
   float alpha_cutoff;
   float far_clip_distance;
+  int tonemap;
 } typedef Camera;
 
 struct Light {

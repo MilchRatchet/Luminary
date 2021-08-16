@@ -1268,7 +1268,16 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     pixel.g = pixel_00.g * f00 + pixel_10.g * f10 + pixel_01.g * f01 + pixel_11.g * f11;
     pixel.b = pixel_00.b * f00 + pixel_10.b * f10 + pixel_01.b * f01 + pixel_11.b * f11;
 
-    pixel = reinhard_tonemap(pixel);
+    switch (device_scene.camera.tonemap) {
+      case TONEMAP_NONE:
+        break;
+      case TONEMAP_ACES:
+        pixel = aces_tonemap(pixel);
+        break;
+      case TONEMAP_REINHARD:
+        pixel = reinhard_tonemap(pixel);
+        break;
+    }
 
     pixel.r = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.r));
     pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.g));

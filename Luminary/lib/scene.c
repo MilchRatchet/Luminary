@@ -69,6 +69,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.camera.auto_exposure     = 0;
   scene.camera.alpha_cutoff      = 0.0f;
   scene.camera.far_clip_distance = 1000000.0f;
+  scene.camera.tonemap           = TONEMAP_REINHARD;
 
   scene.ocean.active           = 0;
   scene.ocean.emissive         = 0;
