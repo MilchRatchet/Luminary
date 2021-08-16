@@ -828,7 +828,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    const vec3 normal = get_toy_normal(task.position);
+    vec3 normal = get_toy_normal(task.position);
+
+    if (dot_product(normal, task.ray) > 0.0f) {
+      normal = scale_vector(normal, -1.0f);
+    }
 
     RGBAF albedo          = device_scene.toy.albedo;
     const float roughness = (1.0f - device_scene.toy.material.r) * (1.0f - device_scene.toy.material.r);
@@ -869,7 +873,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       uint32_t light_sample_id;
 
       if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
-        task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps));
+        task.position = add_vector(task.position, scale_vector(task.ray, eps * 8.0f));
 
         record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
         record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
@@ -918,47 +922,55 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
 
       task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      int remains_active = 1;
+      TraceTask next_task;
+      next_task.origin = task.position;
+      next_task.ray    = task.ray;
+      next_task.index  = task.index;
+      next_task.state  = task.state;
 
-#ifdef WEIGHT_BASED_EXIT
-      const float max_record = fmaxf(record.r, fmaxf(record.g, record.b));
-      if (
-        max_record < CUTOFF
-        || (max_record < PROBABILISTIC_CUTOFF && sample_blue_noise(task.index.x, task.index.y, task.state, 20) > (max_record - CUTOFF) / (CUTOFF - PROBABILISTIC_CUTOFF))) {
-        remains_active = 0;
-      }
-#endif
+      store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
 
-#ifdef LOW_QUALITY_LONG_BOUNCES
-      if (
-        albedo.a > 0.0f && ((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES)
-        && sample_blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f / device_max_ray_depth) {
-        remains_active = 0;
-      }
-#endif
-
-      if (remains_active) {
-        TraceTask next_task;
-        next_task.origin = task.position;
-        next_task.ray    = task.ray;
-        next_task.index  = task.index;
-        next_task.state  = task.state;
-
-        store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
-
-        device_records[pixel]              = record;
-        device_light_sample_history[pixel] = light_sample_id;
-      }
-      else {
-        atomicSub(&device_pixels_left, 1);
-      }
+      device_records[pixel]              = record;
+      device_light_sample_history[pixel] = light_sample_id;
     }
     else {
       atomicSub(&device_pixels_left, 1);
     }
   }
 
-  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = trace_count;
+  device_task_counts[id * 4] = trace_count;
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int task_count  = device_task_counts[id * 4 + 3];
+  const int task_offset = device_task_offsets[id * 4 + 3];
+
+  for (int i = 0; i < task_count; i++) {
+    const ToyTask task = load_toy_task(device_tasks + get_task_address(task_offset + i));
+    const int pixel    = task.index.y * device_width + task.index.x;
+
+    if (device_shading_mode == SHADING_ALBEDO) {
+      device_frame_buffer[pixel] = get_color(device_scene.toy.albedo.r, device_scene.toy.albedo.g, device_scene.toy.albedo.b);
+    }
+    else if (device_shading_mode == SHADING_DEPTH) {
+      const float dist           = get_length(sub_vector(device_scene.camera.pos, task.position));
+      const float value          = __saturatef((1.0f / dist) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value, value, value);
+    }
+    else if (device_shading_mode == SHADING_NORMAL) {
+      vec3 normal = get_toy_normal(task.position);
+
+      if (dot_product(normal, task.ray) > 0.0f) {
+        normal = scale_vector(normal, -1.0f);
+      }
+
+      device_frame_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
+    }
+
+    atomicSub(&device_pixels_left, 1);
+  }
 }
 
 __global__ void finalize_samples() {
