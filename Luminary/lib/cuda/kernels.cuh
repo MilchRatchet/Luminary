@@ -698,6 +698,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
         record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
         record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
         record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
+
+        const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
+
+        ray = refraction_BRDF(record, normal, ray, 0.0f, refraction_index);
       }
       else {
         const vec3 V = scale_vector(ray, -1.0f);
@@ -828,10 +832,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    vec3 normal = get_toy_normal(task.position);
+    vec3 normal     = get_toy_normal(task.position);
+    int from_inside = 0;
 
     if (dot_product(normal, task.ray) > 0.0f) {
-      normal = scale_vector(normal, -1.0f);
+      normal      = scale_vector(normal, -1.0f);
+      from_inside = 1;
     }
 
     RGBAF albedo          = device_scene.toy.albedo;
@@ -880,6 +886,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
         record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
 
         light_sample_id = device_light_sample_history[pixel];
+
+        const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
+
+        task.ray = refraction_BRDF(record, normal, task.ray, roughness, refraction_index);
       }
       else {
         const float specular_probability = lerp(0.5f, 1.0f, metallic);

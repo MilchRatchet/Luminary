@@ -53,6 +53,7 @@ struct Toy {
   vec3 position;
   vec3 rotation;
   float scale;
+  float refractive_index;
   RGBAF albedo;
   RGBAF material;
   RGBAF emission;
@@ -78,6 +79,7 @@ struct Ocean {
   float speed;
   float time;
   RGBAF albedo;
+  float refractive_index;
 } typedef Ocean;
 
 struct Scene {
