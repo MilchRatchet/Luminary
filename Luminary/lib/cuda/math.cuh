@@ -273,15 +273,83 @@ __device__ float linearRGB_to_SRGB(const float value) {
 }
 
 __device__ RGBF aces_tonemap(RGBF pixel) {
-  const float a = 2.51f;
-  const float b = 0.03f;
-  const float c = 2.43f;
-  const float d = 0.59f;
-  const float e = 0.14f;
+  RGBF color;
+  color.r = 0.59719f * pixel.r + 0.35458f * pixel.g + 0.04823f * pixel.b;
+  color.g = 0.07600f * pixel.r + 0.90834f * pixel.g + 0.01566f * pixel.b;
+  color.b = 0.02840f * pixel.r + 0.13383f * pixel.g + 0.83777f * pixel.b;
 
-  pixel.r = 1.25f * (pixel.r * (a * pixel.r + b)) / (pixel.r * (c * pixel.r + d) + e);
-  pixel.g = 1.25f * (pixel.g * (a * pixel.g + b)) / (pixel.g * (c * pixel.g + d) + e);
-  pixel.b = 1.25f * (pixel.b * (a * pixel.b + b)) / (pixel.b * (c * pixel.b + d) + e);
+  RGBF a = add_color(color, get_color(0.0245786f, 0.0245786f, 0.0245786f));
+  a      = mul_color(color, a);
+  a      = add_color(a, get_color(-0.000090537f, -0.000090537f, -0.000090537f));
+  RGBF b = mul_color(color, get_color(0.983729f, 0.983729f, 0.983729f));
+  b      = add_color(b, get_color(0.432951f, 0.432951f, 0.432951f));
+  b      = mul_color(color, b);
+  b      = add_color(b, get_color(0.238081f, 0.238081f, 0.238081f));
+  b      = get_color(1.0f / b.r, 1.0f / b.g, 1.0f / b.b);
+  color  = mul_color(a, b);
+
+  pixel.r = 1.60475f * color.r - 0.53108f * color.g - 0.07367f * color.b;
+  pixel.g = -0.10208f * color.r + 1.10813f * color.g - 0.00605f * color.b;
+  pixel.b = -0.00327f * color.r - 0.07276f * color.g + 1.07602f * color.b;
+
+  return pixel;
+}
+
+__device__ RGBF uncharted2_partial(RGBF pixel) {
+  const float a = 0.15f;
+  const float b = 0.50f;
+  const float c = 0.10f;
+  const float d = 0.20f;
+  const float e = 0.02f;
+  const float f = 0.30f;
+
+  pixel.r = ((pixel.r * (a * pixel.r + c * b) + d * e) / (pixel.r * (a * pixel.r + b) + d * f)) - e / f;
+  pixel.g = ((pixel.g * (a * pixel.g + c * b) + d * e) / (pixel.g * (a * pixel.g + b) + d * f)) - e / f;
+  pixel.b = ((pixel.b * (a * pixel.b + c * b) + d * e) / (pixel.b * (a * pixel.b + b) + d * f)) - e / f;
+
+  return pixel;
+}
+
+__device__ RGBF uncharted2_tonemap(RGBF pixel) {
+  const float exposure_bias = 2.0f;
+
+  pixel = mul_color(pixel, get_color(exposure_bias, exposure_bias, exposure_bias));
+  pixel = uncharted2_partial(pixel);
+
+  RGBF scale = uncharted2_partial(get_color(11.2f, 11.2f, 11.2f));
+  scale      = get_color(1.0f / scale.r, 1.0f / scale.g, 1.0f / scale.b);
+
+  return mul_color(pixel, scale);
+}
+
+__device__ RGBF custom_tonemap(RGBF pixel) {
+  pixel = uncharted2_tonemap(pixel);
+
+  const float max = fmaxf(pixel.r, fmaxf(pixel.g, pixel.b));
+
+  if (max < eps)
+    return pixel;
+
+  RGBF ratio                   = get_color(pixel.r / max, pixel.g / max, pixel.b / max);
+  const float crosstalk        = 1.0f;
+  const float saturation       = 1.0f;
+  const float cross_saturation = 3.0f;
+
+  ratio.r = powf(ratio.r, saturation / cross_saturation);
+  ratio.g = powf(ratio.g, saturation / cross_saturation);
+  ratio.b = powf(ratio.b, saturation / cross_saturation);
+
+  ratio.r = lerp(ratio.r, 1.0f, powf(max, crosstalk));
+  ratio.g = lerp(ratio.g, 1.0f, powf(max, crosstalk));
+  ratio.b = lerp(ratio.b, 1.0f, powf(max, crosstalk));
+
+  ratio.r = powf(ratio.r, cross_saturation);
+  ratio.g = powf(ratio.g, cross_saturation);
+  ratio.b = powf(ratio.b, cross_saturation);
+
+  pixel.r = ratio.r * max;
+  pixel.g = ratio.g * max;
+  pixel.b = ratio.b * max;
 
   return pixel;
 }

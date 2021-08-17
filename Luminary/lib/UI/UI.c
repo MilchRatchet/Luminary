@@ -60,7 +60,8 @@ static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_info(ui, "Rotation X", &(instance->scene_gpu.camera.rotation.x), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Rotation Y", &(instance->scene_gpu.camera.rotation.y), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Rotation Z", &(instance->scene_gpu.camera.rotation.z), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
-  panels[i++] = create_dropdown(ui, "Tone Mapping", &(instance->scene_gpu.camera.tonemap), 1, 3, "None\0ACES\0Reinhard", 7);
+  panels[i++] =
+    create_dropdown(ui, "Tone Mapping", &(instance->scene_gpu.camera.tonemap), 0, 5, "None\0ACES\0Reinhard\0Uncharted 2\0Custom", 7);
   panels[i++] = create_slider(ui, "Field of View", &(instance->scene_gpu.camera.fov), 1, 0.001f, 0.0001f, FLT_MAX);
   panels[i++] = create_check(ui, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure), 0);
   panels[i++] = create_info(ui, "Exposure", &(instance->scene_gpu.camera.exposure), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);

@@ -1277,6 +1277,12 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
       case TONEMAP_REINHARD:
         pixel = reinhard_tonemap(pixel);
         break;
+      case TONEMAP_UNCHARTED2:
+        pixel = uncharted2_tonemap(pixel);
+        break;
+      case TONEMAP_CUSTOM:
+        pixel = custom_tonemap(pixel);
+        break;
     }
 
     pixel.r = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.r));
