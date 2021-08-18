@@ -15,21 +15,21 @@
 #include <thread>
 
 #include "SDL/SDL.h"
-#include "cuda/brdf.cuh"
-#include "cuda/bvh.cuh"
-#include "cuda/directives.cuh"
-#include "cuda/math.cuh"
-#include "cuda/memory.cuh"
-#include "cuda/ocean.cuh"
-#include "cuda/random.cuh"
-#include "cuda/sky.cuh"
-#include "cuda/toy.cuh"
-#include "cuda/utils.cuh"
+#include "brdf.cuh"
+#include "bvh.cuh"
+#include "directives.cuh"
 #include "image.h"
+#include "math.cuh"
+#include "memory.cuh"
 #include "mesh.h"
+#include "ocean.cuh"
 #include "primitives.h"
+#include "random.cuh"
 #include "raytrace.h"
 #include "scene.h"
+#include "sky.cuh"
+#include "toy.cuh"
+#include "utils.cuh"
 
 __device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 default_ray;
@@ -1096,137 +1096,6 @@ __global__ void finalize_samples() {
   }
 }
 
-/*__global__
-void bloom_kernel_split(RGBF* image) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  while (id < device_amount) {
-    RGBF pixel = image[id];
-    RGBF truncated_pixel = get_color(fminf(0.0f, pixel.r),fminf(0.0f, pixel.g),fminf(0.0f, pixel.b));
-    //image[id] = truncated_pixel;
-
-    pixel.r -= truncated_pixel.r;
-    pixel.g -= truncated_pixel.g;
-    pixel.b -= truncated_pixel.b;
-
-    device_albedo_buffer[id] = pixel;
-
-    id += blockDim.x * gridDim.x;
-  }
-}*/
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void bloom_kernel_blur_vertical(RGBF* image) {
-  const int stride_length = 4;
-
-  unsigned int id     = threadIdx.x + blockIdx.x * blockDim.x;
-  unsigned int stride = id % device_width + device_width * stride_length * (id / device_width);
-
-  const float sigma    = 3.0f;
-  const float strength = 4.0f;
-
-  const float reference_pixel_count = 1280.0f;
-  const float pixel_size            = reference_pixel_count / device_width;
-  const int kernel_size             = (int) ((sigma * 3.0f) / pixel_size) + 1;
-
-  const float gauss_factor1 = 1.0f / (2.0f * sigma * sigma);
-  const float gauss_factor2 = gauss_factor1 / 3.14159265358979323846f;
-
-  __shared__ RGBF reuse[THREADS_PER_BLOCK][stride_length];
-
-  while (stride < device_amount) {
-    for (int i = 0; i < stride_length; i++) {
-      if (stride + i * device_width >= device_amount)
-        break;
-      reuse[threadIdx.x][i] = image[stride + i * device_width];
-    }
-
-    for (int j = 0; j < stride_length; j++) {
-      if (stride + j * device_width >= device_amount)
-        break;
-
-      RGBF collector = get_color(0.0f, 0.0f, 0.0f);
-
-      for (int i = -kernel_size + 1; i < kernel_size; i += 2) {
-        const int index = stride + (i + j) * device_width;
-        if (index < 0)
-          continue;
-        if (index >= device_amount)
-          break;
-
-        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i + j] : image[index];
-
-        const float x     = abs(i) * pixel_size;
-        const float gauss = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
-
-        collector.r += value.r * gauss;
-        collector.g += value.g * gauss;
-        collector.b += value.b * gauss;
-      }
-
-      device_bloom_scratch[stride + j * device_width] = collector;
-    }
-
-    id += blockDim.x * gridDim.x;
-    stride = id % device_width + device_width * stride_length * (id / device_width);
-  }
-}
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void bloom_kernel_blur_horizontal(RGBF* image) {
-  const int stride_length = 4;
-
-  unsigned int id     = threadIdx.x + blockIdx.x * blockDim.x;
-  unsigned int stride = stride_length * id;
-
-  const float sigma    = 3.0f;
-  const float strength = 4.0f;
-
-  const float reference_pixel_count = 1280.0f;
-  const float pixel_size            = reference_pixel_count / device_width;
-  const int kernel_size             = (int) ((sigma * 3.0f) / pixel_size) + 1;
-
-  const float gauss_factor1 = 1.0f / (2.0f * sigma * sigma);
-  const float gauss_factor2 = gauss_factor1 / 3.14159265358979323846f;
-
-  __shared__ RGBF reuse[THREADS_PER_BLOCK][stride_length];
-
-  while (stride < device_amount) {
-    for (int i = 0; i < stride_length; i++) {
-      if (stride + i >= device_amount)
-        break;
-      reuse[threadIdx.x][i] = device_bloom_scratch[stride + i];
-    }
-
-    const int column              = stride % device_width;
-    const int begin               = max(-kernel_size + 1, -column);
-    const int end                 = min(kernel_size, device_width - column - 3);
-    const int valid_stride_length = min(stride_length, device_amount - stride);
-
-    for (int j = 0; j < valid_stride_length; j++) {
-      RGBF collector = get_color(0.0f, 0.0f, 0.0f);
-
-      for (int i = begin; i < end; i += 2) {
-        const int index = stride + i + j;
-
-        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i + j] : device_bloom_scratch[index];
-
-        const float x     = abs(i) * pixel_size;
-        const float gauss = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
-
-        collector.r += value.r * gauss;
-        collector.g += value.g * gauss;
-        collector.b += value.b * gauss;
-      }
-
-      RGBF pixel = image[stride + j];
-
-      image[stride + j] = add_color(pixel, collector);
-    }
-
-    id += blockDim.x * gridDim.x;
-    stride = stride_length * id;
-  }
-}
-
 __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const RGBF* source) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -1268,6 +1137,10 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     pixel.g = pixel_00.g * f00 + pixel_10.g * f10 + pixel_01.g * f01 + pixel_11.g * f11;
     pixel.b = pixel_00.b * f00 + pixel_10.b * f10 + pixel_01.b * f01 + pixel_11.b * f11;
 
+    pixel.r *= device_scene.camera.exposure;
+    pixel.g *= device_scene.camera.exposure;
+    pixel.b *= device_scene.camera.exposure;
+
     switch (device_scene.camera.tonemap) {
       case TONEMAP_NONE:
         break;
@@ -1285,9 +1158,11 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
         break;
     }
 
-    pixel.r = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.r));
-    pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.g));
-    pixel.b = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.b));
+    const float dither = ((x + y & 1) & 1) ? 0.25f : -0.25f;
+
+    pixel.r = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.r));
+    pixel.g = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.g));
+    pixel.b = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.b));
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;
