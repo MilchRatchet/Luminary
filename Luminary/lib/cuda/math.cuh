@@ -264,6 +264,16 @@ __device__ RGBF mul_color(const RGBF a, const RGBF b) {
   return result;
 }
 
+__device__ RGBF scale_color(const RGBF a, const float b) {
+  RGBF result;
+
+  result.r = a.r * b;
+  result.g = a.g * b;
+  result.b = a.b * b;
+
+  return result;
+}
+
 __device__ float get_dithering(const int x, const int y) {
   const float dither = 2.0f * sample_blue_noise(x, y, 0, 0) - 1.0f;
 

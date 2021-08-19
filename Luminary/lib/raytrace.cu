@@ -10,6 +10,7 @@
 #include <thread>
 
 #include "SDL/SDL.h"
+#include "cuda/bloom.cuh"
 #include "cuda/brdf.cuh"
 #include "cuda/bvh.cuh"
 #include "cuda/denoise.cuh"
@@ -158,9 +159,6 @@ extern "C" RaytraceInstance* init_raytracing(
     gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * width * height));
     gpuErrchk(cudaMemcpyToSymbol(device_albedo_buffer, &(instance->albedo_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
-
-    gpuErrchk(cudaMalloc((void**) &(instance->bloom_scratch_gpu), sizeof(RGBF) * width * height));
-    gpuErrchk(cudaMemcpyToSymbol(device_bloom_scratch, &(instance->bloom_scratch_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
   }
 
   const int thread_count      = THREADS_PER_BLOCK * BLOCKS_PER_GRID;
@@ -185,6 +183,7 @@ extern "C" RaytraceInstance* init_raytracing(
   initialize_randoms<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   update_scene(instance);
+  allocate_bloom_mips(instance);
 
   return instance;
 }
@@ -306,14 +305,6 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
   gpuErrchk(cudaDeviceSynchronize());
 }
 
-extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
-  if (instance->denoiser) {
-    // bloom_kernel_split<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image);
-    bloom_kernel_blur_vertical<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image);
-    bloom_kernel_blur_horizontal<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image);
-  }
-}
-
 extern "C" void free_inputs(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene_gpu.texture_assignments));
   gpuErrchk(cudaFree(instance->scene_gpu.triangles));
@@ -321,6 +312,8 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene_gpu.nodes));
   gpuErrchk(cudaFree(instance->scene_gpu.lights));
   gpuErrchk(cudaFree(instance->tasks_gpu));
+  gpuErrchk(cudaFree(instance->task_counts_gpu));
+  gpuErrchk(cudaFree(instance->task_offsets_gpu));
   gpuErrchk(cudaFree(instance->frame_buffer_gpu));
   gpuErrchk(cudaFree(instance->frame_variance_gpu));
   gpuErrchk(cudaFree(instance->frame_bias_cache_gpu));
@@ -333,8 +326,9 @@ extern "C" void free_outputs(RaytraceInstance* instance) {
 
   if (instance->denoiser) {
     gpuErrchk(cudaFree(instance->albedo_buffer_gpu));
-    gpuErrchk(cudaFree(instance->bloom_scratch_gpu));
   }
+
+  free_bloom_mips(instance);
 
   free(instance);
 }

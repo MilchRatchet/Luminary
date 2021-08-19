@@ -50,6 +50,7 @@ struct Camera {
   float far_clip_distance;
   int tonemap;
   int bloom;
+  float bloom_threshold;
   int dithering;
 } typedef Camera;
 
@@ -142,8 +143,7 @@ struct RaytraceInstance {
   void* randoms_gpu;
   RGBF default_material;
   int shading_mode;
-  RGBF* bloom_scratch_gpu;
-  void* bloom_textures_gpu;
+  RGBF** bloom_mips_gpu;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \

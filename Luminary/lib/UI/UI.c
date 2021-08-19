@@ -69,6 +69,7 @@ static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Focal Length", &(instance->scene_gpu.camera.focal_length), 1, 0.001f, 0.0f, FLT_MAX);
   panels[i++] = create_slider(ui, "Far Clip Distance", &(instance->scene_gpu.camera.far_clip_distance), 1, 0.05f, 0.0f, FLT_MAX);
   panels[i++] = create_check(ui, "Bloom", &(instance->scene_gpu.camera.bloom), 0);
+  panels[i++] = create_slider(ui, "Bloom Threshold", &(instance->scene_gpu.camera.bloom_threshold), 0, 0.0005f, 0.0f, FLT_MAX);
   panels[i++] = create_check(ui, "Dithering", &(instance->scene_gpu.camera.dithering), 0);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene_gpu.camera.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f);
 
