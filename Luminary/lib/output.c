@@ -88,7 +88,6 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
   UI ui                     = init_UI(instance, realtime);
 
   instance->temporal_frames = 0;
-  instance->use_bloom       = 1;
 
   int make_png = 0;
 
@@ -107,7 +106,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
     start_frametime(&frametime_post);
     if (instance->denoiser && instance->use_denoiser) {
       RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
-      if (instance->use_bloom)
+      if (instance->scene_gpu.camera.bloom)
         apply_bloom(instance, denoised_image);
       copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, denoised_image, instance);
     }

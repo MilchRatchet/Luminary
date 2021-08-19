@@ -4,6 +4,7 @@
 #include <cuda_runtime_api.h>
 #include <float.h>
 
+#include "random.cuh"
 #include "utils.cuh"
 
 __device__ vec3 cross_product(const vec3 a, const vec3 b) {
@@ -261,6 +262,12 @@ __device__ RGBF mul_color(const RGBF a, const RGBF b) {
   result.b = a.b * b.b;
 
   return result;
+}
+
+__device__ float get_dithering(const int x, const int y) {
+  const float dither = 2.0f * sample_blue_noise(x, y, 0, 0) - 1.0f;
+
+  return copysignf(1.0f - sqrtf(1.0f - fabsf(dither)), dither);
 }
 
 __device__ float linearRGB_to_SRGB(const float value) {

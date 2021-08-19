@@ -67,6 +67,8 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.camera.aperture_size     = 0.00f;
   scene.camera.exposure          = 1.0f;
   scene.camera.auto_exposure     = 0;
+  scene.camera.bloom             = 1;
+  scene.camera.dithering         = 1;
   scene.camera.alpha_cutoff      = 0.0f;
   scene.camera.far_clip_distance = 1000000.0f;
   scene.camera.tonemap           = TONEMAP_CUSTOM;

@@ -49,6 +49,8 @@ struct Camera {
   float alpha_cutoff;
   float far_clip_distance;
   int tonemap;
+  int bloom;
+  int dithering;
 } typedef Camera;
 
 struct Light {
@@ -135,7 +137,6 @@ struct RaytraceInstance {
   Scene scene_gpu;
   int denoiser;
   int use_denoiser;
-  int use_bloom;
   int temporal_frames;
   int lights_active;
   void* randoms_gpu;

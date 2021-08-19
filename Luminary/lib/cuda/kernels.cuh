@@ -1158,7 +1158,7 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
         break;
     }
 
-    const float dither = ((x + y & 1) & 1) ? 0.25f : -0.25f;
+    const float dither = (device_scene.camera.dithering) ? get_dithering(x, y) : 0.0f;
 
     pixel.r = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.r));
     pixel.g = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.g));
