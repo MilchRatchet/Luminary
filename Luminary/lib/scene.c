@@ -110,10 +110,13 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.toy.emission.b       = 0.0f;
   scene.toy.emission.a       = 0.0f;
 
+  scene.sky.sun_color.r      = 1.0f;
+  scene.sky.sun_color.g      = 0.9f;
+  scene.sky.sun_color.b      = 0.8f;
   scene.sky.altitude         = 0.5f;
   scene.sky.azimuth          = 3.141f;
   scene.sky.sun_strength     = 30.0f;
-  scene.sky.base_density     = 0.8f;
+  scene.sky.base_density     = 1.0f;
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
 

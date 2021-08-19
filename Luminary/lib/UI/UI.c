@@ -80,6 +80,10 @@ static UIPanel* create_sky_panels(UI* ui, RaytraceInstance* instance) {
   int i = 0;
 
   panels[i++] = create_tab(ui, &(ui->tab));
+  panels[i++] = create_color(ui, "Albedo", (float*) &(instance->scene_gpu.sky.sun_color));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.sky.sun_color.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.sky.sun_color.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.sky.sun_color.b), 1, 0.001f, 0.0f, 1.0f);
   panels[i++] = create_info(ui, "Azimuth", &(instance->scene_gpu.sky.azimuth), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Altitude", &(instance->scene_gpu.sky.altitude), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_slider(ui, "Density", &(instance->scene_gpu.sky.base_density), 1, 0.001f, 0.0f, FLT_MAX);

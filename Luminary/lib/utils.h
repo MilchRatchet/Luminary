@@ -70,6 +70,7 @@ struct Toy {
 } typedef Toy;
 
 struct Sky {
+  RGBF sun_color;
   float azimuth;
   float altitude;
   float sun_strength;
@@ -141,6 +142,7 @@ struct RaytraceInstance {
   RGBF default_material;
   int shading_mode;
   RGBF* bloom_scratch_gpu;
+  void* bloom_textures_gpu;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \
