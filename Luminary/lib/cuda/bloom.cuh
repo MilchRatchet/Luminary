@@ -4,6 +4,17 @@
 #include "math.cuh"
 #include "utils.cuh"
 
+/*
+ * This implementation is based on a presentation
+ * "Next Generation Post Processing in Call of Duty: Advanced Warfare"
+ * by Jorge Jimenez at SIGGRAPH 2014.
+ *
+ * We downsample using a 13 tap box filter.
+ * We upsample using a 9 tap tent filter.
+ *
+ * For performance it may be beneficial to wrap the mip buffers into a texture object for better sampling
+ */
+
 #define BLOOM_MIP_COUNT 9
 
 __device__ RGBF sample_pixel(RGBF* image, float x, float y, const int width, const int height) {

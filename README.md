@@ -72,3 +72,4 @@ This is a list of papers I have used for this project so far. Note that some tec
 - A. Dietrich, H. Friedrich and M. Stich, _Spatial splits in bounding volume hierarchies_, HPG '09: Proceedings of the Conference on High Performance Graphics 2009, pp. 7-13, 2009.
 - A. Ebert, V. Fuetterling, C. Lojewski and F. Pfreundt, _Parallel Spatial Splits in Bounding Volume Hierarchies_, Eurographics Symposium on Parallel Graphics and Visualization, 2016.
 - E. Haines, T. Akenine-Möller, "Ray Tracing Gems", Apress, 2019.
+- J. Jimenez, _Next Generation Post Processing in Call of Duty: Advanced Warfare_, Talk at SIGGRAPH 2014.
