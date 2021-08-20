@@ -344,20 +344,11 @@ __device__ float luminance(const RGBF v) {
 }
 
 /*
- * ACES Tonemap without the darkening
- * Makes very bright pixels white and desaturates a bit
+ * ACES Tonemap but with a more sensible brightness
+ * "I don't know, I like it" - Milch
  */
 __device__ RGBF custom_tonemap(RGBF pixel) {
-  RGBF color;
-  color.r = 0.59719f * pixel.r + 0.35458f * pixel.g + 0.04823f * pixel.b;
-  color.g = 0.07600f * pixel.r + 0.90834f * pixel.g + 0.01566f * pixel.b;
-  color.b = 0.02840f * pixel.r + 0.13383f * pixel.g + 0.83777f * pixel.b;
-
-  pixel.r = 1.60475f * color.r - 0.53108f * color.g - 0.07367f * color.b;
-  pixel.g = -0.10208f * color.r + 1.10813f * color.g - 0.00605f * color.b;
-  pixel.b = -0.00327f * color.r - 0.07276f * color.g + 1.07602f * color.b;
-
-  return pixel;
+  return aces_tonemap(scale_color(pixel, 2.0f));
 }
 
 __device__ RGBF reinhard_tonemap(RGBF pixel) {
