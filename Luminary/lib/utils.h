@@ -50,7 +50,7 @@ struct Camera {
   float far_clip_distance;
   int tonemap;
   int bloom;
-  float bloom_threshold;
+  float bloom_strength;
   int dithering;
 } typedef Camera;
 

@@ -7,15 +7,15 @@
 #define BLOOM_MIP_COUNT 9
 
 __device__ RGBF sample_pixel(RGBF* image, float x, float y, const int width, const int height) {
-  x = __saturatef(x);
-  y = __saturatef(y);
+  x = fmaxf(x, 0.0f);
+  y = fmaxf(y, 0.0f);
 
   // clamp with largest float below 1.0f
   x = fminf(x, __uint_as_float(0b00111111011111111111111111111111));
   y = fminf(y, __uint_as_float(0b00111111011111111111111111111111));
 
-  const float source_x = x * (width - 1);
-  const float source_y = y * (height - 1);
+  const float source_x = fmaxf(0.0f, x * width - 0.5f);
+  const float source_y = fmaxf(0.0f, y * height - 0.5f);
 
   const int index_x = source_x;
   const int index_y = source_y;
@@ -23,10 +23,15 @@ __device__ RGBF sample_pixel(RGBF* image, float x, float y, const int width, con
   const int index_0 = index_x + index_y * width;
   const int index_1 = index_x + (index_y + 1) * width;
 
-  const RGBF pixel_00 = image[index_0];
-  const RGBF pixel_01 = image[index_0 + 1];
-  const RGBF pixel_10 = image[index_1];
-  const RGBF pixel_11 = image[index_1 + 1];
+  const int index_00 = index_0;
+  const int index_01 = index_00 + ((index_x < width - 1) ? 1 : 0);
+  const int index_10 = index_1 + ((index_y >= height - 1) ? -width : 0);
+  const int index_11 = index_10 + ((index_x < width - 1) ? 1 : 0);
+
+  const RGBF pixel_00 = image[index_00];
+  const RGBF pixel_01 = image[index_01];
+  const RGBF pixel_10 = image[index_10];
+  const RGBF pixel_11 = image[index_11];
 
   const float fx  = source_x - index_x;
   const float ifx = 1.0f - fx;
@@ -44,21 +49,20 @@ __device__ RGBF sample_pixel(RGBF* image, float x, float y, const int width, con
     pixel_00.b * f00 + pixel_01.b * f01 + pixel_10.b * f10 + pixel_11.b * f11);
 }
 
-__global__ void bloom_downsample(
-  RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th, const float threshold) {
+__global__ void bloom_downsample(RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const float scale_x = 1.0f / (tw - 1);
-  const float scale_y = 1.0f / (th - 1);
-  const float step_x  = 0.5f / (sw - 1);
-  const float step_y  = 0.5f / (sh - 1);
+  const float scale_x = 1.0f / tw;
+  const float scale_y = 1.0f / th;
+  const float step_x  = 1.0f / sw;
+  const float step_y  = 1.0f / sh;
 
   while (id < tw * th) {
     const int x = id % tw;
     const int y = id / tw;
 
-    const float sx = scale_x * x;
-    const float sy = scale_y * y;
+    const float sx = scale_x * x + 0.5f * scale_x;
+    const float sy = scale_y * y + 0.5f * scale_y;
 
     RGBF a1 = sample_pixel(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
     RGBF a2 = sample_pixel(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
@@ -79,31 +83,27 @@ __global__ void bloom_downsample(
 
     pixel = scale_color(pixel, 0.125f);
 
-    float lum = luminance(pixel);
-    pixel     = scale_color(pixel, 1.0f / (lum + eps));
-    lum       = (fmaxf(0.0f, lum - threshold));
-    pixel     = scale_color(pixel, lum);
-
     target[x + y * tw] = pixel;
 
     id += blockDim.x * gridDim.x;
   }
 }
 
-__global__ void bloom_upsample(RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
+__global__ void bloom_upsample(
+  RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th, const float a, const float b) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const float scale_x = 1.0f / (tw - 1);
-  const float scale_y = 1.0f / (th - 1);
-  const float step_x  = 0.5f / (sw - 1);
-  const float step_y  = 0.5f / (sh - 1);
+  const float scale_x = 1.0f / tw;
+  const float scale_y = 1.0f / th;
+  const float step_x  = 1.0f / sw;
+  const float step_y  = 1.0f / sh;
 
   while (id < tw * th) {
     const int x = id % tw;
     const int y = id / tw;
 
-    const float sx = scale_x * x;
-    const float sy = scale_y * y;
+    const float sx = scale_x * x + 0.5f * scale_x;
+    const float sy = scale_y * y + 0.5f * scale_y;
 
     RGBF pixel = sample_pixel(source, sx - step_x, sy - step_y, sw, sh);
 
@@ -119,6 +119,8 @@ __global__ void bloom_upsample(RGBF* source, const int sw, const int sh, RGBF* t
     pixel = scale_color(pixel, 0.0625f);
 
     RGBF o = target[x + y * tw];
+    o      = scale_color(o, a);
+    pixel  = scale_color(pixel, b);
     pixel  = add_color(pixel, o);
 
     target[x + y * tw] = pixel;
@@ -134,16 +136,14 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
   if (width < (1 << BLOOM_MIP_COUNT) || height < (1 << BLOOM_MIP_COUNT))
     return;
 
-  bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    image, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1, instance->scene_gpu.camera.bloom_threshold);
+  bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
 
   for (int i = 0; i < BLOOM_MIP_COUNT - 1; i++) {
     const int sw = width >> (i + 1);
     const int sh = height >> (i + 1);
     const int tw = width >> (i + 2);
     const int th = height >> (i + 2);
-    bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-      instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i + 1], tw, th, 0.0f);
+    bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i + 1], tw, th);
   }
 
   for (int i = BLOOM_MIP_COUNT - 1; i > 0; i--) {
@@ -151,10 +151,13 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
     const int sh = height >> (i + 1);
     const int tw = width >> i;
     const int th = height >> i;
-    bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i - 1], tw, th);
+    bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+      instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i - 1], tw, th, 1.0f, 1.0f);
   }
 
-  bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(instance->bloom_mips_gpu[0], width >> 1, height >> 1, image, width, height);
+  bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+    instance->bloom_mips_gpu[0], width >> 1, height >> 1, image, width, height, 1.0f - instance->scene_gpu.camera.bloom_strength,
+    instance->scene_gpu.camera.bloom_strength / BLOOM_MIP_COUNT);
 }
 
 static void allocate_bloom_mips(RaytraceInstance* instance) {
