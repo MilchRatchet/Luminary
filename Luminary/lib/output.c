@@ -264,7 +264,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
     }
 
     if (instance->scene_gpu.camera.auto_exposure) {
-      instance->scene_gpu.camera.exposure = get_auto_exposure_from_optix(optix_setup);
+      instance->scene_gpu.camera.exposure = get_auto_exposure_from_optix(optix_setup, instance->scene_gpu.camera.exposure);
     }
   }
 
