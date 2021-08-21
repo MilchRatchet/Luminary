@@ -343,14 +343,6 @@ __device__ float luminance(const RGBF v) {
   return 0.2126f * v.r + 0.7152f * v.g + 0.0722f * v.b;
 }
 
-/*
- * ACES Tonemap but with a more sensible brightness
- * "I don't know, I like it" - Milch
- */
-__device__ RGBF custom_tonemap(RGBF pixel) {
-  return aces_tonemap(scale_color(pixel, 2.0f));
-}
-
 __device__ RGBF reinhard_tonemap(RGBF pixel) {
   const float factor = 1.0f / (1.0f + luminance(pixel));
   pixel.r *= factor;

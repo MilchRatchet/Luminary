@@ -35,7 +35,6 @@
 #define TONEMAP_ACES 1
 #define TONEMAP_REINHARD 2
 #define TONEMAP_UNCHARTED2 3
-#define TONEMAP_CUSTOM 4
 #endif
 
 struct Camera {

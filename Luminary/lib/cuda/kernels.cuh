@@ -1153,9 +1153,6 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
       case TONEMAP_UNCHARTED2:
         pixel = uncharted2_tonemap(pixel);
         break;
-      case TONEMAP_CUSTOM:
-        pixel = custom_tonemap(pixel);
-        break;
     }
 
     const float dither = (device_scene.camera.dithering) ? get_dithering(x, y) : 0.0f;

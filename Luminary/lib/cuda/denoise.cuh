@@ -104,13 +104,31 @@ extern "C" RGBF* denoise_with_optix_realtime(void* input) {
   return (RGBF*) denoise_setup->outputLayer.data;
 }
 
-extern "C" float get_auto_exposure_from_optix(void* input, float exposure) {
+extern "C" float get_auto_exposure_from_optix(void* input, RaytraceInstance* instance) {
   realtime_denoise denoise_setup = *(realtime_denoise*) input;
+  const float exposure           = instance->scene_gpu.camera.exposure;
+
+  float target_exposure = 1.0f;
+
+  switch (instance->scene_gpu.camera.tonemap) {
+    case TONEMAP_NONE:
+      target_exposure = 0.75f;
+      break;
+    case TONEMAP_ACES:
+      target_exposure = 2.0f;
+      break;
+    case TONEMAP_REINHARD:
+      target_exposure = 0.75f;
+      break;
+    case TONEMAP_UNCHARTED2:
+      target_exposure = 0.75f;
+      break;
+  }
 
   float brightness;
   gpuErrchk(cudaMemcpy(&brightness, (void*) denoise_setup.hdr_intensity, sizeof(float), cudaMemcpyDeviceToHost));
 
-  return 0.8f * exposure + 0.2f * log2f(1.0f + brightness);
+  return 0.8f * exposure + 0.2f * target_exposure * log2f(1.0f + brightness);
 }
 
 extern "C" void free_realtime_denoise(void* input) {
