@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#undef assert
 #define assert(ans, message, _abort) \
   { ___assert((ans), (message), __FILE__, __LINE__, (_abort)); }
 

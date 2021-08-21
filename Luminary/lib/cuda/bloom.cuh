@@ -144,12 +144,16 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
   const int width  = instance->width;
   const int height = instance->height;
 
-  if (width < (1 << BLOOM_MIP_COUNT) || height < (1 << BLOOM_MIP_COUNT))
-    return;
+  int mip_count_w;
+  int mip_count_h;
+  bsr(width, mip_count_w);
+  bsr(height, mip_count_h);
+
+  const int mip_count = min(BLOOM_MIP_COUNT, min(mip_count_w, mip_count_h));
 
   bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
 
-  for (int i = 0; i < BLOOM_MIP_COUNT - 1; i++) {
+  for (int i = 0; i < mip_count - 1; i++) {
     const int sw = width >> (i + 1);
     const int sh = height >> (i + 1);
     const int tw = width >> (i + 2);
@@ -157,7 +161,7 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
     bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i + 1], tw, th);
   }
 
-  for (int i = BLOOM_MIP_COUNT - 1; i > 0; i--) {
+  for (int i = mip_count - 1; i > 0; i--) {
     const int sw = width >> (i + 1);
     const int sh = height >> (i + 1);
     const int tw = width >> i;
@@ -168,7 +172,7 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
 
   bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
     instance->bloom_mips_gpu[0], width >> 1, height >> 1, image, width, height, 1.0f - instance->scene_gpu.camera.bloom_strength,
-    instance->scene_gpu.camera.bloom_strength / BLOOM_MIP_COUNT);
+    instance->scene_gpu.camera.bloom_strength / mip_count);
 }
 
 static void allocate_bloom_mips(RaytraceInstance* instance) {

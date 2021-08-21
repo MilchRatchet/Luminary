@@ -3,6 +3,10 @@
 
 #include <stdlib.h>
 
+#if defined(__MSVC__) || defined(__CUDACC__) || defined(__clang__)
+#include <intrin.h>
+#endif
+
 #include "bvh.h"
 #include "mesh.h"
 #include "primitives.h"
@@ -156,5 +160,17 @@ struct RaytraceInstance {
       ptr = safe_realloc(ptr, size * length);     \
     }                                             \
   }
+
+#if defined(__GNUC__)
+#warning The function bsr may not work correctly on GCC as it was never tested.
+#define bsr(input, output) \
+  { output = 32 - __builtin_clz(input | 1) }
+#elif defined(__MSVC__)
+#define bsr(input, output) _BitScanReverse((DWORD*) &output, (DWORD) input | 1);
+#elif defined(__clang__) || defined(__CUDACC__)
+#define bsr(input, output) _BitScanReverse((unsigned long*) &output, (unsigned long) input | 1);
+#else
+#error No implementation of bsr is available for the given compiler. Consider adding an implementation.
+#endif
 
 #endif /* UTILS_H */
