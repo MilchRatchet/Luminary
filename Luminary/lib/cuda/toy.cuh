@@ -3,6 +3,12 @@
 
 #include "math.cuh"
 
+/*
+ * Requirement:
+ *      - Position should be the middle of the shape
+ *      - Scale should be the radius of the shape
+ */
+
 __device__ float toy_sphere_distance(const vec3 origin, const vec3 ray) {
   const vec3 a      = sub_vector(origin, device_scene.toy.position);
   const float u     = dot_product(a, ray);

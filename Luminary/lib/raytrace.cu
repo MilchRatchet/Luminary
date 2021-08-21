@@ -31,7 +31,7 @@
 // Path Tracing
 //---------------------------------
 
-static void update_sun(const Scene scene) {
+static void update_special_lights(const Scene scene) {
   vec3 sun;
   sun.x             = sinf(scene.sky.azimuth) * cosf(scene.sky.altitude);
   sun.y             = sinf(scene.sky.altitude);
@@ -46,6 +46,12 @@ static void update_sun(const Scene scene) {
   const vec3 light_source_sun = scale_vector(sun, 149630000000.0f);
 
   gpuErrchk(cudaMemcpy(scene.lights, &light_source_sun, sizeof(vec3), cudaMemcpyHostToDevice));
+
+  Light toy_light;
+  toy_light.pos    = scene.toy.position;
+  toy_light.radius = scene.toy.scale;
+
+  gpuErrchk(cudaMemcpy(scene.lights + 1, &toy_light, sizeof(Light), cudaMemcpyHostToDevice));
 }
 
 static void update_camera_pos(const Scene scene, const unsigned int width, const unsigned int height) {
@@ -259,7 +265,7 @@ void update_scene(RaytraceInstance* instance) {
   gpuErrchk(cudaMemcpyToSymbol(device_pixels_left, &(amount), sizeof(int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-  update_sun(instance->scene_gpu);
+  update_special_lights(instance->scene_gpu);
   update_camera_pos(instance->scene_gpu, instance->width, instance->height);
   gpuErrchk(cudaMemcpyToSymbol(device_default_material, &(instance->default_material), sizeof(RGBF), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_lights_active, &(instance->lights_active), sizeof(int), 0, cudaMemcpyHostToDevice));

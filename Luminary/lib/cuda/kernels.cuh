@@ -476,22 +476,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_geometry_tasks()
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
-        int light_count = 1;
-
-        if (device_lights_active) {
-          light_count = device_scene.lights_length;
-        }
+        int light_count;
+        Light light;
+        light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
 
         const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
 
         const float light_sample_depth_bias = powf(0.1f, device_max_ray_depth - ((task.state & DEPTH_LEFT) >> 16));
         const float light_sample_probability =
           fmaxf(1.0f - 1.0f / (light_count + 1), 1.0f - (1 + device_temporal_frames) * light_sample_depth_bias);
-
-        Light light;
-        if (light_sample < light_sample_probability) {
-          light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
-        }
 
         const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
         const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
@@ -898,22 +891,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
-        int light_count = 1;
-
-        if (device_lights_active) {
-          light_count = device_scene.lights_length;
-        }
+        int light_count;
+        Light light;
+        light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
 
         const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
 
         const float light_sample_depth_bias = powf(0.1f, device_max_ray_depth - ((task.state & DEPTH_LEFT) >> 16));
         const float light_sample_probability =
           fmaxf(1.0f - 1.0f / (light_count + 1), 1.0f - (1 + device_temporal_frames) * light_sample_depth_bias);
-
-        Light light;
-        if (light_sample < light_sample_probability) {
-          light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
-        }
 
         const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
         const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);

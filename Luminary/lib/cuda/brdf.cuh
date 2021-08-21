@@ -198,12 +198,18 @@ __device__ vec3 refraction_BRDF(RGBF& record, const vec3 normal, const vec3 ray,
   return normalize_vector(add_vector(scale_vector(ray, index), scale_vector(n, index * fabsf(a) - sqrtf(b))));
 }
 
-__device__ Light sample_light(const vec3 position, const int light_count, uint32_t& light_sample_id, const float r) {
-  uint32_t light_index = 0;
+__device__ Light sample_light(const vec3 position, int& light_count, uint32_t& light_sample_id, const float r) {
+  const int sun_visible = device_sun.y >= -0.1f;
+  const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
+  light_count           = 0;
+  light_count += (sun_visible) ? 1 : 0;
+  light_count += (toy_visible) ? 1 : 0;
+  light_count += (device_lights_active) ? device_scene.lights_length - 2 : 0;
 
-  if (device_lights_active) {
-    light_index = (uint32_t) (r * light_count);
-  }
+  uint32_t light_index = (uint32_t) (r * light_count);
+
+  light_index += (sun_visible) ? 0 : 1;
+  light_index += (toy_visible || light_index < TOY_LIGHT) ? 0 : 1;
 
   light_sample_id = light_index;
 

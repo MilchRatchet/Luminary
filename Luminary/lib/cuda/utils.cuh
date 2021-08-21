@@ -109,7 +109,8 @@ struct TraceResult {
 #define OCEAN_HIT 0xfffffffe
 #define TOY_HIT 0xfffffffd
 #define ANY_LIGHT 0xffffffff
-#define TOY_LIGHT 0xfffffffd
+#define TOY_LIGHT 0x1
+#define SUN_LIGHT 0x0
 
 //===========================================================================================
 // Device Variables
