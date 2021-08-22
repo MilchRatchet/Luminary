@@ -694,7 +694,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
 
         const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
 
-        ray = refraction_BRDF(record, normal, ray, 0.0f, refraction_index);
+        ray = refraction_BRDF(record, normal, ray, 0.0f, refraction_index, 0.0f, 0.0f);
       }
       else {
         const vec3 V = scale_vector(ray, -1.0f);
@@ -870,6 +870,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       }
 
       uint32_t light_sample_id;
+      const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
+      const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
       if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
         task.position = add_vector(task.position, scale_vector(task.ray, eps * 8.0f));
@@ -882,7 +884,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
 
         const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
 
-        task.ray = refraction_BRDF(record, normal, task.ray, roughness, refraction_index);
+        task.ray = refraction_BRDF(record, normal, task.ray, roughness, refraction_index, beta, gamma);
       }
       else {
         const float specular_probability = lerp(0.5f, 1.0f, metallic);
@@ -900,9 +902,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
         const float light_sample_depth_bias = powf(0.1f, device_max_ray_depth - ((task.state & DEPTH_LEFT) >> 16));
         const float light_sample_probability =
           fmaxf(1.0f - 1.0f / (light_count + 1), 1.0f - (1 + device_temporal_frames) * light_sample_depth_bias);
-
-        const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
-        const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
 
         if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < specular_probability) {
           task.ray = specular_BRDF(
