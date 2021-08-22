@@ -144,4 +144,23 @@ __device__ SkyTask load_sky_task(const void* ptr) {
   return task;
 }
 
+__device__ ToyTask load_toy_task(const void* ptr) {
+  const float4 data0 = __ldcs((float4*) ptr);
+  const float4 data1 = __ldcs(((float4*) ptr) + 1);
+
+  ToyTask task;
+  task.position.x = data0.x;
+  task.position.y = data0.y;
+  task.position.z = data0.z;
+  task.ray.x      = data0.w;
+
+  task.ray.y   = data1.x;
+  task.ray.z   = data1.y;
+  task.index.x = float_as_uint(data1.z) & 0xffff;
+  task.index.y = (float_as_uint(data1.z) >> 16);
+  task.state   = float_as_uint(data1.w);
+
+  return task;
+}
+
 #endif /* CU_MEMORY_H */

@@ -15,20 +15,21 @@
 #include <thread>
 
 #include "SDL/SDL.h"
-#include "cuda/brdf.cuh"
-#include "cuda/bvh.cuh"
-#include "cuda/directives.cuh"
-#include "cuda/math.cuh"
-#include "cuda/memory.cuh"
-#include "cuda/ocean.cuh"
-#include "cuda/random.cuh"
-#include "cuda/sky.cuh"
-#include "cuda/utils.cuh"
+#include "brdf.cuh"
+#include "bvh.cuh"
+#include "directives.cuh"
 #include "image.h"
+#include "math.cuh"
+#include "memory.cuh"
 #include "mesh.h"
+#include "ocean.cuh"
 #include "primitives.h"
+#include "random.cuh"
 #include "raytrace.h"
 #include "scene.h"
+#include "sky.cuh"
+#include "toy.cuh"
+#include "utils.cuh"
 
 __device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 default_ray;
@@ -166,6 +167,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
+    if (device_scene.toy.active) {
+      const float toy_dist = get_toy_distance(task.origin, task.ray);
+
+      if (toy_dist < depth) {
+        depth  = toy_dist;
+        hit_id = TOY_HIT;
+      }
+    }
+
     float2 result;
     result.x = depth;
     result.y = uint_as_float(hit_id);
@@ -179,6 +189,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   uint16_t geometry_task_count = 0;
   uint16_t sky_task_count      = 0;
   uint16_t ocean_task_count    = 0;
+  uint16_t toy_task_count      = 0;
 
   // count data
   for (int i = 0; i < task_count; i++) {
@@ -191,6 +202,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     else if (hit_id == OCEAN_HIT) {
       ocean_task_count++;
     }
+    else if (hit_id == TOY_HIT) {
+      toy_task_count++;
+    }
     else {
       geometry_task_count++;
     }
@@ -199,7 +213,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   int geometry_offset = 0;
   int ocean_offset    = geometry_task_count;
   int sky_offset      = geometry_task_count + ocean_task_count;
+  int toy_offset      = geometry_task_count + ocean_task_count + sky_task_count;
   int k               = 0;
+
+  ushort4 task_offsets;
+  task_offsets.x = geometry_offset;
+  task_offsets.y = ocean_offset;
+  task_offsets.z = sky_offset;
+  task_offsets.w = toy_offset;
+  __stcs((ushort4*) (device_task_offsets + (threadIdx.x + blockIdx.x * blockDim.x) * 4), task_offsets);
 
   // order data
   while (k < task_count) {
@@ -211,11 +233,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     if (hit_id == SKY_HIT) {
       index          = sky_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count);
+      needs_swapping = (k < geometry_task_count + ocean_task_count) || (k >= geometry_task_count + ocean_task_count + sky_task_count);
     }
     else if (hit_id == OCEAN_HIT) {
       index          = ocean_offset++;
       needs_swapping = (k < geometry_task_count) || (k >= geometry_task_count + ocean_task_count);
+    }
+    else if (hit_id == TOY_HIT) {
+      index          = toy_offset++;
+      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count);
     }
     else {
       index          = geometry_offset++;
@@ -233,6 +259,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   geometry_task_count = 0;
   sky_task_count      = 0;
   ocean_task_count    = 0;
+  toy_task_count      = 0;
 
   // process data
   for (int i = 0; i < task_count; i++) {
@@ -259,16 +286,24 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       data0.x     = task.origin.x;
       data0.y     = task.origin.y;
       data0.z     = task.origin.z;
-      data0.w     = asinf(task.ray.y);
-      data1.x     = atan2f(task.ray.z, task.ray.x);
-
-      if (hit_id == OCEAN_HIT) {
-        ocean_task_count++;
-        data1.y = depth;
+      if (hit_id == TOY_HIT) {
+        toy_task_count++;
+        data0.w = task.ray.x;
+        data1.x = task.ray.y;
+        data1.y = task.ray.z;
       }
       else {
-        geometry_task_count++;
-        data1.y = uint_as_float(hit_id);
+        data0.w = asinf(task.ray.y);
+        data1.x = atan2f(task.ray.z, task.ray.x);
+
+        if (hit_id == OCEAN_HIT) {
+          ocean_task_count++;
+          data1.y = depth;
+        }
+        else {
+          geometry_task_count++;
+          data1.y = uint_as_float(hit_id);
+        }
       }
 
       data1.z = *((float*) &task.index);
@@ -281,17 +316,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   }
 
   ushort4 task_counts;
-  task_counts.x = 0;
-  task_counts.y = geometry_task_count;
-  task_counts.z = ocean_task_count;
-  task_counts.w = sky_task_count;
+  task_counts.x = geometry_task_count;
+  task_counts.y = ocean_task_count;
+  task_counts.z = sky_task_count;
+  task_counts.w = toy_task_count;
 
   __stcs((ushort4*) (device_task_counts + (threadIdx.x + blockIdx.x * blockDim.x) * 4), task_counts);
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_geometry_tasks() {
   int trace_count      = 0;
-  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device_tasks + get_task_address(i));
@@ -441,22 +476,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_geometry_tasks()
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 
-        int light_count = 1;
-
-        if (device_lights_active) {
-          light_count = device_scene.lights_length;
-        }
+        int light_count;
+        Light light;
+        light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
 
         const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
 
         const float light_sample_depth_bias = powf(0.1f, device_max_ray_depth - ((task.state & DEPTH_LEFT) >> 16));
         const float light_sample_probability =
           fmaxf(1.0f - 1.0f / (light_count + 1), 1.0f - (1 + device_temporal_frames) * light_sample_depth_bias);
-
-        Light light;
-        if (light_sample < light_sample_probability) {
-          light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
-        }
 
         const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
         const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
@@ -519,7 +547,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_geometry_tasks()
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_tasks() {
-  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device_tasks + get_task_address(i));
@@ -614,11 +642,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  int trace_count          = device_task_counts[id * 4];
-  const int geometry_count = device_task_counts[id * 4 + 1];
-  const int task_count     = device_task_counts[id * 4 + 2];
-
-  const int task_offset = geometry_count;
+  int trace_count       = device_task_counts[id * 4];
+  const int task_count  = device_task_counts[id * 4 + 1];
+  const int task_offset = device_task_offsets[id * 4 + 1];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device_tasks + get_task_address(task_offset + i));
@@ -665,6 +691,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
         record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
         record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
         record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
+
+        const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
+
+        ray = refraction_BRDF(record, normal, ray, 0.0f, refraction_index, 0.0f, 0.0f);
       }
       else {
         const vec3 V = scale_vector(ray, -1.0f);
@@ -708,10 +738,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int geometry_count = device_task_counts[id * 4 + 1];
-  const int task_count     = device_task_counts[id * 4 + 2];
-
-  const int task_offset = geometry_count;
+  const int task_count  = device_task_counts[id * 4 + 1];
+  const int task_offset = device_task_offsets[id * 4 + 1];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device_tasks + get_task_address(task_offset + i));
@@ -736,11 +764,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
-  const int geometry_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
-  const int ocean_count    = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
-  const int task_count     = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_offset = geometry_count + ocean_count;
+  const int task_count  = device_task_counts[id * 4 + 2];
+  const int task_offset = device_task_offsets[id * 4 + 2];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device_tasks + get_task_address(task_offset + i));
@@ -761,11 +788,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks() {
-  const int geometry_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 1];
-  const int ocean_count    = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 2];
-  const int task_count     = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4 + 3];
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_offset = geometry_count + ocean_count;
+  const int task_count  = device_task_counts[id * 4 + 2];
+  const int task_offset = device_task_offsets[id * 4 + 2];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device_tasks + get_task_address(task_offset + i));
@@ -780,6 +806,162 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
     }
     else if (device_shading_mode == SHADING_NORMAL) {
       device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+    }
+
+    atomicSub(&device_pixels_left, 1);
+  }
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  int trace_count       = device_task_counts[id * 4];
+  const int task_count  = device_task_counts[id * 4 + 3];
+  const int task_offset = device_task_offsets[id * 4 + 3];
+
+  for (int i = 0; i < task_count; i++) {
+    ToyTask task    = load_toy_task(device_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
+
+    vec3 normal     = get_toy_normal(task.position);
+    int from_inside = 0;
+
+    if (dot_product(normal, task.ray) > 0.0f) {
+      normal      = scale_vector(normal, -1.0f);
+      from_inside = 1;
+    }
+
+    RGBAF albedo          = device_scene.toy.albedo;
+    const float roughness = (1.0f - device_scene.toy.material.r) * (1.0f - device_scene.toy.material.r);
+    const float metallic  = device_scene.toy.material.g;
+    const float intensity = device_scene.toy.material.b;
+    RGBF emission         = get_color(device_scene.toy.emission.r, device_scene.toy.emission.g, device_scene.toy.emission.b);
+
+    if (albedo.a < device_scene.camera.alpha_cutoff)
+      albedo.a = 0.0f;
+
+    RGBF record = device_records[pixel];
+
+    if (albedo.a > 0.0f && device_scene.toy.emissive) {
+      if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
+        device_albedo_buffer[pixel] = emission;
+      }
+
+      if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
+        emission.r *= intensity * record.r;
+        emission.g *= intensity * record.g;
+        emission.b *= intensity * record.b;
+
+        const uint32_t light = device_light_sample_history[pixel];
+
+        if (light == ANY_LIGHT || light == TOY_LIGHT) {
+          device_frame_buffer[pixel] = emission;
+        }
+      }
+
+      atomicSub(&device_pixels_left, 1);
+    }
+    else if (task.state & DEPTH_LEFT) {
+      if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
+        device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
+        task.state ^= ALBEDO_BUFFER_STATE;
+      }
+
+      uint32_t light_sample_id;
+      const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
+      const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
+
+      if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
+        task.position = add_vector(task.position, scale_vector(task.ray, eps * 8.0f));
+
+        record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
+        record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
+        record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
+
+        light_sample_id = device_light_sample_history[pixel];
+
+        const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
+
+        task.ray = refraction_BRDF(record, normal, task.ray, roughness, refraction_index, beta, gamma);
+      }
+      else {
+        const float specular_probability = lerp(0.5f, 1.0f, metallic);
+
+        const vec3 V = scale_vector(task.ray, -1.0f);
+
+        task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
+
+        int light_count;
+        Light light;
+        light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
+
+        const float light_sample = sample_blue_noise(task.index.x, task.index.y, task.state, 50);
+
+        const float light_sample_depth_bias = powf(0.1f, device_max_ray_depth - ((task.state & DEPTH_LEFT) >> 16));
+        const float light_sample_probability =
+          fmaxf(1.0f - 1.0f / (light_count + 1), 1.0f - (1 + device_temporal_frames) * light_sample_depth_bias);
+
+        if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < specular_probability) {
+          task.ray = specular_BRDF(
+            record, light_sample_id, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic,
+            beta, gamma, specular_probability);
+        }
+        else {
+          task.ray = diffuse_BRDF(
+            record, light_sample_id, normal, V, light, light_sample, light_sample_probability, light_count, albedo, roughness, metallic,
+            beta, gamma, specular_probability);
+        }
+      }
+
+      task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
+
+      TraceTask next_task;
+      next_task.origin = task.position;
+      next_task.ray    = task.ray;
+      next_task.index  = task.index;
+      next_task.state  = task.state;
+
+      store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
+
+      device_records[pixel]              = record;
+      device_light_sample_history[pixel] = light_sample_id;
+    }
+    else {
+      atomicSub(&device_pixels_left, 1);
+    }
+  }
+
+  device_task_counts[id * 4] = trace_count;
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int task_count  = device_task_counts[id * 4 + 3];
+  const int task_offset = device_task_offsets[id * 4 + 3];
+
+  for (int i = 0; i < task_count; i++) {
+    const ToyTask task = load_toy_task(device_tasks + get_task_address(task_offset + i));
+    const int pixel    = task.index.y * device_width + task.index.x;
+
+    if (device_shading_mode == SHADING_ALBEDO) {
+      device_frame_buffer[pixel] = get_color(device_scene.toy.albedo.r, device_scene.toy.albedo.g, device_scene.toy.albedo.b);
+    }
+    else if (device_shading_mode == SHADING_DEPTH) {
+      const float dist           = get_length(sub_vector(device_scene.camera.pos, task.position));
+      const float value          = __saturatef((1.0f / dist) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value, value, value);
+    }
+    else if (device_shading_mode == SHADING_NORMAL) {
+      vec3 normal = get_toy_normal(task.position);
+
+      if (dot_product(normal, task.ray) > 0.0f) {
+        normal = scale_vector(normal, -1.0f);
+      }
+
+      device_frame_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
     }
 
     atomicSub(&device_pixels_left, 1);
@@ -899,137 +1081,6 @@ __global__ void finalize_samples() {
   }
 }
 
-/*__global__
-void bloom_kernel_split(RGBF* image) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  while (id < device_amount) {
-    RGBF pixel = image[id];
-    RGBF truncated_pixel = get_color(fminf(0.0f, pixel.r),fminf(0.0f, pixel.g),fminf(0.0f, pixel.b));
-    //image[id] = truncated_pixel;
-
-    pixel.r -= truncated_pixel.r;
-    pixel.g -= truncated_pixel.g;
-    pixel.b -= truncated_pixel.b;
-
-    device_albedo_buffer[id] = pixel;
-
-    id += blockDim.x * gridDim.x;
-  }
-}*/
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void bloom_kernel_blur_vertical(RGBF* image) {
-  const int stride_length = 4;
-
-  unsigned int id     = threadIdx.x + blockIdx.x * blockDim.x;
-  unsigned int stride = id % device_width + device_width * stride_length * (id / device_width);
-
-  const float sigma    = 3.0f;
-  const float strength = 4.0f;
-
-  const float reference_pixel_count = 1280.0f;
-  const float pixel_size            = reference_pixel_count / device_width;
-  const int kernel_size             = (int) ((sigma * 3.0f) / pixel_size) + 1;
-
-  const float gauss_factor1 = 1.0f / (2.0f * sigma * sigma);
-  const float gauss_factor2 = gauss_factor1 / 3.14159265358979323846f;
-
-  __shared__ RGBF reuse[THREADS_PER_BLOCK][stride_length];
-
-  while (stride < device_amount) {
-    for (int i = 0; i < stride_length; i++) {
-      if (stride + i * device_width >= device_amount)
-        break;
-      reuse[threadIdx.x][i] = image[stride + i * device_width];
-    }
-
-    for (int j = 0; j < stride_length; j++) {
-      if (stride + j * device_width >= device_amount)
-        break;
-
-      RGBF collector = get_color(0.0f, 0.0f, 0.0f);
-
-      for (int i = -kernel_size + 1; i < kernel_size; i += 2) {
-        const int index = stride + (i + j) * device_width;
-        if (index < 0)
-          continue;
-        if (index >= device_amount)
-          break;
-
-        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i + j] : image[index];
-
-        const float x     = abs(i) * pixel_size;
-        const float gauss = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
-
-        collector.r += value.r * gauss;
-        collector.g += value.g * gauss;
-        collector.b += value.b * gauss;
-      }
-
-      device_bloom_scratch[stride + j * device_width] = collector;
-    }
-
-    id += blockDim.x * gridDim.x;
-    stride = id % device_width + device_width * stride_length * (id / device_width);
-  }
-}
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void bloom_kernel_blur_horizontal(RGBF* image) {
-  const int stride_length = 4;
-
-  unsigned int id     = threadIdx.x + blockIdx.x * blockDim.x;
-  unsigned int stride = stride_length * id;
-
-  const float sigma    = 3.0f;
-  const float strength = 4.0f;
-
-  const float reference_pixel_count = 1280.0f;
-  const float pixel_size            = reference_pixel_count / device_width;
-  const int kernel_size             = (int) ((sigma * 3.0f) / pixel_size) + 1;
-
-  const float gauss_factor1 = 1.0f / (2.0f * sigma * sigma);
-  const float gauss_factor2 = gauss_factor1 / 3.14159265358979323846f;
-
-  __shared__ RGBF reuse[THREADS_PER_BLOCK][stride_length];
-
-  while (stride < device_amount) {
-    for (int i = 0; i < stride_length; i++) {
-      if (stride + i >= device_amount)
-        break;
-      reuse[threadIdx.x][i] = device_bloom_scratch[stride + i];
-    }
-
-    const int column              = stride % device_width;
-    const int begin               = max(-kernel_size + 1, -column);
-    const int end                 = min(kernel_size, device_width - column - 3);
-    const int valid_stride_length = min(stride_length, device_amount - stride);
-
-    for (int j = 0; j < valid_stride_length; j++) {
-      RGBF collector = get_color(0.0f, 0.0f, 0.0f);
-
-      for (int i = begin; i < end; i += 2) {
-        const int index = stride + i + j;
-
-        RGBF value = (i + j >= 0 && i + j < stride_length) ? reuse[threadIdx.x][i + j] : device_bloom_scratch[index];
-
-        const float x     = abs(i) * pixel_size;
-        const float gauss = strength * pixel_size * gauss_factor2 * expf(-x * x * gauss_factor1);
-
-        collector.r += value.r * gauss;
-        collector.g += value.g * gauss;
-        collector.b += value.b * gauss;
-      }
-
-      RGBF pixel = image[stride + j];
-
-      image[stride + j] = add_color(pixel, collector);
-    }
-
-    id += blockDim.x * gridDim.x;
-    stride = stride_length * id;
-  }
-}
-
 __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const RGBF* source) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -1071,11 +1122,29 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     pixel.g = pixel_00.g * f00 + pixel_10.g * f10 + pixel_01.g * f01 + pixel_11.g * f11;
     pixel.b = pixel_00.b * f00 + pixel_10.b * f10 + pixel_01.b * f01 + pixel_11.b * f11;
 
-    pixel = reinhard_tonemap(pixel);
+    pixel.r *= device_scene.camera.exposure;
+    pixel.g *= device_scene.camera.exposure;
+    pixel.b *= device_scene.camera.exposure;
 
-    pixel.r = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.r));
-    pixel.g = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.g));
-    pixel.b = fminf(255.9f, 255.9f * linearRGB_to_SRGB(device_scene.camera.exposure * pixel.b));
+    switch (device_scene.camera.tonemap) {
+      case TONEMAP_NONE:
+        break;
+      case TONEMAP_ACES:
+        pixel = aces_tonemap(pixel);
+        break;
+      case TONEMAP_REINHARD:
+        pixel = reinhard_tonemap(pixel);
+        break;
+      case TONEMAP_UNCHARTED2:
+        pixel = uncharted2_tonemap(pixel);
+        break;
+    }
+
+    const float dither = (device_scene.camera.dithering) ? get_dithering(x, y) : 0.0f;
+
+    pixel.r = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.r));
+    pixel.g = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.g));
+    pixel.b = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.b));
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;

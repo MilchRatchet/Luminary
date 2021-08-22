@@ -35,6 +35,9 @@ __device__ float Smith_G2_over_G1_height_correlated(const float alpha2, const fl
 }
 
 __device__ vec3 sample_GGX_VNDF(const vec3 v, const float alpha, const float random1, const float random2) {
+  if (alpha < eps * eps)
+    return get_vector(0.0f, 0.0f, 1.0f);
+
   vec3 v_hemi;
 
   v_hemi.x = alpha * v.x;
@@ -88,33 +91,24 @@ __device__ vec3 specular_BRDF(
   const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
   vec3 H_local;
 
-  if (alpha < eps * eps) {
-    H_local.x = 0.0f;
-    H_local.y = 0.0f;
-    H_local.z = 1.0f;
+  const vec3 S_local =
+    rotate_vector_by_quaternion(normalize_vector(sample_ray_from_angles_and_vector(beta * light.radius, gamma, light.pos)), rotation_to_z);
 
-    light_sample_id = ANY_LIGHT;
+  if (light_sample < light_sample_probability) {
+    H_local.x = S_local.x + V_local.x;
+    H_local.y = S_local.y + V_local.y;
+    H_local.z = S_local.z + V_local.z;
+
+    H_local = normalize_vector(H_local);
+
+    weight = (1.0f / light_sample_probability) * light.radius * light_count;
   }
   else {
-    const vec3 S_local = rotate_vector_by_quaternion(
-      normalize_vector(sample_ray_from_angles_and_vector(beta * light.radius, gamma, light.pos)), rotation_to_z);
+    H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
 
-    if (light_sample < light_sample_probability) {
-      H_local.x = S_local.x + V_local.x;
-      H_local.y = S_local.y + V_local.y;
-      H_local.z = S_local.z + V_local.z;
+    light_sample_id = ANY_LIGHT;
 
-      H_local = normalize_vector(H_local);
-
-      weight = (1.0f / light_sample_probability) * light.radius * light_count;
-    }
-    else {
-      H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
-
-      light_sample_id = ANY_LIGHT;
-
-      weight = (1.0f / (1.0f - light_sample_probability));
-    }
+    weight = (1.0f / (1.0f - light_sample_probability));
   }
 
   const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
@@ -190,12 +184,55 @@ __device__ vec3 diffuse_BRDF(
   return ray;
 }
 
-__device__ Light sample_light(const vec3 position, const int light_count, uint32_t& light_sample_id, const float r) {
-  uint32_t light_index = 0;
+__device__ vec3 refraction_BRDF(
+  RGBF& record, const vec3 normal, const vec3 ray, const float roughness, const float index, const float r1, const float r2) {
+  const float alpha = roughness * roughness;
 
-  if (device_lights_active) {
-    light_index = (uint32_t) (r * light_count);
+  vec3 H;
+
+  const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
+  const vec3 V                   = scale_vector(ray, -1.0f);
+  const vec3 V_local             = rotate_vector_by_quaternion(V, rotation_to_z);
+
+  const vec3 H_local = sample_GGX_VNDF(V_local, alpha, r1, r2);
+  H                  = rotate_vector_by_quaternion(H_local, inverse_quaternion(rotation_to_z));
+
+  const float HdotV = fmaxf(eps, fminf(1.0f, dot_product(H_local, V_local)));
+  const float NdotH = fmaxf(eps, fminf(1.0f, H_local.z));
+  const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
+
+  RGBF specular_f0 = get_color(1.0f, 1.0f, 1.0f);
+
+  const RGBF F = Fresnel_Schlick(specular_f0, shadowed_F90(specular_f0), HdotV);
+
+  const float weight = Smith_G2_over_G1_height_correlated(alpha * alpha, NdotH, NdotV);
+
+  record.r *= F.r * weight;
+  record.g *= F.g * weight;
+  record.b *= F.b * weight;
+
+  const float a = -dot_product(ray, H);
+  const float b = 1.0f - index * index * (1.0f - a * a);
+
+  if (b < 0.0f) {
+    return normalize_vector(reflect_vector(ray, scale_vector(H, -1.0f)));
   }
+
+  return normalize_vector(add_vector(scale_vector(ray, index), scale_vector(H, index * a - sqrtf(b))));
+}
+
+__device__ Light sample_light(const vec3 position, int& light_count, uint32_t& light_sample_id, const float r) {
+  const int sun_visible = device_sun.y >= -0.1f;
+  const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
+  light_count           = 0;
+  light_count += (sun_visible) ? 1 : 0;
+  light_count += (toy_visible) ? 1 : 0;
+  light_count += (device_lights_active) ? device_scene.lights_length - 2 : 0;
+
+  uint32_t light_index = (uint32_t) (r * light_count);
+
+  light_index += (sun_visible) ? 0 : 1;
+  light_index += (toy_visible || light_index < TOY_LIGHT) ? 0 : 1;
 
   light_sample_id = light_index;
 

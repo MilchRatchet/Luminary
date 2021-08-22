@@ -85,7 +85,7 @@ void process_lights(Scene* scene) {
 
   unsigned int light_groups_length = 16;
   Light* light_groups              = (Light*) malloc(sizeof(Light) * lights_length);
-  unsigned int light_group_count   = 1;
+  unsigned int light_group_count   = 2;
 
   vec3 sun;
   sun.x = sinf(data.sky.azimuth) * cosf(data.sky.altitude) * 149630000000.0f;
@@ -94,6 +94,9 @@ void process_lights(Scene* scene) {
 
   light_groups[0].pos    = sun;
   light_groups[0].radius = 696340000.0f;
+
+  light_groups[1].pos    = data.toy.position;
+  light_groups[1].radius = data.toy.scale;
 
   while (light_count != 0) {
     if (light_group_count == light_groups_length) {

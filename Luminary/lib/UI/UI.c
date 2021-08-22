@@ -60,13 +60,16 @@ static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_info(ui, "Rotation X", &(instance->scene_gpu.camera.rotation.x), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Rotation Y", &(instance->scene_gpu.camera.rotation.y), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Rotation Z", &(instance->scene_gpu.camera.rotation.z), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
+  panels[i++] = create_dropdown(ui, "Tone Mapping", &(instance->scene_gpu.camera.tonemap), 0, 4, "None\0ACES\0Reinhard\0Uncharted 2", 7);
   panels[i++] = create_slider(ui, "Field of View", &(instance->scene_gpu.camera.fov), 1, 0.001f, 0.0001f, FLT_MAX);
   panels[i++] = create_check(ui, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure), 0);
   panels[i++] = create_info(ui, "Exposure", &(instance->scene_gpu.camera.exposure), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_slider(ui, "Aperture Size", &(instance->scene_gpu.camera.aperture_size), 1, 0.0005f, 0.0f, FLT_MAX);
   panels[i++] = create_slider(ui, "Focal Length", &(instance->scene_gpu.camera.focal_length), 1, 0.001f, 0.0f, FLT_MAX);
   panels[i++] = create_slider(ui, "Far Clip Distance", &(instance->scene_gpu.camera.far_clip_distance), 1, 0.05f, 0.0f, FLT_MAX);
-  panels[i++] = create_check(ui, "Bloom", &(instance->use_bloom), 0);
+  panels[i++] = create_check(ui, "Bloom", &(instance->scene_gpu.camera.bloom), 0);
+  panels[i++] = create_slider(ui, "Bloom Strength", &(instance->scene_gpu.camera.bloom_strength), 0, 0.0005f, 0.0f, 1.0f);
+  panels[i++] = create_check(ui, "Dithering", &(instance->scene_gpu.camera.dithering), 0);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene_gpu.camera.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f);
 
   return panels;
@@ -78,6 +81,10 @@ static UIPanel* create_sky_panels(UI* ui, RaytraceInstance* instance) {
   int i = 0;
 
   panels[i++] = create_tab(ui, &(ui->tab));
+  panels[i++] = create_color(ui, "Sun Color", (float*) &(instance->scene_gpu.sky.sun_color));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.sky.sun_color.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.sky.sun_color.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.sky.sun_color.b), 1, 0.001f, 0.0f, 1.0f);
   panels[i++] = create_info(ui, "Azimuth", &(instance->scene_gpu.sky.azimuth), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Altitude", &(instance->scene_gpu.sky.altitude), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_slider(ui, "Density", &(instance->scene_gpu.sky.base_density), 1, 0.001f, 0.0f, FLT_MAX);
@@ -103,6 +110,7 @@ static UIPanel* create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.ocean.albedo.r), 1, 0.001f, 0.0f, 1.0f);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.ocean.albedo.g), 1, 0.001f, 0.0f, 1.0f);
   panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.ocean.albedo.b), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene_gpu.ocean.refractive_index), 1, 0.001f, 1.0f, FLT_MAX);
   panels[i++] = create_check(ui, "Emissive", &(instance->scene_gpu.ocean.emissive), 1);
   panels[i++] = create_slider(ui, "Alpha", &(instance->scene_gpu.ocean.albedo.a), 1, 0.001f, 0.0f, 1.0f);
   panels[i++] = create_check(ui, "Animated", &(instance->scene_gpu.ocean.update), 1);
@@ -117,6 +125,29 @@ static UIPanel* create_toy_panels(UI* ui, RaytraceInstance* instance) {
   int i = 0;
 
   panels[i++] = create_tab(ui, &(ui->tab));
+  panels[i++] = create_check(ui, "Active", &(instance->scene_gpu.toy.active), 1);
+  panels[i++] = create_dropdown(ui, "Shape", &(instance->scene_gpu.toy.shape), 1, 1, "Sphere", 2);
+  panels[i++] = create_slider(ui, "Position X", &(instance->scene_gpu.toy.position.x), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Position Y", &(instance->scene_gpu.toy.position.y), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Position Z", &(instance->scene_gpu.toy.position.z), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Rotation X", &(instance->scene_gpu.toy.rotation.x), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Rotation Y", &(instance->scene_gpu.toy.rotation.y), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Rotation Z", &(instance->scene_gpu.toy.rotation.z), 1, 0.005f, -FLT_MAX, FLT_MAX);
+  panels[i++] = create_slider(ui, "Scale", &(instance->scene_gpu.toy.scale), 1, 0.005f, 0.0f, FLT_MAX);
+  panels[i++] = create_color(ui, "Albedo", (float*) &(instance->scene_gpu.toy.albedo));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.toy.albedo.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.toy.albedo.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.toy.albedo.b), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Alpha", &(instance->scene_gpu.toy.albedo.a), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "Smoothness", &(instance->scene_gpu.toy.material.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "Metallic", &(instance->scene_gpu.toy.material.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene_gpu.toy.refractive_index), 1, 0.001f, 1.0f, FLT_MAX);
+  panels[i++] = create_check(ui, "Emissive", &(instance->scene_gpu.toy.emissive), 1);
+  panels[i++] = create_color(ui, "Emission", (float*) &(instance->scene_gpu.toy.emission));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.toy.emission.r), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.toy.emission.g), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.toy.emission.b), 1, 0.001f, 0.0f, 1.0f);
+  panels[i++] = create_slider(ui, "Light Intensity", &(instance->scene_gpu.toy.material.b), 1, 0.001f, 0.0f, FLT_MAX);
 
   return panels;
 }

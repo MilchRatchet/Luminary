@@ -190,9 +190,9 @@ __device__ RGBF get_sky_color(const vec3 ray) {
     result.b += transmittance.b * cos_angle * device_scene.sky.sun_strength;
   }
 
-  result.r *= sun_intensity;
-  result.g *= sun_intensity;
-  result.b *= sun_intensity;
+  result.r *= sun_intensity * device_scene.sky.sun_color.r;
+  result.g *= sun_intensity * device_scene.sky.sun_color.g;
+  result.b *= sun_intensity * device_scene.sky.sun_color.b;
 
   return result;
 }
