@@ -11,11 +11,11 @@
 #include "mesh.h"
 #include "primitives.h"
 
-#define THRESHOLD_TRIANGLES 2
+#define THRESHOLD_TRIANGLES 3
 #define OBJECT_SPLIT_BIN_COUNT 32
 #define SPATIAL_SPLIT_THRESHOLD 0.00001f
 #define SPATIAL_SPLIT_BIN_COUNT 32
-#define COST_OF_TRIANGLE 0.4f
+#define COST_OF_TRIANGLE 0.5f
 #define COST_OF_NODE 1.0f
 
 struct vec3_p {
@@ -873,9 +873,6 @@ Node8* collapse_bvh(
       const float compression_y = 1.0f / exp2f(node.ey);
       const float compression_z = 1.0f / exp2f(node.ez);
 
-      vec3 centroid = {
-        .x = (node_high.x + node_low.x) * 0.5f, .y = (node_high.y + node_low.y) * 0.5f, .z = (node_high.z + node_low.z) * 0.5f};
-
       float cost_table[8][8];
       int order[8];
       int slot_empty[8];
@@ -893,10 +890,7 @@ Node8* collapse_bvh(
             cost_table[i][j] = FLT_MAX;
           }
           else {
-            vec3 child_centroid = {
-              .x = ((high[j].x + low[j].x) * 0.5f) - centroid.x,
-              .y = ((high[j].y + low[j].y) * 0.5f) - centroid.y,
-              .z = ((high[j].z + low[j].z) * 0.5f) - centroid.z};
+            vec3 child_centroid = {.x = high[j].x + low[j].x, .y = high[j].y + low[j].y, .z = high[j].z + low[j].z};
 
             cost_table[i][j] = child_centroid.x * direction.x + child_centroid.y * direction.y + child_centroid.z * direction.z;
           }
