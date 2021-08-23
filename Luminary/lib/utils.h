@@ -26,6 +26,7 @@
 #define SHADING_ALBEDO 1
 #define SHADING_DEPTH 2
 #define SHADING_NORMAL 3
+#define SHADING_HEAT 4
 #endif
 
 #ifndef LUMINARY_TOY_SHAPES

@@ -103,6 +103,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
   vec3 origin;
   vec3 ray;
 
+  uint32_t iterations = 0;
+
   uint2 node_task     = make_uint2(0, 0);
   uint2 triangle_task = make_uint2(0, 0);
 
@@ -133,6 +135,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       packed_stptr_invoct.y = ((task.ray.x < 0.0f) ? 0b100 : 0) | ((task.ray.y < 0.0f) ? 0b10 : 0) | ((task.ray.z < 0.0f) ? 0b1 : 0);
       packed_stptr_invoct.y = 0b111 - packed_stptr_invoct.y;
       packed_stptr_invoct.x = 0;
+
+      iterations = 0;
     }
 
     if (node_task.y > 0x00ffffff) {
@@ -146,6 +150,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       if (node_task.y > 0x00ffffff) {
         STACK_PUSH(node_task);
       }
+
+      iterations++;
 
       const unsigned int slot_index       = (child_bit_index - 24) ^ (unsigned int) packed_stptr_invoct.y;
       const unsigned int inverse_octant4  = (unsigned int) packed_stptr_invoct.y * 0x01010101u;
@@ -391,7 +397,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       else {
         float2 result;
         result.x = depth;
-        result.y = uint_as_float(hit_id);
+        result.y = (device_shading_mode == SHADING_HEAT) ? uint_as_float(iterations) : uint_as_float(hit_id);
 
         __stcs((float2*) (device_trace_results + get_task_address(offset)), result);
 

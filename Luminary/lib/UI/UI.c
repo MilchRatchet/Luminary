@@ -41,7 +41,7 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene_gpu.lights_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_check(ui, "Lights", &(instance->lights_active), 1);
-  panels[i++] = create_dropdown(ui, "Shading Mode", &(instance->shading_mode), 1, 4, "Default\0Albedo\0Depth\0Normal", 9);
+  panels[i++] = create_dropdown(ui, "Shading Mode", &(instance->shading_mode), 1, 5, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap", 9);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->default_material.r), 1, 0.001f, 0.0f, 1.0f);
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->default_material.g), 1, 0.001f, 0.0f, 1.0f);
   panels[i++] = create_slider(ui, "Default Light Intensity", &(instance->default_material.b), 1, 0.001f, 0.0f, FLT_MAX);
