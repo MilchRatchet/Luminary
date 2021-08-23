@@ -53,7 +53,7 @@ RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
 
   realtime->buffer = (XRGB8*) realtime->window_surface->pixels;
   realtime->ld     = realtime->window_surface->pitch;
-  initialize_8bit_frame(instance, rect.w, rect.h);
+  initialize_8bit_frame(instance, max(rect.w, instance->width), max(rect.h, instance->height));
 
   return realtime;
 }

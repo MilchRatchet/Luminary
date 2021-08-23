@@ -191,6 +191,8 @@ extern "C" RaytraceInstance* init_raytracing(
   update_scene(instance);
   allocate_bloom_mips(instance);
 
+  instance->snap_resolution = SNAP_RESOLUTION_RENDER;
+
   return instance;
 }
 

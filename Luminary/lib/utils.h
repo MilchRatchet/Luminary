@@ -41,6 +41,12 @@
 #define TONEMAP_UNCHARTED2 3
 #endif
 
+#ifndef LUMINARY_SNAP_RESOLUTION
+#define LUMINARY_SNAP_RESOLUTION
+#define SNAP_RESOLUTION_WINDOW 0
+#define SNAP_RESOLUTION_RENDER 1
+#endif
+
 struct Camera {
   vec3 pos;
   vec3 rotation;
@@ -123,6 +129,7 @@ struct RaytraceInstance {
   void* task_counts_gpu;
   void* task_offsets_gpu;
   uint32_t* light_sample_history_gpu;
+  RGBF* frame_final_gpu;
   RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
   RGBF* frame_variance_gpu;
@@ -147,6 +154,7 @@ struct RaytraceInstance {
   RGBF default_material;
   int shading_mode;
   RGBF** bloom_mips_gpu;
+  int snap_resolution;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \

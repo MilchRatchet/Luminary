@@ -76,6 +76,50 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   return result;
 }
 
+static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime) {
+  char* filename   = malloc(4096);
+  char* timestring = malloc(4096);
+  time_t rawtime;
+  struct tm timeinfo;
+
+  time(&rawtime);
+  localtime_s(&timeinfo, &rawtime);
+  strftime(timestring, 4096, "%Y-%m-%d-%H-%M-%S", &timeinfo);
+
+  sprintf(filename, "Snap-%s.png", timestring);
+
+  XRGB8* buffer;
+  int width;
+  int height;
+
+  switch (instance->snap_resolution) {
+    case SNAP_RESOLUTION_WINDOW:
+      buffer = realtime->buffer;
+      width  = realtime->width;
+      height = realtime->height;
+      break;
+    case SNAP_RESOLUTION_RENDER:
+      width  = instance->width;
+      height = instance->height;
+      buffer = malloc(sizeof(XRGB8) * width * height);
+      copy_framebuffer_to_8bit(buffer, width, height, instance->frame_final_gpu, instance);
+      break;
+    default:
+      free(filename);
+      free(timestring);
+      return;
+  }
+
+  store_XRGB8_png(filename, buffer, width, height);
+
+  if (instance->snap_resolution != SNAP_RESOLUTION_WINDOW) {
+    free(buffer);
+  }
+
+  free(filename);
+  free(timestring);
+}
+
 void realtime_output(Scene scene, RaytraceInstance* instance) {
   RealtimeInstance* realtime = init_realtime_instance(instance);
 
@@ -105,14 +149,14 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
 
     start_frametime(&frametime_post);
     if (instance->denoiser && instance->use_denoiser) {
-      RGBF* denoised_image = denoise_with_optix_realtime(optix_setup);
+      instance->frame_final_gpu = denoise_with_optix_realtime(optix_setup);
       if (instance->scene_gpu.camera.bloom)
-        apply_bloom(instance, denoised_image);
-      copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, denoised_image, instance);
+        apply_bloom(instance, instance->frame_final_gpu);
     }
     else {
-      copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, instance->frame_output_gpu, instance);
+      instance->frame_final_gpu = instance->frame_output_gpu;
     }
+    copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, instance->frame_final_gpu, instance);
     sample_frametime(&frametime_post);
 
     instance->temporal_frames++;
@@ -159,21 +203,8 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
     sample_frametime(&frametime_UI);
 
     if (make_png) {
-      make_png         = 0;
-      char* filename   = malloc(4096);
-      char* timestring = malloc(4096);
-      time_t rawtime;
-      struct tm timeinfo;
-
-      time(&rawtime);
-      localtime_s(&timeinfo, &rawtime);
-      strftime(timestring, 4096, "%Y-%m-%d-%H-%M-%S", &timeinfo);
-
-      sprintf(filename, "Snap-%s.png", timestring);
-      store_XRGB8_png(filename, realtime->buffer, realtime->width, realtime->height);
-
-      free(filename);
-      free(timestring);
+      make_snapshot(instance, realtime);
+      make_png = 0;
     }
 
     sample_frametime(&frametime_total);
