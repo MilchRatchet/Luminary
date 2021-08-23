@@ -17,7 +17,7 @@
 
 #define BLOOM_MIP_COUNT 9
 
-__device__ RGBF sample_pixel(RGBF* image, float x, float y, const int width, const int height) {
+__device__ RGBF sample_pixel(const RGBF* image, float x, float y, const int width, const int height) {
   x = fmaxf(x, 0.0f);
   y = fmaxf(y, 0.0f);
 

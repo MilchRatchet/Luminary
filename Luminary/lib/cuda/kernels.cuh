@@ -635,11 +635,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
     else if (device_shading_mode == SHADING_HEAT) {
-      const float iter           = task.hit_id;
-      const float value          = 1.0f - 1.0f / (powf(iter, 0.25f));
-      const float red            = __saturatef(2.0f * value);
-      const float green          = __saturatef(2.0f * (value - 0.5f));
-      const float blue           = __saturatef((value > 0.5f) ? 0.0f : 4.0f * (0.25f - fabsf(value - 0.25f)));
+      const float iter  = task.hit_id;
+      const float value = 1.0f - 1.0f / (powf(iter, 0.25f));
+      const float red   = __saturatef(2.0f * value);
+      const float green = __saturatef(2.0f * (value - 0.5f));
+      const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
       device_frame_buffer[pixel] = get_color(red, green, blue);
     }
 
@@ -1093,42 +1093,17 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int amount    = width * height;
-  const float scale_x = (((float) device_width - 1.0f) / width);
-  const float scale_y = (((float) device_height - 1.0f) / height);
+  const float scale_x = 1.0f / width;
+  const float scale_y = 1.0f / height;
 
   while (id < amount) {
     const int x = id % width;
     const int y = id / width;
 
-    const float source_x = x * scale_x;
-    const float source_y = y * scale_y;
+    const float sx = x * scale_x;
+    const float sy = y * scale_y;
 
-    const int index_x = source_x;
-    const int index_y = source_y;
-
-    const int index_0 = index_x + index_y * device_width;
-    const int index_1 = index_x + (index_y + 1) * device_width;
-
-    RGBF pixel;
-
-    RGBF pixel_00 = source[index_0];
-    RGBF pixel_10 = source[index_0 + 1];
-    RGBF pixel_01 = source[index_1];
-    RGBF pixel_11 = source[index_1 + 1];
-
-    const float fx  = source_x - index_x;
-    const float ifx = 1.0f - fx;
-    const float fy  = source_y - index_y;
-    const float ify = 1.0f - fy;
-
-    const float f00 = ifx * ify;
-    const float f10 = fx * ify;
-    const float f01 = ifx * fy;
-    const float f11 = fx * fy;
-
-    pixel.r = pixel_00.r * f00 + pixel_10.r * f10 + pixel_01.r * f01 + pixel_11.r * f11;
-    pixel.g = pixel_00.g * f00 + pixel_10.g * f10 + pixel_01.g * f01 + pixel_11.g * f11;
-    pixel.b = pixel_00.b * f00 + pixel_10.b * f10 + pixel_01.b * f01 + pixel_11.b * f11;
+    RGBF pixel = sample_pixel(source, sx, sy, device_width, device_height);
 
     pixel.r *= device_scene.camera.exposure;
     pixel.g *= device_scene.camera.exposure;
