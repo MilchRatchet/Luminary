@@ -13,14 +13,17 @@ struct compressed_vec3 {
 } typedef compressed_vec3;
 
 struct Node2 {
-  int32_t child_address;
-  int8_t leaf_node;
   vec3 left_low;
   vec3 left_high;
   vec3 right_low;
   vec3 right_high;
   int32_t triangle_count;
   int32_t triangles_address;
+  int32_t child_address;
+  float surface_area;
+  float sah_cost[7];
+  int cost_computed;
+  int8_t leaf_node;
 } typedef Node2;
 
 struct Node8 {

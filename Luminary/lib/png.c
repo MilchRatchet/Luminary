@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bench.h"
 #include "error.h"
 #include "texture.h"
 #include "zlib/zlib.h"
@@ -107,6 +108,7 @@ static void write_IEND_chunk_to_file(FILE* file) {
 int store_as_png(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
   const uint8_t color_type, const uint8_t bit_depth) {
+  bench_tic();
   uint8_t bytes_per_pixel;
   uint8_t bytes_per_channel;
 
@@ -188,6 +190,8 @@ int store_as_png(
 
   free(compressed_image);
   free(filtered_image);
+
+  bench_toc("Storing PNG");
 
   return 0;
 }

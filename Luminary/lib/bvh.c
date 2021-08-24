@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "bench.h"
 #include "error.h"
 #include "mesh.h"
 #include "primitives.h"
@@ -17,6 +18,10 @@
 #define SPATIAL_SPLIT_BIN_COUNT 32
 #define COST_OF_TRIANGLE 0.5f
 #define COST_OF_NODE 1.0f
+
+#define BINARY_NODE_IS_INTERNAL_NODE 0b0
+#define BINARY_NODE_IS_LEAF_NODE 0b1
+#define BINARY_NODE_IS_NULL 0b10
 
 struct vec3_p {
   float x;
@@ -376,6 +381,7 @@ static void divide_along_axis(
 }
 
 Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, int* nodes_length_out) {
+  bench_tic();
   unsigned int triangles_length = *triangles_length_io;
   Triangle* triangles           = *triangles_io;
   unsigned int node_count       = 1 + triangles_length / THRESHOLD_TRIANGLES;
@@ -666,7 +672,9 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
       nodes[write_ptr].triangle_count    = optimal_split;
       nodes[write_ptr].triangles_address = buffer_ptr;
-      nodes[write_ptr].leaf_node         = 1;
+      nodes[write_ptr].leaf_node         = BINARY_NODE_IS_LEAF_NODE;
+      nodes[write_ptr].surface_area =
+        (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z);
 
       write_ptr++;
       buffer_ptr += optimal_split;
@@ -682,7 +690,9 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
       nodes[write_ptr].triangle_count    = optimal_total_triangles - optimal_split;
       nodes[write_ptr].triangles_address = buffer_ptr;
-      nodes[write_ptr].leaf_node         = 1;
+      nodes[write_ptr].leaf_node         = BINARY_NODE_IS_LEAF_NODE;
+      nodes[write_ptr].surface_area =
+        (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z);
 
       write_ptr++;
       buffer_ptr += optimal_total_triangles - optimal_split;
@@ -712,6 +722,8 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
     printf("\r                                                      \rBVH Nodes: %d", write_ptr);
   }
 
+  printf("\r                                                      \r");
+
   node_count = write_ptr;
 
   free(leaf_nodes);
@@ -736,15 +748,38 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
   *nodes_length_out = node_count;
 
+  bench_toc("Binary BVH Construction");
+
   return nodes;
 }
 
-#define BINARY_NODE_IS_INTERNAL_NODE 0b0
-#define BINARY_NODE_IS_LEAF_NODE 0b1
-#define BINARY_NODE_IS_NULL 0b10
+// This is incomplete, it only initializes the leafs and the costs are not actually used yet
+// This will be part of the SAH based node collapsing
+static void compute_sah_costs(Node2* binary_nodes, const int binary_nodes_length) {
+  bench_tic();
+  for (int i = 0; i < binary_nodes_length; i++) {
+    Node2 node = binary_nodes[i];
+
+    node.cost_computed = node.leaf_node == BINARY_NODE_IS_LEAF_NODE;
+
+    if (!node.cost_computed)
+      continue;
+
+    const float cost = node.surface_area * COST_OF_TRIANGLE;
+
+    for (int i = 1; i < 8; i++) {
+      node.sah_cost[i] = cost;
+    }
+  }
+  bench_toc("SAH Cost Computation");
+}
 
 Node8* collapse_bvh(
   Node2* binary_nodes, const int binary_nodes_length, Triangle** triangles_io, const int triangles_length, int* nodes_length_out) {
+  compute_sah_costs(binary_nodes, binary_nodes_length);
+
+  bench_tic();
+
   Triangle* triangles = *triangles_io;
   int node_count      = binary_nodes_length;
 
@@ -1084,6 +1119,8 @@ Node8* collapse_bvh(
 
   printf("+--------------------------------------------------+\n");
   */
+
+  bench_toc("Collapsing BVH");
 
   return nodes;
 }

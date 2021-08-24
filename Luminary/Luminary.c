@@ -1,13 +1,15 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
-#include "lib/scene.h"
-#include "lib/raytrace.h"
+
+#include "lib/bench.h"
 #include "lib/error.h"
 #include "lib/output.h"
+#include "lib/raytrace.h"
+#include "lib/scene.h"
 
-static int parse_command(char* arg, char* opt1, char* opt2) {
+static int parse_command(const char* arg, char* opt1, char* opt2) {
   int ptr1    = -1;
   int result1 = 1;
 
@@ -35,9 +37,20 @@ static int parse_command(char* arg, char* opt1, char* opt2) {
 }
 
 int main(int argc, char* argv[]) {
+  initialize_device();
+
   assert(argc >= 2, "No scene description was given!", 1);
 
-  initialize_device();
+  int realtime = 0;
+  int bench    = 0;
+
+  for (int i = 2; i < argc; i++) {
+    realtime |= parse_command(argv[i], "-r", "--realtime");
+    bench |= parse_command(argv[i], "-t", "--timings");
+  }
+
+  if (bench)
+    bench_activate();
 
   clock_t time = clock();
 
@@ -48,12 +61,6 @@ int main(int argc, char* argv[]) {
   Scene scene = load_scene(argv[1], &instance, &output_name);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-
-  int realtime = 0;
-
-  for (int i = 2; i < argc; i++) {
-    realtime |= parse_command(argv[i], "-r", "--realtime");
-  }
 
   if (realtime) {
     realtime_output(scene, instance);

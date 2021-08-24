@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "bench.h"
 #include "error.h"
 #include "utils.h"
 
@@ -22,6 +23,7 @@ struct Triangle_Light {
 } typedef Triangle_Light;
 
 void process_lights(Scene* scene) {
+  bench_tic();
   Scene data = *scene;
 
   unsigned int lights_length = 16;
@@ -174,4 +176,6 @@ void process_lights(Scene* scene) {
   data.lights_length = light_group_count;
 
   *scene = data;
+
+  bench_toc("Processing Lights");
 }

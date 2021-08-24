@@ -27,6 +27,9 @@ where `File` is a relative or absolute path and Option is one or more of:
 ```
 -r, --realtime
         start in realtime mode
+
+-t, --timings
+        print execution times of some CPU functions
 ```
 
 In realtime mode, you can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.

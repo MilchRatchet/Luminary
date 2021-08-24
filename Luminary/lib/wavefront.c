@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "bench.h"
 #include "error.h"
 #include "png.h"
 #include "texture.h"
@@ -169,6 +170,7 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
 }
 
 int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
+  bench_tic();
   FILE* file;
   fopen_s(&file, filename, "r");
 
@@ -287,6 +289,8 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
 
   free(loaded_mtls);
 
+  bench_toc("Reading *.obj File");
+
   return 0;
 }
 
@@ -306,6 +310,8 @@ texture_assignment* get_texture_assignments(Wavefront_Content content) {
 }
 
 unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content content) {
+  bench_tic();
+
   unsigned int count = content.triangles_length;
 
   *triangles       = (Triangle*) malloc(sizeof(Triangle) * count);
@@ -469,6 +475,8 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
 
     (*triangles)[ptr++] = triangle;
   }
+
+  bench_toc("Converting Mesh");
 
   return ptr;
 }

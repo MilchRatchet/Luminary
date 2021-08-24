@@ -247,6 +247,7 @@ extern "C" void initialize_device() {
   cudaGetDeviceProperties(&prop, 0);
 
   printf("Luminary - %s\n", prop.name);
+  printf("Copyright (c) 2021 MilchRatchet\n");
 }
 
 extern "C" void free_textures(void* texture_atlas, const int textures_length) {
