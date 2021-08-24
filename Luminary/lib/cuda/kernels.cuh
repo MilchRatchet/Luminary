@@ -1093,8 +1093,8 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int amount    = width * height;
-  const float scale_x = 1.0f / width;
-  const float scale_y = 1.0f / height;
+  const float scale_x = 1.0f / (width - 1);
+  const float scale_y = 1.0f / (height - 1);
 
   while (id < amount) {
     const int x = id % width;

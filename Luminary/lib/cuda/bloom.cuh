@@ -25,19 +25,16 @@ __device__ RGBF sample_pixel(const RGBF* image, float x, float y, const int widt
   x = fminf(x, __uint_as_float(0b00111111011111111111111111111111));
   y = fminf(y, __uint_as_float(0b00111111011111111111111111111111));
 
-  const float source_x = fmaxf(0.0f, x * width - 0.5f);
-  const float source_y = fmaxf(0.0f, y * height - 0.5f);
+  const float source_x = fmaxf(0.0f, x * (width - 1) - 0.5f);
+  const float source_y = fmaxf(0.0f, y * (height - 1) - 0.5f);
 
   const int index_x = source_x;
   const int index_y = source_y;
 
-  const int index_0 = index_x + index_y * width;
-  const int index_1 = index_x + (index_y + 1) * width;
-
-  const int index_00 = index_0;
-  const int index_01 = index_00 + ((index_x < width - 1) ? 1 : 0);
-  const int index_10 = index_1 + ((index_y >= height - 1) ? -width : 0);
-  const int index_11 = index_10 + ((index_x < width - 1) ? 1 : 0);
+  const int index_00 = index_x + index_y * width;
+  const int index_01 = index_00 + ((index_y < height - 1) ? width : 0);
+  const int index_10 = index_00 + ((index_x < width - 1) ? 1 : 0);
+  const int index_11 = index_01 + ((index_x < width - 1) ? 1 : 0);
 
   const RGBF pixel_00 = image[index_00];
   const RGBF pixel_01 = image[index_01];
@@ -50,8 +47,8 @@ __device__ RGBF sample_pixel(const RGBF* image, float x, float y, const int widt
   const float ify = 1.0f - fy;
 
   const float f00 = ifx * ify;
-  const float f10 = fx * ify;
   const float f01 = ifx * fy;
+  const float f10 = fx * ify;
   const float f11 = fx * fy;
 
   return get_color(
@@ -63,10 +60,10 @@ __device__ RGBF sample_pixel(const RGBF* image, float x, float y, const int widt
 __global__ void bloom_downsample(RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const float scale_x = 1.0f / tw;
-  const float scale_y = 1.0f / th;
-  const float step_x  = 1.0f / sw;
-  const float step_y  = 1.0f / sh;
+  const float scale_x = 1.0f / (tw - 1);
+  const float scale_y = 1.0f / (th - 1);
+  const float step_x  = 1.0f / (sw - 1);
+  const float step_y  = 1.0f / (sh - 1);
 
   while (id < tw * th) {
     const int x = id % tw;
@@ -104,10 +101,10 @@ __global__ void bloom_upsample(
   RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th, const float a, const float b) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const float scale_x = 1.0f / tw;
-  const float scale_y = 1.0f / th;
-  const float step_x  = 1.0f / sw;
-  const float step_y  = 1.0f / sh;
+  const float scale_x = 1.0f / (tw - 1);
+  const float scale_y = 1.0f / (th - 1);
+  const float step_x  = 1.0f / (sw - 1);
+  const float step_y  = 1.0f / (sh - 1);
 
   while (id < tw * th) {
     const int x = id % tw;
