@@ -12,12 +12,14 @@
 #include "mesh.h"
 #include "primitives.h"
 
-#define THRESHOLD_TRIANGLES 3
+#define THRESHOLD_TRIANGLES 1
 #define OBJECT_SPLIT_BIN_COUNT 32
 #define SPATIAL_SPLIT_THRESHOLD 0.00001f
 #define SPATIAL_SPLIT_BIN_COUNT 32
-#define COST_OF_TRIANGLE 0.5f
+#define COST_OF_TRIANGLE 0.4f
 #define COST_OF_NODE 1.0f
+
+#define TRIANGLES_MAX 3
 
 #define BINARY_NODE_IS_INTERNAL_NODE 0b0
 #define BINARY_NODE_IS_LEAF_NODE 0b1
@@ -29,15 +31,6 @@ struct vec3_p {
   float z;
   float _p;
 } typedef vec3_p;
-
-struct bvh_triangle {
-  vec3_p edge1;
-  vec3_p edge2;
-  vec3_p vertex;
-  uint32_t id;
-  uint32_t _p1;
-  uint64_t _p2;
-} typedef bvh_triangle;
 
 struct fragment {
   vec3_p high;
@@ -396,7 +389,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = triangles_length;
-  nodes[0].leaf_node         = 1;
+  nodes[0].kind              = BINARY_NODE_IS_LEAF_NODE;
 
   unsigned int* leaf_nodes     = malloc(sizeof(unsigned int) * node_count);
   unsigned int leaf_node_count = 0;
@@ -446,7 +439,8 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
     unsigned int leaf_nodes_in_iteration = 0;
 
     for (unsigned int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
-      Node2 node = nodes[node_ptr];
+      Node2 node         = nodes[node_ptr];
+      node.cost_computed = 0;
 
       if (fragments_ptr != node.triangles_address) {
         memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * (node.triangles_address - fragments_ptr));
@@ -456,6 +450,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
       if (node.triangle_count <= THRESHOLD_TRIANGLES) {
         nodes[node_ptr].triangles_address = buffer_ptr;
+        nodes[node_ptr].cost_computed     = 0;
 
         memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * node.triangle_count);
         buffer_ptr += node.triangle_count;
@@ -672,9 +667,16 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
       nodes[write_ptr].triangle_count    = optimal_split;
       nodes[write_ptr].triangles_address = buffer_ptr;
-      nodes[write_ptr].leaf_node         = BINARY_NODE_IS_LEAF_NODE;
+      nodes[write_ptr].kind              = BINARY_NODE_IS_LEAF_NODE;
       nodes[write_ptr].surface_area =
         (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z);
+
+      nodes[write_ptr].self_high.x = high.x;
+      nodes[write_ptr].self_high.y = high.y;
+      nodes[write_ptr].self_high.z = high.z;
+      nodes[write_ptr].self_low.x  = low.x;
+      nodes[write_ptr].self_low.y  = low.y;
+      nodes[write_ptr].self_low.z  = low.z;
 
       write_ptr++;
       buffer_ptr += optimal_split;
@@ -690,15 +692,21 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
       nodes[write_ptr].triangle_count    = optimal_total_triangles - optimal_split;
       nodes[write_ptr].triangles_address = buffer_ptr;
-      nodes[write_ptr].leaf_node         = BINARY_NODE_IS_LEAF_NODE;
+      nodes[write_ptr].kind              = BINARY_NODE_IS_LEAF_NODE;
       nodes[write_ptr].surface_area =
         (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z);
+      nodes[write_ptr].self_high.x = high.x;
+      nodes[write_ptr].self_high.y = high.y;
+      nodes[write_ptr].self_high.z = high.z;
+      nodes[write_ptr].self_low.x  = low.x;
+      nodes[write_ptr].self_low.y  = low.y;
+      nodes[write_ptr].self_low.z  = low.z;
 
       write_ptr++;
       buffer_ptr += optimal_total_triangles - optimal_split;
 
       node.triangles_address = -1;
-      node.leaf_node         = 0;
+      node.kind              = 0;
 
       nodes[node_ptr] = node;
     }
@@ -753,30 +761,136 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
   return nodes;
 }
 
-// This is incomplete, it only initializes the leafs and the costs are not actually used yet
-// This will be part of the SAH based node collapsing
-static void compute_sah_costs(Node2* binary_nodes, const int binary_nodes_length) {
+static void compute_single_node_triangles(Node2* binary_nodes, const int index) {
+  if (binary_nodes[index].kind == BINARY_NODE_IS_LEAF_NODE)
+    return;
+
+  const int child_address = binary_nodes[index].child_address;
+
+  compute_single_node_triangles(binary_nodes, child_address);
+  compute_single_node_triangles(binary_nodes, child_address + 1);
+
+  binary_nodes[index].triangles_address = binary_nodes[child_address].triangles_address;
+  binary_nodes[index].triangle_count    = binary_nodes[child_address].triangle_count + binary_nodes[child_address + 1].triangle_count;
+}
+
+// recursion seems to be a sufficient solution in this case
+static void compute_node_triangle_properties(Node2* binary_nodes) {
   bench_tic();
-  for (int i = 0; i < binary_nodes_length; i++) {
-    Node2 node = binary_nodes[i];
+  compute_single_node_triangles(binary_nodes, 0);
+  bench_toc("Node Triangle Property Recovery");
+}
 
-    node.cost_computed = node.leaf_node == BINARY_NODE_IS_LEAF_NODE;
+static float cost_distribute(Node2* binary_nodes, Node2 node, int j, int* decision) {
+  float min = FLT_MAX;
 
-    if (!node.cost_computed)
-      continue;
+  for (int k = 0; k < j; k++) {
+    const float cost = binary_nodes[node.child_address].sah_cost[k] + binary_nodes[node.child_address + 1].sah_cost[j - 1 - k];
+    if (cost <= min) {
+      *decision = k + 1;
+      min       = cost;
+    }
+  }
+
+  return min;
+}
+
+#define OPTIMAL_LEAF 0xffff
+
+static void compute_single_node_costs(Node2* binary_nodes, const int index) {
+  if (binary_nodes[index].kind == BINARY_NODE_IS_LEAF_NODE) {
+    Node2 node = binary_nodes[index];
 
     const float cost = node.surface_area * COST_OF_TRIANGLE;
 
-    for (int i = 1; i < 8; i++) {
+    for (int i = 0; i < 7; i++) {
       node.sah_cost[i] = cost;
+      node.decision[i] = 0;
     }
+
+    node.decision[0] = OPTIMAL_LEAF;
+
+    node.cost_computed = 1;
+
+    binary_nodes[index] = node;
   }
+  else {
+    int child_address = binary_nodes[index].child_address;
+    if (!binary_nodes[child_address].cost_computed)
+      compute_single_node_costs(binary_nodes, child_address);
+
+    if (!binary_nodes[child_address + 1].cost_computed)
+      compute_single_node_costs(binary_nodes, child_address + 1);
+
+    Node2 node = binary_nodes[index];
+
+    int decision        = 0;
+    float cost_leaf     = (node.triangle_count <= TRIANGLES_MAX) ? node.surface_area * node.triangle_count * COST_OF_TRIANGLE : FLT_MAX;
+    float cost_internal = node.surface_area * COST_OF_NODE + cost_distribute(binary_nodes, node, 7, &decision);
+    node.sah_cost[0]    = fminf(cost_leaf, cost_internal);
+    node.decision[0]    = (cost_leaf <= cost_internal) ? OPTIMAL_LEAF : decision;
+
+    for (int i = 1; i < 7; i++) {
+      float cost       = cost_distribute(binary_nodes, node, i, &decision);
+      node.sah_cost[i] = fminf(cost, node.sah_cost[i - 1]);
+      node.decision[i] = (cost <= node.sah_cost[i - 1]) ? decision : 0;
+    }
+
+    node.cost_computed = 1;
+
+    binary_nodes[index] = node;
+  }
+}
+
+// recursion seems to be a sufficient solution in this case
+static void compute_sah_costs(Node2* binary_nodes) {
+  bench_tic();
+  compute_single_node_costs(binary_nodes, 0);
   bench_toc("SAH Cost Computation");
+}
+
+struct node_packed {
+  Node2* binary_nodes;
+  Node2* binary_children;
+  vec3* low;
+  vec3* high;
+  int* binary_addresses;
+} typedef node_packed;
+
+static void apply_decision(Node2* node, int node_index, int decision, int slot, node_packed node_data) {
+  int split          = 0;
+  int decision_index = decision - 1;
+
+  while (!split) {
+    split = node->decision[decision_index--];
+  }
+
+  decision_index++;
+
+  if (split == OPTIMAL_LEAF) {
+    node->kind                       = BINARY_NODE_IS_LEAF_NODE;
+    node_data.binary_children[slot]  = *node;
+    node_data.low[slot]              = node->self_low;
+    node_data.high[slot]             = node->self_high;
+    node_data.binary_addresses[slot] = node_index;
+  }
+  else if (decision_index == 0) {
+    node->kind                       = BINARY_NODE_IS_INTERNAL_NODE;
+    node_data.binary_children[slot]  = *node;
+    node_data.low[slot]              = node->self_low;
+    node_data.high[slot]             = node->self_high;
+    node_data.binary_addresses[slot] = node_index;
+  }
+  else {
+    apply_decision(node_data.binary_nodes + node->child_address, node->child_address, split, slot, node_data);
+    apply_decision(node_data.binary_nodes + node->child_address + 1, node->child_address + 1, decision - split, slot + split, node_data);
+  }
 }
 
 Node8* collapse_bvh(
   Node2* binary_nodes, const int binary_nodes_length, Triangle** triangles_io, const int triangles_length, int* nodes_length_out) {
-  compute_sah_costs(binary_nodes, binary_nodes_length);
+  compute_node_triangle_properties(binary_nodes);
+  compute_sah_costs(binary_nodes);
 
   bench_tic();
 
@@ -789,20 +903,13 @@ Node8* collapse_bvh(
 
   memset(nodes, 0, sizeof(Node8) * node_count);
 
-  bvh_triangle* bvh_triangles = _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
-  bvh_triangle* new_triangles = _mm_malloc(sizeof(bvh_triangle) * triangles_length, 64);
+  uint32_t* bvh_triangles = _mm_malloc(sizeof(uint32_t) * triangles_length, 64);
+  uint32_t* new_triangles = _mm_malloc(sizeof(uint32_t) * triangles_length, 64);
 
   for (unsigned int i = 0; i < triangles_length; i++) {
-    Triangle t      = triangles[i];
-    bvh_triangle bt = {
-      .vertex = {.x = t.vertex.x, .y = t.vertex.y, .z = t.vertex.z},
-      .edge1  = {.x = t.edge1.x, .y = t.edge1.y, .z = t.edge1.z},
-      .edge2  = {.x = t.edge2.x, .y = t.edge2.y, .z = t.edge2.z},
-      .id     = i};
-    bvh_triangles[i] = bt;
+    bvh_triangles[i] = i;
+    new_triangles[i] = i;
   }
-
-  memcpy(new_triangles, bvh_triangles, sizeof(bvh_triangle) * triangles_length);
 
   nodes[0].triangle_base_index   = 0;
   nodes[0].child_node_base_index = 0;
@@ -825,67 +932,29 @@ Node8* collapse_bvh(
       vec3 low[8];
       vec3 high[8];
       int binary_addresses[8];
-      binary_children[0] = binary_nodes[binary_index];
 
-      int offset      = 8;
-      int half_offset = 4;
-
-      for (int j = 0; j < 3; j++) {
-        for (int i = 0; i < 8; i += offset) {
-          Node2 base_child = binary_children[i];
-
-          if (base_child.leaf_node != BINARY_NODE_IS_INTERNAL_NODE) {
-            binary_children[i + half_offset].leaf_node = BINARY_NODE_IS_NULL;
-          }
-          else {
-            binary_children[i]                = binary_nodes[base_child.child_address];
-            low[i]                            = base_child.left_low;
-            high[i]                           = base_child.left_high;
-            binary_addresses[i]               = base_child.child_address;
-            binary_children[i + half_offset]  = binary_nodes[base_child.child_address + 1];
-            low[i + half_offset]              = base_child.right_low;
-            high[i + half_offset]             = base_child.right_high;
-            binary_addresses[i + half_offset] = base_child.child_address + 1;
-          }
-        }
-        offset      = offset >> 1;
-        half_offset = half_offset >> 1;
-      }
-
-      // naive optimization to improve childs per node count
-      // this gives 5% better child slot occupation
       for (int i = 0; i < 8; i++) {
-        if (binary_children[i].leaf_node == BINARY_NODE_IS_NULL) {
-          int best_index      = -1;
-          int least_triangles = INT_MAX;
-
-          for (int j = 0; j < 8; j++) {
-            Node2 base_child = binary_children[j];
-            if (base_child.leaf_node == BINARY_NODE_IS_INTERNAL_NODE && base_child.triangle_count < least_triangles) {
-              best_index      = j;
-              least_triangles = base_child.triangle_count;
-            }
-          }
-
-          if (best_index != -1) {
-            Node2 base_child             = binary_children[best_index];
-            binary_children[i]           = binary_nodes[base_child.child_address];
-            low[i]                       = base_child.left_low;
-            high[i]                      = base_child.left_high;
-            binary_addresses[i]          = base_child.child_address;
-            binary_children[best_index]  = binary_nodes[base_child.child_address + 1];
-            low[best_index]              = base_child.right_low;
-            high[best_index]             = base_child.right_high;
-            binary_addresses[best_index] = base_child.child_address + 1;
-          }
-        }
+        binary_children[i].kind = BINARY_NODE_IS_NULL;
       }
+
+      node_packed node_data = {
+        .binary_nodes     = binary_nodes,
+        .binary_children  = (Node2*) &binary_children,
+        .low              = (vec3*) &low,
+        .high             = (vec3*) &high,
+        .binary_addresses = (int*) &binary_addresses};
+
+      const int split         = binary_nodes[binary_index].decision[0];
+      const int child_address = binary_nodes[binary_index].child_address;
+
+      apply_decision(binary_nodes + child_address, child_address, split, 0, node_data);
+      apply_decision(binary_nodes + child_address + 1, child_address + 1, 8 - split, split, node_data);
 
       vec3 node_low  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
       vec3 node_high = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
 
       for (int i = 0; i < 8; i++) {
-        if (binary_children[i].leaf_node != BINARY_NODE_IS_NULL) {
+        if (binary_children[i].kind != BINARY_NODE_IS_NULL) {
           vec3 lo    = low[i];
           node_low.x = min(node_low.x, lo.x);
           node_low.y = min(node_low.y, lo.y);
@@ -921,7 +990,7 @@ Node8* collapse_bvh(
         vec3 direction = {.x = ((i >> 2) & 0b1) ? -1.0f : 1.0f, .y = ((i >> 1) & 0b1) ? -1.0f : 1.0f, .z = ((i >> 0) & 0b1) ? -1.0f : 1.0f};
 
         for (int j = 0; j < 8; j++) {
-          if (binary_children[j].leaf_node == BINARY_NODE_IS_NULL) {
+          if (binary_children[j].kind == BINARY_NODE_IS_NULL) {
             cost_table[i][j] = FLT_MAX;
           }
           else {
@@ -997,12 +1066,12 @@ Node8* collapse_bvh(
 
       for (int i = 0; i < 8; i++) {
         Node2 base_child = binary_children[i];
-        if (base_child.leaf_node == BINARY_NODE_IS_INTERNAL_NODE) {
+        if (base_child.kind == BINARY_NODE_IS_INTERNAL_NODE) {
           node.imask |= 1 << i;
           nodes[write_ptr++].child_node_base_index = binary_addresses[i];
           node.meta[i]                             = 0b00100000 + 0b11000 + i;
         }
-        else if (base_child.leaf_node == BINARY_NODE_IS_LEAF_NODE) {
+        else if (base_child.kind == BINARY_NODE_IS_LEAF_NODE) {
           assert(base_child.triangle_count < 4, "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
           int meta = 0;
           switch (base_child.triangle_count) {
@@ -1021,8 +1090,7 @@ Node8* collapse_bvh(
 
           node.meta[i] = meta;
 
-          memcpy(
-            new_triangles + triangles_ptr, bvh_triangles + base_child.triangles_address, sizeof(bvh_triangle) * base_child.triangle_count);
+          memcpy(new_triangles + triangles_ptr, bvh_triangles + base_child.triangles_address, sizeof(uint32_t) * base_child.triangle_count);
 
           triangles_ptr += base_child.triangle_count;
           triangle_counting_address += base_child.triangle_count;
@@ -1033,7 +1101,7 @@ Node8* collapse_bvh(
       }
 
       for (int i = 0; i < 8; i++) {
-        if (binary_children[i].leaf_node == BINARY_NODE_IS_NULL) {
+        if (binary_children[i].kind == BINARY_NODE_IS_NULL) {
           node.low_x[i] = 0;
           node.low_y[i] = 0;
           node.low_z[i] = 0;
@@ -1069,7 +1137,7 @@ Node8* collapse_bvh(
   memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
 
   for (unsigned int i = 0; i < triangles_length; i++) {
-    triangles[i] = triangles_swap[bvh_triangles[i].id];
+    triangles[i] = triangles_swap[bvh_triangles[i]];
   }
 
   free(triangles_swap);
@@ -1085,40 +1153,6 @@ Node8* collapse_bvh(
   *triangles_io = triangles;
 
   *nodes_length_out = node_count;
-
-  /*
-  // BVH Statistics
-  int childs_per_node[9];
-
-  for (int i = 0; i < 9; i++) {
-    childs_per_node[i] = 0;
-  }
-
-  for (int i = 0; i < node_count; i++) {
-    int count = 0;
-    for (int j = 0; j < 8; j++) {
-      count += nodes[i].meta[j] != 0;
-    }
-    childs_per_node[count]++;
-  }
-
-  double average = 0.0;
-
-  printf("+----------+---------------------------------------+\n");
-  printf("| Children | Count\n");
-  printf("+----------+---------------------------------------+\n");
-
-  for (int i = 0; i < 9; i++) {
-    printf("|        %d | %d\n", i, childs_per_node[i]);
-    average += i * childs_per_node[i];
-  }
-
-  printf("+----------+---------------------------------------+\n");
-
-  printf("| Average: %f\n", average / node_count);
-
-  printf("+--------------------------------------------------+\n");
-  */
 
   bench_toc("Collapsing BVH");
 
