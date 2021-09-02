@@ -62,6 +62,10 @@ struct Camera {
   int bloom;
   float bloom_strength;
   int dithering;
+  float wasd_speed;
+  float mouse_speed;
+  int smooth_movement;
+  float smoothing_factor;
 } typedef Camera;
 
 struct Light {

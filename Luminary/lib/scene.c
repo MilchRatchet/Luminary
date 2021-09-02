@@ -73,6 +73,10 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.camera.alpha_cutoff      = 0.0f;
   scene.camera.far_clip_distance = 1000000.0f;
   scene.camera.tonemap           = TONEMAP_ACES;
+  scene.camera.wasd_speed        = 1.0f;
+  scene.camera.mouse_speed       = 1.0f;
+  scene.camera.smooth_movement   = 0;
+  scene.camera.smoothing_factor  = 0.1f;
 
   scene.ocean.active           = 0;
   scene.ocean.emissive         = 0;

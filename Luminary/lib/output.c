@@ -133,6 +133,9 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
 
   instance->temporal_frames = 0;
 
+  float mouse_x_speed = 0.0f;
+  float mouse_y_speed = 0.0f;
+
   int make_png = 0;
 
   char* title = (char*) malloc(4096);
@@ -166,14 +169,17 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
     int mwheel  = 0;
     int mmotion = 0;
 
+    float mouse_x_diff = 0.0f;
+    float mouse_y_diff = 0.0f;
+
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_MOUSEMOTION) {
         if (ui.active) {
           mmotion += event.motion.xrel;
         }
         else {
-          instance->scene_gpu.camera.rotation.y += event.motion.xrel * (-0.005f);
-          instance->scene_gpu.camera.rotation.x += event.motion.yrel * (-0.005f);
+          mouse_y_diff += event.motion.xrel * (-0.005f) * instance->scene_gpu.camera.mouse_speed;
+          mouse_x_diff += event.motion.yrel * (-0.005f) * instance->scene_gpu.camera.mouse_speed;
 
           if (event.motion.xrel || event.motion.yrel)
             instance->temporal_frames = 0;
@@ -192,6 +198,37 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
       }
       else if (event.type == SDL_QUIT) {
         exit = 1;
+      }
+    }
+
+    if (instance->scene_gpu.camera.smooth_movement) {
+      mouse_x_speed += mouse_x_diff * instance->scene_gpu.camera.smoothing_factor;
+      mouse_y_speed += mouse_y_diff * instance->scene_gpu.camera.smoothing_factor;
+    }
+    else {
+      mouse_x_speed = mouse_x_diff;
+      mouse_y_speed = mouse_y_diff;
+    }
+
+    if (mouse_x_speed != 0.0f || mouse_y_speed != 0.0f) {
+      instance->scene_gpu.camera.rotation.x += mouse_x_speed;
+      instance->scene_gpu.camera.rotation.y += mouse_y_speed;
+
+      instance->temporal_frames = 0;
+
+      if (instance->scene_gpu.camera.smooth_movement) {
+        mouse_x_speed -= mouse_x_speed * instance->scene_gpu.camera.smoothing_factor * instance->scene_gpu.camera.mouse_speed;
+        mouse_y_speed -= mouse_y_speed * instance->scene_gpu.camera.smoothing_factor * instance->scene_gpu.camera.mouse_speed;
+
+        if (fabsf(mouse_x_speed) < 0.0001f * instance->scene_gpu.camera.mouse_speed)
+          mouse_x_speed = 0.0f;
+
+        if (fabsf(mouse_y_speed) < 0.0001f * instance->scene_gpu.camera.mouse_speed)
+          mouse_y_speed = 0.0f;
+      }
+      else {
+        mouse_x_speed = 0.0f;
+        mouse_y_speed = 0.0f;
       }
     }
 
@@ -282,7 +319,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
       shift_pressed = 2;
     }
 
-    const float movement_speed = 0.5f * shift_pressed * normalized_time;
+    const float movement_speed = 0.5f * shift_pressed * normalized_time * instance->scene_gpu.camera.wasd_speed;
 
     movement_vector = rotate_vector_by_quaternion(movement_vector, q);
     instance->scene_gpu.camera.pos.x += movement_speed * movement_vector.x;

@@ -23,7 +23,7 @@ void handle_mouse_UIPanel_slider(UI* ui, UIPanel* panel, int mouse_state, int x,
 void render_UIPanel_slider(UI* ui, UIPanel* panel, int y) {
   blit_text(ui, panel->title, 5, y + ((PANEL_HEIGHT - panel->title->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
 
-  if (panel->hover || !panel->data_text) {
+  if (panel->prop4 || panel->hover || !panel->data_text) {
     if (panel->data_text)
       SDL_FreeSurface(panel->data_text);
 
