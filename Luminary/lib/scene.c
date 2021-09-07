@@ -12,7 +12,7 @@
 #include "wavefront.h"
 
 static const int LINE_SIZE       = 4096;
-static const int CURRENT_VERSION = 3;
+static const int CURRENT_VERSION = 4;
 
 static int validate_filetype(const char* line) {
   int result = 0;
@@ -27,6 +27,245 @@ static int validate_filetype(const char* line) {
   result += line[7] ^ 'y';
 
   return result;
+}
+
+static void parse_general_settings(
+  int* width, int* height, int* bounces, int* samples, char* output_path, int* denoiser, Wavefront_Content* content, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+
+  switch (key) {
+    /* MESHFILE */
+    case 4993446653056992589u:
+      char* source = (char*) malloc(LINE_SIZE);
+      sscanf_s(line, "%*s %s\n", source, LINE_SIZE);
+      if (read_wavefront_file(source, content)) {
+        print_error("Mesh file could not be loaded!");
+      }
+      free(source);
+      break;
+    /* WIDTH___ */
+    case 6872316320646711639u:
+      sscanf_s(line, "%*s %d\n", width);
+      break;
+    /* HEIGHT__ */
+    case 6872304225801028936u:
+      sscanf_s(line, "%*s %d\n", height);
+      break;
+    /* BOUNCES_ */
+    case 6868910012049477442u:
+      sscanf_s(line, "%*s %d\n", bounces);
+      break;
+    /* SAMPLES_ */
+    case 6868910050737209683u:
+      sscanf_s(line, "%*s %d\n", samples);
+      break;
+    /* DENOISER */
+    case 5928236058831373636u:
+      sscanf_s(line, "%*s %d\n", denoiser);
+      break;
+    /* OUTPUTFN */
+    case 5640288308724782415u:
+      sscanf_s(line, "%*s %s\n", output_path, LINE_SIZE);
+      break;
+    default:
+      break;
+  }
+}
+
+static void parse_camera_settings(Camera* camera, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+
+  switch (key) {
+    /* POSITION */
+    case 5642809484474797904u:
+      sscanf_s(line, "%*s %f %f %f\n", &camera->pos.x, &camera->pos.y, &camera->pos.z);
+      break;
+    /* ROTATION */
+    case 5642809484340645714u:
+      sscanf_s(line, "%*s %f %f %f\n", &camera->rotation.x, &camera->rotation.y, &camera->rotation.z);
+      break;
+    /* FOV_____ */
+    case 6872316419616689990u:
+      sscanf_s(line, "%*s %f\n", &camera->fov);
+      break;
+    /* FOCALLEN */
+    case 5639997998747569990u:
+      sscanf_s(line, "%*s %f\n", &camera->focal_length);
+      break;
+    /* APERTURE */
+    case 4995148757353189441u:
+      sscanf_s(line, "%*s %f\n", &camera->aperture_size);
+      break;
+    /* AUTOEXP_ */
+    case 6868086486446921025u:
+      sscanf_s(line, "%*s %f\n", &camera->auto_exposure);
+      break;
+    /* EXPOSURE */
+    case 4995148753008613445u:
+      sscanf_s(line, "%*s %f\n", &camera->exposure);
+      break;
+    /* BLOOM___ */
+    case 6872316342038383682u:
+      sscanf_s(line, "%*s %d\n", &camera->bloom);
+      break;
+    /* BLOOMSTR */
+    case 5932458200661969986u:
+      sscanf_s(line, "%*s %f\n", &camera->bloom_strength);
+      break;
+    /* DITHER__ */
+    case 6872302013910370628u:
+      sscanf_s(line, "%*s %d\n", &camera->dithering);
+      break;
+    /* FARCLIPD */
+    case 4922514984611758406u:
+      sscanf_s(line, "%*s %f\n", &camera->far_clip_distance);
+      break;
+    /* TONEMAP_ */
+    case 6868061231871053652u:
+      sscanf_s(line, "%*s %d\n", &camera->tonemap);
+      break;
+    /* ALPHACUT */
+    case 6076837219871509569u:
+      sscanf_s(line, "%*s %f\n", &camera->alpha_cutoff);
+      break;
+    default:
+      break;
+  }
+}
+
+static void parse_sky_settings(Sky* sky, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+
+  switch (key) {
+    /* SUNCOLOR */
+    case 5931043137585567059u:
+      sscanf_s(line, "%*s %f %f %f\n", &sky->sun_color.r, &sky->sun_color.g, &sky->sun_color.b);
+      break;
+    /* STRENGTH */
+    case 5211869070270551123u:
+      sscanf_s(line, "%*s %f\n", &sky->sun_strength);
+      break;
+    /* AZIMUTH_ */
+    case 6865830357271927361u:
+      sscanf_s(line, "%*s %f\n", &sky->azimuth);
+      break;
+    /* ALTITUDE */
+    case 4991208107529227329u:
+      sscanf_s(line, "%*s %f\n", &sky->altitude);
+      break;
+    /* DENSITY_ */
+    case 6870615380437386564u:
+      sscanf_s(line, "%*s %f\n", &sky->base_density);
+      break;
+    /* RAYLEIGH */
+    case 5208212056059756882u:
+      sscanf_s(line, "%*s %f\n", &sky->rayleigh_falloff);
+      break;
+    /* MIE_____ */
+    case 6872316419615574349u:
+      sscanf_s(line, "%*s %f\n", &sky->mie_falloff);
+      break;
+    default:
+      break;
+  }
+}
+
+static void parse_ocean_settings(Ocean* ocean, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+
+  switch (key) {
+    /* ACTIVE__ */
+    case 6872287793290429249u:
+      sscanf_s(line, "%*s %d\n", &ocean->active);
+      break;
+    /* HEIGHT__ */
+    case 6872304225801028936u:
+      sscanf_s(line, "%*s %f\n", &ocean->height);
+      break;
+    /* AMPLITUD */
+    case 4923934441389182273u:
+      sscanf_s(line, "%*s %f\n", &ocean->amplitude);
+      break;
+    /* FREQUENC */
+    case 4849890081462637126u:
+      sscanf_s(line, "%*s %f\n", &ocean->frequency);
+      break;
+    /* CHOPPY__ */
+    case 6872309757870295107u:
+      sscanf_s(line, "%*s %f\n", &ocean->choppyness);
+      break;
+    /* SPEED___ */
+    case 6872316303215251539u:
+      sscanf_s(line, "%*s %f\n", &ocean->speed);
+      break;
+    /* ANIMATED */
+    case 4919430807418392129u:
+      sscanf_s(line, "%*s %d\n", &ocean->update);
+      break;
+    /* COLOR___ */
+    case 6872316363513024323u:
+      sscanf_s(line, "%*s %f %f %f %f\n", &ocean->albedo.r, &ocean->albedo.g, &ocean->albedo.b, &ocean->albedo.a);
+      break;
+    /* EMISSIVE */
+    case 4996261458842570053u:
+      sscanf_s(line, "%*s %d\n", &ocean->emissive);
+      break;
+    /* REFRACT_ */
+    case 6869189279479121234u:
+      sscanf_s(line, "%*s %f\n", &ocean->refractive_index);
+      break;
+    default:
+      break;
+  }
+}
+
+static void parse_toy_settings(Toy* toy, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+
+  switch (key) {
+    /* ACTIVE__ */
+    case 6872287793290429249u:
+      sscanf_s(line, "%*s %d\n", &toy->active);
+      break;
+    /* POSITION */
+    case 5642809484474797904u:
+      sscanf_s(line, "%*s %f %f %f\n", &toy->position.x, &toy->position.y, &toy->position.z);
+      break;
+    /* ROTATION */
+    case 5642809484340645714u:
+      sscanf_s(line, "%*s %f %f %f\n", &toy->rotation.x, &toy->rotation.y, &toy->rotation.z);
+      break;
+    /* SHAPE___ */
+    case 6872316307694504019u:
+      sscanf_s(line, "%*s %d\n", &toy->shape);
+      break;
+    /* SCALE__ */
+    case 6872316307627393875u:
+      sscanf_s(line, "%*s %f\n", &toy->scale);
+      break;
+    /* COLOR___ */
+    case 6872316363513024323u:
+      sscanf_s(line, "%*s %f %f %f %f\n", &toy->albedo.r, &toy->albedo.g, &toy->albedo.b, &toy->albedo.a);
+      break;
+    /* MATERIAL */
+    case 5494753638068011341u:
+      sscanf_s(line, "%*s %f %f %f\n", &toy->material.r, &toy->material.g, &toy->material.b);
+      break;
+    /* EMISSION */
+    case 5642809480346946885u:
+      sscanf_s(line, "%*s %f %f %f\n", &toy->emission.r, &toy->emission.g, &toy->emission.b);
+      break;
+    /* EMISSIVE */
+    case 4996261458842570053u:
+      sscanf_s(line, "%*s %d\n", &toy->emissive);
+      break;
+    /* REFRACT_ */
+    case 6869189279479121234u:
+      sscanf_s(line, "%*s %f\n", &toy->refractive_index);
+      break;
+    default:
+      break;
+  }
 }
 
 Scene load_scene(const char* filename, RaytraceInstance** instance, char** output_name) {
@@ -51,7 +290,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
     assert(version == CURRENT_VERSION, "Incompatible Scene version! Update the file or use an older version of Luminary!", 1);
   }
   else {
-    print_error("Scene file has no version information, assuming version!")
+    print_error("Scene file has no version information, assuming correct version!")
   }
 
   Scene scene;
@@ -122,7 +361,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.sky.sun_color.b      = 0.8f;
   scene.sky.altitude         = 0.5f;
   scene.sky.azimuth          = 3.141f;
-  scene.sky.sun_strength     = 30.0f;
+  scene.sky.sun_strength     = 40.0f;
   scene.sky.base_density     = 1.0f;
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
@@ -136,60 +375,36 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
 
   Wavefront_Content content = create_wavefront_content();
 
-  char* source = (char*) malloc(LINE_SIZE);
-
   while (!feof(file)) {
     fgets(line, LINE_SIZE, file);
 
-    if (line[0] == 'm' && line[1] == ' ') {
-      sscanf_s(line, "%*c %s\n", source, LINE_SIZE);
-      if (read_wavefront_file(source, &content)) {
-        print_error("Mesh file could not be loaded!");
-      }
+    if (line[0] == 'G') {
+      parse_general_settings(&width, &height, &bounces, &samples, *output_name, &denoiser, &content, line + 7 + 1);
     }
-    else if (line[0] == 'c' && line[1] == ' ') {
-      sscanf_s(
-        line, "%*c %f %f %f %f %f %f %f\n", &scene.camera.pos.x, &scene.camera.pos.y, &scene.camera.pos.z, &scene.camera.rotation.x,
-        &scene.camera.rotation.y, &scene.camera.rotation.z, &scene.camera.fov);
+    else if (line[0] == 'C') {
+      parse_camera_settings(&scene.camera, line + 6 + 1);
     }
-    else if (line[0] == 'l' && line[1] == ' ') {
-      sscanf_s(line, "%*c %f %f %f\n", &scene.camera.focal_length, &scene.camera.aperture_size, &scene.camera.exposure);
+    else if (line[0] == 'S') {
+      parse_sky_settings(&scene.sky, line + 3 + 1);
     }
-    else if (line[0] == 's' && line[1] == ' ') {
-      sscanf_s(line, "%*c %f %f %f\n", &scene.sky.azimuth, &scene.sky.altitude, &scene.sky.sun_strength);
+    else if (line[0] == 'O') {
+      parse_ocean_settings(&scene.ocean, line + 5 + 1);
     }
-    else if (line[0] == 'i' && line[1] == ' ') {
-      sscanf_s(line, "%*c %d %d %d %d\n", &width, &height, &bounces, &samples);
+    else if (line[0] == 'T') {
+      parse_toy_settings(&scene.toy, line + 3 + 1);
     }
-    else if (line[0] == 'o' && line[1] == ' ') {
-      sscanf_s(line, "%*c %s\n", *output_name, 4096);
-    }
-    else if (line[0] == 'f') {
-      sscanf_s(line, "%*c %f\n", &scene.camera.far_clip_distance);
-    }
-    else if (line[0] == 'w') {
-      sscanf_s(
-        line, "%*c %d %d %f %f %f %f %f %f %f %f %f\n", &scene.ocean.active, &scene.ocean.emissive, &scene.ocean.albedo.r,
-        &scene.ocean.albedo.g, &scene.ocean.albedo.b, &scene.ocean.albedo.a, &scene.ocean.height, &scene.ocean.amplitude,
-        &scene.ocean.frequency, &scene.ocean.choppyness, &scene.ocean.speed);
-    }
-    else if (line[0] == 'd') {
-      sscanf_s(line, "%*c %d\n", &denoiser);
-    }
-    else if (line[0] == '#') {
+    else if (line[0] == '#' || line[0] == 10) {
       continue;
     }
-    else if (line[0] == 'x') {
-      break;
-    }
     else {
-      sprintf(source, "Scene file contains unknown line!\n Content: %s\n", line);
-      print_error(source);
+      char* error_msg = (char*) malloc(LINE_SIZE);
+      sprintf(error_msg, "Scene file contains unknown line!\n Content: %s", line);
+      print_error(error_msg);
+      free(error_msg);
     }
   }
 
   fclose(file);
-  free(source);
   free(line);
 
   Triangle* triangles;
