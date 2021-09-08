@@ -67,7 +67,6 @@ int main(int argc, char* argv[]) {
   }
 
   free_scene(scene, instance);
-
   free_outputs(instance);
 
   printf("[%.3fs] Instance freed.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);

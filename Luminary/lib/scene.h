@@ -8,6 +8,7 @@
 #include "utils.h"
 
 Scene load_scene(const char* filename, RaytraceInstance** instance);
+void serialize_scene(RaytraceInstance* instance);
 void free_scene(Scene scene, RaytraceInstance* instance);
 
 #endif /* SCENE_H */
