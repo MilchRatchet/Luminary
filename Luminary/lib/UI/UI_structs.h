@@ -13,6 +13,7 @@ struct UIPanel {
   int prop4;
   int prop5;
   int voids_frames;
+  void (*func)(void*);
   void* data;
   SDL_Surface* title;
   SDL_Surface* data_text;

@@ -464,6 +464,10 @@ Scene load_scene(const char* filename, RaytraceInstance** instance) {
   return scene;
 }
 
+void serialize_scene(RaytraceInstance* instance) {
+  printf("Serializing is not yet implemented!\n");
+}
+
 void free_scene(Scene scene, RaytraceInstance* instance) {
   free_textures(instance->albedo_atlas, instance->albedo_atlas_length);
   free_textures(instance->illuminance_atlas, instance->illuminance_atlas_length);
@@ -473,7 +477,6 @@ void free_scene(Scene scene, RaytraceInstance* instance) {
     free(instance->settings.mesh_files[i]);
   }
   free(instance->settings.mesh_files);
-  free(instance->settings.output_path);
 
   free(scene.triangles);
   free(scene.nodes);

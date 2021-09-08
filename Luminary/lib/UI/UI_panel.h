@@ -10,6 +10,7 @@
 #define PANEL_COLOR 0x4
 #define PANEL_INFO 0x5
 #define PANEL_TAB 0x6
+#define PANEL_BUTTON 0x7
 
 #define PANEL_HEIGHT 40
 
@@ -22,7 +23,8 @@ UIPanel create_check(UI* ui, const char* text, int* data_binding, int voids_fram
 UIPanel create_dropdown(UI* ui, const char* text, int* data_binding, int voids_frames, int option_count, char* options, int index);
 UIPanel create_color(UI* ui, const char* text, float* data_binding);
 UIPanel create_info(UI* ui, const char* text, void* data_binding, int data_type, int kind);
-UIPanel create_tab(UI* ui, int* data_bindin);
+UIPanel create_tab(UI* ui, int* data_binding);
+UIPanel create_button(UI* ui, const char* text, void* data_binding, void (*func)(void*));
 void handle_mouse_UIPanel(UI* ui, UIPanel* panel, int mouse_state, int x, int y);
 void render_UIPanel(UI* ui, UIPanel* panel, int y);
 void free_UIPanel(UIPanel* panel);

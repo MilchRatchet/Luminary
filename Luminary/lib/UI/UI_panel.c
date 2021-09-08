@@ -1,6 +1,7 @@
 #include "UI_panel.h"
 
 #include "UI.h"
+#include "UI_button.h"
 #include "UI_check.h"
 #include "UI_color.h"
 #include "UI_dropdown.h"
@@ -125,6 +126,14 @@ UIPanel create_tab(UI* ui, int* data_binding) {
   return tab;
 }
 
+UIPanel create_button(UI* ui, const char* text, void* data_binding, void (*func)(void*)) {
+  UIPanel button = init_UIPanel(ui, PANEL_BUTTON, text, data_binding, 0);
+
+  button.func = func;
+
+  return button;
+}
+
 void handle_mouse_UIPanel(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
   switch (panel->type) {
     case PANEL_SLIDER:
@@ -142,6 +151,9 @@ void handle_mouse_UIPanel(UI* ui, UIPanel* panel, int mouse_state, int x, int y)
       break;
     case PANEL_TAB:
       handle_mouse_UIPanel_tab(ui, panel, mouse_state, x, y);
+      break;
+    case PANEL_BUTTON:
+      handle_mouse_UIPanel_button(ui, panel, mouse_state, x, y);
       break;
   }
 }
@@ -165,6 +177,9 @@ void render_UIPanel(UI* ui, UIPanel* panel, int y) {
       break;
     case PANEL_TAB:
       render_UIPanel_tab(ui, panel);
+      break;
+    case PANEL_BUTTON:
+      render_UIPanel_button(ui, panel, y);
       break;
   }
 }
