@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "error.h"
 #include "light.h"
@@ -29,8 +30,7 @@ static int validate_filetype(const char* line) {
   return result;
 }
 
-static void parse_general_settings(
-  int* width, int* height, int* bounces, int* samples, char* output_path, int* denoiser, Wavefront_Content* content, char* line) {
+static void parse_general_settings(General* general, Wavefront_Content* content, char* line) {
   const uint64_t key = *((uint64_t*) line);
 
   switch (key) {
@@ -41,31 +41,35 @@ static void parse_general_settings(
       if (read_wavefront_file(source, content)) {
         print_error("Mesh file could not be loaded!");
       }
-      free(source);
+      if (general->mesh_files_count == general->mesh_files_length) {
+        general->mesh_files_length *= 2;
+        general->mesh_files = safe_realloc(general->mesh_files, sizeof(char*) * general->mesh_files_length);
+      }
+      general->mesh_files[general->mesh_files_count++] = source;
       break;
     /* WIDTH___ */
     case 6872316320646711639u:
-      sscanf_s(line, "%*s %d\n", width);
+      sscanf_s(line, "%*s %d\n", &general->width);
       break;
     /* HEIGHT__ */
     case 6872304225801028936u:
-      sscanf_s(line, "%*s %d\n", height);
+      sscanf_s(line, "%*s %d\n", &general->height);
       break;
     /* BOUNCES_ */
     case 6868910012049477442u:
-      sscanf_s(line, "%*s %d\n", bounces);
+      sscanf_s(line, "%*s %d\n", &general->max_ray_depth);
       break;
     /* SAMPLES_ */
     case 6868910050737209683u:
-      sscanf_s(line, "%*s %d\n", samples);
+      sscanf_s(line, "%*s %d\n", &general->samples);
       break;
     /* DENOISER */
     case 5928236058831373636u:
-      sscanf_s(line, "%*s %d\n", denoiser);
+      sscanf_s(line, "%*s %d\n", &general->denoiser);
       break;
     /* OUTPUTFN */
     case 5640288308724782415u:
-      sscanf_s(line, "%*s %s\n", output_path, LINE_SIZE);
+      sscanf_s(line, "%*s %s\n", &general->output_path, LINE_SIZE);
       break;
     default:
       break;
@@ -268,7 +272,7 @@ static void parse_toy_settings(Toy* toy, char* line) {
   }
 }
 
-Scene load_scene(const char* filename, RaytraceInstance** instance, char** output_name) {
+Scene load_scene(const char* filename, RaytraceInstance** instance) {
   FILE* file;
   fopen_s(&file, filename, "rb");
 
@@ -366,12 +370,18 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
 
-  int width   = 1280;
-  int height  = 720;
-  int bounces = 5;
-  int samples = 16;
+  General general = {
+    .width             = 1280,
+    .height            = 720,
+    .max_ray_depth     = 5,
+    .samples           = 16,
+    .denoiser          = 1,
+    .output_path       = malloc(LINE_SIZE),
+    .mesh_files        = malloc(sizeof(char*) * 10),
+    .mesh_files_count  = 0,
+    .mesh_files_length = 10};
 
-  int denoiser = 1;
+  strncpy_s(general.output_path, LINE_SIZE, "output.png", 11);
 
   Wavefront_Content content = create_wavefront_content();
 
@@ -379,7 +389,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
     fgets(line, LINE_SIZE, file);
 
     if (line[0] == 'G') {
-      parse_general_settings(&width, &height, &bounces, &samples, *output_name, &denoiser, &content, line + 7 + 1);
+      parse_general_settings(&general, &content, line + 7 + 1);
     }
     else if (line[0] == 'C') {
       parse_camera_settings(&scene.camera, line + 6 + 1);
@@ -446,8 +456,8 @@ Scene load_scene(const char* filename, RaytraceInstance** instance, char** outpu
   void* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
 
   *instance = init_raytracing(
-    width, height, bounces, samples, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length,
-    material_atlas, content.material_maps_length, scene, denoiser);
+    general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
+    content.material_maps_length, scene);
 
   free_wavefront_content(content);
 
@@ -458,6 +468,12 @@ void free_scene(Scene scene, RaytraceInstance* instance) {
   free_textures(instance->albedo_atlas, instance->albedo_atlas_length);
   free_textures(instance->illuminance_atlas, instance->illuminance_atlas_length);
   free_textures(instance->material_atlas, instance->material_atlas_length);
+
+  for (int i = 0; i < instance->settings.mesh_files_count; i++) {
+    free(instance->settings.mesh_files[i]);
+  }
+  free(instance->settings.mesh_files);
+  free(instance->settings.output_path);
 
   free(scene.triangles);
   free(scene.nodes);

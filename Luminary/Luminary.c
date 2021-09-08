@@ -55,10 +55,7 @@ int main(int argc, char* argv[]) {
   clock_t time = clock();
 
   RaytraceInstance* instance;
-
-  char* output_name = (char*) malloc(4096);
-
-  Scene scene = load_scene(argv[1], &instance, &output_name);
+  Scene scene = load_scene(argv[1], &instance);
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
@@ -66,10 +63,8 @@ int main(int argc, char* argv[]) {
     realtime_output(scene, instance);
   }
   else {
-    offline_output(scene, instance, output_name, time);
+    offline_output(scene, instance, time);
   }
-
-  free(output_name);
 
   free_scene(scene, instance);
 

@@ -48,6 +48,18 @@
 #define SNAP_RESOLUTION_RENDER 1
 #endif
 
+struct General {
+  int width;
+  int height;
+  int samples;
+  int max_ray_depth;
+  int denoiser;
+  char** mesh_files;
+  int mesh_files_count;
+  int mesh_files_length;
+  char* output_path;
+} typedef General;
+
 struct Camera {
   vec3 pos;
   vec3 rotation;
@@ -160,6 +172,7 @@ struct RaytraceInstance {
   int shading_mode;
   RGBF** bloom_mips_gpu;
   int snap_resolution;
+  General settings;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \

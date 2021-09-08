@@ -15,9 +15,8 @@ extern "C" {
 
 void initialize_device();
 RaytraceInstance* init_raytracing(
-  const unsigned int width, const unsigned int height, const int max_ray_depth, const int samples, void* albedo_atlas,
-  int albedo_atlas_length, void* illuminance_atlas, int illuminance_atlas_length, void* material_atlas, int material_atlas_length,
-  Scene scene, int denoiser);
+  General general, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas, int illuminance_atlas_length, void* material_atlas,
+  int material_atlas_length, Scene scene);
 void update_scene(RaytraceInstance* instance);
 void trace_scene(RaytraceInstance* instance, const int temporal_frames);
 void apply_bloom(RaytraceInstance* instance, RGBF* image);
