@@ -7,7 +7,7 @@
 #include "texture.h"
 #include "utils.h"
 
-Scene load_scene(const char* filename, RaytraceInstance** instance, char** output_name);
+Scene load_scene(const char* filename, RaytraceInstance** instance);
 void free_scene(Scene scene, RaytraceInstance* instance);
 
 #endif /* SCENE_H */

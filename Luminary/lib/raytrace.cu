@@ -86,24 +86,23 @@ static void update_camera_pos(const Scene scene, const unsigned int width, const
 }
 
 extern "C" RaytraceInstance* init_raytracing(
-  const unsigned int width, const unsigned int height, const int max_ray_depth, const int samples, void* albedo_atlas,
-  int albedo_atlas_length, void* illuminance_atlas, int illuminance_atlas_length, void* material_atlas, int material_atlas_length,
-  Scene scene, int denoiser) {
+  General general, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas, int illuminance_atlas_length, void* material_atlas,
+  int material_atlas_length, Scene scene) {
   RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
 
-  instance->width  = width;
-  instance->height = height;
+  instance->width  = general.width;
+  instance->height = general.height;
 
-  const unsigned int amount = width * height;
+  const unsigned int amount = general.width * general.height;
 
-  gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * width * height));
-  gpuErrchk(cudaMalloc((void**) &(instance->frame_output_gpu), sizeof(RGBF) * width * height));
-  gpuErrchk(cudaMalloc((void**) &(instance->frame_variance_gpu), sizeof(RGBF) * width * height));
-  gpuErrchk(cudaMalloc((void**) &(instance->frame_bias_cache_gpu), sizeof(RGBF) * width * height));
-  gpuErrchk(cudaMalloc((void**) &(instance->records_gpu), sizeof(RGBF) * width * height));
+  gpuErrchk(cudaMalloc((void**) &(instance->frame_buffer_gpu), sizeof(RGBF) * amount));
+  gpuErrchk(cudaMalloc((void**) &(instance->frame_output_gpu), sizeof(RGBF) * amount));
+  gpuErrchk(cudaMalloc((void**) &(instance->frame_variance_gpu), sizeof(RGBF) * amount));
+  gpuErrchk(cudaMalloc((void**) &(instance->frame_bias_cache_gpu), sizeof(RGBF) * amount));
+  gpuErrchk(cudaMalloc((void**) &(instance->records_gpu), sizeof(RGBF) * amount));
 
-  instance->max_ray_depth   = max_ray_depth;
-  instance->offline_samples = samples;
+  instance->max_ray_depth   = general.max_ray_depth;
+  instance->offline_samples = general.samples;
 
   instance->albedo_atlas      = albedo_atlas;
   instance->illuminance_atlas = illuminance_atlas;
@@ -118,6 +117,7 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->default_material.b = 1.0f;
 
   instance->scene_gpu    = scene;
+  instance->settings     = general;
   instance->shading_mode = 0;
 
   gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment) * scene.materials_length));
@@ -153,16 +153,16 @@ extern "C" RaytraceInstance* init_raytracing(
   gpuErrchk(cudaMemcpyToSymbol(device_material_atlas, &(instance->material_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_amount, &(amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
 
-  gpuErrchk(cudaMalloc((void**) &(instance->light_sample_history_gpu), sizeof(uint32_t) * width * height));
+  gpuErrchk(cudaMalloc((void**) &(instance->light_sample_history_gpu), sizeof(uint32_t) * general.width * general.height));
   gpuErrchk(
     cudaMemcpyToSymbol(device_light_sample_history, &(instance->light_sample_history_gpu), sizeof(uint32_t*), 0, cudaMemcpyHostToDevice));
 
-  instance->denoiser      = denoiser;
-  instance->use_denoiser  = denoiser;
+  instance->denoiser      = general.denoiser;
+  instance->use_denoiser  = general.denoiser;
   instance->lights_active = (scene.sky.altitude < 0.0f);
 
   if (instance->denoiser) {
-    gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * width * height));
+    gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * general.width * general.height));
     gpuErrchk(cudaMemcpyToSymbol(device_albedo_buffer, &(instance->albedo_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
     gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
   }

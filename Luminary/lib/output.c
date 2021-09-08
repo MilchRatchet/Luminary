@@ -16,7 +16,7 @@
 #include "realtime.h"
 #include "utils.h"
 
-void offline_output(Scene scene, RaytraceInstance* instance, char* output_name, clock_t time) {
+void offline_output(Scene scene, RaytraceInstance* instance, clock_t time) {
   clock_t start_of_rt = clock();
   trace_scene(instance, 0);
   for (int i = 1; i < instance->offline_samples; i++) {
@@ -48,7 +48,7 @@ void offline_output(Scene scene, RaytraceInstance* instance, char* output_name, 
   XRGB8* frame = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
   copy_framebuffer_to_8bit(frame, instance->width, instance->height, instance->frame_output_gpu, instance);
 
-  store_XRGB8_png(output_name, frame, instance->width, instance->height);
+  store_XRGB8_png(instance->settings.output_path, frame, instance->width, instance->height);
 
   printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
