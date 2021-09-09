@@ -69,7 +69,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
       break;
     /* OUTPUTFN */
     case 5640288308724782415u:
-      sscanf_s(line, "%*s %s\n", &general->output_path, LINE_SIZE);
+      sscanf_s(line, "%*s %s\n", general->output_path, LINE_SIZE);
       break;
     default:
       break;
@@ -102,7 +102,7 @@ static void parse_camera_settings(Camera* camera, char* line) {
       break;
     /* AUTOEXP_ */
     case 6868086486446921025u:
-      sscanf_s(line, "%*s %f\n", &camera->auto_exposure);
+      sscanf_s(line, "%*s %d\n", &camera->auto_exposure);
       break;
     /* EXPOSURE */
     case 4995148753008613445u:
@@ -288,7 +288,7 @@ Scene load_scene(const char* filename, RaytraceInstance** instance) {
 
   fgets(line, LINE_SIZE, file);
 
-  if (line[0] == 'v') {
+  if (line[0] == 'v' || line[0] == 'V') {
     int version = 0;
     sscanf_s(line, "%*c %d\n", &version);
     assert(version == CURRENT_VERSION, "Incompatible Scene version! Update the file or use an older version of Luminary!", 1);
@@ -465,7 +465,162 @@ Scene load_scene(const char* filename, RaytraceInstance** instance) {
 }
 
 void serialize_scene(RaytraceInstance* instance) {
-  printf("Serializing is not yet implemented!\n");
+  FILE* file;
+  fopen_s(&file, "generated.lum", "wb");
+
+  if (!file) {
+    print_error("Could not export settings!");
+    return;
+  }
+
+  char* line = malloc(LINE_SIZE);
+
+  sprintf_s(line, LINE_SIZE, "Luminary\n");
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "V %d\n", CURRENT_VERSION);
+  fputs(line, file);
+
+  sprintf_s(
+    line, LINE_SIZE,
+    "#===============================\n# This file was automatically\n# created by Luminary.\n#\n# Please read the documentation\n# before "
+    "changing any settings.\n#===============================\n");
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "\n#===============================\n# General Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "GENERAL WIDTH___ %d\n", instance->settings.width);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "GENERAL HEIGHT__ %d\n", instance->settings.height);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "GENERAL BOUNCES_ %d\n", instance->settings.max_ray_depth);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "GENERAL SAMPLES_ %d\n", instance->settings.samples);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "GENERAL DENOISER %d\n", instance->settings.denoiser);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "GENERAL OUTPUTFN %s\n", instance->settings.output_path);
+  fputs(line, file);
+  for (int i = 0; i < instance->settings.mesh_files_count; i++) {
+    sprintf_s(line, LINE_SIZE, "GENERAL MESHFILE %s\n", instance->settings.mesh_files[i]);
+    fputs(line, file);
+  }
+
+  sprintf_s(line, LINE_SIZE, "\n#===============================\n# Camera Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf_s(
+    line, LINE_SIZE, "CAMERA POSITION %f %f %f\n", instance->scene_gpu.camera.pos.x, instance->scene_gpu.camera.pos.y,
+    instance->scene_gpu.camera.pos.z);
+  fputs(line, file);
+  sprintf_s(
+    line, LINE_SIZE, "CAMERA ROTATION %f %f %f\n", instance->scene_gpu.camera.rotation.x, instance->scene_gpu.camera.rotation.y,
+    instance->scene_gpu.camera.rotation.z);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA FOV_____ %f\n", instance->scene_gpu.camera.fov);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA FOCALLEN %f\n", instance->scene_gpu.camera.focal_length);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA APERTURE %f\n", instance->scene_gpu.camera.aperture_size);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA EXPOSURE %f\n", instance->scene_gpu.camera.exposure);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA BLOOM___ %d\n", instance->scene_gpu.camera.bloom);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA BLOOMSTR %f\n", instance->scene_gpu.camera.bloom_strength);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA DITHER__ %d\n", instance->scene_gpu.camera.dithering);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA FARCLIPD %f\n", instance->scene_gpu.camera.far_clip_distance);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA TONEMAP_ %d\n", instance->scene_gpu.camera.tonemap);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA ALPHACUT %f\n", instance->scene_gpu.camera.alpha_cutoff);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA AUTOEXP_ %d\n", instance->scene_gpu.camera.auto_exposure);
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "\n#===============================\n# Sky Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf_s(
+    line, LINE_SIZE, "SKY SUNCOLOR %f %f %f\n", instance->scene_gpu.sky.sun_color.r, instance->scene_gpu.sky.sun_color.g,
+    instance->scene_gpu.sky.sun_color.b);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY AZIMUTH_ %f\n", instance->scene_gpu.sky.azimuth);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY ALTITUDE %f\n", instance->scene_gpu.sky.altitude);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY STRENGTH %f\n", instance->scene_gpu.sky.sun_strength);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY DENSITY_ %f\n", instance->scene_gpu.sky.base_density);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY RAYLEIGH %f\n", instance->scene_gpu.sky.rayleigh_falloff);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY MIE_____ %f\n", instance->scene_gpu.sky.mie_falloff);
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "\n#===============================\n# Ocean Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "OCEAN ACTIVE__ %d\n", instance->scene_gpu.ocean.active);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "OCEAN HEIGHT__ %f\n", instance->scene_gpu.ocean.height);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "OCEAN AMPLITUD %f\n", instance->scene_gpu.ocean.amplitude);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "OCEAN FREQUENC %f\n", instance->scene_gpu.ocean.frequency);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "OCEAN CHOPPY__ %f\n", instance->scene_gpu.ocean.choppyness);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "OCEAN SPEED___ %f\n", instance->scene_gpu.ocean.speed);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "OCEAN ANIMATED %d\n", instance->scene_gpu.ocean.update);
+  fputs(line, file);
+  sprintf_s(
+    line, LINE_SIZE, "OCEAN COLOR___ %f %f %f %f\n", instance->scene_gpu.ocean.albedo.r, instance->scene_gpu.ocean.albedo.g,
+    instance->scene_gpu.ocean.albedo.b, instance->scene_gpu.ocean.albedo.a);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "OCEAN EMISSIVE %d\n", instance->scene_gpu.ocean.emissive);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "OCEAN REFRACT_ %f\n", instance->scene_gpu.ocean.refractive_index);
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "\n#===============================\n# Toy Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "TOY ACTIVE__ %d\n", instance->scene_gpu.toy.active);
+  fputs(line, file);
+  sprintf_s(
+    line, LINE_SIZE, "TOY POSITION %f %f %f\n", instance->scene_gpu.toy.position.x, instance->scene_gpu.toy.position.y,
+    instance->scene_gpu.toy.position.z);
+  fputs(line, file);
+  sprintf_s(
+    line, LINE_SIZE, "TOY ROTATION %f %f %f\n", instance->scene_gpu.toy.rotation.x, instance->scene_gpu.toy.rotation.y,
+    instance->scene_gpu.toy.rotation.z);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "TOY SHAPE___ %d\n", instance->scene_gpu.toy.shape);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "TOY SCALE___ %f\n", instance->scene_gpu.toy.scale);
+  fputs(line, file);
+  sprintf_s(
+    line, LINE_SIZE, "TOY COLOR___ %f %f %f %f\n", instance->scene_gpu.toy.albedo.r, instance->scene_gpu.toy.albedo.g,
+    instance->scene_gpu.toy.albedo.b, instance->scene_gpu.toy.albedo.a);
+  fputs(line, file);
+  sprintf_s(
+    line, LINE_SIZE, "TOY MATERIAL %f %f %f\n", instance->scene_gpu.toy.material.r, instance->scene_gpu.toy.material.g,
+    instance->scene_gpu.toy.material.b);
+  fputs(line, file);
+  sprintf_s(
+    line, LINE_SIZE, "TOY EMISSION %f %f %f\n", instance->scene_gpu.toy.emission.r, instance->scene_gpu.toy.emission.g,
+    instance->scene_gpu.toy.emission.b);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "TOY EMISSIVE %d\n", instance->scene_gpu.toy.emissive);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "TOY REFRACT_ %f\n", instance->scene_gpu.toy.refractive_index);
+  fputs(line, file);
+
+  fclose(file);
 }
 
 void free_scene(Scene scene, RaytraceInstance* instance) {
@@ -477,6 +632,7 @@ void free_scene(Scene scene, RaytraceInstance* instance) {
     free(instance->settings.mesh_files[i]);
   }
   free(instance->settings.mesh_files);
+  free(instance->settings.output_path);
 
   free(scene.triangles);
   free(scene.nodes);
