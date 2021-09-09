@@ -620,6 +620,8 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf_s(line, LINE_SIZE, "TOY REFRACT_ %f\n", instance->scene_gpu.toy.refractive_index);
   fputs(line, file);
 
+  free(line);
+
   fclose(file);
 }
 
