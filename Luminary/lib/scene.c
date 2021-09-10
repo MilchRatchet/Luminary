@@ -32,12 +32,13 @@ static int validate_filetype(const char* line) {
 
 static void parse_general_settings(General* general, Wavefront_Content* content, char* line) {
   const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
 
   switch (key) {
     /* MESHFILE */
     case 4993446653056992589u:
       char* source = (char*) malloc(LINE_SIZE);
-      sscanf_s(line, "%*s %s\n", source, LINE_SIZE);
+      sscanf_s(value, "%s\n", source, LINE_SIZE);
       if (read_wavefront_file(source, content)) {
         print_error("Mesh file could not be loaded!");
       }
@@ -49,225 +50,249 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
       break;
     /* WIDTH___ */
     case 6872316320646711639u:
-      sscanf_s(line, "%*s %d\n", &general->width);
+      sscanf_s(value, "%d\n", &general->width);
       break;
     /* HEIGHT__ */
     case 6872304225801028936u:
-      sscanf_s(line, "%*s %d\n", &general->height);
+      sscanf_s(value, "%d\n", &general->height);
       break;
     /* BOUNCES_ */
     case 6868910012049477442u:
-      sscanf_s(line, "%*s %d\n", &general->max_ray_depth);
+      sscanf_s(value, "%d\n", &general->max_ray_depth);
       break;
     /* SAMPLES_ */
     case 6868910050737209683u:
-      sscanf_s(line, "%*s %d\n", &general->samples);
+      sscanf_s(value, "%d\n", &general->samples);
       break;
     /* DENOISER */
     case 5928236058831373636u:
-      sscanf_s(line, "%*s %d\n", &general->denoiser);
+      sscanf_s(value, "%d\n", &general->denoiser);
       break;
     /* OUTPUTFN */
     case 5640288308724782415u:
-      sscanf_s(line, "%*s %s\n", general->output_path, LINE_SIZE);
+      sscanf_s(value, "%s\n", general->output_path, LINE_SIZE);
       break;
     default:
+      char* error_msg = (char*) malloc(LINE_SIZE);
+      sprintf(error_msg, "%8.8s is not a valid GENERAL setting.", line);
+      print_error(error_msg);
+      free(error_msg);
       break;
   }
 }
 
 static void parse_camera_settings(Camera* camera, char* line) {
   const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
 
   switch (key) {
     /* POSITION */
     case 5642809484474797904u:
-      sscanf_s(line, "%*s %f %f %f\n", &camera->pos.x, &camera->pos.y, &camera->pos.z);
+      sscanf_s(value, "%f %f %f\n", &camera->pos.x, &camera->pos.y, &camera->pos.z);
       break;
     /* ROTATION */
     case 5642809484340645714u:
-      sscanf_s(line, "%*s %f %f %f\n", &camera->rotation.x, &camera->rotation.y, &camera->rotation.z);
+      sscanf_s(value, "%f %f %f\n", &camera->rotation.x, &camera->rotation.y, &camera->rotation.z);
       break;
     /* FOV_____ */
     case 6872316419616689990u:
-      sscanf_s(line, "%*s %f\n", &camera->fov);
+      sscanf_s(value, "%f\n", &camera->fov);
       break;
     /* FOCALLEN */
     case 5639997998747569990u:
-      sscanf_s(line, "%*s %f\n", &camera->focal_length);
+      sscanf_s(value, "%f\n", &camera->focal_length);
       break;
     /* APERTURE */
     case 4995148757353189441u:
-      sscanf_s(line, "%*s %f\n", &camera->aperture_size);
+      sscanf_s(value, "%f\n", &camera->aperture_size);
       break;
     /* AUTOEXP_ */
     case 6868086486446921025u:
-      sscanf_s(line, "%*s %d\n", &camera->auto_exposure);
+      sscanf_s(value, "%d\n", &camera->auto_exposure);
       break;
     /* EXPOSURE */
     case 4995148753008613445u:
-      sscanf_s(line, "%*s %f\n", &camera->exposure);
+      sscanf_s(value, "%f\n", &camera->exposure);
       break;
     /* BLOOM___ */
     case 6872316342038383682u:
-      sscanf_s(line, "%*s %d\n", &camera->bloom);
+      sscanf_s(value, "%d\n", &camera->bloom);
       break;
     /* BLOOMSTR */
     case 5932458200661969986u:
-      sscanf_s(line, "%*s %f\n", &camera->bloom_strength);
+      sscanf_s(value, "%f\n", &camera->bloom_strength);
       break;
     /* DITHER__ */
     case 6872302013910370628u:
-      sscanf_s(line, "%*s %d\n", &camera->dithering);
+      sscanf_s(value, "%d\n", &camera->dithering);
       break;
     /* FARCLIPD */
     case 4922514984611758406u:
-      sscanf_s(line, "%*s %f\n", &camera->far_clip_distance);
+      sscanf_s(value, "%f\n", &camera->far_clip_distance);
       break;
     /* TONEMAP_ */
     case 6868061231871053652u:
-      sscanf_s(line, "%*s %d\n", &camera->tonemap);
+      sscanf_s(value, "%d\n", &camera->tonemap);
       break;
     /* ALPHACUT */
     case 6076837219871509569u:
-      sscanf_s(line, "%*s %f\n", &camera->alpha_cutoff);
+      sscanf_s(value, "%f\n", &camera->alpha_cutoff);
       break;
     default:
+      char* error_msg = (char*) malloc(LINE_SIZE);
+      sprintf(error_msg, "%8.8s is not a valid CAMERA setting.", line);
+      print_error(error_msg);
+      free(error_msg);
       break;
   }
 }
 
 static void parse_sky_settings(Sky* sky, char* line) {
   const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
 
   switch (key) {
     /* SUNCOLOR */
     case 5931043137585567059u:
-      sscanf_s(line, "%*s %f %f %f\n", &sky->sun_color.r, &sky->sun_color.g, &sky->sun_color.b);
+      sscanf_s(value, "%f %f %f\n", &sky->sun_color.r, &sky->sun_color.g, &sky->sun_color.b);
       break;
     /* STRENGTH */
     case 5211869070270551123u:
-      sscanf_s(line, "%*s %f\n", &sky->sun_strength);
+      sscanf_s(value, "%f\n", &sky->sun_strength);
       break;
     /* AZIMUTH_ */
     case 6865830357271927361u:
-      sscanf_s(line, "%*s %f\n", &sky->azimuth);
+      sscanf_s(value, "%f\n", &sky->azimuth);
       break;
     /* ALTITUDE */
     case 4991208107529227329u:
-      sscanf_s(line, "%*s %f\n", &sky->altitude);
+      sscanf_s(value, "%f\n", &sky->altitude);
       break;
     /* DENSITY_ */
     case 6870615380437386564u:
-      sscanf_s(line, "%*s %f\n", &sky->base_density);
+      sscanf_s(value, "%f\n", &sky->base_density);
       break;
     /* RAYLEIGH */
     case 5208212056059756882u:
-      sscanf_s(line, "%*s %f\n", &sky->rayleigh_falloff);
+      sscanf_s(value, "%f\n", &sky->rayleigh_falloff);
       break;
     /* MIE_____ */
     case 6872316419615574349u:
-      sscanf_s(line, "%*s %f\n", &sky->mie_falloff);
+      sscanf_s(value, "%f\n", &sky->mie_falloff);
       break;
     default:
+      char* error_msg = (char*) malloc(LINE_SIZE);
+      sprintf(error_msg, "%8.8s is not a valid SKY setting.", line);
+      print_error(error_msg);
+      free(error_msg);
       break;
   }
 }
 
 static void parse_ocean_settings(Ocean* ocean, char* line) {
   const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
 
   switch (key) {
     /* ACTIVE__ */
     case 6872287793290429249u:
-      sscanf_s(line, "%*s %d\n", &ocean->active);
+      sscanf_s(value, "%d\n", &ocean->active);
       break;
     /* HEIGHT__ */
     case 6872304225801028936u:
-      sscanf_s(line, "%*s %f\n", &ocean->height);
+      sscanf_s(value, "%f\n", &ocean->height);
       break;
     /* AMPLITUD */
     case 4923934441389182273u:
-      sscanf_s(line, "%*s %f\n", &ocean->amplitude);
+      sscanf_s(value, "%f\n", &ocean->amplitude);
       break;
     /* FREQUENC */
     case 4849890081462637126u:
-      sscanf_s(line, "%*s %f\n", &ocean->frequency);
+      sscanf_s(value, "%f\n", &ocean->frequency);
       break;
     /* CHOPPY__ */
     case 6872309757870295107u:
-      sscanf_s(line, "%*s %f\n", &ocean->choppyness);
+      sscanf_s(value, "%f\n", &ocean->choppyness);
       break;
     /* SPEED___ */
     case 6872316303215251539u:
-      sscanf_s(line, "%*s %f\n", &ocean->speed);
+      sscanf_s(value, "%f\n", &ocean->speed);
       break;
     /* ANIMATED */
     case 4919430807418392129u:
-      sscanf_s(line, "%*s %d\n", &ocean->update);
+      sscanf_s(value, "%d\n", &ocean->update);
       break;
     /* COLOR___ */
     case 6872316363513024323u:
-      sscanf_s(line, "%*s %f %f %f %f\n", &ocean->albedo.r, &ocean->albedo.g, &ocean->albedo.b, &ocean->albedo.a);
+      sscanf_s(value, "%f %f %f %f\n", &ocean->albedo.r, &ocean->albedo.g, &ocean->albedo.b, &ocean->albedo.a);
       break;
     /* EMISSIVE */
     case 4996261458842570053u:
-      sscanf_s(line, "%*s %d\n", &ocean->emissive);
+      sscanf_s(value, "%d\n", &ocean->emissive);
       break;
     /* REFRACT_ */
     case 6869189279479121234u:
-      sscanf_s(line, "%*s %f\n", &ocean->refractive_index);
+      sscanf_s(value, "%f\n", &ocean->refractive_index);
       break;
     default:
+      char* error_msg = (char*) malloc(LINE_SIZE);
+      sprintf(error_msg, "%8.8s is not a valid OCEAN setting.", line);
+      print_error(error_msg);
+      free(error_msg);
       break;
   }
 }
 
 static void parse_toy_settings(Toy* toy, char* line) {
   const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
 
   switch (key) {
     /* ACTIVE__ */
     case 6872287793290429249u:
-      sscanf_s(line, "%*s %d\n", &toy->active);
+      sscanf_s(value, "%d\n", &toy->active);
       break;
     /* POSITION */
     case 5642809484474797904u:
-      sscanf_s(line, "%*s %f %f %f\n", &toy->position.x, &toy->position.y, &toy->position.z);
+      sscanf_s(value, "%f %f %f\n", &toy->position.x, &toy->position.y, &toy->position.z);
       break;
     /* ROTATION */
     case 5642809484340645714u:
-      sscanf_s(line, "%*s %f %f %f\n", &toy->rotation.x, &toy->rotation.y, &toy->rotation.z);
+      sscanf_s(value, "%f %f %f\n", &toy->rotation.x, &toy->rotation.y, &toy->rotation.z);
       break;
     /* SHAPE___ */
     case 6872316307694504019u:
-      sscanf_s(line, "%*s %d\n", &toy->shape);
+      sscanf_s(value, "%d\n", &toy->shape);
       break;
     /* SCALE__ */
     case 6872316307627393875u:
-      sscanf_s(line, "%*s %f\n", &toy->scale);
+      sscanf_s(value, "%f\n", &toy->scale);
       break;
     /* COLOR___ */
     case 6872316363513024323u:
-      sscanf_s(line, "%*s %f %f %f %f\n", &toy->albedo.r, &toy->albedo.g, &toy->albedo.b, &toy->albedo.a);
+      sscanf_s(value, "%f %f %f %f\n", &toy->albedo.r, &toy->albedo.g, &toy->albedo.b, &toy->albedo.a);
       break;
     /* MATERIAL */
     case 5494753638068011341u:
-      sscanf_s(line, "%*s %f %f %f\n", &toy->material.r, &toy->material.g, &toy->material.b);
+      sscanf_s(value, "%f %f %f\n", &toy->material.r, &toy->material.g, &toy->material.b);
       break;
     /* EMISSION */
     case 5642809480346946885u:
-      sscanf_s(line, "%*s %f %f %f\n", &toy->emission.r, &toy->emission.g, &toy->emission.b);
+      sscanf_s(value, "%f %f %f\n", &toy->emission.r, &toy->emission.g, &toy->emission.b);
       break;
     /* EMISSIVE */
     case 4996261458842570053u:
-      sscanf_s(line, "%*s %d\n", &toy->emissive);
+      sscanf_s(value, "%d\n", &toy->emissive);
       break;
     /* REFRACT_ */
     case 6869189279479121234u:
-      sscanf_s(line, "%*s %f\n", &toy->refractive_index);
+      sscanf_s(value, "%f\n", &toy->refractive_index);
       break;
     default:
+      char* error_msg = (char*) malloc(LINE_SIZE);
+      sprintf(error_msg, "%8.8s is not a valid TOY setting.", line);
+      print_error(error_msg);
+      free(error_msg);
       break;
   }
 }
