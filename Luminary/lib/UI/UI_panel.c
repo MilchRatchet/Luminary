@@ -23,13 +23,19 @@ static UIPanel init_UIPanel(UI* ui, int type, const char* text, void* data_bindi
   return panel;
 }
 
-UIPanel create_slider(UI* ui, const char* text, float* data_binding, int voids_frames, float scale, float min, float max, int refresh) {
+UIPanel create_slider(
+  UI* ui, const char* text, void* data_binding, int voids_frames, float scale, float min, float max, int refresh, int integral) {
   UIPanel slider = init_UIPanel(ui, PANEL_SLIDER, text, data_binding, voids_frames);
 
   slider.prop1 = *((int*) &scale);
   slider.prop2 = *((int*) &min);
   slider.prop3 = *((int*) &max);
   slider.prop4 = refresh;
+  slider.prop5 = integral;
+
+  if (slider.prop5) {
+    slider.data_buffer = *((int*) slider.data);
+  }
 
   return slider;
 }

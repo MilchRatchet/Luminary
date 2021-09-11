@@ -18,7 +18,8 @@
 #define HOVER_G 0xff
 #define HOVER_B 0xa5
 
-UIPanel create_slider(UI* ui, const char* text, float* data_binding, int voids_frames, float scale, float min, float max, int refresh);
+UIPanel create_slider(
+  UI* ui, const char* text, void* data_binding, int voids_frames, float scale, float min, float max, int refresh, int integral);
 UIPanel create_check(UI* ui, const char* text, int* data_binding, int voids_frames);
 UIPanel create_dropdown(UI* ui, const char* text, int* data_binding, int voids_frames, int option_count, char* options, int index);
 UIPanel create_color(UI* ui, const char* text, float* data_binding);
