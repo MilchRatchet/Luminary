@@ -140,7 +140,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
 
   char* title = (char*) malloc(4096);
 
-  void* optix_setup = initialize_optix_denoise_for_realtime(instance);
+  instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
 
   while (!exit) {
     SDL_Event event;
@@ -152,7 +152,7 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
 
     start_frametime(&frametime_post);
     if (instance->denoiser && instance->use_denoiser) {
-      instance->frame_final_gpu = denoise_with_optix_realtime(optix_setup);
+      instance->frame_final_gpu = denoise_with_optix_realtime(instance->denoise_setup);
       if (instance->scene_gpu.camera.bloom)
         apply_bloom(instance, instance->frame_final_gpu);
     }
@@ -332,13 +332,13 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
     }
 
     if (instance->scene_gpu.camera.auto_exposure) {
-      instance->scene_gpu.camera.exposure = get_auto_exposure_from_optix(optix_setup, instance);
+      instance->scene_gpu.camera.exposure = get_auto_exposure_from_optix(instance->denoise_setup, instance);
     }
   }
 
   free(title);
   free_8bit_frame(instance);
-  free_realtime_denoise(optix_setup);
+  free_realtime_denoise(instance->denoise_setup);
   free_realtime_instance(realtime);
   free_UI(&ui);
 }

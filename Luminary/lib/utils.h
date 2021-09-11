@@ -173,6 +173,7 @@ struct RaytraceInstance {
   RGBF** bloom_mips_gpu;
   int snap_resolution;
   General settings;
+  void* denoise_setup;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \

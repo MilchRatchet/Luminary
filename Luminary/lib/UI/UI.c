@@ -38,13 +38,14 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Width", &(instance->settings.width), 0, 0.001f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Height", &(instance->settings.height), 0, 0.001f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Max Ray Depth", &(instance->settings.max_ray_depth), 0, 0.001f, 1.0f, 1024.0f, 0, 1);
+  panels[i++] = create_button(ui, "Reset Renderer", instance, (void (*)(void*)) reset_raytracing, 1);
   panels[i++] = create_info(ui, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[i++] = create_dropdown(ui, "Snapshot Resolution", &(instance->snap_resolution), 0, 2, "Window\0Render", 4);
+  panels[i++] = create_dropdown(ui, "Snapshot Resolution", &(instance->snap_resolution), 0, 2, "Window\0Render", 6);
   panels[i++] = create_check(ui, "Optix Denoiser", &(instance->use_denoiser), 0);
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene_gpu.lights_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_check(ui, "Lights", &(instance->lights_active), 1);
-  panels[i++] = create_dropdown(ui, "Shading Mode", &(instance->shading_mode), 1, 5, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap", 9);
+  panels[i++] = create_dropdown(ui, "Shading Mode", &(instance->shading_mode), 1, 5, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap", 11);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->default_material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Light Intensity", &(instance->default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
