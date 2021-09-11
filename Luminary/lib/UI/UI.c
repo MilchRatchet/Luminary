@@ -11,6 +11,7 @@
 #include "UI_info.h"
 #include "UI_panel.h"
 #include "UI_text.h"
+#include "raytrace.h"
 #include "scene.h"
 
 #define MOUSE_LEFT_BLOCKED 0b1
@@ -50,7 +51,7 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Mouse Sensitivity", &(instance->scene_gpu.camera.mouse_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0);
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene_gpu.camera.smooth_movement), 0);
   panels[i++] = create_slider(ui, "Smoothing Factor", &(instance->scene_gpu.camera.smoothing_factor), 0, 0.0001f, 0.0f, 1.0f, 0);
-  panels[i++] = create_button(ui, "Export Settings", instance, (void (*)(void*)) serialize_scene);
+  panels[i++] = create_button(ui, "Export Settings", instance, (void (*)(void*)) serialize_scene, 0);
 
   return panels;
 }
@@ -134,6 +135,7 @@ static UIPanel* create_toy_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_tab(ui, &(ui->tab));
   panels[i++] = create_check(ui, "Active", &(instance->scene_gpu.toy.active), 1);
   panels[i++] = create_dropdown(ui, "Shape", &(instance->scene_gpu.toy.shape), 1, 1, "Sphere", 2);
+  panels[i++] = create_button(ui, "Center at Camera", instance, (void (*)(void*)) center_toy_at_camera, 1);
   panels[i++] = create_slider(ui, "Position X", &(instance->scene_gpu.toy.position.x), 1, 0.005f, -FLT_MAX, FLT_MAX, 0);
   panels[i++] = create_slider(ui, "Position Y", &(instance->scene_gpu.toy.position.y), 1, 0.005f, -FLT_MAX, FLT_MAX, 0);
   panels[i++] = create_slider(ui, "Position Z", &(instance->scene_gpu.toy.position.z), 1, 0.005f, -FLT_MAX, FLT_MAX, 0);

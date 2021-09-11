@@ -126,8 +126,8 @@ UIPanel create_tab(UI* ui, int* data_binding) {
   return tab;
 }
 
-UIPanel create_button(UI* ui, const char* text, void* data_binding, void (*func)(void*)) {
-  UIPanel button = init_UIPanel(ui, PANEL_BUTTON, text, data_binding, 0);
+UIPanel create_button(UI* ui, const char* text, void* data_binding, void (*func)(void*), int voids_frames) {
+  UIPanel button = init_UIPanel(ui, PANEL_BUTTON, text, data_binding, voids_frames);
 
   button.func = func;
 

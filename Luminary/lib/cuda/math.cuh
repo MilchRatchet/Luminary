@@ -39,7 +39,7 @@ __device__ vec3 get_vector(const float x, const float y, const float z) {
   return result;
 }
 
-__device__ vec3 add_vector(const vec3 a, const vec3 b) {
+__device__ __host__ vec3 add_vector(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = a.x + b.x;
@@ -208,7 +208,7 @@ __device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
   return res;
 }
 
-__device__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
+__device__ __host__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   vec3 result;
 
   vec3 u;

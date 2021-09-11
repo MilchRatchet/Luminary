@@ -54,10 +54,10 @@ static void update_special_lights(const Scene scene) {
   gpuErrchk(cudaMemcpy(scene.lights + 1, &toy_light, sizeof(Light), cudaMemcpyHostToDevice));
 }
 
-static void update_camera_pos(const Scene scene, const unsigned int width, const unsigned int height) {
-  const float alpha = scene.camera.rotation.x;
-  const float beta  = scene.camera.rotation.y;
-  const float gamma = scene.camera.rotation.z;
+static Quaternion get_rotation_quaternion(const vec3 rotation) {
+  const float alpha = rotation.x;
+  const float beta  = rotation.y;
+  const float gamma = rotation.z;
 
   const float cy = cosf(gamma * 0.5f);
   const float sy = sinf(gamma * 0.5f);
@@ -72,6 +72,11 @@ static void update_camera_pos(const Scene scene, const unsigned int width, const
   q.y = cr * sp * cy + sr * cp * sy;
   q.z = cr * cp * sy - sr * sp * cy;
 
+  return q;
+}
+
+static void update_camera_pos(const Scene scene, const unsigned int width, const unsigned int height) {
+  const Quaternion q = get_rotation_quaternion(scene.camera.rotation);
   gpuErrchk(cudaMemcpyToSymbol(device_camera_rotation, &(q), sizeof(Quaternion), 0, cudaMemcpyHostToDevice));
 
   const float step     = 2.0f * (scene.camera.fov / width);
@@ -83,6 +88,21 @@ static void update_camera_pos(const Scene scene, const unsigned int width, const
   gpuErrchk(cudaMemcpyToSymbol(device_vfov, &(vfov), sizeof(float), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_offset_x, &(offset_x), sizeof(float), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_offset_y, &(offset_y), sizeof(float), 0, cudaMemcpyHostToDevice));
+}
+
+void center_toy_at_camera(RaytraceInstance* instance) {
+  const Quaternion q = get_rotation_quaternion(instance->scene_gpu.camera.rotation);
+
+  vec3 offset;
+  offset.x = 0.0f;
+  offset.y = 0.0f;
+  offset.z = -1.0f;
+
+  offset = rotate_vector_by_quaternion(offset, q);
+
+  offset = scale_vector(offset, 3.0f * instance->scene_gpu.toy.scale);
+
+  instance->scene_gpu.toy.position = add_vector(instance->scene_gpu.camera.pos, offset);
 }
 
 extern "C" RaytraceInstance* init_raytracing(

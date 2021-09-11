@@ -24,7 +24,7 @@ UIPanel create_dropdown(UI* ui, const char* text, int* data_binding, int voids_f
 UIPanel create_color(UI* ui, const char* text, float* data_binding);
 UIPanel create_info(UI* ui, const char* text, void* data_binding, int data_type, int kind);
 UIPanel create_tab(UI* ui, int* data_binding);
-UIPanel create_button(UI* ui, const char* text, void* data_binding, void (*func)(void*));
+UIPanel create_button(UI* ui, const char* text, void* data_binding, void (*func)(void*), int voids_frames);
 void handle_mouse_UIPanel(UI* ui, UIPanel* panel, int mouse_state, int x, int y);
 void render_UIPanel(UI* ui, UIPanel* panel, int y);
 void free_UIPanel(UIPanel* panel);
