@@ -12,6 +12,7 @@ struct UIPanel {
   int prop3;
   int prop4;
   int prop5;
+  float data_buffer;
   int voids_frames;
   void (*func)(void*);
   void* data;

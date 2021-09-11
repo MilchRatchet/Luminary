@@ -11,10 +11,20 @@ void handle_mouse_UIPanel_slider(UI* ui, UIPanel* panel, int mouse_state, int x,
   if (SDL_BUTTON_LMASK & mouse_state) {
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
-    float value = *((float*) panel->data);
-    value += (1.0f + fabsf(value)) * (*((float*) (&panel->prop1))) * ui->mouse_xrel;
-    clamp(value, *((float*) (&panel->prop2)), *((float*) (&panel->prop3)));
-    *((float*) panel->data) = value;
+    if (panel->prop5) {
+      float value = panel->data_buffer;
+      value += (1.0f + fabsf(value)) * (*((float*) (&panel->prop1))) * ui->mouse_xrel;
+      clamp(value, *((float*) (&panel->prop2)), *((float*) (&panel->prop3)));
+      panel->data_buffer    = value;
+      *((int*) panel->data) = (int) (value + 0.5f);
+    }
+    else {
+      float value = *((float*) panel->data);
+      value += (1.0f + fabsf(value)) * (*((float*) (&panel->prop1))) * ui->mouse_xrel;
+      clamp(value, *((float*) (&panel->prop2)), *((float*) (&panel->prop3)));
+      *((float*) panel->data) = value;
+    }
+
     if (panel->voids_frames && ui->mouse_xrel)
       *(ui->temporal_frames) = 0;
   }
@@ -27,9 +37,15 @@ void render_UIPanel_slider(UI* ui, UIPanel* panel, int y) {
     if (panel->data_text)
       SDL_FreeSurface(panel->data_text);
 
-    char* buffer      = malloc(64);
-    const float value = *((float*) panel->data);
-    sprintf_s(buffer, 64, "%.3f", value);
+    char* buffer = malloc(64);
+    if (panel->prop5) {
+      const int value = *((int*) panel->data);
+      sprintf_s(buffer, 64, "%d", value);
+    }
+    else {
+      const float value = *((float*) panel->data);
+      sprintf_s(buffer, 64, "%.3f", value);
+    }
     panel->data_text = render_text(ui, buffer);
     free(buffer);
   }
