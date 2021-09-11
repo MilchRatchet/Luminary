@@ -29,7 +29,7 @@
 #define UI_PANELS_OCEAN_TAB 0x3
 #define UI_PANELS_OCEAN_COUNT 15
 #define UI_PANELS_TOY_TAB 0x4
-#define UI_PANELS_TOY_COUNT 24
+#define UI_PANELS_TOY_COUNT 25
 
 #if !defined(__AVX2__)
 #warning Using non AVX2 version of Luminary UI.

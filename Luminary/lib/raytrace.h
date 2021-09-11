@@ -18,6 +18,7 @@ RaytraceInstance* init_raytracing(
   General general, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas, int illuminance_atlas_length, void* material_atlas,
   int material_atlas_length, Scene scene);
 void update_scene(RaytraceInstance* instance);
+void center_toy_at_camera(RaytraceInstance* instance);
 void trace_scene(RaytraceInstance* instance, const int temporal_frames);
 void apply_bloom(RaytraceInstance* instance, RGBF* image);
 void free_inputs(RaytraceInstance* instance);
