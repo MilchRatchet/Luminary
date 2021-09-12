@@ -26,9 +26,6 @@ __device__ float bvh_triangle_intersection(const float4* triangles, const vec3 o
   const vec3 h  = cross_product(ray, edge2);
   const float a = dot_product(edge1, h);
 
-  if (__builtin_expect(a > -0.00000001f && a < 0.00000001f, 0))
-    return FLT_MAX;
-
   const float f = 1.0f / a;
   const vec3 s  = sub_vector(origin, vertex);
   const float u = f * dot_product(s, h);
@@ -44,12 +41,7 @@ __device__ float bvh_triangle_intersection(const float4* triangles, const vec3 o
 
   const float t = f * dot_product(edge2, q);
 
-  if (t > -eps) {
-    return t;
-  }
-  else {
-    return FLT_MAX;
-  }
+  return (t > -eps) ? t : FLT_MAX;
 }
 
 __device__ unsigned char get_8bit(const unsigned int input, const unsigned int bitshift) {
