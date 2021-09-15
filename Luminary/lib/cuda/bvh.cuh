@@ -30,18 +30,15 @@ __device__ float bvh_triangle_intersection(const float4* triangles, const vec3 o
   const vec3 s  = sub_vector(origin, vertex);
   const float u = f * dot_product(s, h);
 
-  if (u < 0.0f || u > 1.0f)
-    return FLT_MAX;
-
   const vec3 q  = cross_product(s, edge1);
   const float v = f * dot_product(ray, q);
 
-  if (v < 0.0f || u + v > 1.0f)
+  if (v < 0.0f || u < 0.0f || u + v > 1.0f)
     return FLT_MAX;
 
   const float t = f * dot_product(edge2, q);
 
-  return (t > -eps) ? t : FLT_MAX;
+  return (t > 0.0f) ? t : FLT_MAX;
 }
 
 __device__ unsigned char get_8bit(const unsigned int input, const unsigned int bitshift) {
