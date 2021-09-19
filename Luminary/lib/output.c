@@ -315,6 +315,14 @@ void realtime_output(Scene scene, RaytraceInstance* instance) {
       movement_vector.x += 1.0f;
       instance->temporal_frames = 0;
     }
+    if (keystate[SDL_SCANCODE_LCTRL]) {
+      movement_vector.y -= 1.0f;
+      instance->temporal_frames = 0;
+    }
+    if (keystate[SDL_SCANCODE_SPACE]) {
+      movement_vector.y += 1.0f;
+      instance->temporal_frames = 0;
+    }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;
     }
