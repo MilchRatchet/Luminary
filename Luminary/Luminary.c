@@ -41,11 +41,11 @@ int main(int argc, char* argv[]) {
 
   assert(argc >= 2, "No scene description was given!", 1);
 
-  int realtime = 0;
-  int bench    = 0;
+  int offline = 0;
+  int bench   = 0;
 
   for (int i = 2; i < argc; i++) {
-    realtime |= parse_command(argv[i], "-r", "--realtime");
+    offline |= parse_command(argv[i], "-o", "--offline");
     bench |= parse_command(argv[i], "-t", "--timings");
   }
 
@@ -59,11 +59,11 @@ int main(int argc, char* argv[]) {
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
-  if (realtime) {
-    realtime_output(scene, instance);
+  if (offline) {
+    offline_output(scene, instance, time);
   }
   else {
-    offline_output(scene, instance, time);
+    realtime_output(scene, instance);
   }
 
   free_scene(scene, instance);
