@@ -297,31 +297,7 @@ static void parse_toy_settings(Toy* toy, char* line) {
   }
 }
 
-Scene load_scene(const char* filename, RaytraceInstance** instance) {
-  FILE* file;
-  fopen_s(&file, filename, "rb");
-
-  char* line = (char*) malloc(LINE_SIZE);
-
-  sprintf(line, "Scene file \"%s\" could not be opened.", filename);
-
-  assert((unsigned long long) file, line, 1);
-
-  fgets(line, LINE_SIZE, file);
-
-  assert(!validate_filetype(line), "Scene file is not a Luminary scene file!", 1);
-
-  fgets(line, LINE_SIZE, file);
-
-  if (line[0] == 'v' || line[0] == 'V') {
-    int version = 0;
-    sscanf_s(line, "%*c %d\n", &version);
-    assert(version == CURRENT_VERSION, "Incompatible Scene version! Update the file or use an older version of Luminary!", 1);
-  }
-  else {
-    print_error("Scene file has no version information, assuming correct version!")
-  }
-
+static Scene get_default_scene() {
   Scene scene;
 
   scene.camera.pos.x             = 0.0f;
@@ -395,6 +371,61 @@ Scene load_scene(const char* filename, RaytraceInstance** instance) {
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
 
+  return scene;
+}
+
+static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scene) {
+  scene->triangles_length = convert_wavefront_content(&scene->triangles, content);
+
+  Node2* initial_nodes = build_bvh_structure(&scene->triangles, &scene->triangles_length, &scene->nodes_length);
+
+  scene->nodes = collapse_bvh(initial_nodes, scene->nodes_length, &scene->triangles, scene->triangles_length, &scene->nodes_length);
+
+  free(initial_nodes);
+
+  scene->traversal_triangles = malloc(sizeof(Traversal_Triangle) * scene->triangles_length);
+
+  for (unsigned int i = 0; i < scene->triangles_length; i++) {
+    Triangle triangle     = scene->triangles[i];
+    Traversal_Triangle tt = {
+      .vertex = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
+      .edge1  = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
+      .edge2  = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z}};
+    scene->traversal_triangles[i] = tt;
+    scene->triangles[i]           = triangle;
+  }
+
+  scene->materials_length    = content.materials_length;
+  scene->texture_assignments = get_texture_assignments(content);
+}
+
+Scene load_scene(const char* filename, RaytraceInstance** instance) {
+  FILE* file;
+  fopen_s(&file, filename, "rb");
+
+  char* line = (char*) malloc(LINE_SIZE);
+
+  sprintf(line, "Scene file \"%s\" could not be opened.", filename);
+
+  assert((unsigned long long) file, line, 1);
+
+  fgets(line, LINE_SIZE, file);
+
+  assert(!validate_filetype(line), "Scene file is not a Luminary scene file!", 1);
+
+  fgets(line, LINE_SIZE, file);
+
+  if (line[0] == 'v' || line[0] == 'V') {
+    int version = 0;
+    sscanf_s(line, "%*c %d\n", &version);
+    assert(version == CURRENT_VERSION, "Incompatible Scene version! Update the file or use an older version of Luminary!", 1);
+  }
+  else {
+    print_error("Scene file has no version information, assuming correct version!")
+  }
+
+  Scene scene = get_default_scene();
+
   General general = {
     .width             = 1280,
     .height            = 720,
@@ -442,37 +473,51 @@ Scene load_scene(const char* filename, RaytraceInstance** instance) {
   fclose(file);
   free(line);
 
-  Triangle* triangles;
+  assert(general.mesh_files_count, "No mesh files where loaded.", 1);
 
-  unsigned int triangle_count = convert_wavefront_content(&triangles, content);
+  convert_wavefront_to_internal(content, &scene);
 
-  int nodes_length;
+  process_lights(&scene);
 
-  Node2* initial_nodes = build_bvh_structure(&triangles, &triangle_count, &nodes_length);
+  void* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
+  void* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
+  void* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
 
-  Node8* nodes = collapse_bvh(initial_nodes, nodes_length, &triangles, triangle_count, &nodes_length);
+  *instance = init_raytracing(
+    general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
+    content.material_maps_length, scene);
 
-  free(initial_nodes);
+  free_wavefront_content(content);
 
-  Traversal_Triangle* traversal_triangles = malloc(sizeof(Traversal_Triangle) * triangle_count);
+  return scene;
+}
 
-  for (unsigned int i = 0; i < triangle_count; i++) {
-    Triangle triangle     = triangles[i];
-    Traversal_Triangle tt = {
-      .vertex = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
-      .edge1  = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
-      .edge2  = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z}};
-    traversal_triangles[i] = tt;
-    triangles[i]           = triangle;
-  }
+Scene load_obj_as_scene(char* filename, RaytraceInstance** instance) {
+  Scene scene = get_default_scene();
 
-  scene.triangles           = triangles;
-  scene.traversal_triangles = traversal_triangles;
-  scene.triangles_length    = triangle_count;
-  scene.nodes               = nodes;
-  scene.nodes_length        = nodes_length;
-  scene.materials_length    = content.materials_length;
-  scene.texture_assignments = get_texture_assignments(content);
+  General general = {
+    .width             = 1280,
+    .height            = 720,
+    .max_ray_depth     = 5,
+    .samples           = 16,
+    .denoiser          = 1,
+    .output_path       = malloc(LINE_SIZE),
+    .mesh_files        = malloc(sizeof(char*) * 10),
+    .mesh_files_count  = 0,
+    .mesh_files_length = 10};
+
+  general.mesh_files[0] = malloc(LINE_SIZE);
+  strcpy_s(general.mesh_files[0], LINE_SIZE, filename);
+
+  strncpy_s(general.output_path, LINE_SIZE, "output.png", 11);
+
+  Wavefront_Content content = create_wavefront_content();
+
+  assert(!read_wavefront_file(filename, &content), "Mesh file could not be loaded.", 1);
+
+  general.mesh_files[general.mesh_files_count++] = filename;
+
+  convert_wavefront_to_internal(content, &scene);
 
   process_lights(&scene);
 

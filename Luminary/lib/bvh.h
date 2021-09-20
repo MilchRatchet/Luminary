@@ -46,8 +46,9 @@ struct Node8 {
   uint8_t high_z[8];
 } typedef Node8;
 
-Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, int* nodes_length_out);
+Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, unsigned int* nodes_length_out);
 Node8* collapse_bvh(
-  Node2* binary_nodes, const int binary_nodes_length, Triangle** triangles_io, const int triangles_length, int* nodes_length_out);
+  Node2* binary_nodes, const unsigned int binary_nodes_length, Triangle** triangles_io, const int triangles_length,
+  unsigned int* nodes_length_out);
 
 #endif /* BVH_H */
