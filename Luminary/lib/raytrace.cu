@@ -320,9 +320,6 @@ extern "C" void free_textures(void* texture_atlas, const int textures_length) {
 }
 
 extern "C" void update_scene(RaytraceInstance* instance) {
-  const int amount = instance->width * instance->height;
-
-  gpuErrchk(cudaMemcpyToSymbol(device_pixels_left, &(amount), sizeof(int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   update_special_lights(instance->scene_gpu);
@@ -335,6 +332,7 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
   const int amount = instance->width * instance->height;
 
   gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_pixels_left, &(amount), sizeof(int), 0, cudaMemcpyHostToDevice));
 
   int pixels_left   = amount;
   const float ratio = 1.0f / (amount);
