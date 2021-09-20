@@ -373,7 +373,7 @@ static void divide_along_axis(
   }
 }
 
-Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, int* nodes_length_out) {
+Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, unsigned int* nodes_length_out) {
   bench_tic();
   unsigned int triangles_length = *triangles_length_io;
   Triangle* triangles           = *triangles_io;
@@ -888,7 +888,8 @@ static void apply_decision(Node2* node, int node_index, int decision, int slot, 
 }
 
 Node8* collapse_bvh(
-  Node2* binary_nodes, const int binary_nodes_length, Triangle** triangles_io, const int triangles_length, int* nodes_length_out) {
+  Node2* binary_nodes, const unsigned int binary_nodes_length, Triangle** triangles_io, const int triangles_length,
+  unsigned int* nodes_length_out) {
   compute_node_triangle_properties(binary_nodes);
   compute_sah_costs(binary_nodes);
 

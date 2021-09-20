@@ -36,10 +36,35 @@ static int parse_command(const char* arg, char* opt1, char* opt2) {
   return result2;
 }
 
+#define LUM_FILE 0
+#define OBJ_FILE 1
+
+// We figure out what kind of file was given only by the last char in the path
+static int magic(char* path) {
+  int ptr        = 0;
+  char last_char = 0;
+
+  while (path[ptr] != '\0') {
+    last_char = path[ptr];
+    ptr++;
+  }
+
+  switch (last_char) {
+    case 'm':
+      return LUM_FILE;
+    case 'j':
+      return OBJ_FILE;
+    default:
+      return LUM_FILE;
+  }
+}
+
 int main(int argc, char* argv[]) {
   initialize_device();
 
   assert(argc >= 2, "No scene description was given!", 1);
+
+  int file_type = magic(argv[1]);
 
   int offline = 0;
   int bench   = 0;
@@ -55,7 +80,19 @@ int main(int argc, char* argv[]) {
   clock_t time = clock();
 
   RaytraceInstance* instance;
-  Scene scene = load_scene(argv[1], &instance);
+  Scene scene;
+
+  switch (file_type) {
+    case LUM_FILE:
+      scene = load_scene(argv[1], &instance);
+      break;
+    case OBJ_FILE:
+      scene = load_obj_as_scene(argv[1], &instance);
+      break;
+    default:
+      scene = load_scene(argv[1], &instance);
+      break;
+  }
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
