@@ -18,8 +18,8 @@
 
 void offline_output(Scene scene, RaytraceInstance* instance, clock_t time) {
   clock_t start_of_rt = clock();
-  trace_scene(instance, 0);
-  for (int i = 1; i < instance->offline_samples; i++) {
+  update_scene(instance);
+  for (int i = 0; i < instance->offline_samples; i++) {
     trace_scene(instance, i);
     const double progress     = ((double) i) / instance->offline_samples;
     const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
@@ -42,7 +42,8 @@ void offline_output(Scene scene, RaytraceInstance* instance, clock_t time) {
     printf("[%.3fs] Applied Optix Denoiser.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
   }
 
-  apply_bloom(instance, instance->frame_output_gpu);
+  if (instance->scene_gpu.camera.bloom)
+    apply_bloom(instance, instance->frame_output_gpu);
 
   initialize_8bit_frame(instance, instance->width, instance->height);
   XRGB8* frame = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
