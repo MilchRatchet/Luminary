@@ -632,6 +632,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
 
+      normal.x = 0.5f * normal.x + 0.5f;
+      normal.y = 0.5f * normal.y + 0.5f;
+      normal.z = 0.5f * normal.z + 0.5f;
+
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
     else if (device_shading_mode == SHADING_HEAT) {
@@ -762,7 +766,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
       device_frame_buffer[pixel] = get_color(value, value, value);
     }
     else if (device_shading_mode == SHADING_NORMAL) {
-      const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+      vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+
+      normal.x = 0.5f * normal.x + 0.5f;
+      normal.y = 0.5f * normal.y + 0.5f;
+      normal.z = 0.5f * normal.z + 0.5f;
 
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
@@ -969,7 +977,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
         normal = scale_vector(normal, -1.0f);
       }
 
-      device_frame_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
+      normal.x = 0.5f * normal.x + 0.5f;
+      normal.y = 0.5f * normal.y + 0.5f;
+      normal.z = 0.5f * normal.z + 0.5f;
+
+      device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
 
     atomicSub(&device_pixels_left, 1);
