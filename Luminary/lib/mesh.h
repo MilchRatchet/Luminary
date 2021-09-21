@@ -25,13 +25,13 @@ struct Triangle {
   float padding2;
 } typedef Triangle;
 
-struct Traversal_Triangle {
+struct TraversalTriangle {
   vec3 vertex;
   vec3 edge1;
   vec3 edge2;
   float padding0;
   float padding1;
   float padding2;
-} typedef Traversal_Triangle;
+} typedef TraversalTriangle;
 
 #endif /* MESH_H */

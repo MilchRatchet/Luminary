@@ -383,11 +383,11 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
 
   free(initial_nodes);
 
-  scene->traversal_triangles = malloc(sizeof(Traversal_Triangle) * scene->triangles_length);
+  scene->traversal_triangles = malloc(sizeof(TraversalTriangle) * scene->triangles_length);
 
   for (unsigned int i = 0; i < scene->triangles_length; i++) {
-    Triangle triangle     = scene->triangles[i];
-    Traversal_Triangle tt = {
+    Triangle triangle    = scene->triangles[i];
+    TraversalTriangle tt = {
       .vertex = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
       .edge1  = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
       .edge2  = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z}};
