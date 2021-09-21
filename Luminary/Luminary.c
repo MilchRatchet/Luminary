@@ -38,6 +38,7 @@ static int parse_command(const char* arg, char* opt1, char* opt2) {
 
 #define LUM_FILE 0
 #define OBJ_FILE 1
+#define BAKED_FILE 2
 
 // We figure out what kind of file was given only by the last char in the path
 static int magic(char* path) {
@@ -54,6 +55,8 @@ static int magic(char* path) {
       return LUM_FILE;
     case 'j':
       return OBJ_FILE;
+    case 'd':
+      return BAKED_FILE;
     default:
       return LUM_FILE;
   }

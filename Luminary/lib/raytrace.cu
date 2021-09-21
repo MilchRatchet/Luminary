@@ -184,25 +184,25 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->settings     = general;
   instance->shading_mode = 0;
 
-  gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment) * scene.materials_length));
+  gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene.materials_length));
   gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length));
   gpuErrchk(
-    cudaMalloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(Traversal_Triangle) * instance->scene_gpu.triangles_length));
+    cudaMalloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(TraversalTriangle) * instance->scene_gpu.triangles_length));
   gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.nodes), sizeof(Node8) * instance->scene_gpu.nodes_length));
   gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.lights), sizeof(Light) * instance->scene_gpu.lights_length));
 
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.texture_assignments, scene.texture_assignments, sizeof(texture_assignment) * scene.materials_length,
+    instance->scene_gpu.texture_assignments, scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length,
     cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(instance->scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.traversal_triangles, scene.traversal_triangles, sizeof(Traversal_Triangle) * scene.triangles_length,
+    instance->scene_gpu.traversal_triangles, scene.traversal_triangles, sizeof(TraversalTriangle) * scene.triangles_length,
     cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene.nodes, sizeof(Node8) * scene.nodes_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(instance->scene_gpu.lights, scene.lights, sizeof(Light) * scene.lights_length, cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMemcpyToSymbol(
-    device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(texture_assignment*), 0, cudaMemcpyHostToDevice));
+    device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment*), 0, cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMemcpyToSymbol(device_albedo_atlas, &(instance->albedo_atlas), sizeof(cudaTextureObject_t), 0, cudaMemcpyHostToDevice));
   gpuErrchk(
@@ -411,4 +411,65 @@ extern "C" void free_8bit_frame(RaytraceInstance* instance) {
 extern "C" void copy_framebuffer_to_8bit(XRGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance) {
   convert_RGBF_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(width, height, source);
   gpuErrchk(cudaMemcpy(buffer, instance->buffer_8bit_gpu, sizeof(XRGB8) * width * height, cudaMemcpyDeviceToHost));
+}
+
+extern "C" void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size) {
+  void* cpu_ptr;
+  gpuErrchk(cudaMallocHost((void**) &(cpu_ptr), size));
+  gpuErrchk(cudaMemcpy(cpu_ptr, gpu_ptr, size, cudaMemcpyDeviceToHost));
+  return cpu_ptr;
+}
+
+extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
+  const uint64_t tex_count   = *count;
+  const uint64_t header_size = 16 * tex_count;
+
+  uint8_t* header = (uint8_t*) malloc(header_size);
+
+  cudaTextureObject_t* tex_objects;
+  gpuErrchk(cudaMallocHost((void**) &(tex_objects), sizeof(cudaTextureObject_t) * tex_count));
+  gpuErrchk(cudaMemcpy(tex_objects, textures_ptr, sizeof(cudaTextureObject_t) * tex_count, cudaMemcpyDeviceToHost));
+
+  cudaResourceDesc resource;
+  uint64_t buffer_size = header_size;
+
+  for (int i = 0; i < tex_count; i++) {
+    cudaGetTextureObjectResourceDesc(&resource, tex_objects[i]);
+    size_t width  = resource.res.pitch2D.width;
+    size_t height = resource.res.pitch2D.height;
+    memcpy(header + i * 16, &buffer_size, 8);
+    memcpy(header + i * 16 + 8, &width, 4);
+    memcpy(header + i * 16 + 12, &height, 4);
+    buffer_size += sizeof(RGBAF) * width * height;
+  }
+
+  uint8_t* cpu_ptr;
+  gpuErrchk(cudaMallocHost((void**) &(cpu_ptr), buffer_size));
+
+  memcpy(cpu_ptr, header, header_size);
+  free(header);
+
+  uint64_t offset = header_size;
+
+  for (int i = 0; i < tex_count; i++) {
+    cudaGetTextureObjectResourceDesc(&resource, tex_objects[i]);
+    size_t pitch    = resource.res.pitch2D.pitchInBytes;
+    size_t width    = resource.res.pitch2D.width;
+    size_t height   = resource.res.pitch2D.height;
+    uint8_t* source = (uint8_t*) resource.res.pitch2D.devPtr;
+    for (int j = 0; j < height; j++) {
+      gpuErrchk(cudaMemcpy(cpu_ptr + offset, source + j * pitch, sizeof(RGBAF) * width, cudaMemcpyDeviceToHost));
+      offset += sizeof(RGBAF) * width;
+    }
+  }
+
+  gpuErrchk(cudaFreeHost(tex_objects));
+
+  *count = buffer_size;
+
+  return cpu_ptr;
+}
+
+extern "C" void free_host_memory(void* ptr) {
+  gpuErrchk(cudaFreeHost(ptr));
 }

@@ -34,6 +34,9 @@ void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance);
 float get_auto_exposure_from_optix(void* input, RaytraceInstance* instance);
 RGBF* denoise_with_optix_realtime(void* input);
 void free_realtime_denoise(void* input);
+void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size);
+void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count);
+void free_host_memory(void* ptr);
 
 #if __cplusplus
 }

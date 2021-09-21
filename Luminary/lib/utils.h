@@ -125,12 +125,12 @@ struct Ocean {
 struct Scene {
   Camera camera;
   Triangle* triangles;
-  Traversal_Triangle* traversal_triangles;
+  TraversalTriangle* traversal_triangles;
   unsigned int triangles_length;
   Node8* nodes;
   unsigned int nodes_length;
   uint16_t materials_length;
-  texture_assignment* texture_assignments;
+  TextureAssignment* texture_assignments;
   Light* lights;
   unsigned int lights_length;
   Ocean ocean;

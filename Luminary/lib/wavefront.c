@@ -294,11 +294,11 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   return 0;
 }
 
-texture_assignment* get_texture_assignments(Wavefront_Content content) {
-  texture_assignment* texture_assignments = malloc(sizeof(texture_assignment) * content.materials_length);
+TextureAssignment* get_texture_assignments(Wavefront_Content content) {
+  TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * content.materials_length);
 
   for (int i = 0; i < content.materials_length; i++) {
-    texture_assignment assignment;
+    TextureAssignment assignment;
     assignment.albedo_map      = content.materials[i].albedo_texture;
     assignment.illuminance_map = content.materials[i].illuminance_texture;
     assignment.material_map    = content.materials[i].material_texture;

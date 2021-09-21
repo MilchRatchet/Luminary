@@ -11,6 +11,7 @@
 #include "UI_info.h"
 #include "UI_panel.h"
 #include "UI_text.h"
+#include "baked.h"
 #include "raytrace.h"
 #include "scene.h"
 
@@ -54,6 +55,7 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene_gpu.camera.smooth_movement), 0);
   panels[i++] = create_slider(ui, "Smoothing Factor", &(instance->scene_gpu.camera.smoothing_factor), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_button(ui, "Export Settings", instance, (void (*)(void*)) serialize_scene, 0);
+  panels[i++] = create_button(ui, "Export Baked File", instance, (void (*)(void*)) serialize_baked, 0);
 
   return panels;
 }

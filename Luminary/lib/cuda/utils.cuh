@@ -180,7 +180,7 @@ __constant__ cudaTextureObject_t* device_illuminance_atlas;
 
 __constant__ cudaTextureObject_t* device_material_atlas;
 
-__constant__ texture_assignment* device_texture_assignments;
+__constant__ TextureAssignment* device_texture_assignments;
 
 __constant__ vec3 device_sun;
 
