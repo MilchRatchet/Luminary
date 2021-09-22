@@ -3,7 +3,7 @@
 
 #include "utils.h"
 
-Scene load_baked(const char* filename, RaytraceInstance** instance);
+RaytraceInstance* load_baked(const char* filename);
 void serialize_baked(RaytraceInstance* instance);
 
 #endif /* DOUGH */

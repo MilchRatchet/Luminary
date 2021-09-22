@@ -16,7 +16,7 @@
 #include "realtime.h"
 #include "utils.h"
 
-void offline_output(Scene scene, RaytraceInstance* instance, clock_t time) {
+void offline_output(RaytraceInstance* instance, clock_t time) {
   clock_t start_of_rt = clock();
   update_scene(instance);
   for (int i = 0; i < instance->offline_samples; i++) {
@@ -121,7 +121,7 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
   free(timestring);
 }
 
-void realtime_output(Scene scene, RaytraceInstance* instance) {
+void realtime_output(RaytraceInstance* instance) {
   RealtimeInstance* realtime = init_realtime_instance(instance);
 
   int exit = 0;
