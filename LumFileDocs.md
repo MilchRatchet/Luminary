@@ -1,48 +1,162 @@
 # Scene Description Format
 
-A scene is decribed by a `*.lum` file which has the following format:
-```
-Luminary
-v 3
-# Comments start with a # symbol
-# Comments may only appear after the first two lines
-# This example demonstrates this particular version of lum
-#
-# m [Path to Obj file]
-m Meshes/Example.obj
-#
-# Camera parameters
-# c [Pos.x | Pos.y | Pos.z | Rotation.x | Rotation.y | Rotation.z | FOV]
-c 2.0 0.3 -0.06 0.0 1.570796 0.0 2.0
-#
-# Camera lens parameters
-# l [Focal Length | Aperture Size | Exposure] (Default Aperture Size=0.0)
-l 20.0 0.4 2.0
-#
-# Sun parameters
-# s [Azimuth | Altitude | Intensity]
-s 1.0 1.4 50.0
-#
-# Ocean parameters
-# w [Active? | Emissive? | Red | Green | Blue | Alpha | Height | Amplitude | Frequency | Choppyness | Speed]
-w 1 0 0.0 0.0 0.0 0.9 222.0 0.5 0.16 4.0 0.8
-#
-# Rendering parameters
-# i [Width | Height | Bounces | Samples per Pixel]
-i 1920 1080 6 50
-#
-# Denoiser (0 = 3x3 Mean, 1 = Optix)
-# d [Denoiser] (Default=1)
-d 1
-#
-# Output path (Offline Mode only)
-# o [Path to Output file]
-o Results/image.png
-#
-# A *.lum file must contain an x
-x
-# Lines after the x are ignored
-```
+A scene is decribed by a `*.lum` file. An example can be found in `Example.lum`.
+
+## General Settings
+
+`GENERAL WIDTH___ [INT32]`<br/>
+The number of horizontal pixels used for rendering. Number must be strictly greater than 0.
+
+`GENERAL HEIGHT__ [INT32]`<br/>
+The number of vertical pixels used for rendering. Number must be strictly greater than 0.
+
+`GENERAL BOUNCES_ [INT32]`<br/>
+This number restrict the length of the path that is traced for each pixel. Number must be strictly greater than 0.
+
+`GENERAL SAMPLES_ [INT32]`<br/>
+The number of samples to compute per pixel in offline mode. Number must be strictly greater than 0.
+
+`GENERAL DENOISER [INT32]`<br/>
+Set 1 to enable Optix denoising. This activates denoising in offline mode and allows denoising to be made active in realtime mode.
+
+`GENERAL OUTPUTFN [STRING]`<br/>
+File name of output image in offline mode. Specified directory must already exist.
+
+`GENERAL MESHFILE [STRING]`<br/>
+Path to an `*.obj` mesh file. Option may be specified multiple times to load multiple mesh files.
+
+## Camera Settings
+
+`CAMERA POSITION [FP32] [FP32] [FP32]`<br/>
+Position of the camera.
+
+`CAMERA ROTATION [FP32] [FP32] [FP32]`<br/>
+Rotation of the camera.
+
+`CAMERA FOV_____ [FP32]`<br/>
+Field of view of the camera. Number must be non-negative.
+
+`CAMERA FOCALLEN [FP32]`<br/>
+Focal length of the camera. Number must be non-negative.
+
+`CAMERA APERTURE [FP32]`<br/>
+Aperture size of the camera. Number must be non-negative.
+
+`CAMERA EXPOSURE [FP32]`<br/>
+Exposure of the camera. Number must be non-negative.
+
+`CAMERA AUTOEXP_ [INT32]`<br/>
+Set 1 to activate auto exposure in realtime mode, 0 else.
+
+`CAMERA BLOOM___ [INT32]`<br/>
+Set 1 to activate bloom, 0 else.
+
+`CAMERA BLOOMSTR [FP32]`<br/>
+Strength of the bloom. Number must be in the range [0,1].
+
+`CAMERA DITHER__ [INT32]`<br/>
+Set 1 to activate randomized dithering, 0 else.
+
+`CAMERA FARCLIPD [FP32]`<br/>
+Maximum distance a ray may travel. Number must be non-negative.
+
+`CAMERA TONEMAP_ [INT32]`<br/>
+Defines which of the available tonemaps is used:
+  - 0 = None
+  - 1 = ACES
+  - 2 = Reinhard
+  - 3 = Uncharted 2
+
+`CAMERA ALPHACUT [FP32]`<br/>
+Every alpha value smaller than this value is automatically treated as 0, i.e., fully transparent. Number must be in the range [0,1].
+
+## Sky Settings
+
+`SKY SUNCOLOR [FP32] [FP32] [FP32]`<br/>
+Base color of the sun. Numbers must be in the range [0,1].
+
+`SKY AZIMUTH_ [FP32]`<br/>
+Azimuth of the sun.
+
+`SKY ALTITUDE [FP32]`<br/>
+Altitude of the sun.
+
+`SKY STRENGTH [FP32]`<br/>
+Sun light intensity. Number should be non-negative.
+
+`SKY DENSITY_ [FP32]`<br/>
+Density of the atmosphere. Number should be non-negative.
+
+`SKY RAYLEIGH [FP32]`<br/>
+Height based density falloff regarding rayleigh scattering. Number should be non-negative.
+
+`SKY MIE_____ [FP32]`<br/>
+Height based density falloff regarding mie scattering. Number should be non-negative.
+
+## Ocean Settings
+
+`OCEAN ACTIVE__ [INT32]`<br/>
+Set 1 to activate the ocean, 0 else.
+
+`OCEAN HEIGHT__ [FP32]`<br/>
+Height of the ocean plane.
+
+`OCEAN AMPLITUD [FP32]`<br/>
+Amplitude of the ocean waves. Number should be non-negative.
+
+`OCEAN FREQUENC [FP32]`<br/>
+Frequency of the ocean waves. Number should be non-negative.
+
+`OCEAN CHOPPY__ [FP32]`<br/>
+Choppyness of the ocean waves. Number should be non-negative.
+
+`OCEAN ANIMATED [INT32]`<br/>
+Set 1 to activate the ocean animation, 0 else.
+
+`OCEAN SPEED___ [FP32]`<br/>
+Speed of the ocean waves when the ocean is animated. Number should be non-negative.
+
+`OCEAN COLOR___ [FP32] [FP32] [FP32]`<br/>
+Albedo of the ocean. Numbers must be in the range [0,1].
+
+`OCEAN EMISSIVE [INT32]`<br/>
+Set 1 to make the albedo of the ocean act as emission, 0 else.
+
+`OCEAN REFRACT_ [FP32]`<br/>
+Refraction index of the ocean relative to the air. Number must be at least 1.
+
+## Toy Settings
+
+`TOY ACTIVE__ [INT32]`<br/>
+Set 1 to activate the toy, 0 else.
+
+`TOY POSITION [FP32] [FP32] [FP32]`<br/>
+Position of the toy.
+
+`TOY ROTATION [FP32] [FP32] [FP32]`<br/>
+Rotation of the toy.
+
+`TOY SHAPE__ [INT32]`<br/>
+Defines which of the available shapes is used for the toy:
+  - 0 = Sphere
+
+`TOY SCALE___ [FP32]`<br/>
+Scale of the toy.
+
+`TOY COLOR___ [FP32] [FP32] [FP32] [FP32]`<br/>
+Albedo color of the toy. The last number represent the alpha. Numbers must be in the range [0,1].
+
+`TOY MATERIAL [FP32] [FP32] [FP32]`<br/>
+Material properties of the toy in order: smoothness, metallic and emission strength. First two numbers must be in the range [0,1].
+
+`TOY EMISSIVE [INT32]`<br/>
+Set 1 to activate the emission, 0 else.
+
+`TOY EMISSION [FP32] [FP32] [FP32]`<br/>
+Emission color of the toy. Numbers must be in the range [0,1].
+
+`TOY REFRACT_ [FP32]`<br/>
+Refraction index of the toy relative to the air. Number must be at least 1.
 
 # Meshes
 

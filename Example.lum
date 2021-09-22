@@ -1,0 +1,68 @@
+Luminary
+VERSION 4
+#=========================================
+# Luminary Example File
+# 
+# The values here represent the default
+# values which are used in case the 
+# respective value is not set otherwise.
+#
+# GENERAL MESHFILE is not set by default
+# and may be set multiple times to load
+# multiple meshes.
+#
+# These files are supposed to be created
+# by Luminary. This can be done by
+# exporting the settings in realtime mode.
+#=========================================
+GENERAL WIDTH___ 1920
+GENERAL HEIGHT__ 1080
+GENERAL BOUNCES_ 5
+GENERAL SAMPLES_ 128
+GENERAL OUTPUTFN output.png
+GENERAL DENOISER 1
+GENERAL MESHFILE Example.obj
+#=========================================
+CAMERA POSITION 0.0 0.0 0.0
+CAMERA ROTATION 0.0 0.0 0.0
+CAMERA FOV_____ 1.0
+CAMERA FOCALLEN 1.0
+CAMERA APERTURE 0.0
+CAMERA EXPOSURE 1.0
+CAMERA BLOOM___ 1
+CAMERA BLOOMSTR 0.1
+CAMERA DITHER__ 1
+CAMERA FARCLIPD 1000000.0
+CAMERA TONEMAP_ 1
+CAMERA ALPHACUT 0.0
+CAMERA AUTOEXP_ 1
+#=========================================
+SKY SUNCOLOR 1.0 0.9 0.8
+SKY AZIMUTH_ 3.141
+SKY ALTITUDE 0.5
+SKY STRENGTH 40.0
+SKY DENSITY_ 1.0
+SKY RAYLEIGH 0.125
+SKY MIE_____ 0.833333
+#=========================================
+TOY ACTIVE__ 0
+TOY POSITION 0.0 0.0 0.0
+TOY ROTATION 0.0 0.0 0.0
+TOY SHAPE___ 0
+TOY SCALE___ 1.0
+TOY COLOR___ 0.9 0.9 0.9 1.0
+TOY MATERIAL 0.3 0.0 1.0
+TOY EMISSION 0.0 0.0 0.0
+TOY EMISSIVE 0
+TOY REFRACT_ 1.0
+#=========================================
+OCEAN ACTIVE__ 0
+OCEAN HEIGHT__ 0.0
+OCEAN AMPLITUD 0.6
+OCEAN FREQUENC 0.16
+OCEAN CHOPPY__ 4.0
+OCEAN SPEED___ 1.0
+OCEAN ANIMATED 0
+OCEAN COLOR___ 0.0 0.0 0.0 0.9
+OCEAN EMISSIVE 0
+OCEAN REFRACT_ 1.333
