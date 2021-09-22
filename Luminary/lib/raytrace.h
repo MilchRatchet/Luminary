@@ -26,7 +26,7 @@ void apply_bloom(RaytraceInstance* instance, RGBF* image);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);
 void* initialize_textures(TextureRGBA* textures, const int textures_length);
-void free_textures(void* texture_atlas, const int textures_length);
+void free_textures_atlas(void* texture_atlas, const int textures_length);
 void initialize_8bit_frame(RaytraceInstance* instance, const int width, const int height);
 void free_8bit_frame(RaytraceInstance* instance);
 void copy_framebuffer_to_8bit(XRGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance);

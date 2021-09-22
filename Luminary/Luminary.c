@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include "lib/baked.h"
 #include "lib/bench.h"
 #include "lib/error.h"
 #include "lib/output.h"
@@ -83,30 +84,32 @@ int main(int argc, char* argv[]) {
   clock_t time = clock();
 
   RaytraceInstance* instance;
-  Scene scene;
 
   switch (file_type) {
     case LUM_FILE:
-      scene = load_scene(argv[1], &instance);
+      instance = load_scene(argv[1]);
       break;
     case OBJ_FILE:
-      scene = load_obj_as_scene(argv[1], &instance);
+      instance = load_obj_as_scene(argv[1]);
+      break;
+    case BAKED_FILE:
+      instance = load_baked(argv[1]);
       break;
     default:
-      scene = load_scene(argv[1], &instance);
+      instance = load_scene(argv[1]);
       break;
   }
 
   printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
 
   if (offline) {
-    offline_output(scene, instance, time);
+    offline_output(instance, time);
   }
   else {
-    realtime_output(scene, instance);
+    realtime_output(instance);
   }
 
-  free_scene(scene, instance);
+  free_atlases(instance);
   free_outputs(instance);
 
   printf("[%.3fs] Instance freed.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);

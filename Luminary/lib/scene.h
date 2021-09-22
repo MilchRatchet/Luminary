@@ -7,9 +7,11 @@
 #include "texture.h"
 #include "utils.h"
 
-Scene load_scene(const char* filename, RaytraceInstance** instance);
-Scene load_obj_as_scene(char* filename, RaytraceInstance** instance);
+RaytraceInstance* load_scene(const char* filename);
+RaytraceInstance* load_obj_as_scene(char* filename);
 void serialize_scene(RaytraceInstance* instance);
-void free_scene(Scene scene, RaytraceInstance* instance);
+void free_atlases(RaytraceInstance* instance);
+void free_strings(RaytraceInstance* instance);
+void free_scene(Scene scene);
 
 #endif /* SCENE_H */

@@ -399,7 +399,7 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
   scene->texture_assignments = get_texture_assignments(content);
 }
 
-Scene load_scene(const char* filename, RaytraceInstance** instance) {
+RaytraceInstance* load_scene(const char* filename) {
   FILE* file;
   fopen_s(&file, filename, "rb");
 
@@ -483,16 +483,17 @@ Scene load_scene(const char* filename, RaytraceInstance** instance) {
   void* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
   void* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
 
-  *instance = init_raytracing(
+  RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
     content.material_maps_length, scene);
 
   free_wavefront_content(content);
+  free_scene(scene);
 
-  return scene;
+  return instance;
 }
 
-Scene load_obj_as_scene(char* filename, RaytraceInstance** instance) {
+RaytraceInstance* load_obj_as_scene(char* filename) {
   Scene scene = get_default_scene();
 
   General general = {
@@ -525,13 +526,14 @@ Scene load_obj_as_scene(char* filename, RaytraceInstance** instance) {
   void* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
   void* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
 
-  *instance = init_raytracing(
+  RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
     content.material_maps_length, scene);
 
   free_wavefront_content(content);
+  free_scene(scene);
 
-  return scene;
+  return instance;
 }
 
 void serialize_scene(RaytraceInstance* instance) {
@@ -695,18 +697,24 @@ void serialize_scene(RaytraceInstance* instance) {
   fclose(file);
 }
 
-void free_scene(Scene scene, RaytraceInstance* instance) {
-  free_textures(instance->albedo_atlas, instance->albedo_atlas_length);
-  free_textures(instance->illuminance_atlas, instance->illuminance_atlas_length);
-  free_textures(instance->material_atlas, instance->material_atlas_length);
+void free_atlases(RaytraceInstance* instance) {
+  free_textures_atlas(instance->albedo_atlas, instance->albedo_atlas_length);
+  free_textures_atlas(instance->illuminance_atlas, instance->illuminance_atlas_length);
+  free_textures_atlas(instance->material_atlas, instance->material_atlas_length);
+}
 
+void free_strings(RaytraceInstance* instance) {
   for (int i = 0; i < instance->settings.mesh_files_count; i++) {
     free(instance->settings.mesh_files[i]);
   }
   free(instance->settings.mesh_files);
   free(instance->settings.output_path);
+}
 
+void free_scene(Scene scene) {
   free(scene.triangles);
+  free(scene.traversal_triangles);
   free(scene.nodes);
   free(scene.lights);
+  free(scene.texture_assignments);
 }

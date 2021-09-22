@@ -307,7 +307,7 @@ extern "C" void initialize_device() {
   printf("Copyright (c) 2021 MilchRatchet\n");
 }
 
-extern "C" void free_textures(void* texture_atlas, const int textures_length) {
+extern "C" void free_textures_atlas(void* texture_atlas, const int textures_length) {
   cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
   gpuErrchk(cudaMemcpy(textures_cpu, texture_atlas, sizeof(cudaTextureObject_t) * textures_length, cudaMemcpyDeviceToHost));
 
