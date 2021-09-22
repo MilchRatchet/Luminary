@@ -435,8 +435,8 @@ extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
 
   for (int i = 0; i < tex_count; i++) {
     cudaGetTextureObjectResourceDesc(&resource, tex_objects[i]);
-    size_t width  = resource.res.pitch2D.width;
-    size_t height = resource.res.pitch2D.height;
+    uint32_t width  = (uint32_t) resource.res.pitch2D.width;
+    uint32_t height = (uint32_t) resource.res.pitch2D.height;
     memcpy(header + i * 16, &buffer_size, 8);
     memcpy(header + i * 16 + 8, &width, 4);
     memcpy(header + i * 16 + 12, &height, 4);
