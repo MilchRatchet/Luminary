@@ -14,7 +14,7 @@ Meshes and textures in the example images are taken from the Ratchet and Clank H
 
 # Usage
 
-The scene is described through the Luminary Scene Description format (`*.lum`). The format is documented in the [Luminary File Documentations](LumFileDocs.md).
+The scene is described through the Luminary Scene Description format (`*.lum`). The format is documented in the [Luminary File Documentations](LumFileDocs.md). It is possible to specify a `*.obj` file instead of a `*.lum` file. This will load the mesh and use the default settings. Then one can make changes to the settings and automatically generate a `*.lum` file. Alternatively, one can generate a `*.baked` file that contains all the necessary data in one file. The advantage is that loading from a `*.baked` file is fast, however, the file can be large.
 
 You can start as:
 
@@ -22,17 +22,17 @@ You can start as:
 Luminary [File] [Option]
 ```
 
-where `File` is a relative or absolute path and Option is one or more of:
+where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` file and Option is one or more of:
 
 ```
--r, --realtime
-        start in realtime mode
+-o, --offline
+        start in offline mode, which renders one image using the specified settings
 
 -t, --timings
         print execution times of some CPU functions
 ```
 
-In realtime mode, you can control the camera through `WASD` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
+In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
 
 # Building
 
