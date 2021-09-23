@@ -74,7 +74,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
       break;
     default:
       char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s is not a valid GENERAL setting.", line);
+      sprintf(error_msg, "%8.8s (%zu) is not a valid GENERAL setting.", line, key);
       print_error(error_msg);
       free(error_msg);
       break;
@@ -139,12 +139,12 @@ static void parse_camera_settings(Camera* camera, char* line) {
       sscanf_s(value, "%f\n", &camera->alpha_cutoff);
       break;
     /* FILTER__ */
-    case 5064663180778823519u:
+    case 6872302014111172934u:
       sscanf_s(value, "%d\n", &camera->filter);
       break;
     default:
       char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s is not a valid CAMERA setting.", line);
+      sprintf(error_msg, "%8.8s (%zu) is not a valid CAMERA setting.", line, key);
       print_error(error_msg);
       free(error_msg);
       break;
@@ -186,7 +186,7 @@ static void parse_sky_settings(Sky* sky, char* line) {
       break;
     default:
       char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s is not a valid SKY setting.", line);
+      sprintf(error_msg, "%8.8s (%zu) is not a valid SKY setting.", line, key);
       print_error(error_msg);
       free(error_msg);
       break;
@@ -240,7 +240,7 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
       break;
     default:
       char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s is not a valid OCEAN setting.", line);
+      sprintf(error_msg, "%8.8s (%zu) is not a valid OCEAN setting.", line, key);
       print_error(error_msg);
       free(error_msg);
       break;
@@ -294,7 +294,7 @@ static void parse_toy_settings(Toy* toy, char* line) {
       break;
     default:
       char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s is not a valid TOY setting.", line);
+      sprintf(error_msg, "%8.8s (%zu) is not a valid TOY setting.", line, key);
       print_error(error_msg);
       free(error_msg);
       break;
