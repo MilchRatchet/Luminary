@@ -89,6 +89,8 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
 
   sprintf(filename, "Snap-%s.png", timestring);
 
+  update_8bit_frame(realtime, instance);
+
   XRGB8* buffer;
   int width;
   int height;

@@ -53,9 +53,21 @@ RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
 
   realtime->buffer = (XRGB8*) realtime->window_surface->pixels;
   realtime->ld     = realtime->window_surface->pitch;
+
+  realtime->gpu_buffer_size = max(rect.w, instance->width) * max(rect.h, instance->height);
   initialize_8bit_frame(instance, max(rect.w, instance->width), max(rect.h, instance->height));
 
   return realtime;
+}
+
+void update_8bit_frame(RealtimeInstance* realtime, RaytraceInstance* instance) {
+  int required_buffer_size = max(realtime->width, instance->width) * max(realtime->height, instance->height);
+
+  if (required_buffer_size > realtime->gpu_buffer_size) {
+    free_8bit_frame(instance);
+    initialize_8bit_frame(instance, max(realtime->width, instance->width), max(realtime->height, instance->height));
+    realtime->gpu_buffer_size = required_buffer_size;
+  }
 }
 
 void free_realtime_instance(RealtimeInstance* realtime) {
