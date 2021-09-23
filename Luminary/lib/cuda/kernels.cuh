@@ -324,7 +324,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   __stcs((ushort4*) (device_task_counts + (threadIdx.x + blockIdx.x * blockDim.x) * 4), task_counts);
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_geometry_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks() {
   int trace_count      = 0;
   const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
 
@@ -366,19 +366,24 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_geometry_tasks()
 
     normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
 
-    UV vertex_texture = get_UV(t5.z, t5.w);
-    UV edge1_texture  = get_UV(t6.x, t6.y);
-    UV edge2_texture  = get_UV(t6.z, t6.w);
-
-    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
-
     if (dot_product(normal, face_normal) < 0.0f) {
       face_normal = scale_vector(face_normal, -1.0f);
     }
 
     if (dot_product(face_normal, scale_vector(ray, -1.0f)) < 0.0f) {
-      normal = scale_vector(normal, -1.0f);
+      normal        = scale_vector(normal, -1.0f);
+      vertex_normal = scale_vector(vertex_normal, -1.0f);
+      edge1_normal  = scale_vector(edge1_normal, -1.0f);
+      edge2_normal  = scale_vector(edge2_normal, -1.0f);
     }
+
+    const vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+
+    UV vertex_texture = get_UV(t5.z, t5.w);
+    UV edge1_texture  = get_UV(t6.x, t6.y);
+    UV edge2_texture  = get_UV(t6.z, t6.w);
+
+    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
 
     const int texture_object         = __float_as_int(t7.x);
     const uint32_t triangle_light_id = __float_as_uint(t7.y);
@@ -473,6 +478,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_geometry_tasks()
         const float specular_probability = lerp(0.5f, 1.0f, metallic);
 
         const vec3 V = scale_vector(ray, -1.0f);
+
+        task.position = terminator;
 
         task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 

@@ -76,3 +76,4 @@ This is a list of papers I have used for this project so far. Note that some tec
 - A. Ebert, V. Fuetterling, C. Lojewski and F. Pfreundt, _Parallel Spatial Splits in Bounding Volume Hierarchies_, Eurographics Symposium on Parallel Graphics and Visualization, 2016.
 - E. Haines, T. Akenine-Möller, "Ray Tracing Gems", Apress, 2019.
 - J. Jimenez, _Next Generation Post Processing in Call of Duty: Advanced Warfare_, Talk at SIGGRAPH 2014.
+- A. Marrs, P. Shirley and I. Wald, "Ray Tracing Gems II", Apress, 2021.

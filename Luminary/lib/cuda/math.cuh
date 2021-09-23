@@ -172,6 +172,31 @@ __device__ vec3 sample_ray_from_angles_and_vector(const float theta, const float
   return normalize_vector(result);
 }
 
+__device__ vec3 terminator_fix(vec3 p, vec3 a, vec3 edge1, vec3 edge2, vec3 na, vec3 n_edge1, vec3 n_edge2, float lambda, float mu) {
+  const vec3 b  = add_vector(a, edge1);
+  const vec3 c  = add_vector(a, edge2);
+  const vec3 nb = add_vector(na, n_edge1);
+  const vec3 nc = add_vector(na, n_edge2);
+
+  const float bary_u = 1.0f - mu - lambda;
+  const float bary_v = lambda;
+  const float bary_w = mu;
+
+  vec3 u = sub_vector(p, a);
+  vec3 v = sub_vector(p, b);
+  vec3 w = sub_vector(p, c);
+
+  const float dot_ua = fminf(0.0f, dot_product(u, na));
+  const float dot_vb = fminf(0.0f, dot_product(v, nb));
+  const float dot_wc = fminf(0.0f, dot_product(w, nc));
+
+  u = sub_vector(u, scale_vector(na, dot_ua));
+  v = sub_vector(v, scale_vector(nb, dot_vb));
+  w = sub_vector(w, scale_vector(nc, dot_wc));
+
+  return add_vector(p, add_vector(scale_vector(u, bary_u), add_vector(scale_vector(v, bary_v), scale_vector(w, bary_w))));
+}
+
 __device__ int trailing_zeros(const unsigned int n) {
   return __clz(__brev(n));
 }

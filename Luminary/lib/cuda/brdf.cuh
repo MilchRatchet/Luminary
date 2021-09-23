@@ -113,7 +113,7 @@ __device__ vec3 specular_BRDF(
 
   const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
 
-  const float HdotR = fmaxf(eps, fminf(1.0f, dot_product(H_local, ray_local)));
+  const float HdotR = __saturatef(dot_product(H_local, ray_local));
   const float NdotR = fmaxf(eps, fminf(1.0f, ray_local.z));
   const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
 
@@ -164,13 +164,13 @@ __device__ vec3 diffuse_BRDF(
   H.z = V.z + ray.z;
   H   = normalize_vector(H);
 
-  const float half_angle   = fmaxf(eps, fminf(dot_product(H, ray), 1.0f));
+  const float half_angle   = __saturatef(dot_product(H, ray));
   const float energyFactor = lerp(1.0f, 1.0f / 1.51f, roughness);
 
   const float FD90MinusOne = 0.5f * roughness + 2.0f * half_angle * half_angle * roughness - 1.0f;
 
-  const float angle          = fmaxf(eps, fminf(dot_product(normal, ray), 1.0f));
-  const float previous_angle = fmaxf(eps, fminf(dot_product(V, normal), 1.0f));
+  const float angle          = __saturatef(dot_product(normal, ray));
+  const float previous_angle = __saturatef(dot_product(V, normal));
 
   const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
   const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
