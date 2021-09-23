@@ -36,9 +36,9 @@ static UIPanel* create_general_panels(UI* ui, RaytraceInstance* instance) {
   int i = 0;
 
   panels[i++] = create_tab(ui, &(ui->tab));
-  panels[i++] = create_slider(ui, "Width", &(instance->settings.width), 0, 0.001f, 16.0f, 16384.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Height", &(instance->settings.height), 0, 0.001f, 16.0f, 16384.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Max Ray Depth", &(instance->settings.max_ray_depth), 0, 0.001f, 1.0f, 1024.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Width", &(instance->settings.width), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Height", &(instance->settings.height), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Max Ray Depth", &(instance->settings.max_ray_depth), 0, 0.02f, 1.0f, 1024.0f, 0, 1);
   panels[i++] = create_button(ui, "Reset Renderer", instance, (void (*)(void*)) reset_raytracing, 1);
   panels[i++] = create_info(ui, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_dropdown(ui, "Snapshot Resolution", &(instance->snap_resolution), 0, 2, "Window\0Render", 6);

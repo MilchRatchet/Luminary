@@ -13,7 +13,7 @@ void handle_mouse_UIPanel_slider(UI* ui, UIPanel* panel, int mouse_state, int x,
 
     if (panel->prop5) {
       float value = panel->data_buffer;
-      value += (1.0f + fabsf(value)) * (*((float*) (&panel->prop1))) * ui->mouse_xrel;
+      value += (*((float*) (&panel->prop1))) * ui->mouse_xrel;
       clamp(value, *((float*) (&panel->prop2)), *((float*) (&panel->prop3)));
       panel->data_buffer    = value;
       *((int*) panel->data) = (int) (value + 0.5f);
