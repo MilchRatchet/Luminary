@@ -1142,11 +1142,34 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
         break;
     }
 
+    switch (device_scene.camera.filter) {
+      case FILTER_NONE:
+        break;
+      case FILTER_GRAY:
+        pixel = filter_gray(pixel);
+        break;
+      case FILTER_SEPIA:
+        pixel = filter_sepia(pixel);
+        break;
+      case FILTER_GAMEBOY:
+        pixel = filter_gameboy(pixel, x, y);
+        break;
+      case FILTER_2BITGRAY:
+        pixel = filter_2bitgray(pixel, x, y);
+        break;
+      case FILTER_CRT:
+        pixel = filter_crt(pixel, x, y);
+        break;
+      case FILTER_BLACKWHITE:
+        pixel = filter_blackwhite(pixel, x, y);
+        break;
+    }
+
     const float dither = (device_scene.camera.dithering) ? get_dithering(x, y) : 0.0f;
 
-    pixel.r = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.r));
-    pixel.g = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.g));
-    pixel.b = fminf(255.9f, 0.5f + dither + 255.9f * linearRGB_to_SRGB(pixel.b));
+    pixel.r = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.r));
+    pixel.g = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.g));
+    pixel.b = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.b));
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;

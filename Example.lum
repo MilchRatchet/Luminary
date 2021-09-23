@@ -2,9 +2,9 @@ Luminary
 VERSION 4
 #=========================================
 # Luminary Example File
-# 
+#
 # The values here represent the default
-# values which are used in case the 
+# values which are used in case the
 # respective value is not set otherwise.
 #
 # GENERAL MESHFILE is not set by default
@@ -36,6 +36,7 @@ CAMERA FARCLIPD 1000000.0
 CAMERA TONEMAP_ 1
 CAMERA ALPHACUT 0.0
 CAMERA AUTOEXP_ 1
+CAMERA FILTER__ 0
 #=========================================
 SKY SUNCOLOR 1.0 0.9 0.8
 SKY AZIMUTH_ 3.141

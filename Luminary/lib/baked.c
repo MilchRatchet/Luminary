@@ -9,7 +9,7 @@
 
 #define head_size 0x68
 #define magic 4919420911629456716ul
-#define version 22092021  // we literally just use the date of the last change as the version
+#define version 23092021  // we literally just use the date of the last change as the version
 
 /*
  * Format:

@@ -70,6 +70,16 @@ Defines which of the available tonemaps is used:
 `CAMERA ALPHACUT [FP32]`<br/>
 Every alpha value smaller than this value is automatically treated as 0, i.e., fully transparent. Number must be in the range [0,1].
 
+`CAMERA FILTER__ [INT32]`<br/>
+Defines which of the available filters is used:
+  - 0 = None
+  - 1 = Grayscale
+  - 2 = Sepia
+  - 3 = Gameboy (4 shades of olive green)
+  - 4 = 2 Bit Gray (4 shades of gray)
+  - 5 = CRT
+  - 6 = Black/White
+
 ## Sky Settings
 
 `SKY SUNCOLOR [FP32] [FP32] [FP32]`<br/>

@@ -388,4 +388,98 @@ __device__ RGBAF saturate_albedo(RGBAF color, float change) {
   return color;
 }
 
+__device__ RGBF filter_gray(RGBF color) {
+  const float value = luminance(color);
+
+  return get_color(value, value, value);
+}
+
+__device__ RGBF filter_sepia(RGBF color) {
+  return get_color(
+    color.r * 0.393f + color.g * 0.769f + color.b * 0.189f, color.r * 0.349f + color.g * 0.686f + color.b * 0.168f,
+    color.r * 0.272f + color.g * 0.534f + color.b * 0.131f);
+}
+
+__device__ RGBF filter_gameboy(RGBF color, int x, int y) {
+  const float value = 2550.0f * luminance(color);
+
+  const float dither = get_dithering(x, y);
+
+  const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
+
+  switch (tone) {
+    case 0:
+      return get_color(15.0f / 255.0f, 56.0f / 255.0f, 15.0f / 255.0f);
+    case 1:
+      return get_color(48.0f / 255.0f, 98.0f / 255.0f, 48.0f / 255.0f);
+    case 2:
+      return get_color(139.0f / 255.0f, 172.0f / 255.0f, 15.0f / 255.0f);
+    case 3:
+    default:
+      return get_color(155.0f / 255.0f, 188.0f / 255.0f, 15.0f / 255.0f);
+  }
+}
+
+__device__ RGBF filter_2bitgray(RGBF color, int x, int y) {
+  const float value = 2550.0f * luminance(color);
+
+  const float dither = get_dithering(x, y);
+
+  const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
+
+  switch (tone) {
+    case 0:
+      return get_color(0.0f, 0.0f, 0.0f);
+    case 1:
+      return get_color(85.0f / 255.0f, 85.0f / 255.0f, 85.0f / 255.0f);
+    case 2:
+      return get_color(170.0f / 255.0f, 170.0f / 255.0f, 170.0f / 255.0f);
+    case 3:
+    default:
+      return get_color(1.0f, 1.0f, 1.0f);
+  }
+}
+
+__device__ RGBF filter_crt(RGBF color, int x, int y) {
+  color = scale_color(color, 2.0f);
+
+  const int column = x % 3;
+
+  switch (column) {
+    case 0:
+      color.r *= 0.5f;
+      color.g *= 0.75f;
+      break;
+    case 1:
+      color.g *= 0.5f;
+      color.b *= 0.75f;
+      break;
+    case 2:
+      color.r *= 0.75f;
+      color.b *= 0.5f;
+      break;
+  }
+
+  if (y % 3 == 0) {
+    color = scale_color(color, 0.5f);
+  }
+  return color;
+}
+
+__device__ RGBF filter_blackwhite(RGBF color, int x, int y) {
+  const float value = 2550.0f * luminance(color);
+
+  const float dither = get_dithering(x, y);
+
+  const int tone = (int) ((64.0f + value - dither * 128.0f) / 128.0f);
+
+  switch (tone) {
+    case 0:
+      return get_color(0.0f, 0.0f, 0.0f);
+    case 1:
+    default:
+      return get_color(1.0f, 1.0f, 1.0f);
+  }
+}
+
 #endif /* CU_MATH_H */

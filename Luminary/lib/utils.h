@@ -42,6 +42,17 @@
 #define TONEMAP_UNCHARTED2 3
 #endif
 
+#ifndef LUMINARY_FILTERS
+#define LUMINARY_FILTERS
+#define FILTER_NONE 0
+#define FILTER_GRAY 1
+#define FILTER_SEPIA 2
+#define FILTER_GAMEBOY 3
+#define FILTER_2BITGRAY 4
+#define FILTER_CRT 5
+#define FILTER_BLACKWHITE 6
+#endif
+
 #ifndef LUMINARY_SNAP_RESOLUTION
 #define LUMINARY_SNAP_RESOLUTION
 #define SNAP_RESOLUTION_WINDOW 0
@@ -71,6 +82,7 @@ struct Camera {
   float alpha_cutoff;
   float far_clip_distance;
   int tonemap;
+  int filter;
   int bloom;
   float bloom_strength;
   int dithering;

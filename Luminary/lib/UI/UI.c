@@ -73,6 +73,8 @@ static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Rotation Y", &(instance->scene_gpu.camera.rotation.y), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Rotation Z", &(instance->scene_gpu.camera.rotation.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_dropdown(ui, "Tone Mapping", &(instance->scene_gpu.camera.tonemap), 0, 4, "None\0ACES\0Reinhard\0Uncharted 2", 7);
+  panels[i++] = create_dropdown(
+    ui, "Filter", &(instance->scene_gpu.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 8);
   panels[i++] = create_slider(ui, "Field of View", &(instance->scene_gpu.camera.fov), 1, 0.001f, 0.0001f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure), 0);
   panels[i++] = create_slider(ui, "Exposure", &(instance->scene_gpu.camera.exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);

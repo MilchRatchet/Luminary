@@ -138,6 +138,10 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 6076837219871509569u:
       sscanf_s(value, "%f\n", &camera->alpha_cutoff);
       break;
+    /* FILTER__ */
+    case 5064663180778823519u:
+      sscanf_s(value, "%d\n", &camera->filter);
+      break;
     default:
       char* error_msg = (char*) malloc(LINE_SIZE);
       sprintf(error_msg, "%8.8s is not a valid CAMERA setting.", line);
@@ -317,6 +321,7 @@ static Scene get_default_scene() {
   scene.camera.alpha_cutoff      = 0.0f;
   scene.camera.far_clip_distance = 1000000.0f;
   scene.camera.tonemap           = TONEMAP_ACES;
+  scene.camera.filter            = FILTER_NONE;
   scene.camera.wasd_speed        = 1.0f;
   scene.camera.mouse_speed       = 1.0f;
   scene.camera.smooth_movement   = 0;
@@ -610,6 +615,8 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf_s(line, LINE_SIZE, "CAMERA ALPHACUT %f\n", instance->scene_gpu.camera.alpha_cutoff);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "CAMERA AUTOEXP_ %d\n", instance->scene_gpu.camera.auto_exposure);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA FILTER__ %d\n", instance->scene_gpu.camera.filter);
   fputs(line, file);
 
   sprintf_s(line, LINE_SIZE, "\n#===============================\n# Sky Settings\n#===============================\n\n");
