@@ -151,6 +151,7 @@ void realtime_output(RaytraceInstance* instance) {
     start_frametime(&frametime_trace);
     update_scene(instance);
     trace_scene(instance, instance->temporal_frames);
+    update_projection_matrix(instance);
     sample_frametime(&frametime_trace);
 
     start_frametime(&frametime_post);

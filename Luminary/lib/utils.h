@@ -161,11 +161,13 @@ struct RaytraceInstance {
   RGBF* frame_final_gpu;
   RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
+  RGBF* frame_temporal_gpu;
   RGBF* frame_variance_gpu;
   RGBF* frame_bias_cache_gpu;
   RGBF* albedo_buffer_gpu;
   RGBF* records_gpu;
-  RGB8* buffer_8bit_gpu;
+  XRGB8* buffer_8bit_gpu;
+  vec3* world_space_hit_gpu;
   void* albedo_atlas;
   int albedo_atlas_length;
   void* illuminance_atlas;

@@ -270,6 +270,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     const float depth     = result.x;
     const uint32_t hit_id = float_as_uint(result.y);
 
+    if ((task.state & DEPTH_LEFT) >> 16 == device_max_ray_depth)
+      device_world_space_hit[task.index.x + task.index.y * device_width] = add_vector(task.origin, scale_vector(task.ray, depth));
+
     float4* ptr = (float4*) (device_tasks + offset);
     float4 data0;
     float4 data1;
@@ -1105,6 +1108,41 @@ __global__ void finalize_samples() {
     __stcs(((float*) device_frame_bias_cache + offset), bias_cache);
     output = (buffer + output * device_temporal_frames) / (device_temporal_frames + 1);
     __stcs((float*) device_frame_output + offset, output);
+  }
+}
+
+__global__ void finalize_samples_temporal() {
+  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
+    RGBF buffer = device_frame_buffer[offset];
+
+    vec3 hit = device_world_space_hit[offset];
+
+    vec4 pos;
+    pos.x = hit.x;
+    pos.y = hit.y;
+    pos.z = hit.z;
+    pos.w = 1.0f;
+
+    vec4 prev_pixel = transform_vec4(device_projection, transform_vec4(device_view_space, pos));
+
+    prev_pixel.x /= -prev_pixel.w;
+    prev_pixel.y /= -prev_pixel.w;
+
+    prev_pixel.x = device_width * (1.0f - prev_pixel.x) * 0.5f;
+    prev_pixel.y = device_height * (prev_pixel.y + 1.0f) * 0.5f;
+
+    const int prev_x = prev_pixel.x;
+    const int prev_y = prev_pixel.y;
+
+    RGBF temporal = buffer;
+
+    if (prev_x >= 0 && prev_x < device_width && prev_y >= 0 && prev_y < device_height) {
+      temporal = device_frame_temporal[prev_y * device_width + prev_x];
+    }
+
+    const float alpha = fminf(1.0f - 1.0f / 1000.0f, lerp(0.99f, 1.0f, (float) device_temporal_frames / 100.0f));
+
+    device_frame_output[offset] = add_color(scale_color(buffer, 1.0f - alpha), scale_color(temporal, alpha));
   }
 }
 

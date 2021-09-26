@@ -19,6 +19,7 @@ RaytraceInstance* init_raytracing(
   int material_atlas_length, Scene scene);
 void reset_raytracing(RaytraceInstance* instance);
 void allocate_buffers(RaytraceInstance* instance);
+void update_projection_matrix(RaytraceInstance* instance);
 void update_scene(RaytraceInstance* instance);
 void center_toy_at_camera(RaytraceInstance* instance);
 void trace_scene(RaytraceInstance* instance, const int temporal_frames);

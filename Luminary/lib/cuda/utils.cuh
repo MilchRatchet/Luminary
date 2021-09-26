@@ -144,6 +144,8 @@ __constant__ int device_lights_active;
 
 __constant__ RGBF* device_frame_buffer;
 
+__constant__ RGBF* device_frame_temporal;
+
 __constant__ RGBF* device_frame_output;
 
 __constant__ RGBF* device_frame_variance;
@@ -157,6 +159,8 @@ __constant__ RGBF* device_denoiser;
 __constant__ RGBF* device_albedo_buffer;
 
 __constant__ XRGB8* device_frame_8bit;
+
+__constant__ vec3* device_world_space_hit;
 
 __constant__ int device_width;
 
@@ -189,6 +193,10 @@ __constant__ RGBF device_default_material;
 __constant__ int device_shading_mode;
 
 __constant__ RGBF* device_bloom_scratch;
+
+__device__ Mat4x4 device_view_space;
+
+__device__ Mat4x4 device_projection;
 
 //===========================================================================================
 // Functions
