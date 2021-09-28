@@ -270,6 +270,14 @@ __device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
   return res;
 }
 
+__device__ int temporalDepthTest(const float depth, const float prev_depth) {
+  return (fabsf(prev_depth - depth) < 2.0f);
+}
+
+__device__ int temporalNormalTest(const vec3 normal, const vec3 prev_normal) {
+  return (dot_product(normal, prev_normal) > 0.95f);
+}
+
 __device__ RGBF get_color(const float r, const float g, const float b) {
   RGBF result;
 

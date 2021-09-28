@@ -152,6 +152,18 @@ __constant__ RGBF* device_frame_variance;
 
 __constant__ RGBF* device_frame_bias_cache;
 
+__constant__ float* device_frame_history_buffer;
+
+__constant__ float* device_frame_history_temporal;
+
+__constant__ float* device_frame_depth_buffer;
+
+__constant__ float* device_frame_depth_temporal;
+
+__constant__ vec3* device_frame_normal_buffer;
+
+__constant__ vec3* device_frame_normal_temporal;
+
 __constant__ RGBF* device_records;
 
 __constant__ RGBF* device_denoiser;

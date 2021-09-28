@@ -34,12 +34,10 @@
 __device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 default_ray;
 
-  const float random_offset = sample_blue_noise(task.index.x, task.index.y, task.state, 8);
+  // const float random_offset = sample_blue_noise(task.index.x, task.index.y, task.state, 8);
 
-  default_ray.x =
-    device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * task.index.x + device_offset_x * random_offset * 2.0f);
-  default_ray.y =
-    device_scene.camera.focal_length * (device_vfov - device_step * task.index.y - device_offset_y * fractf(random_offset * 10.0f) * 2.0f);
+  default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * task.index.x + 0.5f * device_step);
+  default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * task.index.y - 0.5f * device_step);
   default_ray.z = -device_scene.camera.focal_length;
 
   const float alpha =
@@ -82,6 +80,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
 
     device_records[pixel]              = get_color(1.0f, 1.0f, 1.0f);
     device_frame_buffer[pixel]         = get_color(0.0f, 0.0f, 0.0f);
+    device_frame_depth_buffer[pixel]   = 0.0f;
+    device_frame_normal_buffer[pixel]  = get_vector(1.0f, 0.0f, 0.0f);
     device_light_sample_history[pixel] = ANY_LIGHT;
 
     if (device_denoiser)
@@ -270,8 +270,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     const float depth     = result.x;
     const uint32_t hit_id = float_as_uint(result.y);
 
-    if ((task.state & DEPTH_LEFT) >> 16 == device_max_ray_depth)
-      device_world_space_hit[task.index.x + task.index.y * device_width] = add_vector(task.origin, scale_vector(task.ray, depth));
+    if ((task.state & DEPTH_LEFT) >> 16 == device_max_ray_depth) {
+      device_world_space_hit[task.index.x + task.index.y * device_width]    = add_vector(task.origin, scale_vector(task.ray, depth));
+      device_frame_depth_buffer[task.index.x + task.index.y * device_width] = depth;
+    }
 
     float4* ptr = (float4*) (device_tasks + offset);
     float4 data0;
@@ -379,6 +381,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       edge1_normal  = scale_vector(edge1_normal, -1.0f);
       edge2_normal  = scale_vector(edge2_normal, -1.0f);
     }
+
+    if ((((task.state & DEPTH_LEFT) >> 16)) == device_max_ray_depth - 1)
+      device_frame_normal_buffer[pixel] = normal;
 
     const vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, lambda, mu);
 
@@ -681,6 +686,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
 
     const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
 
+    if ((((task.state & DEPTH_LEFT) >> 16) + 1) == device_max_ray_depth)
+      device_frame_normal_buffer[pixel] = normal;
+
     RGBAF albedo = device_scene.ocean.albedo;
     RGBF record  = device_records[pixel];
 
@@ -851,7 +859,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    vec3 normal     = get_toy_normal(task.position);
+    vec3 normal = get_toy_normal(task.position);
+
+    if ((((task.state & DEPTH_LEFT) >> 16) + 1) == device_max_ray_depth)
+      device_frame_normal_buffer[pixel] = normal;
+
     int from_inside = 0;
 
     if (dot_product(normal, task.ray) > 0.0f) {
@@ -1131,18 +1143,58 @@ __global__ void finalize_samples_temporal() {
     prev_pixel.x = device_width * (1.0f - prev_pixel.x) * 0.5f;
     prev_pixel.y = device_height * (prev_pixel.y + 1.0f) * 0.5f;
 
-    const int prev_x = prev_pixel.x;
-    const int prev_y = prev_pixel.y;
+    const int prev_x = prev_pixel.x - 0.5f;
+    const int prev_y = prev_pixel.y - 0.5f;
 
-    RGBF temporal = buffer;
+    float2 w = make_float2(prev_pixel.x - 0.5f - floorf(prev_pixel.x - 0.5f), prev_pixel.y - 0.5f - floorf(prev_pixel.y - 0.5f));
 
-    if (prev_x >= 0 && prev_x < device_width && prev_y >= 0 && prev_y < device_height) {
-      temporal = device_frame_temporal[prev_y * device_width + prev_x];
+    RGBF temporal     = get_color(0.0f, 0.0f, 0.0f);
+    float depth       = device_frame_depth_buffer[offset];
+    vec3 normal       = device_frame_normal_buffer[offset];
+    float sum_weights = 0.0f;
+    float history     = 0.0f;
+
+    for (int i = 0; i < 2; i++) {
+      for (int j = 0; j < 2; j++) {
+        const int x = prev_x + i;
+        const int y = prev_y + j;
+
+        if (x < 0 || x >= device_width || y < 0 || y >= device_height)
+          continue;
+
+        float prev_depth = device_frame_depth_temporal[y * device_width + x];
+
+        /*if (!temporalDepthTest(depth, prev_depth))
+          continue;*/
+
+        vec3 prev_normal = device_frame_normal_temporal[y * device_width + x];
+
+        if (!temporalNormalTest(normal, prev_normal))
+          continue;
+
+        const float weight = ((i == 0) ? (1.0f - w.x) : w.x) * ((j == 0) ? (1.0f - w.y) : w.y);
+
+        temporal = add_color(temporal, scale_color(device_frame_temporal[y * device_width + x], weight));
+        history += device_frame_history_temporal[y * device_width + x] * weight;
+        sum_weights += weight;
+      }
     }
 
-    const float alpha = fminf(1.0f - 1.0f / 1000.0f, lerp(0.99f, 1.0f, (float) device_temporal_frames / 100.0f));
+    if (sum_weights > 0.01f) {
+      temporal = scale_color(temporal, 1.0f / sum_weights);
+      history *= 1.0f / sum_weights;
 
-    device_frame_output[offset] = add_color(scale_color(buffer, 1.0f - alpha), scale_color(temporal, alpha));
+      float alpha = fmaxf(0.0f, 1.0f / (history + 1.0f));
+      buffer      = add_color(scale_color(buffer, alpha), scale_color(temporal, 1.0f - alpha));
+
+      history = fminf(64.0f, history + 1.0f);
+    }
+    else {
+      history = 1.0f;
+    }
+
+    device_frame_output[offset]         = buffer;
+    device_frame_history_buffer[offset] = history;
   }
 }
 
