@@ -156,9 +156,9 @@ __constant__ float* device_frame_history_buffer;
 
 __constant__ float* device_frame_history_temporal;
 
-__constant__ float* device_frame_depth_buffer;
+__constant__ TraceResult* device_frame_trace_buffer;
 
-__constant__ float* device_frame_depth_temporal;
+__constant__ TraceResult* device_frame_trace_temporal;
 
 __constant__ vec3* device_frame_normal_buffer;
 

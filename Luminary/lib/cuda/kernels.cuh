@@ -80,7 +80,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
 
     device_records[pixel]              = get_color(1.0f, 1.0f, 1.0f);
     device_frame_buffer[pixel]         = get_color(0.0f, 0.0f, 0.0f);
-    device_frame_depth_buffer[pixel]   = 0.0f;
     device_frame_normal_buffer[pixel]  = get_vector(1.0f, 0.0f, 0.0f);
     device_light_sample_history[pixel] = ANY_LIGHT;
 
@@ -272,7 +271,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     if ((task.state & DEPTH_LEFT) >> 16 == device_max_ray_depth) {
       device_world_space_hit[task.index.x + task.index.y * device_width]    = add_vector(task.origin, scale_vector(task.ray, depth));
-      device_frame_depth_buffer[task.index.x + task.index.y * device_width] = depth;
+      device_frame_trace_buffer[task.index.x + task.index.y * device_width] = device_trace_results[offset];
     }
 
     float4* ptr = (float4*) (device_tasks + offset);
@@ -1149,7 +1148,7 @@ __global__ void finalize_samples_temporal() {
     float2 w = make_float2(prev_pixel.x - 0.5f - floorf(prev_pixel.x - 0.5f), prev_pixel.y - 0.5f - floorf(prev_pixel.y - 0.5f));
 
     RGBF temporal     = get_color(0.0f, 0.0f, 0.0f);
-    float depth       = device_frame_depth_buffer[offset];
+    TraceResult trace = device_frame_trace_buffer[offset];
     vec3 normal       = device_frame_normal_buffer[offset];
     float sum_weights = 0.0f;
     float history     = 0.0f;
@@ -1162,10 +1161,10 @@ __global__ void finalize_samples_temporal() {
         if (x < 0 || x >= device_width || y < 0 || y >= device_height)
           continue;
 
-        float prev_depth = device_frame_depth_temporal[y * device_width + x];
+        TraceResult prev_trace = device_frame_trace_temporal[y * device_width + x];
 
-        /*if (!temporalDepthTest(depth, prev_depth))
-          continue;*/
+        if (!temporalTraceTest(trace, prev_trace))
+          continue;
 
         vec3 prev_normal = device_frame_normal_temporal[y * device_width + x];
 

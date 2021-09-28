@@ -270,8 +270,12 @@ __device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
   return res;
 }
 
-__device__ int temporalDepthTest(const float depth, const float prev_depth) {
-  return (fabsf(prev_depth - depth) < 2.0f);
+__device__ int temporalTraceTest(const TraceResult trace, const TraceResult prev_trace) {
+  const int depth_test = (fabsf(prev_trace.depth - trace.depth) < 2.0f);
+
+  const int hit_id_test = trace.hit_id == prev_trace.hit_id;
+
+  return hit_id_test;
 }
 
 __device__ int temporalNormalTest(const vec3 normal, const vec3 prev_normal) {

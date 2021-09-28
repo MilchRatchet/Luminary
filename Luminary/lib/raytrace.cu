@@ -210,12 +210,13 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   gpuErrchk(
     cudaMemcpyToSymbol(device_frame_history_temporal, &(instance->frame_history_temporal_gpu), sizeof(float*), 0, cudaMemcpyHostToDevice));
 
-  gpuErrchk(cudaMalloc((void**) &(instance->frame_depth_buffer_gpu), sizeof(float) * amount));
-  gpuErrchk(cudaMemcpyToSymbol(device_frame_depth_buffer, &(instance->frame_depth_buffer_gpu), sizeof(float*), 0, cudaMemcpyHostToDevice));
-
-  gpuErrchk(cudaMalloc((void**) &(instance->frame_depth_temporal_gpu), sizeof(float) * amount));
+  gpuErrchk(cudaMalloc((void**) &(instance->frame_trace_buffer_gpu), sizeof(TraceResult) * amount));
   gpuErrchk(
-    cudaMemcpyToSymbol(device_frame_depth_temporal, &(instance->frame_depth_temporal_gpu), sizeof(float*), 0, cudaMemcpyHostToDevice));
+    cudaMemcpyToSymbol(device_frame_trace_buffer, &(instance->frame_trace_buffer_gpu), sizeof(TraceResult*), 0, cudaMemcpyHostToDevice));
+
+  gpuErrchk(cudaMalloc((void**) &(instance->frame_trace_temporal_gpu), sizeof(TraceResult) * amount));
+  gpuErrchk(cudaMemcpyToSymbol(
+    device_frame_trace_temporal, &(instance->frame_trace_temporal_gpu), sizeof(TraceResult*), 0, cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMalloc((void**) &(instance->frame_normal_buffer_gpu), sizeof(vec3) * amount));
   gpuErrchk(cudaMemcpyToSymbol(device_frame_normal_buffer, &(instance->frame_normal_buffer_gpu), sizeof(vec3*), 0, cudaMemcpyHostToDevice));
@@ -303,8 +304,8 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->frame_bias_cache_gpu));
   gpuErrchk(cudaFree(instance->frame_history_buffer_gpu));
   gpuErrchk(cudaFree(instance->frame_history_temporal_gpu));
-  gpuErrchk(cudaFree(instance->frame_depth_buffer_gpu));
-  gpuErrchk(cudaFree(instance->frame_depth_temporal_gpu));
+  gpuErrchk(cudaFree(instance->frame_trace_buffer_gpu));
+  gpuErrchk(cudaFree(instance->frame_trace_temporal_gpu));
   gpuErrchk(cudaFree(instance->frame_normal_buffer_gpu));
   gpuErrchk(cudaFree(instance->frame_normal_temporal_gpu));
   gpuErrchk(cudaFree(instance->records_gpu));
@@ -413,8 +414,8 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
   int pixels_left   = amount;
   const float ratio = 1.0f / (amount);
 
-  gpuErrchk(
-    cudaMemcpy(instance->frame_depth_temporal_gpu, instance->frame_depth_buffer_gpu, sizeof(float) * amount, cudaMemcpyDeviceToDevice));
+  gpuErrchk(cudaMemcpy(
+    instance->frame_trace_temporal_gpu, instance->frame_trace_buffer_gpu, sizeof(TraceResult) * amount, cudaMemcpyDeviceToDevice));
   gpuErrchk(
     cudaMemcpy(instance->frame_normal_temporal_gpu, instance->frame_normal_buffer_gpu, sizeof(vec3) * amount, cudaMemcpyDeviceToDevice));
 
@@ -472,8 +473,8 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->light_sample_history_gpu));
   gpuErrchk(cudaFree(instance->frame_history_buffer_gpu));
   gpuErrchk(cudaFree(instance->frame_history_temporal_gpu));
-  gpuErrchk(cudaFree(instance->frame_depth_buffer_gpu));
-  gpuErrchk(cudaFree(instance->frame_depth_temporal_gpu));
+  gpuErrchk(cudaFree(instance->frame_trace_buffer_gpu));
+  gpuErrchk(cudaFree(instance->frame_trace_temporal_gpu));
   gpuErrchk(cudaFree(instance->frame_normal_buffer_gpu));
   gpuErrchk(cudaFree(instance->frame_normal_temporal_gpu));
   gpuErrchk(cudaFree(instance->world_space_hit_gpu));
