@@ -23,6 +23,7 @@ void update_projection_matrix(RaytraceInstance* instance);
 void update_scene(RaytraceInstance* instance);
 void center_toy_at_camera(RaytraceInstance* instance);
 void trace_scene(RaytraceInstance* instance, const int temporal_frames);
+void finalize(RaytraceInstance* instance);
 void apply_bloom(RaytraceInstance* instance, RGBF* image);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);

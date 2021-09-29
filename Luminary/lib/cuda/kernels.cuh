@@ -81,6 +81,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     device_records[pixel]              = get_color(1.0f, 1.0f, 1.0f);
     device_frame_buffer[pixel]         = get_color(0.0f, 0.0f, 0.0f);
     device_frame_normal_buffer[pixel]  = get_vector(1.0f, 0.0f, 0.0f);
+    device_frame_slope_buffer[pixel]   = 0.0f;
     device_light_sample_history[pixel] = ANY_LIGHT;
 
     if (device_denoiser)
@@ -381,8 +382,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       edge2_normal  = scale_vector(edge2_normal, -1.0f);
     }
 
-    if ((((task.state & DEPTH_LEFT) >> 16)) == device_max_ray_depth - 1)
+    if ((((task.state & DEPTH_LEFT) >> 16)) == device_max_ray_depth - 1) {
       device_frame_normal_buffer[pixel] = normal;
+      device_frame_slope_buffer[pixel]  = compute_ss_slope_from_normal(face_normal);
+    }
 
     const vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, lambda, mu);
 
@@ -1006,194 +1009,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
     }
 
     atomicSub(&device_pixels_left, 1);
-  }
-}
-
-__global__ void finalize_samples() {
-  int offset = 4 * (threadIdx.x + blockIdx.x * blockDim.x);
-
-  for (; offset < 3 * device_amount - 4; offset += 4 * blockDim.x * gridDim.x) {
-    float4 buffer = __ldcs((float4*) ((float*) device_frame_buffer + offset));
-    float4 output;
-    float4 variance;
-    float4 bias_cache;
-
-    if (device_temporal_frames == 0) {
-      output.x   = buffer.x;
-      output.y   = buffer.y;
-      output.z   = buffer.z;
-      output.w   = buffer.w;
-      variance.x = 1.0f;
-      variance.y = 1.0f;
-      variance.z = 1.0f;
-      variance.w = 1.0f;
-      __stcs((float4*) ((float*) device_frame_variance + offset), variance);
-      bias_cache.x = 0.0f;
-      bias_cache.y = 0.0f;
-      bias_cache.z = 0.0f;
-      bias_cache.w = 0.0f;
-    }
-    else {
-      output     = __ldcs((float4*) ((float*) device_frame_output + offset));
-      variance   = __ldcs((float4*) ((float*) device_frame_variance + offset));
-      bias_cache = __ldcs((float4*) ((float*) device_frame_bias_cache + offset));
-    }
-
-    float4 deviation;
-    deviation.x = sqrtf(fmaxf(eps, variance.x));
-    deviation.y = sqrtf(fmaxf(eps, variance.y));
-    deviation.z = sqrtf(fmaxf(eps, variance.z));
-    deviation.w = sqrtf(fmaxf(eps, variance.w));
-
-    if (device_temporal_frames) {
-      variance.x = ((buffer.x - output.x) * (buffer.x - output.x) + variance.x * (device_temporal_frames - 1)) / device_temporal_frames;
-      variance.y = ((buffer.y - output.y) * (buffer.y - output.y) + variance.y * (device_temporal_frames - 1)) / device_temporal_frames;
-      variance.z = ((buffer.z - output.z) * (buffer.z - output.z) + variance.z * (device_temporal_frames - 1)) / device_temporal_frames;
-      variance.w = ((buffer.w - output.w) * (buffer.w - output.w) + variance.w * (device_temporal_frames - 1)) / device_temporal_frames;
-      __stcs((float4*) ((float*) device_frame_variance + offset), variance);
-    }
-
-    float4 firefly_rejection;
-    firefly_rejection.x = 0.1f + output.x + deviation.x * 4.0f;
-    firefly_rejection.y = 0.1f + output.y + deviation.y * 4.0f;
-    firefly_rejection.z = 0.1f + output.z + deviation.z * 4.0f;
-    firefly_rejection.w = 0.1f + output.w + deviation.w * 4.0f;
-
-    firefly_rejection.x = fmaxf(0.0f, buffer.x - firefly_rejection.x);
-    firefly_rejection.y = fmaxf(0.0f, buffer.y - firefly_rejection.y);
-    firefly_rejection.z = fmaxf(0.0f, buffer.z - firefly_rejection.z);
-    firefly_rejection.w = fmaxf(0.0f, buffer.w - firefly_rejection.w);
-
-    bias_cache.x += firefly_rejection.x;
-    bias_cache.y += firefly_rejection.y;
-    bias_cache.z += firefly_rejection.z;
-    bias_cache.w += firefly_rejection.w;
-
-    buffer.x -= firefly_rejection.x;
-    buffer.y -= firefly_rejection.y;
-    buffer.z -= firefly_rejection.z;
-    buffer.w -= firefly_rejection.w;
-
-    float4 debias;
-    debias.x = fmaxf(0.0f, fminf(bias_cache.x, output.x - deviation.x * 2.0f - buffer.x));
-    debias.y = fmaxf(0.0f, fminf(bias_cache.y, output.y - deviation.y * 2.0f - buffer.y));
-    debias.z = fmaxf(0.0f, fminf(bias_cache.z, output.z - deviation.z * 2.0f - buffer.z));
-    debias.w = fmaxf(0.0f, fminf(bias_cache.w, output.w - deviation.w * 2.0f - buffer.w));
-
-    buffer.x += debias.x;
-    buffer.y += debias.y;
-    buffer.z += debias.z;
-    buffer.w += debias.w;
-
-    bias_cache.x -= debias.x;
-    bias_cache.y -= debias.y;
-    bias_cache.z -= debias.z;
-    bias_cache.w -= debias.w;
-    __stcs((float4*) ((float*) device_frame_bias_cache + offset), bias_cache);
-
-    output.x = (buffer.x + output.x * device_temporal_frames) / (device_temporal_frames + 1);
-    output.y = (buffer.y + output.y * device_temporal_frames) / (device_temporal_frames + 1);
-    output.z = (buffer.z + output.z * device_temporal_frames) / (device_temporal_frames + 1);
-    output.w = (buffer.w + output.w * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float4*) ((float*) device_frame_output + offset), output);
-  }
-
-  for (; offset < 3 * device_amount; offset++) {
-    float buffer     = __ldcs((float*) device_frame_buffer + offset);
-    float output     = __ldcs((float*) device_frame_output + offset);
-    float variance   = __ldcs((float*) device_frame_variance + offset);
-    float bias_cache = __ldcs(((float*) device_frame_bias_cache + offset));
-    if (device_temporal_frames == 0) {
-      bias_cache = 0.0f;
-    }
-    float deviation = sqrtf(fmaxf(eps, variance));
-    variance        = ((buffer - output) * (buffer - output) + variance * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float*) device_frame_variance + offset, variance);
-    float firefly_rejection = 0.1f + output + deviation * 8.0f;
-    firefly_rejection       = fmaxf(0.0f, buffer - firefly_rejection);
-    bias_cache += firefly_rejection;
-    buffer -= firefly_rejection;
-    float debias = fmaxf(0.0f, fminf(bias_cache, output - deviation * 2.0f - buffer));
-    buffer += debias;
-    bias_cache -= debias;
-    __stcs(((float*) device_frame_bias_cache + offset), bias_cache);
-    output = (buffer + output * device_temporal_frames) / (device_temporal_frames + 1);
-    __stcs((float*) device_frame_output + offset, output);
-  }
-}
-
-__global__ void finalize_samples_temporal() {
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    RGBF buffer = device_frame_buffer[offset];
-
-    vec3 hit = device_world_space_hit[offset];
-
-    vec4 pos;
-    pos.x = hit.x;
-    pos.y = hit.y;
-    pos.z = hit.z;
-    pos.w = 1.0f;
-
-    vec4 prev_pixel = transform_vec4(device_projection, transform_vec4(device_view_space, pos));
-
-    prev_pixel.x /= -prev_pixel.w;
-    prev_pixel.y /= -prev_pixel.w;
-
-    prev_pixel.x = device_width * (1.0f - prev_pixel.x) * 0.5f;
-    prev_pixel.y = device_height * (prev_pixel.y + 1.0f) * 0.5f;
-
-    const int prev_x = prev_pixel.x - 0.5f;
-    const int prev_y = prev_pixel.y - 0.5f;
-
-    float2 w = make_float2(prev_pixel.x - 0.5f - floorf(prev_pixel.x - 0.5f), prev_pixel.y - 0.5f - floorf(prev_pixel.y - 0.5f));
-
-    RGBF temporal     = get_color(0.0f, 0.0f, 0.0f);
-    TraceResult trace = device_frame_trace_buffer[offset];
-    vec3 normal       = device_frame_normal_buffer[offset];
-    float sum_weights = 0.0f;
-    float history     = 0.0f;
-
-    for (int i = 0; i < 2; i++) {
-      for (int j = 0; j < 2; j++) {
-        const int x = prev_x + i;
-        const int y = prev_y + j;
-
-        if (x < 0 || x >= device_width || y < 0 || y >= device_height)
-          continue;
-
-        TraceResult prev_trace = device_frame_trace_temporal[y * device_width + x];
-
-        if (!temporalTraceTest(trace, prev_trace))
-          continue;
-
-        vec3 prev_normal = device_frame_normal_temporal[y * device_width + x];
-
-        if (!temporalNormalTest(normal, prev_normal))
-          continue;
-
-        const float weight = ((i == 0) ? (1.0f - w.x) : w.x) * ((j == 0) ? (1.0f - w.y) : w.y);
-
-        temporal = add_color(temporal, scale_color(device_frame_temporal[y * device_width + x], weight));
-        history += device_frame_history_temporal[y * device_width + x] * weight;
-        sum_weights += weight;
-      }
-    }
-
-    if (sum_weights > 0.01f) {
-      temporal = scale_color(temporal, 1.0f / sum_weights);
-      history *= 1.0f / sum_weights;
-
-      float alpha = fmaxf(0.0f, 1.0f / (history + 1.0f));
-      buffer      = add_color(scale_color(buffer, alpha), scale_color(temporal, 1.0f - alpha));
-
-      history = fminf(64.0f, history + 1.0f);
-    }
-    else {
-      history = 1.0f;
-    }
-
-    device_frame_output[offset]         = buffer;
-    device_frame_history_buffer[offset] = history;
   }
 }
 

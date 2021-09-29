@@ -148,7 +148,7 @@ __constant__ RGBF* device_frame_temporal;
 
 __constant__ RGBF* device_frame_output;
 
-__constant__ RGBF* device_frame_variance;
+__constant__ float* device_frame_variance_buffer;
 
 __constant__ RGBF* device_frame_bias_cache;
 
@@ -163,6 +163,10 @@ __constant__ TraceResult* device_frame_trace_temporal;
 __constant__ vec3* device_frame_normal_buffer;
 
 __constant__ vec3* device_frame_normal_temporal;
+
+__constant__ float2* device_frame_moments_temporal;
+
+__constant__ float* device_frame_slope_buffer;
 
 __constant__ RGBF* device_records;
 

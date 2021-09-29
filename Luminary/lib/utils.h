@@ -162,7 +162,7 @@ struct RaytraceInstance {
   RGBF* frame_output_gpu;
   RGBF* frame_buffer_gpu;
   RGBF* frame_temporal_gpu;
-  RGBF* frame_variance_gpu;
+  RGBF* frame_variance_buffer_gpu;
   RGBF* frame_bias_cache_gpu;
   float* frame_history_buffer_gpu;
   float* frame_history_temporal_gpu;
@@ -170,6 +170,8 @@ struct RaytraceInstance {
   void* frame_trace_temporal_gpu;
   vec3* frame_normal_buffer_gpu;
   vec3* frame_normal_temporal_gpu;
+  void* frame_moments_temporal_gpu;
+  float* frame_slope_buffer_gpu;
   RGBF* albedo_buffer_gpu;
   RGBF* records_gpu;
   XRGB8* buffer_8bit_gpu;

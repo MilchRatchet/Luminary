@@ -270,12 +270,24 @@ __device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
   return res;
 }
 
-__device__ int temporalTraceTest(const TraceResult trace, const TraceResult prev_trace) {
-  const int depth_test = (fabsf(prev_trace.depth - trace.depth) < 2.0f);
+__device__ int temporalTraceTest(const TraceResult trace, const TraceResult prev_trace, const float slope) {
+  const int depth_test = (fabsf(prev_trace.depth - trace.depth) < 2.0f * (slope + eps));
 
   const int hit_id_test = trace.hit_id == prev_trace.hit_id;
 
-  return hit_id_test;
+  return hit_id_test && depth_test;
+}
+
+__device__ float compute_ss_slope_from_normal(vec3 normal) {
+  vec4 dir;
+  dir.x = normal.x;
+  dir.y = normal.y;
+  dir.z = normal.z;
+  dir.w = 0.0f;
+
+  const float z = fabsf(transform_vec4(device_view_space, dir).z);
+
+  return tanf(0.5f * PI - asinf(z));
 }
 
 __device__ int temporalNormalTest(const vec3 normal, const vec3 prev_normal) {

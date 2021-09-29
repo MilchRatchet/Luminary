@@ -19,8 +19,10 @@
 void offline_output(RaytraceInstance* instance, clock_t time) {
   clock_t start_of_rt = clock();
   update_scene(instance);
+  finalize(instance);
   for (int i = 0; i < instance->offline_samples; i++) {
     trace_scene(instance, i);
+    finalize(instance);
     const double progress     = ((double) i) / instance->offline_samples;
     const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
     const double time_left    = (time_elapsed / progress) - time_elapsed;
@@ -151,6 +153,7 @@ void realtime_output(RaytraceInstance* instance) {
     start_frametime(&frametime_trace);
     update_scene(instance);
     trace_scene(instance, instance->temporal_frames);
+    finalize(instance);
     update_projection_matrix(instance);
     sample_frametime(&frametime_trace);
 
