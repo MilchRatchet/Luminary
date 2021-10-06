@@ -18,6 +18,7 @@
 #include "brdf.cuh"
 #include "bvh.cuh"
 #include "directives.cuh"
+#include "fog.cuh"
 #include "image.h"
 #include "math.cuh"
 #include "memory.cuh"
@@ -90,7 +91,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     store_trace_task(device_tasks + get_task_address(offset++), task);
   }
 
-  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = offset;
+  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5] = offset;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
@@ -103,7 +104,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
   uint16_t average = 0;
 
   for (int i = 0; i < 32; i++) {
-    const uint16_t c       = device_task_counts[4 * (32 * warp + i)];
+    const uint16_t c       = device_task_counts[5 * (32 * warp + i)];
     counts[threadIdx.x][i] = c;
     average += c;
   }
@@ -144,19 +145,28 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
   }
 
   for (int i = 0; i < 32; i++) {
-    device_task_counts[4 * (32 * warp + i)] = counts[threadIdx.x][i];
+    device_task_counts[5 * (32 * warp + i)] = counts[threadIdx.x][i];
   }
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks() {
-  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
 
   for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
-    TraceTask task   = load_trace_task_essentials(device_tasks + offset);
+    TraceTask task   = load_trace_task(device_tasks + offset);
 
     float depth     = device_scene.camera.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
+
+    if (device_scene.fog.active && is_first_ray(task.state)) {
+      const float fog_dist = get_intersection_fog(task.origin, task.ray, sample_blue_noise(task.index.x, task.index.y, task.state, 169));
+
+      if (fog_dist < depth) {
+        depth  = fog_dist;
+        hit_id = FOG_HIT;
+      }
+    }
 
     if (device_scene.ocean.active) {
       const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
@@ -176,6 +186,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
+    /*if (device_scene.fog.active) {
+      float weight = expf(-depth * device_scene.fog.absorption_coeff * 0.00001f);
+
+      RGBF record = device_records[task.index.x + task.index.y * device_width];
+
+      record = scale_color(record, weight);
+
+      device_records[task.index.x + task.index.y * device_width] = record;
+    }*/
+
     float2 result;
     result.x = depth;
     result.y = uint_as_float(hit_id);
@@ -185,11 +205,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {
-  const int task_count         = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
+  const int task_count         = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
   uint16_t geometry_task_count = 0;
   uint16_t sky_task_count      = 0;
   uint16_t ocean_task_count    = 0;
   uint16_t toy_task_count      = 0;
+  uint16_t fog_task_count      = 0;
 
   // count data
   for (int i = 0; i < task_count; i++) {
@@ -205,23 +226,26 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     else if (hit_id == TOY_HIT) {
       toy_task_count++;
     }
+    else if (hit_id == FOG_HIT) {
+      fog_task_count++;
+    }
     else {
       geometry_task_count++;
     }
   }
 
   int geometry_offset = 0;
-  int ocean_offset    = geometry_task_count;
-  int sky_offset      = geometry_task_count + ocean_task_count;
-  int toy_offset      = geometry_task_count + ocean_task_count + sky_task_count;
+  int ocean_offset    = geometry_offset + geometry_task_count;
+  int sky_offset      = ocean_offset + ocean_task_count;
+  int toy_offset      = sky_offset + sky_task_count;
+  int fog_offset      = toy_offset + toy_task_count;
   int k               = 0;
 
-  ushort4 task_offsets;
-  task_offsets.x = geometry_offset;
-  task_offsets.y = ocean_offset;
-  task_offsets.z = sky_offset;
-  task_offsets.w = toy_offset;
-  __stcs((ushort4*) (device_task_offsets + (threadIdx.x + blockIdx.x * blockDim.x) * 4), task_offsets);
+  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_offset;
+  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1] = ocean_offset;
+  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 2] = sky_offset;
+  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_offset;
+  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = fog_offset;
 
   // order data
   while (k < task_count) {
@@ -231,17 +255,22 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     int index;
     int needs_swapping;
 
-    if (hit_id == SKY_HIT) {
-      index          = sky_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count) || (k >= geometry_task_count + ocean_task_count + sky_task_count);
-    }
-    else if (hit_id == OCEAN_HIT) {
+    if (hit_id == OCEAN_HIT) {
       index          = ocean_offset++;
       needs_swapping = (k < geometry_task_count) || (k >= geometry_task_count + ocean_task_count);
     }
+    else if (hit_id == SKY_HIT) {
+      index          = sky_offset++;
+      needs_swapping = (k < geometry_task_count + ocean_task_count) || (k >= geometry_task_count + ocean_task_count + sky_task_count);
+    }
     else if (hit_id == TOY_HIT) {
       index          = toy_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count);
+      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count)
+                       || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count);
+    }
+    else if (hit_id == FOG_HIT) {
+      index          = fog_offset++;
+      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count);
     }
     else {
       index          = geometry_offset++;
@@ -260,6 +289,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   sky_task_count      = 0;
   ocean_task_count    = 0;
   toy_task_count      = 0;
+  fog_task_count      = 0;
 
   // process data
   for (int i = 0; i < task_count; i++) {
@@ -300,6 +330,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
           ocean_task_count++;
           data1.y = depth;
         }
+        else if (hit_id == FOG_HIT) {
+          fog_task_count++;
+          data1.y = depth;
+        }
         else {
           geometry_task_count++;
           data1.y = uint_as_float(hit_id);
@@ -315,18 +349,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     __stcs(ptr, data0);
   }
 
-  ushort4 task_counts;
-  task_counts.x = geometry_task_count;
-  task_counts.y = ocean_task_count;
-  task_counts.z = sky_task_count;
-  task_counts.w = toy_task_count;
-
-  __stcs((ushort4*) (device_task_counts + (threadIdx.x + blockIdx.x * blockDim.x) * 4), task_counts);
+  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_task_count;
+  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1] = ocean_task_count;
+  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 2] = sky_task_count;
+  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_task_count;
+  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = fog_task_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks() {
   int trace_count      = 0;
-  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device_tasks + get_task_address(i));
@@ -550,11 +582,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
     }
   }
 
-  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4] = trace_count;
+  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5] = trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_tasks() {
-  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 4];
+  const int task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device_tasks + get_task_address(i));
@@ -661,9 +693,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  int trace_count       = device_task_counts[id * 4];
-  const int task_count  = device_task_counts[id * 4 + 1];
-  const int task_offset = device_task_offsets[id * 4 + 1];
+  int trace_count       = device_task_counts[id * 5];
+  const int task_count  = device_task_counts[id * 5 + 1];
+  const int task_offset = device_task_offsets[id * 5 + 1];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device_tasks + get_task_address(task_offset + i));
@@ -751,14 +783,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
     }
   }
 
-  device_task_counts[id * 4] = trace_count;
+  device_task_counts[id * 5] = trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device_task_counts[id * 4 + 1];
-  const int task_offset = device_task_offsets[id * 4 + 1];
+  const int task_count  = device_task_counts[id * 5 + 1];
+  const int task_offset = device_task_offsets[id * 5 + 1];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device_tasks + get_task_address(task_offset + i));
@@ -789,8 +821,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device_task_counts[id * 4 + 2];
-  const int task_offset = device_task_offsets[id * 4 + 2];
+  const int task_count  = device_task_counts[id * 5 + 2];
+  const int task_offset = device_task_offsets[id * 5 + 2];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device_tasks + get_task_address(task_offset + i));
@@ -813,8 +845,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device_task_counts[id * 4 + 2];
-  const int task_offset = device_task_offsets[id * 4 + 2];
+  const int task_count  = device_task_counts[id * 5 + 2];
+  const int task_offset = device_task_offsets[id * 5 + 2];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device_tasks + get_task_address(task_offset + i));
@@ -838,9 +870,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  int trace_count       = device_task_counts[id * 4];
-  const int task_count  = device_task_counts[id * 4 + 3];
-  const int task_offset = device_task_offsets[id * 4 + 3];
+  int trace_count       = device_task_counts[id * 5];
+  const int task_count  = device_task_counts[id * 5 + 3];
+  const int task_offset = device_task_offsets[id * 5 + 3];
 
   for (int i = 0; i < task_count; i++) {
     ToyTask task    = load_toy_task(device_tasks + get_task_address(task_offset + i));
@@ -956,14 +988,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
     }
   }
 
-  device_task_counts[id * 4] = trace_count;
+  device_task_counts[id * 5] = trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device_task_counts[id * 4 + 3];
-  const int task_offset = device_task_offsets[id * 4 + 3];
+  const int task_count  = device_task_counts[id * 5 + 3];
+  const int task_offset = device_task_offsets[id * 5 + 3];
 
   for (int i = 0; i < task_count; i++) {
     const ToyTask task = load_toy_task(device_tasks + get_task_address(task_offset + i));
@@ -989,6 +1021,90 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       normal.z = 0.5f * normal.z + 0.5f;
 
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+    }
+
+    atomicSub(&device_pixels_left, 1);
+  }
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  int trace_count       = device_task_counts[id * 5];
+  const int task_count  = device_task_counts[id * 5 + 4];
+  const int task_offset = device_task_offsets[id * 5 + 4];
+
+  for (int i = 0; i < task_count; i++) {
+    FogTask task    = load_fog_task(device_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    vec3 ray;
+    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+    ray.y = sinf(task.ray_y);
+    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
+    task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
+
+    if (task.state & DEPTH_LEFT) {
+      int light_count;
+      uint32_t light_sample_id;
+      Light light;
+
+      light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
+
+      if (!light_count) {
+        atomicSub(&device_pixels_left, 1);
+        continue;
+      }
+
+      float alpha = sample_blue_noise(task.index.x, task.index.y, task.state, 99);
+      float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 98);
+
+      vec3 out_ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
+      float angle  = dot_product(ray, out_ray);
+      float g      = device_scene.fog.scatter_param;
+
+      float weight = (4 * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
+      weight *= device_scene.fog.scattering_coeff * 0.00001f;
+
+      RGBF record                        = device_records[pixel];
+      device_records[pixel]              = scale_color(record, weight / light_count);
+      device_light_sample_history[pixel] = light_sample_id;
+
+      task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
+
+      TraceTask next_task;
+      next_task.origin = task.position;
+      next_task.ray    = out_ray;
+      next_task.index  = task.index;
+      next_task.state  = task.state;
+
+      store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
+    }
+    else {
+      atomicSub(&device_pixels_left, 1);
+    }
+  }
+
+  device_task_counts[id * 5] = trace_count;
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int task_count  = device_task_counts[id * 5 + 4];
+  const int task_offset = device_task_offsets[id * 5 + 4];
+
+  for (int i = 0; i < task_count; i++) {
+    FogTask task    = load_fog_task(device_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_NORMAL) {
+      device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+    }
+    else if (device_shading_mode == SHADING_DEPTH) {
+      const float value          = __saturatef((1.0f / task.distance) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value, value, value);
     }
 
     atomicSub(&device_pixels_left, 1);

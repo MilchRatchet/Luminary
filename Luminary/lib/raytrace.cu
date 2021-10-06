@@ -142,9 +142,9 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaMalloc((void**) &(instance->trace_results_gpu), sizeof(TraceResult) * max_task_count));
   gpuErrchk(cudaMemcpyToSymbol(device_trace_results, &(instance->trace_results_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
-  gpuErrchk(cudaMalloc((void**) &(instance->task_counts_gpu), 4 * sizeof(uint16_t) * thread_count));
+  gpuErrchk(cudaMalloc((void**) &(instance->task_counts_gpu), 5 * sizeof(uint16_t) * thread_count));
   gpuErrchk(cudaMemcpyToSymbol(device_task_counts, &(instance->task_counts_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMalloc((void**) &(instance->task_offsets_gpu), 4 * sizeof(uint16_t) * thread_count));
+  gpuErrchk(cudaMalloc((void**) &(instance->task_offsets_gpu), 5 * sizeof(uint16_t) * thread_count));
   gpuErrchk(cudaMemcpyToSymbol(device_task_offsets, &(instance->task_offsets_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMalloc((void**) &(instance->randoms_gpu), sizeof(curandStateXORWOW_t) * thread_count));
@@ -347,18 +347,28 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
     process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     process_debug_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     process_debug_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    process_debug_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   else {
     while (pixels_left > 0) {
       if (pixels_left < amount)
         balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
       preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      gpuErrchk(cudaDeviceSynchronize());
       process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      gpuErrchk(cudaDeviceSynchronize());
       postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      gpuErrchk(cudaDeviceSynchronize());
       process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      gpuErrchk(cudaDeviceSynchronize());
       process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      gpuErrchk(cudaDeviceSynchronize());
       process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      gpuErrchk(cudaDeviceSynchronize());
       process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      gpuErrchk(cudaDeviceSynchronize());
+      process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      gpuErrchk(cudaDeviceSynchronize());
 
       gpuErrchk(cudaMemcpyFromSymbol(&(pixels_left), device_pixels_left, sizeof(int), 0, cudaMemcpyDeviceToHost));
       gpuErrchk(cudaDeviceSynchronize());
