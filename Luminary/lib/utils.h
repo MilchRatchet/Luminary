@@ -134,6 +134,15 @@ struct Ocean {
   float refractive_index;
 } typedef Ocean;
 
+struct Fog {
+  int active;
+  float density;
+  float scattering_coeff;
+  float absorption_coeff;
+  float scatter_param;
+  float height;
+} typedef Fog;
+
 struct Scene {
   Camera camera;
   Triangle* triangles;
@@ -148,6 +157,7 @@ struct Scene {
   Ocean ocean;
   Sky sky;
   Toy toy;
+  Fog fog;
 } typedef Scene;
 
 struct RaytraceInstance {

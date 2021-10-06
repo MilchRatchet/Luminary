@@ -86,6 +86,15 @@ struct ToyTask {
   uint32_t state;
 } typedef ToyTask;
 
+struct FogTask {
+  vec3 position;
+  float ray_y;
+  float ray_xz;
+  float distance;
+  ushort2 index;
+  uint32_t state;
+} typedef FogTask;
+
 struct TraceTask {
   vec3 origin;
   vec3 ray;
@@ -108,6 +117,7 @@ struct TraceResult {
 #define SKY_HIT 0xffffffff
 #define OCEAN_HIT 0xfffffffe
 #define TOY_HIT 0xfffffffd
+#define FOG_HIT 0xfffffffc
 #define ANY_LIGHT 0xffffffff
 #define TOY_LIGHT 0x1
 #define SUN_LIGHT 0x0
@@ -202,6 +212,10 @@ __device__ int get_task_address_of_thread(const int thread_id, const int block_i
 
 __device__ int get_task_address(const int number) {
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
+}
+
+__device__ int is_first_ray(const int state) {
+  return (((state & DEPTH_LEFT) >> 16) >= device_max_ray_depth);
 }
 
 #endif /* CU_UTILS_H */

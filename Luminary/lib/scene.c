@@ -376,6 +376,13 @@ static Scene get_default_scene() {
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
 
+  scene.fog.active           = 1;
+  scene.fog.density          = 1.0f;
+  scene.fog.absorption_coeff = 0.01f;
+  scene.fog.scattering_coeff = 0.01f;
+  scene.fog.scatter_param    = 0.0f;
+  scene.fog.height           = 1000.0f;
+
   return scene;
 }
 
