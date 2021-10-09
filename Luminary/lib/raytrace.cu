@@ -329,13 +329,7 @@ extern "C" void update_scene(RaytraceInstance* instance) {
 }
 
 extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frames) {
-  const int amount = instance->width * instance->height;
-
   gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_pixels_left, &(amount), sizeof(int), 0, cudaMemcpyHostToDevice));
-
-  int pixels_left   = amount;
-  const float ratio = 1.0f / (amount);
 
   generate_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
@@ -350,28 +344,17 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
     process_debug_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   else {
-    while (pixels_left > 0) {
-      if (pixels_left < amount)
+    for (int i = 0; i < instance->max_ray_depth; i++) {
+      if (i)
         balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
       preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      gpuErrchk(cudaDeviceSynchronize());
       process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      gpuErrchk(cudaDeviceSynchronize());
       postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      gpuErrchk(cudaDeviceSynchronize());
       process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      gpuErrchk(cudaDeviceSynchronize());
       process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      gpuErrchk(cudaDeviceSynchronize());
       process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      gpuErrchk(cudaDeviceSynchronize());
       process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      gpuErrchk(cudaDeviceSynchronize());
       process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      gpuErrchk(cudaDeviceSynchronize());
-
-      gpuErrchk(cudaMemcpyFromSymbol(&(pixels_left), device_pixels_left, sizeof(int), 0, cudaMemcpyDeviceToHost));
-      gpuErrchk(cudaDeviceSynchronize());
     }
   }
 

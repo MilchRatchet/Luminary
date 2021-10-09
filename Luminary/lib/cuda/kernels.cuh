@@ -487,8 +487,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
           device_frame_buffer[pixel] = emission;
         }
       }
-
-      atomicSub(&device_pixels_left, 1);
     }
     else if (task.state & DEPTH_LEFT) {
       if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
@@ -574,12 +572,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
         device_records[pixel]              = record;
         device_light_sample_history[pixel] = light_sample_id;
       }
-      else {
-        atomicSub(&device_pixels_left, 1);
-      }
-    }
-    else {
-      atomicSub(&device_pixels_left, 1);
     }
   }
 
@@ -686,8 +678,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
       device_frame_buffer[pixel] = get_color(red, green, blue);
     }
-
-    atomicSub(&device_pixels_left, 1);
   }
 }
 
@@ -728,8 +718,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
 
         device_frame_buffer[pixel] = emission;
       }
-
-      atomicSub(&device_pixels_left, 1);
     }
     else if (task.state & DEPTH_LEFT) {
       if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
@@ -779,9 +767,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
       device_records[pixel]              = record;
       device_light_sample_history[pixel] = ANY_LIGHT;
     }
-    else {
-      atomicSub(&device_pixels_left, 1);
-    }
   }
 
   device_task_counts[id * 5] = trace_count;
@@ -814,8 +799,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
 
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
-
-    atomicSub(&device_pixels_left, 1);
   }
 }
 
@@ -838,8 +821,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
     if (light == ANY_LIGHT || light == 0) {
       device_frame_buffer[pixel] = sky;
     }
-
-    atomicSub(&device_pixels_left, 1);
   }
 }
 
@@ -863,8 +844,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
     else if (device_shading_mode == SHADING_NORMAL) {
       device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
-
-    atomicSub(&device_pixels_left, 1);
   }
 }
 
@@ -916,8 +895,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
           device_frame_buffer[pixel] = emission;
         }
       }
-
-      atomicSub(&device_pixels_left, 1);
     }
     else if (task.state & DEPTH_LEFT) {
       if (device_denoiser && task.state & ALBEDO_BUFFER_STATE) {
@@ -984,9 +961,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       device_records[pixel]              = record;
       device_light_sample_history[pixel] = light_sample_id;
     }
-    else {
-      atomicSub(&device_pixels_left, 1);
-    }
   }
 
   device_task_counts[id * 5] = trace_count;
@@ -1023,8 +997,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
 
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
-
-    atomicSub(&device_pixels_left, 1);
   }
 }
 
@@ -1054,7 +1026,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
 
       if (!light_count) {
-        atomicSub(&device_pixels_left, 1);
         continue;
       }
 
@@ -1083,9 +1054,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
 
       store_trace_task(device_tasks + get_task_address(trace_count++), next_task);
     }
-    else {
-      atomicSub(&device_pixels_left, 1);
-    }
   }
 
   device_task_counts[id * 5] = trace_count;
@@ -1108,8 +1076,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks
       const float value          = __saturatef((1.0f / task.distance) * 2.0f);
       device_frame_buffer[pixel] = get_color(value, value, value);
     }
-
-    atomicSub(&device_pixels_left, 1);
   }
 }
 
