@@ -132,8 +132,6 @@ __constant__ Scene device_scene;
 
 __constant__ int device_pixels_per_thread;
 
-__device__ int device_pixels_left;
-
 __constant__ TraceTask* device_tasks;
 
 __constant__ TraceResult* device_trace_results;
