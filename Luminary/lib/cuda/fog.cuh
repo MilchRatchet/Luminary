@@ -29,7 +29,7 @@ __device__ float get_intersection_fog(vec3 origin, vec3 ray, float random) {
 
   max_dist = fminf(device_scene.fog.dist, max_dist);
 
-  float t = fmaxf(0.0f, min_dist) + logf(random) / (-device_scene.fog.scattering_coeff * 0.00001f);
+  float t = fmaxf(0.0f, min_dist) + logf(random) / (-device_scene.fog.scattering * 0.001f);
 
   return (t < min_dist || t > max_dist) ? FLT_MAX : t;
 }

@@ -193,6 +193,48 @@ static void parse_sky_settings(Sky* sky, char* line) {
   }
 }
 
+static void parse_fog_settings(Fog* fog, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
+
+  switch (key) {
+    /* ACTIVE__ */
+    case 6872287793290429249u:
+      sscanf_s(value, "%d\n", &fog->active);
+      break;
+    /* ABSORPTI */
+    case 5283936577260831297u:
+      sscanf_s(value, "%f\n", &fog->absorption);
+      break;
+    /* SCATTERI */
+    case 5283361541352145747u:
+      sscanf_s(value, "%f\n", &fog->scattering);
+      break;
+    /* ANISOTRO */
+    case 5715723576763043393u:
+      sscanf_s(value, "%f\n", &fog->anisotropy);
+      break;
+    /* DISTANCE */
+    case 4990918854551226692u:
+      sscanf_s(value, "%f\n", &fog->dist);
+      break;
+    /* HEIGHT__ */
+    case 6872304225801028936u:
+      sscanf_s(value, "%f\n", &fog->height);
+      break;
+    /* FALLOFF_ */
+    case 6865251988369326406u:
+      sscanf_s(value, "%f\n", &fog->falloff);
+      break;
+    default:
+      char* error_msg = (char*) malloc(LINE_SIZE);
+      sprintf(error_msg, "%8.8s (%zu) is not a valid SKY setting.", line, key);
+      print_error(error_msg);
+      free(error_msg);
+      break;
+  }
+}
+
 static void parse_ocean_settings(Ocean* ocean, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
@@ -376,14 +418,13 @@ static Scene get_default_scene() {
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
 
-  scene.fog.active           = 1;
-  scene.fog.density          = 1.0f;
-  scene.fog.absorption_coeff = 0.01f;
-  scene.fog.scattering_coeff = 0.01f;
-  scene.fog.scatter_param    = 0.0f;
-  scene.fog.height           = 1000.0f;
-  scene.fog.dist             = 100.0f;
-  scene.fog.falloff          = 10.0f;
+  scene.fog.active     = 0;
+  scene.fog.absorption = 1.0f;
+  scene.fog.scattering = 1.0f;
+  scene.fog.anisotropy = 0.0f;
+  scene.fog.height     = 1000.0f;
+  scene.fog.dist       = 100.0f;
+  scene.fog.falloff    = 10.0f;
 
   return scene;
 }
@@ -466,6 +507,9 @@ RaytraceInstance* load_scene(const char* filename) {
     }
     else if (line[0] == 'S') {
       parse_sky_settings(&scene.sky, line + 3 + 1);
+    }
+    else if (line[0] == 'F') {
+      parse_fog_settings(&scene.fog, line + 3 + 1);
     }
     else if (line[0] == 'O') {
       parse_ocean_settings(&scene.ocean, line + 5 + 1);
@@ -646,6 +690,24 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf_s(line, LINE_SIZE, "SKY RAYLEIGH %f\n", instance->scene_gpu.sky.rayleigh_falloff);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "SKY MIE_____ %f\n", instance->scene_gpu.sky.mie_falloff);
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "\n#===============================\n# Fog Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "FOG ACTIVE__ %d\n", instance->scene_gpu.fog.active);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "FOG ABSORPTI %f\n", instance->scene_gpu.fog.absorption);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "FOG SCATTERI %f\n", instance->scene_gpu.fog.scattering);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "FOG ANISOTRO %f\n", instance->scene_gpu.fog.anisotropy);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "FOG DISTANCE %f\n", instance->scene_gpu.fog.dist);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "FOG HEIGHT__ %f\n", instance->scene_gpu.fog.height);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "FOG FALLOFF_ %f\n", instance->scene_gpu.fog.falloff);
   fputs(line, file);
 
   sprintf_s(line, LINE_SIZE, "\n#===============================\n# Ocean Settings\n#===============================\n\n");

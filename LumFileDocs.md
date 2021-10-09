@@ -103,6 +103,29 @@ Height based density falloff regarding rayleigh scattering. Number should be non
 `SKY MIE_____ [FP32]`<br/>
 Height based density falloff regarding mie scattering. Number should be non-negative.
 
+## Fog Settings
+
+`FOG ACTIVE__ [INT32]`<br/>
+Set 1 to activate fog, 0 else.
+
+`FOG ABSORPTI [FP32]`<br/>
+Absorption coefficient used for light extinction in fog. Number should be non-negative.
+
+`FOG SCATTERI [FP32]`<br/>
+Scattering coefficient determining the amout of light being scattered. Number should be non-negative.
+
+`FOG ANISOTRO [FP32]`<br/>
+Anisotropy determines the wether light is more likely to be scattered forward than backward. Numbers must be in the range [0,1].
+
+`FOG DISTANCE [FP32]`<br/>
+Maximum distance of the fog from the camera. Number should be non-negative.
+
+`FOG HEIGHT__ [FP32]`<br/>
+Ceiling of the fog.
+
+`FOG FALLOFF_ [FP32]`<br/>
+Distance over the height of the fog over which the fog density linear goes to 0. Number should be non-negative.
+
 ## Ocean Settings
 
 `OCEAN ACTIVE__ [INT32]`<br/>

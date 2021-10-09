@@ -292,7 +292,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     if (device_scene.fog.active) {
       float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
-      float weight = expf(-t * device_scene.fog.absorption_coeff * 0.00001f);
+      float weight = expf(-t * device_scene.fog.absorption * 0.001f);
 
       RGBF record = device_records[task.index.x + task.index.y * device_width];
 
@@ -1063,11 +1063,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
 
       vec3 out_ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
       float angle  = dot_product(ray, out_ray);
-      float g      = device_scene.fog.scatter_param;
+      float g      = device_scene.fog.anisotropy;
 
       float weight  = (4 * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
-      float density = get_fog_density(device_scene.fog.scattering_coeff, task.position.y);
-      weight *= density * 0.00001f;
+      float density = get_fog_density(device_scene.fog.scattering, task.position.y);
+      weight *= density * 0.001f;
 
       RGBF record                        = device_records[pixel];
       device_records[pixel]              = scale_color(record, weight / light_count);
