@@ -110,6 +110,8 @@ static UIPanel* create_sky_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Fog Scattering", &(instance->scene_gpu.fog.scattering_coeff), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Fog Scattering Param", &(instance->scene_gpu.fog.scatter_param), 1, 0.001f, -1.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Fog Height", &(instance->scene_gpu.fog.height), 1, 0.005f, -FLT_MAX, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Fog Distance", &(instance->scene_gpu.fog.dist), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Fog Falloff", &(instance->scene_gpu.fog.falloff), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
 
   return panels;
 }
