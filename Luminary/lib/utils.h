@@ -141,6 +141,8 @@ struct Fog {
   float absorption_coeff;
   float scatter_param;
   float height;
+  float dist;
+  float falloff;
 } typedef Fog;
 
 struct Scene {

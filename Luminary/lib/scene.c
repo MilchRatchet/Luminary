@@ -382,6 +382,8 @@ static Scene get_default_scene() {
   scene.fog.scattering_coeff = 0.01f;
   scene.fog.scatter_param    = 0.0f;
   scene.fog.height           = 1000.0f;
+  scene.fog.dist             = 100.0f;
+  scene.fog.falloff          = 10.0f;
 
   return scene;
 }

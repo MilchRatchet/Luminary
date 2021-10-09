@@ -160,7 +160,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     uint32_t hit_id = SKY_HIT;
 
     if (device_scene.fog.active && is_first_ray(task.state)) {
-      const float fog_dist = get_intersection_fog(task.origin, task.ray, sample_blue_noise(task.index.x, task.index.y, task.state, 169));
+      const float fog_dist = get_intersection_fog(task.origin, task.ray, sample_blue_noise(task.index.x, task.index.y, 256, 169));
 
       if (fog_dist < depth) {
         depth  = fog_dist;
@@ -186,15 +186,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
-    /*if (device_scene.fog.active) {
-      float weight = expf(-depth * device_scene.fog.absorption_coeff * 0.00001f);
+    if (device_scene.fog.active) {
+      float t      = fminf(depth, device_scene.fog.dist);
+      float weight = expf(-t * device_scene.fog.absorption_coeff * 0.00001f);
 
       RGBF record = device_records[task.index.x + task.index.y * device_width];
 
       record = scale_color(record, weight);
 
       device_records[task.index.x + task.index.y * device_width] = record;
-    }*/
+    }
 
     float2 result;
     result.x = depth;
@@ -1064,8 +1065,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       float angle  = dot_product(ray, out_ray);
       float g      = device_scene.fog.scatter_param;
 
-      float weight = (4 * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
-      weight *= device_scene.fog.scattering_coeff * 0.00001f;
+      float weight  = (4 * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
+      float density = device_scene.fog.scattering_coeff;
+
+      if (task.position.y > device_scene.fog.height) {
+        density = (task.position.y < device_scene.fog.height + device_scene.fog.falloff)
+                    ? lerp(density, 0.0f, (task.position.y - device_scene.fog.height) / device_scene.fog.falloff)
+                    : 0.0f;
+      }
+
+      weight *= density * 0.00001f;
 
       RGBF record                        = device_records[pixel];
       device_records[pixel]              = scale_color(record, weight / light_count);
