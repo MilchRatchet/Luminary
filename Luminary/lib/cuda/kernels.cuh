@@ -168,15 +168,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
-    if (device_scene.ocean.active) {
-      const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
-
-      if (ocean_dist < depth) {
-        depth  = ocean_dist;
-        hit_id = OCEAN_HIT;
-      }
-    }
-
     if (device_scene.toy.active) {
       const float toy_dist = get_toy_distance(task.origin, task.ray);
 
@@ -186,15 +177,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
-    if (device_scene.fog.active) {
-      float t      = fminf(depth, device_scene.fog.dist);
-      float weight = expf(-t * device_scene.fog.absorption_coeff * 0.00001f);
+    if (device_scene.ocean.active) {
+      const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
 
-      RGBF record = device_records[task.index.x + task.index.y * device_width];
-
-      record = scale_color(record, weight);
-
-      device_records[task.index.x + task.index.y * device_width] = record;
+      if (ocean_dist < depth) {
+        depth  = ocean_dist;
+        hit_id = OCEAN_HIT;
+      }
     }
 
     float2 result;
@@ -300,6 +289,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     const float depth     = result.x;
     const uint32_t hit_id = float_as_uint(result.y);
+
+    if (device_scene.fog.active) {
+      float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
+      float weight = expf(-t * device_scene.fog.absorption_coeff * 0.00001f);
+
+      RGBF record = device_records[task.index.x + task.index.y * device_width];
+
+      record = scale_color(record, weight);
+
+      device_records[task.index.x + task.index.y * device_width] = record;
+    }
 
     float4* ptr = (float4*) (device_tasks + offset);
     float4 data0;
@@ -1066,14 +1066,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       float g      = device_scene.fog.scatter_param;
 
       float weight  = (4 * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
-      float density = device_scene.fog.scattering_coeff;
-
-      if (task.position.y > device_scene.fog.height) {
-        density = (task.position.y < device_scene.fog.height + device_scene.fog.falloff)
-                    ? lerp(density, 0.0f, (task.position.y - device_scene.fog.height) / device_scene.fog.falloff)
-                    : 0.0f;
-      }
-
+      float density = get_fog_density(device_scene.fog.scattering_coeff, task.position.y);
       weight *= density * 0.00001f;
 
       RGBF record                        = device_records[pixel];
