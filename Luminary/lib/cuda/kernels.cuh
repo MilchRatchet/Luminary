@@ -678,6 +678,31 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
       device_frame_buffer[pixel] = get_color(red, green, blue);
     }
+    else if (device_shading_mode == SHADING_WIREFRAME) {
+      const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
+
+      const float4 t1 = __ldg(hit_address);
+      const float4 t2 = __ldg(hit_address + 1);
+      const float4 t3 = __ldg(hit_address + 2);
+      const float4 t4 = __ldg(hit_address + 3);
+      const float4 t5 = __ldg(hit_address + 4);
+      const float4 t6 = __ldg(hit_address + 5);
+      const float2 t7 = __ldg((float2*) (hit_address + 6));
+
+      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
+      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+      vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
+
+      vec3 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+
+      int a = fabsf(coords.x + coords.y - 1.0f) < 0.001f;
+      int b = fabsf(coords.x) < 0.001f;
+      int c = fabsf(coords.y) < 0.001f;
+
+      float light = (a || b || c) ? 1.0f : 0.0f;
+
+      device_frame_buffer[pixel] = get_color(light, 0.5f * light, 0.0f);
+    }
   }
 }
 
@@ -799,6 +824,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
 
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
+    else if (device_shading_mode == SHADING_WIREFRAME) {
+      int a = fabsf(floorf(task.position.x) - task.position.x) < 0.001f;
+      int b = fabsf(floorf(task.position.z) - task.position.z) < 0.001f;
+      int c = fabsf(ceilf(task.position.x) - task.position.x) < 0.001f;
+      int d = fabsf(ceilf(task.position.z) - task.position.z) < 0.001f;
+
+      float light = (a || b || c || d) ? 1.0f : 0.0f;
+
+      device_frame_buffer[pixel] = get_color(0.0f, 0.5f * light, light);
+    }
   }
 }
 
@@ -840,9 +875,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value          = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);
       device_frame_buffer[pixel] = get_color(value, value, value);
-    }
-    else if (device_shading_mode == SHADING_NORMAL) {
-      device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
   }
 }
