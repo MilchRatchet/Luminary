@@ -17,8 +17,8 @@
  */
 #define WEIGHT_BASED_EXIT
 #define BRIGHTEST_EMISSION 40.0f
-#define CUTOFF ((1.0f)/(BRIGHTEST_EMISSION * 255.0f))
-#define PROBABILISTIC_CUTOFF ((1.0f)/(0.5f * BRIGHTEST_EMISSION * 255.0f))
+#define CUTOFF ((1.0f) / (BRIGHTEST_EMISSION * 255.0f))
+#define PROBABILISTIC_CUTOFF ((1.0f) / (0.5f * BRIGHTEST_EMISSION * 255.0f))
 
 /*
  * Define LOW_QUALITY_LONG_BOUNCES for the following to apply
@@ -31,5 +31,25 @@
 #define LOW_QUALITY_LONG_BOUNCES
 #define MIN_BOUNCES 1
 
+__device__ int validate_trace_task(TraceTask task, RGBF record) {
+  int valid = 1;
+#ifdef WEIGHT_BASED_EXIT
+  const float max = fmaxf(record.r, fmaxf(record.g, record.b));
+  if (
+    max < CUTOFF
+    || (max < PROBABILISTIC_CUTOFF && sample_blue_noise(task.index.x, task.index.y, task.state, 20) > (max - CUTOFF) / (CUTOFF - PROBABILISTIC_CUTOFF))) {
+    valid = 0;
+  }
+#endif
+
+#ifdef LOW_QUALITY_LONG_BOUNCES
+  if (
+    ((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES)
+    && sample_blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f / (1 + device_max_ray_depth)) {
+    valid = 0;
+  }
+#endif
+  return valid;
+}
 
 #endif /* CU_DIRECTIVES_H */

@@ -365,21 +365,13 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   if (type != TYPE_CAMERA)
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
 }
 
 static void execute_debug_kernels(RaytraceInstance* instance, int type) {
@@ -399,7 +391,6 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
   gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
 
   generate_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
 
   if (instance->shading_mode) {
     execute_debug_kernels(instance, TYPE_CAMERA);

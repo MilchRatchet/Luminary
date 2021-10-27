@@ -561,13 +561,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       }
 
       TraceTask bounce_task;
-      bounce_task.origin           = task.position;
-      bounce_task.ray              = ray;
-      bounce_task.index            = task.index;
-      bounce_task.state            = set_type(task.state, TYPE_BOUNCE);
-      device_bounce_records[pixel] = bounce_record;
+      bounce_task.origin = task.position;
+      bounce_task.ray    = ray;
+      bounce_task.index  = task.index;
+      bounce_task.state  = set_type(task.state, TYPE_BOUNCE);
 
-      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      if (validate_trace_task(bounce_task, bounce_record)) {
+        device_bounce_records[pixel] = bounce_record;
+        store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      }
     }
   }
 
@@ -1034,13 +1036,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       }
 
       TraceTask bounce_task;
-      bounce_task.origin           = task.position;
-      bounce_task.ray              = task.ray;
-      bounce_task.index            = task.index;
-      bounce_task.state            = set_type(task.state, TYPE_BOUNCE);
-      device_bounce_records[pixel] = bounce_record;
+      bounce_task.origin = task.position;
+      bounce_task.ray    = task.ray;
+      bounce_task.index  = task.index;
+      bounce_task.state  = set_type(task.state, TYPE_BOUNCE);
 
-      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      if (validate_trace_task(bounce_task, bounce_record)) {
+        device_bounce_records[pixel] = bounce_record;
+        store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      }
     }
   }
 
