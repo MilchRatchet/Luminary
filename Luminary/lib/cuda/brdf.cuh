@@ -78,38 +78,16 @@ __device__ vec3 sample_GGX_VNDF(const vec3 v, const float alpha, const float ran
 }
 
 __device__ vec3 specular_BRDF(
-  RGBF& record, uint32_t& light_sample_id, const vec3 normal, const vec3 V, const Light light, const float light_sample,
-  float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic, const float beta,
-  const float gamma, const float specular_probability) {
-  const float alpha        = roughness * roughness;
-  light_sample_probability = lerp(0.0f, light_sample_probability * alpha, metallic);
-
+  RGBF& record, const vec3 normal, const vec3 V, const RGBAF albedo, const float roughness, const float metallic, const float beta,
+  const float gamma, const float spec_prob) {
+  const float alpha              = roughness * roughness;
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
 
   float weight = 1.0f;
 
   const vec3 V_local = rotate_vector_by_quaternion(V, rotation_to_z);
-  vec3 H_local;
 
-  const vec3 S_local =
-    rotate_vector_by_quaternion(normalize_vector(sample_ray_from_angles_and_vector(beta * light.radius, gamma, light.pos)), rotation_to_z);
-
-  if (light_sample < light_sample_probability) {
-    H_local.x = S_local.x + V_local.x;
-    H_local.y = S_local.y + V_local.y;
-    H_local.z = S_local.z + V_local.z;
-
-    H_local = normalize_vector(H_local);
-
-    weight = (1.0f / light_sample_probability) * light.radius * light_count;
-  }
-  else {
-    H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
-
-    light_sample_id = ANY_LIGHT;
-
-    weight = (1.0f / (1.0f - light_sample_probability));
-  }
+  vec3 H_local = sample_GGX_VNDF(V_local, alpha, beta, gamma);
 
   const vec3 ray_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
 
@@ -128,7 +106,7 @@ __device__ vec3 specular_BRDF(
 
   const float milchs_energy_recovery = lerp(1.0f, 1.51f + 1.51f * NdotV, roughness);
 
-  weight *= milchs_energy_recovery * Smith_G2_over_G1_height_correlated(alpha * alpha, NdotR, NdotV) / specular_probability;
+  weight *= milchs_energy_recovery * Smith_G2_over_G1_height_correlated(alpha * alpha, NdotR, NdotV) / spec_prob;
 
   record.r *= F.r * weight;
   record.g *= F.g * weight;
@@ -138,25 +116,11 @@ __device__ vec3 specular_BRDF(
 }
 
 __device__ vec3 diffuse_BRDF(
-  RGBF& record, uint32_t& light_sample_id, const vec3 normal, const vec3 V, const Light light, const float light_sample,
-  const float light_sample_probability, const int light_count, const RGBAF albedo, const float roughness, const float metallic,
-  const float beta, const float gamma, const float specular_probability) {
-  float weight = 1.0f;
-
+  RGBF& record, const vec3 normal, const vec3 V, const RGBAF albedo, const float roughness, const float metallic, const float beta,
+  const float gamma, const float spec_prob) {
   const float alpha = acosf(sqrtf(beta));
 
-  vec3 ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
-
-  if (light_sample < light_sample_probability) {
-    weight = (1.0f / light_sample_probability) * light.radius * light_count;
-  }
-  else {
-    ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
-
-    light_sample_id = ANY_LIGHT;
-
-    weight = (1.0f / (1.0f - light_sample_probability));
-  }
+  vec3 ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
   vec3 H;
   H.x = V.x + ray.x;
@@ -175,7 +139,42 @@ __device__ vec3 diffuse_BRDF(
   const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
   const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
 
-  weight *= FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - specular_probability);
+  float weight = FDL * FDV * energyFactor * (1.0f - metallic) / (1.0f - spec_prob);
+
+  record.r *= albedo.r * weight;
+  record.g *= albedo.g * weight;
+  record.b *= albedo.b * weight;
+
+  return ray;
+}
+
+__device__ vec3 light_BRDF(
+  RGBF& record, const vec3 normal, const vec3 V, const Light light, const int light_count, const RGBAF albedo, const float roughness,
+  const float metallic, const float beta, const float gamma) {
+  const float alpha = acosf(sqrtf(beta));
+
+  vec3 ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
+
+  float weight = light.radius * light_count;
+
+  vec3 H;
+  H.x = V.x + ray.x;
+  H.y = V.y + ray.y;
+  H.z = V.z + ray.z;
+  H   = normalize_vector(H);
+
+  const float half_angle   = __saturatef(dot_product(H, ray));
+  const float energyFactor = lerp(1.0f, 1.0f / 1.51f, roughness);
+
+  const float FD90MinusOne = 0.5f * roughness + 2.0f * half_angle * half_angle * roughness - 1.0f;
+
+  const float angle          = __saturatef(dot_product(normal, ray));
+  const float previous_angle = __saturatef(dot_product(V, normal));
+
+  const float FDL = 1.0f + (FD90MinusOne * __powf(1.0f - angle, 5.0f));
+  const float FDV = 1.0f + (FD90MinusOne * __powf(1.0f - previous_angle, 5.0f));
+
+  weight *= FDL * FDV * energyFactor * (1.0f - metallic);
 
   record.r *= albedo.r * weight;
   record.g *= albedo.g * weight;
