@@ -79,7 +79,7 @@ __device__ unsigned int __bfind(unsigned int a) {
   }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
-  const uint16_t trace_task_count = device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
+  const uint16_t trace_task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   uint16_t offset                 = 0;
 
   uint2 traversal_stack[STACK_SIZE];
@@ -105,7 +105,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       if (offset >= trace_task_count)
         break;
 
-      const TraceTask task = load_trace_task_essentials(device_tasks + get_task_address(offset));
+      const TraceTask task = load_trace_task_essentials(device_trace_tasks + get_task_address(offset));
       const float2 result  = __ldcs((float2*) (device_trace_results + get_task_address(offset)));
 
       node_task     = make_uint2(0, 0x80000000);

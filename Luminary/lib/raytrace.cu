@@ -117,13 +117,15 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaMalloc((void**) &(instance->frame_output_gpu), sizeof(RGBF) * amount));
   gpuErrchk(cudaMalloc((void**) &(instance->frame_variance_gpu), sizeof(RGBF) * amount));
   gpuErrchk(cudaMalloc((void**) &(instance->frame_bias_cache_gpu), sizeof(RGBF) * amount));
-  gpuErrchk(cudaMalloc((void**) &(instance->records_gpu), sizeof(RGBF) * amount));
+  gpuErrchk(cudaMalloc((void**) &(instance->light_records_gpu), sizeof(RGBF) * amount));
+  gpuErrchk(cudaMalloc((void**) &(instance->bounce_records_gpu), sizeof(RGBF) * amount));
 
   gpuErrchk(cudaMemcpyToSymbol(device_frame_buffer, &(instance->frame_buffer_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_frame_output, &(instance->frame_output_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_frame_variance, &(instance->frame_variance_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_frame_bias_cache, &(instance->frame_bias_cache_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_records, &(instance->records_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_light_records, &(instance->light_records_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_bounce_records, &(instance->bounce_records_gpu), sizeof(RGBF*), 0, cudaMemcpyHostToDevice));
 
   if (instance->denoiser) {
     gpuErrchk(cudaMalloc((void**) &(instance->albedo_buffer_gpu), sizeof(RGBF) * amount));
@@ -137,8 +139,15 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
 
   gpuErrchk(cudaMemcpyToSymbol(device_pixels_per_thread, &(pixels_per_thread), sizeof(int), 0, cudaMemcpyHostToDevice));
 
-  gpuErrchk(cudaMalloc((void**) &(instance->tasks_gpu), 32 * max_task_count));
-  gpuErrchk(cudaMemcpyToSymbol(device_tasks, &(instance->tasks_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**) &(instance->light_trace_gpu), 32 * max_task_count));
+  gpuErrchk(cudaMemcpyToSymbol(device_light_trace, &(instance->light_trace_gpu), sizeof(TraceTask*), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**) &(instance->bounce_trace_gpu), 32 * max_task_count));
+  gpuErrchk(cudaMemcpyToSymbol(device_bounce_trace, &(instance->bounce_trace_gpu), sizeof(TraceTask*), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**) &(instance->light_trace_count_gpu), sizeof(uint16_t) * max_task_count));
+  gpuErrchk(cudaMemcpyToSymbol(device_light_trace_count, &(instance->light_trace_count_gpu), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMalloc((void**) &(instance->bounce_trace_count_gpu), sizeof(uint16_t) * max_task_count));
+  gpuErrchk(
+    cudaMemcpyToSymbol(device_bounce_trace_count, &(instance->bounce_trace_count_gpu), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMalloc((void**) &(instance->trace_results_gpu), sizeof(TraceResult) * max_task_count));
   gpuErrchk(cudaMemcpyToSymbol(device_trace_results, &(instance->trace_results_gpu), sizeof(void*), 0, cudaMemcpyHostToDevice));
 
@@ -224,7 +233,10 @@ extern "C" RaytraceInstance* init_raytracing(
 
 extern "C" void reset_raytracing(RaytraceInstance* instance) {
   free_bloom_mips(instance);
-  gpuErrchk(cudaFree(instance->tasks_gpu));
+  gpuErrchk(cudaFree(instance->light_trace_gpu));
+  gpuErrchk(cudaFree(instance->bounce_trace_gpu));
+  gpuErrchk(cudaFree(instance->light_trace_count_gpu));
+  gpuErrchk(cudaFree(instance->bounce_trace_count_gpu));
   gpuErrchk(cudaFree(instance->trace_results_gpu));
   gpuErrchk(cudaFree(instance->task_counts_gpu));
   gpuErrchk(cudaFree(instance->task_offsets_gpu));
@@ -232,7 +244,8 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->frame_output_gpu));
   gpuErrchk(cudaFree(instance->frame_variance_gpu));
   gpuErrchk(cudaFree(instance->frame_bias_cache_gpu));
-  gpuErrchk(cudaFree(instance->records_gpu));
+  gpuErrchk(cudaFree(instance->light_records_gpu));
+  gpuErrchk(cudaFree(instance->bounce_records_gpu));
   gpuErrchk(cudaFree(instance->randoms_gpu));
   gpuErrchk(cudaFree(instance->light_sample_history_gpu));
 
@@ -328,10 +341,45 @@ extern "C" void update_scene(RaytraceInstance* instance) {
   gpuErrchk(cudaMemcpyToSymbol(device_lights_active, &(instance->lights_active), sizeof(int), 0, cudaMemcpyHostToDevice));
 }
 
+static void execute_kernels(RaytraceInstance* instance, int type) {
+  gpuErrchk(cudaMemcpyToSymbol(device_iteration_type, &(type), sizeof(int), 0, cudaMemcpyHostToDevice));
+
+  switch (type) {
+    case TYPE_CAMERA:
+    case TYPE_BOUNCE:
+      gpuErrchk(cudaMemcpyToSymbol(device_trace_tasks, &(instance->bounce_trace_gpu), sizeof(TraceTask*), 0, cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpyToSymbol(device_trace_count, &(instance->bounce_trace_count_gpu), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpyToSymbol(device_records, &(instance->bounce_records_gpu), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
+      break;
+    case TYPE_LIGHT:
+      gpuErrchk(cudaMemcpyToSymbol(device_trace_tasks, &(instance->light_trace_gpu), sizeof(TraceTask*), 0, cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpyToSymbol(device_trace_count, &(instance->light_trace_count_gpu), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
+      gpuErrchk(cudaMemcpyToSymbol(device_records, &(instance->light_records_gpu), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
+      break;
+  }
+
+  if (type != TYPE_CAMERA)
+    balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  gpuErrchk(cudaDeviceSynchronize());
+  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  gpuErrchk(cudaDeviceSynchronize());
+  postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  gpuErrchk(cudaDeviceSynchronize());
+  process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  gpuErrchk(cudaDeviceSynchronize());
+  // process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  gpuErrchk(cudaDeviceSynchronize());
+  // process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  // process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+}
+
 extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frames) {
   gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
 
   generate_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  gpuErrchk(cudaDeviceSynchronize());
 
   if (instance->shading_mode) {
     preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -344,17 +392,11 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
     process_debug_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   else {
+    execute_kernels(instance, TYPE_CAMERA);
+    execute_kernels(instance, TYPE_LIGHT);
     for (int i = 0; i < instance->max_ray_depth; i++) {
-      if (i)
-        balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      execute_kernels(instance, TYPE_BOUNCE);
+      execute_kernels(instance, TYPE_LIGHT);
     }
   }
 
@@ -368,14 +410,18 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
   gpuErrchk(cudaFree(instance->scene_gpu.nodes));
   gpuErrchk(cudaFree(instance->scene_gpu.lights));
-  gpuErrchk(cudaFree(instance->tasks_gpu));
+  gpuErrchk(cudaFree(instance->light_trace_gpu));
+  gpuErrchk(cudaFree(instance->bounce_trace_gpu));
+  gpuErrchk(cudaFree(instance->light_trace_count_gpu));
+  gpuErrchk(cudaFree(instance->bounce_trace_count_gpu));
   gpuErrchk(cudaFree(instance->trace_results_gpu));
   gpuErrchk(cudaFree(instance->task_counts_gpu));
   gpuErrchk(cudaFree(instance->task_offsets_gpu));
   gpuErrchk(cudaFree(instance->frame_buffer_gpu));
   gpuErrchk(cudaFree(instance->frame_variance_gpu));
   gpuErrchk(cudaFree(instance->frame_bias_cache_gpu));
-  gpuErrchk(cudaFree(instance->records_gpu));
+  gpuErrchk(cudaFree(instance->light_records_gpu));
+  gpuErrchk(cudaFree(instance->bounce_records_gpu));
   gpuErrchk(cudaFree(instance->randoms_gpu));
   gpuErrchk(cudaFree(instance->light_sample_history_gpu));
 }

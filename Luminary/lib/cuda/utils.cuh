@@ -52,7 +52,7 @@ struct Quaternion {
 } typedef Quaternion;
 #endif
 
-// state is first bit albedo buffer written, then 15 bits the depth and the last 16 bits the random_index
+// state is first 2 bits type, then 14 bits the depth and the last 16 bits the random_index
 
 // ray_xz is horizontal angle
 struct GeometryTask {
@@ -112,8 +112,8 @@ struct TraceResult {
 //===========================================================================================
 
 #define RANDOM_INDEX 0x0000ffff
-#define DEPTH_LEFT 0x7fff0000
-#define ALBEDO_BUFFER_STATE 0x80000000
+#define DEPTH_LEFT 0x3fff0000
+#define TASK_TYPE 0xc0000000
 #define SKY_HIT 0xffffffff
 #define OCEAN_HIT 0xfffffffe
 #define TOY_HIT 0xfffffffd
@@ -121,6 +121,9 @@ struct TraceResult {
 #define ANY_LIGHT 0xffffffff
 #define TOY_LIGHT 0x1
 #define SUN_LIGHT 0x0
+#define TYPE_CAMERA 0x0
+#define TYPE_LIGHT 0x1
+#define TYPE_BOUNCE 0x2
 
 //===========================================================================================
 // Device Variables
@@ -132,14 +135,26 @@ __constant__ Scene device_scene;
 
 __constant__ int device_pixels_per_thread;
 
-__constant__ TraceTask* device_tasks;
+__constant__ int device_iteration_type;
+
+__constant__ TraceTask* device_trace_tasks;
+
+__constant__ TraceTask* device_light_trace;
+
+__constant__ TraceTask* device_bounce_trace;
 
 __constant__ TraceResult* device_trace_results;
 
-// 0: TraceCount/GeoCount 1: OceanCount 2: SkyCount 3: ToyCount
+__constant__ uint16_t* device_trace_count;
+
+__constant__ uint16_t* device_light_trace_count;
+
+__constant__ uint16_t* device_bounce_trace_count;
+
+// 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
 __constant__ uint16_t* device_task_counts;
 
-// 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount
+// 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
 __constant__ uint16_t* device_task_offsets;
 
 __constant__ uint32_t* device_light_sample_history;
@@ -159,6 +174,10 @@ __constant__ RGBF* device_frame_variance;
 __constant__ RGBF* device_frame_bias_cache;
 
 __constant__ RGBF* device_records;
+
+__constant__ RGBF* device_light_records;
+
+__constant__ RGBF* device_bounce_records;
 
 __constant__ RGBF* device_denoiser;
 
@@ -212,8 +231,16 @@ __device__ int get_task_address(const int number) {
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
 }
 
+__device__ int get_type(const int state) {
+  return ((state & TASK_TYPE) >> 30);
+}
+
+__device__ int set_type(const int state, const int type) {
+  return (state & ~TASK_TYPE) | (type << 30);
+}
+
 __device__ int is_first_ray(const int state) {
-  return (((state & DEPTH_LEFT) >> 16) >= device_max_ray_depth);
+  return (get_type(state) == TYPE_CAMERA);
 }
 
 #endif /* CU_UTILS_H */

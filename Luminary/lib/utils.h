@@ -165,7 +165,10 @@ struct Scene {
 struct RaytraceInstance {
   unsigned int width;
   unsigned int height;
-  void* tasks_gpu;
+  void* light_trace_gpu;
+  void* bounce_trace_gpu;
+  uint16_t* light_trace_count_gpu;
+  uint16_t* bounce_trace_count_gpu;
   void* trace_results_gpu;
   void* task_counts_gpu;
   void* task_offsets_gpu;
@@ -176,7 +179,8 @@ struct RaytraceInstance {
   RGBF* frame_variance_gpu;
   RGBF* frame_bias_cache_gpu;
   RGBF* albedo_buffer_gpu;
-  RGBF* records_gpu;
+  RGBF* light_records_gpu;
+  RGBF* bounce_records_gpu;
   RGB8* buffer_8bit_gpu;
   void* albedo_atlas;
   int albedo_atlas_length;
