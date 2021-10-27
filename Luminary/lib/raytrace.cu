@@ -368,7 +368,8 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   gpuErrchk(cudaDeviceSynchronize());
   process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   gpuErrchk(cudaDeviceSynchronize());
-  // process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  gpuErrchk(cudaDeviceSynchronize());
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   gpuErrchk(cudaDeviceSynchronize());
   // process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
