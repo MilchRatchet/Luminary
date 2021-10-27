@@ -492,24 +492,37 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
         }
       }
     }
+    else if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
+      task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
+
+      record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
+      record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
+      record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
+
+      TraceTask new_task;
+      new_task.origin = task.position;
+      new_task.ray    = ray;
+      new_task.index  = task.index;
+      new_task.state  = task.state;
+
+      switch (get_type(task.state)) {
+        case TYPE_CAMERA:
+        case TYPE_BOUNCE:
+          device_bounce_records[pixel] = record;
+          store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), new_task);
+          break;
+        case TYPE_LIGHT:
+          device_light_records[pixel] = record;
+          store_trace_task(device_light_trace + get_task_address(light_trace_count++), new_task);
+          break;
+      }
+    }
     else if (get_type(task.state) != TYPE_LIGHT) {
       if (device_denoiser && is_first_ray(task.state)) {
         device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
       }
 
       uint32_t light_sample_id;
-
-      // Figure out transparency later
-      /*if (0 && sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
-        task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
-
-        record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
-        record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
-        record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
-
-        light_sample_id = device_light_sample_history[pixel];
-      }*/
-
       const vec3 V = scale_vector(ray, -1.0f);
 
       task.position = terminator;
