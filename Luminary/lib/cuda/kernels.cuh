@@ -706,11 +706,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device_task_counts[id * 5 + 1];
-  const int task_offset = device_task_offsets[id * 5 + 1];
-
-  int light_trace_count  = device_light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
-  int bounce_trace_count = device_bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count   = device_task_counts[id * 5 + 1];
+  const int task_offset  = device_task_offsets[id * 5 + 1];
+  int light_trace_count  = device_light_trace_count[id];
+  int bounce_trace_count = device_bounce_trace_count[id];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device_trace_tasks + get_task_address(task_offset + i));
@@ -824,8 +823,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
     }
   }
 
-  device_light_trace_count[threadIdx.x + blockIdx.x * blockDim.x]  = light_trace_count;
-  device_bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x] = bounce_trace_count;
+  device_light_trace_count[id]  = light_trace_count;
+  device_bounce_trace_count[id] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
@@ -915,8 +914,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
 
   const int task_count   = device_task_counts[id * 5 + 3];
   const int task_offset  = device_task_offsets[id * 5 + 3];
-  int light_trace_count  = device_light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
-  int bounce_trace_count = device_bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  int light_trace_count  = device_light_trace_count[id];
+  int bounce_trace_count = device_bounce_trace_count[id];
 
   for (int i = 0; i < task_count; i++) {
     ToyTask task    = load_toy_task(device_trace_tasks + get_task_address(task_offset + i));
@@ -1045,8 +1044,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
     }
   }
 
-  device_light_trace_count[threadIdx.x + blockIdx.x * blockDim.x]  = light_trace_count;
-  device_bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x] = bounce_trace_count;
+  device_light_trace_count[id]  = light_trace_count;
+  device_bounce_trace_count[id] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
@@ -1083,12 +1082,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
   }
 }
 
-/*__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  int trace_count       = device_task_counts[id * 5];
-  const int task_count  = device_task_counts[id * 5 + 4];
-  const int task_offset = device_task_offsets[id * 5 + 4];
+  const int task_count   = device_task_counts[id * 5 + 4];
+  const int task_offset  = device_task_offsets[id * 5 + 4];
+  int light_trace_count  = device_light_trace_count[id];
+  int bounce_trace_count = device_bounce_trace_count[id];
 
   for (int i = 0; i < task_count; i++) {
     FogTask task    = load_fog_task(device_trace_tasks + get_task_address(task_offset + i));
@@ -1106,6 +1106,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       uint32_t light_sample_id;
       Light light;
 
+      TraceTask continue_task;
+      continue_task.origin = task.position;
+      continue_task.ray    = ray;
+      continue_task.index  = task.index;
+      continue_task.state  = set_type(task.state, TYPE_BOUNCE);
+
+      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), continue_task);
+
       light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
 
       if (!light_count) {
@@ -1119,7 +1127,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       float angle  = dot_product(ray, out_ray);
       float g      = device_scene.fog.anisotropy;
 
-      float weight  = (4 * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
+      float weight  = (4.0f * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
       float density = get_fog_density(device_scene.fog.scattering, task.position.y);
       weight *= density * 0.001f;
 
@@ -1129,18 +1137,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
 
       task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      TraceTask next_task;
-      next_task.origin = task.position;
-      next_task.ray    = out_ray;
-      next_task.index  = task.index;
-      next_task.state  = task.state;
+      TraceTask light_task;
+      light_task.origin = task.position;
+      light_task.ray    = out_ray;
+      light_task.index  = task.index;
+      light_task.state  = set_type(task.state, TYPE_LIGHT);
 
-      store_trace_task(device_trace_tasks + get_task_address(trace_count++), next_task);
+      store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
     }
   }
 
-  device_task_counts[id * 5] = trace_count;
-}*/
+  device_light_trace_count[id]  = light_trace_count;
+  device_bounce_trace_count[id] = bounce_trace_count;
+}
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
