@@ -341,7 +341,7 @@ extern "C" void update_scene(RaytraceInstance* instance) {
   gpuErrchk(cudaMemcpyToSymbol(device_lights_active, &(instance->lights_active), sizeof(int), 0, cudaMemcpyHostToDevice));
 }
 
-static void execute_kernels(RaytraceInstance* instance, int type) {
+static void bind_type(RaytraceInstance* instance, int type) {
   gpuErrchk(cudaMemcpyToSymbol(device_iteration_type, &(type), sizeof(int), 0, cudaMemcpyHostToDevice));
 
   switch (type) {
@@ -357,6 +357,10 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
       gpuErrchk(cudaMemcpyToSymbol(device_records, &(instance->light_records_gpu), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
       break;
   }
+}
+
+static void execute_kernels(RaytraceInstance* instance, int type) {
+  bind_type(instance, type);
 
   if (type != TYPE_CAMERA)
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -376,6 +380,19 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   // process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
+static void execute_debug_kernels(RaytraceInstance* instance, int type) {
+  bind_type(instance, type);
+
+  preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_debug_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_debug_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_debug_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+}
+
 extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frames) {
   gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
 
@@ -383,14 +400,7 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
   gpuErrchk(cudaDeviceSynchronize());
 
   if (instance->shading_mode) {
-    preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    process_debug_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    process_debug_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    process_debug_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    execute_debug_kernels(instance, TYPE_CAMERA);
   }
   else {
     execute_kernels(instance, TYPE_CAMERA);
