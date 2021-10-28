@@ -28,7 +28,7 @@ void offline_output(RaytraceInstance* instance, clock_t time) {
       "\r                                                                                                          \rProgress: "
       "%2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
       100.0 * progress, time_elapsed, time_left,
-      0.000001 * instance->max_ray_depth * instance->width * instance->height * i / time_elapsed);
+      0.000001 * 2.0 * (1 + instance->max_ray_depth) * instance->width * instance->height * i / time_elapsed);
   }
 
   printf("\r                                                                                                              \r");
