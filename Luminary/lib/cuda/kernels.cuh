@@ -541,14 +541,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       ray = light_BRDF(light_record, normal, V, light, light_count, albedo, roughness, metallic, beta, gamma);
 
       TraceTask light_task;
-      light_task.origin                  = task.position;
-      light_task.ray                     = ray;
-      light_task.index                   = task.index;
-      light_task.state                   = set_type(task.state, TYPE_LIGHT);
-      device_light_records[pixel]        = light_record;
-      device_light_sample_history[pixel] = light_sample_id;
+      light_task.origin = task.position;
+      light_task.ray    = ray;
+      light_task.index  = task.index;
+      light_task.state  = set_type(task.state, TYPE_LIGHT);
 
-      store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+      if (light_count) {
+        device_light_records[pixel]        = light_record;
+        device_light_sample_history[pixel] = light_sample_id;
+        store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+      }
 
       RGBF bounce_record    = record;
       const float spec_prob = lerp(0.5f, 1.0f, metallic);
@@ -796,14 +798,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
       ray = light_BRDF(light_record, normal, V, light, light_count, albedo, 0.0f, 0.0f, beta, gamma);
 
       TraceTask light_task;
-      light_task.origin                  = task.position;
-      light_task.ray                     = ray;
-      light_task.index                   = task.index;
-      light_task.state                   = set_type(task.state, TYPE_LIGHT);
-      device_light_records[pixel]        = light_record;
-      device_light_sample_history[pixel] = light_sample_id;
+      light_task.origin = task.position;
+      light_task.ray    = ray;
+      light_task.index  = task.index;
+      light_task.state  = set_type(task.state, TYPE_LIGHT);
 
-      store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+      if (light_count) {
+        device_light_records[pixel]        = light_record;
+        device_light_sample_history[pixel] = light_sample_id;
+        store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+      }
 
       RGBF bounce_record = record;
 
@@ -1016,14 +1020,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       task.ray = light_BRDF(light_record, normal, V, light, light_count, albedo, roughness, metallic, beta, gamma);
 
       TraceTask light_task;
-      light_task.origin                  = task.position;
-      light_task.ray                     = task.ray;
-      light_task.index                   = task.index;
-      light_task.state                   = set_type(task.state, TYPE_LIGHT);
-      device_light_records[pixel]        = light_record;
-      device_light_sample_history[pixel] = light_sample_id;
+      light_task.origin = task.position;
+      light_task.ray    = task.ray;
+      light_task.index  = task.index;
+      light_task.state  = set_type(task.state, TYPE_LIGHT);
 
-      store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+      if (light_count) {
+        device_light_records[pixel]        = light_record;
+        device_light_sample_history[pixel] = light_sample_id;
+        store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+      }
 
       RGBF bounce_record    = record;
       const float spec_prob = lerp(0.5f, 1.0f, metallic);
