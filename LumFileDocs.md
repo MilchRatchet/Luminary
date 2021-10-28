@@ -11,7 +11,7 @@ The number of horizontal pixels used for rendering. Number must be strictly grea
 The number of vertical pixels used for rendering. Number must be strictly greater than 0.
 
 `GENERAL BOUNCES_ [INT32]`<br/>
-This number restrict the length of the path that is traced for each pixel. Number must be strictly greater than 0.
+This number restricts the number of bounces of the path that is traced for each pixel. Number must be non-negative.
 
 `GENERAL SAMPLES_ [INT32]`<br/>
 The number of samples to compute per pixel in offline mode. Number must be strictly greater than 0.
