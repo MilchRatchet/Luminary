@@ -31,8 +31,17 @@
 #define LOW_QUALITY_LONG_BOUNCES
 #define MIN_BOUNCES 1
 
+/*
+ * Define SINGLE_CONTRIBUTIONS_ONLY for the following to apply
+ *
+ * A sample exits early when light information have already been gathered
+ * This improves performance at the cost of reflections in directly lit surfaces
+ */
+#define SINGLE_CONTRIBUTION_ONLY
+
 __device__ int validate_trace_task(TraceTask task, RGBF record) {
   int valid = 1;
+
 #ifdef WEIGHT_BASED_EXIT
   const float max = fmaxf(record.r, fmaxf(record.g, record.b));
   if (
@@ -49,6 +58,15 @@ __device__ int validate_trace_task(TraceTask task, RGBF record) {
     valid = 0;
   }
 #endif
+
+#ifdef SINGLE_CONTRIBUTION_ONLY
+  {
+    RGBF color = device_frame_buffer[task.index.x + task.index.y * device_width];
+    if (luminance(color) > eps)
+      valid = 0;
+  }
+#endif
+
   return valid;
 }
 
