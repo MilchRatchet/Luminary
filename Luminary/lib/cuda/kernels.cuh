@@ -1111,13 +1111,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       uint32_t light_sample_id;
       Light light;
 
-      /*TraceTask continue_task;
+      TraceTask continue_task;
       continue_task.origin = task.position;
       continue_task.ray    = ray;
       continue_task.index  = task.index;
       continue_task.state  = task.state;
 
-      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), continue_task);*/
+      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), continue_task);
 
       light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
 
@@ -1138,7 +1138,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       weight *= light.radius * light_count;
 
       RGBF record                        = device_records[pixel];
-      device_records[pixel]              = scale_color(record, weight / light_count);
+      device_light_records[pixel]        = scale_color(record, weight);
       device_light_sample_history[pixel] = light_sample_id;
 
       task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
