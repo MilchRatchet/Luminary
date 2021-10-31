@@ -145,6 +145,13 @@ struct Fog {
   float falloff;
 } typedef Fog;
 
+struct Jitter {
+  float x;
+  float y;
+  float prev_x;
+  float prev_y;
+} typedef Jitter;
+
 struct Scene {
   Camera camera;
   Triangle* triangles;
@@ -202,6 +209,7 @@ struct RaytraceInstance {
   int snap_resolution;
   General settings;
   void* denoise_setup;
+  Jitter jitter;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \
