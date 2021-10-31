@@ -73,14 +73,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     task.index.x = (uint16_t) (pixel % device_width);
     task.index.y = (uint16_t) (pixel / device_width);
 
-    task.state = (TYPE_CAMERA << 30) | (device_max_ray_depth << 16) | (device_temporal_frames & RANDOM_INDEX);
+    task.state = (device_max_ray_depth << 16) | (device_temporal_frames & RANDOM_INDEX);
 
     task = get_starting_ray(task);
 
-    device_light_records[pixel]        = get_color(1.0f, 1.0f, 1.0f);
-    device_bounce_records[pixel]       = get_color(1.0f, 1.0f, 1.0f);
-    device_frame_buffer[pixel]         = get_color(0.0f, 0.0f, 0.0f);
-    device_light_sample_history[pixel] = ANY_LIGHT;
+    device_light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
+    device_bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
+    device_frame_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
 
     if (device_denoiser)
       device_albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
@@ -483,7 +482,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
 
         const uint32_t light = device_light_sample_history[pixel];
 
-        if (get_type(task.state) != TYPE_LIGHT || light == ANY_LIGHT || light == triangle_light_id) {
+        if (device_iteration_type != TYPE_LIGHT || light == triangle_light_id) {
           device_frame_buffer[pixel] = add_color(device_frame_buffer[pixel], emission);
         }
       }
@@ -501,7 +500,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       new_task.index  = task.index;
       new_task.state  = task.state;
 
-      switch (get_type(task.state)) {
+      switch (device_iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
           device_bounce_records[pixel] = record;
@@ -513,7 +512,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
           break;
       }
     }
-    else if (get_type(task.state) != TYPE_LIGHT) {
+    else if (device_iteration_type != TYPE_LIGHT) {
       if (device_denoiser && is_first_ray(task.state)) {
         device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
       }
@@ -540,7 +539,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       light_task.origin = task.position;
       light_task.ray    = ray;
       light_task.index  = task.index;
-      light_task.state  = set_type(task.state, TYPE_LIGHT);
+      light_task.state  = task.state;
 
       if (light_count) {
         device_light_records[pixel]        = light_record;
@@ -562,7 +561,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       bounce_task.origin = task.position;
       bounce_task.ray    = ray;
       bounce_task.index  = task.index;
-      bounce_task.state  = set_type(task.state, TYPE_BOUNCE);
+      bounce_task.state  = task.state;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
         device_bounce_records[pixel] = bounce_record;
@@ -759,7 +758,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
       new_task.index  = task.index;
       new_task.state  = task.state;
 
-      switch (get_type(task.state)) {
+      switch (device_iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
           device_bounce_records[pixel] = record;
@@ -771,7 +770,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
           break;
       }
     }
-    else if (get_type(task.state) != TYPE_LIGHT) {
+    else if (device_iteration_type != TYPE_LIGHT) {
       if (device_denoiser && is_first_ray(task.state)) {
         device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
       }
@@ -797,7 +796,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
       light_task.origin = task.position;
       light_task.ray    = ray;
       light_task.index  = task.index;
-      light_task.state  = set_type(task.state, TYPE_LIGHT);
+      light_task.state  = task.state;
 
       if (light_count) {
         device_light_records[pixel]        = light_record;
@@ -818,7 +817,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
       bounce_task.origin           = task.position;
       bounce_task.ray              = ray;
       bounce_task.index            = task.index;
-      bounce_task.state            = set_type(task.state, TYPE_BOUNCE);
+      bounce_task.state            = task.state;
       device_bounce_records[pixel] = bounce_record;
 
       store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
@@ -885,7 +884,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
 
     const uint32_t light = device_light_sample_history[pixel];
 
-    if (device_iteration_type != TYPE_LIGHT || light == ANY_LIGHT || light == 0) {
+    if (device_iteration_type != TYPE_LIGHT || light == 0) {
       device_frame_buffer[pixel] = add_color(device_frame_buffer[pixel], sky);
     }
   }
@@ -956,7 +955,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
 
         const uint32_t light = device_light_sample_history[pixel];
 
-        if (get_type(task.state) != TYPE_LIGHT || light == ANY_LIGHT || light == TOY_LIGHT) {
+        if (device_iteration_type != TYPE_LIGHT || light == TOY_LIGHT) {
           device_frame_buffer[pixel] = add_color(device_frame_buffer[pixel], emission);
         }
       }
@@ -981,7 +980,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       new_task.index  = task.index;
       new_task.state  = task.state;
 
-      switch (get_type(task.state)) {
+      switch (device_iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
           device_bounce_records[pixel] = record;
@@ -993,7 +992,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
           break;
       }
     }
-    else if (get_type(task.state) != TYPE_LIGHT) {
+    else if (device_iteration_type != TYPE_LIGHT) {
       if (device_denoiser && is_first_ray(task.state)) {
         device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
       }
@@ -1019,7 +1018,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       light_task.origin = task.position;
       light_task.ray    = task.ray;
       light_task.index  = task.index;
-      light_task.state  = set_type(task.state, TYPE_LIGHT);
+      light_task.state  = task.state;
 
       if (light_count) {
         device_light_records[pixel]        = light_record;
@@ -1041,7 +1040,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       bounce_task.origin = task.position;
       bounce_task.ray    = task.ray;
       bounce_task.index  = task.index;
-      bounce_task.state  = set_type(task.state, TYPE_BOUNCE);
+      bounce_task.state  = task.state;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
         device_bounce_records[pixel] = bounce_record;
@@ -1112,13 +1111,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       uint32_t light_sample_id;
       Light light;
 
-      TraceTask continue_task;
+      /*TraceTask continue_task;
       continue_task.origin = task.position;
       continue_task.ray    = ray;
       continue_task.index  = task.index;
-      continue_task.state  = set_type(task.state, TYPE_BOUNCE);
+      continue_task.state  = task.state;
 
-      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), continue_task);
+      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), continue_task);*/
 
       light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
 
@@ -1136,6 +1135,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       float weight  = (4.0f * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
       float density = get_fog_density(device_scene.fog.scattering, task.position.y);
       weight *= density * 0.001f;
+      weight *= light.radius * light_count;
 
       RGBF record                        = device_records[pixel];
       device_records[pixel]              = scale_color(record, weight / light_count);
@@ -1147,7 +1147,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       light_task.origin = task.position;
       light_task.ray    = out_ray;
       light_task.index  = task.index;
-      light_task.state  = set_type(task.state, TYPE_LIGHT);
+      light_task.state  = task.state;
 
       store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
     }

@@ -31,6 +31,10 @@
 // Path Tracing
 //---------------------------------
 
+/*
+ * Computes virtual lights for the sun and the toy. These lights are uploaded to index 0 and 1 of the lights GPU buffer.
+ * @param scene Scene which contains the sun and toy properties and the GPU pointer to the lights buffer.
+ */
 static void update_special_lights(const Scene scene) {
   vec3 sun;
   sun.x             = sinf(scene.sky.azimuth) * cosf(scene.sky.altitude);
@@ -89,6 +93,11 @@ static void update_jitter(RaytraceInstance* instance) {
   gpuErrchk(cudaMemcpyToSymbol(device_jitter, &(instance->jitter), sizeof(Jitter), 0, cudaMemcpyHostToDevice));
 }
 
+/*
+ * Computes a rotation quaternion from euler angles.
+ * @param rotation Euler angles defining the rotation.
+ * @result Rotation quaternion
+ */
 static Quaternion get_rotation_quaternion(const vec3 rotation) {
   const float alpha = rotation.x;
   const float beta  = rotation.y;
@@ -110,21 +119,27 @@ static Quaternion get_rotation_quaternion(const vec3 rotation) {
   return q;
 }
 
+/*
+ * Computes and uploads to GPU camera rotation quaternions and fov step increments.
+ * @param scene Scene which contains camera information.
+ * @param width Number of pixel in horizontal in internal render buffer.
+ * @param height Number of pixel in vertical in internal render buffer.
+ */
 static void update_camera_pos(const Scene scene, const unsigned int width, const unsigned int height) {
   const Quaternion q = get_rotation_quaternion(scene.camera.rotation);
   gpuErrchk(cudaMemcpyToSymbol(device_camera_rotation, &(q), sizeof(Quaternion), 0, cudaMemcpyHostToDevice));
 
-  const float step     = 2.0f * (scene.camera.fov / width);
-  const float vfov     = step * height / 2.0f;
-  const float offset_x = (step / 2.0f);
-  const float offset_y = (step / 2.0f);
+  const float step = 2.0f * (scene.camera.fov / width);
+  const float vfov = step * height / 2.0f;
 
   gpuErrchk(cudaMemcpyToSymbol(device_step, &(step), sizeof(float), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_vfov, &(vfov), sizeof(float), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_offset_x, &(offset_x), sizeof(float), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_offset_y, &(offset_y), sizeof(float), 0, cudaMemcpyHostToDevice));
 }
 
+/*
+ * Positions toy in front of the camera.
+ * @param instance RaytraceInstance to be used.
+ */
 extern "C" void center_toy_at_camera(RaytraceInstance* instance) {
   const Quaternion q = get_rotation_quaternion(instance->scene_gpu.camera.rotation);
 
@@ -140,6 +155,10 @@ extern "C" void center_toy_at_camera(RaytraceInstance* instance) {
   instance->scene_gpu.toy.position = add_vector(instance->scene_gpu.camera.pos, offset);
 }
 
+/*
+ * Allocates all pixel count related buffers.
+ * @param instance RaytraceInstance to be used.
+ */
 extern "C" void allocate_buffers(RaytraceInstance* instance) {
   const unsigned int amount = instance->width * instance->height;
 

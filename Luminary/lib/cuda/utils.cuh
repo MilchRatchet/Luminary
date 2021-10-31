@@ -52,7 +52,7 @@ struct Quaternion {
 } typedef Quaternion;
 #endif
 
-// state is first 2 bits type, then 14 bits the depth and the last 16 bits the random_index
+// state is 16 bits the depth and the last 16 bits the random_index
 
 // ray_xz is horizontal angle
 struct GeometryTask {
@@ -112,13 +112,11 @@ struct TraceResult {
 //===========================================================================================
 
 #define RANDOM_INDEX 0x0000ffff
-#define DEPTH_LEFT 0x3fff0000
-#define TASK_TYPE 0xc0000000
+#define DEPTH_LEFT 0xffff0000
 #define SKY_HIT 0xffffffff
 #define OCEAN_HIT 0xfffffffe
 #define TOY_HIT 0xfffffffd
 #define FOG_HIT 0xfffffffc
-#define ANY_LIGHT 0xffffffff
 #define TOY_LIGHT 0x1
 #define SUN_LIGHT 0x0
 #define TYPE_CAMERA 0x0
@@ -195,10 +193,6 @@ __constant__ float device_step;
 
 __constant__ float device_vfov;
 
-__constant__ float device_offset_x;
-
-__constant__ float device_offset_y;
-
 __constant__ Quaternion device_camera_rotation;
 
 __constant__ cudaTextureObject_t* device_albedo_atlas;
@@ -233,16 +227,8 @@ __device__ int get_task_address(const int number) {
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
 }
 
-__device__ int get_type(const int state) {
-  return ((state & TASK_TYPE) >> 30);
-}
-
-__device__ int set_type(const int state, const int type) {
-  return (state & ~TASK_TYPE) | (type << 30);
-}
-
 __device__ int is_first_ray(const int state) {
-  return (get_type(state) == TYPE_CAMERA);
+  return (device_iteration_type == TYPE_CAMERA);
 }
 
 #endif /* CU_UTILS_H */
