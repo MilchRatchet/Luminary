@@ -54,6 +54,41 @@ static void update_special_lights(const Scene scene) {
   gpuErrchk(cudaMemcpy(scene.lights + 1, &toy_light, sizeof(Light), cudaMemcpyHostToDevice));
 }
 
+/*
+ * Computes value in halton sequence.
+ * @param index Index in halton sequence.
+ * @param base Base of halton sequence.
+ * @result Value in halton sequence of base at index.
+ */
+static float halton(int index, int base) {
+  float fraction = 1.0f;
+  float result   = 0.0f;
+
+  while (index > 0) {
+    fraction /= base;
+    result += fraction * (index % base);
+    index = index / base;
+  }
+
+  return result;
+}
+
+/*
+ * Updates the uniform per pixel jitter. Uploads updated jitter to GPU.
+ * @param instance RaytraceInstance to be used.
+ */
+static void update_jitter(RaytraceInstance* instance) {
+  Jitter jitter;
+
+  jitter.prev_x = instance->jitter.x;
+  jitter.prev_y = instance->jitter.y;
+  jitter.x      = halton(instance->temporal_frames, 2);
+  jitter.y      = halton(instance->temporal_frames, 3);
+
+  instance->jitter = jitter;
+  gpuErrchk(cudaMemcpyToSymbol(device_jitter, &(instance->jitter), sizeof(Jitter), 0, cudaMemcpyHostToDevice));
+}
+
 static Quaternion get_rotation_quaternion(const vec3 rotation) {
   const float alpha = rotation.x;
   const float beta  = rotation.y;
@@ -170,6 +205,7 @@ extern "C" RaytraceInstance* init_raytracing(
   General general, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas, int illuminance_atlas_length, void* material_atlas,
   int material_atlas_length, Scene scene) {
   RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
+  memset(instance, 0, sizeof(RaytraceInstance));
 
   instance->width  = general.width;
   instance->height = general.height;
@@ -337,6 +373,7 @@ extern "C" void update_scene(RaytraceInstance* instance) {
   gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   update_special_lights(instance->scene_gpu);
   update_camera_pos(instance->scene_gpu, instance->width, instance->height);
+  update_jitter(instance);
   gpuErrchk(cudaMemcpyToSymbol(device_default_material, &(instance->default_material), sizeof(RGBF), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_lights_active, &(instance->lights_active), sizeof(int), 0, cudaMemcpyHostToDevice));
 }

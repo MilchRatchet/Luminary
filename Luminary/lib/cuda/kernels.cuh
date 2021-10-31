@@ -35,12 +35,8 @@
 __device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 default_ray;
 
-  const float random_offset = sample_blue_noise(task.index.x, task.index.y, task.state, 8);
-
-  default_ray.x =
-    device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * task.index.x + device_offset_x * random_offset * 2.0f);
-  default_ray.y =
-    device_scene.camera.focal_length * (device_vfov - device_step * task.index.y - device_offset_y * fractf(random_offset * 10.0f) * 2.0f);
+  default_ray.x = device_scene.camera.focal_length * (-device_scene.camera.fov + device_step * (task.index.x + device_jitter.x));
+  default_ray.y = device_scene.camera.focal_length * (device_vfov - device_step * (task.index.y + device_jitter.y));
   default_ray.z = -device_scene.camera.focal_length;
 
   const float alpha =
