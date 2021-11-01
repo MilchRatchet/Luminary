@@ -447,8 +447,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       albedo.g              = albedo_f.y;
       albedo.b              = albedo_f.z;
       albedo.a              = albedo_f.w;
-
-      albedo = saturate_albedo(albedo, 0.0f);
     }
     else {
       albedo.r = 0.9f;
