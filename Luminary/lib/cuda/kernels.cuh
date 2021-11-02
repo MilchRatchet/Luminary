@@ -269,6 +269,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     if (is_first_ray()) {
       device_world_space_hit[task.index.x + task.index.y * device_width] = add_vector(task.origin, scale_vector(task.ray, depth));
+      device_depth_buffer[task.index.x + task.index.y * device_width]    = depth;
     }
 
     if (device_scene.fog.active) {
