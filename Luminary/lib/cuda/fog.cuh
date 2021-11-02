@@ -60,4 +60,94 @@ __device__ float get_fog_density(float base_density, float height) {
   return base_density;
 }
 
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int task_count   = device_task_counts[id * 5 + 4];
+  const int task_offset  = device_task_offsets[id * 5 + 4];
+  int light_trace_count  = device_light_trace_count[id];
+  int bounce_trace_count = device_bounce_trace_count[id];
+
+  for (int i = 0; i < task_count; i++) {
+    FogTask task    = load_fog_task(device_trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    vec3 ray;
+    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+    ray.y = sinf(task.ray_y);
+    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
+    task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
+
+    if (task.state & DEPTH_LEFT) {
+      int light_count;
+      uint32_t light_sample_id;
+      Light light;
+
+      TraceTask continue_task;
+      continue_task.origin = task.position;
+      continue_task.ray    = ray;
+      continue_task.index  = task.index;
+      continue_task.state  = task.state;
+
+      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), continue_task);
+
+      light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
+
+      if (!light_count) {
+        continue;
+      }
+
+      float alpha = sample_blue_noise(task.index.x, task.index.y, task.state, 99);
+      float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 98);
+
+      vec3 out_ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
+      float angle  = dot_product(ray, out_ray);
+      float g      = device_scene.fog.anisotropy;
+
+      float weight  = (4.0f * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
+      float density = get_fog_density(device_scene.fog.scattering, task.position.y);
+      weight *= density * 0.001f;
+      weight *= light.radius * light_count;
+
+      RGBF record                        = device_records[pixel];
+      device_light_records[pixel]        = scale_color(record, weight);
+      device_light_sample_history[pixel] = light_sample_id;
+
+      task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
+
+      TraceTask light_task;
+      light_task.origin = task.position;
+      light_task.ray    = out_ray;
+      light_task.index  = task.index;
+      light_task.state  = task.state;
+
+      store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+    }
+  }
+
+  device_light_trace_count[id]  = light_trace_count;
+  device_bounce_trace_count[id] = bounce_trace_count;
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int task_count  = device_task_counts[id * 5 + 4];
+  const int task_offset = device_task_offsets[id * 5 + 4];
+
+  for (int i = 0; i < task_count; i++) {
+    FogTask task    = load_fog_task(device_trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_NORMAL) {
+      device_frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+    }
+    else if (device_shading_mode == SHADING_DEPTH) {
+      const float value          = __saturatef((1.0f / task.distance) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value, value, value);
+    }
+  }
+}
+
 #endif /* CU_FOG_H */
