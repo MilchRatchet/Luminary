@@ -220,6 +220,8 @@ struct RaytraceInstance {
   Jitter jitter;
   int accum_mode;
   vec3* world_space_hit_gpu;
+  vec3* world_space_hit_temporal_gpu;
+  float* depth_buffer_gpu;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \

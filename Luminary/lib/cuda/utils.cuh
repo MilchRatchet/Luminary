@@ -221,6 +221,10 @@ __device__ Mat4x4 device_projection;
 
 __constant__ vec3* device_world_space_hit;
 
+__constant__ vec3* device_world_space_hit_temporal;
+
+__constant__ float* device_depth_buffer;
+
 //===========================================================================================
 // Functions
 //===========================================================================================

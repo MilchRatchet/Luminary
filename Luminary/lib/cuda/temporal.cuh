@@ -1,6 +1,12 @@
 #include "image.h"
 #include "utils.cuh"
 
+__device__ int world_space_discrepancy(vec3 hit, vec3 hit_prev, float depth) {
+  float dist = get_length(sub_vector(hit, hit_prev));
+
+  return (dist > 0.1f * depth);
+}
+
 __global__ void temporal_accumulation() {
   int offset = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -70,6 +76,7 @@ __global__ void temporal_reprojection() {
   for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
     RGBF buffer = device_frame_buffer[offset];
     vec3 hit    = device_world_space_hit[offset];
+    float depth = device_depth_buffer[offset];
 
     vec4 pos;
     pos.x = hit.x;
@@ -104,16 +111,24 @@ __global__ void temporal_reprojection() {
         if (x < 0 || x >= device_width || y < 0 || y >= device_height)
           continue;
 
+        vec3 prev_hit = device_world_space_hit_temporal[y * device_width + x];
+
+        if (world_space_discrepancy(hit, prev_hit, depth))
+          continue;
+
         const float weight = ((i == 0) ? (1.0f - w.x) : w.x) * ((j == 0) ? (1.0f - w.y) : w.y);
 
-        temporal = add_color(temporal, scale_color(device_frame_temporal[y * device_width + x], weight));
+        RGBF prev_color = device_frame_temporal[y * device_width + x];
+
+        temporal = add_color(temporal, scale_color(prev_color, weight));
         sum_weights += weight;
       }
     }
 
     if (sum_weights > 0.01f) {
-      temporal    = scale_color(temporal, 1.0f / sum_weights);
-      float alpha = 0.01f;
+      temporal = scale_color(temporal, 1.0f / sum_weights);
+
+      float alpha = 0.05f;
       buffer      = add_color(scale_color(buffer, alpha), scale_color(temporal, 1.0f - alpha));
     }
 
