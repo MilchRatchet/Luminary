@@ -247,6 +247,7 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->scene_gpu    = scene;
   instance->settings     = general;
   instance->shading_mode = 0;
+  instance->accum_mode   = TEMPORAL_ACCUMULATION;
 
   gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene.materials_length));
   gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length));
@@ -464,7 +465,21 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
     }
   }
 
-  finalize_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  switch (instance->accum_mode) {
+    case NO_ACCUMULATION:
+      gpuErrchk(cudaMemcpy(
+        instance->frame_output_gpu, instance->frame_buffer_gpu, sizeof(RGBF) * instance->width * instance->height,
+        cudaMemcpyDeviceToDevice));
+      break;
+    case TEMPORAL_ACCUMULATION:
+      temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+      break;
+    case TEMPORAL_REPROJECTION:
+      break;
+    default:
+      break;
+  }
+
   gpuErrchk(cudaDeviceSynchronize());
 }
 

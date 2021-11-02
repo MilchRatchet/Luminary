@@ -60,6 +60,13 @@
 #define SNAP_RESOLUTION_RENDER 1
 #endif
 
+#ifndef LUMINARY_ACCUM_MODES
+#define LUMINARY_ACCUM_MODES
+#define NO_ACCUMULATION 0
+#define TEMPORAL_ACCUMULATION 1
+#define TEMPORAL_REPROJECTION 2
+#endif
+
 struct General {
   int width;
   int height;
@@ -210,6 +217,7 @@ struct RaytraceInstance {
   General settings;
   void* denoise_setup;
   Jitter jitter;
+  int accum_mode;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \

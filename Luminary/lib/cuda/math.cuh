@@ -279,6 +279,16 @@ __device__ RGBF add_color(const RGBF a, const RGBF b) {
   return result;
 }
 
+__device__ RGBF sub_color(const RGBF a, const RGBF b) {
+  RGBF result;
+
+  result.r = a.r - b.r;
+  result.g = a.g - b.g;
+  result.b = a.b - b.b;
+
+  return result;
+}
+
 __device__ RGBF mul_color(const RGBF a, const RGBF b) {
   RGBF result;
 
