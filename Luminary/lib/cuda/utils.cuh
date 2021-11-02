@@ -165,6 +165,8 @@ __constant__ int device_lights_active;
 
 __constant__ RGBF* device_frame_buffer;
 
+__constant__ RGBF* device_frame_temporal;
+
 __constant__ RGBF* device_frame_output;
 
 __constant__ RGBF* device_frame_variance;
@@ -213,6 +215,12 @@ __constant__ RGBF* device_bloom_scratch;
 
 __constant__ Jitter device_jitter;
 
+__device__ Mat4x4 device_view_space;
+
+__device__ Mat4x4 device_projection;
+
+__constant__ vec3* device_world_space_hit;
+
 //===========================================================================================
 // Functions
 //===========================================================================================
@@ -227,7 +235,7 @@ __device__ int get_task_address(const int number) {
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
 }
 
-__device__ int is_first_ray(const int state) {
+__device__ int is_first_ray() {
   return (device_iteration_type == TYPE_CAMERA);
 }
 

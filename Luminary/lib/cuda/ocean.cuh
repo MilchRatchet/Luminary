@@ -174,7 +174,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
     if (device_scene.ocean.emissive) {
       RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
 
-      if (device_denoiser && is_first_ray(task.state)) {
+      if (device_denoiser && is_first_ray()) {
         device_albedo_buffer[pixel] = emission;
       }
 
@@ -216,7 +216,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {
-      if (device_denoiser && is_first_ray(task.state)) {
+      if (device_denoiser && is_first_ray()) {
         device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
       }
 

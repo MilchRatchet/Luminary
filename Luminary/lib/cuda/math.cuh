@@ -259,6 +259,17 @@ __device__ __host__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quatern
   return result;
 }
 
+__device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
+  vec4 res;
+
+  res.x = m.f11 * p.x + m.f12 * p.y + m.f13 * p.z + m.f14 * p.w;
+  res.y = m.f21 * p.x + m.f22 * p.y + m.f23 * p.z + m.f24 * p.w;
+  res.z = m.f31 * p.x + m.f32 * p.y + m.f33 * p.z + m.f34 * p.w;
+  res.w = m.f41 * p.x + m.f42 * p.y + m.f43 * p.z + m.f44 * p.w;
+
+  return res;
+}
+
 __device__ RGBF get_color(const float r, const float g, const float b) {
   RGBF result;
 

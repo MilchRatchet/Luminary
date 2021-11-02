@@ -136,7 +136,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     float depth     = device_scene.camera.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
 
-    if (device_scene.fog.active && is_first_ray(task.state)) {
+    if (device_scene.fog.active && is_first_ray()) {
       const float fog_dist = get_intersection_fog(task.origin, task.ray, sample_blue_noise(task.index.x, task.index.y, 256, 169));
 
       if (fog_dist < depth) {
@@ -266,6 +266,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     const float depth     = result.x;
     const uint32_t hit_id = float_as_uint(result.y);
+
+    if (is_first_ray()) {
+      device_world_space_hit[task.index.x + task.index.y * device_width] = add_vector(task.origin, scale_vector(task.ray, depth));
+    }
 
     if (device_scene.fog.active) {
       float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
