@@ -16,7 +16,7 @@ extern "C" {
 void initialize_device();
 RaytraceInstance* init_raytracing(
   General general, void* albedo_atlas, int albedo_atlas_length, void* illuminance_atlas, int illuminance_atlas_length, void* material_atlas,
-  int material_atlas_length, Scene scene);
+  int material_atlas_length, Scene scene, RGBF default_material);
 void reset_raytracing(RaytraceInstance* instance);
 void allocate_buffers(RaytraceInstance* instance);
 void prepare_trace(RaytraceInstance* instance);
