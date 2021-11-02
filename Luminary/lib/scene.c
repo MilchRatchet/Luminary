@@ -543,7 +543,7 @@ RaytraceInstance* load_scene(const char* filename) {
 
   RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
-    content.material_maps_length, scene);
+    content.material_maps_length, scene, (RGBF){.r = 0.3f, .g = 0.0f, .b = 1.0f});
 
   free_wavefront_content(content);
   free_scene(scene);
@@ -586,7 +586,7 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
-    content.material_maps_length, scene);
+    content.material_maps_length, scene, (RGBF){.r = 0.3f, .g = 0.0f, .b = 1.0f});
 
   free_wavefront_content(content);
   free_scene(scene);
