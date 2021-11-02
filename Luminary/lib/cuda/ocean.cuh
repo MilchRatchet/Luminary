@@ -147,4 +147,170 @@ __device__ float get_intersection_ocean(const vec3 origin, const vec3 ray, float
   return mid;
 }
 
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int task_count   = device_task_counts[id * 5 + 1];
+  const int task_offset  = device_task_offsets[id * 5 + 1];
+  int light_trace_count  = device_light_trace_count[id];
+  int bounce_trace_count = device_bounce_trace_count[id];
+
+  for (int i = 0; i < task_count; i++) {
+    OceanTask task  = load_ocean_task(device_trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    vec3 ray;
+    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+    ray.y = sinf(task.ray_y);
+    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
+    task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
+
+    const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+
+    RGBAF albedo = device_scene.ocean.albedo;
+    RGBF record  = device_records[pixel];
+
+    if (device_scene.ocean.emissive) {
+      RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
+
+      if (device_denoiser && is_first_ray(task.state)) {
+        device_albedo_buffer[pixel] = emission;
+      }
+
+      if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
+        emission.r *= 2.0f * record.r;
+        emission.g *= 2.0f * record.g;
+        emission.b *= 2.0f * record.b;
+
+        device_frame_buffer[pixel] = emission;
+      }
+    }
+    else if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
+      task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
+
+      record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
+      record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
+      record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
+
+      const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
+
+      ray = refraction_BRDF(record, normal, ray, 0.0f, refraction_index, 0.0f, 0.0f);
+
+      TraceTask new_task;
+      new_task.origin = task.position;
+      new_task.ray    = ray;
+      new_task.index  = task.index;
+      new_task.state  = task.state;
+
+      switch (device_iteration_type) {
+        case TYPE_CAMERA:
+        case TYPE_BOUNCE:
+          device_bounce_records[pixel] = record;
+          store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), new_task);
+          break;
+        case TYPE_LIGHT:
+          device_light_records[pixel] = record;
+          store_trace_task(device_light_trace + get_task_address(light_trace_count++), new_task);
+          break;
+      }
+    }
+    else if (device_iteration_type != TYPE_LIGHT) {
+      if (device_denoiser && is_first_ray(task.state)) {
+        device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
+      }
+
+      uint32_t light_sample_id;
+      const vec3 V = scale_vector(ray, -1.0f);
+
+      task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
+      task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
+
+      int light_count;
+      Light light;
+      light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
+
+      const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
+      const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
+
+      RGBF light_record = record;
+
+      ray = light_BRDF(light_record, normal, V, light, light_count, albedo, 0.0f, 0.0f, beta, gamma);
+
+      TraceTask light_task;
+      light_task.origin = task.position;
+      light_task.ray    = ray;
+      light_task.index  = task.index;
+      light_task.state  = task.state;
+
+      if (light_count) {
+        device_light_records[pixel]        = light_record;
+        device_light_sample_history[pixel] = light_sample_id;
+        store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+      }
+
+      RGBF bounce_record = record;
+
+      if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < 0.5f) {
+        ray = specular_BRDF(bounce_record, normal, V, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
+      }
+      else {
+        ray = diffuse_BRDF(bounce_record, normal, V, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
+      }
+
+      TraceTask bounce_task;
+      bounce_task.origin           = task.position;
+      bounce_task.ray              = ray;
+      bounce_task.index            = task.index;
+      bounce_task.state            = task.state;
+      device_bounce_records[pixel] = bounce_record;
+
+      store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+    }
+  }
+
+  device_light_trace_count[id]  = light_trace_count;
+  device_bounce_trace_count[id] = bounce_trace_count;
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int task_count  = device_task_counts[id * 5 + 1];
+  const int task_offset = device_task_offsets[id * 5 + 1];
+
+  for (int i = 0; i < task_count; i++) {
+    OceanTask task  = load_ocean_task(device_trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device_width + task.index.x;
+
+    if (device_shading_mode == SHADING_ALBEDO) {
+      RGBAF albedo               = device_scene.ocean.albedo;
+      device_frame_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
+    }
+    else if (device_shading_mode == SHADING_DEPTH) {
+      const float value          = __saturatef((1.0f / task.distance) * 2.0f);
+      device_frame_buffer[pixel] = get_color(value, value, value);
+    }
+    else if (device_shading_mode == SHADING_NORMAL) {
+      vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+
+      normal.x = 0.5f * normal.x + 0.5f;
+      normal.y = 0.5f * normal.y + 0.5f;
+      normal.z = 0.5f * normal.z + 0.5f;
+
+      device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+    }
+    else if (device_shading_mode == SHADING_WIREFRAME) {
+      int a = fabsf(floorf(task.position.x) - task.position.x) < 0.001f;
+      int b = fabsf(floorf(task.position.z) - task.position.z) < 0.001f;
+      int c = fabsf(ceilf(task.position.x) - task.position.x) < 0.001f;
+      int d = fabsf(ceilf(task.position.z) - task.position.z) < 0.001f;
+
+      float light = (a || b || c || d) ? 1.0f : 0.0f;
+
+      device_frame_buffer[pixel] = get_color(0.0f, 0.5f * light, light);
+    }
+  }
+}
+
 #endif /* CU_OCEAN_H */

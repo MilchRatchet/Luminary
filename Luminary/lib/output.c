@@ -18,7 +18,7 @@
 
 void offline_output(RaytraceInstance* instance, clock_t time) {
   clock_t start_of_rt = clock();
-  update_scene(instance);
+  prepare_trace(instance);
   for (int i = 0; i < instance->offline_samples; i++) {
     trace_scene(instance, i);
     const double progress     = ((double) i) / instance->offline_samples;
@@ -149,7 +149,7 @@ void realtime_output(RaytraceInstance* instance) {
     SDL_Event event;
 
     start_frametime(&frametime_trace);
-    update_scene(instance);
+    prepare_trace(instance);
     trace_scene(instance, instance->temporal_frames);
     sample_frametime(&frametime_trace);
 

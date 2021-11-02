@@ -277,7 +277,7 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->use_denoiser  = general.denoiser;
   instance->lights_active = (scene.sky.altitude < 0.0f);
 
-  update_scene(instance);
+  prepare_trace(instance);
   allocate_bloom_mips(instance);
   allocate_buffers(instance);
 
@@ -315,7 +315,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
 
   allocate_buffers(instance);
   allocate_bloom_mips(instance);
-  update_scene(instance);
+  prepare_trace(instance);
 
   if (instance->denoiser)
     instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
@@ -387,7 +387,11 @@ extern "C" void free_textures_atlas(void* texture_atlas, const int textures_leng
   free(textures_cpu);
 }
 
-extern "C" void update_scene(RaytraceInstance* instance) {
+/*
+ * Updates and uploades all dynamic data. Must be called at least once before using trace.
+ * @param instance RaytraceInstance to be used.
+ */
+extern "C" void prepare_trace(RaytraceInstance* instance) {
   gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   update_special_lights(instance->scene_gpu);
