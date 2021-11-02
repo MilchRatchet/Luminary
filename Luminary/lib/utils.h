@@ -189,6 +189,7 @@ struct RaytraceInstance {
   uint32_t* light_sample_history_gpu;
   RGBF* frame_final_gpu;
   RGBF* frame_output_gpu;
+  RGBF* frame_temporal_gpu;
   RGBF* frame_buffer_gpu;
   RGBF* frame_variance_gpu;
   RGBF* frame_bias_cache_gpu;
@@ -218,6 +219,7 @@ struct RaytraceInstance {
   void* denoise_setup;
   Jitter jitter;
   int accum_mode;
+  vec3* world_space_hit_gpu;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \
