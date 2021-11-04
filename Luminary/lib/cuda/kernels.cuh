@@ -268,7 +268,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     const uint32_t hit_id = float_as_uint(result.y);
 
     if (is_first_ray()) {
-      device_world_space_hit[task.index.x + task.index.y * device_width] = add_vector(task.origin, scale_vector(task.ray, depth));
+      device_world_space_hit[task.index.x + task.index.y * device_width] = task.ray;
       device_depth_buffer[task.index.x + task.index.y * device_width]    = depth;
     }
 
