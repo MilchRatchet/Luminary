@@ -320,6 +320,26 @@ __device__ RGBF scale_color(const RGBF a, const float b) {
   return result;
 }
 
+__device__ RGBF min_color(const RGBF a, const RGBF b) {
+  RGBF result;
+
+  result.r = fminf(a.r, b.r);
+  result.g = fminf(a.g, b.g);
+  result.b = fminf(a.b, b.b);
+
+  return result;
+}
+
+__device__ RGBF max_color(const RGBF a, const RGBF b) {
+  RGBF result;
+
+  result.r = fmaxf(a.r, b.r);
+  result.g = fmaxf(a.g, b.g);
+  result.b = fmaxf(a.b, b.b);
+
+  return result;
+}
+
 __device__ float get_dithering(const int x, const int y) {
   const float dither = 2.0f * sample_blue_noise(x, y, 0, 0) - 1.0f;
 
