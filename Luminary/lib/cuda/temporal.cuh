@@ -155,8 +155,6 @@ __global__ void temporal_reprojection() {
 
     RGBF sum_color      = get_color(0.0f, 0.0f, 0.0f);
     float sum_weights   = 0.0f;
-    RGBF moment1        = get_color(0.0f, 0.0f, 0.0f);
-    RGBF moment2        = get_color(0.0f, 0.0f, 0.0f);
     float closest_depth = FLT_MAX;
 
     for (int i = -1; i <= -1; i++) {
@@ -171,20 +169,17 @@ __global__ void temporal_reprojection() {
         sum_color = add_color(sum_color, scale_color(color, weight));
         sum_weights += weight;
 
-        moment1 = add_color(moment1, color);
-        moment2 = add_color(moment2, mul_color(color, color));
+        TraceResult trace = device_trace_result_buffer[x + y * device_width];
 
-        float depth = device_depth_buffer[x + y * device_width];
-
-        if (depth < closest_depth) {
-          closest_depth = depth;
+        if (trace.depth < closest_depth) {
+          closest_depth = trace.depth;
         }
       }
     }
 
     RGBF output = scale_color(sum_color, 1.0f / sum_weights);
 
-    vec3 hit = add_vector(device_scene.camera.pos, scale_vector(device_world_space_hit[offset], closest_depth));
+    vec3 hit = add_vector(device_scene.camera.pos, scale_vector(device_raydir_buffer[offset], closest_depth));
 
     vec4 pos;
     pos.x = hit.x;
@@ -209,10 +204,13 @@ __global__ void temporal_reprojection() {
     if (prev_x >= 0 && prev_x < device_width && prev_y >= 0 && prev_y < device_height) {
       RGBF temporal = sample_pixel_catmull_rom(device_frame_temporal, prev_pixel.x, prev_pixel.y, device_width, device_height);
 
-      float alpha = 0.01f;
+      float alpha = 0.15f;
       output      = add_color(scale_color(output, alpha), scale_color(temporal, 1.0f - alpha));
     }
 
     device_frame_output[offset] = output;
+
+    // Interesting motion vector visualization
+    // device_frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));
   }
 }
