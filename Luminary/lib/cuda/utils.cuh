@@ -219,11 +219,11 @@ __device__ Mat4x4 device_view_space;
 
 __device__ Mat4x4 device_projection;
 
-__constant__ vec3* device_world_space_hit;
+__constant__ vec3* device_raydir_buffer;
 
-__constant__ vec3* device_world_space_hit_temporal;
+__constant__ TraceResult* device_trace_result_buffer;
 
-__constant__ float* device_depth_buffer;
+__constant__ TraceResult* device_trace_result_temporal;
 
 //===========================================================================================
 // Functions

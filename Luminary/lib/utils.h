@@ -219,9 +219,9 @@ struct RaytraceInstance {
   void* denoise_setup;
   Jitter jitter;
   int accum_mode;
-  vec3* world_space_hit_gpu;
-  vec3* world_space_hit_temporal_gpu;
-  float* depth_buffer_gpu;
+  vec3* raydir_buffer_gpu;
+  void* trace_result_buffer_gpu;
+  void* trace_result_temporal_gpu;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \
