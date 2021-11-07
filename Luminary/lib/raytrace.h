@@ -20,7 +20,7 @@ RaytraceInstance* init_raytracing(
 void reset_raytracing(RaytraceInstance* instance);
 void allocate_buffers(RaytraceInstance* instance);
 void prepare_trace(RaytraceInstance* instance);
-void update_projection_matrix(RaytraceInstance* instance);
+void update_temporal_matrix(RaytraceInstance* instance);
 void center_toy_at_camera(RaytraceInstance* instance);
 void trace_scene(RaytraceInstance* instance, const int temporal_frames);
 void apply_bloom(RaytraceInstance* instance, RGBF* image);
