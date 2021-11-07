@@ -10,6 +10,7 @@
 #include <thread>
 
 #include "SDL/SDL.h"
+#include "config.h"
 #include "cuda/bloom.cuh"
 #include "cuda/brdf.cuh"
 #include "cuda/bvh.cuh"
@@ -442,6 +443,8 @@ extern "C" void initialize_device() {
   cudaGetDeviceProperties(&prop, 0);
 
   print_info("Luminary - %s", prop.name);
+  print_info("[%s] %s", LUMINARY_BRANCH_NAME, LUMINARY_VERSION_DATE);
+  print_info("Compiled using %s on %s", LUMINARY_COMPILER, LUMINARY_OS);
   print_info("Copyright (c) 2021 MilchRatchet");
 }
 
