@@ -60,6 +60,7 @@ static int magic(char* path) {
     case 'd':
       return BAKED_FILE;
     default:
+      warn_message("Input file (%s) is of unknown type ending with %c. Assuming *.lum file.", path, last_char);
       return LUM_FILE;
   }
 }

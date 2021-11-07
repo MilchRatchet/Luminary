@@ -115,5 +115,5 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
   gpuErrchk(cudaFree((void*) denoiserState));
   gpuErrchk(cudaFree((void*) denoiserScratch));
 
-  bench_toc("Optix Denoiser.");
+  bench_toc("Optix Denoiser");
 }

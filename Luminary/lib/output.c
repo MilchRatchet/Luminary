@@ -36,7 +36,7 @@ void offline_output(RaytraceInstance* instance, clock_t time) {
 
   printf("\r                                                                                                              \r");
 
-  bench_toc("Raytracing.");
+  bench_toc("Raytracing");
 
   free_inputs(instance);
 
