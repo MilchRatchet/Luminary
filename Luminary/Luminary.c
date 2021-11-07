@@ -6,6 +6,7 @@
 #include "lib/baked.h"
 #include "lib/bench.h"
 #include "lib/error.h"
+#include "lib/log.h"
 #include "lib/output.h"
 #include "lib/raytrace.h"
 #include "lib/scene.h"
@@ -64,6 +65,8 @@ static int magic(char* path) {
 }
 
 int main(int argc, char* argv[]) {
+  init_log();
+
   initialize_device();
 
   assert(argc >= 2, "No scene description was given!", 1);
@@ -100,7 +103,7 @@ int main(int argc, char* argv[]) {
       break;
   }
 
-  printf("[%.3fs] Instance set up.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+  info_message("Instance set up.");
 
   if (offline) {
     offline_output(instance, time);
@@ -112,7 +115,9 @@ int main(int argc, char* argv[]) {
   free_atlases(instance);
   free_outputs(instance);
 
-  printf("[%.3fs] Instance freed.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+  info_message("Instance freed.");
+
+  write_log();
 
   return 0;
 }

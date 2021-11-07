@@ -7,6 +7,7 @@
 
 #include "bench.h"
 #include "error.h"
+#include "log.h"
 #include "texture.h"
 #include "zlib/zlib.h"
 
@@ -244,7 +245,7 @@ static inline TextureRGBA default_texture() {
 }
 
 static inline TextureRGBA default_failure() {
-  print_error("File content is corrupted!");
+  error_message("File content is corrupted!");
   return default_texture();
 }
 
@@ -460,12 +461,12 @@ TextureRGBA load_texture_from_png(const char* filename) {
   fopen_s(&file, filename, "rb");
 
   if (!file) {
-    print_error("File could not be opened!");
+    error_message("File could not be opened!");
     return default_texture();
   }
 
   if (verify_header(file)) {
-    print_error("File header does not correspond to png!");
+    error_message("File header does not correspond to png!");
     fclose(file);
     return default_texture();
   }
@@ -473,7 +474,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
   uint8_t* IHDR = (uint8_t*) malloc(25);
 
   if (IHDR == (uint8_t*) 0) {
-    print_error("Failed to allocate memory!");
+    error_message("Failed to allocate memory!");
     fclose(file);
     return default_texture();
   }
@@ -500,28 +501,28 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   if (color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA && color_type != PNG_COLORTYPE_TRUECOLOR) {
     free(IHDR);
-    print_error("Texture is not in RGB/RGBA format!");
+    error_message("Texture is not in RGB/RGBA format!");
     fclose(file);
     return default_texture();
   }
 
   if (bit_depth != PNG_BITDEPTH_8) {
     free(IHDR);
-    print_error("Texture does not have 8 bit depth!");
+    error_message("Texture does not have 8 bit depth!");
     fclose(file);
     return default_texture();
   }
 
   if (interlace_type == PNG_INTERLACE_ADAM7) {
     free(IHDR);
-    print_error("Interlaced textures are not supported!");
+    error_message("Interlaced textures are not supported!");
     fclose(file);
     return default_texture();
   }
 
   if ((uint32_t) crc32(0, IHDR + 4, 17) != read_int_big_endian(IHDR + 21)) {
     free(IHDR);
-    print_error("Texture is corrupted!");
+    error_message("Texture is corrupted!");
     fclose(file);
     return default_failure();
   }
@@ -535,7 +536,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
   uint8_t* chunk = (uint8_t*) malloc(8);
 
   if (chunk == (uint8_t*) 0) {
-    print_error("Failed to allocate memory!");
+    error_message("Failed to allocate memory!");
     return default_texture();
   }
 
@@ -601,7 +602,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
   uint8_t* buffer_address = line_buffer;
 
   if (line_buffer == (uint8_t*) 0) {
-    print_error("Failed to allocate memory!");
+    error_message("Failed to allocate memory!");
     free(data);
     free(filtered_data);
     return default_texture();

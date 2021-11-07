@@ -726,11 +726,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
     fragments_length        = fragments_buffer_count;
     fragments_buffer        = _mm_malloc(sizeof(fragment) * fragments_length * 2, 64);
     fragments_buffer_length = fragments_length * 2;
-
-    printf("\r                                                      \rBVH Nodes: %d", write_ptr);
   }
-
-  printf("\r                                                      \r");
 
   node_count = write_ptr;
 
@@ -1146,8 +1142,6 @@ Node8* collapse_bvh(
   _mm_free(new_triangles);
 
   node_count = write_ptr;
-
-  printf("\r                                                         \r");
 
   nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
 

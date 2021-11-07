@@ -2,6 +2,8 @@
 
 #include <stdio.h>
 
+#include "log.h"
+
 #define TTF_FONT_LOCATION "LuminaryFont.ttf"
 
 void init_text(UI* ui) {
@@ -9,11 +11,9 @@ void init_text(UI* ui) {
   ui->font = TTF_OpenFont(TTF_FONT_LOCATION, 20);
 
   if (!ui->font) {
-    printf(
+    crash_message(
       "LuminaryFont.ttf was not found. Make sure it resides in the same folder as the "
-      "executable!\n");
-    system("Pause");
-    exit(1);
+      "executable!");
   }
 }
 

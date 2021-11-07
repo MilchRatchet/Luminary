@@ -9,14 +9,17 @@
 
 #include "SDL/SDL.h"
 #include "UI/UI.h"
+#include "bench.h"
 #include "denoiser.h"
 #include "frametime.h"
+#include "log.h"
 #include "png.h"
 #include "raytrace.h"
 #include "realtime.h"
 #include "utils.h"
 
 void offline_output(RaytraceInstance* instance, clock_t time) {
+  bench_tic();
   clock_t start_of_rt = clock();
   prepare_trace(instance);
   for (int i = 0; i < instance->offline_samples; i++) {
@@ -33,13 +36,12 @@ void offline_output(RaytraceInstance* instance, clock_t time) {
 
   printf("\r                                                                                                              \r");
 
-  printf("[%.3fs] Raytracing done.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
+  bench_toc("Raytracing.");
 
   free_inputs(instance);
 
   if (instance->denoiser) {
     denoise_with_optix(instance);
-    printf("[%.3fs] Applied Optix Denoiser.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
   }
 
   if (instance->scene_gpu.camera.bloom)
@@ -51,11 +53,11 @@ void offline_output(RaytraceInstance* instance, clock_t time) {
 
   store_XRGB8_png(instance->settings.output_path, frame, instance->width, instance->height);
 
-  printf("[%.3fs] PNG file created.\n", ((double) (clock() - time)) / CLOCKS_PER_SEC);
-
   free(frame);
 
-  printf("[Done] Luminary can now be closed.\n");
+  info_message("PNG file created.");
+
+  info_message("Luminary can now be closed.");
   system("Pause");
 }
 
