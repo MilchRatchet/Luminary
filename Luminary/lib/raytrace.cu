@@ -59,10 +59,10 @@ static void update_special_lights(const Scene scene) {
 }
 
 /*
- * Computes view space matrix.
+ * Computes matrices used for temporal reprojection.
  * @param instance RaytraceInstance to be used.
  */
-extern "C" void update_projection_matrix(RaytraceInstance* instance) {
+extern "C" void update_temporal_matrix(RaytraceInstance* instance) {
   Quaternion q;
   gpuErrchk(cudaMemcpyFromSymbol(&q, device_camera_rotation, sizeof(Quaternion), 0, cudaMemcpyDeviceToHost));
 
@@ -87,6 +87,22 @@ extern "C" void update_projection_matrix(RaytraceInstance* instance) {
   mat.f44 = 1.0f;
 
   gpuErrchk(cudaMemcpyToSymbol(device_view_space, &(mat), sizeof(Mat4x4), 0, cudaMemcpyHostToDevice));
+
+  const float step = 2.0f * (instance->scene_gpu.camera.fov / instance->width);
+  const float vfov = step * instance->height / 2.0f;
+
+  memset(&mat, 0, sizeof(Mat4x4));
+
+  const float z_far  = instance->scene_gpu.camera.far_clip_distance;
+  const float z_near = 1.0f;
+
+  mat.f11 = 1.0f / instance->scene_gpu.camera.fov;
+  mat.f22 = 1.0f / vfov;
+  mat.f33 = -(z_far + z_near) / (z_far - z_near);
+  mat.f43 = -1.0f;
+  mat.f34 = -(2.0f * z_far * z_near) / (z_far - z_near);
+
+  gpuErrchk(cudaMemcpyToSymbol(device_projection, &(mat), sizeof(Mat4x4), 0, cudaMemcpyHostToDevice));
 }
 
 /*
@@ -162,20 +178,6 @@ static void update_camera_pos(const Scene scene, const unsigned int width, const
 
   const float step = 2.0f * (scene.camera.fov / width);
   const float vfov = step * height / 2.0f;
-
-  Mat4x4 mat;
-  memset(&mat, 0, sizeof(Mat4x4));
-
-  const float z_far  = scene.camera.far_clip_distance;
-  const float z_near = 1.0f;
-
-  mat.f11 = 1.0f / scene.camera.fov;
-  mat.f22 = 1.0f / vfov;
-  mat.f33 = -(z_far + z_near) / (z_far - z_near);
-  mat.f43 = -1.0f;
-  mat.f34 = -(2.0f * z_far * z_near) / (z_far - z_near);
-
-  gpuErrchk(cudaMemcpyToSymbol(device_projection, &(mat), sizeof(Mat4x4), 0, cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMemcpyToSymbol(device_step, &(step), sizeof(float), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_vfov, &(vfov), sizeof(float), 0, cudaMemcpyHostToDevice));
@@ -337,6 +339,7 @@ extern "C" RaytraceInstance* init_raytracing(
   allocate_buffers(instance);
   allocate_bloom_mips(instance);
   prepare_trace(instance);
+  update_temporal_matrix(instance);
 
   instance->snap_resolution = SNAP_RESOLUTION_RENDER;
 
@@ -377,6 +380,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   allocate_buffers(instance);
   allocate_bloom_mips(instance);
   prepare_trace(instance);
+  update_temporal_matrix(instance);
 
   if (instance->denoiser)
     instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
@@ -542,7 +546,7 @@ extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frame
         instance->frame_temporal_gpu, instance->frame_output_gpu, sizeof(RGBF) * instance->width * instance->height,
         cudaMemcpyDeviceToDevice));
       temporal_reprojection<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      update_projection_matrix(instance);
+      update_temporal_matrix(instance);
       break;
     default:
       break;
