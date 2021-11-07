@@ -60,8 +60,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     device_light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
     device_bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
     device_frame_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
+    device_state_buffer[pixel]   = 0;
 
-    if (device_denoiser)
+    if (device_denoiser && !device_temporal_frames)
       device_albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
 
     store_trace_task(device_bounce_trace + get_task_address(offset++), task);

@@ -222,6 +222,7 @@ struct RaytraceInstance {
   vec3* raydir_buffer_gpu;
   void* trace_result_buffer_gpu;
   void* trace_result_temporal_gpu;
+  uint8_t* state_buffer_gpu;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \
