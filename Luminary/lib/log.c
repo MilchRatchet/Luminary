@@ -35,6 +35,9 @@ static void enable_windows_virtual_terminal_sequence() {
 #define enable_windows_virtual_terminal_sequence()
 #endif /* _WIN32 */
 
+/*
+ * Initializes all log functionalities. Using logs before calling this function results in undefined behaviour.
+ */
 void init_log() {
   log_buffer        = malloc(8192);
   log_buffer_offset = 0;
@@ -46,6 +49,9 @@ void init_log() {
   enable_windows_virtual_terminal_sequence();
 }
 
+/*
+ * Writes the log to a file.
+ */
 void write_log() {
   FILE* file;
   fopen_s(&file, "luminary.log", "wb");
@@ -112,6 +118,11 @@ static void write_to_log_buffer(int size) {
   log_buffer[log_buffer_offset++] = '\n';
 }
 
+/*
+ * Writes a message to log only.
+ * @param format Message which may contain format specifiers.
+ * @param ... Additional arguments to replace the format speciefiers.
+ */
 void print_log(const char* format, ...) {
   va_list args;
   va_start(args, format);
@@ -120,6 +131,11 @@ void print_log(const char* format, ...) {
   write_to_log_buffer(size);
 }
 
+/*
+ * Writes a message.
+ * @param format Message which may contain format specifiers.
+ * @param ... Additional arguments to replace the format speciefiers.
+ */
 void print_info(const char* format, ...) {
   va_list args;
   va_start(args, format);
@@ -130,6 +146,11 @@ void print_info(const char* format, ...) {
   printf("\x1B[1m%s\033[0m\n", print_buffer);
 }
 
+/*
+ * Writes a message in yellow text.
+ * @param format Message which may contain format specifiers.
+ * @param ... Additional arguments to replace the format speciefiers.
+ */
 void print_warn(const char* format, ...) {
   va_list args;
   va_start(args, format);
@@ -140,6 +161,11 @@ void print_warn(const char* format, ...) {
   printf("\x1B[93m\x1B[1m%s\033[0m\n", print_buffer);
 }
 
+/*
+ * Writes a message in red text.
+ * @param format Message which may contain format specifiers.
+ * @param ... Additional arguments to replace the format speciefiers.
+ */
 void print_error(const char* format, ...) {
   va_list args;
   va_start(args, format);
@@ -150,6 +176,11 @@ void print_error(const char* format, ...) {
   printf("\x1B[91m\x1B[1m%s\033[0m\n", print_buffer);
 }
 
+/*
+ * Writes a message in purple text and terminates the program.
+ * @param format Message which may contain format specifiers.
+ * @param ... Additional arguments to replace the format speciefiers.
+ */
 void print_crash(const char* format, ...) {
   va_list args;
   va_start(args, format);
