@@ -106,8 +106,6 @@ void process_lights(Scene* scene) {
       light_groups = safe_realloc(light_groups, sizeof(Light) * light_groups_length);
     }
 
-    printf("\r                                  \r%d Lights left to process.", light_count);
-
     Light light_group;
 
     light_group.pos    = lights[0].pos;
@@ -155,18 +153,6 @@ void process_lights(Scene* scene) {
 
     light_groups[light_group_count++] = light_group;
   }
-
-  printf("\r                                      \r");
-
-  /*printf("Light Groups: %d\n", light_group_count);
-
-  for (int i = 0; i < light_group_count; i++) {
-    printf("Light: %d\n", i);
-    printf(
-      "Pos: X: %f Y: %f Z: %f\n", light_groups[i].pos.x, light_groups[i].pos.y,
-      light_groups[i].pos.z);
-    printf("Radius: %f\n", light_groups[i].radius);
-  }*/
 
   free(lights);
 

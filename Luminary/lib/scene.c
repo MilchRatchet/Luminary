@@ -8,6 +8,7 @@
 
 #include "error.h"
 #include "light.h"
+#include "log.h"
 #include "png.h"
 #include "raytrace.h"
 #include "wavefront.h"
@@ -40,7 +41,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
       char* source = (char*) malloc(LINE_SIZE);
       sscanf_s(value, "%s\n", source, LINE_SIZE);
       if (read_wavefront_file(source, content)) {
-        print_error("Mesh file could not be loaded!");
+        error_message("Mesh file could not be loaded!");
       }
       if (general->mesh_files_count == general->mesh_files_length) {
         general->mesh_files_length *= 2;
@@ -73,10 +74,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
       sscanf_s(value, "%s\n", general->output_path, LINE_SIZE);
       break;
     default:
-      char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s (%zu) is not a valid GENERAL setting.", line, key);
-      print_error(error_msg);
-      free(error_msg);
+      error_message("%8.8s (%zu) is not a valid GENERAL setting.", line, key);
       break;
   }
 }
@@ -143,10 +141,7 @@ static void parse_camera_settings(Camera* camera, char* line) {
       sscanf_s(value, "%d\n", &camera->filter);
       break;
     default:
-      char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s (%zu) is not a valid CAMERA setting.", line, key);
-      print_error(error_msg);
-      free(error_msg);
+      error_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
       break;
   }
 }
@@ -185,10 +180,7 @@ static void parse_sky_settings(Sky* sky, char* line) {
       sscanf_s(value, "%f\n", &sky->mie_falloff);
       break;
     default:
-      char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s (%zu) is not a valid SKY setting.", line, key);
-      print_error(error_msg);
-      free(error_msg);
+      error_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
       break;
   }
 }
@@ -227,10 +219,7 @@ static void parse_fog_settings(Fog* fog, char* line) {
       sscanf_s(value, "%f\n", &fog->falloff);
       break;
     default:
-      char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s (%zu) is not a valid SKY setting.", line, key);
-      print_error(error_msg);
-      free(error_msg);
+      error_message("%8.8s (%zu) is not a valid FOG setting.", line, key);
       break;
   }
 }
@@ -281,10 +270,7 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
       sscanf_s(value, "%f\n", &ocean->refractive_index);
       break;
     default:
-      char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s (%zu) is not a valid OCEAN setting.", line, key);
-      print_error(error_msg);
-      free(error_msg);
+      error_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
       break;
   }
 }
@@ -335,10 +321,7 @@ static void parse_toy_settings(Toy* toy, char* line) {
       sscanf_s(value, "%f\n", &toy->refractive_index);
       break;
     default:
-      char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "%8.8s (%zu) is not a valid TOY setting.", line, key);
-      print_error(error_msg);
-      free(error_msg);
+      error_message("%8.8s (%zu) is not a valid TOY setting.", line, key);
       break;
   }
 }
@@ -476,7 +459,7 @@ RaytraceInstance* load_scene(const char* filename) {
     assert(version == CURRENT_VERSION, "Incompatible Scene version! Update the file or use an older version of Luminary!", 1);
   }
   else {
-    print_error("Scene file has no version information, assuming correct version!")
+    error_message("Scene file has no version information, assuming correct version!");
   }
 
   Scene scene = get_default_scene();
@@ -521,10 +504,7 @@ RaytraceInstance* load_scene(const char* filename) {
       continue;
     }
     else {
-      char* error_msg = (char*) malloc(LINE_SIZE);
-      sprintf(error_msg, "Scene file contains unknown line!\n Content: %s", line);
-      print_error(error_msg);
-      free(error_msg);
+      error_message("Scene file contains unknown line!\n Content: %s", line);
     }
   }
 
@@ -599,7 +579,7 @@ void serialize_scene(RaytraceInstance* instance) {
   fopen_s(&file, "generated.lum", "wb");
 
   if (!file) {
-    print_error("Could not export settings!");
+    error_message("Could not export settings!");
     return;
   }
 

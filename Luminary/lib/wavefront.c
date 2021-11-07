@@ -8,6 +8,7 @@
 
 #include "bench.h"
 #include "error.h"
+#include "log.h"
 #include "png.h"
 #include "texture.h"
 #include "utils.h"
@@ -102,7 +103,7 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
   fopen_s(&file, filename, "r");
 
   if (!file) {
-    print_error("Could not read material file!");
+    error_message("Could not read material file!");
     return;
   }
 
@@ -175,7 +176,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   fopen_s(&file, filename, "r");
 
   if (!file) {
-    print_error("File could not be opened!");
+    error_message("File could not be opened!");
     return -1;
   }
 

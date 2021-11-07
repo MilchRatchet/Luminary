@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "log.h"
+
 // windows.h must be included before any other windows header
 #ifdef _WIN32
 #include <windows.h>
@@ -19,9 +21,6 @@ static uint64_t t       = 0;
 
 void bench_activate() {
   bench_active = 1;
-
-  printf("\n%6.6s | %32.32s | %s\n", "TIMING", "Completed Task", "Time to Completion");
-  printf("-------+----------------------------------+---------------------\n");
 }
 
 static uint64_t get_time() {
@@ -60,5 +59,5 @@ void bench_toc(char* text) {
   if (!bench_active)
     return;
 
-  printf("%6.6s | %32.32s | %.3fs\n", "TIMING", text, get_diff(t, get_time()));
+  print_info("%-32s [%.3fs]", text, get_diff(t, get_time()));
 }

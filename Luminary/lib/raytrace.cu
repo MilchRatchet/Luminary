@@ -22,6 +22,7 @@
 #include "cuda/utils.cuh"
 #include "error.h"
 #include "image.h"
+#include "log.h"
 #include "mesh.h"
 #include "primitives.h"
 #include "raytrace.h"
@@ -440,8 +441,8 @@ extern "C" void initialize_device() {
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, 0);
 
-  printf("Luminary - %s\n", prop.name);
-  printf("Copyright (c) 2021 MilchRatchet\n");
+  print_info("Luminary - %s", prop.name);
+  print_info("Copyright (c) 2021 MilchRatchet");
 }
 
 extern "C" void free_textures_atlas(void* texture_atlas, const int textures_length) {

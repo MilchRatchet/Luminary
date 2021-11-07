@@ -6,31 +6,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "log.h"
 #include "utils.h"
 
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 1024
 
-#define gpuErrchk(ans) \
-  { gpuAssert((ans), __FILE__, __LINE__); }
-inline void gpuAssert(cudaError_t code, const char* file, int line, bool abort = true) {
-  if (code != cudaSuccess) {
-    fprintf(stderr, "GPUassert: %s %s %d\n", cudaGetErrorString(code), file, line);
-    if (abort) {
-      system("pause");
-      exit(code);
-    }
+#define OPTIX_CHECK(call)                                                \
+  {                                                                      \
+    OptixResult res = call;                                              \
+                                                                         \
+    if (res != OPTIX_SUCCESS) {                                          \
+      crash_message("Optix returned error %d in call (%s)", res, #call); \
+    }                                                                    \
   }
-}
 
-#define OPTIX_CHECK(call)                                                                        \
-  {                                                                                              \
-    OptixResult res = call;                                                                      \
-    if (res != OPTIX_SUCCESS) {                                                                  \
-      fprintf(stderr, "Optix returned error %d in call (%s) (line %d)\n", res, #call, __LINE__); \
-      system("pause");                                                                           \
-      exit(-1);                                                                                  \
-    }                                                                                            \
+#define gpuErrchk(ans)                                         \
+  {                                                            \
+    if (ans != cudaSuccess) {                                  \
+      crash_message("GPUassert: %s", cudaGetErrorString(ans)); \
+    }                                                          \
   }
 
 #ifndef eps
