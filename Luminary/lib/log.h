@@ -1,6 +1,7 @@
 #ifndef LOG_H
 #define LOG_H
 
+#define log_message(fmt, ...) print_log("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
 #define info_message(fmt, ...) print_info("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
 #define warn_message(fmt, ...) print_warn("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
 #define error_message(fmt, ...) print_error("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
@@ -11,6 +12,7 @@ extern "C" {
 #endif
 
 void init_log();
+void print_log(const char* format, ...);
 void print_info(const char* format, ...);
 void print_warn(const char* format, ...);
 void print_error(const char* format, ...);
