@@ -57,6 +57,8 @@ compile_commands.json
 # no cachegrind output
 cachegrind.out.*
 
+# no cmake generated config.h file
+config.h
 
 # no output from coverage analysis
 coverage
