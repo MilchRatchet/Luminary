@@ -122,6 +122,7 @@ struct TraceResult {
 #define TYPE_CAMERA 0x0
 #define TYPE_LIGHT 0x1
 #define TYPE_BOUNCE 0x2
+#define STATE_ALBEDO 0b1
 
 //===========================================================================================
 // Device Variables
@@ -179,7 +180,7 @@ __constant__ RGBF* device_light_records;
 
 __constant__ RGBF* device_bounce_records;
 
-__constant__ RGBF* device_denoiser;
+__constant__ int device_denoiser;
 
 __constant__ RGBF* device_albedo_buffer;
 
@@ -224,6 +225,10 @@ __constant__ vec3* device_raydir_buffer;
 __constant__ TraceResult* device_trace_result_buffer;
 
 __constant__ TraceResult* device_trace_result_temporal;
+
+__constant__ int device_accum_mode;
+
+__constant__ uint8_t* device_state_buffer;
 
 //===========================================================================================
 // Functions

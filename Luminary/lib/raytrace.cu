@@ -278,6 +278,9 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaMalloc((void**) &(instance->trace_result_temporal_gpu), sizeof(TraceResult) * amount));
   gpuErrchk(cudaMemcpyToSymbol(
     device_trace_result_temporal, &(instance->trace_result_temporal_gpu), sizeof(TraceResult*), 0, cudaMemcpyHostToDevice));
+
+  gpuErrchk(cudaMalloc((void**) &(instance->state_buffer_gpu), sizeof(uint8_t) * amount));
+  gpuErrchk(cudaMemcpyToSymbol(device_state_buffer, &(instance->state_buffer_gpu), sizeof(uint8_t*), 0, cudaMemcpyHostToDevice));
 }
 
 extern "C" RaytraceInstance* init_raytracing(
@@ -367,6 +370,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->raydir_buffer_gpu));
   gpuErrchk(cudaFree(instance->trace_result_buffer_gpu));
   gpuErrchk(cudaFree(instance->trace_result_temporal_gpu));
+  gpuErrchk(cudaFree(instance->state_buffer_gpu));
 
   if (instance->denoiser) {
     gpuErrchk(cudaFree(instance->albedo_buffer_gpu));
@@ -467,6 +471,7 @@ extern "C" void prepare_trace(RaytraceInstance* instance) {
   update_jitter(instance);
   gpuErrchk(cudaMemcpyToSymbol(device_default_material, &(instance->default_material), sizeof(RGBF), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_lights_active, &(instance->lights_active), sizeof(int), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_accum_mode, &(instance->accum_mode), sizeof(int), 0, cudaMemcpyHostToDevice));
 }
 
 static void bind_type(RaytraceInstance* instance, int type) {
@@ -579,6 +584,7 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->raydir_buffer_gpu));
   gpuErrchk(cudaFree(instance->trace_result_buffer_gpu));
   gpuErrchk(cudaFree(instance->trace_result_temporal_gpu));
+  gpuErrchk(cudaFree(instance->state_buffer_gpu));
 }
 
 extern "C" void free_outputs(RaytraceInstance* instance) {

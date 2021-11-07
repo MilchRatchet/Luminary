@@ -182,4 +182,24 @@ __device__ FogTask load_fog_task(const void* ptr) {
   return task;
 }
 
+/*
+ * Updates the albedo buffer if criteria are met.
+ * @param albedo Albedo color to be added to the albedo buffer.
+ * @param pixel Index of pixel.
+ */
+__device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
+  if (!device_denoiser || device_state_buffer[pixel] & STATE_ALBEDO)
+    return;
+
+  if (device_temporal_frames && device_accum_mode == TEMPORAL_ACCUMULATION) {
+    RGBF out_albedo = device_albedo_buffer[pixel];
+    out_albedo      = scale_color(out_albedo, device_temporal_frames);
+    albedo          = add_color(albedo, out_albedo);
+    albedo          = scale_color(albedo, 1.0f / (device_temporal_frames + 1));
+  }
+
+  device_albedo_buffer[pixel] = albedo;
+  device_state_buffer[pixel] |= STATE_ALBEDO;
+}
+
 #endif /* CU_MEMORY_H */

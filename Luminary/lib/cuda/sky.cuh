@@ -216,6 +216,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
     if (device_iteration_type != TYPE_LIGHT || light == 0) {
       device_frame_buffer[pixel] = add_color(device_frame_buffer[pixel], sky);
     }
+
+    write_albedo_buffer(sky, pixel);
   }
 }
 

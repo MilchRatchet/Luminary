@@ -112,9 +112,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
     RGBF record = device_records[pixel];
 
     if (albedo.a > 0.0f && (emission.r > 0.0f || emission.g > 0.0f || emission.b > 0.0f)) {
-      if (device_denoiser && is_first_ray()) {
-        device_albedo_buffer[pixel] = emission;
-      }
+      write_albedo_buffer(emission, pixel);
 
       if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
         emission.r *= intensity * record.r;
@@ -154,9 +152,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {
-      if (device_denoiser && is_first_ray()) {
-        device_albedo_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
-      }
+      write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
 
       uint32_t light_sample_id;
       const vec3 V = scale_vector(ray, -1.0f);
