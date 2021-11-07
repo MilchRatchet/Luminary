@@ -250,6 +250,7 @@ void realtime_output(RaytraceInstance* instance) {
     sample_frametime(&frametime_UI);
 
     if (make_png) {
+      log_message("Taking snapshot.");
       make_snapshot(instance, realtime);
       make_png = 0;
     }

@@ -99,6 +99,7 @@ static size_t hash_djb2(unsigned char* str) {
 }
 
 static void read_materials_file(const char* filename, Wavefront_Content* io_content) {
+  log_message("Reading *.mtl file (%s)", filename);
   FILE* file;
   fopen_s(&file, filename, "r");
 
@@ -168,9 +169,12 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
   *io_content = content;
 
   fclose(file);
+
+  log_message("Material counts: %d (%d %d %d)", materials_count, albedo_maps_count, illuminance_maps_count, material_maps_count);
 }
 
 int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
+  log_message("Reading *.obj file (%s)", filename);
   bench_tic();
   FILE* file;
   fopen_s(&file, filename, "r");
@@ -291,6 +295,8 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   free(loaded_mtls);
 
   bench_toc("Reading *.obj File");
+
+  log_message("Mesh: Verts: %d Tris: %d", vertices_count, triangles_count);
 
   return 0;
 }

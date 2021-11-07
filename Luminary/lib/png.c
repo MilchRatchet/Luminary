@@ -109,6 +109,7 @@ static void write_IEND_chunk_to_file(FILE* file) {
 int store_as_png(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
   const uint8_t color_type, const uint8_t bit_depth) {
+  log_message("Storing png file (%s) Size: %dx%d Depth: %d Colortype: %d", filename, width, height, bit_depth, color_type);
   bench_tic();
   uint8_t bytes_per_pixel;
   uint8_t bytes_per_channel;
@@ -457,6 +458,8 @@ static void reconstruction_4_uint8_RGB(uint8_t* line, const uint32_t line_length
 }
 
 TextureRGBA load_texture_from_png(const char* filename) {
+  log_message("Loading png file (%s)", filename);
+
   FILE* file;
   fopen_s(&file, filename, "rb");
 
@@ -679,6 +682,8 @@ TextureRGBA load_texture_from_png(const char* filename) {
   result.data = float_data;
 
   free(filtered_data);
+
+  log_message("PNG (%s) Size: %dx%d Depth: %d Colortype: %d", filename, width, height, bit_depth, color_type);
 
   return result;
 }

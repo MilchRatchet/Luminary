@@ -100,17 +100,24 @@ static int format_string(const char* format, va_list args) {
 }
 
 static void write_to_log_buffer(int size) {
-  size++;
   size_t space = log_buffer_size - log_buffer_offset;
 
-  if (size > space) {
-    manage_log_buffer(size);
+  if (size + 1 > space) {
+    manage_log_buffer(size + 1);
   }
 
   memcpy(log_buffer + log_buffer_offset, print_buffer, size);
   log_buffer_offset += size;
 
   log_buffer[log_buffer_offset++] = '\n';
+}
+
+void print_log(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  int size = format_string(format, args);
+  va_end(args);
+  write_to_log_buffer(size);
 }
 
 void print_info(const char* format, ...) {
