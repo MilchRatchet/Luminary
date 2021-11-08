@@ -118,7 +118,7 @@ __device__ vec3 specular_BRDF(
 __device__ vec3 diffuse_BRDF(
   RGBF& record, const vec3 normal, const vec3 V, const RGBAF albedo, const float roughness, const float metallic, const float beta,
   const float gamma, const float spec_prob) {
-  const float alpha = acosf(sqrtf(beta));
+  const float alpha = sqrtf(beta);
 
   vec3 ray = sample_ray_from_angles_and_vector(alpha, gamma, normal);
 
@@ -151,7 +151,7 @@ __device__ vec3 diffuse_BRDF(
 __device__ vec3 light_BRDF(
   RGBF& record, const vec3 normal, const vec3 V, const Light light, const int light_count, const RGBAF albedo, const float roughness,
   const float metallic, const float beta, const float gamma) {
-  const float alpha = acosf(sqrtf(beta));
+  const float alpha = sqrtf(beta);
 
   vec3 ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
 
@@ -245,7 +245,7 @@ __device__ Light sample_light(const vec3 position, int& light_count, uint32_t& l
 
   Light light;
   light.pos    = normalize_vector(light_pos);
-  light.radius = fminf(1.0f, asinf(light_data.w / d) * 2.0f / PI);
+  light.radius = fminf(1.0f, atanf(light_data.w / d));
 
   return light;
 }
