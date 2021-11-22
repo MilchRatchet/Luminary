@@ -204,7 +204,7 @@ __global__ void temporal_reprojection() {
     if (prev_x >= 0 && prev_x < device_width && prev_y >= 0 && prev_y < device_height) {
       RGBF temporal = sample_pixel_catmull_rom(device_frame_temporal, prev_pixel.x, prev_pixel.y, device_width, device_height);
 
-      float alpha = 0.15f;
+      float alpha = device_scene.camera.temporal_blend_factor;
       output      = add_color(scale_color(output, alpha), scale_color(temporal, 1.0f - alpha));
     }
 

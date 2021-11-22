@@ -87,6 +87,8 @@ static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Bloom Strength", &(instance->scene_gpu.camera.bloom_strength), 0, 0.0005f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_check(ui, "Dithering", &(instance->scene_gpu.camera.dithering), 0);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene_gpu.camera.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Temporal Blend Factor", &(instance->scene_gpu.camera.temporal_blend_factor), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
 
   return panels;
 }

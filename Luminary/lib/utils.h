@@ -98,6 +98,7 @@ struct Camera {
   float mouse_speed;
   int smooth_movement;
   float smoothing_factor;
+  float temporal_blend_factor;
 } typedef Camera;
 
 struct Light {
