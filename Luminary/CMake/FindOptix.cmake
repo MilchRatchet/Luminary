@@ -38,7 +38,7 @@ else()
 endif()
 
 #set(OptiX_INSTALL_DIR "" CACHE PATH "Path to OptiX installed location.")
-set(OptiX_INSTALL_DIR "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.2.0")
+set(OptiX_INSTALL_DIR "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.4.0")
 
 macro(OPTIX_find_api_library name version)
   find_library(${name}_LIBRARY

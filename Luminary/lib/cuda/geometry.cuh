@@ -304,7 +304,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
     else if (device_shading_mode == SHADING_HEAT) {
-      const float cost  = uint_as_float(task.hit_id);
+      const float cost  = __uint_as_float(task.hit_id);
       const float value = 1.0f - 1.0f / (powf(cost, 0.25f));
       const float red   = __saturatef(2.0f * value);
       const float green = __saturatef(2.0f * (value - 0.5f));

@@ -54,9 +54,9 @@ __device__ TraceTask load_trace_task(const void* ptr) {
 
   task.ray.y   = data1.x;
   task.ray.z   = data1.y;
-  task.index.x = float_as_uint(data1.z) & 0xffff;
-  task.index.y = (float_as_uint(data1.z) >> 16);
-  task.state   = float_as_uint(data1.w);
+  task.index.x = __float_as_uint(data1.z) & 0xffff;
+  task.index.y = (__float_as_uint(data1.z) >> 16);
+  task.state   = __float_as_uint(data1.w);
 
   return task;
 }
@@ -72,8 +72,8 @@ __device__ void store_trace_task(const void* ptr, const TraceTask task) {
   float4 data1;
   data1.x = task.ray.y;
   data1.y = task.ray.z;
-  data1.z = uint_as_float((task.index.x & 0xffff) | (task.index.y << 16));
-  data1.w = uint_as_float(task.state);
+  data1.z = __uint_as_float((task.index.x & 0xffff) | (task.index.y << 16));
+  data1.w = __uint_as_float(task.state);
   __stcs(((float4*) ptr) + 1, data1);
 }
 
@@ -104,10 +104,10 @@ __device__ GeometryTask load_geometry_task(const void* ptr) {
   task.ray_y      = data0.w;
 
   task.ray_xz  = data1.x;
-  task.hit_id  = float_as_uint(data1.y);
-  task.index.x = float_as_uint(data1.z) & 0xffff;
-  task.index.y = (float_as_uint(data1.z) >> 16);
-  task.state   = float_as_uint(data1.w);
+  task.hit_id  = __float_as_uint(data1.y);
+  task.index.x = __float_as_uint(data1.z) & 0xffff;
+  task.index.y = (__float_as_uint(data1.z) >> 16);
+  task.state   = __float_as_uint(data1.w);
 
   return task;
 }
@@ -124,9 +124,9 @@ __device__ OceanTask load_ocean_task(const void* ptr) {
 
   task.ray_xz   = data1.x;
   task.distance = data1.y;
-  task.index.x  = float_as_uint(data1.z) & 0xffff;
-  task.index.y  = (float_as_uint(data1.z) >> 16);
-  task.state    = float_as_uint(data1.w);
+  task.index.x  = __float_as_uint(data1.z) & 0xffff;
+  task.index.y  = (__float_as_uint(data1.z) >> 16);
+  task.state    = __float_as_uint(data1.w);
 
   return task;
 }
@@ -138,8 +138,8 @@ __device__ SkyTask load_sky_task(const void* ptr) {
   task.ray.x   = data.x;
   task.ray.y   = data.y;
   task.ray.z   = data.z;
-  task.index.x = float_as_uint(data.w) & 0xffff;
-  task.index.y = (float_as_uint(data.w) >> 16);
+  task.index.x = __float_as_uint(data.w) & 0xffff;
+  task.index.y = (__float_as_uint(data.w) >> 16);
 
   return task;
 }
@@ -156,9 +156,9 @@ __device__ ToyTask load_toy_task(const void* ptr) {
 
   task.ray.y   = data1.x;
   task.ray.z   = data1.y;
-  task.index.x = float_as_uint(data1.z) & 0xffff;
-  task.index.y = (float_as_uint(data1.z) >> 16);
-  task.state   = float_as_uint(data1.w);
+  task.index.x = __float_as_uint(data1.z) & 0xffff;
+  task.index.y = (__float_as_uint(data1.z) >> 16);
+  task.state   = __float_as_uint(data1.w);
 
   return task;
 }
@@ -175,9 +175,9 @@ __device__ FogTask load_fog_task(const void* ptr) {
 
   task.ray_xz   = data1.x;
   task.distance = data1.y;
-  task.index.x  = float_as_uint(data1.z) & 0xffff;
-  task.index.y  = (float_as_uint(data1.z) >> 16);
-  task.state    = float_as_uint(data1.w);
+  task.index.x  = __float_as_uint(data1.z) & 0xffff;
+  task.index.y  = (__float_as_uint(data1.z) >> 16);
+  task.state    = __float_as_uint(data1.w);
 
   return task;
 }

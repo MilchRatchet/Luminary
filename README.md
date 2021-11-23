@@ -40,7 +40,7 @@ This project is a bit of a mess when it comes to building. It was only ever buil
 
 - You need to change the `CUDA toolkit` version in the `CMakeLists.txt` to the one installed on your system.
 - You need to change the `CUDA compatibility` version in the `CMakeLists.txt` to your specific version or lower.
-- You need to install the `Optix 7.2 SDK` and specify the installation directory in `Luminary/CMake/FindOptix.cmake`.
+- You need to install the `Optix 7.4 SDK` and specify the installation directory in `Luminary/CMake/FindOptix.cmake`.
 - You need an `SSE 4.1` compatible CPU.
 - You need to download the development libraries from http://www.libsdl.org/ and https://www.libsdl.org/projects/SDL_ttf/ and extract the libraries to `Luminary/lib/SDL/`. `SDL2.dll`, `SDL2_ttf.dll` and `libfreetype-6.dll` will automatically be copied to the build directory and have to reside in the same folder as the executable for it to run.
 - A font file named `LuminaryFont.ttf` must reside in the binary directory. A default font is automatically copied to the build directory. You can replace this font with any other font.

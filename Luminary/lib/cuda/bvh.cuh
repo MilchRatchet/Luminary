@@ -112,7 +112,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       triangle_task = make_uint2(0, 0);
 
       depth  = result.x;
-      hit_id = float_as_uint(result.y);
+      hit_id = __float_as_uint(result.y);
 
       origin = task.origin;
       ray    = task.ray;
@@ -165,8 +165,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       e.y = *((char*) &data0.w + 1);
       e.z = *((char*) &data0.w + 2);
 
-      node_task.x           = float_as_uint(data1.x);
-      triangle_task.x       = float_as_uint(data1.y);
+      node_task.x           = __float_as_uint(data1.x);
+      triangle_task.x       = __float_as_uint(data1.y);
       triangle_task.y       = 0;
       unsigned int hit_mask = 0;
 
@@ -181,18 +181,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       shifted_origin.z = (p.z - origin.z) * inv_ray.z;
 
       {
-        const unsigned int meta4       = float_as_int(data1.z);
+        const unsigned int meta4       = __float_as_int(data1.z);
         const unsigned int is_inner4   = (meta4 & (meta4 << 1)) & 0x10101010;
         const unsigned int inner_mask4 = sign_extend_s8x4(is_inner4 << 3);
         const unsigned int bit_index4  = (meta4 ^ (inverse_octant4 & inner_mask4)) & 0x1f1f1f1f;
         const unsigned int child_bits4 = (meta4 >> 5) & 0x07070707;
 
-        const unsigned int low_x  = (inv_ray.x < 0.0f) ? float_as_uint(data3.z) : float_as_uint(data2.x);
-        const unsigned int high_x = (inv_ray.x < 0.0f) ? float_as_uint(data2.x) : float_as_uint(data3.z);
-        const unsigned int low_y  = (inv_ray.y < 0.0f) ? float_as_uint(data4.x) : float_as_uint(data2.z);
-        const unsigned int high_y = (inv_ray.y < 0.0f) ? float_as_uint(data2.z) : float_as_uint(data4.x);
-        const unsigned int low_z  = (inv_ray.z < 0.0f) ? float_as_uint(data4.z) : float_as_uint(data3.x);
-        const unsigned int high_z = (inv_ray.z < 0.0f) ? float_as_uint(data3.x) : float_as_uint(data4.z);
+        const unsigned int low_x  = (inv_ray.x < 0.0f) ? __float_as_uint(data3.z) : __float_as_uint(data2.x);
+        const unsigned int high_x = (inv_ray.x < 0.0f) ? __float_as_uint(data2.x) : __float_as_uint(data3.z);
+        const unsigned int low_y  = (inv_ray.y < 0.0f) ? __float_as_uint(data4.x) : __float_as_uint(data2.z);
+        const unsigned int high_y = (inv_ray.y < 0.0f) ? __float_as_uint(data2.z) : __float_as_uint(data4.x);
+        const unsigned int low_z  = (inv_ray.z < 0.0f) ? __float_as_uint(data4.z) : __float_as_uint(data3.x);
+        const unsigned int high_z = (inv_ray.z < 0.0f) ? __float_as_uint(data3.x) : __float_as_uint(data4.z);
 
         float min_x[4];
         float max_x[4];
@@ -264,18 +264,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       }
 
       {
-        const unsigned int meta4       = float_as_int(data1.w);
+        const unsigned int meta4       = __float_as_int(data1.w);
         const unsigned int is_inner4   = (meta4 & (meta4 << 1)) & 0x10101010;
         const unsigned int inner_mask4 = sign_extend_s8x4(is_inner4 << 3);
         const unsigned int bit_index4  = (meta4 ^ (inverse_octant4 & inner_mask4)) & 0x1f1f1f1f;
         const unsigned int child_bits4 = (meta4 >> 5) & 0x07070707;
 
-        const unsigned int low_x  = (inv_ray.x < 0.0f) ? float_as_uint(data3.w) : float_as_uint(data2.y);
-        const unsigned int high_x = (inv_ray.x < 0.0f) ? float_as_uint(data2.y) : float_as_uint(data3.w);
-        const unsigned int low_y  = (inv_ray.y < 0.0f) ? float_as_uint(data4.y) : float_as_uint(data2.w);
-        const unsigned int high_y = (inv_ray.y < 0.0f) ? float_as_uint(data2.w) : float_as_uint(data4.y);
-        const unsigned int low_z  = (inv_ray.z < 0.0f) ? float_as_uint(data4.w) : float_as_uint(data3.y);
-        const unsigned int high_z = (inv_ray.z < 0.0f) ? float_as_uint(data3.y) : float_as_uint(data4.w);
+        const unsigned int low_x  = (inv_ray.x < 0.0f) ? __float_as_uint(data3.w) : __float_as_uint(data2.y);
+        const unsigned int high_x = (inv_ray.x < 0.0f) ? __float_as_uint(data2.y) : __float_as_uint(data3.w);
+        const unsigned int low_y  = (inv_ray.y < 0.0f) ? __float_as_uint(data4.y) : __float_as_uint(data2.w);
+        const unsigned int high_y = (inv_ray.y < 0.0f) ? __float_as_uint(data2.w) : __float_as_uint(data4.y);
+        const unsigned int low_z  = (inv_ray.z < 0.0f) ? __float_as_uint(data4.w) : __float_as_uint(data3.y);
+        const unsigned int high_z = (inv_ray.z < 0.0f) ? __float_as_uint(data3.y) : __float_as_uint(data4.w);
 
         float min_x[4];
         float max_x[4];
@@ -388,7 +388,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       else {
         float2 result;
         result.x = depth;
-        result.y = (device_shading_mode == SHADING_HEAT) ? cost : uint_as_float(hit_id);
+        result.y = (device_shading_mode == SHADING_HEAT) ? cost : __uint_as_float(hit_id);
 
         __stcs((float2*) (device_trace_results + get_task_address(offset)), result);
 

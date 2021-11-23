@@ -166,7 +166,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
 
     float2 result;
     result.x = depth;
-    result.y = uint_as_float(hit_id);
+    result.y = __uint_as_float(hit_id);
 
     __stcs((float2*) (device_trace_results + offset), result);
   }
@@ -266,7 +266,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     const float2 result = __ldcs((float2*) (device_trace_results + offset));
 
     const float depth     = result.x;
-    const uint32_t hit_id = float_as_uint(result.y);
+    const uint32_t hit_id = __float_as_uint(result.y);
 
     if (is_first_ray()) {
       device_raydir_buffer[task.index.x + task.index.y * device_width] = task.ray;
@@ -325,7 +325,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
         }
         else {
           geometry_task_count++;
-          data1.y = uint_as_float(hit_id);
+          data1.y = __uint_as_float(hit_id);
         }
       }
 
