@@ -1,0 +1,24 @@
+name: C-linter
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  C-linter:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: shenxianpeng/cpp-linter-action@master
+        id: linter
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          style: file
+          extensions: 'c,h'
+          ignore: 'Luminary/lib/SDL/**|Luminary/lib/zlib/**'
+          files-changed-only: false
+
+      - name: Fail fast?!
+        if: steps.linter.outputs.checks-failed > 0
+        run: exit 1
