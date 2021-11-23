@@ -1,24 +1,12 @@
-name: C-linter
+name: clang-format
 
 on:
   push:
 
 jobs:
-  C-linter:
+  clang-format:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: shenxianpeng/cpp-linter-action@master
-        id: linter
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          style: file
-          extensions: 'c,h'
-          ignore: 'Luminary/lib/SDL|Luminary/lib/zlib'
-          files-changed-only: false
-          thread-comments: false
-
-      - name: Checking for errors
-        if: steps.linter.outputs.checks-failed > 0
-        run: exit 1
+      - name: clang-format
+        run: clang-format --dry-run --Werror -i Luminary/lib/UI/*.c Luminary/lib/UI/*.h Luminary/lib/cuda/*.cuh
