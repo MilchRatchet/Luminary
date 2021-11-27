@@ -149,6 +149,8 @@ struct DevicePointers {
 #define TYPE_LIGHT 0x1
 #define TYPE_BOUNCE 0x2
 #define STATE_ALBEDO 0b1
+#define STATE_LIGHT_OCCUPIED 0b10
+#define STATE_BOUNCE_OCCUPIED 0b100
 
 //===========================================================================================
 // Device Variables

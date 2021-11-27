@@ -1,6 +1,6 @@
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks() {
   const int task_count   = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
-  int light_trace_count  = 0;
+  int light_trace_count  = device.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   int bounce_trace_count = device.bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
   for (int i = 0; i < task_count; i++) {
@@ -148,6 +148,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
         case TYPE_LIGHT:
           device.light_records[pixel] = record;
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
+          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           break;
       }
     }
@@ -178,7 +179,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       light_task.index  = task.index;
       light_task.state  = task.state;
 
-      if (light_count) {
+      if (light_count && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED)) {
         device.light_records[pixel]        = light_record;
         device.light_sample_history[pixel] = light_sample_id;
         store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);

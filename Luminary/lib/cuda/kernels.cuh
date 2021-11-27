@@ -278,6 +278,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       device.trace_result_buffer[task.index.x + task.index.y * device_width] = trace_result;
     }
 
+    if (device_iteration_type == TYPE_LIGHT)
+      device.state_buffer[task.index.x + task.index.y * device_width] &= ~STATE_LIGHT_OCCUPIED;
+
     if (device_scene.fog.active) {
       float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
       float weight = expf(-t * device_scene.fog.absorption * 0.001f);

@@ -129,6 +129,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
           break;
         case TYPE_LIGHT:
           device.light_records[pixel] = record;
+          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
           break;
       }
@@ -159,7 +160,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       light_task.index  = task.index;
       light_task.state  = task.state;
 
-      if (light_count) {
+      if (light_count && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED)) {
         device.light_records[pixel]        = light_record;
         device.light_sample_history[pixel] = light_sample_id;
         store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
