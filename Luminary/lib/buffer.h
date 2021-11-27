@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+size_t device_memory_usage();
+size_t device_memory_limit();
+void device_set_memory_limit(size_t limit);
 void device_buffer_init(DeviceBuffer** buffer);
 void device_buffer_free(DeviceBuffer* buffer);
 void device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t count);

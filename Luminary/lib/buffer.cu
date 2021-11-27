@@ -1,6 +1,23 @@
 #include "buffer.h"
 #include "cuda/utils.cuh"
 
+size_t memory_limit = 0;
+size_t memory_usage = 0;
+
+extern "C" size_t device_memory_usage() {
+  return memory_usage;
+}
+
+extern "C" size_t device_memory_limit() {
+  return memory_limit;
+}
+
+extern "C" void device_set_memory_limit(size_t limit) {
+  memory_limit = limit;
+
+  log_message("Set memory limit to %zu bytes.", limit);
+}
+
 extern "C" void device_buffer_init(DeviceBuffer** buffer) {
   (*buffer) = (DeviceBuffer*) malloc(sizeof(DeviceBuffer));
 
@@ -17,6 +34,8 @@ extern "C" void device_buffer_free(DeviceBuffer* buffer) {
     warn_message("Unallocated device buffer was attempted to be freed.");
     return;
   }
+
+  memory_usage -= buffer->size;
 
   gpuErrchk(cudaFree(buffer->device_pointer));
   buffer->allocated = 0;
@@ -39,6 +58,12 @@ extern "C" void device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, 
     else {
       device_buffer_free(buffer);
     }
+  }
+
+  memory_usage += size;
+
+  if (memory_usage > (size_t) (0.9 * memory_limit)) {
+    warn_message("Device is running low on memory.");
   }
 
   gpuErrchk(cudaMalloc(&buffer->device_pointer, size));

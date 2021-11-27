@@ -414,6 +414,8 @@ extern "C" void initialize_device() {
   cudaDeviceProp prop;
   cudaGetDeviceProperties(&prop, 0);
 
+  device_set_memory_limit(prop.totalGlobalMem);
+
   print_info("Luminary - %s", prop.name);
   print_info("[%s] %s", LUMINARY_BRANCH_NAME, LUMINARY_VERSION_DATE);
   print_info("Compiled using %s on %s", LUMINARY_COMPILER, LUMINARY_OS);

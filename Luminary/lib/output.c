@@ -263,8 +263,9 @@ void realtime_output(RaytraceInstance* instance) {
     const double total_time = get_frametime(&frametime_total);
 
     sprintf(
-      title, "Luminary - FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms", 1000.0 / total_time, total_time, trace_time,
-      ui_time, post_time);
+      title, "Luminary - FPS: %.0f - Frametime: %.2fms Trace: %.2fms UI: %.2fms Post: %.2fms Mem: %.2f/%.2fGB", 1000.0 / total_time,
+      total_time, trace_time, ui_time, post_time, device_memory_usage() * (1.0 / (1024.0 * 1024.0 * 1024.0)),
+      device_memory_limit() * (1.0 / (1024.0 * 1024.0 * 1024.0)));
 
     const double normalized_time = total_time / 16.66667;
 
