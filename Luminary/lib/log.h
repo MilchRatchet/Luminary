@@ -11,7 +11,7 @@
 extern "C" {
 #endif
 
-void init_log();
+void init_log(int wl);
 void print_log(const char* format, ...);
 void print_info(const char* format, ...);
 void print_warn(const char* format, ...);

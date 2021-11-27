@@ -23,6 +23,8 @@ size_t log_buffer_offset;
 char* print_buffer;
 int print_buffer_size;
 
+int write_logs;
+
 #ifdef _WIN32
 static void enable_windows_virtual_terminal_sequence() {
   HANDLE hOut  = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -38,13 +40,15 @@ static void enable_windows_virtual_terminal_sequence() {
 /*
  * Initializes all log functionalities. Using logs before calling this function results in undefined behaviour.
  */
-void init_log() {
+void init_log(int wl) {
   log_buffer        = malloc(8192);
   log_buffer_offset = 0;
   log_buffer_size   = 8192;
 
   print_buffer      = malloc(4096);
   print_buffer_size = 4096;
+
+  write_logs = wl;
 
   enable_windows_virtual_terminal_sequence();
 }
@@ -53,6 +57,9 @@ void init_log() {
  * Writes the log to a file.
  */
 void write_log() {
+  if (!write_logs)
+    return;
+
   FILE* file;
   fopen_s(&file, "luminary.log", "wb");
 
@@ -106,6 +113,9 @@ static int format_string(const char* format, va_list args) {
 }
 
 static void write_to_log_buffer(int size) {
+  if (!write_logs)
+    return;
+
   size_t space = log_buffer_size - log_buffer_offset;
 
   if (size + 1 > space) {

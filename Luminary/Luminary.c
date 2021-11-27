@@ -66,21 +66,23 @@ static int magic(char* path) {
 }
 
 int main(int argc, char* argv[]) {
-  init_log();
+  int offline    = 0;
+  int bench      = 0;
+  int write_logs = 0;
+
+  for (int i = 2; i < argc; i++) {
+    offline |= parse_command(argv[i], "-o", "--offline");
+    bench |= parse_command(argv[i], "-t", "--timings");
+    write_logs |= parse_command(argv[i], "-l", "--logs");
+  }
+
+  init_log(write_logs);
 
   initialize_device();
 
   assert(argc >= 2, "No scene description was given!", 1);
 
   int file_type = magic(argv[1]);
-
-  int offline = 0;
-  int bench   = 0;
-
-  for (int i = 2; i < argc; i++) {
-    offline |= parse_command(argv[i], "-o", "--offline");
-    bench |= parse_command(argv[i], "-t", "--timings");
-  }
 
   if (bench)
     bench_activate();
