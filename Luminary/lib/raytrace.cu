@@ -303,6 +303,8 @@ extern "C" RaytraceInstance* init_raytracing(
   device_buffer_init(&instance->trace_result_temporal);
   device_buffer_init(&instance->state_buffer);
 
+  device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
+
   gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene.materials_length));
   gpuErrchk(cudaMalloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length));
   gpuErrchk(
