@@ -33,14 +33,14 @@ extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instanc
   OPTIX_CHECK(
     optixDenoiserComputeMemoryResources(denoise_setup->denoiser, instance->width, instance->height, &denoise_setup->denoiserReturnSizes));
 
-  gpuErrchk(cudaMalloc((void**) &denoise_setup->denoiserState, denoise_setup->denoiserReturnSizes.stateSizeInBytes));
+  device_malloc((void**) &denoise_setup->denoiserState, denoise_setup->denoiserReturnSizes.stateSizeInBytes);
 
   const size_t scratchSize =
     (denoise_setup->denoiserReturnSizes.withoutOverlapScratchSizeInBytes > denoise_setup->denoiserReturnSizes.withOverlapScratchSizeInBytes)
       ? denoise_setup->denoiserReturnSizes.withoutOverlapScratchSizeInBytes
       : denoise_setup->denoiserReturnSizes.withOverlapScratchSizeInBytes;
 
-  gpuErrchk(cudaMalloc((void**) &denoise_setup->denoiserScratch, scratchSize));
+  device_malloc((void**) &denoise_setup->denoiserScratch, scratchSize);
 
   OPTIX_CHECK(optixDenoiserSetup(
     denoise_setup->denoiser, 0, instance->width, instance->height, denoise_setup->denoiserState,
@@ -61,7 +61,7 @@ extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instanc
   denoise_setup->inputLayer[1].format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   RGBF* output;
-  gpuErrchk(cudaMalloc((void**) &output, sizeof(RGBF) * instance->width * instance->height));
+  device_malloc((void**) &output, sizeof(RGBF) * instance->width * instance->height);
 
   denoise_setup->outputLayer.data               = (CUdeviceptr) output;
   denoise_setup->outputLayer.width              = instance->width;

@@ -181,7 +181,7 @@ static void allocate_bloom_mips(RaytraceInstance* instance) {
   for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
     width  = width >> 1;
     height = height >> 1;
-    gpuErrchk(cudaMalloc((void**) &(instance->bloom_mips_gpu[i]), sizeof(RGBF) * width * height));
+    device_malloc((void**) &(instance->bloom_mips_gpu[i]), sizeof(RGBF) * width * height);
   }
 }
 
