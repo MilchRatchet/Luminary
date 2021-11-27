@@ -4,6 +4,7 @@
 #include <string.h>
 
 #include "bench.h"
+#include "buffer.h"
 #include "error.h"
 #include "raytrace.h"
 
@@ -263,9 +264,9 @@ void serialize_baked(RaytraceInstance* instance) {
   head[5]  = write_data(file, instance->scene_gpu.nodes_length, sizeof(Node8), instance->scene_gpu.nodes, GPU_PTR);
   head[6]  = write_data(file, instance->scene_gpu.lights_length, sizeof(Light), instance->scene_gpu.lights, GPU_PTR);
   head[7]  = write_data(file, instance->scene_gpu.materials_length, sizeof(TextureAssignment), instance->scene_gpu.texture_assignments, 1);
-  head[8]  = write_data(file, instance->albedo_atlas_length, 1, instance->albedo_atlas, TEX_PTR);
-  head[9]  = write_data(file, instance->illuminance_atlas_length, 1, instance->illuminance_atlas, TEX_PTR);
-  head[10] = write_data(file, instance->material_atlas_length, 1, instance->material_atlas, TEX_PTR);
+  head[8]  = write_data(file, instance->albedo_atlas_length, 1, device_buffer_get_pointer(instance->albedo_atlas), TEX_PTR);
+  head[9]  = write_data(file, instance->illuminance_atlas_length, 1, device_buffer_get_pointer(instance->illuminance_atlas), TEX_PTR);
+  head[10] = write_data(file, instance->material_atlas_length, 1, device_buffer_get_pointer(instance->material_atlas), TEX_PTR);
   head[11] = 1 + instance->settings.mesh_files_count;
 
   void* strings;
