@@ -4,6 +4,7 @@
 #include <optix_stubs.h>
 
 #include "bench.h"
+#include "buffer.h"
 #include "denoiser.h"
 #include "error.h"
 #include "log.h"
@@ -58,14 +59,14 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
 
   OptixImage2D inputLayer[2];
 
-  inputLayer[0].data               = (CUdeviceptr) instance->frame_output_gpu;
+  inputLayer[0].data               = (CUdeviceptr) device_buffer_get_pointer(instance->frame_output);
   inputLayer[0].width              = instance->width;
   inputLayer[0].height             = instance->height;
   inputLayer[0].rowStrideInBytes   = instance->width * sizeof(RGBF);
   inputLayer[0].pixelStrideInBytes = sizeof(RGBF);
   inputLayer[0].format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-  inputLayer[1].data               = (CUdeviceptr) instance->albedo_buffer_gpu;
+  inputLayer[1].data               = (CUdeviceptr) device_buffer_get_pointer(instance->albedo_buffer);
   inputLayer[1].width              = instance->width;
   inputLayer[1].height             = instance->height;
   inputLayer[1].rowStrideInBytes   = instance->width * sizeof(RGBF);
@@ -104,7 +105,9 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
     denoiser, 0, &denoiserParams, denoiserState, denoiserReturnSizes.stateSizeInBytes, &inputLayer[0], 2, 0, 0, &outputLayer,
     denoiserScratch, scratchSize));
 
-  gpuErrchk(cudaMemcpy(instance->frame_output_gpu, output, sizeof(RGBF) * instance->width * instance->height, cudaMemcpyDeviceToDevice));
+  gpuErrchk(cudaMemcpy(
+    device_buffer_get_pointer(instance->frame_output), output, sizeof(RGBF) * instance->width * instance->height,
+    cudaMemcpyDeviceToDevice));
 
   OPTIX_CHECK(optixDeviceContextDestroy(ctx));
   OPTIX_CHECK(optixDenoiserDestroy(denoiser));

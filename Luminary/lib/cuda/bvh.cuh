@@ -106,7 +106,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         break;
 
       const TraceTask task = load_trace_task_essentials(device_trace_tasks + get_task_address(offset));
-      const float2 result  = __ldcs((float2*) (device_trace_results + get_task_address(offset)));
+      const float2 result  = __ldcs((float2*) (device.trace_results + get_task_address(offset)));
 
       node_task     = make_uint2(0, 0x80000000);
       triangle_task = make_uint2(0, 0);
@@ -390,7 +390,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         result.x = depth;
         result.y = (device_shading_mode == SHADING_HEAT) ? cost : __uint_as_float(hit_id);
 
-        __stcs((float2*) (device_trace_results + get_task_address(offset)), result);
+        __stcs((float2*) (device.trace_results + get_task_address(offset)), result);
 
         offset++;
       }

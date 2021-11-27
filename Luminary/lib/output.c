@@ -10,6 +10,7 @@
 #include "SDL/SDL.h"
 #include "UI/UI.h"
 #include "bench.h"
+#include "buffer.h"
 #include "denoiser.h"
 #include "frametime.h"
 #include "log.h"
@@ -45,11 +46,11 @@ void offline_output(RaytraceInstance* instance, clock_t time) {
   }
 
   if (instance->scene_gpu.camera.bloom)
-    apply_bloom(instance, instance->frame_output_gpu);
+    apply_bloom(instance, device_buffer_get_pointer(instance->frame_output));
 
   initialize_8bit_frame(instance, instance->width, instance->height);
   XRGB8* frame = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
-  copy_framebuffer_to_8bit(frame, instance->width, instance->height, instance->frame_output_gpu, instance);
+  copy_framebuffer_to_8bit(frame, instance->width, instance->height, device_buffer_get_pointer(instance->frame_output), instance);
 
   store_XRGB8_png(instance->settings.output_path, frame, instance->width, instance->height);
 
@@ -107,7 +108,7 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
       width  = instance->width;
       height = instance->height;
       buffer = malloc(sizeof(XRGB8) * width * height);
-      copy_framebuffer_to_8bit(buffer, width, height, instance->frame_final_gpu, instance);
+      copy_framebuffer_to_8bit(buffer, width, height, instance->frame_final_device, instance);
       break;
     default:
       free(filename);
@@ -144,8 +145,7 @@ void realtime_output(RaytraceInstance* instance) {
 
   int make_png = 0;
 
-  char* title = (char*) malloc(4096);
-
+  char* title             = (char*) malloc(4096);
   instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
 
   while (!exit) {
@@ -161,14 +161,14 @@ void realtime_output(RaytraceInstance* instance) {
 
     start_frametime(&frametime_post);
     if (instance->denoiser && instance->use_denoiser) {
-      instance->frame_final_gpu = denoise_with_optix_realtime(instance->denoise_setup);
+      instance->frame_final_device = denoise_with_optix_realtime(instance->denoise_setup);
       if (instance->scene_gpu.camera.bloom)
-        apply_bloom(instance, instance->frame_final_gpu);
+        apply_bloom(instance, instance->frame_final_device);
     }
     else {
-      instance->frame_final_gpu = instance->frame_output_gpu;
+      instance->frame_final_device = device_buffer_get_pointer(instance->frame_output);
     }
-    copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, instance->frame_final_gpu, instance);
+    copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, instance->frame_final_device, instance);
     sample_frametime(&frametime_post);
 
     instance->temporal_frames++;

@@ -49,6 +49,8 @@ struct Quaternion {
 
 // state is 16 bits the depth and the last 16 bits the random_index
 
+// TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
+
 // ray_xz is horizontal angle
 struct GeometryTask {
   vec3 position;
@@ -102,6 +104,35 @@ struct TraceResult {
   uint32_t hit_id;
 } typedef TraceResult;
 
+struct DevicePointers {
+  TraceTask* light_trace;
+  TraceTask* bounce_trace;
+  uint16_t* light_trace_count;
+  uint16_t* bounce_trace_count;
+  TraceResult* trace_results;
+  uint16_t* task_counts;
+  uint16_t* task_offsets;
+  uint32_t* light_sample_history;
+  RGBF* frame_final;
+  RGBF* frame_output;
+  RGBF* frame_temporal;
+  RGBF* frame_buffer;
+  RGBF* frame_variance;
+  RGBF* frame_bias_cache;
+  RGBF* albedo_buffer;
+  RGBF* light_records;
+  RGBF* bounce_records;
+  XRGB8* buffer_8bit;
+  vec3* raydir_buffer;
+  TraceResult* trace_result_buffer;
+  TraceResult* trace_result_temporal;
+  uint8_t* state_buffer;
+  curandStateXORWOW_t* randoms;
+  cudaTextureObject_t* albedo_atlas;
+  cudaTextureObject_t* illuminance_atlas;
+  cudaTextureObject_t* material_atlas;
+} typedef DevicePointers;
+
 //===========================================================================================
 // Bit Masks
 //===========================================================================================
@@ -123,6 +154,8 @@ struct TraceResult {
 // Device Variables
 //===========================================================================================
 
+__constant__ DevicePointers device;
+
 __constant__ int device_max_ray_depth;
 
 __constant__ Scene device_scene;
@@ -133,53 +166,15 @@ __constant__ int device_iteration_type;
 
 __constant__ TraceTask* device_trace_tasks;
 
-__constant__ TraceTask* device_light_trace;
-
-__constant__ TraceTask* device_bounce_trace;
-
-__constant__ TraceResult* device_trace_results;
-
 __constant__ uint16_t* device_trace_count;
 
-__constant__ uint16_t* device_light_trace_count;
-
-__constant__ uint16_t* device_bounce_trace_count;
-
-// 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
-__constant__ uint16_t* device_task_counts;
-
-// 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
-__constant__ uint16_t* device_task_offsets;
-
-__constant__ uint32_t* device_light_sample_history;
-
-__constant__ curandStateXORWOW_t* device_sample_randoms;
+__constant__ RGBF* device_records;
 
 __constant__ int device_temporal_frames;
 
 __constant__ int device_lights_active;
 
-__constant__ RGBF* device_frame_buffer;
-
-__constant__ RGBF* device_frame_temporal;
-
-__constant__ RGBF* device_frame_output;
-
-__constant__ RGBF* device_frame_variance;
-
-__constant__ RGBF* device_frame_bias_cache;
-
-__constant__ RGBF* device_records;
-
-__constant__ RGBF* device_light_records;
-
-__constant__ RGBF* device_bounce_records;
-
 __constant__ int device_denoiser;
-
-__constant__ RGBF* device_albedo_buffer;
-
-__constant__ XRGB8* device_frame_8bit;
 
 __constant__ int device_width;
 
@@ -192,12 +187,6 @@ __constant__ float device_step;
 __constant__ float device_vfov;
 
 __constant__ Quaternion device_camera_rotation;
-
-__constant__ cudaTextureObject_t* device_albedo_atlas;
-
-__constant__ cudaTextureObject_t* device_illuminance_atlas;
-
-__constant__ cudaTextureObject_t* device_material_atlas;
 
 __constant__ TextureAssignment* device_texture_assignments;
 
@@ -215,31 +204,23 @@ __device__ Mat4x4 device_view_space;
 
 __device__ Mat4x4 device_projection;
 
-__constant__ vec3* device_raydir_buffer;
-
-__constant__ TraceResult* device_trace_result_buffer;
-
-__constant__ TraceResult* device_trace_result_temporal;
-
 __constant__ int device_accum_mode;
-
-__constant__ uint8_t* device_state_buffer;
 
 //===========================================================================================
 // Functions
 //===========================================================================================
 
-__device__ int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
+__device__ static int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
   const int warp_id       = (((thread_id & 0x60) >> 5) + block_id * (THREADS_PER_BLOCK / 32));
   const int thread_offset = (thread_id & 0x1f);
   return 32 * device_pixels_per_thread * warp_id + 32 * number + thread_offset;
 }
 
-__device__ int get_task_address(const int number) {
+__device__ static int get_task_address(const int number) {
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
 }
 
-__device__ int is_first_ray() {
+__device__ static int is_first_ray() {
   return (device_iteration_type == TYPE_CAMERA);
 }
 

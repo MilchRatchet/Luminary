@@ -177,32 +177,38 @@ struct Scene {
   Fog fog;
 } typedef Scene;
 
+struct DeviceBuffer {
+  void* device_pointer;
+  size_t size;
+  int allocated;
+} typedef DeviceBuffer;
+
 struct RaytraceInstance {
   unsigned int width;
   unsigned int height;
-  void* light_trace_gpu;
-  void* bounce_trace_gpu;
-  uint16_t* light_trace_count_gpu;
-  uint16_t* bounce_trace_count_gpu;
-  void* trace_results_gpu;
-  void* task_counts_gpu;
-  void* task_offsets_gpu;
-  uint32_t* light_sample_history_gpu;
-  RGBF* frame_final_gpu;
-  RGBF* frame_output_gpu;
-  RGBF* frame_temporal_gpu;
-  RGBF* frame_buffer_gpu;
-  RGBF* frame_variance_gpu;
-  RGBF* frame_bias_cache_gpu;
-  RGBF* albedo_buffer_gpu;
-  RGBF* light_records_gpu;
-  RGBF* bounce_records_gpu;
-  RGB8* buffer_8bit_gpu;
-  void* albedo_atlas;
+  RGBF* frame_final_device;
+  DeviceBuffer* light_trace;
+  DeviceBuffer* bounce_trace;
+  DeviceBuffer* light_trace_count;
+  DeviceBuffer* bounce_trace_count;
+  DeviceBuffer* trace_results;
+  DeviceBuffer* task_counts;
+  DeviceBuffer* task_offsets;
+  DeviceBuffer* light_sample_history;
+  DeviceBuffer* frame_output;
+  DeviceBuffer* frame_temporal;
+  DeviceBuffer* frame_buffer;
+  DeviceBuffer* frame_variance;
+  DeviceBuffer* frame_bias_cache;
+  DeviceBuffer* albedo_buffer;
+  DeviceBuffer* light_records;
+  DeviceBuffer* bounce_records;
+  DeviceBuffer* buffer_8bit;
+  DeviceBuffer* albedo_atlas;
   int albedo_atlas_length;
-  void* illuminance_atlas;
+  DeviceBuffer* illuminance_atlas;
   int illuminance_atlas_length;
-  void* material_atlas;
+  DeviceBuffer* material_atlas;
   int material_atlas_length;
   int max_ray_depth;
   int offline_samples;
@@ -211,7 +217,7 @@ struct RaytraceInstance {
   int use_denoiser;
   int temporal_frames;
   int lights_active;
-  void* randoms_gpu;
+  DeviceBuffer* randoms;
   RGBF default_material;
   int shading_mode;
   RGBF** bloom_mips_gpu;
@@ -220,10 +226,10 @@ struct RaytraceInstance {
   void* denoise_setup;
   Jitter jitter;
   int accum_mode;
-  vec3* raydir_buffer_gpu;
-  void* trace_result_buffer_gpu;
-  void* trace_result_temporal_gpu;
-  uint8_t* state_buffer_gpu;
+  DeviceBuffer* raydir_buffer;
+  DeviceBuffer* trace_result_buffer;
+  DeviceBuffer* trace_result_temporal;
+  DeviceBuffer* state_buffer;
 } typedef RaytraceInstance;
 
 #define clamp(value, low, high) \

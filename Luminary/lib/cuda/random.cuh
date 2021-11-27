@@ -12162,7 +12162,7 @@ __device__ float sample_blue_noise(int x, int y, int task_state, int sample_dime
   int sample_index = task_state & RANDOM_INDEX;
 
   if (sample_index >= 256) {
-    return curand_uniform(device_sample_randoms + threadIdx.x + blockIdx.x * blockDim.x);
+    return curand_uniform(device.randoms + threadIdx.x + blockIdx.x * blockDim.x);
   }
 
   x                = x & 127;

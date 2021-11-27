@@ -41,7 +41,7 @@ __global__ void initialize_randoms() {
 
   curandStateXORWOW_t state;
   curand_init(id, 0, 0, &state);
-  device_sample_randoms[id] = state;
+  device.randoms[id] = state;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() {
@@ -57,19 +57,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
 
     task = get_starting_ray(task);
 
-    device_light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
-    device_bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
-    device_frame_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
-    device_state_buffer[pixel]   = 0;
+    device.light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
+    device.bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
+    device.frame_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
+    device.state_buffer[pixel]   = 0;
 
     if (device_denoiser && !device_temporal_frames)
-      device_albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+      device.albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
 
-    store_trace_task(device_bounce_trace + get_task_address(offset++), task);
+    store_trace_task(device.bounce_trace + get_task_address(offset++), task);
   }
 
-  device_light_trace_count[threadIdx.x + blockIdx.x * blockDim.x]  = 0;
-  device_bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x] = offset;
+  device.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x]  = 0;
+  device.bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x] = offset;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
@@ -168,7 +168,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     result.x = depth;
     result.y = __uint_as_float(hit_id);
 
-    __stcs((float2*) (device_trace_results + offset), result);
+    __stcs((float2*) (device.trace_results + offset), result);
   }
 }
 
@@ -183,7 +183,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   // count data
   for (int i = 0; i < task_count; i++) {
     const int offset      = get_task_address(i);
-    const uint32_t hit_id = __ldca((uint32_t*) (device_trace_results + offset) + 1);
+    const uint32_t hit_id = __ldca((uint32_t*) (device.trace_results + offset) + 1);
 
     if (hit_id == SKY_HIT) {
       sky_task_count++;
@@ -209,16 +209,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   int fog_offset      = toy_offset + toy_task_count;
   int k               = 0;
 
-  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_offset;
-  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1] = ocean_offset;
-  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 2] = sky_offset;
-  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_offset;
-  device_task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = fog_offset;
+  device.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_offset;
+  device.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1] = ocean_offset;
+  device.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 2] = sky_offset;
+  device.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_offset;
+  device.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = fog_offset;
 
   // order data
   while (k < task_count) {
     const int offset      = get_task_address(k);
-    const uint32_t hit_id = __ldca((uint32_t*) (device_trace_results + offset) + 1);
+    const uint32_t hit_id = __ldca((uint32_t*) (device.trace_results + offset) + 1);
 
     int index;
     int needs_swapping;
@@ -263,19 +263,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device_trace_tasks + offset);
-    const float2 result = __ldcs((float2*) (device_trace_results + offset));
+    const float2 result = __ldcs((float2*) (device.trace_results + offset));
 
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
     if (is_first_ray()) {
-      device_raydir_buffer[task.index.x + task.index.y * device_width] = task.ray;
+      device.raydir_buffer[task.index.x + task.index.y * device_width] = task.ray;
 
       TraceResult trace_result;
       trace_result.depth  = depth;
       trace_result.hit_id = hit_id;
 
-      device_trace_result_buffer[task.index.x + task.index.y * device_width] = trace_result;
+      device.trace_result_buffer[task.index.x + task.index.y * device_width] = trace_result;
     }
 
     if (device_scene.fog.active) {
@@ -338,11 +338,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     __stcs(ptr, data0);
   }
 
-  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_task_count;
-  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1] = ocean_task_count;
-  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 2] = sky_task_count;
-  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_task_count;
-  device_task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = fog_task_count;
+  device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_task_count;
+  device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1] = ocean_task_count;
+  device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 2] = sky_task_count;
+  device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_task_count;
+  device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = fog_task_count;
   device_trace_count[threadIdx.x + blockIdx.x * blockDim.x]           = 0;
 }
 
@@ -415,7 +415,7 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     converted_pixel.g      = (uint8_t) pixel.g;
     converted_pixel.b      = (uint8_t) pixel.b;
 
-    device_frame_8bit[x + y * width] = converted_pixel;
+    device.buffer_8bit[x + y * width] = converted_pixel;
 
     id += blockDim.x * gridDim.x;
   }

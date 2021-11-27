@@ -56,10 +56,10 @@ __device__ vec3 get_toy_normal(const vec3 position) {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count   = device_task_counts[id * 5 + 3];
-  const int task_offset  = device_task_offsets[id * 5 + 3];
-  int light_trace_count  = device_light_trace_count[id];
-  int bounce_trace_count = device_bounce_trace_count[id];
+  const int task_count   = device.task_counts[id * 5 + 3];
+  const int task_offset  = device.task_offsets[id * 5 + 3];
+  int light_trace_count  = device.light_trace_count[id];
+  int bounce_trace_count = device.bounce_trace_count[id];
 
   for (int i = 0; i < task_count; i++) {
     ToyTask task    = load_toy_task(device_trace_tasks + get_task_address(task_offset + i));
@@ -94,10 +94,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
         emission.g *= intensity * record.g;
         emission.b *= intensity * record.b;
 
-        const uint32_t light = device_light_sample_history[pixel];
+        const uint32_t light = device.light_sample_history[pixel];
 
         if (device_iteration_type != TYPE_LIGHT || light == TOY_LIGHT) {
-          device_frame_buffer[pixel] = add_color(device_frame_buffer[pixel], emission);
+          device.frame_buffer[pixel] = add_color(device.frame_buffer[pixel], emission);
         }
       }
     }
@@ -124,12 +124,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       switch (device_iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          device_bounce_records[pixel] = record;
-          store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), new_task);
+          device.bounce_records[pixel] = record;
+          store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
-          device_light_records[pixel] = record;
-          store_trace_task(device_light_trace + get_task_address(light_trace_count++), new_task);
+          device.light_records[pixel] = record;
+          store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
           break;
       }
     }
@@ -160,9 +160,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       light_task.state  = task.state;
 
       if (light_count) {
-        device_light_records[pixel]        = light_record;
-        device_light_sample_history[pixel] = light_sample_id;
-        store_trace_task(device_light_trace + get_task_address(light_trace_count++), light_task);
+        device.light_records[pixel]        = light_record;
+        device.light_sample_history[pixel] = light_sample_id;
+        store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
       }
 
       RGBF bounce_record    = record;
@@ -182,33 +182,33 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       bounce_task.state  = task.state;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
-        device_bounce_records[pixel] = bounce_record;
-        store_trace_task(device_bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+        device.bounce_records[pixel] = bounce_record;
+        store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }
     }
   }
 
-  device_light_trace_count[id]  = light_trace_count;
-  device_bounce_trace_count[id] = bounce_trace_count;
+  device.light_trace_count[id]  = light_trace_count;
+  device.bounce_trace_count[id] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device_task_counts[id * 5 + 3];
-  const int task_offset = device_task_offsets[id * 5 + 3];
+  const int task_count  = device.task_counts[id * 5 + 3];
+  const int task_offset = device.task_offsets[id * 5 + 3];
 
   for (int i = 0; i < task_count; i++) {
     const ToyTask task = load_toy_task(device_trace_tasks + get_task_address(task_offset + i));
     const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO) {
-      device_frame_buffer[pixel] = get_color(device_scene.toy.albedo.r, device_scene.toy.albedo.g, device_scene.toy.albedo.b);
+      device.frame_buffer[pixel] = get_color(device_scene.toy.albedo.r, device_scene.toy.albedo.g, device_scene.toy.albedo.b);
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float dist           = get_length(sub_vector(device_scene.camera.pos, task.position));
       const float value          = __saturatef((1.0f / dist) * 2.0f);
-      device_frame_buffer[pixel] = get_color(value, value, value);
+      device.frame_buffer[pixel] = get_color(value, value, value);
     }
     else if (device_shading_mode == SHADING_NORMAL) {
       vec3 normal = get_toy_normal(task.position);
@@ -221,7 +221,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      device_frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+      device.frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
   }
 }

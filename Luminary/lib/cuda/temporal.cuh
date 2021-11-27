@@ -87,7 +87,7 @@ __global__ void temporal_accumulation() {
   int offset = threadIdx.x + blockIdx.x * blockDim.x;
 
   for (; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    RGBF buffer = device_frame_buffer[offset];
+    RGBF buffer = device.frame_buffer[offset];
     RGBF output;
     RGBF variance;
     RGBF bias_cache;
@@ -98,9 +98,9 @@ __global__ void temporal_accumulation() {
       bias_cache = get_color(0.0f, 0.0f, 0.0f);
     }
     else {
-      output     = device_frame_output[offset];
-      variance   = device_frame_variance[offset];
-      bias_cache = device_frame_bias_cache[offset];
+      output     = device.frame_output[offset];
+      variance   = device.frame_variance[offset];
+      bias_cache = device.frame_bias_cache[offset];
     }
 
     RGBF deviation;
@@ -116,7 +116,7 @@ __global__ void temporal_accumulation() {
       variance  = scale_color(variance, 1.0f / device_temporal_frames);
     }
 
-    device_frame_variance[offset] = variance;
+    device.frame_variance[offset] = variance;
 
     RGBF firefly_rejection;
     firefly_rejection.r = 0.1f + output.r + deviation.r * 4.0f;
@@ -138,13 +138,13 @@ __global__ void temporal_accumulation() {
     buffer     = add_color(buffer, debias);
     bias_cache = sub_color(bias_cache, debias);
 
-    device_frame_bias_cache[offset] = bias_cache;
+    device.frame_bias_cache[offset] = bias_cache;
 
     output = scale_color(output, device_temporal_frames);
     output = add_color(buffer, output);
     output = scale_color(output, 1.0f / (device_temporal_frames + 1));
 
-    device_frame_output[offset] = output;
+    device.frame_output[offset] = output;
   }
 }
 
@@ -162,14 +162,14 @@ __global__ void temporal_reprojection() {
         const int x = max(0, min(device_width, curr_x + j));
         const int y = max(0, min(device_height, curr_y + i));
 
-        RGBF color = device_frame_buffer[x + y * device_width];
+        RGBF color = device.frame_buffer[x + y * device_width];
 
         float weight = mitchell_netravali(i, j);
 
         sum_color = add_color(sum_color, scale_color(color, weight));
         sum_weights += weight;
 
-        TraceResult trace = device_trace_result_buffer[x + y * device_width];
+        TraceResult trace = device.trace_result_buffer[x + y * device_width];
 
         if (trace.depth < closest_depth) {
           closest_depth = trace.depth;
@@ -179,7 +179,7 @@ __global__ void temporal_reprojection() {
 
     RGBF output = scale_color(sum_color, 1.0f / sum_weights);
 
-    vec3 hit = add_vector(device_scene.camera.pos, scale_vector(device_raydir_buffer[offset], closest_depth));
+    vec3 hit = add_vector(device_scene.camera.pos, scale_vector(device.raydir_buffer[offset], closest_depth));
 
     vec4 pos;
     pos.x = hit.x;
@@ -202,15 +202,15 @@ __global__ void temporal_reprojection() {
     const int prev_y = prev_pixel.y;
 
     if (prev_x >= 0 && prev_x < device_width && prev_y >= 0 && prev_y < device_height) {
-      RGBF temporal = sample_pixel_catmull_rom(device_frame_temporal, prev_pixel.x, prev_pixel.y, device_width, device_height);
+      RGBF temporal = sample_pixel_catmull_rom(device.frame_temporal, prev_pixel.x, prev_pixel.y, device_width, device_height);
 
       float alpha = device_scene.camera.temporal_blend_factor;
       output      = add_color(scale_color(output, alpha), scale_color(temporal, 1.0f - alpha));
     }
 
-    device_frame_output[offset] = output;
+    device.frame_output[offset] = output;
 
     // Interesting motion vector visualization
-    // device_frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));
+    // device.frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));
   }
 }

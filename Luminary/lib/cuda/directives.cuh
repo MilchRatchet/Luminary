@@ -61,7 +61,7 @@ __device__ int validate_trace_task(TraceTask task, RGBF record) {
 
 #ifdef SINGLE_CONTRIBUTION_ONLY
   {
-    RGBF color = device_frame_buffer[task.index.x + task.index.y * device_width];
+    RGBF color = device.frame_buffer[task.index.x + task.index.y * device_width];
     if (luminance(color) > eps)
       valid = 0;
   }

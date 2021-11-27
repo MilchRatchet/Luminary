@@ -200,8 +200,8 @@ __device__ RGBF get_sky_color(const vec3 ray) {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device_task_counts[id * 5 + 2];
-  const int task_offset = device_task_offsets[id * 5 + 2];
+  const int task_count  = device.task_counts[id * 5 + 2];
+  const int task_offset = device.task_offsets[id * 5 + 2];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device_trace_tasks + get_task_address(task_offset + i));
@@ -211,10 +211,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
     RGBF sky          = get_sky_color(task.ray);
     sky               = mul_color(sky, record);
 
-    const uint32_t light = device_light_sample_history[pixel];
+    const uint32_t light = device.light_sample_history[pixel];
 
     if (device_iteration_type != TYPE_LIGHT || light == 0) {
-      device_frame_buffer[pixel] = add_color(device_frame_buffer[pixel], sky);
+      device.frame_buffer[pixel] = add_color(device.frame_buffer[pixel], sky);
     }
 
     write_albedo_buffer(sky, pixel);
@@ -224,19 +224,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device_task_counts[id * 5 + 2];
-  const int task_offset = device_task_offsets[id * 5 + 2];
+  const int task_count  = device.task_counts[id * 5 + 2];
+  const int task_offset = device.task_offsets[id * 5 + 2];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device_trace_tasks + get_task_address(task_offset + i));
     const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO) {
-      device_frame_buffer[pixel] = get_sky_color(task.ray);
+      device.frame_buffer[pixel] = get_sky_color(task.ray);
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value          = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);
-      device_frame_buffer[pixel] = get_color(value, value, value);
+      device.frame_buffer[pixel] = get_color(value, value, value);
     }
   }
 }

@@ -518,9 +518,9 @@ RaytraceInstance* load_scene(const char* filename) {
 
   process_lights(&scene);
 
-  void* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
-  void* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
-  void* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
+  DeviceBuffer* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
+  DeviceBuffer* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
+  DeviceBuffer* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
 
   RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
@@ -561,9 +561,9 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   process_lights(&scene);
 
-  void* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
-  void* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
-  void* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
+  DeviceBuffer* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
+  DeviceBuffer* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
+  DeviceBuffer* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
 
   RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
