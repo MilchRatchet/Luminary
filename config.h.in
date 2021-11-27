@@ -9,5 +9,9 @@
                     "${CMAKE_SYSTEM_VERSION}"
 #define LUMINARY_VERSION_DATE "${GIT_COMMIT_DATE}"
 #define LUMINARY_BRANCH_NAME "${GIT_BRANCH_NAME}"
+#define LUMINARY_CUDA_VERSION "${CUDAToolkit_VERSION_MAJOR}" \
+                              "."                            \
+                              "${CUDAToolkit_VERSION_MINOR}"
+#define LUMINARY_OPTIX_VERSION "${OptiX_version}"
 
 #endif /* CONFIG_H */
