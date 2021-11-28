@@ -348,7 +348,7 @@ extern "C" RaytraceInstance* init_raytracing(
 extern "C" void reset_raytracing(RaytraceInstance* instance) {
   free_bloom_mips(instance);
 
-  if (instance->denoiser) {
+  if (instance->denoiser && instance->denoise_setup) {
     free_realtime_denoise(instance->denoise_setup);
   }
 
@@ -363,8 +363,10 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   prepare_trace(instance);
   update_temporal_matrix(instance);
 
-  if (instance->denoiser)
+  if (instance->denoiser && instance->denoise_setup)
     instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
+
+  log_message("Reset raytrace instance.");
 }
 
 extern "C" DeviceBuffer* initialize_textures(TextureRGBA* textures, const int textures_length) {

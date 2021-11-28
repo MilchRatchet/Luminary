@@ -38,6 +38,21 @@ static int parse_command(const char* arg, char* opt1, char* opt2) {
   return result2;
 }
 
+static int parse_number(const char* arg) {
+  int contains_invalid_char = 0;
+
+  int ptr = 0;
+
+  while (arg[ptr] != '\0') {
+    unsigned char c = ((unsigned char*) arg)[ptr++];
+    if (c < 48 || c > 57) {
+      contains_invalid_char |= 1;
+    }
+  }
+
+  return (contains_invalid_char) ? 0 : atoi(arg);
+}
+
 #define LUM_FILE 0
 #define OBJ_FILE 1
 #define BAKED_FILE 2
@@ -66,14 +81,35 @@ static int magic(char* path) {
 }
 
 int main(int argc, char* argv[]) {
-  int offline    = 0;
-  int bench      = 0;
-  int write_logs = 0;
+  int offline         = 0;
+  int bench           = 0;
+  int write_logs      = 0;
+  int custom_samples  = 0;
+  int offline_samples = 0;
+  int custom_width    = 0;
+  int custom_height   = 0;
+  int width           = 0;
+  int height          = 0;
 
   for (int i = 2; i < argc; i++) {
+    if (custom_samples) {
+      offline_samples = parse_number(argv[i]);
+    }
+
+    if (custom_width) {
+      width = parse_number(argv[i]);
+    }
+
+    if (custom_height) {
+      height = parse_number(argv[i]);
+    }
+
     offline |= parse_command(argv[i], "-o", "--offline");
     bench |= parse_command(argv[i], "-t", "--timings");
     write_logs |= parse_command(argv[i], "-l", "--logs");
+    custom_samples = parse_command(argv[i], "-s", "--samples");
+    custom_width   = parse_command(argv[i], "-w", "--width");
+    custom_height  = parse_command(argv[i], "-h", "--height");
   }
 
   init_log(write_logs);
@@ -104,6 +140,18 @@ int main(int argc, char* argv[]) {
     default:
       instance = load_scene(argv[1]);
       break;
+  }
+
+  if (offline_samples)
+    instance->offline_samples = offline_samples;
+
+  int custom_res = width | height;
+
+  if (custom_res) {
+    instance->settings.width  = (width) ? width : instance->width;
+    instance->settings.height = (height) ? height : instance->height;
+
+    reset_raytracing(instance);
   }
 
   info_message("Instance set up.");

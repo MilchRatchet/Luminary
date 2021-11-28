@@ -132,6 +132,11 @@ extern "C" float get_auto_exposure_from_optix(void* input, RaytraceInstance* ins
 }
 
 extern "C" void free_realtime_denoise(void* input) {
+  if (!input) {
+    error_message("Realtime denoise setup is NULL.");
+    return;
+  }
+
   realtime_denoise denoise_setup = *(realtime_denoise*) input;
 
   OPTIX_CHECK(optixDeviceContextDestroy(denoise_setup.ctx));

@@ -33,6 +33,15 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
 
 -l, --logs
         write a log file at the end of execution
+
+-s, --samples
+        set custom sample count for offline rendering (overrides value set by input file)
+
+-w, --width
+        set custom width (overrides value set by input file)
+
+-h, --height
+        set custom height (overrides value set by input file)
 ```
 
 In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
