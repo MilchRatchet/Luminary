@@ -30,6 +30,9 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
 
 -t, --timings
         print execution times of some CPU functions
+
+-l, --logs
+        write a log file at the end of execution
 ```
 
 In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
