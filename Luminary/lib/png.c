@@ -21,18 +21,18 @@ static inline void write_int_big_endian(uint8_t* buffer, uint32_t value) {
 static void write_header_to_file(FILE* file) {
   uint8_t* header = (uint8_t*) malloc(8);
 
-  header[0] = 0x89ui8;
+  header[0] = 0x89u;
 
-  header[1] = 0x50ui8;
-  header[2] = 0x4Eui8;
-  header[3] = 0x47ui8;
+  header[1] = 0x50u;
+  header[2] = 0x4Eu;
+  header[3] = 0x47u;
 
-  header[4] = 0x0Dui8;
-  header[5] = 0x0Aui8;
+  header[4] = 0x0Du;
+  header[5] = 0x0Au;
 
-  header[6] = 0x1Aui8;
+  header[6] = 0x1Au;
 
-  header[7] = 0x0Aui8;
+  header[7] = 0x0Au;
 
   fwrite(header, 1, 8, file);
 
@@ -56,8 +56,8 @@ static void write_IHDR_chunk_to_file(
 
   chunk[16] = bit_depth;
   chunk[17] = color_type;
-  chunk[18] = 0ui8;
-  chunk[19] = 0ui8;
+  chunk[18] = 0u;
+  chunk[19] = 0u;
   chunk[20] = interlace_method;
 
   write_int_big_endian(chunk + 21, (uint32_t) crc32(0, chunk + 4, 17));
@@ -221,14 +221,14 @@ static int verify_header(FILE* file) {
 
   int result = 0;
 
-  result += header[0] ^ 0x89ui8;
-  result += header[1] ^ 0x50ui8;
-  result += header[2] ^ 0x4Eui8;
-  result += header[3] ^ 0x47ui8;
-  result += header[4] ^ 0x0Dui8;
-  result += header[5] ^ 0x0Aui8;
-  result += header[6] ^ 0x1Aui8;
-  result += header[7] ^ 0x0Aui8;
+  result += header[0] ^ 0x89u;
+  result += header[1] ^ 0x50u;
+  result += header[2] ^ 0x4Eu;
+  result += header[3] ^ 0x47u;
+  result += header[4] ^ 0x0Du;
+  result += header[5] ^ 0x0Au;
+  result += header[6] ^ 0x1Au;
+  result += header[7] ^ 0x0Au;
 
   free(header);
 

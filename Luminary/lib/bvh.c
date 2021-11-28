@@ -11,6 +11,7 @@
 #include "error.h"
 #include "mesh.h"
 #include "primitives.h"
+#include "utils.h"
 
 #define THRESHOLD_TRIANGLES 1
 #define OBJECT_SPLIT_BIN_COUNT 32
