@@ -78,7 +78,7 @@ static void exit_program() {
   write_log();
   puts("Press enter to close...");
   getchar();
-  exit(SIGABRT_COMPAT);
+  exit(SIGABRT);
 }
 
 static void manage_log_buffer(const size_t desired_space) {
