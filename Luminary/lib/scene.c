@@ -37,7 +37,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
 
   switch (key) {
     /* MESHFILE */
-    case 4993446653056992589u:
+    case 4993446653056992589u: {
       char* source = (char*) malloc(LINE_SIZE);
       sscanf_s(value, "%s\n", source, LINE_SIZE);
       if (read_wavefront_file(source, content)) {
@@ -49,6 +49,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
       }
       general->mesh_files[general->mesh_files_count++] = source;
       break;
+    }
     /* WIDTH___ */
     case 6872316320646711639u:
       sscanf_s(value, "%d\n", &general->width);

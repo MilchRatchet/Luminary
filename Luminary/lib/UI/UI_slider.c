@@ -1,5 +1,6 @@
 #include "UI_slider.h"
 
+#include <math.h>
 #include <stdio.h>
 
 #include "UI_blit.h"

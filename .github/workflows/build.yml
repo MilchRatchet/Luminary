@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  GCC-Build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./.github
+    steps:
+      - uses: actions/checkout@master
+        with:
+            submodules: 'recursive'
+
+      - name: Build
+        run: make compile-gcc
+
+  Clang-Build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./.github
+    steps:
+      - uses: actions/checkout@master
+        with:
+            submodules: 'recursive'
+
+      - name: Build
+        run: make compile-clang

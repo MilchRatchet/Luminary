@@ -1,8 +1,9 @@
 #ifndef MESH_H
 #define MESH_H
 
+#include <stdint.h>
+
 #include "primitives.h"
-#include "stdint.h"
 
 struct UV {
   float u;

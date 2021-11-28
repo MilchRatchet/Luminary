@@ -1,6 +1,7 @@
 #ifndef WAVEFRONT_H
 #define WAVEFRONT_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "mesh.h"

@@ -1,11 +1,11 @@
 #ifndef LOG_H
 #define LOG_H
 
-#define log_message(fmt, ...) print_log("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
-#define info_message(fmt, ...) print_info("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
-#define warn_message(fmt, ...) print_warn("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
-#define error_message(fmt, ...) print_error("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
-#define crash_message(fmt, ...) print_crash("[%s:%d] " fmt, __func__, __LINE__, __VA_ARGS__)
+#define log_message(fmt, ...) print_log("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define info_message(fmt, ...) print_info("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define warn_message(fmt, ...) print_warn("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define error_message(fmt, ...) print_error("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
+#define crash_message(fmt, ...) print_crash("[%s:%d] " fmt, __func__, __LINE__, ##__VA_ARGS__)
 
 #if __cplusplus
 extern "C" {
