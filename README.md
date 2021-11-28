@@ -47,6 +47,7 @@ This project is a bit of a mess when it comes to building. It was only ever buil
 - You need an `SSE 4.1` compatible CPU.
 - You need to download the development libraries from http://www.libsdl.org/ and https://www.libsdl.org/projects/SDL_ttf/ and extract the libraries to `Luminary/lib/SDL/`. `SDL2.dll`, `SDL2_ttf.dll` and `libfreetype-6.dll` will automatically be copied to the build directory and have to reside in the same folder as the executable for it to run.
 - A font file named `LuminaryFont.ttf` must reside in the binary directory. A default font is automatically copied to the build directory. You can replace this font with any other font.
+- `_s` versions of `fopen` etc. are used. Those may not be available on `Linus/OSX` and need to be changed there.
 
 In `Luminary/lib/cuda/directives.cuh` are some preprocessor directives that can be used to tune performance to quality in the CUDA kernel.
 

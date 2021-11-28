@@ -164,8 +164,10 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
   }
 }
 #else
-void blit_UI_internal(UI* ui, uint8_t* target, int width, int height, int offset) {
-  const int k = UI_WIDTH / 4;
+void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
+  const int k      = UI_WIDTH / 4;
+  const int offset = ui->scroll_pos % PANEL_HEIGHT;
+
   const __m128i bg =
     _mm_setr_epi8(BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0, BG_BLUE, BG_GREEN, BG_RED, 0);
   const __m128i bg_h = _mm_setr_epi8(
