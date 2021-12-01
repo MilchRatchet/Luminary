@@ -37,12 +37,12 @@ __device__ TraceTask get_starting_ray(TraceTask task) {
 }
 
 __device__ float get_light_source_intersection(vec3 ray, vec3 origin) {
-  const int sun_visible = device_sun.y >= -0.1f;
+  const int sun_visible = (device_sun.y >= -0.1f);
   const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
 
   int i = 0;
-  i += (sun_visible) ? 0 : 1;
-  i += (toy_visible) ? 0 : 1;
+  i += !sun_visible;
+  i += !toy_visible;
 
   float min_dist = FLT_MAX;
 
