@@ -30,42 +30,23 @@ enum ShadingMode {
   SHADING_LIGHTSOURCE = 6
 } typedef ShadingMode;
 
-#ifndef LUMINARY_TOY_SHAPES
-#define LUMINARY_TOY_SHAPES
-#define TOY_SPHERE 0
-#endif
+enum ToyShape { TOY_SPHERE = 0 } typedef ToyShape;
 
-#ifndef LUMINARY_TONEMAPS
-#define LUMINARY_TONEMAPS
-#define TONEMAP_NONE 0
-#define TONEMAP_ACES 1
-#define TONEMAP_REINHARD 2
-#define TONEMAP_UNCHARTED2 3
-#endif
+enum ToneMap { TONEMAP_NONE = 0, TONEMAP_ACES = 1, TONEMAP_REINHARD = 2, TONEMAP_UNCHARTED2 = 3 } typedef ToneMap;
 
-#ifndef LUMINARY_FILTERS
-#define LUMINARY_FILTERS
-#define FILTER_NONE 0
-#define FILTER_GRAY 1
-#define FILTER_SEPIA 2
-#define FILTER_GAMEBOY 3
-#define FILTER_2BITGRAY 4
-#define FILTER_CRT 5
-#define FILTER_BLACKWHITE 6
-#endif
+enum Filter {
+  FILTER_NONE       = 0,
+  FILTER_GRAY       = 1,
+  FILTER_SEPIA      = 2,
+  FILTER_GAMEBOY    = 3,
+  FILTER_2BITGRAY   = 4,
+  FILTER_CRT        = 5,
+  FILTER_BLACKWHITE = 6
+} typedef Filter;
 
-#ifndef LUMINARY_SNAP_RESOLUTION
-#define LUMINARY_SNAP_RESOLUTION
-#define SNAP_RESOLUTION_WINDOW 0
-#define SNAP_RESOLUTION_RENDER 1
-#endif
+enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } typedef SnapResolution;
 
-#ifndef LUMINARY_ACCUM_MODES
-#define LUMINARY_ACCUM_MODES
-#define NO_ACCUMULATION 0
-#define TEMPORAL_ACCUMULATION 1
-#define TEMPORAL_REPROJECTION 2
-#endif
+enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJECTION = 2 } typedef AccumMode;
 
 struct General {
   int width;
