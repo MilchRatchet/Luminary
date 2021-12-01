@@ -20,15 +20,15 @@
 #define ONE_OVER_PI 0.31830988618f
 #endif
 
-#ifndef LUMINARY_SHADING_MODES
-#define LUMINARY_SHADING_MODES
-#define SHADING_DEFAULT 0
-#define SHADING_ALBEDO 1
-#define SHADING_DEPTH 2
-#define SHADING_NORMAL 3
-#define SHADING_HEAT 4
-#define SHADING_WIREFRAME 5
-#endif
+enum ShadingMode {
+  SHADING_DEFAULT     = 0,
+  SHADING_ALBEDO      = 1,
+  SHADING_DEPTH       = 2,
+  SHADING_NORMAL      = 3,
+  SHADING_HEAT        = 4,
+  SHADING_WIREFRAME   = 5,
+  SHADING_LIGHTSOURCE = 6
+} typedef ShadingMode;
 
 #ifndef LUMINARY_TOY_SHAPES
 #define LUMINARY_TOY_SHAPES

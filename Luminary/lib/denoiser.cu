@@ -109,6 +109,8 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
     device_buffer_get_pointer(instance->frame_output), output, sizeof(RGBF) * instance->width * instance->height,
     cudaMemcpyDeviceToDevice));
 
+  gpuErrchk(cudaDeviceSynchronize());
+
   OPTIX_CHECK(optixDeviceContextDestroy(ctx));
   OPTIX_CHECK(optixDenoiserDestroy(denoiser));
 

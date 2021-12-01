@@ -219,50 +219,55 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
     GeometryTask task = load_geometry_task(device_trace_tasks + get_task_address(i));
     const int pixel   = task.index.y * device_width + task.index.x;
 
-    if (device_shading_mode == SHADING_ALBEDO) {
-      const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
-
-      const float4 t1 = __ldg(hit_address);
-      const float4 t2 = __ldg(hit_address + 1);
-      const float4 t3 = __ldg(hit_address + 2);
-      const float4 t4 = __ldg(hit_address + 3);
-      const float4 t5 = __ldg(hit_address + 4);
-      const float4 t6 = __ldg(hit_address + 5);
-      const float2 t7 = __ldg((float2*) (hit_address + 6));
-
-      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
-      vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
-
-      vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
-
-      const float lambda = normal.x;
-      const float mu     = normal.y;
-
-      UV vertex_texture = get_UV(t5.z, t5.w);
-      UV edge1_texture  = get_UV(t6.x, t6.y);
-      UV edge2_texture  = get_UV(t6.z, t6.w);
-
-      const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
-
-      const int texture_object = __float_as_int(t7.x);
-
-      const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
-
+    if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_LIGHTSOURCE) {
       RGBF color = get_color(0.0f, 0.0f, 0.0f);
 
-      if (maps.x) {
-        const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
-        color                 = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
+      if (device_shading_mode == SHADING_LIGHTSOURCE && task.hit_id == DEBUG_LIGHT_HIT) {
+        color = get_color(1.0f, 0.8f, 0.0f);
       }
       else {
-        color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
-      }
+        const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
 
-      if (maps.y && device_lights_active) {
-        const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
+        const float4 t1 = __ldg(hit_address);
+        const float4 t2 = __ldg(hit_address + 1);
+        const float4 t3 = __ldg(hit_address + 2);
+        const float4 t4 = __ldg(hit_address + 3);
+        const float4 t5 = __ldg(hit_address + 4);
+        const float4 t6 = __ldg(hit_address + 5);
+        const float2 t7 = __ldg((float2*) (hit_address + 6));
 
-        color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
+        vec3 vertex = get_vector(t1.x, t1.y, t1.z);
+        vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+        vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
+
+        vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+
+        const float lambda = normal.x;
+        const float mu     = normal.y;
+
+        UV vertex_texture = get_UV(t5.z, t5.w);
+        UV edge1_texture  = get_UV(t6.x, t6.y);
+        UV edge2_texture  = get_UV(t6.z, t6.w);
+
+        const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
+
+        const int texture_object = __float_as_int(t7.x);
+
+        const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
+
+        if (maps.x) {
+          const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
+          color                 = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
+        }
+        else {
+          color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
+        }
+
+        if (maps.y && device_lights_active) {
+          const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
+
+          color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
+        }
       }
 
       device.frame_buffer[pixel] = color;

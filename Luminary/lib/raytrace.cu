@@ -570,6 +570,8 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   device_buffer_free(instance->trace_result_buffer);
   device_buffer_free(instance->trace_result_temporal);
   device_buffer_free(instance->state_buffer);
+
+  gpuErrchk(cudaDeviceSynchronize());
 }
 
 extern "C" void free_outputs(RaytraceInstance* instance) {
