@@ -24,22 +24,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
     const float4 t6 = __ldg(hit_address + 5);
     const float2 t7 = __ldg((float2*) (hit_address + 6));
 
-    vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-    vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
-    vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
+    const vec3 vertex = get_vector(t1.x, t1.y, t1.z);
+    const vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+    const vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
     vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
-    vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
-
-    const float lambda = normal.x;
-    const float mu     = normal.y;
+    const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
     vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
     vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
     vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
-    normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
+    vec3 normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, coords, face_normal);
 
     if (dot_product(normal, face_normal) < 0.0f) {
       face_normal = scale_vector(face_normal, -1.0f);
@@ -52,13 +49,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       edge2_normal  = scale_vector(edge2_normal, -1.0f);
     }
 
-    const vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, lambda, mu);
+    const vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
 
     UV vertex_texture = get_UV(t5.z, t5.w);
     UV edge1_texture  = get_UV(t6.x, t6.y);
     UV edge2_texture  = get_UV(t6.z, t6.w);
 
-    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
+    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 
     const int texture_object         = __float_as_int(t7.x);
     const uint32_t triangle_light_id = __float_as_uint(t7.y);
@@ -240,16 +237,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
         vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
         vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
-        vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
-
-        const float lambda = normal.x;
-        const float mu     = normal.y;
+        const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
         UV vertex_texture = get_UV(t5.z, t5.w);
         UV edge1_texture  = get_UV(t6.x, t6.y);
         UV edge2_texture  = get_UV(t6.z, t6.w);
 
-        const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, lambda, mu);
+        const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 
         const int texture_object = __float_as_int(t7.x);
 
@@ -292,16 +286,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
-      vec3 normal = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
-
-      const float lambda = normal.x;
-      const float mu     = normal.y;
+      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
       vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
       vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
       vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
-      normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, lambda, mu, face_normal);
+      vec3 normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, coords, face_normal);
 
       normal.x = 0.5f * normal.x + 0.5f;
       normal.y = 0.5f * normal.y + 0.5f;
@@ -328,7 +319,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
       vec3 edge2  = get_vector(t2.z, t2.w, t3);
 
-      vec3 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
       int a = fabsf(coords.x + coords.y - 1.0f) < 0.001f;
       int b = fabsf(coords.x) < 0.001f;
