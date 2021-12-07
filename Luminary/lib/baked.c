@@ -5,12 +5,13 @@
 
 #include "bench.h"
 #include "buffer.h"
+#include "config.h"
 #include "error.h"
 #include "raytrace.h"
 
 #define head_size 0x68
 #define magic 4919420911629456716ul
-#define version 23092021  // we literally just use the date of the last change as the version
+#define version LUMINARY_VERSION_HASH
 
 /*
  * Format:
@@ -122,7 +123,10 @@ RaytraceInstance* load_baked(const char* filename) {
   fread_s(head, head_size, head_size, 1, file);
 
   assert(head[0] == magic, "Specified file is not a Luminary Baked File!", 1);
-  assert(head[1] == version, "Baked File is of wrong version!", 1);
+
+  if (head[1] != version) {
+    warn_message("Baked file is from a different version of Luminary.");
+  }
 
   RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
 

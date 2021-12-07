@@ -1,6 +1,8 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <stdlib.h>
+
 #define LUMINARY_COMPILER "${CMAKE_C_COMPILER_ID}" \
                           " "                      \
                           "${CMAKE_C_COMPILER_VERSION}"
@@ -13,5 +15,6 @@
                               "."                            \
                               "${CUDAToolkit_VERSION_MINOR}"
 #define LUMINARY_OPTIX_VERSION "${OptiX_version}"
+#define LUMINARY_VERSION_HASH (strtol("${GIT_COMMIT_HASH}", (char **)0, 16))
 
 #endif /* CONFIG_H */

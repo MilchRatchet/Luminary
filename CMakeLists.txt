@@ -60,4 +60,11 @@ execute_process(
 
 string (REGEX REPLACE "\n" ""  GIT_BRANCH_NAME ${GIT_BRANCH_NAME})
 
+execute_process(
+    COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+    RESULT_VARIABLE RESULT
+    OUTPUT_VARIABLE GIT_COMMIT_HASH)
+
+string (REGEX REPLACE "\n" ""  GIT_COMMIT_HASH ${GIT_COMMIT_HASH})
+
 configure_file("${CMAKE_SOURCE_DIR}/config.h.in" "${CMAKE_SOURCE_DIR}/Luminary/lib/config.h")
