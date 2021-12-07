@@ -23,16 +23,17 @@ void offline_output(RaytraceInstance* instance, clock_t time) {
   bench_tic();
   clock_t start_of_rt = clock();
   prepare_trace(instance);
-  for (int i = 0; i < instance->offline_samples; i++) {
-    trace_scene(instance, i);
-    const double progress     = ((double) i) / instance->offline_samples;
+  for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; instance->temporal_frames++) {
+    trace_scene(instance);
+    update_jitter(instance);
+    const double progress     = ((double) instance->temporal_frames) / instance->offline_samples;
     const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
     const double time_left    = (time_elapsed / progress) - time_elapsed;
     printf(
       "\r                                                                                                          \rProgress: "
       "%2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
       100.0 * progress, time_elapsed, time_left,
-      0.000001 * 2.0 * (1 + instance->max_ray_depth) * instance->width * instance->height * i / time_elapsed);
+      0.000001 * 2.0 * (1 + instance->max_ray_depth) * instance->width * instance->height * instance->temporal_frames / time_elapsed);
   }
 
   printf("\r                                                                                                              \r");
@@ -156,7 +157,7 @@ void realtime_output(RaytraceInstance* instance) {
 
     start_frametime(&frametime_trace);
     prepare_trace(instance);
-    trace_scene(instance, instance->temporal_frames);
+    trace_scene(instance);
     sample_frametime(&frametime_trace);
 
     start_frametime(&frametime_post);

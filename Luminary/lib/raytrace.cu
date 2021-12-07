@@ -131,7 +131,7 @@ static float halton(int index, int base) {
  * Updates the uniform per pixel jitter. Uploads updated jitter to GPU.
  * @param instance RaytraceInstance to be used.
  */
-static void update_jitter(RaytraceInstance* instance) {
+void update_jitter(RaytraceInstance* instance) {
   Jitter jitter;
 
   jitter.prev_x = instance->jitter.x;
@@ -508,8 +508,8 @@ static void execute_debug_kernels(RaytraceInstance* instance, int type) {
   process_debug_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
-extern "C" void trace_scene(RaytraceInstance* instance, const int temporal_frames) {
-  gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
+extern "C" void trace_scene(RaytraceInstance* instance) {
+  gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(instance->temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
 
   generate_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 

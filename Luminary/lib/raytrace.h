@@ -19,10 +19,11 @@ RaytraceInstance* init_raytracing(
   DeviceBuffer* material_atlas, int material_atlas_length, Scene scene, RGBF default_material);
 void reset_raytracing(RaytraceInstance* instance);
 void allocate_buffers(RaytraceInstance* instance);
+void update_jitter(RaytraceInstance* instance);
 void prepare_trace(RaytraceInstance* instance);
 void update_temporal_matrix(RaytraceInstance* instance);
 void center_toy_at_camera(RaytraceInstance* instance);
-void trace_scene(RaytraceInstance* instance, const int temporal_frames);
+void trace_scene(RaytraceInstance* instance);
 void apply_bloom(RaytraceInstance* instance, RGBF* image);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);
