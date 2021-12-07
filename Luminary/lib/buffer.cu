@@ -28,6 +28,20 @@ extern "C" void device_malloc(void** buffer, size_t size) {
   gpuErrchk(cudaMalloc(buffer, size));
 }
 
+extern "C" size_t device_malloc_pitch(void** buffer, size_t rowstride, size_t num_rows) {
+  size_t pitch;
+
+  gpuErrchk(cudaMallocPitch(buffer, &pitch, rowstride, num_rows));
+
+  memory_usage += pitch * num_rows;
+
+  if (memory_usage > (size_t) (0.7 * memory_limit)) {
+    warn_message("Device is running low on memory.");
+  }
+
+  return pitch;
+}
+
 extern "C" void device_free(void* buffer, size_t size) {
   memory_usage -= size;
 

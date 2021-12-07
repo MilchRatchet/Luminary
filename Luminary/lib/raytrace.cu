@@ -391,8 +391,7 @@ extern "C" DeviceBuffer* initialize_textures(TextureRGBA* textures, const int te
     const int num_cols = texture.width;
     RGBAF* data        = texture.data;
     RGBAF* data_gpu;
-    size_t pitch;
-    gpuErrchk(cudaMallocPitch((void**) &data_gpu, &pitch, num_cols * sizeof(RGBAF), num_rows));
+    size_t pitch = device_malloc_pitch((void**) &data_gpu, num_cols * sizeof(RGBAF), num_rows);
     gpuErrchk(cudaMemcpy2D(data_gpu, pitch, data, num_cols * sizeof(RGBAF), num_cols * sizeof(RGBAF), num_rows, cudaMemcpyHostToDevice));
 
     struct cudaResourceDesc resDesc;
