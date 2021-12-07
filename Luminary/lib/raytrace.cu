@@ -349,7 +349,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   free_bloom_mips(instance);
 
   if (instance->denoiser && instance->denoise_setup) {
-    free_realtime_denoise(instance->denoise_setup);
+    free_realtime_denoise(instance, instance->denoise_setup);
   }
 
   instance->width         = instance->settings.width;

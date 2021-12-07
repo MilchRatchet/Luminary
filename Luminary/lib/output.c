@@ -358,7 +358,7 @@ void realtime_output(RaytraceInstance* instance) {
 
   free(title);
   free_8bit_frame(instance);
-  free_realtime_denoise(instance->denoise_setup);
+  free_realtime_denoise(instance, instance->denoise_setup);
   free_realtime_instance(realtime);
   free_UI(&ui);
 }

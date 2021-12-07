@@ -44,18 +44,22 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
   OptixDenoiserSizes denoiserReturnSizes;
   OPTIX_CHECK(optixDenoiserComputeMemoryResources(denoiser, instance->width, instance->height, &denoiserReturnSizes));
 
-  CUdeviceptr denoiserState;
-  gpuErrchk(cudaMalloc((void**) &denoiserState, denoiserReturnSizes.stateSizeInBytes));
+  DeviceBuffer* denoiserState;
+  device_buffer_init(&denoiserState);
+  device_buffer_malloc(denoiserState, denoiserReturnSizes.stateSizeInBytes, 1);
 
   const size_t scratchSize = (denoiserReturnSizes.withoutOverlapScratchSizeInBytes > denoiserReturnSizes.withOverlapScratchSizeInBytes)
                                ? denoiserReturnSizes.withoutOverlapScratchSizeInBytes
                                : denoiserReturnSizes.withOverlapScratchSizeInBytes;
 
-  CUdeviceptr denoiserScratch;
-  gpuErrchk(cudaMalloc((void**) &denoiserScratch, scratchSize));
+  DeviceBuffer* denoiserScratch;
+  device_buffer_init(&denoiserScratch);
+  device_buffer_malloc(denoiserScratch, scratchSize, 1);
 
   OPTIX_CHECK(optixDenoiserSetup(
-    denoiser, 0, instance->width, instance->height, denoiserState, denoiserReturnSizes.stateSizeInBytes, denoiserScratch, scratchSize));
+    denoiser, 0, instance->width, instance->height, (CUdeviceptr) device_buffer_get_pointer(denoiserState),
+    device_buffer_get_size(denoiserState), (CUdeviceptr) device_buffer_get_pointer(denoiserScratch),
+    device_buffer_get_size(denoiserScratch)));
 
   OptixImage2D inputLayer[2];
 
@@ -73,52 +77,58 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
   inputLayer[1].pixelStrideInBytes = sizeof(RGBF);
   inputLayer[1].format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-  RGBF* output;
-  gpuErrchk(cudaMalloc((void**) &output, sizeof(RGBF) * instance->width * instance->height));
+  DeviceBuffer* output;
+  device_buffer_init(&output);
+  device_buffer_malloc(output, sizeof(RGBF), instance->width * instance->height);
 
   OptixImage2D outputLayer;
 
-  outputLayer.data               = (CUdeviceptr) output;
+  outputLayer.data               = (CUdeviceptr) device_buffer_get_pointer(output);
   outputLayer.width              = instance->width;
   outputLayer.height             = instance->height;
   outputLayer.rowStrideInBytes   = instance->width * sizeof(RGBF);
   outputLayer.pixelStrideInBytes = sizeof(RGBF);
   outputLayer.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-  CUdeviceptr hdr_intensity;
-  gpuErrchk(cudaMalloc((void**) &hdr_intensity, sizeof(float)));
+  DeviceBuffer* hdr_intensity;
+  device_buffer_init(&hdr_intensity);
+  device_buffer_malloc(hdr_intensity, sizeof(float), 1);
 
-  OPTIX_CHECK(optixDenoiserComputeIntensity(denoiser, 0, &inputLayer[0], hdr_intensity, denoiserScratch, scratchSize));
+  OPTIX_CHECK(optixDenoiserComputeIntensity(
+    denoiser, 0, &inputLayer[0], (CUdeviceptr) device_buffer_get_pointer(hdr_intensity),
+    (CUdeviceptr) device_buffer_get_pointer(denoiserScratch), device_buffer_get_size(denoiserScratch)));
 
-  CUdeviceptr avg_color;
-  gpuErrchk(cudaMalloc((void**) &avg_color, sizeof(float) * 3));
+  DeviceBuffer* avg_color;
+  device_buffer_init(&avg_color);
+  device_buffer_malloc(avg_color, sizeof(float), 3);
 
-  OPTIX_CHECK(optixDenoiserComputeAverageColor(denoiser, 0, &inputLayer[0], avg_color, denoiserScratch, scratchSize));
+  OPTIX_CHECK(optixDenoiserComputeAverageColor(
+    denoiser, 0, &inputLayer[0], (CUdeviceptr) device_buffer_get_pointer(avg_color),
+    (CUdeviceptr) device_buffer_get_pointer(denoiserScratch), device_buffer_get_size(denoiserScratch)));
 
   OptixDenoiserParams denoiserParams;
   denoiserParams.denoiseAlpha    = 0;
-  denoiserParams.hdrIntensity    = hdr_intensity;
+  denoiserParams.hdrIntensity    = (CUdeviceptr) device_buffer_get_pointer(hdr_intensity);
   denoiserParams.blendFactor     = 0.0f;
-  denoiserParams.hdrAverageColor = avg_color;
+  denoiserParams.hdrAverageColor = (CUdeviceptr) device_buffer_get_pointer(avg_color);
 
   OPTIX_CHECK(optixDenoiserInvoke(
-    denoiser, 0, &denoiserParams, denoiserState, denoiserReturnSizes.stateSizeInBytes, &inputLayer[0], 2, 0, 0, &outputLayer,
-    denoiserScratch, scratchSize));
+    denoiser, 0, &denoiserParams, (CUdeviceptr) device_buffer_get_pointer(denoiserState), device_buffer_get_size(denoiserState),
+    &inputLayer[0], 2, 0, 0, &outputLayer, (CUdeviceptr) device_buffer_get_pointer(denoiserScratch),
+    device_buffer_get_size(denoiserScratch)));
 
-  gpuErrchk(cudaMemcpy(
-    device_buffer_get_pointer(instance->frame_output), output, sizeof(RGBF) * instance->width * instance->height,
-    cudaMemcpyDeviceToDevice));
+  device_buffer_copy(output, instance->frame_output);
 
   gpuErrchk(cudaDeviceSynchronize());
 
+  device_buffer_destroy(output);
+  device_buffer_destroy(hdr_intensity);
+  device_buffer_destroy(avg_color);
+  device_buffer_destroy(denoiserState);
+  device_buffer_destroy(denoiserScratch);
+
   OPTIX_CHECK(optixDeviceContextDestroy(ctx));
   OPTIX_CHECK(optixDenoiserDestroy(denoiser));
-
-  gpuErrchk(cudaFree(output));
-  gpuErrchk(cudaFree((void*) hdr_intensity));
-  gpuErrchk(cudaFree((void*) avg_color));
-  gpuErrchk(cudaFree((void*) denoiserState));
-  gpuErrchk(cudaFree((void*) denoiserScratch));
 
   bench_toc("Optix Denoiser");
 }

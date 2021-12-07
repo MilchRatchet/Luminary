@@ -186,8 +186,13 @@ static void allocate_bloom_mips(RaytraceInstance* instance) {
 }
 
 static void free_bloom_mips(RaytraceInstance* instance) {
+  int width  = instance->width;
+  int height = instance->height;
+
   for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
-    gpuErrchk(cudaFree(instance->bloom_mips_gpu[i]));
+    width  = width >> 1;
+    height = height >> 1;
+    device_free(instance->bloom_mips_gpu[i], sizeof(RGBF) * width * height);
   }
 
   free(instance->bloom_mips_gpu);
