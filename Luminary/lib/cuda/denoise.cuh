@@ -86,11 +86,6 @@ extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instanc
 extern "C" RGBF* denoise_with_optix_realtime(void* input) {
   realtime_denoise* denoise_setup = (realtime_denoise*) input;
 
-  const size_t scratchSize =
-    (denoise_setup->denoiserReturnSizes.withoutOverlapScratchSizeInBytes > denoise_setup->denoiserReturnSizes.withOverlapScratchSizeInBytes)
-      ? denoise_setup->denoiserReturnSizes.withoutOverlapScratchSizeInBytes
-      : denoise_setup->denoiserReturnSizes.withOverlapScratchSizeInBytes;
-
   OPTIX_CHECK(optixDenoiserComputeIntensity(
     denoise_setup->denoiser, 0, &denoise_setup->inputLayer[0], (CUdeviceptr) device_buffer_get_pointer(denoise_setup->hdr_intensity),
     (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserScratch), device_buffer_get_size(denoise_setup->denoiserScratch)));
