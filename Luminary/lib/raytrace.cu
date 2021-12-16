@@ -50,7 +50,7 @@ static void update_special_lights(const Scene scene) {
 
   gpuErrchk(cudaMemcpyToSymbol(device_sun, &(sun), sizeof(vec3), 0, cudaMemcpyHostToDevice));
 
-  const vec3 light_source_sun = scale_vector(sun, 149630000000.0f);
+  const vec3 light_source_sun = scale_vector(sun, 149597870000.0f);
 
   gpuErrchk(cudaMemcpy(scene.lights, &light_source_sun, sizeof(vec3), cudaMemcpyHostToDevice));
 

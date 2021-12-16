@@ -290,6 +290,26 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
   return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
 }
 
+__device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
+  vec3 diff = sub_vector(origin, p);
+  float a   = dot_product(ray, ray);
+  float b   = 2.0f * dot_product(diff, ray);
+  float c   = dot_product(diff, diff) - r * r;
+  float d   = b * b - 4.0f * a * c;
+
+  if (d < 0.0f)
+    return FLT_MAX;
+
+  float num = -b + sqrtf(d);
+
+  if (num > 0.0f)
+    return 0.5f * num / a;
+
+  num = -b - sqrtf(d);
+
+  return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
+}
+
 __device__ RGBF get_color(const float r, const float g, const float b) {
   RGBF result;
 

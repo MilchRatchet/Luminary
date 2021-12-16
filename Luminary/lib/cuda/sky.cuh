@@ -20,7 +20,7 @@ __device__ float density_at_height(const float height, const float density_fallo
 }
 
 __device__ float height_at_point(const vec3 point) {
-  return (get_length(point) - EARTH_RADIUS);
+  return get_length(point) - EARTH_RADIUS;
 }
 
 __device__ float get_earth_intersection(const vec3 origin, const vec3 ray) {
@@ -29,47 +29,16 @@ __device__ float get_earth_intersection(const vec3 origin, const vec3 ray) {
   return a * a - b * b + EARTH_RADIUS * EARTH_RADIUS;
 }
 
-__device__ float get_earth_shadowing(const vec3 origin, const vec3 ray, const vec3 sun, const float atmosphere_length) {
-  if (sun.y >= 0.0f)
-    return 1.0f;
-
-  const int steps = 8;
-  float a         = atmosphere_length * 0.5f;
-  float step_size = a;
-
-  vec3 p = add_vector(origin, scale_vector(ray, a));
-
-  for (int i = 0; i < steps; i++) {
-    const vec3 ray_scatter = normalize_vector(sub_vector(sun, p));
-
-    float delta = get_earth_intersection(p, ray_scatter);
-
-    if (fabsf(delta) < eps)
-      break;
-
-    a += (delta > 0.0f) ? step_size : -step_size;
-    step_size *= 0.5f;
-
-    if (a < 0.0f) {
-      return 1.0f;
-    }
-
-    p = add_vector(origin, scale_vector(ray, a));
-  }
-
-  return fmaxf(0.0f, 1.0f - (a / atmosphere_length));
-}
-
-__device__ float get_optical_depth(const vec3 origin, const vec3 ray, const float length) {
-  if (length == 0.0f)
+__device__ float get_optical_depth(const vec3 origin, const vec3 ray, const float start, const float length) {
+  if (length <= 0.0f)
     return 0.0f;
 
-  const int steps       = 8;
+  const int steps       = device_scene.sky.steps;
   const float step_size = length / steps;
   float depth           = 0.0f;
   vec3 point            = origin;
 
-  point = add_vector(point, scale_vector(ray, 0.125f * step_size));
+  point = add_vector(point, scale_vector(ray, start + 0.125f * step_size));
 
   for (int i = 0; i < steps; i++) {
     depth += density_at_height(height_at_point(point), 0.125f) * step_size;
@@ -80,13 +49,8 @@ __device__ float get_optical_depth(const vec3 origin, const vec3 ray, const floa
   return depth;
 }
 
-__device__ RGBF get_sky_color(const vec3 ray) {
+__device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
-  ;
-
-  if (ray.y < 0.0f) {
-    return result;
-  }
 
   const float angular_diameter = 0.009f;
 
@@ -104,77 +68,120 @@ __device__ RGBF get_sky_color(const vec3 ray) {
   ozone_absorbtion.g = 1.881f * 0.001f * overall_density;
   ozone_absorbtion.b = 0.085f * 0.001f * overall_density;
 
-  const float sun_dist      = 150000000.0f;
+  const float sun_dist      = 149597870.0f;
+  const float sun_radius    = 696340.0f;
   const float sun_intensity = 6.0f;
 
   const vec3 sun_normalized = device_sun;
-  const vec3 sun            = scale_vector(sun_normalized, sun_dist);
+  vec3 sun                  = scale_vector(sun_normalized, sun_dist);
+
+  sun.y -= EARTH_RADIUS;
+
+  vec3 moon;
+  moon.x = sinf(device_scene.sky.moon_azimuth) * cosf(device_scene.sky.moon_altitude);
+  moon.y = sinf(device_scene.sky.moon_altitude);
+  moon.z = cosf(device_scene.sky.moon_azimuth) * cosf(device_scene.sky.moon_altitude);
+
+  moon = scale_vector(moon, 384399.0f);
+
+  moon.y -= EARTH_RADIUS;
+
+  const float moon_radius = 1737.4f;
 
   const float atmosphere_height = 100.0f;
+  const float atmo_radius       = atmosphere_height + EARTH_RADIUS;
 
-  vec3 origin = get_vector(0.0f, EARTH_RADIUS, 0.0f);
+  pos = scale_vector(pos, 0.001f);
+
+  vec3 origin = get_vector(pos.x, EARTH_RADIUS + pos.y, pos.z);
 
   const vec3 origin_default = origin;
 
-  const float limit           = get_length_to_border(origin, ray, EARTH_RADIUS + atmosphere_height);
-  const float earth_shadowing = get_earth_shadowing(origin, ray, sun, limit);
-  const int steps             = 8;
-  const float step_size       = limit / steps;
-  float reach                 = 0.0f;
+  const float height = get_length(origin);
 
-  reach += step_size * 0.125f;
+  if (height <= EARTH_RADIUS)
+    return result;
 
-  origin = add_vector(origin, scale_vector(ray, 0.125f * step_size));
+  float distance;
+  float start = 0.0f;
+  if (height > atmo_radius) {
+    float earth_dist = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS);
+    float atmo_dist  = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), atmo_radius);
+    float atmo_dist2 = sphere_ray_intersect_back(ray, origin, get_vector(0.0f, 0.0f, 0.0f), atmo_radius);
 
-  for (int i = 0; i < steps; i++) {
-    const vec3 ray_scatter = normalize_vector(sub_vector(sun, origin));
-
-    const float optical_depth =
-      get_optical_depth(origin_default, ray, reach)
-      + get_optical_depth(origin, ray_scatter, get_length_to_border(origin, ray_scatter, EARTH_RADIUS + atmosphere_height));
-
-    const float height = height_at_point(origin);
-
-    const float local_density = density_at_height(height, device_scene.sky.rayleigh_falloff);
-    const float mie_density   = density_at_height(height, device_scene.sky.mie_falloff);
-    // The tent function is disabled atm, first argument 0.0f to activate
-    const float ozone_density = fmaxf(0.0f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
-
-    RGBF transmittance;
-    transmittance.r = expf(-optical_depth * (scatter.r + ozone_density * ozone_absorbtion.r + 1.11f * mie_scatter));
-    transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
-    transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
-
-    float cos_angle = dot_product(ray, ray_scatter);
-
-    cos_angle = cosf(fmaxf(0.0f, acosf(cos_angle) - angular_diameter));
-
-    const float rayleigh = 3.0f * (1.0f + cos_angle * cos_angle) / (16.0f * 3.1415926535f);
-
-    const float g   = 0.8f;
-    const float mie = 1.5f * (1.0f + cos_angle * cos_angle) * (1.0f - g * g)
-                      / (4.0f * 3.1415926535f * (2.0f + g * g) * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
-
-    result.r += transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie);
-    result.g += transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie);
-    result.b += transmittance.b * (local_density * scatter.b * rayleigh + mie_density * mie_scatter * mie);
-
-    reach += step_size;
-
-    origin = add_vector(origin, scale_vector(ray, step_size));
+    distance = fminf(earth_dist - atmo_dist, atmo_dist2 - atmo_dist);
+    start    = atmo_dist;
+  }
+  else {
+    float earth_dist = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS);
+    float atmo_dist  = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), atmo_radius);
+    distance         = fminf(earth_dist, atmo_dist);
   }
 
-  result.r *= step_size * earth_shadowing;
-  result.g *= step_size * earth_shadowing;
-  result.b *= step_size * earth_shadowing;
+  if (distance > 0.0f) {
+    const int steps       = device_scene.sky.steps;
+    const float step_size = distance / steps;
+    float reach           = 0.0f;
 
-  const vec3 ray_sun = normalize_vector(sub_vector(sun, origin_default));
+    reach += step_size * 0.125f;
 
-  float cos_angle = dot_product(ray, ray_sun);
-  cos_angle       = cosf(fmaxf(0.0f, acosf(cos_angle) - angular_diameter));
+    origin = add_vector(origin, scale_vector(ray, start + 0.125f * step_size));
 
-  if (cos_angle >= 0.99999f) {
-    const float optical_depth = get_optical_depth(origin_default, ray, limit);
+    for (int i = 0; i < steps; i++) {
+      const vec3 ray_scatter = normalize_vector(sub_vector(sun, origin));
+
+      const float moon_hit = sphere_ray_intersection(ray_scatter, origin, moon, moon_radius * 0.5f);
+
+      if (moon_hit < FLT_MAX)
+        continue;
+
+      const float optical_depth =
+        get_optical_depth(origin_default, ray, start, reach)
+        + get_optical_depth(
+          origin, ray_scatter, 0.0f, sphere_ray_intersection(ray_scatter, origin, get_vector(0.0f, 0.0f, 0.0f), atmo_radius));
+
+      const float height = height_at_point(origin);
+
+      const float local_density = density_at_height(height, device_scene.sky.rayleigh_falloff);
+      const float mie_density   = density_at_height(height, device_scene.sky.mie_falloff);
+      // The tent function is disabled atm, first argument 0.0f to activate
+      const float ozone_density = fmaxf(0.0f, 1.0f - fabsf(height - atmosphere_height * 0.25f) * 0.066666667f);
+
+      RGBF transmittance;
+      transmittance.r = expf(-optical_depth * (scatter.r + ozone_density * ozone_absorbtion.r + 1.11f * mie_scatter));
+      transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
+      transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
+
+      float cos_angle = dot_product(ray, ray_scatter);
+
+      const float rayleigh = 3.0f * (1.0f + cos_angle * cos_angle) / (16.0f * 3.1415926535f);
+
+      const float g   = 0.8f;
+      const float mie = 1.5f * (1.0f + cos_angle * cos_angle) * (1.0f - g * g)
+                        / (4.0f * 3.1415926535f * (2.0f + g * g) * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
+
+      result.r += transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie);
+      result.g += transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie);
+      result.b += transmittance.b * (local_density * scatter.b * rayleigh + mie_density * mie_scatter * mie);
+
+      reach += step_size;
+
+      origin = add_vector(origin, scale_vector(ray, step_size));
+    }
+
+    result = scale_color(result, step_size);
+  }
+
+  origin = origin_default;
+
+  const float moon_albedo = 0.14f;
+
+  float sun_hit   = sphere_ray_intersection(ray, origin, sun, sun_radius);
+  float earth_hit = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS);
+  float moon_hit  = sphere_ray_intersection(ray, origin, moon, moon_radius);
+
+  if (earth_hit > sun_hit && moon_hit > sun_hit) {
+    const float optical_depth = get_optical_depth(origin_default, ray, start, distance);
 
     const float height = height_at_point(origin_default);
 
@@ -185,9 +192,35 @@ __device__ RGBF get_sky_color(const vec3 ray) {
     transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
     transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
 
-    result.r += transmittance.r * cos_angle * device_scene.sky.sun_strength;
-    result.g += transmittance.g * cos_angle * device_scene.sky.sun_strength;
-    result.b += transmittance.b * cos_angle * device_scene.sky.sun_strength;
+    result.r += transmittance.r * device_scene.sky.sun_strength;
+    result.g += transmittance.g * device_scene.sky.sun_strength;
+    result.b += transmittance.b * device_scene.sky.sun_strength;
+  }
+  else if (earth_hit > moon_hit) {
+    vec3 moon_pos = add_vector(origin, scale_vector(ray, moon_hit));
+
+    vec3 normal = normalize_vector(sub_vector(moon_pos, moon));
+
+    vec3 bounce_ray = normalize_vector(sub_vector(sun, moon_pos));
+
+    float earth_intersect = sphere_ray_intersection(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS);
+
+    if (earth_intersect == FLT_MAX && dot_product(normal, bounce_ray) > 0.0f) {
+      const float optical_depth = get_optical_depth(origin_default, ray, start, distance);
+
+      const float height = height_at_point(origin_default);
+
+      const float ozone_density = fmaxf(0.0f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
+
+      RGBF transmittance;
+      transmittance.r = expf(-optical_depth * (scatter.r + ozone_density * ozone_absorbtion.r + 1.11f * mie_scatter));
+      transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
+      transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
+
+      result.r += transmittance.r * device_scene.sky.sun_strength * moon_albedo;
+      result.g += transmittance.g * device_scene.sky.sun_strength * moon_albedo;
+      result.b += transmittance.b * device_scene.sky.sun_strength * moon_albedo;
+    }
   }
 
   result.r *= sun_intensity * device_scene.sky.sun_color.r;
@@ -208,7 +241,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
     const int pixel    = task.index.y * device_width + task.index.x;
 
     const RGBF record = device_records[pixel];
-    RGBF sky          = get_sky_color(task.ray);
+    RGBF sky          = get_sky_color(task.origin, task.ray);
     sky               = mul_color(sky, record);
 
     const uint32_t light = device.light_sample_history[pixel];
@@ -232,7 +265,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
     const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_LIGHTSOURCE) {
-      device.frame_buffer[pixel] = get_sky_color(task.ray);
+      device.frame_buffer[pixel] = get_sky_color(task.origin, task.ray);
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value          = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);

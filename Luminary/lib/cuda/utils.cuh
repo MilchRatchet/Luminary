@@ -62,8 +62,10 @@ struct GeometryTask {
 } typedef GeometryTask;
 
 struct SkyTask {
+  vec3 origin;
   vec3 ray;
   ushort2 index;
+  uint32_t state;
 } typedef SkyTask;
 
 // Magnitude of ray gives distance

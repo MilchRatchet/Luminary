@@ -132,14 +132,19 @@ __device__ OceanTask load_ocean_task(const void* ptr) {
 }
 
 __device__ SkyTask load_sky_task(const void* ptr) {
-  const float4 data = __ldcs((float4*) ptr);
+  const float4 data0 = __ldcs((float4*) ptr);
+  const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
   SkyTask task;
-  task.ray.x   = data.x;
-  task.ray.y   = data.y;
-  task.ray.z   = data.z;
-  task.index.x = __float_as_uint(data.w) & 0xffff;
-  task.index.y = (__float_as_uint(data.w) >> 16);
+  task.origin.x = data0.x;
+  task.origin.y = data0.y;
+  task.origin.z = data0.z;
+  task.ray.x    = data0.w;
+  task.ray.y    = data1.x;
+  task.ray.z    = data1.y;
+  task.index.x  = __float_as_uint(data1.z) & 0xffff;
+  task.index.y  = (__float_as_uint(data1.z) >> 16);
+  task.state    = __float_as_uint(data1.w);
 
   return task;
 }

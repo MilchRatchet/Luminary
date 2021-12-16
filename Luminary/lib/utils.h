@@ -75,6 +75,7 @@ struct Camera {
   int bloom;
   float bloom_strength;
   int dithering;
+  int purkinje;
   float wasd_speed;
   float mouse_speed;
   int smooth_movement;
@@ -104,10 +105,13 @@ struct Sky {
   RGBF sun_color;
   float azimuth;
   float altitude;
+  float moon_azimuth;
+  float moon_altitude;
   float sun_strength;
   float base_density;
   float rayleigh_falloff;
   float mie_falloff;
+  int steps;
 } typedef Sky;
 
 struct Ocean {

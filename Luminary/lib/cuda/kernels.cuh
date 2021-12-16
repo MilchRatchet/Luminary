@@ -7,6 +7,7 @@
 #include "fog.cuh"
 #include "geometry.cuh"
 #include "ocean.cuh"
+#include "purkinje.cuh"
 #include "sky.cuh"
 #include "temporal.cuh"
 #include "toy.cuh"
@@ -333,49 +334,44 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     float4 data0;
     float4 data1;
 
-    if (hit_id == SKY_HIT) {
-      sky_task_count++;
-      data0.x = task.ray.x;
-      data0.y = task.ray.y;
-      data0.z = task.ray.z;
-      data0.w = *((float*) (&task.index));
+    if (hit_id != SKY_HIT)
+      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+
+    data0.x = task.origin.x;
+    data0.y = task.origin.y;
+    data0.z = task.origin.z;
+
+    toy_task_count += (hit_id == TOY_HIT);
+    sky_task_count += (hit_id == SKY_HIT);
+    ocean_task_count += (hit_id == OCEAN_HIT);
+    fog_task_count += (hit_id == FOG_HIT);
+    geometry_task_count += (hit_id < DEBUG_LIGHT_HIT);
+
+    if (hit_id == TOY_HIT || hit_id == SKY_HIT) {
+      data0.w = task.ray.x;
+      data1.x = task.ray.y;
+      data1.y = task.ray.z;
     }
     else {
-      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
-      data0.x     = task.origin.x;
-      data0.y     = task.origin.y;
-      data0.z     = task.origin.z;
-      if (hit_id == TOY_HIT) {
-        toy_task_count++;
-        data0.w = task.ray.x;
-        data1.x = task.ray.y;
-        data1.y = task.ray.z;
+      data0.w = asinf(task.ray.y);
+      data1.x = atan2f(task.ray.z, task.ray.x);
+
+      if (hit_id == OCEAN_HIT) {
+        data1.y = depth;
+      }
+      else if (hit_id == FOG_HIT) {
+        data1.y = depth;
       }
       else {
-        data0.w = asinf(task.ray.y);
-        data1.x = atan2f(task.ray.z, task.ray.x);
-
-        if (hit_id == OCEAN_HIT) {
-          ocean_task_count++;
-          data1.y = depth;
-        }
-        else if (hit_id == FOG_HIT) {
-          fog_task_count++;
-          data1.y = depth;
-        }
-        else {
-          geometry_task_count++;
-          data1.y = __uint_as_float(hit_id);
-        }
+        data1.y = __uint_as_float(hit_id);
       }
-
-      data1.z = *((float*) &task.index);
-      data1.w = *((float*) &task.state);
-
-      __stcs(ptr + 1, data1);
     }
 
+    data1.z = *((float*) &task.index);
+    data1.w = *((float*) &task.state);
+
     __stcs(ptr, data0);
+    __stcs(ptr + 1, data1);
   }
 
   device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_task_count;
@@ -401,6 +397,10 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     const float sy = y * scale_y;
 
     RGBF pixel = sample_pixel(source, sx, sy, device_width, device_height);
+
+    if (device_scene.camera.purkinje) {
+      pixel = purkinje_shift(pixel);
+    }
 
     pixel.r *= device_scene.camera.exposure;
     pixel.g *= device_scene.camera.exposure;

@@ -353,6 +353,7 @@ static Scene get_default_scene() {
   scene.camera.smooth_movement       = 0;
   scene.camera.smoothing_factor      = 0.1f;
   scene.camera.temporal_blend_factor = 0.15f;
+  scene.camera.purkinje              = 1;
 
   scene.ocean.active           = 0;
   scene.ocean.emissive         = 0;
@@ -398,10 +399,13 @@ static Scene get_default_scene() {
   scene.sky.sun_color.b      = 0.8f;
   scene.sky.altitude         = 0.5f;
   scene.sky.azimuth          = 3.141f;
+  scene.sky.moon_altitude    = -0.5f;
+  scene.sky.moon_azimuth     = 0.0f;
   scene.sky.sun_strength     = 40.0f;
   scene.sky.base_density     = 1.0f;
   scene.sky.rayleigh_falloff = 0.125f;
   scene.sky.mie_falloff      = 0.833333f;
+  scene.sky.steps            = 8;
 
   scene.fog.active     = 0;
   scene.fog.absorption = 1.0f;
