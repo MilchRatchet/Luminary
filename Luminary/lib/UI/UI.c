@@ -90,6 +90,7 @@ static UIPanel* create_camera_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene_gpu.camera.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
   panels[i++] =
     create_slider(ui, "Temporal Blend Factor", &(instance->scene_gpu.camera.temporal_blend_factor), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_check(ui, "Purkinje Shift", &(instance->scene_gpu.camera.purkinje), 0);
 
   return panels;
 }
@@ -104,12 +105,15 @@ static UIPanel* create_sky_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.sky.sun_color.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.sky.sun_color.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.sky.sun_color.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Azimuth", &(instance->scene_gpu.sky.azimuth), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
-  panels[i++] = create_slider(ui, "Altitude", &(instance->scene_gpu.sky.altitude), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Azimuth", &(instance->scene_gpu.sky.azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Altitude", &(instance->scene_gpu.sky.altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Moon Azimuth", &(instance->scene_gpu.sky.moon_azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Moon Altitude", &(instance->scene_gpu.sky.moon_altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Density", &(instance->scene_gpu.sky.base_density), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Rayleigh Falloff", &(instance->scene_gpu.sky.rayleigh_falloff), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Mie Falloff", &(instance->scene_gpu.sky.mie_falloff), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Sun Intensity", &(instance->scene_gpu.sky.sun_strength), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Steps", &(instance->scene_gpu.sky.steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_check(ui, "Fog Active", &(instance->scene_gpu.fog.active), 1);
   panels[i++] = create_slider(ui, "Fog Absorption", &(instance->scene_gpu.fog.absorption), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Fog Scattering", &(instance->scene_gpu.fog.scattering), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);

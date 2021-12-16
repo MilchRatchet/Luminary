@@ -12,7 +12,7 @@
 #define PANEL_TAB 0x6
 #define PANEL_BUTTON 0x7
 
-#define PANEL_HEIGHT 40
+#define PANEL_HEIGHT 36
 
 #define HOVER_R 0x00
 #define HOVER_G 0xff
