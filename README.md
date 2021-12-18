@@ -90,3 +90,5 @@ This is a list of papers I have used for this project so far. Note that some tec
 - E. Haines, T. Akenine-Möller, "Ray Tracing Gems", Apress, 2019.
 - J. Jimenez, _Next Generation Post Processing in Call of Duty: Advanced Warfare_, Talk at SIGGRAPH 2014.
 - A. Marrs, P. Shirley and I. Wald, "Ray Tracing Gems II", Apress, 2021.
+- A. Kirk and J. O'Brien, _Perceptually Based Tone Mapping for Low-Light Conditions_, ACM Transactions on Graphics, 30(4), pp. 1-10, 2011.
+- J. Patry, _Real-Time Samurai Cinema: Lighting, Atmosphere, and Tonemapping in Ghost of Tsushima_, Talk at SIGGRAPH 2021.
