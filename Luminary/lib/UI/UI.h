@@ -20,16 +20,6 @@
 #define UI_BORDER_SIZE 20
 
 #define UI_PANELS_TAB_COUNT 5
-#define UI_PANELS_GENERAL_TAB 0x0
-#define UI_PANELS_GENERAL_COUNT 22
-#define UI_PANELS_CAMERA_TAB 0x1
-#define UI_PANELS_CAMERA_COUNT 21
-#define UI_PANELS_SKY_TAB 0x2
-#define UI_PANELS_SKY_COUNT 21
-#define UI_PANELS_OCEAN_TAB 0x3
-#define UI_PANELS_OCEAN_COUNT 15
-#define UI_PANELS_TOY_TAB 0x4
-#define UI_PANELS_TOY_COUNT 25
 
 #if !defined(__AVX2__)
 #warning Using non AVX2 version of Luminary UI.

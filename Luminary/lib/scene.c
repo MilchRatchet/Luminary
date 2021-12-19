@@ -395,8 +395,8 @@ static Scene get_default_scene() {
   scene.toy.emission.a       = 0.0f;
 
   scene.sky.sun_color.r      = 1.0f;
-  scene.sky.sun_color.g      = 0.9f;
-  scene.sky.sun_color.b      = 0.8f;
+  scene.sky.sun_color.g      = 1.0f;
+  scene.sky.sun_color.b      = 1.0f;
   scene.sky.altitude         = 0.5f;
   scene.sky.azimuth          = 3.141f;
   scene.sky.moon_altitude    = -0.5f;
