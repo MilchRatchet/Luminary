@@ -1,5 +1,7 @@
 #include "UI_panel.h"
 
+#include <string.h>
+
 #include "UI.h"
 #include "UI_button.h"
 #include "UI_check.h"

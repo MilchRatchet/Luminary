@@ -174,8 +174,6 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
 
   origin = origin_default;
 
-  const float moon_albedo = 0.14f;
-
   float sun_hit   = sphere_ray_intersection(ray, origin, sun, sun_radius);
   float earth_hit = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS);
   float moon_hit  = sphere_ray_intersection(ray, origin, moon, moon_radius);
@@ -217,9 +215,9 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
       transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
       transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
 
-      result.r += transmittance.r * device_scene.sky.sun_strength * moon_albedo;
-      result.g += transmittance.g * device_scene.sky.sun_strength * moon_albedo;
-      result.b += transmittance.b * device_scene.sky.sun_strength * moon_albedo;
+      result.r += transmittance.r * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
+      result.g += transmittance.g * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
+      result.b += transmittance.b * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
     }
   }
 

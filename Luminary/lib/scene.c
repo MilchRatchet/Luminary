@@ -401,6 +401,7 @@ static Scene get_default_scene() {
   scene.sky.azimuth          = 3.141f;
   scene.sky.moon_altitude    = -0.5f;
   scene.sky.moon_azimuth     = 0.0f;
+  scene.sky.moon_albedo      = 0.12f;
   scene.sky.sun_strength     = 40.0f;
   scene.sky.base_density     = 1.0f;
   scene.sky.rayleigh_falloff = 0.125f;

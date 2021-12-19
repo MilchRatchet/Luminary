@@ -153,7 +153,7 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 11;
+  tab.panel_count = 12;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -168,8 +168,9 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Sun Azimuth", &(instance->scene_gpu.sky.azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Sun Altitude", &(instance->scene_gpu.sky.altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Sun Intensity", &(instance->scene_gpu.sky.sun_strength), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Moon Azimuth", &(instance->scene_gpu.sky.moon_azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
-  panels[i++] = create_slider(ui, "Moon Altitude", &(instance->scene_gpu.sky.moon_altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Moon Azimuth", &(instance->scene_gpu.sky.moon_azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Moon Altitude", &(instance->scene_gpu.sky.moon_altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Moon Albedo", &(instance->scene_gpu.sky.moon_albedo), 1, 0.0001f, 0.0f, 1.0f, 0, 0);
 
   tab.panels = panels;
 
