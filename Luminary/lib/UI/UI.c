@@ -106,7 +106,7 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 11;
+  tab.panel_count = 13;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -125,6 +125,8 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] =
     create_slider(ui, "Temporal Blend Factor", &(instance->scene_gpu.camera.temporal_blend_factor), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_check(ui, "Purkinje Shift", &(instance->scene_gpu.camera.purkinje), 0);
+  panels[i++] = create_slider(ui, "Purkinje Blueness", &(instance->scene_gpu.camera.purkinje_kappa1), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Purkinje Brightness", &(instance->scene_gpu.camera.purkinje_kappa2), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
 
   tab.panels = panels;
 

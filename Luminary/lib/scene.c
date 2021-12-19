@@ -354,6 +354,8 @@ static Scene get_default_scene() {
   scene.camera.smoothing_factor      = 0.1f;
   scene.camera.temporal_blend_factor = 0.15f;
   scene.camera.purkinje              = 1;
+  scene.camera.purkinje_kappa1       = 0.2f;
+  scene.camera.purkinje_kappa2       = 0.29f;
 
   scene.ocean.active           = 0;
   scene.ocean.emissive         = 0;

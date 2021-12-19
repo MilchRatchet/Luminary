@@ -76,6 +76,8 @@ struct Camera {
   float bloom_strength;
   int dithering;
   int purkinje;
+  float purkinje_kappa1;
+  float purkinje_kappa2;
   float wasd_speed;
   float mouse_speed;
   int smooth_movement;
