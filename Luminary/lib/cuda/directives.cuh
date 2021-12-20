@@ -46,7 +46,7 @@ __device__ int validate_trace_task(TraceTask task, RGBF record) {
   const float max = fmaxf(record.r, fmaxf(record.g, record.b));
   if (
     max < CUTOFF
-    || (max < PROBABILISTIC_CUTOFF && sample_blue_noise(task.index.x, task.index.y, task.state, 20) > (max - CUTOFF) / (CUTOFF - PROBABILISTIC_CUTOFF))) {
+    || (max < PROBABILISTIC_CUTOFF && blue_noise(task.index.x, task.index.y, task.state, 20) > (max - CUTOFF) / (CUTOFF - PROBABILISTIC_CUTOFF))) {
     valid = 0;
   }
 #endif
@@ -54,7 +54,7 @@ __device__ int validate_trace_task(TraceTask task, RGBF record) {
 #ifdef LOW_QUALITY_LONG_BOUNCES
   if (
     ((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES)
-    && sample_blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f / (1 + device_max_ray_depth)) {
+    && blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f / (1 + device_max_ray_depth)) {
     valid = 0;
   }
 #endif

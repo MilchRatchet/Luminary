@@ -21,10 +21,10 @@ __device__ TraceTask get_starting_ray(TraceTask task) {
   default_ray.z = -device_scene.camera.focal_length;
 
   const float alpha =
-    (device_scene.camera.aperture_size == 0.0f) ? 0.0f : sample_blue_noise(task.index.x, task.index.y, task.state, 0) * 2.0f * PI;
+    (device_scene.camera.aperture_size == 0.0f) ? 0.0f : blue_noise(task.index.x, task.index.y, task.state, 0) * 2.0f * PI;
   const float beta = (device_scene.camera.aperture_size == 0.0f)
                        ? 0.0f
-                       : sqrtf(sample_blue_noise(task.index.x, task.index.y, task.state, 1)) * device_scene.camera.aperture_size;
+                       : sqrtf(blue_noise(task.index.x, task.index.y, task.state, 1)) * device_scene.camera.aperture_size;
 
   vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 
@@ -167,7 +167,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     uint32_t hit_id = SKY_HIT;
 
     if (device_scene.fog.active && is_first_ray()) {
-      const float fog_dist = get_intersection_fog(task.origin, task.ray, sample_blue_noise(task.index.x, task.index.y, 256, 169));
+      const float fog_dist = get_intersection_fog(task.origin, task.ray, blue_noise(task.index.x, task.index.y, 256, 169));
 
       if (fog_dist < depth) {
         depth  = fog_dist;

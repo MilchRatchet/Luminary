@@ -52,8 +52,6 @@ __device__ float get_optical_depth(const vec3 origin, const vec3 ray, const floa
 __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
-  const float angular_diameter = 0.009f;
-
   const float overall_density = device_scene.sky.base_density;
 
   RGBF scatter;

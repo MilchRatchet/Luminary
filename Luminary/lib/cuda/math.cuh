@@ -381,7 +381,7 @@ __device__ RGBF max_color(const RGBF a, const RGBF b) {
 }
 
 __device__ float get_dithering(const int x, const int y) {
-  const float dither = 2.0f * sample_blue_noise(x, y, 0, 0) - 1.0f;
+  const float dither = 2.0f * blue_noise(x, y, 0, 0) - 1.0f;
 
   return copysignf(1.0f - sqrtf(1.0f - fabsf(dither)), dither);
 }

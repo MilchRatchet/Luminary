@@ -7,6 +7,13 @@
 #include "random.cuh"
 #include "utils.cuh"
 
+struct LightSample {
+  vec3 dir;
+  float angle;
+  uint32_t id;
+  float weight;
+} typedef LightSample;
+
 __device__ float shadowed_F90(const RGBF f0) {
   const float t = 1.0f / 0.04f;
   return fminf(1.0f, t * luminance(f0));
@@ -149,13 +156,13 @@ __device__ vec3 diffuse_BRDF(
 }
 
 __device__ vec3 light_BRDF(
-  RGBF& record, const vec3 normal, const vec3 V, const Light light, const int light_count, const RGBAF albedo, const float roughness,
-  const float metallic, const float beta, const float gamma) {
+  RGBF& record, const vec3 normal, const vec3 V, const LightSample light, const RGBAF albedo, const float roughness, const float metallic,
+  const float beta, const float gamma) {
   const float alpha = sqrtf(beta);
 
-  vec3 ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
+  vec3 ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.angle, gamma, light.dir));
 
-  float weight = light.radius * light_count;
+  float weight = light.weight;
 
   vec3 H;
   H.x = V.x + ray.x;
@@ -220,34 +227,69 @@ __device__ vec3 refraction_BRDF(
   return normalize_vector(add_vector(scale_vector(ray, index), scale_vector(H, index * a - sqrtf(b))));
 }
 
-__device__ Light sample_light(const vec3 position, int& light_count, uint32_t& light_sample_id, const float r) {
+__device__ LightSample sample_light(const vec3 position, const vec3 normal) {
   const int sun_visible = (device_sun.y >= -0.1f);
   const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
-  light_count           = 0;
+  uint32_t light_count  = 0;
   light_count += sun_visible;
   light_count += toy_visible;
   light_count += (device_lights_active) ? device_scene.lights_length - 2 : 0;
 
-  uint32_t light_index = (uint32_t) (r * light_count);
+  float weight_sum = 0.0f;
+  LightSample selected;
+  selected.weight = -1.0f;
 
-  light_index += !sun_visible;
-  light_index += (toy_visible || light_index < TOY_LIGHT) ? 0 : 1;
+  if (!light_count)
+    return selected;
 
-  light_sample_id = light_index;
+  const int reservoir_sampling_size = min(light_count, 8);
 
-  const float4 light_data = __ldg((float4*) (device_scene.lights + light_index));
-  vec3 light_pos;
-  light_pos.x   = light_data.x;
-  light_pos.y   = light_data.y;
-  light_pos.z   = light_data.z;
-  light_pos     = sub_vector(light_pos, position);
-  const float d = get_length(light_pos) + eps;
+  for (int i = 0; i < reservoir_sampling_size; i++) {
+    const float r1       = white_noise();
+    uint32_t light_index = (uint32_t) (r1 * light_count);
 
-  Light light;
-  light.pos    = normalize_vector(light_pos);
-  light.radius = fminf(1.0f, atanf(light_data.w / d));
+    light_index += !sun_visible;
+    light_index += (toy_visible || light_index < TOY_LIGHT) ? 0 : 1;
 
-  return light;
+    const float4 light_data = __ldg((float4*) (device_scene.lights + light_index));
+
+    LightSample light;
+    light.dir.x = light_data.x;
+    light.dir.y = light_data.y;
+    light.dir.z = light_data.z;
+    light.dir   = sub_vector(light.dir, position);
+
+    const float d = get_length(light.dir) + eps;
+
+    light.dir    = normalize_vector(light.dir);
+    light.angle  = __saturatef(atanf(light_data.w / d));
+    light.id     = light_index;
+    light.weight = light.angle * (dot_product(light.dir, normal) >= 0.0f);
+
+    switch (light_index) {
+      case 0:
+        light.weight *= device_scene.sky.sun_strength;
+        break;
+      case 1:
+        light.weight *= device_scene.toy.material.b;
+        break;
+      default:
+        light.weight *= device_default_material.b;
+        break;
+    }
+
+    weight_sum += light.weight;
+
+    const float r2 = white_noise();
+
+    if (r2 < light.weight / weight_sum) {
+      selected = light;
+    }
+  }
+
+  selected.weight = reservoir_sampling_size * selected.angle * weight_sum / selected.weight;
+
+  return selected;
 }
 
 #endif /* CU_BRDF_H */
