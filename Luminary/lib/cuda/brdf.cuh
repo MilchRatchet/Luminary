@@ -287,7 +287,7 @@ __device__ LightSample sample_light(const vec3 position, const vec3 normal) {
     }
   }
 
-  selected.weight = reservoir_sampling_size * selected.angle * weight_sum / selected.weight;
+  selected.weight = light_count / reservoir_sampling_size * selected.angle * weight_sum / selected.weight;
 
   return selected;
 }
