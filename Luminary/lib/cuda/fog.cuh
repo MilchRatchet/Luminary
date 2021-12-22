@@ -90,7 +90,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
 
       store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), continue_task);
 
-      light = sample_light(task.position, get_vector(0.0f, 0.0f, 0.0f));
+      light = sample_light(task.position, get_vector(0.0f, 0.0f, 0.0f), task.index, task.state);
 
       if (light.weight <= 0.0f) {
         continue;

@@ -159,7 +159,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
       LightSample light;
-      light = sample_light(task.position, normal);
+      light = sample_light(task.position, normal, task.index, task.state);
 
       const float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
       const float beta  = blue_noise(task.index.x, task.index.y, task.state, 2);

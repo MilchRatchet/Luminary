@@ -227,7 +227,7 @@ __device__ vec3 refraction_BRDF(
   return normalize_vector(add_vector(scale_vector(ray, index), scale_vector(H, index * a - sqrtf(b))));
 }
 
-__device__ LightSample sample_light(const vec3 position, const vec3 normal) {
+__device__ LightSample sample_light(const vec3 position, const vec3 normal, const ushort2 index, const uint32_t seed) {
   const int sun_visible = (device_sun.y >= -0.1f);
   const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
   uint32_t light_count  = 0;
@@ -245,7 +245,7 @@ __device__ LightSample sample_light(const vec3 position, const vec3 normal) {
   const int reservoir_sampling_size = min(light_count, 8);
 
   for (int i = 0; i < reservoir_sampling_size; i++) {
-    const float r1       = white_noise();
+    const float r1       = blue_noise(index.x, index.y, seed, i);
     uint32_t light_index = (uint32_t) (r1 * light_count);
 
     light_index += !sun_visible;
@@ -280,7 +280,7 @@ __device__ LightSample sample_light(const vec3 position, const vec3 normal) {
 
     weight_sum += light.weight;
 
-    const float r2 = white_noise();
+    const float r2 = blue_noise(index.x, index.y, seed, reservoir_sampling_size + i);
 
     if (r2 < light.weight / weight_sum) {
       selected = light;
