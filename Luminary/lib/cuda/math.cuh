@@ -270,6 +270,14 @@ __device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
   return res;
 }
 
+/*
+ * Computes the distance to the first intersection of a ray with a sphere. To check for any hit use sphere_ray_hit.
+ * @param ray Ray direction.
+ * @param origin Ray origin.
+ * @param p Center of the sphere.
+ * @param r Radius of the sphere.
+ * @result Value a such that origin + a * ray is a point on the sphere.
+ */
 __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
   vec3 diff = sub_vector(origin, p);
   float a   = dot_product(ray, ray);
@@ -290,6 +298,37 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
   return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
 }
 
+/*
+ * Computes whether a ray hits a sphere. To compute the distance see sphere_ray_intersection.
+ * @param ray Ray direction.
+ * @param origin Ray origin.
+ * @param p Center of the sphere.
+ * @param r Radius of the sphere.
+ * @result 1 if the ray hits the sphere, 0 else.
+ */
+__device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
+  vec3 diff = sub_vector(origin, p);
+  float a   = dot_product(ray, ray);
+  float b   = 2.0f * dot_product(diff, ray);
+  float c   = dot_product(diff, diff) - r * r;
+  float d   = b * b - 4.0f * a * c;
+
+  if (d < 0.0f)
+    return 0;
+
+  const float num = -b - sqrtf(d);
+
+  return (num >= 0.0f);
+}
+
+/*
+ * Computes the distance to the last intersection of a ray with a sphere. To compute the first hit use sphere_ray_intersection.
+ * @param ray Ray direction.
+ * @param origin Ray origin.
+ * @param p Center of the sphere.
+ * @param r Radius of the sphere.
+ * @result Value a such that origin + a * ray is a point on the sphere.
+ */
 __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
   vec3 diff = sub_vector(origin, p);
   float a   = dot_product(ray, ray);
