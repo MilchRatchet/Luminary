@@ -15,6 +15,7 @@
 #include "baked.h"
 #include "raytrace.h"
 #include "scene.h"
+#include "stars.h"
 
 #define MOUSE_LEFT_BLOCKED 0b1
 #define MOUSE_DRAGGING_WINDOW 0b10
@@ -155,7 +156,7 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 12;
+  tab.panel_count = 16;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -173,6 +174,10 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Moon Azimuth", &(instance->scene_gpu.sky.moon_azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Moon Altitude", &(instance->scene_gpu.sky.moon_altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Moon Albedo", &(instance->scene_gpu.sky.moon_albedo), 1, 0.0001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Stars Count", &(instance->scene_gpu.sky.settings_stars_count), 0, 1.0f, 0.0f, FLT_MAX, 0, 1);
+  panels[i++] = create_slider(ui, "Stars Seed", &(instance->scene_gpu.sky.stars_seed), 0, 1.0f, 0.0f, FLT_MAX, 0, 1);
+  panels[i++] = create_slider(ui, "Stars Intensity", &(instance->scene_gpu.sky.stars_intensity), 1, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_button(ui, "Generate Stars", instance, (void (*)(void*)) generate_stars, 1);
 
   tab.panels = panels;
 

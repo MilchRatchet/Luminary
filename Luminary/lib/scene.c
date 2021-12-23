@@ -11,6 +11,7 @@
 #include "log.h"
 #include "png.h"
 #include "raytrace.h"
+#include "stars.h"
 #include "wavefront.h"
 
 static const int LINE_SIZE       = 4096;
@@ -330,6 +331,8 @@ static void parse_toy_settings(Toy* toy, char* line) {
 static Scene get_default_scene() {
   Scene scene;
 
+  memset(&scene, 0, sizeof(Scene));
+
   scene.camera.pos.x                 = 0.0f;
   scene.camera.pos.y                 = 0.0f;
   scene.camera.pos.z                 = 0.0f;
@@ -345,7 +348,7 @@ static Scene get_default_scene() {
   scene.camera.bloom_strength        = 0.1f;
   scene.camera.dithering             = 1;
   scene.camera.alpha_cutoff          = 0.0f;
-  scene.camera.far_clip_distance     = 1000000.0f;
+  scene.camera.far_clip_distance     = 50000.0f;
   scene.camera.tonemap               = TONEMAP_ACES;
   scene.camera.filter                = FILTER_NONE;
   scene.camera.wasd_speed            = 1.0f;
@@ -396,19 +399,22 @@ static Scene get_default_scene() {
   scene.toy.emission.b       = 0.0f;
   scene.toy.emission.a       = 0.0f;
 
-  scene.sky.sun_color.r      = 1.0f;
-  scene.sky.sun_color.g      = 1.0f;
-  scene.sky.sun_color.b      = 1.0f;
-  scene.sky.altitude         = 0.5f;
-  scene.sky.azimuth          = 3.141f;
-  scene.sky.moon_altitude    = -0.5f;
-  scene.sky.moon_azimuth     = 0.0f;
-  scene.sky.moon_albedo      = 0.12f;
-  scene.sky.sun_strength     = 40.0f;
-  scene.sky.base_density     = 1.0f;
-  scene.sky.rayleigh_falloff = 0.125f;
-  scene.sky.mie_falloff      = 0.833333f;
-  scene.sky.steps            = 8;
+  scene.sky.sun_color.r          = 1.0f;
+  scene.sky.sun_color.g          = 1.0f;
+  scene.sky.sun_color.b          = 1.0f;
+  scene.sky.altitude             = 0.5f;
+  scene.sky.azimuth              = 3.141f;
+  scene.sky.moon_altitude        = -0.5f;
+  scene.sky.moon_azimuth         = 0.0f;
+  scene.sky.moon_albedo          = 0.12f;
+  scene.sky.sun_strength         = 40.0f;
+  scene.sky.base_density         = 1.0f;
+  scene.sky.rayleigh_falloff     = 0.125f;
+  scene.sky.mie_falloff          = 0.833333f;
+  scene.sky.steps                = 8;
+  scene.sky.stars_seed           = 0;
+  scene.sky.stars_intensity      = 1.0f;
+  scene.sky.settings_stars_count = 10000;
 
   scene.fog.active     = 0;
   scene.fog.absorption = 1.0f;
@@ -537,6 +543,8 @@ RaytraceInstance* load_scene(const char* filename) {
   free_wavefront_content(content);
   free_scene(scene);
 
+  generate_stars(instance);
+
   return instance;
 }
 
@@ -579,6 +587,8 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   free_wavefront_content(content);
   free_scene(scene);
+
+  generate_stars(instance);
 
   return instance;
 }

@@ -103,6 +103,13 @@ struct Toy {
   RGBAF emission;
 } typedef Toy;
 
+struct Star {
+  float altitude;
+  float azimuth;
+  float radius;
+  float intensity;
+} typedef Star;
+
 struct Sky {
   RGBF sun_color;
   float azimuth;
@@ -115,6 +122,12 @@ struct Sky {
   float rayleigh_falloff;
   float mie_falloff;
   int steps;
+  Star* stars;
+  int* stars_offsets;
+  int settings_stars_count;
+  int current_stars_count;
+  int stars_seed;
+  float stars_intensity;
 } typedef Sky;
 
 struct Ocean {

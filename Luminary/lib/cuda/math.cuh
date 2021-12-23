@@ -310,6 +310,15 @@ __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, co
   return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
 }
 
+__device__ __host__ vec3 angles_to_direction(float altitude, float azimuth) {
+  vec3 dir;
+  dir.x = cosf(azimuth) * cosf(altitude);
+  dir.y = sinf(altitude);
+  dir.z = sinf(azimuth) * cosf(altitude);
+
+  return dir;
+}
+
 __device__ RGBF get_color(const float r, const float g, const float b) {
   RGBF result;
 

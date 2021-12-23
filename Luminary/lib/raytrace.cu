@@ -39,10 +39,7 @@
  * @param scene Scene which contains the sun and toy properties and the GPU pointer to the lights buffer.
  */
 static void update_special_lights(const Scene scene) {
-  vec3 sun;
-  sun.x             = sinf(scene.sky.azimuth) * cosf(scene.sky.altitude);
-  sun.y             = sinf(scene.sky.altitude);
-  sun.z             = cosf(scene.sky.azimuth) * cosf(scene.sky.altitude);
+  vec3 sun          = angles_to_direction(scene.sky.altitude, scene.sky.azimuth);
   const float scale = 1.0f / (sqrtf(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z));
   sun.x *= scale;
   sun.y *= scale;

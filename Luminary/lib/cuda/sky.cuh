@@ -4,6 +4,7 @@
 #include <cuda_runtime_api.h>
 
 #include "math.cuh"
+#include "stars.h"
 #include "utils.cuh"
 
 #define EARTH_RADIUS 6371.0f
@@ -75,10 +76,7 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
 
   sun.y -= EARTH_RADIUS;
 
-  vec3 moon;
-  moon.x = sinf(device_scene.sky.moon_azimuth) * cosf(device_scene.sky.moon_altitude);
-  moon.y = sinf(device_scene.sky.moon_altitude);
-  moon.z = cosf(device_scene.sky.moon_azimuth) * cosf(device_scene.sky.moon_altitude);
+  vec3 moon = angles_to_direction(device_scene.sky.moon_altitude, device_scene.sky.moon_azimuth);
 
   moon = scale_vector(moon, 384399.0f);
 
@@ -216,6 +214,42 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
       result.r += transmittance.r * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
       result.g += transmittance.g * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
       result.b += transmittance.b * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
+    }
+  }
+  else if (sun_hit == FLT_MAX && earth_hit == FLT_MAX && moon_hit == FLT_MAX) {
+    float ray_altitude = asinf(ray.y);
+    float ray_azimuth  = atan2f(-ray.z, -ray.x) + PI;
+
+    int x = (int) (ray_azimuth * 10.0f);
+    int y = (int) ((ray_altitude + PI * 0.5f) * 10.0f);
+
+    int grid = x + y * STARS_GRID_LD;
+
+    int a = device_scene.sky.stars_offsets[grid];
+    int b = device_scene.sky.stars_offsets[grid + 1];
+
+    for (int i = a; i < b; i++) {
+      Star star     = device_scene.sky.stars[i];
+      vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
+
+      float star_hit = sphere_ray_intersection(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius);
+
+      if (star_hit < FLT_MAX) {
+        const float optical_depth = get_optical_depth(origin_default, ray, start, distance);
+
+        const float height = height_at_point(origin_default);
+
+        const float ozone_density = fmaxf(0.0f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
+
+        RGBF transmittance;
+        transmittance.r = expf(-optical_depth * (scatter.r + ozone_density * ozone_absorbtion.r + 1.11f * mie_scatter));
+        transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
+        transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
+
+        result.r += transmittance.r * star.intensity * device_scene.sky.stars_intensity;
+        result.g += transmittance.g * star.intensity * device_scene.sky.stars_intensity;
+        result.b += transmittance.b * star.intensity * device_scene.sky.stars_intensity;
+      }
     }
   }
 

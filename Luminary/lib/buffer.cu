@@ -48,6 +48,11 @@ extern "C" void device_free(void* buffer, size_t size) {
   gpuErrchk(cudaFree(buffer));
 }
 
+extern "C" void device_upload(void* dst, void* src, size_t size) {
+  gpuErrchk(cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice));
+  log_message("Uploaded %zu bytes to device.", size);
+}
+
 extern "C" void device_buffer_init(DeviceBuffer** buffer) {
   (*buffer) = (DeviceBuffer*) malloc(sizeof(DeviceBuffer));
 
@@ -112,7 +117,7 @@ extern "C" void device_buffer_upload(DeviceBuffer* buffer, void* data) {
     return;
   }
 
-  gpuErrchk(cudaMemcpy(buffer->device_pointer, data, buffer->size, cudaMemcpyHostToDevice));
+  device_upload(buffer->device_pointer, data, buffer->size);
   log_message("Copied %zu bytes to device buffer %zu.", buffer->size, buffer->device_pointer);
 }
 
