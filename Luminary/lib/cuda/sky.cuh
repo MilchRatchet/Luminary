@@ -148,7 +148,7 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
       transmittance.g = expf(-optical_depth * (scatter.g + ozone_density * ozone_absorbtion.g + 1.11f * mie_scatter));
       transmittance.b = expf(-optical_depth * (scatter.b + ozone_density * ozone_absorbtion.b + 1.11f * mie_scatter));
 
-      float cos_angle = dot_product(ray, ray_scatter);
+      float cos_angle = fmaxf(0.0f, dot_product(ray, ray_scatter));
 
       const float rayleigh = 3.0f * (1.0f + cos_angle * cos_angle) / (16.0f * 3.1415926535f);
 
@@ -168,6 +168,8 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
     result = scale_color(result, step_size);
   }
 
+  result = mul_color(result, device_scene.sky.sun_color);
+
   origin = origin_default;
 
   const float sun_hit   = sphere_ray_intersection(ray, origin, sun, sun_radius);
@@ -175,31 +177,38 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
   const float moon_hit  = sphere_ray_intersection(ray, origin, moon, moon_radius);
 
   if (earth_hit > sun_hit && moon_hit > sun_hit) {
+    /*
+     * Sun limb darkening using the model from http://www.physics.hmc.edu/faculty/esin/a101/limbdarkening.pdf
+     */
+    const vec3 sun_hit_pos  = add_vector(origin, scale_vector(ray, sun_hit));
+    const float limb_factor = 1.0f + dot_product(normalize_vector(sub_vector(sun_hit_pos, sun)), ray);
+    const float mu          = sqrtf(1.0f - limb_factor * limb_factor);
+
+    const RGBF limb_color = get_color(0.397f, 0.503f, 0.652f);
+
     const float optical_depth = get_optical_depth(origin_default, ray, start, distance);
     const RGBF transmittance  = get_transmittance_fast(optical_depth, scatter, mie_scatter);
 
-    result.r += transmittance.r * device_scene.sky.sun_strength;
-    result.g += transmittance.g * device_scene.sky.sun_strength;
-    result.b += transmittance.b * device_scene.sky.sun_strength;
+    result.r += transmittance.r * device_scene.sky.sun_strength * (1.0f - device_scene.sky.sun_color.r * (1.0f - powf(mu, limb_color.r)));
+    result.g += transmittance.g * device_scene.sky.sun_strength * (1.0f - device_scene.sky.sun_color.g * (1.0f - powf(mu, limb_color.g)));
+    result.b += transmittance.b * device_scene.sky.sun_strength * (1.0f - device_scene.sky.sun_color.b * (1.0f - powf(mu, limb_color.b)));
   }
   else if (earth_hit > moon_hit) {
-    vec3 moon_pos = add_vector(origin, scale_vector(ray, moon_hit));
-
-    vec3 normal = normalize_vector(sub_vector(moon_pos, moon));
-
+    vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
+    vec3 normal     = normalize_vector(sub_vector(moon_pos, moon));
     vec3 bounce_ray = normalize_vector(sub_vector(sun, moon_pos));
 
     if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
       const float optical_depth = get_optical_depth(origin_default, ray, start, distance);
       const RGBF transmittance  = get_transmittance_fast(optical_depth, scatter, mie_scatter);
 
-      result.r += transmittance.r * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
-      result.g += transmittance.g * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
-      result.b += transmittance.b * device_scene.sky.sun_strength * device_scene.sky.moon_albedo;
+      const float weight = device_scene.sky.sun_strength * device_scene.sky.moon_albedo * 0.1f;
+
+      result.r += transmittance.r * weight * device_scene.sky.sun_color.r;
+      result.g += transmittance.g * weight * device_scene.sky.sun_color.g;
+      result.b += transmittance.b * weight * device_scene.sky.sun_color.b;
     }
   }
-
-  result = mul_color(result, device_scene.sky.sun_color);
 
   if (sun_hit == FLT_MAX && earth_hit == FLT_MAX && moon_hit == FLT_MAX) {
     float ray_altitude = asinf(ray.y);
