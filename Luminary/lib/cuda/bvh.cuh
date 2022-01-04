@@ -3,9 +3,9 @@
 
 #include <cuda_runtime_api.h>
 
+#include "intrinsics.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "minmax.cuh"
 #include "ocean.cuh"
 #include "utils.cuh"
 
@@ -43,18 +43,6 @@ __device__ float bvh_triangle_intersection(const float4* triangles, const vec3 o
 
 __device__ unsigned char get_8bit(const unsigned int input, const unsigned int bitshift) {
   return (input >> bitshift) & 0x000000FF;
-}
-
-__device__ unsigned int sign_extend_s8x4(unsigned int a) {
-  unsigned int result;
-  asm("prmt.b32 %0, %1, 0x0, 0x0000BA98;" : "=r"(result) : "r"(a));
-  return result;
-}
-
-__device__ unsigned int __bfind(unsigned int a) {
-  unsigned int result;
-  asm volatile("bfind.u32 %0, %1; " : "=r"(result) : "r"(a));
-  return result;
 }
 
 #define STACK_SIZE_SM 10
@@ -155,10 +143,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       const float4 data3 = __ldg(data_ptr + 3);
       const float4 data4 = __ldg(data_ptr + 4);
 
-      vec3 p;
-      p.x = data0.x;
-      p.y = data0.y;
-      p.z = data0.z;
+      const vec3 p = get_vector(data0.x, data0.y, data0.z);
 
       float3 e;
       e.x = *((char*) &data0.w + 0);
@@ -175,10 +160,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       scaled_inv_ray.y = exp2f(e.y) * inv_ray.y;
       scaled_inv_ray.z = exp2f(e.z) * inv_ray.z;
 
-      vec3 shifted_origin;
-      shifted_origin.x = (p.x - origin.x) * inv_ray.x;
-      shifted_origin.y = (p.y - origin.y) * inv_ray.y;
-      shifted_origin.z = (p.z - origin.z) * inv_ray.z;
+      const float diag_shift = (p.x - origin.x) * inv_ray.x;
+
+      const float shifted_eps   = eps - diag_shift;
+      const float shifted_depth = depth - diag_shift;
+
+      const float shifted_origin_y = (p.y - origin.y) * inv_ray.y - diag_shift;
+      const float shifted_origin_z = (p.z - origin.z) * inv_ray.z - diag_shift;
 
       {
         const unsigned int meta4       = __float_as_int(data1.z);
@@ -187,12 +175,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         const unsigned int bit_index4  = (meta4 ^ (inverse_octant4 & inner_mask4)) & 0x1f1f1f1f;
         const unsigned int child_bits4 = (meta4 >> 5) & 0x07070707;
 
-        const unsigned int low_x  = (inv_ray.x < 0.0f) ? __float_as_uint(data3.z) : __float_as_uint(data2.x);
-        const unsigned int high_x = (inv_ray.x < 0.0f) ? __float_as_uint(data2.x) : __float_as_uint(data3.z);
-        const unsigned int low_y  = (inv_ray.y < 0.0f) ? __float_as_uint(data4.x) : __float_as_uint(data2.z);
-        const unsigned int high_y = (inv_ray.y < 0.0f) ? __float_as_uint(data2.z) : __float_as_uint(data4.x);
-        const unsigned int low_z  = (inv_ray.z < 0.0f) ? __float_as_uint(data4.z) : __float_as_uint(data3.x);
-        const unsigned int high_z = (inv_ray.z < 0.0f) ? __float_as_uint(data3.x) : __float_as_uint(data4.z);
+        const unsigned int low_x  = __uslctf(__float_as_uint(data2.x), __float_as_uint(data3.z), inv_ray.x);
+        const unsigned int high_x = __uslctf(__float_as_uint(data3.z), __float_as_uint(data2.x), inv_ray.x);
+        const unsigned int low_y  = __uslctf(__float_as_uint(data2.z), __float_as_uint(data4.x), inv_ray.y);
+        const unsigned int high_y = __uslctf(__float_as_uint(data4.x), __float_as_uint(data2.z), inv_ray.y);
+        const unsigned int low_z  = __uslctf(__float_as_uint(data3.x), __float_as_uint(data4.z), inv_ray.z);
+        const unsigned int high_z = __uslctf(__float_as_uint(data4.z), __float_as_uint(data3.x), inv_ray.z);
 
         float min_x[4];
         float max_x[4];
@@ -201,62 +189,63 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         float min_z[4];
         float max_z[4];
 
-        min_x[0] = get_8bit(low_x, 0) * scaled_inv_ray.x + shifted_origin.x;
-        min_x[1] = get_8bit(low_x, 8) * scaled_inv_ray.x + shifted_origin.x;
-        min_x[2] = get_8bit(low_x, 16) * scaled_inv_ray.x + shifted_origin.x;
-        min_x[3] = get_8bit(low_x, 24) * scaled_inv_ray.x + shifted_origin.x;
+        min_x[0] = get_8bit(low_x, 0) * scaled_inv_ray.x;
+        min_x[1] = get_8bit(low_x, 8) * scaled_inv_ray.x;
+        min_x[2] = get_8bit(low_x, 16) * scaled_inv_ray.x;
+        min_x[3] = get_8bit(low_x, 24) * scaled_inv_ray.x;
 
-        max_x[0] = get_8bit(high_x, 0) * scaled_inv_ray.x + shifted_origin.x;
-        max_x[1] = get_8bit(high_x, 8) * scaled_inv_ray.x + shifted_origin.x;
-        max_x[2] = get_8bit(high_x, 16) * scaled_inv_ray.x + shifted_origin.x;
-        max_x[3] = get_8bit(high_x, 24) * scaled_inv_ray.x + shifted_origin.x;
+        max_x[0] = get_8bit(high_x, 0) * scaled_inv_ray.x;
+        max_x[1] = get_8bit(high_x, 8) * scaled_inv_ray.x;
+        max_x[2] = get_8bit(high_x, 16) * scaled_inv_ray.x;
+        max_x[3] = get_8bit(high_x, 24) * scaled_inv_ray.x;
 
-        min_y[0] = get_8bit(low_y, 0) * scaled_inv_ray.y + shifted_origin.y;
-        min_y[1] = get_8bit(low_y, 8) * scaled_inv_ray.y + shifted_origin.y;
-        min_y[2] = get_8bit(low_y, 16) * scaled_inv_ray.y + shifted_origin.y;
-        min_y[3] = get_8bit(low_y, 24) * scaled_inv_ray.y + shifted_origin.y;
+        min_y[0] = get_8bit(low_y, 0) * scaled_inv_ray.y + shifted_origin_y;
+        min_y[1] = get_8bit(low_y, 8) * scaled_inv_ray.y + shifted_origin_y;
+        min_y[2] = get_8bit(low_y, 16) * scaled_inv_ray.y + shifted_origin_y;
+        min_y[3] = get_8bit(low_y, 24) * scaled_inv_ray.y + shifted_origin_y;
 
-        max_y[0] = get_8bit(high_y, 0) * scaled_inv_ray.y + shifted_origin.y;
-        max_y[1] = get_8bit(high_y, 8) * scaled_inv_ray.y + shifted_origin.y;
-        max_y[2] = get_8bit(high_y, 16) * scaled_inv_ray.y + shifted_origin.y;
-        max_y[3] = get_8bit(high_y, 24) * scaled_inv_ray.y + shifted_origin.y;
+        max_y[0] = get_8bit(high_y, 0) * scaled_inv_ray.y + shifted_origin_y;
+        max_y[1] = get_8bit(high_y, 8) * scaled_inv_ray.y + shifted_origin_y;
+        max_y[2] = get_8bit(high_y, 16) * scaled_inv_ray.y + shifted_origin_y;
+        max_y[3] = get_8bit(high_y, 24) * scaled_inv_ray.y + shifted_origin_y;
 
-        min_z[0] = get_8bit(low_z, 0) * scaled_inv_ray.z + shifted_origin.z;
-        min_z[1] = get_8bit(low_z, 8) * scaled_inv_ray.z + shifted_origin.z;
-        min_z[2] = get_8bit(low_z, 16) * scaled_inv_ray.z + shifted_origin.z;
-        min_z[3] = get_8bit(low_z, 24) * scaled_inv_ray.z + shifted_origin.z;
+        min_z[0] = get_8bit(low_z, 0) * scaled_inv_ray.z + shifted_origin_z;
+        min_z[1] = get_8bit(low_z, 8) * scaled_inv_ray.z + shifted_origin_z;
+        min_z[2] = get_8bit(low_z, 16) * scaled_inv_ray.z + shifted_origin_z;
+        min_z[3] = get_8bit(low_z, 24) * scaled_inv_ray.z + shifted_origin_z;
 
-        max_z[0] = get_8bit(high_z, 0) * scaled_inv_ray.z + shifted_origin.z;
-        max_z[1] = get_8bit(high_z, 8) * scaled_inv_ray.z + shifted_origin.z;
-        max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin.z;
-        max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin.z;
+        max_z[0] = get_8bit(high_z, 0) * scaled_inv_ray.z + shifted_origin_z;
+        max_z[1] = get_8bit(high_z, 8) * scaled_inv_ray.z + shifted_origin_z;
+        max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin_z;
+        max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin_z;
 
+        // We don't use fmax_fmax/fmin_fmin here because we are ALU bound on Ampere
         float slab_min, slab_max;
         int intersection;
 
-        slab_min     = fmaxf(fmax_fmax(min_x[0], min_y[0], min_z[0]), eps);
-        slab_max     = fminf(fmin_fmin(max_x[0], max_y[0], max_z[0]), depth);
+        slab_min     = fmaxf(fmaxf(min_x[0], fmaxf(min_y[0], min_z[0])), shifted_eps);
+        slab_max     = fminf(fminf(max_x[0], fminf(max_y[0], max_z[0])), shifted_depth);
         intersection = slab_min <= slab_max;
 
         if (intersection)
           asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
 
-        slab_min     = fmaxf(fmax_fmax(min_x[1], min_y[1], min_z[1]), eps);
-        slab_max     = fminf(fmin_fmin(max_x[1], max_y[1], max_z[1]), depth);
+        slab_min     = fmaxf(fmaxf(min_x[1], fmaxf(min_y[1], min_z[1])), shifted_eps);
+        slab_max     = fminf(fminf(max_x[1], fminf(max_y[1], max_z[1])), shifted_depth);
         intersection = slab_min <= slab_max;
 
         if (intersection)
           asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
 
-        slab_min     = fmaxf(fmax_fmax(min_x[2], min_y[2], min_z[2]), eps);
-        slab_max     = fminf(fmin_fmin(max_x[2], max_y[2], max_z[2]), depth);
+        slab_min     = fmaxf(fmaxf(min_x[2], fmaxf(min_y[2], min_z[2])), shifted_eps);
+        slab_max     = fminf(fminf(max_x[2], fminf(max_y[2], max_z[2])), shifted_depth);
         intersection = slab_min <= slab_max;
 
         if (intersection)
           asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
 
-        slab_min     = fmaxf(fmax_fmax(min_x[3], min_y[3], min_z[3]), eps);
-        slab_max     = fminf(fmin_fmin(max_x[3], max_y[3], max_z[3]), depth);
+        slab_min     = fmaxf(fmaxf(min_x[3], fmaxf(min_y[3], min_z[3])), shifted_eps);
+        slab_max     = fminf(fminf(max_x[3], fminf(max_y[3], max_z[3])), shifted_depth);
         intersection = slab_min <= slab_max;
 
         if (intersection)
@@ -270,12 +259,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         const unsigned int bit_index4  = (meta4 ^ (inverse_octant4 & inner_mask4)) & 0x1f1f1f1f;
         const unsigned int child_bits4 = (meta4 >> 5) & 0x07070707;
 
-        const unsigned int low_x  = (inv_ray.x < 0.0f) ? __float_as_uint(data3.w) : __float_as_uint(data2.y);
-        const unsigned int high_x = (inv_ray.x < 0.0f) ? __float_as_uint(data2.y) : __float_as_uint(data3.w);
-        const unsigned int low_y  = (inv_ray.y < 0.0f) ? __float_as_uint(data4.y) : __float_as_uint(data2.w);
-        const unsigned int high_y = (inv_ray.y < 0.0f) ? __float_as_uint(data2.w) : __float_as_uint(data4.y);
-        const unsigned int low_z  = (inv_ray.z < 0.0f) ? __float_as_uint(data4.w) : __float_as_uint(data3.y);
-        const unsigned int high_z = (inv_ray.z < 0.0f) ? __float_as_uint(data3.y) : __float_as_uint(data4.w);
+        const unsigned int low_x  = __uslctf(__float_as_uint(data2.y), __float_as_uint(data3.w), inv_ray.x);
+        const unsigned int high_x = __uslctf(__float_as_uint(data3.w), __float_as_uint(data2.y), inv_ray.x);
+        const unsigned int low_y  = __uslctf(__float_as_uint(data2.w), __float_as_uint(data4.y), inv_ray.y);
+        const unsigned int high_y = __uslctf(__float_as_uint(data4.y), __float_as_uint(data2.w), inv_ray.y);
+        const unsigned int low_z  = __uslctf(__float_as_uint(data3.y), __float_as_uint(data4.w), inv_ray.z);
+        const unsigned int high_z = __uslctf(__float_as_uint(data4.w), __float_as_uint(data3.y), inv_ray.z);
 
         float min_x[4];
         float max_x[4];
@@ -284,62 +273,63 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         float min_z[4];
         float max_z[4];
 
-        min_x[0] = get_8bit(low_x, 0) * scaled_inv_ray.x + shifted_origin.x;
-        min_x[1] = get_8bit(low_x, 8) * scaled_inv_ray.x + shifted_origin.x;
-        min_x[2] = get_8bit(low_x, 16) * scaled_inv_ray.x + shifted_origin.x;
-        min_x[3] = get_8bit(low_x, 24) * scaled_inv_ray.x + shifted_origin.x;
+        min_x[0] = get_8bit(low_x, 0) * scaled_inv_ray.x;
+        min_x[1] = get_8bit(low_x, 8) * scaled_inv_ray.x;
+        min_x[2] = get_8bit(low_x, 16) * scaled_inv_ray.x;
+        min_x[3] = get_8bit(low_x, 24) * scaled_inv_ray.x;
 
-        max_x[0] = get_8bit(high_x, 0) * scaled_inv_ray.x + shifted_origin.x;
-        max_x[1] = get_8bit(high_x, 8) * scaled_inv_ray.x + shifted_origin.x;
-        max_x[2] = get_8bit(high_x, 16) * scaled_inv_ray.x + shifted_origin.x;
-        max_x[3] = get_8bit(high_x, 24) * scaled_inv_ray.x + shifted_origin.x;
+        max_x[0] = get_8bit(high_x, 0) * scaled_inv_ray.x;
+        max_x[1] = get_8bit(high_x, 8) * scaled_inv_ray.x;
+        max_x[2] = get_8bit(high_x, 16) * scaled_inv_ray.x;
+        max_x[3] = get_8bit(high_x, 24) * scaled_inv_ray.x;
 
-        min_y[0] = get_8bit(low_y, 0) * scaled_inv_ray.y + shifted_origin.y;
-        min_y[1] = get_8bit(low_y, 8) * scaled_inv_ray.y + shifted_origin.y;
-        min_y[2] = get_8bit(low_y, 16) * scaled_inv_ray.y + shifted_origin.y;
-        min_y[3] = get_8bit(low_y, 24) * scaled_inv_ray.y + shifted_origin.y;
+        min_y[0] = get_8bit(low_y, 0) * scaled_inv_ray.y + shifted_origin_y;
+        min_y[1] = get_8bit(low_y, 8) * scaled_inv_ray.y + shifted_origin_y;
+        min_y[2] = get_8bit(low_y, 16) * scaled_inv_ray.y + shifted_origin_y;
+        min_y[3] = get_8bit(low_y, 24) * scaled_inv_ray.y + shifted_origin_y;
 
-        max_y[0] = get_8bit(high_y, 0) * scaled_inv_ray.y + shifted_origin.y;
-        max_y[1] = get_8bit(high_y, 8) * scaled_inv_ray.y + shifted_origin.y;
-        max_y[2] = get_8bit(high_y, 16) * scaled_inv_ray.y + shifted_origin.y;
-        max_y[3] = get_8bit(high_y, 24) * scaled_inv_ray.y + shifted_origin.y;
+        max_y[0] = get_8bit(high_y, 0) * scaled_inv_ray.y + shifted_origin_y;
+        max_y[1] = get_8bit(high_y, 8) * scaled_inv_ray.y + shifted_origin_y;
+        max_y[2] = get_8bit(high_y, 16) * scaled_inv_ray.y + shifted_origin_y;
+        max_y[3] = get_8bit(high_y, 24) * scaled_inv_ray.y + shifted_origin_y;
 
-        min_z[0] = get_8bit(low_z, 0) * scaled_inv_ray.z + shifted_origin.z;
-        min_z[1] = get_8bit(low_z, 8) * scaled_inv_ray.z + shifted_origin.z;
-        min_z[2] = get_8bit(low_z, 16) * scaled_inv_ray.z + shifted_origin.z;
-        min_z[3] = get_8bit(low_z, 24) * scaled_inv_ray.z + shifted_origin.z;
+        min_z[0] = get_8bit(low_z, 0) * scaled_inv_ray.z + shifted_origin_z;
+        min_z[1] = get_8bit(low_z, 8) * scaled_inv_ray.z + shifted_origin_z;
+        min_z[2] = get_8bit(low_z, 16) * scaled_inv_ray.z + shifted_origin_z;
+        min_z[3] = get_8bit(low_z, 24) * scaled_inv_ray.z + shifted_origin_z;
 
-        max_z[0] = get_8bit(high_z, 0) * scaled_inv_ray.z + shifted_origin.z;
-        max_z[1] = get_8bit(high_z, 8) * scaled_inv_ray.z + shifted_origin.z;
-        max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin.z;
-        max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin.z;
+        max_z[0] = get_8bit(high_z, 0) * scaled_inv_ray.z + shifted_origin_z;
+        max_z[1] = get_8bit(high_z, 8) * scaled_inv_ray.z + shifted_origin_z;
+        max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin_z;
+        max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin_z;
 
+        // We don't use fmax_fmax/fmin_fmin here because we are ALU bound on Ampere
         float slab_min, slab_max;
         int intersection;
 
-        slab_min     = fmaxf(fmax_fmax(min_x[0], min_y[0], min_z[0]), eps);
-        slab_max     = fminf(fmin_fmin(max_x[0], max_y[0], max_z[0]), depth);
+        slab_min     = fmaxf(fmaxf(min_x[0], fmaxf(min_y[0], min_z[0])), shifted_eps);
+        slab_max     = fminf(fminf(max_x[0], fminf(max_y[0], max_z[0])), shifted_depth);
         intersection = slab_min <= slab_max;
 
         if (intersection)
           asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
 
-        slab_min     = fmaxf(fmax_fmax(min_x[1], min_y[1], min_z[1]), eps);
-        slab_max     = fminf(fmin_fmin(max_x[1], max_y[1], max_z[1]), depth);
+        slab_min     = fmaxf(fmaxf(min_x[1], fmaxf(min_y[1], min_z[1])), shifted_eps);
+        slab_max     = fminf(fminf(max_x[1], fminf(max_y[1], max_z[1])), shifted_depth);
         intersection = slab_min <= slab_max;
 
         if (intersection)
           asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
 
-        slab_min     = fmaxf(fmax_fmax(min_x[2], min_y[2], min_z[2]), eps);
-        slab_max     = fminf(fmin_fmin(max_x[2], max_y[2], max_z[2]), depth);
+        slab_min     = fmaxf(fmaxf(min_x[2], fmaxf(min_y[2], min_z[2])), shifted_eps);
+        slab_max     = fminf(fminf(max_x[2], fminf(max_y[2], max_z[2])), shifted_depth);
         intersection = slab_min <= slab_max;
 
         if (intersection)
           asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
 
-        slab_min     = fmaxf(fmax_fmax(min_x[3], min_y[3], min_z[3]), eps);
-        slab_max     = fminf(fmin_fmin(max_x[3], max_y[3], max_z[3]), depth);
+        slab_min     = fmaxf(fmaxf(min_x[3], fmaxf(min_y[3], min_z[3])), shifted_eps);
+        slab_max     = fminf(fminf(max_x[3], fminf(max_y[3], max_z[3])), shifted_depth);
         intersection = slab_min <= slab_max;
 
         if (intersection)
