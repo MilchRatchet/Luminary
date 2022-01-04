@@ -60,22 +60,22 @@ __device__ unsigned int __bfind(unsigned int a) {
 #define STACK_SIZE_SM 10
 #define STACK_SIZE 32
 
-#define STACK_POP(X)                                              \
-  {                                                               \
-    packed_stptr_invoct.x--;                                      \
-    if (packed_stptr_invoct.x < STACK_SIZE_SM)                    \
-      X = traversal_stack_sm[threadIdx.x][packed_stptr_invoct.x]; \
-    else                                                          \
-      X = traversal_stack[packed_stptr_invoct.x - STACK_SIZE_SM]; \
+#define STACK_POP(X)                                  \
+  {                                                   \
+    stack_ptr--;                                      \
+    if (stack_ptr < STACK_SIZE_SM)                    \
+      X = traversal_stack_sm[threadIdx.x][stack_ptr]; \
+    else                                              \
+      X = traversal_stack[stack_ptr - STACK_SIZE_SM]; \
   }
 
-#define STACK_PUSH(X)                                             \
-  {                                                               \
-    if (packed_stptr_invoct.x < STACK_SIZE_SM)                    \
-      traversal_stack_sm[threadIdx.x][packed_stptr_invoct.x] = X; \
-    else                                                          \
-      traversal_stack[packed_stptr_invoct.x - STACK_SIZE_SM] = X; \
-    packed_stptr_invoct.x++;                                      \
+#define STACK_PUSH(X)                                 \
+  {                                                   \
+    if (stack_ptr < STACK_SIZE_SM)                    \
+      traversal_stack_sm[threadIdx.x][stack_ptr] = X; \
+    else                                              \
+      traversal_stack[stack_ptr - STACK_SIZE_SM] = X; \
+    stack_ptr++;                                      \
   }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
@@ -97,11 +97,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
   uint2 node_task     = make_uint2(0, 0);
   uint2 triangle_task = make_uint2(0, 0);
 
-  ushort2 packed_stptr_invoct;
-  packed_stptr_invoct.x = 0;
+  unsigned int stack_ptr = 0;
+  unsigned int octant;
 
   while (1) {
-    if (packed_stptr_invoct.x == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
+    if (stack_ptr == 0 && node_task.y <= 0x00ffffff && triangle_task.y == 0) {
       if (offset >= trace_task_count)
         break;
 
@@ -121,9 +121,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       inv_ray.y = 1.0f / (fabsf(task.ray.y) > eps ? task.ray.y : copysignf(eps, task.ray.y));
       inv_ray.z = 1.0f / (fabsf(task.ray.z) > eps ? task.ray.z : copysignf(eps, task.ray.z));
 
-      packed_stptr_invoct.y = ((task.ray.x < 0.0f) ? 0b100 : 0) | ((task.ray.y < 0.0f) ? 0b10 : 0) | ((task.ray.z < 0.0f) ? 0b1 : 0);
-      packed_stptr_invoct.y = 0b111 - packed_stptr_invoct.y;
-      packed_stptr_invoct.x = 0;
+      octant    = ((task.ray.x < 0.0f) ? 0b100 : 0) | ((task.ray.y < 0.0f) ? 0b10 : 0) | ((task.ray.z < 0.0f) ? 0b1 : 0);
+      octant    = 0b111 - octant;
+      stack_ptr = 0;
 
       cost = 0.0f;
     }
@@ -142,8 +142,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
 
       cost += 1.0f;
 
-      const unsigned int slot_index       = (child_bit_index - 24) ^ (unsigned int) packed_stptr_invoct.y;
-      const unsigned int inverse_octant4  = (unsigned int) packed_stptr_invoct.y * 0x01010101u;
+      const unsigned int slot_index       = (child_bit_index - 24) ^ octant;
+      const unsigned int inverse_octant4  = octant * 0x01010101u;
       const unsigned int relative_index   = __popc(imask & ~(0xffffffff << slot_index));
       const unsigned int child_node_index = child_node_base_index + relative_index;
 
@@ -377,7 +377,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
     }
 
     if (node_task.y <= 0x00ffffff) {
-      if (packed_stptr_invoct.x > 0) {
+      if (stack_ptr > 0) {
         STACK_POP(node_task);
 
         if (node_task.y <= 0x00ffffff) {
