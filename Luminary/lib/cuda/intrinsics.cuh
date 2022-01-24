@@ -9,7 +9,7 @@ __device__ unsigned int sign_extend_s8x4(unsigned int a) {
 
 __device__ unsigned int __bfind(unsigned int a) {
   unsigned int result;
-  asm volatile("bfind.u32 %0, %1; " : "=r"(result) : "r"(a));
+  asm("bfind.u32 %0, %1; " : "=r"(result) : "r"(a));
   return result;
 }
 
@@ -19,7 +19,7 @@ __device__ unsigned int __bfind(unsigned int a) {
  */
 __device__ float __fslctf(const float a, const float b, const float c) {
   float result;
-  asm volatile("slct.f32.f32 %0, %1, %2, %3;" : "=f"(result) : "f"(a), "f"(b), "f"(c));
+  asm("slct.f32.f32 %0, %1, %2, %3;" : "=f"(result) : "f"(a), "f"(b), "f"(c));
   return result;
 }
 
@@ -29,7 +29,7 @@ __device__ float __fslctf(const float a, const float b, const float c) {
  */
 __device__ unsigned int __uslctf(const unsigned int a, const unsigned int b, const float c) {
   unsigned int result;
-  asm volatile("slct.u32.f32 %0, %1, %2, %3;" : "=r"(result) : "r"(a), "r"(b), "f"(c));
+  asm("slct.u32.f32 %0, %1, %2, %3;" : "=r"(result) : "r"(a), "r"(b), "f"(c));
   return result;
 }
 
