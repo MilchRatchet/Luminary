@@ -117,6 +117,7 @@ struct Star {
 } typedef Star;
 
 struct Cloud {
+  int initialized;
   float offset_x;
   float offset_z;
   float height_max;

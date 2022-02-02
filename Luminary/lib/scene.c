@@ -343,7 +343,7 @@ static Scene get_default_scene() {
   scene.camera.far_clip_distance     = 50000.0f;
   scene.camera.tonemap               = TONEMAP_ACES;
   scene.camera.filter                = FILTER_NONE;
-  scene.camera.wasd_speed            = 20.0f;
+  scene.camera.wasd_speed            = 1.0f;
   scene.camera.mouse_speed           = 1.0f;
   scene.camera.smooth_movement       = 0;
   scene.camera.smoothing_factor      = 0.1f;
@@ -391,31 +391,31 @@ static Scene get_default_scene() {
   scene.toy.emission.b       = 0.0f;
   scene.toy.emission.a       = 0.0f;
 
-  scene.sky.geometry_offset.x    = 0.0f;
-  scene.sky.geometry_offset.y    = 0.0f;
-  scene.sky.geometry_offset.z    = 0.0f;
-  scene.sky.sun_color.r          = 1.0f;
-  scene.sky.sun_color.g          = 1.0f;
-  scene.sky.sun_color.b          = 1.0f;
-  scene.sky.altitude             = 0.5f;
-  scene.sky.azimuth              = 3.141f;
-  scene.sky.moon_altitude        = -0.5f;
-  scene.sky.moon_azimuth         = 0.0f;
-  scene.sky.moon_albedo          = 0.12f;
-  scene.sky.sky_intensity        = 40.0f;
-  scene.sky.sun_strength         = 5.0f;
-  scene.sky.base_density         = 0.7f;
-  scene.sky.steps                = 8;
-  scene.sky.stars_seed           = 0;
-  scene.sky.stars_intensity      = 1.0f;
-  scene.sky.settings_stars_count = 10000;
-  scene.sky.clouds_active        = 0;
-  scene.sky.cloud.seed           = 0;
-  scene.sky.cloud.offset_x       = 0.0f;
-  scene.sky.cloud.offset_z       = 0.0f;
-  scene.sky.cloud.height_max     = 4000.0f;
-  scene.sky.cloud.height_min     = 1500.0f;
-
+  scene.sky.geometry_offset.x         = 0.0f;
+  scene.sky.geometry_offset.y         = 0.0f;
+  scene.sky.geometry_offset.z         = 0.0f;
+  scene.sky.sun_color.r               = 1.0f;
+  scene.sky.sun_color.g               = 1.0f;
+  scene.sky.sun_color.b               = 1.0f;
+  scene.sky.altitude                  = 0.5f;
+  scene.sky.azimuth                   = 3.141f;
+  scene.sky.moon_altitude             = -0.5f;
+  scene.sky.moon_azimuth              = 0.0f;
+  scene.sky.moon_albedo               = 0.12f;
+  scene.sky.sky_intensity             = 40.0f;
+  scene.sky.sun_strength              = 5.0f;
+  scene.sky.base_density              = 0.7f;
+  scene.sky.steps                     = 8;
+  scene.sky.stars_seed                = 0;
+  scene.sky.stars_intensity           = 1.0f;
+  scene.sky.settings_stars_count      = 10000;
+  scene.sky.clouds_active             = 0;
+  scene.sky.cloud.initialized         = 0;
+  scene.sky.cloud.seed                = 1;
+  scene.sky.cloud.offset_x            = 0.0f;
+  scene.sky.cloud.offset_z            = 0.0f;
+  scene.sky.cloud.height_max          = 4000.0f;
+  scene.sky.cloud.height_min          = 1500.0f;
   scene.sky.cloud.noise_shape_scale   = 1.0f;
   scene.sky.cloud.noise_detail_scale  = 1.0f;
   scene.sky.cloud.noise_weather_scale = 1.0f;
@@ -609,6 +609,7 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
   free_scene(scene);
 
   generate_stars(instance);
+  generate_clouds(instance);
 
   return instance;
 }
