@@ -7,8 +7,6 @@
 #include "stars.h"
 #include "utils.cuh"
 
-#define EARTH_RADIUS 6371.0f
-
 __device__ float get_length_to_border(const vec3 origin, vec3 ray, const float atmosphere_end) {
   if (ray.y < 0.0f)
     ray = scale_vector(ray, -1.0f);
@@ -21,13 +19,13 @@ __device__ float density_at_height(const float height, const float density_fallo
 }
 
 __device__ float height_at_point(const vec3 point) {
-  return get_length(point) - EARTH_RADIUS;
+  return get_length(point) - SKY_EARTH_RADIUS;
 }
 
 __device__ float get_earth_intersection(const vec3 origin, const vec3 ray) {
   const float a = dot_product(origin, ray);
   const float b = get_length(origin);
-  return a * a - b * b + EARTH_RADIUS * EARTH_RADIUS;
+  return a * a - b * b + SKY_EARTH_RADIUS * SKY_EARTH_RADIUS;
 }
 
 __device__ float get_optical_depth(const vec3 origin, const vec3 ray, const float start, const float length) {
@@ -71,49 +69,43 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
   const RGBF ozone_absorbtion =
     get_color(0.65f * 0.001f * overall_density, 1.881f * 0.001f * overall_density, 0.085f * 0.001f * overall_density);
 
-  const float sun_dist   = 149597870.0f;
-  const float sun_radius = 696340.0f;
-
   const float sky_intensity = 6.0f;
 
-  const vec3 sun_normalized = device_sun;
-  vec3 sun                  = scale_vector(sun_normalized, sun_dist);
-
-  sun.y -= EARTH_RADIUS;
+  vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
+  sun.y -= SKY_EARTH_RADIUS;
+  sun = sub_vector(sun, device_scene.sky.geometry_offset);
 
   vec3 moon = angles_to_direction(device_scene.sky.moon_altitude, device_scene.sky.moon_azimuth);
   moon      = scale_vector(moon, 384399.0f);
-  moon.y -= EARTH_RADIUS;
+  moon.y -= SKY_EARTH_RADIUS;
 
   const float moon_radius = 1737.4f;
 
   const float atmosphere_height = 100.0f;
-  const float atmo_radius       = atmosphere_height + EARTH_RADIUS;
+  const float atmo_radius       = atmosphere_height + SKY_EARTH_RADIUS;
 
-  pos = scale_vector(pos, 0.001f);
-
-  vec3 origin = get_vector(pos.x, EARTH_RADIUS + pos.y, pos.z);
+  vec3 origin = world_to_sky_transform(pos);
 
   const vec3 origin_default = origin;
 
   const float height = get_length(origin);
 
-  if (height <= EARTH_RADIUS)
+  if (height <= SKY_EARTH_RADIUS)
     return result;
 
   float distance;
   float start = 0.0f;
   if (height > atmo_radius) {
-    float earth_dist = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS);
-    float atmo_dist  = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), atmo_radius);
-    float atmo_dist2 = sphere_ray_intersect_back(ray, origin, get_vector(0.0f, 0.0f, 0.0f), atmo_radius);
+    float earth_dist = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
+    float atmo_dist  = sph_ray_int_p0(ray, origin, atmo_radius);
+    float atmo_dist2 = sph_ray_int_back_p0(ray, origin, atmo_radius);
 
     distance = fminf(earth_dist - atmo_dist, atmo_dist2 - atmo_dist);
     start    = atmo_dist;
   }
   else {
-    float earth_dist = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS);
-    float atmo_dist  = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), atmo_radius);
+    float earth_dist = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
+    float atmo_dist  = sph_ray_int_p0(ray, origin, atmo_radius);
     distance         = fminf(earth_dist, atmo_dist);
   }
 
@@ -132,10 +124,8 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
       if (sphere_ray_hit(ray_scatter, origin, moon, moon_radius * 0.5f))
         continue;
 
-      const float optical_depth =
-        get_optical_depth(origin_default, ray, start, reach)
-        + get_optical_depth(
-          origin, ray_scatter, 0.0f, sphere_ray_intersection(ray_scatter, origin, get_vector(0.0f, 0.0f, 0.0f), atmo_radius));
+      const float optical_depth = get_optical_depth(origin_default, ray, start, reach)
+                                  + get_optical_depth(origin, ray_scatter, 0.0f, sph_ray_int_p0(ray_scatter, origin, atmo_radius));
 
       const float height = height_at_point(origin);
 
@@ -154,7 +144,7 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
 
       const float g   = 0.8f;
       const float mie = 1.5f * (1.0f + cos_angle * cos_angle) * (1.0f - g * g)
-                        / (4.0f * 3.1415926535f * (2.0f + g * g) * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
+                        / (4.0f * PI * (2.0f + g * g) * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
 
       result.r += transmittance.r * (local_density * scatter.r * rayleigh + mie_density * mie_scatter * mie);
       result.g += transmittance.g * (local_density * scatter.g * rayleigh + mie_density * mie_scatter * mie);
@@ -172,8 +162,8 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
 
   origin = origin_default;
 
-  const float sun_hit   = sphere_ray_intersection(ray, origin, sun, sun_radius);
-  const float earth_hit = sphere_ray_intersection(ray, origin, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS);
+  const float sun_hit   = sphere_ray_intersection(ray, origin, sun, SKY_SUN_RADIUS);
+  const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
   const float moon_hit  = sphere_ray_intersection(ray, origin, moon, moon_radius);
 
   if (earth_hit > sun_hit && moon_hit > sun_hit) {
@@ -198,7 +188,7 @@ __device__ RGBF get_sky_color(vec3 pos, const vec3 ray) {
     vec3 normal     = normalize_vector(sub_vector(moon_pos, moon));
     vec3 bounce_ray = normalize_vector(sub_vector(sun, moon_pos));
 
-    if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
+    if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
       const float optical_depth = get_optical_depth(origin_default, ray, start, distance);
       const RGBF transmittance  = get_transmittance_fast(optical_depth, scatter, mie_scatter);
 

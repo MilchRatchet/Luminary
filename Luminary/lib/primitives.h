@@ -40,4 +40,16 @@ struct Mat4x4 {
   float f44;
 } typedef Mat4x4;
 
+struct Mat3x3 {
+  float f11;
+  float f12;
+  float f13;
+  float f21;
+  float f22;
+  float f23;
+  float f31;
+  float f32;
+  float f33;
+} typedef Mat3x3;
+
 #endif /* PRIMITIVES_H */

@@ -351,7 +351,7 @@ static Scene get_default_scene() {
   scene.camera.far_clip_distance     = 50000.0f;
   scene.camera.tonemap               = TONEMAP_ACES;
   scene.camera.filter                = FILTER_NONE;
-  scene.camera.wasd_speed            = 1.0f;
+  scene.camera.wasd_speed            = 20.0f;
   scene.camera.mouse_speed           = 1.0f;
   scene.camera.smooth_movement       = 0;
   scene.camera.smoothing_factor      = 0.1f;
@@ -379,7 +379,7 @@ static Scene get_default_scene() {
   scene.toy.emissive         = 0;
   scene.toy.shape            = TOY_SPHERE;
   scene.toy.position.x       = 0.0f;
-  scene.toy.position.y       = 0.0f;
+  scene.toy.position.y       = 10.0f;
   scene.toy.position.z       = 0.0f;
   scene.toy.rotation.x       = 0.0f;
   scene.toy.rotation.y       = 0.0f;
@@ -399,6 +399,9 @@ static Scene get_default_scene() {
   scene.toy.emission.b       = 0.0f;
   scene.toy.emission.a       = 0.0f;
 
+  scene.sky.geometry_offset.x    = 0.0f;
+  scene.sky.geometry_offset.y    = 0.0f;
+  scene.sky.geometry_offset.z    = 0.0f;
   scene.sky.sun_color.r          = 1.0f;
   scene.sky.sun_color.g          = 1.0f;
   scene.sky.sun_color.b          = 1.0f;
@@ -415,6 +418,30 @@ static Scene get_default_scene() {
   scene.sky.stars_seed           = 0;
   scene.sky.stars_intensity      = 1.0f;
   scene.sky.settings_stars_count = 10000;
+  scene.sky.clouds_active        = 0;
+  scene.sky.cloud.seed           = 0;
+  scene.sky.cloud.offset_x       = 0.0f;
+  scene.sky.cloud.offset_z       = 0.0f;
+  scene.sky.cloud.height_max     = 4000.0f;
+  scene.sky.cloud.height_min     = 1500.0f;
+
+  scene.sky.cloud.noise_shape_scale   = 1.0f;
+  scene.sky.cloud.noise_detail_scale  = 1.0f;
+  scene.sky.cloud.noise_weather_scale = 1.0f;
+  scene.sky.cloud.noise_curl_scale    = 1.0f;
+  scene.sky.cloud.coverage            = 2.0f;
+  scene.sky.cloud.anvil               = 0.0f;
+
+  scene.sky.cloud.coverage_min = 1.05f;
+
+  scene.sky.cloud.forward_scattering  = 0.8f;
+  scene.sky.cloud.backward_scattering = -0.2f;
+  scene.sky.cloud.lobe_lerp           = 0.5f;
+
+  scene.sky.cloud.wetness      = 0.0f;
+  scene.sky.cloud.powder       = 0.5f;
+  scene.sky.cloud.shadow_steps = 16;
+  scene.sky.cloud.density      = 1.0f;
 
   scene.fog.active     = 0;
   scene.fog.absorption = 1.0f;
@@ -431,6 +458,10 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
   scene->triangles_length = convert_wavefront_content(&scene->triangles, content);
 
   Node2* initial_nodes = build_bvh_structure(&scene->triangles, &scene->triangles_length, &scene->nodes_length);
+
+  if (!scene->triangles_length) {
+    crash_message("No triangles are left. Did the scene not contain any faces?");
+  }
 
   scene->nodes = collapse_bvh(initial_nodes, scene->nodes_length, &scene->triangles, scene->triangles_length, &scene->nodes_length);
 
@@ -544,6 +575,7 @@ RaytraceInstance* load_scene(const char* filename) {
   free_scene(scene);
 
   generate_stars(instance);
+  generate_clouds(instance);
 
   return instance;
 }

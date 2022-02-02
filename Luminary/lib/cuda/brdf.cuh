@@ -228,7 +228,12 @@ __device__ vec3 refraction_BRDF(
 }
 
 __device__ LightSample sample_light(const vec3 position, const vec3 normal, const ushort2 index, const uint32_t seed) {
-  const int sun_visible = (device_sun.y >= -0.1f);
+  vec3 sun = scale_vector(device_sun, 149597870.0f);
+  sun.y -= SKY_EARTH_RADIUS;
+  sun               = sub_vector(sun, device_scene.sky.geometry_offset);
+  const vec3 origin = world_to_sky_transform(position);
+
+  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(sun, origin)), origin, SKY_EARTH_RADIUS);
   const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
   uint32_t light_count  = 0;
   light_count += sun_visible;

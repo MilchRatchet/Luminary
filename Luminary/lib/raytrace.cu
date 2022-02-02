@@ -15,6 +15,7 @@
 #include "cuda/bloom.cuh"
 #include "cuda/brdf.cuh"
 #include "cuda/bvh.cuh"
+#include "cuda/cloudgen.cuh"
 #include "cuda/denoise.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/kernels.cuh"
@@ -253,6 +254,26 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_result_buffer, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->trace_result_temporal, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
+}
+
+void generate_clouds(RaytraceInstance* instance) {
+  bench_tic();
+
+  device_malloc(
+    (void**) &instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
+  generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_SHAPE_RES, instance->scene_gpu.sky.cloud.shape_noise);
+
+  device_malloc(
+    (void**) &instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
+  generate_detail_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_DETAIL_RES, instance->scene_gpu.sky.cloud.detail_noise);
+
+  device_malloc((void**) &instance->scene_gpu.sky.cloud.weather_map, CLOUD_WEATHER_RES * CLOUD_WEATHER_RES * 4 * sizeof(uint8_t));
+  generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_WEATHER_RES, 1.0f, instance->scene_gpu.sky.cloud.weather_map);
+
+  device_malloc((void**) &instance->scene_gpu.sky.cloud.curl_noise, CLOUD_CURL_RES * CLOUD_CURL_RES * 4 * sizeof(uint8_t));
+  generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_CURL_RES, instance->scene_gpu.sky.cloud.curl_noise);
+
+  bench_toc((char*) "Cloud Noise Generation");
 }
 
 extern "C" RaytraceInstance* init_raytracing(

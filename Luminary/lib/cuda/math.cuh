@@ -29,6 +29,32 @@ __device__ float lerp(const float a, const float b, const float t) {
   return a + t * (b - a);
 }
 
+/*
+ * Linearly remaps a value from one range to another.
+ * @param value Value to map.
+ * @param src_low Low of source range.
+ * @param src_high High of source range.
+ * @param dst_low Low of destination range.
+ * @param dst_high High of destination range.
+ * @result Remapped value.
+ */
+__device__ float remap(const float value, const float src_low, const float src_high, const float dst_low, const float dst_high) {
+  return (value - src_low) / (src_high - src_low) * (dst_high - dst_low) + dst_low;
+}
+
+__device__ float remap01(const float value, const float src_low, const float src_high) {
+  return __saturatef(remap(value, src_low, src_high, 0.0f, 1.0f));
+}
+
+__device__ float step(const float edge, const float x) {
+  return (x < edge) ? 0.0f : 1.0f;
+}
+
+__device__ float smoothstep(const float x, const float edge0, const float edge1) {
+  float t = remap01(x, edge0, edge1);
+  return t * t * (3.0f - 2.0f * t);
+}
+
 __device__ vec3 get_vector(const float x, const float y, const float z) {
   vec3 result;
 
@@ -57,6 +83,58 @@ __device__ vec3 sub_vector(const vec3 a, const vec3 b) {
   result.z = a.z - b.z;
 
   return result;
+}
+
+__device__ vec3 mul_vector(const vec3 a, const vec3 b) {
+  vec3 result;
+
+  result.x = a.x * b.x;
+  result.y = a.y * b.y;
+  result.z = a.z * b.z;
+
+  return result;
+}
+
+__device__ vec3 min_vector(const vec3 a, const vec3 b) {
+  vec3 result;
+
+  result.x = fminf(a.x, b.x);
+  result.y = fminf(a.y, b.y);
+  result.z = fminf(a.z, b.z);
+
+  return result;
+}
+
+__device__ vec3 max_vector(const vec3 a, const vec3 b) {
+  vec3 result;
+
+  result.x = fmaxf(a.x, b.x);
+  result.y = fmaxf(a.y, b.y);
+  result.z = fmaxf(a.z, b.z);
+
+  return result;
+}
+
+__device__ vec3 inv_vector(const vec3 a) {
+  vec3 result;
+
+  result.x = 1.0f / a.x;
+  result.y = 1.0f / a.y;
+  result.z = 1.0f / a.z;
+
+  return result;
+}
+
+__device__ vec3 add_vector_const(const vec3 x, const float y) {
+  return add_vector(x, get_vector(y, y, y));
+}
+
+__device__ vec3 fract_vector(const vec3 x) {
+  return get_vector(fractf(x.x), fractf(x.y), fractf(x.z));
+}
+
+__device__ vec3 floor_vector(const vec3 x) {
+  return get_vector(floorf(x.x), floorf(x.y), floorf(x.z));
 }
 
 __device__ vec3 reflect_vector(const vec3 v, const vec3 n) {
@@ -270,6 +348,16 @@ __device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
   return res;
 }
 
+__device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
+  vec3 res;
+
+  res.x = m.f11 * p.x + m.f12 * p.y + m.f13 * p.z;
+  res.y = m.f21 * p.x + m.f22 * p.y + m.f23 * p.z;
+  res.z = m.f31 * p.x + m.f32 * p.y + m.f33 * p.z;
+
+  return res;
+}
+
 /*
  * Computes the distance to the first intersection of a ray with a sphere. To check for any hit use sphere_ray_hit.
  * @param ray Ray direction.
@@ -284,6 +372,32 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
   float b   = 2.0f * dot_product(diff, ray);
   float c   = dot_product(diff, diff) - r * r;
   float d   = b * b - 4.0f * a * c;
+
+  if (d < 0.0f)
+    return FLT_MAX;
+
+  float num = -b - sqrtf(d);
+
+  if (num > 0.0f)
+    return 0.5f * num / a;
+
+  num = -b + sqrtf(d);
+
+  return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
+}
+
+/*
+ * Computes the distance to the first intersection of a ray with a sphere with (0,0,0) as its center.
+ * @param ray Ray direction.
+ * @param origin Ray origin.
+ * @param r Radius of the sphere.
+ * @result Value a such that origin + a * ray is a point on the sphere.
+ */
+__device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r) {
+  float a = dot_product(ray, ray);
+  float b = 2.0f * dot_product(origin, ray);
+  float c = dot_product(origin, origin) - r * r;
+  float d = b * b - 4.0f * a * c;
 
   if (d < 0.0f)
     return FLT_MAX;
@@ -322,6 +436,27 @@ __device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, c
 }
 
 /*
+ * Computes whether a ray hits a sphere with (0,0,0) as its center. To compute the distance see sph_ray_int_p0.
+ * @param ray Ray direction.
+ * @param origin Ray origin.
+ * @param r Radius of the sphere.
+ * @result 1 if the ray hits the sphere, 0 else.
+ */
+__device__ int sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) {
+  float a = dot_product(ray, ray);
+  float b = 2.0f * dot_product(origin, ray);
+  float c = dot_product(origin, origin) - r * r;
+  float d = b * b - 4.0f * a * c;
+
+  if (d < 0.0f)
+    return 0;
+
+  const float num = -b - sqrtf(d);
+
+  return (num >= 0.0f);
+}
+
+/*
  * Computes the distance to the last intersection of a ray with a sphere. To compute the first hit use sphere_ray_intersection.
  * @param ray Ray direction.
  * @param origin Ray origin.
@@ -349,6 +484,32 @@ __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, co
   return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
 }
 
+/*
+ * Computes the distance to the last intersection of a ray with a sphere with (0,0,0) as its center.
+ * @param ray Ray direction.
+ * @param origin Ray origin.
+ * @param r Radius of the sphere.
+ * @result Value a such that origin + a * ray is a point on the sphere.
+ */
+__device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const float r) {
+  float a = dot_product(ray, ray);
+  float b = 2.0f * dot_product(origin, ray);
+  float c = dot_product(origin, origin) - r * r;
+  float d = b * b - 4.0f * a * c;
+
+  if (d < 0.0f)
+    return FLT_MAX;
+
+  float num = -b + sqrtf(d);
+
+  if (num > 0.0f)
+    return 0.5f * num / a;
+
+  num = -b - sqrtf(d);
+
+  return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
+}
+
 __device__ __host__ vec3 angles_to_direction(float altitude, float azimuth) {
   vec3 dir;
   dir.x = cosf(azimuth) * cosf(altitude);
@@ -356,6 +517,30 @@ __device__ __host__ vec3 angles_to_direction(float altitude, float azimuth) {
   dir.z = sinf(azimuth) * cosf(altitude);
 
   return dir;
+}
+
+__device__ vec3 world_to_sky_transform(vec3 input) {
+  vec3 result;
+
+  result.x = input.x * 0.001f;
+  result.y = input.y * 0.001f + SKY_EARTH_RADIUS;
+  result.z = input.z * 0.001f;
+
+  result = add_vector(result, device_scene.sky.geometry_offset);
+
+  return result;
+}
+
+__device__ vec3 sky_to_world_transform(vec3 input) {
+  vec3 result;
+
+  input = sub_vector(input, device_scene.sky.geometry_offset);
+
+  result.x = input.x * 1000.0f;
+  result.y = (input.y - SKY_EARTH_RADIUS) * 1000.0f;
+  result.z = input.z * 1000.0f;
+
+  return result;
 }
 
 __device__ RGBF get_color(const float r, const float g, const float b) {

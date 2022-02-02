@@ -32,6 +32,10 @@
 #define eps 0.001f
 #endif /* eps */
 
+#define SKY_EARTH_RADIUS 6371.0f
+#define SKY_SUN_RADIUS 696340.0f
+#define SKY_SUN_DISTANCE 149597870.0f
+
 #ifndef PRIMITIVES_H
 struct vec3 {
   float x;

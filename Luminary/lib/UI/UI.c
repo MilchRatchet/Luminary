@@ -156,7 +156,7 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 16;
+  tab.panel_count = 19;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -164,6 +164,9 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
 
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Celestial\nAtmosphere\nClouds\nFog");
+  panels[i++] = create_slider(ui, "Geometry Offset X", &(instance->scene_gpu.sky.geometry_offset.x), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Geometry Offset Y", &(instance->scene_gpu.sky.geometry_offset.y), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Geometry Offset Z", &(instance->scene_gpu.sky.geometry_offset.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_color(ui, "Sun Color", (float*) &(instance->scene_gpu.sky.sun_color));
   panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.sky.sun_color.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.sky.sun_color.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
@@ -212,7 +215,7 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 2;
+  tab.panel_count = 21;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -220,6 +223,27 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
 
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Celestial\nAtmosphere\nClouds\nFog");
+  panels[i++] = create_check(ui, "Active", &(instance->scene_gpu.sky.clouds_active), 1);
+  panels[i++] = create_slider(ui, "Offset X", &(instance->scene_gpu.sky.cloud.offset_x), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Offset Z", &(instance->scene_gpu.sky.cloud.offset_z), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Height Minimum", &(instance->scene_gpu.sky.cloud.height_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Height Maximum", &(instance->scene_gpu.sky.cloud.height_max), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Noise Shape Scale", &(instance->scene_gpu.sky.cloud.noise_shape_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Noise Detail Scale", &(instance->scene_gpu.sky.cloud.noise_detail_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Noise Weather Scale", &(instance->scene_gpu.sky.cloud.noise_weather_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Noise Curl Scale", &(instance->scene_gpu.sky.cloud.noise_curl_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Density", &(instance->scene_gpu.sky.cloud.density), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Coverage", &(instance->scene_gpu.sky.cloud.coverage), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Coverage", &(instance->scene_gpu.sky.cloud.coverage_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Anvil Overhang", &(instance->scene_gpu.sky.cloud.anvil), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Forward Scattering", &(instance->scene_gpu.sky.cloud.forward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Backward Scattering", &(instance->scene_gpu.sky.cloud.backward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Direction Lerp", &(instance->scene_gpu.sky.cloud.lobe_lerp), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Wetness", &(instance->scene_gpu.sky.cloud.wetness), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Beer Powder Effect", &(instance->scene_gpu.sky.cloud.powder), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Shadow Steps", &(instance->scene_gpu.sky.cloud.shadow_steps), 1, 0.01f, 0.0f, 128.0f, 0, 1);
 
   tab.panels = panels;
 

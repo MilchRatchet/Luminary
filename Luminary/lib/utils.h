@@ -48,6 +48,12 @@ enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } t
 
 enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJECTION = 2 } typedef AccumMode;
 
+struct DeviceBuffer {
+  void* device_pointer;
+  size_t size;
+  int allocated;
+} typedef DeviceBuffer;
+
 struct General {
   int width;
   int height;
@@ -110,7 +116,34 @@ struct Star {
   float intensity;
 } typedef Star;
 
+struct Cloud {
+  float offset_x;
+  float offset_z;
+  float height_max;
+  float height_min;
+  float density;
+  int seed;
+  uint8_t* shape_noise;
+  uint8_t* detail_noise;
+  uint8_t* weather_map;
+  uint8_t* curl_noise;
+  float forward_scattering;
+  float backward_scattering;
+  float lobe_lerp;
+  float wetness;
+  float powder;
+  int shadow_steps;
+  float noise_shape_scale;
+  float noise_detail_scale;
+  float noise_weather_scale;
+  float noise_curl_scale;
+  float coverage;
+  float coverage_min;
+  float anvil;
+} typedef Cloud;
+
 struct Sky {
+  vec3 geometry_offset;
   RGBF sun_color;
   float azimuth;
   float altitude;
@@ -128,6 +161,8 @@ struct Sky {
   int current_stars_count;
   int stars_seed;
   float stars_intensity;
+  Cloud cloud;
+  int clouds_active;
 } typedef Sky;
 
 struct Ocean {
@@ -177,12 +212,6 @@ struct Scene {
   Toy toy;
   Fog fog;
 } typedef Scene;
-
-struct DeviceBuffer {
-  void* device_pointer;
-  size_t size;
-  int allocated;
-} typedef DeviceBuffer;
 
 struct RaytraceInstance {
   unsigned int width;

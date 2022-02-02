@@ -12,13 +12,16 @@ static float random() {
   return (float) (((double) rand()) / RAND_MAX);
 }
 
+/*
+ * I use a simply look up table/grid to store the stars.
+ * This still gives O(n) time complexity but we obtain
+ * a very small constant factor that given the typical amount of stars.
+ *
+ * The grid is [0,2PI] x [-PI/2,PI/2] in blocks of [0,0.1] x [0,0.1]
+ * which means we use 64 x 32 blocks.
+ */
 void generate_stars(RaytraceInstance* instance) {
   bench_tic();
-
-  /*
-   * Grid [0,2PI] x [-PI/2,PI/2] in blocks of [0,0.1] x [0,0.1]
-   * There are 64 x 32 blocks
-   */
 
   const int grid_x = STARS_GRID_LD;
   const int grid_y = 32;
@@ -44,7 +47,7 @@ void generate_stars(RaytraceInstance* instance) {
       .altitude  = -PI * 0.5f + PI * (1.0f - sqrtf(random())),
       .azimuth   = 2.0f * PI * random(),
       .radius    = 0.0001f + 0.0014f * (1.0f - sqrtf(random())),
-      .intensity = 0.01f * (0.1f + 0.9f * (1.0f - sqrtf(random())))};
+      .intensity = 0.001f * (0.1f + 0.9f * (1.0f - sqrtf(random())))};
 
     int x = (int) (s.azimuth * 10.0f);
     int y = (int) ((s.altitude + PI * 0.5f) * 10.0f);
