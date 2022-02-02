@@ -61,7 +61,7 @@ __device__ RGBF sky_extinction(const vec3 origin, const vec3 ray, const float st
   return get_color(expf(-density.r), expf(-density.g), expf(-density.b));
 }
 
-__device__ RGBF get_sky_color(vec3 origin, const vec3 ray) {
+__device__ RGBF get_sky_color(const vec3 origin, const vec3 ray) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
   vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
@@ -76,8 +76,6 @@ __device__ RGBF get_sky_color(vec3 origin, const vec3 ray) {
 
   const float atmosphere_height = 100.0f;
   const float atmo_radius       = atmosphere_height + SKY_EARTH_RADIUS;
-
-  origin = world_to_sky_transform(origin);
 
   const float height = get_length(origin);
 
@@ -230,7 +228,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
     const int pixel    = task.index.y * device_width + task.index.x;
 
     const RGBF record = device_records[pixel];
-    RGBF sky          = get_sky_color(task.origin, task.ray);
+    RGBF sky          = get_sky_color(world_to_sky_transform(task.origin), task.ray);
     sky               = mul_color(sky, record);
 
     const uint32_t light = device.light_sample_history[pixel];
@@ -254,7 +252,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
     const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_LIGHTSOURCE) {
-      device.frame_buffer[pixel] = get_sky_color(task.origin, task.ray);
+      device.frame_buffer[pixel] = get_sky_color(world_to_sky_transform(task.origin), task.ray);
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value          = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);

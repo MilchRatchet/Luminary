@@ -274,11 +274,11 @@ __device__ RGBAF cloud_render(vec3 origin, vec3 ray, float start, float dist) {
   const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
     cos_angle_sun, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering, device_scene.sky.cloud.lobe_lerp);
 
-  RGBF sun_color = get_sky_color(sky_to_world_transform(add_vector(origin, scale_vector(ray, start))), ray_sun);
+  RGBF sun_color = get_sky_color(add_vector(origin, scale_vector(ray, start)), ray_sun);
   sun_color      = scale_color(sun_color, light_angle * scattering_sun);
 
   vec3 ray_ambient   = get_vector(0.0f, 1.0f, 0.0f);
-  RGBF ambient_color = get_sky_color(sky_to_world_transform(add_vector(origin, scale_vector(ray, start))), ray_ambient);
+  RGBF ambient_color = get_sky_color(add_vector(origin, scale_vector(ray, start)), ray_ambient);
 
   ambient_color = scale_color(ambient_color, 1.0f / (4.0f * PI));
 
