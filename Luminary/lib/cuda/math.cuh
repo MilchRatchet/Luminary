@@ -613,6 +613,16 @@ __device__ RGBF max_color(const RGBF a, const RGBF b) {
   return result;
 }
 
+__device__ RGBF inv_color(const RGBF a) {
+  RGBF result;
+
+  result.r = 1.0f / a.r;
+  result.g = 1.0f / a.g;
+  result.b = 1.0f / a.b;
+
+  return result;
+}
+
 __device__ float get_dithering(const int x, const int y) {
   const float dither = 2.0f * blue_noise(x, y, 0, 0) - 1.0f;
 
@@ -794,6 +804,10 @@ __device__ RGBF filter_blackwhite(RGBF color, int x, int y) {
     default:
       return get_color(1.0f, 1.0f, 1.0f);
   }
+}
+
+__device__ float henvey_greenstein(const float cos_angle, const float g) {
+  return (1.0f - g * g) / (4.0f * PI * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
 }
 
 #endif /* CU_MATH_H */

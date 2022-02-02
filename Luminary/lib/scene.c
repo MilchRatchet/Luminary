@@ -173,14 +173,6 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 6870615380437386564u:
       sscanf_s(value, "%f\n", &sky->base_density);
       break;
-    /* RAYLEIGH */
-    case 5208212056059756882u:
-      sscanf_s(value, "%f\n", &sky->rayleigh_falloff);
-      break;
-    /* MIE_____ */
-    case 6872316419615574349u:
-      sscanf_s(value, "%f\n", &sky->mie_falloff);
-      break;
     default:
       error_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
       break;
@@ -410,10 +402,9 @@ static Scene get_default_scene() {
   scene.sky.moon_altitude        = -0.5f;
   scene.sky.moon_azimuth         = 0.0f;
   scene.sky.moon_albedo          = 0.12f;
-  scene.sky.sun_strength         = 40.0f;
-  scene.sky.base_density         = 1.0f;
-  scene.sky.rayleigh_falloff     = 0.125f;
-  scene.sky.mie_falloff          = 0.833333f;
+  scene.sky.sky_intensity        = 40.0f;
+  scene.sky.sun_strength         = 5.0f;
+  scene.sky.base_density         = 0.7f;
   scene.sky.steps                = 8;
   scene.sky.stars_seed           = 0;
   scene.sky.stars_intensity      = 1.0f;
@@ -431,17 +422,14 @@ static Scene get_default_scene() {
   scene.sky.cloud.noise_curl_scale    = 1.0f;
   scene.sky.cloud.coverage            = 2.0f;
   scene.sky.cloud.anvil               = 0.0f;
-
-  scene.sky.cloud.coverage_min = 1.05f;
-
+  scene.sky.cloud.coverage_min        = 1.05f;
   scene.sky.cloud.forward_scattering  = 0.8f;
   scene.sky.cloud.backward_scattering = -0.2f;
   scene.sky.cloud.lobe_lerp           = 0.5f;
-
-  scene.sky.cloud.wetness      = 0.0f;
-  scene.sky.cloud.powder       = 0.5f;
-  scene.sky.cloud.shadow_steps = 16;
-  scene.sky.cloud.density      = 1.0f;
+  scene.sky.cloud.wetness             = 0.0f;
+  scene.sky.cloud.powder              = 0.5f;
+  scene.sky.cloud.shadow_steps        = 16;
+  scene.sky.cloud.density             = 1.0f;
 
   scene.fog.active     = 0;
   scene.fog.absorption = 1.0f;
@@ -717,10 +705,6 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf_s(line, LINE_SIZE, "SKY STRENGTH %f\n", instance->scene_gpu.sky.sun_strength);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "SKY DENSITY_ %f\n", instance->scene_gpu.sky.base_density);
-  fputs(line, file);
-  sprintf_s(line, LINE_SIZE, "SKY RAYLEIGH %f\n", instance->scene_gpu.sky.rayleigh_falloff);
-  fputs(line, file);
-  sprintf_s(line, LINE_SIZE, "SKY MIE_____ %f\n", instance->scene_gpu.sky.mie_falloff);
   fputs(line, file);
 
   sprintf_s(line, LINE_SIZE, "\n#===============================\n# Fog Settings\n#===============================\n\n");

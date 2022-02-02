@@ -250,10 +250,6 @@ __device__ float cloud_weather_wetness(vec3 weather) {
   return lerp(1.0f, 1.0f - device_scene.sky.cloud.wetness, __saturatef(weather.z));
 }
 
-__device__ float henvey_greenstein(const float cos_angle, const float g) {
-  return (1.0f - g * g) / (4.0f * PI * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
-}
-
 __device__ float cloud_dual_lobe_henvey_greenstein(float cos_angle, float g0, float g1, float w) {
   const float mie0 = henvey_greenstein(cos_angle, g0);
   const float mie1 = henvey_greenstein(cos_angle, g1);

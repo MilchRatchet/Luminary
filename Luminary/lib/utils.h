@@ -152,8 +152,7 @@ struct Sky {
   float moon_albedo;
   float sun_strength;
   float base_density;
-  float rayleigh_falloff;
-  float mie_falloff;
+  float sky_intensity;
   int steps;
   Star* stars;
   int* stars_offsets;
