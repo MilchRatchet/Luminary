@@ -61,7 +61,8 @@ __device__ RGBF sky_extinction(const vec3 origin, const vec3 ray, const float st
   return get_color(expf(-density.r), expf(-density.g), expf(-density.b));
 }
 
-__device__ RGBF get_sky_color(const vec3 origin, const vec3 ray) {
+__device__ RGBF
+  sky_compute_atmosphere(RGBF& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
   vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
@@ -99,6 +100,8 @@ __device__ RGBF get_sky_color(const vec3 origin, const vec3 ray) {
   }
 
   RGBF transmittance = get_color(1.0f, 1.0f, 1.0f);
+
+  distance = fminf(distance, limit - start);
 
   if (distance > 0.0f) {
     const int steps       = device_scene.sky.steps;
@@ -161,60 +164,88 @@ __device__ RGBF get_sky_color(const vec3 origin, const vec3 ray) {
     }
   }
 
-  const float sun_hit   = sphere_ray_intersection(ray, origin, sun, SKY_SUN_RADIUS);
-  const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-  const float moon_hit  = sphere_ray_intersection(ray, origin, moon, moon_radius);
+  if (celestials) {
+    const float sun_hit   = sphere_ray_intersection(ray, origin, sun, SKY_SUN_RADIUS);
+    const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
+    const float moon_hit  = sphere_ray_intersection(ray, origin, moon, moon_radius);
 
-  if (earth_hit > sun_hit && moon_hit > sun_hit) {
-    const vec3 sun_hit_pos  = add_vector(origin, scale_vector(ray, sun_hit));
-    const float limb_factor = 1.0f + dot_product(normalize_vector(sub_vector(sun_hit_pos, sun)), ray);
-    const float mu          = sqrtf(1.0f - limb_factor * limb_factor);
+    if (earth_hit > sun_hit && moon_hit > sun_hit) {
+      const vec3 sun_hit_pos  = add_vector(origin, scale_vector(ray, sun_hit));
+      const float limb_factor = 1.0f + dot_product(normalize_vector(sub_vector(sun_hit_pos, sun)), ray);
+      const float mu          = sqrtf(1.0f - limb_factor * limb_factor);
 
-    const RGBF limb_color = get_color(0.397f, 0.503f, 0.652f);
+      const RGBF limb_color = get_color(0.397f, 0.503f, 0.652f);
 
-    const RGBF limb_darkening = get_color(powf(mu, limb_color.r), powf(mu, limb_color.g), powf(mu, limb_color.b));
+      const RGBF limb_darkening = get_color(powf(mu, limb_color.r), powf(mu, limb_color.g), powf(mu, limb_color.b));
 
-    RGBF S = mul_color(transmittance, scale_color(device_scene.sky.sun_color, device_scene.sky.sky_intensity));
-    S      = scale_color(S, device_scene.sky.sun_strength);
-    S      = mul_color(S, limb_darkening);
+      RGBF S = mul_color(transmittance, scale_color(device_scene.sky.sun_color, device_scene.sky.sky_intensity));
+      S      = scale_color(S, device_scene.sky.sun_strength);
+      S      = mul_color(S, limb_darkening);
 
-    result = add_color(result, S);
-  }
-  else if (earth_hit > moon_hit) {
-    vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
-    vec3 normal     = normalize_vector(sub_vector(moon_pos, moon));
-    vec3 bounce_ray = normalize_vector(sub_vector(sun, moon_pos));
-
-    if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
-      const float weight = device_scene.sky.sky_intensity * device_scene.sky.moon_albedo * 0.1f;
-
-      result = add_color(result, mul_color(transmittance, scale_color(device_scene.sky.sun_color, weight)));
+      result = add_color(result, S);
     }
-  }
+    else if (earth_hit > moon_hit) {
+      vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
+      vec3 normal     = normalize_vector(sub_vector(moon_pos, moon));
+      vec3 bounce_ray = normalize_vector(sub_vector(sun, moon_pos));
 
-  if (sun_hit == FLT_MAX && earth_hit == FLT_MAX && moon_hit == FLT_MAX) {
-    float ray_altitude = asinf(ray.y);
-    float ray_azimuth  = atan2f(-ray.z, -ray.x) + PI;
+      if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
+        const float weight = device_scene.sky.sky_intensity * device_scene.sky.moon_albedo * 0.1f;
 
-    int x = (int) (ray_azimuth * 10.0f);
-    int y = (int) ((ray_altitude + PI * 0.5f) * 10.0f);
+        result = add_color(result, mul_color(transmittance, scale_color(device_scene.sky.sun_color, weight)));
+      }
+    }
 
-    int grid = x + y * STARS_GRID_LD;
+    if (sun_hit == FLT_MAX && earth_hit == FLT_MAX && moon_hit == FLT_MAX) {
+      float ray_altitude = asinf(ray.y);
+      float ray_azimuth  = atan2f(-ray.z, -ray.x) + PI;
 
-    int a = device_scene.sky.stars_offsets[grid];
-    int b = device_scene.sky.stars_offsets[grid + 1];
+      int x = (int) (ray_azimuth * 10.0f);
+      int y = (int) ((ray_altitude + PI * 0.5f) * 10.0f);
 
-    for (int i = a; i < b; i++) {
-      Star star     = device_scene.sky.stars[i];
-      vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
+      int grid = x + y * STARS_GRID_LD;
 
-      if (sphere_ray_hit(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius)) {
-        result = add_color(result, scale_color(transmittance, star.intensity * device_scene.sky.stars_intensity));
+      int a = device_scene.sky.stars_offsets[grid];
+      int b = device_scene.sky.stars_offsets[grid + 1];
+
+      for (int i = a; i < b; i++) {
+        Star star     = device_scene.sky.stars[i];
+        vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
+
+        if (sphere_ray_hit(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius)) {
+          result = add_color(result, scale_color(transmittance, star.intensity * device_scene.sky.stars_intensity));
+        }
       }
     }
   }
 
+  transmittance_out = mul_color(transmittance_out, transmittance);
+
   return result;
+}
+
+__device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials) {
+  RGBF unused = get_color(0.0f, 0.0f, 0.0f);
+
+  RGBF result = sky_compute_atmosphere(unused, origin, ray, limit, celestials);
+
+  return result;
+}
+
+__device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, ushort2 index) {
+  int pixel = index.x + index.y * device_width;
+
+  RGBF record = device_records[pixel];
+
+  RGBF new_record = record;
+
+  RGBF inscattering = sky_compute_atmosphere(new_record, origin, ray, limit, false);
+
+  if ((inscattering.r + inscattering.g + inscattering.b) != 0.0f) {
+    device.frame_buffer[pixel] = add_color(device.frame_buffer[pixel], mul_color(inscattering, record));
+  }
+
+  device_records[pixel] = new_record;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
@@ -228,7 +259,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_sky_tasks() {
     const int pixel    = task.index.y * device_width + task.index.x;
 
     const RGBF record = device_records[pixel];
-    RGBF sky          = get_sky_color(world_to_sky_transform(task.origin), task.ray);
+    RGBF sky          = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true);
     sky               = mul_color(sky, record);
 
     const uint32_t light = device.light_sample_history[pixel];
@@ -252,7 +283,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
     const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_LIGHTSOURCE) {
-      device.frame_buffer[pixel] = get_sky_color(world_to_sky_transform(task.origin), task.ray);
+      device.frame_buffer[pixel] = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true);
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value          = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);

@@ -261,7 +261,7 @@ __device__ float cloud_powder(const float density, const float step_size) {
   return lerp(1.0f, __saturatef(powder), device_scene.sky.cloud.powder);
 }
 
-__device__ RGBAF cloud_render(vec3 origin, vec3 ray, float start, float dist) {
+__device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, const float dist) {
   vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
   sun.y -= SKY_EARTH_RADIUS;
   sun = sub_vector(sun, device_scene.sky.geometry_offset);
@@ -274,25 +274,25 @@ __device__ RGBAF cloud_render(vec3 origin, vec3 ray, float start, float dist) {
   const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
     cos_angle_sun, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering, device_scene.sky.cloud.lobe_lerp);
 
-  RGBF sun_color = get_sky_color(add_vector(origin, scale_vector(ray, start)), ray_sun);
+  RGBF sun_color = sky_get_color(add_vector(origin, scale_vector(ray, start)), ray_sun, FLT_MAX, true);
   sun_color      = scale_color(sun_color, light_angle * scattering_sun);
 
   vec3 ray_ambient   = get_vector(0.0f, 1.0f, 0.0f);
-  RGBF ambient_color = get_sky_color(add_vector(origin, scale_vector(ray, start)), ray_ambient);
+  RGBF ambient_color = sky_get_color(add_vector(origin, scale_vector(ray, start)), ray_ambient, FLT_MAX, true);
 
   ambient_color = scale_color(ambient_color, 1.0f / (4.0f * PI));
 
-  const int step_count = CLOUD_STEPS;
+  const int step_count = CLOUD_STEPS * (dist / (start + dist)) * (is_first_ray() ? 1.0f : 0.25f);
 
   const float big_step     = 5.0f;
-  const float default_step = 0.001f * (device_scene.sky.cloud.height_max - device_scene.sky.cloud.height_min) / step_count;
+  const float default_step = fminf(0.001f * (device_scene.sky.cloud.height_max - device_scene.sky.cloud.height_min), dist) / step_count;
 
   int zero_density_streak = 0;
 
   float reach = start;
   float step  = big_step;
 
-  reach += default_step * step * white_noise();
+  reach -= default_step * step * white_noise();
 
   float transmittance = 1.0f;
   RGBF scatteredLight = get_color(0.0f, 0.0f, 0.0f);
@@ -302,7 +302,7 @@ __device__ RGBAF cloud_render(vec3 origin, vec3 ray, float start, float dist) {
 
     float height = cloud_height_fraction(pos);
 
-    if (height < 0.0f || height > 1.0f)
+    if (height > 1.0f)
       break;
 
     height = __saturatef(height);
@@ -311,7 +311,7 @@ __device__ RGBAF cloud_render(vec3 origin, vec3 ray, float start, float dist) {
 
     if (weather.x < 0.3f) {
       zero_density_streak++;
-      step = (zero_density_streak > 10) ? big_step : step;
+      step = (zero_density_streak > 3) ? big_step : step;
       reach += default_step * step;
       continue;
     }
@@ -347,11 +347,11 @@ __device__ RGBAF cloud_render(vec3 origin, vec3 ray, float start, float dist) {
         transmittance = 0.0f;
         break;
       }
-      step = (zero_density_streak > 10) ? big_step : 1.0f;
+      step = (zero_density_streak > 3) ? big_step : 1.0f;
     }
     else {
       zero_density_streak++;
-      step = (zero_density_streak > 10) ? big_step : step;
+      step = (zero_density_streak > 3) ? big_step : step;
     }
 
     reach += default_step * step;
@@ -366,15 +366,9 @@ __device__ RGBAF cloud_render(vec3 origin, vec3 ray, float start, float dist) {
   return result;
 }
 
-__device__ RGBAF cloud_compute_intersection(Cloud cloud, vec3 origin, vec3 ray, float limit) {
-  const float h_min = cloud.height_min * 0.001f + SKY_EARTH_RADIUS;
-  const float h_max = cloud.height_max * 0.001f + SKY_EARTH_RADIUS;
-
-  RGBAF result;
-  result.r = 0.0f;
-  result.g = 0.0f;
-  result.b = 0.0f;
-  result.a = 1.0f;
+__device__ float2 cloud_get_intersection(const vec3 origin, const vec3 ray, const float limit) {
+  const float h_min = device_scene.sky.cloud.height_min * 0.001f + SKY_EARTH_RADIUS;
+  const float h_max = device_scene.sky.cloud.height_max * 0.001f + SKY_EARTH_RADIUS;
 
   const float height = get_length(origin);
 
@@ -403,25 +397,20 @@ __device__ RGBAF cloud_compute_intersection(Cloud cloud, vec3 origin, vec3 ray, 
     distance             = fminf(min_dist, max_dist);
   }
 
-  distance = fminf(distance, limit - start);
+  const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
+  distance              = fminf(distance, fminf(earth_hit, limit) - start);
+  distance              = fmaxf(0.0f, distance);
 
-  if (distance <= 0.0f)
-    return result;
-
-  return cloud_render(origin, ray, start, distance);
+  return make_float2(start, distance);
 }
 
-__device__ void trace_clouds(vec3 origin, vec3 ray, ushort2 index, float limit) {
+__device__ void trace_clouds(const vec3 origin, const vec3 ray, const float start, const float distance, ushort2 index) {
   int pixel = index.x + index.y * device_width;
 
-  limit *= 0.001f;
+  if (distance <= 0.0f)
+    return;
 
-  origin = world_to_sky_transform(origin);
-
-  const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-  limit                 = fminf(earth_hit, limit);
-
-  RGBAF result = cloud_compute_intersection(device_scene.sky.cloud, origin, ray, limit);
+  RGBAF result = cloud_render(origin, ray, start, distance);
 
   if ((result.r + result.g + result.b) != 0.0f) {
     RGBF color  = device.frame_buffer[pixel];
