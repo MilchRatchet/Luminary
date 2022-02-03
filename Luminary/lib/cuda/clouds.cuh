@@ -302,8 +302,13 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 
     float height = cloud_height_fraction(pos);
 
-    if (height > 1.0f)
-      break;
+    if (height < 0.0f || height > 1.0f) {
+      zero_density_streak++;
+      if (zero_density_streak > 3)
+        break;
+      reach += default_step * step;
+      continue;
+    }
 
     height = __saturatef(height);
 

@@ -157,9 +157,45 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 5931043137585567059u:
       sscanf_s(value, "%f %f %f\n", &sky->sun_color.r, &sky->sun_color.g, &sky->sun_color.b);
       break;
-    /* STRENGTH */
-    case 5211869070270551123u:
+    /* OFFSET__ */
+    case 6872304213117257295u:
+      sscanf_s(value, "%f %f %f\n", &sky->geometry_offset.x, &sky->geometry_offset.y, &sky->geometry_offset.z);
+      break;
+    /* MOONALTI */
+    case 5283932106182840141u:
+      sscanf_s(value, "%f\n", &sky->moon_altitude);
+      break;
+    /* MOONAZIM */
+    case 5569081650753523533u:
+      sscanf_s(value, "%f\n", &sky->moon_azimuth);
+      break;
+    /* MOONALBE */
+    case 4990635180450336589u:
+      sscanf_s(value, "%f\n", &sky->moon_albedo);
+      break;
+    /* INTENSIT */
+    case 6073477168121531977u:
+      sscanf_s(value, "%f\n", &sky->sky_intensity);
+      break;
+    /* SUNSTREN */
+    case 5640004630479787347u:
       sscanf_s(value, "%f\n", &sky->sun_strength);
+      break;
+    /* STEPS___ */
+    case 6872316367824311379u:
+      sscanf_s(value, "%d\n", &sky->steps);
+      break;
+    /* STARSEED */
+    case 4919414392136750163u:
+      sscanf_s(value, "%d\n", &sky->stars_seed);
+      break;
+    /* STARINTE */
+    case 4995703963480314963u:
+      sscanf_s(value, "%f\n", &sky->stars_intensity);
+      break;
+    /* STARNUM_ */
+    case 6867238801685697619u:
+      sscanf_s(value, "%d\n", &sky->settings_stars_count);
       break;
     /* AZIMUTH_ */
     case 6865830357271927361u:
@@ -175,6 +211,93 @@ static void parse_sky_settings(Sky* sky, char* line) {
       break;
     default:
       error_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
+      break;
+  }
+}
+
+static void parse_cloud_settings(Cloud* cloud, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
+
+  switch (key) {
+    /* ACTIVE__ */
+    case 6872287793290429249u:
+      sscanf_s(value, "%d\n", &cloud->active);
+      break;
+    /* SEED___ */
+    case 6872316419162588499u:
+      sscanf_s(value, "%d\n", &cloud->seed);
+      break;
+    /* OFFSET__ */
+    case 6872304213117257295u:
+      sscanf_s(value, "%f %f\n", &cloud->offset_x, &cloud->offset_z);
+      break;
+    /* HEIGHTMA */
+    case 4705509855082399048u:
+      sscanf_s(value, "%f\n", &cloud->height_max);
+      break;
+    /* HEIGHTMI */
+    case 5281970607385822536u:
+      sscanf_s(value, "%f\n", &cloud->height_min);
+      break;
+    /* SHASCALE */
+    case 4993437844262438995u:
+      sscanf_s(value, "%f\n", &cloud->noise_shape_scale);
+      break;
+    /* DETSCALE */
+    case 4993437844263683396u:
+      sscanf_s(value, "%f\n", &cloud->noise_detail_scale);
+      break;
+    /* WEASCALE */
+    case 4993437844262438231u:
+      sscanf_s(value, "%f\n", &cloud->noise_weather_scale);
+      break;
+    /* CURSCALE */
+    case 4993437844263556419u:
+      sscanf_s(value, "%f\n", &cloud->noise_curl_scale);
+      break;
+    /* COVERAGE */
+    case 4992030533569892163u:
+      sscanf_s(value, "%f\n", &cloud->coverage);
+      break;
+    /* COVERMIN */
+    case 5641125024004198211u:
+      sscanf_s(value, "%f\n", &cloud->coverage_min);
+      break;
+    /* ANVIL___ */
+    case 6872316337643212353u:
+      sscanf_s(value, "%f\n", &cloud->anvil);
+      break;
+    /* FWDSCATT */
+    case 6076553554645243718u:
+      sscanf_s(value, "%f\n", &cloud->forward_scattering);
+      break;
+    /* BWDSCATT */
+    case 6076553554645243714u:
+      sscanf_s(value, "%f\n", &cloud->backward_scattering);
+      break;
+    /* SCATLERP */
+    case 5787764665257902931u:
+      sscanf_s(value, "%f\n", &cloud->lobe_lerp);
+      break;
+    /* WETNESS_ */
+    case 6868925413802132823u:
+      sscanf_s(value, "%f\n", &cloud->wetness);
+      break;
+    /* POWDER__ */
+    case 6872302013843459920u:
+      sscanf_s(value, "%f\n", &cloud->powder);
+      break;
+    /* SHASTEPS */
+    case 6003374531761227859u:
+      sscanf_s(value, "%d\n", &cloud->shadow_steps);
+      break;
+    /* DENSITY_ */
+    case 6870615380437386564u:
+      sscanf_s(value, "%f\n", &cloud->density);
+      break;
+    default:
+      error_message("%8.8s (%zu) is not a valid CLOUD setting.", line, key);
       break;
   }
 }
@@ -402,14 +525,14 @@ static Scene get_default_scene() {
   scene.sky.moon_altitude             = -0.5f;
   scene.sky.moon_azimuth              = 0.0f;
   scene.sky.moon_albedo               = 0.12f;
-  scene.sky.sky_intensity             = 40.0f;
+  scene.sky.sky_intensity             = 10.0f;
   scene.sky.sun_strength              = 5.0f;
   scene.sky.base_density              = 0.7f;
   scene.sky.steps                     = 8;
   scene.sky.stars_seed                = 0;
   scene.sky.stars_intensity           = 1.0f;
   scene.sky.settings_stars_count      = 10000;
-  scene.sky.clouds_active             = 0;
+  scene.sky.cloud.active              = 0;
   scene.sky.cloud.initialized         = 0;
   scene.sky.cloud.seed                = 1;
   scene.sky.cloud.offset_x            = 0.0f;
@@ -519,11 +642,14 @@ RaytraceInstance* load_scene(const char* filename) {
     if (line[0] == 'G') {
       parse_general_settings(&general, &content, line + 7 + 1);
     }
-    else if (line[0] == 'C') {
+    else if (line[0] == 'C' && line[1] == 'A') {
       parse_camera_settings(&scene.camera, line + 6 + 1);
     }
     else if (line[0] == 'S') {
       parse_sky_settings(&scene.sky, line + 3 + 1);
+    }
+    else if (line[0] == 'C' && line[1] == 'L') {
+      parse_cloud_settings(&scene.sky.cloud, line + 5 + 1);
     }
     else if (line[0] == 'F') {
       parse_fog_settings(&scene.fog, line + 3 + 1);
@@ -699,13 +825,75 @@ void serialize_scene(RaytraceInstance* instance) {
     line, LINE_SIZE, "SKY SUNCOLOR %f %f %f\n", instance->scene_gpu.sky.sun_color.r, instance->scene_gpu.sky.sun_color.g,
     instance->scene_gpu.sky.sun_color.b);
   fputs(line, file);
+  sprintf_s(
+    line, LINE_SIZE, "SKY OFFSET__ %f %f %f\n", instance->scene_gpu.sky.geometry_offset.x, instance->scene_gpu.sky.geometry_offset.y,
+    instance->scene_gpu.sky.geometry_offset.z);
+  fputs(line, file);
   sprintf_s(line, LINE_SIZE, "SKY AZIMUTH_ %f\n", instance->scene_gpu.sky.azimuth);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "SKY ALTITUDE %f\n", instance->scene_gpu.sky.altitude);
   fputs(line, file);
-  sprintf_s(line, LINE_SIZE, "SKY STRENGTH %f\n", instance->scene_gpu.sky.sun_strength);
+  sprintf_s(line, LINE_SIZE, "SKY MOONALTI %f\n", instance->scene_gpu.sky.moon_altitude);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY MOONAZIM %f\n", instance->scene_gpu.sky.moon_azimuth);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY MOONALBE %f\n", instance->scene_gpu.sky.moon_albedo);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY INTENSIT %f\n", instance->scene_gpu.sky.sky_intensity);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY SUNSTREN %f\n", instance->scene_gpu.sky.sun_strength);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "SKY DENSITY_ %f\n", instance->scene_gpu.sky.base_density);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY STEPS___ %d\n", instance->scene_gpu.sky.steps);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY STARSEED %d\n", instance->scene_gpu.sky.stars_seed);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY STARINTE %f\n", instance->scene_gpu.sky.stars_intensity);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY STARNUM_ %d\n", instance->scene_gpu.sky.settings_stars_count);
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "\n#===============================\n# Cloud Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "CLOUD ACTIVE__ %d\n", instance->scene_gpu.sky.cloud.active);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD SEED____ %d\n", instance->scene_gpu.sky.cloud.seed);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD OFFSET__ %f %f\n", instance->scene_gpu.sky.cloud.offset_x, instance->scene_gpu.sky.cloud.offset_z);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD HEIGHTMA %f\n", instance->scene_gpu.sky.cloud.height_max);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD HEIGHTMI %f\n", instance->scene_gpu.sky.cloud.height_min);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD SHASCALE %f\n", instance->scene_gpu.sky.cloud.noise_shape_scale);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD DETSCALE %f\n", instance->scene_gpu.sky.cloud.noise_detail_scale);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD WEASCALE %f\n", instance->scene_gpu.sky.cloud.noise_weather_scale);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD CURSCALE %f\n", instance->scene_gpu.sky.cloud.noise_curl_scale);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD COVERAGE %f\n", instance->scene_gpu.sky.cloud.coverage);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD COVERMIN %f\n", instance->scene_gpu.sky.cloud.coverage_min);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD ANVIL___ %f\n", instance->scene_gpu.sky.cloud.anvil);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD FWDSCATT %f\n", instance->scene_gpu.sky.cloud.forward_scattering);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD BWDSCATT %f\n", instance->scene_gpu.sky.cloud.backward_scattering);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD SCATLERP %f\n", instance->scene_gpu.sky.cloud.lobe_lerp);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD WETNESS_ %f\n", instance->scene_gpu.sky.cloud.wetness);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD POWDER__ %f\n", instance->scene_gpu.sky.cloud.powder);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD SHASTEPS %d\n", instance->scene_gpu.sky.cloud.shadow_steps);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CLOUD DENSITY_ %f\n", instance->scene_gpu.sky.cloud.density);
   fputs(line, file);
 
   sprintf_s(line, LINE_SIZE, "\n#===============================\n# Fog Settings\n#===============================\n\n");

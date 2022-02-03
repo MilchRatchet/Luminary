@@ -117,6 +117,7 @@ struct Star {
 } typedef Star;
 
 struct Cloud {
+  int active;
   int initialized;
   float offset_x;
   float offset_z;
@@ -162,7 +163,6 @@ struct Sky {
   int stars_seed;
   float stars_intensity;
   Cloud cloud;
-  int clouds_active;
 } typedef Sky;
 
 struct Ocean {
