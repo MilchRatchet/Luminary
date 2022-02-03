@@ -9,15 +9,16 @@ void handle_mouse_UIPanel_tab(UI* ui, UIPanel* panel, int mouse_state, int x, in
 
   int offset          = 0;
   SDL_Surface** texts = (SDL_Surface**) panel->data_text;
-  panel->prop1        = 0;
+  panel->prop1        = -1;
 
-  for (int i = 0; i < UI_PANELS_TAB_COUNT; i++) {
+  for (int i = 0; i < panel->prop3; i++) {
     if (x >= offset && x < offset + texts[i]->w + panel->prop2) {
       panel->prop1 = i;
       if (SDL_BUTTON_LMASK & mouse_state) {
-        ui->tab        = i;
-        ui->scroll_pos = 0;
-        panel->hover   = 0;
+        ui->subtab            = 0;
+        *((int*) panel->data) = i;
+        ui->scroll_pos        = 0;
+        panel->hover          = 0;
       }
       break;
     }
@@ -25,31 +26,32 @@ void handle_mouse_UIPanel_tab(UI* ui, UIPanel* panel, int mouse_state, int x, in
   }
 }
 
-void render_UIPanel_tab(UI* ui, UIPanel* panel) {
+void render_UIPanel_tab(UI* ui, UIPanel* panel, int y) {
   int offset          = 0;
   SDL_Surface** texts = (SDL_Surface**) panel->data_text;
+  int tab             = *((int*) (panel->data));
 
-  for (int i = 0; i < UI_PANELS_TAB_COUNT; i++) {
-    blit_text(ui, texts[i], 5 + offset, ((PANEL_HEIGHT - texts[i]->h) >> 1), UI_WIDTH, UI_HEIGHT_BUFFER);
+  for (int i = 0; i < panel->prop3; i++) {
+    blit_text(ui, texts[i], (panel->prop2 >> 1) + offset, ((PANEL_HEIGHT - texts[i]->h) >> 1) + y, UI_WIDTH, UI_HEIGHT_BUFFER);
 
     offset += texts[i]->w + panel->prop2;
   }
 
-  if (panel->hover && panel->prop1 != ui->tab) {
-    int x = 5;
+  if (panel->hover && panel->prop1 != tab && panel->prop1 != -1) {
+    int x = panel->prop2 >> 1;
     for (int i = 0; i < panel->prop1; i++) {
       x += texts[i]->w + panel->prop2;
     }
-    blit_color_shaded(ui->pixels, x, 0, UI_WIDTH, UI_HEIGHT_BUFFER, texts[panel->prop1]->w, PANEL_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
+    blit_color_shaded(ui->pixels, x, y, UI_WIDTH, UI_HEIGHT_BUFFER, texts[panel->prop1]->w, PANEL_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
   }
 
   {
-    int x = 5;
-    for (int i = 0; i < ui->tab; i++) {
+    int x = panel->prop2 >> 1;
+    for (int i = 0; i < tab; i++) {
       x += texts[i]->w + panel->prop2;
     }
-    blit_gray(ui->pixels_mask, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w + 10, 2, 0xff);
-    blit_color(ui->pixels, x - 5, PANEL_HEIGHT - 2, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w + 10, 2, HOVER_R, HOVER_G, HOVER_B);
-    blit_color_shaded(ui->pixels, x, 0, UI_WIDTH, UI_HEIGHT_BUFFER, texts[ui->tab]->w, PANEL_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
+    blit_gray(ui->pixels_mask, x - 5, PANEL_HEIGHT - 2 + y, UI_WIDTH, UI_HEIGHT_BUFFER, texts[tab]->w + 10, 2, 0xff);
+    blit_color(ui->pixels, x - 5, PANEL_HEIGHT - 2 + y, UI_WIDTH, UI_HEIGHT_BUFFER, texts[tab]->w + 10, 2, HOVER_R, HOVER_G, HOVER_B);
+    blit_color_shaded(ui->pixels, x, y, UI_WIDTH, UI_HEIGHT_BUFFER, texts[tab]->w, PANEL_HEIGHT, HOVER_R, HOVER_G, HOVER_B);
   }
 }

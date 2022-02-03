@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "bench.h"
 #include "error.h"
@@ -173,6 +174,154 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
   log_message("Material counts: %d (%d %d %d)", materials_count, albedo_maps_count, illuminance_maps_count, material_maps_count);
 }
 
+/*
+ * Reads face indices from a string. Note that quads have to be triangles fans.
+ * @param str String containing the indices in Wavefront format.
+ * @param face1 Pointer to Triangle which gets filled by the data.
+ * @param face2 Pointer to Triangle which gets filled by the data.
+ * @result Returns the number of triangles parsed.
+ */
+static int read_face(const char* str, Wavefront_Triangle* face1, Wavefront_Triangle* face2) {
+  int ptr = 0;
+
+  const unsigned int num_check = 0b00110000;
+  const unsigned int num_mask  = 0b11110000;
+
+  int data[12];
+  unsigned int data_ptr = 0;
+
+  int sign = 1;
+
+  char c = str[ptr++];
+
+  // Find first number
+  while ((c & num_mask) != num_check && c != '-') {
+    if (c == '\0' || c == '\r' || c == '\n')
+      break;
+    c = str[ptr++];
+  }
+
+  while (c != '\0' && c != '\r' && c != '\n') {
+    if (c == '-') {
+      sign = -1;
+    }
+
+    int value = 0;
+
+    while ((c & num_mask) == num_check) {
+      value = value * 10 + (int) (c & 0b00001111);
+
+      c = str[ptr++];
+    }
+
+    if (c == '/' || c == ' ' || c == '\0' || c == '\r' || c == '\n') {
+      data[data_ptr++] = value * sign;
+
+      sign = 1;
+    }
+
+    c = str[ptr++];
+  }
+
+  int tris = 0;
+
+  switch (data_ptr) {
+    case 3:  // Triangle, Only v
+    {
+      memset(face1, 0, sizeof(Wavefront_Triangle));
+      face1->v1 = data[0];
+      face1->v2 = data[1];
+      face1->v3 = data[2];
+      tris      = 1;
+    } break;
+    case 4:  // Quad, Only v
+    {
+      memset(face1, 0, sizeof(Wavefront_Triangle));
+      memset(face2, 0, sizeof(Wavefront_Triangle));
+      face1->v1 = data[0];
+      face1->v2 = data[1];
+      face1->v3 = data[2];
+      face2->v1 = data[0];
+      face2->v2 = data[2];
+      face2->v3 = data[3];
+      tris      = 2;
+    } break;
+    case 6:  // Triangle, Only v and vt
+    {
+      memset(face1, 0, sizeof(Wavefront_Triangle));
+      face1->v1  = data[0];
+      face1->vt1 = data[1];
+      face1->v2  = data[2];
+      face1->vt2 = data[3];
+      face1->v3  = data[4];
+      face1->vt3 = data[5];
+      tris       = 1;
+    } break;
+    case 8:  // Quad, Only v and vt
+    {
+      memset(face1, 0, sizeof(Wavefront_Triangle));
+      memset(face2, 0, sizeof(Wavefront_Triangle));
+      face1->v1  = data[0];
+      face1->vt1 = data[1];
+      face1->v2  = data[2];
+      face1->vt2 = data[3];
+      face1->v3  = data[4];
+      face1->vt3 = data[5];
+      face2->v1  = data[0];
+      face2->vt1 = data[1];
+      face2->v2  = data[4];
+      face2->vt2 = data[5];
+      face2->v3  = data[6];
+      face2->vt3 = data[7];
+      tris       = 2;
+    } break;
+    case 9:  // Triangle
+    {
+      face1->v1     = data[0];
+      face1->vt1    = data[1];
+      face1->vn1    = data[2];
+      face1->v2     = data[3];
+      face1->vt2    = data[4];
+      face1->vn2    = data[5];
+      face1->v3     = data[6];
+      face1->vt3    = data[7];
+      face1->vn3    = data[8];
+      face1->object = 0;
+      tris          = 1;
+    } break;
+    case 12:  // Quad
+    {
+      face1->v1     = data[0];
+      face1->vt1    = data[1];
+      face1->vn1    = data[2];
+      face1->v2     = data[3];
+      face1->vt2    = data[4];
+      face1->vn2    = data[5];
+      face1->v3     = data[6];
+      face1->vt3    = data[7];
+      face1->vn3    = data[8];
+      face1->object = 0;
+      face2->v1     = data[0];
+      face2->vt1    = data[1];
+      face2->vn1    = data[2];
+      face2->v2     = data[6];
+      face2->vt2    = data[7];
+      face2->vn2    = data[8];
+      face2->v3     = data[9];
+      face2->vt3    = data[10];
+      face2->vn3    = data[11];
+      face2->object = 0;
+      tris          = 2;
+    } break;
+    default: {
+      error_message("A face is of unsupported format. %s\n", str);
+      tris = 0;
+    } break;
+  }
+
+  return tris;
+}
+
 int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   log_message("Reading *.obj file (%s)", filename);
   bench_tic();
@@ -231,24 +380,39 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
     }
     else if (line[0] == 'f') {
       ensure_capacity(content.triangles, triangles_count, content.triangles_length, sizeof(Wavefront_Triangle));
-      Wavefront_Triangle face;
-      sscanf_s(
-        line, "%*c %u/%u/%u %u/%u/%u %u/%u/%u", &face.v1, &face.vt1, &face.vn1, &face.v2, &face.vt2, &face.vn2, &face.v3, &face.vt3,
-        &face.vn3);
-      face.object = current_material;
+      Wavefront_Triangle face1;
+      Wavefront_Triangle face2;
+      const int returned_faces = read_face(line, &face1, &face2);
 
-      face.v1 += vertices_offset;
-      face.v2 += vertices_offset;
-      face.v3 += vertices_offset;
-      face.vn1 += normals_offset;
-      face.vn2 += normals_offset;
-      face.vn3 += normals_offset;
-      face.vt1 += uvs_offset;
-      face.vt2 += uvs_offset;
-      face.vt3 += uvs_offset;
+      if (returned_faces >= 1) {
+        face1.object = current_material;
+        face1.v1 += vertices_offset;
+        face1.v2 += vertices_offset;
+        face1.v3 += vertices_offset;
+        face1.vn1 += normals_offset;
+        face1.vn2 += normals_offset;
+        face1.vn3 += normals_offset;
+        face1.vt1 += uvs_offset;
+        face1.vt2 += uvs_offset;
+        face1.vt3 += uvs_offset;
 
-      content.triangles[triangles_count] = face;
-      triangles_count++;
+        content.triangles[triangles_count++] = face1;
+      }
+
+      if (returned_faces >= 2) {
+        face2.object = current_material;
+        face2.v1 += vertices_offset;
+        face2.v2 += vertices_offset;
+        face2.v3 += vertices_offset;
+        face2.vn1 += normals_offset;
+        face2.vn2 += normals_offset;
+        face2.vn3 += normals_offset;
+        face2.vt1 += uvs_offset;
+        face2.vt2 += uvs_offset;
+        face2.vt3 += uvs_offset;
+
+        content.triangles[triangles_count++] = face2;
+      }
     }
     else if (line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i' && line[5] == 'b') {
       sscanf_s(line, "%*s %s\n", path, LINE_SIZE);
@@ -330,6 +494,8 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
 
     Wavefront_Vertex v;
 
+    t.v1 += (t.v1 < 0) ? content.vertices_length + 1 : 0;
+
     if (t.v1 > content.vertices_length) {
       continue;
     }
@@ -341,6 +507,8 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.vertex.y = v.y;
     triangle.vertex.z = v.z;
 
+    t.v2 += (t.v2 < 0) ? content.vertices_length + 1 : 0;
+
     if (t.v2 > content.vertices_length) {
       continue;
     }
@@ -351,6 +519,8 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.edge1.x = v.x - triangle.vertex.x;
     triangle.edge1.y = v.y - triangle.vertex.y;
     triangle.edge1.z = v.z - triangle.vertex.z;
+
+    t.v3 += (t.v3 < 0) ? content.vertices_length + 1 : 0;
 
     if (t.v3 > content.vertices_length) {
       continue;
@@ -365,7 +535,9 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
 
     Wavefront_UV uv;
 
-    if (t.vt1 > content.uvs_length) {
+    t.vt1 += (t.vt1 < 0) ? content.uvs_length + 1 : 0;
+
+    if (t.vt1 > content.uvs_length || t.vt1 == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
@@ -376,7 +548,9 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.vertex_texture.u = uv.u;
     triangle.vertex_texture.v = uv.v;
 
-    if (t.vt2 > content.uvs_length) {
+    t.vt2 += (t.vt2 < 0) ? content.uvs_length + 1 : 0;
+
+    if (t.vt2 > content.uvs_length || t.vt2 == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
@@ -387,7 +561,9 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.edge1_texture.u = uv.u - triangle.vertex_texture.u;
     triangle.edge1_texture.v = uv.v - triangle.vertex_texture.v;
 
-    if (t.vt3 > content.uvs_length) {
+    t.vt3 += (t.vt3 < 0) ? content.uvs_length + 1 : 0;
+
+    if (t.vt3 > content.uvs_length || t.vt3 == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
@@ -400,7 +576,9 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
 
     Wavefront_Normal n;
 
-    if (t.vn1 > content.normals_length) {
+    t.vn1 += (t.vn1 < 0) ? content.normals_length + 1 : 0;
+
+    if (t.vn1 > content.normals_length || t.vn1 == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
@@ -426,7 +604,9 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.vertex_normal.y = n.y;
     triangle.vertex_normal.z = n.z;
 
-    if (t.vn2 > content.normals_length) {
+    t.vn2 += (t.vn2 < 0) ? content.normals_length + 1 : 0;
+
+    if (t.vn2 > content.normals_length || t.vn2 == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
@@ -452,7 +632,9 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.edge1_normal.y = n.y - triangle.vertex_normal.y;
     triangle.edge1_normal.z = n.z - triangle.vertex_normal.z;
 
-    if (t.vn3 > content.normals_length) {
+    t.vn3 += (t.vn3 < 0) ? content.normals_length + 1 : 0;
+
+    if (t.vn3 > content.normals_length || t.vn3 == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;

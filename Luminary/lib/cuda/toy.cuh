@@ -101,15 +101,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
         }
       }
     }
-    else if (sample_blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
+    else if (blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
       task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps));
 
       record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
       record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
       record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
 
-      const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
-      const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
+      const float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
+      const float beta  = blue_noise(task.index.x, task.index.y, task.state, 2);
 
       const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
 
@@ -137,22 +137,20 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
     else if (device_iteration_type != TYPE_LIGHT) {
       write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
 
-      uint32_t light_sample_id;
       const vec3 V = scale_vector(task.ray, -1.0f);
 
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      int light_count;
-      Light light;
-      light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
+      LightSample light;
+      light = sample_light(task.position, normal, task.index, task.state);
 
-      const float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 3);
-      const float beta  = sample_blue_noise(task.index.x, task.index.y, task.state, 2);
+      const float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
+      const float beta  = blue_noise(task.index.x, task.index.y, task.state, 2);
 
       RGBF light_record = record;
 
-      task.ray = light_BRDF(light_record, normal, V, light, light_count, albedo, roughness, metallic, beta, gamma);
+      task.ray = light_BRDF(light_record, normal, V, light, albedo, roughness, metallic, beta, gamma);
 
       TraceTask light_task;
       light_task.origin = task.position;
@@ -160,16 +158,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
       light_task.index  = task.index;
       light_task.state  = task.state;
 
-      if (light_count && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED)) {
+      if (light.weight > 0.0f && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED)) {
         device.light_records[pixel]        = light_record;
-        device.light_sample_history[pixel] = light_sample_id;
+        device.light_sample_history[pixel] = light.id;
         store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
       }
 
       RGBF bounce_record    = record;
       const float spec_prob = lerp(0.5f, 1.0f, metallic);
 
-      if (sample_blue_noise(task.index.x, task.index.y, task.state, 10) < spec_prob) {
+      if (blue_noise(task.index.x, task.index.y, task.state, 10) < spec_prob) {
         task.ray = specular_BRDF(bounce_record, normal, V, albedo, roughness, metallic, beta, gamma, spec_prob);
       }
       else {

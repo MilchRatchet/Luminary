@@ -80,9 +80,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
     if (task.state & DEPTH_LEFT) {
-      int light_count;
-      uint32_t light_sample_id;
-      Light light;
+      LightSample light;
 
       TraceTask continue_task;
       continue_task.origin = task.position;
@@ -92,27 +90,27 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
 
       store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), continue_task);
 
-      light = sample_light(task.position, light_count, light_sample_id, sample_blue_noise(task.index.x, task.index.y, task.state, 51));
+      light = sample_light(task.position, get_vector(0.0f, 0.0f, 0.0f), task.index, task.state);
 
-      if (!light_count) {
+      if (light.weight <= 0.0f) {
         continue;
       }
 
-      float alpha = sample_blue_noise(task.index.x, task.index.y, task.state, 99);
-      float gamma = 2.0f * PI * sample_blue_noise(task.index.x, task.index.y, task.state, 98);
+      float alpha = blue_noise(task.index.x, task.index.y, task.state, 99);
+      float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 98);
 
-      vec3 out_ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.radius, gamma, light.pos));
+      vec3 out_ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.angle, gamma, light.dir));
       float angle  = dot_product(ray, out_ray);
       float g      = device_scene.fog.anisotropy;
 
       float weight  = (4.0f * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
       float density = get_fog_density(device_scene.fog.scattering, task.position.y);
       weight *= density * 0.001f;
-      weight *= light.radius * light_count;
+      weight *= light.weight;
 
       RGBF record                        = device_records[pixel];
       device.light_records[pixel]        = scale_color(record, weight);
-      device.light_sample_history[pixel] = light_sample_id;
+      device.light_sample_history[pixel] = light.id;
 
       task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 

@@ -20,9 +20,17 @@ struct UIPanel {
   SDL_Surface* data_text;
 } typedef UIPanel;
 
+struct UITab {
+  int count;
+  struct UITab* subtabs;
+  int panel_count;
+  UIPanel* panels;
+} typedef UITab;
+
 struct UI {
   int active;
   int tab;
+  int subtab;
   int border_hover;
   int panel_hover;
   UIPanel* last_panel;
@@ -38,11 +46,7 @@ struct UI {
   TTF_Font* font;
   uint8_t* pixels;
   uint8_t* pixels_mask;
-  UIPanel* general_panels;
-  UIPanel* camera_panels;
-  UIPanel* sky_panels;
-  UIPanel* ocean_panels;
-  UIPanel* toy_panels;
+  UITab* tabs;
   int* temporal_frames;
   void* scratch;
 } typedef UI;

@@ -90,12 +90,13 @@ void process_lights(Scene* scene) {
   unsigned int light_group_count   = 2;
 
   vec3 sun;
-  sun.x = sinf(data.sky.azimuth) * cosf(data.sky.altitude) * 149630000000.0f;
-  sun.y = sinf(data.sky.altitude) * 149630000000.0f;
-  sun.z = cosf(data.sky.azimuth) * cosf(data.sky.altitude) * 149630000000.0f;
+  sun.x = sinf(data.sky.azimuth) * cosf(data.sky.altitude) * 149597870000.0f;
+  sun.y = sinf(data.sky.altitude) * 149597870000.0f;
+  sun.z = cosf(data.sky.azimuth) * cosf(data.sky.altitude) * 149597870000.0f;
 
+  // The sun is sampled slightly smaller than its actual size to account for numerical issues
   light_groups[0].pos    = sun;
-  light_groups[0].radius = 696340000.0f;
+  light_groups[0].radius = 696340000.0f * 0.9f;
 
   light_groups[1].pos    = data.toy.position;
   light_groups[1].radius = data.toy.scale;

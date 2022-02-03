@@ -13,6 +13,7 @@ void device_set_memory_limit(size_t limit);
 void device_malloc(void** buffer, size_t size);
 size_t device_malloc_pitch(void** buffer, size_t rowstride, size_t num_rows);
 void device_free(void* buffer, size_t size);
+void device_upload(void* dst, void* src, size_t size);
 void device_buffer_init(DeviceBuffer** buffer);
 void device_buffer_free(DeviceBuffer* buffer);
 void device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t count);

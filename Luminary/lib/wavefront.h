@@ -25,15 +25,15 @@ struct Wavefront_UV {
 } typedef Wavefront_UV;
 
 struct Wavefront_Triangle {
-  unsigned int v1;
-  unsigned int v2;
-  unsigned int v3;
-  unsigned int vt1;
-  unsigned int vt2;
-  unsigned int vt3;
-  unsigned int vn1;
-  unsigned int vn2;
-  unsigned int vn3;
+  int v1;
+  int v2;
+  int v3;
+  int vt1;
+  int vt2;
+  int vt3;
+  int vn1;
+  int vn2;
+  int vn3;
   uint16_t object;
 } typedef Wavefront_Triangle;
 
@@ -46,11 +46,11 @@ struct Wavefront_Material {
 
 struct Wavefront_Content {
   Wavefront_Vertex* vertices;
-  unsigned int vertices_length;
+  int vertices_length;
   Wavefront_Normal* normals;
-  unsigned int normals_length;
+  int normals_length;
   Wavefront_UV* uvs;
-  unsigned int uvs_length;
+  int uvs_length;
   Wavefront_Triangle* triangles;
   unsigned int triangles_length;
   Wavefront_Material* materials;

@@ -1,5 +1,7 @@
 #include "UI_panel.h"
 
+#include <string.h>
+
 #include "UI.h"
 #include "UI_button.h"
 #include "UI_check.h"
@@ -97,37 +99,70 @@ UIPanel create_info(UI* ui, const char* text, void* data_binding, int data_type,
   return info;
 }
 
-UIPanel create_tab(UI* ui, int* data_binding) {
+UIPanel create_tab(UI* ui, int* data_binding, char* options) {
   UIPanel tab;
+
+  char* tmp = options;
+  char c    = *tmp;
+  int count = 1;
+
+  while (c != '\0') {
+    c = *(++tmp);
+    count += (c == '\n');
+  }
+
+  int* starts = malloc(sizeof(int) * (count + 1));
+
+  tmp = options;
+
+  starts[0] = 0;
+
+  int offset = 0;
+  int k      = 1;
+
+  c = *tmp;
+
+  while (c != '\0') {
+    c = tmp[offset++];
+    if (c == '\n')
+      starts[k++] = offset;
+  }
+
+  starts[count] = offset;
+
+  char** strings = malloc(sizeof(char*) * count);
+
+  for (int i = 0; i < count; i++) {
+    const int len = starts[i + 1] - starts[i] - 1;
+    strings[i]    = malloc(sizeof(char) * (len + 1));
+    memcpy(strings[i], options + starts[i], len);
+    strings[i][len] = '\0';
+  }
+
+  free(starts);
 
   tab = init_UIPanel(ui, PANEL_TAB, "", data_binding, 0);
 
-  tab.data_text = (SDL_Surface*) malloc(sizeof(SDL_Surface*) * UI_PANELS_TAB_COUNT);
+  tab.data_text = (SDL_Surface*) malloc(sizeof(SDL_Surface*) * count);
 
   SDL_Surface** texts = (SDL_Surface**) tab.data_text;
 
-  SDL_Surface* surface;
-
-  surface  = render_text(ui, "General");
-  texts[0] = surface;
-  surface  = render_text(ui, "Camera");
-  texts[1] = surface;
-  surface  = render_text(ui, "Sky");
-  texts[2] = surface;
-  surface  = render_text(ui, "Ocean");
-  texts[3] = surface;
-  surface  = render_text(ui, "Toy");
-  texts[4] = surface;
+  for (int i = 0; i < count; i++) {
+    texts[i] = render_text(ui, strings[i]);
+  }
 
   int total_width = 0;
 
-  for (int i = 0; i < UI_PANELS_TAB_COUNT; i++) {
+  for (int i = 0; i < count; i++) {
     total_width += texts[i]->w;
   }
 
-  tab.prop2 = (UI_WIDTH - total_width - 10) >> 2;
+  tab.prop2 = (UI_WIDTH - total_width) / count;
+  tab.prop3 = count;
 
   tab.voids_frames = 0;
+
+  free(strings);
 
   return tab;
 }
@@ -182,7 +217,7 @@ void render_UIPanel(UI* ui, UIPanel* panel, int y) {
       render_UIPanel_info(ui, panel, y);
       break;
     case PANEL_TAB:
-      render_UIPanel_tab(ui, panel);
+      render_UIPanel_tab(ui, panel, y);
       break;
     case PANEL_BUTTON:
       render_UIPanel_button(ui, panel, y);
@@ -196,7 +231,7 @@ void free_UIPanel(UIPanel* panel) {
 
   if (panel->data_text) {
     if (panel->type == PANEL_TAB) {
-      for (int i = 0; i < UI_PANELS_TAB_COUNT; i++) {
+      for (int i = 0; i < panel->prop3; i++) {
         SDL_FreeSurface(((SDL_Surface**) panel->data_text)[i]);
       }
 

@@ -48,6 +48,12 @@ enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } t
 
 enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJECTION = 2 } typedef AccumMode;
 
+struct DeviceBuffer {
+  void* device_pointer;
+  size_t size;
+  int allocated;
+} typedef DeviceBuffer;
+
 struct General {
   int width;
   int height;
@@ -75,6 +81,9 @@ struct Camera {
   int bloom;
   float bloom_strength;
   int dithering;
+  int purkinje;
+  float purkinje_kappa1;
+  float purkinje_kappa2;
   float wasd_speed;
   float mouse_speed;
   int smooth_movement;
@@ -100,14 +109,60 @@ struct Toy {
   RGBAF emission;
 } typedef Toy;
 
+struct Star {
+  float altitude;
+  float azimuth;
+  float radius;
+  float intensity;
+} typedef Star;
+
+struct Cloud {
+  int active;
+  int initialized;
+  float offset_x;
+  float offset_z;
+  float height_max;
+  float height_min;
+  float density;
+  int seed;
+  uint8_t* shape_noise;
+  uint8_t* detail_noise;
+  uint8_t* weather_map;
+  uint8_t* curl_noise;
+  float forward_scattering;
+  float backward_scattering;
+  float lobe_lerp;
+  float wetness;
+  float powder;
+  int shadow_steps;
+  float noise_shape_scale;
+  float noise_detail_scale;
+  float noise_weather_scale;
+  float noise_curl_scale;
+  float coverage;
+  float coverage_min;
+  float anvil;
+} typedef Cloud;
+
 struct Sky {
+  vec3 geometry_offset;
   RGBF sun_color;
   float azimuth;
   float altitude;
+  float moon_azimuth;
+  float moon_altitude;
+  float moon_albedo;
   float sun_strength;
   float base_density;
-  float rayleigh_falloff;
-  float mie_falloff;
+  float sky_intensity;
+  int steps;
+  Star* stars;
+  int* stars_offsets;
+  int settings_stars_count;
+  int current_stars_count;
+  int stars_seed;
+  float stars_intensity;
+  Cloud cloud;
 } typedef Sky;
 
 struct Ocean {
@@ -157,12 +212,6 @@ struct Scene {
   Toy toy;
   Fog fog;
 } typedef Scene;
-
-struct DeviceBuffer {
-  void* device_pointer;
-  size_t size;
-  int allocated;
-} typedef DeviceBuffer;
 
 struct RaytraceInstance {
   unsigned int width;

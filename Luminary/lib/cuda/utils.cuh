@@ -32,6 +32,10 @@
 #define eps 0.001f
 #endif /* eps */
 
+#define SKY_EARTH_RADIUS 6371.0f
+#define SKY_SUN_RADIUS 696340.0f
+#define SKY_SUN_DISTANCE 149597870.0f
+
 #ifndef PRIMITIVES_H
 struct vec3 {
   float x;
@@ -62,8 +66,10 @@ struct GeometryTask {
 } typedef GeometryTask;
 
 struct SkyTask {
+  vec3 origin;
   vec3 ray;
   ushort2 index;
+  uint32_t state;
 } typedef SkyTask;
 
 // Magnitude of ray gives distance

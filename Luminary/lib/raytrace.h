@@ -27,6 +27,7 @@ void trace_scene(RaytraceInstance* instance);
 void apply_bloom(RaytraceInstance* instance, RGBF* image);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);
+void generate_clouds(RaytraceInstance* instance);
 DeviceBuffer* initialize_textures(TextureRGBA* textures, const int textures_length);
 void free_textures_atlas(DeviceBuffer* texture_atlas, const int textures_length);
 void initialize_8bit_frame(RaytraceInstance* instance, const int width, const int height);

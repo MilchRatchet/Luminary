@@ -12155,14 +12155,18 @@ __device__ const int ranking_tile[128 * 128 * 8] = {
 #include <curand_kernel.h>
 #include "utils.cuh"
 
+__device__ float white_noise() {
+  return curand_uniform(device.randoms + threadIdx.x + blockIdx.x * blockDim.x);
+}
+
 /*
  * Adapted implementation of the code associated with the paper by E. Heitz et al.
  */
-__device__ float sample_blue_noise(int x, int y, int task_state, int sample_dimension) {
+__device__ float blue_noise(int x, int y, int task_state, int sample_dimension) {
   int sample_index = task_state & RANDOM_INDEX;
 
   if (sample_index >= 256) {
-    return curand_uniform(device.randoms + threadIdx.x + blockIdx.x * blockDim.x);
+    return white_noise();
   }
 
   x                = x & 127;

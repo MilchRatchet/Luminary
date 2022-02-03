@@ -297,11 +297,11 @@ void realtime_output(RaytraceInstance* instance) {
     const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
 
     if (keystate[SDL_SCANCODE_LEFT]) {
-      instance->scene_gpu.sky.azimuth += 0.005f * normalized_time;
+      instance->scene_gpu.sky.azimuth -= 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_RIGHT]) {
-      instance->scene_gpu.sky.azimuth -= 0.005f * normalized_time;
+      instance->scene_gpu.sky.azimuth += 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_UP]) {

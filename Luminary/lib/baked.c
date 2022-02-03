@@ -8,6 +8,7 @@
 #include "config.h"
 #include "error.h"
 #include "raytrace.h"
+#include "stars.h"
 
 #define head_size 0x68
 #define magic 4919420911629456716ul
@@ -172,6 +173,11 @@ RaytraceInstance* load_baked(const char* filename) {
   RaytraceInstance* final = init_raytracing(
     instance->settings, albedo_atlas, instance->albedo_atlas_length, illuminance_atlas, instance->illuminance_atlas_length, material_atlas,
     instance->material_atlas_length, scene, instance->default_material);
+
+  final->scene_gpu.sky.stars             = (Star*) 0;
+  final->scene_gpu.sky.cloud.initialized = 0;
+  generate_stars(final);
+  generate_clouds(final);
 
   uint64_t strings_count = head[11];
   char** strings         = load_strings(file, strings_count, head[12]);

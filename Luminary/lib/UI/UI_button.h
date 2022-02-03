@@ -3,7 +3,7 @@
 
 #include "UI_structs.h"
 
-#define BUTTON_SIZE 30
+#define BUTTON_SIZE 28
 
 void handle_mouse_UIPanel_button(UI* ui, UIPanel* panel, int mouse_state, int x, int y);
 void render_UIPanel_button(UI* ui, UIPanel* panel, int y);

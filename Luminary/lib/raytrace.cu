@@ -15,6 +15,7 @@
 #include "cuda/bloom.cuh"
 #include "cuda/brdf.cuh"
 #include "cuda/bvh.cuh"
+#include "cuda/cloudgen.cuh"
 #include "cuda/denoise.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/kernels.cuh"
@@ -39,10 +40,7 @@
  * @param scene Scene which contains the sun and toy properties and the GPU pointer to the lights buffer.
  */
 static void update_special_lights(const Scene scene) {
-  vec3 sun;
-  sun.x             = sinf(scene.sky.azimuth) * cosf(scene.sky.altitude);
-  sun.y             = sinf(scene.sky.altitude);
-  sun.z             = cosf(scene.sky.azimuth) * cosf(scene.sky.altitude);
+  vec3 sun          = angles_to_direction(scene.sky.altitude, scene.sky.azimuth);
   const float scale = 1.0f / (sqrtf(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z));
   sun.x *= scale;
   sun.y *= scale;
@@ -50,7 +48,7 @@ static void update_special_lights(const Scene scene) {
 
   gpuErrchk(cudaMemcpyToSymbol(device_sun, &(sun), sizeof(vec3), 0, cudaMemcpyHostToDevice));
 
-  const vec3 light_source_sun = scale_vector(sun, 149630000000.0f);
+  const vec3 light_source_sun = scale_vector(sun, 149597870000.0f);
 
   gpuErrchk(cudaMemcpy(scene.lights, &light_source_sun, sizeof(vec3), cudaMemcpyHostToDevice));
 
@@ -256,6 +254,36 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_result_buffer, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->trace_result_temporal, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
+}
+
+void generate_clouds(RaytraceInstance* instance) {
+  bench_tic();
+
+  if (instance->scene_gpu.sky.cloud.initialized) {
+    device_free(instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
+    device_free(instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
+    device_free(instance->scene_gpu.sky.cloud.weather_map, CLOUD_WEATHER_RES * CLOUD_WEATHER_RES * 4 * sizeof(uint8_t));
+    device_free(instance->scene_gpu.sky.cloud.curl_noise, CLOUD_CURL_RES * CLOUD_CURL_RES * 4 * sizeof(uint8_t));
+  }
+
+  device_malloc(
+    (void**) &instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
+  generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_SHAPE_RES, instance->scene_gpu.sky.cloud.shape_noise);
+
+  device_malloc(
+    (void**) &instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
+  generate_detail_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_DETAIL_RES, instance->scene_gpu.sky.cloud.detail_noise);
+
+  device_malloc((void**) &instance->scene_gpu.sky.cloud.weather_map, CLOUD_WEATHER_RES * CLOUD_WEATHER_RES * 4 * sizeof(uint8_t));
+  generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+    CLOUD_WEATHER_RES, (float) instance->scene_gpu.sky.cloud.seed, instance->scene_gpu.sky.cloud.weather_map);
+
+  device_malloc((void**) &instance->scene_gpu.sky.cloud.curl_noise, CLOUD_CURL_RES * CLOUD_CURL_RES * 4 * sizeof(uint8_t));
+  generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_CURL_RES, instance->scene_gpu.sky.cloud.curl_noise);
+
+  instance->scene_gpu.sky.cloud.initialized = 1;
+
+  bench_toc((char*) "Cloud Noise Generation");
 }
 
 extern "C" RaytraceInstance* init_raytracing(

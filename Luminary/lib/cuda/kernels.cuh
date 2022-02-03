@@ -4,9 +4,11 @@
 #include <cuda_runtime_api.h>
 
 #include "bvh.cuh"
+#include "clouds.cuh"
 #include "fog.cuh"
 #include "geometry.cuh"
 #include "ocean.cuh"
+#include "purkinje.cuh"
 #include "sky.cuh"
 #include "temporal.cuh"
 #include "toy.cuh"
@@ -20,10 +22,10 @@ __device__ TraceTask get_starting_ray(TraceTask task) {
   default_ray.z = -device_scene.camera.focal_length;
 
   const float alpha =
-    (device_scene.camera.aperture_size == 0.0f) ? 0.0f : sample_blue_noise(task.index.x, task.index.y, task.state, 0) * 2.0f * PI;
+    (device_scene.camera.aperture_size == 0.0f) ? 0.0f : blue_noise(task.index.x, task.index.y, task.state, 0) * 2.0f * PI;
   const float beta = (device_scene.camera.aperture_size == 0.0f)
                        ? 0.0f
-                       : sqrtf(sample_blue_noise(task.index.x, task.index.y, task.state, 1)) * device_scene.camera.aperture_size;
+                       : sqrtf(blue_noise(task.index.x, task.index.y, task.state, 1)) * device_scene.camera.aperture_size;
 
   vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 
@@ -166,7 +168,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     uint32_t hit_id = SKY_HIT;
 
     if (device_scene.fog.active && is_first_ray()) {
-      const float fog_dist = get_intersection_fog(task.origin, task.ray, sample_blue_noise(task.index.x, task.index.y, 256, 169));
+      const float fog_dist = get_intersection_fog(task.origin, task.ray, blue_noise(task.index.x, task.index.y, 256, 169));
 
       if (fog_dist < depth) {
         depth  = fog_dist;
@@ -305,6 +307,35 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
+    const bool is_hit           = (hit_id != SKY_HIT);
+    const bool use_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
+
+    if (device_scene.sky.cloud.active) {
+      const vec3 sky_origin = world_to_sky_transform(task.origin);
+
+      float2 params =
+        cloud_get_intersection(sky_origin, task.ray, (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : 0.001f * depth);
+
+      const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
+
+      if (cloud_hit) {
+        if (use_inscattering) {
+          const float inscattering_limit = fmaxf(0.0f, fminf(0.001f * depth, params.x));
+
+          sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
+        }
+
+        trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
+
+        if (!is_hit && use_inscattering) {
+          task.origin = add_vector(task.origin, scale_vector(task.ray, params.x));
+        }
+      }
+    }
+    else if (is_hit && use_inscattering) {
+      sky_trace_inscattering(world_to_sky_transform(task.origin), task.ray, 0.001f * depth, task.index);
+    }
+
     if (is_first_ray()) {
       device.raydir_buffer[task.index.x + task.index.y * device_width] = task.ray;
 
@@ -333,49 +364,44 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     float4 data0;
     float4 data1;
 
-    if (hit_id == SKY_HIT) {
-      sky_task_count++;
-      data0.x = task.ray.x;
-      data0.y = task.ray.y;
-      data0.z = task.ray.z;
-      data0.w = *((float*) (&task.index));
+    if (hit_id != SKY_HIT)
+      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+
+    data0.x = task.origin.x;
+    data0.y = task.origin.y;
+    data0.z = task.origin.z;
+
+    toy_task_count += (hit_id == TOY_HIT);
+    sky_task_count += (hit_id == SKY_HIT);
+    ocean_task_count += (hit_id == OCEAN_HIT);
+    fog_task_count += (hit_id == FOG_HIT);
+    geometry_task_count += (hit_id < DEBUG_LIGHT_HIT);
+
+    if (hit_id == TOY_HIT || hit_id == SKY_HIT) {
+      data0.w = task.ray.x;
+      data1.x = task.ray.y;
+      data1.y = task.ray.z;
     }
     else {
-      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
-      data0.x     = task.origin.x;
-      data0.y     = task.origin.y;
-      data0.z     = task.origin.z;
-      if (hit_id == TOY_HIT) {
-        toy_task_count++;
-        data0.w = task.ray.x;
-        data1.x = task.ray.y;
-        data1.y = task.ray.z;
+      data0.w = asinf(task.ray.y);
+      data1.x = atan2f(task.ray.z, task.ray.x);
+
+      if (hit_id == OCEAN_HIT) {
+        data1.y = depth;
+      }
+      else if (hit_id == FOG_HIT) {
+        data1.y = depth;
       }
       else {
-        data0.w = asinf(task.ray.y);
-        data1.x = atan2f(task.ray.z, task.ray.x);
-
-        if (hit_id == OCEAN_HIT) {
-          ocean_task_count++;
-          data1.y = depth;
-        }
-        else if (hit_id == FOG_HIT) {
-          fog_task_count++;
-          data1.y = depth;
-        }
-        else {
-          geometry_task_count++;
-          data1.y = __uint_as_float(hit_id);
-        }
+        data1.y = __uint_as_float(hit_id);
       }
-
-      data1.z = *((float*) &task.index);
-      data1.w = *((float*) &task.state);
-
-      __stcs(ptr + 1, data1);
     }
 
+    data1.z = *((float*) &task.index);
+    data1.w = *((float*) &task.state);
+
     __stcs(ptr, data0);
+    __stcs(ptr + 1, data1);
   }
 
   device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_task_count;
@@ -401,6 +427,10 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     const float sy = y * scale_y;
 
     RGBF pixel = sample_pixel(source, sx, sy, device_width, device_height);
+
+    if (device_scene.camera.purkinje) {
+      pixel = purkinje_shift(pixel);
+    }
 
     pixel.r *= device_scene.camera.exposure;
     pixel.g *= device_scene.camera.exposure;
@@ -454,6 +484,21 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     converted_pixel.r      = (uint8_t) pixel.r;
     converted_pixel.g      = (uint8_t) pixel.g;
     converted_pixel.b      = (uint8_t) pixel.b;
+
+#if 0
+    {
+      float d_x = device_scene.sky.cloud.noise_max * (((float) x) / width) - device_scene.sky.cloud.noise_min;
+      float d_y = device_scene.sky.cloud.noise_max * (((float) y) / height) - device_scene.sky.cloud.noise_min;
+
+      // float4 arr = sample_noise_texture_2D(device_scene.sky.cloud.weather_map, get_vector(d_x, 0.0f, d_y), 1024);
+      // float4 arr = sample_noise_texture_3D(device_scene.sky.cloud.shape_noise, get_vector(d_x, 0.5f, d_y), CLOUD_SHAPE_RES);
+      float4 arr = sample_noise_texture_3D(device_scene.sky.cloud.detail_noise, get_vector(d_x, 0.5f, d_y), CLOUD_DETAIL_RES);
+
+      converted_pixel.r = arr.z * 255.0f;
+      converted_pixel.g = arr.z * 255.0f;
+      converted_pixel.b = arr.z * 255.0f;
+    }
+#endif
 
     device.buffer_8bit[x + y * width] = converted_pixel;
 
