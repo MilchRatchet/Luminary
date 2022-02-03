@@ -85,23 +85,103 @@ Defines which of the available filters is used:
 `SKY SUNCOLOR [FP32] [FP32] [FP32]`<br/>
 Base color of the sun. Numbers must be in the range [0,1].
 
+`SKY OFFSET__ [FP32] [FP32] [FP32]`<br/>
+Offset of geometry relative to sky. This allows to position the geometry outside the atmosphere.
+
 `SKY AZIMUTH_ [FP32]`<br/>
 Azimuth of the sun.
 
 `SKY ALTITUDE [FP32]`<br/>
 Altitude of the sun.
 
-`SKY STRENGTH [FP32]`<br/>
-Sun light intensity. Number should be non-negative.
+`SKY MOONAZIM [FP32]`<br/>
+Azimuth of the moon.
+
+`SKY MOONALTI [FP32]`<br/>
+Altitude of the moon.
+
+`SKY MOONALBE [FP32]`<br/>
+Albedo of the moon. Number must be in the range [0,1].
+
+`SKY INTENSIT [FP32]`<br/>
+Intensity of the sky. Number should be non-negative.
+
+`SKY SUNSTREN [FP32]`<br/>
+Sun light strength. Number should be non-negative.
+
+`SKY STEPS___ [INT32]`<br/>
+Number of raymarch steps used in the sky computation. Number should be non-negative.
 
 `SKY DENSITY_ [FP32]`<br/>
 Density of the atmosphere. Number should be non-negative.
 
-`SKY RAYLEIGH [FP32]`<br/>
-Height based density falloff regarding rayleigh scattering. Number should be non-negative.
+`SKY STARSEED [INT32]`<br/>
+Seed used for the star generation.
 
-`SKY MIE_____ [FP32]`<br/>
-Height based density falloff regarding mie scattering. Number should be non-negative.
+`SKY STARINTE [FP32]`<br/>
+Light strength of the stars. Number should be non-negative.
+
+`SKY STARNUM_ [INT32]`<br/>
+Number of stars generated.
+
+## Cloud Settings
+
+`CLOUD ACTIVE__ [INT32]`<br/>
+Set 1 to activate clouds, 0 else.
+
+`CLOUD SEED____ [INT32]`<br/>
+Seed used to generate the weather map.
+
+`CLOUD OFFSET__ [FP32] [FP32]`<br/>
+Horizontal offset of the clouds.
+
+`CLOUD HEIGHTMA [FP32]`<br/>
+Maximum height of the clouds. Number should be non-negative.
+
+`CLOUD HEIGHTMI [FP32]`<br/>
+Minimum height of the clouds. Number should be non-negative.
+
+`CLOUD SHASCALE [FP32]`<br/>
+Scaling used when sampling the shape noise texture. Number should be non-negative.
+
+`CLOUD DETSCALE [FP32]`<br/>
+Scaling used when sampling the detail noise texture. Number should be non-negative.
+
+`CLOUD WEASCALE [FP32]`<br/>
+Scaling used when sampling the weather noise texture. Number should be non-negative.
+
+`CLOUD CURSCALE [FP32]`<br/>
+Scaling used when sampling the curl noise texture. Number should be non-negative.
+
+`CLOUD COVERAGE [FP32]`<br/>
+Cloud coverage, higher numbers imply thicker clouds. Number should be non-negative.
+
+`CLOUD COVERMIN [FP32]`<br/>
+Cloud minimum coverage, higher numbers imply denser clouds. Number should be non-negative.
+
+`CLOUD ANVIL___ [FP32]`<br/>
+Anvil overhang. Number must be in the range [0,1].
+
+`CLOUD FWDSCATT [FP32]`<br/>
+Forward scattering g factor used in mie scattering. Number must be in the range [-1,1].
+
+`CLOUD BWDSCATT [FP32]`<br/>
+Backward scattering g factor used in mie scattering. Number must be in the range [-1,1].
+
+`CLOUD SCATLERP [FP32]`<br/>
+Interpolation factor between forward and backward scattering in the dual lobe phase function. Number must be in the range [0,1].
+
+`CLOUD WETNESS_ [FP32]`<br/>
+Determines how wet the clouds are. Wetter clouds are darker. Number must be in the range [0,1].
+
+`CLOUD POWDER__ [FP32]`<br/>
+Determines how strong the beer-powder effect is applied. Number must be in the range [0,1].
+
+`CLOUD SHASTEPS [INT32]`<br/>
+Number of raymarching steps that are used for volumetric extinction/shadowing. Number should be non-negative.
+
+`CLOUD DENSITY_ [FP32]`<br/>
+Cloud density scaling. Number should be non-negative.
 
 ## Fog Settings
 
@@ -193,7 +273,7 @@ Refraction index of the toy relative to the air. Number must be at least 1.
 
 # Meshes
 
-Meshes must be in the Wavefront OBJ (`*.obj`) file format. Geometric vertices, texture coordinates, vertex normals and triangle faces are supported. Textures are to be referenced through a `*.mtl` which has the same name as the `*.obj` file.
+Meshes must be in the Wavefront OBJ (`*.obj`) file format. Geometric vertices, texture coordinates, vertex normals and triangle/quad faces are supported. Textures are to be referenced through a `*.mtl` which has the same name as the `*.obj` file.
 
 # Textures
 
