@@ -53,7 +53,7 @@ __device__ vec3 get_toy_normal(const vec3 position) {
   return normalize_vector(position);
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_toy_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int task_count   = device.task_counts[id * 5 + 3];

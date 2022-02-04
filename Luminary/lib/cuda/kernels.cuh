@@ -211,7 +211,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void postprocess_trace_tasks() {
   const int task_count         = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   uint16_t geometry_task_count = 0;
   uint16_t sky_task_count      = 0;

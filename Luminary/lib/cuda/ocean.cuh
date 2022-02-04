@@ -147,7 +147,7 @@ __device__ float get_intersection_ocean(const vec3 origin, const vec3 ray, float
   return mid;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_ocean_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int task_count   = device.task_counts[id * 5 + 1];

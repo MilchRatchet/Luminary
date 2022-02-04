@@ -1,4 +1,4 @@
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks() {
   const int task_count   = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
   int light_trace_count  = device.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   int bounce_trace_count = device.bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
