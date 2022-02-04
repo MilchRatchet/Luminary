@@ -16,10 +16,13 @@ struct TextureG {
   float* data;
 } typedef TextureG;
 
+enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1 } typedef TextureDataType;
+
 struct TextureRGBA {
   unsigned int width;
   unsigned int height;
-  RGBAF* data;
+  TextureDataType type;
+  void* data;
 } typedef TextureRGBA;
 
 #endif /* TEXTURE_H */

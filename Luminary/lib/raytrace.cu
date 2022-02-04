@@ -404,23 +404,26 @@ extern "C" DeviceBuffer* initialize_textures(TextureRGBA* textures, const int te
   device_buffer_init(&textures_gpu);
   device_buffer_malloc(textures_gpu, sizeof(cudaTextureObject_t), textures_length);
 
-  struct cudaTextureDesc texDesc;
-  memset(&texDesc, 0, sizeof(texDesc));
-  texDesc.addressMode[0]   = cudaAddressModeWrap;
-  texDesc.addressMode[1]   = cudaAddressModeWrap;
-  texDesc.filterMode       = cudaFilterModeLinear;
-  texDesc.readMode         = cudaReadModeElementType;
-  texDesc.normalizedCoords = 1;
-
   for (int i = 0; i < textures_length; i++) {
     TextureRGBA texture = textures[i];
 
+    const size_t pixel_size = (texture.type == TexDataFP32) ? sizeof(RGBAF) : sizeof(RGBA8);
+
+    struct cudaTextureDesc texDesc;
+    memset(&texDesc, 0, sizeof(texDesc));
+    texDesc.addressMode[0]   = cudaAddressModeWrap;
+    texDesc.addressMode[1]   = cudaAddressModeWrap;
+    texDesc.filterMode       = cudaFilterModeLinear;
+    texDesc.maxAnisotropy    = 16;
+    texDesc.readMode         = (texture.type == TexDataFP32) ? cudaReadModeElementType : cudaReadModeNormalizedFloat;
+    texDesc.normalizedCoords = 1;
+
     const int num_rows = texture.height;
     const int num_cols = texture.width;
-    RGBAF* data        = texture.data;
-    RGBAF* data_gpu;
-    size_t pitch = device_malloc_pitch((void**) &data_gpu, num_cols * sizeof(RGBAF), num_rows);
-    gpuErrchk(cudaMemcpy2D(data_gpu, pitch, data, num_cols * sizeof(RGBAF), num_cols * sizeof(RGBAF), num_rows, cudaMemcpyHostToDevice));
+    void* data         = (void*) texture.data;
+    void* data_gpu;
+    size_t pitch = device_malloc_pitch((void**) &data_gpu, num_cols * pixel_size, num_rows);
+    gpuErrchk(cudaMemcpy2D(data_gpu, pitch, data, num_cols * pixel_size, num_cols * pixel_size, num_rows, cudaMemcpyHostToDevice));
 
     struct cudaResourceDesc resDesc;
     memset(&resDesc, 0, sizeof(resDesc));
@@ -428,7 +431,7 @@ extern "C" DeviceBuffer* initialize_textures(TextureRGBA* textures, const int te
     resDesc.res.pitch2D.devPtr       = data_gpu;
     resDesc.res.pitch2D.width        = num_cols;
     resDesc.res.pitch2D.height       = num_rows;
-    resDesc.res.pitch2D.desc         = cudaCreateChannelDesc<float4>();
+    resDesc.res.pitch2D.desc         = cudaCreateChannelDesc<uchar4>();
     resDesc.res.pitch2D.pitchInBytes = pitch;
 
     gpuErrchk(cudaCreateTextureObject(textures_cpu + i, &resDesc, &texDesc, NULL));
@@ -636,8 +639,9 @@ extern "C" void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size) {
 }
 
 extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
-  const uint64_t tex_count   = *count;
-  const uint64_t header_size = 16 * tex_count;
+  const uint64_t tex_count           = *count;
+  const uint32_t header_element_size = 32;
+  const uint64_t header_size         = header_element_size * tex_count;
 
   uint8_t* header = (uint8_t*) malloc(header_size);
 
@@ -646,16 +650,20 @@ extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
   gpuErrchk(cudaMemcpy(tex_objects, textures_ptr, sizeof(cudaTextureObject_t) * tex_count, cudaMemcpyDeviceToHost));
 
   cudaResourceDesc resource;
+  cudaTextureDesc texture_desc;
   uint64_t buffer_size = header_size;
 
   for (int i = 0; i < tex_count; i++) {
     cudaGetTextureObjectResourceDesc(&resource, tex_objects[i]);
-    uint32_t width  = (uint32_t) resource.res.pitch2D.width;
-    uint32_t height = (uint32_t) resource.res.pitch2D.height;
-    memcpy(header + i * 16, &buffer_size, 8);
-    memcpy(header + i * 16 + 8, &width, 4);
-    memcpy(header + i * 16 + 12, &height, 4);
-    buffer_size += sizeof(RGBAF) * width * height;
+    cudaGetTextureObjectTextureDesc(&texture_desc, tex_objects[i]);
+    uint32_t width      = (uint32_t) resource.res.pitch2D.width;
+    uint32_t height     = (uint32_t) resource.res.pitch2D.height;
+    uint32_t pixel_size = (uint32_t) (texture_desc.readMode == cudaReadModeElementType) ? sizeof(RGBAF) : sizeof(RGBA8);
+    memcpy(header + i * header_element_size, &buffer_size, 8);
+    memcpy(header + i * header_element_size + 8, &width, 4);
+    memcpy(header + i * header_element_size + 12, &height, 4);
+    memcpy(header + i * header_element_size + 16, &pixel_size, 4);
+    buffer_size += pixel_size * width * height;
   }
 
   uint8_t* cpu_ptr;
@@ -668,13 +676,15 @@ extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
 
   for (int i = 0; i < tex_count; i++) {
     cudaGetTextureObjectResourceDesc(&resource, tex_objects[i]);
-    size_t pitch    = resource.res.pitch2D.pitchInBytes;
-    size_t width    = resource.res.pitch2D.width;
-    size_t height   = resource.res.pitch2D.height;
-    uint8_t* source = (uint8_t*) resource.res.pitch2D.devPtr;
+    cudaGetTextureObjectTextureDesc(&texture_desc, tex_objects[i]);
+    size_t pitch        = resource.res.pitch2D.pitchInBytes;
+    size_t width        = resource.res.pitch2D.width;
+    size_t height       = resource.res.pitch2D.height;
+    uint32_t pixel_size = (uint32_t) (texture_desc.readMode == cudaReadModeElementType) ? sizeof(RGBAF) : sizeof(RGBA8);
+    uint8_t* source     = (uint8_t*) resource.res.pitch2D.devPtr;
     for (int j = 0; j < height; j++) {
-      gpuErrchk(cudaMemcpy(cpu_ptr + offset, source + j * pitch, sizeof(RGBAF) * width, cudaMemcpyDeviceToHost));
-      offset += sizeof(RGBAF) * width;
+      gpuErrchk(cudaMemcpy(cpu_ptr + offset, source + j * pitch, pixel_size * width, cudaMemcpyDeviceToHost));
+      offset += pixel_size * width;
     }
   }
 

@@ -9,6 +9,13 @@ struct RGB8 {
   uint8_t b;
 } typedef RGB8;
 
+struct RGBA8 {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+  uint8_t a;
+} typedef RGBA8;
+
 struct XRGB8 {
   uint8_t b;
   uint8_t g;

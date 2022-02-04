@@ -27,10 +27,12 @@
  *  0x60 | Strings            |
  * ------+--------------------+----------------------
  *
- * Texture Atlas Header:
+ * Texture Atlas Header (32 Bytes):
  * 0x00 - Relative Offset (8 Bytes)
  * 0x08 - Width (4 Bytes)
- * 0x12 - Height (4 Bytes)
+ * 0x0C - Height (4 Bytes)
+ * 0x10 - Pixel Size (4 Bytes)
+ * 0x14 - Padding (12 Bytes)
  *
  * Strings Header: (First string is output path, rest is mesh paths)
  * 0x00 - Relative Offset (8 Bytes)
@@ -40,7 +42,8 @@
  */
 
 static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
-  const uint64_t header_size = 16 * count;
+  const uint32_t header_element_size = 32;
+  const uint64_t header_size         = header_element_size * count;
 
   uint8_t* head = malloc(header_size);
   fseek(file, offset, SEEK_SET);
@@ -48,32 +51,45 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
 
   TextureRGBA* textures = malloc(sizeof(TextureRGBA) * count);
   uint64_t data_offset;
-  uint32_t width, height;
+  uint32_t width, height, pixel_size;
   uint64_t amount;
   uint64_t total_length = 0;
 
   for (uint64_t i = 0; i < count; i++) {
-    memcpy(&data_offset, head + 16 * i, 8);
-    memcpy(&width, head + 16 * i + 8, 4);
-    memcpy(&height, head + 16 * i + 12, 4);
+    memcpy(&data_offset, head + header_element_size * i, 8);
+    memcpy(&width, head + header_element_size * i + 8, 4);
+    memcpy(&height, head + header_element_size * i + 12, 4);
+    memcpy(&pixel_size, head + header_element_size * i + 16, 4);
 
     textures[i].width  = width;
     textures[i].height = height;
 
+    switch (pixel_size) {
+      case sizeof(RGBA8):
+        textures[i].type = TexDataUINT8;
+        break;
+      case sizeof(RGBAF):
+        textures[i].type = TexDataFP32;
+        break;
+      default:
+        crash_message("Baked file texture has invalid pixel size of %d", pixel_size);
+        break;
+    }
+
     amount           = width * height;
-    textures[i].data = (RGBAF*) (data_offset - header_size);
-    total_length += amount;
+    textures[i].data = (void*) (data_offset - header_size);
+    total_length += amount * pixel_size;
   }
 
-  RGBAF* data = malloc(sizeof(RGBAF) * total_length);
+  RGBAF* data = malloc(total_length);
 
   fseek(file, offset + header_size, SEEK_SET);
-  fread_s(data, sizeof(RGBAF) * total_length, sizeof(RGBAF) * total_length, 1, file);
+  fread_s(data, total_length, total_length, 1, file);
 
   for (uint64_t i = 0; i < count; i++) {
     uint8_t* ptr = (uint8_t*) textures[i].data;
     ptr += (uint64_t) data;
-    textures[i].data = (RGBAF*) ptr;
+    textures[i].data = (void*) ptr;
   }
 
   return textures;

@@ -236,12 +236,14 @@ static int verify_header(FILE* file) {
 }
 
 static inline TextureRGBA default_texture() {
-  TextureRGBA fallback = {.data = malloc(sizeof(RGBAF) * 4), .height = 2, .width = 2};
-  RGBAF default_pixel  = {.r = 1.0f, .g = 0.0f, .b = 0.0f, .a = 1.0f};
-  fallback.data[0]     = default_pixel;
-  fallback.data[1]     = default_pixel;
-  fallback.data[2]     = default_pixel;
-  fallback.data[3]     = default_pixel;
+  RGBA8* data          = malloc(sizeof(RGBA8) * 4);
+  RGBA8 default_pixel  = {.r = 255, .g = 0, .b = 0, .a = 255};
+  data[0]              = default_pixel;
+  data[1]              = default_pixel;
+  data[2]              = default_pixel;
+  data[3]              = default_pixel;
+  TextureRGBA fallback = {.data = data, .height = 2, .width = 2, .type = TexDataUINT8};
+
   return fallback;
 }
 
@@ -652,34 +654,23 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   free(buffer_address);
 
-  RGBAF* float_data = (RGBAF*) malloc(width * height * sizeof(RGBAF));
+  RGBA8* output_data = (RGBA8*) malloc(width * height * sizeof(RGBA8));
 
   if (color_type == PNG_COLORTYPE_TRUECOLOR) {
     for (uint32_t i = 0; i < width * height; i++) {
-      RGBAF pixel = {
-        .r = data[i * byte_per_pixel] / 255.0f,
-        .g = data[i * byte_per_pixel + 1] / 255.0f,
-        .b = data[i * byte_per_pixel + 2] / 255.0f,
-        .a = 1.0f};
+      RGBA8 pixel = {.r = data[i * byte_per_pixel], .g = data[i * byte_per_pixel + 1], .b = data[i * byte_per_pixel + 2], .a = 255};
 
-      float_data[i] = pixel;
+      output_data[i] = pixel;
     }
   }
   else {
-    for (uint32_t i = 0; i < width * height; i++) {
-      RGBAF pixel = {
-        .r = data[i * byte_per_pixel] / 255.0f,
-        .g = data[i * byte_per_pixel + 1] / 255.0f,
-        .b = data[i * byte_per_pixel + 2] / 255.0f,
-        .a = data[i * byte_per_pixel + 3] / 255.0f};
-
-      float_data[i] = pixel;
-    }
+    memcpy(output_data, data, width * height * sizeof(RGBA8));
   }
 
   free(data);
 
-  result.data = float_data;
+  result.type = TexDataUINT8;
+  result.data = output_data;
 
   free(filtered_data);
 

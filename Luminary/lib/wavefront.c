@@ -41,27 +41,27 @@ Wavefront_Content create_wavefront_content() {
   content.material_maps           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
   content.material_maps_length    = 1;
 
-  content.albedo_maps[0].width          = 1;
-  content.albedo_maps[0].height         = 1;
-  content.albedo_maps[0].data           = (RGBAF*) malloc(sizeof(RGBAF));
-  content.albedo_maps[0].data[0].r      = 0.9f;
-  content.albedo_maps[0].data[0].g      = 0.9f;
-  content.albedo_maps[0].data[0].b      = 0.9f;
-  content.albedo_maps[0].data[0].a      = 1.0f;
-  content.illuminance_maps[0].width     = 1;
-  content.illuminance_maps[0].height    = 1;
-  content.illuminance_maps[0].data      = (RGBAF*) malloc(sizeof(RGBAF));
-  content.illuminance_maps[0].data[0].r = 0.0f;
-  content.illuminance_maps[0].data[0].g = 0.0f;
-  content.illuminance_maps[0].data[0].b = 0.0f;
-  content.illuminance_maps[0].data[0].a = 0.0f;
-  content.material_maps[0].width        = 1;
-  content.material_maps[0].height       = 1;
-  content.material_maps[0].data         = (RGBAF*) malloc(sizeof(RGBAF));
-  content.material_maps[0].data[0].r    = 0.2f;
-  content.material_maps[0].data[0].g    = 0.0f;
-  content.material_maps[0].data[0].b    = 1.0f / 255.0f;
-  content.material_maps[0].data[0].a    = 0.0f;
+  content.albedo_maps[0].width              = 1;
+  content.albedo_maps[0].height             = 1;
+  content.albedo_maps[0].type               = TexDataUINT8;
+  content.albedo_maps[0].data               = (RGBA8*) malloc(sizeof(RGBA8));
+  ((RGBA8*) content.albedo_maps[0].data)->r = 230;
+  ((RGBA8*) content.albedo_maps[0].data)->g = 230;
+  ((RGBA8*) content.albedo_maps[0].data)->b = 230;
+  ((RGBA8*) content.albedo_maps[0].data)->a = 255;
+  content.illuminance_maps[0].width         = 1;
+  content.illuminance_maps[0].height        = 1;
+  content.illuminance_maps[0].type          = TexDataUINT8;
+  content.illuminance_maps[0].data          = (RGBA8*) malloc(sizeof(RGBA8));
+  memset(content.illuminance_maps[0].data, 0, sizeof(RGBA8));
+  content.material_maps[0].width              = 1;
+  content.material_maps[0].height             = 1;
+  content.material_maps[0].type               = TexDataUINT8;
+  content.material_maps[0].data               = (RGBA8*) malloc(sizeof(RGBA8));
+  ((RGBA8*) content.material_maps[0].data)->r = 50;
+  ((RGBA8*) content.material_maps[0].data)->g = 0;
+  ((RGBA8*) content.material_maps[0].data)->b = 1;
+  ((RGBA8*) content.material_maps[0].data)->a = 0;
 
   return content;
 }
