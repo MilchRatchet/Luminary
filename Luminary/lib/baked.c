@@ -190,6 +190,7 @@ RaytraceInstance* load_baked(const char* filename) {
   free(instance);
   free_scene(scene);
   free(head);
+  fclose(file);
 
   bench_toc("Loading Luminary Baked File");
 
@@ -261,6 +262,11 @@ void serialize_baked(RaytraceInstance* instance) {
   bench_tic();
   FILE* file;
   fopen_s(&file, "generated.baked", "wb");
+
+  if (!file) {
+    error_message("Failed to write baked file. generated.baked could not be opened.");
+    return;
+  }
 
   fseek(file, head_size, SEEK_SET);
 
