@@ -211,7 +211,66 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void postprocess_trace_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trace_tasks() {
+  const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset    = get_task_address(i);
+    TraceTask task      = load_trace_task(device_trace_tasks + offset);
+    const float2 result = __ldg((float2*) (device.trace_results + offset));
+
+    const float depth     = result.x;
+    const uint32_t hit_id = __float_as_uint(result.y);
+
+    const bool is_hit           = (hit_id != SKY_HIT);
+    const bool use_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
+    bool modified_task          = false;
+
+    if (device_scene.sky.cloud.active) {
+      const vec3 sky_origin = world_to_sky_transform(task.origin);
+
+      float2 params =
+        cloud_get_intersection(sky_origin, task.ray, (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : 0.001f * depth);
+
+      const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
+
+      if (cloud_hit) {
+        if (use_inscattering) {
+          const float inscattering_limit = fmaxf(0.0f, fminf(0.001f * depth, params.x));
+
+          sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
+        }
+
+        trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
+
+        if (!is_hit && use_inscattering) {
+          task.origin   = add_vector(task.origin, scale_vector(task.ray, params.x));
+          modified_task = true;
+        }
+      }
+    }
+    else if (is_hit && use_inscattering) {
+      sky_trace_inscattering(world_to_sky_transform(task.origin), task.ray, 0.001f * depth, task.index);
+    }
+
+    if (device_scene.fog.active) {
+      float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
+      float weight = expf(-t * device_scene.fog.absorption * 0.001f);
+
+      RGBF record = device_records[task.index.x + task.index.y * device_width];
+
+      record = scale_color(record, weight);
+
+      device_records[task.index.x + task.index.y * device_width] = record;
+    }
+
+    if (modified_task) {
+      store_trace_task(device_trace_tasks + offset, task);
+    }
+  }
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {
   const int task_count         = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   uint16_t geometry_task_count = 0;
   uint16_t sky_task_count      = 0;
@@ -307,35 +366,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void postprocess_trace_tasks(
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
-    const bool is_hit           = (hit_id != SKY_HIT);
-    const bool use_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
-
-    if (device_scene.sky.cloud.active) {
-      const vec3 sky_origin = world_to_sky_transform(task.origin);
-
-      float2 params =
-        cloud_get_intersection(sky_origin, task.ray, (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : 0.001f * depth);
-
-      const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
-
-      if (cloud_hit) {
-        if (use_inscattering) {
-          const float inscattering_limit = fmaxf(0.0f, fminf(0.001f * depth, params.x));
-
-          sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
-        }
-
-        trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
-
-        if (!is_hit && use_inscattering) {
-          task.origin = add_vector(task.origin, scale_vector(task.ray, params.x));
-        }
-      }
-    }
-    else if (is_hit && use_inscattering) {
-      sky_trace_inscattering(world_to_sky_transform(task.origin), task.ray, 0.001f * depth, task.index);
-    }
-
     if (is_first_ray()) {
       device.raydir_buffer[task.index.x + task.index.y * device_width] = task.ray;
 
@@ -348,17 +378,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void postprocess_trace_tasks(
 
     if (device_iteration_type == TYPE_LIGHT)
       device.state_buffer[task.index.x + task.index.y * device_width] &= ~STATE_LIGHT_OCCUPIED;
-
-    if (device_scene.fog.active) {
-      float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
-      float weight = expf(-t * device_scene.fog.absorption * 0.001f);
-
-      RGBF record = device_records[task.index.x + task.index.y * device_width];
-
-      record = scale_color(record, weight);
-
-      device_records[task.index.x + task.index.y * device_width] = record;
-    }
 
     float4* ptr = (float4*) (device_trace_tasks + offset);
     float4 data0;

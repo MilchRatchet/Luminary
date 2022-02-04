@@ -515,6 +515,7 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
