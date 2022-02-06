@@ -161,12 +161,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       LightSample light;
       light = sample_light(task.position, normal, task.index, task.state);
 
-      const float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
-      const float beta  = blue_noise(task.index.x, task.index.y, task.state, 2);
+      ray = brdf_sample_light_ray(
+        light.dir, light.angle, blue_noise(task.index.x, task.index.y, task.state, 0),
+        2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 1));
 
-      RGBF light_record = record;
-
-      ray = light_BRDF(light_record, normal, V, light, albedo, roughness, metallic, beta, gamma);
+      const RGBF light_record =
+        mul_color(record, scale_color(brdf_evaluate(opaque_color(albedo), V, ray, normal, roughness, metallic), light.weight));
 
       TraceTask light_task;
       light_task.origin = task.position;
@@ -180,15 +180,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
       }
 
-      RGBF bounce_record    = record;
-      const float spec_prob = lerp(0.5f, 1.0f, metallic);
-
-      if (blue_noise(task.index.x, task.index.y, task.state, 10) < spec_prob) {
-        ray = specular_BRDF(bounce_record, normal, V, albedo, roughness, metallic, beta, gamma, spec_prob);
-      }
-      else {
-        ray = diffuse_BRDF(bounce_record, normal, V, albedo, roughness, metallic, beta, gamma, spec_prob);
-      }
+      RGBF bounce_record = record;
+      const bool valid_bounce =
+        brdf_sample_ray(ray, bounce_record, task.index, task.state, opaque_color(albedo), V, normal, face_normal, roughness, metallic);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
@@ -196,7 +190,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       bounce_task.index  = task.index;
       bounce_task.state  = task.state;
 
-      if (validate_trace_task(bounce_task, bounce_record)) {
+      if (valid_bounce && validate_trace_task(bounce_task, bounce_record)) {
         device.bounce_records[pixel] = bounce_record;
         store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }

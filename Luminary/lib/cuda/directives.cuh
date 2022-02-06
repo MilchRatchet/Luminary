@@ -37,7 +37,7 @@
  * A sample exits early when light information have already been gathered
  * This improves performance at the cost of reflections in directly lit surfaces
  */
-#define SINGLE_CONTRIBUTION_ONLY
+//#define SINGLE_CONTRIBUTION_ONLY
 
 __device__ int validate_trace_task(TraceTask task, RGBF record) {
   int valid = 1;

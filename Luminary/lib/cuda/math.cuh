@@ -623,6 +623,10 @@ __device__ RGBF inv_color(const RGBF a) {
   return result;
 }
 
+__device__ RGBF opaque_color(const RGBAF a) {
+  return get_color(a.r, a.g, a.b);
+}
+
 __device__ float get_dithering(const int x, const int y) {
   const float dither = 2.0f * blue_noise(x, y, 0, 0) - 1.0f;
 

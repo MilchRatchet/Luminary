@@ -526,7 +526,7 @@ static Scene get_default_scene() {
   scene.sky.moon_azimuth              = 0.0f;
   scene.sky.moon_albedo               = 0.12f;
   scene.sky.sky_intensity             = 10.0f;
-  scene.sky.sun_strength              = 5.0f;
+  scene.sky.sun_strength              = 20.0f;
   scene.sky.base_density              = 0.7f;
   scene.sky.steps                     = 8;
   scene.sky.stars_seed                = 0;

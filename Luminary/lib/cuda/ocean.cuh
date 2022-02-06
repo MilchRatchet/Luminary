@@ -220,36 +220,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      LightSample light;
-      light = sample_light(task.position, normal, task.index, task.state);
-
-      const float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
-      const float beta  = blue_noise(task.index.x, task.index.y, task.state, 2);
-
-      RGBF light_record = record;
-
-      ray = light_BRDF(light_record, normal, V, light, albedo, 0.0f, 0.0f, beta, gamma);
-
-      TraceTask light_task;
-      light_task.origin = task.position;
-      light_task.ray    = ray;
-      light_task.index  = task.index;
-      light_task.state  = task.state;
-
-      if (light.weight > 0.0f && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED)) {
-        device.light_records[pixel]        = light_record;
-        device.light_sample_history[pixel] = light.id;
-        store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
-      }
-
       RGBF bounce_record = record;
 
-      if (blue_noise(task.index.x, task.index.y, task.state, 10) < 0.5f) {
-        ray = specular_BRDF(bounce_record, normal, V, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
-      }
-      else {
-        ray = diffuse_BRDF(bounce_record, normal, V, albedo, 0.0f, 0.0f, beta, gamma, 0.5f);
-      }
+      brdf_sample_ray(ray, bounce_record, task.index, task.state, opaque_color(albedo), V, normal, normal, 0.0f, 0.0f);
 
       TraceTask bounce_task;
       bounce_task.origin           = task.position;
