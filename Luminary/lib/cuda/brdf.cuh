@@ -309,6 +309,13 @@ __device__ vec3 brdf_sample_microfacet(const vec3 V_local, const float roughness
   return brdf_sample_microfacet_GGX(V_local, roughness2, alpha, beta);
 }
 
+/*
+ * Multiscattering compensation for microfacet model similar to in the paper by Fdez-Aguera.
+ * I scale the multiscattering term with the roughness because there cannot be any multiscattering in perfectly smooth surfaces.
+ * In fact the issue came up in light sampling. The multiscattering assumes Ess + Ems = 1 for perfect reflectors.
+ * However, this is obviously only true for physically feasible in-out directions. However light sampling generates
+ * infeasible directions for which there should really be Ess + Ems = 0.
+ */
 __device__ RGBF brdf_microfacet_multiscattering(
   const float roughness2, const float NdotL, const float NdotV, const RGBF fresnel, const RGBF specular_f0, const float brdf_term) {
   const RGBF FssEss = scale_color(fresnel, brdf_term);
@@ -319,7 +326,7 @@ __device__ RGBF brdf_microfacet_multiscattering(
   const RGBF FmsEms = get_color(
     Ems * FssEss.r * F_avg.r / (1.0f - F_avg.r * Ems), Ems * FssEss.g * F_avg.g / (1.0f - F_avg.g * Ems),
     Ems * FssEss.b * F_avg.b / (1.0f - F_avg.b * Ems));
-  return add_color(FssEss, FmsEms);
+  return add_color(FssEss, scale_color(FmsEms, roughness2));
 }
 
 __device__ vec3
@@ -420,7 +427,7 @@ __device__ float brdf_evaluate_microfacet_GGX(const float roughness4, const floa
 
 __device__ RGBF brdf_evaluate_microfacet(
   const float roughness, const float NdotH, const float NdotL, const float NdotV, const RGBF fresnel, const RGBF specular_f0) {
-  const float roughness4 = fmaxf(eps, roughness * roughness * roughness * roughness);
+  const float roughness4 = fmaxf(0.00001f, roughness * roughness * roughness * roughness);
   const float D          = brdf_evaluate_microfacet_GGX(roughness4, NdotH);
   const float G2         = brdf_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
@@ -470,7 +477,8 @@ __device__ RGBF
   const float NdotH = __saturatef(dot_product(normal, H));
   const float HdotV = __saturatef(dot_product(H, V));
 
-  const RGBF specular_f0 = brdf_albedo_as_specular_f0(albedo, metallic);
+  const RGBF specular_f0    = brdf_albedo_as_specular_f0(albedo, metallic);
+  const RGBF diffuse_albedo = brdf_albedo_as_diffuse(albedo, metallic);
 
 #if FRESNEL_APPROXIMATION == BRDF_SCHLICK
   const RGBF fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotV);
@@ -479,7 +487,7 @@ __device__ RGBF
 #endif
 
   const RGBF specular = brdf_evaluate_specular(roughness, NdotH, NdotL, NdotV, fresnel, specular_f0);
-  const RGBF diffuse  = brdf_evaluate_diffuse(albedo, NdotL, NdotV, HdotV, roughness);
+  const RGBF diffuse  = brdf_evaluate_diffuse(diffuse_albedo, NdotL, NdotV, HdotV, roughness);
 
   return add_color(specular, mul_color(diffuse, get_color(1.0f - fresnel.r, 1.0f - fresnel.g, 1.0f - fresnel.b)));
 }
