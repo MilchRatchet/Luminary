@@ -25,6 +25,27 @@ File name of output image in offline mode. Specified directory must already exis
 `GENERAL MESHFILE [STRING]`<br/>
 Path to an `*.obj` mesh file. Option may be specified multiple times to load multiple mesh files.
 
+## Material Settings
+
+`MATERIAL SMOOTHNE [FP32]`<br/>
+Default smoothness value that is used when no material texture is present. Number must be in the range [0,1].
+
+`MATERIAL METALLIC [FP32]`<br/>
+Default metallic value that is used when no material texture is present. Number must be in the range [0,1].
+
+`MATERIAL EMISSION [FP32]`<br/>
+Default emission intensity value that is used when no material texture is present. Number must be strictly greater than 0.
+
+`MATERIAL DIFFUSE_ [INT32]`<br/>
+Defines which of the available diffuse BRDFs is used:
+  - 0 = Lambertian
+  - 1 = Frostbite-Disney
+
+`MATERIAL FRESNEL_ [INT32]`<br/>
+Defines which of the available fresnel approximations is used:
+  - 0 = Schlick
+  - 1 = Fdez-Aguera
+
 ## Camera Settings
 
 `CAMERA POSITION [FP32] [FP32] [FP32]`<br/>

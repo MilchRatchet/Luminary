@@ -201,8 +201,6 @@ __constant__ TextureAssignment* device_texture_assignments;
 
 __constant__ vec3 device_sun;
 
-__constant__ RGBF device_default_material;
-
 __constant__ int device_shading_mode;
 
 __constant__ RGBF* device_bloom_scratch;

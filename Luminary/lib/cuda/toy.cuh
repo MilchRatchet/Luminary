@@ -76,7 +76,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     }
 
     RGBAF albedo          = device_scene.toy.albedo;
-    const float roughness = (1.0f - device_scene.toy.material.r) * (1.0f - device_scene.toy.material.r);
+    const float roughness = (1.0f - device_scene.toy.material.r);
     const float metallic  = device_scene.toy.material.g;
     const float intensity = device_scene.toy.material.b;
     RGBF emission         = get_color(device_scene.toy.emission.r, device_scene.toy.emission.g, device_scene.toy.emission.b);

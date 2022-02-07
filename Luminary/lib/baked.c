@@ -188,7 +188,7 @@ RaytraceInstance* load_baked(const char* filename) {
 
   RaytraceInstance* final = init_raytracing(
     instance->settings, albedo_atlas, instance->albedo_atlas_length, illuminance_atlas, instance->illuminance_atlas_length, material_atlas,
-    instance->material_atlas_length, scene, instance->default_material);
+    instance->material_atlas_length, scene);
 
   final->scene_gpu.sky.stars             = (Star*) 0;
   final->scene_gpu.sky.cloud.initialized = 0;

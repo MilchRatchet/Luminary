@@ -69,14 +69,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     if (maps.z) {
       const float4 material_f = tex2D<float4>(device.material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
 
-      roughness = (1.0f - material_f.x) * (1.0f - material_f.x);
+      roughness = (1.0f - material_f.x);
       metallic  = material_f.y;
       intensity = material_f.z * 255.0f;
     }
     else {
-      roughness = (1.0f - device_default_material.r) * (1.0f - device_default_material.r);
-      metallic  = device_default_material.g;
-      intensity = device_default_material.b;
+      roughness = (1.0f - device_scene.material.default_material.r);
+      metallic  = device_scene.material.default_material.g;
+      intensity = device_scene.material.default_material.b;
     }
 
     RGBAF albedo;

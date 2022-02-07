@@ -13,14 +13,6 @@
  * "A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting" by Fdez-Aguera.
  */
 
-// Diffuse BRDFs
-#define BRDF_LAMBERTIAN 0
-#define BRDF_FROSTBITE_DISNEY 1
-
-// Fresnel Approximations
-#define BRDF_SCHLICK 0
-#define BRDF_ROUGHNESS 1
-
 /*
  * There are two diffuse BRDFs implemented.
  *  - Lambertian
@@ -31,18 +23,14 @@
  * The lambertian BRDF works a lot better, however, even that one has some energy loss when combined with the specular BRDF.
  *
  * The specular BRDF is a microfacet GGX distributed BRDF. Since it only takes single scattering into consideration
- * there is a multiscattering compensation factor, however, while this improves energy conservation, there is still some
- * energy lost. One could try to properly implement the energy compensation.
+ * there is a multiscattering compensation, however, while this improves energy conservation, there is still some
+ * energy lost.
  */
-#define DIFFUSE_BRDF BRDF_LAMBERTIAN
-//#define DIFFUSE_BRDF BRDF_FROSTBITE_DISNEY
 
 /*
  * There are two fresnel approximations. One is the standard Schlick approximation. The other is some
  * approximation found in the paper by Fdez-Aguera.
  */
-//#define FRESNEL_APPROXIMATION BRDF_SCHLICK
-#define FRESNEL_APPROXIMATION BRDF_ROUGHNESS
 
 struct LightSample {
   vec3 dir;
@@ -95,11 +83,9 @@ __device__ RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float
  * @result Fresnel approximation.
  */
 __device__ RGBF brdf_fresnel_roughness(const RGBF f0, const float roughness, const float NdotV) {
-  RGBF result;
-
   const float t = powf(1.0f - NdotV, 5.0f);
 
-  RGBF Fr = sub_color(max_color(get_color(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), f0), f0);
+  const RGBF Fr = sub_color(max_color(get_color(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), f0), f0);
   return add_color(f0, scale_color(Fr, t));
 }
 
@@ -263,7 +249,7 @@ __device__ LightSample sample_light(const vec3 position, const vec3 normal, cons
         light.weight *= device_scene.toy.material.b;
         break;
       default:
-        light.weight *= device_default_material.b;
+        light.weight *= device_scene.material.default_material.b;
         break;
     }
 
@@ -294,11 +280,13 @@ __device__ float brdf_diffuse_term_frostbyte_disney(const float roughness, const
 }
 
 __device__ float brdf_diffuse_term(const float roughness, const float HdotV, const float NdotL, const float NdotV) {
-#if DIFFUSE_BRDF == BRDF_LAMBERTIAN
-  return 1.0f;
-#elif DIFFUSE_BRDF == BRDF_FROSTBITE_DISNEY
-  return brdf_diffuse_term_frostbyte_disney(roughness, HdotV, NdotL, NdotV);
-#endif
+  switch (device_scene.material.diffuse) {
+    case FROSTBITEDISNEY:
+      return brdf_diffuse_term_frostbyte_disney(roughness, HdotV, NdotL, NdotV);
+    case LAMBERTIAN:
+    default:
+      return 1.0f;
+  }
 }
 
 __device__ vec3 brdf_sample_ray_hemisphere(float alpha, const float beta, const vec3 normal) {
@@ -346,11 +334,16 @@ __device__ vec3
   const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
   const float NdotH = fmaxf(0.00001f, fminf(1.0f, H_local.z));
 
-#if FRESNEL_APPROXIMATION == BRDF_SCHLICK
-  const RGBF fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotL);
-#elif FRESNEL_APPROXIMATION == BRDF_ROUGHNESS
-  const RGBF fresnel = brdf_fresnel_roughness(specular_f0, sqrtf(roughness2), HdotL);
-#endif
+  RGBF fresnel;
+  switch (device_scene.material.fresnel) {
+    case SCHLICK:
+      fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotL);
+      break;
+    case FDEZ_AGUERA:
+    default:
+      fresnel = brdf_fresnel_roughness(specular_f0, sqrtf(roughness2), HdotL);
+      break;
+  }
 
   const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
 
@@ -450,11 +443,13 @@ __device__ RGBF
 }
 
 __device__ RGBF brdf_evaluate_diffuse(const RGBF albedo, const float NdotL, const float NdotV, const float HdotV, const float roughness) {
-#if DIFFUSE_BRDF == BRDF_LAMBERTIAN
-  return brdf_evaluate_lambertian(albedo, NdotL);
-#elif DIFFUSE_BRDF == BRDF_FROSTBITE_DISNEY
-  return brdf_evaluate_frostbyte_disney(albedo, NdotL, NdotV, HdotV, roughness);
-#endif
+  switch (device_scene.material.diffuse) {
+    case FROSTBITEDISNEY:
+      return brdf_evaluate_frostbyte_disney(albedo, NdotL, NdotV, HdotV, roughness);
+    case LAMBERTIAN:
+    default:
+      return brdf_evaluate_lambertian(albedo, NdotL);
+  }
 }
 
 /*
@@ -480,11 +475,16 @@ __device__ RGBF
   const RGBF specular_f0    = brdf_albedo_as_specular_f0(albedo, metallic);
   const RGBF diffuse_albedo = brdf_albedo_as_diffuse(albedo, metallic);
 
-#if FRESNEL_APPROXIMATION == BRDF_SCHLICK
-  const RGBF fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotV);
-#elif FRESNEL_APPROXIMATION == BRDF_ROUGHNESS
-  const RGBF fresnel = brdf_fresnel_roughness(specular_f0, roughness, HdotV);
-#endif
+  RGBF fresnel;
+  switch (device_scene.material.fresnel) {
+    case SCHLICK:
+      fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotV);
+      break;
+    case FDEZ_AGUERA:
+    default:
+      fresnel = brdf_fresnel_roughness(specular_f0, roughness, HdotV);
+      break;
+  }
 
   const RGBF specular = brdf_evaluate_specular(roughness, NdotH, NdotL, NdotV, fresnel, specular_f0);
   const RGBF diffuse  = brdf_evaluate_diffuse(diffuse_albedo, NdotL, NdotV, HdotV, roughness);

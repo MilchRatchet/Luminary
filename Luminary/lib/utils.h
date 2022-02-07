@@ -48,6 +48,10 @@ enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } t
 
 enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJECTION = 2 } typedef AccumMode;
 
+enum MaterialFresnel { SCHLICK = 0, FDEZ_AGUERA = 1 } typedef MaterialFresnel;
+
+enum MaterialDiffuse { LAMBERTIAN = 0, FROSTBITEDISNEY = 1 } typedef MaterialDiffuse;
+
 struct DeviceBuffer {
   void* device_pointer;
   size_t size;
@@ -196,6 +200,12 @@ struct Jitter {
   float prev_y;
 } typedef Jitter;
 
+struct GlobalMaterial {
+  RGBF default_material;
+  MaterialFresnel fresnel;
+  MaterialDiffuse diffuse;
+} typedef GlobalMaterial;
+
 struct Scene {
   Camera camera;
   Triangle* triangles;
@@ -211,6 +221,7 @@ struct Scene {
   Sky sky;
   Toy toy;
   Fog fog;
+  GlobalMaterial material;
 } typedef Scene;
 
 struct RaytraceInstance {
@@ -248,7 +259,6 @@ struct RaytraceInstance {
   int temporal_frames;
   int lights_active;
   DeviceBuffer* randoms;
-  RGBF default_material;
   int shading_mode;
   RGBF** bloom_mips_gpu;
   int snap_resolution;

@@ -288,7 +288,7 @@ void generate_clouds(RaytraceInstance* instance) {
 
 extern "C" RaytraceInstance* init_raytracing(
   General general, DeviceBuffer* albedo_atlas, int albedo_atlas_length, DeviceBuffer* illuminance_atlas, int illuminance_atlas_length,
-  DeviceBuffer* material_atlas, int material_atlas_length, Scene scene, RGBF default_material) {
+  DeviceBuffer* material_atlas, int material_atlas_length, Scene scene) {
   RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
   memset(instance, 0, sizeof(RaytraceInstance));
 
@@ -305,8 +305,6 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->albedo_atlas_length      = albedo_atlas_length;
   instance->illuminance_atlas_length = illuminance_atlas_length;
   instance->material_atlas_length    = material_atlas_length;
-
-  instance->default_material = default_material;
 
   instance->scene_gpu    = scene;
   instance->settings     = general;
@@ -482,7 +480,6 @@ extern "C" void prepare_trace(RaytraceInstance* instance) {
   update_special_lights(instance->scene_gpu);
   update_camera_pos(instance->scene_gpu, instance->width, instance->height);
   update_jitter(instance);
-  gpuErrchk(cudaMemcpyToSymbol(device_default_material, &(instance->default_material), sizeof(RGBF), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_lights_active, &(instance->lights_active), sizeof(int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_accum_mode, &(instance->accum_mode), sizeof(int), 0, cudaMemcpyHostToDevice));
 }

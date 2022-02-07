@@ -81,6 +81,37 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
   }
 }
 
+static void parse_material_settings(GlobalMaterial* material, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
+
+  switch (key) {
+    /* SMOOTHNE */
+    case 4994008563745508691u:
+      sscanf_s(value, "%f\n", &material->default_material.r);
+      break;
+    /* METALLIC */
+    case 4848490364238316877u:
+      sscanf_s(value, "%f\n", &material->default_material.g);
+      break;
+    /* EMISSION */
+    case 5642809480346946885u:
+      sscanf_s(value, "%f\n", &material->default_material.b);
+      break;
+    /* DIFFUSE_ */
+    case 6864984832712526148u:
+      sscanf_s(value, "%d\n", &material->diffuse);
+      break;
+    /* FRESNEL_ */
+    case 6866939734539981382u:
+      sscanf_s(value, "%d\n", &material->fresnel);
+      break;
+    default:
+      error_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
+      break;
+  }
+}
+
 static void parse_camera_settings(Camera* camera, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
@@ -448,6 +479,12 @@ static Scene get_default_scene() {
 
   memset(&scene, 0, sizeof(Scene));
 
+  scene.material.default_material.r = 0.3f;
+  scene.material.default_material.g = 0.0f;
+  scene.material.default_material.b = 1.0f;
+  scene.material.fresnel            = FDEZ_AGUERA;
+  scene.material.diffuse            = LAMBERTIAN;
+
   scene.camera.pos.x                 = 0.0f;
   scene.camera.pos.y                 = 0.0f;
   scene.camera.pos.z                 = 0.0f;
@@ -642,6 +679,9 @@ RaytraceInstance* load_scene(const char* filename) {
     if (line[0] == 'G') {
       parse_general_settings(&general, &content, line + 7 + 1);
     }
+    else if (line[0] == 'M') {
+      parse_material_settings(&scene.material, line + 8 + 1);
+    }
     else if (line[0] == 'C' && line[1] == 'A') {
       parse_camera_settings(&scene.camera, line + 6 + 1);
     }
@@ -683,7 +723,7 @@ RaytraceInstance* load_scene(const char* filename) {
 
   RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
-    content.material_maps_length, scene, (RGBF){.r = 0.3f, .g = 0.0f, .b = 1.0f});
+    content.material_maps_length, scene);
 
   free_wavefront_content(content);
   free_scene(scene);
@@ -729,7 +769,7 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
-    content.material_maps_length, scene, (RGBF){.r = 0.3f, .g = 0.0f, .b = 1.0f});
+    content.material_maps_length, scene);
 
   free_wavefront_content(content);
   free_scene(scene);
@@ -816,6 +856,20 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf_s(line, LINE_SIZE, "CAMERA AUTOEXP_ %d\n", instance->scene_gpu.camera.auto_exposure);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "CAMERA FILTER__ %d\n", instance->scene_gpu.camera.filter);
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf_s(line, LINE_SIZE, "MATERIAL SMOOTHNE %f\n", instance->scene_gpu.material.default_material.r);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "MATERIAL METALLIC %f\n", instance->scene_gpu.material.default_material.g);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "MATERIAL EMISSION %f\n", instance->scene_gpu.material.default_material.b);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "MATERIAL DIFFUSE_ %d\n", instance->scene_gpu.material.diffuse);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "MATERIAL FRESNEL_ %d\n", instance->scene_gpu.material.fresnel);
   fputs(line, file);
 
   sprintf_s(line, LINE_SIZE, "\n#===============================\n# Sky Settings\n#===============================\n\n");
