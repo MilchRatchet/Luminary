@@ -219,11 +219,11 @@ __device__ LightSample sample_light(const vec3 position, const vec3 normal, cons
 
   const int reservoir_sampling_size = min(light_count, 8);
 
-  const float light_count_float = (float) light_count;
+  const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
 
   for (int i = 0; i < reservoir_sampling_size; i++) {
     const float r1       = white_noise();
-    uint32_t light_index = (uint32_t) (r1 * (light_count_float + 0.9999999f));
+    uint32_t light_index = (uint32_t) (r1 * light_count_float);
 
     light_index += !sun_visible;
     light_index += (toy_visible || light_index < TOY_LIGHT) ? 0 : 1;
