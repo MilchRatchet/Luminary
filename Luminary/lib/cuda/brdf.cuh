@@ -321,11 +321,9 @@ __device__ RGBF brdf_microfacet_multiscattering(
 
 __device__ vec3
   brdf_sample_ray_microfacet(RGBF& record, const vec3 V_local, const float roughness2, RGBF specular_f0, float alpha, float beta) {
-  vec3 H_local;
-  if (roughness2 == 0.0f) {
-    H_local = get_vector(0.0f, 0.0f, 1.0f);
-  }
-  else {
+  vec3 H_local = get_vector(0.0f, 0.0f, 1.0f);
+
+  if (roughness2 > 0.0f) {
     H_local = brdf_sample_microfacet(V_local, roughness2, alpha, beta);
   }
 
@@ -334,7 +332,6 @@ __device__ vec3
   const float HdotL = fmaxf(0.00001f, fminf(1.0f, dot_product(H_local, L_local)));
   const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
   const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
-  const float NdotH = fmaxf(0.00001f, fminf(1.0f, H_local.z));
 
   RGBF fresnel;
   switch (device_scene.material.fresnel) {
