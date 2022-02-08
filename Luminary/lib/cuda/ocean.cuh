@@ -193,7 +193,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
 
       const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
 
-      ray = refraction_BRDF(record, normal, ray, 0.0f, refraction_index, 0.0f, 0.0f);
+      ray = brdf_sample_ray_refraction(record, get_color(1.0f, 1.0f, 1.0f), normal, ray, 0.0f, refraction_index, 0.0f, 0.0f);
 
       TraceTask new_task;
       new_task.origin = task.position;

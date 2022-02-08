@@ -160,43 +160,6 @@ __device__ vec3 brdf_sample_light_ray(const vec3 direction, const float angle, c
   return normalize_vector(sample_ray_from_angles_and_vector(sqrtf(alpha) * angle, beta, direction));
 }
 
-__device__ vec3 refraction_BRDF(
-  RGBF& record, const vec3 normal, const vec3 ray, const float roughness, const float index, const float r1, const float r2) {
-  const float alpha = roughness * roughness;
-
-  vec3 H;
-
-  const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
-  const vec3 V                   = scale_vector(ray, -1.0f);
-  const vec3 V_local             = rotate_vector_by_quaternion(V, rotation_to_z);
-
-  const vec3 H_local = brdf_sample_microfacet_GGX(V_local, alpha, r1, r2);
-  H                  = rotate_vector_by_quaternion(H_local, inverse_quaternion(rotation_to_z));
-
-  const float HdotV = fmaxf(eps, fminf(1.0f, dot_product(H_local, V_local)));
-  const float NdotH = fmaxf(eps, fminf(1.0f, H_local.z));
-  const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
-
-  RGBF specular_f0 = get_color(1.0f, 1.0f, 1.0f);
-
-  const RGBF F = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotV);
-
-  const float weight = brdf_smith_G2_over_G1_height_correlated(alpha * alpha, NdotH, NdotV);
-
-  record.r *= F.r * weight;
-  record.g *= F.g * weight;
-  record.b *= F.b * weight;
-
-  const float a = -dot_product(ray, H);
-  const float b = 1.0f - index * index * (1.0f - a * a);
-
-  if (b < 0.0f) {
-    return normalize_vector(reflect_vector(ray, scale_vector(H, -1.0f)));
-  }
-
-  return normalize_vector(add_vector(scale_vector(ray, index), scale_vector(H, index * a - sqrtf(b))));
-}
-
 __device__ LightSample sample_light(const vec3 position, const vec3 normal, const ushort2 index, const uint32_t seed) {
   vec3 sun = scale_vector(device_sun, 149597870.0f);
   sun.y -= SKY_EARTH_RADIUS;
@@ -489,6 +452,72 @@ __device__ RGBF
   const RGBF diffuse  = brdf_evaluate_diffuse(diffuse_albedo, NdotL, NdotV, HdotV, roughness);
 
   return add_color(specular, mul_color(diffuse, get_color(1.0f - fresnel.r, 1.0f - fresnel.g, 1.0f - fresnel.b)));
+}
+
+/*
+ * This is not correct but it looks right.
+ *
+ * Essentially I handle refraction like specular reflection. I sample a microfacet and
+ * simply refract along it instead of reflecting. Weighting is done exactly like in reflection.
+ * The albedo is simply taken as the specular f0, I don't know I feel like that makes sense
+ * from an artistic standpoint. This is most likely completely non physical but since
+ * refraction plays such a small role at the moment, it probably doesnt matter too much.
+ */
+__device__ vec3 brdf_sample_ray_refraction(
+  RGBF& record, const RGBF albedo, const vec3 normal, const vec3 ray, const float roughness, const float index, const float r1,
+  const float r2) {
+  const float alpha = r1;
+  const float beta  = r2;
+
+  const float roughness2 = roughness * roughness;
+
+  const RGBF specular_f0 = albedo;
+
+  const vec3 V = scale_vector(ray, -1.0f);
+
+  const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
+  const vec3 V_local             = rotate_vector_by_quaternion(V, rotation_to_z);
+
+  vec3 H_local = get_vector(0.0f, 0.0f, 1.0f);
+
+  if (roughness2 > 0.0f) {
+    H_local = brdf_sample_microfacet(V_local, roughness2, alpha, beta);
+  }
+
+  vec3 L_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
+
+  const float HdotL = fmaxf(0.00001f, fminf(1.0f, dot_product(H_local, L_local)));
+  const float HdotV = fmaxf(0.00001f, fminf(1.0f, dot_product(H_local, V_local)));
+  const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
+  const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
+
+  RGBF fresnel;
+  switch (device_scene.material.fresnel) {
+    case SCHLICK:
+      fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotL);
+      break;
+    case FDEZ_AGUERA:
+    default:
+      fresnel = brdf_fresnel_roughness(specular_f0, sqrtf(roughness2), HdotL);
+      break;
+  }
+
+  const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
+
+  record = mul_color(record, brdf_microfacet_multiscattering(roughness2, NdotL, NdotV, fresnel, specular_f0, brdf_term));
+
+  const float b = 1.0f - index * index * (1.0f - HdotV * HdotV);
+
+  const vec3 ray_local = scale_vector(V_local, -1.0f);
+
+  if (b < 0.0f) {
+    L_local = normalize_vector(reflect_vector(ray_local, scale_vector(H_local, -1.0f)));
+  }
+  else {
+    L_local = normalize_vector(add_vector(scale_vector(ray_local, index), scale_vector(H_local, index * HdotV - sqrtf(b))));
+  }
+
+  return normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
 }
 
 #endif /* CU_BRDF_H */

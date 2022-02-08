@@ -108,12 +108,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
       record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
 
-      const float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
-      const float beta  = blue_noise(task.index.x, task.index.y, task.state, 2);
+      const float alpha = blue_noise(task.index.x, task.index.y, task.state, 2);
+      const float beta  = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
 
       const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
 
-      task.ray = refraction_BRDF(record, normal, task.ray, roughness, refraction_index, beta, gamma);
+      task.ray = brdf_sample_ray_refraction(record, opaque_color(albedo), normal, task.ray, roughness, refraction_index, alpha, beta);
 
       TraceTask new_task;
       new_task.origin = task.position;
