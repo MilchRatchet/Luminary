@@ -1,7 +1,6 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #include "lib/baked.h"
 #include "lib/bench.h"
@@ -123,8 +122,6 @@ int main(int argc, char* argv[]) {
   if (bench)
     bench_activate();
 
-  clock_t time = clock();
-
   RaytraceInstance* instance;
 
   switch (file_type) {
@@ -157,7 +154,7 @@ int main(int argc, char* argv[]) {
   info_message("Instance set up.");
 
   if (offline) {
-    offline_output(instance, time);
+    offline_output(instance);
   }
   else {
     realtime_output(instance);

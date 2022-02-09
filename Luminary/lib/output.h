@@ -5,7 +5,7 @@
 
 #include "utils.h"
 
-void offline_output(RaytraceInstance* instance, clock_t time);
+void offline_output(RaytraceInstance* instance);
 void realtime_output(RaytraceInstance* instance);
 
 #endif /* OUTPUT_H */

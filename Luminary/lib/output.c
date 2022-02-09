@@ -19,7 +19,7 @@
 #include "realtime.h"
 #include "utils.h"
 
-void offline_output(RaytraceInstance* instance, clock_t time) {
+void offline_output(RaytraceInstance* instance) {
   bench_tic();
   clock_t start_of_rt = clock();
   prepare_trace(instance);
