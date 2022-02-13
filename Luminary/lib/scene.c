@@ -153,6 +153,10 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 5932458200661969986u:
       sscanf_s(value, "%f\n", &camera->bloom_strength);
       break;
+    /* BLOOMTHR */
+    case 5929081600453069890u:
+      sscanf_s(value, "%f\n", &camera->bloom_threshold);
+      break;
     /* DITHER__ */
     case 6872302013910370628u:
       sscanf_s(value, "%d\n", &camera->dithering);
@@ -497,7 +501,8 @@ static Scene get_default_scene() {
   scene.camera.exposure              = 1.0f;
   scene.camera.auto_exposure         = 1;
   scene.camera.bloom                 = 1;
-  scene.camera.bloom_strength        = 0.1f;
+  scene.camera.bloom_strength        = 1.0f;
+  scene.camera.bloom_threshold       = 1.0f;
   scene.camera.dithering             = 1;
   scene.camera.alpha_cutoff          = 0.0f;
   scene.camera.far_clip_distance     = 50000.0f;
@@ -844,6 +849,8 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf_s(line, LINE_SIZE, "CAMERA BLOOM___ %d\n", instance->scene_gpu.camera.bloom);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "CAMERA BLOOMSTR %f\n", instance->scene_gpu.camera.bloom_strength);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "CAMERA BLOOMTHR %f\n", instance->scene_gpu.camera.bloom_threshold);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "CAMERA DITHER__ %d\n", instance->scene_gpu.camera.dithering);
   fputs(line, file);

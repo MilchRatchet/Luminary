@@ -97,6 +97,48 @@ __global__ void bloom_downsample(RGBF* source, const int sw, const int sh, RGBF*
   }
 }
 
+__global__ void bloom_downsample_truncate(RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const float thresh = device_scene.camera.bloom_threshold;
+
+  const float scale_x = 1.0f / (tw - 1);
+  const float scale_y = 1.0f / (th - 1);
+  const float step_x  = 1.0f / (sw - 1);
+  const float step_y  = 1.0f / (sh - 1);
+
+  while (id < tw * th) {
+    const int x = id % tw;
+    const int y = id / tw;
+
+    const float sx = scale_x * x + 0.5f * scale_x;
+    const float sy = scale_y * y + 0.5f * scale_y;
+
+    RGBF a1 = sample_pixel(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBF a2 = sample_pixel(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBF a3 = sample_pixel(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBF a4 = sample_pixel(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+
+    RGBF pixel = add_color(add_color(a1, a2), add_color(a3, a4));
+
+    pixel = add_color(pixel, sample_pixel(source, sx, sy, sw, sh));
+    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy - step_y, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy + step_y, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy - step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy - step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy + step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy + step_y, sw, sh), 0.25f));
+
+    pixel = scale_color(pixel, 0.125f);
+
+    target[x + y * tw] = max_color(sub_color(pixel, get_color(thresh, thresh, thresh)), get_color(0.0f, 0.0f, 0.0f));
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
 __global__ void bloom_upsample(
   RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th, const float a, const float b) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -148,7 +190,8 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
 
   const int mip_count = min(BLOOM_MIP_COUNT, min(mip_count_w, mip_count_h));
 
-  bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(image, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
+  bloom_downsample_truncate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+    image, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
 
   for (int i = 0; i < mip_count - 1; i++) {
     const int sw = width >> (i + 1);
@@ -168,7 +211,7 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
   }
 
   bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    instance->bloom_mips_gpu[0], width >> 1, height >> 1, image, width, height, 1.0f - instance->scene_gpu.camera.bloom_strength,
+    instance->bloom_mips_gpu[0], width >> 1, height >> 1, image, width, height, 1.0f,
     instance->scene_gpu.camera.bloom_strength / mip_count);
 }
 

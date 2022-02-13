@@ -73,7 +73,10 @@ Set 1 to activate auto exposure in realtime mode, 0 else.
 Set 1 to activate bloom, 0 else.
 
 `CAMERA BLOOMSTR [FP32]`<br/>
-Strength of the bloom. Number must be in the range [0,1].
+Strength of the bloom. Number must be non-negative.
+
+`CAMERA BLOOMTHR [FP32]`<br/>
+Threshold of the bloom. Bloom is applied to max(pixel - threshold, 0). Number must be non-negative.
 
 `CAMERA DITHER__ [INT32]`<br/>
 Set 1 to activate randomized dithering, 0 else.

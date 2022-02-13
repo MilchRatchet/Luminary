@@ -167,7 +167,7 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 13;
+  tab.panel_count = 14;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -181,7 +181,8 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_check(ui, "Auto Exposure", &(instance->scene_gpu.camera.auto_exposure), 0);
   panels[i++] = create_slider(ui, "Exposure", &(instance->scene_gpu.camera.exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
   panels[i++] = create_check(ui, "Bloom", &(instance->scene_gpu.camera.bloom), 0);
-  panels[i++] = create_slider(ui, "Bloom Strength", &(instance->scene_gpu.camera.bloom_strength), 0, 0.0005f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Bloom Strength", &(instance->scene_gpu.camera.bloom_strength), 0, 0.0005f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Bloom Threshold", &(instance->scene_gpu.camera.bloom_threshold), 0, 0.0005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Dithering", &(instance->scene_gpu.camera.dithering), 0);
   panels[i++] =
     create_slider(ui, "Temporal Blend Factor", &(instance->scene_gpu.camera.temporal_blend_factor), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
