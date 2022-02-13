@@ -231,6 +231,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       bounce_task.state            = task.state;
       device.bounce_records[pixel] = bounce_record;
 
+      device.light_sample_history[pixel] = ANY_LIGHT;
       store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
   }

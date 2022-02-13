@@ -150,6 +150,8 @@ struct DevicePointers {
 #define TOY_HIT 0xfffffffd
 #define FOG_HIT 0xfffffffc
 #define DEBUG_LIGHT_HIT 0xfffffff0
+#define ANY_LIGHT 0xfffffff0
+#define NO_LIGHT 0xfffffff1
 #define TOY_LIGHT 0x1
 #define SUN_LIGHT 0x0
 #define TYPE_CAMERA 0x0
@@ -229,6 +231,10 @@ __device__ static int get_task_address(const int number) {
 
 __device__ static int is_first_ray() {
   return (device_iteration_type == TYPE_CAMERA);
+}
+
+__device__ static int proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
+  return (device_iteration_type == TYPE_CAMERA || target_light == source_light || target_light == ANY_LIGHT);
 }
 
 #endif /* CU_UTILS_H */

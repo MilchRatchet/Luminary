@@ -258,16 +258,21 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_sky_tasks() {
     const SkyTask task = load_sky_task(device_trace_tasks + get_task_address(task_offset + i));
     const int pixel    = task.index.y * device_width + task.index.x;
 
-    const RGBF record = device_records[pixel];
-    RGBF sky          = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true);
-    sky               = mul_color(sky, record);
-
+    const RGBF record    = device_records[pixel];
+    const vec3 origin    = world_to_sky_transform(task.origin);
     const uint32_t light = device.light_sample_history[pixel];
+    RGBF sky;
 
-    if (device_iteration_type != TYPE_LIGHT || light == 0) {
-      device.frame_buffer[pixel] = add_color(device.frame_buffer[pixel], sky);
+    if (proper_light_sample(light, 0)) {
+      sky = sky_get_color(origin, task.ray, FLT_MAX, true);
+    }
+    else {
+      sky = sky_get_color(origin, task.ray, FLT_MAX, false);
     }
 
+    sky = mul_color(sky, record);
+
+    device.frame_buffer[pixel] = add_color(device.frame_buffer[pixel], sky);
     write_albedo_buffer(sky, pixel);
   }
 }

@@ -623,6 +623,10 @@ __device__ RGBF inv_color(const RGBF a) {
   return result;
 }
 
+__device__ int color_any(const RGBF a) {
+  return (a.r > 0.0f || a.g > 0.0f || a.b > 0.0f);
+}
+
 __device__ RGBF opaque_color(const RGBAF a) {
   return get_color(a.r, a.g, a.b);
 }
