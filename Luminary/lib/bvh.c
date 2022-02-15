@@ -494,10 +494,10 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
           right += bins[k].exit;
         }
 
-        vec3_p high_left  = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
-        vec3_p high_right = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
-        vec3_p low_left   = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
-        vec3_p low_right  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
+        vec3_p high_left  = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX, ._p = -FLT_MAX};
+        vec3_p high_right = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX, ._p = -FLT_MAX};
+        vec3_p low_left   = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX, ._p = FLT_MAX};
+        vec3_p low_right  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX, ._p = FLT_MAX};
 
         for (int k = 1; k < OBJECT_SPLIT_BIN_COUNT - 1; k++) {
           update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
@@ -536,23 +536,15 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
         }
       }
 
-      int do_spatial_splits;
-
       vec3_p overlap = {
-        .x  = min(optimal_high_left.x, optimal_high_right.x) - max(optimal_low_left.x, optimal_low_right.x),
-        .y  = min(optimal_high_left.y, optimal_high_right.y) - max(optimal_low_left.y, optimal_low_right.y),
-        .z  = min(optimal_high_left.z, optimal_high_right.z) - max(optimal_low_left.z, optimal_low_right.z),
-        ._p = min(optimal_high_left._p, optimal_high_right._p) - max(optimal_low_left._p, optimal_low_right._p),
+        .x  = max(min(optimal_high_left.x, optimal_high_right.x) - max(optimal_low_left.x, optimal_low_right.x), 0.0f),
+        .y  = max(min(optimal_high_left.y, optimal_high_right.y) - max(optimal_low_left.y, optimal_low_right.y), 0.0f),
+        .z  = max(min(optimal_high_left.z, optimal_high_right.z) - max(optimal_low_left.z, optimal_low_right.z), 0.0f),
+        ._p = max(min(optimal_high_left._p, optimal_high_right._p) - max(optimal_low_left._p, optimal_low_right._p), 0.0f),
       };
 
-      const float o = overlap.x * overlap.y + overlap.x * overlap.z + overlap.y * overlap.z;
-
-      if (overlap.x > 0.0f && overlap.y > 0.0f && overlap.z > 0.0f) {
-        do_spatial_splits = ((o / root_surface_area) > SPATIAL_SPLIT_THRESHOLD);
-      }
-      else {
-        do_spatial_splits = 0;
-      }
+      const float o               = overlap.x * overlap.y + overlap.x * overlap.z + overlap.y * overlap.z;
+      const int do_spatial_splits = ((o / root_surface_area) > SPATIAL_SPLIT_THRESHOLD);
 
       if (do_spatial_splits) {
         for (int a = 0; a < 3; a++) {
