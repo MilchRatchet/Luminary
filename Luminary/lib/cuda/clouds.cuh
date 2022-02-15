@@ -227,16 +227,24 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
     vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
     float height = cloud_height_fraction(pos);
-    if (height < 0.0f || height > 1.0f)
+    if (height > 1.0f)
       break;
+
+    if (height < 0.0f) {
+      const float h_min = device_scene.sky.cloud.height_min * 0.001f + SKY_EARTH_RADIUS;
+      reach += sph_ray_int_p0(ray, pos, h_min);
+      continue;
+    }
 
     height = __saturatef(height);
 
     vec3 weather = cloud_weather(pos, height);
 
-    const float density = 1000.0f * 0.05f * 0.1f * cloud_density(pos, height, weather);
+    if (weather.x > 0.3f) {
+      const float density = 1000.0f * 0.05f * 0.1f * cloud_density(pos, height, weather);
 
-    extinction -= density * step_size;
+      extinction -= density * step_size;
+    }
 
     step_size *= CLOUD_EXTINCTION_STEP_MULTIPLY;
     step_size = fminf(CLOUD_EXTINCTION_STEP_MAX, step_size);
