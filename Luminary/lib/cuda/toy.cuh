@@ -9,32 +9,10 @@
  *      - Scale should be the radius of the shape
  */
 
-__device__ float toy_sphere_distance(const vec3 origin, const vec3 ray) {
-  const vec3 a      = sub_vector(origin, device_scene.toy.position);
-  const float u     = dot_product(a, ray);
-  const float v     = dot_product(a, a);
-  const float b     = u * u;
-  const float c     = v - device_scene.toy.scale * device_scene.toy.scale;
-  const float delta = b - c;
-
-  if (delta < 0.0f)
-    return FLT_MAX;
-
-  const float d = sqrtf(delta);
-
-  float distance1 = -u + d;
-  float distance2 = -u - d;
-
-  distance1 = (distance1 < 0.0f) ? FLT_MAX : distance1;
-  distance2 = (distance2 < 0.0f) ? FLT_MAX : distance2;
-
-  return fminf(distance1, distance2);
-}
-
 __device__ float get_toy_distance(const vec3 origin, const vec3 ray) {
   switch (device_scene.toy.shape) {
     case TOY_SPHERE:
-      return toy_sphere_distance(origin, ray);
+      return sphere_ray_intersection(ray, origin, device_scene.toy.position, device_scene.toy.scale);
   }
 
   return FLT_MAX;
@@ -101,7 +79,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         }
       }
     }
-    else if (blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
+    else if (white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps));
 
       record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);

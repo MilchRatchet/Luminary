@@ -184,7 +184,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
         device.frame_buffer[pixel] = emission;
       }
     }
-    else if (blue_noise(task.index.x, task.index.y, task.state, 40) > albedo.a) {
+    else if (white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
       record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
