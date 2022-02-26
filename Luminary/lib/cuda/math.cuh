@@ -368,23 +368,29 @@ __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
  * @result Value a such that origin + a * ray is a point on the sphere.
  */
 __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
-  vec3 diff = sub_vector(origin, p);
-  float a   = dot_product(ray, ray);
-  float b   = 2.0f * dot_product(diff, ray);
-  float c   = dot_product(diff, diff) - r * r;
-  float d   = b * b - 4.0f * a * c;
+  const vec3 diff = sub_vector(origin, p);
+  const float dot = dot_product(diff, ray);
+  const float r2  = r * r;
+  const float a   = dot_product(ray, ray);
+  const float b   = 2.0f * dot;
+  const float c   = dot_product(diff, diff) - r2;
+  const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
+  const float d   = 4.0f * a * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  float num = -b - sqrtf(d);
+  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
+  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
-  if (num > 0.0f)
-    return 0.5f * num / a;
+  const float t0 = c / q;
 
-  num = -b + sqrtf(d);
+  if (t0 >= 0.0f)
+    return t0;
 
-  return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
+  const float t1 = q / a;
+  return (t1 < 0.0f) ? FLT_MAX : t1;
 }
 
 /*
@@ -395,22 +401,28 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
  * @result Value a such that origin + a * ray is a point on the sphere.
  */
 __device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r) {
-  float a = dot_product(ray, ray);
-  float b = 2.0f * dot_product(origin, ray);
-  float c = dot_product(origin, origin) - r * r;
-  float d = b * b - 4.0f * a * c;
+  const float dot = dot_product(origin, ray);
+  const float r2  = r * r;
+  const float a   = dot_product(ray, ray);
+  const float b   = 2.0f * dot;
+  const float c   = dot_product(origin, origin) - r2;
+  const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
+  const float d   = 4.0f * a * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  float num = -b - sqrtf(d);
+  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
+  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
-  if (num > 0.0f)
-    return 0.5f * num / a;
+  const float t0 = c / q;
 
-  num = -b + sqrtf(d);
+  if (t0 >= 0.0f)
+    return t0;
 
-  return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
+  const float t1 = q / a;
+  return (t1 < 0.0f) ? FLT_MAX : t1;
 }
 
 /*
@@ -422,18 +434,25 @@ __device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r
  * @result 1 if the ray hits the sphere, 0 else.
  */
 __device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
-  vec3 diff = sub_vector(origin, p);
-  float a   = dot_product(ray, ray);
-  float b   = 2.0f * dot_product(diff, ray);
-  float c   = dot_product(diff, diff) - r * r;
-  float d   = b * b - 4.0f * a * c;
+  const vec3 diff = sub_vector(origin, p);
+  const float dot = dot_product(diff, ray);
+  const float r2  = r * r;
+  const float a   = dot_product(ray, ray);
+  const float b   = 2.0f * dot;
+  const float c   = dot_product(diff, diff) - r2;
+  const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
+  const float d   = 4.0f * a * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return 0;
 
-  const float num = -b - sqrtf(d);
+  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
+  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
-  return (num >= 0.0f);
+  const float t0 = c / q;
+
+  return (t0 >= 0.0f);
 }
 
 /*
@@ -444,17 +463,24 @@ __device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, c
  * @result 1 if the ray hits the sphere, 0 else.
  */
 __device__ int sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) {
-  float a = dot_product(ray, ray);
-  float b = 2.0f * dot_product(origin, ray);
-  float c = dot_product(origin, origin) - r * r;
-  float d = b * b - 4.0f * a * c;
+  const float dot = dot_product(origin, ray);
+  const float r2  = r * r;
+  const float a   = dot_product(ray, ray);
+  const float b   = 2.0f * dot;
+  const float c   = dot_product(origin, origin) - r2;
+  const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
+  const float d   = 4.0f * a * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return 0;
 
-  const float num = -b - sqrtf(d);
+  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
+  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
-  return (num >= 0.0f);
+  const float t0 = c / q;
+
+  return (t0 >= 0.0f);
 }
 
 /*
@@ -466,23 +492,29 @@ __device__ int sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) 
  * @result Value a such that origin + a * ray is a point on the sphere.
  */
 __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
-  vec3 diff = sub_vector(origin, p);
-  float a   = dot_product(ray, ray);
-  float b   = 2.0f * dot_product(diff, ray);
-  float c   = dot_product(diff, diff) - r * r;
-  float d   = b * b - 4.0f * a * c;
+  const vec3 diff = sub_vector(origin, p);
+  const float dot = dot_product(diff, ray);
+  const float r2  = r * r;
+  const float a   = dot_product(ray, ray);
+  const float b   = 2.0f * dot;
+  const float c   = dot_product(diff, diff) - r2;
+  const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
+  const float d   = 4.0f * a * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  float num = -b + sqrtf(d);
+  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
+  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
-  if (num > 0.0f)
-    return 0.5f * num / a;
+  const float t1 = q / a;
 
-  num = -b - sqrtf(d);
+  if (t1 >= 0.0f)
+    return t1;
 
-  return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
+  const float t0 = c / q;
+  return (t0 < 0.0f) ? FLT_MAX : t0;
 }
 
 /*
@@ -493,22 +525,28 @@ __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, co
  * @result Value a such that origin + a * ray is a point on the sphere.
  */
 __device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const float r) {
-  float a = dot_product(ray, ray);
-  float b = 2.0f * dot_product(origin, ray);
-  float c = dot_product(origin, origin) - r * r;
-  float d = b * b - 4.0f * a * c;
+  const float dot = dot_product(origin, ray);
+  const float r2  = r * r;
+  const float a   = dot_product(ray, ray);
+  const float b   = 2.0f * dot;
+  const float c   = dot_product(origin, origin) - r2;
+  const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
+  const float d   = 4.0f * a * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  float num = -b + sqrtf(d);
+  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
+  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
-  if (num > 0.0f)
-    return 0.5f * num / a;
+  const float t1 = q / a;
 
-  num = -b - sqrtf(d);
+  if (t1 >= 0.0f)
+    return t1;
 
-  return (num < 0.0f) ? FLT_MAX : 0.5f * num / a;
+  const float t0 = c / q;
+  return (t0 < 0.0f) ? FLT_MAX : t0;
 }
 
 __device__ __host__ vec3 angles_to_direction(float altitude, float azimuth) {
