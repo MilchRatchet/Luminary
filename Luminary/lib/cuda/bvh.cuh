@@ -6,40 +6,12 @@
 #include "intrinsics.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "ocean.cuh"
 #include "utils.cuh"
 
 struct traversal_result {
   unsigned int hit_id;
   float depth;
 } typedef traversal_result;
-
-__device__ float bvh_triangle_intersection(const float4* triangles, const vec3 origin, const vec3 ray) {
-  const float4 v1 = __ldg(triangles);
-  const float4 v2 = __ldg(triangles + 1);
-  const float v3  = __ldg((float*) (triangles + 2));
-
-  vec3 vertex = get_vector(v1.x, v1.y, v1.z);
-  vec3 edge1  = get_vector(v1.w, v2.x, v2.y);
-  vec3 edge2  = get_vector(v2.z, v2.w, v3);
-
-  const vec3 h  = cross_product(ray, edge2);
-  const float a = dot_product(edge1, h);
-
-  const float f = 1.0f / a;
-  const vec3 s  = sub_vector(origin, vertex);
-  const float u = f * dot_product(s, h);
-
-  const vec3 q  = cross_product(s, edge1);
-  const float v = f * dot_product(ray, q);
-
-  if (v < 0.0f || u < 0.0f || u + v > 1.0f)
-    return FLT_MAX;
-
-  const float t = f * dot_product(edge2, q);
-
-  return __fslctf(t, FLT_MAX, t);
-}
 
 __device__ unsigned char get_8bit(const unsigned int input, const unsigned int bitshift) {
   return (input >> bitshift) & 0x000000FF;
@@ -367,8 +339,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       }
       else {
         float2 result;
-        result.x = depth;
-        result.y = (device_shading_mode == SHADING_HEAT) ? cost : __uint_as_float(hit_id);
+        result.x = (device_shading_mode == SHADING_HEAT) ? cost : depth;
+        result.y = __uint_as_float(hit_id);
 
         __stcs((float2*) (device.trace_results + get_task_address(offset)), result);
 

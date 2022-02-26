@@ -167,6 +167,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     float depth     = device_scene.camera.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
 
+    if (is_first_ray()) {
+      const uint32_t t_id = device.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
+
+      if (t_id <= TRIANGLE_HIT_LIMIT) {
+        const float dist = bvh_triangle_intersection((float4*) (device_scene.traversal_triangles + t_id), task.origin, task.ray);
+
+        if (dist < depth) {
+          depth  = dist;
+          hit_id = t_id;
+        }
+      }
+    }
+
     if (device_scene.fog.active && is_first_ray()) {
       const float fog_dist = get_intersection_fog(task.origin, task.ray, blue_noise(task.index.x, task.index.y, 256, 169));
 
@@ -366,18 +379,20 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
+    const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
+
     if (is_first_ray()) {
-      device.raydir_buffer[task.index.x + task.index.y * device_width] = task.ray;
+      device.raydir_buffer[pixel] = task.ray;
 
       TraceResult trace_result;
       trace_result.depth  = depth;
       trace_result.hit_id = hit_id;
 
-      device.trace_result_buffer[task.index.x + task.index.y * device_width] = trace_result;
+      device.trace_result_buffer[pixel] = trace_result;
     }
 
     if (device_iteration_type == TYPE_LIGHT)
-      device.state_buffer[task.index.x + task.index.y * device_width] &= ~STATE_LIGHT_OCCUPIED;
+      device.state_buffer[pixel] &= ~STATE_LIGHT_OCCUPIED;
 
     float4* ptr = (float4*) (device_trace_tasks + offset);
     float4 data0;
@@ -503,21 +518,6 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     converted_pixel.r      = (uint8_t) pixel.r;
     converted_pixel.g      = (uint8_t) pixel.g;
     converted_pixel.b      = (uint8_t) pixel.b;
-
-#if 0
-    {
-      float d_x = device_scene.sky.cloud.noise_max * (((float) x) / width) - device_scene.sky.cloud.noise_min;
-      float d_y = device_scene.sky.cloud.noise_max * (((float) y) / height) - device_scene.sky.cloud.noise_min;
-
-      // float4 arr = sample_noise_texture_2D(device_scene.sky.cloud.weather_map, get_vector(d_x, 0.0f, d_y), 1024);
-      // float4 arr = sample_noise_texture_3D(device_scene.sky.cloud.shape_noise, get_vector(d_x, 0.5f, d_y), CLOUD_SHAPE_RES);
-      float4 arr = sample_noise_texture_3D(device_scene.sky.cloud.detail_noise, get_vector(d_x, 0.5f, d_y), CLOUD_DETAIL_RES);
-
-      converted_pixel.r = arr.z * 255.0f;
-      converted_pixel.g = arr.z * 255.0f;
-      converted_pixel.b = arr.z * 255.0f;
-    }
-#endif
 
     device.buffer_8bit[x + y * width] = converted_pixel;
 

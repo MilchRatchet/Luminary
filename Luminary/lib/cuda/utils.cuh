@@ -150,6 +150,7 @@ struct DevicePointers {
 #define TOY_HIT 0xfffffffd
 #define FOG_HIT 0xfffffffc
 #define DEBUG_LIGHT_HIT 0xfffffff0
+#define TRIANGLE_HIT_LIMIT 0xefffffff
 #define ANY_LIGHT 0xfffffff0
 #define NO_LIGHT 0xfffffff1
 #define TOY_LIGHT 0x1
@@ -218,6 +219,10 @@ __constant__ int device_accum_mode;
 //===========================================================================================
 // Functions
 //===========================================================================================
+
+__device__ static uint32_t get_pixel_id(const int x, const int y) {
+  return x + device_width * y;
+}
 
 __device__ static int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
   const int warp_id       = (((thread_id & 0x60) >> 5) + block_id * (THREADS_PER_BLOCK / 32));
