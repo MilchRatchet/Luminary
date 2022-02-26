@@ -285,8 +285,11 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
   RGBF sun_color = sky_get_color(add_vector(origin, scale_vector(ray, start)), ray_sun, FLT_MAX, true);
   sun_color      = scale_color(sun_color, light_angle * scattering_sun);
 
-  vec3 ray_ambient   = get_vector(0.0f, 1.0f, 0.0f);
-  RGBF ambient_color = sky_get_color(add_vector(origin, scale_vector(ray, start)), ray_ambient, FLT_MAX, true);
+  const float ambient_r1 = PI * blue_noise(0, 0, 0, device_temporal_frames);
+  const float ambient_r2 = 2.0f * PI * blue_noise(0, 0, 0, device_temporal_frames + 1);
+
+  const vec3 ray_ambient = angles_to_direction(ambient_r1, ambient_r2);
+  RGBF ambient_color     = sky_get_color(add_vector(origin, scale_vector(ray, start)), ray_ambient, FLT_MAX, false);
 
   ambient_color = scale_color(ambient_color, 1.0f / (4.0f * PI));
 
