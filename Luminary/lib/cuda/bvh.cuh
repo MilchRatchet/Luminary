@@ -338,6 +338,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         }
       }
       else {
+        if (device_shading_mode == SHADING_HEAT && hit_id >= TRIANGLE_HIT_LIMIT) {
+          hit_id = 0;
+        }
+
         float2 result;
         result.x = (device_shading_mode == SHADING_HEAT) ? cost : depth;
         result.y = __uint_as_float(hit_id);
