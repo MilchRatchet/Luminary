@@ -160,7 +160,9 @@ struct Sky {
   float sun_strength;
   float base_density;
   float sky_intensity;
+  int ozone_absorption;
   int steps;
+  int shadow_steps;
   Star* stars;
   int* stars_offsets;
   int settings_stars_count;

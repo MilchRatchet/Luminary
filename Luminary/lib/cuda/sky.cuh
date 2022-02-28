@@ -35,7 +35,7 @@ __device__ RGBF sky_extinction(const vec3 origin, const vec3 ray, const float st
   if (length <= 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  const int steps       = device_scene.sky.steps;
+  const int steps       = device_scene.sky.shadow_steps;
   const float step_size = length / steps;
   RGBF density          = get_color(0.0f, 0.0f, 0.0f);
   float reach           = start + 0.125f * step_size;
@@ -124,7 +124,7 @@ __device__ RGBF
 
       const float density_rayleigh = sky_density_falloff(height, SKY_RAYLEIGH_DISTRIBUTION);
       const float density_mie      = sky_density_falloff(height, SKY_MIE_DISTRIBUTION);
-      const float density_ozone    = sky_density_falloff(height, SKY_OZONE_DISTRIBUTION);
+      const float density_ozone    = (device_scene.sky.ozone_absorption) ? sky_density_falloff(height, SKY_OZONE_DISTRIBUTION) : 0.0f;
 
       const float cos_angle = fmaxf(0.0f, dot_product(ray, ray_scatter));
 

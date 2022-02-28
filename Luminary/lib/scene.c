@@ -216,9 +216,17 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 5640004630479787347u:
       sscanf_s(value, "%f\n", &sky->sun_strength);
       break;
+    /* OZONEABS */
+    case 5999429419533294159u:
+      sscanf_s(value, "%d\n", &sky->ozone_absorption);
+      break;
     /* STEPS___ */
     case 6872316367824311379u:
       sscanf_s(value, "%d\n", &sky->steps);
+      break;
+    /* SHASTEPS */
+    case 6003374531761227859u:
+      sscanf_s(value, "%d\n", &sky->shadow_steps);
       break;
     /* STARSEED */
     case 4919414392136750163u:
@@ -567,10 +575,12 @@ static Scene get_default_scene() {
   scene.sky.moon_altitude             = -0.5f;
   scene.sky.moon_azimuth              = 0.0f;
   scene.sky.moon_albedo               = 0.12f;
-  scene.sky.sky_intensity             = 10.0f;
-  scene.sky.sun_strength              = 20.0f;
-  scene.sky.base_density              = 0.7f;
-  scene.sky.steps                     = 8;
+  scene.sky.sky_intensity             = 20.0f;
+  scene.sky.sun_strength              = 10.0f;
+  scene.sky.base_density              = 0.6f;
+  scene.sky.steps                     = 16;
+  scene.sky.shadow_steps              = 128;
+  scene.sky.ozone_absorption          = 0;
   scene.sky.stars_seed                = 0;
   scene.sky.stars_intensity           = 1.0f;
   scene.sky.settings_stars_count      = 10000;
@@ -906,7 +916,11 @@ void serialize_scene(RaytraceInstance* instance) {
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "SKY DENSITY_ %f\n", instance->scene_gpu.sky.base_density);
   fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY OZONEABS %d\n", instance->scene_gpu.sky.ozone_absorption);
+  fputs(line, file);
   sprintf_s(line, LINE_SIZE, "SKY STEPS___ %d\n", instance->scene_gpu.sky.steps);
+  fputs(line, file);
+  sprintf_s(line, LINE_SIZE, "SKY SHASTEPS %d\n", instance->scene_gpu.sky.shadow_steps);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "SKY STARSEED %d\n", instance->scene_gpu.sky.stars_seed);
   fputs(line, file);
