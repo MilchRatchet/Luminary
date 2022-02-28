@@ -133,8 +133,14 @@ Intensity of the sky. Number should be non-negative.
 `SKY SUNSTREN [FP32]`<br/>
 Sun light strength. Number should be non-negative.
 
+`SKY OZONEALB [INT32]`<br/>
+Set 1 to activate ozone absorption, 0 else.
+
 `SKY STEPS___ [INT32]`<br/>
 Number of raymarch steps used in the sky computation. Number should be non-negative.
+
+`SKY SHASTEPS [INT32]`<br/>
+Number of raymarch steps used in the extinction integration in the sky computation. Number should be non-negative.
 
 `SKY DENSITY_ [FP32]`<br/>
 Density of the atmosphere. Number should be non-negative.
