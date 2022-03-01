@@ -161,7 +161,7 @@ void realtime_output(RaytraceInstance* instance) {
     sample_frametime(&frametime_trace);
 
     start_frametime(&frametime_post);
-    if (instance->denoiser && instance->use_denoiser) {
+    if (instance->denoiser) {
       instance->frame_final_device = denoise_with_optix_realtime(instance->denoise_setup);
       if (instance->scene_gpu.camera.bloom)
         apply_bloom(instance, instance->frame_final_device);

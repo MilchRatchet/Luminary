@@ -207,6 +207,7 @@ struct GlobalMaterial {
   RGBF default_material;
   MaterialFresnel fresnel;
   MaterialDiffuse diffuse;
+  int lights_active;
 } typedef GlobalMaterial;
 
 struct Scene {
@@ -258,9 +259,7 @@ struct RaytraceInstance {
   int offline_samples;
   Scene scene_gpu;
   int denoiser;
-  int use_denoiser;
   int temporal_frames;
-  int lights_active;
   DeviceBuffer* randoms;
   int shading_mode;
   RGBF** bloom_mips_gpu;

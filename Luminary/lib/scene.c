@@ -86,6 +86,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
   char* value        = line + 9;
 
   switch (key) {
+    /* LIGHTSON */
+    case 5642820479573510476u:
+      sscanf_s(value, "%d\n", &material->lights_active);
+      break;
     /* SMOOTHNE */
     case 4994008563745508691u:
       sscanf_s(value, "%f\n", &material->default_material.r);
@@ -491,6 +495,7 @@ static Scene get_default_scene() {
 
   memset(&scene, 0, sizeof(Scene));
 
+  scene.material.lights_active      = 0;
   scene.material.default_material.r = 0.3f;
   scene.material.default_material.g = 0.0f;
   scene.material.default_material.b = 1.0f;
@@ -878,6 +883,8 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf_s(line, LINE_SIZE, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");
   fputs(line, file);
 
+  sprintf_s(line, LINE_SIZE, "MATERIAL LIGHTSON %d\n", instance->scene_gpu.material.lights_active);
+  fputs(line, file);
   sprintf_s(line, LINE_SIZE, "MATERIAL SMOOTHNE %f\n", instance->scene_gpu.material.default_material.r);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "MATERIAL METALLIC %f\n", instance->scene_gpu.material.default_material.g);

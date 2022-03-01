@@ -17,7 +17,7 @@ This number restricts the number of bounces of the path that is traced for each 
 The number of samples to compute per pixel in offline mode. Number must be strictly greater than 0.
 
 `GENERAL DENOISER [INT32]`<br/>
-Set 1 to enable Optix denoising. This activates denoising in offline mode and allows denoising to be made active in realtime mode.
+Set 1 to enable Optix denoising, 0 else.
 
 `GENERAL OUTPUTFN [STRING]`<br/>
 File name of output image in offline mode. Specified directory must already exist.
@@ -26,6 +26,9 @@ File name of output image in offline mode. Specified directory must already exis
 Path to an `*.obj` mesh file. Option may be specified multiple times to load multiple mesh files.
 
 ## Material Settings
+
+`MATERIAL LIGHTSON [INT32]`<br/>
+Set 1 to enable light sources from geometry, 0 else.
 
 `MATERIAL SMOOTHNE [FP32]`<br/>
 Default smoothness value that is used when no material texture is present. Number must be in the range [0,1].

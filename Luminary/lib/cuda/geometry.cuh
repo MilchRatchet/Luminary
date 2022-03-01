@@ -97,7 +97,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     RGBF emission = get_color(0.0f, 0.0f, 0.0f);
 
-    if (maps.y && device_lights_active) {
+    if (maps.y && device_scene.material.lights_active) {
       const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
       emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
@@ -259,7 +259,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
           color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
         }
 
-        if (maps.y && device_lights_active) {
+        if (maps.y && device_scene.material.lights_active) {
           const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
           color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));

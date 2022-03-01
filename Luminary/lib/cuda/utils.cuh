@@ -184,8 +184,6 @@ __constant__ RGBF* device_records;
 
 __constant__ int device_temporal_frames;
 
-__constant__ int device_lights_active;
-
 __constant__ int device_denoiser;
 
 __constant__ int device_width;

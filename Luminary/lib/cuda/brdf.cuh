@@ -171,7 +171,7 @@ __device__ LightSample sample_light(const vec3 position, const vec3 normal, cons
   uint32_t light_count  = 0;
   light_count += sun_visible;
   light_count += toy_visible;
-  light_count += (device_lights_active) ? device_scene.lights_length - 2 : 0;
+  light_count += (device_scene.material.lights_active) ? device_scene.lights_length - 2 : 0;
 
   float weight_sum = 0.0f;
   LightSample selected;

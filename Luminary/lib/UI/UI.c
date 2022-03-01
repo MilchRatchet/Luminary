@@ -37,7 +37,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 13;
+  tab.panel_count = 12;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -48,15 +48,14 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Width", &(instance->settings.width), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Height", &(instance->settings.height), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Max Ray Depth", &(instance->settings.max_ray_depth), 0, 0.02f, 0.0f, 1024.0f, 0, 1);
+  panels[i++] = create_check(ui, "Optix Denoiser", &(instance->settings.denoiser), 0);
   panels[i++] = create_button(ui, "Reset Renderer", instance, (void (*)(void*)) reset_raytracing, 1);
   panels[i++] = create_info(ui, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[i++] = create_check(ui, "Optix Denoiser", &(instance->use_denoiser), 0);
-  panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 8);
+  panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 7);
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene_gpu.lights_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[i++] = create_check(ui, "Lights", &(instance->lights_active), 1);
   panels[i++] = create_dropdown(
-    ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Wireframe\0Light Sources", 12);
+    ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Wireframe\0Light Sources", 11);
 
   tab.panels = panels;
 
@@ -68,7 +67,7 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 7;
+  tab.panel_count = 8;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -76,7 +75,8 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
 
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Renderer\nMaterials\nExport");
-  panels[i++] = create_dropdown(ui, "Diffuse BRDF", &(instance->scene_gpu.material.diffuse), 1, 2, "Lambertian\0Frostbite-Disney", 2);
+  panels[i++] = create_check(ui, "Lights", &(instance->scene_gpu.material.lights_active), 1);
+  panels[i++] = create_dropdown(ui, "Diffuse BRDF", &(instance->scene_gpu.material.diffuse), 1, 2, "Lambertian\0Frostbite-Disney", 3);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->scene_gpu.material.default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->scene_gpu.material.default_material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] =

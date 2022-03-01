@@ -299,6 +299,7 @@ extern "C" RaytraceInstance* init_raytracing(
 
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;
+  instance->denoiser        = general.denoiser;
 
   instance->albedo_atlas      = albedo_atlas;
   instance->illuminance_atlas = illuminance_atlas;
@@ -357,10 +358,6 @@ extern "C" RaytraceInstance* init_raytracing(
   gpuErrchk(cudaMemcpyToSymbol(
     device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment*), 0, cudaMemcpyHostToDevice));
 
-  instance->denoiser      = general.denoiser;
-  instance->use_denoiser  = general.denoiser;
-  instance->lights_active = (scene.sky.altitude < 0.0f);
-
   allocate_buffers(instance);
   allocate_bloom_mips(instance);
   update_device_pointers(instance);
@@ -376,13 +373,14 @@ extern "C" RaytraceInstance* init_raytracing(
 extern "C" void reset_raytracing(RaytraceInstance* instance) {
   free_bloom_mips(instance);
 
-  if (instance->denoiser && instance->denoise_setup) {
+  if (instance->denoiser) {
     free_realtime_denoise(instance, instance->denoise_setup);
   }
 
   instance->width         = instance->settings.width;
   instance->height        = instance->settings.height;
   instance->max_ray_depth = instance->settings.max_ray_depth;
+  instance->denoiser      = instance->settings.denoiser;
 
   allocate_buffers(instance);
   allocate_bloom_mips(instance);
@@ -391,7 +389,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   prepare_trace(instance);
   update_temporal_matrix(instance);
 
-  if (instance->denoiser && instance->denoise_setup)
+  if (instance->denoiser)
     instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
 
   log_message("Reset raytrace instance.");
@@ -482,7 +480,6 @@ extern "C" void prepare_trace(RaytraceInstance* instance) {
   update_special_lights(instance->scene_gpu);
   update_camera_pos(instance->scene_gpu, instance->width, instance->height);
   update_jitter(instance);
-  gpuErrchk(cudaMemcpyToSymbol(device_lights_active, &(instance->lights_active), sizeof(int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_accum_mode, &(instance->accum_mode), sizeof(int), 0, cudaMemcpyHostToDevice));
 }
 
