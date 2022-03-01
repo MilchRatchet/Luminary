@@ -231,6 +231,7 @@ struct Scene {
 struct RaytraceInstance {
   unsigned int width;
   unsigned int height;
+  int realtime;
   RGBF* frame_final_device;
   DeviceBuffer* light_trace;
   DeviceBuffer* bounce_trace;

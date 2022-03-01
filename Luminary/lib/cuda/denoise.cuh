@@ -22,6 +22,10 @@ struct realtime_denoise {
 } typedef realtime_denoise;
 
 extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance) {
+  if (!instance->realtime) {
+    log_message("Tried to initialize realtime denoiser in offline mode.");
+    return (void*) 0;
+  }
   OPTIX_CHECK(optixInit());
 
   realtime_denoise* denoise_setup = (realtime_denoise*) malloc(sizeof(realtime_denoise));
@@ -147,7 +151,7 @@ extern "C" float get_auto_exposure_from_optix(void* input, RaytraceInstance* ins
 
 extern "C" void free_realtime_denoise(RaytraceInstance* instance, void* input) {
   if (!input) {
-    error_message("Realtime denoise setup is NULL.");
+    log_message("Realtime denoise setup is NULL.");
     return;
   }
 

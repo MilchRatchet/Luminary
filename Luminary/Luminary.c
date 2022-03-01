@@ -139,10 +139,12 @@ int main(int argc, char* argv[]) {
       break;
   }
 
+  instance->realtime = !offline;
+
   if (offline_samples)
     instance->offline_samples = offline_samples;
 
-  int custom_res = width | height;
+  int custom_res = width || height;
 
   if (custom_res) {
     instance->settings.width  = (width) ? width : instance->width;

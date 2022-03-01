@@ -389,8 +389,9 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   prepare_trace(instance);
   update_temporal_matrix(instance);
 
-  if (instance->denoiser)
+  if (instance->denoiser) {
     instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
+  }
 
   log_message("Reset raytrace instance.");
 }
