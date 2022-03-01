@@ -51,7 +51,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_check(ui, "Optix Denoiser", &(instance->settings.denoiser), 0);
   panels[i++] = create_button(ui, "Reset Renderer", instance, (void (*)(void*)) reset_raytracing, 1);
   panels[i++] = create_info(ui, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 7);
+  panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 8);
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene_gpu.lights_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_dropdown(
