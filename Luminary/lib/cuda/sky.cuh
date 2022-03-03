@@ -17,7 +17,6 @@
 
 #define SKY_RAYLEIGH_DISTRIBUTION 0.125f
 #define SKY_MIE_DISTRIBUTION 0.833f
-#define SKY_OZONE_DISTRIBUTION 0.125f
 
 __device__ float sky_rayleigh_phase(const float cos_angle) {
   return 3.0f * (1.0f + cos_angle * cos_angle) / (16.0f * 3.1415926535f);
@@ -25,6 +24,18 @@ __device__ float sky_rayleigh_phase(const float cos_angle) {
 
 __device__ float sky_density_falloff(const float height, const float density_falloff) {
   return expf(-height * density_falloff);
+}
+
+__device__ float sky_ozone_density(const float height) {
+  if (!device_scene.sky.ozone_absorption)
+    return 0.0f;
+
+  if (height > 25.0f) {
+    return fmaxf(0.0f, 1.0f - fabsf(height - 25.0f) * 0.04f);
+  }
+  else {
+    return fmaxf(0.1f, 1.0f - fabsf(height - 25.0f) * 0.066666667f);
+  }
 }
 
 __device__ float sky_height(const vec3 point) {
@@ -38,27 +49,28 @@ __device__ RGBF sky_extinction(const vec3 origin, const vec3 ray, const float st
   const int steps       = device_scene.sky.shadow_steps;
   const float step_size = length / steps;
   RGBF density          = get_color(0.0f, 0.0f, 0.0f);
-  float reach           = start + 0.125f * step_size;
+  float reach           = start + white_noise() * step_size;
 
   for (int i = 0; i < steps; i++) {
-    vec3 pos = add_vector(origin, scale_vector(ray, step_size));
+    const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
     const float height           = sky_height(pos);
     const float density_rayleigh = sky_density_falloff(height, SKY_RAYLEIGH_DISTRIBUTION);
     const float density_mie      = sky_density_falloff(height, SKY_MIE_DISTRIBUTION);
-    const float density_ozone    = sky_density_falloff(height, SKY_OZONE_DISTRIBUTION);
+    const float density_ozone    = sky_ozone_density(height);
 
     RGBF D = scale_color(SKY_RAYLEIGH_EXTINCTION, density_rayleigh);
     D      = add_color(D, scale_color(SKY_MIE_EXTINCTION, density_mie));
     D      = add_color(D, scale_color(SKY_OZONE_EXTINCTION, density_ozone));
-    D      = scale_color(D, step_size);
 
     density = add_color(density, D);
+
+    reach += step_size;
   }
 
-  density = scale_color(density, device_scene.sky.base_density);
+  density = scale_color(density, -device_scene.sky.base_density * step_size);
 
-  return get_color(expf(-density.r), expf(-density.g), expf(-density.b));
+  return get_color(expf(density.r), expf(density.g), expf(density.b));
 }
 
 __device__ RGBF
@@ -106,25 +118,29 @@ __device__ RGBF
   if (distance > 0.0f) {
     const int steps       = device_scene.sky.steps;
     const float step_size = distance / steps;
-    float reach           = start + step_size * 0.125f;
+    float reach           = start + step_size * white_noise();
 
     for (int i = 0; i < steps; i++) {
       const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
-      const vec3 ray_scatter = normalize_vector(sub_vector(sun, pos));
-
-      if (sphere_ray_hit(ray_scatter, pos, moon, moon_radius * 0.5f))
-        continue;
-
-      const RGBF extinction_sun = sky_extinction(pos, ray_scatter, 0.0f, sph_ray_int_p0(ray_scatter, pos, atmo_radius));
-
       const float height = sky_height(pos);
-      if (height < 0.0f)
+      if (height < 0.0f || height > atmosphere_height) {
+        reach += step_size;
         continue;
+      }
+
+      vec3 ray_scatter        = sub_vector(sun, pos);
+      const float light_angle = __saturatef(atanf(SKY_SUN_RADIUS / (get_length(ray_scatter) + eps)));
+      ray_scatter             = normalize_vector(ray_scatter);
+
+      const float scatter_distance =
+        (sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS)) ? 0.0f : sph_ray_int_p0(ray_scatter, pos, atmo_radius);
+
+      const RGBF extinction_sun = sky_extinction(pos, ray_scatter, 0.0f, scatter_distance);
 
       const float density_rayleigh = sky_density_falloff(height, SKY_RAYLEIGH_DISTRIBUTION);
       const float density_mie      = sky_density_falloff(height, SKY_MIE_DISTRIBUTION);
-      const float density_ozone    = (device_scene.sky.ozone_absorption) ? sky_density_falloff(height, SKY_OZONE_DISTRIBUTION) : 0.0f;
+      const float density_ozone    = sky_ozone_density(height);
 
       const float cos_angle = fmaxf(0.0f, dot_product(ray, ray_scatter));
 
@@ -132,13 +148,13 @@ __device__ RGBF
       const float phase_mie      = henvey_greenstein(cos_angle, 0.8f);
 
       // Amount of light that reached pos
-      RGBF S = scale_color(device_scene.sky.sun_color, device_scene.sky.sky_intensity);
+      RGBF S = scale_color(device_scene.sky.sun_color, device_scene.sky.sun_strength);
       S      = mul_color(S, extinction_sun);
 
       // Amount of light that gets scattered towards camera at pos
       RGBF scattering = scale_color(SKY_RAYLEIGH_SCATTERING, density_rayleigh * phase_rayleigh);
       scattering      = add_color(scattering, scale_color(SKY_MIE_SCATTERING, density_mie * phase_mie));
-      scattering      = scale_color(scattering, device_scene.sky.base_density);
+      scattering      = scale_color(scattering, device_scene.sky.base_density * light_angle);
 
       S = mul_color(S, scattering);
 
@@ -178,8 +194,7 @@ __device__ RGBF
 
       const RGBF limb_darkening = get_color(powf(mu, limb_color.r), powf(mu, limb_color.g), powf(mu, limb_color.b));
 
-      RGBF S = mul_color(transmittance, scale_color(device_scene.sky.sun_color, device_scene.sky.sky_intensity));
-      S      = scale_color(S, device_scene.sky.sun_strength);
+      RGBF S = mul_color(transmittance, scale_color(device_scene.sky.sun_color, device_scene.sky.sun_strength));
       S      = mul_color(S, limb_darkening);
 
       result = add_color(result, S);
@@ -190,7 +205,8 @@ __device__ RGBF
       vec3 bounce_ray = normalize_vector(sub_vector(sun, moon_pos));
 
       if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
-        const float weight = device_scene.sky.sky_intensity * device_scene.sky.moon_albedo * 0.1f;
+        const float light_angle = __saturatef(atanf(SKY_SUN_RADIUS / (get_length(sub_vector(sun, moon)) + eps)));
+        const float weight      = device_scene.sky.sun_strength * device_scene.sky.moon_albedo * light_angle;
 
         result = add_color(result, mul_color(transmittance, scale_color(device_scene.sky.sun_color, weight)));
       }

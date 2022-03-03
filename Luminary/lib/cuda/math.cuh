@@ -549,7 +549,7 @@ __device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const fl
   return (t0 < 0.0f) ? FLT_MAX : t0;
 }
 
-__device__ __host__ vec3 angles_to_direction(float altitude, float azimuth) {
+__device__ __host__ vec3 angles_to_direction(const float altitude, const float azimuth) {
   vec3 dir;
   dir.x = cosf(azimuth) * cosf(altitude);
   dir.y = sinf(altitude);

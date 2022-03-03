@@ -159,7 +159,6 @@ struct Sky {
   float moon_albedo;
   float sun_strength;
   float base_density;
-  float sky_intensity;
   int ozone_absorption;
   int steps;
   int shadow_steps;
