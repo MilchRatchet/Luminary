@@ -236,7 +236,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
     const uint32_t hit_id = __float_as_uint(result.y);
 
     const bool is_hit           = (hit_id != SKY_HIT);
-    const bool use_inscattering = true;
+    const bool use_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
     bool modified_task          = false;
 
     if (device_scene.sky.cloud.active) {
