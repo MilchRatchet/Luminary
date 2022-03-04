@@ -26,7 +26,7 @@ __device__ float dot_product(const vec3 a, const vec3 b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-__device__ float lerp(const float a, const float b, const float t) {
+__device__ __host__ float lerp(const float a, const float b, const float t) {
   return a + t * (b - a);
 }
 

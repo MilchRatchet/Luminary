@@ -580,7 +580,7 @@ static Scene get_default_scene() {
   scene.sky.base_density              = 1.0f;
   scene.sky.steps                     = 8;
   scene.sky.shadow_steps              = 8;
-  scene.sky.ozone_absorption          = 0;
+  scene.sky.ozone_absorption          = 1;
   scene.sky.stars_seed                = 0;
   scene.sky.stars_intensity           = 1.0f;
   scene.sky.settings_stars_count      = 10000;

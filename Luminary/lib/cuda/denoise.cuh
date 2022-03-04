@@ -130,23 +130,25 @@ extern "C" float get_auto_exposure_from_optix(void* input, RaytraceInstance* ins
 
   switch (instance->scene_gpu.camera.tonemap) {
     case TONEMAP_NONE:
-      target_exposure = 0.75f;
+      target_exposure = 2.0f;
       break;
     case TONEMAP_ACES:
-      target_exposure = 1.75f;
+      target_exposure = 4.0f;
       break;
     case TONEMAP_REINHARD:
-      target_exposure = 0.75f;
+      target_exposure = 2.0f;
       break;
     case TONEMAP_UNCHARTED2:
-      target_exposure = 0.75f;
+      target_exposure = 2.0f;
       break;
   }
 
   float brightness;
   device_buffer_download_full(denoise_setup.hdr_intensity, &brightness);
 
-  return 0.8f * exposure + 0.2f * target_exposure * log2f(1.0f + brightness);
+  const float lerp_factor = 0.2f * (1.0f - 1.0f / (1 + instance->temporal_frames));
+
+  return lerp(exposure, target_exposure * log2f(1.0f + brightness), lerp_factor);
 }
 
 extern "C" void free_realtime_denoise(RaytraceInstance* instance, void* input) {
