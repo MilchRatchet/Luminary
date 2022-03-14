@@ -530,7 +530,7 @@ static Scene get_default_scene() {
   scene.ocean.emissive         = 0;
   scene.ocean.update           = 0;
   scene.ocean.height           = 0.0f;
-  scene.ocean.amplitude        = 0.6f;
+  scene.ocean.amplitude        = 0.2f;
   scene.ocean.frequency        = 0.16f;
   scene.ocean.choppyness       = 4.0f;
   scene.ocean.speed            = 1.0f;
@@ -569,8 +569,8 @@ static Scene get_default_scene() {
   scene.sky.geometry_offset.y         = 0.0f;
   scene.sky.geometry_offset.z         = 0.0f;
   scene.sky.sun_color.r               = 1.0f;
-  scene.sky.sun_color.g               = 1.0f;
-  scene.sky.sun_color.b               = 1.0f;
+  scene.sky.sun_color.g               = 0.9f;
+  scene.sky.sun_color.b               = 0.8f;
   scene.sky.altitude                  = 0.5f;
   scene.sky.azimuth                   = 3.141f;
   scene.sky.moon_altitude             = -0.5f;
