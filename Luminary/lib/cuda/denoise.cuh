@@ -123,6 +123,9 @@ extern "C" float get_auto_exposure_from_optix(void* input, RaytraceInstance* ins
     return instance->scene_gpu.camera.exposure;
   }
 
+  if (instance->shading_mode != SHADING_DEFAULT)
+    return 1.0f;
+
   realtime_denoise denoise_setup = *(realtime_denoise*) input;
   const float exposure           = instance->scene_gpu.camera.exposure;
 
