@@ -21,13 +21,12 @@
 #endif
 
 enum ShadingMode {
-  SHADING_DEFAULT     = 0,
-  SHADING_ALBEDO      = 1,
-  SHADING_DEPTH       = 2,
-  SHADING_NORMAL      = 3,
-  SHADING_HEAT        = 4,
-  SHADING_WIREFRAME   = 5,
-  SHADING_LIGHTSOURCE = 6
+  SHADING_DEFAULT   = 0,
+  SHADING_ALBEDO    = 1,
+  SHADING_DEPTH     = 2,
+  SHADING_NORMAL    = 3,
+  SHADING_HEAT      = 4,
+  SHADING_WIREFRAME = 5
 } typedef ShadingMode;
 
 enum ToyShape { TOY_SPHERE = 0 } typedef ToyShape;

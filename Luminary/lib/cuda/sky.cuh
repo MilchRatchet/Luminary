@@ -303,7 +303,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
     const SkyTask task = load_sky_task(device_trace_tasks + get_task_address(task_offset + i));
     const int pixel    = task.index.y * device_width + task.index.x;
 
-    if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_LIGHTSOURCE) {
+    if (device_shading_mode == SHADING_ALBEDO) {
       device.frame_buffer[pixel] = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true);
     }
     else if (device_shading_mode == SHADING_DEPTH) {

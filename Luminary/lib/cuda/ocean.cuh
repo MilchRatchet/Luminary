@@ -250,7 +250,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
     OceanTask task  = load_ocean_task(device_trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device_width + task.index.x;
 
-    if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_LIGHTSOURCE) {
+    if (device_shading_mode == SHADING_ALBEDO) {
       RGBAF albedo               = device_scene.ocean.albedo;
       device.frame_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
     }

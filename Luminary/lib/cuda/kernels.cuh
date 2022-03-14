@@ -38,34 +38,6 @@ __device__ TraceTask get_starting_ray(TraceTask task) {
   return task;
 }
 
-__device__ float get_light_source_intersection(vec3 ray, vec3 origin) {
-  const int sun_visible = (device_sun.y >= -0.1f);
-  const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
-
-  int i = 0;
-  i += !sun_visible;
-  i += !toy_visible;
-
-  float min_dist = FLT_MAX;
-
-  for (; i < device_scene.lights_length; i++) {
-    const float4 light_data = __ldg((float4*) (device_scene.lights + i));
-    Light light;
-    light.pos.x  = light_data.x;
-    light.pos.y  = light_data.y;
-    light.pos.z  = light_data.z;
-    light.radius = light_data.w;
-
-    float dist = sphere_ray_intersection(ray, origin, light.pos, light.radius);
-
-    if (dist < min_dist) {
-      min_dist = dist;
-    }
-  }
-
-  return min_dist;
-}
-
 __global__ void initialize_randoms() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -204,15 +176,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       if (ocean_dist < depth) {
         depth  = ocean_dist;
         hit_id = OCEAN_HIT;
-      }
-    }
-
-    if (device_shading_mode == SHADING_LIGHTSOURCE) {
-      const float dist = get_light_source_intersection(task.ray, task.origin);
-
-      if (dist < depth) {
-        depth  = dist;
-        hit_id = DEBUG_LIGHT_HIT;
       }
     }
 
