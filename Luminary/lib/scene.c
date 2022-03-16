@@ -736,7 +736,7 @@ RaytraceInstance* load_scene(const char* filename) {
 
   convert_wavefront_to_internal(content, &scene);
 
-  process_lights(&scene);
+  process_lights(&scene, content.illuminance_maps);
 
   DeviceBuffer* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
   DeviceBuffer* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
@@ -772,7 +772,7 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   convert_wavefront_to_internal(content, &scene);
 
-  process_lights(&scene);
+  process_lights(&scene, content.illuminance_maps);
 
   DeviceBuffer* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
   DeviceBuffer* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);

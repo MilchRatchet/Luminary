@@ -3,6 +3,6 @@
 
 #include "utils.h"
 
-void process_lights(Scene* scene);
+void process_lights(Scene* scene, TextureRGBA* textures);
 
 #endif /* LIGHT_H */
