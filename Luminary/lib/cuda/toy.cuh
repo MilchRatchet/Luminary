@@ -74,7 +74,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
         const uint32_t light = device.light_sample_history[pixel];
 
-        if (proper_light_sample(light, TOY_LIGHT)) {
+        if (proper_light_sample(light, LIGHT_ID_TOY)) {
           device.frame_buffer[pixel] = add_color(device.frame_buffer[pixel], emission);
         }
       }
@@ -116,41 +116,39 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
 
       const vec3 V               = scale_vector(task.ray, -1.0f);
-      const int use_light_sample = (roughness > 0.1f || metallic < 0.9f);
+      const int use_light_sample = (roughness > 0.1f || metallic < 0.9f) && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      uint32_t light_history_buffer_entry = ANY_LIGHT;
+      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
       if (use_light_sample) {
         LightSample light;
         light = sample_light(task.position, normal, task.index, task.state);
 
-        task.ray = brdf_sample_light_ray(
-          light.dir, light.angle, blue_noise(task.index.x, task.index.y, task.state, 0),
-          2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 1));
+        if (light.weight > 0.0f) {
+          task.ray = brdf_sample_light_ray(light, task.position);
 
-        const RGBF light_record =
-          mul_color(record, scale_color(brdf_evaluate(opaque_color(albedo), V, task.ray, normal, roughness, metallic), light.weight));
+          const RGBF light_record =
+            mul_color(record, scale_color(brdf_evaluate(opaque_color(albedo), V, task.ray, normal, roughness, metallic), light.weight));
 
-        TraceTask light_task;
-        light_task.origin = task.position;
-        light_task.ray    = task.ray;
-        light_task.index  = task.index;
-        light_task.state  = task.state;
+          TraceTask light_task;
+          light_task.origin = task.position;
+          light_task.ray    = task.ray;
+          light_task.index  = task.index;
+          light_task.state  = task.state;
 
-        if (color_any(light_record) && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED)) {
-          device.light_records[pixel] = light_record;
-          light_history_buffer_entry  = light.id;
-          store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
-        }
-        else {
-          light_history_buffer_entry = NO_LIGHT;
+          if (color_any(light_record)) {
+            device.light_records[pixel] = light_record;
+            light_history_buffer_entry  = light.id;
+            store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
+          }
         }
       }
 
-      device.light_sample_history[pixel] = light_history_buffer_entry;
+      if (!(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
+        device.light_sample_history[pixel] = light_history_buffer_entry;
 
       RGBF bounce_record = record;
 

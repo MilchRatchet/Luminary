@@ -143,24 +143,22 @@ struct DevicePointers {
 // Bit Masks
 //===========================================================================================
 
-#define RANDOM_INDEX 0x0000ffff
-#define DEPTH_LEFT 0xffff0000
-#define SKY_HIT 0xffffffff
-#define OCEAN_HIT 0xfffffffe
-#define TOY_HIT 0xfffffffd
-#define FOG_HIT 0xfffffffc
-#define DEBUG_LIGHT_HIT 0xfffffff0
-#define TRIANGLE_HIT_LIMIT 0xefffffff
-#define ANY_LIGHT 0xfffffff0
-#define NO_LIGHT 0xfffffff1
-#define TOY_LIGHT 0x1
-#define SUN_LIGHT 0x0
-#define TYPE_CAMERA 0x0
-#define TYPE_LIGHT 0x1
-#define TYPE_BOUNCE 0x2
-#define STATE_ALBEDO 0b1
-#define STATE_LIGHT_OCCUPIED 0b10
-#define STATE_BOUNCE_OCCUPIED 0b100
+#define RANDOM_INDEX 0x0000ffffu
+#define DEPTH_LEFT 0xffff0000u
+#define SKY_HIT 0xffffffffu
+#define OCEAN_HIT 0xfffffffeu
+#define TOY_HIT 0xfffffffdu
+#define FOG_HIT 0xfffffffcu
+#define DEBUG_LIGHT_HIT 0xfffffff0u
+#define TRIANGLE_ID_LIMIT 0xefffffffu
+#define LIGHT_ID_ANY 0xfffffff0u
+#define LIGHT_ID_NONE 0xfffffff1u
+#define TYPE_CAMERA 0x0u
+#define TYPE_LIGHT 0x1u
+#define TYPE_BOUNCE 0x2u
+#define STATE_ALBEDO 0b1u
+#define STATE_LIGHT_OCCUPIED 0b10u
+#define STATE_BOUNCE_OCCUPIED 0b100u
 
 //===========================================================================================
 // Device Variables
@@ -185,6 +183,8 @@ __constant__ RGBF* device_records;
 __constant__ int device_temporal_frames;
 
 __constant__ int device_denoiser;
+
+__constant__ uint32_t device_reservoir_size;
 
 __constant__ int device_width;
 
@@ -237,7 +237,7 @@ __device__ static int is_first_ray() {
 }
 
 __device__ static int proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
-  return (device_iteration_type == TYPE_CAMERA || target_light == source_light || target_light == ANY_LIGHT);
+  return (device_iteration_type == TYPE_CAMERA || target_light == source_light || target_light == LIGHT_ID_ANY);
 }
 
 #endif /* CU_UTILS_H */

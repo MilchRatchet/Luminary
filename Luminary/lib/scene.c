@@ -566,7 +566,7 @@ static Scene get_default_scene() {
   scene.toy.emission.a       = 0.0f;
 
   scene.sky.geometry_offset.x         = 0.0f;
-  scene.sky.geometry_offset.y         = 0.0f;
+  scene.sky.geometry_offset.y         = 0.1f;
   scene.sky.geometry_offset.z         = 0.0f;
   scene.sky.sun_color.r               = 1.0f;
   scene.sky.sun_color.g               = 0.9f;
@@ -576,7 +576,7 @@ static Scene get_default_scene() {
   scene.sky.moon_altitude             = -0.5f;
   scene.sky.moon_azimuth              = 0.0f;
   scene.sky.moon_albedo               = 0.12f;
-  scene.sky.sun_strength              = 500.0f;
+  scene.sky.sun_strength              = 15000.0f;
   scene.sky.base_density              = 1.0f;
   scene.sky.steps                     = 8;
   scene.sky.shadow_steps              = 8;
@@ -615,6 +615,22 @@ static Scene get_default_scene() {
   scene.fog.falloff    = 10.0f;
 
   return scene;
+}
+
+static General get_default_settings() {
+  General general = {
+    .width             = 1280,
+    .height            = 720,
+    .max_ray_depth     = 5,
+    .samples           = 16,
+    .denoiser          = 1,
+    .reservoir_size    = 8,
+    .output_path       = malloc(LINE_SIZE),
+    .mesh_files        = malloc(sizeof(char*) * 10),
+    .mesh_files_count  = 0,
+    .mesh_files_length = 10};
+
+  return general;
 }
 
 static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scene) {
@@ -671,18 +687,8 @@ RaytraceInstance* load_scene(const char* filename) {
     error_message("Scene file has no version information, assuming correct version!");
   }
 
-  Scene scene = get_default_scene();
-
-  General general = {
-    .width             = 1280,
-    .height            = 720,
-    .max_ray_depth     = 5,
-    .samples           = 16,
-    .denoiser          = 1,
-    .output_path       = malloc(LINE_SIZE),
-    .mesh_files        = malloc(sizeof(char*) * 10),
-    .mesh_files_count  = 0,
-    .mesh_files_length = 10};
+  Scene scene     = get_default_scene();
+  General general = get_default_settings();
 
   strncpy_s(general.output_path, LINE_SIZE, "output.png", 11);
 
@@ -750,18 +756,8 @@ RaytraceInstance* load_scene(const char* filename) {
 }
 
 RaytraceInstance* load_obj_as_scene(char* filename) {
-  Scene scene = get_default_scene();
-
-  General general = {
-    .width             = 1280,
-    .height            = 720,
-    .max_ray_depth     = 5,
-    .samples           = 16,
-    .denoiser          = 1,
-    .output_path       = malloc(LINE_SIZE),
-    .mesh_files        = malloc(sizeof(char*) * 10),
-    .mesh_files_count  = 0,
-    .mesh_files_length = 10};
+  Scene scene     = get_default_scene();
+  General general = get_default_settings();
 
   general.mesh_files[0] = malloc(LINE_SIZE);
   strcpy_s(general.mesh_files[0], LINE_SIZE, filename);
@@ -1072,6 +1068,6 @@ void free_scene(Scene scene) {
   free(scene.triangles);
   free(scene.traversal_triangles);
   free(scene.nodes);
-  free(scene.lights);
+  free(scene.lights_ids);
   free(scene.texture_assignments);
 }

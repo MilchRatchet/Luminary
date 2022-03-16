@@ -37,7 +37,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 12;
+  tab.panel_count = 13;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -48,12 +48,13 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Width", &(instance->settings.width), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Height", &(instance->settings.height), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Max Ray Depth", &(instance->settings.max_ray_depth), 0, 0.02f, 0.0f, 1024.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Reservoir Size", &(instance->settings.reservoir_size), 0, 0.02f, 1.0f, 1024.0f, 0, 1);
   panels[i++] = create_check(ui, "Optix Denoiser", &(instance->settings.denoiser), 0);
   panels[i++] = create_button(ui, "Reset Renderer", instance, (void (*)(void*)) reset_raytracing, 1);
   panels[i++] = create_info(ui, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 8);
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
-  panels[i++] = create_info(ui, "Light Source Count", &(instance->scene_gpu.lights_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
+  panels[i++] = create_info(ui, "Light Source Count", &(instance->scene_gpu.lights_ids_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] =
     create_dropdown(ui, "Shading Mode", &(instance->shading_mode), 1, 6, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Wireframe", 11);
 

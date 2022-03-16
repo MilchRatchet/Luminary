@@ -20,6 +20,9 @@
 #define ONE_OVER_PI 0.31830988618f
 #endif
 
+#define LIGHT_ID_SUN 0xffffffffu
+#define LIGHT_ID_TOY 0xfffffffeu
+
 enum ShadingMode {
   SHADING_DEFAULT   = 0,
   SHADING_ALBEDO    = 1,
@@ -62,6 +65,7 @@ struct General {
   int height;
   int samples;
   int max_ray_depth;
+  int reservoir_size;
   int denoiser;
   char** mesh_files;
   int mesh_files_count;
@@ -217,8 +221,8 @@ struct Scene {
   unsigned int nodes_length;
   uint16_t materials_length;
   TextureAssignment* texture_assignments;
-  Light* lights;
-  unsigned int lights_length;
+  uint32_t* lights_ids;
+  unsigned int lights_ids_length;
   Ocean ocean;
   Sky sky;
   Toy toy;
@@ -255,6 +259,7 @@ struct RaytraceInstance {
   DeviceBuffer* material_atlas;
   int material_atlas_length;
   int max_ray_depth;
+  int reservoir_size;
   int offline_samples;
   Scene scene_gpu;
   int denoiser;

@@ -129,9 +129,8 @@ __device__ RGBF
         continue;
       }
 
-      vec3 ray_scatter        = sub_vector(sun, pos);
-      const float light_angle = __saturatef(atanf(SKY_SUN_RADIUS / (get_length(ray_scatter) + eps)));
-      ray_scatter             = normalize_vector(ray_scatter);
+      const float light_angle = sample_sphere_solid_angle(sun, SKY_SUN_RADIUS, pos, get_vector(0.0f, 0.0f, 0.0f));
+      const vec3 ray_scatter  = normalize_vector(sub_vector(sun, pos));
 
       const float scatter_distance =
         (sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS)) ? 0.0f : sph_ray_int_p0(ray_scatter, pos, atmo_radius);
@@ -205,7 +204,7 @@ __device__ RGBF
       vec3 bounce_ray = normalize_vector(sub_vector(sun, moon_pos));
 
       if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
-        const float light_angle = __saturatef(atanf(SKY_SUN_RADIUS / (get_length(sub_vector(sun, moon)) + eps)));
+        const float light_angle = sample_sphere_solid_angle(sun, SKY_SUN_RADIUS, moon_pos, normal);
         const float weight      = device_scene.sky.sun_strength * device_scene.sky.moon_albedo * light_angle;
 
         result = add_color(result, mul_color(transmittance, scale_color(device_scene.sky.sun_color, weight)));
@@ -279,7 +278,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_sky_tasks() {
     const uint32_t light = device.light_sample_history[pixel];
     RGBF sky;
 
-    if (proper_light_sample(light, 0)) {
+    if (proper_light_sample(light, LIGHT_ID_SUN)) {
       sky = sky_get_color(origin, task.ray, FLT_MAX, true);
     }
     else {

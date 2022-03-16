@@ -166,9 +166,9 @@ RaytraceInstance* load_baked(const char* filename) {
   fseek(file, head[5], SEEK_SET);
   fread_s(scene.nodes, sizeof(Node8) * scene.nodes_length, sizeof(Node8) * scene.nodes_length, 1, file);
 
-  scene.lights = malloc(sizeof(Light) * scene.lights_length);
+  scene.lights_ids = malloc(sizeof(uint32_t) * scene.lights_ids_length);
   fseek(file, head[6], SEEK_SET);
-  fread_s(scene.lights, sizeof(Light) * scene.lights_length, sizeof(Light) * scene.lights_length, 1, file);
+  fread_s(scene.lights_ids, sizeof(uint32_t) * scene.lights_ids_length, sizeof(uint32_t) * scene.lights_ids_length, 1, file);
 
   scene.texture_assignments = malloc(sizeof(TextureAssignment) * scene.materials_length);
   fseek(file, head[7], SEEK_SET);
@@ -294,7 +294,7 @@ void serialize_baked(RaytraceInstance* instance) {
   head[3]  = write_data(file, instance->scene_gpu.triangles_length, sizeof(Triangle), instance->scene_gpu.triangles, GPU_PTR);
   head[4]  = write_data(file, instance->scene_gpu.triangles_length, sizeof(TraversalTriangle), instance->scene_gpu.traversal_triangles, 1);
   head[5]  = write_data(file, instance->scene_gpu.nodes_length, sizeof(Node8), instance->scene_gpu.nodes, GPU_PTR);
-  head[6]  = write_data(file, instance->scene_gpu.lights_length, sizeof(Light), instance->scene_gpu.lights, GPU_PTR);
+  head[6]  = write_data(file, instance->scene_gpu.lights_ids_length, sizeof(uint32_t), instance->scene_gpu.lights_ids, GPU_PTR);
   head[7]  = write_data(file, instance->scene_gpu.materials_length, sizeof(TextureAssignment), instance->scene_gpu.texture_assignments, 1);
   head[8]  = write_data(file, instance->albedo_atlas_length, 1, device_buffer_get_pointer(instance->albedo_atlas), TEX_PTR);
   head[9]  = write_data(file, instance->illuminance_atlas_length, 1, device_buffer_get_pointer(instance->illuminance_atlas), TEX_PTR);

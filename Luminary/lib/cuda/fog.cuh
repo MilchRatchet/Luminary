@@ -99,7 +99,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       float alpha = blue_noise(task.index.x, task.index.y, task.state, 99);
       float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 98);
 
-      vec3 out_ray = normalize_vector(sample_ray_from_angles_and_vector(alpha * light.angle, gamma, light.dir));
+      vec3 out_ray = brdf_sample_light_ray(light, task.position);
       float angle  = dot_product(ray, out_ray);
       float g      = device_scene.fog.anisotropy;
 
