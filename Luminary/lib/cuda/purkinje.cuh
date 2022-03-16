@@ -69,7 +69,7 @@ __device__ RGBF purkinje_shift(RGBF pixel) {
   sRGB.g = -0.9693f * XYZ.r + 1.876f * XYZ.g + 0.0416f * XYZ.b;
   sRGB.b = 0.0556f * XYZ.r - 0.2040f * XYZ.g + 1.0572f * XYZ.b;
 
-  float blend = __saturatef(1.0f - 100.0f * luminance(pixel));
+  float blend = __saturatef(1.0f - 500.0f * luminance(pixel));
 
   blend *= blend;
 
