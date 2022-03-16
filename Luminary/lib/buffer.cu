@@ -65,8 +65,8 @@ extern "C" void device_buffer_free(DeviceBuffer* buffer) {
     return;
   }
 
-  if (!buffer->allocated) {
-    warn_message("Unallocated device buffer was attempted to be freed.");
+  if (!device_buffer_is_allocated(buffer)) {
+    log_message("Unallocated device buffer was attempted to be freed.");
     return;
   }
 
@@ -84,7 +84,7 @@ extern "C" void device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, 
 
   size_t size = element_size * count;
 
-  if (buffer->allocated) {
+  if (device_buffer_is_allocated(buffer)) {
     if (buffer->size == size) {
       log_message("Device buffer is already allocated with the correct size. No action is taken.");
       return;
@@ -107,7 +107,7 @@ extern "C" void device_buffer_upload(DeviceBuffer* buffer, void* data) {
     return;
   }
 
-  if (!buffer->allocated) {
+  if (!device_buffer_is_allocated(buffer)) {
     error_message("Cannot upload to unallocated device buffer.");
     return;
   }
@@ -136,7 +136,7 @@ extern "C" void device_buffer_download(DeviceBuffer* buffer, void* dest, size_t 
     return;
   }
 
-  if (!buffer->allocated) {
+  if (!device_buffer_is_allocated(buffer)) {
     error_message("Cannot download from unallocated device buffer.");
     return;
   }
@@ -166,12 +166,12 @@ extern "C" void device_buffer_copy(DeviceBuffer* src, DeviceBuffer* dest) {
     return;
   }
 
-  if (!src->allocated) {
+  if (!device_buffer_is_allocated(src)) {
     error_message("Source is not allocated.");
     return;
   }
 
-  if (!dest->allocated || dest->size < src->size) {
+  if (!device_buffer_is_allocated(dest) || dest->size < src->size) {
     warn_message("Destination is not allocated or too small.");
     device_buffer_malloc(dest, 1, device_buffer_get_size(src));
   }
@@ -188,8 +188,8 @@ extern "C" void* device_buffer_get_pointer(DeviceBuffer* buffer) {
     return (void*) 0;
   }
 
-  if (!buffer->allocated) {
-    error_message("Device buffer is unallocated.");
+  if (!device_buffer_is_allocated(buffer)) {
+    log_message("Device buffer is unallocated.");
     return (void*) 0;
   }
 
@@ -202,8 +202,8 @@ extern "C" size_t device_buffer_get_size(DeviceBuffer* buffer) {
     return 0;
   }
 
-  if (!buffer->allocated) {
-    warn_message("Device buffer is unallocated.");
+  if (!device_buffer_is_allocated(buffer)) {
+    log_message("Device buffer is unallocated.");
     return 0;
   }
 
