@@ -89,9 +89,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       const float alpha = blue_noise(task.index.x, task.index.y, task.state, 2);
       const float beta  = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
 
-      const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
+      if (device_scene.toy.refractive_index != 1.0f) {
+        const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
 
-      task.ray = brdf_sample_ray_refraction(record, opaque_color(albedo), normal, task.ray, roughness, refraction_index, alpha, beta);
+        task.ray = brdf_sample_ray_refraction(record, opaque_color(albedo), normal, task.ray, roughness, refraction_index, alpha, beta);
+      }
 
       TraceTask new_task;
       new_task.origin = task.position;
@@ -106,7 +108,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
           store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
-          device.light_records[pixel] = record;
+          if (white_noise() > 0.5f)
+            break;
+          device.light_records[pixel] = scale_color(record, 2.0f);
           device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
           break;
