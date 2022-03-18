@@ -21,6 +21,7 @@
 #include "cuda/kernels.cuh"
 #include "cuda/math.cuh"
 #include "cuda/random.cuh"
+#include "cuda/restir.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/utils.cuh"
 #include "error.h"
@@ -246,6 +247,10 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_result_temporal, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
 
+  device_buffer_malloc(instance->restir_samples_1, sizeof(RestirSample), amount);
+  device_buffer_malloc(instance->restir_samples_2, sizeof(RestirSample), amount);
+  device_buffer_malloc(instance->restir_eval_data, sizeof(RestirEvalData), amount);
+
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }
 
@@ -328,6 +333,9 @@ extern "C" RaytraceInstance* init_raytracing(
   device_buffer_init(&instance->trace_result_buffer);
   device_buffer_init(&instance->trace_result_temporal);
   device_buffer_init(&instance->state_buffer);
+  device_buffer_init(&instance->restir_samples_1);
+  device_buffer_init(&instance->restir_samples_2);
+  device_buffer_init(&instance->restir_eval_data);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
@@ -515,6 +523,8 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   gpuErrchk(cudaDeviceSynchronize());
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   gpuErrchk(cudaDeviceSynchronize());
+  restir_generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  gpuErrchk(cudaDeviceSynchronize());
   process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   gpuErrchk(cudaDeviceSynchronize());
   process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -601,6 +611,9 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   device_buffer_free(instance->trace_result_buffer);
   device_buffer_free(instance->trace_result_temporal);
   device_buffer_free(instance->state_buffer);
+  device_buffer_free(instance->restir_samples_1);
+  device_buffer_free(instance->restir_samples_2);
+  device_buffer_free(instance->restir_eval_data);
 
   gpuErrchk(cudaDeviceSynchronize());
 }
@@ -723,6 +736,8 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.trace_result_buffer   = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.trace_result_temporal = (TraceResult*) device_buffer_get_pointer(instance->trace_result_temporal);
   ptrs.state_buffer          = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
+  ptrs.restir_samples        = (RestirSample*) device_buffer_get_pointer(instance->restir_samples_1);
+  ptrs.restir_eval_data      = (RestirEvalData*) device_buffer_get_pointer(instance->restir_eval_data);
 
   gpuErrchk(cudaMemcpyToSymbol(device, &(ptrs), sizeof(DevicePointers), 0, cudaMemcpyHostToDevice));
   log_message("Updated device pointers.");

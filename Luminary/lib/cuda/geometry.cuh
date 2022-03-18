@@ -164,8 +164,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
       if (use_light_sample) {
-        LightSample light;
-        light = sample_light(task.position, normal, task.index, task.state);
+        const RestirSample light = device.restir_samples[pixel];
 
         if (light.weight > 0.0f) {
           ray = brdf_sample_light_ray(light, task.position);

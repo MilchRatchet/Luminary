@@ -31,13 +31,6 @@
  * There are two fresnel approximations. One is the standard Schlick approximation. The other is some
  * approximation found in the paper by Fdez-Aguera.
  */
-
-struct LightSample {
-  uint32_t id;
-  float weight;
-  float solid_angle;
-} typedef LightSample;
-
 __device__ float brdf_shadowed_F90(const RGBF f0) {
   const float t = 1.0f / 0.04f;
   return fminf(1.0f, t * luminance(f0));
@@ -155,7 +148,7 @@ __device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, cons
   return normalize_vector(normal_hemi);
 }
 
-__device__ vec3 brdf_sample_light_ray(const LightSample light, const vec3 origin) {
+__device__ vec3 brdf_sample_light_ray(const RestirSample light, const vec3 origin) {
   switch (light.id) {
     case LIGHT_ID_SUN: {
       vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
@@ -172,7 +165,7 @@ __device__ vec3 brdf_sample_light_ray(const LightSample light, const vec3 origin
   }
 }
 
-__device__ LightSample sample_light(const vec3 position, const vec3 normal, const ushort2 index, const uint32_t seed) {
+__device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
   vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
   sun.y -= SKY_EARTH_RADIUS;
   sun = sub_vector(sun, device_scene.sky.geometry_offset);
@@ -187,10 +180,11 @@ __device__ LightSample sample_light(const vec3 position, const vec3 normal, cons
   light_count += (device_scene.material.lights_active) ? device_scene.lights_ids_length - 2 : 0;
 
   float weight_sum = 0.0f;
-  LightSample selected;
-  selected.id          = LIGHT_ID_NONE;
-  selected.solid_angle = 0.0f;
-  selected.weight      = 0.0f;
+  RestirSample selected;
+  selected.id     = LIGHT_ID_NONE;
+  selected.weight = 0.0f;
+
+  float selected_solid_angle = 0.0f;
 
   if (!light_count)
     return selected;
@@ -230,23 +224,23 @@ __device__ LightSample sample_light(const vec3 position, const vec3 normal, cons
       } break;
     }
 
-    LightSample light;
-    light.id          = light_id;
-    light.weight      = weight * solid_angle;
-    light.solid_angle = solid_angle;
+    RestirSample light;
+    light.id     = light_id;
+    light.weight = weight * solid_angle;
 
     weight_sum += light.weight;
 
     const float r2 = white_noise();
 
     if (r2 < light.weight / weight_sum) {
-      selected = light;
+      selected             = light;
+      selected_solid_angle = solid_angle;
     }
   }
 
   // This is the inverse of the probability times the portion of the hemisphere the light covers
   // This is supposed to get multiplied to the BRDF weight
-  selected.weight = selected.solid_angle * (light_count * weight_sum) / (selected.weight * reservoir_sampling_size);
+  selected.weight = selected_solid_angle * (light_count * weight_sum) / (selected.weight * reservoir_sampling_size);
 
   return selected;
 }

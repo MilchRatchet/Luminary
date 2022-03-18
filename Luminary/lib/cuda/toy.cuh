@@ -19,7 +19,13 @@ __device__ float get_toy_distance(const vec3 origin, const vec3 ray) {
 }
 
 __device__ vec3 toy_sphere_normal(const vec3 position) {
-  return normalize_vector(sub_vector(position, device_scene.toy.position));
+  const vec3 diff = sub_vector(position, device_scene.toy.position);
+  vec3 normal     = normalize_vector(diff);
+
+  if (get_length(diff) < device_scene.toy.scale)
+    normal = scale_vector(normal, -1.0f);
+
+  return normal;
 }
 
 __device__ vec3 get_toy_normal(const vec3 position) {
@@ -128,8 +134,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
       if (use_light_sample) {
-        LightSample light;
-        light = sample_light(task.position, normal, task.index, task.state);
+        const RestirSample light = device.restir_samples[pixel];
 
         if (light.weight > 0.0f) {
           task.ray = brdf_sample_light_ray(light, task.position);

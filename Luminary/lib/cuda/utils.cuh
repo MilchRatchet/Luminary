@@ -51,6 +51,16 @@ struct Quaternion {
 } typedef Quaternion;
 #endif
 
+struct RestirSample {
+  uint32_t id;
+  float weight;
+} typedef RestirSample;
+
+struct RestirEvalData {
+  vec3 position;
+  vec3 normal;
+} typedef RestirEvalData;
+
 // state is 16 bits the depth and the last 16 bits the random_index
 
 // TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
@@ -137,6 +147,8 @@ struct DevicePointers {
   cudaTextureObject_t* albedo_atlas;
   cudaTextureObject_t* illuminance_atlas;
   cudaTextureObject_t* material_atlas;
+  RestirSample* restir_samples;
+  RestirEvalData* restir_eval_data;
 } typedef DevicePointers;
 
 //===========================================================================================

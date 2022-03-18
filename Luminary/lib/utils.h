@@ -253,6 +253,9 @@ struct RaytraceInstance {
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* albedo_atlas;
+  DeviceBuffer* restir_samples_1;
+  DeviceBuffer* restir_samples_2;
+  DeviceBuffer* restir_eval_data;
   int albedo_atlas_length;
   DeviceBuffer* illuminance_atlas;
   int illuminance_atlas_length;

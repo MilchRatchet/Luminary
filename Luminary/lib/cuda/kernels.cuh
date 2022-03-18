@@ -354,15 +354,41 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       device.trace_result_buffer[pixel] = trace_result;
     }
 
+    if (hit_id != SKY_HIT)
+      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+
+    RestirEvalData restir_data;
+    restir_data.position = task.origin;
+    restir_data.normal   = get_vector(0.0f, 0.0f, 0.0f);
+
+    switch (hit_id) {
+      case SKY_HIT:
+      case OCEAN_HIT:
+        restir_data.position.x = NAN;
+      case FOG_HIT:
+        break;
+      case TOY_HIT:
+        restir_data.normal = get_toy_normal(task.origin);
+        break;
+      default:
+        const TraversalTriangle triangle = device_scene.traversal_triangles[hit_id];
+        vec3 face_normal                 = normalize_vector(triangle.face_normal);
+
+        if (dot_product(face_normal, task.ray) > 0.0f)
+          face_normal = scale_vector(face_normal, -1.0f);
+
+        restir_data.normal = triangle.face_normal;
+        break;
+    }
+
+    device.restir_eval_data[pixel] = restir_data;
+
     if (device_iteration_type == TYPE_LIGHT)
       device.state_buffer[pixel] &= ~STATE_LIGHT_OCCUPIED;
 
     float4* ptr = (float4*) (device_trace_tasks + offset);
     float4 data0;
     float4 data1;
-
-    if (hit_id != SKY_HIT)
-      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
     data0.x = task.origin.x;
     data0.y = task.origin.y;

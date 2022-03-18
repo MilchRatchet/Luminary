@@ -30,9 +30,7 @@ struct TraversalTriangle {
   vec3 vertex;
   vec3 edge1;
   vec3 edge2;
-  float padding0;
-  float padding1;
-  float padding2;
+  vec3 face_normal;
 } typedef TraversalTriangle;
 
 #endif /* MESH_H */
