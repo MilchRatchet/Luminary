@@ -42,10 +42,45 @@ __global__ void restir_generate_samples() {
       sample.weight = 0.0f;
     }
     device.restir_samples[offset] = sample;
+
+    if (device_iteration_type != TYPE_CAMERA) {
+      device.restir_eval_data[offset].position.x = NAN;
+    }
   }
 }
 
 __global__ void restir_spatial_resampling(RestirSample* input, RestirSample* output) {
+  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
+    const RestirEvalData data  = device.restir_eval_data[offset];
+    const RestirSample current = input[offset];
+
+    RestirSample selected = current;
+
+    if (!isnan(data.position.x)) {
+      const int x = offset % device_width;
+      const int y = offset / device_width;
+
+      for (int i = 0; i < device_restir_spatial_samples; i++) {
+        int sample_x = x + (int) (2.0f * (white_noise() - 0.5f) * 30.0f);
+        int sample_y = y + (int) (2.0f * (white_noise() - 0.5f) * 30.0f);
+
+        sample_x = max(sample_x, 0);
+        sample_y = max(sample_y, 0);
+        sample_x = min(sample_x, device_width - 1);
+        sample_y = min(sample_y, device_height - 1);
+
+        const RestirEvalData data_spatial = device.restir_eval_data[sample_x + sample_y * device_width];
+        const RestirSample spatial        = input[sample_x + sample_y * device_width];
+
+        if (spatial.id == LIGHT_ID_NONE)
+          continue;
+
+        selected = resample_light(current, spatial, data);
+      }
+    }
+
+    output[offset] = selected;
+  }
 }
 
 /*

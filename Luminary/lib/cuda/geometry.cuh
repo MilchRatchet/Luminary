@@ -42,8 +42,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       face_normal = scale_vector(face_normal, -1.0f);
     }
 
-    if (dot_product(face_normal, scale_vector(ray, -1.0f)) < 0.0f) {
+    if (dot_product(face_normal, ray) > 0.0f) {
       normal        = scale_vector(normal, -1.0f);
+      face_normal   = scale_vector(face_normal, -1.0f);
       vertex_normal = scale_vector(vertex_normal, -1.0f);
       edge1_normal  = scale_vector(edge1_normal, -1.0f);
       edge2_normal  = scale_vector(edge2_normal, -1.0f);
@@ -51,9 +52,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     const vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
 
-    UV vertex_texture = get_UV(t5.z, t5.w);
-    UV edge1_texture  = get_UV(t6.x, t6.y);
-    UV edge2_texture  = get_UV(t6.z, t6.w);
+    const UV vertex_texture = get_UV(t5.z, t5.w);
+    const UV edge1_texture  = get_UV(t6.x, t6.y);
+    const UV edge2_texture  = get_UV(t6.z, t6.w);
 
     const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 

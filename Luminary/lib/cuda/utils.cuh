@@ -198,6 +198,8 @@ __constant__ int device_denoiser;
 
 __constant__ uint32_t device_reservoir_size;
 
+__constant__ int device_restir_spatial_samples;
+
 __constant__ int device_width;
 
 __constant__ int device_height;

@@ -310,10 +310,12 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->illuminance_atlas_length = illuminance_atlas_length;
   instance->material_atlas_length    = material_atlas_length;
 
-  instance->scene_gpu    = scene;
-  instance->settings     = general;
-  instance->shading_mode = 0;
-  instance->accum_mode   = TEMPORAL_ACCUMULATION;
+  instance->scene_gpu                 = scene;
+  instance->settings                  = general;
+  instance->shading_mode              = 0;
+  instance->accum_mode                = TEMPORAL_ACCUMULATION;
+  instance->restir_spatial_samples    = 5;
+  instance->restir_spatial_iterations = 2;
 
   device_buffer_init(&instance->light_trace);
   device_buffer_init(&instance->bounce_trace);
@@ -488,6 +490,7 @@ extern "C" void prepare_trace(RaytraceInstance* instance) {
   update_camera_pos(instance->scene_gpu, instance->width, instance->height);
   update_jitter(instance);
   gpuErrchk(cudaMemcpyToSymbol(device_accum_mode, &(instance->accum_mode), sizeof(int), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_restir_spatial_samples, &(instance->restir_spatial_samples), sizeof(int), 0, cudaMemcpyHostToDevice));
 }
 
 static void bind_type(RaytraceInstance* instance, int type) {
@@ -527,8 +530,18 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   gpuErrchk(cudaDeviceSynchronize());
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   gpuErrchk(cudaDeviceSynchronize());
-  restir_generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
+  if (type != TYPE_LIGHT) {
+    restir_generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    gpuErrchk(cudaDeviceSynchronize());
+    if (type == TYPE_CAMERA && instance->scene_gpu.material.lights_active) {
+      RestirSample* restir_samples_1 = (RestirSample*) device_buffer_get_pointer(instance->restir_samples_1);
+      RestirSample* restir_samples_2 = (RestirSample*) device_buffer_get_pointer(instance->restir_samples_2);
+      for (int i = 0; i < instance->restir_spatial_iterations; i++) {
+        restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(restir_samples_1, restir_samples_2);
+        restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(restir_samples_2, restir_samples_1);
+      }
+    }
+  }
   process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   gpuErrchk(cudaDeviceSynchronize());
   process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

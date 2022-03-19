@@ -979,8 +979,10 @@ __device__ float sample_triangle_solid_angle(const TraversalTriangle triangle, c
   const vec3 c = normalize_vector(add_vector(triangle.edge2, a));
   a            = normalize_vector(a);
 
+#if 0
   if (dot_product(normal, a) < 0.0f && dot_product(normal, b) < 0.0f && dot_product(normal, c) < 0.0f)
     return 0.0f;
+#endif
 
   const float num   = fabsf(dot_product(a, cross_product(b, c)));
   const float denom = 1.0f + dot_product(a, b) + dot_product(a, c) + dot_product(b, c);
@@ -1034,12 +1036,16 @@ __device__ float sample_sphere_solid_angle(const vec3 p, const float r, const ve
   const float angle = cosf(a);
   const float dot   = dot_product(normal, dir);
 
+#if 0
   if (dot < -angle) {
     return 0.0f;
   }
   else {
     return 2.0f * PI * a * a;
   }
+#else
+  return 2.0f * PI * a * a;
+#endif
 }
 
 #endif /* CU_MATH_H */

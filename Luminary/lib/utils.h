@@ -267,6 +267,8 @@ struct RaytraceInstance {
   Scene scene_gpu;
   int denoiser;
   int temporal_frames;
+  int restir_spatial_samples;
+  int restir_spatial_iterations;
   DeviceBuffer* randoms;
   int shading_mode;
   RGBF** bloom_mips_gpu;

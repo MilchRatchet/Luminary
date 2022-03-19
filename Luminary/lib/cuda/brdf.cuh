@@ -182,6 +182,29 @@ __device__ RestirSample brdf_finalize_restir_sample(RestirSample light, const ve
   return light;
 }
 
+__device__ RestirSample resample_light(const RestirSample a, const RestirSample b, const RestirEvalData d) {
+  if (a.id == LIGHT_ID_NONE) {
+    return b;
+  }
+  else if (b.id == LIGHT_ID_NONE) {
+    return a;
+  }
+
+  RestirSample af = brdf_finalize_restir_sample(a, d.position, d.normal);
+  RestirSample bf = brdf_finalize_restir_sample(b, d.position, d.normal);
+
+  const float r = white_noise();
+
+  const float weight_sum = af.weight + bf.weight;
+
+  RestirSample selected = (r < af.weight / weight_sum) ? a : b;
+  const float p         = (r < af.weight / weight_sum) ? af.weight : bf.weight;
+
+  selected.weight *= 2.0f * p / weight_sum;
+
+  return selected;
+}
+
 __device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
   const vec3 sky_pos = world_to_sky_transform(position);
 
