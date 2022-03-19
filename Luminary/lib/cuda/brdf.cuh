@@ -151,10 +151,7 @@ __device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, cons
 __device__ vec3 brdf_sample_light_ray(const RestirSample light, const vec3 origin) {
   switch (light.id) {
     case LIGHT_ID_SUN: {
-      vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
-      sun.y -= SKY_EARTH_RADIUS;
-      sun = sub_vector(sun, device_scene.sky.geometry_offset);
-      return sample_sphere(sun, SKY_SUN_RADIUS, world_to_sky_transform(origin));
+      return sample_sphere(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(origin));
     }
     case LIGHT_ID_TOY:
       return sample_sphere(device_scene.toy.position, device_scene.toy.scale, origin);
@@ -166,13 +163,9 @@ __device__ vec3 brdf_sample_light_ray(const RestirSample light, const vec3 origi
 }
 
 __device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
-  vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
-  sun.y -= SKY_EARTH_RADIUS;
-  sun = sub_vector(sun, device_scene.sky.geometry_offset);
-
   const vec3 sky_pos = world_to_sky_transform(position);
 
-  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
   uint32_t light_count  = 0;
   light_count += sun_visible;
@@ -209,7 +202,7 @@ __device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
     float solid_angle;
     switch (light_id) {
       case LIGHT_ID_SUN:
-        solid_angle = sample_sphere_solid_angle(sun, SKY_SUN_RADIUS, sky_pos, normal);
+        solid_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, sky_pos, normal);
         weight      = device_scene.sky.sun_strength;
         break;
       case LIGHT_ID_TOY:

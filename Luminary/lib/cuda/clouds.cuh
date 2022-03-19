@@ -270,14 +270,10 @@ __device__ float cloud_powder(const float density, const float step_size) {
 }
 
 __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, const float dist) {
-  vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
-  sun.y -= SKY_EARTH_RADIUS;
-  sun = sub_vector(sun, device_scene.sky.geometry_offset);
-
-  const vec3 sun_diff = sub_vector(sun, add_vector(origin, scale_vector(ray, start)));
+  const vec3 sun_diff = sub_vector(device_sun, add_vector(origin, scale_vector(ray, start)));
   const vec3 ray_sun  = normalize_vector(sun_diff);
   const float light_angle =
-    sample_sphere_solid_angle(sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, start)), get_vector(0.0f, 0.0f, 0.0f));
+    sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, start)), get_vector(0.0f, 0.0f, 0.0f));
 
   const float cos_angle_sun  = dot_product(ray, ray_sun);
   const float scattering_sun = cloud_dual_lobe_henvey_greenstein(

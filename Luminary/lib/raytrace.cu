@@ -43,9 +43,13 @@
 static void update_special_lights(const Scene scene) {
   vec3 sun          = angles_to_direction(scene.sky.altitude, scene.sky.azimuth);
   const float scale = 1.0f / (sqrtf(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z));
-  sun.x *= scale;
-  sun.y *= scale;
-  sun.z *= scale;
+  sun.x *= scale * SKY_SUN_DISTANCE;
+  sun.y *= scale * SKY_SUN_DISTANCE;
+  sun.z *= scale * SKY_SUN_DISTANCE;
+  sun.y -= SKY_EARTH_RADIUS;
+  sun.x -= scene.sky.geometry_offset.x;
+  sun.y -= scene.sky.geometry_offset.y;
+  sun.z -= scene.sky.geometry_offset.z;
 
   gpuErrchk(cudaMemcpyToSymbol(device_sun, &(sun), sizeof(vec3), 0, cudaMemcpyHostToDevice));
 }

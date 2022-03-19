@@ -77,10 +77,6 @@ __device__ RGBF
   sky_compute_atmosphere(RGBF& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
-  vec3 sun = scale_vector(device_sun, SKY_SUN_DISTANCE);
-  sun.y -= SKY_EARTH_RADIUS;
-  sun = sub_vector(sun, device_scene.sky.geometry_offset);
-
   vec3 moon = angles_to_direction(device_scene.sky.moon_altitude, device_scene.sky.moon_azimuth);
   moon      = scale_vector(moon, 384399.0f);
   moon.y -= SKY_EARTH_RADIUS;
@@ -129,8 +125,8 @@ __device__ RGBF
         continue;
       }
 
-      const float light_angle = sample_sphere_solid_angle(sun, SKY_SUN_RADIUS, pos, get_vector(0.0f, 0.0f, 0.0f));
-      const vec3 ray_scatter  = normalize_vector(sub_vector(sun, pos));
+      const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos, get_vector(0.0f, 0.0f, 0.0f));
+      const vec3 ray_scatter  = normalize_vector(sub_vector(device_sun, pos));
 
       const float scatter_distance =
         (sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS)) ? 0.0f : sph_ray_int_p0(ray_scatter, pos, atmo_radius);
@@ -180,13 +176,13 @@ __device__ RGBF
   }
 
   if (celestials) {
-    const float sun_hit   = sphere_ray_intersection(ray, origin, sun, SKY_SUN_RADIUS);
+    const float sun_hit   = sphere_ray_intersection(ray, origin, device_sun, SKY_SUN_RADIUS);
     const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
     const float moon_hit  = sphere_ray_intersection(ray, origin, moon, moon_radius);
 
     if (earth_hit > sun_hit && moon_hit > sun_hit) {
       const vec3 sun_hit_pos  = add_vector(origin, scale_vector(ray, sun_hit));
-      const float limb_factor = 1.0f + dot_product(normalize_vector(sub_vector(sun_hit_pos, sun)), ray);
+      const float limb_factor = 1.0f + dot_product(normalize_vector(sub_vector(sun_hit_pos, device_sun)), ray);
       const float mu          = sqrtf(1.0f - limb_factor * limb_factor);
 
       const RGBF limb_color = get_color(0.397f, 0.503f, 0.652f);
@@ -201,10 +197,10 @@ __device__ RGBF
     else if (earth_hit > moon_hit) {
       vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
       vec3 normal     = normalize_vector(sub_vector(moon_pos, moon));
-      vec3 bounce_ray = normalize_vector(sub_vector(sun, moon_pos));
+      vec3 bounce_ray = normalize_vector(sub_vector(device_sun, moon_pos));
 
       if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
-        const float light_angle = sample_sphere_solid_angle(sun, SKY_SUN_RADIUS, moon_pos, normal);
+        const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, moon_pos, normal);
         const float weight      = device_scene.sky.sun_strength * device_scene.sky.moon_albedo * light_angle;
 
         result = add_color(result, mul_color(transmittance, scale_color(device_scene.sky.sun_color, weight)));
