@@ -150,16 +150,36 @@ __device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, cons
 
 __device__ vec3 brdf_sample_light_ray(const RestirSample light, const vec3 origin) {
   switch (light.id) {
-    case LIGHT_ID_SUN: {
+    case LIGHT_ID_NONE:
+    case LIGHT_ID_SUN:
       return sample_sphere(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(origin));
-    }
     case LIGHT_ID_TOY:
       return sample_sphere(device_scene.toy.position, device_scene.toy.scale, origin);
-    default: {
+    default:
       const TraversalTriangle triangle = device_scene.traversal_triangles[light.id];
       return sample_triangle(triangle, origin);
-    }
   }
+}
+
+__device__ RestirSample brdf_finalize_restir_sample(RestirSample light, const vec3 origin, const vec3 normal) {
+  light.weight = 1.0f / light.weight;
+  switch (light.id) {
+    case LIGHT_ID_SUN:
+      light.weight *= sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(origin), normal);
+      break;
+    case LIGHT_ID_TOY:
+      light.weight *= sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, origin, normal);
+      break;
+    case LIGHT_ID_NONE:
+      light.weight = 0.0f;
+      break;
+    default:
+      const TraversalTriangle triangle = device_scene.traversal_triangles[light.id];
+      light.weight *= sample_triangle_solid_angle(triangle, origin, normal);
+      break;
+  }
+
+  return light;
 }
 
 __device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
@@ -176,8 +196,6 @@ __device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
   RestirSample selected;
   selected.id     = LIGHT_ID_NONE;
   selected.weight = 0.0f;
-
-  float selected_solid_angle = 0.0f;
 
   if (!light_count)
     return selected;
@@ -226,14 +244,11 @@ __device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
     const float r2 = white_noise();
 
     if (r2 < light.weight / weight_sum) {
-      selected             = light;
-      selected_solid_angle = solid_angle;
+      selected = light;
     }
   }
 
-  // This is the inverse of the probability times the portion of the hemisphere the light covers
-  // This is supposed to get multiplied to the BRDF weight
-  selected.weight = selected_solid_angle * (light_count * weight_sum) / (selected.weight * reservoir_sampling_size);
+  selected.weight = (selected.weight * reservoir_sampling_size) / (light_count * weight_sum);
 
   return selected;
 }

@@ -88,7 +88,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
 
       store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), continue_task);
 
-      const RestirSample light = device.restir_samples[pixel];
+      RestirSample light = device.restir_samples[pixel];
+      light              = brdf_finalize_restir_sample(light, task.position, get_vector(0.0f, 0.0f, 0.0f));
 
       if (light.weight <= 0.0f) {
         continue;
