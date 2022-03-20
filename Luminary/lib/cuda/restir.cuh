@@ -69,8 +69,8 @@ __global__ void restir_spatial_resampling(RestirSample* input, RestirSample* out
         sample_x = min(sample_x, device_width - 1);
         sample_y = min(sample_y, device_height - 1);
 
-        const RestirEvalData data_spatial = device.restir_eval_data[sample_x + sample_y * device_width];
-        const RestirSample spatial        = input[sample_x + sample_y * device_width];
+        // const RestirEvalData data_spatial = device.restir_eval_data[sample_x + sample_y * device_width];
+        const RestirSample spatial = input[sample_x + sample_y * device_width];
 
         if (spatial.id == LIGHT_ID_NONE)
           continue;

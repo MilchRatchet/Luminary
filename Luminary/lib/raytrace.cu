@@ -41,17 +41,29 @@
  * @param scene Scene which contains the sun properties.
  */
 static void update_special_lights(const Scene scene) {
-  vec3 sun          = angles_to_direction(scene.sky.altitude, scene.sky.azimuth);
-  const float scale = 1.0f / (sqrtf(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z));
-  sun.x *= scale * SKY_SUN_DISTANCE;
-  sun.y *= scale * SKY_SUN_DISTANCE;
-  sun.z *= scale * SKY_SUN_DISTANCE;
+  vec3 sun              = angles_to_direction(scene.sky.altitude, scene.sky.azimuth);
+  const float scale_sun = 1.0f / (sqrtf(sun.x * sun.x + sun.y * sun.y + sun.z * sun.z));
+  sun.x *= scale_sun * SKY_SUN_DISTANCE;
+  sun.y *= scale_sun * SKY_SUN_DISTANCE;
+  sun.z *= scale_sun * SKY_SUN_DISTANCE;
   sun.y -= SKY_EARTH_RADIUS;
   sun.x -= scene.sky.geometry_offset.x;
   sun.y -= scene.sky.geometry_offset.y;
   sun.z -= scene.sky.geometry_offset.z;
 
   gpuErrchk(cudaMemcpyToSymbol(device_sun, &(sun), sizeof(vec3), 0, cudaMemcpyHostToDevice));
+
+  vec3 moon              = angles_to_direction(scene.sky.moon_altitude, scene.sky.moon_azimuth);
+  const float scale_moon = 1.0f / (sqrtf(moon.x * moon.x + moon.y * moon.y + moon.z * moon.z));
+  moon.x *= scale_moon * SKY_MOON_DISTANCE;
+  moon.y *= scale_moon * SKY_MOON_DISTANCE;
+  moon.z *= scale_moon * SKY_MOON_DISTANCE;
+  moon.y -= SKY_EARTH_RADIUS;
+  moon.x -= scene.sky.geometry_offset.x;
+  moon.y -= scene.sky.geometry_offset.y;
+  moon.z -= scene.sky.geometry_offset.z;
+
+  gpuErrchk(cudaMemcpyToSymbol(device_moon, &(moon), sizeof(vec3), 0, cudaMemcpyHostToDevice));
 }
 
 /*

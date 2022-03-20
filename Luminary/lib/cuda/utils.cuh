@@ -35,6 +35,10 @@
 #define SKY_EARTH_RADIUS 6371.0f
 #define SKY_SUN_RADIUS 696340.0f
 #define SKY_SUN_DISTANCE 149597870.0f
+#define SKY_MOON_RADIUS 1737.4f
+#define SKY_MOON_DISTANCE 384399.0f
+#define SKY_ATMO_HEIGHT 100.0f
+#define SKY_ATMO_RADIUS SKY_ATMO_HEIGHT + SKY_EARTH_RADIUS
 
 #ifndef PRIMITIVES_H
 struct vec3 {
@@ -215,6 +219,8 @@ __constant__ Quaternion device_camera_rotation;
 __constant__ TextureAssignment* device_texture_assignments;
 
 __constant__ vec3 device_sun;
+
+__constant__ vec3 device_moon;
 
 __constant__ int device_shading_mode;
 
