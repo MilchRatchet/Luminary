@@ -26,7 +26,7 @@ void offline_output(RaytraceInstance* instance) {
   for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; instance->temporal_frames++) {
     trace_scene(instance);
     update_jitter(instance);
-    const double progress     = ((double) instance->temporal_frames) / instance->offline_samples;
+    const double progress     = ((double) (instance->temporal_frames + 1)) / instance->offline_samples;
     const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
     const double time_left    = (time_elapsed / progress) - time_elapsed;
     printf(
