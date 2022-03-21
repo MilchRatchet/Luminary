@@ -562,8 +562,10 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   gpuErrchk(cudaDeviceSynchronize());
   process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   gpuErrchk(cudaDeviceSynchronize());
-  process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
+  if (type != TYPE_LIGHT) {
+    process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    gpuErrchk(cudaDeviceSynchronize());
+  }
 }
 
 static void execute_debug_kernels(RaytraceInstance* instance, int type) {

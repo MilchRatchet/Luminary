@@ -317,8 +317,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
 
       const int triangle_index = __bfind(triangle_task.y);
 
-      const float d =
-        bvh_triangle_intersection((float4*) (device_scene.traversal_triangles + triangle_index + triangle_task.x), origin, ray);
+      const float d = bvh_triangle_intersection(load_traversal_triangle(triangle_index + triangle_task.x), origin, ray);
 
       if (d < depth) {
         depth  = d;

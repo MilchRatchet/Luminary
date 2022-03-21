@@ -245,4 +245,18 @@ __device__ void store_restir_sample(const RestirSample* ptr, const RestirSample 
   __stcs((float2*) (ptr + offset), packet);
 }
 
+__device__ TraversalTriangle load_traversal_triangle(const int offset) {
+  const float4* ptr = (float4*) (device_scene.traversal_triangles + offset);
+  const float4 v1   = __ldg(ptr);
+  const float4 v2   = __ldg(ptr + 1);
+  const float v3    = __ldg((float*) (ptr + 2));
+
+  TraversalTriangle triangle;
+  triangle.vertex = get_vector(v1.x, v1.y, v1.z);
+  triangle.edge1  = get_vector(v1.w, v2.x, v2.y);
+  triangle.edge2  = get_vector(v2.z, v2.w, v3);
+
+  return triangle;
+}
+
 #endif /* CU_MEMORY_H */

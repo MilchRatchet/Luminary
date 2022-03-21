@@ -143,7 +143,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       const uint32_t t_id = device.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
 
       if (t_id <= TRIANGLE_ID_LIMIT) {
-        const float dist = bvh_triangle_intersection((float4*) (device_scene.traversal_triangles + t_id), task.origin, task.ray);
+        const float dist = bvh_triangle_intersection(load_traversal_triangle(t_id), task.origin, task.ray);
 
         if (dist < depth) {
           depth  = dist;

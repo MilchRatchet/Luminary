@@ -865,29 +865,21 @@ __device__ float henvey_greenstein(const float cos_angle, const float g) {
   return (1.0f - g * g) / (4.0f * PI * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
 }
 
-__device__ float bvh_triangle_intersection(const float4* triangles, const vec3 origin, const vec3 ray) {
-  const float4 v1 = __ldg(triangles);
-  const float4 v2 = __ldg(triangles + 1);
-  const float v3  = __ldg((float*) (triangles + 2));
-
-  vec3 vertex = get_vector(v1.x, v1.y, v1.z);
-  vec3 edge1  = get_vector(v1.w, v2.x, v2.y);
-  vec3 edge2  = get_vector(v2.z, v2.w, v3);
-
-  const vec3 h  = cross_product(ray, edge2);
-  const float a = dot_product(edge1, h);
+__device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
+  const vec3 h  = cross_product(ray, triangle.edge2);
+  const float a = dot_product(triangle.edge1, h);
 
   const float f = 1.0f / a;
-  const vec3 s  = sub_vector(origin, vertex);
+  const vec3 s  = sub_vector(origin, triangle.vertex);
   const float u = f * dot_product(s, h);
 
-  const vec3 q  = cross_product(s, edge1);
+  const vec3 q  = cross_product(s, triangle.edge1);
   const float v = f * dot_product(ray, q);
 
   if (v < 0.0f || u < 0.0f || u + v > 1.0f)
     return FLT_MAX;
 
-  const float t = f * dot_product(edge2, q);
+  const float t = f * dot_product(triangle.edge2, q);
 
   return __fslctf(t, FLT_MAX, t);
 }

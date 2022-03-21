@@ -4,6 +4,7 @@
 #include <cuda_runtime_api.h>
 
 #include "math.cuh"
+#include "memory.cuh"
 #include "random.cuh"
 #include "utils.cuh"
 
@@ -156,7 +157,7 @@ __device__ vec3 brdf_sample_light_ray(const RestirSample light, const vec3 origi
     case LIGHT_ID_TOY:
       return sample_sphere(device_scene.toy.position, device_scene.toy.scale, origin);
     default:
-      const TraversalTriangle triangle = device_scene.traversal_triangles[light.id];
+      const TraversalTriangle triangle = load_traversal_triangle(light.id);
       return sample_triangle(triangle, origin);
   }
 }
@@ -174,7 +175,7 @@ __device__ RestirSample brdf_finalize_restir_sample(RestirSample light, const ve
       light.weight = 0.0f;
       break;
     default:
-      const TraversalTriangle triangle = device_scene.traversal_triangles[light.id];
+      const TraversalTriangle triangle = load_traversal_triangle(light.id);
       light.weight *= sample_triangle_solid_angle(triangle, origin);
       break;
   }
@@ -251,7 +252,7 @@ __device__ RestirSample sample_light(const vec3 position) {
         weight      = device_scene.toy.material.b;
         break;
       default: {
-        const TraversalTriangle triangle = device_scene.traversal_triangles[light_id];
+        const TraversalTriangle triangle = load_traversal_triangle(light_id);
 
         solid_angle = sample_triangle_solid_angle(triangle, position);
         weight      = device_scene.material.default_material.b;
