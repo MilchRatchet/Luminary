@@ -359,29 +359,20 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     RestirEvalData restir_data;
     restir_data.position = task.origin;
-    restir_data.normal   = get_vector(0.0f, 0.0f, 0.0f);
+    restir_data.flags    = 0;
 
     switch (hit_id) {
       case SKY_HIT:
       case OCEAN_HIT:
-        restir_data.position.x = NAN;
       case FOG_HIT:
         break;
       case TOY_HIT:
-        restir_data.normal = get_toy_normal(task.origin);
-        break;
       default:
-        const TraversalTriangle triangle = device_scene.traversal_triangles[hit_id];
-        vec3 face_normal                 = normalize_vector(triangle.face_normal);
-
-        if (dot_product(face_normal, task.ray) > 0.0f)
-          face_normal = scale_vector(face_normal, -1.0f);
-
-        restir_data.normal = triangle.face_normal;
+        restir_data.flags = 1;
         break;
     }
 
-    device.restir_eval_data[pixel] = restir_data;
+    store_restir_eval_data(restir_data, pixel);
 
     if (device_iteration_type == TYPE_LIGHT)
       device.state_buffer[pixel] &= ~STATE_LIGHT_OCCUPIED;

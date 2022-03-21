@@ -973,16 +973,11 @@ __device__ vec3 sample_triangle(const TraversalTriangle triangle, const vec3 ori
  * @param normal Normalized normal of surface from which you sample.
  * @result Solid angle of triangle.
  */
-__device__ float sample_triangle_solid_angle(const TraversalTriangle triangle, const vec3 origin, const vec3 normal) {
+__device__ float sample_triangle_solid_angle(const TraversalTriangle triangle, const vec3 origin) {
   vec3 a       = sub_vector(triangle.vertex, origin);
   const vec3 b = normalize_vector(add_vector(triangle.edge1, a));
   const vec3 c = normalize_vector(add_vector(triangle.edge2, a));
   a            = normalize_vector(a);
-
-#if 0
-  if (dot_product(normal, a) < 0.0f && dot_product(normal, b) < 0.0f && dot_product(normal, c) < 0.0f)
-    return 0.0f;
-#endif
 
   const float num   = fabsf(dot_product(a, cross_product(b, c)));
   const float denom = 1.0f + dot_product(a, b) + dot_product(a, c) + dot_product(b, c);
@@ -1022,30 +1017,16 @@ __device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin) {
  * @param normal Normalized normal of surface from which you sample.
  * @result Solid angle of sphere.
  */
-__device__ float sample_sphere_solid_angle(const vec3 p, const float r, const vec3 origin, const vec3 normal) {
+__device__ float sample_sphere_solid_angle(const vec3 p, const float r, const vec3 origin) {
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);
 
   if (d < r)
     return 2.0f * PI;
 
-  const float rd = r / d;
+  const float a = asinf(r / d);
 
-  dir               = normalize_vector(dir);
-  const float a     = asinf(rd);
-  const float angle = cosf(a);
-  const float dot   = dot_product(normal, dir);
-
-#if 0
-  if (dot < -angle) {
-    return 0.0f;
-  }
-  else {
-    return 2.0f * PI * a * a;
-  }
-#else
   return 2.0f * PI * a * a;
-#endif
 }
 
 #endif /* CU_MATH_H */

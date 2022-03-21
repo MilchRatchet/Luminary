@@ -116,7 +116,7 @@ __device__ RGBF
         continue;
       }
 
-      const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos, get_vector(0.0f, 0.0f, 0.0f));
+      const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos);
       const vec3 ray_scatter  = normalize_vector(sub_vector(device_sun, pos));
 
       const float scatter_distance =
@@ -191,7 +191,7 @@ __device__ RGBF
       vec3 bounce_ray = normalize_vector(sub_vector(device_sun, moon_pos));
 
       if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && dot_product(normal, bounce_ray) > 0.0f) {
-        const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, moon_pos, normal);
+        const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, moon_pos);
         const float weight      = device_scene.sky.sun_strength * device_scene.sky.moon_albedo * light_angle;
 
         result = add_color(result, mul_color(transmittance, scale_color(device_scene.sky.sun_color, weight)));

@@ -32,31 +32,31 @@
  */
 __global__ void restir_generate_samples() {
   for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    const RestirEvalData data = device.restir_eval_data[offset];
+    const RestirEvalData data = load_restir_eval_data(offset);
     RestirSample sample;
-    if (!isnan(data.position.x)) {
-      sample = sample_light(data.position, data.normal);
+    if (data.flags) {
+      sample = sample_light(data.position);
     }
     else {
       sample.id     = LIGHT_ID_NONE;
       sample.weight = 0.0f;
     }
-    device.restir_samples[offset] = sample;
+    store_restir_sample(device.restir_samples, sample, offset);
 
     if (device_iteration_type != TYPE_CAMERA) {
-      device.restir_eval_data[offset].position.x = NAN;
+      device.restir_eval_data[offset].flags = 0;
     }
   }
 }
 
 __global__ void restir_spatial_resampling(RestirSample* input, RestirSample* output) {
   for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    const RestirEvalData data  = device.restir_eval_data[offset];
-    const RestirSample current = input[offset];
+    const RestirEvalData data  = load_restir_eval_data(offset);
+    const RestirSample current = load_restir_sample(input, offset);
 
     RestirSample selected = current;
 
-    if (!isnan(data.position.x)) {
+    if (data.flags) {
       const int x = offset % device_width;
       const int y = offset / device_width;
 
@@ -69,8 +69,7 @@ __global__ void restir_spatial_resampling(RestirSample* input, RestirSample* out
         sample_x = min(sample_x, device_width - 1);
         sample_y = min(sample_y, device_height - 1);
 
-        // const RestirEvalData data_spatial = device.restir_eval_data[sample_x + sample_y * device_width];
-        const RestirSample spatial = input[sample_x + sample_y * device_width];
+        const RestirSample spatial = load_restir_sample(input, sample_x + sample_y * device_width);
 
         if (spatial.id == LIGHT_ID_NONE)
           continue;
@@ -79,7 +78,7 @@ __global__ void restir_spatial_resampling(RestirSample* input, RestirSample* out
       }
     }
 
-    output[offset] = selected;
+    store_restir_sample(output, selected, offset);
   }
 }
 

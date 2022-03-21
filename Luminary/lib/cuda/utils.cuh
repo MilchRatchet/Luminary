@@ -62,7 +62,7 @@ struct RestirSample {
 
 struct RestirEvalData {
   vec3 position;
-  vec3 normal;
+  uint32_t flags;
 } typedef RestirEvalData;
 
 // state is 16 bits the depth and the last 16 bits the random_index

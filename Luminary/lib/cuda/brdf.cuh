@@ -161,21 +161,21 @@ __device__ vec3 brdf_sample_light_ray(const RestirSample light, const vec3 origi
   }
 }
 
-__device__ RestirSample brdf_finalize_restir_sample(RestirSample light, const vec3 origin, const vec3 normal) {
+__device__ RestirSample brdf_finalize_restir_sample(RestirSample light, const vec3 origin) {
   light.weight = 1.0f / light.weight;
   switch (light.id) {
     case LIGHT_ID_SUN:
-      light.weight *= sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(origin), normal);
+      light.weight *= sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(origin));
       break;
     case LIGHT_ID_TOY:
-      light.weight *= sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, origin, normal);
+      light.weight *= sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, origin);
       break;
     case LIGHT_ID_NONE:
       light.weight = 0.0f;
       break;
     default:
       const TraversalTriangle triangle = device_scene.traversal_triangles[light.id];
-      light.weight *= sample_triangle_solid_angle(triangle, origin, normal);
+      light.weight *= sample_triangle_solid_angle(triangle, origin);
       break;
   }
 
@@ -190,8 +190,8 @@ __device__ RestirSample resample_light(const RestirSample a, const RestirSample 
     return a;
   }
 
-  RestirSample af = brdf_finalize_restir_sample(a, d.position, d.normal);
-  RestirSample bf = brdf_finalize_restir_sample(b, d.position, d.normal);
+  RestirSample af = brdf_finalize_restir_sample(a, d.position);
+  RestirSample bf = brdf_finalize_restir_sample(b, d.position);
 
   const float r = white_noise();
 
@@ -205,7 +205,7 @@ __device__ RestirSample resample_light(const RestirSample a, const RestirSample 
   return selected;
 }
 
-__device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
+__device__ RestirSample sample_light(const vec3 position) {
   const vec3 sky_pos = world_to_sky_transform(position);
 
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
@@ -243,17 +243,17 @@ __device__ RestirSample sample_light(const vec3 position, const vec3 normal) {
     float solid_angle;
     switch (light_id) {
       case LIGHT_ID_SUN:
-        solid_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, sky_pos, normal);
+        solid_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, sky_pos);
         weight      = device_scene.sky.sun_strength;
         break;
       case LIGHT_ID_TOY:
-        solid_angle = sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, position, normal);
+        solid_angle = sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, position);
         weight      = device_scene.toy.material.b;
         break;
       default: {
         const TraversalTriangle triangle = device_scene.traversal_triangles[light_id];
 
-        solid_angle = sample_triangle_solid_angle(triangle, position, normal);
+        solid_angle = sample_triangle_solid_angle(triangle, position);
         weight      = device_scene.material.default_material.b;
       } break;
     }
