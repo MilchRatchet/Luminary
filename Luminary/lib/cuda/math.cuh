@@ -890,7 +890,7 @@ __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, con
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the triangle.
  */
-__device__ vec3 sample_triangle(const TraversalTriangle triangle, const vec3 origin) {
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin) {
   const float u     = white_noise();
   const uint32_t uf = u * __uint_as_float(0x4f800000u);  // u * 2^32
   float2 a          = make_float2(1.0f, 0.0f);
@@ -965,7 +965,7 @@ __device__ vec3 sample_triangle(const TraversalTriangle triangle, const vec3 ori
  * @param normal Normalized normal of surface from which you sample.
  * @result Solid angle of triangle.
  */
-__device__ float sample_triangle_solid_angle(const TraversalTriangle triangle, const vec3 origin) {
+__device__ float sample_triangle_solid_angle(const TriangleLight triangle, const vec3 origin) {
   vec3 a       = sub_vector(triangle.vertex, origin);
   const vec3 b = normalize_vector(add_vector(triangle.edge1, a));
   const vec3 c = normalize_vector(add_vector(triangle.edge2, a));

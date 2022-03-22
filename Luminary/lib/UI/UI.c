@@ -54,7 +54,8 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_info(ui, "Triangle Count", &(instance->scene_gpu.triangles_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 8);
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
-  panels[i++] = create_info(ui, "Light Source Count", &(instance->scene_gpu.lights_ids_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
+  panels[i++] =
+    create_info(ui, "Light Source Count", &(instance->scene_gpu.triangle_lights_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_slider(ui, "ReSTIR Spatial Samples", &(instance->restir_spatial_samples), 0, 0.02f, 0.0f, 16.0f, 0, 1);
   panels[i++] = create_slider(ui, "ReSTIR Spatial Iterations", &(instance->restir_spatial_iterations), 0, 0.02f, 0.0f, 16.0f, 0, 1);
   panels[i++] =

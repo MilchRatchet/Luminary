@@ -168,7 +168,6 @@ struct DevicePointers {
 #define DEBUG_LIGHT_HIT 0xfffffff0u
 #define TRIANGLE_ID_LIMIT 0xefffffffu
 #define LIGHT_ID_ANY 0xfffffff0u
-#define LIGHT_ID_NONE 0xfffffff1u
 #define TYPE_CAMERA 0x0u
 #define TYPE_LIGHT 0x1u
 #define TYPE_BOUNCE 0x2u

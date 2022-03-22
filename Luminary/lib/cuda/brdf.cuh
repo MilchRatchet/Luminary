@@ -157,7 +157,7 @@ __device__ vec3 brdf_sample_light_ray(const RestirSample light, const vec3 origi
     case LIGHT_ID_TOY:
       return sample_sphere(device_scene.toy.position, device_scene.toy.scale, origin);
     default:
-      const TraversalTriangle triangle = load_traversal_triangle(light.id);
+      const TriangleLight triangle = load_triangle_light(light.id);
       return sample_triangle(triangle, origin);
   }
 }
@@ -175,7 +175,7 @@ __device__ RestirSample brdf_finalize_restir_sample(RestirSample light, const ve
       light.weight = 0.0f;
       break;
     default:
-      const TraversalTriangle triangle = load_traversal_triangle(light.id);
+      const TriangleLight triangle = load_triangle_light(light.id);
       light.weight *= sample_triangle_solid_angle(triangle, origin);
       break;
   }
@@ -214,7 +214,7 @@ __device__ RestirSample sample_light(const vec3 position) {
   uint32_t light_count  = 0;
   light_count += sun_visible;
   light_count += toy_visible;
-  light_count += (device_scene.material.lights_active) ? device_scene.lights_ids_length - 2 : 0;
+  light_count += (device_scene.material.lights_active) ? device_scene.triangle_lights_length : 0;
 
   float weight_sum = 0.0f;
   RestirSample selected;
@@ -235,27 +235,29 @@ __device__ RestirSample sample_light(const vec3 position) {
     light_index += !sun_visible;
     light_index += (!toy_visible && light_index) ? 1 : 0;
 
-    if (light_index >= device_scene.lights_ids_length)
+    if (light_index >= device_scene.triangle_lights_length + 2)
       continue;
-
-    const uint32_t light_id = __ldg(device_scene.lights_ids + light_index);
 
     float weight;
     float solid_angle;
-    switch (light_id) {
-      case LIGHT_ID_SUN:
+    uint32_t light_id = LIGHT_ID_NONE;
+    switch (light_index) {
+      case 0:
         solid_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, sky_pos);
         weight      = device_scene.sky.sun_strength;
+        light_id    = LIGHT_ID_SUN;
         break;
-      case LIGHT_ID_TOY:
+      case 1:
         solid_angle = sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, position);
         weight      = device_scene.toy.material.b;
+        light_id    = LIGHT_ID_TOY;
         break;
       default: {
-        const TraversalTriangle triangle = load_traversal_triangle(light_id);
+        const TriangleLight triangle = load_triangle_light(light_index - 2);
 
         solid_angle = sample_triangle_solid_angle(triangle, position);
         weight      = device_scene.material.default_material.b;
+        light_id    = light_index - 2;
       } break;
     }
 

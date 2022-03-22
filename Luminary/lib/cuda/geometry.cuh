@@ -59,7 +59,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 
     const int texture_object         = __float_as_int(t7.x);
-    const uint32_t triangle_light_id = task.hit_id;
+    const uint32_t triangle_light_id = __float_as_uint(t7.y);
 
     const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 

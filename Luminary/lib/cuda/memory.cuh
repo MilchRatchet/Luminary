@@ -259,4 +259,19 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   return triangle;
 }
 
+__device__ TriangleLight load_triangle_light(const int offset) {
+  const float4* ptr = (float4*) (device_scene.triangle_lights + offset);
+  const float4 v1   = __ldg(ptr);
+  const float4 v2   = __ldg(ptr + 1);
+  const float2 v3   = __ldg((float2*) (ptr + 2));
+
+  TriangleLight triangle;
+  triangle.vertex      = get_vector(v1.x, v1.y, v1.z);
+  triangle.edge1       = get_vector(v1.w, v2.x, v2.y);
+  triangle.edge2       = get_vector(v2.z, v2.w, v3.x);
+  triangle.triangle_id = __float_as_uint(v3.y);
+
+  return triangle;
+}
+
 #endif /* CU_MEMORY_H */

@@ -633,15 +633,6 @@ static General get_default_settings() {
   return general;
 }
 
-static vec3 compute_face_normal(const TraversalTriangle triangle) {
-  const vec3 a = triangle.edge1;
-  const vec3 b = triangle.edge2;
-
-  const vec3 result = {.x = a.y * b.z - b.y * a.z, .y = a.z * b.x - a.x * b.z, .z = a.x * b.y - b.x * a.y};
-
-  return result;
-}
-
 static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scene) {
   scene->triangles_length = convert_wavefront_content(&scene->triangles, content);
 
@@ -665,7 +656,6 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
       .vertex = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
       .edge1  = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
       .edge2  = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z}};
-    tt.face_normal                = compute_face_normal(tt);
     scene->traversal_triangles[i] = tt;
     scene->triangles[i]           = triangle;
   }
@@ -1080,6 +1070,6 @@ void free_scene(Scene scene) {
   free(scene.triangles);
   free(scene.traversal_triangles);
   free(scene.nodes);
-  free(scene.lights_ids);
+  free(scene.triangle_lights);
   free(scene.texture_assignments);
 }

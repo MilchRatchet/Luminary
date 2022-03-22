@@ -361,7 +361,7 @@ extern "C" RaytraceInstance* init_raytracing(
   device_malloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length);
   device_malloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(TraversalTriangle) * instance->scene_gpu.triangles_length);
   device_malloc((void**) &(instance->scene_gpu.nodes), sizeof(Node8) * instance->scene_gpu.nodes_length);
-  device_malloc((void**) &(instance->scene_gpu.lights_ids), sizeof(uint32_t) * instance->scene_gpu.lights_ids_length);
+  device_malloc((void**) &(instance->scene_gpu.triangle_lights), sizeof(TriangleLight) * instance->scene_gpu.triangle_lights_length);
 
   gpuErrchk(cudaMemcpy(
     instance->scene_gpu.texture_assignments, scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length,
@@ -371,8 +371,9 @@ extern "C" RaytraceInstance* init_raytracing(
     instance->scene_gpu.traversal_triangles, scene.traversal_triangles, sizeof(TraversalTriangle) * scene.triangles_length,
     cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene.nodes, sizeof(Node8) * scene.nodes_length, cudaMemcpyHostToDevice));
-  gpuErrchk(
-    cudaMemcpy(instance->scene_gpu.lights_ids, scene.lights_ids, sizeof(uint32_t) * scene.lights_ids_length, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(
+    instance->scene_gpu.triangle_lights, scene.triangle_lights, sizeof(TriangleLight) * scene.triangle_lights_length,
+    cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMemcpyToSymbol(
     device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment*), 0, cudaMemcpyHostToDevice));
@@ -622,7 +623,7 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene_gpu.triangles));
   gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
   gpuErrchk(cudaFree(instance->scene_gpu.nodes));
-  gpuErrchk(cudaFree(instance->scene_gpu.lights_ids));
+  gpuErrchk(cudaFree(instance->scene_gpu.triangle_lights));
   device_buffer_free(instance->light_trace);
   device_buffer_free(instance->bounce_trace);
   device_buffer_free(instance->light_trace_count);

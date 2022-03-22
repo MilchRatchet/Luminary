@@ -75,12 +75,9 @@ void process_lights(Scene* scene, TextureRGBA* textures) {
 
   Scene data = *scene;
 
-  unsigned int lights_ids_length = 16;
-  uint32_t* lights_ids           = (uint32_t*) malloc(sizeof(uint32_t) * lights_ids_length);
-  unsigned int light_count       = 2;
-
-  lights_ids[0] = LIGHT_ID_SUN;
-  lights_ids[1] = LIGHT_ID_TOY;
+  unsigned int lights_length = 16;
+  TriangleLight* lights      = (TriangleLight*) malloc(sizeof(TriangleLight) * lights_length);
+  unsigned int light_count   = 0;
 
   for (unsigned int i = 0; i < data.triangles_length; i++) {
     const Triangle triangle = data.triangles[i];
@@ -88,18 +85,20 @@ void process_lights(Scene* scene, TextureRGBA* textures) {
     const uint16_t tex_index = data.texture_assignments[triangle.object_maps].illuminance_map;
 
     if (tex_index != 0 && contains_illumination(triangle, textures[tex_index])) {
-      lights_ids[light_count++] = i;
-      if (light_count == lights_ids_length) {
-        lights_ids_length *= 2;
-        lights_ids = safe_realloc(lights_ids, sizeof(uint32_t) * lights_ids_length);
+      const TriangleLight l      = {.vertex = triangle.vertex, .edge1 = triangle.edge1, .edge2 = triangle.edge2, .triangle_id = i};
+      data.triangles[i].light_id = light_count;
+      lights[light_count++]      = l;
+      if (light_count == lights_length) {
+        lights_length *= 2;
+        lights = safe_realloc(lights, sizeof(TriangleLight) * lights_length);
       }
     }
   }
 
-  lights_ids = safe_realloc(lights_ids, sizeof(uint32_t) * light_count);
+  lights = safe_realloc(lights, sizeof(TriangleLight) * light_count);
 
-  data.lights_ids        = lights_ids;
-  data.lights_ids_length = light_count;
+  data.triangle_lights        = lights;
+  data.triangle_lights_length = light_count;
 
   *scene = data;
 

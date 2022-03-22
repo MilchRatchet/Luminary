@@ -22,6 +22,7 @@
 
 #define LIGHT_ID_SUN 0xffffffffu
 #define LIGHT_ID_TOY 0xfffffffeu
+#define LIGHT_ID_NONE 0xfffffff1u
 
 enum ShadingMode {
   SHADING_DEFAULT   = 0,
@@ -216,13 +217,13 @@ struct Scene {
   Camera camera;
   Triangle* triangles;
   TraversalTriangle* traversal_triangles;
+  TriangleLight* triangle_lights;
   unsigned int triangles_length;
+  unsigned int triangle_lights_length;
   Node8* nodes;
   unsigned int nodes_length;
   uint16_t materials_length;
   TextureAssignment* texture_assignments;
-  uint32_t* lights_ids;
-  unsigned int lights_ids_length;
   Ocean ocean;
   Sky sky;
   Toy toy;

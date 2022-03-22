@@ -661,6 +661,7 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.edge2_normal.z = n.z - triangle.vertex_normal.z;
 
     triangle.object_maps = t.object;
+    triangle.light_id    = LIGHT_ID_NONE;
 
     (*triangles)[ptr++] = triangle;
   }
