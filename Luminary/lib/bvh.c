@@ -1146,3 +1146,60 @@ Node8* collapse_bvh(
 
   return nodes;
 }
+
+static void insert_triangles(Triangle* src, Triangle* dst, Node8* nodes, const int node_index, int* offset) {
+  Node8* node = nodes + node_index;
+
+  const uint8_t imask = node->imask;
+
+  const int new_triangle_base_index = *offset;
+  int new_rel_offset                = 0;
+
+  // Insert Leaf Nodes
+  for (int i = 0; i < 8; i++) {
+    if ((imask >> i) & 0b1)
+      continue;
+
+    const uint8_t meta = node->meta[i];
+
+    if (meta == 0)
+      continue;
+
+    const int count = _mm_popcnt_u32(meta & 0b11100000);
+    const int index = node->triangle_base_index + (meta & 0b11111);
+    for (int j = 0; j < count; j++) {
+      dst[*offset] = src[index + j];
+      *offset      = (*offset) + 1;
+    }
+
+    node->meta[i] = (meta & 0b11100000) | new_rel_offset;
+    new_rel_offset += count;
+  }
+
+  node->triangle_base_index = new_triangle_base_index;
+
+  int child_index = node->child_node_base_index;
+
+  // Traverse Internal Nodes
+  for (int i = 0; i < 8; i++) {
+    if ((~(imask >> i)) & 0b1)
+      continue;
+
+    const int index = child_index++;
+    insert_triangles(src, dst, nodes, index, offset);
+  }
+}
+
+void sort_traversal_triangles(Node8* nodes, Triangle** triangles_io, const int triangles_length) {
+  Triangle* triangles = *triangles_io;
+
+  Triangle* new_triangles = (Triangle*) malloc(sizeof(Triangle) * triangles_length * 2);
+
+  int offset = 0;
+
+  insert_triangles(triangles, new_triangles, nodes, 0, &offset);
+
+  free(triangles);
+
+  *triangles_io = new_triangles;
+}

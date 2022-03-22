@@ -655,6 +655,8 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
 
   free(initial_nodes);
 
+  sort_traversal_triangles(scene->nodes, &scene->triangles, scene->triangles_length);
+
   scene->traversal_triangles = malloc(sizeof(TraversalTriangle) * scene->triangles_length);
 
   for (unsigned int i = 0; i < scene->triangles_length; i++) {
