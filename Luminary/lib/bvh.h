@@ -50,6 +50,6 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 Node8* collapse_bvh(
   Node2* binary_nodes, const unsigned int binary_nodes_length, Triangle** triangles_io, const int triangles_length,
   unsigned int* nodes_length_out);
-void sort_traversal_triangles(Node8* nodes, Triangle** triangles_io, const int triangles_length);
+void sort_traversal_elements(Node8** nodes_io, const int nodes_length, Triangle** triangles_io, const int triangles_length);
 
 #endif /* BVH_H */

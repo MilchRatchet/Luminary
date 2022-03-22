@@ -1147,7 +1147,7 @@ Node8* collapse_bvh(
   return nodes;
 }
 
-static void insert_triangles(Triangle* src, Triangle* dst, Node8* nodes, const int node_index, int* offset) {
+static void sort_triangles_depth_first(Triangle* src, Triangle* dst, Node8* nodes, const int node_index, int* offset) {
   Node8* node = nodes + node_index;
 
   const uint8_t imask = node->imask;
@@ -1186,18 +1186,69 @@ static void insert_triangles(Triangle* src, Triangle* dst, Node8* nodes, const i
       continue;
 
     const int index = child_index++;
-    insert_triangles(src, dst, nodes, index, offset);
+    sort_triangles_depth_first(src, dst, nodes, index, offset);
   }
 }
 
-void sort_traversal_triangles(Node8* nodes, Triangle** triangles_io, const int triangles_length) {
+static void sort_nodes_depth_first(Node8* src, Node8* dst, const int src_index, const int dst_index, int* index) {
+  Node8* src_node = src + src_index;
+  Node8* dst_node = dst + dst_index;
+
+  const uint8_t imask = src_node->imask;
+
+  dst_node->child_node_base_index = *index;
+
+  int child_index = 0;
+
+  for (int i = 0; i < 8; i++) {
+    if ((~(imask >> i)) & 0b1)
+      continue;
+
+    const int si = src_node->child_node_base_index + child_index++;
+
+    dst[*index] = src[si];
+    *index      = (*index) + 1;
+  }
+
+  child_index = 0;
+
+  for (int i = 0; i < 8; i++) {
+    if ((~(imask >> i)) & 0b1)
+      continue;
+
+    const int si = src_node->child_node_base_index + child_index;
+    const int di = dst_node->child_node_base_index + child_index;
+    sort_nodes_depth_first(src, dst, si, di, index);
+    child_index++;
+  }
+}
+
+/*
+ * Sorts both nodes and triangles into depth first order.
+ */
+void sort_traversal_elements(Node8** nodes_io, const int nodes_length, Triangle** triangles_io, const int triangles_length) {
   Triangle* triangles = *triangles_io;
+  Node8* nodes        = *nodes_io;
 
-  Triangle* new_triangles = (Triangle*) malloc(sizeof(Triangle) * triangles_length * 2);
+  Node8* new_nodes = (Node8*) malloc(sizeof(Node8) * nodes_length);
 
-  int offset = 0;
+  new_nodes[0] = nodes[0];
 
-  insert_triangles(triangles, new_triangles, nodes, 0, &offset);
+  int offset = 1;
+
+  sort_nodes_depth_first(nodes, new_nodes, 0, 0, &offset);
+
+  free(nodes);
+
+  *nodes_io = new_nodes;
+
+  nodes = new_nodes;
+
+  Triangle* new_triangles = (Triangle*) malloc(sizeof(Triangle) * triangles_length);
+
+  offset = 0;
+
+  sort_triangles_depth_first(triangles, new_triangles, nodes, 0, &offset);
 
   free(triangles);
 
