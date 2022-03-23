@@ -102,6 +102,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
       emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
+      emission = scale_color(emission, intensity);
     }
 
     if (albedo.a < device_scene.camera.alpha_cutoff)
@@ -113,9 +114,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       write_albedo_buffer(emission, pixel);
 
       if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
-        emission.r *= intensity * record.r;
-        emission.g *= intensity * record.g;
-        emission.b *= intensity * record.b;
+        emission = mul_color(emission, record);
 
         const uint32_t light = device.light_sample_history[pixel];
 
@@ -124,7 +123,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         }
       }
     }
-    else if (white_noise() > albedo.a) {
+
+    if (white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
       record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);

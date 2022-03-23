@@ -64,6 +64,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     const float metallic  = device_scene.toy.material.g;
     const float intensity = device_scene.toy.material.b;
     RGBF emission         = get_color(device_scene.toy.emission.r, device_scene.toy.emission.g, device_scene.toy.emission.b);
+    emission              = scale_color(emission, intensity);
 
     if (albedo.a < device_scene.camera.alpha_cutoff)
       albedo.a = 0.0f;
@@ -74,9 +75,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       write_albedo_buffer(emission, pixel);
 
       if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
-        emission.r *= intensity * record.r;
-        emission.g *= intensity * record.g;
-        emission.b *= intensity * record.b;
+        emission = mul_color(emission, record);
 
         const uint32_t light = device.light_sample_history[pixel];
 
@@ -85,7 +84,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         }
       }
     }
-    else if (white_noise() > albedo.a) {
+
+    if (white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps));
 
       record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
