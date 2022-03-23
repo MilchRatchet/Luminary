@@ -255,8 +255,10 @@ __device__ static int is_first_ray() {
   return (device_iteration_type == TYPE_CAMERA);
 }
 
-__device__ static int proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
-  return (device_iteration_type == TYPE_CAMERA || target_light == source_light || target_light == LIGHT_ID_ANY);
+__device__ static bool proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
+  return (
+    device_iteration_type == TYPE_CAMERA || ((device_iteration_type == TYPE_LIGHT) && (target_light == source_light))
+    || ((device_iteration_type == TYPE_BOUNCE) && (target_light != source_light)) || target_light == LIGHT_ID_ANY);
 }
 
 #endif /* CU_UTILS_H */
