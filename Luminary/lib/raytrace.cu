@@ -19,9 +19,9 @@
 #include "cuda/denoise.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/kernels.cuh"
+#include "cuda/light.cuh"
 #include "cuda/math.cuh"
 #include "cuda/random.cuh"
-#include "cuda/restir.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/utils.cuh"
 #include "error.h"
@@ -263,9 +263,9 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_result_temporal, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
 
-  device_buffer_malloc(instance->restir_samples_1, sizeof(RestirSample), amount);
-  device_buffer_malloc(instance->restir_samples_2, sizeof(RestirSample), amount);
-  device_buffer_malloc(instance->restir_eval_data, sizeof(RestirEvalData), amount);
+  device_buffer_malloc(instance->light_samples_1, sizeof(LightSample), amount);
+  device_buffer_malloc(instance->light_samples_2, sizeof(LightSample), amount);
+  device_buffer_malloc(instance->light_eval_data, sizeof(LightEvalData), amount);
 
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }
@@ -322,12 +322,12 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->illuminance_atlas_length = illuminance_atlas_length;
   instance->material_atlas_length    = material_atlas_length;
 
-  instance->scene_gpu                 = scene;
-  instance->settings                  = general;
-  instance->shading_mode              = 0;
-  instance->accum_mode                = TEMPORAL_ACCUMULATION;
-  instance->restir_spatial_samples    = 5;
-  instance->restir_spatial_iterations = 2;
+  instance->scene_gpu          = scene;
+  instance->settings           = general;
+  instance->shading_mode       = 0;
+  instance->accum_mode         = TEMPORAL_ACCUMULATION;
+  instance->spatial_samples    = 5;
+  instance->spatial_iterations = 2;
 
   device_buffer_init(&instance->light_trace);
   device_buffer_init(&instance->bounce_trace);
@@ -351,9 +351,9 @@ extern "C" RaytraceInstance* init_raytracing(
   device_buffer_init(&instance->trace_result_buffer);
   device_buffer_init(&instance->trace_result_temporal);
   device_buffer_init(&instance->state_buffer);
-  device_buffer_init(&instance->restir_samples_1);
-  device_buffer_init(&instance->restir_samples_2);
-  device_buffer_init(&instance->restir_eval_data);
+  device_buffer_init(&instance->light_samples_1);
+  device_buffer_init(&instance->light_samples_2);
+  device_buffer_init(&instance->light_eval_data);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
@@ -503,7 +503,7 @@ extern "C" void prepare_trace(RaytraceInstance* instance) {
   update_camera_pos(instance->scene_gpu, instance->width, instance->height);
   update_jitter(instance);
   gpuErrchk(cudaMemcpyToSymbol(device_accum_mode, &(instance->accum_mode), sizeof(int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_restir_spatial_samples, &(instance->restir_spatial_samples), sizeof(int), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_spatial_samples, &(instance->spatial_samples), sizeof(int), 0, cudaMemcpyHostToDevice));
 }
 
 static void bind_type(RaytraceInstance* instance, int type) {
@@ -544,14 +544,14 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   gpuErrchk(cudaDeviceSynchronize());
   if (type != TYPE_LIGHT) {
-    restir_generate_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    generate_light_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     gpuErrchk(cudaDeviceSynchronize());
     if (type == TYPE_CAMERA && instance->scene_gpu.material.lights_active) {
-      RestirSample* restir_samples_1 = (RestirSample*) device_buffer_get_pointer(instance->restir_samples_1);
-      RestirSample* restir_samples_2 = (RestirSample*) device_buffer_get_pointer(instance->restir_samples_2);
-      for (int i = 0; i < instance->restir_spatial_iterations; i++) {
-        restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(restir_samples_1, restir_samples_2);
-        restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(restir_samples_2, restir_samples_1);
+      LightSample* light_samples_1 = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
+      LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
+      for (int i = 0; i < instance->spatial_iterations; i++) {
+        spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
+        spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_2, light_samples_1);
       }
     }
   }
@@ -643,9 +643,9 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   device_buffer_free(instance->trace_result_buffer);
   device_buffer_free(instance->trace_result_temporal);
   device_buffer_free(instance->state_buffer);
-  device_buffer_free(instance->restir_samples_1);
-  device_buffer_free(instance->restir_samples_2);
-  device_buffer_free(instance->restir_eval_data);
+  device_buffer_free(instance->light_samples_1);
+  device_buffer_free(instance->light_samples_2);
+  device_buffer_free(instance->light_eval_data);
 
   gpuErrchk(cudaDeviceSynchronize());
 }
@@ -768,8 +768,8 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.trace_result_buffer   = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.trace_result_temporal = (TraceResult*) device_buffer_get_pointer(instance->trace_result_temporal);
   ptrs.state_buffer          = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
-  ptrs.restir_samples        = (RestirSample*) device_buffer_get_pointer(instance->restir_samples_1);
-  ptrs.restir_eval_data      = (RestirEvalData*) device_buffer_get_pointer(instance->restir_eval_data);
+  ptrs.light_samples         = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
+  ptrs.light_eval_data       = (LightEvalData*) device_buffer_get_pointer(instance->light_eval_data);
 
   gpuErrchk(cudaMemcpyToSymbol(device, &(ptrs), sizeof(DevicePointers), 0, cudaMemcpyHostToDevice));
   log_message("Updated device pointers.");

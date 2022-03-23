@@ -254,9 +254,9 @@ struct RaytraceInstance {
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* albedo_atlas;
-  DeviceBuffer* restir_samples_1;
-  DeviceBuffer* restir_samples_2;
-  DeviceBuffer* restir_eval_data;
+  DeviceBuffer* light_samples_1;
+  DeviceBuffer* light_samples_2;
+  DeviceBuffer* light_eval_data;
   int albedo_atlas_length;
   DeviceBuffer* illuminance_atlas;
   int illuminance_atlas_length;
@@ -268,8 +268,8 @@ struct RaytraceInstance {
   Scene scene_gpu;
   int denoiser;
   int temporal_frames;
-  int restir_spatial_samples;
-  int restir_spatial_iterations;
+  int spatial_samples;
+  int spatial_iterations;
   DeviceBuffer* randoms;
   int shading_mode;
   RGBF** bloom_mips_gpu;

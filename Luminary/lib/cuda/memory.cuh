@@ -207,37 +207,37 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
   device.state_buffer[pixel] |= STATE_ALBEDO;
 }
 
-__device__ RestirEvalData load_restir_eval_data(const int offset) {
-  const float4 packet = __ldcs((float4*) (device.restir_eval_data + offset));
+__device__ LightEvalData load_light_eval_data(const int offset) {
+  const float4 packet = __ldcs((float4*) (device.light_eval_data + offset));
 
-  RestirEvalData result;
+  LightEvalData result;
   result.position = get_vector(packet.x, packet.y, packet.z);
   result.flags    = __float_as_uint(packet.w);
 
   return result;
 }
 
-__device__ void store_restir_eval_data(const RestirEvalData data, const int offset) {
+__device__ void store_light_eval_data(const LightEvalData data, const int offset) {
   float4 packet;
   packet.x = data.position.x;
   packet.y = data.position.y;
   packet.z = data.position.z;
   packet.w = __uint_as_float(data.flags);
 
-  __stcs((float4*) (device.restir_eval_data + offset), packet);
+  __stcs((float4*) (device.light_eval_data + offset), packet);
 }
 
-__device__ RestirSample load_restir_sample(const RestirSample* ptr, const int offset) {
+__device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {
   const float2 packet = __ldcs((float2*) (ptr + offset));
 
-  RestirSample sample;
+  LightSample sample;
   sample.id     = __float_as_uint(packet.x);
   sample.weight = packet.y;
 
   return sample;
 }
 
-__device__ void store_restir_sample(const RestirSample* ptr, const RestirSample sample, const int offset) {
+__device__ void store_light_sample(const LightSample* ptr, const LightSample sample, const int offset) {
   float2 packet;
   packet.x = __uint_as_float(sample.id);
   packet.y = sample.weight;

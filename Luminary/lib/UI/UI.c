@@ -56,8 +56,8 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] =
     create_info(ui, "Light Source Count", &(instance->scene_gpu.triangle_lights_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[i++] = create_slider(ui, "ReSTIR Spatial Samples", &(instance->restir_spatial_samples), 0, 0.02f, 0.0f, 16.0f, 0, 1);
-  panels[i++] = create_slider(ui, "ReSTIR Spatial Iterations", &(instance->restir_spatial_iterations), 0, 0.02f, 0.0f, 16.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Spatial Resampling Samples", &(instance->spatial_samples), 0, 0.02f, 0.0f, 16.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Spatial Resampling Iterations", &(instance->spatial_iterations), 0, 0.02f, 0.0f, 16.0f, 0, 1);
   panels[i++] =
     create_dropdown(ui, "Shading Mode", &(instance->shading_mode), 1, 6, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Wireframe", 14);
 

@@ -1227,6 +1227,8 @@ static void sort_nodes_depth_first(Node8* src, Node8* dst, const int src_index, 
  * Sorts both nodes and triangles into depth first order.
  */
 void sort_traversal_elements(Node8** nodes_io, const int nodes_length, Triangle** triangles_io, const int triangles_length) {
+  bench_tic();
+
   Triangle* triangles = *triangles_io;
   Node8* nodes        = *nodes_io;
 
@@ -1253,4 +1255,6 @@ void sort_traversal_elements(Node8** nodes_io, const int nodes_length, Triangle*
   free(triangles);
 
   *triangles_io = new_triangles;
+
+  bench_toc("Sorting Traversal Structures");
 }

@@ -55,15 +55,15 @@ struct Quaternion {
 } typedef Quaternion;
 #endif
 
-struct RestirSample {
+struct LightSample {
   uint32_t id;
   float weight;
-} typedef RestirSample;
+} typedef LightSample;
 
-struct RestirEvalData {
+struct LightEvalData {
   vec3 position;
   uint32_t flags;
-} typedef RestirEvalData;
+} typedef LightEvalData;
 
 // state is 16 bits the depth and the last 16 bits the random_index
 
@@ -151,8 +151,8 @@ struct DevicePointers {
   cudaTextureObject_t* albedo_atlas;
   cudaTextureObject_t* illuminance_atlas;
   cudaTextureObject_t* material_atlas;
-  RestirSample* restir_samples;
-  RestirEvalData* restir_eval_data;
+  LightSample* light_samples;
+  LightEvalData* light_eval_data;
 } typedef DevicePointers;
 
 //===========================================================================================
@@ -201,7 +201,7 @@ __constant__ int device_denoiser;
 
 __constant__ uint32_t device_reservoir_size;
 
-__constant__ int device_restir_spatial_samples;
+__constant__ int device_spatial_samples;
 
 __constant__ int device_width;
 

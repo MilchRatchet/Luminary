@@ -357,9 +357,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     if (hit_id != SKY_HIT)
       task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    RestirEvalData restir_data;
-    restir_data.position = task.origin;
-    restir_data.flags    = 0;
+    LightEvalData light_data;
+    light_data.position = task.origin;
+    light_data.flags    = 0;
 
     switch (hit_id) {
       case SKY_HIT:
@@ -368,11 +368,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
         break;
       case TOY_HIT:
       default:
-        restir_data.flags = 1;
+        light_data.flags = 1;
         break;
     }
 
-    store_restir_eval_data(restir_data, pixel);
+    store_light_eval_data(light_data, pixel);
 
     if (device_iteration_type == TYPE_LIGHT)
       device.state_buffer[pixel] &= ~STATE_LIGHT_OCCUPIED;
