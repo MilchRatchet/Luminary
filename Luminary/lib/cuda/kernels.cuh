@@ -228,11 +228,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
       if (fog.x < depth) {
         depth  = fog.x;
         hit_id = FOG_HIT;
-        weight = fog.y;
+        weight = 1.0f / fog.y;
         __stcs((float2*) (device.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
       }
       else {
-        weight = 1.0f - fog.y;
+        weight = 1.0f / (1.0f - fog.y);
       }
 
       const int pixel       = task.index.x + task.index.y * device_width;
