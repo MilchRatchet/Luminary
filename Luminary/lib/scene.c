@@ -354,10 +354,6 @@ static void parse_fog_settings(Fog* fog, char* line) {
     case 6872287793290429249u:
       sscanf_s(value, "%d\n", &fog->active);
       break;
-    /* ABSORPTI */
-    case 5283936577260831297u:
-      sscanf_s(value, "%f\n", &fog->absorption);
-      break;
     /* SCATTERI */
     case 5283361541352145747u:
       sscanf_s(value, "%f\n", &fog->scattering);
@@ -607,7 +603,6 @@ static Scene get_default_scene() {
   scene.sky.cloud.density             = 1.0f;
 
   scene.fog.active     = 0;
-  scene.fog.absorption = 1.0f;
   scene.fog.scattering = 1.0f;
   scene.fog.anisotropy = 0.0f;
   scene.fog.height     = 1000.0f;
@@ -973,8 +968,6 @@ void serialize_scene(RaytraceInstance* instance) {
   fputs(line, file);
 
   sprintf_s(line, LINE_SIZE, "FOG ACTIVE__ %d\n", instance->scene_gpu.fog.active);
-  fputs(line, file);
-  sprintf_s(line, LINE_SIZE, "FOG ABSORPTI %f\n", instance->scene_gpu.fog.absorption);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "FOG SCATTERI %f\n", instance->scene_gpu.fog.scattering);
   fputs(line, file);

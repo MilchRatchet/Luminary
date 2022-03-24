@@ -3,9 +3,17 @@
 
 #include "math.cuh"
 
-__device__ float get_intersection_fog(vec3 origin, vec3 ray, float random) {
-  float height = device_scene.fog.height + device_scene.fog.falloff;
-  float dist   = (fabsf(ray.y) < eps) ? FLT_MAX : (height - origin.y) / ray.y;
+/*
+ * Computes randomly a scattering point for fog.
+ * @param origin Origin of ray.
+ * @param ray Direction of ray.
+ * @param depth Depth of ray without scattering.
+ * @param random Random value in [0,1)
+ * @result Two floats, the first containing the sampled depth, the second containing the probability for the scattering point.
+ */
+__device__ float2 get_intersection_fog(const vec3 origin, const vec3 ray, const float depth, const float random) {
+  const float height = device_scene.fog.height + device_scene.fog.falloff;
+  const float dist   = (fabsf(ray.y) < eps * eps) ? FLT_MAX : (height - origin.y) / ray.y;
 
   float max_dist = FLT_MAX;
   float min_dist = 0.0f;
@@ -29,9 +37,15 @@ __device__ float get_intersection_fog(vec3 origin, vec3 ray, float random) {
 
   max_dist = fminf(device_scene.fog.dist, max_dist);
 
-  float t = fmaxf(0.0f, min_dist) + logf(random) / (-device_scene.fog.scattering * 0.001f);
+  float t = min_dist - logf(random) / (0.001f * device_scene.fog.scattering);
 
-  return (t < min_dist || t > max_dist) ? FLT_MAX : t;
+  float p = 1.0f - (expf((min_dist - fminf(max_dist, depth)) * 0.001f * device_scene.fog.scattering));
+
+  if (t < min_dist || t > max_dist) {
+    t = FLT_MAX;
+  }
+
+  return make_float2(t, p);
 }
 
 __device__ float get_fog_depth(float y, float ry, float depth) {
@@ -77,50 +91,59 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
+    const float density = get_fog_density(0.001f * device_scene.fog.scattering, task.position.y);
+
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    if (task.state & DEPTH_LEFT) {
-      TraceTask continue_task;
-      continue_task.origin = task.position;
-      continue_task.ray    = ray;
-      continue_task.index  = task.index;
-      continue_task.state  = task.state;
+    RGBF record = device_records[pixel];
 
-      store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), continue_task);
+    {
+      const vec3 bounce_ray = angles_to_direction(white_noise() * PI, white_noise() * 2.0f * PI);
+      const float cos_angle = dot_product(ray, bounce_ray);
+      const float phase     = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
+      const float weight    = 4.0f * PI * phase * density * task.distance;
 
+      device.bounce_records[pixel] = scale_color(record, weight);
+
+      TraceTask bounce_task;
+      bounce_task.origin = task.position;
+      bounce_task.ray    = bounce_ray;
+      bounce_task.index  = task.index;
+      bounce_task.state  = task.state;
+
+      store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+    }
+
+    const int light_occupied = (device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
+
+    if (!light_occupied) {
       LightSample light = load_light_sample(device.light_samples, pixel);
       light             = brdf_finalize_light_sample(light, task.position);
 
-      if (light.weight <= 0.0f) {
-        continue;
+      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
+
+      if (light.weight > 0.0f) {
+        const vec3 light_ray  = brdf_sample_light_ray(light, task.position);
+        const float cos_angle = dot_product(ray, light_ray);
+        const float phase     = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
+        const float weight    = light.weight * phase * density * task.distance;
+
+        device.light_records[pixel] = scale_color(record, weight);
+        light_history_buffer_entry  = light.id;
+
+        TraceTask light_task;
+        light_task.origin = task.position;
+        light_task.ray    = light_ray;
+        light_task.index  = task.index;
+        light_task.state  = task.state;
+
+        store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
       }
 
-      float alpha = blue_noise(task.index.x, task.index.y, task.state, 99);
-      float gamma = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 98);
-
-      vec3 out_ray = brdf_sample_light_ray(light, task.position);
-      float angle  = dot_product(ray, out_ray);
-      float g      = device_scene.fog.anisotropy;
-
-      float weight  = (4.0f * PI * powf(1.0f + g * g - 2.0f * g * angle, 1.5f)) / (1.0f - g * g);
-      float density = get_fog_density(device_scene.fog.scattering, task.position.y);
-      weight *= density * 0.001f;
-      weight *= light.weight;
-
-      RGBF record                        = device_records[pixel];
-      device.light_records[pixel]        = scale_color(record, weight);
-      device.light_sample_history[pixel] = light.id;
-
-      task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
-
-      TraceTask light_task;
-      light_task.origin = task.position;
-      light_task.ray    = out_ray;
-      light_task.index  = task.index;
-      light_task.state  = task.state;
-
-      store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
+      device.light_sample_history[pixel] = light_history_buffer_entry;
     }
+
+    task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
   }
 
   device.light_trace_count[id]  = light_trace_count;
