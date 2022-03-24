@@ -536,16 +536,11 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   if (type != TYPE_CAMERA)
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   if (type != TYPE_LIGHT) {
     generate_light_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    gpuErrchk(cudaDeviceSynchronize());
     if (type == TYPE_CAMERA && instance->scene_gpu.material.lights_active) {
       LightSample* light_samples_1 = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
       LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
@@ -556,16 +551,11 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
     }
   }
   process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  gpuErrchk(cudaDeviceSynchronize());
   if (type != TYPE_LIGHT) {
     process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    gpuErrchk(cudaDeviceSynchronize());
   }
 }
 
