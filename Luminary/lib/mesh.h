@@ -22,8 +22,8 @@ struct Triangle {
   UV edge2_texture;
   uint32_t object_maps;
   uint32_t light_id;
-  float padding1;
   float padding2;
+  float padding3;
 } typedef Triangle;
 
 struct TraversalTriangle {
@@ -34,5 +34,14 @@ struct TraversalTriangle {
   float padding1;
   float padding2;
 } typedef TraversalTriangle;
+
+struct TriangleLight {
+  vec3 vertex;
+  vec3 edge1;
+  vec3 edge2;
+  uint32_t triangle_id;
+  float padding1;
+  float padding2;
+} typedef TriangleLight;
 
 #endif /* MESH_H */

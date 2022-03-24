@@ -38,34 +38,6 @@ __device__ TraceTask get_starting_ray(TraceTask task) {
   return task;
 }
 
-__device__ float get_light_source_intersection(vec3 ray, vec3 origin) {
-  const int sun_visible = (device_sun.y >= -0.1f);
-  const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
-
-  int i = 0;
-  i += !sun_visible;
-  i += !toy_visible;
-
-  float min_dist = FLT_MAX;
-
-  for (; i < device_scene.lights_length; i++) {
-    const float4 light_data = __ldg((float4*) (device_scene.lights + i));
-    Light light;
-    light.pos.x  = light_data.x;
-    light.pos.y  = light_data.y;
-    light.pos.z  = light_data.z;
-    light.radius = light_data.w;
-
-    float dist = sphere_ray_intersection(ray, origin, light.pos, light.radius);
-
-    if (dist < min_dist) {
-      min_dist = dist;
-    }
-  }
-
-  return min_dist;
-}
-
 __global__ void initialize_randoms() {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -170,22 +142,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     if (is_first_ray()) {
       const uint32_t t_id = device.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
 
-      if (t_id <= TRIANGLE_HIT_LIMIT) {
-        const float dist = bvh_triangle_intersection((float4*) (device_scene.traversal_triangles + t_id), task.origin, task.ray);
+      if (t_id <= TRIANGLE_ID_LIMIT) {
+        const float dist = bvh_triangle_intersection(load_traversal_triangle(t_id), task.origin, task.ray);
 
         if (dist < depth) {
           depth  = dist;
           hit_id = t_id;
         }
-      }
-    }
-
-    if (device_scene.fog.active && is_first_ray()) {
-      const float fog_dist = get_intersection_fog(task.origin, task.ray, blue_noise(task.index.x, task.index.y, 256, 169));
-
-      if (fog_dist < depth) {
-        depth  = fog_dist;
-        hit_id = FOG_HIT;
       }
     }
 
@@ -207,15 +170,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
-    if (device_shading_mode == SHADING_LIGHTSOURCE) {
-      const float dist = get_light_source_intersection(task.ray, task.origin);
-
-      if (dist < depth) {
-        depth  = dist;
-        hit_id = DEBUG_LIGHT_HIT;
-      }
-    }
-
     float2 result;
     result.x = depth;
     result.y = __uint_as_float(hit_id);
@@ -232,8 +186,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
     TraceTask task      = load_trace_task(device_trace_tasks + offset);
     const float2 result = __ldg((float2*) (device.trace_results + offset));
 
-    const float depth     = result.x;
-    const uint32_t hit_id = __float_as_uint(result.y);
+    float depth     = result.x;
+    uint32_t hit_id = __float_as_uint(result.y);
 
     const bool is_hit           = (hit_id != SKY_HIT);
     const bool use_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
@@ -266,15 +220,31 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
       sky_trace_inscattering(world_to_sky_transform(task.origin), task.ray, 0.001f * depth, task.index);
     }
 
-    if (device_scene.fog.active) {
-      float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
-      float weight = expf(-t * device_scene.fog.absorption * 0.001f);
+    if (device_scene.fog.active && is_first_ray()) {
+      const float2 fog = get_intersection_fog(task.origin, task.ray, depth, blue_noise(task.index.x, task.index.y, 256, 169));
 
-      RGBF record = device_records[task.index.x + task.index.y * device_width];
+      float weight = 1.0f;
 
-      record = scale_color(record, weight);
+      if (fog.x < depth) {
+        depth  = fog.x;
+        hit_id = FOG_HIT;
+        weight = fog.y;
+        __stcs((float2*) (device.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
+      }
+      else {
+        weight = 1.0f - fog.y;
+      }
 
-      device_records[task.index.x + task.index.y * device_width] = record;
+      const int pixel       = task.index.x + task.index.y * device_width;
+      device_records[pixel] = scale_color(device_records[pixel], weight);
+    }
+
+    if (device_scene.fog.active && device_iteration_type == TYPE_LIGHT) {
+      const int pixel    = task.index.x + task.index.y * device_width;
+      const float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
+      const float weight = expf(-t * 0.001f * device_scene.fog.scattering);
+
+      device_records[pixel] = scale_color(device_records[pixel], weight);
     }
 
     if (modified_task) {
@@ -391,15 +361,32 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       device.trace_result_buffer[pixel] = trace_result;
     }
 
+    if (hit_id != SKY_HIT)
+      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+
+    LightEvalData light_data;
+    light_data.position = task.origin;
+    light_data.flags    = 0;
+
+    switch (hit_id) {
+      case SKY_HIT:
+      case OCEAN_HIT:
+      case FOG_HIT:
+        break;
+      case TOY_HIT:
+      default:
+        light_data.flags = 1;
+        break;
+    }
+
+    store_light_eval_data(light_data, pixel);
+
     if (device_iteration_type == TYPE_LIGHT)
       device.state_buffer[pixel] &= ~STATE_LIGHT_OCCUPIED;
 
     float4* ptr = (float4*) (device_trace_tasks + offset);
     float4 data0;
     float4 data1;
-
-    if (hit_id != SKY_HIT)
-      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
     data0.x = task.origin.x;
     data0.y = task.origin.y;

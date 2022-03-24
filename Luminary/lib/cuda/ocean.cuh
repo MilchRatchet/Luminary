@@ -184,7 +184,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
         device.frame_buffer[pixel] = emission;
       }
     }
-    else if (white_noise() > albedo.a) {
+
+    if (white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
       record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
@@ -208,7 +209,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
           store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
-          device.light_records[pixel] = record;
+          if (white_noise() > 0.5f)
+            break;
+          device.light_records[pixel] = scale_color(record, 2.0f);
           device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
           break;
@@ -231,7 +234,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       bounce_task.state            = task.state;
       device.bounce_records[pixel] = bounce_record;
 
-      device.light_sample_history[pixel] = ANY_LIGHT;
+      device.light_sample_history[pixel] = LIGHT_ID_ANY;
       store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
   }
@@ -250,7 +253,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
     OceanTask task  = load_ocean_task(device_trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device_width + task.index.x;
 
-    if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_LIGHTSOURCE) {
+    if (device_shading_mode == SHADING_ALBEDO) {
       RGBAF albedo               = device_scene.ocean.albedo;
       device.frame_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
     }

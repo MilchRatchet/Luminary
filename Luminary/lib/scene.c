@@ -354,10 +354,6 @@ static void parse_fog_settings(Fog* fog, char* line) {
     case 6872287793290429249u:
       sscanf_s(value, "%d\n", &fog->active);
       break;
-    /* ABSORPTI */
-    case 5283936577260831297u:
-      sscanf_s(value, "%f\n", &fog->absorption);
-      break;
     /* SCATTERI */
     case 5283361541352145747u:
       sscanf_s(value, "%f\n", &fog->scattering);
@@ -530,7 +526,7 @@ static Scene get_default_scene() {
   scene.ocean.emissive         = 0;
   scene.ocean.update           = 0;
   scene.ocean.height           = 0.0f;
-  scene.ocean.amplitude        = 0.6f;
+  scene.ocean.amplitude        = 0.2f;
   scene.ocean.frequency        = 0.16f;
   scene.ocean.choppyness       = 4.0f;
   scene.ocean.speed            = 1.0f;
@@ -566,17 +562,17 @@ static Scene get_default_scene() {
   scene.toy.emission.a       = 0.0f;
 
   scene.sky.geometry_offset.x         = 0.0f;
-  scene.sky.geometry_offset.y         = 0.0f;
+  scene.sky.geometry_offset.y         = 0.1f;
   scene.sky.geometry_offset.z         = 0.0f;
   scene.sky.sun_color.r               = 1.0f;
-  scene.sky.sun_color.g               = 1.0f;
-  scene.sky.sun_color.b               = 1.0f;
+  scene.sky.sun_color.g               = 0.9f;
+  scene.sky.sun_color.b               = 0.8f;
   scene.sky.altitude                  = 0.5f;
   scene.sky.azimuth                   = 3.141f;
   scene.sky.moon_altitude             = -0.5f;
   scene.sky.moon_azimuth              = 0.0f;
   scene.sky.moon_albedo               = 0.12f;
-  scene.sky.sun_strength              = 500.0f;
+  scene.sky.sun_strength              = 15000.0f;
   scene.sky.base_density              = 1.0f;
   scene.sky.steps                     = 8;
   scene.sky.shadow_steps              = 8;
@@ -607,7 +603,6 @@ static Scene get_default_scene() {
   scene.sky.cloud.density             = 1.0f;
 
   scene.fog.active     = 0;
-  scene.fog.absorption = 1.0f;
   scene.fog.scattering = 1.0f;
   scene.fog.anisotropy = 0.0f;
   scene.fog.height     = 1000.0f;
@@ -615,6 +610,22 @@ static Scene get_default_scene() {
   scene.fog.falloff    = 10.0f;
 
   return scene;
+}
+
+static General get_default_settings() {
+  General general = {
+    .width             = 1280,
+    .height            = 720,
+    .max_ray_depth     = 5,
+    .samples           = 16,
+    .denoiser          = 1,
+    .reservoir_size    = 8,
+    .output_path       = malloc(LINE_SIZE),
+    .mesh_files        = malloc(sizeof(char*) * 10),
+    .mesh_files_count  = 0,
+    .mesh_files_length = 10};
+
+  return general;
 }
 
 static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scene) {
@@ -629,6 +640,8 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
   scene->nodes = collapse_bvh(initial_nodes, scene->nodes_length, &scene->triangles, scene->triangles_length, &scene->nodes_length);
 
   free(initial_nodes);
+
+  sort_traversal_elements(&scene->nodes, scene->nodes_length, &scene->triangles, scene->triangles_length);
 
   scene->traversal_triangles = malloc(sizeof(TraversalTriangle) * scene->triangles_length);
 
@@ -671,18 +684,8 @@ RaytraceInstance* load_scene(const char* filename) {
     error_message("Scene file has no version information, assuming correct version!");
   }
 
-  Scene scene = get_default_scene();
-
-  General general = {
-    .width             = 1280,
-    .height            = 720,
-    .max_ray_depth     = 5,
-    .samples           = 16,
-    .denoiser          = 1,
-    .output_path       = malloc(LINE_SIZE),
-    .mesh_files        = malloc(sizeof(char*) * 10),
-    .mesh_files_count  = 0,
-    .mesh_files_length = 10};
+  Scene scene     = get_default_scene();
+  General general = get_default_settings();
 
   strncpy_s(general.output_path, LINE_SIZE, "output.png", 11);
 
@@ -730,7 +733,7 @@ RaytraceInstance* load_scene(const char* filename) {
 
   convert_wavefront_to_internal(content, &scene);
 
-  process_lights(&scene);
+  process_lights(&scene, content.illuminance_maps);
 
   DeviceBuffer* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
   DeviceBuffer* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
@@ -750,18 +753,8 @@ RaytraceInstance* load_scene(const char* filename) {
 }
 
 RaytraceInstance* load_obj_as_scene(char* filename) {
-  Scene scene = get_default_scene();
-
-  General general = {
-    .width             = 1280,
-    .height            = 720,
-    .max_ray_depth     = 5,
-    .samples           = 16,
-    .denoiser          = 1,
-    .output_path       = malloc(LINE_SIZE),
-    .mesh_files        = malloc(sizeof(char*) * 10),
-    .mesh_files_count  = 0,
-    .mesh_files_length = 10};
+  Scene scene     = get_default_scene();
+  General general = get_default_settings();
 
   general.mesh_files[0] = malloc(LINE_SIZE);
   strcpy_s(general.mesh_files[0], LINE_SIZE, filename);
@@ -776,7 +769,7 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   convert_wavefront_to_internal(content, &scene);
 
-  process_lights(&scene);
+  process_lights(&scene, content.illuminance_maps);
 
   DeviceBuffer* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
   DeviceBuffer* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
@@ -976,8 +969,6 @@ void serialize_scene(RaytraceInstance* instance) {
 
   sprintf_s(line, LINE_SIZE, "FOG ACTIVE__ %d\n", instance->scene_gpu.fog.active);
   fputs(line, file);
-  sprintf_s(line, LINE_SIZE, "FOG ABSORPTI %f\n", instance->scene_gpu.fog.absorption);
-  fputs(line, file);
   sprintf_s(line, LINE_SIZE, "FOG SCATTERI %f\n", instance->scene_gpu.fog.scattering);
   fputs(line, file);
   sprintf_s(line, LINE_SIZE, "FOG ANISOTRO %f\n", instance->scene_gpu.fog.anisotropy);
@@ -1072,6 +1063,6 @@ void free_scene(Scene scene) {
   free(scene.triangles);
   free(scene.traversal_triangles);
   free(scene.nodes);
-  free(scene.lights);
+  free(scene.triangle_lights);
   free(scene.texture_assignments);
 }

@@ -18,8 +18,12 @@
  * are perceptively unaffected.
  */
 #define WEIGHT_BASED_EXIT
-#define BRIGHTEST_EMISSION (device_scene.camera.exposure * fmaxf(device_scene.sky.sun_strength, device_scene.material.default_material.b))
-#define CUTOFF ((1.0) / (BRIGHTEST_EMISSION))
+#define BRIGHTEST_EMISSION                   \
+  (device_scene.camera.exposure              \
+   * fmaxf(                                  \
+     device_scene.sky.sun_strength * 0.001f, \
+     fmaxf(device_scene.material.default_material.b, device_scene.toy.active * device_scene.toy.material.b)))
+#define CUTOFF ((1.0f) / (BRIGHTEST_EMISSION))
 #define PROBABILISTIC_CUTOFF ((1.0f) / (0.25f * BRIGHTEST_EMISSION))
 
 /*

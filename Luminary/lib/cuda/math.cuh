@@ -582,6 +582,14 @@ __device__ vec3 sky_to_world_transform(vec3 input) {
   return result;
 }
 
+__device__ float world_to_sky_scale(float input) {
+  return input * 0.001f;
+}
+
+__device__ float sky_to_world_scale(float input) {
+  return input * 1000.0f;
+}
+
 __device__ RGBF get_color(const float r, const float g, const float b) {
   RGBF result;
 
@@ -857,31 +865,160 @@ __device__ float henvey_greenstein(const float cos_angle, const float g) {
   return (1.0f - g * g) / (4.0f * PI * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
 }
 
-__device__ float bvh_triangle_intersection(const float4* triangles, const vec3 origin, const vec3 ray) {
-  const float4 v1 = __ldg(triangles);
-  const float4 v2 = __ldg(triangles + 1);
-  const float v3  = __ldg((float*) (triangles + 2));
-
-  vec3 vertex = get_vector(v1.x, v1.y, v1.z);
-  vec3 edge1  = get_vector(v1.w, v2.x, v2.y);
-  vec3 edge2  = get_vector(v2.z, v2.w, v3);
-
-  const vec3 h  = cross_product(ray, edge2);
-  const float a = dot_product(edge1, h);
+__device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
+  const vec3 h  = cross_product(ray, triangle.edge2);
+  const float a = dot_product(triangle.edge1, h);
 
   const float f = 1.0f / a;
-  const vec3 s  = sub_vector(origin, vertex);
+  const vec3 s  = sub_vector(origin, triangle.vertex);
   const float u = f * dot_product(s, h);
 
-  const vec3 q  = cross_product(s, edge1);
+  const vec3 q  = cross_product(s, triangle.edge1);
   const float v = f * dot_product(ray, q);
 
   if (v < 0.0f || u < 0.0f || u + v > 1.0f)
     return FLT_MAX;
 
-  const float t = f * dot_product(edge2, q);
+  const float t = f * dot_product(triangle.edge2, q);
 
   return __fslctf(t, FLT_MAX, t);
+}
+
+/*
+ * Sample a random point on a triangle using Basu and Owen's mapping.
+ * @param triangle Triangle.
+ * @param origin Point to sample from.
+ * @result Normalized direction to the point on the triangle.
+ */
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin) {
+  const float u     = white_noise();
+  const uint32_t uf = u * __uint_as_float(0x4f800000u);  // u * 2^32
+  float2 a          = make_float2(1.0f, 0.0f);
+  float2 b          = make_float2(0.0f, 1.0f);
+  float2 c          = make_float2(0.0f, 0.0f);
+
+  for (int i = 0; i < 16; i++) {
+    const int d = (uf >> (2 * (15 - i))) & 0x3;
+    float2 ai;
+    float2 bi;
+    float2 ci;
+    switch (d) {
+      case 0:
+        ai.x = b.x + c.x;
+        ai.y = b.y + c.y;
+        bi.x = a.x + c.x;
+        bi.y = a.y + c.y;
+        ci.x = a.x + b.x;
+        ci.y = a.y + b.y;
+        break;
+      case 1:
+        ai   = a;
+        bi.x = a.x + b.x;
+        bi.y = a.y + b.y;
+        ci.x = a.x + c.x;
+        ci.y = a.y + c.y;
+        break;
+      case 2:
+        ai.x = b.x + a.x;
+        ai.y = b.y + a.y;
+        bi   = b;
+        ci.x = b.x + c.x;
+        ci.y = b.y + c.y;
+        break;
+      case 3:
+        ai.x = c.x + a.x;
+        ai.y = c.y + a.y;
+        bi.x = c.x + b.x;
+        bi.y = c.y + b.y;
+        ci   = c;
+        break;
+    }
+    if (d != 1) {
+      ai.x *= 0.5f;
+      ai.y *= 0.5f;
+    }
+    if (d != 2) {
+      bi.x *= 0.5f;
+      bi.y *= 0.5f;
+    }
+    if (d != 3) {
+      ci.x *= 0.5f;
+      ci.y *= 0.5f;
+    }
+    a = ai;
+    b = bi;
+    c = ci;
+  }
+
+  const float2 uv = make_float2((a.x + b.x + c.x) * 1.0f / 3.0f, (a.y + b.y + c.y) * 1.0f / 3.0f);
+
+  const vec3 p = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
+
+  return normalize_vector(sub_vector(p, origin));
+}
+
+/*
+ * Computes solid angle when sampling a triangle using the formula in "The Solid Angle of a Plane Triangle" (1983) by A. Van Oosterom and J.
+ * Strackee.
+ * @param triangle Triangle.
+ * @param origin Point from which you sample.
+ * @param normal Normalized normal of surface from which you sample.
+ * @result Solid angle of triangle.
+ */
+__device__ float sample_triangle_solid_angle(const TriangleLight triangle, const vec3 origin) {
+  vec3 a       = sub_vector(triangle.vertex, origin);
+  const vec3 b = normalize_vector(add_vector(triangle.edge1, a));
+  const vec3 c = normalize_vector(add_vector(triangle.edge2, a));
+  a            = normalize_vector(a);
+
+  const float num   = fabsf(dot_product(a, cross_product(b, c)));
+  const float denom = 1.0f + dot_product(a, b) + dot_product(a, c) + dot_product(b, c);
+
+  return 4.0f * atan2f(num, denom);
+}
+
+/*
+ * Sample a random point on a sphere.
+ * @param p Center of the sphere.
+ * @param r Radius of the sphere.
+ * @param origin Point to sample from.
+ * @result Normalized direction to the point on the sphere.
+ */
+__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin) {
+  const float u1 = sqrtf(white_noise());
+  const float u2 = white_noise() * 2.0f * PI;
+
+  vec3 dir      = sub_vector(p, origin);
+  const float d = get_length(dir);
+
+  if (d < r) {
+    return normalize_vector(angles_to_direction(u1 * u1 * 2.0f * PI, u2));
+  }
+
+  dir               = normalize_vector(dir);
+  const float angle = asinf(r / d);
+
+  return normalize_vector(sample_ray_from_angles_and_vector(u1 * angle, u2, dir));
+}
+
+/*
+ * Computes solid angle when sampling a sphere.
+ * @param p Center of sphere.
+ * @param r Radius of sphere.
+ * @param origin Point from which you sample.
+ * @param normal Normalized normal of surface from which you sample.
+ * @result Solid angle of sphere.
+ */
+__device__ float sample_sphere_solid_angle(const vec3 p, const float r, const vec3 origin) {
+  vec3 dir      = sub_vector(p, origin);
+  const float d = get_length(dir);
+
+  if (d < r)
+    return 2.0f * PI;
+
+  const float a = asinf(r / d);
+
+  return 2.0f * PI * a * a;
 }
 
 #endif /* CU_MATH_H */

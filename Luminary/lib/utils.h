@@ -20,14 +20,17 @@
 #define ONE_OVER_PI 0.31830988618f
 #endif
 
+#define LIGHT_ID_SUN 0xffffffffu
+#define LIGHT_ID_TOY 0xfffffffeu
+#define LIGHT_ID_NONE 0xfffffff1u
+
 enum ShadingMode {
-  SHADING_DEFAULT     = 0,
-  SHADING_ALBEDO      = 1,
-  SHADING_DEPTH       = 2,
-  SHADING_NORMAL      = 3,
-  SHADING_HEAT        = 4,
-  SHADING_WIREFRAME   = 5,
-  SHADING_LIGHTSOURCE = 6
+  SHADING_DEFAULT   = 0,
+  SHADING_ALBEDO    = 1,
+  SHADING_DEPTH     = 2,
+  SHADING_NORMAL    = 3,
+  SHADING_HEAT      = 4,
+  SHADING_WIREFRAME = 5
 } typedef ShadingMode;
 
 enum ToyShape { TOY_SPHERE = 0 } typedef ToyShape;
@@ -63,6 +66,7 @@ struct General {
   int height;
   int samples;
   int max_ray_depth;
+  int reservoir_size;
   int denoiser;
   char** mesh_files;
   int mesh_files_count;
@@ -188,7 +192,6 @@ struct Ocean {
 struct Fog {
   int active;
   float scattering;
-  float absorption;
   float anisotropy;
   float height;
   float dist;
@@ -213,13 +216,13 @@ struct Scene {
   Camera camera;
   Triangle* triangles;
   TraversalTriangle* traversal_triangles;
+  TriangleLight* triangle_lights;
   unsigned int triangles_length;
+  unsigned int triangle_lights_length;
   Node8* nodes;
   unsigned int nodes_length;
   uint16_t materials_length;
   TextureAssignment* texture_assignments;
-  Light* lights;
-  unsigned int lights_length;
   Ocean ocean;
   Sky sky;
   Toy toy;
@@ -250,16 +253,22 @@ struct RaytraceInstance {
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* albedo_atlas;
+  DeviceBuffer* light_samples_1;
+  DeviceBuffer* light_samples_2;
+  DeviceBuffer* light_eval_data;
   int albedo_atlas_length;
   DeviceBuffer* illuminance_atlas;
   int illuminance_atlas_length;
   DeviceBuffer* material_atlas;
   int material_atlas_length;
   int max_ray_depth;
+  int reservoir_size;
   int offline_samples;
   Scene scene_gpu;
   int denoiser;
   int temporal_frames;
+  int spatial_samples;
+  int spatial_iterations;
   DeviceBuffer* randoms;
   int shading_mode;
   RGBF** bloom_mips_gpu;

@@ -207,4 +207,71 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
   device.state_buffer[pixel] |= STATE_ALBEDO;
 }
 
+__device__ LightEvalData load_light_eval_data(const int offset) {
+  const float4 packet = __ldcs((float4*) (device.light_eval_data + offset));
+
+  LightEvalData result;
+  result.position = get_vector(packet.x, packet.y, packet.z);
+  result.flags    = __float_as_uint(packet.w);
+
+  return result;
+}
+
+__device__ void store_light_eval_data(const LightEvalData data, const int offset) {
+  float4 packet;
+  packet.x = data.position.x;
+  packet.y = data.position.y;
+  packet.z = data.position.z;
+  packet.w = __uint_as_float(data.flags);
+
+  __stcs((float4*) (device.light_eval_data + offset), packet);
+}
+
+__device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {
+  const float2 packet = __ldcs((float2*) (ptr + offset));
+
+  LightSample sample;
+  sample.id     = __float_as_uint(packet.x);
+  sample.weight = packet.y;
+
+  return sample;
+}
+
+__device__ void store_light_sample(const LightSample* ptr, const LightSample sample, const int offset) {
+  float2 packet;
+  packet.x = __uint_as_float(sample.id);
+  packet.y = sample.weight;
+
+  __stcs((float2*) (ptr + offset), packet);
+}
+
+__device__ TraversalTriangle load_traversal_triangle(const int offset) {
+  const float4* ptr = (float4*) (device_scene.traversal_triangles + offset);
+  const float4 v1   = __ldg(ptr);
+  const float4 v2   = __ldg(ptr + 1);
+  const float v3    = __ldg((float*) (ptr + 2));
+
+  TraversalTriangle triangle;
+  triangle.vertex = get_vector(v1.x, v1.y, v1.z);
+  triangle.edge1  = get_vector(v1.w, v2.x, v2.y);
+  triangle.edge2  = get_vector(v2.z, v2.w, v3);
+
+  return triangle;
+}
+
+__device__ TriangleLight load_triangle_light(const int offset) {
+  const float4* ptr = (float4*) (device_scene.triangle_lights + offset);
+  const float4 v1   = __ldg(ptr);
+  const float4 v2   = __ldg(ptr + 1);
+  const float2 v3   = __ldg((float2*) (ptr + 2));
+
+  TriangleLight triangle;
+  triangle.vertex      = get_vector(v1.x, v1.y, v1.z);
+  triangle.edge1       = get_vector(v1.w, v2.x, v2.y);
+  triangle.edge2       = get_vector(v2.z, v2.w, v3.x);
+  triangle.triangle_id = __float_as_uint(v3.y);
+
+  return triangle;
+}
+
 #endif /* CU_MEMORY_H */

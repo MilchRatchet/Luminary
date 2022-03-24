@@ -221,9 +221,6 @@ Cloud density scaling. Number should be non-negative.
 `FOG ACTIVE__ [INT32]`<br/>
 Set 1 to activate fog, 0 else.
 
-`FOG ABSORPTI [FP32]`<br/>
-Absorption coefficient used for light extinction in fog. Number should be non-negative.
-
 `FOG SCATTERI [FP32]`<br/>
 Scattering coefficient determining the amout of light being scattered. Number should be non-negative.
 
