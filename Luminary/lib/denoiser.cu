@@ -36,10 +36,12 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
   OptixDenoiser denoiser;
 
   OptixDenoiserOptions opt;
-  opt.inputKind = OPTIX_DENOISER_INPUT_RGB_ALBEDO;
+  opt.guideAlbedo = 1;
+  opt.guideNormal = 0;
 
-  OPTIX_CHECK(optixDenoiserCreate(ctx, &opt, &denoiser));
-  OPTIX_CHECK(optixDenoiserSetModel(denoiser, OPTIX_DENOISER_MODEL_KIND_HDR, nullptr, 0));
+  OptixDenoiserModelKind kind = OPTIX_DENOISER_MODEL_KIND_HDR;
+
+  OPTIX_CHECK(optixDenoiserCreate(ctx, kind, &opt, &denoiser));
 
   OptixDenoiserSizes denoiserReturnSizes;
   OPTIX_CHECK(optixDenoiserComputeMemoryResources(denoiser, instance->width, instance->height, &denoiserReturnSizes));
@@ -61,41 +63,38 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
     device_buffer_get_size(denoiserState), (CUdeviceptr) device_buffer_get_pointer(denoiserScratch),
     device_buffer_get_size(denoiserScratch)));
 
-  OptixImage2D inputLayer[2];
-
-  inputLayer[0].data               = (CUdeviceptr) device_buffer_get_pointer(instance->frame_output);
-  inputLayer[0].width              = instance->width;
-  inputLayer[0].height             = instance->height;
-  inputLayer[0].rowStrideInBytes   = instance->width * sizeof(RGBF);
-  inputLayer[0].pixelStrideInBytes = sizeof(RGBF);
-  inputLayer[0].format             = OPTIX_PIXEL_FORMAT_FLOAT3;
-
-  inputLayer[1].data               = (CUdeviceptr) device_buffer_get_pointer(instance->albedo_buffer);
-  inputLayer[1].width              = instance->width;
-  inputLayer[1].height             = instance->height;
-  inputLayer[1].rowStrideInBytes   = instance->width * sizeof(RGBF);
-  inputLayer[1].pixelStrideInBytes = sizeof(RGBF);
-  inputLayer[1].format             = OPTIX_PIXEL_FORMAT_FLOAT3;
-
   DeviceBuffer* output;
   device_buffer_init(&output);
   device_buffer_malloc(output, sizeof(RGBF), instance->width * instance->height);
 
-  OptixImage2D outputLayer;
+  OptixDenoiserLayer layer;
+  layer.input.data                = (CUdeviceptr) device_buffer_get_pointer(instance->frame_output);
+  layer.input.width               = instance->width;
+  layer.input.height              = instance->height;
+  layer.input.rowStrideInBytes    = instance->width * sizeof(RGBF);
+  layer.input.pixelStrideInBytes  = sizeof(RGBF);
+  layer.input.format              = OPTIX_PIXEL_FORMAT_FLOAT3;
+  layer.output.data               = (CUdeviceptr) device_buffer_get_pointer(output);
+  layer.output.width              = instance->width;
+  layer.output.height             = instance->height;
+  layer.output.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  layer.output.pixelStrideInBytes = sizeof(RGBF);
+  layer.output.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-  outputLayer.data               = (CUdeviceptr) device_buffer_get_pointer(output);
-  outputLayer.width              = instance->width;
-  outputLayer.height             = instance->height;
-  outputLayer.rowStrideInBytes   = instance->width * sizeof(RGBF);
-  outputLayer.pixelStrideInBytes = sizeof(RGBF);
-  outputLayer.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
+  OptixDenoiserGuideLayer guide_layer;
+  guide_layer.albedo.data               = (CUdeviceptr) device_buffer_get_pointer(instance->albedo_buffer);
+  guide_layer.albedo.width              = instance->width;
+  guide_layer.albedo.height             = instance->height;
+  guide_layer.albedo.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  guide_layer.albedo.pixelStrideInBytes = sizeof(RGBF);
+  guide_layer.albedo.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   DeviceBuffer* hdr_intensity;
   device_buffer_init(&hdr_intensity);
   device_buffer_malloc(hdr_intensity, sizeof(float), 1);
 
   OPTIX_CHECK(optixDenoiserComputeIntensity(
-    denoiser, 0, &inputLayer[0], (CUdeviceptr) device_buffer_get_pointer(hdr_intensity),
+    denoiser, 0, &(layer.input), (CUdeviceptr) device_buffer_get_pointer(hdr_intensity),
     (CUdeviceptr) device_buffer_get_pointer(denoiserScratch), device_buffer_get_size(denoiserScratch)));
 
   DeviceBuffer* avg_color;
@@ -103,7 +102,7 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
   device_buffer_malloc(avg_color, sizeof(float), 3);
 
   OPTIX_CHECK(optixDenoiserComputeAverageColor(
-    denoiser, 0, &inputLayer[0], (CUdeviceptr) device_buffer_get_pointer(avg_color),
+    denoiser, 0, &(layer.input), (CUdeviceptr) device_buffer_get_pointer(avg_color),
     (CUdeviceptr) device_buffer_get_pointer(denoiserScratch), device_buffer_get_size(denoiserScratch)));
 
   OptixDenoiserParams denoiserParams;
@@ -114,8 +113,7 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
 
   OPTIX_CHECK(optixDenoiserInvoke(
     denoiser, 0, &denoiserParams, (CUdeviceptr) device_buffer_get_pointer(denoiserState), device_buffer_get_size(denoiserState),
-    &inputLayer[0], 2, 0, 0, &outputLayer, (CUdeviceptr) device_buffer_get_pointer(denoiserScratch),
-    device_buffer_get_size(denoiserScratch)));
+    &guide_layer, &layer, 1, 0, 0, (CUdeviceptr) device_buffer_get_pointer(denoiserScratch), device_buffer_get_size(denoiserScratch)));
 
   device_buffer_copy(output, instance->frame_output);
 
