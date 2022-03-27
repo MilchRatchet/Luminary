@@ -372,7 +372,6 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
   const float a   = dot_product(ray, ray);
-  const float b   = 2.0f * dot;
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
   const float d   = 4.0f * a * (r2 - dot_product(k, k));
@@ -404,7 +403,6 @@ __device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
   const float a   = dot_product(ray, ray);
-  const float b   = 2.0f * dot;
   const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
   const float d   = 4.0f * a * (r2 - dot_product(k, k));
@@ -438,7 +436,6 @@ __device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, c
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
   const float a   = dot_product(ray, ray);
-  const float b   = 2.0f * dot;
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
   const float d   = 4.0f * a * (r2 - dot_product(k, k));
@@ -466,7 +463,6 @@ __device__ int sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) 
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
   const float a   = dot_product(ray, ray);
-  const float b   = 2.0f * dot;
   const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
   const float d   = 4.0f * a * (r2 - dot_product(k, k));
@@ -496,7 +492,6 @@ __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, co
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
   const float a   = dot_product(ray, ray);
-  const float b   = 2.0f * dot;
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
   const float d   = 4.0f * a * (r2 - dot_product(k, k));
@@ -528,7 +523,6 @@ __device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const fl
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
   const float a   = dot_product(ray, ray);
-  const float b   = 2.0f * dot;
   const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
   const float d   = 4.0f * a * (r2 - dot_product(k, k));
