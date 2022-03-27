@@ -128,5 +128,5 @@ extern "C" void denoise_with_optix(RaytraceInstance* instance) {
   OPTIX_CHECK(optixDeviceContextDestroy(ctx));
   OPTIX_CHECK(optixDenoiserDestroy(denoiser));
 
-  bench_toc("Optix Denoiser");
+  bench_toc((char*) "Optix Denoiser");
 }
