@@ -48,25 +48,56 @@ In realtime mode, which is used by default, you can control the camera through `
 
 # Building
 
-This project is a bit of a mess when it comes to building. It was only ever built on `Windows` so changes may have to be made for `Linus/OSX`. Some hints to get it to run are:
+Requirements:
+- CUDA Toolkit 11.6
+- Optix 7.4 SDK
+- SDL2 and SDL2_ttf
+- Modern CMake
+- Make or Ninja
+- SSE 4.1 compatible CPU
+- Supported Nvidia GPU (Recommended: Volta or later)
 
-- You need to change the `CUDA toolkit` version in the `CMakeLists.txt` to the one installed on your system.
-- You need to change the `CUDA compatibility` version in the `CMakeLists.txt` to your specific version or lower.
-- You need to install the `Optix 7.4 SDK` and specify the installation directory in `Luminary/CMake/FindOptix.cmake`.
-- You need an `SSE 4.1` compatible CPU.
-- You need to download the development libraries from http://www.libsdl.org/ and https://www.libsdl.org/projects/SDL_ttf/ and extract the libraries to `Luminary/lib/SDL/`. `SDL2.dll`, `SDL2_ttf.dll` and `libfreetype-6.dll` will automatically be copied to the build directory and have to reside in the same folder as the executable for it to run.
-- A font file named `LuminaryFont.ttf` must reside in the binary directory. A default font is automatically copied to the build directory. You can replace this font with any other font.
-- `_s` versions of `fopen` etc. are used. Those may not be available on `Linus/OSX` and need to be changed there.
+The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name.
 
-In `Luminary/lib/cuda/directives.cuh` are some preprocessor directives that can be used to tune performance to quality in the CUDA kernel.
+## Linux
+
+You need a `nvcc` compatible host compiler. Which compilers are supported can be found in the [CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements). In general, any modern GCC, ICC or CLANG will work. By default, `nvcc` uses `gcc`/`g++`.
+
+```
+mkdir build
+cmake -B ./build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
+cd build && ninja
+cd ..
+```
+If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
+
+## Windows
+
+You need a modern installation of Visual Studio and a compatible clang-cl and cmake installation (for example as provided in MSYS2). Building was tested on VS 2019, VS 2022 should also work. You need to download SDL2_devel and SDL2_ttf_devel for VC.
+
+You can build using the following commands in the main project directory:
+```
+mkdir build
+
+call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
+
+cmake -B ./build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM="{VS Path}/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe" -DCMAKE_C_COMPILER="{MSYS Path}/mingw64/bin/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
+
+cd build && ninja
+
+cd ..
+```
+Notes:
+- It is important to use either `clang-cl.exe` or `cl.exe` as the C compiler.
+- Run `vcvarsall.bat` only once per terminal.
+- The CUDA compiler `nvcc` uses `cl.exe` as host compiler. If `nvcc` failes to find it you need to make sure add its path to the PATH variable. `cl.exe` can be found in `{VS Path}/VC/Tools/MSVC/{Version}/bin/Hostx64/x64`.
+- `SDL2.dll` and `SDL2_ttf.dll` are automatically copied into the build dir and always need to reside in the same directory as `Luminary.exe`.
 
 # Licences
 
 The licence for this code can be found in the `LICENCE` file.
 
-The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.
-
-The `SDL2` library is used for the realtime mode. Details about its authors and its licence can be found in `Luminary/lib/SDL/SDL.h`.
+The `zlib` library is used for the compression part of the `png` routine. Its licence can be found in the `zlib` repository.
 
 The default font provided by `Luminary` is the font `Tuffy` by Ulrich Thatcher which he placed in the `Public Domain`.
 

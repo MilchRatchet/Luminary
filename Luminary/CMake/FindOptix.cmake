@@ -27,8 +27,8 @@
 #
 
 
-# Adjust the library search path based on the bit-ness of the build.  
-# (i.e. 64: bin64, lib64; 32: bin, lib).  
+# Adjust the library search path based on the bit-ness of the build.
+# (i.e. 64: bin64, lib64; 32: bin, lib).
 # Note that on Mac, the OptiX library is a universal binary, so we
 # only need to look in lib and not lib64 for 64 bit builds.
 if(CMAKE_SIZEOF_VOID_P EQUAL 8 AND NOT APPLE)
@@ -38,7 +38,6 @@ else()
 endif()
 
 #set(OptiX_INSTALL_DIR "" CACHE PATH "Path to OptiX installed location.")
-set(OptiX_INSTALL_DIR "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.4.0")
 
 macro(OPTIX_find_api_library name version)
   find_library(${name}_LIBRARY
@@ -101,8 +100,6 @@ OPTIX_find_api_library(optix ${OptiX_version})
 OPTIX_find_api_library(optixu ${OptiX_Utility_version})
 # None of the advanced examples is using OptiX Prime.
 # OPTIX_find_api_library(optix_prime ${OptiX_Prime_version})
-
-message(STATUS "SOURCE_DIR: ${OptiX_INSTALL_DIR}")
 
 # Include
 find_path(OptiX_INCLUDE

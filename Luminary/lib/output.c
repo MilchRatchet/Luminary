@@ -7,7 +7,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "SDL/SDL.h"
+#include "SDL.h"
 #include "UI/UI.h"
 #include "bench.h"
 #include "buffer.h"

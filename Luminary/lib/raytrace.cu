@@ -9,7 +9,7 @@
 #include <chrono>
 #include <thread>
 
-#include "SDL/SDL.h"
+#include "SDL.h"
 #include "buffer.h"
 #include "config.h"
 #include "cuda/bloom.cuh"

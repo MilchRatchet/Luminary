@@ -12,6 +12,9 @@ octave-workspace
 octave-core
 core
 
+# no batch files
+*.bat
+
 # no rivate config
 config.mk
 RMakefile.priv

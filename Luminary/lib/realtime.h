@@ -1,7 +1,7 @@
 #ifndef REALTIME_H
 #define REALTIME_H
 
-#include "SDL/SDL.h"
+#include "SDL.h"
 #include "utils.h"
 
 struct RealtimeInstance {
