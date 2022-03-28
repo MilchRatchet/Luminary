@@ -47,7 +47,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
 
   uint8_t* head = malloc(header_size);
   fseek(file, offset, SEEK_SET);
-  fread_s(head, header_size, header_size, 1, file);
+  fread(head, header_size, 1, file);
 
   TextureRGBA* textures = malloc(sizeof(TextureRGBA) * count);
   uint64_t data_offset;
@@ -84,7 +84,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
   RGBAF* data = malloc(total_length);
 
   fseek(file, offset + header_size, SEEK_SET);
-  fread_s(data, total_length, total_length, 1, file);
+  fread(data, total_length, 1, file);
 
   for (uint64_t i = 0; i < count; i++) {
     uint8_t* ptr = (uint8_t*) textures[i].data;
@@ -105,7 +105,7 @@ static char** load_strings(FILE* file, uint64_t count, uint64_t offset) {
 
   uint64_t* head = malloc(header_size);
   fseek(file, offset, SEEK_SET);
-  fread_s(head, header_size, header_size, 1, file);
+  fread(head, header_size, 1, file);
 
   char** strings = malloc(sizeof(char*) * count);
 
@@ -118,7 +118,7 @@ static char** load_strings(FILE* file, uint64_t count, uint64_t offset) {
 
   char* data = malloc(total_length);
   fseek(file, offset + header_size, SEEK_SET);
-  fread_s(data, total_length, total_length, 1, file);
+  fread(data, total_length, 1, file);
 
   for (uint64_t i = 0; i < count; i++) {
     strings[i] += (uint64_t) data;
@@ -131,13 +131,12 @@ static char** load_strings(FILE* file, uint64_t count, uint64_t offset) {
 
 RaytraceInstance* load_baked(const char* filename) {
   bench_tic();
-  FILE* file;
-  fopen_s(&file, filename, "rb");
+  FILE* file = fopen(filename, "rb");
 
   assert(file != 0, "Baked file could not be loaded!", 1);
 
   uint64_t* head = malloc(head_size);
-  fread_s(head, head_size, head_size, 1, file);
+  fread(head, head_size, 1, file);
 
   assert(head[0] == magic, "Specified file is not a Luminary Baked File!", 1);
 
@@ -148,35 +147,29 @@ RaytraceInstance* load_baked(const char* filename) {
   RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
 
   fseek(file, head[2], SEEK_SET);
-  fread_s(instance, sizeof(RaytraceInstance), sizeof(RaytraceInstance), 1, file);
+  fread(instance, sizeof(RaytraceInstance), 1, file);
 
   Scene scene = instance->scene_gpu;
 
   scene.triangles = malloc(sizeof(Triangle) * scene.triangles_length);
   fseek(file, head[3], SEEK_SET);
-  fread_s(scene.triangles, sizeof(Triangle) * scene.triangles_length, sizeof(Triangle) * scene.triangles_length, 1, file);
+  fread(scene.triangles, sizeof(Triangle) * scene.triangles_length, 1, file);
 
   scene.traversal_triangles = malloc(sizeof(TraversalTriangle) * scene.triangles_length);
   fseek(file, head[4], SEEK_SET);
-  fread_s(
-    scene.traversal_triangles, sizeof(TraversalTriangle) * scene.triangles_length, sizeof(TraversalTriangle) * scene.triangles_length, 1,
-    file);
+  fread(scene.traversal_triangles, sizeof(TraversalTriangle) * scene.triangles_length, 1, file);
 
   scene.nodes = malloc(sizeof(Node8) * scene.nodes_length);
   fseek(file, head[5], SEEK_SET);
-  fread_s(scene.nodes, sizeof(Node8) * scene.nodes_length, sizeof(Node8) * scene.nodes_length, 1, file);
+  fread(scene.nodes, sizeof(Node8) * scene.nodes_length, 1, file);
 
   scene.triangle_lights = malloc(sizeof(TriangleLight) * scene.triangle_lights_length);
   fseek(file, head[6], SEEK_SET);
-  fread_s(
-    scene.triangle_lights, sizeof(TriangleLight) * scene.triangle_lights_length, sizeof(TriangleLight) * scene.triangle_lights_length, 1,
-    file);
+  fread(scene.triangle_lights, sizeof(TriangleLight) * scene.triangle_lights_length, 1, file);
 
   scene.texture_assignments = malloc(sizeof(TextureAssignment) * scene.materials_length);
   fseek(file, head[7], SEEK_SET);
-  fread_s(
-    scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length, sizeof(TextureAssignment) * scene.materials_length, 1,
-    file);
+  fread(scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length, 1, file);
 
   TextureRGBA* albedo_tex = load_textures(file, instance->albedo_atlas_length, head[8]);
   void* albedo_atlas      = initialize_textures(albedo_tex, instance->albedo_atlas_length);
@@ -278,8 +271,7 @@ static uint64_t serialize_strings(RaytraceInstance* instance, void** ptr) {
 
 void serialize_baked(RaytraceInstance* instance) {
   bench_tic();
-  FILE* file;
-  fopen_s(&file, "generated.baked", "wb");
+  FILE* file = fopen("generated.baked", "wb");
 
   if (!file) {
     error_message("Failed to write baked file. generated.baked could not be opened.");

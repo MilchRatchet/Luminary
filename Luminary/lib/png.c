@@ -153,8 +153,7 @@ int store_as_png(
     memcpy(filtered_image + i * width * bytes_per_pixel + i + 1, image + i * width * bytes_per_pixel, width * bytes_per_pixel);
   }
 
-  FILE* file;
-  fopen_s(&file, filename, "wb");
+  FILE* file = fopen(filename, "wb");
 
   if (!file) {
     puts("png.c: File could not be opened!");
@@ -462,8 +461,7 @@ static void reconstruction_4_uint8_RGB(uint8_t* line, const uint32_t line_length
 TextureRGBA load_texture_from_png(const char* filename) {
   log_message("Loading png file (%s)", filename);
 
-  FILE* file;
-  fopen_s(&file, filename, "rb");
+  FILE* file = fopen(filename, "rb");
 
   if (!file) {
     error_message("File could not be opened!");

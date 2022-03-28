@@ -60,8 +60,7 @@ void write_log() {
   if (!write_logs)
     return;
 
-  FILE* file;
-  fopen_s(&file, "luminary.log", "wb");
+  FILE* file = fopen("luminary.log", "wb");
 
   if (!file) {
     print_error("Could not write log to file.");

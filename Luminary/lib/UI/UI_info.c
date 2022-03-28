@@ -21,27 +21,27 @@ static void rerender_data_text(UI* ui, UIPanel* panel) {
   switch (panel->prop1) {
     case PANEL_INFO_TYPE_INT8: {
       const uint8_t value = *((uint8_t*) panel->data);
-      sprintf_s(buffer, 64, "%d", value);
+      sprintf(buffer, "%u", value);
     } break;
     case PANEL_INFO_TYPE_INT16: {
       const uint16_t value = *((uint16_t*) panel->data);
-      sprintf_s(buffer, 64, "%d", value);
+      sprintf(buffer, "%u", value);
     } break;
     case PANEL_INFO_TYPE_INT32: {
       const uint32_t value = *((uint32_t*) panel->data);
-      sprintf_s(buffer, 64, "%d", value);
+      sprintf(buffer, "%u", value);
     } break;
     case PANEL_INFO_TYPE_INT64: {
       const uint64_t value = *((uint64_t*) panel->data);
-      sprintf_s(buffer, 64, "%ld", value);
+      sprintf(buffer, "%llu", value);
     } break;
     case PANEL_INFO_TYPE_FP32: {
       const float value = *((float*) panel->data);
-      sprintf_s(buffer, 64, "%.2f", value);
+      sprintf(buffer, "%.2f", value);
     } break;
     case PANEL_INFO_TYPE_FP64: {
       const double value = *((double*) panel->data);
-      sprintf_s(buffer, 64, "%.2f", value);
+      sprintf(buffer, "%.2f", value);
     } break;
   }
 

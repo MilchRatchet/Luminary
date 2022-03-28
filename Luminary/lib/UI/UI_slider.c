@@ -41,11 +41,11 @@ void render_UIPanel_slider(UI* ui, UIPanel* panel, int y) {
     char* buffer = malloc(64);
     if (panel->prop5) {
       const int value = *((int*) panel->data);
-      sprintf_s(buffer, 64, "%d", value);
+      sprintf(buffer, "%d", value);
     }
     else {
       const float value = *((float*) panel->data);
-      sprintf_s(buffer, 64, "%.3f", value);
+      sprintf(buffer, "%.3f", value);
     }
     panel->data_text = render_text(ui, buffer);
     free(buffer);

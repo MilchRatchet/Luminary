@@ -78,13 +78,9 @@ You need a modern installation of Visual Studio and a compatible clang-cl and cm
 You can build using the following commands in the main project directory:
 ```
 mkdir build
-
 call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
-
 cmake -B ./build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM="{VS Path}/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe" -DCMAKE_C_COMPILER="{MSYS Path}/mingw64/bin/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
-
 cd build && ninja
-
 cd ..
 ```
 Notes:

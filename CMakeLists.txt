@@ -91,6 +91,10 @@ endif()
 #=============================================================
 # Set C flags
 #=============================================================
+if (WIN32)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -D_CRT_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_DEPRECATE -D_CRT_NONSTDC_NO_WARNINGS")
+endif()
+
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     if (CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         set(CMAKE_C_FLAGS_RELEASE "-O2 -march=native")
