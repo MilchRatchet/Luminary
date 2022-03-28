@@ -4,8 +4,8 @@ CONFIG_EXAMPLE_TEXT := \#ifndef CONFIG_H\n\#define CONFIG_H\n\#define LUMINARY_C
 
 compile-gcc:
 	echo "$(CONFIG_EXAMPLE_TEXT)" > ../Luminary/lib/config.h
-	gcc -c -I../Luminary/lib -I../Luminary/lib/UI -I../Luminary/lib/SDL -march=skylake -O3 -std=c17 -Wall $(SOURCES)
+	gcc -c -I../include -I../include/UI -march=skylake -O3 -std=c17 -Wall $(SOURCES)
 
 compile-clang:
 	echo "$(CONFIG_EXAMPLE_TEXT)" > ../Luminary/lib/config.h
-	clang -c -I../Luminary/lib -I../Luminary/lib/UI -I../Luminary/lib/SDL -march=skylake -O3 -std=c17 -Wall $(SOURCES)
+	clang -c -I../include -I../include/UI -march=skylake -O3 -std=c17 -Wall $(SOURCES)

@@ -57,7 +57,7 @@ Requirements:
 - SSE 4.1 compatible CPU
 - Supported Nvidia GPU (Recommended: Volta or later)
 
-The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name.
+The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed.
 
 ## Linux
 

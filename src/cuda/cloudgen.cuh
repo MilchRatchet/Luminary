@@ -3,7 +3,7 @@
 #include <math.h>
 #include <stdlib.h>
 
-#include <cuda/math.cuh>
+#include <math.cuh>
 
 #include "bench.h"
 #include "buffer.h"

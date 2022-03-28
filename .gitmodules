@@ -1,3 +1,3 @@
 [submodule "Luminary/lib/zlib"]
-	path = Luminary/lib/zlib
+	path = src/zlib
 	url = https://github.com/madler/zlib.git

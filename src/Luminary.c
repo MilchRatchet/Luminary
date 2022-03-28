@@ -2,13 +2,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "lib/baked.h"
-#include "lib/bench.h"
-#include "lib/error.h"
-#include "lib/log.h"
-#include "lib/output.h"
-#include "lib/raytrace.h"
-#include "lib/scene.h"
+#include "baked.h"
+#include "bench.h"
+#include "error.h"
+#include "log.h"
+#include "output.h"
+#include "raytrace.h"
+#include "scene.h"
 
 static int parse_command(const char* arg, char* opt1, char* opt2) {
   int ptr1    = -1;

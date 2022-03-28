@@ -14,7 +14,7 @@ if (DEBUG)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/Luminary/CMake" ${CMAKE_MODULE_PATH})
+set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 
 #=============================================================
 # Configure this path
@@ -25,13 +25,15 @@ find_package(OptiX 7.4 REQUIRED QUIET)
 #=============================================================
 # Set files to compile
 #=============================================================
-file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/zlib/*.c" "${CMAKE_SOURCE_DIR}/Luminary/lib/UI/*.c")
-file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/Luminary/lib/*.cu")
+file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
+file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
 
 #=============================================================
 # Set include directories
 #=============================================================
-include_directories("${CMAKE_SOURCE_DIR}/Luminary/lib")
+include_directories("${CMAKE_SOURCE_DIR}/include")
+include_directories("${CMAKE_SOURCE_DIR}/include/UI")
+include_directories("${CMAKE_SOURCE_DIR}/src/cuda")
 include_directories("${OptiX_INCLUDE}")
 
 #=============================================================
@@ -160,11 +162,11 @@ if(WIN32)
     add_custom_command(TARGET Luminary POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${SDL2_LIBRARIES_DIR}/SDL2.dll"
         "${SDL2_TTF_LIBRARIES_DIR}/SDL2_ttf.dll"
-        "${CMAKE_SOURCE_DIR}/Luminary/lib/UI/LuminaryFont.ttf"
+        "${CMAKE_SOURCE_DIR}/LuminaryFont.ttf"
         ${CMAKE_BINARY_DIR})
 else()
     add_custom_command(TARGET Luminary POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/Luminary/lib/UI/LuminaryFont.ttf"
+        "${CMAKE_SOURCE_DIR}/LuminaryFont.ttf"
         ${CMAKE_BINARY_DIR})
 endif()
 
@@ -201,4 +203,4 @@ else()
     message(SEND_ERROR "Failed to find git.")
 endif()
 
-configure_file("${CMAKE_SOURCE_DIR}/config.h.in" "${CMAKE_SOURCE_DIR}/Luminary/lib/config.h")
+configure_file("${CMAKE_SOURCE_DIR}/config.h.in" "${CMAKE_SOURCE_DIR}/include/config.h")
