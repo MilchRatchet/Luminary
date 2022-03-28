@@ -686,7 +686,7 @@ RaytraceInstance* load_scene(const char* filename) {
   Scene scene     = get_default_scene();
   General general = get_default_settings();
 
-  strncpy_s(general.output_path, LINE_SIZE, "output.png", 11);
+  strcpy(general.output_path, "output.png");
 
   Wavefront_Content content = create_wavefront_content();
 
@@ -756,9 +756,8 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
   General general = get_default_settings();
 
   general.mesh_files[0] = malloc(LINE_SIZE);
-  strcpy_s(general.mesh_files[0], LINE_SIZE, filename);
-
-  strncpy_s(general.output_path, LINE_SIZE, "output.png", 11);
+  strcpy(general.mesh_files[0], filename);
+  strcpy(general.output_path, "output.png");
 
   Wavefront_Content content = create_wavefront_content();
 
