@@ -2,8 +2,15 @@
 
 project ("Luminary" LANGUAGES CUDA C)
 
+if (UNIX)
+  set(CMAKE_THREAD_LIBS_INIT "-lpthread")
+  set(CMAKE_HAVE_THREADS_LIBRARY 1)
+  set(CMAKE_USE_WIN32_THREADS_INIT 0)
+  set(CMAKE_USE_PTHREADS_INIT 1)
+  set(THREADS_PREFER_PTHREAD_FLAG ON)
+endif()
 
-set(CMAKE_C_STANDARD 17)
+set(CMAKE_C_STANDARD 11)
 
 option(DEBUG "Debug Mode" OFF)
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
@@ -20,7 +27,7 @@ set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 # Configure this path
 #=============================================================
 find_package(CUDAToolkit 11.6 REQUIRED QUIET)
-find_package(OptiX 7.4 REQUIRED QUIET)
+find_package(Optix 7.4 REQUIRED QUIET)
 
 #=============================================================
 # Set files to compile
@@ -39,30 +46,44 @@ include_directories("${OptiX_INCLUDE}")
 #=============================================================
 # SDL2
 #=============================================================
-if (DEFINED SDL2_DIR)
-    set(SDL2_INCLUDE_DIR "${SDL2_DIR}/include")
-    set(SDL2_LIBRARIES_DIR "${SDL2_DIR}/lib/x64")
+if(WIN32)
+  if (DEFINED SDL2_DIR)
+      set(SDL2_INCLUDE_DIRS "${SDL2_DIR}/include")
+      set(SDL2_LIBRARIES_DIR "${SDL2_DIR}/lib/x64")
+  else()
+      find_package(SDL2 QUIET)
+      if (SDL2_FOUND)
+      else()
+          message(FATAL_ERROR "Could not find SDL2. Specify the directory using -DSDL2_DIR")
+      endif()
+  endif()
 else()
-    find_package(SDL2 QUIET)
-    if (SDL2_FOUND)
+    find_package(SDL2 REQUIRED QUIET)
+endif()
+
+if(WIN32)
+    if(DEFINED SDL2_TTF_DIR)
+        set(SDL2_TTF_INCLUDE_DIRS "${SDL2_TTF_DIR}/include")
+        set(SDL2_TTF_LIBRARIES_DIR "${SDL2_TTF_DIR}/lib/x64")
     else()
-        message(FATAL_ERROR "Could not find SDL2. Specify the directory using -DSDL2_DIR")
+        message(FATAL_ERROR "Could not find SDL2_ttf. Specify the directory using -DSDL2_TTF_DIR")
     endif()
-endif()
-
-if (DEFINED SDL2_TTF_DIR)
-    set(SDL2_TTF_INCLUDE_DIR "${SDL2_TTF_DIR}/include")
-    set(SDL2_TTF_LIBRARIES_DIR "${SDL2_TTF_DIR}/lib/x64")
+elseif(UNIX)
+    set(SDL2_TTF_INCLUDE_DIRS "${SDL2_INCLUDE_DIRS}")
+    set(SDL2_TTF_LIBRARIES -lSDL2_ttf)
 else()
-    message(FATAL_ERROR "Could not find SDL2_ttf.")
+    message(FATAL_ERROR "No handling for SDL2_ttf for the current OS.")
 endif()
 
-include_directories(${SDL2_INCLUDE_DIR})
-link_directories(${SDL2_LIBRARIES_DIR})
-include_directories(${SDL2_TTF_INCLUDE_DIR})
-link_directories(${SDL2_TTF_LIBRARIES_DIR})
-set(SDL2_LIBRARIES "SDL2")
-set(SDL2_TTF_LIBRARIES "SDL2_ttf")
+include_directories(${SDL2_INCLUDE_DIRS})
+include_directories(${SDL2_TTF_INCLUDE_DIRS})
+
+if (WIN32)
+  link_directories(${SDL2_LIBRARIES_DIR})
+  link_directories(${SDL2_TTF_LIBRARIES_DIR})
+  set(SDL2_LIBRARIES "SDL2")
+  set(SDL2_TTF_LIBRARIES "SDL2_ttf")
+endif()
 
 
 #=============================================================
@@ -121,10 +142,15 @@ message("CUDA Toolkit Include:        ${CUDAToolkit_INCLUDE_DIR}")
 message("CUDA Toolkit Libraries:      ${CUDAToolkit_LIBRARY_DIR}")
 message("CUDA Toolkit NVCC:           ${CUDAToolkit_NVCC_EXECUTABLE}")
 message("Optix Include:               ${OptiX_INCLUDE}")
-message("SDL2 Include:                ${SDL2_INCLUDE_DIR}")
-message("SDL2 Libraries:              ${SDL2_LIBRARIES_DIR}")
-message("SDL2_TTF Include:            ${SDL2_TTF_INCLUDE_DIR}")
-message("SDL2_TTF Libraries:          ${SDL2_TTF_LIBRARIES_DIR}")
+if (WIN32)
+    message("SDL2 Include:                ${SDL2_INCLUDE_DIRS}")
+    message("SDL2 Libraries:              ${SDL2_LIBRARIES_DIR}")
+    message("SDL2_TTF Include:            ${SDL2_TTF_INCLUDE_DIRS}")
+    message("SDL2_TTF Libraries:          ${SDL2_TTF_LIBRARIES_DIR}")
+else()
+    message("SDL2 Include:                ${SDL2_INCLUDE_DIRS}")
+    message("SDL2 Libraries:              ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES}")
+endif()
 message("=======================================================================")
 #=============================================================
 # Print compile flags
