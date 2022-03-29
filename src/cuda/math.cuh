@@ -172,7 +172,7 @@ __device__ vec3 normalize_vector(vec3 vector) {
   return vector;
 }
 
-__device__ float2 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
+__device__ UV get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
   const vec3 diff   = sub_vector(point, vertex);
   const float d00   = dot_product(edge1, edge1);
   const float d01   = dot_product(edge1, edge2);
@@ -180,19 +180,19 @@ __device__ float2 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge
   const float d20   = dot_product(diff, edge1);
   const float d21   = dot_product(diff, edge2);
   const float denom = 1.0f / (d00 * d11 - d01 * d01);
-  float2 result;
-  result.x = (d11 * d20 - d01 * d21) * denom;
-  result.y = (d00 * d21 - d01 * d20) * denom;
+  UV result;
+  result.u = (d11 * d20 - d01 * d21) * denom;
+  result.v = (d00 * d21 - d01 * d20) * denom;
   return result;
 }
 
 __device__ vec3
-  lerp_normals(const vec3 vertex_normal, const vec3 edge1_normal, const vec3 edge2_normal, const float2 coords, const vec3 face_normal) {
+  lerp_normals(const vec3 vertex_normal, const vec3 edge1_normal, const vec3 edge2_normal, const UV coords, const vec3 face_normal) {
   vec3 result;
 
-  result.x = vertex_normal.x + coords.x * edge1_normal.x + coords.y * edge2_normal.x;
-  result.y = vertex_normal.y + coords.x * edge1_normal.y + coords.y * edge2_normal.y;
-  result.z = vertex_normal.z + coords.x * edge1_normal.z + coords.y * edge2_normal.z;
+  result.x = vertex_normal.x + coords.u * edge1_normal.x + coords.v * edge2_normal.x;
+  result.y = vertex_normal.y + coords.u * edge1_normal.y + coords.v * edge2_normal.y;
+  result.z = vertex_normal.z + coords.u * edge1_normal.z + coords.v * edge2_normal.z;
 
   const float length = get_length(result);
 
@@ -208,11 +208,11 @@ __device__ UV get_UV(const float u, const float v) {
   return result;
 }
 
-__device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV edge2_texture, const float2 coords) {
+__device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV edge2_texture, const UV coords) {
   UV result;
 
-  result.u = vertex_texture.u + coords.x * edge1_texture.u + coords.y * edge2_texture.u;
-  result.v = vertex_texture.v + coords.x * edge1_texture.v + coords.y * edge2_texture.v;
+  result.u = vertex_texture.u + coords.u * edge1_texture.u + coords.v * edge2_texture.u;
+  result.v = vertex_texture.v + coords.u * edge1_texture.v + coords.v * edge2_texture.v;
 
   return result;
 }
@@ -251,15 +251,15 @@ __device__ vec3 sample_ray_from_angles_and_vector(const float theta, const float
   return normalize_vector(result);
 }
 
-__device__ vec3 terminator_fix(vec3 p, vec3 a, vec3 edge1, vec3 edge2, vec3 na, vec3 n_edge1, vec3 n_edge2, const float2 coords) {
+__device__ vec3 terminator_fix(vec3 p, vec3 a, vec3 edge1, vec3 edge2, vec3 na, vec3 n_edge1, vec3 n_edge2, const UV coords) {
   const vec3 b  = add_vector(a, edge1);
   const vec3 c  = add_vector(a, edge2);
   const vec3 nb = add_vector(na, n_edge1);
   const vec3 nc = add_vector(na, n_edge2);
 
-  const float bary_u = 1.0f - coords.y - coords.x;
-  const float bary_v = coords.x;
-  const float bary_w = coords.y;
+  const float bary_u = 1.0f - coords.v - coords.u;
+  const float bary_v = coords.u;
+  const float bary_w = coords.v;
 
   vec3 u = sub_vector(p, a);
   vec3 v = sub_vector(p, b);
@@ -869,6 +869,27 @@ __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, con
 
   const vec3 q  = cross_product(s, triangle.edge1);
   const float v = f * dot_product(ray, q);
+
+  if (v < 0.0f || u < 0.0f || u + v > 1.0f)
+    return FLT_MAX;
+
+  const float t = f * dot_product(triangle.edge2, q);
+
+  return __fslctf(t, FLT_MAX, t);
+}
+
+__device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, const vec3 origin, const vec3 ray, UV& uv) {
+  const vec3 h  = cross_product(ray, triangle.edge2);
+  const float a = dot_product(triangle.edge1, h);
+
+  const float f = 1.0f / a;
+  const vec3 s  = sub_vector(origin, triangle.vertex);
+  const float u = f * dot_product(s, h);
+
+  const vec3 q  = cross_product(s, triangle.edge1);
+  const float v = f * dot_product(ray, q);
+
+  uv = get_UV(u, v);
 
   if (v < 0.0f || u < 0.0f || u + v > 1.0f)
     return FLT_MAX;

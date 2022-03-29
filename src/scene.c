@@ -110,6 +110,14 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 6866939734539981382u:
       sscanf(value, "%d\n", &material->fresnel);
       break;
+    /* BVHALPHA */
+    case 4704098099231479362u:
+      sscanf(value, "%d\n", &material->bvh_alpha_cutoff);
+      break;
+    /* ALPHACUT */
+    case 6076837219871509569u:
+      sscanf(value, "%f\n", &material->alpha_cutoff);
+      break;
     default:
       error_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
       break;
@@ -172,10 +180,6 @@ static void parse_camera_settings(Camera* camera, char* line) {
     /* TONEMAP_ */
     case 6868061231871053652u:
       sscanf(value, "%d\n", &camera->tonemap);
-      break;
-    /* ALPHACUT */
-    case 6076837219871509569u:
-      sscanf(value, "%f\n", &camera->alpha_cutoff);
       break;
     /* FILTER__ */
     case 6872302014111172934u:
@@ -493,6 +497,8 @@ static Scene get_default_scene() {
   scene.material.default_material.b = 1.0f;
   scene.material.fresnel            = FDEZ_AGUERA;
   scene.material.diffuse            = LAMBERTIAN;
+  scene.material.bvh_alpha_cutoff   = 0;
+  scene.material.alpha_cutoff       = 0.0f;
 
   scene.camera.pos.x                 = 0.0f;
   scene.camera.pos.y                 = 0.0f;
@@ -509,7 +515,6 @@ static Scene get_default_scene() {
   scene.camera.bloom_strength        = 1.0f;
   scene.camera.bloom_threshold       = 1.0f;
   scene.camera.dithering             = 1;
-  scene.camera.alpha_cutoff          = 0.0f;
   scene.camera.far_clip_distance     = 50000.0f;
   scene.camera.tonemap               = TONEMAP_ACES;
   scene.camera.filter                = FILTER_NONE;
@@ -643,20 +648,22 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
 
   sort_traversal_elements(&scene->nodes, scene->nodes_length, &scene->triangles, scene->triangles_length);
 
+  scene->materials_length    = content.materials_length;
+  scene->texture_assignments = get_texture_assignments(content);
+
   scene->traversal_triangles = malloc(sizeof(TraversalTriangle) * scene->triangles_length);
 
   for (unsigned int i = 0; i < scene->triangles_length; i++) {
-    Triangle triangle    = scene->triangles[i];
-    TraversalTriangle tt = {
-      .vertex = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
-      .edge1  = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
-      .edge2  = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z}};
+    const Triangle triangle   = scene->triangles[i];
+    const uint32_t albedo_tex = scene->texture_assignments[triangle.object_maps].albedo_map;
+    TraversalTriangle tt      = {
+           .vertex     = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
+           .edge1      = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
+           .edge2      = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z},
+           .albedo_tex = albedo_tex};
     scene->traversal_triangles[i] = tt;
     scene->triangles[i]           = triangle;
   }
-
-  scene->materials_length    = content.materials_length;
-  scene->texture_assignments = get_texture_assignments(content);
 }
 
 RaytraceInstance* load_scene(const char* filename) {
@@ -858,8 +865,6 @@ void serialize_scene(RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CAMERA TONEMAP_ %d\n", instance->scene_gpu.camera.tonemap);
   fputs(line, file);
-  sprintf(line, "CAMERA ALPHACUT %f\n", instance->scene_gpu.camera.alpha_cutoff);
-  fputs(line, file);
   sprintf(line, "CAMERA AUTOEXP_ %d\n", instance->scene_gpu.camera.auto_exposure);
   fputs(line, file);
   sprintf(line, "CAMERA FILTER__ %d\n", instance->scene_gpu.camera.filter);
@@ -879,6 +884,10 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf(line, "MATERIAL DIFFUSE_ %d\n", instance->scene_gpu.material.diffuse);
   fputs(line, file);
   sprintf(line, "MATERIAL FRESNEL_ %d\n", instance->scene_gpu.material.fresnel);
+  fputs(line, file);
+  sprintf(line, "MATERIAL BVHALPHA %d\n", instance->scene_gpu.material.bvh_alpha_cutoff);
+  fputs(line, file);
+  sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene_gpu.material.alpha_cutoff);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");

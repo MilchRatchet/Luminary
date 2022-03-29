@@ -71,7 +71,7 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 8;
+  tab.panel_count = 10;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -80,12 +80,14 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Renderer\nMaterials\nExport");
   panels[i++] = create_check(ui, "Lights", &(instance->scene_gpu.material.lights_active), 1);
-  panels[i++] = create_dropdown(ui, "Diffuse BRDF", &(instance->scene_gpu.material.diffuse), 1, 2, "Lambertian\0Frostbite-Disney", 3);
+  panels[i++] = create_check(ui, "BVH Alpha Cutoff", &(instance->scene_gpu.material.bvh_alpha_cutoff), 1);
+  panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene_gpu.material.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_dropdown(ui, "Diffuse BRDF", &(instance->scene_gpu.material.diffuse), 1, 2, "Lambertian\0Frostbite-Disney", 5);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->scene_gpu.material.default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->scene_gpu.material.default_material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] =
     create_slider(ui, "Default Light Intensity", &(instance->scene_gpu.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene_gpu.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 6);
+  panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene_gpu.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 8);
 
   tab.panels = panels;
 
@@ -137,7 +139,7 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
 
   tab.count       = 1;
   tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 17;
+  tab.panel_count = 16;
 
   UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
 
@@ -155,7 +157,6 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Aperture Size", &(instance->scene_gpu.camera.aperture_size), 1, 0.0005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Focal Length", &(instance->scene_gpu.camera.focal_length), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Far Clip Distance", &(instance->scene_gpu.camera.far_clip_distance), 1, 0.05f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene_gpu.camera.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Camera Speed", &(instance->scene_gpu.camera.wasd_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Mouse Sensitivity", &(instance->scene_gpu.camera.mouse_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene_gpu.camera.smooth_movement), 0);

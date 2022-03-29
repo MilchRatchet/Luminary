@@ -38,7 +38,7 @@ __device__ unsigned char get_8bit(const unsigned int input, const unsigned int b
     stack_ptr++;                                      \
   }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
+__device__ void traverse_bvh(const bool check_alpha) {
   const uint16_t trace_task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   uint16_t offset                 = 0;
 
@@ -317,11 +317,37 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
 
       const int triangle_index = __bfind(triangle_task.y);
 
-      const float d = bvh_triangle_intersection(load_traversal_triangle(triangle_index + triangle_task.x), origin, ray);
+      const TraversalTriangle triangle = load_traversal_triangle(triangle_index + triangle_task.x);
 
-      if (d < depth) {
-        depth  = d;
-        hit_id = triangle_index + triangle_task.x;
+      if (check_alpha) {
+        UV coords;
+        const float d = bvh_triangle_intersection_uv(triangle, origin, ray, coords);
+
+        if (d < depth) {
+          bool opaque = true;
+
+          if (triangle.albedo_tex) {
+            const UV tex_coords = load_triangle_tex_coords(triangle_index + triangle_task.x, coords);
+            const float4 albedo = tex2D<float4>(device.albedo_atlas[triangle.albedo_tex], tex_coords.u, 1.0f - tex_coords.v);
+
+            if (albedo.w <= device_scene.material.alpha_cutoff) {
+              opaque = false;
+            }
+          }
+
+          if (opaque) {
+            depth  = d;
+            hit_id = triangle_index + triangle_task.x;
+          }
+        }
+      }
+      else {
+        const float d = bvh_triangle_intersection(triangle, origin, ray);
+
+        if (d < depth) {
+          depth  = d;
+          hit_id = triangle_index + triangle_task.x;
+        }
       }
 
       triangle_task.y ^= (1 << triangle_index);
@@ -351,6 +377,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       }
     }
   }
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
+  traverse_bvh(false);
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks_alpha_cutoff() {
+  traverse_bvh(true);
 }
 
 #endif /* CU_BVH_H */

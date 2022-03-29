@@ -84,7 +84,6 @@ struct Camera {
   float aperture_size;
   float exposure;
   int auto_exposure;
-  float alpha_cutoff;
   float far_clip_distance;
   int tonemap;
   int filter;
@@ -212,6 +211,8 @@ struct GlobalMaterial {
   MaterialFresnel fresnel;
   MaterialDiffuse diffuse;
   int lights_active;
+  int bvh_alpha_cutoff;
+  float alpha_cutoff;
 } typedef GlobalMaterial;
 
 struct Scene {

@@ -30,7 +30,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
-    const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+    const UV coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
     vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
     vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
@@ -105,7 +105,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       emission = scale_color(emission, intensity);
     }
 
-    if (albedo.a < device_scene.camera.alpha_cutoff)
+    if (albedo.a < device_scene.material.alpha_cutoff)
       albedo.a = 0.0f;
 
     RGBF record = device_records[pixel];
@@ -237,7 +237,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
       vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
-      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+      const UV coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
       UV vertex_texture = get_UV(t5.z, t5.w);
       UV edge1_texture  = get_UV(t6.x, t6.y);
@@ -285,7 +285,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
-      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+      const UV coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
       vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
       vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
@@ -318,11 +318,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
       vec3 edge2  = get_vector(t2.z, t2.w, t3);
 
-      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+      const UV coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
-      int a = fabsf(coords.x + coords.y - 1.0f) < 0.001f;
-      int b = fabsf(coords.x) < 0.001f;
-      int c = fabsf(coords.y) < 0.001f;
+      int a = fabsf(coords.u + coords.v - 1.0f) < 0.001f;
+      int b = fabsf(coords.u) < 0.001f;
+      int c = fabsf(coords.v) < 0.001f;
 
       float light = (a || b || c) ? 1.0f : 0.0f;
 

@@ -66,7 +66,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     RGBF emission         = get_color(device_scene.toy.emission.r, device_scene.toy.emission.g, device_scene.toy.emission.b);
     emission              = scale_color(emission, intensity);
 
-    if (albedo.a < device_scene.camera.alpha_cutoff)
+    if (albedo.a < device_scene.material.alpha_cutoff)
       albedo.a = 0.0f;
 
     RGBF record = device_records[pixel];

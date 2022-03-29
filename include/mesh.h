@@ -30,7 +30,7 @@ struct TraversalTriangle {
   vec3 vertex;
   vec3 edge1;
   vec3 edge2;
-  float padding0;
+  uint32_t albedo_tex;
   float padding1;
   float padding2;
 } typedef TraversalTriangle;

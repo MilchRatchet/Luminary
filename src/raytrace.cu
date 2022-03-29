@@ -24,13 +24,13 @@
 #include "cuda/random.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/utils.cuh"
-#include "utils.h"
 #include "image.h"
 #include "log.h"
 #include "mesh.h"
 #include "primitives.h"
 #include "raytrace.h"
 #include "scene.h"
+#include "utils.h"
 
 //---------------------------------
 // Path Tracing
@@ -536,7 +536,12 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   if (type != TYPE_CAMERA)
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->scene_gpu.material.bvh_alpha_cutoff) {
+    process_trace_tasks_alpha_cutoff<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+  else {
+    process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
   process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   if (type != TYPE_LIGHT) {
@@ -563,7 +568,12 @@ static void execute_debug_kernels(RaytraceInstance* instance, int type) {
   bind_type(instance, type);
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->scene_gpu.material.bvh_alpha_cutoff) {
+    process_trace_tasks_alpha_cutoff<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+  else {
+    process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

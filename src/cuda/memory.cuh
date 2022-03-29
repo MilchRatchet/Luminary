@@ -249,14 +249,27 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   const float4* ptr = (float4*) (device_scene.traversal_triangles + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
-  const float v3    = __ldg((float*) (ptr + 2));
+  const float2 v3   = __ldg((float2*) (ptr + 2));
 
   TraversalTriangle triangle;
-  triangle.vertex = get_vector(v1.x, v1.y, v1.z);
-  triangle.edge1  = get_vector(v1.w, v2.x, v2.y);
-  triangle.edge2  = get_vector(v2.z, v2.w, v3);
+  triangle.vertex     = get_vector(v1.x, v1.y, v1.z);
+  triangle.edge1      = get_vector(v1.w, v2.x, v2.y);
+  triangle.edge2      = get_vector(v2.z, v2.w, v3.x);
+  triangle.albedo_tex = __float_as_uint(v3.y);
 
   return triangle;
+}
+
+__device__ UV load_triangle_tex_coords(const int offset, const UV coords) {
+  const float4* ptr      = (float4*) (device_scene.triangles + offset);
+  const float2 bytes0x48 = __ldg(((float2*) (ptr + 4)) + 1);
+  const float4 bytes0x50 = __ldg(ptr + 5);
+
+  const UV vertex_texture = get_UV(bytes0x48.x, bytes0x48.y);
+  const UV edge1_texture  = get_UV(bytes0x50.x, bytes0x50.y);
+  const UV edge2_texture  = get_UV(bytes0x50.z, bytes0x50.w);
+
+  return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 }
 
 __device__ TriangleLight load_triangle_light(const int offset) {

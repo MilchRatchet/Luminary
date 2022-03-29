@@ -139,7 +139,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     float depth     = device_scene.camera.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
 
-    if (is_first_ray()) {
+    if (is_first_ray() && !device_scene.material.bvh_alpha_cutoff) {
       const uint32_t t_id = device.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
 
       if (t_id <= TRIANGLE_ID_LIMIT) {
