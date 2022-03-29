@@ -6,9 +6,9 @@
 #include <string.h>
 
 #include "bench.h"
-#include "error.h"
 #include "log.h"
 #include "texture.h"
+#include "utils.h"
 #include "zlib/zlib.h"
 
 static inline void write_int_big_endian(uint8_t* buffer, uint32_t value) {

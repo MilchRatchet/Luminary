@@ -8,7 +8,7 @@
 #include "log.h"
 #include "utils.h"
 
-static float random() {
+static float random_float() {
   return (float) (((double) rand()) / RAND_MAX);
 }
 
@@ -44,10 +44,10 @@ void generate_stars(RaytraceInstance* instance) {
 
   for (int i = 0; i < count; i++) {
     Star s = {
-      .altitude  = -PI * 0.5f + PI * (1.0f - sqrtf(random())),
-      .azimuth   = 2.0f * PI * random(),
-      .radius    = 0.00005f + 0.001f * (1.0f - sqrtf(random())),
-      .intensity = 0.01f * (0.1f + 0.9f * (1.0f - sqrtf(random())))};
+      .altitude  = -PI * 0.5f + PI * (1.0f - sqrtf(random_float())),
+      .azimuth   = 2.0f * PI * random_float(),
+      .radius    = 0.00005f + 0.001f * (1.0f - sqrtf(random_float())),
+      .intensity = 0.01f * (0.1f + 0.9f * (1.0f - sqrtf(random_float())))};
 
     int x = (int) (s.azimuth * 10.0f);
     int y = (int) ((s.altitude + PI * 0.5f) * 10.0f);

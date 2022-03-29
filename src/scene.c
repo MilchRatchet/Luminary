@@ -6,12 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "error.h"
 #include "light.h"
 #include "log.h"
 #include "png.h"
 #include "raytrace.h"
 #include "stars.h"
+#include "utils.h"
 #include "wavefront.h"
 
 static const int LINE_SIZE       = 4096;

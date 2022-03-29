@@ -65,11 +65,11 @@ You need a `nvcc` compatible host compiler. Which compilers are supported can be
 
 ```
 mkdir build
-cmake -B ./build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
-cd build && ninja
-cd ..
+cmake -B ./build -S . -DCMAKE_BUILD_TYPE=Release -DOptiX_INSTALL_DIR="{OptiX Path}"
+cd build
+make
 ```
-If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
+Note that there is a bug in a version of GCC 11. If `nvcc` happens to use that version of G++ 11, the build will fail. Select a different compiler in that case using for example`-DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++-10`. If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
 
 ## Windows
 
@@ -81,7 +81,6 @@ mkdir build
 call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
 cmake -B ./build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM="{VS Path}/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe" -DCMAKE_C_COMPILER="{MSYS Path}/mingw64/bin/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
 cd build && ninja
-cd ..
 ```
 Notes:
 - It is important to use either `clang-cl.exe` or `cl.exe` as the C compiler.

@@ -6,8 +6,8 @@
 #include "bench.h"
 #include "buffer.h"
 #include "denoiser.h"
-#include "error.h"
 #include "log.h"
+#include "utils.h"
 
 #define OPTIX_CHECK(call)                                                \
   {                                                                      \

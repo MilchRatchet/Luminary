@@ -8,6 +8,7 @@
 #endif
 
 #include "bvh.h"
+#include "log.h"
 #include "mesh.h"
 #include "primitives.h"
 #include "texture.h"
@@ -290,6 +291,29 @@ struct RaytraceInstance {
 #ifndef max
 #define max(a, b) (((a) > (b)) ? (a) : (b))
 #endif /* max */
+
+#undef assert
+#define assert(ans, message, _abort)  \
+  {                                   \
+    if (!(ans)) {                     \
+      if (_abort) {                   \
+        crash_message("%s", message); \
+      }                               \
+      else {                          \
+        error_message("%s", message); \
+      }                               \
+    }                                 \
+  }
+
+static inline void* ___s_realloc(void* ptr, const size_t size) {
+  if (size == 0)
+    return (void*) 0;
+  void* new_ptr = realloc(ptr, size);
+  assert((unsigned long long) new_ptr, "Reallocation failed!", 1);
+  return new_ptr;
+}
+
+#define safe_realloc(ptr, size) ___s_realloc((ptr), (size))
 
 #define clamp(value, low, high) \
   { (value) = min((high), max((value), (low))); }

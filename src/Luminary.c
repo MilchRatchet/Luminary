@@ -4,11 +4,11 @@
 
 #include "baked.h"
 #include "bench.h"
-#include "error.h"
 #include "log.h"
 #include "output.h"
 #include "raytrace.h"
 #include "scene.h"
+#include "utils.h"
 
 static int parse_command(const char* arg, char* opt1, char* opt2) {
   int ptr1    = -1;

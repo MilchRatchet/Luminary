@@ -24,7 +24,7 @@
 #include "cuda/random.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/utils.cuh"
-#include "error.h"
+#include "utils.h"
 #include "image.h"
 #include "log.h"
 #include "mesh.h"

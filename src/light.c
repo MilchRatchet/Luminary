@@ -5,7 +5,6 @@
 #include <stdlib.h>
 
 #include "bench.h"
-#include "error.h"
 #include "texture.h"
 #include "utils.h"
 

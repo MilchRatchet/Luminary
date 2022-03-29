@@ -8,7 +8,6 @@
 #include <string.h>
 
 #include "bench.h"
-#include "error.h"
 #include "mesh.h"
 #include "primitives.h"
 #include "utils.h"

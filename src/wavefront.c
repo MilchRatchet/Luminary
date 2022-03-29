@@ -8,7 +8,6 @@
 #include <string.h>
 
 #include "bench.h"
-#include "error.h"
 #include "log.h"
 #include "png.h"
 #include "texture.h"

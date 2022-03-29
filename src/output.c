@@ -88,7 +88,7 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
   struct tm timeinfo;
 
   time(&rawtime);
-  localtime_s(&timeinfo, &rawtime);
+  timeinfo = *localtime(&rawtime);
   strftime(timestring, 4096, "%Y-%m-%d-%H-%M-%S", &timeinfo);
 
   sprintf(filename, "Snap-%s.png", timestring);

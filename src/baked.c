@@ -6,9 +6,9 @@
 #include "bench.h"
 #include "buffer.h"
 #include "config.h"
-#include "error.h"
 #include "raytrace.h"
 #include "stars.h"
+#include "utils.h"
 
 #define head_size 0x68
 #define magic 4919420911629456716ul
