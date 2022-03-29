@@ -57,7 +57,11 @@ Requirements:
 - SSE 4.1 compatible CPU
 - Supported Nvidia GPU (Recommended: Volta or later)
 
-The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed.
+The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed. CMake Options:
+| Option                     | Description
+| ------------------------------| --------------------------------------------
+| -DDEBUG=ON/OFF                | Enable Debug Mode. Default: OFF
+| -DNATIVE_CUDA_ARCH=ON/OFF     | Enable that the CUDA architecture is based on the installed GPU. This is overwritten if `-DCMAKE_CUDA_ARCHITECTURE` is set. Default: ON
 
 ## Linux
 
@@ -65,7 +69,7 @@ You need a `nvcc` compatible host compiler. Which compilers are supported can be
 
 ```
 mkdir build
-cmake -B ./build -S . -DCMAKE_BUILD_TYPE=Release -DOptiX_INSTALL_DIR="{OptiX Path}"
+cmake -B ./build -S . -DOptiX_INSTALL_DIR="{OptiX Path}"
 cd build
 make
 ```
@@ -79,7 +83,7 @@ You can build using the following commands in the main project directory:
 ```
 mkdir build
 call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
-cmake -B ./build -S . -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_MAKE_PROGRAM="{VS Path}/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe" -DCMAKE_C_COMPILER="{MSYS Path}/mingw64/bin/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
+cmake -B ./build -S . -G Ninja -DCMAKE_MAKE_PROGRAM="{VS Path}/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe" -DCMAKE_C_COMPILER="{MSYS Path}/mingw64/bin/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
 cd build && ninja
 ```
 Notes:
