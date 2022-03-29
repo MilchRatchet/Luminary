@@ -3,7 +3,8 @@
 
 #include <stdlib.h>
 
-#if defined(__MSVC__) || defined(__CUDACC__)
+#if defined(__GNUC__) || defined(__clang__)
+#elif defined(__MSVC__) || defined(__CUDACC__)
 #include <intrin.h>
 #endif
 
@@ -329,7 +330,7 @@ static inline void* ___s_realloc(void* ptr, const size_t size) {
 
 #if defined(__GNUC__) || defined(__clang__)
 #define bsr(input, output) \
-  { output = 32 - __builtin_clz(input | 1) }
+  { output = 32 - __builtin_clz(input | 1); }
 #elif defined(__MSVC__)
 #define bsr(input, output) _BitScanReverse((DWORD*) &output, (DWORD) input | 1);
 #elif defined(__CUDACC__)
