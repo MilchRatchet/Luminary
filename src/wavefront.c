@@ -134,21 +134,21 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
     else if (line[0] == 'm' && line[1] == 'a' && line[2] == 'p' && line[3] == '_') {
       if (line[4] == 'K' && line[5] == 'd') {
         ensure_capacity(content.albedo_maps, albedo_maps_count, content.albedo_maps_length, sizeof(TextureRGBA));
-        sscanf(line, "%*s %s\n", path);
+        sscanf(line, "%*s %[^\n]\n", path);
         content.albedo_maps[albedo_maps_count]                = load_texture_from_png(path);
         content.materials[materials_count - 1].albedo_texture = albedo_maps_count;
         albedo_maps_count++;
       }
       else if (line[4] == 'K' && line[5] == 'e') {
         ensure_capacity(content.illuminance_maps, illuminance_maps_count, content.illuminance_maps_length, sizeof(TextureRGBA));
-        sscanf(line, "%*s %s\n", path);
+        sscanf(line, "%*s %[^\n]\n", path);
         content.illuminance_maps[illuminance_maps_count]           = load_texture_from_png(path);
         content.materials[materials_count - 1].illuminance_texture = illuminance_maps_count;
         illuminance_maps_count++;
       }
       else if (line[4] == 'N' && line[5] == 's') {
         ensure_capacity(content.material_maps, material_maps_count, content.material_maps_length, sizeof(TextureRGBA));
-        sscanf(line, "%*s %s\n", path);
+        sscanf(line, "%*s %[^\n]\n", path);
         content.material_maps[material_maps_count]              = load_texture_from_png(path);
         content.materials[materials_count - 1].material_texture = material_maps_count;
         material_maps_count++;
@@ -412,7 +412,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
       }
     }
     else if (line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i' && line[5] == 'b') {
-      sscanf(line, "%*s %s\n", path);
+      sscanf(line, "%*s %[^\n]\n", path);
       size_t hash = hash_djb2((unsigned char*) path);
 
       int already_loaded = 0;
@@ -430,7 +430,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
       }
     }
     else if (line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
-      sscanf(line, "%*s %s\n", path);
+      sscanf(line, "%*s %[^\n]\n", path);
       size_t hash      = hash_djb2((unsigned char*) path);
       current_material = 0;
       for (int i = 1; i < materials_count; i++) {
