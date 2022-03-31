@@ -62,6 +62,11 @@ Wavefront_Content create_wavefront_content() {
   ((RGBA8*) content.material_maps[0].data)->b = 1;
   ((RGBA8*) content.material_maps[0].data)->a = 0;
 
+  content.texture_list           = malloc(sizeof(Wavefront_TextureList));
+  content.texture_list->textures = malloc(sizeof(Wavefront_TextureInstance) * 16);
+  content.texture_list->count    = 0;
+  content.texture_list->length   = 16;
+
   return content;
 }
 
@@ -85,6 +90,8 @@ void free_wavefront_content(Wavefront_Content content) {
   free(content.albedo_maps);
   free(content.illuminance_maps);
   free(content.material_maps);
+  free(content.texture_list->textures);
+  free(content.texture_list);
 }
 
 static size_t hash_djb2(unsigned char* str) {
@@ -96,6 +103,30 @@ static size_t hash_djb2(unsigned char* str) {
   }
 
   return hash;
+}
+
+/*
+ * @result Index of texture if texture is already present, else 0 (since zero is the NULL texture)
+ */
+static uint16_t find_texture(Wavefront_TextureList* textures, uint32_t hash, Wavefront_TextureInstanceType type) {
+  for (uint32_t i = 0; i < textures->count; i++) {
+    Wavefront_TextureInstance tex = textures->textures[i];
+    if (tex.hash == hash && tex.type == type)
+      return tex.offset;
+  }
+
+  return 0;
+}
+
+static void add_texture(Wavefront_TextureList* textures, uint32_t hash, Wavefront_TextureInstanceType type, uint16_t offset) {
+  if (textures->count == textures->length) {
+    textures->length *= 2;
+    textures->textures = safe_realloc(textures->textures, sizeof(Wavefront_TextureInstance) * textures->length);
+  }
+
+  Wavefront_TextureInstance tex = {.hash = hash, .offset = offset, .type = type};
+
+  textures->textures[textures->count++] = tex;
 }
 
 static void read_materials_file(const char* filename, Wavefront_Content* io_content) {
@@ -135,23 +166,44 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
       if (line[4] == 'K' && line[5] == 'd') {
         ensure_capacity(content.albedo_maps, albedo_maps_count, content.albedo_maps_length, sizeof(TextureRGBA));
         sscanf(line, "%*s %[^\n]\n", path);
-        content.albedo_maps[albedo_maps_count]                = load_texture_from_png(path);
-        content.materials[materials_count - 1].albedo_texture = albedo_maps_count;
-        albedo_maps_count++;
+        const size_t hash = hash_djb2((unsigned char*) path);
+        uint16_t offset   = find_texture(content.texture_list, hash, WF_ALBEDO);
+
+        if (!offset) {
+          offset = albedo_maps_count++;
+          add_texture(content.texture_list, hash, WF_ALBEDO, offset);
+          content.albedo_maps[offset] = load_texture_from_png(path);
+        }
+
+        content.materials[materials_count - 1].albedo_texture = offset;
       }
       else if (line[4] == 'K' && line[5] == 'e') {
         ensure_capacity(content.illuminance_maps, illuminance_maps_count, content.illuminance_maps_length, sizeof(TextureRGBA));
         sscanf(line, "%*s %[^\n]\n", path);
-        content.illuminance_maps[illuminance_maps_count]           = load_texture_from_png(path);
-        content.materials[materials_count - 1].illuminance_texture = illuminance_maps_count;
-        illuminance_maps_count++;
+        const size_t hash = hash_djb2((unsigned char*) path);
+        uint16_t offset   = find_texture(content.texture_list, hash, WF_ILLUMINANCE);
+
+        if (!offset) {
+          offset = illuminance_maps_count++;
+          add_texture(content.texture_list, hash, WF_ILLUMINANCE, offset);
+          content.illuminance_maps[offset] = load_texture_from_png(path);
+        }
+
+        content.materials[materials_count - 1].illuminance_texture = offset;
       }
       else if (line[4] == 'N' && line[5] == 's') {
         ensure_capacity(content.material_maps, material_maps_count, content.material_maps_length, sizeof(TextureRGBA));
         sscanf(line, "%*s %[^\n]\n", path);
-        content.material_maps[material_maps_count]              = load_texture_from_png(path);
-        content.materials[materials_count - 1].material_texture = material_maps_count;
-        material_maps_count++;
+        const size_t hash = hash_djb2((unsigned char*) path);
+        uint16_t offset   = find_texture(content.texture_list, hash, WF_MATERIAL);
+
+        if (!offset) {
+          offset = material_maps_count++;
+          add_texture(content.texture_list, hash, WF_MATERIAL, offset);
+          content.material_maps[offset] = load_texture_from_png(path);
+        }
+
+        content.materials[materials_count - 1].material_texture = offset;
       }
     }
   }
