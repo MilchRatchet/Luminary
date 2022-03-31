@@ -23,6 +23,8 @@
 
 #define MOUSE_SCROLL_SPEED 10
 
+#define TAB_PANEL_DEFAULT_ALLOCATION 128
+
 static size_t compute_scratch_space() {
   size_t val = blur_scratch_needed();
 
@@ -35,11 +37,10 @@ static size_t compute_scratch_space() {
 static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 15;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -61,7 +62,9 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] =
     create_dropdown(ui, "Shading Mode", &(instance->shading_mode), 1, 6, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Wireframe", 14);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -69,11 +72,10 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
 static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 10;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -89,7 +91,9 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
     create_slider(ui, "Default Light Intensity", &(instance->scene_gpu.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene_gpu.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 8);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -97,11 +101,10 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
 static UITab create_general_export_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 5;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -111,7 +114,9 @@ static UITab create_general_export_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_button(ui, "Export Settings", instance, (void (*)(void*)) serialize_scene, 0);
   panels[i++] = create_button(ui, "Export Baked File", instance, (void (*)(void*)) serialize_baked, 0);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -137,11 +142,10 @@ static UITab create_general_panels(UI* ui, RaytraceInstance* instance) {
 static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 16;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -162,7 +166,9 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene_gpu.camera.smooth_movement), 0);
   panels[i++] = create_slider(ui, "Smoothing Factor", &(instance->scene_gpu.camera.smoothing_factor), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -170,11 +176,10 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
 static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 14;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -195,7 +200,9 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Purkinje Blueness", &(instance->scene_gpu.camera.purkinje_kappa1), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Purkinje Brightness", &(instance->scene_gpu.camera.purkinje_kappa2), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -220,11 +227,10 @@ static UITab create_camera_panels(UI* ui, RaytraceInstance* instance) {
 static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 19;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -248,7 +254,9 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Stars Intensity", &(instance->scene_gpu.sky.stars_intensity), 1, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_button(ui, "Generate Stars", instance, (void (*)(void*)) generate_stars, 1);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -256,11 +264,10 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
 static UITab create_sky_atmo_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 6;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -271,7 +278,9 @@ static UITab create_sky_atmo_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Steps", &(instance->scene_gpu.sky.steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Shadow Steps", &(instance->scene_gpu.sky.shadow_steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -279,11 +288,10 @@ static UITab create_sky_atmo_panels(UI* ui, RaytraceInstance* instance) {
 static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 23;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -313,7 +321,9 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Seed", &(instance->scene_gpu.sky.cloud.seed), 0, 0.005f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_button(ui, "Generate Noise Maps", instance, (void (*)(void*)) generate_clouds, 1);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -321,11 +331,10 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
 static UITab create_sky_fog_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 8;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -338,7 +347,9 @@ static UITab create_sky_fog_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Height", &(instance->scene_gpu.fog.height), 1, 0.005f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Height Falloff", &(instance->scene_gpu.fog.falloff), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -365,11 +376,10 @@ static UITab create_sky_panels(UI* ui, RaytraceInstance* instance) {
 static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 15;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -389,7 +399,9 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_check(ui, "Animated", &(instance->scene_gpu.ocean.update), 1);
   panels[i++] = create_slider(ui, "Speed", &(instance->scene_gpu.ocean.speed), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
@@ -397,11 +409,10 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
 static UITab create_toy_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
-  tab.count       = 1;
-  tab.subtabs     = (UITab*) 0;
-  tab.panel_count = 25;
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
 
-  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * tab.panel_count);
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
 
   int i = 0;
 
@@ -431,7 +442,9 @@ static UITab create_toy_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.toy.emission.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Light Intensity", &(instance->scene_gpu.toy.material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
 
-  tab.panels = panels;
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
 
   return tab;
 }
