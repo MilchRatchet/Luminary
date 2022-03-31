@@ -61,7 +61,8 @@ The `LuminaryFont.ttf` file is automatically copied to the build directory and n
 | Option                     | Description
 | ------------------------------| --------------------------------------------
 | -DDEBUG=ON/OFF                | Enable Debug Mode. Default: OFF
-| -DNATIVE_CUDA_ARCH=ON/OFF     | Enable that the CUDA architecture is based on the installed GPU. This is overwritten if `-DCMAKE_CUDA_ARCHITECTURE` is set. Default: ON
+| -DNATIVE_CUDA_ARCH=ON/OFF     | Enable that the CUDA architecture is based on the installed GPU. Default: ON
+| -DSHOW_KERNEL_STATS=ON/OFF    | Enable that CUDA kernel stats are printed at compilation. Default: OFF
 
 ## Linux
 

@@ -14,6 +14,7 @@ set(CMAKE_C_STANDARD 11)
 
 option(DEBUG "Debug Mode" OFF)
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
+option(SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)
 
 set(CMAKE_BUILD_TYPE "Release")
 
@@ -89,7 +90,7 @@ endif()
 #=============================================================
 # Set CUDA flags
 #=============================================================
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --source-in-ptx --ptxas-options=-warn-double-usage --ptxas-options=-v --use_fast_math")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --source-in-ptx --ptxas-options=-warn-double-usage --use_fast_math")
 if(WIN32)
     set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --compiler-options -O2 -fp:fast -arch:AVX2")
     set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Od -fp:fast -arch:AVX2 -g")
@@ -98,18 +99,19 @@ else()
     set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Og -g")
 endif()
 
-if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
-    if (NATIVE_CUDA_ARCH)
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=native")
-        set(CMAKE_CUDA_ARCHITECTURES OFF)
-    else()
-        message(SEND_ERROR "No CUDA Architecture selected. Building for all major archs.")
-        set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=all-major")
-        set(CMAKE_CUDA_ARCHITECTURES OFF)
-    endif()
-else()
-    set(NATIVE_CUDA_ARCH OFF)
+if(SHOW_KERNEL_STATS)
+  set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --ptxas-options=-v")
 endif()
+
+if(NATIVE_CUDA_ARCH)
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=native")
+    set(CMAKE_CUDA_ARCHITECTURES OFF)
+elseif(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+    message(SEND_ERROR "No CUDA Architecture selected. Building for all major archs.")
+    set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -arch=all-major")
+    set(CMAKE_CUDA_ARCHITECTURES OFF)
+endif()
+
 
 #=============================================================
 # Set C flags
@@ -128,9 +130,11 @@ endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     if (CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        set(CMAKE_C_FLAGS_RELEASE "-O2 -march=native")
-        set(CMAKE_C_FLAGS_DEBUG "-Od -g")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4")
+        set(CMAKE_C_FLAGS_RELEASE "/O2 -march=native")
+        set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG")
     elseif(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
         set(CMAKE_C_FLAGS_RELEASE "-O3 -march=native")
         set(CMAKE_C_FLAGS_DEBUG "-Og -g")
     endif()
@@ -189,6 +193,7 @@ message("")
 #=============================================================
 # Executable
 #=============================================================
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 add_executable(Luminary ${cpu_source_files} ${gpu_source_files})
 target_link_libraries(Luminary ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES})
 
@@ -197,11 +202,11 @@ if(WIN32)
         "${SDL2_LIBRARIES_DIR}/SDL2.dll"
         "${SDL2_TTF_LIBRARIES_DIR}/SDL2_ttf.dll"
         "${CMAKE_SOURCE_DIR}/LuminaryFont.ttf"
-        ${CMAKE_BINARY_DIR})
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 else()
     add_custom_command(TARGET Luminary POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/LuminaryFont.ttf"
-        ${CMAKE_BINARY_DIR})
+        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
 #=============================================================
