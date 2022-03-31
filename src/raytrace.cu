@@ -662,7 +662,7 @@ extern "C" void free_outputs(RaytraceInstance* instance) {
   free(instance);
 }
 
-extern "C" void initialize_8bit_frame(RaytraceInstance* instance, const int width, const int height) {
+extern "C" void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height) {
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), width * height);
   update_device_pointers(instance);
 }

@@ -5,13 +5,13 @@
 #include "utils.h"
 
 struct RealtimeInstance {
-  int width;
-  int height;
-  int ld;
+  unsigned int width;
+  unsigned int height;
+  unsigned int ld;
   SDL_Window* window;
   SDL_Surface* window_surface;
   XRGB8* buffer;
-  int gpu_buffer_size;
+  unsigned int gpu_buffer_size;
 } typedef RealtimeInstance;
 
 RealtimeInstance* init_realtime_instance(RaytraceInstance* instance);

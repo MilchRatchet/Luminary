@@ -41,7 +41,7 @@ void handle_mouse_UIPanel_dropdown(UI* ui, UIPanel* panel, int mouse_state, int 
   }
 }
 
-int get_intersection_dropdown(UI* ui, UIPanel* panel, int x, int y) {
+int get_intersection_dropdown(UIPanel* panel, int x, int y) {
   int top    = panel->prop3 * PANEL_HEIGHT + UI_BORDER_SIZE + PANEL_DROPDOWN_BOX_HEIGHT + 5;
   int bottom = top + (panel->prop1) * PANEL_DROPDOWN_BOX_HEIGHT;
   int left   = UI_WIDTH - 10 - panel->prop4 - 5;

@@ -550,7 +550,7 @@ void handle_mouse_UI(UI* ui) {
   if (ui->mouse_flags & MOUSE_DRAGGING_SLIDER) {
     panel = ui->last_panel;
   }
-  else if (ui->dropdown && get_intersection_dropdown(ui, ui->dropdown, x, ui->scroll_pos + y)) {
+  else if (ui->dropdown && get_intersection_dropdown(ui->dropdown, x, ui->scroll_pos + y)) {
     if (ui->mouse_flags & MOUSE_LEFT_BLOCKED) {
       state &= ~SDL_BUTTON_LMASK;
     }
@@ -639,12 +639,12 @@ void render_UI(UI* ui) {
   }
 }
 
-void blit_UI(UI* ui, uint8_t* target, int width, int height) {
+void blit_UI(UI* ui, uint8_t* target, int width) {
   if (!ui->active)
     return;
 
-  blur_background(ui, target, width, height);
-  blit_UI_internal(ui, target, width, height);
+  blur_background(ui, target, width);
+  blit_UI_internal(ui, target, width);
 }
 
 void free_UI(UI* ui) {

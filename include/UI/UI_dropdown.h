@@ -14,7 +14,7 @@
 #define PANEL_DROPDOWN_BOX_HEIGHT 28
 
 void handle_mouse_UIPanel_dropdown(UI* ui, UIPanel* panel, int mouse_state, int x, int y);
-int get_intersection_dropdown(UI* ui, UIPanel* panel, int x, int y);
+int get_intersection_dropdown(UIPanel* panel, int x, int y);
 void render_UIPanel_dropdown(UI* ui, UIPanel* panel, int y);
 void render_dropdown(UI* ui, UIPanel* panel, int offset);
 

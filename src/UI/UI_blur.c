@@ -16,7 +16,7 @@
 #define SHIFT 11
 #define FACTOR 2048
 
-void blur_background(UI* ui, uint8_t* target, int width, int height) {
+void blur_background(UI* ui, uint8_t* target, int width) {
   const int off = 4 * width * ui->y + 4 * ui->x;
   float* temp   = (float*) ui->scratch;
 

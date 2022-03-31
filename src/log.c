@@ -1,5 +1,5 @@
 #ifdef _WIN32
-#include <windows.h>
+#include <Windows.h>
 #endif
 
 #ifdef _WIN32
@@ -111,11 +111,11 @@ static int format_string(const char* format, va_list args) {
   return size;
 }
 
-static void write_to_log_buffer(int size) {
+static void write_to_log_buffer(const size_t size) {
   if (!write_logs)
     return;
 
-  size_t space = log_buffer_size - log_buffer_offset;
+  const size_t space = log_buffer_size - log_buffer_offset;
 
   if (size + 1 > space) {
     manage_log_buffer(size + 1);

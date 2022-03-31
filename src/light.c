@@ -112,7 +112,7 @@ static int contains_illumination(Triangle triangle, TextureRGBA tex) {
     const float e1   = max(min(a1 + v * m1, max_e_1), min_e_1);
     const float e2   = max(min(a2 + v * m2, max_e_2), min_e_2);
     const int min_x  = max(0, min_3_float_to_int(e0, e1, e2));
-    const int max_x  = min(tex.width - 1, max_3_float_to_int(e0, e1, e2) + 1);
+    const int max_x  = min(((int) tex.width) - 1, max_3_float_to_int(e0, e1, e2) + 1);
 
     for (int i = min_x; i <= max_x; i++) {
       const int coordx = i % tex.width;

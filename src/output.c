@@ -247,7 +247,7 @@ void realtime_output(RaytraceInstance* instance) {
     set_input_events_UI(&ui, mmotion, mwheel);
     handle_mouse_UI(&ui);
     render_UI(&ui);
-    blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width, realtime->height);
+    blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width);
     sample_frametime(&frametime_UI);
 
     if (make_png) {

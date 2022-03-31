@@ -148,7 +148,7 @@ int store_as_png(
 
   /* Adding filter byte at the beginning of each scanline */
   uint8_t* filtered_image = (uint8_t*) malloc(image_length + height);
-  for (int i = 0; i < height; i++) {
+  for (uint32_t i = 0; i < height; i++) {
     filtered_image[i * width * bytes_per_pixel + i] = 0;
     memcpy(filtered_image + i * width * bytes_per_pixel + i + 1, image + i * width * bytes_per_pixel, width * bytes_per_pixel);
   }

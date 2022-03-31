@@ -96,7 +96,9 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
 }
 
 static void free_textures(TextureRGBA* textures, uint64_t count) {
-  free(textures[0].data);
+  for (uint64_t i = 0; i < count; i++) {
+    free(textures[i].data);
+  }
   free(textures);
 }
 
@@ -241,7 +243,7 @@ static uint64_t serialize_strings(RaytraceInstance* instance, void** ptr) {
     total_length += output_len;
   }
 
-  for (uint64_t i = 0; i < instance->settings.mesh_files_count; i++) {
+  for (int i = 0; i < instance->settings.mesh_files_count; i++) {
     const uint64_t mesh_len = strlen(instance->settings.mesh_files[i]) + 1;
     header[3 + 2 * i]       = mesh_len;
     total_length += mesh_len;
@@ -254,7 +256,7 @@ static uint64_t serialize_strings(RaytraceInstance* instance, void** ptr) {
   memcpy(body + offset, instance->settings.output_path, header[1]);
   offset += header[1];
 
-  for (uint64_t i = 0; i < instance->settings.mesh_files_count; i++) {
+  for (int i = 0; i < instance->settings.mesh_files_count; i++) {
     header[2 + 2 * i] = offset;
     memcpy(body + offset, instance->settings.mesh_files[i], header[3 + 2 * i]);
     offset += header[3 + 2 * i];

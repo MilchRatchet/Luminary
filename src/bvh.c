@@ -135,7 +135,7 @@ static void fit_bounds_of_bins(const bin* bins, const int bins_length, vec3_p* h
   __m128 high = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
   __m128 low  = _mm_setr_ps(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
 
-  for (unsigned int i = 0; i < bins_length; i++) {
+  for (int i = 0; i < bins_length; i++) {
     const float* baseptr = (float*) (bins + i);
 
     __m128 high_bin = _mm_loadu_ps(baseptr);
@@ -194,7 +194,7 @@ static float construct_bins(
     bins[i] = b;
   }
 
-  for (int i = 0; i < fragments_length; i++) {
+  for (unsigned int i = 0; i < fragments_length; i++) {
     fragment frag     = fragments[i];
     const float value = get_entry_by_axis(frag.middle, axis);
     int pos           = 0;
@@ -248,7 +248,7 @@ static float construct_chopped_bins(
     bins[i] = b;
   }
 
-  for (int i = 0; i < fragments_length; i++) {
+  for (unsigned int i = 0; i < fragments_length; i++) {
     vec3_p high_triangle = fragments[i].high;
     vec3_p low_triangle  = fragments[i].low;
 
@@ -314,7 +314,7 @@ static void divide_middles_along_axis(
   int left  = 0;
   int right = 0;
 
-  for (int i = 0; i < fragments_length; i++) {
+  for (unsigned int i = 0; i < fragments_length; i++) {
     fragment frag = fragments_in[i];
 
     const float middle = get_entry_by_axis(frag.middle, axis);
@@ -334,7 +334,7 @@ static void divide_along_axis(
   int left  = 0;
   int right = 0;
 
-  for (int i = 0; i < fragments_length; i++) {
+  for (unsigned int i = 0; i < fragments_length; i++) {
     const float low  = get_entry_by_axis(fragments_in[i].low, axis);
     const float high = get_entry_by_axis(fragments_in[i].high, axis);
 
@@ -431,7 +431,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
   unsigned int begin_of_current_nodes = 0;
   unsigned int end_of_current_nodes   = 1;
-  int write_ptr                       = 1;
+  unsigned int write_ptr              = 1;
 
   while (begin_of_current_nodes != end_of_current_nodes) {
     unsigned int fragments_ptr           = 0;
@@ -621,7 +621,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
         const unsigned int duplicated_triangles = optimal_total_triangles - node.triangle_count;
         fragments_buffer_count += duplicated_triangles;
 
-        for (int k = 0; k < leaf_node_count; k++) {
+        for (unsigned int k = 0; k < leaf_node_count; k++) {
           if (nodes[leaf_nodes[k]].triangles_address > buffer_ptr)
             nodes[leaf_nodes[k]].triangles_address += duplicated_triangles;
         }
@@ -895,7 +895,7 @@ Node8* collapse_bvh(
   uint32_t* bvh_triangles = _mm_malloc(sizeof(uint32_t) * triangles_length, 64);
   uint32_t* new_triangles = _mm_malloc(sizeof(uint32_t) * triangles_length, 64);
 
-  for (unsigned int i = 0; i < triangles_length; i++) {
+  for (int i = 0; i < triangles_length; i++) {
     bvh_triangles[i] = i;
     new_triangles[i] = i;
   }
@@ -1125,7 +1125,7 @@ Node8* collapse_bvh(
   Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
   memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
 
-  for (unsigned int i = 0; i < triangles_length; i++) {
+  for (int i = 0; i < triangles_length; i++) {
     triangles[i] = triangles_swap[bvh_triangles[i]];
   }
 

@@ -77,13 +77,13 @@ void free_wavefront_content(Wavefront_Content content) {
   free(content.triangles);
   free(content.materials);
 
-  for (int i = 0; i < content.albedo_maps_length; i++) {
+  for (unsigned int i = 0; i < content.albedo_maps_length; i++) {
     free(content.albedo_maps[i].data);
   }
-  for (int i = 0; i < content.illuminance_maps_length; i++) {
+  for (unsigned int i = 0; i < content.illuminance_maps_length; i++) {
     free(content.illuminance_maps[i].data);
   }
-  for (int i = 0; i < content.material_maps_length; i++) {
+  for (unsigned int i = 0; i < content.material_maps_length; i++) {
     free(content.material_maps[i].data);
   }
 
@@ -389,9 +389,9 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   const unsigned int uvs_offset      = content.uvs_length;
 
   unsigned int triangles_count = content.triangles_length;
-  unsigned int vertices_count  = content.vertices_length;
-  unsigned int normals_count   = content.normals_length;
-  unsigned int uvs_count       = content.uvs_length;
+  int vertices_count           = content.vertices_length;
+  int normals_count            = content.normals_length;
+  int uvs_count                = content.uvs_length;
   unsigned int materials_count = content.materials_length;
 
   size_t* loaded_mtls             = malloc(sizeof(size_t) * 16);
@@ -485,7 +485,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
       sscanf(line, "%*s %[^\n]\n", path);
       size_t hash      = hash_djb2((unsigned char*) path);
       current_material = 0;
-      for (int i = 1; i < materials_count; i++) {
+      for (unsigned int i = 1; i < materials_count; i++) {
         if (content.materials[i].hash == hash) {
           current_material = i;
           break;
@@ -517,7 +517,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
 TextureAssignment* get_texture_assignments(Wavefront_Content content) {
   TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * content.materials_length);
 
-  for (int i = 0; i < content.materials_length; i++) {
+  for (unsigned int i = 0; i < content.materials_length; i++) {
     TextureAssignment assignment;
     assignment.albedo_map      = content.materials[i].albedo_texture;
     assignment.illuminance_map = content.materials[i].illuminance_texture;
@@ -537,7 +537,7 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
   *triangles       = (Triangle*) malloc(sizeof(Triangle) * count);
   unsigned int ptr = 0;
 
-  for (int j = 0; j < count; j++) {
+  for (unsigned int j = 0; j < count; j++) {
     Wavefront_Triangle t = content.triangles[j];
     Triangle triangle;
 

@@ -30,7 +30,7 @@ void free_outputs(RaytraceInstance* instance);
 void generate_clouds(RaytraceInstance* instance);
 DeviceBuffer* initialize_textures(TextureRGBA* textures, const int textures_length);
 void free_textures_atlas(DeviceBuffer* texture_atlas, const int textures_length);
-void initialize_8bit_frame(RaytraceInstance* instance, const int width, const int height);
+void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height);
 void free_8bit_frame(RaytraceInstance* instance);
 void copy_framebuffer_to_8bit(XRGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance);
 void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance);

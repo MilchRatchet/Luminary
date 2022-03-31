@@ -5,6 +5,9 @@
 #include "UI_text.h"
 
 void handle_mouse_UIPanel_check(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
+  if (x < 0 || y < 0)
+    return;
+
   panel->hover = 1;
 
   if (SDL_BUTTON_LMASK & mouse_state) {

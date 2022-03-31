@@ -30,24 +30,24 @@ RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
     rect.h = rect.w * ((float) instance->height) / instance->width;
   }
 
-  realtime->width  = rect.w;
-  realtime->height = rect.h;
+  realtime->width  = (unsigned int) rect.w;
+  realtime->height = (unsigned int) rect.h;
 
   realtime->window = SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN);
 
   realtime->window_surface = SDL_GetWindowSurface(realtime->window);
 
   realtime->buffer = (XRGB8*) realtime->window_surface->pixels;
-  realtime->ld     = realtime->window_surface->pitch;
+  realtime->ld     = (unsigned int) realtime->window_surface->pitch;
 
-  realtime->gpu_buffer_size = max(rect.w, instance->width) * max(rect.h, instance->height);
-  initialize_8bit_frame(instance, max(rect.w, instance->width), max(rect.h, instance->height));
+  realtime->gpu_buffer_size = max((unsigned int) rect.w, instance->width) * max((unsigned int) rect.h, instance->height);
+  initialize_8bit_frame(instance, max((unsigned int) rect.w, instance->width), max((unsigned int) rect.h, instance->height));
 
   return realtime;
 }
 
 void update_8bit_frame(RealtimeInstance* realtime, RaytraceInstance* instance) {
-  int required_buffer_size = max(realtime->width, instance->width) * max(realtime->height, instance->height);
+  const unsigned int required_buffer_size = max(realtime->width, instance->width) * max(realtime->height, instance->height);
 
   if (required_buffer_size > realtime->gpu_buffer_size) {
     free_8bit_frame(instance);

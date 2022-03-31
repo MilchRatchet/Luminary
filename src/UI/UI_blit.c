@@ -50,7 +50,7 @@ void blit_color_shaded(uint8_t* dst, int x, int y, int ldd, int hd, int width, i
 }
 
 #if defined(__AVX2__)
-void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
+void blit_UI_internal(UI* ui, uint8_t* target, int width) {
   const int k      = UI_WIDTH / 8;
   const int offset = ui->scroll_pos % PANEL_HEIGHT;
 
@@ -164,7 +164,7 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
   }
 }
 #else
-void blit_UI_internal(UI* ui, uint8_t* target, int width, int height) {
+void blit_UI_internal(UI* ui, uint8_t* target, int width) {
   const int k      = UI_WIDTH / 4;
   const int offset = ui->scroll_pos % PANEL_HEIGHT;
 

@@ -18,7 +18,7 @@ void init_text(UI* ui) {
 }
 
 SDL_Surface* render_text(UI* ui, const char* text) {
-  SDL_Color color1 = {255, 255, 255};
-  SDL_Color color2 = {0, 0, 0};
+  SDL_Color color1 = {255, 255, 255, 255};
+  SDL_Color color2 = {0, 0, 0, 255};
   return TTF_RenderText_Shaded(ui->font, text, color1, color2);
 }
