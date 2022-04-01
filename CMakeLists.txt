@@ -188,6 +188,7 @@ message("")
 message("=============================== SUMMARY ===============================")
 message("Debug Mode                     ${DEBUG}")
 message("Use Native CUDA Architecture   ${NATIVE_CUDA_ARCH}")
+message("Show CUDA Kernel Stats         ${SHOW_KERNEL_STATS}")
 
 message("C Compiler:                    ${CMAKE_C_COMPILER_ID} ${CMAKE_C_COMPILER_VERSION}")
 message("CUDA Compiler:                 ${CMAKE_CUDA_COMPILER_ID} ${CMAKE_CUDA_COMPILER_VERSION}")
