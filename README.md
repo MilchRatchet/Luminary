@@ -78,19 +78,51 @@ Note that there is a bug in a version of GCC 11. If `nvcc` happens to use that v
 
 ## Windows
 
-You need a modern installation of Visual Studio and a compatible clang-cl and cmake installation (for example as provided in MSYS2). Building was tested on VS 2019, VS 2022 should also work. You need to download SDL2_devel and SDL2_ttf_devel for VC.
+Additional requirements:
+- MSVC
+- Windows SDK
+- clang-cl
+
+Clang-cl comes for example with mingw-w64 or Visual Studio. MSVC and Windows SDK come with Visual Studio. However, if at some point it is possible to get them standalone, that would probably also suffice. Note that the paths to the CUDA Toolkit, CMake and Ninja binaries must be defined in the PATH environment variable, otherwise they will need to be defined in cmake.
+
+Regarding MSVC and Windows SDK paths, there are two possibilities:
+
+__Option 1__:
+```
+call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
+```
+This sets the environment variables containing all the paths in this terminal instance.
+
+__Option 2__: Add the paths of the binaries to the PATH environment variable, they look something like that:
+```
+{VS Path}/VC/Tools/MSVC/{Version}/bin/Hostx64/x64
+{Windows SDK Path}/10/bin/{Version}/x64
+```
+Additionally, you need to pass the path to the libraries to cmake, the paths look like this:
+```
+{VS Path}/VC/Tools/MSVC/{Version}/lib/x64
+{Windows SDK Path}/10/Lib/{Version}
+```
+
+__Regarding SDL2__: You need to download SDL2_devel and SDL2_ttf_devel for VC, these are for example available on Github.
 
 You can build using the following commands in the main project directory:
 ```
 mkdir build
 call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
-cmake -B ./build -S . -G Ninja -DCMAKE_MAKE_PROGRAM="{VS Path}/Common7/IDE/CommonExtensions/Microsoft/CMake/Ninja/ninja.exe" -DCMAKE_C_COMPILER="{MSYS Path}/mingw64/bin/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
 cd build && ninja
 ```
+or alternatively:
+```
+mkdir build
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}" -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/10.0.19041.0" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
+cd build && ninja
+```
+
 Notes:
 - It is important to use either `clang-cl.exe` or `cl.exe` as the C compiler.
-- Run `vcvarsall.bat` only once per terminal.
-- The CUDA compiler `nvcc` uses `cl.exe` as host compiler. If `nvcc` failes to find it you need to make sure add its path to the PATH variable. `cl.exe` can be found in `{VS Path}/VC/Tools/MSVC/{Version}/bin/Hostx64/x64`.
+- If you use the first option, run `vcvarsall.bat` only once per terminal.
 - `SDL2.dll` and `SDL2_ttf.dll` are automatically copied into the build dir and always need to reside in the same directory as `Luminary.exe`.
 
 # Licences

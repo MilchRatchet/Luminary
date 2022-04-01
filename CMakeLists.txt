@@ -1,5 +1,7 @@
 ﻿cmake_minimum_required (VERSION 3.19)
 
+set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
+
 project ("Luminary" LANGUAGES CUDA C)
 
 if (UNIX)
@@ -25,7 +27,21 @@ endif()
 set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
 
 #=============================================================
-# Configure this path
+# Link MSVC and Windows SDK libraries
+#=============================================================
+if(WIN32)
+  if(DEFINED WIN_LIB_DIR)
+    link_directories("${WIN_LIB_DIR}/um/x64")
+    link_directories("${WIN_LIB_DIR}/ucrt/x64")
+  endif()
+
+  if(DEFINED MSVC_LIB_DIR)
+    link_directories(${MSVC_LIB_DIR})
+  endif()
+endif()
+
+#=============================================================
+# Find Nvidia packages
 #=============================================================
 find_package(CUDAToolkit 11.6 REQUIRED QUIET)
 find_package(Optix 7.4 REQUIRED QUIET)
@@ -130,16 +146,17 @@ endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     if (CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4")
-        set(CMAKE_C_FLAGS_RELEASE "/O2 -march=native")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4")
+        set(CMAKE_C_FLAGS_RELEASE "/O2")
         set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG")
     elseif(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -Wextra")
-        set(CMAKE_C_FLAGS_RELEASE "-O3 -march=native")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wall -Wextra")
+        set(CMAKE_C_FLAGS_RELEASE "-O3")
         set(CMAKE_C_FLAGS_DEBUG "-Og -g")
     endif()
 elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_C_FLAGS_RELEASE "-O3 -march=native")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
+    set(CMAKE_C_FLAGS_RELEASE "-O3")
     set(CMAKE_C_FLAGS_DEBUG "-Og -g")
 else()
     message(SEND_ERROR "No flags available for CUDA Compiler ${CMAKE_C_COMPILER_ID}.")
