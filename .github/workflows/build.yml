@@ -14,7 +14,10 @@ jobs:
       - uses: actions/checkout@master
         with:
             submodules: 'recursive'
-
+      - name: Install SDL2 with SDL2_ttf
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install libsdl2-dev libsdl2-ttf-dev
       - name: Build
         run: make compile-gcc
 
@@ -27,6 +30,9 @@ jobs:
       - uses: actions/checkout@master
         with:
             submodules: 'recursive'
-
+      - name: Install SDL2 with SDL2_ttf
+        run: |
+          sudo apt-get update -y -qq
+          sudo apt-get install libsdl2-dev libsdl2-ttf-dev
       - name: Build
         run: make compile-clang

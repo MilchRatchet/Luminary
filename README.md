@@ -1,14 +1,33 @@
-# Luminary
 
-![Daxx Example](/demo_images/Daxx.png)
+<p align="center">
+  <h1><p align="center" style="font-weight: bold;">Luminary</p></h1>
+  <p align="center">
+    CUDA Pathtracing Renderer
+    </p>
+</p>
+<p align="center">
+  <a href="#about">About</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#building">Building</a> •
+  <a href="#licences">Licences</a> •
+  <a href="#literature">Literature</a>
+</p>
 
-![Pokitaru Example](/demo_images/Pokitaru.png)
+<p align="center">
+  <img src="demo_images/Daxx.png" alt="Daxx Example">
+</p>
 
-Luminary is a CUDA based pathtracing renderer.
+<p align="center">
+  <img src="demo_images/Todano.png" alt="Todano Example">
+</p>
+
+# About
+
+Luminary is a renderer using pathtracing. It aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, the input consists of only meshes with albedo, material and illuminance textures. All other effects come parameterized.
 
 This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
 
-The goal is to use as few libraries as feasible. Currently, these include `SDL2`, `zlib` and `Optix`. However, only the denoiser is used from the Optix library.
+The goal is to use as few libraries as feasible. Currently, these include `SDL2`, `zlib` and `OptiX`. However, only the denoiser is used from the Optix library.
 
 Meshes and textures in the example images are taken from the Ratchet and Clank HD Trilogy and were exported using [Replanetizer](https://github.com/RatchetModding/Replanetizer).
 
@@ -44,29 +63,105 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
         set custom height (overrides value set by input file)
 ```
 
-In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
+## Realtime Mode
+
+<p align="center">
+  <img src="demo_images/KorosUI.png" alt="UI Example">
+</p>
+
+In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be controlled with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change most parameters.
+
+>📝 In a UI panel, if the number is colored when hovering, you can change the value by holding the left mouse button and moving the mouse left/right.
 
 # Building
 
-This project is a bit of a mess when it comes to building. It was only ever built on `Windows` so changes may have to be made for `Linus/OSX`. Some hints to get it to run are:
+Requirements:
+- CUDA Toolkit 11.6
+- Optix 7.4 SDK
+- SDL2 and SDL2_ttf
+- Modern CMake
+- Make or Ninja
+- SSE 4.1 compatible CPU
+- Supported Nvidia GPU (Recommended: Volta or later)
 
-- You need to change the `CUDA toolkit` version in the `CMakeLists.txt` to the one installed on your system.
-- You need to change the `CUDA compatibility` version in the `CMakeLists.txt` to your specific version or lower.
-- You need to install the `Optix 7.4 SDK` and specify the installation directory in `Luminary/CMake/FindOptix.cmake`.
-- You need an `SSE 4.1` compatible CPU.
-- You need to download the development libraries from http://www.libsdl.org/ and https://www.libsdl.org/projects/SDL_ttf/ and extract the libraries to `Luminary/lib/SDL/`. `SDL2.dll`, `SDL2_ttf.dll` and `libfreetype-6.dll` will automatically be copied to the build directory and have to reside in the same folder as the executable for it to run.
-- A font file named `LuminaryFont.ttf` must reside in the binary directory. A default font is automatically copied to the build directory. You can replace this font with any other font.
-- `_s` versions of `fopen` etc. are used. Those may not be available on `Linus/OSX` and need to be changed there.
+The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed.
+>📝 `zlib` comes as a git submodule. Make sure to clone the submodule by using `git submodule update --init` after cloning Luminary.
 
-In `Luminary/lib/cuda/directives.cuh` are some preprocessor directives that can be used to tune performance to quality in the CUDA kernel.
+## CMake Options
+| Option                     | Description
+| ------------------------------| --------------------------------------------
+| -DDEBUG=ON/OFF                | Enable Debug Mode. Default: OFF
+| -DNATIVE_CUDA_ARCH=ON/OFF     | Enable that the CUDA architecture is based on the installed GPU. Default: ON
+| -DSHOW_KERNEL_STATS=ON/OFF    | Enable that CUDA kernel stats are printed at compilation. Default: OFF
+
+
+
+## Linux
+
+You need a `nvcc` compatible host compiler. Which compilers are supported can be found in the [CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements). In general, any modern GCC, ICC or CLANG will work. By default, `nvcc` uses `gcc`/`g++`.
+
+```
+mkdir build
+cmake -B ./build -S . -DOptiX_INSTALL_DIR="{OptiX Path}"
+cd build
+make
+```
+Note that there is a bug in a version of GCC 11. If `nvcc` happens to use that version of G++ 11, the build will fail. Select a different compiler in that case using for example`-DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++-10`. If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
+
+## Windows
+
+Additional requirements:
+- MSVC
+- Windows SDK
+- clang-cl
+
+Clang-cl comes for example with mingw-w64 or Visual Studio. MSVC and Windows SDK come with Visual Studio. However, if at some point it is possible to get them standalone, that would probably also suffice. Note that the paths to the CUDA Toolkit, CMake and Ninja binaries must be defined in the PATH environment variable, otherwise they will need to be defined in cmake.
+
+Regarding MSVC and Windows SDK paths, there are two possibilities:
+
+__Option 1__:
+```
+call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
+```
+This sets the environment variables containing all the paths in this terminal instance.
+
+__Option 2__: Add the paths of the binaries to the PATH environment variable, they look something like that:
+```
+{VS Path}/VC/Tools/MSVC/{Version}/bin/Hostx64/x64
+{Windows SDK Path}/10/bin/{Version}/x64
+```
+Additionally, you need to pass the path to the libraries to cmake, the paths look like this:
+```
+{VS Path}/VC/Tools/MSVC/{Version}/lib/x64
+{Windows SDK Path}/10/Lib/{Version}
+```
+
+__Regarding SDL2__: You need to download SDL2_devel and SDL2_ttf_devel for VC, these are for example available on Github.
+
+You can build using the following commands in the main project directory:
+```
+mkdir build
+call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
+cd build && ninja
+```
+or alternatively:
+```
+mkdir build
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}" -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/10.0.19041.0" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
+cd build && ninja
+```
+
+Notes:
+- It is important to use either `clang-cl.exe` or `cl.exe` as the C compiler.
+- If you use the first option, run `vcvarsall.bat` only once per terminal.
+- `SDL2.dll` and `SDL2_ttf.dll` are automatically copied into the build dir and always need to reside in the same directory as `Luminary.exe`.
 
 # Licences
 
 The licence for this code can be found in the `LICENCE` file.
 
-The `zlib` library is used for the compression part of the `png` routine. Details about its authors and its licence can be found in `Luminary/lib/zlib/zlib.h`.
-
-The `SDL2` library is used for the realtime mode. Details about its authors and its licence can be found in `Luminary/lib/SDL/SDL.h`.
+The `zlib` library is used for the compression part of the `png` routine. Its licence can be found in the `zlib` repository.
 
 The default font provided by `Luminary` is the font `Tuffy` by Ulrich Thatcher which he placed in the `Public Domain`.
 
