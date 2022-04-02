@@ -1,14 +1,15 @@
 
 <p align="center">
-  <p align="center" style="font-weight: bold; font-size: 500%; margin-bottom: -10px">Luminary</p>
-  <p align="center" style="font-size: 100%; margin-bottom: 0px">
+  <h1><p align="center" style="font-weight: bold;">Luminary</p></h1>
+  <p align="center">
     CUDA Pathtracing Renderer
     </p>
 </p>
 <p align="center">
+  <a href="#about">About</a> •
   <a href="#usage">Usage</a> •
   <a href="#building">Building</a> •
-  <a href="#licensing">Licensing</a> •
+  <a href="#licences">Licences</a> •
   <a href="#literature">Literature</a>
 </p>
 
@@ -20,9 +21,11 @@
   <img src="demo_images/Todano.png" alt="Todano Example">
 </p>
 
-This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
+# About
 
-Luminary aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, Luminary only takes meshes with albedo, material and illuminance textures as input. All other effects come parameterized.
+Luminary is a renderer using pathtracing. It aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, the input consists of only meshes with albedo, material and illuminance textures. All other effects come parameterized.
+
+This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
 
 The goal is to use as few libraries as feasible. Currently, these include `SDL2`, `zlib` and `OptiX`. However, only the denoiser is used from the Optix library.
 
@@ -60,7 +63,15 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
         set custom height (overrides value set by input file)
 ```
 
-In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be rotated with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change many parameters.
+## Realtime Mode
+
+<p align="center">
+  <img src="demo_images/KorosUI.png" alt="UI Example">
+</p>
+
+In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be controlled with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change most parameters.
+
+>📝 In a UI panel, if the number is colored when hovering, you can change the value by holding the left mouse button and moving the mouse left/right.
 
 # Building
 
@@ -73,12 +84,17 @@ Requirements:
 - SSE 4.1 compatible CPU
 - Supported Nvidia GPU (Recommended: Volta or later)
 
-The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed. CMake Options:
+The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed.
+>📝 `zlib` comes as a git submodule. Make sure to clone the submodule by using `git submodule update --init` after cloning Luminary.
+
+## CMake Options
 | Option                     | Description
 | ------------------------------| --------------------------------------------
 | -DDEBUG=ON/OFF                | Enable Debug Mode. Default: OFF
 | -DNATIVE_CUDA_ARCH=ON/OFF     | Enable that the CUDA architecture is based on the installed GPU. Default: ON
 | -DSHOW_KERNEL_STATS=ON/OFF    | Enable that CUDA kernel stats are printed at compilation. Default: OFF
+
+
 
 ## Linux
 
