@@ -340,3 +340,6 @@ In `Blender` these map types correspond to:
 - map_Ke = Emission
 - map_Ns = Smoothness
 
+>📝 There was a [bug](https://developer.blender.org/D14519) in Blender before 02.04.22 where map_Ke were not exported. If you encounter any issues of Luminary detecting no emissive triangles, use a newer Blender version for the export.
+
+

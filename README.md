@@ -1,14 +1,30 @@
-# Luminary
 
-![Daxx Example](/demo_images/Daxx.png)
+<p align="center">
+  <p align="center" style="font-weight: bold; font-size: 500%; margin-bottom: -10px">Luminary</p>
+  <p align="center" style="font-size: 100%; margin-bottom: 0px">
+    CUDA Pathtracing Renderer
+    </p>
+</p>
+<p align="center">
+  <a href="#usage">Usage</a> •
+  <a href="#building">Building</a> •
+  <a href="#licensing">Licensing</a> •
+  <a href="#literature">Literature</a>
+</p>
 
-![Pokitaru Example](/demo_images/Pokitaru.png)
+<p align="center">
+  <img src="demo_images/Daxx.png" alt="Daxx Example">
+</p>
 
-Luminary is a CUDA based pathtracing renderer.
+<p align="center">
+  <img src="demo_images/Todano.png" alt="Todano Example">
+</p>
 
 This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
 
-The goal is to use as few libraries as feasible. Currently, these include `SDL2`, `zlib` and `Optix`. However, only the denoiser is used from the Optix library.
+Luminary aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, Luminary only takes meshes with albedo, material and illuminance textures as input. All other effects come parameterized.
+
+The goal is to use as few libraries as feasible. Currently, these include `SDL2`, `zlib` and `OptiX`. However, only the denoiser is used from the Optix library.
 
 Meshes and textures in the example images are taken from the Ratchet and Clank HD Trilogy and were exported using [Replanetizer](https://github.com/RatchetModding/Replanetizer).
 
