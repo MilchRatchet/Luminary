@@ -3,10 +3,11 @@
 #include "UI_blit.h"
 #include "UI_structs.h"
 #include "UI_text.h"
+#include "utils.h"
 
 void handle_mouse_UIPanel_check(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
-  if (x < 0 || y < 0)
-    return;
+  LUM_UNUSED(x)
+  LUM_UNUSED(y)
 
   panel->hover = 1;
 
