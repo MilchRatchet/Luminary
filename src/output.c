@@ -15,6 +15,7 @@
 #include "frametime.h"
 #include "log.h"
 #include "png.h"
+#include "qoi.h"
 #include "raytrace.h"
 #include "realtime.h"
 #include "utils.h"
@@ -53,11 +54,24 @@ void offline_output(RaytraceInstance* instance) {
   XRGB8* frame = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
   copy_framebuffer_to_8bit(frame, instance->width, instance->height, device_buffer_get_pointer(instance->frame_output), instance);
 
-  store_XRGB8_png(instance->settings.output_path, frame, instance->width, instance->height);
+  char* output_path = malloc(4096);
 
+  switch (instance->image_format) {
+    case IMGFORMAT_QOI:
+      sprintf(output_path, "%s.qoi", instance->settings.output_path);
+      store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
+      info_message("QOI file created.");
+      break;
+    case IMGFORMAT_PNG:
+    default:
+      sprintf(output_path, "%s.png", instance->settings.output_path);
+      store_XRGB8_png(output_path, frame, instance->width, instance->height);
+      info_message("PNG file created.");
+      break;
+  }
+
+  free(output_path);
   free(frame);
-
-  info_message("PNG file created.");
 
   info_message("Luminary can now be closed.");
   system("Pause");
@@ -91,8 +105,6 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
   timeinfo = *localtime(&rawtime);
   strftime(timestring, 4096, "%Y-%m-%d-%H-%M-%S", &timeinfo);
 
-  sprintf(filename, "Snap-%s.png", timestring);
-
   update_8bit_frame(realtime, instance);
 
   XRGB8* buffer;
@@ -117,7 +129,19 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
       return;
   }
 
-  store_XRGB8_png(filename, buffer, width, height);
+  switch (instance->image_format) {
+    case IMGFORMAT_PNG:
+      sprintf(filename, "Snap-%s.png", timestring);
+      store_XRGB8_png(filename, buffer, width, height);
+      break;
+    case IMGFORMAT_QOI:
+      sprintf(filename, "Snap-%s.qoi", timestring);
+      store_XRGB8_qoi(filename, buffer, width, height);
+      break;
+    default:
+      warn_message("Invalid Image Format, Snapshot was not saved.");
+      break;
+  }
 
   if (instance->snap_resolution != SNAP_RESOLUTION_WINDOW) {
     free(buffer);
@@ -144,7 +168,7 @@ void realtime_output(RaytraceInstance* instance) {
   float mouse_x_speed = 0.0f;
   float mouse_y_speed = 0.0f;
 
-  int make_png = 0;
+  int make_image = 0;
 
   char* title             = (char*) malloc(4096);
   instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
@@ -201,7 +225,7 @@ void realtime_output(RaytraceInstance* instance) {
       }
       else if (event.type == SDL_KEYDOWN) {
         if (event.key.keysym.scancode == SDL_SCANCODE_F12) {
-          make_png = 1;
+          make_image = 1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
           toggle_UI(&ui);
@@ -250,10 +274,10 @@ void realtime_output(RaytraceInstance* instance) {
     blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width);
     sample_frametime(&frametime_UI);
 
-    if (make_png) {
+    if (make_image) {
       log_message("Taking snapshot.");
       make_snapshot(instance, realtime);
-      make_png = 0;
+      make_image = 0;
     }
 
     sample_frametime(&frametime_total);

@@ -29,6 +29,8 @@
 #define LIGHT_ID_TOY 0xfffffffeu
 #define LIGHT_ID_NONE 0xfffffff1u
 
+enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
+
 enum ShadingMode {
   SHADING_DEFAULT   = 0,
   SHADING_ALBEDO    = 1,
@@ -279,6 +281,7 @@ struct RaytraceInstance {
   int shading_mode;
   RGBF** bloom_mips_gpu;
   int snap_resolution;
+  OutputImageFormat image_format;
   General settings;
   void* denoise_setup;
   Jitter jitter;

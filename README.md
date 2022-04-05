@@ -61,6 +61,12 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
 
 -h, --height
         set custom height (overrides value set by input file)
+
+    --qoi
+        set output image format to QOI
+
+    --png
+        set output image format to PNG
 ```
 
 ## Realtime Mode
@@ -160,8 +166,6 @@ Notes:
 # Licences
 
 The licence for this code can be found in the `LICENCE` file.
-
-The `zlib` library is used for the compression part of the `png` routine. Its licence can be found in the `zlib` repository.
 
 The default font provided by `Luminary` is the font `Tuffy` by Ulrich Thatcher which he placed in the `Public Domain`.
 

@@ -1,3 +1,6 @@
 [submodule "Luminary/lib/zlib"]
 	path = src/zlib
 	url = https://github.com/madler/zlib.git
+[submodule "include/qoi"]
+	path = include/qoi
+	url = https://github.com/phoboslab/qoi.git

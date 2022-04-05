@@ -11,30 +11,37 @@
 #include "utils.h"
 
 static int parse_command(const char* arg, char* opt1, char* opt2) {
-  int ptr1    = -1;
-  int result1 = 1;
+  if (opt1) {
+    int ptr1    = -1;
+    int result1 = 1;
 
-  do {
-    ptr1++;
-    result1 &= (arg[ptr1] == opt1[ptr1]);
-  } while (arg[ptr1] != '\0' && opt1[ptr1] != '\0');
+    do {
+      ptr1++;
+      result1 &= (arg[ptr1] == opt1[ptr1]);
+    } while (arg[ptr1] != '\0' && opt1[ptr1] != '\0');
 
-  result1 &= (opt1[ptr1] == '\0');
+    result1 &= (opt1[ptr1] == '\0');
 
-  if (result1)
-    return 1;
+    if (result1)
+      return 1;
+  }
 
-  int ptr2    = -1;
-  int result2 = 1;
+  if (opt2) {
+    int ptr2    = -1;
+    int result2 = 1;
 
-  do {
-    ptr2++;
-    result2 &= (arg[ptr2] == opt2[ptr2]);
-  } while (arg[ptr2] != '\0' && opt2[ptr2] != '\0');
+    do {
+      ptr2++;
+      result2 &= (arg[ptr2] == opt2[ptr2]);
+    } while (arg[ptr2] != '\0' && opt2[ptr2] != '\0');
 
-  result2 &= (opt2[ptr2] == '\0');
+    result2 &= (opt2[ptr2] == '\0');
 
-  return result2;
+    if (result2)
+      return 1;
+  }
+
+  return 0;
 }
 
 static int parse_number(const char* arg) {
@@ -80,15 +87,16 @@ static int magic(char* path) {
 }
 
 int main(int argc, char* argv[]) {
-  int offline         = 0;
-  int bench           = 0;
-  int write_logs      = 0;
-  int custom_samples  = 0;
-  int offline_samples = 0;
-  int custom_width    = 0;
-  int custom_height   = 0;
-  int width           = 0;
-  int height          = 0;
+  int offline                  = 0;
+  int bench                    = 0;
+  int write_logs               = 0;
+  int custom_samples           = 0;
+  int offline_samples          = 0;
+  int custom_width             = 0;
+  int custom_height            = 0;
+  int width                    = 0;
+  int height                   = 0;
+  OutputImageFormat img_format = IMGFORMAT_PNG;
 
   for (int i = 2; i < argc; i++) {
     if (custom_samples) {
@@ -109,6 +117,14 @@ int main(int argc, char* argv[]) {
     custom_samples = parse_command(argv[i], "-s", "--samples");
     custom_width   = parse_command(argv[i], "-w", "--width");
     custom_height  = parse_command(argv[i], "-h", "--height");
+
+    if (parse_command(argv[i], (char*) 0, "--png")) {
+      img_format = IMGFORMAT_PNG;
+    }
+
+    if (parse_command(argv[i], (char*) 0, "--qoi")) {
+      img_format = IMGFORMAT_QOI;
+    }
   }
 
   init_log(write_logs);
@@ -152,6 +168,8 @@ int main(int argc, char* argv[]) {
 
     reset_raytracing(instance);
   }
+
+  instance->image_format = img_format;
 
   info_message("Instance set up.");
 
