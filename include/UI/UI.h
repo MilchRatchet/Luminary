@@ -25,12 +25,13 @@
 #warning Using non AVX2 version of Luminary UI.
 #endif
 
-UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime);
+UI init_post_process_UI(RaytraceInstance* instance, WindowInstance* realtime);
+UI init_UI(RaytraceInstance* instance, WindowInstance* realtime);
 void toggle_UI(UI* ui);
 void set_input_events_UI(UI* ui, int mouse_xrel, int mouse_wheel);
 void handle_mouse_UI(UI* ui);
 void render_UI(UI* ui);
-void blit_UI(UI* ui, uint8_t* target, int width);
+void blit_UI(UI* ui, uint8_t* target, int width, int height, int ld);
 void free_UI(UI* ui);
 
 #endif /* UI_H */

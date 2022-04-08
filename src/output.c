@@ -20,6 +20,80 @@
 #include "realtime.h"
 #include "utils.h"
 
+void offline_exit_post_process_menu(RaytraceInstance* instance) {
+  instance->post_process_menu = 0;
+}
+
+static void offline_post_process_menu(RaytraceInstance* instance) {
+  WindowInstance* window = window_instance_init(instance);
+
+  Frametime frametime = init_frametime();
+
+  int exit = 0;
+
+  UI ui = init_post_process_UI(instance, window);
+
+  char* title = (char*) malloc(4096);
+
+  void* gpu_source  = device_buffer_get_pointer(instance->frame_buffer);
+  void* gpu_output  = device_buffer_get_pointer(instance->frame_output);
+  void* gpu_scratch = device_buffer_get_pointer(window->gpu_buffer);
+
+  while (!exit) {
+    SDL_Event event;
+
+    update_device_scene(instance);
+
+    if (instance->scene_gpu.camera.bloom)
+      apply_bloom(instance, gpu_source, gpu_output);
+
+    copy_framebuffer_to_8bit(gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld);
+
+    SDL_PumpEvents();
+
+    int mwheel  = 0;
+    int mmotion = 0;
+
+    while (SDL_PollEvent(&event)) {
+      if (event.type == SDL_MOUSEMOTION) {
+        mmotion += event.motion.xrel;
+      }
+      else if (event.type == SDL_MOUSEWHEEL) {
+        mwheel += event.wheel.y;
+      }
+      else if (event.type == SDL_QUIT) {
+        exit = 1;
+      }
+    }
+
+    window_instance_update_pointer(window);
+
+    set_input_events_UI(&ui, mmotion, mwheel);
+    handle_mouse_UI(&ui);
+    render_UI(&ui);
+
+    blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
+
+    sample_frametime(&frametime);
+    start_frametime(&frametime);
+    const double total_time = get_frametime(&frametime);
+
+    sprintf(
+      title, "Luminary - Post Process Menu - FPS: %.0f - Frametime: %.2fms - Mem: %.2f/%.2fGB", 1000.0 / total_time, total_time,
+      device_memory_usage() * (1.0 / (1024.0 * 1024.0 * 1024.0)), device_memory_limit() * (1.0 / (1024.0 * 1024.0 * 1024.0)));
+
+    SDL_SetWindowTitle(window->window, title);
+    SDL_UpdateWindowSurface(window->window);
+
+    if (!(instance->post_process_menu))
+      exit = 1;
+  }
+
+  free(title);
+  window_instance_free(window);
+  free_UI(&ui);
+}
+
 void offline_output(RaytraceInstance* instance) {
   bench_tic();
   clock_t start_of_rt = clock();
@@ -47,14 +121,46 @@ void offline_output(RaytraceInstance* instance) {
     denoise_with_optix(instance);
   }
 
+  if (instance->post_process_menu) {
+    device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), instance->width * instance->height);
+    device_buffer_copy(instance->frame_output, instance->frame_buffer);
+  }
+
   if (instance->scene_gpu.camera.bloom)
-    apply_bloom(instance, device_buffer_get_pointer(instance->frame_output));
+    apply_bloom(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));
 
-  initialize_8bit_frame(instance, instance->width, instance->height);
-  XRGB8* frame = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
-  copy_framebuffer_to_8bit(frame, instance->width, instance->height, device_buffer_get_pointer(instance->frame_output), instance);
-
+  DeviceBuffer* scratch_buffer;
+  device_buffer_init(&scratch_buffer);
+  device_buffer_malloc(scratch_buffer, sizeof(XRGB8), instance->width * instance->height);
+  XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
   char* output_path = malloc(4096);
+
+  copy_framebuffer_to_8bit(
+    device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
+    instance->width);
+
+  switch (instance->image_format) {
+    case IMGFORMAT_QOI:
+      sprintf(output_path, "%s.qoi1", instance->settings.output_path);
+      store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
+      break;
+    case IMGFORMAT_PNG:
+    default:
+      sprintf(output_path, "%s.png1", instance->settings.output_path);
+      store_XRGB8_png(output_path, frame, instance->width, instance->height);
+      break;
+  }
+
+  if (instance->post_process_menu) {
+    offline_post_process_menu(instance);
+    device_buffer_free(instance->frame_buffer);
+  }
+
+  copy_framebuffer_to_8bit(
+    device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
+    instance->width);
+
+  device_buffer_destroy(scratch_buffer);
 
   switch (instance->image_format) {
     case IMGFORMAT_QOI:
@@ -95,7 +201,7 @@ static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   return result;
 }
 
-static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime) {
+static void make_snapshot(RaytraceInstance* instance, WindowInstance* window) {
   char* filename   = malloc(4096);
   char* timestring = malloc(4096);
   time_t rawtime;
@@ -105,23 +211,21 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
   timeinfo = *localtime(&rawtime);
   strftime(timestring, 4096, "%Y-%m-%d-%H-%M-%S", &timeinfo);
 
-  update_8bit_frame(realtime, instance);
-
   XRGB8* buffer;
   int width;
   int height;
 
   switch (instance->snap_resolution) {
     case SNAP_RESOLUTION_WINDOW:
-      buffer = realtime->buffer;
-      width  = realtime->width;
-      height = realtime->height;
+      buffer = window->buffer;
+      width  = window->width;
+      height = window->height;
       break;
     case SNAP_RESOLUTION_RENDER:
       width  = instance->width;
       height = instance->height;
       buffer = malloc(sizeof(XRGB8) * width * height);
-      copy_framebuffer_to_8bit(buffer, width, height, instance->frame_final_device, instance);
+      copy_framebuffer_to_8bit(instance->frame_final_device, device_buffer_get_pointer(window->gpu_buffer), buffer, width, height, width);
       break;
     default:
       free(filename);
@@ -143,7 +247,7 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
       break;
   }
 
-  if (instance->snap_resolution != SNAP_RESOLUTION_WINDOW) {
+  if (instance->snap_resolution == SNAP_RESOLUTION_RENDER) {
     free(buffer);
   }
 
@@ -152,7 +256,7 @@ static void make_snapshot(RaytraceInstance* instance, RealtimeInstance* realtime
 }
 
 void realtime_output(RaytraceInstance* instance) {
-  RealtimeInstance* realtime = init_realtime_instance(instance);
+  WindowInstance* window = window_instance_init(instance);
 
   int exit = 0;
 
@@ -160,7 +264,7 @@ void realtime_output(RaytraceInstance* instance) {
   Frametime frametime_UI    = init_frametime();
   Frametime frametime_post  = init_frametime();
   Frametime frametime_total = init_frametime();
-  UI ui                     = init_UI(instance, realtime);
+  UI ui                     = init_UI(instance, window);
 
   instance->temporal_frames  = 0;
   int temporal_frames_buffer = 0;
@@ -172,6 +276,8 @@ void realtime_output(RaytraceInstance* instance) {
 
   char* title             = (char*) malloc(4096);
   instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
+
+  void* gpu_scratch = device_buffer_get_pointer(window->gpu_buffer);
 
   while (!exit) {
     SDL_Event event;
@@ -188,12 +294,12 @@ void realtime_output(RaytraceInstance* instance) {
     if (instance->denoiser) {
       instance->frame_final_device = denoise_with_optix_realtime(instance->denoise_setup);
       if (instance->scene_gpu.camera.bloom)
-        apply_bloom(instance, instance->frame_final_device);
+        apply_bloom(instance, instance->frame_final_device, instance->frame_final_device);
     }
     else {
       instance->frame_final_device = device_buffer_get_pointer(instance->frame_output);
     }
-    copy_framebuffer_to_8bit(realtime->buffer, realtime->width, realtime->height, instance->frame_final_device, instance);
+    copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, window->buffer, window->width, window->height, window->ld);
     sample_frametime(&frametime_post);
 
     instance->temporal_frames++;
@@ -267,16 +373,18 @@ void realtime_output(RaytraceInstance* instance) {
       }
     }
 
+    window_instance_update_pointer(window);
+
     start_frametime(&frametime_UI);
     set_input_events_UI(&ui, mmotion, mwheel);
     handle_mouse_UI(&ui);
     render_UI(&ui);
-    blit_UI(&ui, (uint8_t*) realtime->buffer, realtime->width);
+    blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
     sample_frametime(&frametime_UI);
 
     if (make_image) {
       log_message("Taking snapshot.");
-      make_snapshot(instance, realtime);
+      make_snapshot(instance, window);
       make_image = 0;
     }
 
@@ -294,8 +402,8 @@ void realtime_output(RaytraceInstance* instance) {
 
     const double normalized_time = total_time / 16.66667;
 
-    SDL_SetWindowTitle(realtime->window, title);
-    SDL_UpdateWindowSurface(realtime->window);
+    SDL_SetWindowTitle(window->window, title);
+    SDL_UpdateWindowSurface(window->window);
 
     const float alpha = instance->scene_gpu.camera.rotation.x;
     const float beta  = instance->scene_gpu.camera.rotation.y;
@@ -382,8 +490,7 @@ void realtime_output(RaytraceInstance* instance) {
   }
 
   free(title);
-  free_8bit_frame(instance);
   free_realtime_denoise(instance, instance->denoise_setup);
-  free_realtime_instance(realtime);
+  window_instance_free(window);
   free_UI(&ui);
 }

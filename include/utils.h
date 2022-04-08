@@ -282,6 +282,7 @@ struct RaytraceInstance {
   RGBF** bloom_mips_gpu;
   int snap_resolution;
   OutputImageFormat image_format;
+  int post_process_menu;
   General settings;
   void* denoise_setup;
   Jitter jitter;

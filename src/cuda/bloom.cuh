@@ -140,7 +140,7 @@ __global__ void bloom_downsample_truncate(RGBF* source, const int sw, const int 
 }
 
 __global__ void bloom_upsample(
-  RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th, const float a, const float b) {
+  RGBF* source, const int sw, const int sh, RGBF* target, RGBF* base, const int tw, const int th, const float a, const float b) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const float scale_x = 1.0f / (tw - 1);
@@ -168,7 +168,7 @@ __global__ void bloom_upsample(
 
     pixel = scale_color(pixel, 0.0625f);
 
-    RGBF o = target[x + y * tw];
+    RGBF o = base[x + y * tw];
     o      = scale_color(o, a);
     pixel  = scale_color(pixel, b);
     pixel  = add_color(pixel, o);
@@ -179,7 +179,7 @@ __global__ void bloom_upsample(
   }
 }
 
-extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
+extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* src, RGBF* dst) {
   const int width  = instance->width;
   const int height = instance->height;
 
@@ -191,7 +191,7 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
   const int mip_count = min(BLOOM_MIP_COUNT, min(mip_count_w, mip_count_h));
 
   bloom_downsample_truncate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    image, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
+    src, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
 
   for (int i = 0; i < mip_count - 1; i++) {
     const int sw = width >> (i + 1);
@@ -207,11 +207,11 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* image) {
     const int tw = width >> i;
     const int th = height >> i;
     bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-      instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i - 1], tw, th, 1.0f, 1.0f);
+      instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i - 1], instance->bloom_mips_gpu[i - 1], tw, th, 1.0f, 1.0f);
   }
 
   bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    instance->bloom_mips_gpu[0], width >> 1, height >> 1, image, width, height, 1.0f,
+    instance->bloom_mips_gpu[0], width >> 1, height >> 1, dst, src, width, height, 1.0f,
     0.01f * instance->scene_gpu.camera.bloom_strength / mip_count);
 }
 

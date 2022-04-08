@@ -97,6 +97,7 @@ int main(int argc, char* argv[]) {
   int width                    = 0;
   int height                   = 0;
   OutputImageFormat img_format = IMGFORMAT_PNG;
+  int post_process_menu        = 0;
 
   for (int i = 2; i < argc; i++) {
     if (custom_samples) {
@@ -117,6 +118,7 @@ int main(int argc, char* argv[]) {
     custom_samples = parse_command(argv[i], "-s", "--samples");
     custom_width   = parse_command(argv[i], "-w", "--width");
     custom_height  = parse_command(argv[i], "-h", "--height");
+    post_process_menu |= parse_command(argv[i], "-p", "--post-menu");
 
     if (parse_command(argv[i], (char*) 0, "--png")) {
       img_format = IMGFORMAT_PNG;
@@ -169,7 +171,8 @@ int main(int argc, char* argv[]) {
     reset_raytracing(instance);
   }
 
-  instance->image_format = img_format;
+  instance->image_format      = img_format;
+  instance->post_process_menu = post_process_menu;
 
   info_message("Instance set up.");
 

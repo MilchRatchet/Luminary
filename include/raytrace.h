@@ -20,11 +20,12 @@ RaytraceInstance* init_raytracing(
 void reset_raytracing(RaytraceInstance* instance);
 void allocate_buffers(RaytraceInstance* instance);
 void update_jitter(RaytraceInstance* instance);
+void update_device_scene(RaytraceInstance* instance);
 void prepare_trace(RaytraceInstance* instance);
 void update_temporal_matrix(RaytraceInstance* instance);
 void center_toy_at_camera(RaytraceInstance* instance);
 void trace_scene(RaytraceInstance* instance);
-void apply_bloom(RaytraceInstance* instance, RGBF* image);
+void apply_bloom(RaytraceInstance* instance, RGBF* src, RGBF* dst);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);
 void generate_clouds(RaytraceInstance* instance);
@@ -32,7 +33,7 @@ DeviceBuffer* initialize_textures(TextureRGBA* textures, const int textures_leng
 void free_textures_atlas(DeviceBuffer* texture_atlas, const int textures_length);
 void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height);
 void free_8bit_frame(RaytraceInstance* instance);
-void copy_framebuffer_to_8bit(XRGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance);
+void copy_framebuffer_to_8bit(RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);
 void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance);
 float get_auto_exposure_from_optix(void* input, RaytraceInstance* instance);
 RGBF* denoise_with_optix_realtime(void* input);

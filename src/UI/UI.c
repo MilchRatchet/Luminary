@@ -13,6 +13,7 @@
 #include "UI_panel.h"
 #include "UI_text.h"
 #include "baked.h"
+#include "output.h"
 #include "raytrace.h"
 #include "scene.h"
 #include "stars.h"
@@ -450,7 +451,7 @@ static UITab create_toy_panels(UI* ui, RaytraceInstance* instance) {
   return tab;
 }
 
-UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
+UI init_UI(RaytraceInstance* instance, WindowInstance* window) {
   UI ui;
   ui.active = 0;
   ui.tab    = 0;
@@ -458,8 +459,8 @@ UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
 
   ui.x     = 100;
   ui.y     = 100;
-  ui.max_x = realtime->width - UI_WIDTH;
-  ui.max_y = realtime->height - UI_HEIGHT - UI_BORDER_SIZE;
+  ui.max_x = window->width;
+  ui.max_y = window->height;
 
   ui.mouse_flags = 0;
   ui.scroll_pos  = 0;
@@ -479,7 +480,8 @@ UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
   ui.scratch          = malloc(scratch_size);
   init_text(&ui);
 
-  ui.tabs = malloc(sizeof(UITab) * UI_PANELS_TAB_COUNT);
+  ui.tabs      = malloc(sizeof(UITab) * UI_PANELS_TAB_COUNT);
+  ui.tab_count = UI_PANELS_TAB_COUNT;
 
   ui.tabs[0] = create_general_panels(&ui, instance);
   ui.tabs[1] = create_camera_panels(&ui, instance);
@@ -492,6 +494,75 @@ UI init_UI(RaytraceInstance* instance, RealtimeInstance* realtime) {
   return ui;
 }
 
+static UITab create_post_process_menu_panels(UI* ui, RaytraceInstance* instance) {
+  UITab tab;
+
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
+
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
+
+  int i = 0;
+
+  panels[i++] = create_dropdown(ui, "Tone Mapping", &(instance->scene_gpu.camera.tonemap), 0, 4, "None\0ACES\0Reinhard\0Uncharted 2", 0);
+  panels[i++] = create_dropdown(
+    ui, "Filter", &(instance->scene_gpu.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 1);
+  panels[i++] = create_slider(ui, "Exposure", &(instance->scene_gpu.camera.exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
+  panels[i++] = create_check(ui, "Bloom", &(instance->scene_gpu.camera.bloom), 0);
+  panels[i++] = create_slider(ui, "Bloom Strength", &(instance->scene_gpu.camera.bloom_strength), 0, 0.0005f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Bloom Threshold", &(instance->scene_gpu.camera.bloom_threshold), 0, 0.0005f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Dithering", &(instance->scene_gpu.camera.dithering), 0);
+  panels[i++] = create_check(ui, "Purkinje Shift", &(instance->scene_gpu.camera.purkinje), 0);
+  panels[i++] = create_slider(ui, "Purkinje Blueness", &(instance->scene_gpu.camera.purkinje_kappa1), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Purkinje Brightness", &(instance->scene_gpu.camera.purkinje_kappa2), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_button(ui, "Finish", (void*) instance, (void (*)(void*)) offline_exit_post_process_menu, 0);
+
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
+
+  return tab;
+}
+
+UI init_post_process_UI(RaytraceInstance* instance, WindowInstance* window) {
+  UI ui;
+  ui.active = 1;
+  ui.tab    = 0;
+  ui.subtab = 0;
+
+  ui.x     = 100;
+  ui.y     = 100;
+  ui.max_x = window->width;
+  ui.max_y = window->height;
+
+  ui.mouse_flags = 0;
+  ui.scroll_pos  = 0;
+
+  ui.panel_hover  = -1;
+  ui.border_hover = 0;
+
+  ui.last_panel = (UIPanel*) 0;
+  ui.dropdown   = (UIPanel*) 0;
+
+  ui.pixels      = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT_BUFFER * 4);
+  ui.pixels_mask = (uint8_t*) malloc(sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT_BUFFER * 4);
+
+  ui.temporal_frames = &(instance->temporal_frames);
+
+  size_t scratch_size = compute_scratch_space();
+  ui.scratch          = malloc(scratch_size);
+  init_text(&ui);
+
+  ui.tabs      = malloc(sizeof(UITab));
+  ui.tab_count = 1;
+
+  ui.tabs[0] = create_post_process_menu_panels(&ui, instance);
+
+  SDL_SetRelativeMouseMode(0);
+
+  return ui;
+}
+
 void toggle_UI(UI* ui) {
   ui->active ^= 1;
   SDL_SetRelativeMouseMode(!ui->active);
@@ -500,6 +571,11 @@ void toggle_UI(UI* ui) {
 void set_input_events_UI(UI* ui, int mouse_xrel, int mouse_wheel) {
   ui->mouse_xrel  = mouse_xrel;
   ui->mouse_wheel = mouse_wheel;
+}
+
+static void UI_clamp_position(UI* ui) {
+  ui->x = max(0, min(ui->x, ui->max_x - UI_BORDER_SIZE));
+  ui->y = max(0, min(ui->y, ui->max_y - UI_BORDER_SIZE));
 }
 
 void handle_mouse_UI(UI* ui) {
@@ -532,8 +608,7 @@ void handle_mouse_UI(UI* ui) {
     ui->x += d_x;
     ui->y += d_y;
 
-    clamp(ui->x, 0, ui->max_x);
-    clamp(ui->y, 0, ui->max_y);
+    UI_clamp_position(ui);
 
     ui->mouse_flags |= MOUSE_LEFT_BLOCKED;
     ui->mouse_flags ^= MOUSE_DRAGGING_WINDOW;
@@ -640,12 +715,17 @@ void render_UI(UI* ui) {
   }
 }
 
-void blit_UI(UI* ui, uint8_t* target, int width) {
+void blit_UI(UI* ui, uint8_t* target, int width, int height, int ld) {
   if (!ui->active)
     return;
 
-  blur_background(ui, target, width);
-  blit_UI_internal(ui, target, width);
+  ui->max_x = width;
+  ui->max_y = height;
+
+  UI_clamp_position(ui);
+
+  blur_background(ui, target, width, height, ld);
+  blit_UI_internal(ui, target, width, height, ld);
 }
 
 void free_UI(UI* ui) {
@@ -653,7 +733,7 @@ void free_UI(UI* ui) {
   free(ui->pixels_mask);
   free(ui->scratch);
 
-  for (int i = 0; i < UI_PANELS_TAB_COUNT; i++) {
+  for (int i = 0; i < ui->tab_count; i++) {
     if (ui->tabs[i].count == 1) {
       free(ui->tabs[i].panels);
     }
@@ -664,28 +744,6 @@ void free_UI(UI* ui) {
       free(ui->tabs[i].subtabs);
     }
   }
-
-  /*for (int i = 0; i < UI_PANELS_GENERAL_COUNT; i++) {
-    free_UIPanel(ui->general_panels + i);
-  }
-  for (int i = 0; i < UI_PANELS_CAMERA_COUNT; i++) {
-    free_UIPanel(ui->camera_panels + i);
-  }
-  for (int i = 0; i < UI_PANELS_SKY_COUNT; i++) {
-    free_UIPanel(ui->sky_panels + i);
-  }
-  for (int i = 0; i < UI_PANELS_OCEAN_COUNT; i++) {
-    free_UIPanel(ui->ocean_panels + i);
-  }
-  for (int i = 0; i < UI_PANELS_TOY_COUNT; i++) {
-    free_UIPanel(ui->toy_panels + i);
-  }
-
-  free(ui->general_panels);
-  free(ui->camera_panels);
-  free(ui->sky_panels);
-  free(ui->ocean_panels);
-  free(ui->toy_panels);*/
 
   free(ui->tabs);
 }

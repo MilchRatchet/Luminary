@@ -2,10 +2,11 @@
 
 #include <stdlib.h>
 
+#include "buffer.h"
 #include "raytrace.h"
 
-RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
-  RealtimeInstance* realtime = (RealtimeInstance*) malloc(sizeof(RealtimeInstance));
+WindowInstance* window_instance_init(RaytraceInstance* instance) {
+  WindowInstance* window = (WindowInstance*) malloc(sizeof(WindowInstance));
 
   SDL_Init(SDL_INIT_VIDEO);
 
@@ -14,6 +15,10 @@ RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
 
   SDL_GetDisplayUsableBounds(0, &rect);
   SDL_GetDisplayBounds(0, &screen_size);
+
+  // max_width also acts as leading dimension so it must be slightly larger
+  window->max_width  = screen_size.w + 32;
+  window->max_height = screen_size.h;
 
   rect.y += screen_size.h - rect.h;
   rect.h -= screen_size.h - rect.h;
@@ -30,34 +35,29 @@ RealtimeInstance* init_realtime_instance(RaytraceInstance* instance) {
     rect.h = rect.w * ((float) instance->height) / instance->width;
   }
 
-  realtime->width  = (unsigned int) rect.w;
-  realtime->height = (unsigned int) rect.h;
+  window->width  = (unsigned int) rect.w;
+  window->height = (unsigned int) rect.h;
 
-  realtime->window = SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN);
+  window->window = SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 
-  realtime->window_surface = SDL_GetWindowSurface(realtime->window);
+  window_instance_update_pointer(window);
 
-  realtime->buffer = (XRGB8*) realtime->window_surface->pixels;
-  realtime->ld     = (unsigned int) realtime->window_surface->pitch;
+  device_buffer_init(&window->gpu_buffer);
+  device_buffer_malloc(window->gpu_buffer, sizeof(XRGB8), window->max_width * window->max_height);
 
-  realtime->gpu_buffer_size = max((unsigned int) rect.w, instance->width) * max((unsigned int) rect.h, instance->height);
-  initialize_8bit_frame(instance, max((unsigned int) rect.w, instance->width), max((unsigned int) rect.h, instance->height));
-
-  return realtime;
+  return window;
 }
 
-void update_8bit_frame(RealtimeInstance* realtime, RaytraceInstance* instance) {
-  const unsigned int required_buffer_size = max(realtime->width, instance->width) * max(realtime->height, instance->height);
-
-  if (required_buffer_size > realtime->gpu_buffer_size) {
-    free_8bit_frame(instance);
-    initialize_8bit_frame(instance, max(realtime->width, instance->width), max(realtime->height, instance->height));
-    realtime->gpu_buffer_size = required_buffer_size;
-  }
+void window_instance_update_pointer(WindowInstance* window) {
+  window->window_surface = SDL_GetWindowSurface(window->window);
+  window->buffer         = (XRGB8*) window->window_surface->pixels;
+  SDL_GetWindowSize(window->window, &(window->width), &(window->height));
+  window->ld = ((unsigned int) window->window_surface->pitch) / sizeof(XRGB8);
 }
 
-void free_realtime_instance(RealtimeInstance* realtime) {
-  SDL_DestroyWindow(realtime->window);
+void window_instance_free(WindowInstance* window) {
+  SDL_DestroyWindow(window->window);
   SDL_Quit();
-  free(realtime);
+  device_buffer_destroy(window->gpu_buffer);
+  free(window);
 }

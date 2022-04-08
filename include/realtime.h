@@ -4,18 +4,20 @@
 #include "SDL.h"
 #include "utils.h"
 
-struct RealtimeInstance {
+struct WindowInstance {
   unsigned int width;
   unsigned int height;
   unsigned int ld;
   SDL_Window* window;
   SDL_Surface* window_surface;
   XRGB8* buffer;
-  unsigned int gpu_buffer_size;
-} typedef RealtimeInstance;
+  DeviceBuffer* gpu_buffer;
+  unsigned int max_width;
+  unsigned int max_height;
+} typedef WindowInstance;
 
-RealtimeInstance* init_realtime_instance(RaytraceInstance* instance);
-void update_8bit_frame(RealtimeInstance* realtime, RaytraceInstance* instance);
-void free_realtime_instance(RealtimeInstance* realtime);
+WindowInstance* window_instance_init(RaytraceInstance* instance);
+void window_instance_update_pointer(WindowInstance* window);
+void window_instance_free(WindowInstance* window);
 
 #endif /* REALTIME_H */

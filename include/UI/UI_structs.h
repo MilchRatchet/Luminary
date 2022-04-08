@@ -47,6 +47,7 @@ struct UI {
   uint8_t* pixels;
   uint8_t* pixels_mask;
   UITab* tabs;
+  int tab_count;
   int* temporal_frames;
   void* scratch;
 } typedef UI;

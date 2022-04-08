@@ -491,12 +491,16 @@ extern "C" void free_textures_atlas(DeviceBuffer* texture_atlas, const int textu
   free(textures_cpu);
 }
 
+extern "C" void update_device_scene(RaytraceInstance* instance) {
+  gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
+}
+
 /*
  * Updates and uploades all dynamic data. Must be called at least once before using trace.
  * @param instance RaytraceInstance to be used.
  */
 extern "C" void prepare_trace(RaytraceInstance* instance) {
-  gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
+  update_device_scene(instance);
   gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   device_buffer_copy(instance->trace_result_buffer, instance->trace_result_temporal);
   update_special_lights(instance->scene_gpu);
@@ -671,9 +675,10 @@ extern "C" void free_8bit_frame(RaytraceInstance* instance) {
   device_buffer_free(instance->buffer_8bit);
 }
 
-extern "C" void copy_framebuffer_to_8bit(XRGB8* buffer, const int width, const int height, RGBF* source, RaytraceInstance* instance) {
-  convert_RGBF_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(width, height, source);
-  device_buffer_download(instance->buffer_8bit, buffer, sizeof(XRGB8) * width * height);
+extern "C" void copy_framebuffer_to_8bit(
+  RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld) {
+  convert_RGBF_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(gpu_source, gpu_scratch, width, height, ld);
+  cudaMemcpy(cpu_dest, gpu_scratch, sizeof(XRGB8) * ld * height, cudaMemcpyDeviceToHost);
 }
 
 extern "C" void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size) {

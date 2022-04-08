@@ -433,7 +433,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device_trace_count[threadIdx.x + blockIdx.x * blockDim.x]           = 0;
 }
 
-__global__ void convert_RGBF_to_XRGB8(const int width, const int height, const RGBF* source) {
+__global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int width, const int height, const int ld) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int amount    = width * height;
@@ -506,7 +506,7 @@ __global__ void convert_RGBF_to_XRGB8(const int width, const int height, const R
     converted_pixel.g      = (uint8_t) pixel.g;
     converted_pixel.b      = (uint8_t) pixel.b;
 
-    device.buffer_8bit[x + y * width] = converted_pixel;
+    dest[x + y * ld] = converted_pixel;
 
     id += blockDim.x * gridDim.x;
   }

@@ -50,8 +50,11 @@ void blit_color_shaded(uint8_t* dst, int x, int y, int ldd, int hd, int width, i
 }
 
 #if defined(__AVX2__)
-void blit_UI_internal(UI* ui, uint8_t* target, int width) {
-  const int k      = UI_WIDTH / 8;
+void blit_UI_internal(UI* ui, uint8_t* target, int width, int height, int ld) {
+  const int vis_width  = min(width - ui->x, UI_WIDTH);
+  const int vis_height = min(height - ui->y, UI_HEIGHT + UI_BORDER_SIZE);
+
+  const int k      = vis_width / 8;
   const int offset = ui->scroll_pos % PANEL_HEIGHT;
 
   const __m256i bg = _mm256_setr_epi8(
@@ -63,9 +66,9 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     BG_GREEN_H, BG_RED_H, 0);
 
   if (ui->border_hover) {
-    for (int i = 0; i < UI_BORDER_SIZE; i++) {
+    for (int i = 0; i < min(vis_height, UI_BORDER_SIZE); i++) {
       for (int j = 0; j < k; j++) {
-        const int target_index = (i + ui->y) * 4 * width + 4 * ui->x + j * 32;
+        const int target_index = (i + ui->y) * 4 * ld + 4 * ui->x + j * 32;
 
         __m256i pixel = _mm256_loadu_si256((__m256i*) (target + target_index));
         pixel         = _mm256_avg_epu8(bg_h, pixel);
@@ -74,9 +77,9 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     }
   }
   else {
-    for (int i = 0; i < UI_BORDER_SIZE; i++) {
+    for (int i = 0; i < min(vis_height, UI_BORDER_SIZE); i++) {
       for (int j = 0; j < k; j++) {
-        const int target_index = (i + ui->y) * 4 * width + 4 * ui->x + j * 32;
+        const int target_index = (i + ui->y) * 4 * ld + 4 * ui->x + j * 32;
 
         __m256i pixel = _mm256_loadu_si256((__m256i*) (target + target_index));
         pixel         = _mm256_avg_epu8(bg, pixel);
@@ -86,9 +89,9 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
   }
 
   if (ui->panel_hover == 0) {
-    for (int i = 0; i < PANEL_HEIGHT; i++) {
+    for (int i = 0; i < min(vis_height - UI_BORDER_SIZE, PANEL_HEIGHT); i++) {
       for (int j = 0; j < k; j++) {
-        const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * width + 4 * ui->x + j * 32;
+        const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * ld + 4 * ui->x + j * 32;
         const int ui_index     = j * 32 + i * UI_WIDTH * 4;
 
         __m256i ui_pixel = _mm256_loadu_si256((__m256i*) (ui->pixels + ui_index));
@@ -101,9 +104,9 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     }
   }
   else {
-    for (int i = 0; i < PANEL_HEIGHT; i++) {
+    for (int i = 0; i < min(vis_height - UI_BORDER_SIZE, PANEL_HEIGHT); i++) {
       for (int j = 0; j < k; j++) {
-        const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * width + 4 * ui->x + j * 32;
+        const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * ld + 4 * ui->x + j * 32;
         const int ui_index     = j * 32 + i * UI_WIDTH * 4;
 
         __m256i ui_pixel = _mm256_loadu_si256((__m256i*) (ui->pixels + ui_index));
@@ -116,14 +119,14 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     }
   }
 
-  const int hover_start = ui->panel_hover * PANEL_HEIGHT - ui->scroll_pos;
-  const int hover_end   = min((ui->panel_hover + 1) * PANEL_HEIGHT - ui->scroll_pos, UI_HEIGHT);
+  const int hover_start = min(vis_height - UI_BORDER_SIZE, ui->panel_hover * PANEL_HEIGHT - ui->scroll_pos);
+  const int hover_end   = min(vis_height - UI_BORDER_SIZE, (ui->panel_hover + 1) * PANEL_HEIGHT - ui->scroll_pos);
 
   int i = PANEL_HEIGHT;
 
   for (; i < hover_start; i++) {
     for (int j = 0; j < k; j++) {
-      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * width + 4 * ui->x + j * 32;
+      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * ld + 4 * ui->x + j * 32;
       const int ui_index     = j * 32 + (i + offset) * UI_WIDTH * 4;
 
       __m256i ui_pixel = _mm256_loadu_si256((__m256i*) (ui->pixels + ui_index));
@@ -137,7 +140,7 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
 
   for (; i < hover_end; i++) {
     for (int j = 0; j < k; j++) {
-      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * width + 4 * ui->x + j * 32;
+      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * ld + 4 * ui->x + j * 32;
       const int ui_index     = j * 32 + (i + offset) * UI_WIDTH * 4;
 
       __m256i ui_pixel = _mm256_loadu_si256((__m256i*) (ui->pixels + ui_index));
@@ -149,9 +152,9 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     }
   }
 
-  for (; i < UI_HEIGHT; i++) {
+  for (; i < min(vis_height - UI_BORDER_SIZE, UI_HEIGHT); i++) {
     for (int j = 0; j < k; j++) {
-      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * width + 4 * ui->x + j * 32;
+      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * ld + 4 * ui->x + j * 32;
       const int ui_index     = j * 32 + (i + offset) * UI_WIDTH * 4;
 
       __m256i ui_pixel = _mm256_loadu_si256((__m256i*) (ui->pixels + ui_index));
@@ -164,8 +167,11 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
   }
 }
 #else
-void blit_UI_internal(UI* ui, uint8_t* target, int width) {
-  const int k      = UI_WIDTH / 4;
+void blit_UI_internal(UI* ui, uint8_t* target, int width, int height, int ld) {
+  const int vis_width  = min(width - ui->x, UI_WIDTH);
+  const int vis_height = min(height - ui->y, UI_HEIGHT + UI_BORDER_SIZE);
+
+  const int k      = vis_width / 4;
   const int offset = ui->scroll_pos % PANEL_HEIGHT;
 
   const __m128i bg =
@@ -175,9 +181,9 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     BG_RED_H, 0);
 
   if (ui->border_hover) {
-    for (int i = 0; i < UI_BORDER_SIZE; i++) {
+    for (int i = 0; i < min(vis_height, UI_BORDER_SIZE); i++) {
       for (int j = 0; j < k; j++) {
-        const int target_index = (i + ui->y) * 4 * width + 4 * ui->x + j * 16;
+        const int target_index = (i + ui->y) * 4 * ld + 4 * ui->x + j * 16;
 
         __m128i pixel = _mm_loadu_si128((__m128i*) (target + target_index));
         pixel         = _mm_avg_epu8(bg_h, pixel);
@@ -186,9 +192,9 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     }
   }
   else {
-    for (int i = 0; i < UI_BORDER_SIZE; i++) {
+    for (int i = 0; i < min(vis_height, UI_BORDER_SIZE); i++) {
       for (int j = 0; j < k; j++) {
-        const int target_index = (i + ui->y) * 4 * width + 4 * ui->x + j * 16;
+        const int target_index = (i + ui->y) * 4 * ld + 4 * ui->x + j * 16;
 
         __m128i pixel = _mm_loadu_si128((__m128i*) (target + target_index));
         pixel         = _mm_avg_epu8(bg, pixel);
@@ -197,14 +203,14 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     }
   }
 
-  const int hover_start = ui->panel_hover * PANEL_HEIGHT;
-  const int hover_end   = (ui->panel_hover + 1) * PANEL_HEIGHT;
+  const int hover_start = min(vis_height - UI_BORDER_SIZE, ui->panel_hover * PANEL_HEIGHT - ui->scroll_pos);
+  const int hover_end   = min(vis_height - UI_BORDER_SIZE, (ui->panel_hover + 1) * PANEL_HEIGHT - ui->scroll_pos);
 
   int i = 0;
 
   for (; i < hover_start; i++) {
     for (int j = 0; j < k; j++) {
-      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * width + 4 * ui->x + j * 16;
+      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * ld + 4 * ui->x + j * 16;
       const int ui_index     = j * 16 + (i + offset) * UI_WIDTH * 4;
 
       __m128i ui_pixel = _mm_loadu_si128((__m128i*) (ui->pixels + ui_index));
@@ -218,7 +224,7 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
 
   for (; i < hover_end; i++) {
     for (int j = 0; j < k; j++) {
-      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * width + 4 * ui->x + j * 16;
+      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * ld + 4 * ui->x + j * 16;
       const int ui_index     = j * 16 + (i + offset) * UI_WIDTH * 4;
 
       __m128i ui_pixel = _mm_loadu_si128((__m128i*) (ui->pixels + ui_index));
@@ -230,9 +236,9 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width) {
     }
   }
 
-  for (; i < UI_HEIGHT; i++) {
+  for (; i < min(vis_height - UI_BORDER_SIZE, UI_HEIGHT); i++) {
     for (int j = 0; j < k; j++) {
-      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * width + 4 * ui->x + j * 16;
+      const int target_index = (i + UI_BORDER_SIZE + ui->y) * 4 * ld + 4 * ui->x + j * 16;
       const int ui_index     = j * 16 + (i + offset) * UI_WIDTH * 4;
 
       __m128i ui_pixel = _mm_loadu_si128((__m128i*) (ui->pixels + ui_index));
