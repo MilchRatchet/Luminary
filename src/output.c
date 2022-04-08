@@ -121,10 +121,8 @@ void offline_output(RaytraceInstance* instance) {
     denoise_with_optix(instance);
   }
 
-  if (instance->post_process_menu) {
-    device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), instance->width * instance->height);
-    device_buffer_copy(instance->frame_output, instance->frame_buffer);
-  }
+  device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), instance->width * instance->height);
+  device_buffer_copy(instance->frame_output, instance->frame_buffer);
 
   if (instance->scene_gpu.camera.bloom)
     apply_bloom(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));
@@ -135,26 +133,27 @@ void offline_output(RaytraceInstance* instance) {
   XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
   char* output_path = malloc(4096);
 
-  copy_framebuffer_to_8bit(
-    device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
-    instance->width);
-
-  switch (instance->image_format) {
-    case IMGFORMAT_QOI:
-      sprintf(output_path, "%s.qoi1", instance->settings.output_path);
-      store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
-      break;
-    case IMGFORMAT_PNG:
-    default:
-      sprintf(output_path, "%s.png1", instance->settings.output_path);
-      store_XRGB8_png(output_path, frame, instance->width, instance->height);
-      break;
-  }
-
   if (instance->post_process_menu) {
+    copy_framebuffer_to_8bit(
+      device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->width,
+      instance->height, instance->width);
+
+    switch (instance->image_format) {
+      case IMGFORMAT_QOI:
+        sprintf(output_path, "%s.qoi1", instance->settings.output_path);
+        store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
+        break;
+      case IMGFORMAT_PNG:
+      default:
+        sprintf(output_path, "%s.png1", instance->settings.output_path);
+        store_XRGB8_png(output_path, frame, instance->width, instance->height);
+        break;
+    }
+
     offline_post_process_menu(instance);
-    device_buffer_free(instance->frame_buffer);
   }
+
+  device_buffer_free(instance->frame_buffer);
 
   copy_framebuffer_to_8bit(
     device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
