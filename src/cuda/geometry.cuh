@@ -1,5 +1,5 @@
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks() {
-  const int task_count   = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
+  const int task_count   = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
   int light_trace_count  = device.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   int bounce_trace_count = device.bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
@@ -214,7 +214,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_tasks() {
-  const int task_count = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 5];
+  const int task_count = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device_trace_tasks + get_task_address(i));

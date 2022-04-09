@@ -253,7 +253,7 @@ __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device.task_counts[id * 5 + 2];
+  const int task_count  = device.task_counts[id * 6 + 2];
   const int task_offset = device.task_offsets[id * 5 + 2];
 
   for (int i = 0; i < task_count; i++) {
@@ -274,7 +274,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_sky_tasks() {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device.task_counts[id * 5 + 2];
+  const int task_count  = device.task_counts[id * 6 + 2];
   const int task_offset = device.task_offsets[id * 5 + 2];
 
   for (int i = 0; i < task_count; i++) {

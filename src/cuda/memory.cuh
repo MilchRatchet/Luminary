@@ -98,16 +98,16 @@ __device__ GeometryTask load_geometry_task(const void* ptr) {
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
   GeometryTask task;
-  task.position.x = data0.x;
-  task.position.y = data0.y;
-  task.position.z = data0.z;
-  task.ray_y      = data0.w;
+  task.index.x    = __float_as_uint(data0.x) & 0xffff;
+  task.index.y    = (__float_as_uint(data0.x) >> 16);
+  task.position.x = data0.y;
+  task.position.y = data0.z;
+  task.position.z = data0.w;
+  task.ray_y      = data1.x;
 
-  task.ray_xz  = data1.x;
-  task.hit_id  = __float_as_uint(data1.y);
-  task.index.x = __float_as_uint(data1.z) & 0xffff;
-  task.index.y = (__float_as_uint(data1.z) >> 16);
-  task.state   = __float_as_uint(data1.w);
+  task.ray_xz = data1.y;
+  task.hit_id = __float_as_uint(data1.z);
+  task.state  = __float_as_uint(data1.w);
 
   return task;
 }
@@ -117,16 +117,15 @@ __device__ OceanTask load_ocean_task(const void* ptr) {
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
   OceanTask task;
-  task.position.x = data0.x;
-  task.position.y = data0.y;
-  task.position.z = data0.z;
-  task.ray_y      = data0.w;
-
-  task.ray_xz   = data1.x;
-  task.distance = data1.y;
-  task.index.x  = __float_as_uint(data1.z) & 0xffff;
-  task.index.y  = (__float_as_uint(data1.z) >> 16);
-  task.state    = __float_as_uint(data1.w);
+  task.index.x    = __float_as_uint(data0.x) & 0xffff;
+  task.index.y    = (__float_as_uint(data0.x) >> 16);
+  task.position.x = data0.y;
+  task.position.y = data0.z;
+  task.position.z = data0.w;
+  task.ray_y      = data1.x;
+  task.ray_xz     = data1.y;
+  task.distance   = data1.z;
+  task.state      = __float_as_uint(data1.w);
 
   return task;
 }
@@ -136,14 +135,14 @@ __device__ SkyTask load_sky_task(const void* ptr) {
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
   SkyTask task;
-  task.origin.x = data0.x;
-  task.origin.y = data0.y;
-  task.origin.z = data0.z;
-  task.ray.x    = data0.w;
-  task.ray.y    = data1.x;
-  task.ray.z    = data1.y;
-  task.index.x  = __float_as_uint(data1.z) & 0xffff;
-  task.index.y  = (__float_as_uint(data1.z) >> 16);
+  task.index.x  = __float_as_uint(data0.x) & 0xffff;
+  task.index.y  = (__float_as_uint(data0.x) >> 16);
+  task.origin.x = data0.y;
+  task.origin.y = data0.z;
+  task.origin.z = data0.w;
+  task.ray.x    = data1.x;
+  task.ray.y    = data1.y;
+  task.ray.z    = data1.z;
   task.state    = __float_as_uint(data1.w);
 
   return task;
@@ -154,16 +153,15 @@ __device__ ToyTask load_toy_task(const void* ptr) {
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
   ToyTask task;
-  task.position.x = data0.x;
-  task.position.y = data0.y;
-  task.position.z = data0.z;
-  task.ray.x      = data0.w;
-
-  task.ray.y   = data1.x;
-  task.ray.z   = data1.y;
-  task.index.x = __float_as_uint(data1.z) & 0xffff;
-  task.index.y = (__float_as_uint(data1.z) >> 16);
-  task.state   = __float_as_uint(data1.w);
+  task.index.x    = __float_as_uint(data0.x) & 0xffff;
+  task.index.y    = (__float_as_uint(data0.x) >> 16);
+  task.position.x = data0.y;
+  task.position.y = data0.z;
+  task.position.z = data0.w;
+  task.ray.x      = data1.x;
+  task.ray.y      = data1.y;
+  task.ray.z      = data1.z;
+  task.state      = __float_as_uint(data1.w);
 
   return task;
 }
@@ -173,16 +171,15 @@ __device__ FogTask load_fog_task(const void* ptr) {
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
   FogTask task;
-  task.position.x = data0.x;
-  task.position.y = data0.y;
-  task.position.z = data0.z;
-  task.ray_y      = data0.w;
-
-  task.ray_xz   = data1.x;
-  task.distance = data1.y;
-  task.index.x  = __float_as_uint(data1.z) & 0xffff;
-  task.index.y  = (__float_as_uint(data1.z) >> 16);
-  task.state    = __float_as_uint(data1.w);
+  task.index.x    = __float_as_uint(data0.x) & 0xffff;
+  task.index.y    = (__float_as_uint(data0.x) >> 16);
+  task.position.x = data0.y;
+  task.position.y = data0.z;
+  task.position.z = data0.w;
+  task.ray_y      = data1.x;
+  task.ray_xz     = data1.y;
+  task.distance   = data1.z;
+  task.state      = __float_as_uint(data1.w);
 
   return task;
 }

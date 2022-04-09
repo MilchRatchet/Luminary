@@ -253,7 +253,7 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->bounce_trace_count, sizeof(uint16_t), thread_count);
 
   device_buffer_malloc(instance->trace_results, sizeof(TraceResult), max_task_count);
-  device_buffer_malloc(instance->task_counts, sizeof(uint16_t), 5 * thread_count);
+  device_buffer_malloc(instance->task_counts, sizeof(uint16_t), 6 * thread_count);
   device_buffer_malloc(instance->task_offsets, sizeof(uint16_t), 5 * thread_count);
   device_buffer_malloc(instance->randoms, sizeof(curandStateXORWOW_t), thread_count);
 

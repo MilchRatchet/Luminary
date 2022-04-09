@@ -150,7 +150,7 @@ __device__ float get_intersection_ocean(const vec3 origin, const vec3 ray, float
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count   = device.task_counts[id * 5 + 1];
+  const int task_count   = device.task_counts[id * 6 + 1];
   const int task_offset  = device.task_offsets[id * 5 + 1];
   int light_trace_count  = device.light_trace_count[id];
   int bounce_trace_count = device.bounce_trace_count[id];
@@ -246,7 +246,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device.task_counts[id * 5 + 1];
+  const int task_count  = device.task_counts[id * 6 + 1];
   const int task_offset = device.task_offsets[id * 5 + 1];
 
   for (int i = 0; i < task_count; i++) {

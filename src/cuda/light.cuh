@@ -5,8 +5,14 @@
 #include "utils.cuh"
 
 __global__ void generate_light_samples() {
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    const LightEvalData data = load_light_eval_data(offset);
+  const int task_count = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset     = get_task_address(i);
+    const ushort2 index  = __ldg((ushort2*) (device_trace_tasks + offset));
+    const uint32_t pixel = get_pixel_id(index.x, index.y);
+
+    const LightEvalData data = load_light_eval_data(pixel);
     LightSample sample;
     if (data.flags) {
       sample = sample_light(data.position);
@@ -15,10 +21,10 @@ __global__ void generate_light_samples() {
       sample.id     = LIGHT_ID_NONE;
       sample.weight = 0.0f;
     }
-    store_light_sample(device.light_samples, sample, offset);
+    store_light_sample(device.light_samples, sample, pixel);
 
     if (device_iteration_type != TYPE_CAMERA) {
-      device.light_eval_data[offset].flags = 0;
+      device.light_eval_data[pixel].flags = 0;
     }
   }
 }

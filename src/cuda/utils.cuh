@@ -71,44 +71,44 @@ struct LightEvalData {
 
 // ray_xz is horizontal angle
 struct GeometryTask {
+  ushort2 index;
   vec3 position;
   float ray_y;
   float ray_xz;
   uint32_t hit_id;
-  ushort2 index;
   uint32_t state;
 } typedef GeometryTask;
 
 struct SkyTask {
+  ushort2 index;
   vec3 origin;
   vec3 ray;
-  ushort2 index;
   uint32_t state;
 } typedef SkyTask;
 
 // Magnitude of ray gives distance
 struct OceanTask {
+  ushort2 index;
   vec3 position;
   float ray_y;
   float ray_xz;
   float distance;
-  ushort2 index;
   uint32_t state;
 } typedef OceanTask;
 
 struct ToyTask {
+  ushort2 index;
   vec3 position;
   vec3 ray;
-  ushort2 index;
   uint32_t state;
 } typedef ToyTask;
 
 struct FogTask {
+  ushort2 index;
   vec3 position;
   float ray_y;
   float ray_xz;
   float distance;
-  ushort2 index;
   uint32_t state;
 } typedef FogTask;
 
