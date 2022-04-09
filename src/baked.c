@@ -56,10 +56,10 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
   uint64_t total_length = 0;
 
   for (uint64_t i = 0; i < count; i++) {
-    memcpy(&data_offset, head + header_element_size * i, 8);
-    memcpy(&width, head + header_element_size * i + 8, 4);
-    memcpy(&height, head + header_element_size * i + 12, 4);
-    memcpy(&pixel_size, head + header_element_size * i + 16, 4);
+    memcpy(&data_offset, head + header_element_size * i, sizeof(uint64_t));
+    memcpy(&width, head + header_element_size * i + 8, sizeof(uint32_t));
+    memcpy(&height, head + header_element_size * i + 12, sizeof(uint32_t));
+    memcpy(&pixel_size, head + header_element_size * i + 16, sizeof(uint32_t));
 
     textures[i].width  = width;
     textures[i].height = height;
@@ -96,9 +96,11 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
 }
 
 static void free_textures(TextureRGBA* textures, uint64_t count) {
-  for (uint64_t i = 0; i < count; i++) {
-    free(textures[i].data);
-  }
+  if (count == 0)
+    return;
+
+  // All textures come from the same malloced buffer so only the first one needs to get freed
+  free(textures[0].data);
   free(textures);
 }
 
