@@ -136,11 +136,26 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     const int offset = get_task_address(i);
     TraceTask task   = load_trace_task(device_trace_tasks + offset);
 
+    const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
+
     float depth     = device_scene.camera.far_clip_distance;
     uint32_t hit_id = SKY_HIT;
 
-    if (is_first_ray() && !device_scene.material.bvh_alpha_cutoff) {
-      const uint32_t t_id = device.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
+    uint32_t light_id;
+
+    if (device_iteration_type == TYPE_LIGHT) {
+      light_id = device.light_sample_history[pixel];
+    }
+
+    if ((is_first_ray() && !device_scene.material.bvh_alpha_cutoff) || (device_iteration_type == TYPE_LIGHT)) {
+      uint32_t t_id;
+      if (device_iteration_type == TYPE_LIGHT) {
+        const TriangleLight tri_light = load_triangle_light(light_id);
+        t_id                          = tri_light.triangle_id;
+      }
+      else {
+        t_id = device.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
+      }
 
       if (t_id <= TRIANGLE_ID_LIMIT) {
         const float dist = bvh_triangle_intersection(load_traversal_triangle(t_id), task.origin, task.ray);
@@ -157,7 +172,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
 
       if (toy_dist < depth) {
         depth  = toy_dist;
-        hit_id = TOY_HIT;
+        hit_id = (device_iteration_type == TYPE_LIGHT && light_id != LIGHT_ID_TOY) ? REJECT_HIT : TOY_HIT;
       }
     }
 
@@ -166,7 +181,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
 
       if (ocean_dist < depth) {
         depth  = ocean_dist;
-        hit_id = OCEAN_HIT;
+        hit_id = (device_iteration_type == TYPE_LIGHT) ? REJECT_HIT : OCEAN_HIT;
       }
     }
 
@@ -278,7 +293,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     else if (hit_id == FOG_HIT) {
       fog_task_count++;
     }
-    else {
+    else if (hit_id <= TRIANGLE_ID_LIMIT) {
       geometry_task_count++;
     }
   }
@@ -288,6 +303,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   int sky_offset      = ocean_offset + ocean_task_count;
   int toy_offset      = sky_offset + sky_task_count;
   int fog_offset      = toy_offset + toy_task_count;
+  int rejects_offset  = fog_offset + fog_task_count;
   int k               = 0;
 
   device.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_offset;
@@ -319,11 +335,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     }
     else if (hit_id == FOG_HIT) {
       index          = fog_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count);
+      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count)
+                       || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + fog_task_count);
     }
-    else {
+    else if (hit_id <= TRIANGLE_ID_LIMIT) {
       index          = geometry_offset++;
       needs_swapping = (k >= geometry_task_count);
+    }
+    else {
+      index          = rejects_offset++;
+      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + fog_task_count);
     }
 
     if (needs_swapping) {
@@ -348,6 +369,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
+
+    if (hit_id == REJECT_HIT)
+      break;
 
     const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
 
@@ -418,7 +442,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     sky_task_count += (hit_id == SKY_HIT);
     ocean_task_count += (hit_id == OCEAN_HIT);
     fog_task_count += (hit_id == FOG_HIT);
-    geometry_task_count += (hit_id < DEBUG_LIGHT_HIT);
+    geometry_task_count += (hit_id <= TRIANGLE_ID_LIMIT);
 
     if (hit_id == TOY_HIT || hit_id == SKY_HIT) {
       data1.x = task.ray.x;
@@ -445,12 +469,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     __stcs(ptr + 1, data1);
   }
 
+  const uint16_t new_task_count = geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + fog_task_count;
+
   device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 0] = geometry_task_count;
   device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 1] = ocean_task_count;
   device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 2] = sky_task_count;
   device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 3] = toy_task_count;
   device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 4] = fog_task_count;
-  device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5] = task_count;
+  device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5] = new_task_count;
   device_trace_count[threadIdx.x + blockIdx.x * blockDim.x]           = 0;
 }
 

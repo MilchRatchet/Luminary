@@ -165,7 +165,7 @@ struct DevicePointers {
 #define OCEAN_HIT 0xfffffffeu
 #define TOY_HIT 0xfffffffdu
 #define FOG_HIT 0xfffffffcu
-#define DEBUG_LIGHT_HIT 0xfffffff0u
+#define REJECT_HIT 0xfffffff0u
 #define TRIANGLE_ID_LIMIT 0xefffffffu
 #define LIGHT_ID_ANY 0xfffffff0u
 #define TYPE_CAMERA 0x0u

@@ -324,7 +324,8 @@ __device__ void traverse_bvh(const bool check_alpha) {
         const float d = bvh_triangle_intersection_uv(triangle, origin, ray, coords);
 
         if (d < depth) {
-          bool opaque = true;
+          bool opaque        = true;
+          bool allow_any_hit = true;
 
           if (triangle.albedo_tex) {
             const UV tex_coords = load_triangle_tex_coords(triangle_index + triangle_task.x, coords);
@@ -333,11 +334,25 @@ __device__ void traverse_bvh(const bool check_alpha) {
             if (albedo.w <= device_scene.material.alpha_cutoff) {
               opaque = false;
             }
+
+            if (albedo.w < 1.0f) {
+              allow_any_hit = false;
+            }
           }
 
           if (opaque) {
-            depth  = d;
-            hit_id = triangle_index + triangle_task.x;
+            if (device_iteration_type == TYPE_LIGHT && allow_any_hit) {
+              depth           = -1.0f;
+              hit_id          = REJECT_HIT;
+              triangle_task.y = 0;
+              node_task.y     = 0;
+              stack_ptr       = 0;
+              break;
+            }
+            else {
+              depth  = d;
+              hit_id = triangle_index + triangle_task.x;
+            }
           }
         }
       }
@@ -345,8 +360,18 @@ __device__ void traverse_bvh(const bool check_alpha) {
         const float d = bvh_triangle_intersection(triangle, origin, ray);
 
         if (d < depth) {
-          depth  = d;
-          hit_id = triangle_index + triangle_task.x;
+          if (device_iteration_type == TYPE_LIGHT) {
+            depth           = -1.0f;
+            hit_id          = REJECT_HIT;
+            triangle_task.y = 0;
+            node_task.y     = 0;
+            stack_ptr       = 0;
+            break;
+          }
+          else {
+            depth  = d;
+            hit_id = triangle_index + triangle_task.x;
+          }
         }
       }
 
@@ -363,7 +388,7 @@ __device__ void traverse_bvh(const bool check_alpha) {
         }
       }
       else {
-        if (device_shading_mode == SHADING_HEAT && hit_id >= TRIANGLE_ID_LIMIT) {
+        if (device_shading_mode == SHADING_HEAT && hit_id > TRIANGLE_ID_LIMIT) {
           hit_id = 0;
         }
 
