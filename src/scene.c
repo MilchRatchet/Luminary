@@ -662,7 +662,6 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
            .edge2      = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z},
            .albedo_tex = albedo_tex};
     scene->traversal_triangles[i] = tt;
-    scene->triangles[i]           = triangle;
   }
 }
 

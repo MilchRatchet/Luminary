@@ -11,7 +11,7 @@
 #include "stars.h"
 #include "utils.h"
 
-#define head_size 0x68
+#define head_size 0x60
 #define magic 4919420911629456716ul
 #define version LUMINARY_VERSION_HASH
 
@@ -21,11 +21,10 @@
  * ------+--------------------+----------------------
  *  0x00 | Magic              | Version
  *  0x10 | Instance           | Triangles
- *  0x20 | TraversalTriangles | Nodes
- *  0x30 | Lights             | TextureAssignments
- *  0x40 | TexAlb             | TexMat
- *  0x50 | TexIllum           | StringsCount
- *  0x60 | Strings            |
+ *  0x20 | Nodes              | Lights
+ *  0x30 | TextureAssignments | TexAlb
+ *  0x40 | TexMat             | TexIllum
+ *  0x50 | StringsCount       | Strings
  * ------+--------------------+----------------------
  *
  * Texture Atlas Header (12 Bytes):
@@ -123,6 +122,24 @@ static char** load_strings(FILE* file, uint64_t count, uint64_t offset) {
   return strings;
 }
 
+static TraversalTriangle* construct_traversal_triangles(
+  const Triangle* triangles, const unsigned int triangles_length, const TextureAssignment* texture_assignments) {
+  TraversalTriangle* traversal_triangles = malloc(sizeof(TraversalTriangle) * triangles_length);
+
+  for (unsigned int i = 0; i < triangles_length; i++) {
+    const Triangle triangle   = triangles[i];
+    const uint32_t albedo_tex = texture_assignments[triangle.object_maps].albedo_map;
+    TraversalTriangle tt      = {
+           .vertex     = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
+           .edge1      = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
+           .edge2      = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z},
+           .albedo_tex = albedo_tex};
+    traversal_triangles[i] = tt;
+  }
+
+  return traversal_triangles;
+}
+
 RaytraceInstance* load_baked(const char* filename) {
   bench_tic();
   FILE* file = fopen(filename, "rb");
@@ -149,31 +166,29 @@ RaytraceInstance* load_baked(const char* filename) {
   fseek(file, head[3], SEEK_SET);
   fread(scene.triangles, sizeof(Triangle) * scene.triangles_length, 1, file);
 
-  scene.traversal_triangles = malloc(sizeof(TraversalTriangle) * scene.triangles_length);
-  fseek(file, head[4], SEEK_SET);
-  fread(scene.traversal_triangles, sizeof(TraversalTriangle) * scene.triangles_length, 1, file);
-
   scene.nodes = malloc(sizeof(Node8) * scene.nodes_length);
-  fseek(file, head[5], SEEK_SET);
+  fseek(file, head[4], SEEK_SET);
   fread(scene.nodes, sizeof(Node8) * scene.nodes_length, 1, file);
 
   scene.triangle_lights = malloc(sizeof(TriangleLight) * scene.triangle_lights_length);
-  fseek(file, head[6], SEEK_SET);
+  fseek(file, head[5], SEEK_SET);
   fread(scene.triangle_lights, sizeof(TriangleLight) * scene.triangle_lights_length, 1, file);
 
   scene.texture_assignments = malloc(sizeof(TextureAssignment) * scene.materials_length);
-  fseek(file, head[7], SEEK_SET);
+  fseek(file, head[6], SEEK_SET);
   fread(scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length, 1, file);
 
-  TextureRGBA* albedo_tex = load_textures(file, instance->albedo_atlas_length, head[8]);
+  TextureRGBA* albedo_tex = load_textures(file, instance->albedo_atlas_length, head[7]);
   void* albedo_atlas      = initialize_textures(albedo_tex, instance->albedo_atlas_length);
   free_textures(albedo_tex, instance->albedo_atlas_length);
-  TextureRGBA* illuminance_tex = load_textures(file, instance->illuminance_atlas_length, head[9]);
+  TextureRGBA* illuminance_tex = load_textures(file, instance->illuminance_atlas_length, head[8]);
   void* illuminance_atlas      = initialize_textures(illuminance_tex, instance->illuminance_atlas_length);
   free_textures(illuminance_tex, instance->illuminance_atlas_length);
-  TextureRGBA* material_tex = load_textures(file, instance->material_atlas_length, head[10]);
+  TextureRGBA* material_tex = load_textures(file, instance->material_atlas_length, head[9]);
   void* material_atlas      = initialize_textures(material_tex, instance->material_atlas_length);
   free_textures(material_tex, instance->material_atlas_length);
+
+  scene.traversal_triangles = construct_traversal_triangles(scene.triangles, scene.triangles_length, scene.texture_assignments);
 
   RaytraceInstance* final = init_raytracing(
     instance->settings, albedo_atlas, instance->albedo_atlas_length, illuminance_atlas, instance->illuminance_atlas_length, material_atlas,
@@ -184,8 +199,8 @@ RaytraceInstance* load_baked(const char* filename) {
   generate_stars(final);
   generate_clouds(final);
 
-  uint64_t strings_count = head[11];
-  char** strings         = load_strings(file, strings_count, head[12]);
+  uint64_t strings_count = head[10];
+  char** strings         = load_strings(file, strings_count, head[11]);
 
   final->settings.output_path       = strings[0];
   final->settings.mesh_files        = strings + 1;
@@ -280,19 +295,18 @@ void serialize_baked(RaytraceInstance* instance) {
   head[1] = version;
   head[2] = write_data(file, 1, sizeof(RaytraceInstance), instance, CPU_PTR);
   head[3] = write_data(file, instance->scene_gpu.triangles_length, sizeof(Triangle), instance->scene_gpu.triangles, GPU_PTR);
-  head[4] = write_data(file, instance->scene_gpu.triangles_length, sizeof(TraversalTriangle), instance->scene_gpu.traversal_triangles, 1);
-  head[5] = write_data(file, instance->scene_gpu.nodes_length, sizeof(Node8), instance->scene_gpu.nodes, GPU_PTR);
-  head[6] =
+  head[4] = write_data(file, instance->scene_gpu.nodes_length, sizeof(Node8), instance->scene_gpu.nodes, GPU_PTR);
+  head[5] =
     write_data(file, instance->scene_gpu.triangle_lights_length, sizeof(TriangleLight), instance->scene_gpu.triangle_lights, GPU_PTR);
-  head[7]  = write_data(file, instance->scene_gpu.materials_length, sizeof(TextureAssignment), instance->scene_gpu.texture_assignments, 1);
-  head[8]  = write_data(file, instance->albedo_atlas_length, 1, device_buffer_get_pointer(instance->albedo_atlas), TEX_PTR);
-  head[9]  = write_data(file, instance->illuminance_atlas_length, 1, device_buffer_get_pointer(instance->illuminance_atlas), TEX_PTR);
-  head[10] = write_data(file, instance->material_atlas_length, 1, device_buffer_get_pointer(instance->material_atlas), TEX_PTR);
-  head[11] = 1 + instance->settings.mesh_files_count;
+  head[6]  = write_data(file, instance->scene_gpu.materials_length, sizeof(TextureAssignment), instance->scene_gpu.texture_assignments, 1);
+  head[7]  = write_data(file, instance->albedo_atlas_length, 1, device_buffer_get_pointer(instance->albedo_atlas), TEX_PTR);
+  head[8]  = write_data(file, instance->illuminance_atlas_length, 1, device_buffer_get_pointer(instance->illuminance_atlas), TEX_PTR);
+  head[9]  = write_data(file, instance->material_atlas_length, 1, device_buffer_get_pointer(instance->material_atlas), TEX_PTR);
+  head[10] = 1 + instance->settings.mesh_files_count;
 
   void* strings;
   uint64_t strings_length = serialize_strings(instance, &strings);
-  head[12]                = write_data(file, 1, strings_length, strings, CPU_PTR);
+  head[11]                = write_data(file, 1, strings_length, strings, CPU_PTR);
   free(strings);
 
   fseek(file, 0, SEEK_SET);

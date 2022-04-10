@@ -734,8 +734,6 @@ extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
 
     uint32_t encoded_size;
 
-    printf("Before: %ux%u (%u)\n", tex.width, tex.height, tex.pitch);
-
     void* encoded_data = qoi_encode_RGBA8(&tex, (int*) &encoded_size);
 
     memcpy(cpu_ptr + header_element_size * i + 0x00, &encoded_size, sizeof(uint32_t));
