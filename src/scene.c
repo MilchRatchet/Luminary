@@ -480,6 +480,10 @@ static void parse_toy_settings(Toy* toy, char* line) {
     case 6869189279479121234u:
       sscanf(value, "%f\n", &toy->refractive_index);
       break;
+    /* FLASHLIG */
+    case 5136720723510905926u:
+      sscanf(value, "%d\n", &toy->flashlight_mode);
+      break;
     default:
       error_message("%8.8s (%zu) is not a valid TOY setting.", line, key);
       break;
@@ -565,6 +569,7 @@ static Scene get_default_scene() {
   scene.toy.emission.g       = 0.0f;
   scene.toy.emission.b       = 0.0f;
   scene.toy.emission.a       = 0.0f;
+  scene.toy.flashlight_mode  = 0;
 
   scene.sky.geometry_offset.x         = 0.0f;
   scene.sky.geometry_offset.y         = 0.1f;
@@ -696,8 +701,11 @@ RaytraceInstance* load_scene(const char* filename) {
 
   Wavefront_Content content = create_wavefront_content();
 
-  while (!feof(file)) {
+  while (1) {
     fgets(line, LINE_SIZE, file);
+
+    if (feof(file))
+      break;
 
     if (line[0] == 'G') {
       parse_general_settings(&general, &content, line + 7 + 1);
@@ -1043,6 +1051,8 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf(line, "TOY EMISSIVE %d\n", instance->scene_gpu.toy.emissive);
   fputs(line, file);
   sprintf(line, "TOY REFRACT_ %f\n", instance->scene_gpu.toy.refractive_index);
+  fputs(line, file);
+  sprintf(line, "TOY FLASHLIG %d\n", instance->scene_gpu.toy.flashlight_mode);
   fputs(line, file);
 
   free(line);

@@ -122,6 +122,7 @@ struct Toy {
   RGBAF albedo;
   RGBAF material;
   RGBAF emission;
+  int flashlight_mode;
 } typedef Toy;
 
 struct Star {

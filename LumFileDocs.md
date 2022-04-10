@@ -304,6 +304,9 @@ Emission color of the toy. Numbers must be in the range [0,1].
 `TOY REFRACT_ [FP32]`<br/>
 Refraction index of the toy relative to the air. Number must be at least 1.
 
+`TOY FLASHLIG [INT32]`<br/>
+Set 1 to activate flashlight mode, that is, the toy is behind the camera and emission only happens towards the front, 0 else.
+
 # Meshes
 
 Meshes must be in the Wavefront OBJ (`*.obj`) file format. Geometric vertices, texture coordinates, vertex normals and triangle/quad faces are supported. Textures are to be referenced through a `*.mtl` which has the same name as the `*.obj` file.

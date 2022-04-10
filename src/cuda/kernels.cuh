@@ -167,7 +167,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
-    if (device_scene.toy.active) {
+    if (
+      device_scene.toy.active && (!device_scene.toy.flashlight_mode || (device_iteration_type == TYPE_LIGHT && light_id == LIGHT_ID_TOY))) {
       const float toy_dist = get_toy_distance(task.origin, task.ray);
 
       if (toy_dist < depth) {

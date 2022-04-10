@@ -212,6 +212,23 @@ extern "C" void center_toy_at_camera(RaytraceInstance* instance) {
 }
 
 /*
+ * Positions toy behind the camera.
+ * @param instance RaytraceInstance to be used.
+ */
+static void toy_flashlight_set_position(RaytraceInstance* instance) {
+  const Quaternion q = get_rotation_quaternion(instance->scene_gpu.camera.rotation);
+
+  vec3 offset;
+  offset.x = 0.0f;
+  offset.y = -0.5f;
+  offset.z = 0.0f;
+
+  offset = rotate_vector_by_quaternion(offset, q);
+
+  instance->scene_gpu.toy.position = add_vector(instance->scene_gpu.camera.pos, offset);
+}
+
+/*
  * Allocates all pixel count related buffers.
  * @param instance RaytraceInstance to be used.
  */
@@ -503,6 +520,9 @@ extern "C" void update_device_scene(RaytraceInstance* instance) {
  * @param instance RaytraceInstance to be used.
  */
 extern "C" void prepare_trace(RaytraceInstance* instance) {
+  if (instance->scene_gpu.toy.flashlight_mode) {
+    toy_flashlight_set_position(instance);
+  }
   update_device_scene(instance);
   gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   device_buffer_copy(instance->trace_result_buffer, instance->trace_result_temporal);
