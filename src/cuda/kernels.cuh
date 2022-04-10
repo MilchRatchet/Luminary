@@ -147,7 +147,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       light_id = device.light_sample_history[pixel];
     }
 
-    if ((is_first_ray() && !device_scene.material.bvh_alpha_cutoff) || (device_iteration_type == TYPE_LIGHT)) {
+    if (
+      (is_first_ray() && !device_scene.material.bvh_alpha_cutoff)
+      || (device_iteration_type == TYPE_LIGHT && light_id <= TRIANGLE_ID_LIMIT)) {
       uint32_t t_id;
       if (device_iteration_type == TYPE_LIGHT) {
         const TriangleLight tri_light = load_triangle_light(light_id);
