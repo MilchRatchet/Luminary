@@ -150,6 +150,9 @@ extern "C" float get_auto_exposure_from_optix(void* input, RaytraceInstance* ins
   float brightness;
   device_buffer_download_full(denoise_setup.hdr_intensity, &brightness);
 
+  if (isnan(brightness) || isinf(brightness) || brightness < 0.0f)
+    return exposure;
+
   const float lerp_factor = 0.2f * (1.0f - 1.0f / (1 + instance->temporal_frames));
 
   return lerp(exposure, target_exposure * log2f(1.0f + brightness), lerp_factor);
