@@ -241,7 +241,7 @@ static inline TextureRGBA default_texture() {
   data[1]              = default_pixel;
   data[2]              = default_pixel;
   data[3]              = default_pixel;
-  TextureRGBA fallback = {.data = data, .height = 2, .width = 2, .type = TexDataUINT8};
+  TextureRGBA fallback = {.data = data, .height = 2, .width = 2, .pitch = 2, .type = TexDataUINT8};
 
   return fallback;
 }
@@ -534,7 +534,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   free(IHDR);
 
-  TextureRGBA result = {.width = width, .height = height};
+  TextureRGBA result = {.width = width, .height = height, .pitch = width};
 
   uint8_t* chunk = (uint8_t*) malloc(8);
 

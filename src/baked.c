@@ -6,6 +6,7 @@
 #include "bench.h"
 #include "buffer.h"
 #include "config.h"
+#include "qoi.h"
 #include "raytrace.h"
 #include "stars.h"
 #include "utils.h"
@@ -27,12 +28,10 @@
  *  0x60 | Strings            |
  * ------+--------------------+----------------------
  *
- * Texture Atlas Header (32 Bytes):
- * 0x00 - Relative Offset (8 Bytes)
- * 0x08 - Width (4 Bytes)
- * 0x0C - Height (4 Bytes)
- * 0x10 - Pixel Size (4 Bytes)
- * 0x14 - Padding (12 Bytes)
+ * Texture Atlas Header (12 Bytes):
+ * 0x00 - Size in bytes (4 bytes)
+ * 0x04 - Width (4 bytes)
+ * 0x08 - Height (4 bytes)
  *
  * Strings Header: (First string is output path, rest is mesh paths)
  * 0x00 - Relative Offset (8 Bytes)
@@ -42,7 +41,7 @@
  */
 
 static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
-  const uint32_t header_element_size = 32;
+  const uint32_t header_element_size = 12;
   const uint64_t header_size         = header_element_size * count;
 
   uint8_t* head = malloc(header_size);
@@ -50,46 +49,37 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
   fread(head, header_size, 1, file);
 
   TextureRGBA* textures = malloc(sizeof(TextureRGBA) * count);
-  uint64_t data_offset;
-  uint32_t width, height, pixel_size;
-  uint64_t amount;
+  uint32_t width, height, data_size;
   uint64_t total_length = 0;
 
   for (uint64_t i = 0; i < count; i++) {
-    memcpy(&data_offset, head + header_element_size * i, sizeof(uint64_t));
-    memcpy(&width, head + header_element_size * i + 8, sizeof(uint32_t));
-    memcpy(&height, head + header_element_size * i + 12, sizeof(uint32_t));
-    memcpy(&pixel_size, head + header_element_size * i + 16, sizeof(uint32_t));
+    memcpy(&data_size, head + header_element_size * i + 0x00, sizeof(uint32_t));
+    memcpy(&width, head + header_element_size * i + 0x04, sizeof(uint32_t));
+    memcpy(&height, head + header_element_size * i + 0x08, sizeof(uint32_t));
 
     textures[i].width  = width;
     textures[i].height = height;
+    textures[i].type   = TexDataUINT8;
 
-    switch (pixel_size) {
-      case sizeof(RGBA8):
-        textures[i].type = TexDataUINT8;
-        break;
-      case sizeof(RGBAF):
-        textures[i].type = TexDataFP32;
-        break;
-      default:
-        crash_message("Baked file texture has invalid pixel size of %d", pixel_size);
-        break;
-    }
-
-    amount           = width * height;
-    textures[i].data = (void*) (data_offset - header_size);
-    total_length += amount * pixel_size;
+    textures[i].data = (void*) ((uint64_t) (data_size));
+    total_length += data_size;
   }
 
-  RGBAF* data = malloc(total_length);
+  uint8_t* encoded_data = malloc(total_length);
 
   fseek(file, offset + header_size, SEEK_SET);
-  fread(data, total_length, 1, file);
+  fread(encoded_data, total_length, 1, file);
+
+  size_t encoded_offset = 0;
 
   for (uint64_t i = 0; i < count; i++) {
-    uint8_t* ptr = (uint8_t*) textures[i].data;
-    ptr += (uint64_t) data;
-    textures[i].data = (void*) ptr;
+    const uint64_t size = (uint64_t) textures[i].data;
+    TextureRGBA* tex    = qoi_decode_RGBA8((void*) (encoded_data + encoded_offset), size);
+    textures[i].data    = tex->data;
+    textures[i].pitch   = tex->width;
+    free(tex);
+
+    encoded_offset += size;
   }
 
   return textures;

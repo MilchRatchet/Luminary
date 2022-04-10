@@ -51,7 +51,7 @@ WindowInstance* window_instance_init(RaytraceInstance* instance) {
 void window_instance_update_pointer(WindowInstance* window) {
   window->window_surface = SDL_GetWindowSurface(window->window);
   window->buffer         = (XRGB8*) window->window_surface->pixels;
-  SDL_GetWindowSize(window->window, &(window->width), &(window->height));
+  SDL_GetWindowSize(window->window, (int*) &(window->width), (int*) &(window->height));
   window->ld = ((unsigned int) window->window_surface->pitch) / sizeof(XRGB8);
 }
 

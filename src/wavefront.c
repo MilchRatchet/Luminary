@@ -40,27 +40,31 @@ Wavefront_Content create_wavefront_content() {
   content.material_maps           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
   content.material_maps_length    = 1;
 
-  content.albedo_maps[0].width              = 1;
-  content.albedo_maps[0].height             = 1;
-  content.albedo_maps[0].type               = TexDataUINT8;
-  content.albedo_maps[0].data               = (RGBA8*) malloc(sizeof(RGBA8));
-  ((RGBA8*) content.albedo_maps[0].data)->r = 230;
-  ((RGBA8*) content.albedo_maps[0].data)->g = 230;
-  ((RGBA8*) content.albedo_maps[0].data)->b = 230;
-  ((RGBA8*) content.albedo_maps[0].data)->a = 255;
-  content.illuminance_maps[0].width         = 1;
-  content.illuminance_maps[0].height        = 1;
-  content.illuminance_maps[0].type          = TexDataUINT8;
-  content.illuminance_maps[0].data          = (RGBA8*) malloc(sizeof(RGBA8));
-  memset(content.illuminance_maps[0].data, 0, sizeof(RGBA8));
-  content.material_maps[0].width              = 1;
-  content.material_maps[0].height             = 1;
-  content.material_maps[0].type               = TexDataUINT8;
-  content.material_maps[0].data               = (RGBA8*) malloc(sizeof(RGBA8));
-  ((RGBA8*) content.material_maps[0].data)->r = 50;
-  ((RGBA8*) content.material_maps[0].data)->g = 0;
-  ((RGBA8*) content.material_maps[0].data)->b = 1;
-  ((RGBA8*) content.material_maps[0].data)->a = 0;
+  RGBA8 default_albedo   = {.r = 230, .g = 230, .b = 230, .a = 255};
+  RGBA8 default_material = {.r = 50, .g = 0, .b = 1, .a = 255};
+
+  content.albedo_maps[0].width  = 4;
+  content.albedo_maps[0].height = 4;
+  content.albedo_maps[0].pitch  = 4;
+  content.albedo_maps[0].type   = TexDataUINT8;
+  content.albedo_maps[0].data   = (RGBA8*) malloc(sizeof(RGBA8) * 16);
+  for (int i = 0; i < 16; i++) {
+    ((RGBA8*) content.albedo_maps[0].data)[i] = default_albedo;
+  }
+  content.illuminance_maps[0].width  = 4;
+  content.illuminance_maps[0].height = 4;
+  content.illuminance_maps[0].pitch  = 4;
+  content.illuminance_maps[0].type   = TexDataUINT8;
+  content.illuminance_maps[0].data   = (RGBA8*) malloc(sizeof(RGBA8) * 16);
+  memset(content.illuminance_maps[0].data, 0, sizeof(RGBA8) * 16);
+  content.material_maps[0].width  = 4;
+  content.material_maps[0].height = 4;
+  content.material_maps[0].pitch  = 4;
+  content.material_maps[0].type   = TexDataUINT8;
+  content.material_maps[0].data   = (RGBA8*) malloc(sizeof(RGBA8) * 16);
+  for (int i = 0; i < 16; i++) {
+    ((RGBA8*) content.material_maps[0].data)[i] = default_material;
+  }
 
   content.texture_list           = malloc(sizeof(Wavefront_TextureList));
   content.texture_list->textures = malloc(sizeof(Wavefront_TextureInstance) * 16);

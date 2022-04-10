@@ -53,3 +53,36 @@ int store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, c
 
   return ret;
 }
+
+void* qoi_encode_RGBA8(const TextureRGBA* tex, int* encoded_size) {
+  if (!encoded_size || !tex) {
+    return (void*) 0;
+  }
+
+  if (tex->type != TexDataUINT8) {
+    return (void*) 0;
+  }
+
+  const qoi_desc desc = {.width = tex->pitch, .height = tex->height, .channels = 4, .colorspace = QOI_SRGB};
+
+  return qoi_encode(tex->data, &desc, encoded_size);
+}
+
+TextureRGBA* qoi_decode_RGBA8(const void* data, const int size) {
+  if (!data) {
+    return (TextureRGBA*) 0;
+  }
+
+  qoi_desc desc;
+  void* decoded_data = qoi_decode(data, size, &desc, 4);
+
+  TextureRGBA* tex = malloc(sizeof(TextureRGBA));
+
+  tex->data   = decoded_data;
+  tex->width  = desc.width;
+  tex->pitch  = desc.width;
+  tex->height = desc.height;
+  tex->type   = TexDataUINT8;
+
+  return tex;
+}

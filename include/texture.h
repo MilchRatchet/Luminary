@@ -21,6 +21,7 @@ enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1 } typedef TextureDataTy
 struct TextureRGBA {
   unsigned int width;
   unsigned int height;
+  unsigned int pitch;
   TextureDataType type;
   void* data;
 } typedef TextureRGBA;
