@@ -153,6 +153,7 @@ void print_info(const char* format, ...) {
   write_to_log_buffer(size);
 
   printf("\x1B[1m%s\033[0m\n", print_buffer);
+  fflush(stdout);
 }
 
 /*
@@ -168,6 +169,7 @@ void print_warn(const char* format, ...) {
   write_to_log_buffer(size);
 
   printf("\x1B[93m\x1B[1m%s\033[0m\n", print_buffer);
+  fflush(stdout);
 }
 
 /*
@@ -183,6 +185,7 @@ void print_error(const char* format, ...) {
   write_to_log_buffer(size);
 
   printf("\x1B[91m\x1B[1m%s\033[0m\n", print_buffer);
+  fflush(stdout);
 }
 
 /*
@@ -198,6 +201,7 @@ void print_crash(const char* format, ...) {
   write_to_log_buffer(size);
 
   printf("\x1B[95m\x1B[1m%s\033[0m\n", print_buffer);
+  fflush(stdout);
 
   exit_program();
 }
