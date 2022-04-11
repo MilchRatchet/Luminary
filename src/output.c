@@ -178,8 +178,7 @@ void offline_output(RaytraceInstance* instance) {
   free(output_path);
   free(frame);
 
-  info_message("Luminary can now be closed.");
-  system("Pause");
+  info_message("Offline render completed.");
 }
 
 static vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {

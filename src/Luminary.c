@@ -186,8 +186,6 @@ int main(int argc, char* argv[]) {
   free_atlases(instance);
   free_outputs(instance);
 
-  info_message("Instance freed.");
-
   write_log();
 
   return 0;
