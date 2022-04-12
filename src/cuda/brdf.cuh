@@ -228,6 +228,10 @@ __device__ LightSample sample_light(const vec3 position) {
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
 
+  const float ran = white_noise();
+
+  uint32_t ran_weight = (uint32_t) (ran * ((uint32_t) 0xffff));
+
   for (int i = 0; i < reservoir_sampling_size; i++) {
     const float r1       = white_noise();
     uint32_t light_index = (uint32_t) (r1 * light_count_float);
@@ -267,7 +271,8 @@ __device__ LightSample sample_light(const vec3 position) {
 
     weight_sum += light.weight;
 
-    const float r2 = white_noise();
+    ran_weight     = xorshift_uint32(ran_weight);
+    const float r2 = ((float) (ran_weight & 0xffff)) / ((float) 0xffff);
 
     if (r2 < light.weight / weight_sum) {
       selected = light;

@@ -2,6 +2,7 @@
 #define CU_LIGHT_H
 
 #include "brdf.cuh"
+#include "math.cuh"
 #include "utils.cuh"
 
 __global__ void generate_light_samples() {
@@ -30,19 +31,31 @@ __global__ void generate_light_samples() {
 }
 
 __global__ void spatial_resampling(LightSample* input, LightSample* output) {
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    const LightEvalData data  = load_light_eval_data(offset);
-    const LightSample current = load_light_sample(input, offset);
+  const int task_count = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset     = get_task_address(i);
+    const ushort2 index  = __ldcs((ushort2*) (device_trace_tasks + offset));
+    const uint32_t pixel = get_pixel_id(index.x, index.y);
+
+    const LightEvalData data  = load_light_eval_data(pixel);
+    const LightSample current = load_light_sample(input, pixel);
 
     LightSample selected = current;
 
     if (data.flags) {
-      const int x = offset % device_width;
-      const int y = offset / device_width;
+      const float ran1 = white_noise();
+      const float ran2 = white_noise();
+
+      uint32_t ran_x = 1 + ran1 * 64;
+      uint32_t ran_y = 1 + ran2 * 64;
 
       for (int i = 0; i < device_spatial_samples; i++) {
-        int sample_x = x + (int) (2.0f * (white_noise() - 0.5f) * 30.0f);
-        int sample_y = y + (int) (2.0f * (white_noise() - 0.5f) * 30.0f);
+        ran_x = xorshift_uint32(ran_x);
+        ran_y = xorshift_uint32(ran_y);
+
+        int sample_x = index.x + ((ran_x & 0x3f) - 32);
+        int sample_y = index.y + ((ran_y & 0x3f) - 32);
 
         sample_x = max(sample_x, 0);
         sample_y = max(sample_y, 0);
@@ -58,7 +71,7 @@ __global__ void spatial_resampling(LightSample* input, LightSample* output) {
       }
     }
 
-    store_light_sample(output, selected, offset);
+    store_light_sample(output, selected, pixel);
   }
 }
 
