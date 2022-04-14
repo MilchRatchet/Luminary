@@ -1046,4 +1046,8 @@ __device__ float sample_sphere_solid_angle(const vec3 p, const float r, const ve
   return 2.0f * PI * a * a;
 }
 
+__device__ int material_is_mirror(const float roughness, const float metallic) {
+  return (roughness < 0.1f && metallic > 0.9f);
+}
+
 #endif /* CU_MATH_H */

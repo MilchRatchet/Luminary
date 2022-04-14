@@ -130,10 +130,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {
-      write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
+      const int is_mirror = material_is_mirror(roughness, metallic);
+
+      if (!is_mirror)
+        write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
 
       const vec3 V               = scale_vector(task.ray, -1.0f);
-      const int use_light_sample = (roughness > 0.1f || metallic < 0.9f) && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
+      const int use_light_sample = !is_mirror && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
