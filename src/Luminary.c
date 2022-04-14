@@ -98,6 +98,7 @@ int main(int argc, char* argv[]) {
   int height                   = 0;
   OutputImageFormat img_format = IMGFORMAT_PNG;
   int post_process_menu        = 0;
+  int unittest                 = 0;
 
   for (int i = 2; i < argc; i++) {
     if (custom_samples) {
@@ -119,6 +120,7 @@ int main(int argc, char* argv[]) {
     custom_width   = parse_command(argv[i], "-w", "--width");
     custom_height  = parse_command(argv[i], "-h", "--height");
     post_process_menu |= parse_command(argv[i], "-p", "--post-menu");
+    unittest |= parse_command(argv[i], "-u", "--unittest");
 
     if (parse_command(argv[i], (char*) 0, "--png")) {
       img_format = IMGFORMAT_PNG;
@@ -155,6 +157,13 @@ int main(int argc, char* argv[]) {
     default:
       instance = load_scene(argv[1]);
       break;
+  }
+
+  if (unittest) {
+    if (brdf_unittest(0.95f))
+      error_message("UNITTEST - BRDF failed.");
+
+    return 0;
   }
 
   instance->realtime = !offline;

@@ -65,6 +65,9 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
 -p, --post-menu
         open post process menu after rendering an image in offline mode
 
+-u, --unittest
+        run a test suite, no rendering is done
+
     --qoi
         set output image format to QOI
 

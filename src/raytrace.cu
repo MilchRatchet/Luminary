@@ -14,6 +14,7 @@
 #include "config.h"
 #include "cuda/bloom.cuh"
 #include "cuda/brdf.cuh"
+#include "cuda/brdf_unittest.cuh"
 #include "cuda/bvh.cuh"
 #include "cuda/cloudgen.cuh"
 #include "cuda/denoise.cuh"

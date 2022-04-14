@@ -42,6 +42,7 @@ void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size);
 void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count);
 void update_device_pointers(RaytraceInstance* instance);
 void free_host_memory(void* ptr);
+int brdf_unittest(const float tolerance);
 
 #if __cplusplus
 }
