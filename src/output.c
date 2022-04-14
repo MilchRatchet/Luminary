@@ -11,7 +11,6 @@
 #include "UI/UI.h"
 #include "bench.h"
 #include "buffer.h"
-#include "denoiser.h"
 #include "frametime.h"
 #include "log.h"
 #include "png.h"
@@ -118,7 +117,10 @@ void offline_output(RaytraceInstance* instance) {
   free_inputs(instance);
 
   if (instance->denoiser) {
-    denoise_with_optix(instance);
+    optix_denoise_create(instance);
+    DeviceBuffer* denoise_output = optix_denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
+    device_buffer_copy(denoise_output, instance->frame_output);
+    optix_denoise_free(instance);
   }
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), instance->width * instance->height);
@@ -272,8 +274,8 @@ void realtime_output(RaytraceInstance* instance) {
 
   int make_image = 0;
 
-  char* title             = (char*) malloc(4096);
-  instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
+  char* title = (char*) malloc(4096);
+  optix_denoise_create(instance);
 
   void* gpu_scratch = device_buffer_get_pointer(window->gpu_buffer);
 
@@ -289,14 +291,19 @@ void realtime_output(RaytraceInstance* instance) {
     sample_frametime(&frametime_trace);
 
     start_frametime(&frametime_post);
+
     if (instance->denoiser) {
-      instance->frame_final_device = denoise_with_optix_realtime(instance->denoise_setup);
+      DeviceBuffer* denoise_output = optix_denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
+
       if (instance->scene_gpu.camera.bloom)
-        apply_bloom(instance, instance->frame_final_device, instance->frame_final_device);
+        apply_bloom(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
+
+      instance->frame_final_device = device_buffer_get_pointer(denoise_output);
     }
     else {
       instance->frame_final_device = device_buffer_get_pointer(instance->frame_output);
     }
+
     copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, window->buffer, window->width, window->height, window->ld);
     sample_frametime(&frametime_post);
 
@@ -483,12 +490,12 @@ void realtime_output(RaytraceInstance* instance) {
     }
 
     if (instance->scene_gpu.camera.auto_exposure) {
-      instance->scene_gpu.camera.exposure = get_auto_exposure_from_optix(instance->denoise_setup, instance);
+      instance->scene_gpu.camera.exposure = optix_denoise_auto_exposure(instance);
     }
   }
 
   free(title);
-  free_realtime_denoise(instance, instance->denoise_setup);
+  optix_denoise_free(instance);
   window_instance_free(window);
   free_UI(&ui);
 }

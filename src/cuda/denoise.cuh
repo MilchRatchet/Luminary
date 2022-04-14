@@ -3,11 +3,12 @@
 
 #include <math.h>
 #include <optix.h>
+#include <optix_function_table_definition.h>
 #include <optix_stubs.h>
 
 #include "log.h"
 
-struct realtime_denoise {
+struct OptixDenoiseInstance {
   OptixDeviceContext ctx;
   OptixDenoiser denoiser;
   OptixDenoiserOptions opt;
@@ -19,16 +20,18 @@ struct realtime_denoise {
   DeviceBuffer* hdr_intensity;
   DeviceBuffer* avg_color;
   DeviceBuffer* output;
-} typedef realtime_denoise;
+} typedef OptixDenoiseInstance;
 
-extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance) {
-  if (!instance->realtime) {
-    log_message("Tried to initialize realtime denoiser in offline mode.");
-    return (void*) 0;
-  }
+extern "C" void optix_denoise_create(RaytraceInstance* instance) {
   OPTIX_CHECK(optixInit());
 
-  realtime_denoise* denoise_setup = (realtime_denoise*) malloc(sizeof(realtime_denoise));
+  if (!instance) {
+    log_message("Raytrace Instance is NULL.");
+    instance->denoise_setup = (void*) 0;
+    return;
+  }
+
+  OptixDenoiseInstance* denoise_setup = (OptixDenoiseInstance*) malloc(sizeof(OptixDenoiseInstance));
 
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &denoise_setup->ctx));
 
@@ -58,16 +61,14 @@ extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instanc
     device_buffer_get_size(denoise_setup->denoiserState), (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserScratch),
     device_buffer_get_size(denoise_setup->denoiserScratch)));
 
-  device_buffer_init(&denoise_setup->output);
-  device_buffer_malloc(denoise_setup->output, sizeof(RGBF), instance->width * instance->height);
+  denoise_setup->layer.input.data               = (CUdeviceptr) 0;
+  denoise_setup->layer.input.width              = instance->width;
+  denoise_setup->layer.input.height             = instance->height;
+  denoise_setup->layer.input.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  denoise_setup->layer.input.pixelStrideInBytes = sizeof(RGBF);
+  denoise_setup->layer.input.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
-  denoise_setup->layer.input.data                = (CUdeviceptr) device_buffer_get_pointer(instance->frame_output);
-  denoise_setup->layer.input.width               = instance->width;
-  denoise_setup->layer.input.height              = instance->height;
-  denoise_setup->layer.input.rowStrideInBytes    = instance->width * sizeof(RGBF);
-  denoise_setup->layer.input.pixelStrideInBytes  = sizeof(RGBF);
-  denoise_setup->layer.input.format              = OPTIX_PIXEL_FORMAT_FLOAT3;
-  denoise_setup->layer.output.data               = (CUdeviceptr) device_buffer_get_pointer(denoise_setup->output);
+  denoise_setup->layer.output.data               = (CUdeviceptr) 0;
   denoise_setup->layer.output.width              = instance->width;
   denoise_setup->layer.output.height             = instance->height;
   denoise_setup->layer.output.rowStrideInBytes   = instance->width * sizeof(RGBF);
@@ -87,15 +88,32 @@ extern "C" void* initialize_optix_denoise_for_realtime(RaytraceInstance* instanc
   device_buffer_init(&denoise_setup->avg_color);
   device_buffer_malloc(denoise_setup->avg_color, sizeof(float), 3);
 
-  return denoise_setup;
+  device_buffer_init(&denoise_setup->output);
+  device_buffer_malloc(denoise_setup->output, sizeof(RGBF), denoise_setup->layer.input.width * denoise_setup->layer.input.height);
+
+  instance->denoise_setup = denoise_setup;
 }
 
-extern "C" RGBF* denoise_with_optix_realtime(void* input) {
-  if (!input) {
-    crash_message("Denoise Setup is NULL");
+extern "C" DeviceBuffer* optix_denoise_apply(RaytraceInstance* instance, RGBF* src) {
+  if (!instance) {
+    log_message("Raytrace Instance is NULL.");
+    return (DeviceBuffer*) 0;
   }
 
-  realtime_denoise* denoise_setup = (realtime_denoise*) input;
+  if (!instance->denoise_setup) {
+    log_message("OptiX Denoise Instance is NULL.");
+    return (DeviceBuffer*) 0;
+  }
+
+  if (!src) {
+    crash_message("Source pointer is NULL.");
+    return (DeviceBuffer*) 0;
+  }
+
+  OptixDenoiseInstance* denoise_setup = (OptixDenoiseInstance*) instance->denoise_setup;
+
+  denoise_setup->layer.input.data  = (CUdeviceptr) src;
+  denoise_setup->layer.output.data = (CUdeviceptr) device_buffer_get_pointer(denoise_setup->output);
 
   OPTIX_CHECK(optixDenoiserComputeIntensity(
     denoise_setup->denoiser, 0, &(denoise_setup->layer.input), (CUdeviceptr) device_buffer_get_pointer(denoise_setup->hdr_intensity),
@@ -116,19 +134,26 @@ extern "C" RGBF* denoise_with_optix_realtime(void* input) {
     device_buffer_get_size(denoise_setup->denoiserState), &(denoise_setup->guide_layer), &(denoise_setup->layer), 1, 0, 0,
     (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserScratch), device_buffer_get_size(denoise_setup->denoiserScratch)));
 
-  return (RGBF*) device_buffer_get_pointer(denoise_setup->output);
+  return denoise_setup->output;
 }
 
-extern "C" float get_auto_exposure_from_optix(void* input, RaytraceInstance* instance) {
-  if (!input) {
-    return instance->scene_gpu.camera.exposure;
+extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
+  if (!instance) {
+    log_message("Raytrace Instance is NULL.");
+    return 0.0f;
+  }
+
+  const float exposure = instance->scene_gpu.camera.exposure;
+
+  if (!instance->denoise_setup) {
+    log_message("OptiX Denoise Instance is NULL.");
+    return exposure;
   }
 
   if (instance->shading_mode != SHADING_DEFAULT)
     return 1.0f;
 
-  realtime_denoise denoise_setup = *(realtime_denoise*) input;
-  const float exposure           = instance->scene_gpu.camera.exposure;
+  OptixDenoiseInstance denoise_setup = *(OptixDenoiseInstance*) instance->denoise_setup;
 
   float target_exposure = 1.0f;
 
@@ -158,15 +183,19 @@ extern "C" float get_auto_exposure_from_optix(void* input, RaytraceInstance* ins
   return lerp(exposure, target_exposure * log2f(1.0f + brightness), lerp_factor);
 }
 
-extern "C" void free_realtime_denoise(RaytraceInstance* instance, void* input) {
-  if (!input) {
-    log_message("Realtime denoise setup is NULL.");
+extern "C" void optix_denoise_free(RaytraceInstance* instance) {
+  if (!instance) {
+    log_message("Raytrace Instance is NULL.");
     return;
   }
 
-  realtime_denoise denoise_setup = *(realtime_denoise*) input;
+  if (!instance->denoise_setup) {
+    log_message("OptiX Denoise Instance is NULL.");
+    return;
+  }
 
-  device_buffer_destroy(denoise_setup.output);
+  OptixDenoiseInstance denoise_setup = *(OptixDenoiseInstance*) instance->denoise_setup;
+
   device_buffer_destroy(denoise_setup.hdr_intensity);
   device_buffer_destroy(denoise_setup.avg_color);
   device_buffer_destroy(denoise_setup.denoiserState);
@@ -174,6 +203,8 @@ extern "C" void free_realtime_denoise(RaytraceInstance* instance, void* input) {
 
   OPTIX_CHECK(optixDeviceContextDestroy(denoise_setup.ctx));
   OPTIX_CHECK(optixDenoiserDestroy(denoise_setup.denoiser));
+
+  free(instance->denoise_setup);
 
   instance->denoise_setup = (void*) 0;
 }

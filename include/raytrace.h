@@ -34,15 +34,19 @@ void free_textures_atlas(DeviceBuffer* texture_atlas, const int textures_length)
 void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height);
 void free_8bit_frame(RaytraceInstance* instance);
 void copy_framebuffer_to_8bit(RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);
-void* initialize_optix_denoise_for_realtime(RaytraceInstance* instance);
-float get_auto_exposure_from_optix(void* input, RaytraceInstance* instance);
-RGBF* denoise_with_optix_realtime(void* input);
-void free_realtime_denoise(RaytraceInstance* instance, void* input);
 void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size);
 void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count);
 void update_device_pointers(RaytraceInstance* instance);
 void free_host_memory(void* ptr);
 int brdf_unittest(const float tolerance);
+
+/*
+ * OptiX Denoiser Interface
+ */
+void optix_denoise_create(RaytraceInstance* instance);
+DeviceBuffer* optix_denoise_apply(RaytraceInstance* instance, RGBF* src);
+float optix_denoise_auto_exposure(RaytraceInstance* instance);
+void optix_denoise_free(RaytraceInstance* instance);
 
 #if __cplusplus
 }

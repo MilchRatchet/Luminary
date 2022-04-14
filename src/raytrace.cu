@@ -412,8 +412,8 @@ extern "C" RaytraceInstance* init_raytracing(
 extern "C" void reset_raytracing(RaytraceInstance* instance) {
   free_bloom_mips(instance);
 
-  if (instance->denoiser) {
-    free_realtime_denoise(instance, instance->denoise_setup);
+  if (instance->denoise_setup) {
+    optix_denoise_free(instance);
   }
 
   instance->width          = instance->settings.width;
@@ -430,7 +430,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   update_temporal_matrix(instance);
 
   if (instance->denoiser) {
-    instance->denoise_setup = initialize_optix_denoise_for_realtime(instance);
+    optix_denoise_create(instance);
   }
 
   log_message("Reset raytrace instance.");
