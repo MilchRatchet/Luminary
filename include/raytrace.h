@@ -25,7 +25,7 @@ void prepare_trace(RaytraceInstance* instance);
 void update_temporal_matrix(RaytraceInstance* instance);
 void center_toy_at_camera(RaytraceInstance* instance);
 void trace_scene(RaytraceInstance* instance);
-void apply_bloom(RaytraceInstance* instance, RGBF* src, RGBF* dst);
+void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);
 void generate_clouds(RaytraceInstance* instance);
@@ -33,7 +33,7 @@ DeviceBuffer* initialize_textures(TextureRGBA* textures, const int textures_leng
 void free_textures_atlas(DeviceBuffer* texture_atlas, const int textures_length);
 void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height);
 void free_8bit_frame(RaytraceInstance* instance);
-void copy_framebuffer_to_8bit(RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);
+void copy_framebuffer_to_8bit(RGBAhalf* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);
 void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size);
 void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count);
 void update_device_pointers(RaytraceInstance* instance);

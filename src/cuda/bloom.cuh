@@ -2,6 +2,7 @@
 #define CU_BLOOM_H
 
 #include "math.cuh"
+#include "memory.cuh"
 #include "utils.cuh"
 
 /*
@@ -17,7 +18,7 @@
 
 #define BLOOM_MIP_COUNT 9
 
-__device__ RGBF sample_pixel(const RGBF* image, float x, float y, const int width, const int height) {
+__device__ RGBAhalf sample_pixel(const RGBAhalf* image, float x, float y, const int width, const int height) {
   x = fmaxf(x, 0.0f);
   y = fmaxf(y, 0.0f);
 
@@ -36,10 +37,10 @@ __device__ RGBF sample_pixel(const RGBF* image, float x, float y, const int widt
   const int index_10 = index_00 + ((index_x < width - 1) ? 1 : 0);
   const int index_11 = index_01 + ((index_x < width - 1) ? 1 : 0);
 
-  const RGBF pixel_00 = image[index_00];
-  const RGBF pixel_01 = image[index_01];
-  const RGBF pixel_10 = image[index_10];
-  const RGBF pixel_11 = image[index_11];
+  const RGBAhalf pixel_00 = load_RGBAhalf(image + index_00);
+  const RGBAhalf pixel_01 = load_RGBAhalf(image + index_01);
+  const RGBAhalf pixel_10 = load_RGBAhalf(image + index_10);
+  const RGBAhalf pixel_11 = load_RGBAhalf(image + index_11);
 
   const float fx  = source_x - index_x;
   const float ifx = 1.0f - fx;
@@ -51,13 +52,15 @@ __device__ RGBF sample_pixel(const RGBF* image, float x, float y, const int widt
   const float f10 = fx * ify;
   const float f11 = fx * fy;
 
-  return get_color(
-    pixel_00.r * f00 + pixel_01.r * f01 + pixel_10.r * f10 + pixel_11.r * f11,
-    pixel_00.g * f00 + pixel_01.g * f01 + pixel_10.g * f10 + pixel_11.g * f11,
-    pixel_00.b * f00 + pixel_01.b * f01 + pixel_10.b * f10 + pixel_11.b * f11);
+  RGBAhalf result = scale_RGBAhalf(pixel_00, (__half) f00);
+  result          = fma_RGBAhalf(pixel_01, (__half) f01, result);
+  result          = fma_RGBAhalf(pixel_10, (__half) f10, result);
+  result          = fma_RGBAhalf(pixel_11, (__half) f11, result);
+
+  return result;
 }
 
-__global__ void bloom_downsample(RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
+__global__ void bloom_downsample(RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const float scale_x = 1.0f / (tw - 1);
@@ -72,32 +75,32 @@ __global__ void bloom_downsample(RGBF* source, const int sw, const int sh, RGBF*
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
 
-    RGBF a1 = sample_pixel(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBF a2 = sample_pixel(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBF a3 = sample_pixel(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
-    RGBF a4 = sample_pixel(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBAhalf a1 = sample_pixel(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBAhalf a2 = sample_pixel(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBAhalf a3 = sample_pixel(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBAhalf a4 = sample_pixel(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
 
-    RGBF pixel = add_color(add_color(a1, a2), add_color(a3, a4));
+    RGBAhalf pixel = add_RGBAhalf(add_RGBAhalf(a1, a2), add_RGBAhalf(a3, a4));
 
-    pixel = add_color(pixel, sample_pixel(source, sx, sy, sw, sh));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy - step_y, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy + step_y, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy - step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy - step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy + step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy + step_y, sw, sh), 0.25f));
+    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx, sy, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy - step_y, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy + step_y, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy - step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy - step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy + step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy + step_y, sw, sh), (__half) 0.25f));
 
-    pixel = scale_color(pixel, 0.125f);
+    pixel = scale_RGBAhalf(pixel, (__half) 0.125f);
 
-    target[x + y * tw] = pixel;
+    store_RGBAhalf(target + x + y * tw, bound_RGBAhalf(pixel));
 
     id += blockDim.x * gridDim.x;
   }
 }
 
-__global__ void bloom_downsample_truncate(RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
+__global__ void bloom_downsample_truncate(RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const float thresh = device_scene.camera.bloom_threshold;
@@ -114,33 +117,36 @@ __global__ void bloom_downsample_truncate(RGBF* source, const int sw, const int 
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
 
-    RGBF a1 = sample_pixel(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBF a2 = sample_pixel(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBF a3 = sample_pixel(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
-    RGBF a4 = sample_pixel(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBAhalf a1 = sample_pixel(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBAhalf a2 = sample_pixel(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBAhalf a3 = sample_pixel(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBAhalf a4 = sample_pixel(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
 
-    RGBF pixel = add_color(add_color(a1, a2), add_color(a3, a4));
+    RGBAhalf pixel = add_RGBAhalf(add_RGBAhalf(a1, a2), add_RGBAhalf(a3, a4));
 
-    pixel = add_color(pixel, sample_pixel(source, sx, sy, sw, sh));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy - step_y, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy + step_y, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy - step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy - step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy + step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy + step_y, sw, sh), 0.25f));
+    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx, sy, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy - step_y, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy + step_y, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy - step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy - step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy + step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy + step_y, sw, sh), (__half) 0.25f));
 
-    pixel = scale_color(pixel, 0.125f);
+    pixel = scale_RGBAhalf(pixel, (__half) 0.125f);
 
-    target[x + y * tw] = max_color(sub_color(pixel, get_color(thresh, thresh, thresh)), get_color(0.0f, 0.0f, 0.0f));
+    store_RGBAhalf(
+      target + x + y * tw, bound_RGBAhalf(max_RGBAhalf(
+                             sub_RGBAhalf(pixel, get_RGBAhalf(thresh, thresh, thresh, thresh)), get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f))));
 
     id += blockDim.x * gridDim.x;
   }
 }
 
 __global__ void bloom_upsample(
-  RGBF* source, const int sw, const int sh, RGBF* target, RGBF* base, const int tw, const int th, const float a, const float b) {
+  RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, RGBAhalf* base, const int tw, const int th, const float a,
+  const float b) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const float scale_x = 1.0f / (tw - 1);
@@ -155,31 +161,31 @@ __global__ void bloom_upsample(
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
 
-    RGBF pixel = sample_pixel(source, sx - step_x, sy - step_y, sw, sh);
+    RGBAhalf pixel = sample_pixel(source, sx - step_x, sy - step_y, sw, sh);
 
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy - step_y, sw, sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel(source, sx + step_x, sy - step_y, sw, sh));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx - step_x, sy, sw, sh), 2.0f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy, sw, sh), 4.0f));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx + step_x, sy, sw, sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel(source, sx - step_x, sy + step_y, sw, sh));
-    pixel = add_color(pixel, scale_color(sample_pixel(source, sx, sy + step_y, sw, sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel(source, sx + step_x, sy + step_y, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy - step_y, sw, sh), (__half) 2.0f));
+    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx + step_x, sy - step_y, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy, sw, sh), (__half) 2.0f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy, sw, sh), 4.0f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy, sw, sh), (__half) 2.0f));
+    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx - step_x, sy + step_y, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy + step_y, sw, sh), (__half) 2.0f));
+    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx + step_x, sy + step_y, sw, sh));
 
-    pixel = scale_color(pixel, 0.0625f);
+    pixel = scale_RGBAhalf(pixel, (__half) 0.0625f);
 
-    RGBF o = base[x + y * tw];
-    o      = scale_color(o, a);
-    pixel  = scale_color(pixel, b);
-    pixel  = add_color(pixel, o);
+    RGBAhalf o = load_RGBAhalf(base + x + y * tw);
+    o          = scale_RGBAhalf(o, a);
+    pixel      = scale_RGBAhalf(pixel, b);
+    pixel      = add_RGBAhalf(pixel, o);
 
-    target[x + y * tw] = pixel;
+    store_RGBAhalf(base + x + y * tw, bound_RGBAhalf(pixel));
 
     id += blockDim.x * gridDim.x;
   }
 }
 
-extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* src, RGBF* dst) {
+extern "C" void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst) {
   const int width  = instance->width;
   const int height = instance->height;
 
@@ -191,14 +197,15 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* src, RGBF* dst) {
   const int mip_count = min(BLOOM_MIP_COUNT, min(mip_count_w, mip_count_h));
 
   bloom_downsample_truncate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    src, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
+    (RGBAhalf*) src, width, height, (RGBAhalf*) instance->bloom_mips_gpu[0], width >> 1, height >> 1);
 
   for (int i = 0; i < mip_count - 1; i++) {
     const int sw = width >> (i + 1);
     const int sh = height >> (i + 1);
     const int tw = width >> (i + 2);
     const int th = height >> (i + 2);
-    bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i + 1], tw, th);
+    bloom_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+      (RGBAhalf*) instance->bloom_mips_gpu[i], sw, sh, (RGBAhalf*) instance->bloom_mips_gpu[i + 1], tw, th);
   }
 
   for (int i = mip_count - 1; i > 0; i--) {
@@ -207,11 +214,12 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBF* src, RGBF* dst) {
     const int tw = width >> i;
     const int th = height >> i;
     bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-      instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i - 1], instance->bloom_mips_gpu[i - 1], tw, th, 1.0f, 1.0f);
+      (RGBAhalf*) instance->bloom_mips_gpu[i], sw, sh, (RGBAhalf*) instance->bloom_mips_gpu[i - 1],
+      (RGBAhalf*) instance->bloom_mips_gpu[i - 1], tw, th, 1.0f, 1.0f);
   }
 
   bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    instance->bloom_mips_gpu[0], width >> 1, height >> 1, dst, src, width, height, 1.0f,
+    (RGBAhalf*) instance->bloom_mips_gpu[0], width >> 1, height >> 1, (RGBAhalf*) dst, (RGBAhalf*) src, width, height, 1.0f,
     0.01f * instance->scene_gpu.camera.bloom_strength / mip_count);
 }
 
@@ -219,12 +227,12 @@ static void allocate_bloom_mips(RaytraceInstance* instance) {
   int width  = instance->width;
   int height = instance->height;
 
-  instance->bloom_mips_gpu = (RGBF**) malloc(sizeof(RGBF*) * BLOOM_MIP_COUNT);
+  instance->bloom_mips_gpu = (RGBAhalf**) malloc(sizeof(RGBAhalf*) * BLOOM_MIP_COUNT);
 
   for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
     width  = width >> 1;
     height = height >> 1;
-    device_malloc((void**) &(instance->bloom_mips_gpu[i]), sizeof(RGBF) * width * height);
+    device_malloc((void**) &(instance->bloom_mips_gpu[i]), sizeof(RGBAhalf) * width * height);
   }
 }
 
@@ -235,7 +243,7 @@ static void free_bloom_mips(RaytraceInstance* instance) {
   for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
     width  = width >> 1;
     height = height >> 1;
-    device_free(instance->bloom_mips_gpu[i], sizeof(RGBF) * width * height);
+    device_free(instance->bloom_mips_gpu[i], sizeof(RGBAhalf) * width * height);
   }
 
   free(instance->bloom_mips_gpu);

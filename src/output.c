@@ -123,7 +123,7 @@ void offline_output(RaytraceInstance* instance) {
     optix_denoise_free(instance);
   }
 
-  device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), instance->width * instance->height);
+  device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), instance->width * instance->height);
   device_buffer_copy(instance->frame_output, instance->frame_buffer);
 
   if (instance->scene_gpu.camera.bloom)

@@ -59,6 +59,7 @@ include_directories("${CMAKE_SOURCE_DIR}/include")
 include_directories("${CMAKE_SOURCE_DIR}/include/UI")
 include_directories("${CMAKE_SOURCE_DIR}/src/cuda")
 include_directories("${OptiX_INCLUDE}")
+include_directories("${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
 
 #=============================================================
 # SDL2
@@ -159,7 +160,7 @@ elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
     set(CMAKE_C_FLAGS_RELEASE "-O3")
     set(CMAKE_C_FLAGS_DEBUG "-Og -g")
 else()
-    message(SEND_ERROR "No flags available for CUDA Compiler ${CMAKE_C_COMPILER_ID}.")
+    message(SEND_ERROR "No flags available for C Compiler ${CMAKE_C_COMPILER_ID}.")
 endif()
 
 #=============================================================

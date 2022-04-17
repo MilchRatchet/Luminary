@@ -1050,4 +1050,131 @@ __device__ int material_is_mirror(const float roughness, const float metallic) {
   return (roughness < 0.1f && metallic > 0.9f);
 }
 
+/////////////////
+// RGBAhalf functions
+/////////////////
+
+__device__ RGBAhalf RGBF_to_RGBAhalf(const RGBF a) {
+  RGBAhalf result;
+
+  result.rg   = __floats2half2_rn(a.r, a.g);
+  result.ba.x = __float2half(a.b);
+  result.ba.y = (__half) 0.0f;
+
+  return result;
+}
+
+__device__ RGBF RGBAhalf_to_RGBF(const RGBAhalf a) {
+  RGBF result;
+
+  const float2 rg = __half22float2(a.rg);
+
+  result.r = rg.x;
+  result.g = rg.y;
+  result.b = __half2float(a.ba.x);
+
+  return result;
+}
+
+__device__ RGBAhalf RGBAF_to_RGBAhalf(const RGBAF a) {
+  RGBAhalf result;
+
+  result.rg = __floats2half2_rn(a.r, a.g);
+  result.ba = __floats2half2_rn(a.b, a.a);
+
+  return result;
+}
+
+__device__ RGBAF RGBAhalf_to_RGBAF(const RGBAhalf a) {
+  RGBAF result;
+
+  const float2 rg = __half22float2(a.rg);
+  const float2 ba = __half22float2(a.ba);
+
+  result.r = rg.x;
+  result.g = rg.y;
+  result.b = ba.x;
+  result.a = ba.y;
+
+  return result;
+}
+
+__device__ RGBAhalf scale_RGBAhalf(const RGBAhalf a, const __half b) {
+  RGBAhalf result;
+
+  __half2 s = make_half2(b, b);
+
+  result.rg = __hmul2(a.rg, s);
+  result.ba = __hmul2(a.ba, s);
+
+  return result;
+}
+
+__device__ RGBAhalf add_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+  RGBAhalf result;
+
+  result.rg = __hadd2(a.rg, b.rg);
+  result.ba = __hadd2(a.ba, b.ba);
+
+  return result;
+}
+
+__device__ RGBAhalf sub_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+  RGBAhalf result;
+
+  result.rg = __hsub2(a.rg, b.rg);
+  result.ba = __hsub2(a.ba, b.ba);
+
+  return result;
+}
+
+__device__ RGBAhalf max_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+  RGBAhalf result;
+
+  result.rg = __hmax2(a.rg, b.rg);
+  result.ba = __hmax2(a.ba, b.ba);
+
+  return result;
+}
+
+__device__ RGBAhalf fma_RGBAhalf(const RGBAhalf a, const __half b, const RGBAhalf c) {
+  RGBAhalf result;
+
+  __half2 s = make_half2(b, b);
+
+  result.rg = __hfma2(a.rg, s, c.rg);
+  result.ba = __hfma2(a.ba, s, c.ba);
+
+  return result;
+}
+
+/*
+ * This bounds the RGBAhalf to values of magnitude less than 6500.0f
+ * This is slow!
+ */
+__device__ RGBAhalf bound_RGBAhalf(const RGBAhalf a) {
+  RGBAhalf result;
+
+  int inf_r = __hisinf(a.rg.x) | __hisnan(a.rg.x);
+  int inf_g = __hisinf(a.rg.y) | __hisnan(a.rg.y);
+  int inf_b = __hisinf(a.ba.x) | __hisnan(a.ba.x);
+  int inf_a = __hisinf(a.ba.y) | __hisnan(a.ba.y);
+
+  result.rg.x = (inf_r) ? ((__half) (6500.0f * (float) inf_r)) : a.rg.x;
+  result.rg.y = (inf_g) ? ((__half) (6500.0f * (float) inf_g)) : a.rg.y;
+  result.ba.x = (inf_b) ? ((__half) (6500.0f * (float) inf_b)) : a.ba.x;
+  result.ba.y = (inf_a) ? ((__half) (6500.0f * (float) inf_a)) : a.ba.y;
+
+  return result;
+}
+
+__device__ RGBAhalf get_RGBAhalf(const float r, const float g, const float b, const float a) {
+  RGBAhalf result;
+
+  result.rg = make_half2((__half) r, (__half) g);
+  result.ba = make_half2((__half) b, (__half) a);
+
+  return result;
+}
+
 #endif /* CU_MATH_H */

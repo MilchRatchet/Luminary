@@ -1,6 +1,7 @@
 #ifndef CU_UTILS_H
 #define CU_UTILS_H
 
+#include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
 #include <curand_kernel.h>
 #include <stdio.h>
@@ -133,15 +134,14 @@ struct DevicePointers {
   uint16_t* task_counts;
   uint16_t* task_offsets;
   uint32_t* light_sample_history;
-  RGBF* frame_final;
-  RGBF* frame_output;
-  RGBF* frame_temporal;
-  RGBF* frame_buffer;
-  RGBF* frame_variance;
-  RGBF* frame_bias_cache;
-  RGBF* albedo_buffer;
-  RGBF* light_records;
-  RGBF* bounce_records;
+  RGBAhalf* frame_output;
+  RGBAhalf* frame_temporal;
+  RGBAhalf* frame_buffer;
+  RGBAhalf* frame_variance;
+  RGBAhalf* frame_bias_cache;
+  RGBAhalf* albedo_buffer;
+  RGBAhalf* light_records;
+  RGBAhalf* bounce_records;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
   TraceResult* trace_result_buffer;
@@ -193,7 +193,7 @@ __constant__ TraceTask* device_trace_tasks;
 
 __constant__ uint16_t* device_trace_count;
 
-__constant__ RGBF* device_records;
+__constant__ RGBAhalf* device_records;
 
 __constant__ int device_temporal_frames;
 

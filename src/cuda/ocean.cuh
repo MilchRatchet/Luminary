@@ -169,7 +169,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
     const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
 
     RGBAF albedo = device_scene.ocean.albedo;
-    RGBF record  = device_records[pixel];
+    RGBF record  = RGBAhalf_to_RGBF(device_records[pixel]);
 
     if (device_scene.ocean.emissive) {
       RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
@@ -181,7 +181,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
         emission.g *= 2.0f * record.g;
         emission.b *= 2.0f * record.b;
 
-        device.frame_buffer[pixel] = emission;
+        device.frame_buffer[pixel] = RGBF_to_RGBAhalf(emission);
       }
     }
 
@@ -205,13 +205,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       switch (device_iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          device.bounce_records[pixel] = record;
+          device.bounce_records[pixel] = RGBF_to_RGBAhalf(record);
           store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
           if (white_noise() > 0.5f)
             break;
-          device.light_records[pixel] = scale_color(record, 2.0f);
+          device.light_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, 2.0f));
           device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
           break;
@@ -232,7 +232,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       bounce_task.ray              = ray;
       bounce_task.index            = task.index;
       bounce_task.state            = task.state;
-      device.bounce_records[pixel] = bounce_record;
+      device.bounce_records[pixel] = RGBF_to_RGBAhalf(bounce_record);
 
       device.light_sample_history[pixel] = LIGHT_ID_ANY;
       store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
@@ -255,11 +255,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
 
     if (device_shading_mode == SHADING_ALBEDO) {
       RGBAF albedo               = device_scene.ocean.albedo;
-      device.frame_buffer[pixel] = get_color(albedo.r, albedo.g, albedo.b);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(albedo.r, albedo.g, albedo.b));
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value          = __saturatef((1.0f / task.distance) * 2.0f);
-      device.frame_buffer[pixel] = get_color(value, value, value);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
     else if (device_shading_mode == SHADING_NORMAL) {
       vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
@@ -268,7 +268,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      device.frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
     }
     else if (device_shading_mode == SHADING_WIREFRAME) {
       int a = fabsf(floorf(task.position.x) - task.position.x) < 0.001f;
@@ -278,7 +278,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
 
       float light = (a || b || c || d) ? 1.0f : 0.0f;
 
-      device.frame_buffer[pixel] = get_color(0.0f, 0.5f * light, light);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(0.0f, 0.5f * light, light));
     }
   }
 }

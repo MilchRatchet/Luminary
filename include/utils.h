@@ -9,6 +9,7 @@
 #endif
 
 #include "bvh.h"
+#include "image.h"
 #include "log.h"
 #include "mesh.h"
 #include "primitives.h"
@@ -243,7 +244,7 @@ struct RaytraceInstance {
   unsigned int width;
   unsigned int height;
   int realtime;
-  RGBF* frame_final_device;
+  RGBAhalf* frame_final_device;
   DeviceBuffer* light_trace;
   DeviceBuffer* bounce_trace;
   DeviceBuffer* light_trace_count;
@@ -280,7 +281,7 @@ struct RaytraceInstance {
   int spatial_iterations;
   DeviceBuffer* randoms;
   int shading_mode;
-  RGBF** bloom_mips_gpu;
+  RGBAhalf** bloom_mips_gpu;
   int snap_resolution;
   OutputImageFormat image_format;
   int post_process_menu;

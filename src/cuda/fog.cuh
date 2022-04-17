@@ -95,7 +95,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    RGBF record = device_records[pixel];
+    RGBF record = RGBAhalf_to_RGBF(device_records[pixel]);
 
     {
       const vec3 bounce_ray = angles_to_direction(white_noise() * PI, white_noise() * 2.0f * PI);
@@ -103,7 +103,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
       const float phase     = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
       const float weight    = 4.0f * PI * phase * density * task.distance;
 
-      device.bounce_records[pixel] = scale_color(record, weight);
+      device.bounce_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, weight));
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
@@ -128,7 +128,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
         const float phase     = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
         const float weight    = light.weight * phase * density * task.distance;
 
-        device.light_records[pixel] = scale_color(record, weight);
+        device.light_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, weight));
         light_history_buffer_entry  = light.id;
 
         TraceTask light_task;
@@ -161,11 +161,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks
     const int pixel = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO || device_shading_mode == SHADING_NORMAL) {
-      device.frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(0.0f, 0.0f, 0.0f));
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value          = __saturatef((1.0f / task.distance) * 2.0f);
-      device.frame_buffer[pixel] = get_color(value, value, value);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
   }
 }

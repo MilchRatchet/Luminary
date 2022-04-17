@@ -76,7 +76,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       emission                  = scale_color(emission, dir_intensity);
     }
 
-    RGBF record = device_records[pixel];
+    RGBF record = RGBAhalf_to_RGBF(device_records[pixel]);
 
     if (albedo.a > 0.0f && device_scene.toy.emissive) {
       write_albedo_buffer(emission, pixel);
@@ -87,7 +87,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         const uint32_t light = device.light_sample_history[pixel];
 
         if (proper_light_sample(light, LIGHT_ID_TOY)) {
-          device.frame_buffer[pixel] = add_color(device.frame_buffer[pixel], emission);
+          device.frame_buffer[pixel] = RGBF_to_RGBAhalf(add_color(RGBAhalf_to_RGBF(device.frame_buffer[pixel]), emission));
         }
       }
     }
@@ -117,13 +117,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       switch (device_iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          device.bounce_records[pixel] = record;
+          device.bounce_records[pixel] = RGBF_to_RGBAhalf(record);
           store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
           if (white_noise() > 0.5f)
             break;
-          device.light_records[pixel] = scale_color(record, 2.0f);
+          device.light_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, 2.0f));
           device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
           break;
@@ -161,7 +161,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
           light_task.state  = task.state;
 
           if (color_any(light_record)) {
-            device.light_records[pixel] = light_record;
+            device.light_records[pixel] = RGBF_to_RGBAhalf(light_record);
             light_history_buffer_entry  = light.id;
             store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
           }
@@ -183,7 +183,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       bounce_task.state  = task.state;
 
       if (valid_bounce && validate_trace_task(bounce_task, bounce_record)) {
-        device.bounce_records[pixel] = bounce_record;
+        device.bounce_records[pixel] = RGBF_to_RGBAhalf(bounce_record);
         store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }
     }
@@ -204,12 +204,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
     const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO) {
-      device.frame_buffer[pixel] = get_color(device_scene.toy.albedo.r, device_scene.toy.albedo.g, device_scene.toy.albedo.b);
+      device.frame_buffer[pixel] =
+        RGBF_to_RGBAhalf(get_color(device_scene.toy.albedo.r, device_scene.toy.albedo.g, device_scene.toy.albedo.b));
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float dist           = get_length(sub_vector(device_scene.camera.pos, task.position));
       const float value          = __saturatef((1.0f / dist) * 2.0f);
-      device.frame_buffer[pixel] = get_color(value, value, value);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
     else if (device_shading_mode == SHADING_NORMAL) {
       vec3 normal = get_toy_normal(task.position);
@@ -222,7 +223,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      device.frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
     }
   }
 }

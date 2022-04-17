@@ -35,6 +35,22 @@ struct RGBF {
   float b;
 } typedef RGBF;
 
+#ifndef __cplusplus
+struct RGBAhalf {
+  uint16_t r;
+  uint16_t g;
+  uint16_t b;
+  uint16_t a;
+} typedef RGBAhalf;
+#else
+#include <cuda_fp16.h>
+
+struct RGBAhalf {
+  __half2 rg;
+  __half2 ba;
+} typedef RGBAhalf;
+#endif
+
 struct RGBAF {
   float r;
   float g;

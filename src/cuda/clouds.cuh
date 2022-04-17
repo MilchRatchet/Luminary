@@ -425,20 +425,20 @@ __device__ void trace_clouds(const vec3 origin, const vec3 ray, const float star
   RGBAF result = cloud_render(origin, ray, start, distance);
 
   if ((result.r + result.g + result.b) != 0.0f) {
-    RGBF color  = device.frame_buffer[pixel];
-    RGBF record = device_records[pixel];
+    RGBF color  = RGBAhalf_to_RGBF(device.frame_buffer[pixel]);
+    RGBF record = RGBAhalf_to_RGBF(device_records[pixel]);
 
     color.r += result.r * record.r;
     color.g += result.g * record.g;
     color.b += result.b * record.b;
 
-    device.frame_buffer[pixel] = color;
+    device.frame_buffer[pixel] = RGBF_to_RGBAhalf(color);
   }
 
   if (result.a != 1.0f) {
-    RGBF record           = device_records[pixel];
-    record                = scale_color(record, result.a);
-    device_records[pixel] = record;
+    RGBAhalf record = load_RGBAhalf(device_records + pixel);
+    record          = scale_RGBAhalf(record, __float2half(result.a));
+    store_RGBAhalf(device_records + pixel, record);
   }
 }
 

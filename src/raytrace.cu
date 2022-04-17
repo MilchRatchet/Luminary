@@ -243,16 +243,16 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaMemcpyToSymbol(device_amount, &(amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
 
-  device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_temporal, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_output, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_variance, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_bias_cache, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->frame_temporal, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->frame_output, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->frame_variance, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->frame_bias_cache, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->light_records, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->bounce_records, sizeof(RGBAhalf), amount);
 
   if (instance->denoiser) {
-    device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);
+    device_buffer_malloc(instance->albedo_buffer, sizeof(RGBAhalf), amount);
   }
 
   /*
@@ -702,8 +702,8 @@ extern "C" void free_8bit_frame(RaytraceInstance* instance) {
 }
 
 extern "C" void copy_framebuffer_to_8bit(
-  RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld) {
-  convert_RGBF_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(gpu_source, gpu_scratch, width, height, ld);
+  RGBAhalf* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld) {
+  convert_RGBhalf_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((RGBAhalf*) gpu_source, gpu_scratch, width, height, ld);
   cudaMemcpy(cpu_dest, gpu_scratch, sizeof(XRGB8) * ld * height, cudaMemcpyDeviceToHost);
 }
 
@@ -787,14 +787,14 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.task_counts           = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets          = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
   ptrs.light_sample_history  = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
-  ptrs.frame_output          = (RGBF*) device_buffer_get_pointer(instance->frame_output);
-  ptrs.frame_temporal        = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
-  ptrs.frame_buffer          = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
-  ptrs.frame_variance        = (RGBF*) device_buffer_get_pointer(instance->frame_variance);
-  ptrs.frame_bias_cache      = (RGBF*) device_buffer_get_pointer(instance->frame_bias_cache);
-  ptrs.albedo_buffer         = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
-  ptrs.light_records         = (RGBF*) device_buffer_get_pointer(instance->light_records);
-  ptrs.bounce_records        = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
+  ptrs.frame_output          = (RGBAhalf*) device_buffer_get_pointer(instance->frame_output);
+  ptrs.frame_temporal        = (RGBAhalf*) device_buffer_get_pointer(instance->frame_temporal);
+  ptrs.frame_buffer          = (RGBAhalf*) device_buffer_get_pointer(instance->frame_buffer);
+  ptrs.frame_variance        = (RGBAhalf*) device_buffer_get_pointer(instance->frame_variance);
+  ptrs.frame_bias_cache      = (RGBAhalf*) device_buffer_get_pointer(instance->frame_bias_cache);
+  ptrs.albedo_buffer         = (RGBAhalf*) device_buffer_get_pointer(instance->albedo_buffer);
+  ptrs.light_records         = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
+  ptrs.bounce_records        = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);
   ptrs.buffer_8bit           = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
   ptrs.albedo_atlas          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->albedo_atlas);
   ptrs.illuminance_atlas     = (cudaTextureObject_t*) device_buffer_get_pointer(instance->illuminance_atlas);

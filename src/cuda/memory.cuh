@@ -184,6 +184,24 @@ __device__ FogTask load_fog_task(const void* ptr) {
   return task;
 }
 
+__device__ RGBAhalf load_RGBAhalf(const void* ptr) {
+  const ushort4 data0 = __ldcs((ushort4*) ptr);
+
+  RGBAhalf result;
+  result.rg.x = __ushort_as_half(data0.x);
+  result.rg.y = __ushort_as_half(data0.y);
+  result.ba.x = __ushort_as_half(data0.z);
+  result.ba.y = __ushort_as_half(data0.w);
+
+  return result;
+}
+
+__device__ void store_RGBAhalf(void* ptr, const RGBAhalf a) {
+  ushort4 data0 = make_ushort4(__half_as_ushort(a.rg.x), __half_as_ushort(a.rg.y), __half_as_ushort(a.ba.x), __half_as_ushort(a.ba.y));
+
+  __stcs((ushort4*) ptr, data0);
+}
+
 /*
  * Updates the albedo buffer if criteria are met.
  * @param albedo Albedo color to be added to the albedo buffer.
@@ -194,13 +212,13 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
     return;
 
   if (device_temporal_frames && device_accum_mode == TEMPORAL_ACCUMULATION) {
-    RGBF out_albedo = device.albedo_buffer[pixel];
+    RGBF out_albedo = RGBAhalf_to_RGBF(device.albedo_buffer[pixel]);
     out_albedo      = scale_color(out_albedo, device_temporal_frames);
     albedo          = add_color(albedo, out_albedo);
     albedo          = scale_color(albedo, 1.0f / (device_temporal_frames + 1));
   }
 
-  device.albedo_buffer[pixel] = albedo;
+  device.albedo_buffer[pixel] = RGBF_to_RGBAhalf(albedo);
   device.state_buffer[pixel] |= STATE_ALBEDO;
 }
 

@@ -108,7 +108,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     if (albedo.a < device_scene.material.alpha_cutoff)
       albedo.a = 0.0f;
 
-    RGBF record = device_records[pixel];
+    RGBF record = RGBAhalf_to_RGBF(device_records[pixel]);
 
     if (albedo.a > 0.0f && color_any(emission)) {
       write_albedo_buffer(emission, pixel);
@@ -119,7 +119,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         const uint32_t light = device.light_sample_history[pixel];
 
         if (proper_light_sample(light, triangle_light_id)) {
-          device.frame_buffer[pixel] = add_color(device.frame_buffer[pixel], emission);
+          device.frame_buffer[pixel] = RGBF_to_RGBAhalf(add_color(RGBAhalf_to_RGBF(device.frame_buffer[pixel]), emission));
         }
       }
     }
@@ -140,13 +140,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       switch (device_iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          device.bounce_records[pixel] = record;
+          device.bounce_records[pixel] = RGBF_to_RGBAhalf(record);
           store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
           if (white_noise() > 0.5f)
             break;
-          device.light_records[pixel] = scale_color(record, 2.0f);
+          device.light_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, 2.0f));
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
           device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           break;
@@ -185,7 +185,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
           light_task.state  = task.state;
 
           if (color_any(light_record)) {
-            device.light_records[pixel] = light_record;
+            device.light_records[pixel] = RGBF_to_RGBAhalf(light_record);
             light_history_buffer_entry  = light.id;
             store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
           }
@@ -206,7 +206,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       bounce_task.state  = task.state;
 
       if (valid_bounce && validate_trace_task(bounce_task, bounce_record)) {
-        device.bounce_records[pixel] = bounce_record;
+        device.bounce_records[pixel] = RGBF_to_RGBAhalf(bounce_record);
         store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }
     }
@@ -266,12 +266,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
         color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
       }
 
-      device.frame_buffer[pixel] = color;
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(color);
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float dist           = get_length(sub_vector(device_scene.camera.pos, task.position));
       const float value          = __saturatef((1.0f / dist) * 2.0f);
-      device.frame_buffer[pixel] = get_color(value, value, value);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
     else if (device_shading_mode == SHADING_NORMAL) {
       const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
@@ -300,7 +300,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      device.frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
     }
     else if (device_shading_mode == SHADING_HEAT) {
       const float cost  = device.trace_result_buffer[pixel].depth;
@@ -308,7 +308,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float red   = __saturatef(2.0f * value);
       const float green = __saturatef(2.0f * (value - 0.5f));
       const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
-      device.frame_buffer[pixel] = get_color(red, green, blue);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(red, green, blue));
     }
     else if (device_shading_mode == SHADING_WIREFRAME) {
       const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
@@ -329,7 +329,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       float light = (a || b || c) ? 1.0f : 0.0f;
 
-      device.frame_buffer[pixel] = get_color(light, 0.5f * light, 0.0f);
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(light, 0.5f * light, 0.0f));
     }
   }
 }
