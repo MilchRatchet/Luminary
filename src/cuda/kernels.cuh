@@ -83,10 +83,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
   __shared__ uint16_t counts[THREADS_PER_BLOCK][32];
   uint16_t average = 0;
 
-  for (int i = 0; i < 32; i++) {
-    const uint16_t c       = device_trace_count[32 * warp + i];
-    counts[threadIdx.x][i] = c;
-    average += c;
+  for (int i = 0; i < 32; i += 4) {
+    ushort4 c                  = __ldcs((ushort4*) (device_trace_count + 32 * warp + i));
+    counts[threadIdx.x][i + 0] = c.x;
+    counts[threadIdx.x][i + 1] = c.y;
+    counts[threadIdx.x][i + 2] = c.z;
+    counts[threadIdx.x][i + 3] = c.w;
+    average += c.x;
+    average += c.y;
+    average += c.z;
+    average += c.w;
   }
 
   average = average >> 5;
@@ -124,8 +130,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
     }
   }
 
-  for (int i = 0; i < 32; i++) {
-    device_trace_count[32 * warp + i] = counts[threadIdx.x][i];
+  for (int i = 0; i < 32; i += 4) {
+    ushort4 vals = make_ushort4(counts[threadIdx.x][i], counts[threadIdx.x][i + 1], counts[threadIdx.x][i + 2], counts[threadIdx.x][i + 3]);
+    __stcs((ushort4*) (device_trace_count + 32 * warp + i), vals);
   }
 }
 
@@ -253,8 +260,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
         weight = 1.0f / (1.0f - fog.y);
       }
 
-      const int pixel       = task.index.x + task.index.y * device_width;
-      device_records[pixel] = RGBF_to_RGBAhalf(scale_color(RGBAhalf_to_RGBF(device_records[pixel]), weight));
+      const int pixel = task.index.x + task.index.y * device_width;
+      store_RGBAhalf(device_records + pixel, scale_RGBAhalf(load_RGBAhalf(device_records + pixel), weight));
     }
 
     if (device_scene.fog.active && device_iteration_type == TYPE_LIGHT) {
@@ -262,7 +269,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
       const float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
       const float weight = expf(-t * 0.001f * device_scene.fog.scattering);
 
-      device_records[pixel] = RGBF_to_RGBAhalf(scale_color(RGBAhalf_to_RGBF(device_records[pixel]), weight));
+      store_RGBAhalf(device_records + pixel, scale_RGBAhalf(load_RGBAhalf(device_records + pixel), weight));
     }
 
     if (modified_task) {

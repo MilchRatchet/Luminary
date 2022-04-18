@@ -84,67 +84,59 @@ __device__ RGBF sample_pixel_catmull_rom(const RGBAhalf* image, float x, float y
 }
 
 __global__ void temporal_accumulation() {
-  int offset = threadIdx.x + blockIdx.x * blockDim.x;
-
-  for (; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    RGBF buffer = RGBAhalf_to_RGBF(device.frame_buffer[offset]);
-    RGBF output;
-    RGBF variance;
-    RGBF bias_cache;
+  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
+    RGBAhalf buffer = load_RGBAhalf(device.frame_buffer + offset);
+    RGBAhalf output;
+    RGBAhalf variance;
+    RGBAhalf bias_cache;
 
     if (device_temporal_frames == 0) {
       output     = buffer;
-      variance   = get_color(1.0f, 1.0f, 1.0f);
-      bias_cache = get_color(0.0f, 0.0f, 0.0f);
+      variance   = get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f);
+      bias_cache = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
     }
     else {
-      output     = RGBAhalf_to_RGBF(device.frame_output[offset]);
-      variance   = RGBAhalf_to_RGBF(device.frame_variance[offset]);
-      bias_cache = RGBAhalf_to_RGBF(device.frame_bias_cache[offset]);
+      output     = load_RGBAhalf(device.frame_output + offset);
+      variance   = load_RGBAhalf(device.frame_variance + offset);
+      bias_cache = load_RGBAhalf(device.frame_bias_cache + offset);
     }
 
-    RGBF deviation;
-    deviation.r = sqrtf(fmaxf(eps, variance.r));
-    deviation.g = sqrtf(fmaxf(eps, variance.g));
-    deviation.b = sqrtf(fmaxf(eps, variance.b));
+    RGBAhalf deviation;
+    deviation.rg = h2sqrt(__hmax2(variance.rg, make_half2(eps, eps)));
+    deviation.ba = h2sqrt(__hmax2(variance.ba, make_half2(eps, eps)));
 
     if (device_temporal_frames) {
-      variance  = scale_color(variance, device_temporal_frames - 1.0f);
-      RGBF diff = sub_color(buffer, output);
-      diff      = mul_color(diff, diff);
-      variance  = add_color(variance, diff);
-      variance  = scale_color(variance, 1.0f / device_temporal_frames);
+      variance      = scale_RGBAhalf(variance, device_temporal_frames - 1.0f);
+      RGBAhalf diff = sub_RGBAhalf(buffer, output);
+      diff          = mul_RGBAhalf(diff, diff);
+      variance      = add_RGBAhalf(variance, diff);
+      variance      = scale_RGBAhalf(variance, 1.0f / device_temporal_frames);
     }
 
-    device.frame_variance[offset] = RGBF_to_RGBAhalf(variance);
+    store_RGBAhalf(device.frame_variance + offset, variance);
 
-    RGBF firefly_rejection;
-    firefly_rejection.r = 0.1f + output.r + deviation.r * 4.0f;
-    firefly_rejection.g = 0.1f + output.g + deviation.g * 4.0f;
-    firefly_rejection.b = 0.1f + output.b + deviation.b * 4.0f;
+    RGBAhalf firefly_rejection = add_RGBAhalf(get_RGBAhalf(0.1f, 0.1f, 0.1f, 0.1f), add_RGBAhalf(output, scale_RGBAhalf(deviation, 4.0f)));
+    firefly_rejection          = max_RGBAhalf(get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f), sub_RGBAhalf(buffer, firefly_rejection));
 
-    firefly_rejection.r = fmaxf(0.0f, buffer.r - firefly_rejection.r);
-    firefly_rejection.g = fmaxf(0.0f, buffer.g - firefly_rejection.g);
-    firefly_rejection.b = fmaxf(0.0f, buffer.b - firefly_rejection.b);
+    bias_cache = add_RGBAhalf(bias_cache, firefly_rejection);
+    buffer     = sub_RGBAhalf(buffer, firefly_rejection);
 
-    bias_cache = add_color(bias_cache, firefly_rejection);
-    buffer     = sub_color(buffer, firefly_rejection);
+    RGBAhalf debias;
+    debias.rg =
+      __hmax2(make_half2(0.0f, 0.0f), __hmin2(bias_cache.rg, __hsub2(__hsub2(__hsub2(output.rg, buffer.rg), deviation.rg), deviation.rg)));
+    debias.ba =
+      __hmax2(make_half2(0.0f, 0.0f), __hmin2(bias_cache.ba, __hsub2(__hsub2(__hsub2(output.ba, buffer.ba), deviation.ba), deviation.ba)));
 
-    RGBF debias;
-    debias.r = fmaxf(0.0f, fminf(bias_cache.r, output.r - deviation.r * 2.0f - buffer.r));
-    debias.g = fmaxf(0.0f, fminf(bias_cache.g, output.g - deviation.g * 2.0f - buffer.g));
-    debias.b = fmaxf(0.0f, fminf(bias_cache.b, output.b - deviation.b * 2.0f - buffer.b));
+    buffer     = add_RGBAhalf(buffer, debias);
+    bias_cache = sub_RGBAhalf(bias_cache, debias);
 
-    buffer     = add_color(buffer, debias);
-    bias_cache = sub_color(bias_cache, debias);
+    store_RGBAhalf(device.frame_bias_cache + offset, bias_cache);
 
-    device.frame_bias_cache[offset] = RGBF_to_RGBAhalf(bias_cache);
+    output = scale_RGBAhalf(output, device_temporal_frames);
+    output = add_RGBAhalf(buffer, output);
+    output = scale_RGBAhalf(output, 1.0f / (device_temporal_frames + 1));
 
-    output = scale_color(output, device_temporal_frames);
-    output = add_color(buffer, output);
-    output = scale_color(output, 1.0f / (device_temporal_frames + 1));
-
-    store_RGBAhalf(device.frame_output + offset, bound_RGBAhalf(RGBF_to_RGBAhalf(output)));
+    store_RGBAhalf(device.frame_output + offset, bound_RGBAhalf(output));
   }
 }
 

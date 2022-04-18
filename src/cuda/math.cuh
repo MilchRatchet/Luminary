@@ -1128,6 +1128,15 @@ __device__ RGBAhalf sub_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   return result;
 }
 
+__device__ RGBAhalf mul_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+  RGBAhalf result;
+
+  result.rg = __hmul2(a.rg, b.rg);
+  result.ba = __hmul2(a.ba, b.ba);
+
+  return result;
+}
+
 __device__ RGBAhalf max_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   RGBAhalf result;
 
@@ -1146,6 +1155,12 @@ __device__ RGBAhalf fma_RGBAhalf(const RGBAhalf a, const __half b, const RGBAhal
   result.ba = __hfma2(a.ba, s, c.ba);
 
   return result;
+}
+
+__device__ bool any_RGBAhalf(const RGBAhalf a) {
+  __half2 zero = make_half2(0.0f, 0.0f);
+
+  return !(__hbeq2(a.rg, zero) && __hbeq2(a.ba, zero));
 }
 
 /*

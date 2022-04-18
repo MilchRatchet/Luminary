@@ -237,17 +237,18 @@ __device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float lim
 __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, ushort2 index) {
   int pixel = index.x + index.y * device_width;
 
-  RGBF record = RGBAhalf_to_RGBF(device_records[pixel]);
+  RGBAhalf record = load_RGBAhalf(device_records + pixel);
 
-  RGBF new_record = record;
+  RGBF new_record = RGBAhalf_to_RGBF(record);
 
-  RGBF inscattering = sky_compute_atmosphere(new_record, origin, ray, limit, false);
+  RGBAhalf inscattering = RGBF_to_RGBAhalf(sky_compute_atmosphere(new_record, origin, ray, limit, false));
 
-  if ((inscattering.r + inscattering.g + inscattering.b) != 0.0f) {
-    device.frame_buffer[pixel] = RGBF_to_RGBAhalf(add_color(RGBAhalf_to_RGBF(device.frame_buffer[pixel]), mul_color(inscattering, record)));
+  if (any_RGBAhalf(inscattering)) {
+    store_RGBAhalf(
+      device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), mul_RGBAhalf(inscattering, record)));
   }
 
-  device_records[pixel] = RGBF_to_RGBAhalf(new_record);
+  store_RGBAhalf(device_records + pixel, RGBF_to_RGBAhalf(new_record));
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_sky_tasks() {
@@ -260,14 +261,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_sky_tasks() {
     const SkyTask task = load_sky_task(device_trace_tasks + get_task_address(task_offset + i));
     const int pixel    = task.index.y * device_width + task.index.x;
 
-    const RGBF record    = RGBAhalf_to_RGBF(device_records[pixel]);
-    const vec3 origin    = world_to_sky_transform(task.origin);
-    const uint32_t light = device.light_sample_history[pixel];
+    const RGBAhalf record = load_RGBAhalf(device_records + pixel);
+    const vec3 origin     = world_to_sky_transform(task.origin);
+    const uint32_t light  = device.light_sample_history[pixel];
 
-    const RGBF sky = mul_color(sky_get_color(origin, task.ray, FLT_MAX, proper_light_sample(light, LIGHT_ID_SUN)), record);
+    const RGBAhalf sky =
+      mul_RGBAhalf(RGBF_to_RGBAhalf(sky_get_color(origin, task.ray, FLT_MAX, proper_light_sample(light, LIGHT_ID_SUN))), record);
 
-    device.frame_buffer[pixel] = RGBF_to_RGBAhalf(add_color(RGBAhalf_to_RGBF(device.frame_buffer[pixel]), sky));
-    write_albedo_buffer(sky, pixel);
+    store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), sky));
+    write_albedo_buffer(RGBAhalf_to_RGBF(sky), pixel);
   }
 }
 
@@ -282,11 +284,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks
     const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO) {
-      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true));
+      store_RGBAhalf(
+        device.frame_buffer + pixel, RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true)));
     }
     else if (device_shading_mode == SHADING_DEPTH) {
-      const float value          = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);
-      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
+      const float value = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);
+      store_RGBAhalf(device.frame_buffer + pixel, get_RGBAhalf(value, value, value, value));
     }
   }
 }

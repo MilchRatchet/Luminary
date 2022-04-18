@@ -96,31 +96,29 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       albedo.a = 1.0f;
     }
 
-    RGBF emission = get_color(0.0f, 0.0f, 0.0f);
+    RGBAhalf emission = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
 
     if (maps.y && device_scene.material.lights_active) {
       const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
-      emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
-      emission = scale_color(emission, intensity);
+      emission = get_RGBAhalf(illuminance_f.x, illuminance_f.y, illuminance_f.z, illuminance_f.w);
+      emission = scale_RGBAhalf(emission, intensity);
     }
 
     if (albedo.a < device_scene.material.alpha_cutoff)
       albedo.a = 0.0f;
 
-    RGBF record = RGBAhalf_to_RGBF(device_records[pixel]);
+    RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device_records + pixel));
 
-    if (albedo.a > 0.0f && color_any(emission)) {
-      write_albedo_buffer(emission, pixel);
+    if (albedo.a > 0.0f && any_RGBAhalf(emission)) {
+      write_albedo_buffer(RGBAhalf_to_RGBF(emission), pixel);
 
-      if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
-        emission = mul_color(emission, record);
+      emission = mul_RGBAhalf(emission, RGBF_to_RGBAhalf(record));
 
-        const uint32_t light = device.light_sample_history[pixel];
+      const uint32_t light = device.light_sample_history[pixel];
 
-        if (proper_light_sample(light, triangle_light_id)) {
-          device.frame_buffer[pixel] = RGBF_to_RGBAhalf(add_color(RGBAhalf_to_RGBF(device.frame_buffer[pixel]), emission));
-        }
+      if (proper_light_sample(light, triangle_light_id)) {
+        store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), emission));
       }
     }
 
@@ -185,8 +183,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
           light_task.state  = task.state;
 
           if (color_any(light_record)) {
-            device.light_records[pixel] = RGBF_to_RGBAhalf(light_record);
-            light_history_buffer_entry  = light.id;
+            store_RGBAhalf(device.light_records + pixel, RGBF_to_RGBAhalf(light_record));
+            light_history_buffer_entry = light.id;
             store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
           }
         }
@@ -206,7 +204,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       bounce_task.state  = task.state;
 
       if (valid_bounce && validate_trace_task(bounce_task, bounce_record)) {
-        device.bounce_records[pixel] = RGBF_to_RGBAhalf(bounce_record);
+        store_RGBAhalf(device.bounce_records + pixel, RGBF_to_RGBAhalf(bounce_record));
         store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }
     }
