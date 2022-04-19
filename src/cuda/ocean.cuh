@@ -223,17 +223,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      RGBF bounce_record = record;
+      RGBAhalf bounce_record = RGBF_to_RGBAhalf(record);
 
       brdf_sample_ray(ray, bounce_record, task.index, task.state, opaque_color(albedo), V, normal, normal, 0.0f, 0.0f);
 
       TraceTask bounce_task;
-      bounce_task.origin           = task.position;
-      bounce_task.ray              = ray;
-      bounce_task.index            = task.index;
-      bounce_task.state            = task.state;
-      device.bounce_records[pixel] = RGBF_to_RGBAhalf(bounce_record);
+      bounce_task.origin = task.position;
+      bounce_task.ray    = ray;
+      bounce_task.index  = task.index;
+      bounce_task.state  = task.state;
 
+      store_RGBAhalf(device.bounce_records + pixel, bounce_record);
       device.light_sample_history[pixel] = LIGHT_ID_ANY;
       store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }

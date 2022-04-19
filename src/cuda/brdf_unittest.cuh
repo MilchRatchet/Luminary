@@ -34,13 +34,13 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
       const vec3 V     = sample_ray_from_angles_and_vector(ran1, ran2, get_vector(1.0f, 0.0f, 0.0f));
       vec3 L;
 
-      RGBF brdf = get_color(1.0f, 1.0f, 1.0f);
+      RGBAhalf brdf = get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f);
 
       brdf_sample_ray(
         L, brdf, make_ushort2(0, 0), i, get_color(1.0f, 1.0f, 1.0f), V, get_vector(1.0f, 0.0f, 0.0f), get_vector(1.0f, 0.0f, 0.0f),
         1.0f - smoothness, metallic);
 
-      float weight = luminance(brdf);
+      float weight = luminance(RGBAhalf_to_RGBF(brdf));
 
       sum_bounce += weight;
 
@@ -48,7 +48,7 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
 
       brdf = brdf_evaluate(get_color(1.0f, 1.0f, 1.0f), V, L, get_vector(1.0f, 0.0f, 0.0f), 1.0f - smoothness, metallic);
 
-      weight = 2.0f * PI * luminance(brdf);
+      weight = 2.0f * PI * luminance(RGBAhalf_to_RGBF(brdf));
 
       sum_light += weight;
     }
@@ -86,7 +86,7 @@ extern "C" int brdf_unittest(const float tolerance) {
   for (int i = 0; i < BRDF_UNITTEST_STEPS_METALLIC; i++) {
     printf(" | ");
     for (int j = 0; j < BRDF_UNITTEST_STEPS_SMOOTHNESS; j++) {
-      const float v = values_bounce[i];
+      const float v = values_bounce[i * BRDF_UNITTEST_STEPS_SMOOTHNESS + j];
       if (v > 1.0001f || v < tolerance) {
         printf("\x1B[31m%.3f\x1B[0m ", v);
         error = 1;
@@ -107,7 +107,7 @@ extern "C" int brdf_unittest(const float tolerance) {
   for (int i = 0; i < BRDF_UNITTEST_STEPS_METALLIC; i++) {
     printf(" | ");
     for (int j = 0; j < BRDF_UNITTEST_STEPS_SMOOTHNESS; j++) {
-      const float v = values_light[i];
+      const float v = values_light[i * BRDF_UNITTEST_STEPS_SMOOTHNESS + j];
       if (v > 1.0001f || v < tolerance) {
         printf("\x1B[31m%.3f\x1B[0m ", v);
         error = 1;

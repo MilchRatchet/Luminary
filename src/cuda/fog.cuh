@@ -74,7 +74,7 @@ __device__ float get_fog_density(float base_density, float height) {
   return base_density;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_fog_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int task_count   = device.task_counts[id * 6 + 4];

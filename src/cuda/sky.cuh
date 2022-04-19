@@ -251,7 +251,7 @@ __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
   store_RGBAhalf(device_records + pixel, RGBF_to_RGBAhalf(new_record));
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_sky_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int task_count  = device.task_counts[id * 6 + 2];
@@ -273,7 +273,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_sky_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_sky_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int task_count  = device.task_counts[id * 6 + 2];

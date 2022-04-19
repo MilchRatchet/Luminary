@@ -49,11 +49,11 @@
  */
 //#define SINGLE_CONTRIBUTION_ONLY
 
-__device__ int validate_trace_task(TraceTask task, RGBF record) {
+__device__ int validate_trace_task(TraceTask task, RGBAhalf record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
-  const float max = fmaxf(record.r, fmaxf(record.g, record.b));
+  const float max = hmax_RGBAhalf(record);
   if (
     max < CUTOFF
     || (max < PROBABILISTIC_CUTOFF && blue_noise(task.index.x, task.index.y, task.state, 20) > (max - CUTOFF) / (CUTOFF - PROBABILISTIC_CUTOFF))) {

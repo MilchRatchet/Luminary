@@ -45,8 +45,8 @@ __device__ RGBF brdf_albedo_as_specular_f0(const RGBF albedo, const float metall
   return specular_f0;
 }
 
-__device__ RGBF brdf_albedo_as_diffuse(const RGBF albedo, const float metallic) {
-  return scale_color(albedo, 1.0f - metallic);
+__device__ RGBAhalf brdf_albedo_as_diffuse(const RGBAhalf albedo, const float metallic) {
+  return scale_RGBAhalf(albedo, 1.0f - metallic);
 }
 
 /*
@@ -335,7 +335,7 @@ __device__ RGBF brdf_microfacet_multiscattering(
 }
 
 __device__ vec3
-  brdf_sample_ray_microfacet(RGBF& record, const vec3 V_local, const float roughness2, RGBF specular_f0, float alpha, float beta) {
+  brdf_sample_ray_microfacet(RGBAhalf& record, const vec3 V_local, const float roughness2, RGBF specular_f0, float alpha, float beta) {
   vec3 H_local = get_vector(0.0f, 0.0f, 1.0f);
 
   if (roughness2 > 0.0f) {
@@ -361,13 +361,14 @@ __device__ vec3
 
   const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
 
-  record = mul_color(record, brdf_microfacet_multiscattering(roughness2, NdotL, NdotV, fresnel, specular_f0, brdf_term));
+  record =
+    mul_RGBAhalf(record, RGBF_to_RGBAhalf(brdf_microfacet_multiscattering(roughness2, NdotL, NdotV, fresnel, specular_f0, brdf_term)));
 
   return L_local;
 }
 
 __device__ vec3
-  brdf_sample_ray_specular(RGBF& record, const vec3 V_local, const float roughness2, RGBF specular_f0, float alpha, float beta) {
+  brdf_sample_ray_specular(RGBAhalf& record, const vec3 V_local, const float roughness2, RGBF specular_f0, float alpha, float beta) {
   return brdf_sample_ray_microfacet(record, V_local, roughness2, specular_f0, alpha, beta);
 }
 
@@ -389,7 +390,7 @@ __device__ float brdf_spec_probability(const float metallic) {
  * @result Returns true if the sample is valid. (atm, it always returns true)
  */
 __device__ bool brdf_sample_ray(
-  vec3& ray, RGBF& record, const ushort2 index, const uint32_t state, const RGBF albedo, const vec3 V, const vec3 normal,
+  vec3& ray, RGBAhalf& record, const ushort2 index, const uint32_t state, const RGBF albedo, const vec3 V, const vec3 normal,
   const vec3 face_normal, const float roughness, const float metallic) {
   const float specular_prob = brdf_spec_probability(metallic);
   const int use_specular    = blue_noise(index.x, index.y, state, 10) < specular_prob;
@@ -405,7 +406,7 @@ __device__ bool brdf_sample_ray(
 
   if (use_specular) {
     L_local = brdf_sample_ray_specular(record, V_local, roughness * roughness, specular_f0, alpha, beta);
-    record  = scale_color(record, 1.0f / specular_prob);
+    record  = scale_RGBAhalf(record, 1.0f / specular_prob);
   }
   else {
     L_local = brdf_sample_ray_diffuse(alpha, beta);
@@ -414,11 +415,11 @@ __device__ bool brdf_sample_ray(
     const float VdotH     = fmaxf(0.00001f, fminf(1.0f, dot_product(V_local, H_specular)));
     const RGBF fresnel    = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), VdotH);
 
-    const RGBF diffuse_reflectance = brdf_albedo_as_diffuse(albedo, metallic);
+    const RGBAhalf diffuse_reflectance = brdf_albedo_as_diffuse(RGBF_to_RGBAhalf(albedo), metallic);
 
-    record = mul_color(
-      record, scale_color(
-                mul_color(diffuse_reflectance, get_color(1.0f - fresnel.r, 1.0f - fresnel.g, 1.0f - fresnel.b)),
+    record = mul_RGBAhalf(
+      record, scale_RGBAhalf(
+                mul_RGBAhalf(diffuse_reflectance, get_RGBAhalf(1.0f - fresnel.r, 1.0f - fresnel.g, 1.0f - fresnel.b, 1.0f)),
                 brdf_diffuse_term(roughness, VdotH, L_local.z, V_local.z) / (1.0f - specular_prob)));
   }
 
@@ -447,16 +448,17 @@ __device__ RGBF brdf_evaluate_specular(
   return brdf_evaluate_microfacet(roughness, NdotH, NdotL, NdotV, fresnel, specular_f0);
 }
 
-__device__ RGBF brdf_evaluate_lambertian(const RGBF albedo, const float NdotL) {
-  return scale_color(albedo, ONE_OVER_PI * NdotL);
+__device__ RGBAhalf brdf_evaluate_lambertian(const RGBAhalf albedo, const float NdotL) {
+  return scale_RGBAhalf(albedo, ONE_OVER_PI * NdotL);
 }
 
-__device__ RGBF
-  brdf_evaluate_frostbyte_disney(const RGBF albedo, const float NdotL, const float NdotV, const float HdotV, const float roughness) {
-  return scale_color(albedo, brdf_diffuse_term_frostbyte_disney(roughness, HdotV, NdotL, NdotV) * ONE_OVER_PI * NdotL);
+__device__ RGBAhalf
+  brdf_evaluate_frostbyte_disney(const RGBAhalf albedo, const float NdotL, const float NdotV, const float HdotV, const float roughness) {
+  return scale_RGBAhalf(albedo, brdf_diffuse_term_frostbyte_disney(roughness, HdotV, NdotL, NdotV) * ONE_OVER_PI * NdotL);
 }
 
-__device__ RGBF brdf_evaluate_diffuse(const RGBF albedo, const float NdotL, const float NdotV, const float HdotV, const float roughness) {
+__device__ RGBAhalf
+  brdf_evaluate_diffuse(const RGBAhalf albedo, const float NdotL, const float NdotV, const float HdotV, const float roughness) {
   switch (device_scene.material.diffuse) {
     case FROSTBITEDISNEY:
       return brdf_evaluate_frostbyte_disney(albedo, NdotL, NdotV, HdotV, roughness);
@@ -470,7 +472,7 @@ __device__ RGBF brdf_evaluate_diffuse(const RGBF albedo, const float NdotL, cons
  * This computes the BRDF weight of a light sample.
  * @result Multiplicative weight.
  */
-__device__ RGBF
+__device__ RGBAhalf
   brdf_evaluate(const RGBF albedo, const vec3 V, const vec3 ray, const vec3 normal, const float roughness, const float metallic) {
   const vec3 H = normalize_vector(add_vector(V, ray));
 
@@ -478,7 +480,7 @@ __device__ RGBF
   float NdotV = dot_product(normal, V);
 
   if (NdotL <= 0.0f || NdotV <= 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
 
   NdotL = fminf(fmaxf(0.00001f, NdotL), 1.0f);
   NdotV = fminf(fmaxf(0.00001f, NdotV), 1.0f);
@@ -486,8 +488,8 @@ __device__ RGBF
   const float NdotH = __saturatef(dot_product(normal, H));
   const float HdotV = __saturatef(dot_product(H, V));
 
-  const RGBF specular_f0    = brdf_albedo_as_specular_f0(albedo, metallic);
-  const RGBF diffuse_albedo = brdf_albedo_as_diffuse(albedo, metallic);
+  const RGBF specular_f0        = brdf_albedo_as_specular_f0(albedo, metallic);
+  const RGBAhalf diffuse_albedo = brdf_albedo_as_diffuse(RGBF_to_RGBAhalf(albedo), metallic);
 
   RGBF fresnel;
   switch (device_scene.material.fresnel) {
@@ -500,10 +502,11 @@ __device__ RGBF
       break;
   }
 
-  const RGBF specular = brdf_evaluate_specular(roughness, NdotH, NdotL, NdotV, fresnel, specular_f0);
-  const RGBF diffuse  = brdf_evaluate_diffuse(diffuse_albedo, NdotL, NdotV, HdotV, roughness);
+  const RGBAhalf specular = RGBF_to_RGBAhalf(brdf_evaluate_specular(roughness, NdotH, NdotL, NdotV, fresnel, specular_f0));
+  const RGBAhalf diffuse  = brdf_evaluate_diffuse(diffuse_albedo, NdotL, NdotV, HdotV, roughness);
 
-  return add_color(specular, mul_color(diffuse, get_color(1.0f - fresnel.r, 1.0f - fresnel.g, 1.0f - fresnel.b)));
+  // return add_RGBAhalf(specular, mul_RGBAhalf(diffuse, get_RGBAhalf(1.0f - fresnel.r, 1.0f - fresnel.g, 1.0f - fresnel.b, 1.0f)));
+  return add_RGBAhalf(specular, diffuse);
 }
 
 /*

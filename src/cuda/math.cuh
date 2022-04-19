@@ -1146,6 +1146,12 @@ __device__ RGBAhalf max_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   return result;
 }
 
+__device__ float hmax_RGBAhalf(const RGBAhalf a) {
+  const __half2 max = __hmax2(a.rg, a.ba);
+
+  return fmaxf(__high2float(max), __low2float(max));
+}
+
 __device__ RGBAhalf fma_RGBAhalf(const RGBAhalf a, const __half b, const RGBAhalf c) {
   RGBAhalf result;
 
