@@ -4,6 +4,7 @@
 
 #include "baked.h"
 #include "bench.h"
+#include "config.h"
 #include "log.h"
 #include "output.h"
 #include "raytrace.h"
@@ -86,6 +87,12 @@ static int magic(char* path) {
   }
 }
 
+static void luminary_version_output() {
+  printf("Luminary %s (Branch: %s)\n", LUMINARY_VERSION_DATE, LUMINARY_BRANCH_NAME);
+  printf("(%s, %s, CUDA %s, OptiX %s)\n", LUMINARY_COMPILER, LUMINARY_OS, LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
+  printf("Copyright (c) 2022 MilchRatchet\n");
+}
+
 int main(int argc, char* argv[]) {
   int offline                  = 0;
   int bench                    = 0;
@@ -99,8 +106,9 @@ int main(int argc, char* argv[]) {
   OutputImageFormat img_format = IMGFORMAT_PNG;
   int post_process_menu        = 0;
   int unittest                 = 0;
+  int version_output           = 0;
 
-  for (int i = 2; i < argc; i++) {
+  for (int i = 1; i < argc; i++) {
     if (custom_samples) {
       offline_samples = parse_number(argv[i]);
     }
@@ -121,6 +129,7 @@ int main(int argc, char* argv[]) {
     custom_height  = parse_command(argv[i], "-h", "--height");
     post_process_menu |= parse_command(argv[i], "-p", "--post-menu");
     unittest |= parse_command(argv[i], "-u", "--unittest");
+    version_output |= parse_command(argv[i], "-v", "--version");
 
     if (parse_command(argv[i], (char*) 0, "--png")) {
       img_format = IMGFORMAT_PNG;
@@ -129,6 +138,11 @@ int main(int argc, char* argv[]) {
     if (parse_command(argv[i], (char*) 0, "--qoi")) {
       img_format = IMGFORMAT_QOI;
     }
+  }
+
+  if (version_output) {
+    luminary_version_output();
+    return 0;
   }
 
   init_log(write_logs);

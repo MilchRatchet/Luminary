@@ -68,6 +68,9 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
 -u, --unittest
         run a test suite, no rendering is done
 
+-v, --version
+        print build information and exit
+
     --qoi
         set output image format to QOI
 
@@ -94,7 +97,7 @@ Requirements:
 - Modern CMake
 - Make or Ninja
 - SSE 4.1 compatible CPU
-- Supported Nvidia GPU (Recommended: Volta or later)
+- Supported Nvidia GPU (Recommended: Volta or later, Required: Pascal or later)
 
 The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed.
 >📝 `zlib` and `qoi` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
@@ -110,7 +113,7 @@ The `LuminaryFont.ttf` file is automatically copied to the build directory and n
 
 ## Linux
 
-You need a `nvcc` compatible host compiler. Which compilers are supported can be found in the [CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements). In general, any modern GCC, ICC or CLANG will work. By default, `nvcc` uses `gcc`/`g++`.
+You need a `nvcc` compatible host compiler. Which compilers are supported can be found in the [CUDA Installation Guide](https://docs.nvidia.com/cuda/cuda-installation-guide-linux/index.html#system-requirements). In general, any modern GCC, ICC or clang will work. By default, `nvcc` uses `gcc`/`g++`.
 
 ```
 mkdir build
@@ -118,7 +121,7 @@ cmake -B ./build -S . -DOptiX_INSTALL_DIR="{OptiX Path}"
 cd build
 make
 ```
-Note that there is a bug in a version of GCC 11. If `nvcc` happens to use that version of G++ 11, the build will fail. Select a different compiler in that case using for example`-DCMAKE_CUDA_HOST_COMPILER=/usr/bin/g++-10`. If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
+Note that there is a bug in a version of G++ 11. If `nvcc` happens to use that version of G++ 11 as CUDA host compiler, the build will fail. Select a different compiler in that case using for example`-DCMAKE_CUDA_HOST_COMPILER=clang`. If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
 
 ## Windows
 
