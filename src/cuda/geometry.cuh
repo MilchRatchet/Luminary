@@ -139,21 +139,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       new_task.index  = task.index;
       new_task.state  = task.state;
 
-      if (validate_trace_task(new_task, record)) {
-        switch (device_iteration_type) {
-          case TYPE_CAMERA:
-          case TYPE_BOUNCE:
-            store_RGBAhalf(device.bounce_records + pixel, record);
-            store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+      switch (device_iteration_type) {
+        case TYPE_CAMERA:
+        case TYPE_BOUNCE:
+          store_RGBAhalf(device.bounce_records + pixel, record);
+          store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+          break;
+        case TYPE_LIGHT:
+          if (white_noise() > 0.5f)
             break;
-          case TYPE_LIGHT:
-            if (white_noise() > 0.5f)
-              break;
-            store_RGBAhalf(device.light_records + pixel, scale_RGBAhalf(record, 2.0f));
-            store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
-            device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
-            break;
-        }
+          store_RGBAhalf(device.light_records + pixel, scale_RGBAhalf(record, 2.0f));
+          store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
+          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
+          break;
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {

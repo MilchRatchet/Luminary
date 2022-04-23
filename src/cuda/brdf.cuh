@@ -180,6 +180,8 @@ __device__ LightSample brdf_finalize_light_sample(LightSample light, const vec3 
       break;
   }
 
+  light.weight *= 0.5f * ONE_OVER_PI;
+
   return light;
 }
 
@@ -420,7 +422,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
 
   RGBAhalf specular = brdf_evaluate_microfacet(brdf, NdotH, NdotL, NdotV);
 
-  brdf.term = mul_RGBAhalf(brdf.term, scale_RGBAhalf(specular, 0.5f * ONE_OVER_PI));
+  brdf.term = mul_RGBAhalf(brdf.term, specular);
 
   return brdf;
 }
@@ -446,9 +448,7 @@ __device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const ushort2 index, 
   else {
     const vec3 L_local = brdf_sample_ray_diffuse(alpha, beta);
     brdf.L             = normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
-
-    brdf.term = scale_RGBAhalf(brdf.term, 2.0f * PI);
-    brdf      = brdf_evaluate(brdf);
+    brdf               = brdf_evaluate(brdf);
   }
 
   return brdf;

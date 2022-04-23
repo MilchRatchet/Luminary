@@ -47,7 +47,7 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
 
       brdf = brdf_evaluate(brdf);
 
-      weight = 2.0f * PI * luminance(RGBAhalf_to_RGBF(brdf.term));
+      weight = luminance(RGBAhalf_to_RGBF(brdf.term));
 
       sum_light += weight;
     }
