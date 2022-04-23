@@ -85,12 +85,11 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_check(ui, "Lights", &(instance->scene_gpu.material.lights_active), 1);
   panels[i++] = create_check(ui, "BVH Alpha Cutoff", &(instance->scene_gpu.material.bvh_alpha_cutoff), 1);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene_gpu.material.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_dropdown(ui, "Diffuse BRDF", &(instance->scene_gpu.material.diffuse), 1, 2, "Lambertian\0Frostbite-Disney", 5);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->scene_gpu.material.default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->scene_gpu.material.default_material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] =
     create_slider(ui, "Default Light Intensity", &(instance->scene_gpu.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene_gpu.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 8);
+  panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene_gpu.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 7);
 
   tab.panels      = panels;
   tab.panel_count = i;

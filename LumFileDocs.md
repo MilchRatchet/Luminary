@@ -39,11 +39,6 @@ Default metallic value that is used when no material texture is present. Number 
 `MATERIAL EMISSION [FP32]`<br/>
 Default emission intensity value that is used when no material texture is present. Number must be strictly greater than 0.
 
-`MATERIAL DIFFUSE_ [INT32]`<br/>
-Defines which of the available diffuse BRDFs is used:
-  - 0 = Lambertian
-  - 1 = Frostbite-Disney
-
 `MATERIAL FRESNEL_ [INT32]`<br/>
 Defines which of the available fresnel approximations is used:
   - 0 = Schlick

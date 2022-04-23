@@ -61,8 +61,6 @@ enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJ
 
 enum MaterialFresnel { SCHLICK = 0, FDEZ_AGUERA = 1 } typedef MaterialFresnel;
 
-enum MaterialDiffuse { LAMBERTIAN = 0, FROSTBITEDISNEY = 1 } typedef MaterialDiffuse;
-
 struct DeviceBuffer {
   void* device_pointer;
   size_t size;
@@ -216,7 +214,6 @@ struct Jitter {
 struct GlobalMaterial {
   RGBF default_material;
   MaterialFresnel fresnel;
-  MaterialDiffuse diffuse;
   int lights_active;
   int bvh_alpha_cutoff;
   float alpha_cutoff;

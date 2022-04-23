@@ -102,10 +102,6 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 5642809480346946885u:
       sscanf(value, "%f\n", &material->default_material.b);
       break;
-    /* DIFFUSE_ */
-    case 6864984832712526148u:
-      sscanf(value, "%d\n", &material->diffuse);
-      break;
     /* FRESNEL_ */
     case 6866939734539981382u:
       sscanf(value, "%d\n", &material->fresnel);
@@ -500,7 +496,6 @@ static Scene get_default_scene() {
   scene.material.default_material.g = 0.0f;
   scene.material.default_material.b = 1.0f;
   scene.material.fresnel            = FDEZ_AGUERA;
-  scene.material.diffuse            = LAMBERTIAN;
   scene.material.bvh_alpha_cutoff   = 1;
   scene.material.alpha_cutoff       = 0.0f;
 
@@ -887,8 +882,6 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf(line, "MATERIAL METALLIC %f\n", instance->scene_gpu.material.default_material.g);
   fputs(line, file);
   sprintf(line, "MATERIAL EMISSION %f\n", instance->scene_gpu.material.default_material.b);
-  fputs(line, file);
-  sprintf(line, "MATERIAL DIFFUSE_ %d\n", instance->scene_gpu.material.diffuse);
   fputs(line, file);
   sprintf(line, "MATERIAL FRESNEL_ %d\n", instance->scene_gpu.material.fresnel);
   fputs(line, file);
