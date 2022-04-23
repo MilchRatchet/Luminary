@@ -8,41 +8,42 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-/*
- * This BRDF implementation is based on the BRDF Crashcourse by Jakub Boksansky.
- * Multiscattering compensation is based on the blog "Image Based Lighting with Multiple Scattering" by Bruno Opsenica and the paper
- * "A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting" by Fdez-Aguera.
- */
+struct BRDFInstance {
+  RGBAhalf albedo;
+  RGBAhalf diffuse;
+  RGBAhalf specular_f0;
+  RGBAhalf fresnel;
+  vec3 normal;
+  float roughness;
+  float metallic;
+  RGBAhalf term;
+  vec3 V;
+  vec3 L;
+} typedef BRDFInstance;
 
 /*
- * There are two diffuse BRDFs implemented.
- *  - Lambertian
- *  - Frostbite-Disney
+ * This BRDF implementation is based on the BRDF Crashcourse by Jakub Boksansky and
+ * "A Multiple-Scattering Microfacet Model for Real-Time Image-based Lighting" by Fdez-Aguera.
  *
- * The frostbite-disney BRDF does not seem to work very well in combination with the specular BRDF.
- * The image tends to become a lot darker than it should.
- * The lambertian BRDF works a lot better, however, even that one has some energy loss when combined with the specular BRDF.
- *
- * The specular BRDF is a microfacet GGX distributed BRDF. Since it only takes single scattering into consideration
- * there is a multiscattering compensation, however, while this improves energy conservation, there is still some
- * energy lost.
+ * Essentially instead of using separate BRDFs for diffuse and specular components, the BRDF by Fdez-Aguera
+ * provides both diffuse and specular component based on the microfacet model which achieves perfect energy conservation.
+ * However, only metallic values of 0 and 1 provide energy conservation as all values in between have energy loss.
  */
 
 /*
  * There are two fresnel approximations. One is the standard Schlick approximation. The other is some
  * approximation found in the paper by Fdez-Aguera.
  */
-__device__ float brdf_shadowed_F90(const RGBF f0) {
+__device__ float brdf_shadowed_F90(const RGBAhalf specular_f0) {
   const float t = 1.0f / 0.04f;
-  return fminf(1.0f, t * luminance(f0));
+  return fminf(1.0f, t * luminance(RGBAhalf_to_RGBF(specular_f0)));
 }
 
-__device__ RGBF brdf_albedo_as_specular_f0(const RGBF albedo, const float metallic) {
-  RGBF specular_f0;
-  specular_f0.r = lerp(0.04f, albedo.r, metallic);
-  specular_f0.g = lerp(0.04f, albedo.g, metallic);
-  specular_f0.b = lerp(0.04f, albedo.b, metallic);
-  return specular_f0;
+__device__ RGBAhalf brdf_albedo_as_specular_f0(const RGBAhalf albedo, const float metallic) {
+  const RGBAhalf specular_f0 = get_RGBAhalf(0.04f, 0.04f, 0.04f, 0.04f);
+  const RGBAhalf diff        = sub_RGBAhalf(albedo, specular_f0);
+
+  return fma_RGBAhalf(diff, metallic, specular_f0);
 }
 
 __device__ RGBAhalf brdf_albedo_as_diffuse(const RGBAhalf albedo, const float metallic) {
@@ -56,14 +57,12 @@ __device__ RGBAhalf brdf_albedo_as_diffuse(const RGBAhalf albedo, const float me
  * @param NdotV Cosine Angle.
  * @result Fresnel approximation.
  */
-__device__ RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float NdotV) {
-  RGBF result;
-
+__device__ RGBAhalf brdf_fresnel_schlick(const RGBAhalf f0, const float f90, const float NdotV) {
   const float t = powf(1.0f - NdotV, 5.0f);
 
-  result.r = lerp(f0.r, f90, t);
-  result.g = lerp(f0.g, f90, t);
-  result.b = lerp(f0.b, f90, t);
+  RGBAhalf result = f0;
+  RGBAhalf diff   = sub_RGBAhalf(get_RGBAhalf(f90, f90, f90, f90), f0);
+  result          = fma_RGBAhalf(diff, t, result);
 
   return result;
 }
@@ -75,11 +74,12 @@ __device__ RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float
  * @param NdotV Cosine Angle.
  * @result Fresnel approximation.
  */
-__device__ RGBF brdf_fresnel_roughness(const RGBF f0, const float roughness, const float NdotV) {
-  const float t = powf(1.0f - NdotV, 5.0f);
+__device__ RGBAhalf brdf_fresnel_roughness(const RGBAhalf f0, const float roughness, const float NdotV) {
+  const float t     = powf(1.0f - NdotV, 5.0f);
+  const __half s    = 1.0f - roughness;
+  const RGBAhalf Fr = sub_RGBAhalf(max_RGBAhalf(get_RGBAhalf(s, s, s, s), f0), f0);
 
-  const RGBF Fr = sub_color(max_color(get_color(1.0f - roughness, 1.0f - roughness, 1.0f - roughness), f0), f0);
-  return add_color(f0, scale_color(Fr, t));
+  return fma_RGBAhalf(Fr, t, f0);
 }
 
 __device__ float brdf_smith_G1_GGX(const float roughness4, const float NdotS2) {
@@ -284,32 +284,6 @@ __device__ LightSample sample_light(const vec3 position) {
   return selected;
 }
 
-__device__ float brdf_diffuse_term_frostbyte_disney(const float roughness, const float HdotV, const float NdotL, const float NdotV) {
-  const float energyBias   = 0.5f * roughness;
-  const float energyFactor = lerp(1.0f, 1.0f / 1.51f, roughness);
-
-  const float FD90MinusOne = energyBias + 2.0f * HdotV * HdotV * roughness - 1.0f;
-
-  const float FDL = 1.0f + (FD90MinusOne * pow(1.0f - NdotL, 5.0f));
-  const float FDV = 1.0f + (FD90MinusOne * pow(1.0f - NdotV, 5.0f));
-
-  return FDL * FDV * energyFactor;
-}
-
-__device__ float brdf_diffuse_term(const float roughness, const float HdotV, const float NdotL, const float NdotV) {
-  switch (device_scene.material.diffuse) {
-    case FROSTBITEDISNEY:
-      return brdf_diffuse_term_frostbyte_disney(roughness, HdotV, NdotL, NdotV);
-    case LAMBERTIAN:
-    default:
-      return 1.0f;
-  }
-}
-
-__device__ vec3 brdf_sample_ray_hemisphere(float alpha, const float beta, const vec3 normal) {
-  return normalize_vector(sample_ray_from_angles_and_vector(sqrtf(alpha), beta, normal));
-}
-
 __device__ vec3 brdf_sample_microfacet(const vec3 V_local, const float roughness2, const float alpha, const float beta) {
   return brdf_sample_microfacet_GGX(V_local, roughness2, alpha, beta);
 }
@@ -317,31 +291,29 @@ __device__ vec3 brdf_sample_microfacet(const vec3 V_local, const float roughness
 /*
  * Multiscattering microfacet model by Fdez-Aguera.
  */
-__device__ RGBF brdf_microfacet_multiscattering(
-  const float NdotV, const RGBF fresnel, const RGBF specular_f0, const RGBAhalf diffuse, const float brdf_term) {
-  const RGBF FssEss = scale_color(fresnel, brdf_term);
+__device__ RGBAhalf brdf_microfacet_multiscattering(
+  const float NdotV, const RGBAhalf fresnel, const RGBF specular_f0, const RGBAhalf diffuse, const float brdf_term) {
+  const RGBF FssEss = scale_color(RGBAhalf_to_RGBF(fresnel), brdf_term);
 
   const float Ems = (1.0f - brdf_term);
 
   const RGBF F_avg =
     add_color(specular_f0, get_color((1.0f - specular_f0.r) / 21.0f, (1.0f - specular_f0.g) / 21.0f, (1.0f - specular_f0.b) / 21.0f));
 
-  const RGBF FmsEms = get_color(
-    Ems * FssEss.r * F_avg.r / (1.0f - F_avg.r * Ems), Ems * FssEss.g * F_avg.g / (1.0f - F_avg.g * Ems),
-    Ems * FssEss.b * F_avg.b / (1.0f - F_avg.b * Ems));
+  const RGBF FmsEms = get_color(F_avg.r / (1.0f - F_avg.r * Ems), F_avg.g / (1.0f - F_avg.g * Ems), F_avg.b / (1.0f - F_avg.b * Ems));
 
-  const RGBF SSMS = add_color(FssEss, FmsEms);
+  const RGBAhalf SSMS = RGBF_to_RGBAhalf(add_color(FssEss, scale_color(mul_color(FssEss, FmsEms), Ems)));
 
-  const RGBF Edss = sub_color(get_color(1.0f, 1.0f, 1.0f), SSMS);
+  const RGBAhalf Edss = sub_RGBAhalf(get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f), SSMS);
 
-  const RGBF Kd = mul_color(RGBAhalf_to_RGBF(diffuse), Edss);
+  const RGBAhalf Kd = mul_RGBAhalf(diffuse, Edss);
 
-  return add_color(Kd, SSMS);
+  return add_RGBAhalf(Kd, SSMS);
 }
 
-__device__ vec3 brdf_sample_ray_microfacet(
-  RGBAhalf& record, const vec3 V_local, const float roughness2, RGBF specular_f0, const RGBAhalf diffuse, float alpha, float beta) {
-  vec3 H_local = get_vector(0.0f, 0.0f, 1.0f);
+__device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3 V_local, float alpha, float beta) {
+  const float roughness2 = brdf.roughness * brdf.roughness;
+  vec3 H_local           = get_vector(0.0f, 0.0f, 1.0f);
 
   if (roughness2 > 0.0f) {
     H_local = brdf_sample_microfacet(V_local, roughness2, alpha, beta);
@@ -353,29 +325,25 @@ __device__ vec3 brdf_sample_ray_microfacet(
   const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
   const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
 
-  RGBF fresnel;
   switch (device_scene.material.fresnel) {
     case SCHLICK:
-      fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotL);
+      brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotL);
       break;
     case FDEZ_AGUERA:
     default:
-      fresnel = brdf_fresnel_roughness(specular_f0, sqrtf(roughness2), HdotL);
+      brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotL);
       break;
   }
 
   const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
 
-  const RGBF F = brdf_microfacet_multiscattering(NdotV, fresnel, specular_f0, diffuse, brdf_term);
+  const RGBAhalf F = brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, brdf_term);
 
-  record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(F));
+  brdf.term = mul_RGBAhalf(brdf.term, F);
 
-  return L_local;
-}
+  brdf.L = L_local;
 
-__device__ vec3 brdf_sample_ray_specular(
-  RGBAhalf& record, const vec3 V_local, const float roughness2, RGBF specular_f0, const RGBAhalf diffuse, float alpha, float beta) {
-  return brdf_sample_ray_microfacet(record, V_local, roughness2, specular_f0, diffuse, alpha, beta);
+  return brdf;
 }
 
 __device__ vec3 brdf_sample_ray_hemisphere(const float alpha, const float beta) {
@@ -396,145 +364,94 @@ __device__ float brdf_evaluate_microfacet_GGX(const float roughness4, const floa
   return roughness4 / (PI * a * a);
 }
 
-__device__ RGBF brdf_evaluate_microfacet(
-  float roughness, const float NdotH, const float NdotL, const float NdotV, const RGBF fresnel, const RGBF specular_f0,
-  const RGBAhalf diffuse) {
-  roughness              = fmaxf(roughness, 0.09f);
-  const float roughness4 = roughness * roughness * roughness * roughness;
+__device__ RGBAhalf brdf_evaluate_microfacet(BRDFInstance brdf, const float NdotH, const float NdotL, const float NdotV) {
+  const float roughness4 = brdf.roughness * brdf.roughness * brdf.roughness * brdf.roughness;
   const float D          = brdf_evaluate_microfacet_GGX(roughness4, NdotH);
   const float G2         = brdf_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  const RGBF F = brdf_microfacet_multiscattering(NdotV, fresnel, specular_f0, diffuse, D * G2 * NdotL);
-
-  return F;
+  return brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, D * G2 * NdotL);
 }
 
-// This is supposed to be an interface in the case we want to allow for different BRDFs in the future
-__device__ RGBF brdf_evaluate_specular(
-  const float roughness, const float NdotH, const float NdotL, const float NdotV, const RGBF fresnel, const RGBF specular_f0,
-  const RGBAhalf diffuse) {
-  return brdf_evaluate_microfacet(roughness, NdotH, NdotL, NdotV, fresnel, specular_f0, diffuse);
-}
+__device__ BRDFInstance
+  brdf_get_instance(const RGBAhalf albedo, const vec3 V, const vec3 normal, const float roughness, const float metallic) {
+  BRDFInstance brdf;
+  brdf.albedo      = albedo;
+  brdf.diffuse     = brdf_albedo_as_diffuse(albedo, metallic);
+  brdf.specular_f0 = brdf_albedo_as_specular_f0(albedo, metallic);
+  brdf.V           = V;
+  brdf.roughness   = fmaxf(roughness, 0.09f);
+  brdf.metallic    = metallic;
+  brdf.normal      = normal;
+  brdf.term        = get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f);
 
-__device__ RGBAhalf brdf_evaluate_lambertian(const RGBAhalf albedo, const float NdotL) {
-  return scale_RGBAhalf(albedo, ONE_OVER_PI * NdotL);
-}
-
-__device__ RGBAhalf
-  brdf_evaluate_frostbyte_disney(const RGBAhalf albedo, const float NdotL, const float NdotV, const float HdotV, const float roughness) {
-  return scale_RGBAhalf(albedo, brdf_diffuse_term_frostbyte_disney(roughness, HdotV, NdotL, NdotV) * ONE_OVER_PI * NdotL);
-}
-
-__device__ RGBAhalf
-  brdf_evaluate_diffuse(const RGBAhalf albedo, const float NdotL, const float NdotV, const float HdotV, const float roughness) {
-  switch (device_scene.material.diffuse) {
-    case FROSTBITEDISNEY:
-      return brdf_evaluate_frostbyte_disney(albedo, NdotL, NdotV, HdotV, roughness);
-    case LAMBERTIAN:
-    default:
-      return brdf_evaluate_lambertian(albedo, NdotL);
-  }
+  return brdf;
 }
 
 /*
  * This computes the BRDF weight of a light sample.
- * @result Multiplicative weight.
+ * Writes term of the BRDFInstance.
  */
-__device__ RGBAhalf brdf_evaluate(const RGBF albedo, const vec3 V, const vec3 L, const vec3 normal, const float roughness, float metallic) {
-  const vec3 H = normalize_vector(add_vector(V, L));
+__device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
+  const vec3 H = normalize_vector(add_vector(brdf.V, brdf.L));
 
-  float NdotL = dot_product(normal, L);
-  float NdotV = dot_product(normal, V);
+  float NdotL = dot_product(brdf.normal, brdf.L);
+  float NdotV = dot_product(brdf.normal, brdf.V);
 
-  if (NdotL <= 0.0f || NdotV <= 0.0f)
-    return get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+  if (NdotL <= 0.0f || NdotV <= 0.0f) {
+    brdf.term = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+    return brdf;
+  }
 
-  NdotL = fminf(fmaxf(0.00001f, NdotL), 1.0f);
-  NdotV = fminf(fmaxf(0.00001f, NdotV), 1.0f);
+  NdotL = fminf(fmaxf(0.0001f, NdotL), 1.0f);
+  NdotV = fminf(fmaxf(0.0001f, NdotV), 1.0f);
 
-  const float NdotH = __saturatef(dot_product(normal, H));
-  const float HdotV = __saturatef(dot_product(H, V));
+  const float NdotH = __saturatef(dot_product(brdf.normal, H));
+  const float HdotV = __saturatef(dot_product(H, brdf.V));
 
-  const RGBF specular_f0        = brdf_albedo_as_specular_f0(albedo, metallic);
-  const RGBAhalf diffuse_albedo = brdf_albedo_as_diffuse(RGBF_to_RGBAhalf(albedo), metallic);
-
-  RGBF fresnel;
   switch (device_scene.material.fresnel) {
     case SCHLICK:
-      fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotV);
+      brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotV);
       break;
     case FDEZ_AGUERA:
     default:
-      fresnel = brdf_fresnel_roughness(specular_f0, roughness, HdotV);
+      brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotV);
       break;
   }
 
-  RGBAhalf specular = RGBF_to_RGBAhalf(brdf_evaluate_specular(roughness, NdotH, NdotL, NdotV, fresnel, specular_f0, diffuse_albedo));
-  RGBAhalf diffuse  = brdf_evaluate_diffuse(diffuse_albedo, NdotL, NdotV, HdotV, roughness);
+  RGBAhalf specular = brdf_evaluate_microfacet(brdf, NdotH, NdotL, NdotV);
 
-  specular = scale_RGBAhalf(specular, 0.5f * ONE_OVER_PI);
-  // diffuse  = scale_RGBAhalf(diffuse, 1.0f / 0.94f);
+  brdf.term = mul_RGBAhalf(brdf.term, scale_RGBAhalf(specular, 0.5f * ONE_OVER_PI));
 
-  // return add_RGBAhalf(specular, mul_RGBAhalf(diffuse, get_RGBAhalf(1.0f - fresnel.r, 1.0f - fresnel.g, 1.0f - fresnel.b, 1.0f)));
-  return specular;
+  return brdf;
 }
 
 /*
  * Samples a ray based on the BRDFs and multiplies record with sampling weight.
- * @result Returns true if the sample is valid. (atm, it always returns true)
+ * Writes L and term of the BRDFInstance.
  */
-__device__ bool brdf_sample_ray(
-  vec3& ray, RGBAhalf& record, const ushort2 index, const uint32_t state, const RGBF albedo, const vec3 V, const vec3 normal,
-  const vec3 face_normal, const float roughness, const float metallic) {
-  const float specular_prob = brdf_spec_probability(metallic);
+__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const ushort2 index, const uint32_t state) {
+  const float specular_prob = brdf_spec_probability(brdf.metallic);
   const int use_specular    = blue_noise(index.x, index.y, state, 10) < specular_prob;
   const float alpha         = blue_noise(index.x, index.y, state, 2);
   const float beta          = 2.0f * PI * blue_noise(index.x, index.y, state, 3);
 
-  const RGBF specular_f0 = brdf_albedo_as_specular_f0(albedo, metallic);
-  const RGBAhalf diffuse = brdf_albedo_as_diffuse(RGBF_to_RGBAhalf(albedo), metallic);
-
-  const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
-  const vec3 V_local             = rotate_vector_by_quaternion(V, rotation_to_z);
-
-  vec3 L_local;
+  const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
+  const vec3 V_local             = rotate_vector_by_quaternion(brdf.V, rotation_to_z);
 
   if (use_specular) {
-    L_local = brdf_sample_ray_specular(record, V_local, roughness * roughness, specular_f0, diffuse, alpha, beta);
+    brdf = brdf_sample_ray_microfacet(brdf, V_local, alpha, beta);
+
+    brdf.L = normalize_vector(rotate_vector_by_quaternion(brdf.L, inverse_quaternion(rotation_to_z)));
   }
   else {
-    L_local = brdf_sample_ray_diffuse(alpha, beta);
+    const vec3 L_local = brdf_sample_ray_diffuse(alpha, beta);
+    brdf.L             = normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
 
-    record = scale_RGBAhalf(record, 2.0f * PI);
-
-    record = mul_RGBAhalf(record, brdf_evaluate(albedo, V_local, L_local, get_vector(0.0f, 0.0f, 1.0f), roughness, metallic));
-
-    /*const vec3 H_specular = brdf_sample_microfacet(V_local, roughness * roughness, alpha, beta);
-    const float VdotH     = fmaxf(0.00001f, fminf(1.0f, dot_product(V_local, H_specular)));
-
-    const vec3 H_local = normalize_vector(add_vector(L_local, V_local));
-    const float HdotL  = dot_product(H_local, L_local);
-
-    RGBF fresnel;
-    switch (device_scene.material.fresnel) {
-      case SCHLICK:
-        fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotL);
-        break;
-      case FDEZ_AGUERA:
-      default:
-        fresnel = brdf_fresnel_roughness(specular_f0, sqrtf(roughness * roughness), HdotL);
-        break;
-    }
-
-    record = mul_RGBAhalf(
-      record, scale_RGBAhalf(
-                mul_RGBAhalf(diffuse, get_RGBAhalf(1.0f - fresnel.r, 1.0f - fresnel.g, 1.0f - fresnel.b, 1.0f)),
-                brdf_diffuse_term(roughness, VdotH, L_local.z, V_local.z)));*/
+    brdf.term = scale_RGBAhalf(brdf.term, 2.0f * PI);
+    brdf      = brdf_evaluate(brdf);
   }
 
-  ray = normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
-
-  return true;
+  return brdf;
 }
 
 /*
@@ -542,25 +459,17 @@ __device__ bool brdf_sample_ray(
  *
  * Essentially I handle refraction like specular reflection. I sample a microfacet and
  * simply refract along it instead of reflecting. Weighting is done exactly like in reflection.
- * The albedo is simply taken as the specular f0, I don't know I feel like that makes sense
- * from an artistic standpoint. This is most likely completely non physical but since
- * refraction plays such a small role at the moment, it probably doesnt matter too much.
+ * This is most likely completely non physical but since refraction plays such a small role at the moment,
+ * it probably doesnt matter too much.
  */
-__device__ vec3 brdf_sample_ray_refraction(
-  RGBF& record, const RGBF albedo, const vec3 normal, const vec3 ray, const float roughness, const float metallic, const float index,
-  const float r1, const float r2) {
+__device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const float r1, const float r2) {
   const float alpha = r1;
   const float beta  = r2;
 
-  const float roughness2 = roughness * roughness;
+  const float roughness2 = brdf.roughness * brdf.roughness;
 
-  const RGBF specular_f0 = albedo;
-  const RGBAhalf diffuse = brdf_albedo_as_diffuse(RGBF_to_RGBAhalf(albedo), metallic);
-
-  const vec3 V = scale_vector(ray, -1.0f);
-
-  const Quaternion rotation_to_z = get_rotation_to_z_canonical(normal);
-  const vec3 V_local             = rotate_vector_by_quaternion(V, rotation_to_z);
+  const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
+  const vec3 V_local             = rotate_vector_by_quaternion(brdf.V, rotation_to_z);
 
   vec3 H_local = get_vector(0.0f, 0.0f, 1.0f);
 
@@ -575,22 +484,21 @@ __device__ vec3 brdf_sample_ray_refraction(
   const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
   const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
 
-  RGBF fresnel;
   switch (device_scene.material.fresnel) {
     case SCHLICK:
-      fresnel = brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), HdotL);
+      brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotL);
       break;
     case FDEZ_AGUERA:
     default:
-      fresnel = brdf_fresnel_roughness(specular_f0, sqrtf(roughness2), HdotL);
+      brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotL);
       break;
   }
 
   const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
 
-  const RGBF F = brdf_microfacet_multiscattering(NdotV, fresnel, specular_f0, diffuse, brdf_term);
+  const RGBAhalf F = brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, brdf_term);
 
-  record = mul_color(record, F);
+  brdf.term = mul_RGBAhalf(brdf.term, F);
 
   const float b = 1.0f - index * index * (1.0f - HdotV * HdotV);
 
@@ -603,7 +511,9 @@ __device__ vec3 brdf_sample_ray_refraction(
     L_local = normalize_vector(add_vector(scale_vector(ray_local, index), scale_vector(H_local, index * HdotV - sqrtf(b))));
   }
 
-  return normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
+  brdf.L = normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
+
+  return brdf;
 }
 
 #endif /* CU_BRDF_H */

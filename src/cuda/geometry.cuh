@@ -139,19 +139,21 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       new_task.index  = task.index;
       new_task.state  = task.state;
 
-      switch (device_iteration_type) {
-        case TYPE_CAMERA:
-        case TYPE_BOUNCE:
-          store_RGBAhalf(device.bounce_records + pixel, record);
-          store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
-          break;
-        case TYPE_LIGHT:
-          if (white_noise() > 0.5f)
+      if (validate_trace_task(new_task, record)) {
+        switch (device_iteration_type) {
+          case TYPE_CAMERA:
+          case TYPE_BOUNCE:
+            store_RGBAhalf(device.bounce_records + pixel, record);
+            store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
             break;
-          store_RGBAhalf(device.light_records + pixel, scale_RGBAhalf(record, 2.0f));
-          store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
-          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
-          break;
+          case TYPE_LIGHT:
+            if (white_noise() > 0.5f)
+              break;
+            store_RGBAhalf(device.light_records + pixel, scale_RGBAhalf(record, 2.0f));
+            store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
+            device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
+            break;
+        }
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {
@@ -169,20 +171,21 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
+      BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, roughness, metallic);
+
       if (use_light_sample) {
         LightSample light = load_light_sample(device.light_samples, pixel);
 
         light = brdf_finalize_light_sample(light, task.position);
 
         if (light.weight > 0.0f) {
-          ray = brdf_sample_light_ray(light, task.position);
+          brdf.L = brdf_sample_light_ray(light, task.position);
 
-          const RGBAhalf light_record =
-            mul_RGBAhalf(record, scale_RGBAhalf(brdf_evaluate(opaque_color(albedo), V, ray, normal, roughness, metallic), light.weight));
+          const RGBAhalf light_record = mul_RGBAhalf(record, scale_RGBAhalf(brdf_evaluate(brdf).term, light.weight));
 
           TraceTask light_task;
           light_task.origin = task.position;
-          light_task.ray    = ray;
+          light_task.ray    = brdf.L;
           light_task.index  = task.index;
           light_task.state  = task.state;
 
@@ -197,17 +200,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_geometry_tasks()
       if (!(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
         device.light_sample_history[pixel] = light_history_buffer_entry;
 
-      RGBAhalf bounce_record = record;
-      const bool valid_bounce =
-        brdf_sample_ray(ray, bounce_record, task.index, task.state, opaque_color(albedo), V, normal, face_normal, roughness, metallic);
+      brdf                   = brdf_sample_ray(brdf, task.index, task.state);
+      RGBAhalf bounce_record = mul_RGBAhalf(record, brdf.term);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
-      bounce_task.ray    = ray;
+      bounce_task.ray    = brdf.L;
       bounce_task.index  = task.index;
       bounce_task.state  = task.state;
 
-      if (valid_bounce && validate_trace_task(bounce_task, bounce_record)) {
+      if (validate_trace_task(bounce_task, bounce_record)) {
         store_RGBAhalf(device.bounce_records + pixel, bounce_record);
         store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }

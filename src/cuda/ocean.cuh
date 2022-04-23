@@ -176,14 +176,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
 
       write_albedo_buffer(emission, pixel);
 
-      if (!isnan(record.r) && !isinf(record.r) && !isnan(record.g) && !isinf(record.g) && !isnan(record.b) && !isinf(record.b)) {
-        emission.r *= 2.0f * record.r;
-        emission.g *= 2.0f * record.g;
-        emission.b *= 2.0f * record.b;
+      emission.r *= 2.0f * record.r;
+      emission.g *= 2.0f * record.g;
+      emission.b *= 2.0f * record.b;
 
-        device.frame_buffer[pixel] = RGBF_to_RGBAhalf(emission);
-      }
+      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(emission);
     }
+
+    const vec3 V      = scale_vector(ray, -1.0f);
+    BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, 0.0f, 0.0f);
 
     if (white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
@@ -194,48 +195,52 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
 
       const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
 
-      ray = brdf_sample_ray_refraction(record, get_color(1.0f, 1.0f, 1.0f), normal, ray, 0.0f, 0.0f, refraction_index, 0.0f, 0.0f);
+      brdf = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
+
+      RGBAhalf alpha_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), brdf.term);
 
       TraceTask new_task;
       new_task.origin = task.position;
-      new_task.ray    = ray;
+      new_task.ray    = brdf.L;
       new_task.index  = task.index;
       new_task.state  = task.state;
 
-      switch (device_iteration_type) {
-        case TYPE_CAMERA:
-        case TYPE_BOUNCE:
-          device.bounce_records[pixel] = RGBF_to_RGBAhalf(record);
-          store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
-          break;
-        case TYPE_LIGHT:
-          if (white_noise() > 0.5f)
+      if (validate_trace_task(new_task, alpha_record)) {
+        switch (device_iteration_type) {
+          case TYPE_CAMERA:
+          case TYPE_BOUNCE:
+            device.bounce_records[pixel] = alpha_record;
+            store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
             break;
-          device.light_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, 2.0f));
-          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
-          store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
-          break;
+          case TYPE_LIGHT:
+            if (white_noise() > 0.5f)
+              break;
+            device.light_records[pixel] = scale_RGBAhalf(alpha_record, 2.0f);
+            device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
+            store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
+            break;
+        }
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {
-      const vec3 V = scale_vector(ray, -1.0f);
-
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      RGBAhalf bounce_record = RGBF_to_RGBAhalf(record);
+      brdf = brdf_sample_ray(brdf, task.index, task.state);
 
-      brdf_sample_ray(ray, bounce_record, task.index, task.state, opaque_color(albedo), V, normal, normal, 0.0f, 0.0f);
+      RGBAhalf bounce_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), brdf.term);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
-      bounce_task.ray    = ray;
+      bounce_task.ray    = brdf.L;
       bounce_task.index  = task.index;
       bounce_task.state  = task.state;
 
-      store_RGBAhalf(device.bounce_records + pixel, bounce_record);
-      device.light_sample_history[pixel] = LIGHT_ID_ANY;
-      store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      if (validate_trace_task(bounce_task, bounce_record)) {
+        store_RGBAhalf(device.bounce_records + pixel, bounce_record);
+        device.light_sample_history[pixel] = LIGHT_ID_ANY;
+        store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      }
     }
   }
 
