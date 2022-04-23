@@ -109,8 +109,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
         RGBF refraction_record = RGBAhalf_to_RGBF(record);
 
-        task.ray =
-          brdf_sample_ray_refraction(refraction_record, opaque_color(albedo), normal, task.ray, roughness, refraction_index, alpha, beta);
+        task.ray = brdf_sample_ray_refraction(
+          refraction_record, opaque_color(albedo), normal, task.ray, roughness, metallic, refraction_index, alpha, beta);
 
         record = RGBF_to_RGBAhalf(refraction_record);
       }

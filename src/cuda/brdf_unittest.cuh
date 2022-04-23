@@ -27,26 +27,26 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
     float sum_light  = 0.0f;
 
     for (int i = 0; i < BRDF_UNITTEST_ITERATIONS; i++) {
-      const float ran1 = 0.5f * PI * sqrtf(white_noise());
+      const float ran1 = 0.5f * PI * (1.0f - sqrtf(white_noise()));
       const float ran2 = 2.0f * PI * white_noise();
-      const float ran3 = 0.5f * PI * sqrtf(white_noise());
+      const float ran3 = 0.5f * PI * (1.0f - sqrtf(white_noise()));
       const float ran4 = 2.0f * PI * white_noise();
-      const vec3 V     = sample_ray_from_angles_and_vector(ran1, ran2, get_vector(1.0f, 0.0f, 0.0f));
+      const vec3 V     = angles_to_direction(ran1, ran2);
       vec3 L;
 
       RGBAhalf brdf = get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f);
 
       brdf_sample_ray(
-        L, brdf, make_ushort2(0, 0), i, get_color(1.0f, 1.0f, 1.0f), V, get_vector(1.0f, 0.0f, 0.0f), get_vector(1.0f, 0.0f, 0.0f),
+        L, brdf, make_ushort2(0, 0), i, get_color(1.0f, 1.0f, 1.0f), V, get_vector(0.0f, 1.0f, 0.0f), get_vector(0.0f, 1.0f, 0.0f),
         1.0f - smoothness, metallic);
 
       float weight = luminance(RGBAhalf_to_RGBF(brdf));
 
       sum_bounce += weight;
 
-      L = sample_ray_from_angles_and_vector(ran3, ran4, get_vector(1.0f, 0.0f, 0.0f));
+      L = angles_to_direction(ran3, ran4);
 
-      brdf = brdf_evaluate(get_color(1.0f, 1.0f, 1.0f), V, L, get_vector(1.0f, 0.0f, 0.0f), 1.0f - smoothness, metallic);
+      brdf = brdf_evaluate(get_color(1.0f, 1.0f, 1.0f), V, L, get_vector(0.0f, 1.0f, 0.0f), 1.0f - smoothness, metallic);
 
       weight = 2.0f * PI * luminance(RGBAhalf_to_RGBF(brdf));
 
