@@ -59,13 +59,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
 
     task = get_starting_ray(task);
 
-    device.light_records[pixel]  = RGBF_to_RGBAhalf(get_color(1.0f, 1.0f, 1.0f));
-    device.bounce_records[pixel] = RGBF_to_RGBAhalf(get_color(1.0f, 1.0f, 1.0f));
-    device.frame_buffer[pixel]   = RGBF_to_RGBAhalf(get_color(0.0f, 0.0f, 0.0f));
+    device.light_records[pixel]  = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
+    device.bounce_records[pixel] = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
+    device.frame_buffer[pixel]   = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
     device.state_buffer[pixel]   = 0;
 
     if (device_denoiser && !device_temporal_frames)
-      device.albedo_buffer[pixel] = RGBF_to_RGBAhalf(get_color(0.0f, 0.0f, 0.0f));
+      device.albedo_buffer[pixel] = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
 
     store_trace_task(device.bounce_trace + get_task_address(offset++), task);
   }

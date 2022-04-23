@@ -205,21 +205,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       new_task.index  = task.index;
       new_task.state  = task.state;
 
-      if (validate_trace_task(new_task, alpha_record)) {
-        switch (device_iteration_type) {
-          case TYPE_CAMERA:
-          case TYPE_BOUNCE:
-            device.bounce_records[pixel] = alpha_record;
-            store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+      switch (device_iteration_type) {
+        case TYPE_CAMERA:
+        case TYPE_BOUNCE:
+          device.bounce_records[pixel] = alpha_record;
+          store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+          break;
+        case TYPE_LIGHT:
+          if (white_noise() > 0.5f)
             break;
-          case TYPE_LIGHT:
-            if (white_noise() > 0.5f)
-              break;
-            device.light_records[pixel] = scale_RGBAhalf(alpha_record, 2.0f);
-            device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
-            store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
-            break;
-        }
+          device.light_records[pixel] = scale_RGBAhalf(alpha_record, 2.0f);
+          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
+          store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
+          break;
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {
@@ -236,11 +234,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       bounce_task.index  = task.index;
       bounce_task.state  = task.state;
 
-      if (validate_trace_task(bounce_task, bounce_record)) {
-        store_RGBAhalf(device.bounce_records + pixel, bounce_record);
-        device.light_sample_history[pixel] = LIGHT_ID_ANY;
-        store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
-      }
+      store_RGBAhalf(device.bounce_records + pixel, bounce_record);
+      device.light_sample_history[pixel] = LIGHT_ID_ANY;
+      store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
   }
 

@@ -63,7 +63,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     const float roughness = (1.0f - device_scene.toy.material.r);
     const float metallic  = device_scene.toy.material.g;
     const float intensity = device_scene.toy.material.b;
-    RGBAhalf emission     = get_RGBAhalf(device_scene.toy.emission.r, device_scene.toy.emission.g, device_scene.toy.emission.b, 1.0f);
+    RGBAhalf emission     = get_RGBAhalf(device_scene.toy.emission.r, device_scene.toy.emission.g, device_scene.toy.emission.b, 0.0f);
     emission              = scale_RGBAhalf(emission, intensity);
 
     if (albedo.a < device_scene.material.alpha_cutoff)

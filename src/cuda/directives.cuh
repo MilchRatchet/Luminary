@@ -23,8 +23,8 @@
    * fmaxf(                                  \
      device_scene.sky.sun_strength * 0.001f, \
      fmaxf(device_scene.material.default_material.b, device_scene.toy.active * device_scene.toy.material.b)))
-#define CUTOFF ((1.0f) / (BRIGHTEST_EMISSION))
-#define PROBABILISTIC_CUTOFF ((1.0f) / (0.25f * BRIGHTEST_EMISSION))
+#define CUTOFF ((4.0f) / (BRIGHTEST_EMISSION))
+#define PROBABILISTIC_CUTOFF (16.0f * CUTOFF)
 
 /*
  * Define LOW_QUALITY_LONG_BOUNCES for the following to apply
@@ -49,15 +49,22 @@
  */
 //#define SINGLE_CONTRIBUTION_ONLY
 
-__device__ int validate_trace_task(TraceTask task, RGBAhalf record) {
+__device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
   const float max = hmax_RGBAhalf(record);
-  if (
-    max < CUTOFF
-    || (max < PROBABILISTIC_CUTOFF && blue_noise(task.index.x, task.index.y, task.state, 20) > (max - CUTOFF) / (CUTOFF - PROBABILISTIC_CUTOFF))) {
+  if (max < CUTOFF) {
     valid = 0;
+  }
+  else if (max < PROBABILISTIC_CUTOFF) {
+    const float p = (max - CUTOFF) / (PROBABILISTIC_CUTOFF - CUTOFF);
+    if (blue_noise(task.index.x, task.index.y, task.state, 20) > p) {
+      valid = 0;
+    }
+    else {
+      record = scale_RGBAhalf(record, 1.0f / p);
+    }
   }
 #endif
 

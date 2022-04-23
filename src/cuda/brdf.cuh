@@ -40,7 +40,7 @@ __device__ float brdf_shadowed_F90(const RGBAhalf specular_f0) {
 }
 
 __device__ RGBAhalf brdf_albedo_as_specular_f0(const RGBAhalf albedo, const float metallic) {
-  const RGBAhalf specular_f0 = get_RGBAhalf(0.04f, 0.04f, 0.04f, 0.04f);
+  const RGBAhalf specular_f0 = get_RGBAhalf(0.04f, 0.04f, 0.04f, 0.00f);
   const RGBAhalf diff        = sub_RGBAhalf(albedo, specular_f0);
 
   return fma_RGBAhalf(diff, metallic, specular_f0);
@@ -61,7 +61,7 @@ __device__ RGBAhalf brdf_fresnel_schlick(const RGBAhalf f0, const float f90, con
   const float t = powf(1.0f - NdotV, 5.0f);
 
   RGBAhalf result = f0;
-  RGBAhalf diff   = sub_RGBAhalf(get_RGBAhalf(f90, f90, f90, f90), f0);
+  RGBAhalf diff   = sub_RGBAhalf(get_RGBAhalf(f90, f90, f90, 0.0f), f0);
   result          = fma_RGBAhalf(diff, t, result);
 
   return result;
@@ -77,7 +77,7 @@ __device__ RGBAhalf brdf_fresnel_schlick(const RGBAhalf f0, const float f90, con
 __device__ RGBAhalf brdf_fresnel_roughness(const RGBAhalf f0, const float roughness, const float NdotV) {
   const float t     = powf(1.0f - NdotV, 5.0f);
   const __half s    = 1.0f - roughness;
-  const RGBAhalf Fr = sub_RGBAhalf(max_RGBAhalf(get_RGBAhalf(s, s, s, s), f0), f0);
+  const RGBAhalf Fr = sub_RGBAhalf(max_RGBAhalf(get_RGBAhalf(s, s, s, 0.0f), f0), f0);
 
   return fma_RGBAhalf(Fr, t, f0);
 }
@@ -304,7 +304,7 @@ __device__ RGBAhalf brdf_microfacet_multiscattering(
 
   const RGBAhalf SSMS = RGBF_to_RGBAhalf(add_color(FssEss, scale_color(mul_color(FssEss, FmsEms), Ems)));
 
-  const RGBAhalf Edss = sub_RGBAhalf(get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f), SSMS);
+  const RGBAhalf Edss = sub_RGBAhalf(get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f), SSMS);
 
   const RGBAhalf Kd = mul_RGBAhalf(diffuse, Edss);
 
@@ -382,7 +382,7 @@ __device__ BRDFInstance
   brdf.roughness   = fmaxf(roughness, 0.09f);
   brdf.metallic    = metallic;
   brdf.normal      = normal;
-  brdf.term        = get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f);
+  brdf.term        = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
 
   return brdf;
 }
