@@ -1,6 +1,13 @@
 #include "buffer.h"
 #include "cuda/utils.cuh"
 
+#define gpuBufferErrchk(ans, buf_name, func, line)                                                                \
+  {                                                                                                               \
+    if (ans != cudaSuccess) {                                                                                     \
+      crash_message("Buffer CUDA Error: %s at Buffer %s [%s:%d]", cudaGetErrorString(ans), buf_name, func, line); \
+    }                                                                                                             \
+  }
+
 size_t memory_limit = 0;
 size_t memory_usage = 0;
 
@@ -18,54 +25,56 @@ extern "C" void device_set_memory_limit(size_t limit) {
   log_message("Set memory limit to %zu bytes.", limit);
 }
 
-extern "C" void device_malloc(void** buffer, size_t size) {
+extern "C" void _device_malloc(void** buffer, size_t size, char* buf_name, char* func, int line) {
   memory_usage += size;
 
   if (memory_usage > (size_t) (0.7 * memory_limit)) {
-    warn_message("Device is running low on memory.");
+    print_warn(
+      "[%s:%d] Device is running low on memory (%zu:%zu).", func, line, memory_usage / (1024 * 1024), memory_limit / (1024 * 1024));
   }
 
-  gpuErrchk(cudaMalloc(buffer, size));
+  gpuBufferErrchk(cudaMalloc(buffer, size), buf_name, func, line);
 }
 
-extern "C" size_t device_malloc_pitch(void** buffer, size_t rowstride, size_t num_rows) {
+extern "C" size_t _device_malloc_pitch(void** buffer, size_t rowstride, size_t num_rows, char* buf_name, char* func, int line) {
   size_t pitch;
 
-  gpuErrchk(cudaMallocPitch(buffer, &pitch, rowstride, num_rows));
+  gpuBufferErrchk(cudaMallocPitch(buffer, &pitch, rowstride, num_rows), buf_name, func, line);
 
   memory_usage += pitch * num_rows;
 
   if (memory_usage > (size_t) (0.7 * memory_limit)) {
-    warn_message("Device is running low on memory.");
+    print_warn(
+      "[%s:%d] Device is running low on memory (%zu:%zu).", func, line, memory_usage / (1024 * 1024), memory_limit / (1024 * 1024));
   }
 
   return pitch;
 }
 
-extern "C" void device_free(void* buffer, size_t size) {
+extern "C" void _device_free(void* buffer, size_t size, char* buf_name, char* func, int line) {
   memory_usage -= size;
 
-  gpuErrchk(cudaFree(buffer));
+  gpuBufferErrchk(cudaFree(buffer), buf_name, func, line);
 }
 
-extern "C" void device_upload(void* dst, void* src, size_t size) {
-  gpuErrchk(cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice));
-  log_message("Uploaded %zu bytes to device.", size);
+extern "C" void _device_upload(void* dst, void* src, size_t size, char* dst_name, char* src_name, char* func, int line) {
+  gpuBufferErrchk(cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice), "none", func, line);
+  print_log("[%s:%d] Uploaded %zu bytes from host %s to device %s.", func, line, size, src_name, dst_name);
 }
 
-extern "C" void device_buffer_init(DeviceBuffer** buffer) {
+extern "C" void _device_buffer_init(DeviceBuffer** buffer, char* buf_name, char* func, int line) {
   (*buffer) = (DeviceBuffer*) malloc(sizeof(DeviceBuffer));
 
   (*buffer)->allocated = 0;
 }
 
-extern "C" void device_buffer_free(DeviceBuffer* buffer) {
+extern "C" void _device_buffer_free(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
-    error_message("DeviceBuffer is NULL.");
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
   }
 
-  if (!device_buffer_is_allocated(buffer)) {
+  if (!_device_buffer_is_allocated(buffer, buf_name, func, line)) {
     log_message("Unallocated device buffer was attempted to be freed.");
     return;
   }
@@ -73,122 +82,122 @@ extern "C" void device_buffer_free(DeviceBuffer* buffer) {
   device_free(buffer->device_pointer, buffer->size);
 
   buffer->allocated = 0;
-  log_message("Freed device buffer %zu.", buffer->device_pointer);
+  print_log("[%s:%d] Freed device buffer %s of size %zu.", func, line, buf_name, buffer->size);
 }
 
-extern "C" void device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t count) {
+extern "C" void _device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t count, char* buf_name, char* func, int line) {
   if (!buffer) {
-    error_message("DeviceBuffer is NULL.");
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
   }
 
   size_t size = element_size * count;
 
-  if (device_buffer_is_allocated(buffer)) {
+  if (_device_buffer_is_allocated(buffer, buf_name, func, line)) {
     if (buffer->size == size) {
-      log_message("Device buffer is already allocated with the correct size. No action is taken.");
+      print_log("[%s:%d] Device buffer %s is already allocated with the correct size. No action is taken.", func, line, buf_name);
       return;
     }
     else {
-      device_buffer_free(buffer);
+      _device_buffer_free(buffer, buf_name, func, line);
     }
   }
 
-  device_malloc(&buffer->device_pointer, size);
+  _device_malloc(&buffer->device_pointer, size, buf_name, func, line);
 
   buffer->size      = size;
   buffer->allocated = 1;
-  log_message("Allocated device buffer %zu with size %zu.", buffer->device_pointer, buffer->size);
+  print_log("[%s:%d] Buffer %s allocated at address %zu with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
 }
 
-extern "C" void device_buffer_upload(DeviceBuffer* buffer, void* data) {
+extern "C" void _device_buffer_upload(DeviceBuffer* buffer, void* data, char* buf_name, char* data_name, char* func, int line) {
   if (!buffer) {
-    error_message("DeviceBuffer is NULL.");
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
   }
 
-  if (!device_buffer_is_allocated(buffer)) {
-    error_message("Cannot upload to unallocated device buffer.");
+  if (!_device_buffer_is_allocated(buffer, buf_name, func, line)) {
+    print_error("[%s:%d] Cannot upload to unallocated device buffer %s.", func, line, buf_name);
     return;
   }
 
   if (!data) {
-    error_message("Source pointer is NULL.");
+    print_error("[%s:%d] Source pointer %s is NULL.", func, line, data_name);
     return;
   }
 
-  device_upload(buffer->device_pointer, data, buffer->size);
-  log_message("Copied %zu bytes to device buffer %zu.", buffer->size, buffer->device_pointer);
+  _device_upload(buffer->device_pointer, data, buffer->size, buf_name, data_name, func, line);
+  print_log("[%s:%d] Copied %zu bytes to device buffer %s.", func, line, buffer->size, buf_name);
 }
 
-extern "C" void device_buffer_download_full(DeviceBuffer* buffer, void* dest) {
+extern "C" void _device_buffer_download(
+  DeviceBuffer* buffer, void* dest, size_t size, char* buf_name, char* dest_name, char* func, int line) {
   if (!buffer) {
-    error_message("DeviceBuffer is NULL.");
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
   }
 
-  device_buffer_download(buffer, dest, buffer->size);
-}
-
-extern "C" void device_buffer_download(DeviceBuffer* buffer, void* dest, size_t size) {
-  if (!buffer) {
-    error_message("DeviceBuffer is NULL.");
-    return;
-  }
-
-  if (!device_buffer_is_allocated(buffer)) {
-    error_message("Cannot download from unallocated device buffer.");
+  if (!_device_buffer_is_allocated(buffer, buf_name, func, line)) {
+    print_error("[%s:%d] Cannot download from unallocated device buffer %s.", func, line, buf_name);
     return;
   }
 
   if (!dest) {
-    error_message("Destination pointer is NULL.");
+    print_error("[%s:%d] Destination %s is NULL.", func, line, dest_name);
     return;
   }
 
   if (size > buffer->size) {
-    error_message("Device buffer holds %zu bytes but %zu are requested for download.", buffer->size, size);
+    print_error("[%s:%d] Device buffer %s holds %zu bytes but %zu are requested for download.", func, line, buf_name, buffer->size, size);
     return;
   }
 
-  gpuErrchk(cudaMemcpy(dest, buffer->device_pointer, size, cudaMemcpyDeviceToHost));
-  log_message("Copied %zu bytes from device buffer %zu.", buffer->size, buffer->device_pointer);
+  gpuBufferErrchk(cudaMemcpy(dest, buffer->device_pointer, size, cudaMemcpyDeviceToHost), buf_name, func, line);
+  print_log("[%s:%d] Copied %zu bytes from device buffer %s to host %s.", func, line, size, buf_name, dest_name);
 }
 
-extern "C" void device_buffer_copy(DeviceBuffer* src, DeviceBuffer* dest) {
+extern "C" void _device_buffer_download_full(DeviceBuffer* buffer, void* dest, char* buf_name, char* dest_name, char* func, int line) {
+  if (!buffer) {
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
+    return;
+  }
+
+  _device_buffer_download(buffer, dest, buffer->size, buf_name, dest_name, func, line);
+}
+
+extern "C" void _device_buffer_copy(DeviceBuffer* src, DeviceBuffer* dest, char* src_name, char* dest_name, char* func, int line) {
   if (!src) {
-    error_message("Source is NULL.");
+    print_error("[%s:%d] Source Buffer %s is NULL.", func, line, src_name);
     return;
   }
 
   if (!dest) {
-    error_message("Destination is NULL.");
+    print_error("[%s:%d] Destination Buffer %s is NULL.", func, line, dest_name);
     return;
   }
 
-  if (!device_buffer_is_allocated(src)) {
-    error_message("Source is not allocated.");
+  if (!_device_buffer_is_allocated(src, src_name, func, line)) {
+    print_error("[%s:%d] Source Buffer %s is not allocated.", func, line, src_name);
     return;
   }
 
-  if (!device_buffer_is_allocated(dest) || dest->size < src->size) {
-    warn_message("Destination is not allocated or too small.");
+  if (!_device_buffer_is_allocated(dest, dest_name, func, line) || dest->size < src->size) {
+    print_warn("[%s:%d] Destination Buffer %s is not allocated or too small.", func, line, src_name);
     device_buffer_malloc(dest, 1, device_buffer_get_size(src));
   }
 
-  gpuErrchk(cudaMemcpy(device_buffer_get_pointer(dest), device_buffer_get_pointer(src), src->size, cudaMemcpyDeviceToDevice));
-  log_message(
-    "Copied %zu bytes from device buffer %zu to device buffer %zu.", src->size, device_buffer_get_pointer(src),
-    device_buffer_get_pointer(dest));
+  gpuBufferErrchk(
+    cudaMemcpy(device_buffer_get_pointer(dest), device_buffer_get_pointer(src), src->size, cudaMemcpyDeviceToDevice), src_name, func, line);
+  print_log("[%s:%d] Copied %zu bytes from device buffer %s to device buffer %s.", func, line, src->size, src_name, dest_name);
 }
 
-extern "C" void* device_buffer_get_pointer(DeviceBuffer* buffer) {
+extern "C" void* _device_buffer_get_pointer(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
-    error_message("DeviceBuffer is NULL.");
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return (void*) 0;
   }
 
-  if (!device_buffer_is_allocated(buffer)) {
+  if (!_device_buffer_is_allocated(buffer, buf_name, func, line)) {
     log_message("Device buffer is unallocated.");
     return (void*) 0;
   }
@@ -196,13 +205,13 @@ extern "C" void* device_buffer_get_pointer(DeviceBuffer* buffer) {
   return buffer->device_pointer;
 }
 
-extern "C" size_t device_buffer_get_size(DeviceBuffer* buffer) {
+extern "C" size_t _device_buffer_get_size(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
-    error_message("DeviceBuffer is NULL.");
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return 0;
   }
 
-  if (!device_buffer_is_allocated(buffer)) {
+  if (!_device_buffer_is_allocated(buffer, buf_name, func, line)) {
     log_message("Device buffer is unallocated.");
     return 0;
   }
@@ -210,18 +219,23 @@ extern "C" size_t device_buffer_get_size(DeviceBuffer* buffer) {
   return buffer->size;
 }
 
-extern "C" int device_buffer_is_allocated(DeviceBuffer* buffer) {
+extern "C" int _device_buffer_is_allocated(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
-    error_message("DeviceBuffer is NULL.");
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return 0;
   }
 
   return buffer->allocated;
 }
 
-extern "C" void device_buffer_destroy(DeviceBuffer* buffer) {
-  if (device_buffer_is_allocated(buffer)) {
-    device_buffer_free(buffer);
+extern "C" void _device_buffer_destroy(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
+  if (!buffer) {
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
+    return;
+  }
+
+  if (_device_buffer_is_allocated(buffer, buf_name, func, line)) {
+    _device_buffer_free(buffer, buf_name, func, line);
   }
 
   free(buffer);
