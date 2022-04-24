@@ -412,6 +412,9 @@ extern "C" RaytraceInstance* init_raytracing(
 extern "C" void reset_raytracing(RaytraceInstance* instance) {
   free_bloom_mips(instance);
 
+  // If denoising was set to on but no denoise setup exists, then we do not create one either now
+  const int allocate_denoise = instance->settings.denoiser && !(instance->denoiser && !instance->denoise_setup);
+
   if (instance->denoise_setup) {
     optix_denoise_free(instance);
   }
@@ -429,7 +432,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   prepare_trace(instance);
   update_temporal_matrix(instance);
 
-  if (instance->denoiser) {
+  if (allocate_denoise) {
     optix_denoise_create(instance);
   }
 

@@ -179,7 +179,7 @@ __global__ void bloom_upsample(
     pixel      = scale_RGBAhalf(pixel, b);
     pixel      = add_RGBAhalf(pixel, o);
 
-    store_RGBAhalf(base + x + y * tw, bound_RGBAhalf(pixel));
+    store_RGBAhalf(target + x + y * tw, bound_RGBAhalf(pixel));
 
     id += blockDim.x * gridDim.x;
   }

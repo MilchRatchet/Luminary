@@ -121,6 +121,7 @@ void offline_output(RaytraceInstance* instance) {
     DeviceBuffer* denoise_output = optix_denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
     device_buffer_copy(denoise_output, instance->frame_output);
     optix_denoise_free(instance);
+    device_buffer_free(denoise_output);
   }
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), instance->width * instance->height);
