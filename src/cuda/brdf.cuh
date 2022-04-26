@@ -381,7 +381,7 @@ __device__ BRDFInstance
   brdf.diffuse     = brdf_albedo_as_diffuse(albedo, metallic);
   brdf.specular_f0 = brdf_albedo_as_specular_f0(albedo, metallic);
   brdf.V           = V;
-  brdf.roughness   = fmaxf(roughness, 0.09f);
+  brdf.roughness   = fmaxf(roughness, 0.047f);
   brdf.metallic    = metallic;
   brdf.normal      = normal;
   brdf.term        = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
