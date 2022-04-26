@@ -1183,6 +1183,15 @@ __device__ RGBAhalf bound_RGBAhalf(const RGBAhalf a) {
   return result;
 }
 
+__device__ int infnan_RGBAhalf(const RGBAhalf a) {
+  int inf_r = __hisinf(a.rg.x) || __hisnan(a.rg.x);
+  int inf_g = __hisinf(a.rg.y) || __hisnan(a.rg.y);
+  int inf_b = __hisinf(a.ba.x) || __hisnan(a.ba.x);
+  int inf_a = __hisinf(a.ba.y) || __hisnan(a.ba.y);
+
+  return inf_r || inf_g || inf_b || inf_a;
+}
+
 __device__ RGBAhalf get_RGBAhalf(const float r, const float g, const float b, const float a) {
   RGBAhalf result;
 

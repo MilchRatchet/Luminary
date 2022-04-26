@@ -531,13 +531,13 @@ static Scene get_default_scene() {
   scene.ocean.update           = 0;
   scene.ocean.height           = 0.0f;
   scene.ocean.amplitude        = 0.2f;
-  scene.ocean.frequency        = 0.16f;
+  scene.ocean.frequency        = 0.12f;
   scene.ocean.choppyness       = 4.0f;
   scene.ocean.speed            = 1.0f;
   scene.ocean.time             = 0.0f;
-  scene.ocean.albedo.r         = 0.0f;
-  scene.ocean.albedo.g         = 0.0f;
-  scene.ocean.albedo.b         = 0.0f;
+  scene.ocean.albedo.r         = 0.02f;
+  scene.ocean.albedo.g         = 0.02f;
+  scene.ocean.albedo.b         = 0.02f;
   scene.ocean.albedo.a         = 0.9f;
   scene.ocean.refractive_index = 1.333f;
 

@@ -184,7 +184,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
     }
 
     const vec3 V      = scale_vector(ray, -1.0f);
-    BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, 0.0f, 0.0f);
+    BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, 0.0f, 1.0f);
 
     if (white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
@@ -224,6 +224,35 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
+      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
+
+      {
+        LightSample light = load_light_sample(device.light_samples, pixel);
+
+        light = brdf_finalize_light_sample(light, task.position);
+
+        if (light.weight > 0.0f) {
+          brdf.L = brdf_sample_light_ray(light, task.position);
+
+          const RGBAhalf light_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf_evaluate(brdf).term, light.weight));
+
+          TraceTask light_task;
+          light_task.origin = task.position;
+          light_task.ray    = brdf.L;
+          light_task.index  = task.index;
+          light_task.state  = task.state;
+
+          if (any_RGBAhalf(light_record)) {
+            store_RGBAhalf(device.light_records + pixel, light_record);
+            light_history_buffer_entry = light.id;
+            store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
+          }
+        }
+      }
+
+      if (!(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
+        device.light_sample_history[pixel] = light_history_buffer_entry;
+
       brdf = brdf_sample_ray(brdf, task.index, task.state);
 
       RGBAhalf bounce_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), brdf.term);
@@ -235,7 +264,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       bounce_task.state  = task.state;
 
       store_RGBAhalf(device.bounce_records + pixel, bounce_record);
-      device.light_sample_history[pixel] = LIGHT_ID_ANY;
       store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
   }

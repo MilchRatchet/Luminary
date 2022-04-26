@@ -406,9 +406,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
         switch (hit_id) {
           case SKY_HIT:
-          case OCEAN_HIT:
           case FOG_HIT:
             break;
+          case OCEAN_HIT:
           case TOY_HIT:
           default:
             light_data.flags = 1;
@@ -418,19 +418,21 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
         store_light_eval_data(light_data, pixel);
       }
       else {
-        const vec3 sky_pos    = world_to_sky_transform(task.origin);
-        const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+        if (hit_id == OCEAN_HIT || hit_id == TOY_HIT || hit_id <= TRIANGLE_ID_LIMIT) {
+          const vec3 sky_pos    = world_to_sky_transform(task.origin);
+          const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
 
-        LightSample selected;
-        selected.id     = LIGHT_ID_NONE;
-        selected.weight = 0.0f;
+          LightSample selected;
+          selected.id     = LIGHT_ID_NONE;
+          selected.weight = 0.0f;
 
-        if (sun_visible) {
-          selected.id     = LIGHT_ID_SUN;
-          selected.weight = 1.0f;
+          if (sun_visible) {
+            selected.id     = LIGHT_ID_SUN;
+            selected.weight = 1.0f;
+          }
+
+          store_light_sample(device.light_samples, selected, pixel);
         }
-
-        store_light_sample(device.light_samples, selected, pixel);
       }
     }
 

@@ -92,7 +92,7 @@ __global__ void temporal_accumulation() {
 
     if (device_temporal_frames == 0) {
       output     = buffer;
-      variance   = get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f);
+      variance   = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
       bias_cache = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
     }
     else {
@@ -132,9 +132,15 @@ __global__ void temporal_accumulation() {
 
     store_RGBAhalf(device.frame_bias_cache + offset, bias_cache);
 
+    RGBAhalf old_output = output;
+
     output = scale_RGBAhalf(output, device_temporal_frames);
     output = add_RGBAhalf(buffer, output);
     output = scale_RGBAhalf(output, 1.0f / (device_temporal_frames + 1));
+
+    if (infnan_RGBAhalf(output)) {
+      output = old_output;
+    }
 
     store_RGBAhalf(device.frame_output + offset, bound_RGBAhalf(output));
   }
@@ -155,6 +161,10 @@ __global__ void temporal_reprojection() {
         const int y = max(0, min(device_height, curr_y + i));
 
         RGBF color = RGBAhalf_to_RGBF(device.frame_buffer[x + y * device_width]);
+
+        if (isnan(color.r) || isnan(color.g) || isnan(color.b) || isinf(color.r) || isinf(color.g) || isinf(color.b)) {
+          color = get_color(0.0f, 0.0f, 0.0f);
+        }
 
         float weight = mitchell_netravali(i, j);
 
