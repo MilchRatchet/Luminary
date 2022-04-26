@@ -227,25 +227,19 @@ __device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV 
   return result;
 }
 
-__device__ vec3 sample_ray_from_angles_and_vector(const float theta, const float phi, const vec3 basis) {
+/*
+ * Uses a orthonormal basis which is built as described in
+ * T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_
+ */
+__device__ vec3 sample_hemisphere_basis(const float theta, const float phi, const vec3 basis) {
   vec3 u1, u2;
-  if (basis.z < -1.0f + 2.0f * eps) {
-    u1.x = 0.0f;
-    u1.y = -1.0f;
-    u1.z = 0.0f;
-    u2.x = -1.0f;
-    u2.y = 0.0f;
-    u2.z = 0.0f;
-  }
-  else {
-    const float a = 1.0f / (1.0f + basis.z);
-    const float b = -basis.x * basis.y * a;
-    u1.x          = 1.0f - basis.x * basis.x * a;
-    u1.y          = b;
-    u1.z          = -basis.x;
-    u2.x          = b;
-    u2.y          = 1.0f - basis.y * basis.y * a;
-    u2.z          = -basis.y;
+  // Orthonormal basis building
+  {
+    const float sign = copysignf(1.0f, basis.z);
+    const float a    = -1.0f / (sign + basis.z);
+    const float b    = basis.x * basis.y * a;
+    u1               = get_vector(1.0f + sign * basis.x * basis.x * a, sign * b, -sign * basis.x);
+    u2               = get_vector(b, sign + basis.y * basis.y * a, -basis.y);
   }
 
   const float c1 = sinf(theta) * cosf(phi);
@@ -1023,7 +1017,7 @@ __device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin) {
   dir               = normalize_vector(dir);
   const float angle = asinf(r / d);
 
-  return normalize_vector(sample_ray_from_angles_and_vector(u1 * angle, u2, dir));
+  return normalize_vector(sample_hemisphere_basis(u1 * angle, u2, dir));
 }
 
 /*
