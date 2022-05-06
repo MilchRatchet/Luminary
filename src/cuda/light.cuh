@@ -47,15 +47,15 @@ __global__ void spatial_resampling(LightSample* input, LightSample* output) {
       const float ran1 = white_noise();
       const float ran2 = white_noise();
 
-      uint32_t ran_x = 1 + ran1 * 64;
-      uint32_t ran_y = 1 + ran2 * 64;
+      uint32_t ran_x = 1 + ran1 * 32;
+      uint32_t ran_y = 1 + ran2 * 32;
 
       for (int i = 0; i < device_spatial_samples; i++) {
         ran_x = xorshift_uint32(ran_x);
         ran_y = xorshift_uint32(ran_y);
 
-        int sample_x = index.x + ((ran_x & 0x3f) - 32);
-        int sample_y = index.y + ((ran_y & 0x3f) - 32);
+        int sample_x = index.x + ((ran_x & 0x1f) - 16);
+        int sample_y = index.y + ((ran_y & 0x1f) - 16);
 
         sample_x = max(sample_x, 0);
         sample_y = max(sample_y, 0);
