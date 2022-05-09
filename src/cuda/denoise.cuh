@@ -159,16 +159,16 @@ extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
 
   switch (instance->scene_gpu.camera.tonemap) {
     case TONEMAP_NONE:
-      target_exposure = 2.0f;
+      target_exposure = 3.0f;
       break;
     case TONEMAP_ACES:
-      target_exposure = 4.0f;
+      target_exposure = 6.0f;
       break;
     case TONEMAP_REINHARD:
-      target_exposure = 2.0f;
+      target_exposure = 3.5f;
       break;
     case TONEMAP_UNCHARTED2:
-      target_exposure = 2.0f;
+      target_exposure = 3.5f;
       break;
   }
 
