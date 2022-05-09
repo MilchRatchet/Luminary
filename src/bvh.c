@@ -12,10 +12,13 @@
 #include "primitives.h"
 #include "utils.h"
 
+/*
+ * BIN_COUNTS must be power of 2
+ */
 #define THRESHOLD_TRIANGLES 1
-#define OBJECT_SPLIT_BIN_COUNT 32
+#define OBJECT_SPLIT_BIN_COUNT 8
 #define SPATIAL_SPLIT_THRESHOLD 0.00001f
-#define SPATIAL_SPLIT_BIN_COUNT 32
+#define SPATIAL_SPLIT_BIN_COUNT 64
 #define COST_OF_TRIANGLE 0.4f
 #define COST_OF_NODE 1.0f
 
@@ -151,7 +154,7 @@ static void fit_bounds_of_bins(const bin* bins, const int bins_length, vec3_p* h
     _mm_storeu_ps((float*) low_out, low);
 }
 
-static void update_bounds_of_bins(const bin* bins, vec3_p* high_out, vec3_p* low_out) {
+static void update_bounds_of_bins(const bin* bins, vec3_p* restrict high_out, vec3_p* restrict low_out) {
   __m128 high = _mm_loadu_ps((float*) high_out);
   __m128 low  = _mm_loadu_ps((float*) low_out);
 
@@ -181,17 +184,19 @@ static float construct_bins(
 
   *offset = get_entry_by_axis(low, axis);
 
-  for (int i = 0; i < OBJECT_SPLIT_BIN_COUNT; i++) {
-    bin b = {
-      .high.x = -FLT_MAX,
-      .high.y = -FLT_MAX,
-      .high.z = -FLT_MAX,
-      .low.x  = FLT_MAX,
-      .low.y  = FLT_MAX,
-      .low.z  = FLT_MAX,
-      .entry  = 0,
-      .exit   = 0};
-    bins[i] = b;
+  const bin b = {
+    .high.x = -FLT_MAX,
+    .high.y = -FLT_MAX,
+    .high.z = -FLT_MAX,
+    .low.x  = FLT_MAX,
+    .low.y  = FLT_MAX,
+    .low.z  = FLT_MAX,
+    .entry  = 0,
+    .exit   = 0};
+  bins[0] = b;
+
+  for (uint32_t i = 1; i < OBJECT_SPLIT_BIN_COUNT; i = i << 1) {
+    memcpy(bins + i, bins, i * sizeof(bin));
   }
 
   for (unsigned int i = 0; i < fragments_length; i++) {
@@ -224,7 +229,7 @@ static float construct_bins(
 }
 
 static float construct_chopped_bins(
-  bin* restrict bins, const fragment* restrict fragments, const unsigned int fragments_length, const int axis, float* offset) {
+  bin* restrict bins, const fragment* restrict fragments, const unsigned int fragments_length, const int axis, float* restrict offset) {
   vec3_p high, low;
   fit_bounds(fragments, fragments_length, &high, &low);
   const float span     = get_entry_by_axis(high, axis) - get_entry_by_axis(low, axis);
@@ -235,39 +240,42 @@ static float construct_chopped_bins(
 
   *offset = get_entry_by_axis(low, axis);
 
-  for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
-    bin b = {
-      .high.x = -FLT_MAX,
-      .high.y = -FLT_MAX,
-      .high.z = -FLT_MAX,
-      .low.x  = FLT_MAX,
-      .low.y  = FLT_MAX,
-      .low.z  = FLT_MAX,
-      .entry  = 0,
-      .exit   = 0};
-    bins[i] = b;
+  const bin b = {
+    .high.x = -FLT_MAX,
+    .high.y = -FLT_MAX,
+    .high.z = -FLT_MAX,
+    .low.x  = FLT_MAX,
+    .low.y  = FLT_MAX,
+    .low.z  = FLT_MAX,
+    .entry  = 0,
+    .exit   = 0};
+  bins[0] = b;
+
+  for (uint32_t i = 1; i < SPATIAL_SPLIT_BIN_COUNT; i = i << 1) {
+    memcpy(bins + i, bins, i * sizeof(bin));
   }
+
+  const float low_axis = get_entry_by_axis(low, axis);
 
   for (unsigned int i = 0; i < fragments_length; i++) {
     vec3_p high_triangle = fragments[i].high;
     vec3_p low_triangle  = fragments[i].low;
 
-    const float value1 = get_entry_by_axis(low_triangle, axis);
-    int pos1           = 0;
-    while ((pos1 + 1) * interval + get_entry_by_axis(low, axis) < value1) {
-      pos1++;
-    }
-    const float value2 = get_entry_by_axis(high_triangle, axis);
-    int pos2           = 0;
-    while ((pos2 + 1) * interval + get_entry_by_axis(low, axis) < value2) {
-      pos2++;
-    }
+    /*
+     * This maps value->pos as [0,1] to 0 and (i,i+1] to i
+     */
+    const float value1 = get_entry_by_axis(low_triangle, axis) - low_axis;
+    int pos1           = ((int) -floorf(-value1 / interval)) - 1;
+    if (pos1 < 0)
+      pos1 = 0;
+
+    const float value2 = get_entry_by_axis(high_triangle, axis) - low_axis;
+    int pos2           = ((int) -floorf(-value2 / interval)) - 1;
+    if (pos2 < 0)
+      pos2 = 0;
 
     const int entry = min(pos1, pos2);
-    int exit        = max(pos1, pos2);
-
-    if (exit == SPATIAL_SPLIT_BIN_COUNT)
-      exit--;
+    const int exit  = max(pos1, pos2);
 
     for (int j = entry; j <= exit; j++) {
       bin b = bins[j];
@@ -276,40 +284,48 @@ static float construct_chopped_bins(
       if (j == exit)
         b.exit++;
 
-      b.high.x  = max(b.high.x, high_triangle.x);
-      b.high.y  = max(b.high.y, high_triangle.y);
-      b.high.z  = max(b.high.z, high_triangle.z);
-      b.high._p = max(b.high._p, high_triangle._p);
-      b.low.x   = min(b.low.x, low_triangle.x);
-      b.low.y   = min(b.low.y, low_triangle.y);
-      b.low.z   = min(b.low.z, low_triangle.z);
-      b.low._p  = min(b.low._p, low_triangle._p);
+      b.high.x  = fmaxf(b.high.x, high_triangle.x);
+      b.high.y  = fmaxf(b.high.y, high_triangle.y);
+      b.high.z  = fmaxf(b.high.z, high_triangle.z);
+      b.high._p = fmaxf(b.high._p, high_triangle._p);
+      b.low.x   = fminf(b.low.x, low_triangle.x);
+      b.low.y   = fminf(b.low.y, low_triangle.y);
+      b.low.z   = fminf(b.low.z, low_triangle.z);
+      b.low._p  = fminf(b.low._p, low_triangle._p);
       bins[j]   = b;
     }
   }
 
-  for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
-    bin b = bins[i];
-    if (axis == 0) {
-      b.low.x  = max(b.low.x, low.x + i * interval);
-      b.high.x = min(b.high.x, low.x + (i + 1) * interval);
+  if (axis == 0) {
+    for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
+      bin b    = bins[i];
+      b.low.x  = fmaxf(b.low.x, low.x + i * interval);
+      b.high.x = fminf(b.high.x, low.x + (i + 1) * interval);
+      bins[i]  = b;
     }
-    else if (axis == 1) {
-      b.low.y  = max(b.low.y, low.y + i * interval);
-      b.high.y = min(b.high.y, low.y + (i + 1) * interval);
+  }
+  else if (axis == 1) {
+    for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
+      bin b    = bins[i];
+      b.low.y  = fmaxf(b.low.y, low.y + i * interval);
+      b.high.y = fminf(b.high.y, low.y + (i + 1) * interval);
+      bins[i]  = b;
     }
-    else {
-      b.low.z  = max(b.low.z, low.z + i * interval);
-      b.high.z = min(b.high.z, low.z + (i + 1) * interval);
+  }
+  else {
+    for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
+      bin b    = bins[i];
+      b.low.z  = fmaxf(b.low.z, low.z + i * interval);
+      b.high.z = fminf(b.high.z, low.z + (i + 1) * interval);
+      bins[i]  = b;
     }
-    bins[i] = b;
   }
 
   return interval;
 }
 
 static void divide_middles_along_axis(
-  const float split, const int axis, fragment* fragments_out, fragment* fragments_in, const unsigned int fragments_length,
+  const float split, const int axis, fragment* restrict fragments_out, fragment* restrict fragments_in, const unsigned int fragments_length,
   const int right_offset) {
   int left  = 0;
   int right = 0;
