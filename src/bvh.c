@@ -135,14 +135,14 @@ static void fit_bounds(const fragment* fragments, const unsigned int fragments_l
 }
 
 static void fit_bounds_of_bins(const bin* bins, const int bins_length, vec3_p* high_out, vec3_p* low_out) {
-  __m128 high = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
-  __m128 low  = _mm_setr_ps(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
+  __m128 high = _mm_set1_ps(-FLT_MAX);
+  __m128 low  = _mm_set1_ps(FLT_MAX);
 
   for (int i = 0; i < bins_length; i++) {
     const float* baseptr = (float*) (bins + i);
 
-    __m128 high_bin = _mm_loadu_ps(baseptr);
-    __m128 low_bin  = _mm_loadu_ps(baseptr + 4);
+    const __m128 high_bin = _mm_loadu_ps(baseptr);
+    const __m128 low_bin  = _mm_loadu_ps(baseptr + 4);
 
     high = _mm_max_ps(high, high_bin);
     low  = _mm_min_ps(low, low_bin);
@@ -179,7 +179,7 @@ static float construct_bins(
   const float span     = get_entry_by_axis(high, axis) - get_entry_by_axis(low, axis);
   const float interval = span / OBJECT_SPLIT_BIN_COUNT;
 
-  if (interval <= FLT_EPSILON * get_entry_by_axis(low, axis))
+  if (interval <= FLT_EPSILON * fabsf(get_entry_by_axis(low, axis)))
     return 0.0f;
 
   *offset = get_entry_by_axis(low, axis);
@@ -199,11 +199,13 @@ static float construct_bins(
     memcpy(bins + i, bins, i * sizeof(bin));
   }
 
+  const float low_axis = get_entry_by_axis(low, axis);
+
   for (unsigned int i = 0; i < fragments_length; i++) {
     fragment frag     = fragments[i];
     const float value = get_entry_by_axis(frag.middle, axis);
     int pos           = 0;
-    while ((pos + 1) * interval + get_entry_by_axis(low, axis) < value) {
+    while ((pos + 1) * interval + low_axis < value) {
       pos++;
     }
 
@@ -214,14 +216,14 @@ static float construct_bins(
     b.entry++;
     b.exit++;
 
-    b.high.x  = max(b.high.x, frag.high.x);
-    b.high.y  = max(b.high.y, frag.high.y);
-    b.high.z  = max(b.high.z, frag.high.z);
-    b.high._p = max(b.high._p, frag.high._p);
-    b.low.x   = min(b.low.x, frag.low.x);
-    b.low.y   = min(b.low.y, frag.low.y);
-    b.low.z   = min(b.low.z, frag.low.z);
-    b.low._p  = min(b.low._p, frag.low._p);
+    b.high.x  = fmaxf(b.high.x, frag.high.x);
+    b.high.y  = fmaxf(b.high.y, frag.high.y);
+    b.high.z  = fmaxf(b.high.z, frag.high.z);
+    b.high._p = fmaxf(b.high._p, frag.high._p);
+    b.low.x   = fminf(b.low.x, frag.low.x);
+    b.low.y   = fminf(b.low.y, frag.low.y);
+    b.low.z   = fminf(b.low.z, frag.low.z);
+    b.low._p  = fminf(b.low._p, frag.low._p);
     bins[pos] = b;
   }
 
@@ -235,7 +237,7 @@ static float construct_chopped_bins(
   const float span     = get_entry_by_axis(high, axis) - get_entry_by_axis(low, axis);
   const float interval = span / SPATIAL_SPLIT_BIN_COUNT;
 
-  if (interval <= FLT_EPSILON * get_entry_by_axis(low, axis))
+  if (interval <= FLT_EPSILON * fabsf(get_entry_by_axis(low, axis)))
     return 0.0f;
 
   *offset = get_entry_by_axis(low, axis);
@@ -258,18 +260,15 @@ static float construct_chopped_bins(
   const float low_axis = get_entry_by_axis(low, axis);
 
   for (unsigned int i = 0; i < fragments_length; i++) {
-    vec3_p high_triangle = fragments[i].high;
-    vec3_p low_triangle  = fragments[i].low;
-
     /*
      * This maps value->pos as [0,1] to 0 and (i,i+1] to i
      */
-    const float value1 = get_entry_by_axis(low_triangle, axis) - low_axis;
+    const float value1 = get_entry_by_axis(fragments[i].low, axis) - low_axis;
     int pos1           = ((int) -floorf(-value1 / interval)) - 1;
     if (pos1 < 0)
       pos1 = 0;
 
-    const float value2 = get_entry_by_axis(high_triangle, axis) - low_axis;
+    const float value2 = get_entry_by_axis(fragments[i].high, axis) - low_axis;
     int pos2           = ((int) -floorf(-value2 / interval)) - 1;
     if (pos2 < 0)
       pos2 = 0;
@@ -277,22 +276,23 @@ static float construct_chopped_bins(
     const int entry = min(pos1, pos2);
     const int exit  = max(pos1, pos2);
 
-    for (int j = entry; j <= exit; j++) {
-      bin b = bins[j];
-      if (j == entry)
-        b.entry++;
-      if (j == exit)
-        b.exit++;
+    const __m128 high_frag = _mm_loadu_ps((float*) (fragments + i));
+    const __m128 low_frag  = _mm_loadu_ps(((float*) (fragments + i)) + 4);
 
-      b.high.x  = fmaxf(b.high.x, high_triangle.x);
-      b.high.y  = fmaxf(b.high.y, high_triangle.y);
-      b.high.z  = fmaxf(b.high.z, high_triangle.z);
-      b.high._p = fmaxf(b.high._p, high_triangle._p);
-      b.low.x   = fminf(b.low.x, low_triangle.x);
-      b.low.y   = fminf(b.low.y, low_triangle.y);
-      b.low.z   = fminf(b.low.z, low_triangle.z);
-      b.low._p  = fminf(b.low._p, low_triangle._p);
-      bins[j]   = b;
+    for (int j = entry; j <= exit; j++) {
+      if (j == entry)
+        bins[j].entry++;
+      if (j == exit)
+        bins[j].exit++;
+
+      __m128 high_bin = _mm_loadu_ps((float*) (bins + j));
+      __m128 low_bin  = _mm_loadu_ps(((float*) (bins + j)) + 4);
+
+      high_bin = _mm_max_ps(high_bin, high_frag);
+      low_bin  = _mm_min_ps(low_bin, low_frag);
+
+      _mm_store_ps((float*) (bins + j), high_bin);
+      _mm_store_ps(((float*) (bins + j)) + 4, low_bin);
     }
   }
 
@@ -358,15 +358,15 @@ static void divide_along_axis(
       fragment frag_left = fragments_in[i];
       if (axis == 0) {
         frag_left.high.x   = min(frag_left.high.x, split);
-        frag_left.middle.x = (frag_left.low.x + frag_left.high.x) / 2.0f;
+        frag_left.middle.x = (frag_left.low.x + frag_left.high.x) * 0.5f;
       }
       else if (axis == 1) {
         frag_left.high.y   = min(frag_left.high.y, split);
-        frag_left.middle.y = (frag_left.low.y + frag_left.high.y) / 2.0f;
+        frag_left.middle.y = (frag_left.low.y + frag_left.high.y) * 0.5f;
       }
       else {
         frag_left.high.z   = min(frag_left.high.z, split);
-        frag_left.middle.z = (frag_left.low.z + frag_left.high.z) / 2.0f;
+        frag_left.middle.z = (frag_left.low.z + frag_left.high.z) * 0.5f;
       }
       fragments_out[left++] = frag_left;
     }
@@ -374,15 +374,15 @@ static void divide_along_axis(
       fragment frag_right = fragments_in[i];
       if (axis == 0) {
         frag_right.low.x    = max(frag_right.low.x, split);
-        frag_right.middle.x = (frag_right.low.x + frag_right.high.x) / 2.0f;
+        frag_right.middle.x = (frag_right.low.x + frag_right.high.x) * 0.5f;
       }
       else if (axis == 1) {
         frag_right.low.y    = max(frag_right.low.y, split);
-        frag_right.middle.y = (frag_right.low.y + frag_right.high.y) / 2.0f;
+        frag_right.middle.y = (frag_right.low.y + frag_right.high.y) * 0.5f;
       }
       else {
         frag_right.low.z    = max(frag_right.low.z, split);
-        frag_right.middle.z = (frag_right.low.z + frag_right.high.z) / 2.0f;
+        frag_right.middle.z = (frag_right.low.z + frag_right.high.z) * 0.5f;
       }
       fragments_out[right_offset + right++] = frag_right;
     }
@@ -514,7 +514,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
         vec3_p low_left   = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX, ._p = FLT_MAX};
         vec3_p low_right  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX, ._p = FLT_MAX};
 
-        for (int k = 1; k < OBJECT_SPLIT_BIN_COUNT - 1; k++) {
+        for (int k = 1; k < OBJECT_SPLIT_BIN_COUNT; k++) {
           update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
           fit_bounds_of_bins(bins + k, OBJECT_SPLIT_BIN_COUNT - k, &high_right, &low_right);
 
@@ -581,7 +581,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
           vec3_p low_left   = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
           vec3_p low_right  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
 
-          for (int k = 1; k < SPATIAL_SPLIT_BIN_COUNT - 1; k++) {
+          for (int k = 1; k < SPATIAL_SPLIT_BIN_COUNT; k++) {
             update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
             fit_bounds_of_bins(bins + k, SPATIAL_SPLIT_BIN_COUNT - k, &high_right, &low_right);
 
@@ -790,7 +790,7 @@ static float cost_distribute(Node2* binary_nodes, Node2 node, int j, int* decisi
 
   for (int k = 0; k < j; k++) {
     const float cost = binary_nodes[node.child_address].sah_cost[k] + binary_nodes[node.child_address + 1].sah_cost[j - 1 - k];
-    if (cost <= min) {
+    if (cost < min) {
       *decision = k + 1;
       min       = cost;
     }
