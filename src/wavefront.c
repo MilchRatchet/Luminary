@@ -230,6 +230,28 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
 }
 
 /*
+ * Reads a line str of n floating point numbers and writes them into dst.
+ * @param str String containing the floating point numbers.
+ * @param n Number of floating point numbers.
+ * @param dst Array the floating point numbers are written to.
+ * @result Returns the number of floating point numbers written.
+ */
+static int read_float_line(const char* str, const int n, float* dst) {
+  const char* rstr = str;
+  for (int i = 0; i < n; i++) {
+    char* new_rstr;
+    dst[i] = strtof(rstr, &new_rstr);
+
+    if (!new_rstr)
+      return i + 1;
+
+    rstr = (const char*) new_rstr;
+  }
+
+  return n;
+}
+
+/*
  * Reads face indices from a string. Note that quads have to be triangles fans.
  * @param str String containing the indices in Wavefront format.
  * @param face1 Pointer to Triangle which gets filled by the data.
@@ -426,21 +448,21 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
       if (line[0] == 'v' && line[1] == ' ') {
         ensure_capacity(content.vertices, vertices_count, content.vertices_length, sizeof(Wavefront_Vertex));
         Wavefront_Vertex v;
-        sscanf(line, "%*c %f %f %f", &v.x, &v.y, &v.z);
+        read_float_line(line + 2, 3, &v.x);
         content.vertices[vertices_count] = v;
         vertices_count++;
       }
       else if (line[0] == 'v' && line[1] == 'n') {
         ensure_capacity(content.normals, normals_count, content.normals_length, sizeof(Wavefront_Normal));
         Wavefront_Normal n;
-        sscanf(line, "%*2c %f %f %f", &n.x, &n.y, &n.z);
+        read_float_line(line + 3, 3, &n.x);
         content.normals[normals_count] = n;
         normals_count++;
       }
       else if (line[0] == 'v' && line[1] == 't') {
         ensure_capacity(content.uvs, uvs_count, content.uvs_length, sizeof(Wavefront_UV));
         Wavefront_UV uv;
-        sscanf(line, "%*2c %f %f", &uv.u, &uv.v);
+        read_float_line(line + 3, 2, &uv.u);
         content.uvs[uvs_count] = uv;
         uvs_count++;
       }
