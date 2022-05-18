@@ -14,6 +14,7 @@
 #include "utils.h"
 
 #define LINE_SIZE 4096
+#define READ_BUFFER_SIZE 262144  // 256kb
 
 Wavefront_Content create_wavefront_content() {
   Wavefront_Content content;
@@ -274,6 +275,9 @@ static int read_face(const char* str, Wavefront_Triangle* face1, Wavefront_Trian
       sign = 1;
     }
 
+    if (c == '\0' || c == '\r' || c == '\n')
+      break;
+
     c = str[ptr++];
   }
 
@@ -404,98 +408,113 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
 
   uint16_t current_material = 0;
 
-  char* line = malloc(LINE_SIZE);
-  char* path = malloc(LINE_SIZE);
+  char* path        = malloc(LINE_SIZE);
+  char* read_buffer = malloc(READ_BUFFER_SIZE + LINE_SIZE);
+
+  memset(read_buffer + READ_BUFFER_SIZE, 0, LINE_SIZE);
+
+  size_t offset = 0;
 
   while (!feof(file)) {
-    fgets(line, LINE_SIZE, file);
+    fread(read_buffer + offset, 1, READ_BUFFER_SIZE - offset, file);
 
-    if (line[0] == 'v' && line[1] == ' ') {
-      ensure_capacity(content.vertices, vertices_count, content.vertices_length, sizeof(Wavefront_Vertex));
-      Wavefront_Vertex v;
-      sscanf(line, "%*c %f %f %f\n", &v.x, &v.y, &v.z);
-      content.vertices[vertices_count] = v;
-      vertices_count++;
-    }
-    else if (line[0] == 'v' && line[1] == 'n') {
-      ensure_capacity(content.normals, normals_count, content.normals_length, sizeof(Wavefront_Normal));
-      Wavefront_Normal n;
-      sscanf(line, "%*2c %f %f %f\n", &n.x, &n.y, &n.z);
-      content.normals[normals_count] = n;
-      normals_count++;
-    }
-    else if (line[0] == 'v' && line[1] == 't') {
-      ensure_capacity(content.uvs, uvs_count, content.uvs_length, sizeof(Wavefront_UV));
-      Wavefront_UV uv;
-      sscanf(line, "%*2c %f %f\n", &uv.u, &uv.v);
-      content.uvs[uvs_count] = uv;
-      uvs_count++;
-    }
-    else if (line[0] == 'f') {
-      ensure_capacity(content.triangles, triangles_count, content.triangles_length, sizeof(Wavefront_Triangle));
-      Wavefront_Triangle face1;
-      Wavefront_Triangle face2;
-      const int returned_faces = read_face(line, &face1, &face2);
+    char* line = read_buffer;
+    char* eol;
 
-      if (returned_faces >= 1) {
-        face1.object = current_material;
-        face1.v1 += vertices_offset;
-        face1.v2 += vertices_offset;
-        face1.v3 += vertices_offset;
-        face1.vn1 += normals_offset;
-        face1.vn2 += normals_offset;
-        face1.vn3 += normals_offset;
-        face1.vt1 += uvs_offset;
-        face1.vt2 += uvs_offset;
-        face1.vt3 += uvs_offset;
-
-        content.triangles[triangles_count++] = face1;
+    while ((eol = strchr(line, '\n'))) {
+      *eol = '\0';
+      if (line[0] == 'v' && line[1] == ' ') {
+        ensure_capacity(content.vertices, vertices_count, content.vertices_length, sizeof(Wavefront_Vertex));
+        Wavefront_Vertex v;
+        sscanf(line, "%*c %f %f %f", &v.x, &v.y, &v.z);
+        content.vertices[vertices_count] = v;
+        vertices_count++;
       }
-
-      if (returned_faces >= 2) {
-        face2.object = current_material;
-        face2.v1 += vertices_offset;
-        face2.v2 += vertices_offset;
-        face2.v3 += vertices_offset;
-        face2.vn1 += normals_offset;
-        face2.vn2 += normals_offset;
-        face2.vn3 += normals_offset;
-        face2.vt1 += uvs_offset;
-        face2.vt2 += uvs_offset;
-        face2.vt3 += uvs_offset;
-
-        content.triangles[triangles_count++] = face2;
+      else if (line[0] == 'v' && line[1] == 'n') {
+        ensure_capacity(content.normals, normals_count, content.normals_length, sizeof(Wavefront_Normal));
+        Wavefront_Normal n;
+        sscanf(line, "%*2c %f %f %f", &n.x, &n.y, &n.z);
+        content.normals[normals_count] = n;
+        normals_count++;
       }
-    }
-    else if (line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i' && line[5] == 'b') {
-      sscanf(line, "%*s %[^\n]\n", path);
-      size_t hash = hash_djb2((unsigned char*) path);
-
-      int already_loaded = 0;
-
-      for (unsigned int i = 0; i < loaded_mtls_count; i++) {
-        if (loaded_mtls[i] == hash)
-          already_loaded = 1;
+      else if (line[0] == 'v' && line[1] == 't') {
+        ensure_capacity(content.uvs, uvs_count, content.uvs_length, sizeof(Wavefront_UV));
+        Wavefront_UV uv;
+        sscanf(line, "%*2c %f %f", &uv.u, &uv.v);
+        content.uvs[uvs_count] = uv;
+        uvs_count++;
       }
+      else if (line[0] == 'f') {
+        ensure_capacity(content.triangles, triangles_count, content.triangles_length, sizeof(Wavefront_Triangle));
+        Wavefront_Triangle face1;
+        Wavefront_Triangle face2;
+        const int returned_faces = read_face(line, &face1, &face2);
 
-      if (!already_loaded) {
-        ensure_capacity(loaded_mtls, loaded_mtls_count, loaded_mtls_length, sizeof(size_t));
-        loaded_mtls[loaded_mtls_count++] = hash;
-        read_materials_file(path, &content);
-        materials_count = content.materials_length;
-      }
-    }
-    else if (line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
-      sscanf(line, "%*s %[^\n]\n", path);
-      size_t hash      = hash_djb2((unsigned char*) path);
-      current_material = 0;
-      for (unsigned int i = 1; i < materials_count; i++) {
-        if (content.materials[i].hash == hash) {
-          current_material = i;
-          break;
+        if (returned_faces >= 1) {
+          face1.object = current_material;
+          face1.v1 += vertices_offset;
+          face1.v2 += vertices_offset;
+          face1.v3 += vertices_offset;
+          face1.vn1 += normals_offset;
+          face1.vn2 += normals_offset;
+          face1.vn3 += normals_offset;
+          face1.vt1 += uvs_offset;
+          face1.vt2 += uvs_offset;
+          face1.vt3 += uvs_offset;
+
+          content.triangles[triangles_count++] = face1;
+        }
+
+        if (returned_faces >= 2) {
+          face2.object = current_material;
+          face2.v1 += vertices_offset;
+          face2.v2 += vertices_offset;
+          face2.v3 += vertices_offset;
+          face2.vn1 += normals_offset;
+          face2.vn2 += normals_offset;
+          face2.vn3 += normals_offset;
+          face2.vt1 += uvs_offset;
+          face2.vt2 += uvs_offset;
+          face2.vt3 += uvs_offset;
+
+          content.triangles[triangles_count++] = face2;
         }
       }
+      else if (line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i' && line[5] == 'b') {
+        sscanf(line, "%*s %[^\n]", path);
+        size_t hash = hash_djb2((unsigned char*) path);
+
+        int already_loaded = 0;
+
+        for (unsigned int i = 0; i < loaded_mtls_count; i++) {
+          if (loaded_mtls[i] == hash)
+            already_loaded = 1;
+        }
+
+        if (!already_loaded) {
+          ensure_capacity(loaded_mtls, loaded_mtls_count, loaded_mtls_length, sizeof(size_t));
+          loaded_mtls[loaded_mtls_count++] = hash;
+          read_materials_file(path, &content);
+          materials_count = content.materials_length;
+        }
+      }
+      else if (line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
+        sscanf(line, "%*s %[^\n]", path);
+        size_t hash      = hash_djb2((unsigned char*) path);
+        current_material = 0;
+        for (unsigned int i = 1; i < materials_count; i++) {
+          if (content.materials[i].hash == hash) {
+            current_material = i;
+            break;
+          }
+        }
+      }
+
+      line = eol + 1;
     }
+
+    offset = strlen(line);
+    memcpy(read_buffer, line, offset);
   }
 
   content.vertices_length  = vertices_count;
@@ -510,6 +529,8 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   *io_content = content;
 
   free(loaded_mtls);
+  free(path);
+  free(read_buffer);
 
   bench_toc("Reading *.obj File");
 
