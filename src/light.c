@@ -57,24 +57,22 @@ static int contains_illumination(Triangle triangle, TextureRGBA tex) {
   float m0 = (v0.u - v1.u) / (v0.v - v1.v);
   float m1 = (v1.u - v2.u) / (v1.v - v2.v);
   float m2 = (v2.u - v0.u) / (v2.v - v0.v);
-  float a0 = v0.u - m0 * v0.v;
-  float a1 = v1.u - m1 * v1.v;
-  float a2 = v2.u - m2 * v2.v;
 
   if (isinf(m0) || isnan(m0)) {
-    m0 = m1;
-    a0 = a1;
+    m0 = tex.width;
   }
 
   if (isinf(m1) || isnan(m1)) {
-    m1 = m2;
-    a1 = a2;
+    m1 = tex.width;
   }
 
   if (isinf(m2) || isnan(m2)) {
-    m2 = m0;
-    a2 = a0;
+    m2 = tex.width;
   }
+
+  const float a0 = v0.u - m0 * v0.v;
+  const float a1 = v1.u - m1 * v1.v;
+  const float a2 = v2.u - m2 * v2.v;
 
   float min_e_0, max_e_0;
 
@@ -103,23 +101,23 @@ static int contains_illumination(Triangle triangle, TextureRGBA tex) {
     max_e_2           = max(e_2_2, e_2_0);
   }
 
-  RGB8* ptr = (RGB8*) tex.data;
+  uint32_t* ptr = (uint32_t*) tex.data;
 
   for (int j = min_y; j <= max_y; j++) {
     const int coordy = j % tex.height;
-    const float v    = (float) coordy;
+    const float v    = (float) j;
     const float e0   = max(min(a0 + v * m0, max_e_0), min_e_0);
     const float e1   = max(min(a1 + v * m1, max_e_1), min_e_1);
     const float e2   = max(min(a2 + v * m2, max_e_2), min_e_2);
-    const int min_x  = max(0, min_3_float_to_int(e0, e1, e2));
-    const int max_x  = min(((int) tex.width) - 1, max_3_float_to_int(e0, e1, e2) + 1);
+    const int min_x  = min_3_float_to_int(e0, e1, e2);
+    const int max_x  = max_3_float_to_int(e0, e1, e2) + 1;
 
     for (int i = min_x; i <= max_x; i++) {
       const int coordx = i % tex.width;
 
-      const RGB8 col = ptr[coordx + coordy * tex.width];
+      const uint32_t col = ptr[coordx + coordy * tex.width];
 
-      if (col.r || col.g || col.b)
+      if (col & 0xffffff00)
         return 1;
     }
   }
