@@ -250,10 +250,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float4 t1 = __ldg(hit_address);
       const float4 t2 = __ldg(hit_address + 1);
       const float4 t3 = __ldg(hit_address + 2);
-      const float4 t4 = __ldg(hit_address + 3);
       const float4 t5 = __ldg(hit_address + 4);
       const float4 t6 = __ldg(hit_address + 5);
-      const float2 t7 = __ldg((float2*) (hit_address + 6));
+      const float t7  = __ldg((float*) (hit_address + 6));
 
       vec3 vertex = get_vector(t1.x, t1.y, t1.z);
       vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
@@ -267,7 +266,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 
-      const int texture_object = __float_as_int(t7.x);
+      const int texture_object = __float_as_int(t7);
 
       const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 
@@ -285,7 +284,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
         color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
       }
 
-      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(color);
+      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device_scene.camera.pos, task.position));
@@ -319,7 +318,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
+      store_RGBAhalf(
+        device.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z))));
     }
     else if (device_shading_mode == SHADING_HEAT) {
       const float cost  = device.trace_result_buffer[pixel].depth;
@@ -327,7 +327,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float red   = __saturatef(2.0f * value);
       const float green = __saturatef(2.0f * (value - 0.5f));
       const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
-      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(red, green, blue));
+      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(red, green, blue)));
     }
     else if (device_shading_mode == SHADING_WIREFRAME) {
       const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
@@ -348,7 +348,53 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       float light = (a || b || c) ? 1.0f : 0.0f;
 
-      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(light, 0.5f * light, 0.0f));
+      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(light, 0.5f * light, 0.0f)));
+    }
+    else if (device_shading_mode == SHADING_LIGHTS) {
+      const float4* hit_address = (float4*) (device_scene.triangles + task.hit_id);
+
+      const float4 t1 = __ldg(hit_address);
+      const float4 t2 = __ldg(hit_address + 1);
+      const float4 t3 = __ldg(hit_address + 2);
+      const float4 t5 = __ldg(hit_address + 4);
+      const float4 t6 = __ldg(hit_address + 5);
+      const float2 t7 = __ldg((float2*) (hit_address + 6));
+
+      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
+      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+      vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
+
+      const UV coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+
+      UV vertex_texture = get_UV(t5.z, t5.w);
+      UV edge1_texture  = get_UV(t6.x, t6.y);
+      UV edge2_texture  = get_UV(t6.z, t6.w);
+
+      const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+
+      const int texture_object = __float_as_int(t7.x);
+      const int light_id       = __float_as_int(t7.y);
+
+      RGBF color;
+
+      if (light_id != LIGHT_ID_NONE) {
+        color = get_color(100.0f, 100.0f, 100.0f);
+      }
+      else {
+        const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
+
+        if (maps.x) {
+          const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
+          color                 = get_color(albedo_f.x, albedo_f.y, albedo_f.z);
+        }
+        else {
+          color = get_color(0.9f, 0.9f, 0.9f);
+        }
+
+        color = scale_color(color, 0.1f);
+      }
+
+      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
     }
   }
 }

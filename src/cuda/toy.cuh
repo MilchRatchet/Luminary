@@ -212,13 +212,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
     const int pixel    = task.index.y * device_width + task.index.x;
 
     if (device_shading_mode == SHADING_ALBEDO) {
-      device.frame_buffer[pixel] =
-        RGBF_to_RGBAhalf(get_color(device_scene.toy.albedo.r, device_scene.toy.albedo.g, device_scene.toy.albedo.b));
+      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(opaque_color(device_scene.toy.albedo)));
     }
     else if (device_shading_mode == SHADING_DEPTH) {
-      const float dist           = get_length(sub_vector(device_scene.camera.pos, task.position));
-      const float value          = __saturatef((1.0f / dist) * 2.0f);
-      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
+      const float dist  = get_length(sub_vector(device_scene.camera.pos, task.position));
+      const float value = __saturatef((1.0f / dist) * 2.0f);
+      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(value, value, value)));
     }
     else if (device_shading_mode == SHADING_NORMAL) {
       vec3 normal = get_toy_normal(task.position);
@@ -231,7 +230,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
+      store_RGBAhalf(
+        device.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z))));
+    }
+    else if (device_shading_mode == SHADING_LIGHTS) {
+      RGBF color;
+      if (device_scene.toy.emissive) {
+        color = get_color(100.0f, 100.0f, 100.0f);
+      }
+      else {
+        color = scale_color(opaque_color(device_scene.toy.albedo), 0.1f);
+      }
+
+      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
     }
   }
 }

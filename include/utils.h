@@ -38,7 +38,8 @@ enum ShadingMode {
   SHADING_DEPTH     = 2,
   SHADING_NORMAL    = 3,
   SHADING_HEAT      = 4,
-  SHADING_WIREFRAME = 5
+  SHADING_WIREFRAME = 5,
+  SHADING_LIGHTS    = 6
 } typedef ShadingMode;
 
 enum ToyShape { TOY_SPHERE = 0 } typedef ToyShape;
