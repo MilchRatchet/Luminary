@@ -1157,6 +1157,15 @@ __device__ RGBAhalf fma_RGBAhalf(const RGBAhalf a, const __half b, const RGBAhal
   return result;
 }
 
+__device__ RGBAhalf sqrt_RGBAhalf(const RGBAhalf a) {
+  RGBAhalf result;
+
+  result.rg = h2sqrt(a.rg);
+  result.ba = h2sqrt(a.ba);
+
+  return result;
+}
+
 __device__ bool any_RGBAhalf(const RGBAhalf a) {
   __half2 zero = make_half2(0.0f, 0.0f);
 
