@@ -60,7 +60,7 @@ __device__ float ocean_octave(float2 p, const float choppyness) {
   return powf(1.0f - powf(wave1.x * wave1.y, 0.65f), choppyness);
 }
 
-__device__ float get_ocean_height(const vec3 p, const int steps) {
+__device__ float ocean_get_height(const vec3 p, const int steps) {
   float amplitude  = device_scene.ocean.amplitude;
   float choppyness = device_scene.ocean.choppyness;
   float frequency  = device_scene.ocean.frequency;
@@ -98,29 +98,51 @@ __device__ float get_ocean_height(const vec3 p, const int steps) {
   return p.y - h - device_scene.ocean.height;
 }
 
-__device__ vec3 get_ocean_normal(vec3 p, const float diff) {
+__device__ vec3 ocean_get_normal(vec3 p, const float diff) {
   vec3 normal;
-  normal.y = get_ocean_height(p, SLOW_ITERATIONS);
+  normal.y = ocean_get_height(p, SLOW_ITERATIONS);
   p.x += diff;
-  normal.x = get_ocean_height(p, SLOW_ITERATIONS) - normal.y;
+  normal.x = ocean_get_height(p, SLOW_ITERATIONS) - normal.y;
   p.x -= diff;
   p.z += diff;
-  normal.z = get_ocean_height(p, SLOW_ITERATIONS) - normal.y;
+  normal.z = ocean_get_height(p, SLOW_ITERATIONS) - normal.y;
   normal.y = diff;
 
   return normalize_vector(normal);
 }
 
-__device__ float get_intersection_ocean(const vec3 origin, const vec3 ray, float max) {
+__device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
+  if (ray.y > -eps)
+    return FLT_MAX;
+
+  if (origin.y < device_scene.ocean.height)
+    return FLT_MAX;
+
+  const float depth = (device_scene.ocean.height - origin.y) / ray.y;
+
+  return (depth >= eps) ? depth : FLT_MAX;
+}
+
+__device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
+  if (ray.y > -eps)
+    return FLT_MAX;
+
+  if (origin.y < device_scene.ocean.height)
+    return FLT_MAX;
+
+  return (device_scene.ocean.height + 3.0f * device_scene.ocean.amplitude - origin.y) / ray.y;
+}
+
+__device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, float max) {
   float min = 0.0f;
 
   vec3 p = add_vector(origin, scale_vector(ray, max));
 
-  float height_at_max = get_ocean_height(p, FAST_ITERATIONS);
+  float height_at_max = ocean_get_height(p, FAST_ITERATIONS);
   if (height_at_max > 0.0f)
     return FLT_MAX;
 
-  float height_at_min = get_ocean_height(origin, FAST_ITERATIONS);
+  float height_at_min = ocean_get_height(origin, FAST_ITERATIONS);
   if (height_at_min < 0.0f)
     return FLT_MAX;
 
@@ -132,7 +154,7 @@ __device__ float get_intersection_ocean(const vec3 origin, const vec3 ray, float
     p.y = origin.y + mid * ray.y;
     p.z = origin.z + mid * ray.z;
 
-    float height_at_mid = get_ocean_height(p, FAST_ITERATIONS);
+    float height_at_mid = ocean_get_height(p, FAST_ITERATIONS);
 
     if (height_at_mid < 0.0f) {
       max           = mid;
@@ -166,7 +188,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    const vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+    const vec3 normal = ocean_get_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
 
     RGBAF albedo = device_scene.ocean.albedo;
     RGBF record  = RGBAhalf_to_RGBF(device_records[pixel]);
@@ -291,7 +313,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
       device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
     else if (device_shading_mode == SHADING_NORMAL) {
-      vec3 normal = get_ocean_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+      vec3 normal = ocean_get_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
 
       normal.x = 0.5f * normal.x + 0.5f;
       normal.y = 0.5f * normal.y + 0.5f;

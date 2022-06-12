@@ -187,7 +187,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     }
 
     if (device_scene.ocean.active) {
-      const float ocean_dist = get_intersection_ocean(task.origin, task.ray, depth);
+      const float ocean_dist = ocean_far_distance(task.origin, task.ray);
 
       if (ocean_dist < depth) {
         depth  = ocean_dist;
@@ -203,13 +203,40 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
   }
 }
 
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks() {
+  const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset    = get_task_address(i);
+    TraceTask task      = load_trace_task(device_trace_tasks + offset);
+    const float2 result = __ldcs((float2*) (device.trace_results + offset));
+
+    float depth     = result.x;
+    uint32_t hit_id = __float_as_uint(result.y);
+
+    const float far_distance   = ocean_far_distance(task.origin, task.ray);
+    const float short_distance = ocean_short_distance(task.origin, task.ray);
+
+    if (depth <= far_distance && depth >= short_distance) {
+      const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
+
+      if (ocean_depth < depth) {
+        float2 result;
+        result.x = ocean_depth;
+        result.y = __uint_as_float(OCEAN_HIT);
+        __stcs((float2*) (device.trace_results + offset), result);
+      }
+    }
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trace_tasks() {
   const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device_trace_tasks + offset);
-    const float2 result = __ldg((float2*) (device.trace_results + offset));
+    const float2 result = __ldcs((float2*) (device.trace_results + offset));
 
     float depth     = result.x;
     uint32_t hit_id = __float_as_uint(result.y);
@@ -461,10 +488,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       data1.x = asinf(task.ray.y);
       data1.y = atan2f(task.ray.z, task.ray.x);
 
-      if (hit_id == OCEAN_HIT) {
-        data1.z = depth;
-      }
-      else if (hit_id == FOG_HIT) {
+      if (hit_id == OCEAN_HIT || hit_id == FOG_HIT) {
         data1.z = depth;
       }
       else {

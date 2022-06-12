@@ -573,6 +573,9 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   else {
     process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
+  if (instance->scene_gpu.ocean.active) {
+    ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
   process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   if (
@@ -610,6 +613,9 @@ static void execute_debug_kernels(RaytraceInstance* instance, int type) {
   }
   else {
     process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+  if (instance->scene_gpu.ocean.active) {
+    ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
