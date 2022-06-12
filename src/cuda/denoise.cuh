@@ -143,15 +143,15 @@ extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
     return 0.0f;
   }
 
+  if (instance->shading_mode != SHADING_DEFAULT)
+    return 1.0f;
+
   const float exposure = instance->scene_gpu.camera.exposure;
 
   if (!instance->denoise_setup) {
     log_message("OptiX Denoise Instance is NULL.");
     return exposure;
   }
-
-  if (instance->shading_mode != SHADING_DEFAULT)
-    return 1.0f;
 
   OptixDenoiseInstance denoise_setup = *(OptixDenoiseInstance*) instance->denoise_setup;
 
