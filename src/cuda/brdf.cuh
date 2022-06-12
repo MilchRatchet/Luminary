@@ -271,6 +271,9 @@ __device__ LightSample sample_light(const vec3 position) {
     light.id     = light_id;
     light.weight = weight * solid_angle;
 
+    if (light.id == selected.id)
+      continue;
+
     weight_sum += light.weight;
 
     ran_weight     = xorshift_uint32(ran_weight);
