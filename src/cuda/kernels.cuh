@@ -330,7 +330,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     int index;
     int needs_swapping;
 
-    if (hit_id == OCEAN_HIT) {
+    if (hit_id <= TRIANGLE_ID_LIMIT) {
+      index          = geometry_offset++;
+      needs_swapping = (k >= geometry_task_count);
+    }
+    else if (hit_id == OCEAN_HIT) {
       index          = ocean_offset++;
       needs_swapping = (k < geometry_task_count) || (k >= geometry_task_count + ocean_task_count);
     }
@@ -347,10 +351,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       index          = fog_offset++;
       needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count)
                        || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + fog_task_count);
-    }
-    else if (hit_id <= TRIANGLE_ID_LIMIT) {
-      index          = geometry_offset++;
-      needs_swapping = (k >= geometry_task_count);
     }
     else {
       index          = rejects_offset++;
@@ -372,18 +372,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   fog_task_count      = 0;
 
   // process data
-  for (int i = 0; i < task_count; i++) {
+  for (int i = 0; i < fog_offset; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device_trace_tasks + offset);
     const float2 result = __ldcs((float2*) (device.trace_results + offset));
 
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
-
-    if (hit_id == REJECT_HIT)
-      break;
-
-    const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
+    const uint32_t pixel  = get_pixel_id(task.index.x, task.index.y);
 
     if (is_first_ray()) {
       device.raydir_buffer[pixel] = task.ray;
