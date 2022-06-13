@@ -46,9 +46,11 @@ __global__ void spatial_resampling(LightSample* input, LightSample* output) {
     if (data.flags) {
       const float ran1 = white_noise();
       const float ran2 = white_noise();
+      const float ran3 = white_noise();
 
       uint32_t ran_x = 1 + ran1 * 32;
       uint32_t ran_y = 1 + ran2 * 32;
+      uint32_t ran_w = (uint32_t) (ran3 * ((uint32_t) 0xffff));
 
       for (int i = 0; i < device_spatial_samples; i++) {
         ran_x = xorshift_uint32(ran_x);
@@ -67,13 +69,16 @@ __global__ void spatial_resampling(LightSample* input, LightSample* output) {
         if (spatial.id == LIGHT_ID_NONE || spatial.id == selected.id)
           continue;
 
-        const float spatial_target_weight = brdf_light_sample_target_weight(spatial);
+        const float target_weight = brdf_light_sample_target_weight(spatial);
 
         spatial.solid_angle = brdf_light_sample_solid_angle(spatial, data.position);
 
-        const float spatial_target_weight_resampled = brdf_light_sample_target_weight(spatial);
+        const float target_weight_resampled = brdf_light_sample_target_weight(spatial);
 
-        selected = brdf_light_sample_update(selected, spatial, spatial.weight * (spatial_target_weight_resampled / spatial_target_weight));
+        ran_w         = xorshift_uint32(ran_w);
+        const float r = ((float) (ran_w & 0xffff)) / ((float) 0xffff);
+
+        selected = brdf_light_sample_update(selected, spatial, spatial.weight * (target_weight_resampled / target_weight), r);
       }
     }
 

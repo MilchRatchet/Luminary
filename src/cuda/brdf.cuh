@@ -200,10 +200,10 @@ __device__ float brdf_light_sample_shading_weight(const LightSample light) {
   return (1.0f / brdf_light_sample_target_weight(light)) * (light.weight / light.M);
 }
 
-__device__ LightSample brdf_light_sample_update(LightSample x, const LightSample y, const float update_weight) {
+__device__ LightSample brdf_light_sample_update(LightSample x, const LightSample y, const float update_weight, const float r) {
   x.weight += update_weight;
   x.M += y.M;
-  if (white_noise() < (update_weight / x.weight)) {
+  if (r < (update_weight / x.weight)) {
     x.id          = y.id;
     x.solid_angle = y.solid_angle;
   }
@@ -233,6 +233,9 @@ __device__ LightSample sample_light(const vec3 position) {
   const int reservoir_sampling_size = min(light_count, device_reservoir_size);
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
+
+  const float ran     = white_noise();
+  uint32_t ran_weight = (uint32_t) (ran * ((uint32_t) 0xffff));
 
   for (int i = 0; i < reservoir_sampling_size; i++) {
     const float r1       = white_noise();
@@ -264,7 +267,10 @@ __device__ LightSample sample_light(const vec3 position) {
     light.solid_angle = brdf_light_sample_solid_angle(light, position);
     light.weight      = brdf_light_sample_target_weight(light) * light_count_float;
 
-    selected = brdf_light_sample_update(selected, light, light.weight);
+    ran_weight    = xorshift_uint32(ran_weight);
+    const float r = ((float) (ran_weight & 0xffff)) / ((float) 0xffff);
+
+    selected = brdf_light_sample_update(selected, light, light.weight, r);
   }
 
   return selected;
