@@ -264,6 +264,9 @@ __device__ LightSample sample_light(const vec3 position) {
       } break;
     }
 
+    if (light.id == selected.id)
+      continue;
+
     light.solid_angle = brdf_light_sample_solid_angle(light, position);
     light.weight      = brdf_light_sample_target_weight(light) * light_count_float;
 
