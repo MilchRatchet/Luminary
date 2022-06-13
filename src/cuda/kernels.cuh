@@ -349,6 +349,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_offset;
   device.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = fog_offset;
 
+  const int num_tasks = rejects_offset;
+
   // order data
   while (k < task_count) {
     const int offset      = get_task_address(k);
@@ -399,7 +401,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   fog_task_count      = 0;
 
   // process data
-  for (int i = 0; i < fog_offset; i++) {
+  for (int i = 0; i < num_tasks; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device_trace_tasks + offset);
     const float2 result = __ldcs((float2*) (device.trace_results + offset));
