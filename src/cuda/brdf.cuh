@@ -162,50 +162,53 @@ __device__ vec3 brdf_sample_light_ray(const LightSample light, const vec3 origin
   }
 }
 
-__device__ LightSample brdf_finalize_light_sample(LightSample light, const vec3 origin) {
-  light.weight = 1.0f / light.weight;
+__device__ float brdf_light_sample_target_weight(const LightSample light) {
+  float weight;
   switch (light.id) {
     case LIGHT_ID_SUN:
-      light.weight *= sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(origin));
+      weight = device_scene.sky.sun_strength;
       break;
     case LIGHT_ID_TOY:
-      light.weight *= sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, origin);
+      weight = device_scene.toy.material.b;
       break;
     case LIGHT_ID_NONE:
-      light.weight = 0.0f;
+      weight = 0.0f;
       break;
-    default:
-      const TriangleLight triangle = load_triangle_light(light.id);
-      light.weight *= sample_triangle_solid_angle(triangle, origin);
-      break;
+    default: {
+      weight = device_scene.material.default_material.b;
+    } break;
   }
 
-  light.weight *= 0.5f * ONE_OVER_PI;
-
-  return light;
+  return weight * light.solid_angle;
 }
 
-__device__ LightSample resample_light(const LightSample a, const LightSample b, const LightEvalData d) {
-  if (a.id == LIGHT_ID_NONE) {
-    return b;
+__device__ float brdf_light_sample_solid_angle(const LightSample light, const vec3 pos) {
+  switch (light.id) {
+    case LIGHT_ID_SUN:
+      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(pos));
+    case LIGHT_ID_TOY:
+      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, pos);
+    case LIGHT_ID_NONE:
+      return 0.0f;
+    default:
+      const TriangleLight triangle = load_triangle_light(light.id);
+      return 0.5f * ONE_OVER_PI * sample_triangle_solid_angle(triangle, pos);
   }
-  else if (b.id == LIGHT_ID_NONE) {
-    return a;
+}
+
+__device__ float brdf_light_sample_shading_weight(const LightSample light) {
+  return (1.0f / brdf_light_sample_target_weight(light)) * (light.weight / light.M);
+}
+
+__device__ LightSample brdf_light_sample_update(LightSample x, const LightSample y, const float update_weight) {
+  x.weight += update_weight;
+  x.M += y.M;
+  if (white_noise() < (update_weight / x.weight)) {
+    x.id          = y.id;
+    x.solid_angle = y.solid_angle;
   }
 
-  LightSample af = brdf_finalize_light_sample(a, d.position);
-  LightSample bf = brdf_finalize_light_sample(b, d.position);
-
-  const float r = white_noise();
-
-  const float weight_sum = af.weight + bf.weight;
-
-  LightSample selected = (r < af.weight / weight_sum) ? a : b;
-  const float p        = (r < af.weight / weight_sum) ? af.weight : bf.weight;
-
-  selected.weight *= 2.0f * p / weight_sum;
-
-  return selected;
+  return x;
 }
 
 __device__ LightSample sample_light(const vec3 position) {
@@ -218,10 +221,11 @@ __device__ LightSample sample_light(const vec3 position) {
   light_count += toy_visible;
   light_count += (device_scene.material.lights_active) ? device_scene.triangle_lights_length : 0;
 
-  float weight_sum = 0.0f;
   LightSample selected;
-  selected.id     = LIGHT_ID_NONE;
-  selected.weight = 0.0f;
+  selected.id          = LIGHT_ID_NONE;
+  selected.weight      = 0.0f;
+  selected.M           = 0;
+  selected.solid_angle = 0.0f;
 
   if (!light_count)
     return selected;
@@ -229,10 +233,6 @@ __device__ LightSample sample_light(const vec3 position) {
   const int reservoir_sampling_size = min(light_count, device_reservoir_size);
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
-
-  const float ran = white_noise();
-
-  uint32_t ran_weight = (uint32_t) (ran * ((uint32_t) 0xffff));
 
   for (int i = 0; i < reservoir_sampling_size; i++) {
     const float r1       = white_noise();
@@ -244,47 +244,28 @@ __device__ LightSample sample_light(const vec3 position) {
     if (light_index >= device_scene.triangle_lights_length + 2)
       continue;
 
-    float weight;
-    float solid_angle;
-    uint32_t light_id = LIGHT_ID_NONE;
+    LightSample light;
+    light.id = LIGHT_ID_NONE;
+    light.M  = 1;
+
     switch (light_index) {
       case 0:
-        solid_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, sky_pos);
-        weight      = device_scene.sky.sun_strength;
-        light_id    = LIGHT_ID_SUN;
+        light.id = LIGHT_ID_SUN;
         break;
       case 1:
-        solid_angle = sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, position);
-        weight      = device_scene.toy.material.b;
-        light_id    = LIGHT_ID_TOY;
+        light.id = LIGHT_ID_TOY;
         break;
       default: {
         const TriangleLight triangle = load_triangle_light(light_index - 2);
-
-        solid_angle = sample_triangle_solid_angle(triangle, position);
-        weight      = device_scene.material.default_material.b;
-        light_id    = light_index - 2;
+        light.id                     = light_index - 2;
       } break;
     }
 
-    LightSample light;
-    light.id     = light_id;
-    light.weight = weight * solid_angle;
+    light.solid_angle = brdf_light_sample_solid_angle(light, position);
+    light.weight      = brdf_light_sample_target_weight(light) * light_count_float;
 
-    if (light.id == selected.id)
-      continue;
-
-    weight_sum += light.weight;
-
-    ran_weight     = xorshift_uint32(ran_weight);
-    const float r2 = ((float) (ran_weight & 0xffff)) / ((float) 0xffff);
-
-    if (r2 < light.weight / weight_sum) {
-      selected = light;
-    }
+    selected = brdf_light_sample_update(selected, light, light.weight);
   }
-
-  selected.weight = (selected.weight * reservoir_sampling_size) / (light_count * weight_sum);
 
   return selected;
 }

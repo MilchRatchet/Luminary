@@ -251,12 +251,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       {
         LightSample light = load_light_sample(device.light_samples, pixel);
 
-        light = brdf_finalize_light_sample(light, task.position);
+        const float light_weight = brdf_light_sample_shading_weight(light) * light.solid_angle;
 
-        if (light.weight > 0.0f) {
+        if (light_weight > 0.0f) {
           brdf.L = brdf_sample_light_ray(light, task.position);
 
-          const RGBAhalf light_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf_evaluate(brdf).term, light.weight));
+          const RGBAhalf light_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf_evaluate(brdf).term, light_weight));
 
           TraceTask light_task;
           light_task.origin = task.position;

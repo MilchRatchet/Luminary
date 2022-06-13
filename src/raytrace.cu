@@ -283,8 +283,13 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
 
   device_buffer_malloc(instance->light_samples_1, sizeof(LightSample), amount);
-  device_buffer_malloc(instance->light_samples_2, sizeof(LightSample), amount);
-  device_buffer_malloc(instance->light_eval_data, sizeof(LightEvalData), amount);
+
+  if (
+    instance->realtime || instance->scene_gpu.material.lights_active
+    || (instance->scene_gpu.toy.active && instance->scene_gpu.toy.emissive)) {
+    device_buffer_malloc(instance->light_samples_2, sizeof(LightSample), amount);
+    device_buffer_malloc(instance->light_eval_data, sizeof(LightEvalData), amount);
+  }
 
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }

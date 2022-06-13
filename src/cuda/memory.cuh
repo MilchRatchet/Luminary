@@ -243,21 +243,25 @@ __device__ void store_light_eval_data(const LightEvalData data, const int offset
 }
 
 __device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {
-  const float2 packet = __ldcs((float2*) (ptr + offset));
+  const float4 packet = __ldcs((float4*) (ptr + offset));
 
   LightSample sample;
-  sample.id     = __float_as_uint(packet.x);
-  sample.weight = packet.y;
+  sample.id          = __float_as_uint(packet.x);
+  sample.M           = __float_as_uint(packet.y);
+  sample.weight      = packet.z;
+  sample.solid_angle = packet.w;
 
   return sample;
 }
 
-__device__ void store_light_sample(const LightSample* ptr, const LightSample sample, const int offset) {
-  float2 packet;
+__device__ void store_light_sample(LightSample* ptr, const LightSample sample, const int offset) {
+  float4 packet;
   packet.x = __uint_as_float(sample.id);
-  packet.y = sample.weight;
+  packet.y = __uint_as_float(sample.M);
+  packet.z = sample.weight;
+  packet.w = sample.solid_angle;
 
-  __stcs((float2*) (ptr + offset), packet);
+  __stcs((float4*) (ptr + offset), packet);
 }
 
 __device__ TraversalTriangle load_traversal_triangle(const int offset) {

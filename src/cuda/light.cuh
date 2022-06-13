@@ -62,12 +62,18 @@ __global__ void spatial_resampling(LightSample* input, LightSample* output) {
         sample_x = min(sample_x, device_width - 1);
         sample_y = min(sample_y, device_height - 1);
 
-        const LightSample spatial = load_light_sample(input, sample_x + sample_y * device_width);
+        LightSample spatial = load_light_sample(input, sample_x + sample_y * device_width);
 
         if (spatial.id == LIGHT_ID_NONE || spatial.id == selected.id)
           continue;
 
-        selected = resample_light(selected, spatial, data);
+        const float spatial_target_weight = brdf_light_sample_target_weight(spatial);
+
+        spatial.solid_angle = brdf_light_sample_solid_angle(spatial, data.position);
+
+        const float spatial_target_weight_resampled = brdf_light_sample_target_weight(spatial);
+
+        selected = brdf_light_sample_update(selected, spatial, spatial.weight * (spatial_target_weight_resampled / spatial_target_weight));
       }
     }
 

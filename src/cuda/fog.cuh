@@ -117,16 +117,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
     const int light_occupied = (device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
     if (!light_occupied) {
-      LightSample light = load_light_sample(device.light_samples, pixel);
-      light             = brdf_finalize_light_sample(light, task.position);
+      LightSample light        = load_light_sample(device.light_samples, pixel);
+      const float light_weight = brdf_light_sample_shading_weight(light) * light.solid_angle;
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-      if (light.weight > 0.0f) {
+      if (light_weight > 0.0f) {
         const vec3 light_ray  = brdf_sample_light_ray(light, task.position);
         const float cos_angle = dot_product(ray, light_ray);
         const float phase     = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
-        const float weight    = light.weight * phase * density * task.distance;
+        const float weight    = light_weight * phase * density * task.distance;
 
         device.light_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, weight));
         light_history_buffer_entry  = light.id;

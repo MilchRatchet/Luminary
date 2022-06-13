@@ -58,7 +58,9 @@ struct Quaternion {
 
 struct LightSample {
   uint32_t id;
+  uint32_t M;
   float weight;
+  float solid_angle;
 } typedef LightSample;
 
 struct LightEvalData {
