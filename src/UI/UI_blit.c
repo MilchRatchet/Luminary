@@ -22,14 +22,13 @@ void blit_gray(uint8_t* dst, int x, int y, int ldd, int hd, int width, int heigh
 }
 
 void blit_color(uint8_t* dst, int x, int y, int ldd, int hd, int width, int height, uint8_t red, uint8_t green, uint8_t blue) {
-  height = min(height, hd - y);
-  width  = min(width, ldd - x);
+  height               = min(height, hd - y);
+  width                = min(width, ldd - x);
+  const uint32_t color = (((uint32_t) blue) << 0) | (((uint32_t) green) << 8) | (((uint32_t) red) << 16);
+  uint32_t* dst4       = (uint32_t*) dst;
   for (int i = 0; i < height; i++) {
     for (int j = 0; j < width; j++) {
-      dst[(y + i) * 4 * ldd + 4 * x + 4 * j]     = blue;
-      dst[(y + i) * 4 * ldd + 4 * x + 4 * j + 1] = green;
-      dst[(y + i) * 4 * ldd + 4 * x + 4 * j + 2] = red;
-      dst[(y + i) * 4 * ldd + 4 * x + 4 * j + 3] = 0;
+      dst4[(y + i) * ldd + x + j] = color;
     }
   }
 }
