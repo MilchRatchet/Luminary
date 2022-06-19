@@ -33,6 +33,10 @@ __global__ void generate_light_samples() {
 __global__ void spatial_resampling(LightSample* input, LightSample* output) {
   const int task_count = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
 
+  uint32_t ran_x = 1 + white_noise() * 32;
+  uint32_t ran_y = 1 + white_noise() * 32;
+  uint32_t ran_w = (uint32_t) (white_noise() * ((uint32_t) 0xffff));
+
   for (int i = 0; i < task_count; i++) {
     const int offset     = get_task_address(i);
     const ushort2 index  = __ldcs((ushort2*) (device_trace_tasks + offset));
@@ -44,14 +48,6 @@ __global__ void spatial_resampling(LightSample* input, LightSample* output) {
     LightSample selected = current;
 
     if (data.flags) {
-      const float ran1 = white_noise();
-      const float ran2 = white_noise();
-      const float ran3 = white_noise();
-
-      uint32_t ran_x = 1 + ran1 * 32;
-      uint32_t ran_y = 1 + ran2 * 32;
-      uint32_t ran_w = (uint32_t) (ran3 * ((uint32_t) 0xffff));
-
       for (int i = 0; i < device_spatial_samples; i++) {
         ran_x = xorshift_uint32(ran_x);
         ran_y = xorshift_uint32(ran_y);
