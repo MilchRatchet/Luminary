@@ -49,7 +49,7 @@ void blit_color_shaded(uint8_t* dst, int x, int y, int ldd, int hd, int width, i
 }
 
 #if defined(__AVX2__)
-void blit_UI_internal(UI* ui, uint8_t* target, int width, int height, int ld) {
+void blit_UI_internal(const UI* ui, uint8_t* target, const int width, const int height, const int ld) {
   const int vis_width  = min(width - ui->x, UI_WIDTH);
   const int vis_height = min(height - ui->y, UI_HEIGHT + UI_BORDER_SIZE);
 
@@ -166,7 +166,7 @@ void blit_UI_internal(UI* ui, uint8_t* target, int width, int height, int ld) {
   }
 }
 #else
-void blit_UI_internal(UI* ui, uint8_t* target, int width, int height, int ld) {
+void blit_UI_internal(const UI* ui, uint8_t* target, const int width, const int height, const int ld) {
   const int vis_width  = min(width - ui->x, UI_WIDTH);
   const int vis_height = min(height - ui->y, UI_HEIGHT + UI_BORDER_SIZE);
 

@@ -76,7 +76,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
       sscanf(value, "%s\n", general->output_path);
       break;
     default:
-      error_message("%8.8s (%zu) is not a valid GENERAL setting.", line, key);
+      warn_message("%8.8s (%zu) is not a valid GENERAL setting.", line, key);
       break;
   }
 }
@@ -115,7 +115,7 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
       sscanf(value, "%f\n", &material->alpha_cutoff);
       break;
     default:
-      error_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
+      warn_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
       break;
   }
 }
@@ -182,7 +182,7 @@ static void parse_camera_settings(Camera* camera, char* line) {
       sscanf(value, "%d\n", &camera->filter);
       break;
     default:
-      error_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
+      warn_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
       break;
   }
 }
@@ -253,7 +253,7 @@ static void parse_sky_settings(Sky* sky, char* line) {
       sscanf(value, "%f\n", &sky->base_density);
       break;
     default:
-      error_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
+      warn_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
       break;
   }
 }
@@ -340,7 +340,7 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
       sscanf(value, "%f\n", &cloud->density);
       break;
     default:
-      error_message("%8.8s (%zu) is not a valid CLOUD setting.", line, key);
+      warn_message("%8.8s (%zu) is not a valid CLOUD setting.", line, key);
       break;
   }
 }
@@ -375,7 +375,7 @@ static void parse_fog_settings(Fog* fog, char* line) {
       sscanf(value, "%f\n", &fog->falloff);
       break;
     default:
-      error_message("%8.8s (%zu) is not a valid FOG setting.", line, key);
+      warn_message("%8.8s (%zu) is not a valid FOG setting.", line, key);
       break;
   }
 }
@@ -426,7 +426,7 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
       sscanf(value, "%f\n", &ocean->refractive_index);
       break;
     default:
-      error_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
+      warn_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
       break;
   }
 }
@@ -481,7 +481,7 @@ static void parse_toy_settings(Toy* toy, char* line) {
       sscanf(value, "%d\n", &toy->flashlight_mode);
       break;
     default:
-      error_message("%8.8s (%zu) is not a valid TOY setting.", line, key);
+      warn_message("%8.8s (%zu) is not a valid TOY setting.", line, key);
       break;
   }
 }
@@ -621,7 +621,7 @@ static General get_default_settings() {
   General general = {
     .width             = 1280,
     .height            = 720,
-    .max_ray_depth     = 5,
+    .max_ray_depth     = 3,
     .samples           = 16,
     .denoiser          = 1,
     .reservoir_size    = 8,
