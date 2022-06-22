@@ -208,7 +208,7 @@ __device__ void store_RGBAhalf(void* ptr, const RGBAhalf a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if (!device_denoiser || device.state_buffer[pixel] & STATE_ALBEDO)
+  if (!device_denoiser || device.state_buffer[pixel] & STATE_ALBEDO || device_iteration_type == TYPE_LIGHT)
     return;
 
   if (device_temporal_frames && device_accum_mode == TEMPORAL_ACCUMULATION) {
