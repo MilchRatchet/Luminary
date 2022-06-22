@@ -255,7 +255,6 @@ struct RaytraceInstance {
   DeviceBuffer* frame_temporal;
   DeviceBuffer* frame_buffer;
   DeviceBuffer* frame_variance;
-  DeviceBuffer* frame_bias_cache;
   DeviceBuffer* albedo_buffer;
   DeviceBuffer* light_records;
   DeviceBuffer* bounce_records;

@@ -247,7 +247,6 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_temporal, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->frame_output, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->frame_variance, sizeof(RGBAhalf), amount);
-  device_buffer_malloc(instance->frame_bias_cache, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->light_records, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBAhalf), amount);
 
@@ -365,7 +364,6 @@ extern "C" RaytraceInstance* init_raytracing(
   device_buffer_init(&instance->frame_temporal);
   device_buffer_init(&instance->frame_buffer);
   device_buffer_init(&instance->frame_variance);
-  device_buffer_init(&instance->frame_bias_cache);
   device_buffer_init(&instance->albedo_buffer);
   device_buffer_init(&instance->light_records);
   device_buffer_init(&instance->bounce_records);
@@ -686,7 +684,6 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_buffer);
   device_buffer_free(instance->frame_temporal);
   device_buffer_free(instance->frame_variance);
-  device_buffer_free(instance->frame_bias_cache);
   device_buffer_free(instance->light_records);
   device_buffer_free(instance->bounce_records);
   device_buffer_free(instance->randoms);
@@ -813,7 +810,6 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.frame_temporal        = (RGBAhalf*) device_buffer_get_pointer(instance->frame_temporal);
   ptrs.frame_buffer          = (RGBAhalf*) device_buffer_get_pointer(instance->frame_buffer);
   ptrs.frame_variance        = (RGBAhalf*) device_buffer_get_pointer(instance->frame_variance);
-  ptrs.frame_bias_cache      = (RGBAhalf*) device_buffer_get_pointer(instance->frame_bias_cache);
   ptrs.albedo_buffer         = (RGBAhalf*) device_buffer_get_pointer(instance->albedo_buffer);
   ptrs.light_records         = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
   ptrs.bounce_records        = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);

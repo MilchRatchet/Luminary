@@ -88,17 +88,14 @@ __global__ void temporal_accumulation() {
     RGBAhalf buffer = load_RGBAhalf(device.frame_buffer + offset);
     RGBAhalf output;
     RGBAhalf variance;
-    RGBAhalf bias_cache;
 
     if (device_temporal_frames == 0) {
-      output     = buffer;
-      variance   = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
-      bias_cache = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+      output   = buffer;
+      variance = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
     }
     else {
-      output     = load_RGBAhalf(device.frame_output + offset);
-      variance   = load_RGBAhalf(device.frame_variance + offset);
-      bias_cache = load_RGBAhalf(device.frame_bias_cache + offset);
+      output   = load_RGBAhalf(device.frame_output + offset);
+      variance = load_RGBAhalf(device.frame_variance + offset);
     }
 
     RGBAhalf deviation;
@@ -118,19 +115,7 @@ __global__ void temporal_accumulation() {
     RGBAhalf firefly_rejection = add_RGBAhalf(get_RGBAhalf(0.1f, 0.1f, 0.1f, 0.1f), add_RGBAhalf(output, scale_RGBAhalf(deviation, 4.0f)));
     firefly_rejection          = max_RGBAhalf(get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f), sub_RGBAhalf(buffer, firefly_rejection));
 
-    bias_cache = add_RGBAhalf(bias_cache, firefly_rejection);
-    buffer     = sub_RGBAhalf(buffer, firefly_rejection);
-
-    RGBAhalf debias;
-    debias.rg =
-      __hmax2(make_half2(0.0f, 0.0f), __hmin2(bias_cache.rg, __hsub2(__hsub2(__hsub2(output.rg, buffer.rg), deviation.rg), deviation.rg)));
-    debias.ba =
-      __hmax2(make_half2(0.0f, 0.0f), __hmin2(bias_cache.ba, __hsub2(__hsub2(__hsub2(output.ba, buffer.ba), deviation.ba), deviation.ba)));
-
-    buffer     = add_RGBAhalf(buffer, debias);
-    bias_cache = sub_RGBAhalf(bias_cache, debias);
-
-    store_RGBAhalf(device.frame_bias_cache + offset, bias_cache);
+    buffer = sub_RGBAhalf(buffer, firefly_rejection);
 
     RGBAhalf old_output = output;
 
