@@ -104,13 +104,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
       brdf.term = mul_RGBAhalf(brdf.term, RGBF_to_RGBAhalf(record_alpha_factor));
 
-      const float alpha = blue_noise(task.index.x, task.index.y, task.state, 2);
-      const float beta  = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
-
       if (device_scene.toy.refractive_index != 1.0f) {
-        const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
+        const float alpha = blue_noise(task.index.x, task.index.y, task.state, 2);
+        const float beta  = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
 
-        RGBF refraction_record = RGBAhalf_to_RGBF(record);
+        const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
 
         brdf = brdf_sample_ray_refraction(brdf, refraction_index, alpha, beta);
       }
@@ -136,8 +134,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
           if (white_noise() > 0.5f)
             break;
           store_RGBAhalf(device.light_records + pixel, scale_RGBAhalf(record, 2.0f));
-          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
+          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           break;
       }
     }

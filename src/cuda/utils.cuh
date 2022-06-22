@@ -169,6 +169,7 @@ struct DevicePointers {
 #define REJECT_HIT 0xfffffff0u
 #define TRIANGLE_ID_LIMIT 0xefffffffu
 #define LIGHT_ID_ANY 0xfffffff0u
+#define LIGHT_ID_ANY_NO_SUN 0xfffffff1u
 #define TYPE_CAMERA 0x0u
 #define TYPE_LIGHT 0x1u
 #define TYPE_BOUNCE 0x2u
@@ -259,7 +260,7 @@ __device__ static int is_first_ray() {
 __device__ static bool proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
   return (
     device_iteration_type == TYPE_CAMERA || ((device_iteration_type == TYPE_LIGHT) && (target_light == source_light))
-    || target_light == LIGHT_ID_ANY);
+    || target_light == LIGHT_ID_ANY || (source_light != LIGHT_ID_SUN && target_light == LIGHT_ID_ANY_NO_SUN));
 }
 
 #endif /* CU_UTILS_H */

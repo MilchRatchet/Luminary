@@ -246,7 +246,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
+      uint32_t light_history_buffer_entry = LIGHT_ID_ANY_NO_SUN;
 
       {
         LightSample light = load_light_sample(device.light_samples, pixel);
