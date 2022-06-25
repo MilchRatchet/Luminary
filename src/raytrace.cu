@@ -234,13 +234,17 @@ static void toy_flashlight_set_position(RaytraceInstance* instance) {
  * @param instance RaytraceInstance to be used.
  */
 extern "C" void allocate_buffers(RaytraceInstance* instance) {
-  const unsigned int amount = instance->width * instance->height;
+  const unsigned int amount        = instance->width * instance->height;
+  const unsigned int output_amount = instance->output_width * instance->output_height;
 
   gpuErrchk(cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_output_width, &(instance->output_width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_output_height, &(instance->output_height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_max_ray_depth, &(instance->max_ray_depth), sizeof(int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_reservoir_size, &(instance->reservoir_size), sizeof(int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_amount, &(amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpyToSymbol(device_output_amount, &(output_amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), amount);
@@ -329,8 +333,15 @@ extern "C" RaytraceInstance* init_raytracing(
   RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
   memset(instance, 0, sizeof(RaytraceInstance));
 
-  instance->width  = general.width;
-  instance->height = general.height;
+  instance->width         = general.width;
+  instance->height        = general.height;
+  instance->output_width  = general.width;
+  instance->output_height = general.height;
+
+  if (general.denoiser == DENOISING_UPSCALING) {
+    instance->output_width *= 2;
+    instance->output_height *= 2;
+  }
 
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;
@@ -424,9 +435,16 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
 
   instance->width          = instance->settings.width;
   instance->height         = instance->settings.height;
+  instance->output_width   = instance->settings.width;
+  instance->output_height  = instance->settings.height;
   instance->max_ray_depth  = instance->settings.max_ray_depth;
   instance->denoiser       = instance->settings.denoiser;
   instance->reservoir_size = instance->settings.reservoir_size;
+
+  if (instance->denoiser == DENOISING_UPSCALING) {
+    instance->output_width *= 2;
+    instance->output_height *= 2;
+  }
 
   allocate_buffers(instance);
   allocate_bloom_mips(instance);

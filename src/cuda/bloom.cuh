@@ -186,8 +186,8 @@ __global__ void bloom_upsample(
 }
 
 extern "C" void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst) {
-  const int width  = instance->width;
-  const int height = instance->height;
+  const int width  = instance->output_width;
+  const int height = instance->output_height;
 
   int mip_count_w;
   int mip_count_h;
@@ -224,8 +224,8 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf*
 }
 
 static void allocate_bloom_mips(RaytraceInstance* instance) {
-  int width  = instance->width;
-  int height = instance->height;
+  int width  = instance->output_width;
+  int height = instance->output_height;
 
   instance->bloom_mips_gpu = (RGBAhalf**) malloc(sizeof(RGBAhalf*) * BLOOM_MIP_COUNT);
 
@@ -237,8 +237,8 @@ static void allocate_bloom_mips(RaytraceInstance* instance) {
 }
 
 static void free_bloom_mips(RaytraceInstance* instance) {
-  int width  = instance->width;
-  int height = instance->height;
+  int width  = instance->output_width;
+  int height = instance->output_height;
 
   for (int i = 0; i < BLOOM_MIP_COUNT; i++) {
     width  = width >> 1;
