@@ -64,8 +64,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     device.frame_buffer[pixel]   = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
     device.state_buffer[pixel]   = 0;
 
-    if (device_denoiser && !device_temporal_frames)
+    if (device_denoiser && !device_temporal_frames) {
       device.albedo_buffer[pixel] = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+      device.normal_buffer[pixel] = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+    }
 
     store_trace_task(device.bounce_trace + get_task_address(offset++), task);
   }

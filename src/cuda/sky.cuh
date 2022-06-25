@@ -270,6 +270,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_sky_tasks() {
 
     store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), sky));
     write_albedo_buffer(RGBAhalf_to_RGBF(sky), pixel);
+    write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }
 }
 

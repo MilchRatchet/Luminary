@@ -222,6 +222,21 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
   device.state_buffer[pixel] |= STATE_ALBEDO;
 }
 
+__device__ void write_normal_buffer(vec3 normal, const int pixel) {
+  if (!device_denoiser || device_iteration_type != TYPE_CAMERA || (device_temporal_frames && device_accum_mode == TEMPORAL_ACCUMULATION))
+    return;
+
+  normal = transform_vec4_3(device_view_space, normal);
+
+  const float normal_norm = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
+
+  if (normal_norm > eps) {
+    normal = scale_vector(normal, 1.0f / normal_norm);
+  }
+
+  device.normal_buffer[pixel] = get_RGBAhalf(normal.x, normal.y, normal.z, 0.0f);
+}
+
 __device__ LightEvalData load_light_eval_data(const int offset) {
   const float4 packet = __ldcs((float4*) (device.light_eval_data + offset));
 

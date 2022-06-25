@@ -62,7 +62,7 @@ extern "C" void optix_denoise_create(RaytraceInstance* instance) {
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &denoise_setup->ctx));
 
   denoise_setup->opt.guideAlbedo = 1;
-  denoise_setup->opt.guideNormal = 0;
+  denoise_setup->opt.guideNormal = 1;
 
   OPTIX_CHECK(optixDenoiserCreate(denoise_setup->ctx, kind, &denoise_setup->opt, &denoise_setup->denoiser));
 
@@ -105,6 +105,13 @@ extern "C" void optix_denoise_create(RaytraceInstance* instance) {
   denoise_setup->guide_layer.albedo.rowStrideInBytes   = instance->width * sizeof(RGBAhalf);
   denoise_setup->guide_layer.albedo.pixelStrideInBytes = sizeof(RGBAhalf);
   denoise_setup->guide_layer.albedo.format             = OPTIX_PIXEL_FORMAT_HALF3;
+
+  denoise_setup->guide_layer.normal.data               = (CUdeviceptr) device_buffer_get_pointer(instance->normal_buffer);
+  denoise_setup->guide_layer.normal.width              = instance->width;
+  denoise_setup->guide_layer.normal.height             = instance->height;
+  denoise_setup->guide_layer.normal.rowStrideInBytes   = instance->width * sizeof(RGBAhalf);
+  denoise_setup->guide_layer.normal.pixelStrideInBytes = sizeof(RGBAhalf);
+  denoise_setup->guide_layer.normal.format             = OPTIX_PIXEL_FORMAT_HALF3;
 
   device_buffer_init(&denoise_setup->hdr_intensity);
   device_buffer_malloc(denoise_setup->hdr_intensity, sizeof(float), 1);

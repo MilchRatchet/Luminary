@@ -256,6 +256,7 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
 
   if (instance->denoiser) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBAhalf), amount);
+    device_buffer_malloc(instance->normal_buffer, sizeof(RGBAhalf), amount);
   }
 
   /*
@@ -383,6 +384,7 @@ extern "C" RaytraceInstance* init_raytracing(
   device_buffer_init(&instance->frame_buffer);
   device_buffer_init(&instance->frame_variance);
   device_buffer_init(&instance->albedo_buffer);
+  device_buffer_init(&instance->normal_buffer);
   device_buffer_init(&instance->light_records);
   device_buffer_init(&instance->bounce_records);
   device_buffer_init(&instance->buffer_8bit);
@@ -691,11 +693,12 @@ extern "C" void trace_scene(RaytraceInstance* instance) {
     case TEMPORAL_REPROJECTION:
       device_buffer_copy(instance->frame_output, instance->frame_temporal);
       temporal_reprojection<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      update_temporal_matrix(instance);
       break;
     default:
       break;
   }
+
+  update_temporal_matrix(instance);
 
   gpuErrchk(cudaDeviceSynchronize());
 }
@@ -736,6 +739,7 @@ extern "C" void free_outputs(RaytraceInstance* instance) {
 
   if (instance->denoiser) {
     device_buffer_free(instance->albedo_buffer);
+    device_buffer_free(instance->normal_buffer);
   }
 
   free_bloom_mips(instance);
@@ -843,6 +847,7 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.frame_buffer          = (RGBAhalf*) device_buffer_get_pointer(instance->frame_buffer);
   ptrs.frame_variance        = (RGBAhalf*) device_buffer_get_pointer(instance->frame_variance);
   ptrs.albedo_buffer         = (RGBAhalf*) device_buffer_get_pointer(instance->albedo_buffer);
+  ptrs.normal_buffer         = (RGBAhalf*) device_buffer_get_pointer(instance->normal_buffer);
   ptrs.light_records         = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
   ptrs.bounce_records        = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);
   ptrs.buffer_8bit           = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);

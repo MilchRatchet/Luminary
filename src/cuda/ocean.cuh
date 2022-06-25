@@ -205,6 +205,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       device.frame_buffer[pixel] = RGBF_to_RGBAhalf(emission);
     }
 
+    write_normal_buffer(normal, pixel);
+
     const vec3 V      = scale_vector(ray, -1.0f);
     BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, 0.0f, 1.0f);
 

@@ -353,6 +353,16 @@ __device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
   return res;
 }
 
+__device__ vec3 transform_vec4_3(const Mat4x4 m, const vec3 p) {
+  vec3 res;
+
+  res.x = m.f11 * p.x + m.f12 * p.y + m.f13 * p.z;
+  res.y = m.f21 * p.x + m.f22 * p.y + m.f23 * p.z;
+  res.z = m.f31 * p.x + m.f32 * p.y + m.f33 * p.z;
+
+  return res;
+}
+
 __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
   vec3 res;
 

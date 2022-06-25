@@ -21,6 +21,7 @@ Defines which of the available denoising modes is used:
   - 0 = No denoising
   - 1 = Optix Denoiser
   - 2 = Optix Denoiser with 4x Upscaling
+
 Note that upscaling increases the output image resolution in offline rendering.
 
 `GENERAL OUTPUTFN [STRING]`<br/>

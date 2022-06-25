@@ -132,6 +132,7 @@ struct DevicePointers {
   RGBAhalf* frame_buffer;
   RGBAhalf* frame_variance;
   RGBAhalf* albedo_buffer;
+  RGBAhalf* normal_buffer;
   RGBAhalf* light_records;
   RGBAhalf* bounce_records;
   XRGB8* buffer_8bit;

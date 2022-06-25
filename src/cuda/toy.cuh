@@ -90,6 +90,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       }
     }
 
+    write_normal_buffer(normal, pixel);
+
     const vec3 V      = scale_vector(task.ray, -1.0f);
     BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, roughness, metallic);
 
