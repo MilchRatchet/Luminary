@@ -13,15 +13,6 @@
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 1024
 
-#define OPTIX_CHECK(call)                                                \
-  {                                                                      \
-    OptixResult res = call;                                              \
-                                                                         \
-    if (res != OPTIX_SUCCESS) {                                          \
-      crash_message("Optix returned error %d in call (%s)", res, #call); \
-    }                                                                    \
-  }
-
 #define gpuErrchk(ans)                                         \
   {                                                            \
     if (ans != cudaSuccess) {                                  \

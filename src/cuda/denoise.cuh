@@ -22,6 +22,15 @@ struct OptixDenoiseInstance {
   DeviceBuffer* output;
 } typedef OptixDenoiseInstance;
 
+#define OPTIX_CHECK(call)                                                                                \
+  {                                                                                                      \
+    OptixResult res = call;                                                                              \
+                                                                                                         \
+    if (res != OPTIX_SUCCESS) {                                                                          \
+      crash_message("Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(res), res, #call); \
+    }                                                                                                    \
+  }
+
 extern "C" void optix_denoise_create(RaytraceInstance* instance) {
   OPTIX_CHECK(optixInit());
 
@@ -124,7 +133,7 @@ extern "C" DeviceBuffer* optix_denoise_apply(RaytraceInstance* instance, RGBF* s
     (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserScratch), device_buffer_get_size(denoise_setup->denoiserScratch)));
 
   OptixDenoiserParams denoiserParams;
-  denoiserParams.denoiseAlpha    = 0;
+  denoiserParams.denoiseAlpha    = OPTIX_DENOISER_ALPHA_MODE_COPY;
   denoiserParams.hdrIntensity    = (CUdeviceptr) device_buffer_get_pointer(denoise_setup->hdr_intensity);
   denoiserParams.blendFactor     = 0.0f;
   denoiserParams.hdrAverageColor = (CUdeviceptr) device_buffer_get_pointer(denoise_setup->avg_color);
