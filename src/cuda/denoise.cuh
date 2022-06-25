@@ -40,14 +40,26 @@ extern "C" void optix_denoise_create(RaytraceInstance* instance) {
     return;
   }
 
+  OptixDenoiserModelKind kind;
+
+  switch (instance->denoiser) {
+    case DENOISING_ON:
+      kind = OPTIX_DENOISER_MODEL_KIND_HDR;
+      break;
+    case DENOISING_UPSCALING:
+      kind = OPTIX_DENOISER_MODEL_KIND_UPSCALE2X;
+      break;
+    default:
+      instance->denoiser = DENOISING_OFF;
+      return;
+  }
+
   OptixDenoiseInstance* denoise_setup = (OptixDenoiseInstance*) malloc(sizeof(OptixDenoiseInstance));
 
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &denoise_setup->ctx));
 
   denoise_setup->opt.guideAlbedo = 1;
   denoise_setup->opt.guideNormal = 0;
-
-  OptixDenoiserModelKind kind = OPTIX_DENOISER_MODEL_KIND_HDR;
 
   OPTIX_CHECK(optixDenoiserCreate(denoise_setup->ctx, kind, &denoise_setup->opt, &denoise_setup->denoiser));
 

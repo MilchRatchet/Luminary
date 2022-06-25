@@ -62,6 +62,8 @@ enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJ
 
 enum MaterialFresnel { SCHLICK = 0, FDEZ_AGUERA = 1 } typedef MaterialFresnel;
 
+enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
+
 struct DeviceBuffer {
   void* device_pointer;
   size_t size;
@@ -74,7 +76,7 @@ struct General {
   int samples;
   int max_ray_depth;
   int reservoir_size;
-  int denoiser;
+  DenoisingMode denoiser;
   char** mesh_files;
   int mesh_files_count;
   int mesh_files_length;
@@ -272,7 +274,7 @@ struct RaytraceInstance {
   int reservoir_size;
   int offline_samples;
   Scene scene_gpu;
-  int denoiser;
+  DenoisingMode denoiser;
   int temporal_frames;
   int spatial_samples;
   int spatial_iterations;

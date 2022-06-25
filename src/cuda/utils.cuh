@@ -202,6 +202,12 @@ __constant__ int device_height;
 
 __constant__ int device_amount;
 
+__constant__ int device_output_width;
+
+__constant__ int device_output_height;
+
+__constant__ int device_output_amount;
+
 __constant__ float device_step;
 
 __constant__ float device_vfov;
