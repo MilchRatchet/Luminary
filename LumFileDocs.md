@@ -5,10 +5,10 @@ A scene is decribed by a `*.lum` file. An example can be found in `Example.lum`.
 ## General Settings
 
 `GENERAL WIDTH___ [INT32]`<br/>
-The number of horizontal pixels used for rendering. Number must be strictly greater than 0.
+The number of horizontal pixels used internally for rendering. Number must be strictly greater than 0.
 
 `GENERAL HEIGHT__ [INT32]`<br/>
-The number of vertical pixels used for rendering. Number must be strictly greater than 0.
+The number of vertical pixels used internally for rendering. Number must be strictly greater than 0.
 
 `GENERAL BOUNCES_ [INT32]`<br/>
 This number restricts the number of bounces of the path that is traced for each pixel. Number must be non-negative.
@@ -17,7 +17,11 @@ This number restricts the number of bounces of the path that is traced for each 
 The number of samples to compute per pixel in offline mode. Number must be strictly greater than 0.
 
 `GENERAL DENOISER [INT32]`<br/>
-Set 1 to enable Optix denoising, 0 else.
+Defines which of the available denoising modes is used:
+  - 0 = No denoising
+  - 1 = Optix Denoiser
+  - 2 = Optix Denoiser with 4x Upscaling
+Note that upscaling increases the output image resolution in offline rendering.
 
 `GENERAL OUTPUTFN [STRING]`<br/>
 File name of output image in offline mode. Specified directory must already exist.

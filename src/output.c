@@ -124,7 +124,7 @@ void offline_output(RaytraceInstance* instance) {
     device_buffer_free(denoise_output);
   }
 
-  device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), instance->width * instance->height);
+  device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), instance->output_width * instance->output_height);
   device_buffer_copy(instance->frame_output, instance->frame_buffer);
 
   if (instance->scene_gpu.camera.bloom)
@@ -132,24 +132,24 @@ void offline_output(RaytraceInstance* instance) {
 
   DeviceBuffer* scratch_buffer;
   device_buffer_init(&scratch_buffer);
-  device_buffer_malloc(scratch_buffer, sizeof(XRGB8), instance->width * instance->height);
-  XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
+  device_buffer_malloc(scratch_buffer, sizeof(XRGB8), instance->output_width * instance->output_height);
+  XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->output_width * instance->output_height);
   char* output_path = malloc(4096);
 
   if (instance->post_process_menu) {
     copy_framebuffer_to_8bit(
-      device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->width,
-      instance->height, instance->width);
+      device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
+      instance->output_height, instance->output_width);
 
     switch (instance->image_format) {
       case IMGFORMAT_QOI:
         sprintf(output_path, "%s.qoi1", instance->settings.output_path);
-        store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
+        store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
         break;
       case IMGFORMAT_PNG:
       default:
         sprintf(output_path, "%s.png1", instance->settings.output_path);
-        store_XRGB8_png(output_path, frame, instance->width, instance->height);
+        store_XRGB8_png(output_path, frame, instance->output_width, instance->output_height);
         break;
     }
 
@@ -159,21 +159,21 @@ void offline_output(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_buffer);
 
   copy_framebuffer_to_8bit(
-    device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
-    instance->width);
+    device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
+    instance->output_height, instance->output_width);
 
   device_buffer_destroy(scratch_buffer);
 
   switch (instance->image_format) {
     case IMGFORMAT_QOI:
       sprintf(output_path, "%s.qoi", instance->settings.output_path);
-      store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
+      store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
       info_message("QOI file created.");
       break;
     case IMGFORMAT_PNG:
     default:
       sprintf(output_path, "%s.png", instance->settings.output_path);
-      store_XRGB8_png(output_path, frame, instance->width, instance->height);
+      store_XRGB8_png(output_path, frame, instance->output_width, instance->output_height);
       info_message("PNG file created.");
       break;
   }

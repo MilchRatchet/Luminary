@@ -249,7 +249,7 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->frame_temporal, sizeof(RGBAhalf), amount);
-  device_buffer_malloc(instance->frame_output, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->frame_output, sizeof(RGBAhalf), output_amount);
   device_buffer_malloc(instance->frame_variance, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->light_records, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBAhalf), amount);
@@ -339,8 +339,15 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->output_height = general.height;
 
   if (general.denoiser == DENOISING_UPSCALING) {
-    instance->output_width *= 2;
-    instance->output_height *= 2;
+    if (instance->width * instance->height > 18144000) {
+      error_message(
+        "Internal resolution is too high for denoising with upscaling! The maximum is ~18144000 pixels. Upscaling is turned off!");
+      general.denoiser = DENOISING_ON;
+    }
+    else {
+      instance->output_width *= 2;
+      instance->output_height *= 2;
+    }
   }
 
   instance->max_ray_depth   = general.max_ray_depth;
@@ -442,8 +449,15 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   instance->reservoir_size = instance->settings.reservoir_size;
 
   if (instance->denoiser == DENOISING_UPSCALING) {
-    instance->output_width *= 2;
-    instance->output_height *= 2;
+    if (instance->width * instance->height > 18144000) {
+      error_message(
+        "Internal resolution is too high for denoising with upscaling! The maximum is ~18144000 pixels. Upscaling is turned off!");
+      instance->denoiser = DENOISING_ON;
+    }
+    else {
+      instance->output_width *= 2;
+      instance->output_height *= 2;
+    }
   }
 
   allocate_buffers(instance);

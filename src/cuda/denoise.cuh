@@ -46,9 +46,12 @@ extern "C" void optix_denoise_create(RaytraceInstance* instance) {
     case DENOISING_ON:
       kind = OPTIX_DENOISER_MODEL_KIND_HDR;
       break;
-    case DENOISING_UPSCALING:
+    case DENOISING_UPSCALING: {
+      if (instance->width * instance->height > 18144000) {
+        crash_message("Internal resolution is too high for denoising! The maximum is ~18144000 pixels.");
+      }
       kind = OPTIX_DENOISER_MODEL_KIND_UPSCALE2X;
-      break;
+    } break;
     default:
       instance->denoiser = DENOISING_OFF;
       return;
