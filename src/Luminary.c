@@ -190,9 +190,9 @@ int main(int argc, char* argv[]) {
   if (custom_res) {
     instance->settings.width  = (width) ? width : instance->width;
     instance->settings.height = (height) ? height : instance->height;
-
-    reset_raytracing(instance);
   }
+
+  reset_raytracing(instance);
 
   instance->image_format      = img_format;
   instance->post_process_menu = post_process_menu;

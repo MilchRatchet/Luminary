@@ -214,7 +214,7 @@ extern "C" void* _device_buffer_get_pointer(DeviceBuffer* buffer, char* buf_name
   }
 
   if (!_device_buffer_is_allocated(buffer, buf_name, func, line)) {
-    log_message("Device buffer is unallocated.");
+    print_log("[%s:%d] Device buffer %s is unallocated.", func, line, buf_name);
     return (void*) 0;
   }
 
