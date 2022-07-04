@@ -16,6 +16,7 @@ extern "C" {
 #define device_buffer_free(buffer) _device_buffer_free(buffer, (char*) #buffer, (char*) __func__, __LINE__)
 #define device_buffer_malloc(buffer, element_size, count) \
   _device_buffer_malloc(buffer, element_size, count, (char*) #buffer, (char*) __func__, __LINE__)
+#define device_buffer_zero(buffer) _device_buffer_zero(buffer, (char*) #buffer, (char*) __func__, __LINE__)
 #define device_buffer_upload(buffer, data) _device_buffer_upload(buffer, data, (char*) #buffer, (char*) #data, (char*) __func__, __LINE__)
 #define device_buffer_download(buffer, dest, size) \
   _device_buffer_download(buffer, dest, size, (char*) #buffer, (char*) #dest, (char*) __func__, __LINE__)
@@ -37,6 +38,7 @@ void _device_upload(void* dst, void* src, size_t size, char* dst_name, char* src
 void _device_buffer_init(DeviceBuffer** buffer, char* buf_name, char* func, int line);
 void _device_buffer_free(DeviceBuffer* buffer, char* buf_name, char* func, int line);
 void _device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t count, char* buf_name, char* func, int line);
+void _device_buffer_zero(DeviceBuffer* buffer, char* buf_name, char* func, int line);
 void _device_buffer_upload(DeviceBuffer* buffer, void* data, char* buf_name, char* data_name, char* func, int line);
 void _device_buffer_download(DeviceBuffer* buffer, void* dest, size_t size, char* buf_name, char* dest_name, char* func, int line);
 void _device_buffer_download_full(DeviceBuffer* buffer, void* dest, char* buf_name, char* dest_name, char* func, int line);

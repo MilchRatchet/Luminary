@@ -110,6 +110,22 @@ extern "C" void _device_buffer_malloc(DeviceBuffer* buffer, size_t element_size,
   print_log("[%s:%d] Buffer %s allocated at address %zu with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
 }
 
+extern "C" void _device_buffer_zero(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
+  if (!buffer) {
+    print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
+    return;
+  }
+
+  if (!_device_buffer_is_allocated(buffer, buf_name, func, line)) {
+    print_error("[%s:%d] DeviceBuffer %s is not allocated.", func, line, buf_name);
+    return;
+  }
+
+  gpuBufferErrchk(cudaMemset(buffer->device_pointer, 0, buffer->size), buf_name, func, line);
+
+  print_log("[%s:%d] Buffer %s zeroed at address %zu with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
+}
+
 extern "C" void _device_buffer_upload(DeviceBuffer* buffer, void* data, char* buf_name, char* data_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
