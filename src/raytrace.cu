@@ -69,6 +69,17 @@ static void update_special_lights(const Scene scene) {
 }
 
 /*
+ * Computes whether light resampling is used.
+ * @param instance RaytraceInstance
+ */
+static void raytrace_update_light_resampling_active(RaytraceInstance* instance) {
+  instance->light_resampling =
+    instance->scene_gpu.material.lights_active || (instance->scene_gpu.toy.emissive && instance->scene_gpu.toy.active);
+
+  gpuErrchk(cudaMemcpyToSymbol(device_light_resampling, &(instance->light_resampling), sizeof(int), 0, cudaMemcpyHostToDevice));
+}
+
+/*
  * Computes matrices used for temporal reprojection.
  * @param instance RaytraceInstance to be used.
  */
@@ -288,9 +299,7 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
 
   device_buffer_malloc(instance->light_samples_1, sizeof(LightSample), amount);
 
-  if (
-    instance->realtime || instance->scene_gpu.material.lights_active
-    || (instance->scene_gpu.toy.active && instance->scene_gpu.toy.emissive)) {
+  if (instance->realtime || instance->light_resampling) {
     device_buffer_malloc(instance->light_samples_2, sizeof(LightSample), amount);
     device_buffer_malloc(instance->light_eval_data, sizeof(LightEvalData), amount);
   }
@@ -420,6 +429,7 @@ extern "C" RaytraceInstance* init_raytracing(
   gpuErrchk(cudaMemcpyToSymbol(
     device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment*), 0, cudaMemcpyHostToDevice));
 
+  raytrace_update_light_resampling_active(instance);
   allocate_buffers(instance);
   allocate_bloom_mips(instance);
   update_device_pointers(instance);
@@ -462,6 +472,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
     }
   }
 
+  raytrace_update_light_resampling_active(instance);
   allocate_buffers(instance);
   allocate_bloom_mips(instance);
   update_device_pointers(instance);
@@ -615,9 +626,7 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   }
   process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  if (
-    type != TYPE_LIGHT
-    && (instance->scene_gpu.material.lights_active || (instance->scene_gpu.toy.emissive && instance->scene_gpu.toy.active))) {
+  if (type != TYPE_LIGHT && instance->light_resampling) {
     generate_light_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     if (type == TYPE_CAMERA && instance->scene_gpu.material.lights_active) {
       LightSample* light_samples_1 = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
@@ -668,6 +677,8 @@ static void execute_debug_kernels(RaytraceInstance* instance, int type) {
 
 extern "C" void trace_scene(RaytraceInstance* instance) {
   gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(instance->temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
+
+  raytrace_update_light_resampling_active(instance);
 
   generate_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 

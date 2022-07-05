@@ -276,6 +276,7 @@ struct RaytraceInstance {
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
+  int light_resampling;
   Scene scene_gpu;
   DenoisingMode denoiser;
   int temporal_frames;
