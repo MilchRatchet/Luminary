@@ -426,7 +426,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
     if (device_iteration_type != TYPE_LIGHT) {
-      if (device_light_resampling) {
+      if (device_light_resampling && device_iteration_type == TYPE_CAMERA) {
         LightEvalData light_data;
         light_data.position = task.origin;
         light_data.flags    = 0;
