@@ -223,18 +223,28 @@ __device__ LightSample sample_light(const vec3 position) {
 
   LightSample selected;
   selected.id          = LIGHT_ID_NONE;
-  selected.weight      = 0.0f;
   selected.M           = 0;
   selected.solid_angle = 0.0f;
+  selected.weight      = 0.0f;
 
   if (!light_count)
     return selected;
+
+  const float ran = white_noise();
+
+  if (device_iteration_type != TYPE_CAMERA && sun_visible && ran < 0.5f) {
+    selected.id          = LIGHT_ID_SUN;
+    selected.M           = 1;
+    selected.solid_angle = brdf_light_sample_solid_angle(selected, position);
+    selected.weight      = 2.0f * brdf_light_sample_target_weight(selected);
+
+    return selected;
+  }
 
   const int reservoir_sampling_size = min(light_count, device_reservoir_size);
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
 
-  const float ran     = white_noise();
   uint32_t ran_weight = (uint32_t) (ran * ((uint32_t) 0xffff));
 
   for (int i = 0; i < reservoir_sampling_size; i++) {

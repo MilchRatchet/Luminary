@@ -626,9 +626,9 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
   }
   process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  if (type == TYPE_CAMERA && instance->light_resampling) {
+  if (type != TYPE_LIGHT && instance->light_resampling) {
     generate_light_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    if (instance->scene_gpu.material.lights_active) {
+    if (type == TYPE_CAMERA && instance->scene_gpu.material.lights_active) {
       LightSample* light_samples_1 = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
       LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
       for (int i = 0; i < instance->spatial_iterations; i++) {
