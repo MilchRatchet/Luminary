@@ -294,7 +294,6 @@ struct RaytraceInstance {
   int accum_mode;
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
-  DeviceBuffer* trace_result_temporal;
   DeviceBuffer* state_buffer;
 } typedef RaytraceInstance;
 

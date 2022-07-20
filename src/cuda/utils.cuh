@@ -138,7 +138,6 @@ struct DevicePointers {
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
   TraceResult* trace_result_buffer;
-  TraceResult* trace_result_temporal;
   uint8_t* state_buffer;
   curandStateXORWOW_t* randoms;
   cudaTextureObject_t* albedo_atlas;

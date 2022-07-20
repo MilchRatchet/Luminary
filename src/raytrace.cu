@@ -294,7 +294,6 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->light_sample_history, sizeof(uint32_t), amount);
   device_buffer_malloc(instance->raydir_buffer, sizeof(vec3), amount);
   device_buffer_malloc(instance->trace_result_buffer, sizeof(TraceResult), amount);
-  device_buffer_malloc(instance->trace_result_temporal, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
 
   device_buffer_malloc(instance->light_samples_1, sizeof(LightSample), amount);
@@ -400,7 +399,6 @@ extern "C" RaytraceInstance* init_raytracing(
   device_buffer_init(&instance->randoms);
   device_buffer_init(&instance->raydir_buffer);
   device_buffer_init(&instance->trace_result_buffer);
-  device_buffer_init(&instance->trace_result_temporal);
   device_buffer_init(&instance->state_buffer);
   device_buffer_init(&instance->light_samples_1);
   device_buffer_init(&instance->light_samples_2);
@@ -577,7 +575,6 @@ extern "C" void prepare_trace(RaytraceInstance* instance) {
   }
   update_device_scene(instance);
   gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-  device_buffer_copy(instance->trace_result_buffer, instance->trace_result_temporal);
   update_special_lights(instance->scene_gpu);
   update_camera_pos(instance->scene_gpu, instance->width, instance->height);
   update_jitter(instance);
@@ -736,7 +733,6 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   device_buffer_free(instance->light_sample_history);
   device_buffer_free(instance->raydir_buffer);
   device_buffer_free(instance->trace_result_buffer);
-  device_buffer_free(instance->trace_result_temporal);
   device_buffer_free(instance->state_buffer);
   device_buffer_free(instance->light_samples_1);
   device_buffer_free(instance->light_samples_2);
@@ -845,33 +841,32 @@ extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
 extern "C" void update_device_pointers(RaytraceInstance* instance) {
   DevicePointers ptrs;
 
-  ptrs.light_trace           = (TraceTask*) device_buffer_get_pointer(instance->light_trace);
-  ptrs.bounce_trace          = (TraceTask*) device_buffer_get_pointer(instance->bounce_trace);
-  ptrs.light_trace_count     = (uint16_t*) device_buffer_get_pointer(instance->light_trace_count);
-  ptrs.bounce_trace_count    = (uint16_t*) device_buffer_get_pointer(instance->bounce_trace_count);
-  ptrs.trace_results         = (TraceResult*) device_buffer_get_pointer(instance->trace_results);
-  ptrs.task_counts           = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
-  ptrs.task_offsets          = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
-  ptrs.light_sample_history  = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
-  ptrs.frame_output          = (RGBAhalf*) device_buffer_get_pointer(instance->frame_output);
-  ptrs.frame_temporal        = (RGBAhalf*) device_buffer_get_pointer(instance->frame_temporal);
-  ptrs.frame_buffer          = (RGBAhalf*) device_buffer_get_pointer(instance->frame_buffer);
-  ptrs.frame_variance        = (RGBAhalf*) device_buffer_get_pointer(instance->frame_variance);
-  ptrs.albedo_buffer         = (RGBAhalf*) device_buffer_get_pointer(instance->albedo_buffer);
-  ptrs.normal_buffer         = (RGBAhalf*) device_buffer_get_pointer(instance->normal_buffer);
-  ptrs.light_records         = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
-  ptrs.bounce_records        = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);
-  ptrs.buffer_8bit           = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
-  ptrs.albedo_atlas          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->albedo_atlas);
-  ptrs.illuminance_atlas     = (cudaTextureObject_t*) device_buffer_get_pointer(instance->illuminance_atlas);
-  ptrs.material_atlas        = (cudaTextureObject_t*) device_buffer_get_pointer(instance->material_atlas);
-  ptrs.randoms               = (curandStateXORWOW_t*) device_buffer_get_pointer(instance->randoms);
-  ptrs.raydir_buffer         = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
-  ptrs.trace_result_buffer   = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
-  ptrs.trace_result_temporal = (TraceResult*) device_buffer_get_pointer(instance->trace_result_temporal);
-  ptrs.state_buffer          = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
-  ptrs.light_samples         = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
-  ptrs.light_eval_data       = (LightEvalData*) device_buffer_get_pointer(instance->light_eval_data);
+  ptrs.light_trace          = (TraceTask*) device_buffer_get_pointer(instance->light_trace);
+  ptrs.bounce_trace         = (TraceTask*) device_buffer_get_pointer(instance->bounce_trace);
+  ptrs.light_trace_count    = (uint16_t*) device_buffer_get_pointer(instance->light_trace_count);
+  ptrs.bounce_trace_count   = (uint16_t*) device_buffer_get_pointer(instance->bounce_trace_count);
+  ptrs.trace_results        = (TraceResult*) device_buffer_get_pointer(instance->trace_results);
+  ptrs.task_counts          = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
+  ptrs.task_offsets         = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
+  ptrs.light_sample_history = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
+  ptrs.frame_output         = (RGBAhalf*) device_buffer_get_pointer(instance->frame_output);
+  ptrs.frame_temporal       = (RGBAhalf*) device_buffer_get_pointer(instance->frame_temporal);
+  ptrs.frame_buffer         = (RGBAhalf*) device_buffer_get_pointer(instance->frame_buffer);
+  ptrs.frame_variance       = (RGBAhalf*) device_buffer_get_pointer(instance->frame_variance);
+  ptrs.albedo_buffer        = (RGBAhalf*) device_buffer_get_pointer(instance->albedo_buffer);
+  ptrs.normal_buffer        = (RGBAhalf*) device_buffer_get_pointer(instance->normal_buffer);
+  ptrs.light_records        = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
+  ptrs.bounce_records       = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);
+  ptrs.buffer_8bit          = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
+  ptrs.albedo_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->albedo_atlas);
+  ptrs.illuminance_atlas    = (cudaTextureObject_t*) device_buffer_get_pointer(instance->illuminance_atlas);
+  ptrs.material_atlas       = (cudaTextureObject_t*) device_buffer_get_pointer(instance->material_atlas);
+  ptrs.randoms              = (curandStateXORWOW_t*) device_buffer_get_pointer(instance->randoms);
+  ptrs.raydir_buffer        = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
+  ptrs.trace_result_buffer  = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
+  ptrs.state_buffer         = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
+  ptrs.light_samples        = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
+  ptrs.light_eval_data      = (LightEvalData*) device_buffer_get_pointer(instance->light_eval_data);
 
   gpuErrchk(cudaMemcpyToSymbol(device, &(ptrs), sizeof(DevicePointers), 0, cudaMemcpyHostToDevice));
   log_message("Updated device pointers.");

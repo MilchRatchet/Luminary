@@ -169,7 +169,7 @@ extern "C" void _device_buffer_download(
   }
 
   gpuBufferErrchk(cudaMemcpy(dest, buffer->device_pointer, size, cudaMemcpyDeviceToHost), buf_name, func, line);
-  print_log("[%s:%d] Copied %zu bytes from device buffer %s to host %s.", func, line, size, buf_name, dest_name);
+  // print_log("[%s:%d] Copied %zu bytes from device buffer %s to host %s.", func, line, size, buf_name, dest_name);
 }
 
 extern "C" void _device_buffer_download_full(DeviceBuffer* buffer, void* dest, char* buf_name, char* dest_name, char* func, int line) {
