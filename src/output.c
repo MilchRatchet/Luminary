@@ -223,10 +223,13 @@ static void make_snapshot(RaytraceInstance* instance, WindowInstance* window) {
       height = window->height;
       break;
     case SNAP_RESOLUTION_RENDER:
-      width  = instance->width;
-      height = instance->height;
+      width  = instance->output_width;
+      height = instance->output_height;
       buffer = malloc(sizeof(XRGB8) * width * height);
-      copy_framebuffer_to_8bit(instance->frame_final_device, device_buffer_get_pointer(window->gpu_buffer), buffer, width, height, width);
+      void* gpu_scratch;
+      device_malloc(&gpu_scratch, sizeof(XRGB8) * width * height);
+      copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, buffer, width, height, width);
+      device_free(gpu_scratch, sizeof(XRGB8) * width * height);
       break;
     default:
       free(filename);

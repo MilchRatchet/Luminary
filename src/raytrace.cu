@@ -770,7 +770,7 @@ extern "C" void free_8bit_frame(RaytraceInstance* instance) {
 extern "C" void copy_framebuffer_to_8bit(
   RGBAhalf* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld) {
   convert_RGBhalf_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((RGBAhalf*) gpu_source, gpu_scratch, width, height, ld);
-  cudaMemcpy(cpu_dest, gpu_scratch, sizeof(XRGB8) * ld * height, cudaMemcpyDeviceToHost);
+  gpuErrchk(cudaMemcpy(cpu_dest, gpu_scratch, sizeof(XRGB8) * ld * height, cudaMemcpyDeviceToHost));
 }
 
 extern "C" void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size) {
