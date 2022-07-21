@@ -213,15 +213,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
     if (white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
-      record.r *= (albedo.r * albedo.a + 1.0f - albedo.a);
-      record.g *= (albedo.g * albedo.a + 1.0f - albedo.a);
-      record.b *= (albedo.b * albedo.a + 1.0f - albedo.a);
-
       const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
 
       brdf = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
 
-      RGBAhalf alpha_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), brdf.term);
+      RGBAhalf alpha_record = RGBF_to_RGBAhalf(record);
 
       TraceTask new_task;
       new_task.origin = task.position;
@@ -232,15 +228,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       switch (device_iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          device.bounce_records[pixel] = alpha_record;
+          store_RGBAhalf(device.bounce_records + pixel, alpha_record);
           store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
           if (white_noise() > 0.5f)
             break;
-          device.light_records[pixel] = scale_RGBAhalf(alpha_record, 2.0f);
-          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
+          store_RGBAhalf(device.light_records + pixel, scale_RGBAhalf(alpha_record, 2.0f));
           store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
+          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           break;
       }
     }

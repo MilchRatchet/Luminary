@@ -98,13 +98,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     if (albedo.a < 1.0f && white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps));
 
-      RGBF record_alpha_factor;
-
-      record_alpha_factor.r = (albedo.r * albedo.a + 1.0f - albedo.a);
-      record_alpha_factor.g = (albedo.g * albedo.a + 1.0f - albedo.a);
-      record_alpha_factor.b = (albedo.b * albedo.a + 1.0f - albedo.a);
-
-      brdf.term = mul_RGBAhalf(brdf.term, RGBF_to_RGBAhalf(record_alpha_factor));
+      brdf.term = mul_RGBAhalf(brdf.term, RGBF_to_RGBAhalf(opaque_color(albedo)));
 
       if (device_scene.toy.refractive_index != 1.0f) {
         const float alpha = blue_noise(task.index.x, task.index.y, task.state, 2);

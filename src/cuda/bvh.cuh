@@ -361,18 +361,8 @@ __device__ void traverse_bvh(const bool check_alpha) {
           const float d = bvh_triangle_intersection(triangle, origin, ray);
 
           if (d < depth) {
-            if (device_iteration_type == TYPE_LIGHT) {
-              depth           = -1.0f;
-              hit_id          = REJECT_HIT;
-              triangle_task.y = 0;
-              node_task.y     = 0;
-              stack_ptr       = 0;
-              break;
-            }
-            else {
-              depth  = d;
-              hit_id = triangle_index + triangle_task.x;
-            }
+            depth  = d;
+            hit_id = triangle_index + triangle_task.x;
           }
         }
       }

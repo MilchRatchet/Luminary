@@ -276,7 +276,7 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
    * we have to be able to handle twice the pixels per thread than normally necessary
    */
   const int thread_count      = THREADS_PER_BLOCK * BLOCKS_PER_GRID;
-  const int pixels_per_thread = 2 * (amount + thread_count - 1) / thread_count;
+  const int pixels_per_thread = (amount + thread_count - 1) / thread_count;
   const int max_task_count    = pixels_per_thread * thread_count;
 
   gpuErrchk(cudaMemcpyToSymbol(device_pixels_per_thread, &(pixels_per_thread), sizeof(int), 0, cudaMemcpyHostToDevice));
