@@ -1,3 +1,6 @@
+#ifndef CU_CLOUDGEN_H
+#define CU_CLOUDGEN_H
+
 #include <cuda_runtime_api.h>
 #include <float.h>
 #include <math.h>
@@ -425,3 +428,5 @@ __global__ void generate_curl_noise(const int dim, uint8_t* tex) {
 #define CLOUD_DETAIL_RES 32
 #define CLOUD_WEATHER_RES 1024
 #define CLOUD_CURL_RES 128
+
+#endif /* CU_CLOUDGEN_H */

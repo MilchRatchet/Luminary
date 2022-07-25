@@ -1,3 +1,6 @@
+#ifndef CU_GEOMETRY_H
+#define CU_GEOMETRY_H
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks() {
   const int task_count   = device.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
   int light_trace_count  = device.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
@@ -394,3 +397,5 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
     }
   }
 }
+
+#endif /* CU_GEOMETRY_H */

@@ -1,3 +1,6 @@
+#ifndef CU_TEMPORAL_H
+#define CU_TEMPORAL_H
+
 #include "image.h"
 #include "utils.cuh"
 
@@ -201,3 +204,5 @@ __global__ void temporal_reprojection() {
     // device.frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));
   }
 }
+
+#endif /* CU_TEMPORAL_H */
