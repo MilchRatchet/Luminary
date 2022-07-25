@@ -270,11 +270,6 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
     device_buffer_malloc(instance->normal_buffer, sizeof(RGBAhalf), amount);
   }
 
-  /*
-   * Due to transparency causing light rays to create more light rays and the fact
-   * that pixels may be assigned to different threads in each iteration
-   * we have to be able to handle twice the pixels per thread than normally necessary
-   */
   const int thread_count      = THREADS_PER_BLOCK * BLOCKS_PER_GRID;
   const int pixels_per_thread = (amount + thread_count - 1) / thread_count;
   const int max_task_count    = pixels_per_thread * thread_count;
