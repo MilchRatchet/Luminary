@@ -188,7 +188,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    const vec3 normal = ocean_get_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+    const vec3 normal = ocean_get_normal(task.position, fmaxf(eps, task.distance / device_width));
 
     RGBAF albedo = device_scene.ocean.albedo;
     RGBF record  = RGBAhalf_to_RGBF(device_records[pixel]);
@@ -311,7 +311,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
       device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
     else if (device_shading_mode == SHADING_NORMAL) {
-      vec3 normal = ocean_get_normal(task.position, fmaxf(0.1f * eps, task.distance * 0.1f / device_width));
+      vec3 normal = ocean_get_normal(task.position, fmaxf(eps, task.distance / device_width));
 
       normal.x = 0.5f * normal.x + 0.5f;
       normal.y = 0.5f * normal.y + 0.5f;
