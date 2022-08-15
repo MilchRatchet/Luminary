@@ -279,7 +279,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
     cos_angle_sun, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering, device_scene.sky.cloud.lobe_lerp);
 
   RGBF sun_color = sky_get_color(add_vector(origin, scale_vector(ray, start)), ray_sun, FLT_MAX, true);
-  sun_color      = scale_color(sun_color, light_angle * scattering_sun);
+  sun_color      = scale_color(sun_color, 0.25f * ONE_OVER_PI * light_angle * scattering_sun);
 
   const float ambient_r1 = PI * blue_noise(0, 0, 0, device_temporal_frames);
   const float ambient_r2 = 2.0f * PI * blue_noise(0, 0, 0, device_temporal_frames + 1);
