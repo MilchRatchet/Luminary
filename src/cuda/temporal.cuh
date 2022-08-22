@@ -1,7 +1,7 @@
 #ifndef CU_TEMPORAL_H
 #define CU_TEMPORAL_H
 
-#include "image.h"
+#include "structs.h"
 #include "utils.cuh"
 
 /*

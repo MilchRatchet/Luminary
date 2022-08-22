@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "texture.h"
+#include "structs.h"
 
 #if __cplusplus
 extern "C" {

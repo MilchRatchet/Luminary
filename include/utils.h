@@ -9,11 +9,8 @@
 #endif
 
 #include "bvh.h"
-#include "image.h"
 #include "log.h"
-#include "mesh.h"
-#include "primitives.h"
-#include "texture.h"
+#include "structs.h"
 
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) (void) (x);

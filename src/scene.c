@@ -743,9 +743,9 @@ RaytraceInstance* load_scene(const char* filename) {
 
   process_lights(&scene, content.illuminance_maps);
 
-  DeviceBuffer* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
-  DeviceBuffer* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
-  DeviceBuffer* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
+  DeviceBuffer* albedo_atlas      = cudatexture_allocate_to_buffer(content.albedo_maps, content.albedo_maps_length);
+  DeviceBuffer* illuminance_atlas = cudatexture_allocate_to_buffer(content.illuminance_maps, content.illuminance_maps_length);
+  DeviceBuffer* material_atlas    = cudatexture_allocate_to_buffer(content.material_maps, content.material_maps_length);
 
   RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
@@ -778,9 +778,9 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   process_lights(&scene, content.illuminance_maps);
 
-  DeviceBuffer* albedo_atlas      = initialize_textures(content.albedo_maps, content.albedo_maps_length);
-  DeviceBuffer* illuminance_atlas = initialize_textures(content.illuminance_maps, content.illuminance_maps_length);
-  DeviceBuffer* material_atlas    = initialize_textures(content.material_maps, content.material_maps_length);
+  DeviceBuffer* albedo_atlas      = cudatexture_allocate_to_buffer(content.albedo_maps, content.albedo_maps_length);
+  DeviceBuffer* illuminance_atlas = cudatexture_allocate_to_buffer(content.illuminance_maps, content.illuminance_maps_length);
+  DeviceBuffer* material_atlas    = cudatexture_allocate_to_buffer(content.material_maps, content.material_maps_length);
 
   RaytraceInstance* instance = init_raytracing(
     general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
@@ -1054,9 +1054,9 @@ void serialize_scene(RaytraceInstance* instance) {
 }
 
 void free_atlases(RaytraceInstance* instance) {
-  free_textures_atlas(instance->albedo_atlas, instance->albedo_atlas_length);
-  free_textures_atlas(instance->illuminance_atlas, instance->illuminance_atlas_length);
-  free_textures_atlas(instance->material_atlas, instance->material_atlas_length);
+  cudatexture_free_buffer(instance->albedo_atlas, instance->albedo_atlas_length);
+  cudatexture_free_buffer(instance->illuminance_atlas, instance->illuminance_atlas_length);
+  cudatexture_free_buffer(instance->material_atlas, instance->material_atlas_length);
 }
 
 void free_strings(RaytraceInstance* instance) {

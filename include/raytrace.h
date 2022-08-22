@@ -3,10 +3,8 @@
 
 #include <stdint.h>
 
-#include "image.h"
-#include "primitives.h"
 #include "scene.h"
-#include "texture.h"
+#include "structs.h"
 #include "utils.h"
 
 #if __cplusplus
@@ -29,8 +27,8 @@ void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);
 void generate_clouds(RaytraceInstance* instance);
-DeviceBuffer* initialize_textures(TextureRGBA* textures, const int textures_length);
-void free_textures_atlas(DeviceBuffer* texture_atlas, const int textures_length);
+DeviceBuffer* cudatexture_allocate_to_buffer(TextureRGBA* textures, const int textures_length);
+void cudatexture_free_buffer(DeviceBuffer* texture_atlas, const int textures_length);
 void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height);
 void free_8bit_frame(RaytraceInstance* instance);
 void copy_framebuffer_to_8bit(RGBAhalf* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);

@@ -8,8 +8,7 @@
 #include <string.h>
 
 #include "bench.h"
-#include "mesh.h"
-#include "primitives.h"
+#include "structs.h"
 #include "utils.h"
 
 /*

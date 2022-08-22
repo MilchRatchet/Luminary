@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 
-#include "mesh.h"
-#include "primitives.h"
+#include "structs.h"
 
 struct compressed_vec3 {
   uint8_t x;

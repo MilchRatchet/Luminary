@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "texture.h"
+#include "structs.h"
 
 #define PNG_COLORTYPE_GRAYSCALE 0
 #define PNG_COLORTYPE_TRUECOLOR 2

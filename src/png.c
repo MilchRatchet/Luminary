@@ -7,7 +7,7 @@
 
 #include "bench.h"
 #include "log.h"
-#include "texture.h"
+#include "structs.h"
 #include "utils.h"
 #include "zlib/zlib.h"
 

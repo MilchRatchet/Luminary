@@ -179,13 +179,13 @@ RaytraceInstance* load_baked(const char* filename) {
   fread(scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length, 1, file);
 
   TextureRGBA* albedo_tex = load_textures(file, instance->albedo_atlas_length, head[7]);
-  void* albedo_atlas      = initialize_textures(albedo_tex, instance->albedo_atlas_length);
+  void* albedo_atlas      = cudatexture_allocate_to_buffer(albedo_tex, instance->albedo_atlas_length);
   free_textures(albedo_tex, instance->albedo_atlas_length);
   TextureRGBA* illuminance_tex = load_textures(file, instance->illuminance_atlas_length, head[8]);
-  void* illuminance_atlas      = initialize_textures(illuminance_tex, instance->illuminance_atlas_length);
+  void* illuminance_atlas      = cudatexture_allocate_to_buffer(illuminance_tex, instance->illuminance_atlas_length);
   free_textures(illuminance_tex, instance->illuminance_atlas_length);
   TextureRGBA* material_tex = load_textures(file, instance->material_atlas_length, head[9]);
-  void* material_atlas      = initialize_textures(material_tex, instance->material_atlas_length);
+  void* material_atlas      = cudatexture_allocate_to_buffer(material_tex, instance->material_atlas_length);
   free_textures(material_tex, instance->material_atlas_length);
 
   scene.traversal_triangles = construct_traversal_triangles(scene.triangles, scene.triangles_length, scene.texture_assignments);

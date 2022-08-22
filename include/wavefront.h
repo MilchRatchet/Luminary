@@ -4,8 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "mesh.h"
-#include "texture.h"
+#include "structs.h"
 
 struct Wavefront_Vertex {
   float x;

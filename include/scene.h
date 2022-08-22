@@ -2,9 +2,7 @@
 #define SCENE_H
 
 #include "bvh.h"
-#include "mesh.h"
-#include "primitives.h"
-#include "texture.h"
+#include "structs.h"
 #include "utils.h"
 
 RaytraceInstance* load_scene(const char* filename);

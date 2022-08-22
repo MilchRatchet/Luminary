@@ -32,21 +32,6 @@
 #define SKY_ATMO_HEIGHT 100.0f
 #define SKY_ATMO_RADIUS SKY_ATMO_HEIGHT + SKY_EARTH_RADIUS
 
-#ifndef PRIMITIVES_H
-struct vec3 {
-  float x;
-  float y;
-  float z;
-} typedef vec3;
-
-struct Quaternion {
-  float w;
-  float x;
-  float y;
-  float z;
-} typedef Quaternion;
-#endif
-
 struct LightSample {
   uint32_t id;
   uint32_t M;

@@ -5,7 +5,7 @@
 #include <stdlib.h>
 
 #include "bench.h"
-#include "texture.h"
+#include "structs.h"
 #include "utils.h"
 
 static int min_3_float_to_int(float a, float b, float c) {

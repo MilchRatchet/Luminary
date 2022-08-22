@@ -17,6 +17,7 @@
 #include "cuda/brdf_unittest.cuh"
 #include "cuda/bvh.cuh"
 #include "cuda/cloudgen.cuh"
+#include "cuda/cudatexture.cuh"
 #include "cuda/denoise.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/kernels.cuh"
@@ -25,13 +26,11 @@
 #include "cuda/random.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/utils.cuh"
-#include "image.h"
 #include "log.h"
-#include "mesh.h"
-#include "primitives.h"
 #include "qoi.h"
 #include "raytrace.h"
 #include "scene.h"
+#include "structs.h"
 #include "utils.h"
 
 //---------------------------------
@@ -480,55 +479,6 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
   log_message("Reset raytrace instance.");
 }
 
-extern "C" DeviceBuffer* initialize_textures(TextureRGBA* textures, const int textures_length) {
-  cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
-  DeviceBuffer* textures_gpu;
-
-  device_buffer_init(&textures_gpu);
-  device_buffer_malloc(textures_gpu, sizeof(cudaTextureObject_t), textures_length);
-
-  for (int i = 0; i < textures_length; i++) {
-    TextureRGBA texture = textures[i];
-
-    const size_t pixel_size = (texture.type == TexDataFP32) ? sizeof(RGBAF) : sizeof(RGBA8);
-
-    struct cudaTextureDesc texDesc;
-    memset(&texDesc, 0, sizeof(texDesc));
-    texDesc.addressMode[0]   = cudaAddressModeWrap;
-    texDesc.addressMode[1]   = cudaAddressModeWrap;
-    texDesc.filterMode       = cudaFilterModeLinear;
-    texDesc.maxAnisotropy    = 16;
-    texDesc.readMode         = (texture.type == TexDataFP32) ? cudaReadModeElementType : cudaReadModeNormalizedFloat;
-    texDesc.normalizedCoords = 1;
-
-    const unsigned int width  = texture.width;
-    const unsigned int height = texture.height;
-    const unsigned int pitch  = texture.pitch;
-
-    void* data = (void*) texture.data;
-    void* data_gpu;
-    size_t pitch_gpu = device_malloc_pitch((void**) &data_gpu, pitch * pixel_size, height);
-    gpuErrchk(cudaMemcpy2D(data_gpu, pitch_gpu, data, pitch * pixel_size, width * pixel_size, height, cudaMemcpyHostToDevice));
-
-    struct cudaResourceDesc resDesc;
-    memset(&resDesc, 0, sizeof(resDesc));
-    resDesc.resType                  = cudaResourceTypePitch2D;
-    resDesc.res.pitch2D.devPtr       = data_gpu;
-    resDesc.res.pitch2D.width        = width;
-    resDesc.res.pitch2D.height       = height;
-    resDesc.res.pitch2D.desc         = cudaCreateChannelDesc<uchar4>();
-    resDesc.res.pitch2D.pitchInBytes = pitch_gpu;
-
-    gpuErrchk(cudaCreateTextureObject(textures_cpu + i, &resDesc, &texDesc, NULL));
-  }
-
-  device_buffer_upload(textures_gpu, textures_cpu);
-
-  free(textures_cpu);
-
-  return textures_gpu;
-}
-
 extern "C" void initialize_device() {
   gpuErrchk(cudaSetDeviceFlags(cudaDeviceMapHost));
 
@@ -542,18 +492,6 @@ extern "C" void initialize_device() {
   print_info("Compiled using %s on %s", LUMINARY_COMPILER, LUMINARY_OS);
   print_info("CUDA Version %s OptiX Version %s", LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
   print_info("Copyright (c) 2022 MilchRatchet");
-}
-
-extern "C" void free_textures_atlas(DeviceBuffer* texture_atlas, const int textures_length) {
-  cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(device_buffer_get_size(texture_atlas));
-  device_buffer_download_full(texture_atlas, textures_cpu);
-
-  for (int i = 0; i < textures_length; i++) {
-    gpuErrchk(cudaDestroyTextureObject(textures_cpu[i]));
-  }
-
-  device_buffer_destroy(texture_atlas);
-  free(textures_cpu);
 }
 
 extern "C" void update_device_scene(RaytraceInstance* instance) {

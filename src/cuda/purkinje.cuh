@@ -13,7 +13,7 @@
  * The LMS to sRGB transformation could be optimized but it does not really matter.
  */
 
-#include "image.h"
+#include "structs.h"
 #include "math.cuh"
 
 __device__ RGBF purkinje_shift(RGBF pixel) {

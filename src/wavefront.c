@@ -10,7 +10,7 @@
 #include "bench.h"
 #include "log.h"
 #include "png.h"
-#include "texture.h"
+#include "structs.h"
 #include "utils.h"
 
 #define LINE_SIZE 4096
