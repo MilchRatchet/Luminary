@@ -59,6 +59,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
     textures[i].width  = width;
     textures[i].height = height;
     textures[i].type   = TexDataUINT8;
+    textures[i].gpu    = 0;
 
     textures[i].data = (void*) ((uint64_t) (data_size));
     total_length += data_size;
@@ -197,7 +198,6 @@ RaytraceInstance* load_baked(const char* filename) {
   final->scene_gpu.sky.stars             = (Star*) 0;
   final->scene_gpu.sky.cloud.initialized = 0;
   generate_stars(final);
-  generate_clouds(final);
 
   uint64_t strings_count = head[10];
   char** strings         = load_strings(file, strings_count, head[11]);

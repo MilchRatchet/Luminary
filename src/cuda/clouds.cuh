@@ -9,58 +9,6 @@
  * The code of this file is based on the cloud rendering in https://github.com/turanszkij/WickedEngine.
  */
 
-__device__ float4 sample_noise_texture_2D(const uint8_t* texture, vec3 p, const int dim) {
-  uchar4* src = (uchar4*) texture;
-
-  p.x = dim * fractf(p.x);
-  p.z = dim * fractf(p.z);
-
-  int x0 = floorf(p.x);
-  int z0 = floorf(p.z);
-  int x1 = x0 + 1;
-  int z1 = z0 + 1;
-
-  x1 -= (x1 == dim) ? dim : 0;
-  z1 -= (z1 == dim) ? dim : 0;
-
-  float sx = p.x - x0;
-  float sz = p.z - z0;
-
-#define addr(x, z) (x + z * dim)
-
-  uchar4 v00 = __ldg(src + addr(x0, z0));
-  uchar4 v10 = __ldg(src + addr(x1, z0));
-  uchar4 v01 = __ldg(src + addr(x0, z1));
-  uchar4 v11 = __ldg(src + addr(x1, z1));
-
-#undef addr
-
-#define __floatify(a) make_float4(a.x, a.y, a.z, a.w)
-
-  float4 f00 = __floatify(v00);
-  float4 f10 = __floatify(v10);
-  float4 f01 = __floatify(v01);
-  float4 f11 = __floatify(v11);
-
-#undef __floatify
-
-#define __interp_vals(a, b, s) (make_float4(a.x + (b.x - a.x) * s, a.y + (b.y - a.y) * s, a.z + (b.z - a.z) * s, a.w + (b.w - a.w) * s))
-
-  float4 xy0 = __interp_vals(f00, f10, sx);
-  float4 xy1 = __interp_vals(f01, f11, sx);
-
-  float4 xyz = __interp_vals(xy0, xy1, sz);
-
-#undef __interp_vals
-
-  xyz.x *= 1.0f / 255.0f;
-  xyz.y *= 1.0f / 255.0f;
-  xyz.z *= 1.0f / 255.0f;
-  xyz.w *= 1.0f / 255.0f;
-
-  return xyz;
-}
-
 __device__ float4 sample_noise_texture_3D(const uint8_t* texture, vec3 p, const int dim) {
   uchar4* src = (uchar4*) texture;
 
@@ -150,8 +98,9 @@ __device__ vec3 cloud_weather(vec3 pos, float height) {
   pos.x += device_scene.sky.cloud.offset_x;
   pos.z += device_scene.sky.cloud.offset_z;
 
-  float4 weather = sample_noise_texture_2D(
-    device_scene.sky.cloud.weather_map, scale_vector(pos, 0.025f * device_scene.sky.cloud.noise_weather_scale), CLOUD_WEATHER_RES);
+  const float weather_sample_scale = 0.025f * device_scene.sky.cloud.noise_curl_scale;
+
+  float4 weather = tex2D<float4>(device.cloud_noise[0], pos.x * weather_sample_scale, pos.z * weather_sample_scale);
 
   weather.x = powf(fabsf(weather.x), __saturatef(remap(height * 3.0f, 0.7f, 0.8f, 1.0f, lerp(1.0f, 0.5f, device_scene.sky.cloud.anvil))));
 
@@ -198,8 +147,9 @@ __device__ float cloud_density(vec3 pos, const float height, const vec3 weather)
   density = __saturatef(density - (1.0f - weather.x)) * weather.x;
 
   if (density > 0.0f) {
-    float4 curl = sample_noise_texture_2D(
-      device_scene.sky.cloud.curl_noise, scale_vector(pos, 3.0f * device_scene.sky.cloud.noise_curl_scale), CLOUD_CURL_RES);
+    const float curl_sample_scale = 3.0f * device_scene.sky.cloud.noise_curl_scale;
+
+    float4 curl = tex2D<float4>(device.cloud_noise[1], pos.x * curl_sample_scale, pos.z * curl_sample_scale);
 
     pos.x += 2.0f * (curl.x - 0.5f) * height * 0.55f;
     pos.y += 2.0f * (curl.z - 0.5f) * height * 0.55f;

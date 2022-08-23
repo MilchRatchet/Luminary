@@ -26,7 +26,7 @@ void trace_scene(RaytraceInstance* instance);
 void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst);
 void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);
-void generate_clouds(RaytraceInstance* instance);
+void clouds_generate(RaytraceInstance* instance);
 DeviceBuffer* cudatexture_allocate_to_buffer(TextureRGBA* textures, const int textures_length);
 void cudatexture_free_buffer(DeviceBuffer* texture_atlas, const int textures_length);
 void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height);

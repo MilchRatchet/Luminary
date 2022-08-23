@@ -300,36 +300,6 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }
 
-void generate_clouds(RaytraceInstance* instance) {
-  bench_tic();
-
-  if (instance->scene_gpu.sky.cloud.initialized) {
-    device_free(instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
-    device_free(instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
-    device_free(instance->scene_gpu.sky.cloud.weather_map, CLOUD_WEATHER_RES * CLOUD_WEATHER_RES * 4 * sizeof(uint8_t));
-    device_free(instance->scene_gpu.sky.cloud.curl_noise, CLOUD_CURL_RES * CLOUD_CURL_RES * 4 * sizeof(uint8_t));
-  }
-
-  device_malloc(
-    (void**) &instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
-  generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_SHAPE_RES, instance->scene_gpu.sky.cloud.shape_noise);
-
-  device_malloc(
-    (void**) &instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
-  generate_detail_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_DETAIL_RES, instance->scene_gpu.sky.cloud.detail_noise);
-
-  device_malloc((void**) &instance->scene_gpu.sky.cloud.weather_map, CLOUD_WEATHER_RES * CLOUD_WEATHER_RES * 4 * sizeof(uint8_t));
-  generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    CLOUD_WEATHER_RES, (float) instance->scene_gpu.sky.cloud.seed, instance->scene_gpu.sky.cloud.weather_map);
-
-  device_malloc((void**) &instance->scene_gpu.sky.cloud.curl_noise, CLOUD_CURL_RES * CLOUD_CURL_RES * 4 * sizeof(uint8_t));
-  generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_CURL_RES, instance->scene_gpu.sky.cloud.curl_noise);
-
-  instance->scene_gpu.sky.cloud.initialized = 1;
-
-  bench_toc((char*) "Cloud Noise Generation");
-}
-
 extern "C" RaytraceInstance* init_raytracing(
   General general, DeviceBuffer* albedo_atlas, int albedo_atlas_length, DeviceBuffer* illuminance_atlas, int illuminance_atlas_length,
   DeviceBuffer* material_atlas, int material_atlas_length, Scene scene) {
@@ -420,6 +390,8 @@ extern "C" RaytraceInstance* init_raytracing(
 
   gpuErrchk(cudaMemcpyToSymbol(
     device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment*), 0, cudaMemcpyHostToDevice));
+
+  clouds_generate(instance);
 
   raytrace_update_light_resampling_active(instance);
   allocate_buffers(instance);
@@ -745,6 +717,7 @@ extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
     tex.data   = (void*) (cpu_ptr + offset);
     tex.width  = width;
     tex.height = height;
+    tex.gpu    = 0;
     tex.pitch  = pitch / sizeof(RGBA8);
     tex.type   = TexDataUINT8;
 
@@ -794,6 +767,7 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.albedo_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->albedo_atlas);
   ptrs.illuminance_atlas    = (cudaTextureObject_t*) device_buffer_get_pointer(instance->illuminance_atlas);
   ptrs.material_atlas       = (cudaTextureObject_t*) device_buffer_get_pointer(instance->material_atlas);
+  ptrs.cloud_noise          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->cloud_noise);
   ptrs.randoms              = (curandStateXORWOW_t*) device_buffer_get_pointer(instance->randoms);
   ptrs.raydir_buffer        = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
   ptrs.trace_result_buffer  = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);

@@ -63,6 +63,10 @@ void* qoi_encode_RGBA8(const TextureRGBA* tex, int* encoded_size) {
     return (void*) 0;
   }
 
+  if (tex->gpu) {
+    return (void*) 0;
+  }
+
   const qoi_desc desc = {.width = tex->pitch, .height = tex->height, .channels = 4, .colorspace = QOI_SRGB};
 
   return qoi_encode(tex->data, &desc, encoded_size);
@@ -83,6 +87,7 @@ TextureRGBA* qoi_decode_RGBA8(const void* data, const int size) {
   tex->pitch  = desc.width;
   tex->height = desc.height;
   tex->type   = TexDataUINT8;
+  tex->gpu    = 0;
 
   return tex;
 }

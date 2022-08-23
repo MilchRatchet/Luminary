@@ -48,6 +48,7 @@ Wavefront_Content create_wavefront_content() {
   content.albedo_maps[0].height = 4;
   content.albedo_maps[0].pitch  = 4;
   content.albedo_maps[0].type   = TexDataUINT8;
+  content.albedo_maps[0].gpu    = 0;
   content.albedo_maps[0].data   = (RGBA8*) malloc(sizeof(RGBA8) * 16);
   for (int i = 0; i < 16; i++) {
     ((RGBA8*) content.albedo_maps[0].data)[i] = default_albedo;
@@ -56,12 +57,14 @@ Wavefront_Content create_wavefront_content() {
   content.illuminance_maps[0].height = 4;
   content.illuminance_maps[0].pitch  = 4;
   content.illuminance_maps[0].type   = TexDataUINT8;
+  content.illuminance_maps[0].gpu    = 0;
   content.illuminance_maps[0].data   = (RGBA8*) malloc(sizeof(RGBA8) * 16);
   memset(content.illuminance_maps[0].data, 0, sizeof(RGBA8) * 16);
   content.material_maps[0].width  = 4;
   content.material_maps[0].height = 4;
   content.material_maps[0].pitch  = 4;
   content.material_maps[0].type   = TexDataUINT8;
+  content.material_maps[0].gpu    = 0;
   content.material_maps[0].data   = (RGBA8*) malloc(sizeof(RGBA8) * 16);
   for (int i = 0; i < 16; i++) {
     ((RGBA8*) content.material_maps[0].data)[i] = default_material;

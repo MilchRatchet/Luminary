@@ -6,6 +6,7 @@
 #include <math.h>
 #include <stdlib.h>
 
+#include <cudatexture.cuh>
 #include <math.cuh>
 
 #include "bench.h"
@@ -428,5 +429,55 @@ __global__ void generate_curl_noise(const int dim, uint8_t* tex) {
 #define CLOUD_DETAIL_RES 32
 #define CLOUD_WEATHER_RES 1024
 #define CLOUD_CURL_RES 128
+
+extern "C" void clouds_generate(RaytraceInstance* instance) {
+  bench_tic();
+
+  if (instance->scene_gpu.sky.cloud.initialized) {
+    device_free(instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
+    device_free(instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
+    cudatexture_free_buffer(instance->cloud_noise, 2);
+  }
+
+  device_malloc(
+    (void**) &instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
+  generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_SHAPE_RES, instance->scene_gpu.sky.cloud.shape_noise);
+
+  device_malloc(
+    (void**) &instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
+  generate_detail_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_DETAIL_RES, instance->scene_gpu.sky.cloud.detail_noise);
+
+  /*
+   * Only 2D textures can be turned into cuda textures
+   */
+  TextureRGBA noise_2D[2];
+
+  noise_2D[0].gpu    = 1;
+  noise_2D[0].width  = CLOUD_WEATHER_RES;
+  noise_2D[0].height = CLOUD_WEATHER_RES;
+  noise_2D[0].pitch  = CLOUD_WEATHER_RES;
+  noise_2D[0].type   = TexDataUINT8;
+  noise_2D[1].gpu    = 1;
+  noise_2D[1].width  = CLOUD_CURL_RES;
+  noise_2D[1].height = CLOUD_CURL_RES;
+  noise_2D[1].pitch  = CLOUD_CURL_RES;
+  noise_2D[1].type   = TexDataUINT8;
+
+  device_malloc((void**) &noise_2D[0].data, noise_2D[0].height * noise_2D[0].pitch * 4 * sizeof(uint8_t));
+  generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+    noise_2D[0].width, (float) instance->scene_gpu.sky.cloud.seed, (uint8_t*) noise_2D[0].data);
+
+  device_malloc((void**) &noise_2D[1].data, noise_2D[1].height * noise_2D[1].pitch * 4 * sizeof(uint8_t));
+  generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_2D[1].width, (uint8_t*) noise_2D[1].data);
+
+  instance->cloud_noise = cudatexture_allocate_to_buffer(noise_2D, 2);
+
+  device_free(noise_2D[0].data, noise_2D[0].height * noise_2D[0].pitch * 4 * sizeof(uint8_t));
+  device_free(noise_2D[1].data, noise_2D[1].height * noise_2D[1].pitch * 4 * sizeof(uint8_t));
+
+  instance->scene_gpu.sky.cloud.initialized = 1;
+
+  bench_toc((char*) "Cloud Noise Generation");
+}
 
 #endif /* CU_CLOUDGEN_H */

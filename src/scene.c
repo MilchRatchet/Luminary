@@ -755,7 +755,6 @@ RaytraceInstance* load_scene(const char* filename) {
   free_scene(scene);
 
   generate_stars(instance);
-  generate_clouds(instance);
 
   return instance;
 }
@@ -790,7 +789,6 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
   free_scene(scene);
 
   generate_stars(instance);
-  generate_clouds(instance);
 
   return instance;
 }

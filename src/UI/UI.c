@@ -320,7 +320,7 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Beer Powder Effect", &(instance->scene_gpu.sky.cloud.powder), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Shadow Steps", &(instance->scene_gpu.sky.cloud.shadow_steps), 1, 0.01f, 0.0f, 128.0f, 0, 1);
   panels[i++] = create_slider(ui, "Seed", &(instance->scene_gpu.sky.cloud.seed), 0, 0.005f, 0.0f, FLT_MAX, 0, 1);
-  panels[i++] = create_button(ui, "Generate Noise Maps", instance, (void (*)(void*)) generate_clouds, 1);
+  panels[i++] = create_button(ui, "Generate Noise Maps", instance, (void (*)(void*)) clouds_generate, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

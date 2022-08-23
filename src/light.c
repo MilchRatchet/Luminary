@@ -30,11 +30,16 @@ static int max_3_float_to_int(float a, float b, float c) {
 
 /*
  * Returns 1 if triangle texture is non zero at some point, 0 else.
- * If texture is not RGB8 this will always return 1.
+ * If texture is not RGB8 or not present on CPU this will always return 1.
  */
 static int contains_illumination(Triangle triangle, TextureRGBA tex) {
   if (tex.type != TexDataUINT8)
     return 1;
+
+  if (tex.gpu) {
+    warn_message("Texture is allocated on the GPU. Assume that this triangle is a light.");
+    return 1;
+  }
 
   UV v0 = {.u = triangle.vertex_texture.u, .v = triangle.vertex_texture.v};
   UV v1 = {.u = triangle.vertex_texture.u + triangle.edge1_texture.u, .v = triangle.vertex_texture.v + triangle.edge1_texture.v};

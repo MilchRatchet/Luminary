@@ -22,7 +22,12 @@ static void cudatexture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex)
 
   void* data_gpu;
   size_t pitch_gpu = device_malloc_pitch((void**) &data_gpu, pitch * pixel_size, height);
-  gpuErrchk(cudaMemcpy2D(data_gpu, pitch_gpu, data, pitch * pixel_size, width * pixel_size, height, cudaMemcpyHostToDevice));
+  if (tex->gpu) {
+    gpuErrchk(cudaMemcpy2D(data_gpu, pitch_gpu, data, pitch * pixel_size, width * pixel_size, height, cudaMemcpyDeviceToDevice));
+  }
+  else {
+    gpuErrchk(cudaMemcpy2D(data_gpu, pitch_gpu, data, pitch * pixel_size, width * pixel_size, height, cudaMemcpyHostToDevice));
+  }
 
   struct cudaResourceDesc resDesc;
   memset(&resDesc, 0, sizeof(resDesc));

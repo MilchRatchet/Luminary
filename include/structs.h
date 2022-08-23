@@ -185,6 +185,7 @@ struct TextureRGBA {
   unsigned int pitch;
   TextureDataType type;
   void* data;
+  int gpu;
 } typedef TextureRGBA;
 
 #endif /* STRUCTS_H */

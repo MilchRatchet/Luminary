@@ -142,8 +142,6 @@ struct Cloud {
   int seed;
   uint8_t* shape_noise;
   uint8_t* detail_noise;
-  uint8_t* weather_map;
-  uint8_t* curl_noise;
   float forward_scattering;
   float backward_scattering;
   float lobe_lerp;
@@ -269,6 +267,7 @@ struct RaytraceInstance {
   DeviceBuffer* illuminance_atlas;
   int illuminance_atlas_length;
   DeviceBuffer* material_atlas;
+  DeviceBuffer* cloud_noise;
   int material_atlas_length;
   int max_ray_depth;
   int reservoir_size;
