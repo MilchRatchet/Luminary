@@ -596,7 +596,7 @@ static Scene get_default_scene() {
   scene.sky.cloud.noise_detail_scale  = 1.0f;
   scene.sky.cloud.noise_weather_scale = 1.0f;
   scene.sky.cloud.noise_curl_scale    = 1.0f;
-  scene.sky.cloud.coverage            = 2.0f;
+  scene.sky.cloud.coverage            = 1.0f;
   scene.sky.cloud.anvil               = 0.0f;
   scene.sky.cloud.coverage_min        = 1.05f;
   scene.sky.cloud.forward_scattering  = 0.8f;

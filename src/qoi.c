@@ -82,12 +82,14 @@ TextureRGBA* qoi_decode_RGBA8(const void* data, const int size) {
 
   TextureRGBA* tex = malloc(sizeof(TextureRGBA));
 
-  tex->data   = decoded_data;
-  tex->width  = desc.width;
-  tex->pitch  = desc.width;
-  tex->height = desc.height;
-  tex->type   = TexDataUINT8;
-  tex->gpu    = 0;
+  tex->data       = decoded_data;
+  tex->width      = desc.width;
+  tex->pitch      = desc.width;
+  tex->height     = desc.height;
+  tex->depth      = 1;
+  tex->type       = TexDataUINT8;
+  tex->gpu        = 0;
+  tex->volume_tex = 0;
 
   return tex;
 }

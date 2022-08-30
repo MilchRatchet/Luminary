@@ -313,7 +313,7 @@ __global__ void generate_weather_map(const int dim, const float seed, uint8_t* t
     const float sy = y * scale_y;
 
     const float size_scale                  = 3.0f;
-    const float coverage_perlin_worley_diff = 0.7f;
+    const float coverage_perlin_worley_diff = 0.4f;
 
     const float remap_low  = 0.5f;
     const float remap_high = 1.3f;
@@ -345,6 +345,8 @@ __global__ void generate_weather_map(const int dim, const float seed, uint8_t* t
 
     perlin1 -= perlin4;
     perlin2 -= perlin4 * perlin4;
+
+    perlin1 = remap01(2.0f * perlin1, 0.05, 1.0);
 
     dst[x + y * dim] = make_uchar4(__saturatef(perlin1) * 255.0f, __saturatef(perlin2) * 255.0f, __saturatef(perlin3) * 255.0f, 255);
 
@@ -434,46 +436,56 @@ extern "C" void clouds_generate(RaytraceInstance* instance) {
   bench_tic();
 
   if (instance->scene_gpu.sky.cloud.initialized) {
-    device_free(instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
-    device_free(instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
-    cudatexture_free_buffer(instance->cloud_noise, 2);
+    cudatexture_free_buffer(instance->cloud_noise, 4);
   }
 
-  device_malloc(
-    (void**) &instance->scene_gpu.sky.cloud.shape_noise, CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * CLOUD_SHAPE_RES * 4 * sizeof(uint8_t));
-  generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_SHAPE_RES, instance->scene_gpu.sky.cloud.shape_noise);
+  TextureRGBA noise_tex[4];
+  noise_tex[0].gpu        = 1;
+  noise_tex[0].volume_tex = 1;
+  noise_tex[0].width      = CLOUD_SHAPE_RES;
+  noise_tex[0].height     = CLOUD_SHAPE_RES;
+  noise_tex[0].pitch      = CLOUD_SHAPE_RES;
+  noise_tex[0].depth      = CLOUD_SHAPE_RES;
+  noise_tex[0].type       = TexDataUINT8;
+  noise_tex[1].gpu        = 1;
+  noise_tex[1].volume_tex = 1;
+  noise_tex[1].width      = CLOUD_DETAIL_RES;
+  noise_tex[1].height     = CLOUD_DETAIL_RES;
+  noise_tex[1].pitch      = CLOUD_DETAIL_RES;
+  noise_tex[1].depth      = CLOUD_DETAIL_RES;
+  noise_tex[1].type       = TexDataUINT8;
+  noise_tex[2].gpu        = 1;
+  noise_tex[2].volume_tex = 0;
+  noise_tex[2].width      = CLOUD_WEATHER_RES;
+  noise_tex[2].height     = CLOUD_WEATHER_RES;
+  noise_tex[2].pitch      = CLOUD_WEATHER_RES;
+  noise_tex[2].type       = TexDataUINT8;
+  noise_tex[3].gpu        = 1;
+  noise_tex[3].volume_tex = 0;
+  noise_tex[3].width      = CLOUD_CURL_RES;
+  noise_tex[3].height     = CLOUD_CURL_RES;
+  noise_tex[3].pitch      = CLOUD_CURL_RES;
+  noise_tex[3].type       = TexDataUINT8;
 
-  device_malloc(
-    (void**) &instance->scene_gpu.sky.cloud.detail_noise, CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * CLOUD_DETAIL_RES * 4 * sizeof(uint8_t));
-  generate_detail_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(CLOUD_DETAIL_RES, instance->scene_gpu.sky.cloud.detail_noise);
+  device_malloc((void**) &noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
+  generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[0].width, (uint8_t*) noise_tex[0].data);
 
-  /*
-   * Only 2D textures can be turned into cuda textures
-   */
-  TextureRGBA noise_2D[2];
+  device_malloc((void**) &noise_tex[1].data, noise_tex[1].depth * noise_tex[1].height * noise_tex[1].pitch * 4 * sizeof(uint8_t));
+  generate_detail_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[1].width, (uint8_t*) noise_tex[1].data);
 
-  noise_2D[0].gpu    = 1;
-  noise_2D[0].width  = CLOUD_WEATHER_RES;
-  noise_2D[0].height = CLOUD_WEATHER_RES;
-  noise_2D[0].pitch  = CLOUD_WEATHER_RES;
-  noise_2D[0].type   = TexDataUINT8;
-  noise_2D[1].gpu    = 1;
-  noise_2D[1].width  = CLOUD_CURL_RES;
-  noise_2D[1].height = CLOUD_CURL_RES;
-  noise_2D[1].pitch  = CLOUD_CURL_RES;
-  noise_2D[1].type   = TexDataUINT8;
-
-  device_malloc((void**) &noise_2D[0].data, noise_2D[0].height * noise_2D[0].pitch * 4 * sizeof(uint8_t));
+  device_malloc((void**) &noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
   generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    noise_2D[0].width, (float) instance->scene_gpu.sky.cloud.seed, (uint8_t*) noise_2D[0].data);
+    noise_tex[2].width, (float) instance->scene_gpu.sky.cloud.seed, (uint8_t*) noise_tex[2].data);
 
-  device_malloc((void**) &noise_2D[1].data, noise_2D[1].height * noise_2D[1].pitch * 4 * sizeof(uint8_t));
-  generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_2D[1].width, (uint8_t*) noise_2D[1].data);
+  device_malloc((void**) &noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
+  generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[3].width, (uint8_t*) noise_tex[3].data);
 
-  instance->cloud_noise = cudatexture_allocate_to_buffer(noise_2D, 2);
+  instance->cloud_noise = cudatexture_allocate_to_buffer(noise_tex, 4);
 
-  device_free(noise_2D[0].data, noise_2D[0].height * noise_2D[0].pitch * 4 * sizeof(uint8_t));
-  device_free(noise_2D[1].data, noise_2D[1].height * noise_2D[1].pitch * 4 * sizeof(uint8_t));
+  device_free(noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
+  device_free(noise_tex[1].data, noise_tex[1].depth * noise_tex[1].height * noise_tex[1].pitch * 4 * sizeof(uint8_t));
+  device_free(noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
+  device_free(noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
 
   instance->scene_gpu.sky.cloud.initialized = 1;
 

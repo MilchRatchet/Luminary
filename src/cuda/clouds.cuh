@@ -9,77 +9,7 @@
  * The code of this file is based on the cloud rendering in https://github.com/turanszkij/WickedEngine.
  */
 
-__device__ float4 sample_noise_texture_3D(const uint8_t* texture, vec3 p, const int dim) {
-  uchar4* src = (uchar4*) texture;
-
-  p.x = dim * fractf(p.x);
-  p.y = dim * fractf(p.y);
-  p.z = dim * fractf(p.z);
-
-  int x0 = floorf(p.x);
-  int y0 = floorf(p.y);
-  int z0 = floorf(p.z);
-  int x1 = x0 + 1;
-  int y1 = y0 + 1;
-  int z1 = z0 + 1;
-
-  x1 -= (x1 == dim) ? dim : 0;
-  y1 -= (y1 == dim) ? dim : 0;
-  z1 -= (z1 == dim) ? dim : 0;
-
-  float sx = p.x - x0;
-  float sy = p.y - y0;
-  float sz = p.z - z0;
-
-#define addr(x, y, z) (x + y * dim + z * dim * dim)
-
-  uchar4 v000 = __ldg(src + addr(x0, y0, z0));
-  uchar4 v100 = __ldg(src + addr(x1, y0, z0));
-  uchar4 v010 = __ldg(src + addr(x0, y1, z0));
-  uchar4 v110 = __ldg(src + addr(x1, y1, z0));
-  uchar4 v001 = __ldg(src + addr(x0, y0, z1));
-  uchar4 v101 = __ldg(src + addr(x1, y0, z1));
-  uchar4 v011 = __ldg(src + addr(x0, y1, z1));
-  uchar4 v111 = __ldg(src + addr(x1, y1, z1));
-
-#undef addr
-
-#define __floatify(a) make_float4(a.x, a.y, a.z, a.w)
-
-  float4 f000 = __floatify(v000);
-  float4 f100 = __floatify(v100);
-  float4 f010 = __floatify(v010);
-  float4 f110 = __floatify(v110);
-  float4 f001 = __floatify(v001);
-  float4 f101 = __floatify(v101);
-  float4 f011 = __floatify(v011);
-  float4 f111 = __floatify(v111);
-
-#undef __floatify
-
-#define __interp_vals(a, b, s) (make_float4(a.x + (b.x - a.x) * s, a.y + (b.y - a.y) * s, a.z + (b.z - a.z) * s, a.w + (b.w - a.w) * s))
-
-  float4 x00 = __interp_vals(f000, f100, sx);
-  float4 x10 = __interp_vals(f010, f110, sx);
-  float4 x01 = __interp_vals(f001, f101, sx);
-  float4 x11 = __interp_vals(f011, f111, sx);
-
-  float4 xy0 = __interp_vals(x00, x10, sy);
-  float4 xy1 = __interp_vals(x01, x11, sy);
-
-  float4 xyz = __interp_vals(xy0, xy1, sz);
-
-#undef __interp_vals
-
-  xyz.x *= 1.0f / 255.0f;
-  xyz.y *= 1.0f / 255.0f;
-  xyz.z *= 1.0f / 255.0f;
-  xyz.w *= 1.0f / 255.0f;
-
-  return xyz;
-}
-
-#define CLOUD_STEPS 128
+#define CLOUD_STEPS 96
 #define CLOUD_EXTINCTION_STEP_SIZE 0.02f
 #define CLOUD_EXTINCTION_STEP_MULTIPLY 1.5f
 #define CLOUD_EXTINCTION_STEP_MAX 0.75f
@@ -98,9 +28,9 @@ __device__ vec3 cloud_weather(vec3 pos, float height) {
   pos.x += device_scene.sky.cloud.offset_x;
   pos.z += device_scene.sky.cloud.offset_z;
 
-  const float weather_sample_scale = 0.025f * device_scene.sky.cloud.noise_curl_scale;
+  const float weather_sample_scale = 0.025f * device_scene.sky.cloud.noise_weather_scale;
 
-  float4 weather = tex2D<float4>(device.cloud_noise[0], pos.x * weather_sample_scale, pos.z * weather_sample_scale);
+  float4 weather = tex2D<float4>(device.cloud_noise[2], pos.x * weather_sample_scale, pos.z * weather_sample_scale);
 
   weather.x = powf(fabsf(weather.x), __saturatef(remap(height * 3.0f, 0.7f, 0.8f, 1.0f, lerp(1.0f, 0.5f, device_scene.sky.cloud.anvil))));
 
@@ -126,8 +56,9 @@ __device__ float cloud_density(vec3 pos, const float height, const vec3 weather)
   pos.x += device_scene.sky.cloud.offset_x;
   pos.z += device_scene.sky.cloud.offset_z;
 
-  float4 shape = sample_noise_texture_3D(
-    device_scene.sky.cloud.shape_noise, scale_vector(pos, 0.4f * device_scene.sky.cloud.noise_shape_scale), CLOUD_SHAPE_RES);
+  const float shape_sample_scale = 0.4f * device_scene.sky.cloud.noise_shape_scale;
+
+  float4 shape = tex3D<float4>(device.cloud_noise[0], pos.x * shape_sample_scale, pos.y * shape_sample_scale, pos.z * shape_sample_scale);
 
   const vec3 gradient = get_vector(
     cloud_gradient(make_float4(0.02f, 0.07f, 0.12f, 0.28f), height), cloud_gradient(make_float4(0.02f, 0.07f, 0.39f, 0.59f), height),
@@ -149,14 +80,16 @@ __device__ float cloud_density(vec3 pos, const float height, const vec3 weather)
   if (density > 0.0f) {
     const float curl_sample_scale = 3.0f * device_scene.sky.cloud.noise_curl_scale;
 
-    float4 curl = tex2D<float4>(device.cloud_noise[1], pos.x * curl_sample_scale, pos.z * curl_sample_scale);
+    float4 curl = tex2D<float4>(device.cloud_noise[3], pos.x * curl_sample_scale, pos.z * curl_sample_scale);
 
     pos.x += 2.0f * (curl.x - 0.5f) * height * 0.55f;
     pos.y += 2.0f * (curl.z - 0.5f) * height * 0.55f;
     pos.z += 2.0f * (curl.y - 0.5f) * height * 0.55f;
 
-    float4 detail = sample_noise_texture_3D(
-      device_scene.sky.cloud.detail_noise, scale_vector(pos, 2.0f * device_scene.sky.cloud.noise_detail_scale), CLOUD_DETAIL_RES);
+    const float detail_sample_scale = 2.0f * device_scene.sky.cloud.noise_detail_scale;
+
+    float4 detail =
+      tex3D<float4>(device.cloud_noise[1], pos.x * detail_sample_scale, pos.y * detail_sample_scale, pos.z * detail_sample_scale);
 
     float detail_fbm = __saturatef(detail.x * 0.625f + detail.y * 0.25f + detail.z * 0.125f);
 

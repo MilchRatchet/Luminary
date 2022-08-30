@@ -30,7 +30,7 @@ extern "C" void _device_malloc(void** buffer, size_t size, char* buf_name, char*
 
   if (memory_usage > (size_t) (0.7 * memory_limit)) {
     print_warn(
-      "[%s:%d] Device is running low on memory (%zu:%zu).", func, line, memory_usage / (1024 * 1024), memory_limit / (1024 * 1024));
+      "[%s:%d] Device is running low on memory (%zu/%zu).", func, line, memory_usage / (1024 * 1024), memory_limit / (1024 * 1024));
   }
 
   gpuBufferErrchk(cudaMalloc(buffer, size), buf_name, func, line);
@@ -45,7 +45,7 @@ extern "C" size_t _device_malloc_pitch(void** buffer, size_t rowstride, size_t n
 
   if (memory_usage > (size_t) (0.7 * memory_limit)) {
     print_warn(
-      "[%s:%d] Device is running low on memory (%zu:%zu).", func, line, memory_usage / (1024 * 1024), memory_limit / (1024 * 1024));
+      "[%s:%d] Device is running low on memory (%zu/%zu).", func, line, memory_usage / (1024 * 1024), memory_limit / (1024 * 1024));
   }
 
   return pitch;

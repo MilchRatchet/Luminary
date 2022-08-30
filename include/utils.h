@@ -140,8 +140,6 @@ struct Cloud {
   float height_min;
   float density;
   int seed;
-  uint8_t* shape_noise;
-  uint8_t* detail_noise;
   float forward_scattering;
   float backward_scattering;
   float lobe_lerp;
