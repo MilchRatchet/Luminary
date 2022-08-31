@@ -20,13 +20,11 @@ static void cudatexture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex)
   memset(&resDesc, 0, sizeof(resDesc));
 
   if (tex->volume_tex) {
-    const unsigned int width  = tex->width;
     const unsigned int height = tex->height;
     const unsigned int depth  = tex->depth;
     const unsigned int pitch  = tex->pitch;
     void* data                = tex->data;
 
-    void* data_gpu;
     struct cudaChannelFormatDesc channelDesc = cudaCreateChannelDesc<uchar4>();
 
     cudaArray* array_gpu;
