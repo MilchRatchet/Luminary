@@ -68,7 +68,7 @@ __device__ RGBF sky_extinction(const vec3 origin, const vec3 ray, const float st
     reach += step_size;
   }
 
-  density = scale_color(density, -device_scene.sky.base_density * step_size);
+  density = scale_color(density, -device_scene.sky.base_density * 0.5f * step_size);
 
   return get_color(expf(density.r), expf(density.g), expf(density.b));
 }
@@ -140,14 +140,14 @@ __device__ RGBF
       // Amount of light that gets scattered towards camera at pos
       RGBF scattering = scale_color(SKY_RAYLEIGH_SCATTERING, density_rayleigh * phase_rayleigh);
       scattering      = add_color(scattering, scale_color(SKY_MIE_SCATTERING, density_mie * phase_mie));
-      scattering      = scale_color(scattering, device_scene.sky.base_density * light_angle);
+      scattering      = scale_color(scattering, device_scene.sky.base_density * 0.5f * light_angle);
 
       S = mul_color(S, scattering);
 
       RGBF extinction = scale_color(SKY_RAYLEIGH_EXTINCTION, density_rayleigh);
       extinction      = add_color(extinction, scale_color(SKY_MIE_EXTINCTION, density_mie));
       extinction      = add_color(extinction, scale_color(SKY_OZONE_EXTINCTION, density_ozone));
-      extinction      = scale_color(extinction, device_scene.sky.base_density);
+      extinction      = scale_color(extinction, device_scene.sky.base_density * 0.5f);
 
       // Amount of light that gets lost along this step
       RGBF step_transmittance;

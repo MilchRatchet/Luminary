@@ -274,7 +274,7 @@ static UITab create_sky_atmo_panels(UI* ui, RaytraceInstance* instance) {
 
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Celestial\nAtmosphere\nClouds\nFog");
-  panels[i++] = create_slider(ui, "Density", &(instance->scene_gpu.sky.base_density), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Density", &(instance->scene_gpu.sky.base_density), 1, 0.001f, 0.0001f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Ozone Absorption", &(instance->scene_gpu.sky.ozone_absorption), 1);
   panels[i++] = create_slider(ui, "Steps", &(instance->scene_gpu.sky.steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Shadow Steps", &(instance->scene_gpu.sky.shadow_steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
