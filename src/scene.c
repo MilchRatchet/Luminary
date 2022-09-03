@@ -609,6 +609,7 @@ static Scene get_default_scene() {
 
   scene.fog.active     = 0;
   scene.fog.scattering = 1.0f;
+  scene.fog.extinction = 1.0f;
   scene.fog.anisotropy = 0.0f;
   scene.fog.height     = 1000.0f;
   scene.fog.dist       = 100.0f;
@@ -974,6 +975,8 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf(line, "FOG ACTIVE__ %d\n", instance->scene_gpu.fog.active);
   fputs(line, file);
   sprintf(line, "FOG SCATTERI %f\n", instance->scene_gpu.fog.scattering);
+  fputs(line, file);
+  sprintf(line, "FOG EXTINCTI %f\n", instance->scene_gpu.fog.extinction);
   fputs(line, file);
   sprintf(line, "FOG ANISOTRO %f\n", instance->scene_gpu.fog.anisotropy);
   fputs(line, file);

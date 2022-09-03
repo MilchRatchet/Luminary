@@ -73,34 +73,50 @@ __device__ RGBF sky_extinction(const vec3 origin, const vec3 ray, const float st
   return get_color(expf(density.r), expf(density.g), expf(density.b));
 }
 
-__device__ RGBF
-  sky_compute_atmosphere(RGBF& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials) {
-  RGBF result = get_color(0.0f, 0.0f, 0.0f);
-
+/*
+ * Computes the start and length of a ray path through atmosphere.
+ * @param origin Start point of ray in sky space.
+ * @param ray Direction of ray
+ * @result 2 floats, first value is the start, second value is the length of the path.
+ */
+__device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const float min_height, const float max_height) {
   const float height = get_length(origin);
 
-  if (height <= SKY_EARTH_RADIUS)
-    return result;
+  if (height <= min_height)
+    return make_float2(0.0f, -FLT_MAX);
 
   float distance;
   float start = 0.0f;
-  if (height > SKY_ATMO_RADIUS) {
-    const float earth_dist = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-    const float atmo_dist  = sph_ray_int_p0(ray, origin, SKY_ATMO_RADIUS);
-    const float atmo_dist2 = sph_ray_int_back_p0(ray, origin, SKY_ATMO_RADIUS);
+  if (height > max_height) {
+    const float earth_dist = sph_ray_int_p0(ray, origin, min_height);
+    const float atmo_dist  = sph_ray_int_p0(ray, origin, max_height);
+    const float atmo_dist2 = sph_ray_int_back_p0(ray, origin, max_height);
 
     distance = fminf(earth_dist - atmo_dist, atmo_dist2 - atmo_dist);
     start    = atmo_dist;
   }
   else {
-    const float earth_dist = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-    const float atmo_dist  = sph_ray_int_p0(ray, origin, SKY_ATMO_RADIUS);
+    const float earth_dist = sph_ray_int_p0(ray, origin, min_height);
+    const float atmo_dist  = sph_ray_int_p0(ray, origin, max_height);
     distance               = fminf(earth_dist, atmo_dist);
   }
 
-  RGBF transmittance = get_color(1.0f, 1.0f, 1.0f);
+  return make_float2(start, distance);
+}
 
-  distance = fminf(distance, limit - start);
+__device__ RGBF
+  sky_compute_atmosphere(RGBF& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials) {
+  RGBF result = get_color(0.0f, 0.0f, 0.0f);
+
+  float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
+
+  if (path.y == -FLT_MAX)
+    return result;
+
+  const float start    = path.x;
+  const float distance = fminf(path.y, limit - start);
+
+  RGBF transmittance = get_color(1.0f, 1.0f, 1.0f);
 
   if (distance > 0.0f) {
     const int steps       = device_scene.sky.steps;
@@ -122,6 +138,8 @@ __device__ RGBF
       const float scatter_distance =
         (sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS)) ? 0.0f : sph_ray_int_p0(ray_scatter, pos, SKY_ATMO_RADIUS);
 
+      // If scatter_distance is 0.0 then all light is extinct
+      // This is not very beautiful but it seems to be the easiest approach
       const RGBF extinction_sun = sky_extinction(pos, ray_scatter, 0.0f, scatter_distance);
 
       const float density_rayleigh = sky_density_falloff(height, SKY_RAYLEIGH_DISTRIBUTION);

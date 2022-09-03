@@ -194,6 +194,7 @@ struct Ocean {
 struct Fog {
   int active;
   float scattering;
+  float extinction;
   float anisotropy;
   float height;
   float dist;

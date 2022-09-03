@@ -2,6 +2,7 @@
 #define CU_FOG_H
 
 #include "math.cuh"
+#include "sky.cuh"
 
 /*
  * Computes randomly a scattering point for fog.
@@ -166,6 +167,71 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value          = __saturatef((1.0f / task.distance) * 2.0f);
       device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
+    }
+  }
+}
+
+__device__ RGBF fog_extinction(const vec3 origin, const vec3 ray, const float start, const float length) {
+  if (length <= 0.0f)
+    return get_color(1.0f, 1.0f, 1.0f);
+
+  float density = -device_scene.fog.extinction * 0.0001f * length;
+
+  return get_color(expf(density), expf(density), expf(density));
+}
+
+__global__ void process_fog_extinction_only() {
+  const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset     = get_task_address(i);
+    const TraceTask task = load_trace_task(device_trace_tasks + offset);
+    const float limit    = world_to_sky_scale(__ldca((float*) (device.trace_results + offset)));
+    const int pixel      = task.index.x + task.index.y * device_width;
+
+    const vec3 origin = world_to_sky_transform(task.origin);
+
+    float2 path = sky_compute_path(origin, task.ray, SKY_EARTH_RADIUS, SKY_EARTH_RADIUS + device_scene.fog.height);
+
+    if (path.y == -FLT_MAX)
+      continue;
+
+    const float start    = path.x;
+    const float distance = fminf(path.y, limit - start);
+
+    if (distance > 0.0f) {
+      const RGBF extinction = fog_extinction(origin, task.ray, start, distance);
+
+      store_RGBAhalf(device_records + pixel, mul_RGBAhalf(load_RGBAhalf(device_records + pixel), RGBF_to_RGBAhalf(extinction)));
+    }
+  }
+}
+
+__global__ void process_fog_intratasks() {
+  const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset     = get_task_address(i);
+    const TraceTask task = load_trace_task(device_trace_tasks + offset);
+    const float limit    = world_to_sky_scale(__ldca((float*) (device.trace_results + offset)));
+    const int pixel      = task.index.x + task.index.y * device_width;
+
+    const vec3 origin = world_to_sky_transform(task.origin);
+
+    float2 path = sky_compute_path(origin, task.ray, SKY_EARTH_RADIUS, SKY_EARTH_RADIUS + device_scene.fog.height);
+
+    if (path.y == -FLT_MAX)
+      continue;
+
+    const float start    = fmaxf(path.x, 0.0f);
+    const float distance = fminf(path.y, limit - start);
+
+    const float sample_dist = white_noise() * distance + start;
+
+    if (distance > 0.0f) {
+      const RGBF extinction = fog_extinction(origin, task.ray, start, distance);
+
+      store_RGBAhalf(device_records + pixel, mul_RGBAhalf(load_RGBAhalf(device_records + pixel), RGBF_to_RGBAhalf(extinction)));
     }
   }
 }
