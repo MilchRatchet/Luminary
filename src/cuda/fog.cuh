@@ -171,11 +171,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks
   }
 }
 
+#define FOG_DENSITY_SCALE 0.001f
+
 __device__ RGBF fog_extinction(const vec3 origin, const vec3 ray, const float start, const float length) {
   if (length <= 0.0f)
     return get_color(1.0f, 1.0f, 1.0f);
 
-  float density = -device_scene.fog.extinction * 0.0001f * length;
+  float density = -device_scene.fog.extinction * FOG_DENSITY_SCALE * length;
 
   return get_color(expf(density), expf(density), expf(density));
 }
@@ -226,12 +228,55 @@ __global__ void process_fog_intratasks() {
     const float start    = fmaxf(path.x, 0.0f);
     const float distance = fminf(path.y, limit - start);
 
-    const float sample_dist = white_noise() * distance + start;
-
     if (distance > 0.0f) {
+      /*
+       * Compute inscattering
+       * Currently only unshadowed sun is being sampled
+       */
+
+      const float reach = start + distance * white_noise();
+
+      const vec3 pos = add_vector(origin, scale_vector(task.ray, reach));
+
+      const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos);
+      const vec3 ray_scatter  = normalize_vector(sub_vector(device_sun, pos));
+
+      const float scatter_distance = sph_ray_int_p0(ray_scatter, pos, SKY_EARTH_RADIUS + device_scene.fog.height);
+
+      const RGBF extinction_light = fog_extinction(pos, ray_scatter, 0.0f, scatter_distance);
+
+      const float cos_angle = fmaxf(0.0f, dot_product(task.ray, ray_scatter));
+      const float phase_mie = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
+
+      // Amount of light that reached pos
+      RGBF S = scale_color(device_scene.sky.sun_color, device_scene.sky.sun_strength);
+      S      = mul_color(S, extinction_light);
+
+      // Amount of light that gets scattered towards camera at pos
+      const float scattering = device_scene.fog.scattering * FOG_DENSITY_SCALE * light_angle * phase_mie;
+
+      S = scale_color(S, scattering);
+
+      // Amount of light that gets lost along this step
+      const float transmittance = expf(-distance * device_scene.fog.extinction * FOG_DENSITY_SCALE);
+
+      // Amount of light that gets scattered towards camera along this step
+      S = scale_color(sub_color(S, scale_color(S, transmittance)), 1.0f / (device_scene.fog.extinction * FOG_DENSITY_SCALE));
+
+      /*
+       * Apply extinction to record
+       */
+
       const RGBF extinction = fog_extinction(origin, task.ray, start, distance);
 
-      store_RGBAhalf(device_records + pixel, mul_RGBAhalf(load_RGBAhalf(device_records + pixel), RGBF_to_RGBAhalf(extinction)));
+      RGBAhalf record = load_RGBAhalf(device_records + pixel);
+
+      // Apply record before modifying the record
+      const RGBAhalf fog_inscattered_light = mul_RGBAhalf(RGBF_to_RGBAhalf(S), record);
+      store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), fog_inscattered_light));
+
+      record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(extinction));
+      store_RGBAhalf(device_records + pixel, record);
     }
   }
 }
