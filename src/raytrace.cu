@@ -530,13 +530,6 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (type != TYPE_LIGHT) {
-    process_fog_intratasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
-  else {
-    process_fog_extinction_only<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
-
   process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

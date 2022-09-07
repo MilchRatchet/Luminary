@@ -4,75 +4,63 @@
 #include "math.cuh"
 #include "sky.cuh"
 
+#define FOG_DENSITY_SCALE 0.001f
+
+/*
+ * Computes the start and length of a ray path through fog.
+ * @param origin Start point of ray in world space.
+ * @param ray Direction of ray
+ * @param limit Max distance ray may travel
+ * @result Two floats:
+ *                  - [x] = Start in sky space
+ *                  - [y] = Distance through fog in sky space
+ */
+__device__ float2 fog_compute_path(const vec3 origin, const vec3 ray, const float limit) {
+  const float sky_limit = world_to_sky_scale(limit);
+  const vec3 sky_origin = world_to_sky_transform(origin);
+  const float height    = world_to_sky_scale(device_scene.fog.height);
+  const float2 path     = sky_compute_path(sky_origin, ray, SKY_EARTH_RADIUS, SKY_EARTH_RADIUS + height);
+
+  if (path.y == -FLT_MAX)
+    return make_float2(-FLT_MAX, -FLT_MAX);
+
+  const float start    = fmaxf(path.x, 0.0f);
+  const float distance = fmaxf(fminf(fminf(path.y, sky_limit - start), world_to_sky_scale(device_scene.fog.dist)), 0.0f);
+
+  return make_float2(start, distance);
+}
+
 /*
  * Computes randomly a scattering point for fog.
- * @param origin Origin of ray.
+ * @param origin Origin of ray in world space.
  * @param ray Direction of ray.
- * @param depth Depth of ray without scattering.
- * @param random Random value in [0,1)
- * @result Two floats, the first containing the sampled depth, the second containing the probability for the scattering point.
+ * @param limit Depth of ray without scattering in world space.
+ * @result Two floats:
+ *                  - [x] = Sampled Depth in world space
+ *                  - [y] = Weight associated with this sample
  */
-__device__ float2 get_intersection_fog(const vec3 origin, const vec3 ray, const float depth, const float random) {
-  const float height = device_scene.fog.height + device_scene.fog.falloff;
-  const float dist   = (fabsf(ray.y) < eps * eps) ? FLT_MAX : (height - origin.y) / ray.y;
+__device__ float2 fog_get_intersection(const vec3 origin, const vec3 ray, const float limit) {
+  const float2 path = fog_compute_path(origin, ray, limit);
 
-  float max_dist = FLT_MAX;
-  float min_dist = 0.0f;
+  if (path.y == -FLT_MAX)
+    return make_float2(FLT_MAX, 1.0f);
 
-  if (dist < 0.0f) {
-    if (origin.y > height) {
-      max_dist = -FLT_MAX;
-    }
-    else {
-      max_dist = FLT_MAX;
-    }
-  }
-  else {
-    if (origin.y > height) {
-      min_dist = dist;
-    }
-    else {
-      max_dist = dist;
-    }
+  const float start    = sky_to_world_scale(path.x);
+  const float distance = sky_to_world_scale(path.y);
+
+  if (start > limit)
+    return make_float2(FLT_MAX, 1.0f);
+
+  float t = start + 2.0f * white_noise() * distance;
+
+  float weight = 2.0f * distance * expf(-(t - start) * FOG_DENSITY_SCALE * device_scene.fog.extinction);
+
+  if (t > start + distance) {
+    t      = FLT_MAX;
+    weight = 2.0f * expf(-distance * FOG_DENSITY_SCALE * device_scene.fog.extinction);
   }
 
-  max_dist = fminf(device_scene.fog.dist, max_dist);
-
-  float t = min_dist - logf(random) / (0.001f * device_scene.fog.scattering);
-
-  float p = 1.0f - (expf((min_dist - fminf(max_dist, depth)) * 0.001f * device_scene.fog.scattering));
-
-  if (t < min_dist || t > max_dist) {
-    t = FLT_MAX;
-  }
-
-  return make_float2(t, p);
-}
-
-__device__ float get_fog_depth(float y, float ry, float depth) {
-  float height = device_scene.fog.height + device_scene.fog.falloff;
-
-  if (y >= height && ry >= 0.0f)
-    return 0.0f;
-
-  if (y < height && ry <= 0.0f)
-    return fminf(device_scene.fog.dist, depth);
-
-  if (y < height) {
-    return fminf(device_scene.fog.dist, fminf(((height - y) / ry), depth));
-  }
-
-  return fmaxf(0.0f, fminf(device_scene.fog.dist, depth - ((height - y) / ry)));
-}
-
-__device__ float get_fog_density(float base_density, float height) {
-  if (height > device_scene.fog.height) {
-    base_density = (height < device_scene.fog.height + device_scene.fog.falloff)
-                     ? lerp(base_density, 0.0f, (height - device_scene.fog.height) / device_scene.fog.falloff)
-                     : 0.0f;
-  }
-
-  return base_density;
+  return make_float2(t, weight);
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
@@ -92,8 +80,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    const float density = get_fog_density(0.001f * device_scene.fog.scattering, task.position.y);
-
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
     RGBF record = RGBAhalf_to_RGBF(device_records[pixel]);
@@ -102,7 +88,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
       const vec3 bounce_ray = angles_to_direction(white_noise() * PI, white_noise() * 2.0f * PI);
       const float cos_angle = dot_product(ray, bounce_ray);
       const float phase     = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
-      const float weight    = 4.0f * PI * phase * density * task.distance;
+      const float weight    = 4.0f * PI * phase * FOG_DENSITY_SCALE * device_scene.fog.scattering;
 
       device.bounce_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, weight));
 
@@ -127,7 +113,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
         const vec3 light_ray  = brdf_sample_light_ray(light, task.position);
         const float cos_angle = dot_product(ray, light_ray);
         const float phase     = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
-        const float weight    = light_weight * phase * density * task.distance;
+        const float weight    = light_weight * phase * FOG_DENSITY_SCALE * device_scene.fog.scattering;
 
         device.light_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, weight));
         light_history_buffer_entry  = light.id;
@@ -170,8 +156,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks
     }
   }
 }
-
-#define FOG_DENSITY_SCALE 0.001f
 
 __device__ RGBF fog_extinction(const vec3 origin, const vec3 ray, const float start, const float length) {
   if (length <= 0.0f)
@@ -231,15 +215,47 @@ __global__ void process_fog_intratasks() {
     if (distance > 0.0f) {
       /*
        * Compute inscattering
-       * Currently only unshadowed sun is being sampled
+       * Currently only unshadowed bogus random light stuff idk
        */
 
-      const float reach = start + distance * white_noise();
+      float step_size = 0.2f;
+      float reach     = start + step_size * white_noise();
 
-      const vec3 pos = add_vector(origin, scale_vector(task.ray, reach));
+      vec3 light_pos;
 
-      const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos);
-      const vec3 ray_scatter  = normalize_vector(sub_vector(device_sun, pos));
+      while (reach < distance) {
+        const vec3 pos = add_vector(origin, scale_vector(task.ray, reach));
+      }
+
+      float sampling_weight = 2.0f;
+      float light_angle;
+      vec3 pos, ray_scatter;
+      RGBF light_color;
+
+      if (white_noise() < 0.5f) {
+        // Sample sun
+        const float reach = start + distance * white_noise();
+
+        pos = add_vector(origin, scale_vector(task.ray, reach));
+
+        light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos);
+        ray_scatter = normalize_vector(sub_vector(device_sun, pos));
+
+        light_color = scale_color(device_scene.sky.sun_color, device_scene.sky.sun_strength);
+      }
+      else {
+        const vec3 sphere_center = world_to_sky_transform(device_scene.toy.position);
+
+        // const float reach = (dot_product(task.ray, origin) - dot_product(task.ray, triangle_center)) / dot_product(task.ray, task.ray);
+        const float reach = start + distance * white_noise();
+
+        pos = add_vector(origin, scale_vector(task.ray, reach));
+
+        light_angle = sample_sphere_solid_angle(sphere_center, world_to_sky_scale(device_scene.toy.scale), pos);
+        ray_scatter = normalize_vector(sub_vector(sphere_center, pos));
+
+        light_color = get_color(10.0f, 0.0f, 10.0f);
+      }
 
       const float scatter_distance = sph_ray_int_p0(ray_scatter, pos, SKY_EARTH_RADIUS + device_scene.fog.height);
 
@@ -249,8 +265,7 @@ __global__ void process_fog_intratasks() {
       const float phase_mie = henvey_greenstein(cos_angle, device_scene.fog.anisotropy);
 
       // Amount of light that reached pos
-      RGBF S = scale_color(device_scene.sky.sun_color, device_scene.sky.sun_strength);
-      S      = mul_color(S, extinction_light);
+      RGBF S = mul_color(light_color, extinction_light);
 
       // Amount of light that gets scattered towards camera at pos
       const float scattering = device_scene.fog.scattering * FOG_DENSITY_SCALE * light_angle * phase_mie;
@@ -262,6 +277,8 @@ __global__ void process_fog_intratasks() {
 
       // Amount of light that gets scattered towards camera along this step
       S = scale_color(sub_color(S, scale_color(S, transmittance)), 1.0f / (device_scene.fog.extinction * FOG_DENSITY_SCALE));
+
+      S = scale_color(S, sampling_weight);
 
       /*
        * Apply extinction to record

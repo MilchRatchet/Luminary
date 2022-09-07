@@ -347,7 +347,6 @@ static UITab create_sky_fog_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Anisotropy", &(instance->scene_gpu.fog.anisotropy), 1, 0.001f, -0.95f, 0.95f, 0, 0);
   panels[i++] = create_slider(ui, "Distance", &(instance->scene_gpu.fog.dist), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Height", &(instance->scene_gpu.fog.height), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Height Falloff", &(instance->scene_gpu.fog.falloff), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

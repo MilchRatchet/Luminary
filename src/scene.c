@@ -370,10 +370,6 @@ static void parse_fog_settings(Fog* fog, char* line) {
     case 6872304225801028936u:
       sscanf(value, "%f\n", &fog->height);
       break;
-    /* FALLOFF_ */
-    case 6865251988369326406u:
-      sscanf(value, "%f\n", &fog->falloff);
-      break;
     default:
       warn_message("%8.8s (%zu) is not a valid FOG setting.", line, key);
       break;
@@ -608,12 +604,11 @@ static Scene get_default_scene() {
   scene.sky.cloud.density             = 1.0f;
 
   scene.fog.active     = 0;
-  scene.fog.scattering = 1.0f;
+  scene.fog.scattering = 5.0f;
   scene.fog.extinction = 1.0f;
   scene.fog.anisotropy = 0.0f;
-  scene.fog.height     = 1000.0f;
-  scene.fog.dist       = 100.0f;
-  scene.fog.falloff    = 10.0f;
+  scene.fog.height     = 100.0f;
+  scene.fog.dist       = 250.0f;
 
   return scene;
 }
@@ -983,8 +978,6 @@ void serialize_scene(RaytraceInstance* instance) {
   sprintf(line, "FOG DISTANCE %f\n", instance->scene_gpu.fog.dist);
   fputs(line, file);
   sprintf(line, "FOG HEIGHT__ %f\n", instance->scene_gpu.fog.height);
-  fputs(line, file);
-  sprintf(line, "FOG FALLOFF_ %f\n", instance->scene_gpu.fog.falloff);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Ocean Settings\n#===============================\n\n");

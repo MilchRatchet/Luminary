@@ -198,7 +198,6 @@ struct Fog {
   float anisotropy;
   float height;
   float dist;
-  float falloff;
 } typedef Fog;
 
 struct Jitter {
