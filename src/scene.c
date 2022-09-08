@@ -354,6 +354,10 @@ static void parse_fog_settings(Fog* fog, char* line) {
     case 6872287793290429249u:
       sscanf(value, "%d\n", &fog->active);
       break;
+    /* DENSITY_ */
+    case 6870615380437386564u:
+      sscanf(value, "%f\n", &fog->density);
+      break;
     /* ANISOTRO */
     case 5715723576763043393u:
       sscanf(value, "%f\n", &fog->anisotropy);
@@ -603,7 +607,7 @@ static Scene get_default_scene() {
   scene.fog.density    = 1.0f;
   scene.fog.anisotropy = 0.0f;
   scene.fog.height     = 500.0f;
-  scene.fog.dist       = 250.0f;
+  scene.fog.dist       = 500.0f;
 
   return scene;
 }
