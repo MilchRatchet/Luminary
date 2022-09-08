@@ -354,10 +354,6 @@ static void parse_fog_settings(Fog* fog, char* line) {
     case 6872287793290429249u:
       sscanf(value, "%d\n", &fog->active);
       break;
-    /* SCATTERI */
-    case 5283361541352145747u:
-      sscanf(value, "%f\n", &fog->scattering);
-      break;
     /* ANISOTRO */
     case 5715723576763043393u:
       sscanf(value, "%f\n", &fog->anisotropy);
@@ -604,10 +600,9 @@ static Scene get_default_scene() {
   scene.sky.cloud.density             = 1.0f;
 
   scene.fog.active     = 0;
-  scene.fog.scattering = 5.0f;
-  scene.fog.extinction = 1.0f;
+  scene.fog.density    = 1.0f;
   scene.fog.anisotropy = 0.0f;
-  scene.fog.height     = 100.0f;
+  scene.fog.height     = 500.0f;
   scene.fog.dist       = 250.0f;
 
   return scene;
@@ -969,9 +964,7 @@ void serialize_scene(RaytraceInstance* instance) {
 
   sprintf(line, "FOG ACTIVE__ %d\n", instance->scene_gpu.fog.active);
   fputs(line, file);
-  sprintf(line, "FOG SCATTERI %f\n", instance->scene_gpu.fog.scattering);
-  fputs(line, file);
-  sprintf(line, "FOG EXTINCTI %f\n", instance->scene_gpu.fog.extinction);
+  sprintf(line, "FOG DENSITY_ %f\n", instance->scene_gpu.fog.density);
   fputs(line, file);
   sprintf(line, "FOG ANISOTRO %f\n", instance->scene_gpu.fog.anisotropy);
   fputs(line, file);

@@ -292,7 +292,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
     else if (device_scene.fog.active) {
       const int pixel    = task.index.x + task.index.y * device_width;
       const float t      = fog_compute_path(task.origin, task.ray, depth).y;
-      const float weight = expf(-t * FOG_DENSITY_SCALE * device_scene.fog.extinction);
+      const float weight = expf(-t * FOG_DENSITY);
 
       store_RGBAhalf(device_records + pixel, scale_RGBAhalf(load_RGBAhalf(device_records + pixel), weight));
     }

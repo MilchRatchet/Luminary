@@ -342,8 +342,7 @@ static UITab create_sky_fog_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Celestial\nAtmosphere\nClouds\nFog");
   panels[i++] = create_check(ui, "Active", &(instance->scene_gpu.fog.active), 1);
-  panels[i++] = create_slider(ui, "Scattering", &(instance->scene_gpu.fog.scattering), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Extinction", &(instance->scene_gpu.fog.extinction), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Density", &(instance->scene_gpu.fog.density), 1, 0.001f, 0.001f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Anisotropy", &(instance->scene_gpu.fog.anisotropy), 1, 0.001f, -0.95f, 0.95f, 0, 0);
   panels[i++] = create_slider(ui, "Distance", &(instance->scene_gpu.fog.dist), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Height", &(instance->scene_gpu.fog.height), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
