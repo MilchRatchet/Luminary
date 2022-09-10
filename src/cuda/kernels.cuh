@@ -276,28 +276,23 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
     }
 
     if (device_scene.fog.active && is_first_ray()) {
-      const float2 fog = get_intersection_fog(task.origin, task.ray, depth, blue_noise(task.index.x, task.index.y, 256, 169));
+      const float2 fog = fog_get_intersection(task.origin, task.ray, depth);
 
-      float weight = 1.0f;
+      const float weight = fog.y;
 
       if (fog.x < depth) {
         depth  = fog.x;
         hit_id = FOG_HIT;
-        weight = 1.0f / fog.y;
         __stcs((float2*) (device.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
-      }
-      else {
-        weight = 1.0f / (1.0f - fog.y);
       }
 
       const int pixel = task.index.x + task.index.y * device_width;
       store_RGBAhalf(device_records + pixel, scale_RGBAhalf(load_RGBAhalf(device_records + pixel), weight));
     }
-
-    if (device_scene.fog.active && device_iteration_type == TYPE_LIGHT) {
+    else if (device_scene.fog.active) {
       const int pixel    = task.index.x + task.index.y * device_width;
-      const float t      = get_fog_depth(task.origin.y, task.ray.y, depth);
-      const float weight = expf(-t * 0.001f * device_scene.fog.scattering);
+      const float t      = fog_compute_path(task.origin, task.ray, depth).y;
+      const float weight = expf(-t * FOG_DENSITY);
 
       store_RGBAhalf(device_records + pixel, scale_RGBAhalf(load_RGBAhalf(device_records + pixel), weight));
     }

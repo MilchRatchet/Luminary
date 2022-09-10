@@ -566,12 +566,20 @@ __device__ __host__ vec3 angles_to_direction(const float altitude, const float a
   return dir;
 }
 
+__device__ float world_to_sky_scale(float input) {
+  return input * 0.001f;
+}
+
+__device__ float sky_to_world_scale(float input) {
+  return input * 1000.0f;
+}
+
 __device__ vec3 world_to_sky_transform(vec3 input) {
   vec3 result;
 
-  result.x = input.x * 0.001f;
-  result.y = input.y * 0.001f + SKY_EARTH_RADIUS;
-  result.z = input.z * 0.001f;
+  result.x = world_to_sky_scale(input.x);
+  result.y = world_to_sky_scale(input.y) + SKY_EARTH_RADIUS;
+  result.z = world_to_sky_scale(input.z);
 
   result = add_vector(result, device_scene.sky.geometry_offset);
 
@@ -583,19 +591,11 @@ __device__ vec3 sky_to_world_transform(vec3 input) {
 
   input = sub_vector(input, device_scene.sky.geometry_offset);
 
-  result.x = input.x * 1000.0f;
-  result.y = (input.y - SKY_EARTH_RADIUS) * 1000.0f;
-  result.z = input.z * 1000.0f;
+  result.x = sky_to_world_scale(input.x);
+  result.y = sky_to_world_scale(input.y - SKY_EARTH_RADIUS);
+  result.z = sky_to_world_scale(input.z);
 
   return result;
-}
-
-__device__ float world_to_sky_scale(float input) {
-  return input * 0.001f;
-}
-
-__device__ float sky_to_world_scale(float input) {
-  return input * 1000.0f;
 }
 
 __device__ RGBF get_color(const float r, const float g, const float b) {

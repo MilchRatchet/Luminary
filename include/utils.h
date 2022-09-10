@@ -193,11 +193,10 @@ struct Ocean {
 
 struct Fog {
   int active;
-  float scattering;
+  float density;
   float anisotropy;
   float height;
   float dist;
-  float falloff;
 } typedef Fog;
 
 struct Jitter {
