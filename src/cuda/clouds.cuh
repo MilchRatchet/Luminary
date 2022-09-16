@@ -153,25 +153,6 @@ __device__ float cloud_powder(const float density, const float step_size) {
 }
 
 __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, const float dist) {
-  const vec3 sun_diff     = sub_vector(device_sun, add_vector(origin, scale_vector(ray, start)));
-  const vec3 ray_sun      = normalize_vector(sun_diff);
-  const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, start)));
-
-  const float cos_angle_sun  = dot_product(ray, ray_sun);
-  const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
-    cos_angle_sun, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering, device_scene.sky.cloud.lobe_lerp);
-
-  RGBF sun_color = sky_get_color(add_vector(origin, scale_vector(ray, start)), ray_sun, FLT_MAX, true);
-  sun_color      = scale_color(sun_color, 0.25f * ONE_OVER_PI * light_angle * scattering_sun);
-
-  const float ambient_r1 = PI * blue_noise(0, 0, 0, device_temporal_frames);
-  const float ambient_r2 = 2.0f * PI * blue_noise(0, 0, 0, device_temporal_frames + 1);
-
-  const vec3 ray_ambient = angles_to_direction(ambient_r1, ambient_r2);
-  RGBF ambient_color     = sky_get_color(add_vector(origin, scale_vector(ray, start)), ray_ambient, FLT_MAX, false);
-
-  ambient_color = scale_color(ambient_color, 1.0f / (4.0f * PI));
-
   const int step_count = CLOUD_STEPS * (dist / (start + dist)) * (is_first_ray() ? 1.0f : 0.25f);
 
   const float big_step     = 5.0f;
@@ -221,6 +202,32 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
         step = 1.0f;
         continue;
       }
+
+      // Sun light
+      const vec3 ray_sun      = sample_sphere(device_sun, SKY_SUN_RADIUS, pos);
+      const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos);
+
+      const float cos_angle_sun  = dot_product(ray, ray_sun);
+      const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
+        cos_angle_sun, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
+        device_scene.sky.cloud.lobe_lerp);
+
+      RGBF sun_color = sky_get_color(pos, ray_sun, FLT_MAX, true);
+      sun_color      = scale_color(sun_color, 0.25f * ONE_OVER_PI * light_angle * scattering_sun);
+
+      // Ambient light
+      const float ambient_r1 = (2.0f * PI * blue_noise(i, 0, 0, device_temporal_frames)) - PI;
+      const float ambient_r2 = 2.0f * PI * blue_noise(0, i, 0, device_temporal_frames + 1);
+
+      const vec3 ray_ambient = angles_to_direction(ambient_r1, ambient_r2);
+
+      const float cos_angle_ambient  = dot_product(ray, ray_ambient);
+      const float scattering_ambient = cloud_dual_lobe_henvey_greenstein(
+        cos_angle_ambient, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
+        device_scene.sky.cloud.lobe_lerp);
+
+      RGBF ambient_color = sky_get_color(pos, ray_ambient, FLT_MAX, false);
+      ambient_color      = scale_color(ambient_color, scattering_ambient);
 
       const float scattering = density * 1000.0f * 0.05f;
       const float extinction = density * 1000.0f * 0.05f * 0.1f;
