@@ -216,8 +216,8 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       sun_color      = scale_color(sun_color, 0.25f * ONE_OVER_PI * light_angle * scattering_sun);
 
       // Ambient light
-      const float ambient_r1 = (2.0f * PI * blue_noise(i, 0, 0, device_temporal_frames)) - PI;
-      const float ambient_r2 = 2.0f * PI * blue_noise(0, i, 0, device_temporal_frames + 1);
+      const float ambient_r1 = (2.0f * PI * white_noise()) - PI;
+      const float ambient_r2 = 2.0f * PI * white_noise();
 
       const vec3 ray_ambient = angles_to_direction(ambient_r1, ambient_r2);
 
