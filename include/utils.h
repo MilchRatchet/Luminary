@@ -189,6 +189,11 @@ struct Ocean {
   float time;
   RGBAF albedo;
   float refractive_index;
+  float anisotropy;
+  RGBF scattering;
+  RGBF absorption;
+  float pollution;
+  float absorption_strength;
 } typedef Ocean;
 
 struct Fog {

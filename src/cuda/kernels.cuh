@@ -275,6 +275,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
       sky_trace_inscattering(world_to_sky_transform(task.origin), task.ray, 0.001f * depth, task.index);
     }
 
+    const int pixel = task.index.x + task.index.y * device_width;
+    RGBAhalf record = load_RGBAhalf(device_records + pixel);
+
     if (device_scene.fog.active && is_first_ray()) {
       const float2 fog = fog_get_intersection(task.origin, task.ray, depth);
 
@@ -286,16 +289,29 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
         __stcs((float2*) (device.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
       }
 
-      const int pixel = task.index.x + task.index.y * device_width;
-      store_RGBAhalf(device_records + pixel, scale_RGBAhalf(load_RGBAhalf(device_records + pixel), weight));
+      record = scale_RGBAhalf(record, weight);
     }
     else if (device_scene.fog.active) {
-      const int pixel    = task.index.x + task.index.y * device_width;
       const float t      = fog_compute_path(task.origin, task.ray, depth).y;
       const float weight = expf(-t * FOG_DENSITY);
 
-      store_RGBAhalf(device_records + pixel, scale_RGBAhalf(load_RGBAhalf(device_records + pixel), weight));
+      record = scale_RGBAhalf(record, weight);
     }
+
+    if (device_scene.ocean.active) {
+      const float underwater_dist = ocean_ray_underwater_length(task.origin, task.ray, depth);
+
+      RGBF extinction = ocean_get_extinction();
+
+      RGBF path_extinction;
+      path_extinction.r = expf(-underwater_dist * extinction.r);
+      path_extinction.g = expf(-underwater_dist * extinction.g);
+      path_extinction.b = expf(-underwater_dist * extinction.b);
+
+      record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(path_extinction));
+    }
+
+    store_RGBAhalf(device_records + pixel, record);
 
     if (modified_task) {
       store_trace_task(device_trace_tasks + offset, task);
