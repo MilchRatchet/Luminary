@@ -137,24 +137,12 @@ __device__ vec3 ocean_get_normal(vec3 p, const float diff) {
 }
 
 __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
-  if (ray.y > -eps)
-    return FLT_MAX;
-
-  if (origin.y < device_scene.ocean.height)
-    return FLT_MAX;
-
   const float depth = (device_scene.ocean.height - origin.y) / ray.y;
 
   return (depth >= eps) ? depth : FLT_MAX;
 }
 
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
-  if (ray.y > -eps)
-    return FLT_MAX;
-
-  if (origin.y < device_scene.ocean.height)
-    return FLT_MAX;
-
   return (device_scene.ocean.height + 3.0f * device_scene.ocean.amplitude - origin.y) / ray.y;
 }
 
@@ -164,12 +152,8 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
   vec3 p = add_vector(origin, scale_vector(ray, max));
 
   float height_at_max = ocean_get_height(p, FAST_ITERATIONS);
-  if (height_at_max > 0.0f)
-    return FLT_MAX;
 
   float height_at_min = ocean_get_height(origin, FAST_ITERATIONS);
-  if (height_at_min < 0.0f)
-    return FLT_MAX;
 
   float mid = 0.0f;
 
@@ -191,7 +175,7 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
     }
   }
 
-  return mid;
+  return mid < 0.0f ? FLT_MAX : mid;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
@@ -213,7 +197,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
-    const vec3 normal = ocean_get_normal(task.position, fmaxf(eps, task.distance / device_width));
+    vec3 normal = ocean_get_normal(task.position, fmaxf(eps, task.distance / device_width));
+
+    if (ray.y > 0.0f) {
+      normal = scale_vector(normal, -1.0f);
+    }
 
     RGBAF albedo = device_scene.ocean.albedo;
     RGBF record  = RGBAhalf_to_RGBF(device_records[pixel]);
@@ -266,7 +254,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {
-      const int scattering_pass = white_noise() < 0.5f;
+      const float scattering_prob = (ray.y > 0.0f) ? 0.0f : 0.5f;
+      const int scattering_pass   = white_noise() < scattering_prob;
 
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
@@ -281,10 +270,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
         vec3 light_pos;
 
         if (scattering_pass) {
-          underwater_sample       = 10.0f * white_noise();
-          light_pos               = add_vector(task.position, scale_vector(ray, underwater_sample));
-          const float solid_angle = brdf_light_sample_solid_angle(light, light_pos);
-          light_weight            = brdf_light_sample_shading_weight(light) * solid_angle;
+          underwater_sample            = 10.0f * white_noise();
+          const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
+          BRDFInstance brdf2           = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
+          light_pos                    = add_vector(task.position, scale_vector(brdf2.L, underwater_sample));
+          const float solid_angle      = brdf_light_sample_solid_angle(light, light_pos);
+          light_weight                 = brdf_light_sample_shading_weight(light) * solid_angle;
         }
         else {
           light_pos    = task.position;
@@ -312,14 +303,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
             const RGBF weight = mul_color(sub_color(S, mul_color(S, step_transmittance)), inv_color(extinction));
 
             light_record = RGBF_to_RGBAhalf(mul_color(record, weight));
+            light_record = scale_RGBAhalf(light_record, 2.0f);
           }
           else {
             brdf.L = brdf_sample_light_ray(light, task.position);
 
             light_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf_evaluate(brdf).term, light_weight));
-          }
 
-          light_record = scale_RGBAhalf(light_record, 2.0f);
+            light_record = scale_RGBAhalf(light_record, 1.0f / (1.0f - scattering_prob));
+          }
 
           TraceTask light_task;
           light_task.origin = light_pos;

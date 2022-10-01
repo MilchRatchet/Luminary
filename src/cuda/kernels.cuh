@@ -189,12 +189,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
-    if (device_scene.ocean.active) {
+    if (device_scene.ocean.active && device_iteration_type != TYPE_LIGHT) {
       const float ocean_dist = ocean_far_distance(task.origin, task.ray);
 
       if (ocean_dist < depth) {
         depth  = ocean_dist;
-        hit_id = (device_iteration_type == TYPE_LIGHT && device_scene.ocean.albedo.a == 1.0f) ? REJECT_HIT : OCEAN_HIT;
+        hit_id = OCEAN_HIT;
       }
     }
 

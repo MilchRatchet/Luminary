@@ -403,7 +403,8 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.ocean.scattering.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.ocean.scattering.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.ocean.scattering.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Absorption Strength", &(instance->scene_gpu.ocean.absorption_strength), 1, 0.005f, 0.001f, 1.0f, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Absorption Strength", &(instance->scene_gpu.ocean.absorption_strength), 1, 0.005f, 0.001f, FLT_MAX, 0, 0);
   panels[i++] = create_color(ui, "Absorption", (float*) &(instance->scene_gpu.ocean.absorption));
   panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.ocean.absorption.r), 1, 0.001f, 0.001f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.ocean.absorption.g), 1, 0.001f, 0.001f, 1.0f, 0, 0);
