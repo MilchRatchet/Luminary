@@ -85,19 +85,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     float roughness;
     float metallic;
-    float intensity;
+    float intensity = device_scene.material.default_material.b;
 
     if (maps.z) {
       const float4 material_f = tex2D<float4>(device.material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
 
       roughness = (1.0f - material_f.x);
       metallic  = material_f.y;
-      intensity = material_f.z * 255.0f;
     }
     else {
       roughness = (1.0f - device_scene.material.default_material.r);
       metallic  = device_scene.material.default_material.g;
-      intensity = device_scene.material.default_material.b;
     }
 
     RGBAF albedo;
@@ -122,7 +120,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
       emission = get_RGBAhalf(illuminance_f.x, illuminance_f.y, illuminance_f.z, illuminance_f.w);
-      emission = scale_RGBAhalf(emission, intensity);
+      emission = scale_RGBAhalf(emission, intensity * illuminance_f.w);
     }
 
     if (albedo.a < device_scene.material.alpha_cutoff)

@@ -324,11 +324,11 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
    - Red: Emission Red Color
    - Green: Emission Green Color
    - Blue: Emission Blue Color
-   - Alpha: Unused
+   - Alpha: Emission Intensity [0,1]
  - Material Textures
    - Red: Smoothness
    - Green: Metallic
-   - Blue: Emission Intensity
+   - Blue: Unused
    - Alpha: Unused
 
 Textures are to be referenced in the `*.mtl` as follows:
