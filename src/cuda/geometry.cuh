@@ -129,6 +129,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     RGBAhalf record = load_RGBAhalf(device_records + pixel);
 
     if (albedo.a > 0.0f && any_RGBAhalf(emission)) {
+      emission = scale_RGBAhalf(emission, albedo.a);
+
       write_albedo_buffer(add_color(RGBAhalf_to_RGBF(emission), opaque_color(albedo)), pixel);
 
       emission = mul_RGBAhalf(emission, record);

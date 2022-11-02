@@ -79,6 +79,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     RGBAhalf record = load_RGBAhalf(device_records + pixel);
 
     if (albedo.a > 0.0f && device_scene.toy.emissive) {
+      emission = scale_RGBAhalf(emission, albedo.a);
+
       write_albedo_buffer(RGBAhalf_to_RGBF(emission), pixel);
 
       emission = mul_RGBAhalf(emission, record);
