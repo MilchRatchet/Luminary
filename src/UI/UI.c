@@ -642,8 +642,7 @@ void handle_mouse_UI(UI* ui) {
       state &= ~SDL_BUTTON_LMASK;
     }
 
-    handle_mouse_UIPanel(ui, ui->dropdown, state, x, (ui->scroll_pos + y));
-
+    ui->dropdown->handle_mouse(ui, ui->dropdown, state, x, (ui->scroll_pos + y));
     ui->panel_hover = -1;
   }
   else if (x > 0 && x < UI_WIDTH && y > 0 && y < UI_HEIGHT + UI_BORDER_SIZE) {
@@ -677,8 +676,8 @@ void handle_mouse_UI(UI* ui) {
     ui->mouse_flags |= MOUSE_LEFT_BLOCKED;
   }
 
-  if (panel) {
-    handle_mouse_UIPanel(ui, panel, state, x, (ui->scroll_pos + y) % PANEL_HEIGHT);
+  if (panel && panel->handle_mouse) {
+    panel->handle_mouse(ui, panel, state, x, (ui->scroll_pos + y) % PANEL_HEIGHT);
     if (panel->type == PANEL_SLIDER) {
       ui->mouse_flags &= ~MOUSE_LEFT_BLOCKED;
 
@@ -702,9 +701,11 @@ static void render_tab(UI* ui, UITab* tab) {
   const int first_panel = 1 + ui->scroll_pos / PANEL_HEIGHT;
   const int last_panel  = first_panel + UI_HEIGHT_IN_PANELS;
   int y                 = PANEL_HEIGHT;
-  render_UIPanel(ui, tab->panels, 0);
+  tab->panels[0].render(ui, tab->panels, 0);
   for (int i = first_panel; i < min(last_panel, tab->panel_count); i++) {
-    render_UIPanel(ui, tab->panels + i, y);
+    if (tab->panels[i].render) {
+      tab->panels[i].render(ui, tab->panels + i, y);
+    }
     y += PANEL_HEIGHT;
   }
 }

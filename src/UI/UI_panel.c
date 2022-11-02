@@ -21,6 +21,8 @@ static UIPanel init_UIPanel(UI* ui, int type, const char* text, void* data_bindi
   panel.data_text    = (SDL_Surface*) 0;
   panel.data         = data_binding;
   panel.voids_frames = voids_frames;
+  panel.render       = NULL;
+  panel.handle_mouse = NULL;
 
   return panel;
 }
@@ -29,11 +31,13 @@ UIPanel create_slider(
   UI* ui, const char* text, void* data_binding, int voids_frames, float scale, float min, float max, int refresh, int integral) {
   UIPanel slider = init_UIPanel(ui, PANEL_SLIDER, text, data_binding, voids_frames);
 
-  slider.prop1 = *((int*) &scale);
-  slider.prop2 = *((int*) &min);
-  slider.prop3 = *((int*) &max);
-  slider.prop4 = refresh;
-  slider.prop5 = integral;
+  slider.prop1        = *((int*) &scale);
+  slider.prop2        = *((int*) &min);
+  slider.prop3        = *((int*) &max);
+  slider.prop4        = refresh;
+  slider.prop5        = integral;
+  slider.render       = render_UIPanel_slider;
+  slider.handle_mouse = handle_mouse_UIPanel_slider;
 
   if (slider.prop5) {
     slider.data_buffer = *((int*) slider.data);
@@ -45,16 +49,21 @@ UIPanel create_slider(
 UIPanel create_check(UI* ui, const char* text, int* data_binding, int voids_frames) {
   UIPanel check = init_UIPanel(ui, PANEL_CHECK, text, data_binding, voids_frames);
 
+  check.render       = render_UIPanel_check;
+  check.handle_mouse = handle_mouse_UIPanel_check;
+
   return check;
 }
 
 UIPanel create_dropdown(UI* ui, const char* text, int* data_binding, int voids_frames, int option_count, char* options, int index) {
   UIPanel dropdown = init_UIPanel(ui, PANEL_DROPDOWN, text, data_binding, voids_frames);
 
-  dropdown.prop1 = option_count;
-  dropdown.prop2 = 0;
-  dropdown.prop3 = index;
-  dropdown.prop5 = -1;
+  dropdown.prop1        = option_count;
+  dropdown.prop2        = 0;
+  dropdown.prop3        = index;
+  dropdown.prop5        = -1;
+  dropdown.render       = render_UIPanel_dropdown;
+  dropdown.handle_mouse = handle_mouse_UIPanel_dropdown;
 
   int* offsets               = malloc(sizeof(int) * option_count);
   SDL_Surface** option_texts = malloc(sizeof(SDL_Surface*) * option_count);
@@ -85,16 +94,19 @@ UIPanel create_dropdown(UI* ui, const char* text, int* data_binding, int voids_f
 }
 
 UIPanel create_color(UI* ui, const char* text, float* data_binding) {
-  UIPanel check = init_UIPanel(ui, PANEL_COLOR, text, data_binding, 0);
+  UIPanel color = init_UIPanel(ui, PANEL_COLOR, text, data_binding, 0);
 
-  return check;
+  color.render = render_UIPanel_color;
+
+  return color;
 }
 
 UIPanel create_info(UI* ui, const char* text, void* data_binding, int data_type, int kind) {
   UIPanel info = init_UIPanel(ui, PANEL_INFO, text, data_binding, 0);
 
-  info.prop1 = data_type;
-  info.prop2 = kind;
+  info.prop1  = data_type;
+  info.prop2  = kind;
+  info.render = render_UIPanel_info;
 
   return info;
 }
@@ -157,8 +169,10 @@ UIPanel create_tab(UI* ui, int* data_binding, char* options) {
     total_width += texts[i]->w;
   }
 
-  tab.prop2 = (UI_WIDTH - total_width) / count;
-  tab.prop3 = count;
+  tab.prop2        = (UI_WIDTH - total_width) / count;
+  tab.prop3        = count;
+  tab.render       = render_UIPanel_tab;
+  tab.handle_mouse = handle_mouse_UIPanel_tab;
 
   tab.voids_frames = 0;
 
@@ -170,59 +184,11 @@ UIPanel create_tab(UI* ui, int* data_binding, char* options) {
 UIPanel create_button(UI* ui, const char* text, void* data_binding, void (*func)(void*), int voids_frames) {
   UIPanel button = init_UIPanel(ui, PANEL_BUTTON, text, data_binding, voids_frames);
 
-  button.func = func;
+  button.func         = func;
+  button.render       = render_UIPanel_button;
+  button.handle_mouse = handle_mouse_UIPanel_button;
 
   return button;
-}
-
-void handle_mouse_UIPanel(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
-  switch (panel->type) {
-    case PANEL_SLIDER:
-      handle_mouse_UIPanel_slider(ui, panel, mouse_state, x, y);
-      break;
-    case PANEL_CHECK:
-      handle_mouse_UIPanel_check(ui, panel, mouse_state, x, y);
-      break;
-    case PANEL_DROPDOWN:
-      handle_mouse_UIPanel_dropdown(ui, panel, mouse_state, x, y);
-      break;
-    case PANEL_COLOR:
-      break;
-    case PANEL_INFO:
-      break;
-    case PANEL_TAB:
-      handle_mouse_UIPanel_tab(ui, panel, mouse_state, x, y);
-      break;
-    case PANEL_BUTTON:
-      handle_mouse_UIPanel_button(ui, panel, mouse_state, x, y);
-      break;
-  }
-}
-
-void render_UIPanel(UI* ui, UIPanel* panel, int y) {
-  switch (panel->type) {
-    case PANEL_SLIDER:
-      render_UIPanel_slider(ui, panel, y);
-      break;
-    case PANEL_CHECK:
-      render_UIPanel_check(ui, panel, y);
-      break;
-    case PANEL_DROPDOWN:
-      render_UIPanel_dropdown(ui, panel, y);
-      break;
-    case PANEL_COLOR:
-      render_UIPanel_color(ui, panel, y);
-      break;
-    case PANEL_INFO:
-      render_UIPanel_info(ui, panel, y);
-      break;
-    case PANEL_TAB:
-      render_UIPanel_tab(ui, panel, y);
-      break;
-    case PANEL_BUTTON:
-      render_UIPanel_button(ui, panel, y);
-      break;
-  }
 }
 
 void free_UIPanel(UIPanel* panel) {

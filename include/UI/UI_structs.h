@@ -4,6 +4,10 @@
 #include "SDL.h"
 #include "SDL_ttf.h"
 
+typedef struct UIPanel UIPanel;
+typedef struct UITab UITab;
+typedef struct UI UI;
+
 struct UIPanel {
   int type;
   int hover;
@@ -18,6 +22,8 @@ struct UIPanel {
   void* data;
   SDL_Surface* title;
   SDL_Surface* data_text;
+  void (*render)(UI*, struct UIPanel*, int);
+  void (*handle_mouse)(UI*, UIPanel*, int, int, int);
 } typedef UIPanel;
 
 struct UITab {
