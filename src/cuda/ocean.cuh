@@ -143,7 +143,11 @@ __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
 }
 
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
-  return (device_scene.ocean.height + 3.0f * device_scene.ocean.amplitude - origin.y) / ray.y;
+  const float d = device_scene.ocean.height - origin.y;
+  const float o = (d > 0.0f) ? (d + 3.0f * device_scene.ocean.amplitude) : d;
+  const float s = o / ray.y;
+
+  return (s >= eps) ? s : FLT_MAX;
 }
 
 __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, float max) {
