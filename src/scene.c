@@ -234,14 +234,17 @@ RaytraceInstance* load_scene(const char* filename) {
 
   process_lights(&scene, content.illuminance_maps);
 
-  DeviceBuffer* albedo_atlas      = cudatexture_allocate_to_buffer(content.albedo_maps, content.albedo_maps_length);
-  DeviceBuffer* illuminance_atlas = cudatexture_allocate_to_buffer(content.illuminance_maps, content.illuminance_maps_length);
-  DeviceBuffer* material_atlas    = cudatexture_allocate_to_buffer(content.material_maps, content.material_maps_length);
-  DeviceBuffer* normal_atlas      = cudatexture_allocate_to_buffer(content.normal_maps, content.normal_maps_length);
+  TextureAtlas tex_atlas = {
+    .albedo_atlas             = cudatexture_allocate_to_buffer(content.albedo_maps, content.albedo_maps_length),
+    .albedo_atlas_length      = content.albedo_maps_length,
+    .illuminance_atlas        = cudatexture_allocate_to_buffer(content.illuminance_maps, content.illuminance_maps_length),
+    .illuminance_atlas_length = content.illuminance_maps_length,
+    .material_atlas           = cudatexture_allocate_to_buffer(content.material_maps, content.material_maps_length),
+    .material_atlas_length    = content.material_maps_length,
+    .normal_atlas             = cudatexture_allocate_to_buffer(content.normal_maps, content.normal_maps_length),
+    .normal_atlas_length      = content.normal_maps_length};
 
-  RaytraceInstance* instance = init_raytracing(
-    general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
-    content.material_maps_length, normal_atlas, content.normal_maps_length, scene);
+  RaytraceInstance* instance = init_raytracing(general, tex_atlas, scene);
 
   free_wavefront_content(content);
   free_scene(scene);
@@ -269,14 +272,17 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   process_lights(&scene, content.illuminance_maps);
 
-  DeviceBuffer* albedo_atlas      = cudatexture_allocate_to_buffer(content.albedo_maps, content.albedo_maps_length);
-  DeviceBuffer* illuminance_atlas = cudatexture_allocate_to_buffer(content.illuminance_maps, content.illuminance_maps_length);
-  DeviceBuffer* material_atlas    = cudatexture_allocate_to_buffer(content.material_maps, content.material_maps_length);
-  DeviceBuffer* normal_atlas      = cudatexture_allocate_to_buffer(content.normal_maps, content.normal_maps_length);
+  TextureAtlas tex_atlas = {
+    .albedo_atlas             = cudatexture_allocate_to_buffer(content.albedo_maps, content.albedo_maps_length),
+    .albedo_atlas_length      = content.albedo_maps_length,
+    .illuminance_atlas        = cudatexture_allocate_to_buffer(content.illuminance_maps, content.illuminance_maps_length),
+    .illuminance_atlas_length = content.illuminance_maps_length,
+    .material_atlas           = cudatexture_allocate_to_buffer(content.material_maps, content.material_maps_length),
+    .material_atlas_length    = content.material_maps_length,
+    .normal_atlas             = cudatexture_allocate_to_buffer(content.normal_maps, content.normal_maps_length),
+    .normal_atlas_length      = content.normal_maps_length};
 
-  RaytraceInstance* instance = init_raytracing(
-    general, albedo_atlas, content.albedo_maps_length, illuminance_atlas, content.illuminance_maps_length, material_atlas,
-    content.material_maps_length, normal_atlas, content.normal_maps_length, scene);
+  RaytraceInstance* instance = init_raytracing(general, tex_atlas, scene);
 
   free_wavefront_content(content);
   free_scene(scene);
@@ -300,9 +306,10 @@ void serialize_scene(RaytraceInstance* instance) {
 }
 
 void free_atlases(RaytraceInstance* instance) {
-  cudatexture_free_buffer(instance->albedo_atlas, instance->albedo_atlas_length);
-  cudatexture_free_buffer(instance->illuminance_atlas, instance->illuminance_atlas_length);
-  cudatexture_free_buffer(instance->material_atlas, instance->material_atlas_length);
+  cudatexture_free_buffer(instance->tex_atlas.albedo_atlas, instance->tex_atlas.albedo_atlas_length);
+  cudatexture_free_buffer(instance->tex_atlas.illuminance_atlas, instance->tex_atlas.illuminance_atlas_length);
+  cudatexture_free_buffer(instance->tex_atlas.material_atlas, instance->tex_atlas.material_atlas_length);
+  cudatexture_free_buffer(instance->tex_atlas.normal_atlas, instance->tex_atlas.normal_atlas_length);
 }
 
 void free_strings(RaytraceInstance* instance) {

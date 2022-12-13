@@ -237,6 +237,17 @@ struct Scene {
   GlobalMaterial material;
 } typedef Scene;
 
+struct TextureAtlas {
+  DeviceBuffer* albedo_atlas;
+  int albedo_atlas_length;
+  DeviceBuffer* illuminance_atlas;
+  int illuminance_atlas_length;
+  DeviceBuffer* material_atlas;
+  int material_atlas_length;
+  DeviceBuffer* normal_atlas;
+  int normal_atlas_length;
+} typedef TextureAtlas;
+
 struct RaytraceInstance {
   unsigned int width;
   unsigned int height;
@@ -261,17 +272,9 @@ struct RaytraceInstance {
   DeviceBuffer* light_records;
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
-  DeviceBuffer* albedo_atlas;
   DeviceBuffer* light_samples_1;
   DeviceBuffer* light_samples_2;
   DeviceBuffer* light_eval_data;
-  int albedo_atlas_length;
-  DeviceBuffer* illuminance_atlas;
-  int illuminance_atlas_length;
-  DeviceBuffer* material_atlas;
-  int material_atlas_length;
-  DeviceBuffer* normal_atlas;
-  int normal_atlas_length;
   DeviceBuffer* cloud_noise;
   int max_ray_depth;
   int reservoir_size;
@@ -295,6 +298,7 @@ struct RaytraceInstance {
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
+  TextureAtlas tex_atlas;
 } typedef RaytraceInstance;
 
 #ifndef min
