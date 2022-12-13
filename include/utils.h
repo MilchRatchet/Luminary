@@ -238,14 +238,14 @@ struct Scene {
 } typedef Scene;
 
 struct TextureAtlas {
-  DeviceBuffer* albedo_atlas;
-  int albedo_atlas_length;
-  DeviceBuffer* illuminance_atlas;
-  int illuminance_atlas_length;
-  DeviceBuffer* material_atlas;
-  int material_atlas_length;
-  DeviceBuffer* normal_atlas;
-  int normal_atlas_length;
+  DeviceBuffer* albedo;
+  int albedo_length;
+  DeviceBuffer* illuminance;
+  int illuminance_length;
+  DeviceBuffer* material;
+  int material_length;
+  DeviceBuffer* normal;
+  int normal_length;
 } typedef TextureAtlas;
 
 struct RaytraceInstance {

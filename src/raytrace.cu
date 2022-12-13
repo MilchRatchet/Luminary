@@ -767,10 +767,10 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.light_records        = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
   ptrs.bounce_records       = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);
   ptrs.buffer_8bit          = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
-  ptrs.albedo_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.albedo_atlas);
-  ptrs.illuminance_atlas    = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.illuminance_atlas);
-  ptrs.material_atlas       = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.material_atlas);
-  ptrs.normal_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.normal_atlas);
+  ptrs.albedo_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.albedo);
+  ptrs.illuminance_atlas    = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.illuminance);
+  ptrs.material_atlas       = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.material);
+  ptrs.normal_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.normal);
   ptrs.cloud_noise          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->cloud_noise);
   ptrs.randoms              = (curandStateXORWOW_t*) device_buffer_get_pointer(instance->randoms);
   ptrs.raydir_buffer        = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
