@@ -302,7 +302,7 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
 
 extern "C" RaytraceInstance* init_raytracing(
   General general, DeviceBuffer* albedo_atlas, int albedo_atlas_length, DeviceBuffer* illuminance_atlas, int illuminance_atlas_length,
-  DeviceBuffer* material_atlas, int material_atlas_length, Scene scene) {
+  DeviceBuffer* material_atlas, int material_atlas_length, DeviceBuffer* normal_atlas, int normal_atlas_length, Scene scene) {
   RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
   memset(instance, 0, sizeof(RaytraceInstance));
 
@@ -331,10 +331,12 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->albedo_atlas      = albedo_atlas;
   instance->illuminance_atlas = illuminance_atlas;
   instance->material_atlas    = material_atlas;
+  instance->normal_atlas      = normal_atlas;
 
   instance->albedo_atlas_length      = albedo_atlas_length;
   instance->illuminance_atlas_length = illuminance_atlas_length;
   instance->material_atlas_length    = material_atlas_length;
+  instance->normal_atlas_length      = normal_atlas_length;
 
   instance->scene_gpu          = scene;
   instance->settings           = general;

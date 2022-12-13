@@ -41,9 +41,15 @@ struct Wavefront_Material {
   uint16_t albedo_texture;
   uint16_t illuminance_texture;
   uint16_t material_texture;
+  uint16_t normal_texture;
 } typedef Wavefront_Material;
 
-enum Wavefront_TextureInstanceType { WF_ALBEDO = 0, WF_ILLUMINANCE = 1, WF_MATERIAL = 2 } typedef Wavefront_TextureInstanceType;
+enum Wavefront_TextureInstanceType {
+  WF_ALBEDO      = 0,
+  WF_ILLUMINANCE = 1,
+  WF_MATERIAL    = 2,
+  WF_NORMAL      = 3
+} typedef Wavefront_TextureInstanceType;
 
 struct Wavefront_TextureInstance {
   size_t hash;
@@ -74,6 +80,8 @@ struct Wavefront_Content {
   unsigned int illuminance_maps_length;
   TextureRGBA* material_maps;
   unsigned int material_maps_length;
+  TextureRGBA* normal_maps;
+  unsigned int normal_maps_length;
   Wavefront_TextureList* texture_list;
 } typedef Wavefront_Content;
 

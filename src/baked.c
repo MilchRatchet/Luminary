@@ -24,7 +24,8 @@
  *  0x20 | Nodes              | Lights
  *  0x30 | TextureAssignments | TexAlb
  *  0x40 | TexMat             | TexIllum
- *  0x50 | StringsCount       | Strings
+ *  0x50 | TexNormal          | NULL
+ *  0x60 | StringsCount       | Strings
  * ------+--------------------+----------------------
  *
  * Texture Atlas Header (12 Bytes):
@@ -190,19 +191,22 @@ RaytraceInstance* load_baked(const char* filename) {
   TextureRGBA* material_tex = load_textures(file, instance->material_atlas_length, head[9]);
   void* material_atlas      = cudatexture_allocate_to_buffer(material_tex, instance->material_atlas_length);
   free_textures(material_tex, instance->material_atlas_length);
+  TextureRGBA* normal_tex = load_textures(file, instance->normal_atlas_length, head[10]);
+  void* normal_atlas      = cudatexture_allocate_to_buffer(normal_tex, instance->normal_atlas_length);
+  free_textures(normal_tex, instance->normal_atlas_length);
 
   scene.traversal_triangles = construct_traversal_triangles(scene.triangles, scene.triangles_length, scene.texture_assignments);
 
   RaytraceInstance* final = init_raytracing(
     instance->settings, albedo_atlas, instance->albedo_atlas_length, illuminance_atlas, instance->illuminance_atlas_length, material_atlas,
-    instance->material_atlas_length, scene);
+    instance->material_atlas_length, normal_atlas, instance->normal_atlas_length, scene);
 
   final->scene_gpu.sky.stars             = (Star*) 0;
   final->scene_gpu.sky.cloud.initialized = 0;
   generate_stars(final);
 
-  uint64_t strings_count = head[10];
-  char** strings         = load_strings(file, strings_count, head[11]);
+  uint64_t strings_count = head[12];
+  char** strings         = load_strings(file, strings_count, head[13]);
 
   final->settings.output_path       = strings[0];
   final->settings.mesh_files        = strings + 1;
@@ -304,11 +308,12 @@ void serialize_baked(RaytraceInstance* instance) {
   head[7]  = write_data(file, instance->albedo_atlas_length, 1, device_buffer_get_pointer(instance->albedo_atlas), TEX_PTR);
   head[8]  = write_data(file, instance->illuminance_atlas_length, 1, device_buffer_get_pointer(instance->illuminance_atlas), TEX_PTR);
   head[9]  = write_data(file, instance->material_atlas_length, 1, device_buffer_get_pointer(instance->material_atlas), TEX_PTR);
-  head[10] = 1 + instance->settings.mesh_files_count;
+  head[10] = write_data(file, instance->normal_atlas_length, 1, device_buffer_get_pointer(instance->normal_atlas), TEX_PTR);
+  head[12] = 1 + instance->settings.mesh_files_count;
 
   void* strings;
   uint64_t strings_length = serialize_strings(instance, &strings);
-  head[11]                = write_data(file, 1, strings_length, strings, CPU_PTR);
+  head[13]                = write_data(file, 1, strings_length, strings, CPU_PTR);
   free(strings);
 
   fseek(file, 0, SEEK_SET);

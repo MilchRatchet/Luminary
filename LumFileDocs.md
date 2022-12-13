@@ -330,18 +330,25 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
    - Green: Metallic
    - Blue: Unused
    - Alpha: Unused
+ - Normal Textures
+   - Red: Tangent X
+   - Green: Tangent Y
+   - Blue: Tangent Z
+   - Alpha: Unused
 
 Textures are to be referenced in the `*.mtl` as follows:
 
-- map_Kd = Albedo Textures
-- map_Ke = Illuminance Textures
-- map_Ns = Material Textures
+- map_Kd   = Albedo Textures
+- map_Ke   = Illuminance Textures
+- map_Ns   = Material Textures
+- map_Bump = Normal Textures (Spaces are not allowed in path)
 
 In `Blender` these map types correspond to:
 
-- map_Kd = Albedo
-- map_Ke = Emission
-- map_Ns = Smoothness
+- map_Kd   = Albedo
+- map_Ke   = Emission
+- map_Ns   = Smoothness
+- map_Bump = Normal
 
 >📝 There was a [bug](https://developer.blender.org/D14519) in Blender before 02.04.22 where map_Ke were not exported. If you encounter any issues of Luminary detecting no emissive triangles, use a newer Blender version for the export.
 

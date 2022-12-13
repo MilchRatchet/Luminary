@@ -168,7 +168,7 @@ struct TextureAssignment {
   uint16_t albedo_map;
   uint16_t illuminance_map;
   uint16_t material_map;
-  uint16_t _p;
+  uint16_t normal_map;
 } typedef TextureAssignment;
 
 struct TextureG {

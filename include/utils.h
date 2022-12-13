@@ -269,8 +269,10 @@ struct RaytraceInstance {
   DeviceBuffer* illuminance_atlas;
   int illuminance_atlas_length;
   DeviceBuffer* material_atlas;
-  DeviceBuffer* cloud_noise;
   int material_atlas_length;
+  DeviceBuffer* normal_atlas;
+  int normal_atlas_length;
+  DeviceBuffer* cloud_noise;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;

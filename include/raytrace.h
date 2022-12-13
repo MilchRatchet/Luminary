@@ -14,7 +14,7 @@ extern "C" {
 void initialize_device();
 RaytraceInstance* init_raytracing(
   General general, DeviceBuffer* albedo_atlas, int albedo_atlas_length, DeviceBuffer* illuminance_atlas, int illuminance_atlas_length,
-  DeviceBuffer* material_atlas, int material_atlas_length, Scene scene);
+  DeviceBuffer* material_atlas, int material_atlas_length, DeviceBuffer* normal_atlas, int normal_atlas_length, Scene scene);
 void reset_raytracing(RaytraceInstance* instance);
 void allocate_buffers(RaytraceInstance* instance);
 void update_jitter(RaytraceInstance* instance);
