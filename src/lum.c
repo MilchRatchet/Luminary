@@ -83,10 +83,6 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 6866939734539981382u:
       sscanf(value, "%d\n", &material->fresnel);
       break;
-    /* BVHALPHA */
-    case 4704098099231479362u:
-      sscanf(value, "%d\n", &material->bvh_alpha_cutoff);
-      break;
     /* ALPHACUT */
     case 6076837219871509569u:
       sscanf(value, "%f\n", &material->alpha_cutoff);
@@ -650,8 +646,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL EMISSION %f\n", instance->scene_gpu.material.default_material.b);
   fputs(line, file);
   sprintf(line, "MATERIAL FRESNEL_ %d\n", instance->scene_gpu.material.fresnel);
-  fputs(line, file);
-  sprintf(line, "MATERIAL BVHALPHA %d\n", instance->scene_gpu.material.bvh_alpha_cutoff);
   fputs(line, file);
   sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene_gpu.material.alpha_cutoff);
   fputs(line, file);

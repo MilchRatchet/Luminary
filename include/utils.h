@@ -215,7 +215,6 @@ struct GlobalMaterial {
   RGBF default_material;
   MaterialFresnel fresnel;
   int lights_active;
-  int bvh_alpha_cutoff;
   float alpha_cutoff;
 } typedef GlobalMaterial;
 

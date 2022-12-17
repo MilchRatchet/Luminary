@@ -156,9 +156,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       light_id = device.light_sample_history[pixel];
     }
 
-    if (
-      (is_first_ray() && !device_scene.material.bvh_alpha_cutoff)
-      || (device_iteration_type == TYPE_LIGHT && light_id <= TRIANGLE_ID_LIMIT)) {
+    if (is_first_ray() || (device_iteration_type == TYPE_LIGHT && light_id <= TRIANGLE_ID_LIMIT)) {
       uint32_t t_id;
       if (device_iteration_type == TYPE_LIGHT) {
         const TriangleLight tri_light = load_triangle_light(light_id);
@@ -169,11 +167,22 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
 
       if (t_id <= TRIANGLE_ID_LIMIT) {
-        const float dist = bvh_triangle_intersection(load_traversal_triangle(t_id), task.origin, task.ray);
+        TraversalTriangle t = load_traversal_triangle(t_id);
+
+        UV coords;
+        const float dist = bvh_triangle_intersection_uv(t, task.origin, task.ray, coords);
 
         if (dist < depth) {
-          depth  = dist;
-          hit_id = t_id;
+          const int alpha_result = bvh_triangle_intersection_alpha_test(t, t_id, coords);
+
+          if (alpha_result != 2) {
+            depth  = dist;
+            hit_id = t_id;
+          }
+          else if (device_iteration_type == TYPE_LIGHT) {
+            depth  = -1.0f;
+            hit_id = REJECT_HIT;
+          }
         }
       }
     }

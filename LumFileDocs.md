@@ -49,9 +49,6 @@ Defines which of the available fresnel approximations is used:
   - 0 = Schlick
   - 1 = Fdez-Aguera
 
-`MATERIAL BVHALPHA [INT32]`<br/>
-Set 1 to check for fully transparent hits during BVH traversal, 0 else. This fixes early ray termination in scenes that make much use of alpha cutoff. However, it comes at a mild performance cost.
-
 `MATERIAL ALPHACUT [FP32]`<br/>
 Every alpha value smaller than this value is automatically treated as 0, i.e., fully transparent. Number must be in the range [0,1].
 

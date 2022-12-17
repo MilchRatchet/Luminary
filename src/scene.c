@@ -27,7 +27,6 @@ static Scene get_default_scene() {
   scene.material.default_material.g = 0.0f;
   scene.material.default_material.b = 1.0f;
   scene.material.fresnel            = FDEZ_AGUERA;
-  scene.material.bvh_alpha_cutoff   = 1;
   scene.material.alpha_cutoff       = 0.0f;
 
   scene.camera.pos.x                 = 0.0f;
