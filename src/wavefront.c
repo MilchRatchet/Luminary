@@ -115,7 +115,7 @@ void free_wavefront_content(Wavefront_Content content) {
   for (unsigned int i = 0; i < content.material_maps_length; i++) {
     free(content.material_maps[i].data);
   }
-  for (unsigned int i = 0; i < content.material_maps_length; i++) {
+  for (unsigned int i = 0; i < content.normal_maps_length; i++) {
     free(content.normal_maps[i].data);
   }
 
