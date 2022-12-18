@@ -137,17 +137,33 @@ __device__ vec3 ocean_get_normal(vec3 p, const float diff) {
 }
 
 __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
-  const float depth = (device_scene.ocean.height - origin.y) / ray.y;
+  const float d1 = device_scene.ocean.height - origin.y;
+  const float d2 = d1 + device_scene.ocean.amplitude;
 
-  return (depth >= eps) ? depth : FLT_MAX;
+  const float s1 = d1 / ray.y;
+  const float s2 = d2 / ray.y;
+
+  // inbetween top and bottom is inconclusive
+  if (s1 * s2 < 0.0f)
+    return FLT_MAX;
+
+  const float s = fmaxf(s1, s2);
+
+  return (s >= eps) ? s : FLT_MAX;
 }
 
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
-  const float d = device_scene.ocean.height - origin.y;
-  const float o = (d > 0.0f) ? (d + 3.0f * device_scene.ocean.amplitude) : d;
-  const float s = o / ray.y;
+  const float d1 = device_scene.ocean.height - origin.y;
+  const float d2 = d1 + device_scene.ocean.amplitude;
 
-  return (s >= eps) ? s : FLT_MAX;
+  const float s1 = d1 / ray.y;
+  const float s2 = d2 / ray.y;
+
+  // inbetween top and bottom is inconclusive
+  if (s1 * s2 < 0.0f)
+    return 0.0f;
+
+  return fabsf(fminf(s1, s2));
 }
 
 __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, float max) {
