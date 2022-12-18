@@ -63,6 +63,9 @@ __device__ float step(const float edge, const float x) {
 
 __device__ float smoothstep(const float x, const float edge0, const float edge1) {
   float t = remap01(x, edge0, edge1);
+  // Surprisingly, this is almost equivalent on [0,1]
+  // https://twitter.com/lisyarus/status/1600173486802014209
+  // return 0.5f * (1.0f - cosf(PI * x));
   return t * t * (3.0f - 2.0f * t);
 }
 
@@ -1052,6 +1055,34 @@ __device__ float sample_sphere_solid_angle(const vec3 p, const float r, const ve
 
 __device__ int material_is_mirror(const float roughness, const float metallic) {
   return (roughness < 0.1f && metallic > 0.99f);
+}
+
+// Computes tangent space for use with normal mapping without precomputation
+// http://www.thetenthplanet.de/archives/1180
+__device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
+  const vec3 a1 = cross_product(e2, normal);
+  const vec3 a2 = cross_product(normal, e1);
+
+  vec3 T = add_vector(scale_vector(a1, t1.u), scale_vector(a2, t2.u));
+  vec3 B = add_vector(scale_vector(a1, t1.v), scale_vector(a2, t2.v));
+
+  const float invmax = __frsqrt_rn(fmaxf(dot_product(T, T), dot_product(B, B)));
+
+  T = scale_vector(T, invmax);
+  B = scale_vector(B, invmax);
+
+  Mat3x3 mat;
+  mat.f11 = T.x;
+  mat.f21 = T.y;
+  mat.f31 = T.z;
+  mat.f12 = B.x;
+  mat.f22 = B.y;
+  mat.f32 = B.z;
+  mat.f13 = normal.x;
+  mat.f23 = normal.y;
+  mat.f33 = normal.z;
+
+  return mat;
 }
 
 /////////////////

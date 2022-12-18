@@ -35,6 +35,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     const UV coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
+    const UV vertex_texture = get_UV(t5.z, t5.w);
+    const UV edge1_texture  = get_UV(t6.x, t6.y);
+    const UV edge2_texture  = get_UV(t6.z, t6.w);
+
+    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+
+    const int texture_object         = __float_as_int(t7.x);
+    const uint32_t triangle_light_id = __float_as_uint(t7.y);
+
+    const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
+
     vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
     vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
     vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
@@ -70,18 +81,20 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       edge2_normal  = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(edge2_normal, 1.0f - t)));
     }
 
-    const vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
+    vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
 
-    const UV vertex_texture = get_UV(t5.z, t5.w);
-    const UV edge1_texture  = get_UV(t6.x, t6.y);
-    const UV edge2_texture  = get_UV(t6.z, t6.w);
+    if (maps.w) {
+      const float4 normal_f = tex2D<float4>(device.normal_atlas[maps.w], tex_coords.u, 1.0f - tex_coords.v);
 
-    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+      vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
-    const int texture_object         = __float_as_int(t7.x);
-    const uint32_t triangle_light_id = __float_as_uint(t7.y);
+      map_normal = scale_vector(map_normal, 2.0f);
+      map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
 
-    const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
+      Mat3x3 tangent_space = cotangent_frame(normal, edge1, edge2, edge1_texture, edge2_texture);
+
+      normal = normalize_vector(transform_vec3(tangent_space, map_normal));
+    }
 
     float roughness;
     float metallic;
