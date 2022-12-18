@@ -16,115 +16,121 @@
 #define LINE_SIZE 4096
 #define READ_BUFFER_SIZE 262144  // 256kb
 
-Wavefront_Content create_wavefront_content() {
-  Wavefront_Content content;
-  content.vertices         = malloc(sizeof(Wavefront_Vertex) * 1);
-  content.vertices_length  = 0;
-  content.normals          = malloc(sizeof(Wavefront_Normal) * 1);
-  content.normals_length   = 0;
-  content.uvs              = malloc(sizeof(Wavefront_UV) * 1);
-  content.uvs_length       = 0;
-  content.triangles        = malloc(sizeof(Wavefront_Triangle) * 1);
-  content.triangles_length = 0;
-  content.materials        = malloc(sizeof(Wavefront_Material) * 1);
-  content.materials_length = 1;
+void wavefront_init(WavefrontContent** content) {
+  *content = malloc(sizeof(WavefrontContent));
 
-  content.materials[0].hash                = 0;
-  content.materials[0].albedo_texture      = 0;
-  content.materials[0].illuminance_texture = 0;
-  content.materials[0].material_texture    = 0;
-  content.materials[0].normal_texture      = 0;
+  (*content)->vertices         = malloc(sizeof(WavefrontVertex) * 1);
+  (*content)->vertices_length  = 0;
+  (*content)->normals          = malloc(sizeof(WavefrontNormal) * 1);
+  (*content)->normals_length   = 0;
+  (*content)->uvs              = malloc(sizeof(WavefrontUV) * 1);
+  (*content)->uvs_length       = 0;
+  (*content)->triangles        = malloc(sizeof(WavefrontTriangle) * 1);
+  (*content)->triangles_length = 0;
+  (*content)->materials        = malloc(sizeof(WavefrontMaterial) * 1);
+  (*content)->materials_length = 1;
 
-  content.albedo_maps             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  content.albedo_maps_length      = 1;
-  content.illuminance_maps        = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  content.illuminance_maps_length = 1;
-  content.material_maps           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  content.material_maps_length    = 1;
-  content.normal_maps             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  content.normal_maps_length      = 1;
+  (*content)->materials[0].hash                = 0;
+  (*content)->materials[0].albedo_texture      = 0;
+  (*content)->materials[0].illuminance_texture = 0;
+  (*content)->materials[0].material_texture    = 0;
+  (*content)->materials[0].normal_texture      = 0;
+
+  (*content)->albedo_maps             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->albedo_maps_length      = 1;
+  (*content)->illuminance_maps        = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->illuminance_maps_length = 1;
+  (*content)->material_maps           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->material_maps_length    = 1;
+  (*content)->normal_maps             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->normal_maps_length      = 1;
 
   RGBA8 default_albedo   = {.r = 230, .g = 230, .b = 230, .a = 255};
   RGBA8 default_material = {.r = 50, .g = 0, .b = 1, .a = 255};
   RGBA8 default_normal   = {.r = 127, .g = 127, .b = 255, .a = 0};
 
-  content.albedo_maps[0].width      = 4;
-  content.albedo_maps[0].height     = 4;
-  content.albedo_maps[0].depth      = 1;
-  content.albedo_maps[0].pitch      = 4;
-  content.albedo_maps[0].type       = TexDataUINT8;
-  content.albedo_maps[0].gpu        = 0;
-  content.albedo_maps[0].volume_tex = 0;
-  content.albedo_maps[0].data       = (RGBA8*) malloc(sizeof(RGBA8) * 16);
+  (*content)->albedo_maps[0].width      = 4;
+  (*content)->albedo_maps[0].height     = 4;
+  (*content)->albedo_maps[0].depth      = 1;
+  (*content)->albedo_maps[0].pitch      = 4;
+  (*content)->albedo_maps[0].type       = TexDataUINT8;
+  (*content)->albedo_maps[0].gpu        = 0;
+  (*content)->albedo_maps[0].volume_tex = 0;
+  (*content)->albedo_maps[0].data       = (RGBA8*) malloc(sizeof(RGBA8) * 16);
   for (int i = 0; i < 16; i++) {
-    ((RGBA8*) content.albedo_maps[0].data)[i] = default_albedo;
+    ((RGBA8*) (*content)->albedo_maps[0].data)[i] = default_albedo;
   }
-  content.illuminance_maps[0].width      = 4;
-  content.illuminance_maps[0].height     = 4;
-  content.illuminance_maps[0].depth      = 1;
-  content.illuminance_maps[0].pitch      = 4;
-  content.illuminance_maps[0].type       = TexDataUINT8;
-  content.illuminance_maps[0].gpu        = 0;
-  content.illuminance_maps[0].volume_tex = 0;
-  content.illuminance_maps[0].data       = (RGBA8*) malloc(sizeof(RGBA8) * 16);
-  memset(content.illuminance_maps[0].data, 0, sizeof(RGBA8) * 16);
-  content.material_maps[0].width      = 4;
-  content.material_maps[0].height     = 4;
-  content.material_maps[0].depth      = 1;
-  content.material_maps[0].pitch      = 4;
-  content.material_maps[0].type       = TexDataUINT8;
-  content.material_maps[0].gpu        = 0;
-  content.material_maps[0].volume_tex = 0;
-  content.material_maps[0].data       = (RGBA8*) malloc(sizeof(RGBA8) * 16);
+  (*content)->illuminance_maps[0].width      = 4;
+  (*content)->illuminance_maps[0].height     = 4;
+  (*content)->illuminance_maps[0].depth      = 1;
+  (*content)->illuminance_maps[0].pitch      = 4;
+  (*content)->illuminance_maps[0].type       = TexDataUINT8;
+  (*content)->illuminance_maps[0].gpu        = 0;
+  (*content)->illuminance_maps[0].volume_tex = 0;
+  (*content)->illuminance_maps[0].data       = (RGBA8*) malloc(sizeof(RGBA8) * 16);
+  memset((*content)->illuminance_maps[0].data, 0, sizeof(RGBA8) * 16);
+  (*content)->material_maps[0].width      = 4;
+  (*content)->material_maps[0].height     = 4;
+  (*content)->material_maps[0].depth      = 1;
+  (*content)->material_maps[0].pitch      = 4;
+  (*content)->material_maps[0].type       = TexDataUINT8;
+  (*content)->material_maps[0].gpu        = 0;
+  (*content)->material_maps[0].volume_tex = 0;
+  (*content)->material_maps[0].data       = (RGBA8*) malloc(sizeof(RGBA8) * 16);
   for (int i = 0; i < 16; i++) {
-    ((RGBA8*) content.material_maps[0].data)[i] = default_material;
+    ((RGBA8*) (*content)->material_maps[0].data)[i] = default_material;
   }
-  content.normal_maps[0].width      = 4;
-  content.normal_maps[0].height     = 4;
-  content.normal_maps[0].depth      = 1;
-  content.normal_maps[0].pitch      = 4;
-  content.normal_maps[0].type       = TexDataUINT8;
-  content.normal_maps[0].gpu        = 0;
-  content.normal_maps[0].volume_tex = 0;
-  content.normal_maps[0].data       = (RGBA8*) malloc(sizeof(RGBA8) * 16);
+  (*content)->normal_maps[0].width      = 4;
+  (*content)->normal_maps[0].height     = 4;
+  (*content)->normal_maps[0].depth      = 1;
+  (*content)->normal_maps[0].pitch      = 4;
+  (*content)->normal_maps[0].type       = TexDataUINT8;
+  (*content)->normal_maps[0].gpu        = 0;
+  (*content)->normal_maps[0].volume_tex = 0;
+  (*content)->normal_maps[0].data       = (RGBA8*) malloc(sizeof(RGBA8) * 16);
   for (int i = 0; i < 16; i++) {
-    ((RGBA8*) content.normal_maps[0].data)[i] = default_normal;
+    ((RGBA8*) (*content)->normal_maps[0].data)[i] = default_normal;
   }
 
-  content.texture_list           = malloc(sizeof(Wavefront_TextureList));
-  content.texture_list->textures = malloc(sizeof(Wavefront_TextureInstance) * 16);
-  content.texture_list->count    = 0;
-  content.texture_list->length   = 16;
-
-  return content;
+  (*content)->texture_list           = malloc(sizeof(WavefrontTextureList));
+  (*content)->texture_list->textures = malloc(sizeof(WavefrontTextureInstance) * 16);
+  (*content)->texture_list->count    = 0;
+  (*content)->texture_list->length   = 16;
 }
 
-void free_wavefront_content(Wavefront_Content content) {
-  free(content.vertices);
-  free(content.normals);
-  free(content.uvs);
-  free(content.triangles);
-  free(content.materials);
-
-  for (unsigned int i = 0; i < content.albedo_maps_length; i++) {
-    free(content.albedo_maps[i].data);
-  }
-  for (unsigned int i = 0; i < content.illuminance_maps_length; i++) {
-    free(content.illuminance_maps[i].data);
-  }
-  for (unsigned int i = 0; i < content.material_maps_length; i++) {
-    free(content.material_maps[i].data);
-  }
-  for (unsigned int i = 0; i < content.normal_maps_length; i++) {
-    free(content.normal_maps[i].data);
+void wavefront_clear(WavefrontContent** content) {
+  if (!content) {
+    error_message("WavefrontContent is NULL.");
+    return;
   }
 
-  free(content.albedo_maps);
-  free(content.illuminance_maps);
-  free(content.material_maps);
-  free(content.normal_maps);
-  free(content.texture_list->textures);
-  free(content.texture_list);
+  free((*content)->vertices);
+  free((*content)->normals);
+  free((*content)->uvs);
+  free((*content)->triangles);
+  free((*content)->materials);
+
+  for (unsigned int i = 0; i < (*content)->albedo_maps_length; i++) {
+    free((*content)->albedo_maps[i].data);
+  }
+  for (unsigned int i = 0; i < (*content)->illuminance_maps_length; i++) {
+    free((*content)->illuminance_maps[i].data);
+  }
+  for (unsigned int i = 0; i < (*content)->material_maps_length; i++) {
+    free((*content)->material_maps[i].data);
+  }
+  for (unsigned int i = 0; i < (*content)->normal_maps_length; i++) {
+    free((*content)->normal_maps[i].data);
+  }
+
+  free((*content)->albedo_maps);
+  free((*content)->illuminance_maps);
+  free((*content)->material_maps);
+  free((*content)->normal_maps);
+  free((*content)->texture_list->textures);
+  free((*content)->texture_list);
+
+  free(*content);
 }
 
 static size_t hash_djb2(unsigned char* str) {
@@ -141,9 +147,9 @@ static size_t hash_djb2(unsigned char* str) {
 /*
  * @result Index of texture if texture is already present, else 0 (since zero is the NULL texture)
  */
-static uint16_t find_texture(Wavefront_TextureList* textures, uint32_t hash, Wavefront_TextureInstanceType type) {
+static uint16_t find_texture(WavefrontTextureList* textures, uint32_t hash, WavefrontTextureInstanceType type) {
   for (uint32_t i = 0; i < textures->count; i++) {
-    Wavefront_TextureInstance tex = textures->textures[i];
+    WavefrontTextureInstance tex = textures->textures[i];
     if (tex.hash == hash && tex.type == type)
       return tex.offset;
   }
@@ -151,18 +157,18 @@ static uint16_t find_texture(Wavefront_TextureList* textures, uint32_t hash, Wav
   return 0;
 }
 
-static void add_texture(Wavefront_TextureList* textures, uint32_t hash, Wavefront_TextureInstanceType type, uint16_t offset) {
+static void add_texture(WavefrontTextureList* textures, uint32_t hash, WavefrontTextureInstanceType type, uint16_t offset) {
   if (textures->count == textures->length) {
     textures->length *= 2;
-    textures->textures = safe_realloc(textures->textures, sizeof(Wavefront_TextureInstance) * textures->length);
+    textures->textures = safe_realloc(textures->textures, sizeof(WavefrontTextureInstance) * textures->length);
   }
 
-  Wavefront_TextureInstance tex = {.hash = hash, .offset = offset, .type = type};
+  WavefrontTextureInstance tex = {.hash = hash, .offset = offset, .type = type};
 
   textures->textures[textures->count++] = tex;
 }
 
-static void read_materials_file(const char* filename, Wavefront_Content* io_content) {
+static void read_materials_file(WavefrontContent* _content, const char* filename) {
   log_message("Reading *.mtl file (%s)", filename);
   FILE* file = fopen(filename, "r");
 
@@ -171,7 +177,7 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
     return;
   }
 
-  Wavefront_Content content = *io_content;
+  WavefrontContent content = *_content;
 
   unsigned int materials_count        = content.materials_length;
   unsigned int albedo_maps_count      = content.albedo_maps_length;
@@ -186,7 +192,7 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
     fgets(line, LINE_SIZE, file);
 
     if (line[0] == 'n' && line[1] == 'e' && line[2] == 'w' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
-      ensure_capacity(content.materials, materials_count, content.materials_length, sizeof(Wavefront_Material));
+      ensure_capacity(content.materials, materials_count, content.materials_length, sizeof(WavefrontMaterial));
       sscanf(line, "%*s %s\n", path);
       size_t hash = hash_djb2((unsigned char*) path);
 
@@ -264,7 +270,7 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
   }
 
   content.materials_length        = materials_count;
-  content.materials               = safe_realloc(content.materials, sizeof(Wavefront_Material) * content.materials_length);
+  content.materials               = safe_realloc(content.materials, sizeof(WavefrontMaterial) * content.materials_length);
   content.albedo_maps_length      = albedo_maps_count;
   content.albedo_maps             = safe_realloc(content.albedo_maps, sizeof(TextureRGBA) * content.albedo_maps_length);
   content.illuminance_maps_length = illuminance_maps_count;
@@ -274,7 +280,7 @@ static void read_materials_file(const char* filename, Wavefront_Content* io_cont
   content.normal_maps_length      = normal_maps_count;
   content.normal_maps             = safe_realloc(content.normal_maps, sizeof(TextureRGBA) * content.normal_maps_length);
 
-  *io_content = content;
+  *_content = content;
 
   fclose(file);
 
@@ -312,7 +318,7 @@ static int read_float_line(const char* str, const int n, float* dst) {
  * @param face2 Pointer to Triangle which gets filled by the data.
  * @result Returns the number of triangles parsed.
  */
-static int read_face(const char* str, Wavefront_Triangle* face1, Wavefront_Triangle* face2) {
+static int read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangle* face2) {
   int ptr = 0;
 
   const unsigned int num_check = 0b00110000;
@@ -362,7 +368,7 @@ static int read_face(const char* str, Wavefront_Triangle* face1, Wavefront_Trian
   switch (data_ptr) {
     case 3:  // Triangle, Only v
     {
-      memset(face1, 0, sizeof(Wavefront_Triangle));
+      memset(face1, 0, sizeof(WavefrontTriangle));
       face1->v1 = data[0];
       face1->v2 = data[1];
       face1->v3 = data[2];
@@ -370,8 +376,8 @@ static int read_face(const char* str, Wavefront_Triangle* face1, Wavefront_Trian
     } break;
     case 4:  // Quad, Only v
     {
-      memset(face1, 0, sizeof(Wavefront_Triangle));
-      memset(face2, 0, sizeof(Wavefront_Triangle));
+      memset(face1, 0, sizeof(WavefrontTriangle));
+      memset(face2, 0, sizeof(WavefrontTriangle));
       face1->v1 = data[0];
       face1->v2 = data[1];
       face1->v3 = data[2];
@@ -382,7 +388,7 @@ static int read_face(const char* str, Wavefront_Triangle* face1, Wavefront_Trian
     } break;
     case 6:  // Triangle, Only v and vt
     {
-      memset(face1, 0, sizeof(Wavefront_Triangle));
+      memset(face1, 0, sizeof(WavefrontTriangle));
       face1->v1  = data[0];
       face1->vt1 = data[1];
       face1->v2  = data[2];
@@ -393,8 +399,8 @@ static int read_face(const char* str, Wavefront_Triangle* face1, Wavefront_Trian
     } break;
     case 8:  // Quad, Only v and vt
     {
-      memset(face1, 0, sizeof(Wavefront_Triangle));
-      memset(face2, 0, sizeof(Wavefront_Triangle));
+      memset(face1, 0, sizeof(WavefrontTriangle));
+      memset(face2, 0, sizeof(WavefrontTriangle));
       face1->v1  = data[0];
       face1->vt1 = data[1];
       face1->v2  = data[2];
@@ -456,7 +462,7 @@ static int read_face(const char* str, Wavefront_Triangle* face1, Wavefront_Trian
   return tris;
 }
 
-int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
+int wavefront_read_file(WavefrontContent* _content, const char* filename) {
   log_message("Reading *.obj file (%s)", filename);
   bench_tic();
   FILE* file = fopen(filename, "r");
@@ -466,7 +472,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
     return -1;
   }
 
-  Wavefront_Content content = *io_content;
+  WavefrontContent content = *_content;
 
   const unsigned int vertices_offset = content.vertices_length;
   const unsigned int normals_offset  = content.normals_length;
@@ -500,30 +506,30 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
     while ((eol = strchr(line, '\n'))) {
       *eol = '\0';
       if (line[0] == 'v' && line[1] == ' ') {
-        ensure_capacity(content.vertices, vertices_count, content.vertices_length, sizeof(Wavefront_Vertex));
-        Wavefront_Vertex v;
+        ensure_capacity(content.vertices, vertices_count, content.vertices_length, sizeof(WavefrontVertex));
+        WavefrontVertex v;
         read_float_line(line + 2, 3, &v.x);
         content.vertices[vertices_count] = v;
         vertices_count++;
       }
       else if (line[0] == 'v' && line[1] == 'n') {
-        ensure_capacity(content.normals, normals_count, content.normals_length, sizeof(Wavefront_Normal));
-        Wavefront_Normal n;
+        ensure_capacity(content.normals, normals_count, content.normals_length, sizeof(WavefrontNormal));
+        WavefrontNormal n;
         read_float_line(line + 3, 3, &n.x);
         content.normals[normals_count] = n;
         normals_count++;
       }
       else if (line[0] == 'v' && line[1] == 't') {
-        ensure_capacity(content.uvs, uvs_count, content.uvs_length, sizeof(Wavefront_UV));
-        Wavefront_UV uv;
+        ensure_capacity(content.uvs, uvs_count, content.uvs_length, sizeof(WavefrontUV));
+        WavefrontUV uv;
         read_float_line(line + 3, 2, &uv.u);
         content.uvs[uvs_count] = uv;
         uvs_count++;
       }
       else if (line[0] == 'f') {
-        ensure_capacity(content.triangles, triangles_count, content.triangles_length, sizeof(Wavefront_Triangle));
-        Wavefront_Triangle face1;
-        Wavefront_Triangle face2;
+        ensure_capacity(content.triangles, triangles_count, content.triangles_length, sizeof(WavefrontTriangle));
+        WavefrontTriangle face1;
+        WavefrontTriangle face2;
         const int returned_faces = read_face(line, &face1, &face2);
 
         if (returned_faces >= 1) {
@@ -570,7 +576,7 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
         if (!already_loaded) {
           ensure_capacity(loaded_mtls, loaded_mtls_count, loaded_mtls_length, sizeof(size_t));
           loaded_mtls[loaded_mtls_count++] = hash;
-          read_materials_file(path, &content);
+          read_materials_file(&content, path);
           materials_count = content.materials_length;
         }
       }
@@ -594,15 +600,15 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   }
 
   content.vertices_length  = vertices_count;
-  content.vertices         = safe_realloc(content.vertices, sizeof(Wavefront_Vertex) * content.vertices_length);
+  content.vertices         = safe_realloc(content.vertices, sizeof(WavefrontVertex) * content.vertices_length);
   content.normals_length   = normals_count;
-  content.normals          = safe_realloc(content.normals, sizeof(Wavefront_Normal) * content.normals_length);
+  content.normals          = safe_realloc(content.normals, sizeof(WavefrontNormal) * content.normals_length);
   content.uvs_length       = uvs_count;
-  content.uvs              = safe_realloc(content.uvs, sizeof(Wavefront_UV) * content.uvs_length);
+  content.uvs              = safe_realloc(content.uvs, sizeof(WavefrontUV) * content.uvs_length);
   content.triangles_length = triangles_count;
-  content.triangles        = safe_realloc(content.triangles, sizeof(Wavefront_Triangle) * content.triangles_length);
+  content.triangles        = safe_realloc(content.triangles, sizeof(WavefrontTriangle) * content.triangles_length);
 
-  *io_content = content;
+  *_content = content;
 
   free(loaded_mtls);
   free(path);
@@ -615,15 +621,15 @@ int read_wavefront_file(const char* filename, Wavefront_Content* io_content) {
   return 0;
 }
 
-TextureAssignment* get_texture_assignments(Wavefront_Content content) {
-  TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * content.materials_length);
+TextureAssignment* wavefront_generate_texture_assignments(WavefrontContent* content) {
+  TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * content->materials_length);
 
-  for (unsigned int i = 0; i < content.materials_length; i++) {
+  for (unsigned int i = 0; i < content->materials_length; i++) {
     TextureAssignment assignment;
-    assignment.albedo_map      = content.materials[i].albedo_texture;
-    assignment.illuminance_map = content.materials[i].illuminance_texture;
-    assignment.material_map    = content.materials[i].material_texture;
-    assignment.normal_map      = content.materials[i].normal_texture;
+    assignment.albedo_map      = content->materials[i].albedo_texture;
+    assignment.illuminance_map = content->materials[i].illuminance_texture;
+    assignment.material_map    = content->materials[i].material_texture;
+    assignment.normal_map      = content->materials[i].normal_texture;
 
     texture_assignments[i] = assignment;
   }
@@ -631,111 +637,111 @@ TextureAssignment* get_texture_assignments(Wavefront_Content content) {
   return texture_assignments;
 }
 
-unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content content) {
+unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles) {
   bench_tic();
 
-  unsigned int count = content.triangles_length;
+  unsigned int count = content->triangles_length;
 
   *triangles       = (Triangle*) malloc(sizeof(Triangle) * count);
   unsigned int ptr = 0;
 
   for (unsigned int j = 0; j < count; j++) {
-    Wavefront_Triangle t = content.triangles[j];
+    WavefrontTriangle t = content->triangles[j];
     Triangle triangle;
 
-    Wavefront_Vertex v;
+    WavefrontVertex v;
 
-    t.v1 += (t.v1 < 0) ? content.vertices_length + 1 : 0;
+    t.v1 += (t.v1 < 0) ? content->vertices_length + 1 : 0;
 
-    if (t.v1 > content.vertices_length) {
+    if (t.v1 > content->vertices_length) {
       continue;
     }
     else {
-      v = content.vertices[t.v1 - 1];
+      v = content->vertices[t.v1 - 1];
     }
 
     triangle.vertex.x = v.x;
     triangle.vertex.y = v.y;
     triangle.vertex.z = v.z;
 
-    t.v2 += (t.v2 < 0) ? content.vertices_length + 1 : 0;
+    t.v2 += (t.v2 < 0) ? content->vertices_length + 1 : 0;
 
-    if (t.v2 > content.vertices_length) {
+    if (t.v2 > content->vertices_length) {
       continue;
     }
     else {
-      v = content.vertices[t.v2 - 1];
+      v = content->vertices[t.v2 - 1];
     }
 
     triangle.edge1.x = v.x - triangle.vertex.x;
     triangle.edge1.y = v.y - triangle.vertex.y;
     triangle.edge1.z = v.z - triangle.vertex.z;
 
-    t.v3 += (t.v3 < 0) ? content.vertices_length + 1 : 0;
+    t.v3 += (t.v3 < 0) ? content->vertices_length + 1 : 0;
 
-    if (t.v3 > content.vertices_length) {
+    if (t.v3 > content->vertices_length) {
       continue;
     }
     else {
-      v = content.vertices[t.v3 - 1];
+      v = content->vertices[t.v3 - 1];
     }
 
     triangle.edge2.x = v.x - triangle.vertex.x;
     triangle.edge2.y = v.y - triangle.vertex.y;
     triangle.edge2.z = v.z - triangle.vertex.z;
 
-    Wavefront_UV uv;
+    WavefrontUV uv;
 
-    t.vt1 += (t.vt1 < 0) ? content.uvs_length + 1 : 0;
+    t.vt1 += (t.vt1 < 0) ? content->uvs_length + 1 : 0;
 
-    if (t.vt1 > content.uvs_length || t.vt1 == 0) {
+    if (t.vt1 > content->uvs_length || t.vt1 == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content.uvs[t.vt1 - 1];
+      uv = content->uvs[t.vt1 - 1];
     }
 
     triangle.vertex_texture.u = uv.u;
     triangle.vertex_texture.v = uv.v;
 
-    t.vt2 += (t.vt2 < 0) ? content.uvs_length + 1 : 0;
+    t.vt2 += (t.vt2 < 0) ? content->uvs_length + 1 : 0;
 
-    if (t.vt2 > content.uvs_length || t.vt2 == 0) {
+    if (t.vt2 > content->uvs_length || t.vt2 == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content.uvs[t.vt2 - 1];
+      uv = content->uvs[t.vt2 - 1];
     }
 
     triangle.edge1_texture.u = uv.u - triangle.vertex_texture.u;
     triangle.edge1_texture.v = uv.v - triangle.vertex_texture.v;
 
-    t.vt3 += (t.vt3 < 0) ? content.uvs_length + 1 : 0;
+    t.vt3 += (t.vt3 < 0) ? content->uvs_length + 1 : 0;
 
-    if (t.vt3 > content.uvs_length || t.vt3 == 0) {
+    if (t.vt3 > content->uvs_length || t.vt3 == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content.uvs[t.vt3 - 1];
+      uv = content->uvs[t.vt3 - 1];
     }
 
     triangle.edge2_texture.u = uv.u - triangle.vertex_texture.u;
     triangle.edge2_texture.v = uv.v - triangle.vertex_texture.v;
 
-    Wavefront_Normal n;
+    WavefrontNormal n;
 
-    t.vn1 += (t.vn1 < 0) ? content.normals_length + 1 : 0;
+    t.vn1 += (t.vn1 < 0) ? content->normals_length + 1 : 0;
 
-    if (t.vn1 > content.normals_length || t.vn1 == 0) {
+    if (t.vn1 > content->normals_length || t.vn1 == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content.normals[t.vn1 - 1];
+      n = content->normals[t.vn1 - 1];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
@@ -755,15 +761,15 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.vertex_normal.y = n.y;
     triangle.vertex_normal.z = n.z;
 
-    t.vn2 += (t.vn2 < 0) ? content.normals_length + 1 : 0;
+    t.vn2 += (t.vn2 < 0) ? content->normals_length + 1 : 0;
 
-    if (t.vn2 > content.normals_length || t.vn2 == 0) {
+    if (t.vn2 > content->normals_length || t.vn2 == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content.normals[t.vn2 - 1];
+      n = content->normals[t.vn2 - 1];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
@@ -783,15 +789,15 @@ unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content c
     triangle.edge1_normal.y = n.y - triangle.vertex_normal.y;
     triangle.edge1_normal.z = n.z - triangle.vertex_normal.z;
 
-    t.vn3 += (t.vn3 < 0) ? content.normals_length + 1 : 0;
+    t.vn3 += (t.vn3 < 0) ? content->normals_length + 1 : 0;
 
-    if (t.vn3 > content.normals_length || t.vn3 == 0) {
+    if (t.vn3 > content->normals_length || t.vn3 == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content.normals[t.vn3 - 1];
+      n = content->normals[t.vn3 - 1];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 

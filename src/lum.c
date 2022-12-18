@@ -9,7 +9,7 @@
 static const int LINE_SIZE       = 4096;
 static const int CURRENT_VERSION = 4;
 
-static void parse_general_settings(General* general, Wavefront_Content* content, char* line) {
+static void parse_general_settings(General* general, WavefrontContent* content, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
 
@@ -18,7 +18,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
     case 4993446653056992589u: {
       char* source = (char*) malloc(LINE_SIZE);
       sscanf(value, "%s\n", source);
-      if (read_wavefront_file(source, content)) {
+      if (wavefront_read_file(content, source)) {
         error_message("Mesh file could not be loaded!");
       }
       if (general->mesh_files_count == general->mesh_files_length) {
@@ -513,9 +513,9 @@ int lum_validate_file(FILE* file) {
  * @param file File handle.
  * @param scene Scene instance.
  * @param general General instance.
- * @param content Wavefront_Content instance.
+ * @param content WavefrontContent instance.
  */
-void lum_parse_file(FILE* file, Scene* scene, General* general, Wavefront_Content* content) {
+void lum_parse_file(FILE* file, Scene* scene, General* general, WavefrontContent* content) {
   char* line = (char*) malloc(LINE_SIZE);
 
   while (1) {

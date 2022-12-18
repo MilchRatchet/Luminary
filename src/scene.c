@@ -171,8 +171,8 @@ static General get_default_settings() {
   return general;
 }
 
-static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scene) {
-  scene->triangles_length = convert_wavefront_content(&scene->triangles, content);
+static void convert_wavefront_to_internal(WavefrontContent* content, Scene* scene) {
+  scene->triangles_length = wavefront_convert_content(content, &scene->triangles);
 
   Node2* initial_nodes = build_bvh_structure(&scene->triangles, &scene->triangles_length, &scene->nodes_length);
 
@@ -186,8 +186,8 @@ static void convert_wavefront_to_internal(Wavefront_Content content, Scene* scen
 
   sort_traversal_elements(&scene->nodes, scene->nodes_length, &scene->triangles, scene->triangles_length);
 
-  scene->materials_length    = content.materials_length;
-  scene->texture_assignments = get_texture_assignments(content);
+  scene->materials_length    = content->materials_length;
+  scene->texture_assignments = wavefront_generate_texture_assignments(content);
 
   scene->traversal_triangles = malloc(sizeof(TraversalTriangle) * scene->triangles_length);
 
@@ -221,9 +221,10 @@ RaytraceInstance* load_scene(const char* filename) {
 
   strcpy(general.output_path, "output");
 
-  Wavefront_Content content = create_wavefront_content();
+  WavefrontContent* content;
+  wavefront_init(&content);
 
-  lum_parse_file(file, &scene, &general, &content);
+  lum_parse_file(file, &scene, &general, content);
 
   fclose(file);
 
@@ -231,21 +232,21 @@ RaytraceInstance* load_scene(const char* filename) {
 
   convert_wavefront_to_internal(content, &scene);
 
-  process_lights(&scene, content.illuminance_maps);
+  process_lights(&scene, content->illuminance_maps);
 
   TextureAtlas tex_atlas = {
-    .albedo             = cudatexture_allocate_to_buffer(content.albedo_maps, content.albedo_maps_length),
-    .albedo_length      = content.albedo_maps_length,
-    .illuminance        = cudatexture_allocate_to_buffer(content.illuminance_maps, content.illuminance_maps_length),
-    .illuminance_length = content.illuminance_maps_length,
-    .material           = cudatexture_allocate_to_buffer(content.material_maps, content.material_maps_length),
-    .material_length    = content.material_maps_length,
-    .normal             = cudatexture_allocate_to_buffer(content.normal_maps, content.normal_maps_length),
-    .normal_length      = content.normal_maps_length};
+    .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length),
+    .albedo_length      = content->albedo_maps_length,
+    .illuminance        = cudatexture_allocate_to_buffer(content->illuminance_maps, content->illuminance_maps_length),
+    .illuminance_length = content->illuminance_maps_length,
+    .material           = cudatexture_allocate_to_buffer(content->material_maps, content->material_maps_length),
+    .material_length    = content->material_maps_length,
+    .normal             = cudatexture_allocate_to_buffer(content->normal_maps, content->normal_maps_length),
+    .normal_length      = content->normal_maps_length};
 
   RaytraceInstance* instance = init_raytracing(general, tex_atlas, scene);
 
-  free_wavefront_content(content);
+  wavefront_clear(&content);
   free_scene(scene);
 
   generate_stars(instance);
@@ -261,29 +262,30 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
   strcpy(general.mesh_files[0], filename);
   strcpy(general.output_path, "output");
 
-  Wavefront_Content content = create_wavefront_content();
+  WavefrontContent* content;
+  wavefront_init(&content);
 
-  assert(!read_wavefront_file(filename, &content), "Mesh file could not be loaded.", 1);
+  assert(!wavefront_read_file(content, filename), "Mesh file could not be loaded.", 1);
 
   general.mesh_files[general.mesh_files_count++] = filename;
 
   convert_wavefront_to_internal(content, &scene);
 
-  process_lights(&scene, content.illuminance_maps);
+  process_lights(&scene, content->illuminance_maps);
 
   TextureAtlas tex_atlas = {
-    .albedo             = cudatexture_allocate_to_buffer(content.albedo_maps, content.albedo_maps_length),
-    .albedo_length      = content.albedo_maps_length,
-    .illuminance        = cudatexture_allocate_to_buffer(content.illuminance_maps, content.illuminance_maps_length),
-    .illuminance_length = content.illuminance_maps_length,
-    .material           = cudatexture_allocate_to_buffer(content.material_maps, content.material_maps_length),
-    .material_length    = content.material_maps_length,
-    .normal             = cudatexture_allocate_to_buffer(content.normal_maps, content.normal_maps_length),
-    .normal_length      = content.normal_maps_length};
+    .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length),
+    .albedo_length      = content->albedo_maps_length,
+    .illuminance        = cudatexture_allocate_to_buffer(content->illuminance_maps, content->illuminance_maps_length),
+    .illuminance_length = content->illuminance_maps_length,
+    .material           = cudatexture_allocate_to_buffer(content->material_maps, content->material_maps_length),
+    .material_length    = content->material_maps_length,
+    .normal             = cudatexture_allocate_to_buffer(content->normal_maps, content->normal_maps_length),
+    .normal_length      = content->normal_maps_length};
 
   RaytraceInstance* instance = init_raytracing(general, tex_atlas, scene);
 
-  free_wavefront_content(content);
+  wavefront_clear(&content);
   free_scene(scene);
 
   generate_stars(instance);
