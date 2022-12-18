@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 void initialize_device();
-RaytraceInstance* init_raytracing(General general, TextureAtlas tex_atlas, Scene scene);
+void raytracing_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene);
 void reset_raytracing(RaytraceInstance* instance);
 void allocate_buffers(RaytraceInstance* instance);
 void update_jitter(RaytraceInstance* instance);

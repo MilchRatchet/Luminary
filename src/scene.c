@@ -17,142 +17,140 @@
 
 static const int LINE_SIZE = 4096;
 
-static Scene get_default_scene() {
-  Scene scene;
+void scene_init(Scene** _scene) {
+  Scene* scene = calloc(1, sizeof(Scene));
 
-  memset(&scene, 0, sizeof(Scene));
+  scene->material.lights_active      = 0;
+  scene->material.default_material.r = 0.3f;
+  scene->material.default_material.g = 0.0f;
+  scene->material.default_material.b = 1.0f;
+  scene->material.fresnel            = FDEZ_AGUERA;
+  scene->material.alpha_cutoff       = 0.0f;
 
-  scene.material.lights_active      = 0;
-  scene.material.default_material.r = 0.3f;
-  scene.material.default_material.g = 0.0f;
-  scene.material.default_material.b = 1.0f;
-  scene.material.fresnel            = FDEZ_AGUERA;
-  scene.material.alpha_cutoff       = 0.0f;
+  scene->camera.pos.x                 = 0.0f;
+  scene->camera.pos.y                 = 0.0f;
+  scene->camera.pos.z                 = 0.0f;
+  scene->camera.rotation.x            = 0.0f;
+  scene->camera.rotation.y            = 0.0f;
+  scene->camera.rotation.z            = 0.0f;
+  scene->camera.fov                   = 1.0f;
+  scene->camera.focal_length          = 1.0f;
+  scene->camera.aperture_size         = 0.00f;
+  scene->camera.exposure              = 1.0f;
+  scene->camera.auto_exposure         = 1;
+  scene->camera.bloom                 = 1;
+  scene->camera.bloom_strength        = 1.0f;
+  scene->camera.bloom_threshold       = 1.0f;
+  scene->camera.dithering             = 1;
+  scene->camera.far_clip_distance     = 50000.0f;
+  scene->camera.tonemap               = TONEMAP_ACES;
+  scene->camera.filter                = FILTER_NONE;
+  scene->camera.wasd_speed            = 1.0f;
+  scene->camera.mouse_speed           = 1.0f;
+  scene->camera.smooth_movement       = 0;
+  scene->camera.smoothing_factor      = 0.1f;
+  scene->camera.temporal_blend_factor = 0.15f;
+  scene->camera.purkinje              = 1;
+  scene->camera.purkinje_kappa1       = 0.2f;
+  scene->camera.purkinje_kappa2       = 0.29f;
 
-  scene.camera.pos.x                 = 0.0f;
-  scene.camera.pos.y                 = 0.0f;
-  scene.camera.pos.z                 = 0.0f;
-  scene.camera.rotation.x            = 0.0f;
-  scene.camera.rotation.y            = 0.0f;
-  scene.camera.rotation.z            = 0.0f;
-  scene.camera.fov                   = 1.0f;
-  scene.camera.focal_length          = 1.0f;
-  scene.camera.aperture_size         = 0.00f;
-  scene.camera.exposure              = 1.0f;
-  scene.camera.auto_exposure         = 1;
-  scene.camera.bloom                 = 1;
-  scene.camera.bloom_strength        = 1.0f;
-  scene.camera.bloom_threshold       = 1.0f;
-  scene.camera.dithering             = 1;
-  scene.camera.far_clip_distance     = 50000.0f;
-  scene.camera.tonemap               = TONEMAP_ACES;
-  scene.camera.filter                = FILTER_NONE;
-  scene.camera.wasd_speed            = 1.0f;
-  scene.camera.mouse_speed           = 1.0f;
-  scene.camera.smooth_movement       = 0;
-  scene.camera.smoothing_factor      = 0.1f;
-  scene.camera.temporal_blend_factor = 0.15f;
-  scene.camera.purkinje              = 1;
-  scene.camera.purkinje_kappa1       = 0.2f;
-  scene.camera.purkinje_kappa2       = 0.29f;
+  scene->ocean.active              = 0;
+  scene->ocean.emissive            = 0;
+  scene->ocean.update              = 0;
+  scene->ocean.height              = 0.0f;
+  scene->ocean.amplitude           = 0.2f;
+  scene->ocean.frequency           = 0.12f;
+  scene->ocean.choppyness          = 4.0f;
+  scene->ocean.speed               = 1.0f;
+  scene->ocean.time                = 0.0f;
+  scene->ocean.albedo.r            = 0.0f;
+  scene->ocean.albedo.g            = 0.0f;
+  scene->ocean.albedo.b            = 0.0f;
+  scene->ocean.albedo.a            = 0.9f;
+  scene->ocean.refractive_index    = 1.333f;
+  scene->ocean.anisotropy          = 0.0f;
+  scene->ocean.scattering.r        = 0.0f;
+  scene->ocean.scattering.g        = 0.2f;
+  scene->ocean.scattering.b        = 1.0f;
+  scene->ocean.absorption.r        = 1.0f;
+  scene->ocean.absorption.g        = 0.15f;
+  scene->ocean.absorption.b        = 0.01f;
+  scene->ocean.pollution           = 0.5f;
+  scene->ocean.absorption_strength = 1.0f;
 
-  scene.ocean.active              = 0;
-  scene.ocean.emissive            = 0;
-  scene.ocean.update              = 0;
-  scene.ocean.height              = 0.0f;
-  scene.ocean.amplitude           = 0.2f;
-  scene.ocean.frequency           = 0.12f;
-  scene.ocean.choppyness          = 4.0f;
-  scene.ocean.speed               = 1.0f;
-  scene.ocean.time                = 0.0f;
-  scene.ocean.albedo.r            = 0.0f;
-  scene.ocean.albedo.g            = 0.0f;
-  scene.ocean.albedo.b            = 0.0f;
-  scene.ocean.albedo.a            = 0.9f;
-  scene.ocean.refractive_index    = 1.333f;
-  scene.ocean.anisotropy          = 0.0f;
-  scene.ocean.scattering.r        = 0.0f;
-  scene.ocean.scattering.g        = 0.2f;
-  scene.ocean.scattering.b        = 1.0f;
-  scene.ocean.absorption.r        = 1.0f;
-  scene.ocean.absorption.g        = 0.15f;
-  scene.ocean.absorption.b        = 0.01f;
-  scene.ocean.pollution           = 0.5f;
-  scene.ocean.absorption_strength = 1.0f;
+  scene->toy.active           = 0;
+  scene->toy.emissive         = 0;
+  scene->toy.shape            = TOY_SPHERE;
+  scene->toy.position.x       = 0.0f;
+  scene->toy.position.y       = 10.0f;
+  scene->toy.position.z       = 0.0f;
+  scene->toy.rotation.x       = 0.0f;
+  scene->toy.rotation.y       = 0.0f;
+  scene->toy.rotation.z       = 0.0f;
+  scene->toy.scale            = 1.0f;
+  scene->toy.refractive_index = 1.0f;
+  scene->toy.albedo.r         = 0.9f;
+  scene->toy.albedo.g         = 0.9f;
+  scene->toy.albedo.b         = 0.9f;
+  scene->toy.albedo.a         = 1.0f;
+  scene->toy.material.r       = 0.3f;
+  scene->toy.material.g       = 0.0f;
+  scene->toy.material.b       = 1.0f;
+  scene->toy.material.a       = 0.0f;
+  scene->toy.emission.r       = 0.0f;
+  scene->toy.emission.g       = 0.0f;
+  scene->toy.emission.b       = 0.0f;
+  scene->toy.emission.a       = 0.0f;
+  scene->toy.flashlight_mode  = 0;
 
-  scene.toy.active           = 0;
-  scene.toy.emissive         = 0;
-  scene.toy.shape            = TOY_SPHERE;
-  scene.toy.position.x       = 0.0f;
-  scene.toy.position.y       = 10.0f;
-  scene.toy.position.z       = 0.0f;
-  scene.toy.rotation.x       = 0.0f;
-  scene.toy.rotation.y       = 0.0f;
-  scene.toy.rotation.z       = 0.0f;
-  scene.toy.scale            = 1.0f;
-  scene.toy.refractive_index = 1.0f;
-  scene.toy.albedo.r         = 0.9f;
-  scene.toy.albedo.g         = 0.9f;
-  scene.toy.albedo.b         = 0.9f;
-  scene.toy.albedo.a         = 1.0f;
-  scene.toy.material.r       = 0.3f;
-  scene.toy.material.g       = 0.0f;
-  scene.toy.material.b       = 1.0f;
-  scene.toy.material.a       = 0.0f;
-  scene.toy.emission.r       = 0.0f;
-  scene.toy.emission.g       = 0.0f;
-  scene.toy.emission.b       = 0.0f;
-  scene.toy.emission.a       = 0.0f;
-  scene.toy.flashlight_mode  = 0;
+  scene->sky.geometry_offset.x         = 0.0f;
+  scene->sky.geometry_offset.y         = 0.1f;
+  scene->sky.geometry_offset.z         = 0.0f;
+  scene->sky.sun_color.r               = 1.0f;
+  scene->sky.sun_color.g               = 0.9f;
+  scene->sky.sun_color.b               = 0.8f;
+  scene->sky.altitude                  = 0.5f;
+  scene->sky.azimuth                   = 3.141f;
+  scene->sky.moon_altitude             = -0.5f;
+  scene->sky.moon_azimuth              = 0.0f;
+  scene->sky.moon_albedo               = 0.12f;
+  scene->sky.sun_strength              = 15000.0f;
+  scene->sky.base_density              = 1.0f;
+  scene->sky.steps                     = 8;
+  scene->sky.shadow_steps              = 8;
+  scene->sky.ozone_absorption          = 1;
+  scene->sky.stars_seed                = 0;
+  scene->sky.stars_intensity           = 1.0f;
+  scene->sky.settings_stars_count      = 10000;
+  scene->sky.cloud.active              = 0;
+  scene->sky.cloud.initialized         = 0;
+  scene->sky.cloud.seed                = 1;
+  scene->sky.cloud.offset_x            = 0.0f;
+  scene->sky.cloud.offset_z            = 0.0f;
+  scene->sky.cloud.height_max          = 4000.0f;
+  scene->sky.cloud.height_min          = 1500.0f;
+  scene->sky.cloud.noise_shape_scale   = 1.0f;
+  scene->sky.cloud.noise_detail_scale  = 1.0f;
+  scene->sky.cloud.noise_weather_scale = 1.0f;
+  scene->sky.cloud.noise_curl_scale    = 1.0f;
+  scene->sky.cloud.coverage            = 1.0f;
+  scene->sky.cloud.anvil               = 0.0f;
+  scene->sky.cloud.coverage_min        = 1.05f;
+  scene->sky.cloud.forward_scattering  = 0.8f;
+  scene->sky.cloud.backward_scattering = -0.2f;
+  scene->sky.cloud.lobe_lerp           = 0.5f;
+  scene->sky.cloud.wetness             = 0.0f;
+  scene->sky.cloud.powder              = 0.5f;
+  scene->sky.cloud.shadow_steps        = 16;
+  scene->sky.cloud.density             = 1.0f;
 
-  scene.sky.geometry_offset.x         = 0.0f;
-  scene.sky.geometry_offset.y         = 0.1f;
-  scene.sky.geometry_offset.z         = 0.0f;
-  scene.sky.sun_color.r               = 1.0f;
-  scene.sky.sun_color.g               = 0.9f;
-  scene.sky.sun_color.b               = 0.8f;
-  scene.sky.altitude                  = 0.5f;
-  scene.sky.azimuth                   = 3.141f;
-  scene.sky.moon_altitude             = -0.5f;
-  scene.sky.moon_azimuth              = 0.0f;
-  scene.sky.moon_albedo               = 0.12f;
-  scene.sky.sun_strength              = 15000.0f;
-  scene.sky.base_density              = 1.0f;
-  scene.sky.steps                     = 8;
-  scene.sky.shadow_steps              = 8;
-  scene.sky.ozone_absorption          = 1;
-  scene.sky.stars_seed                = 0;
-  scene.sky.stars_intensity           = 1.0f;
-  scene.sky.settings_stars_count      = 10000;
-  scene.sky.cloud.active              = 0;
-  scene.sky.cloud.initialized         = 0;
-  scene.sky.cloud.seed                = 1;
-  scene.sky.cloud.offset_x            = 0.0f;
-  scene.sky.cloud.offset_z            = 0.0f;
-  scene.sky.cloud.height_max          = 4000.0f;
-  scene.sky.cloud.height_min          = 1500.0f;
-  scene.sky.cloud.noise_shape_scale   = 1.0f;
-  scene.sky.cloud.noise_detail_scale  = 1.0f;
-  scene.sky.cloud.noise_weather_scale = 1.0f;
-  scene.sky.cloud.noise_curl_scale    = 1.0f;
-  scene.sky.cloud.coverage            = 1.0f;
-  scene.sky.cloud.anvil               = 0.0f;
-  scene.sky.cloud.coverage_min        = 1.05f;
-  scene.sky.cloud.forward_scattering  = 0.8f;
-  scene.sky.cloud.backward_scattering = -0.2f;
-  scene.sky.cloud.lobe_lerp           = 0.5f;
-  scene.sky.cloud.wetness             = 0.0f;
-  scene.sky.cloud.powder              = 0.5f;
-  scene.sky.cloud.shadow_steps        = 16;
-  scene.sky.cloud.density             = 1.0f;
+  scene->fog.active     = 0;
+  scene->fog.density    = 1.0f;
+  scene->fog.anisotropy = 0.0f;
+  scene->fog.height     = 500.0f;
+  scene->fog.dist       = 500.0f;
 
-  scene.fog.active     = 0;
-  scene.fog.density    = 1.0f;
-  scene.fog.anisotropy = 0.0f;
-  scene.fog.height     = 500.0f;
-  scene.fog.dist       = 500.0f;
-
-  return scene;
+  *_scene = scene;
 }
 
 static General get_default_settings() {
@@ -171,7 +169,7 @@ static General get_default_settings() {
   return general;
 }
 
-static void convert_wavefront_to_internal(WavefrontContent* content, Scene* scene) {
+void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
   scene->triangles_length = wavefront_convert_content(content, &scene->triangles);
 
   Node2* initial_nodes = build_bvh_structure(&scene->triangles, &scene->triangles_length, &scene->nodes_length);
@@ -203,7 +201,7 @@ static void convert_wavefront_to_internal(WavefrontContent* content, Scene* scen
   }
 }
 
-RaytraceInstance* load_scene(const char* filename) {
+RaytraceInstance* scene_load_lum(const char* filename) {
   FILE* file = fopen(filename, "rb");
 
   if (!file) {
@@ -216,7 +214,9 @@ RaytraceInstance* load_scene(const char* filename) {
     return (RaytraceInstance*) 0;
   }
 
-  Scene scene     = get_default_scene();
+  Scene* scene;
+  scene_init(&scene);
+
   General general = get_default_settings();
 
   strcpy(general.output_path, "output");
@@ -224,15 +224,15 @@ RaytraceInstance* load_scene(const char* filename) {
   WavefrontContent* content;
   wavefront_init(&content);
 
-  lum_parse_file(file, &scene, &general, content);
+  lum_parse_file(file, scene, &general, content);
 
   fclose(file);
 
   assert(general.mesh_files_count, "No mesh files where loaded.", 1);
 
-  convert_wavefront_to_internal(content, &scene);
+  scene_create_from_wavefront(scene, content);
 
-  process_lights(&scene, content->illuminance_maps);
+  process_lights(scene, content->illuminance_maps);
 
   TextureAtlas tex_atlas = {
     .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length),
@@ -244,18 +244,21 @@ RaytraceInstance* load_scene(const char* filename) {
     .normal             = cudatexture_allocate_to_buffer(content->normal_maps, content->normal_maps_length),
     .normal_length      = content->normal_maps_length};
 
-  RaytraceInstance* instance = init_raytracing(general, tex_atlas, scene);
+  RaytraceInstance* instance;
+  raytracing_init(&instance, general, tex_atlas, scene);
 
   wavefront_clear(&content);
-  free_scene(scene);
+  scene_clear(&scene);
 
   generate_stars(instance);
 
   return instance;
 }
 
-RaytraceInstance* load_obj_as_scene(char* filename) {
-  Scene scene     = get_default_scene();
+RaytraceInstance* scene_load_obj(char* filename) {
+  Scene* scene;
+  scene_init(&scene);
+
   General general = get_default_settings();
 
   general.mesh_files[0] = malloc(LINE_SIZE);
@@ -269,9 +272,9 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
 
   general.mesh_files[general.mesh_files_count++] = filename;
 
-  convert_wavefront_to_internal(content, &scene);
+  scene_create_from_wavefront(scene, content);
 
-  process_lights(&scene, content->illuminance_maps);
+  process_lights(scene, content->illuminance_maps);
 
   TextureAtlas tex_atlas = {
     .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length),
@@ -283,17 +286,18 @@ RaytraceInstance* load_obj_as_scene(char* filename) {
     .normal             = cudatexture_allocate_to_buffer(content->normal_maps, content->normal_maps_length),
     .normal_length      = content->normal_maps_length};
 
-  RaytraceInstance* instance = init_raytracing(general, tex_atlas, scene);
+  RaytraceInstance* instance;
+  raytracing_init(&instance, general, tex_atlas, scene);
 
   wavefront_clear(&content);
-  free_scene(scene);
+  scene_clear(&scene);
 
   generate_stars(instance);
 
   return instance;
 }
 
-void serialize_scene(RaytraceInstance* instance) {
+void scene_serialize(RaytraceInstance* instance) {
   FILE* file = fopen("generated.lum", "wb");
 
   if (!file) {
@@ -321,10 +325,17 @@ void free_strings(RaytraceInstance* instance) {
   free(instance->settings.output_path);
 }
 
-void free_scene(Scene scene) {
-  free(scene.triangles);
-  free(scene.traversal_triangles);
-  free(scene.nodes);
-  free(scene.triangle_lights);
-  free(scene.texture_assignments);
+void scene_clear(Scene** scene) {
+  if (!scene) {
+    error_message("Scene is NULL.");
+    return;
+  }
+
+  free((*scene)->triangles);
+  free((*scene)->traversal_triangles);
+  free((*scene)->nodes);
+  free((*scene)->triangle_lights);
+  free((*scene)->texture_assignments);
+
+  free(*scene);
 }

@@ -164,23 +164,26 @@ RaytraceInstance* load_baked(const char* filename) {
   fseek(file, head[2], SEEK_SET);
   fread(instance, sizeof(RaytraceInstance), 1, file);
 
-  Scene scene = instance->scene_gpu;
+  Scene* scene;
+  scene_init(&scene);
 
-  scene.triangles = malloc(sizeof(Triangle) * scene.triangles_length);
+  memcpy(scene, &instance->scene_gpu, sizeof(Scene));
+
+  scene->triangles = malloc(sizeof(Triangle) * scene->triangles_length);
   fseek(file, head[3], SEEK_SET);
-  fread(scene.triangles, sizeof(Triangle) * scene.triangles_length, 1, file);
+  fread(scene->triangles, sizeof(Triangle) * scene->triangles_length, 1, file);
 
-  scene.nodes = malloc(sizeof(Node8) * scene.nodes_length);
+  scene->nodes = malloc(sizeof(Node8) * scene->nodes_length);
   fseek(file, head[4], SEEK_SET);
-  fread(scene.nodes, sizeof(Node8) * scene.nodes_length, 1, file);
+  fread(scene->nodes, sizeof(Node8) * scene->nodes_length, 1, file);
 
-  scene.triangle_lights = malloc(sizeof(TriangleLight) * scene.triangle_lights_length);
+  scene->triangle_lights = malloc(sizeof(TriangleLight) * scene->triangle_lights_length);
   fseek(file, head[5], SEEK_SET);
-  fread(scene.triangle_lights, sizeof(TriangleLight) * scene.triangle_lights_length, 1, file);
+  fread(scene->triangle_lights, sizeof(TriangleLight) * scene->triangle_lights_length, 1, file);
 
-  scene.texture_assignments = malloc(sizeof(TextureAssignment) * scene.materials_length);
+  scene->texture_assignments = malloc(sizeof(TextureAssignment) * scene->materials_length);
   fseek(file, head[6], SEEK_SET);
-  fread(scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length, 1, file);
+  fread(scene->texture_assignments, sizeof(TextureAssignment) * scene->materials_length, 1, file);
 
   TextureRGBA* albedo_tex      = load_textures(file, instance->tex_atlas.albedo_length, head[7]);
   TextureRGBA* illuminance_tex = load_textures(file, instance->tex_atlas.illuminance_length, head[8]);
@@ -202,9 +205,10 @@ RaytraceInstance* load_baked(const char* filename) {
   free_textures(material_tex, instance->tex_atlas.material_length);
   free_textures(normal_tex, instance->tex_atlas.normal_length);
 
-  scene.traversal_triangles = construct_traversal_triangles(scene.triangles, scene.triangles_length, scene.texture_assignments);
+  scene->traversal_triangles = construct_traversal_triangles(scene->triangles, scene->triangles_length, scene->texture_assignments);
 
-  RaytraceInstance* final = init_raytracing(instance->settings, tex_atlas, scene);
+  RaytraceInstance* final;
+  raytracing_init(&final, instance->settings, tex_atlas, scene);
 
   final->scene_gpu.sky.stars             = (Star*) 0;
   final->scene_gpu.sky.cloud.initialized = 0;
@@ -219,7 +223,7 @@ RaytraceInstance* load_baked(const char* filename) {
   final->settings.mesh_files_length = strings_count - 1;
 
   free(instance);
-  free_scene(scene);
+  scene_clear(&scene);
   free(head);
   fclose(file);
 

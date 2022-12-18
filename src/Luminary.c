@@ -160,16 +160,16 @@ int main(int argc, char* argv[]) {
 
   switch (file_type) {
     case LUM_FILE:
-      instance = load_scene(argv[1]);
+      instance = scene_load_lum(argv[1]);
       break;
     case OBJ_FILE:
-      instance = load_obj_as_scene(argv[1]);
+      instance = scene_load_obj(argv[1]);
       break;
     case BAKED_FILE:
       instance = load_baked(argv[1]);
       break;
     default:
-      instance = load_scene(argv[1]);
+      instance = scene_load_lum(argv[1]);
       break;
   }
 

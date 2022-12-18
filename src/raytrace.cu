@@ -300,9 +300,8 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }
 
-extern "C" RaytraceInstance* init_raytracing(General general, TextureAtlas tex_atlas, Scene scene) {
-  RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
-  memset(instance, 0, sizeof(RaytraceInstance));
+extern "C" void raytracing_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene) {
+  RaytraceInstance* instance = (RaytraceInstance*) calloc(1, sizeof(RaytraceInstance));
 
   instance->width         = general.width;
   instance->height        = general.height;
@@ -328,7 +327,7 @@ extern "C" RaytraceInstance* init_raytracing(General general, TextureAtlas tex_a
 
   instance->tex_atlas = tex_atlas;
 
-  instance->scene_gpu          = scene;
+  instance->scene_gpu          = *scene;
   instance->settings           = general;
   instance->shading_mode       = 0;
   instance->accum_mode         = TEMPORAL_ACCUMULATION;
@@ -362,22 +361,23 @@ extern "C" RaytraceInstance* init_raytracing(General general, TextureAtlas tex_a
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
-  device_malloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene.materials_length);
+  device_malloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene->materials_length);
   device_malloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length);
   device_malloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(TraversalTriangle) * instance->scene_gpu.triangles_length);
   device_malloc((void**) &(instance->scene_gpu.nodes), sizeof(Node8) * instance->scene_gpu.nodes_length);
   device_malloc((void**) &(instance->scene_gpu.triangle_lights), sizeof(TriangleLight) * instance->scene_gpu.triangle_lights_length);
 
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.texture_assignments, scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length,
+    instance->scene_gpu.texture_assignments, scene->texture_assignments, sizeof(TextureAssignment) * scene->materials_length,
     cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(instance->scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
+  gpuErrchk(
+    cudaMemcpy(instance->scene_gpu.triangles, scene->triangles, sizeof(Triangle) * scene->triangles_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.traversal_triangles, scene.traversal_triangles, sizeof(TraversalTriangle) * scene.triangles_length,
+    instance->scene_gpu.traversal_triangles, scene->traversal_triangles, sizeof(TraversalTriangle) * scene->triangles_length,
     cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene.nodes, sizeof(Node8) * scene.nodes_length, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene->nodes, sizeof(Node8) * scene->nodes_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.triangle_lights, scene.triangle_lights, sizeof(TriangleLight) * scene.triangle_lights_length,
+    instance->scene_gpu.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * scene->triangle_lights_length,
     cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMemcpyToSymbol(
@@ -395,7 +395,7 @@ extern "C" RaytraceInstance* init_raytracing(General general, TextureAtlas tex_a
 
   instance->snap_resolution = SNAP_RESOLUTION_RENDER;
 
-  return instance;
+  *_instance = instance;
 }
 
 extern "C" void reset_raytracing(RaytraceInstance* instance) {
