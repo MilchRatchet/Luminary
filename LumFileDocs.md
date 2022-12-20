@@ -327,7 +327,7 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
    - Green: Metallic
    - Blue: Unused
    - Alpha: Unused
- - Normal Textures
+ - Normal Textures (OpenGL format)
    - Red: Tangent X
    - Green: Tangent Y
    - Blue: Tangent Z
