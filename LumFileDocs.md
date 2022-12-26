@@ -308,6 +308,8 @@ Set 1 to activate flashlight mode, that is, the toy is behind the camera and emi
 
 Meshes must be in the Wavefront OBJ (`*.obj`) file format. Geometric vertices, texture coordinates, vertex normals and triangle/quad faces are supported. Textures are to be referenced through a `*.mtl` which has the same name as the `*.obj` file.
 
+>📝 A common cause of light leaking / broken lighting is unrealistic vertex normals. Issues appear if the vertex normals represent a surface that is too different from the actual geometry. Performing steps like edge splitting often alleviate this issue at the cost of a higher triangle count.
+
 # Textures
 
 Textures must be in the Portable Network Graphics (`*.png`) file format. They need to have 8 bit channel depth. Supported color formats are `Truecolor` (RGB) and `Truecolor with alpha` (RGBA). They may use filters but may not be interlaced. Textures are used in three different ways:
