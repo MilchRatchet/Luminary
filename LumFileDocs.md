@@ -49,9 +49,6 @@ Defines which of the available fresnel approximations is used:
   - 0 = Schlick
   - 1 = Fdez-Aguera
 
-`MATERIAL BVHALPHA [INT32]`<br/>
-Set 1 to check for fully transparent hits during BVH traversal, 0 else. This fixes early ray termination in scenes that make much use of alpha cutoff. However, it comes at a mild performance cost.
-
 `MATERIAL ALPHACUT [FP32]`<br/>
 Every alpha value smaller than this value is automatically treated as 0, i.e., fully transparent. Number must be in the range [0,1].
 
@@ -311,6 +308,8 @@ Set 1 to activate flashlight mode, that is, the toy is behind the camera and emi
 
 Meshes must be in the Wavefront OBJ (`*.obj`) file format. Geometric vertices, texture coordinates, vertex normals and triangle/quad faces are supported. Textures are to be referenced through a `*.mtl` which has the same name as the `*.obj` file.
 
+>📝 A common cause of light leaking / broken lighting is unrealistic vertex normals. Issues appear if the vertex normals represent a surface that is too different from the actual geometry. Performing steps like edge splitting often alleviate this issue at the cost of a higher triangle count.
+
 # Textures
 
 Textures must be in the Portable Network Graphics (`*.png`) file format. They need to have 8 bit channel depth. Supported color formats are `Truecolor` (RGB) and `Truecolor with alpha` (RGBA). They may use filters but may not be interlaced. Textures are used in three different ways:
@@ -330,18 +329,25 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
    - Green: Metallic
    - Blue: Unused
    - Alpha: Unused
+ - Normal Textures (OpenGL format)
+   - Red: Tangent X
+   - Green: Tangent Y
+   - Blue: Tangent Z
+   - Alpha: Unused
 
 Textures are to be referenced in the `*.mtl` as follows:
 
-- map_Kd = Albedo Textures
-- map_Ke = Illuminance Textures
-- map_Ns = Material Textures
+- map_Kd   = Albedo Textures
+- map_Ke   = Illuminance Textures
+- map_Ns   = Material Textures
+- map_Bump = Normal Textures (Spaces are not allowed in path)
 
 In `Blender` these map types correspond to:
 
-- map_Kd = Albedo
-- map_Ke = Emission
-- map_Ns = Smoothness
+- map_Kd   = Albedo
+- map_Ke   = Emission
+- map_Ns   = Smoothness
+- map_Bump = Normal
 
 >📝 There was a [bug](https://developer.blender.org/D14519) in Blender before 02.04.22 where map_Ke were not exported. If you encounter any issues of Luminary detecting no emissive triangles, use a newer Blender version for the export.
 

@@ -17,6 +17,31 @@ __device__ unsigned char get_8bit(const unsigned int input, const unsigned int b
   return (input >> bitshift) & 0x000000FF;
 }
 
+/*
+ * Performs alpha test on traversal triangle
+ * @param t Triangle to test.
+ * @param t_id ID of tested triangle.
+ * @param coords Hit coordinates in triangle.
+ * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
+ */
+__device__ int bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_t t_id, UV coords) {
+  if (t.albedo_tex == TEXTURE_NONE)
+    return 0;
+
+  const UV tex_coords = load_triangle_tex_coords(t_id, coords);
+  const float4 albedo = tex2D<float4>(device.albedo_atlas[t.albedo_tex], tex_coords.u, 1.0f - tex_coords.v);
+
+  if (albedo.w <= device_scene.material.alpha_cutoff) {
+    return 2;
+  }
+
+  if (albedo.w < 1.0f) {
+    return 1;
+  }
+
+  return 0;
+}
+
 #define STACK_SIZE_SM 10
 #define STACK_SIZE 32
 
@@ -38,7 +63,7 @@ __device__ unsigned char get_8bit(const unsigned int input, const unsigned int b
     stack_ptr++;                                      \
   }
 
-__device__ void traverse_bvh(const bool check_alpha) {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
   const uint16_t trace_task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   uint16_t offset                 = 0;
 
@@ -320,47 +345,21 @@ __device__ void traverse_bvh(const bool check_alpha) {
 
         const TraversalTriangle triangle = load_traversal_triangle(triangle_index + triangle_task.x);
 
-        if (check_alpha) {
-          UV coords;
-          const float d = bvh_triangle_intersection_uv(triangle, origin, ray, coords);
+        UV coords;
+        const float d = bvh_triangle_intersection_uv(triangle, origin, ray, coords);
 
-          if (d < depth) {
-            bool opaque        = true;
-            bool allow_any_hit = true;
+        if (d < depth) {
+          const int alpha_result = bvh_triangle_intersection_alpha_test(triangle, triangle_index + triangle_task.x, coords);
 
-            if (triangle.albedo_tex) {
-              const UV tex_coords = load_triangle_tex_coords(triangle_index + triangle_task.x, coords);
-              const float4 albedo = tex2D<float4>(device.albedo_atlas[triangle.albedo_tex], tex_coords.u, 1.0f - tex_coords.v);
-
-              if (albedo.w <= device_scene.material.alpha_cutoff) {
-                opaque = false;
-              }
-
-              if (albedo.w < 1.0f) {
-                allow_any_hit = false;
-              }
-            }
-
-            if (opaque) {
-              if (device_iteration_type == TYPE_LIGHT && allow_any_hit) {
-                depth           = -1.0f;
-                hit_id          = REJECT_HIT;
-                triangle_task.y = 0;
-                node_task.y     = 0;
-                stack_ptr       = 0;
-                break;
-              }
-              else {
-                depth  = d;
-                hit_id = triangle_index + triangle_task.x;
-              }
-            }
+          if (device_iteration_type == TYPE_LIGHT && alpha_result == 0) {
+            depth           = -1.0f;
+            hit_id          = REJECT_HIT;
+            triangle_task.y = 0;
+            node_task.y     = 0;
+            stack_ptr       = 0;
+            break;
           }
-        }
-        else {
-          const float d = bvh_triangle_intersection(triangle, origin, ray);
-
-          if (d < depth) {
+          else if (alpha_result != 2) {
             depth  = d;
             hit_id = triangle_index + triangle_task.x;
           }
@@ -395,14 +394,6 @@ __device__ void traverse_bvh(const bool check_alpha) {
 
     } while (iterations_lost < 16);
   }
-}
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
-  traverse_bvh(false);
-}
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks_alpha_cutoff() {
-  traverse_bvh(true);
 }
 
 #endif /* CU_BVH_H */

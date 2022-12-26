@@ -35,6 +35,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     const UV coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
+    const UV vertex_texture = get_UV(t5.z, t5.w);
+    const UV edge1_texture  = get_UV(t6.x, t6.y);
+    const UV edge2_texture  = get_UV(t6.z, t6.w);
+
+    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+
+    const int texture_object         = __float_as_int(t7.x);
+    const uint32_t triangle_light_id = __float_as_uint(t7.y);
+
+    const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
+
     vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
     vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
     vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
@@ -70,24 +81,26 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       edge2_normal  = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(edge2_normal, 1.0f - t)));
     }
 
-    const vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
+    vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
 
-    const UV vertex_texture = get_UV(t5.z, t5.w);
-    const UV edge1_texture  = get_UV(t6.x, t6.y);
-    const UV edge2_texture  = get_UV(t6.z, t6.w);
+    if (maps.w != TEXTURE_NONE) {
+      const float4 normal_f = tex2D<float4>(device.normal_atlas[maps.w], tex_coords.u, 1.0f - tex_coords.v);
 
-    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+      vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
-    const int texture_object         = __float_as_int(t7.x);
-    const uint32_t triangle_light_id = __float_as_uint(t7.y);
+      map_normal = scale_vector(map_normal, 2.0f);
+      map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
 
-    const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
+      Mat3x3 tangent_space = cotangent_frame(normal, edge1, edge2, edge1_texture, edge2_texture);
+
+      normal = normalize_vector(transform_vec3(tangent_space, map_normal));
+    }
 
     float roughness;
     float metallic;
     float intensity = device_scene.material.default_material.b;
 
-    if (maps.z) {
+    if (maps.z != TEXTURE_NONE) {
       const float4 material_f = tex2D<float4>(device.material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
 
       roughness = (1.0f - material_f.x);
@@ -100,7 +113,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     RGBAF albedo;
 
-    if (maps.x) {
+    if (maps.x != TEXTURE_NONE) {
       const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
       albedo.r              = albedo_f.x;
       albedo.g              = albedo_f.y;
@@ -116,7 +129,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     RGBAhalf emission = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
 
-    if (maps.y && device_scene.material.lights_active) {
+    if (maps.y != TEXTURE_NONE && device_scene.material.lights_active) {
       const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
       emission = get_RGBAhalf(illuminance_f.x, illuminance_f.y, illuminance_f.z, illuminance_f.w);
@@ -269,7 +282,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 
-      if (maps.x) {
+      if (maps.x != TEXTURE_NONE) {
         const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
         color                 = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
       }
@@ -277,7 +290,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
         color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
       }
 
-      if (maps.y && device_scene.material.lights_active) {
+      if (maps.y != TEXTURE_NONE && device_scene.material.lights_active) {
         const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
         color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
@@ -298,6 +311,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float4 t3 = __ldg(hit_address + 2);
       const float4 t4 = __ldg(hit_address + 3);
       const float4 t5 = __ldg(hit_address + 4);
+      const float4 t6 = __ldg(hit_address + 5);
+      const float t7  = __ldg((float*) (hit_address + 6));
 
       vec3 vertex = get_vector(t1.x, t1.y, t1.z);
       vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
@@ -307,11 +322,34 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       const UV coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
+      const UV vertex_texture = get_UV(t5.z, t5.w);
+      const UV edge1_texture  = get_UV(t6.x, t6.y);
+      const UV edge2_texture  = get_UV(t6.z, t6.w);
+
+      const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+
       vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
       vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
       vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
       vec3 normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, coords, face_normal);
+
+      const int texture_object = __float_as_int(t7);
+
+      const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
+
+      if (maps.w != TEXTURE_NONE) {
+        const float4 normal_f = tex2D<float4>(device.normal_atlas[maps.w], tex_coords.u, 1.0f - tex_coords.v);
+
+        vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
+
+        map_normal = scale_vector(map_normal, 2.0f);
+        map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
+
+        Mat3x3 tangent_space = cotangent_frame(normal, edge1, edge2, edge1_texture, edge2_texture);
+
+        normal = normalize_vector(transform_vec3(tangent_space, map_normal));
+      }
 
       normal.x = 0.5f * normal.x + 0.5f;
       normal.y = 0.5f * normal.y + 0.5f;
@@ -382,7 +420,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       else {
         const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 
-        if (maps.x) {
+        if (maps.x != TEXTURE_NONE) {
           const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
           color                 = get_color(albedo_f.x, albedo_f.y, albedo_f.z);
         }

@@ -464,7 +464,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
   FILE* file = fopen(filename, "rb");
 
   if (!file) {
-    error_message("File could not be opened!");
+    error_message("File %s could not be opened!", filename);
     return default_texture();
   }
 

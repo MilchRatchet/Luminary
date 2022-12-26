@@ -27,6 +27,8 @@
 #define LIGHT_ID_TOY 0xfffffffeu
 #define LIGHT_ID_NONE 0xfffffff1u
 
+#define TEXTURE_NONE ((uint16_t) 0xffffu)
+
 enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
 
 enum ShadingMode {
@@ -215,7 +217,6 @@ struct GlobalMaterial {
   RGBF default_material;
   MaterialFresnel fresnel;
   int lights_active;
-  int bvh_alpha_cutoff;
   float alpha_cutoff;
 } typedef GlobalMaterial;
 
@@ -236,6 +237,17 @@ struct Scene {
   Fog fog;
   GlobalMaterial material;
 } typedef Scene;
+
+struct TextureAtlas {
+  DeviceBuffer* albedo;
+  int albedo_length;
+  DeviceBuffer* illuminance;
+  int illuminance_length;
+  DeviceBuffer* material;
+  int material_length;
+  DeviceBuffer* normal;
+  int normal_length;
+} typedef TextureAtlas;
 
 struct RaytraceInstance {
   unsigned int width;
@@ -261,16 +273,10 @@ struct RaytraceInstance {
   DeviceBuffer* light_records;
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
-  DeviceBuffer* albedo_atlas;
   DeviceBuffer* light_samples_1;
   DeviceBuffer* light_samples_2;
   DeviceBuffer* light_eval_data;
-  int albedo_atlas_length;
-  DeviceBuffer* illuminance_atlas;
-  int illuminance_atlas_length;
-  DeviceBuffer* material_atlas;
   DeviceBuffer* cloud_noise;
-  int material_atlas_length;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
@@ -293,6 +299,7 @@ struct RaytraceInstance {
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
+  TextureAtlas tex_atlas;
 } typedef RaytraceInstance;
 
 #ifndef min

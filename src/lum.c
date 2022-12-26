@@ -9,7 +9,7 @@
 static const int LINE_SIZE       = 4096;
 static const int CURRENT_VERSION = 4;
 
-static void parse_general_settings(General* general, Wavefront_Content* content, char* line) {
+static void parse_general_settings(General* general, WavefrontContent* content, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
 
@@ -18,7 +18,7 @@ static void parse_general_settings(General* general, Wavefront_Content* content,
     case 4993446653056992589u: {
       char* source = (char*) malloc(LINE_SIZE);
       sscanf(value, "%s\n", source);
-      if (read_wavefront_file(source, content)) {
+      if (wavefront_read_file(content, source)) {
         error_message("Mesh file could not be loaded!");
       }
       if (general->mesh_files_count == general->mesh_files_length) {
@@ -82,10 +82,6 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     /* FRESNEL_ */
     case 6866939734539981382u:
       sscanf(value, "%d\n", &material->fresnel);
-      break;
-    /* BVHALPHA */
-    case 4704098099231479362u:
-      sscanf(value, "%d\n", &material->bvh_alpha_cutoff);
       break;
     /* ALPHACUT */
     case 6076837219871509569u:
@@ -517,9 +513,9 @@ int lum_validate_file(FILE* file) {
  * @param file File handle.
  * @param scene Scene instance.
  * @param general General instance.
- * @param content Wavefront_Content instance.
+ * @param content WavefrontContent instance.
  */
-void lum_parse_file(FILE* file, Scene* scene, General* general, Wavefront_Content* content) {
+void lum_parse_file(FILE* file, Scene* scene, General* general, WavefrontContent* content) {
   char* line = (char*) malloc(LINE_SIZE);
 
   while (1) {
@@ -650,8 +646,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL EMISSION %f\n", instance->scene_gpu.material.default_material.b);
   fputs(line, file);
   sprintf(line, "MATERIAL FRESNEL_ %d\n", instance->scene_gpu.material.fresnel);
-  fputs(line, file);
-  sprintf(line, "MATERIAL BVHALPHA %d\n", instance->scene_gpu.material.bvh_alpha_cutoff);
   fputs(line, file);
   sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene_gpu.material.alpha_cutoff);
   fputs(line, file);

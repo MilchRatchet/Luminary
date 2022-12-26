@@ -6,24 +6,24 @@
 
 #include "structs.h"
 
-struct Wavefront_Vertex {
+struct WavefrontVertex {
   float x;
   float y;
   float z;
-} typedef Wavefront_Vertex;
+} typedef WavefrontVertex;
 
-struct Wavefront_Normal {
+struct WavefrontNormal {
   float x;
   float y;
   float z;
-} typedef Wavefront_Normal;
+} typedef WavefrontNormal;
 
-struct Wavefront_UV {
+struct WavefrontUV {
   float u;
   float v;
-} typedef Wavefront_UV;
+} typedef WavefrontUV;
 
-struct Wavefront_Triangle {
+struct WavefrontTriangle {
   int v1;
   int v2;
   int v3;
@@ -34,39 +34,45 @@ struct Wavefront_Triangle {
   int vn2;
   int vn3;
   uint16_t object;
-} typedef Wavefront_Triangle;
+} typedef WavefrontTriangle;
 
-struct Wavefront_Material {
+struct WavefrontMaterial {
   size_t hash;
   uint16_t albedo_texture;
   uint16_t illuminance_texture;
   uint16_t material_texture;
-} typedef Wavefront_Material;
+  uint16_t normal_texture;
+} typedef WavefrontMaterial;
 
-enum Wavefront_TextureInstanceType { WF_ALBEDO = 0, WF_ILLUMINANCE = 1, WF_MATERIAL = 2 } typedef Wavefront_TextureInstanceType;
+enum WavefrontTextureInstanceType {
+  WF_ALBEDO      = 0,
+  WF_ILLUMINANCE = 1,
+  WF_MATERIAL    = 2,
+  WF_NORMAL      = 3
+} typedef WavefrontTextureInstanceType;
 
-struct Wavefront_TextureInstance {
+struct WavefrontTextureInstance {
   size_t hash;
-  Wavefront_TextureInstanceType type;
+  WavefrontTextureInstanceType type;
   uint16_t offset;
-} typedef Wavefront_TextureInstance;
+} typedef WavefrontTextureInstance;
 
-struct Wavefront_TextureList {
-  Wavefront_TextureInstance* textures;
+struct WavefrontTextureList {
+  WavefrontTextureInstance* textures;
   uint32_t count;
   uint32_t length;
-} typedef Wavefront_TextureList;
+} typedef WavefrontTextureList;
 
-struct Wavefront_Content {
-  Wavefront_Vertex* vertices;
+struct WavefrontContent {
+  WavefrontVertex* vertices;
   int vertices_length;
-  Wavefront_Normal* normals;
+  WavefrontNormal* normals;
   int normals_length;
-  Wavefront_UV* uvs;
+  WavefrontUV* uvs;
   int uvs_length;
-  Wavefront_Triangle* triangles;
+  WavefrontTriangle* triangles;
   unsigned int triangles_length;
-  Wavefront_Material* materials;
+  WavefrontMaterial* materials;
   unsigned int materials_length;
   TextureRGBA* albedo_maps;
   unsigned int albedo_maps_length;
@@ -74,13 +80,15 @@ struct Wavefront_Content {
   unsigned int illuminance_maps_length;
   TextureRGBA* material_maps;
   unsigned int material_maps_length;
-  Wavefront_TextureList* texture_list;
-} typedef Wavefront_Content;
+  TextureRGBA* normal_maps;
+  unsigned int normal_maps_length;
+  WavefrontTextureList* texture_list;
+} typedef WavefrontContent;
 
-Wavefront_Content create_wavefront_content();
-void free_wavefront_content(Wavefront_Content content);
-int read_wavefront_file(const char* filename, Wavefront_Content* io_content);
-TextureAssignment* get_texture_assignments(Wavefront_Content content);
-unsigned int convert_wavefront_content(Triangle** triangles, Wavefront_Content content);
+void wavefront_init(WavefrontContent** content);
+void wavefront_clear(WavefrontContent** content);
+int wavefront_read_file(WavefrontContent* _content, const char* filename);
+TextureAssignment* wavefront_generate_texture_assignments(WavefrontContent* content);
+unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles);
 
 #endif /* WAVEFRONT_H */

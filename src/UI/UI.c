@@ -83,7 +83,6 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Renderer\nMaterials\nExport");
   panels[i++] = create_check(ui, "Lights", &(instance->scene_gpu.material.lights_active), 1);
-  panels[i++] = create_check(ui, "BVH Alpha Cutoff", &(instance->scene_gpu.material.bvh_alpha_cutoff), 1);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene_gpu.material.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->scene_gpu.material.default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->scene_gpu.material.default_material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
@@ -112,7 +111,7 @@ static UITab create_general_export_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_tab(ui, &(ui->subtab), "Renderer\nMaterials\nExport");
   panels[i++] = create_dropdown(ui, "Snapshot Resolution", &(instance->snap_resolution), 0, 2, "Window\0Render", 2);
   panels[i++] = create_dropdown(ui, "Output Image Format", &(instance->image_format), 0, 2, "PNG\0QOI", 3);
-  panels[i++] = create_button(ui, "Export Settings", instance, (void (*)(void*)) serialize_scene, 0);
+  panels[i++] = create_button(ui, "Export Settings", instance, (void (*)(void*)) scene_serialize, 0);
   panels[i++] = create_button(ui, "Export Baked File", instance, (void (*)(void*)) serialize_baked, 0);
 
   tab.panels      = panels;

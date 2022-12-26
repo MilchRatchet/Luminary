@@ -3,6 +3,6 @@
 
 #include "utils.h"
 
-void process_lights(Scene* scene, TextureRGBA* textures);
+void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures);
 
 #endif /* LIGHT_H */

@@ -300,11 +300,8 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }
 
-extern "C" RaytraceInstance* init_raytracing(
-  General general, DeviceBuffer* albedo_atlas, int albedo_atlas_length, DeviceBuffer* illuminance_atlas, int illuminance_atlas_length,
-  DeviceBuffer* material_atlas, int material_atlas_length, Scene scene) {
-  RaytraceInstance* instance = (RaytraceInstance*) malloc(sizeof(RaytraceInstance));
-  memset(instance, 0, sizeof(RaytraceInstance));
+extern "C" void raytracing_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene) {
+  RaytraceInstance* instance = (RaytraceInstance*) calloc(1, sizeof(RaytraceInstance));
 
   instance->width         = general.width;
   instance->height        = general.height;
@@ -328,15 +325,9 @@ extern "C" RaytraceInstance* init_raytracing(
   instance->denoiser        = general.denoiser;
   instance->reservoir_size  = general.reservoir_size;
 
-  instance->albedo_atlas      = albedo_atlas;
-  instance->illuminance_atlas = illuminance_atlas;
-  instance->material_atlas    = material_atlas;
+  instance->tex_atlas = tex_atlas;
 
-  instance->albedo_atlas_length      = albedo_atlas_length;
-  instance->illuminance_atlas_length = illuminance_atlas_length;
-  instance->material_atlas_length    = material_atlas_length;
-
-  instance->scene_gpu          = scene;
+  instance->scene_gpu          = *scene;
   instance->settings           = general;
   instance->shading_mode       = 0;
   instance->accum_mode         = TEMPORAL_ACCUMULATION;
@@ -370,22 +361,23 @@ extern "C" RaytraceInstance* init_raytracing(
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
-  device_malloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene.materials_length);
+  device_malloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene->materials_length);
   device_malloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length);
   device_malloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(TraversalTriangle) * instance->scene_gpu.triangles_length);
   device_malloc((void**) &(instance->scene_gpu.nodes), sizeof(Node8) * instance->scene_gpu.nodes_length);
   device_malloc((void**) &(instance->scene_gpu.triangle_lights), sizeof(TriangleLight) * instance->scene_gpu.triangle_lights_length);
 
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.texture_assignments, scene.texture_assignments, sizeof(TextureAssignment) * scene.materials_length,
+    instance->scene_gpu.texture_assignments, scene->texture_assignments, sizeof(TextureAssignment) * scene->materials_length,
     cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(instance->scene_gpu.triangles, scene.triangles, sizeof(Triangle) * scene.triangles_length, cudaMemcpyHostToDevice));
+  gpuErrchk(
+    cudaMemcpy(instance->scene_gpu.triangles, scene->triangles, sizeof(Triangle) * scene->triangles_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.traversal_triangles, scene.traversal_triangles, sizeof(TraversalTriangle) * scene.triangles_length,
+    instance->scene_gpu.traversal_triangles, scene->traversal_triangles, sizeof(TraversalTriangle) * scene->triangles_length,
     cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene.nodes, sizeof(Node8) * scene.nodes_length, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene->nodes, sizeof(Node8) * scene->nodes_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.triangle_lights, scene.triangle_lights, sizeof(TriangleLight) * scene.triangle_lights_length,
+    instance->scene_gpu.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * scene->triangle_lights_length,
     cudaMemcpyHostToDevice));
 
   gpuErrchk(cudaMemcpyToSymbol(
@@ -403,7 +395,7 @@ extern "C" RaytraceInstance* init_raytracing(
 
   instance->snap_resolution = SNAP_RESOLUTION_RENDER;
 
-  return instance;
+  *_instance = instance;
 }
 
 extern "C" void reset_raytracing(RaytraceInstance* instance) {
@@ -519,12 +511,7 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene_gpu.material.bvh_alpha_cutoff) {
-    process_trace_tasks_alpha_cutoff<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
-  else {
-    process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
+  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   if (instance->scene_gpu.ocean.active && type != TYPE_LIGHT) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -567,12 +554,9 @@ static void execute_debug_kernels(RaytraceInstance* instance, int type) {
   bind_type(instance, type);
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  if (instance->scene_gpu.material.bvh_alpha_cutoff) {
-    process_trace_tasks_alpha_cutoff<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
-  else {
-    process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
+
+  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
   if (instance->scene_gpu.ocean.active && type != TYPE_LIGHT) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -775,9 +759,10 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.light_records        = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
   ptrs.bounce_records       = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);
   ptrs.buffer_8bit          = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
-  ptrs.albedo_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->albedo_atlas);
-  ptrs.illuminance_atlas    = (cudaTextureObject_t*) device_buffer_get_pointer(instance->illuminance_atlas);
-  ptrs.material_atlas       = (cudaTextureObject_t*) device_buffer_get_pointer(instance->material_atlas);
+  ptrs.albedo_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.albedo);
+  ptrs.illuminance_atlas    = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.illuminance);
+  ptrs.material_atlas       = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.material);
+  ptrs.normal_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.normal);
   ptrs.cloud_noise          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->cloud_noise);
   ptrs.randoms              = (curandStateXORWOW_t*) device_buffer_get_pointer(instance->randoms);
   ptrs.raydir_buffer        = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);

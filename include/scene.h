@@ -4,12 +4,15 @@
 #include "bvh.h"
 #include "structs.h"
 #include "utils.h"
+#include "wavefront.h"
 
-RaytraceInstance* load_scene(const char* filename);
-RaytraceInstance* load_obj_as_scene(char* filename);
-void serialize_scene(RaytraceInstance* instance);
+void scene_init(Scene** _scene);
+void scene_create_from_wavefront(Scene* scene, WavefrontContent* content);
+RaytraceInstance* scene_load_lum(const char* filename);
+RaytraceInstance* scene_load_obj(char* filename);
+void scene_serialize(RaytraceInstance* instance);
 void free_atlases(RaytraceInstance* instance);
 void free_strings(RaytraceInstance* instance);
-void free_scene(Scene scene);
+void scene_clear(Scene** scene);
 
 #endif /* SCENE_H */
