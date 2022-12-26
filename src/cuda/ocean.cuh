@@ -138,7 +138,7 @@ __device__ vec3 ocean_get_normal(vec3 p, const float diff) {
 
 __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
   const float d1 = device_scene.ocean.height - origin.y;
-  const float d2 = d1 + device_scene.ocean.amplitude;
+  const float d2 = d1 + 3.0f * device_scene.ocean.amplitude;
 
   const float s1 = d1 / ray.y;
   const float s2 = d2 / ray.y;
@@ -154,7 +154,7 @@ __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
 
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
   const float d1 = device_scene.ocean.height - origin.y;
-  const float d2 = d1 + device_scene.ocean.amplitude;
+  const float d2 = d1 + 3.0f * device_scene.ocean.amplitude;
 
   const float s1 = d1 / ray.y;
   const float s2 = d2 / ray.y;
