@@ -25,7 +25,7 @@ __device__ unsigned char get_8bit(const unsigned int input, const unsigned int b
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
 __device__ int bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_t t_id, UV coords) {
-  if (!t.albedo_tex)
+  if (t.albedo_tex == TEXTURE_NONE)
     return 0;
 
   const UV tex_coords = load_triangle_tex_coords(t_id, coords);

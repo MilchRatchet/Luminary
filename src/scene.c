@@ -232,7 +232,7 @@ RaytraceInstance* scene_load_lum(const char* filename) {
 
   scene_create_from_wavefront(scene, content);
 
-  process_lights(scene, content->illuminance_maps);
+  lights_build_set_from_triangles(scene, content->illuminance_maps);
 
   TextureAtlas tex_atlas = {
     .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length),
@@ -274,7 +274,7 @@ RaytraceInstance* scene_load_obj(char* filename) {
 
   scene_create_from_wavefront(scene, content);
 
-  process_lights(scene, content->illuminance_maps);
+  lights_build_set_from_triangles(scene, content->illuminance_maps);
 
   TextureAtlas tex_atlas = {
     .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length),

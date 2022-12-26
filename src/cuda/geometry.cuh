@@ -83,7 +83,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
 
-    if (maps.w) {
+    if (maps.w != TEXTURE_NONE) {
       const float4 normal_f = tex2D<float4>(device.normal_atlas[maps.w], tex_coords.u, 1.0f - tex_coords.v);
 
       vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
@@ -100,7 +100,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     float metallic;
     float intensity = device_scene.material.default_material.b;
 
-    if (maps.z) {
+    if (maps.z != TEXTURE_NONE) {
       const float4 material_f = tex2D<float4>(device.material_atlas[maps.z], tex_coords.u, 1.0f - tex_coords.v);
 
       roughness = (1.0f - material_f.x);
@@ -113,7 +113,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     RGBAF albedo;
 
-    if (maps.x) {
+    if (maps.x != TEXTURE_NONE) {
       const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
       albedo.r              = albedo_f.x;
       albedo.g              = albedo_f.y;
@@ -129,7 +129,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     RGBAhalf emission = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
 
-    if (maps.y && device_scene.material.lights_active) {
+    if (maps.y != TEXTURE_NONE && device_scene.material.lights_active) {
       const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
       emission = get_RGBAhalf(illuminance_f.x, illuminance_f.y, illuminance_f.z, illuminance_f.w);
@@ -282,7 +282,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 
-      if (maps.x) {
+      if (maps.x != TEXTURE_NONE) {
         const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
         color                 = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
       }
@@ -290,7 +290,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
         color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
       }
 
-      if (maps.y && device_scene.material.lights_active) {
+      if (maps.y != TEXTURE_NONE && device_scene.material.lights_active) {
         const float4 illuminance_f = tex2D<float4>(device.illuminance_atlas[maps.y], tex_coords.u, 1.0f - tex_coords.v);
 
         color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
@@ -338,7 +338,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 
-      if (maps.w) {
+      if (maps.w != TEXTURE_NONE) {
         const float4 normal_f = tex2D<float4>(device.normal_atlas[maps.w], tex_coords.u, 1.0f - tex_coords.v);
 
         vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
@@ -420,7 +420,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       else {
         const ushort4 maps = __ldg((ushort4*) (device_texture_assignments + texture_object));
 
-        if (maps.x) {
+        if (maps.x != TEXTURE_NONE) {
           const float4 albedo_f = tex2D<float4>(device.albedo_atlas[maps.x], tex_coords.u, 1.0f - tex_coords.v);
           color                 = get_color(albedo_f.x, albedo_f.y, albedo_f.z);
         }

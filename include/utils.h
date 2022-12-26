@@ -27,6 +27,8 @@
 #define LIGHT_ID_TOY 0xfffffffeu
 #define LIGHT_ID_NONE 0xfffffff1u
 
+#define TEXTURE_NONE ((uint16_t) 0xffffu)
+
 enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
 
 enum ShadingMode {
