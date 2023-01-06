@@ -203,9 +203,15 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
         continue;
       }
 
-      // Sun light
-      const vec3 ray_sun      = sample_sphere(device_sun, SKY_SUN_RADIUS, pos);
-      const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos);
+      // Celestial light (prefer sun but use the moon if possible)
+      int sun_visible  = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, pos)), pos, SKY_EARTH_RADIUS);
+      int moon_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_moon, pos)), pos, SKY_EARTH_RADIUS);
+
+      const vec3 celestial_pos     = (sun_visible || !moon_visible) ? device_sun : device_moon;
+      const float celestial_radius = (sun_visible || !moon_visible) ? SKY_SUN_RADIUS : SKY_MOON_RADIUS;
+
+      const vec3 ray_sun      = sample_sphere(celestial_pos, celestial_radius, pos);
+      const float light_angle = sample_sphere_solid_angle(celestial_pos, celestial_radius, pos);
 
       const float cos_angle_sun  = dot_product(ray, ray_sun);
       const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
