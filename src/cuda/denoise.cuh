@@ -190,16 +190,16 @@ extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
 
   switch (instance->scene_gpu.camera.tonemap) {
     case TONEMAP_NONE:
-      target_exposure = 3.0f;
+      target_exposure = 2.5f;
       break;
     case TONEMAP_ACES:
-      target_exposure = 6.0f;
+      target_exposure = 5.0f;
       break;
     case TONEMAP_REINHARD:
-      target_exposure = 3.5f;
+      target_exposure = 3.0f;
       break;
     case TONEMAP_UNCHARTED2:
-      target_exposure = 3.5f;
+      target_exposure = 3.0f;
       break;
   }
 
@@ -211,7 +211,7 @@ extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
 
   const float lerp_factor = 0.2f * (1.0f - 1.0f / (1 + instance->temporal_frames));
 
-  return lerp(exposure, target_exposure * log2f(1.0f + brightness), lerp_factor);
+  return lerp(exposure, target_exposure * powf(1.0f + brightness, 0.45f), lerp_factor);
 }
 
 extern "C" void optix_denoise_free(RaytraceInstance* instance) {
