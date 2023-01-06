@@ -46,8 +46,8 @@ void generate_stars(RaytraceInstance* instance) {
     Star s = {
       .altitude  = -PI * 0.5f + PI * (1.0f - sqrtf(random_float())),
       .azimuth   = 2.0f * PI * random_float(),
-      .radius    = 0.00005f + 0.001f * (1.0f - sqrtf(random_float())),
-      .intensity = 0.01f * (0.1f + 0.9f * (1.0f - sqrtf(random_float())))};
+      .radius    = 0.0001f + 0.0004f * (1.0f - sqrtf(random_float())),
+      .intensity = 0.0001f + 0.0015f * (0.1f + 0.9f * (1.0f - sqrtf(random_float())))};
 
     int x = (int) (s.azimuth * 10.0f);
     int y = (int) ((s.altitude + PI * 0.5f) * 10.0f);
