@@ -735,11 +735,12 @@ __device__ RGBF uncharted2_partial(RGBF pixel) {
   const float e = 0.02f;
   const float f = 0.30f;
 
-  pixel.r = ((pixel.r * (a * pixel.r + c * b) + d * e) / (pixel.r * (a * pixel.r + b) + d * f)) - e / f;
-  pixel.g = ((pixel.g * (a * pixel.g + c * b) + d * e) / (pixel.g * (a * pixel.g + b) + d * f)) - e / f;
-  pixel.b = ((pixel.b * (a * pixel.b + c * b) + d * e) / (pixel.b * (a * pixel.b + b) + d * f)) - e / f;
+  RGBF result;
+  result.r = ((pixel.r * (a * pixel.r + c * b) + d * e) / (pixel.r * (a * pixel.r + b) + d * f)) - e / f;
+  result.g = ((pixel.g * (a * pixel.g + c * b) + d * e) / (pixel.g * (a * pixel.g + b) + d * f)) - e / f;
+  result.b = ((pixel.b * (a * pixel.b + c * b) + d * e) / (pixel.b * (a * pixel.b + b) + d * f)) - e / f;
 
-  return pixel;
+  return result;
 }
 
 __device__ RGBF uncharted2_tonemap(RGBF pixel) {
