@@ -455,7 +455,7 @@ extern "C" void initialize_device() {
   print_info("[%s] %s", LUMINARY_BRANCH_NAME, LUMINARY_VERSION_DATE);
   print_info("Compiled using %s on %s", LUMINARY_COMPILER, LUMINARY_OS);
   print_info("CUDA Version %s OptiX Version %s", LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
-  print_info("Copyright (c) 2022 MilchRatchet");
+  print_info("Copyright (c) 2023 MilchRatchet");
 }
 
 extern "C" void update_device_scene(RaytraceInstance* instance) {
