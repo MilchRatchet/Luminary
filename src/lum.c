@@ -154,6 +154,10 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 6872302014111172934u:
       sscanf(value, "%d\n", &camera->filter);
       break;
+    /* PURKINJE */
+    case 4992889213596882256u:
+      sscanf(value, "%d\n", &camera->purkinje);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
       break;
@@ -632,6 +636,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "CAMERA AUTOEXP_ %d\n", instance->scene_gpu.camera.auto_exposure);
   fputs(line, file);
   sprintf(line, "CAMERA FILTER__ %d\n", instance->scene_gpu.camera.filter);
+  fputs(line, file);
+  sprintf(line, "CAMERA PURKINJE %d\n", instance->scene_gpu.camera.purkinje);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");

@@ -107,6 +107,9 @@ Defines which of the available filters is used:
   - 5 = CRT
   - 6 = Black/White
 
+`CAMERA PURKINJE [INT32]`<br/>
+Set 1 to activate purkinje effect.
+
 ## Sky Settings
 
 `SKY SUNCOLOR [FP32] [FP32] [FP32]`<br/>
