@@ -130,6 +130,8 @@ struct DevicePointers {
   cudaTextureObject_t* material_atlas;
   cudaTextureObject_t* normal_atlas;
   cudaTextureObject_t* cloud_noise;
+  cudaTextureObject_t* sky_ms_luts;
+  cudaTextureObject_t* sky_tm_luts;
   LightSample* light_samples;
   LightEvalData* light_eval_data;
 } typedef DevicePointers;

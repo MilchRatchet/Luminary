@@ -242,7 +242,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trace_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 3) void process_volumetrics_trace_tasks() {
   const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
   for (int i = 0; i < task_count; i++) {

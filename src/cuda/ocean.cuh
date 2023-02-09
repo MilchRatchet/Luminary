@@ -209,7 +209,7 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
   return mid < 0.0f ? FLT_MAX : mid;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 8) void process_ocean_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int task_count   = device.task_counts[id * 6 + 1];

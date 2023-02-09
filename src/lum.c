@@ -169,10 +169,6 @@ static void parse_sky_settings(Sky* sky, char* line) {
   char* value        = line + 9;
 
   switch (key) {
-    /* SUNCOLOR */
-    case 5931043137585567059u:
-      sscanf(value, "%f %f %f\n", &sky->sun_color.r, &sky->sun_color.g, &sky->sun_color.b);
-      break;
     /* OFFSET__ */
     case 6872304213117257295u:
       sscanf(value, "%f %f %f\n", &sky->geometry_offset.x, &sky->geometry_offset.y, &sky->geometry_offset.z);
@@ -200,10 +196,6 @@ static void parse_sky_settings(Sky* sky, char* line) {
     /* STEPS___ */
     case 6872316367824311379u:
       sscanf(value, "%d\n", &sky->steps);
-      break;
-    /* SHASTEPS */
-    case 6003374531761227859u:
-      sscanf(value, "%d\n", &sky->shadow_steps);
       break;
     /* STARSEED */
     case 4919414392136750163u:
@@ -660,10 +652,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
 
   sprintf(
-    line, "SKY SUNCOLOR %f %f %f\n", instance->scene_gpu.sky.sun_color.r, instance->scene_gpu.sky.sun_color.g,
-    instance->scene_gpu.sky.sun_color.b);
-  fputs(line, file);
-  sprintf(
     line, "SKY OFFSET__ %f %f %f\n", instance->scene_gpu.sky.geometry_offset.x, instance->scene_gpu.sky.geometry_offset.y,
     instance->scene_gpu.sky.geometry_offset.z);
   fputs(line, file);
@@ -685,7 +673,23 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "SKY STEPS___ %d\n", instance->scene_gpu.sky.steps);
   fputs(line, file);
-  sprintf(line, "SKY SHASTEPS %d\n", instance->scene_gpu.sky.shadow_steps);
+  sprintf(line, "SKY RAYLEDEN %f\n", instance->scene_gpu.sky.rayleigh_density);
+  fputs(line, file);
+  sprintf(line, "SKY MIEDENSI %f\n", instance->scene_gpu.sky.mie_density);
+  fputs(line, file);
+  sprintf(line, "SKY OZONEDEN %f\n", instance->scene_gpu.sky.ozone_density);
+  fputs(line, file);
+  sprintf(line, "SKY RAYLEFAL %f\n", instance->scene_gpu.sky.rayleigh_falloff);
+  fputs(line, file);
+  sprintf(line, "SKY MIEFALLO %f\n", instance->scene_gpu.sky.mie_falloff);
+  fputs(line, file);
+  sprintf(line, "SKY MIE_PH_G %f\n", instance->scene_gpu.sky.mie_g);
+  fputs(line, file);
+  sprintf(line, "SKY GROUNDVI %f\n", instance->scene_gpu.sky.ground_visibility);
+  fputs(line, file);
+  sprintf(line, "SKY OZONETHI %f\n", instance->scene_gpu.sky.ozone_layer_thickness);
+  fputs(line, file);
+  sprintf(line, "SKY MSFACTOR %f\n", instance->scene_gpu.sky.multiscattering_factor);
   fputs(line, file);
   sprintf(line, "SKY STARSEED %d\n", instance->scene_gpu.sky.stars_seed);
   fputs(line, file);
