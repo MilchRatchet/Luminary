@@ -60,7 +60,8 @@ static void cudatexture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex)
     resDesc.res.pitch2D.devPtr       = data_gpu;
     resDesc.res.pitch2D.width        = width;
     resDesc.res.pitch2D.height       = height;
-    resDesc.res.pitch2D.desc         = cudaCreateChannelDesc<uchar4>();
+    resDesc.res.pitch2D.desc         = (tex->type == TexDataFP32) ? cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat)
+                                                                  : cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
     resDesc.res.pitch2D.pitchInBytes = pitch_gpu;
   }
 
