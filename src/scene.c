@@ -112,7 +112,7 @@ void scene_init(Scene** _scene) {
   scene->sky.moon_altitude             = -0.5f;
   scene->sky.moon_azimuth              = 0.0f;
   scene->sky.moon_albedo               = 0.12f;
-  scene->sky.sun_strength              = 15000.0f;
+  scene->sky.sun_strength              = 1.0f;
   scene->sky.base_density              = 1.0f;
   scene->sky.rayleigh_density          = 1.0f;
   scene->sky.mie_density               = 1.0f;
@@ -123,7 +123,7 @@ void scene_init(Scene** _scene) {
   scene->sky.rayleigh_falloff          = 8.0f;
   scene->sky.mie_falloff               = 1.7f;
   scene->sky.multiscattering_factor    = 1.0f;
-  scene->sky.steps                     = 8;
+  scene->sky.steps                     = 40;
   scene->sky.ozone_absorption          = 1;
   scene->sky.stars_seed                = 0;
   scene->sky.stars_intensity           = 1.0f;

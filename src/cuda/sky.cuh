@@ -170,8 +170,10 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 
 #define SKY_WAVELENGTHS \
   spectrum_set(4.150000e+02f, 4.464286e+02f, 4.778571e+02f, 5.092857e+02f, 5.407143e+02f, 5.721428e+02f, 6.035714e+02f, 6.350000e+02f)
+
+// The SKY_SUN_RADIANCE is reduced by a factor of 10 due to the limited dynamic range of our 16bit render target
 #define SKY_SUN_RADIANCE \
-  spectrum_set(2.463170e+04f, 2.888721e+04f, 2.795153e+04f, 2.629836e+04f, 2.667237e+04f, 2.638737e+04f, 2.490630e+04f, 2.338930e+04f)
+  spectrum_set(2.463170e+03f, 2.888721e+03f, 2.795153e+03f, 2.629836e+03f, 2.667237e+03f, 2.638737e+03f, 2.490630e+03f, 2.338930e+03f)
 
 #define SKY_RAYLEIGH_SCATTERING \
   spectrum_set(3.945800e-02f, 2.939289e-02f, 2.235060e-02f, 1.730112e-02f, 1.360286e-02f, 1.084340e-02f, 8.750306e-03f, 7.139216e-03f)

@@ -166,7 +166,7 @@ __device__ float brdf_light_sample_target_weight(const LightSample light) {
   float weight;
   switch (light.id) {
     case LIGHT_ID_SUN:
-      weight = device_scene.sky.sun_strength;
+      weight = 2e+3f * device_scene.sky.sun_strength;
       break;
     case LIGHT_ID_TOY:
       weight = device_scene.toy.material.b;
