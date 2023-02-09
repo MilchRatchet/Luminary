@@ -240,13 +240,13 @@ RaytraceInstance* scene_load_lum(const char* filename) {
   lights_build_set_from_triangles(scene, content->illuminance_maps);
 
   TextureAtlas tex_atlas = {
-    .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length),
+    .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length, CUDA_TEX_FLAG_NONE),
     .albedo_length      = content->albedo_maps_length,
-    .illuminance        = cudatexture_allocate_to_buffer(content->illuminance_maps, content->illuminance_maps_length),
+    .illuminance        = cudatexture_allocate_to_buffer(content->illuminance_maps, content->illuminance_maps_length, CUDA_TEX_FLAG_NONE),
     .illuminance_length = content->illuminance_maps_length,
-    .material           = cudatexture_allocate_to_buffer(content->material_maps, content->material_maps_length),
+    .material           = cudatexture_allocate_to_buffer(content->material_maps, content->material_maps_length, CUDA_TEX_FLAG_NONE),
     .material_length    = content->material_maps_length,
-    .normal             = cudatexture_allocate_to_buffer(content->normal_maps, content->normal_maps_length),
+    .normal             = cudatexture_allocate_to_buffer(content->normal_maps, content->normal_maps_length, CUDA_TEX_FLAG_NONE),
     .normal_length      = content->normal_maps_length};
 
   RaytraceInstance* instance;
@@ -282,13 +282,13 @@ RaytraceInstance* scene_load_obj(char* filename) {
   lights_build_set_from_triangles(scene, content->illuminance_maps);
 
   TextureAtlas tex_atlas = {
-    .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length),
+    .albedo             = cudatexture_allocate_to_buffer(content->albedo_maps, content->albedo_maps_length, CUDA_TEX_FLAG_NONE),
     .albedo_length      = content->albedo_maps_length,
-    .illuminance        = cudatexture_allocate_to_buffer(content->illuminance_maps, content->illuminance_maps_length),
+    .illuminance        = cudatexture_allocate_to_buffer(content->illuminance_maps, content->illuminance_maps_length, CUDA_TEX_FLAG_NONE),
     .illuminance_length = content->illuminance_maps_length,
-    .material           = cudatexture_allocate_to_buffer(content->material_maps, content->material_maps_length),
+    .material           = cudatexture_allocate_to_buffer(content->material_maps, content->material_maps_length, CUDA_TEX_FLAG_NONE),
     .material_length    = content->material_maps_length,
-    .normal             = cudatexture_allocate_to_buffer(content->normal_maps, content->normal_maps_length),
+    .normal             = cudatexture_allocate_to_buffer(content->normal_maps, content->normal_maps_length, CUDA_TEX_FLAG_NONE),
     .normal_length      = content->normal_maps_length};
 
   RaytraceInstance* instance;

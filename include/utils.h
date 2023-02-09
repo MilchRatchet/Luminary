@@ -29,6 +29,16 @@
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
+//////////////////////////
+// Cuda Texture Flags
+//////////////////////////
+#define CUDA_TEX_FLAG_NONE 0
+#define CUDA_TEX_FLAG_ADDRESSMODE_MASK 0b11
+#define CUDA_TEX_FLAG_WRAP 0b00
+#define CUDA_TEX_FLAG_CLAMP 0b01
+#define CUDA_TEX_FLAG_MIRROR 0b10
+#define CUDA_TEX_FLAG_BORDER 0b11
+
 enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
 
 enum ShadingMode {
