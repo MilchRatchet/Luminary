@@ -115,6 +115,7 @@ struct Camera {
   int smooth_movement;
   float smoothing_factor;
   float temporal_blend_factor;
+  float russian_roulette_bias;
 } typedef Camera;
 
 struct Light {

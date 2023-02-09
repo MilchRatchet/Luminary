@@ -631,6 +631,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CAMERA PURKINJE %d\n", instance->scene_gpu.camera.purkinje);
   fputs(line, file);
+  sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene_gpu.camera.russian_roulette_bias);
+  fputs(line, file);
 
   sprintf(line, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");
   fputs(line, file);

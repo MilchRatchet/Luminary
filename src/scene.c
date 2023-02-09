@@ -53,6 +53,7 @@ void scene_init(Scene** _scene) {
   scene->camera.purkinje              = 1;
   scene->camera.purkinje_kappa1       = 0.2f;
   scene->camera.purkinje_kappa2       = 0.29f;
+  scene->camera.russian_roulette_bias = 10.0f;
 
   scene->ocean.active              = 0;
   scene->ocean.emissive            = 0;
