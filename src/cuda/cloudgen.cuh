@@ -13,6 +13,7 @@
 #include "buffer.h"
 #include "log.h"
 #include "png.h"
+#include "raytrace.h"
 
 /*
  * This file contains code to generate noise textures needed for the clouds.
@@ -486,6 +487,8 @@ extern "C" void clouds_generate(RaytraceInstance* instance) {
   device_free(noise_tex[1].data, noise_tex[1].depth * noise_tex[1].height * noise_tex[1].pitch * 4 * sizeof(uint8_t));
   device_free(noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
   device_free(noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
+
+  update_device_pointers(instance);
 
   instance->scene_gpu.sky.cloud.initialized = 1;
 
