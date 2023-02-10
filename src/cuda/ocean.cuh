@@ -242,9 +242,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
       write_albedo_buffer(emission, pixel);
 
-      emission.r *= 2.0f * record.r;
-      emission.g *= 2.0f * record.g;
-      emission.b *= 2.0f * record.b;
+      emission.r *= record.r;
+      emission.g *= record.g;
+      emission.b *= record.b;
 
       device.frame_buffer[pixel] = RGBF_to_RGBAhalf(emission);
     }
@@ -339,7 +339,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
           else {
             brdf.L = brdf_sample_light_ray(light, task.position);
 
-            light_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf_evaluate(brdf).term, light_weight));
+            light_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf_evaluate(brdf).term, 0.5f * light_weight));
 
             light_record = scale_RGBAhalf(light_record, 1.0f / (1.0f - scattering_prob));
           }
@@ -363,7 +363,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
       brdf = brdf_sample_ray(brdf, task.index, task.state);
 
-      RGBAhalf bounce_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), brdf.term);
+      RGBAhalf bounce_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf.term, 0.5f));
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
