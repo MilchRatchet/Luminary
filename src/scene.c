@@ -123,7 +123,7 @@ void scene_init(Scene** _scene) {
   scene->sky.rayleigh_falloff          = 8.0f;
   scene->sky.mie_falloff               = 1.7f;
   scene->sky.multiscattering_factor    = 1.0f;
-  scene->sky.steps                     = 40;
+  scene->sky.steps                     = 30;
   scene->sky.ozone_absorption          = 1;
   scene->sky.stars_seed                = 0;
   scene->sky.stars_intensity           = 1.0f;
