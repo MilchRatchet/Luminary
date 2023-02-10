@@ -3,11 +3,24 @@
 
 #include <cuda_runtime_api.h>
 
-#include "log.h"
 #include "math.cuh"
 #include "raytrace.h"
 #include "stars.h"
 #include "utils.cuh"
+
+//
+// In this atmosphere rendering implementation, the single scattering is computed using ray-marching. The transmittance and multiscattering
+// are precomputed as in [Bru17] and [Hil20] respectively. We extended the model using the model of [Wil21] as reference. For this, we
+// modified their public GUI implementation so that we could compare our model to theirs. This modification is found in
+// https://github.com/MilchRatchet/pragueskymodel. Our final model found in that repository has a lot more parameters than the
+// implementation that we use in Luminary. Some of these parameters were found to be superfluous and possibly harmful for an efficient
+// implementation. In the following, we summarize our additions over the common real-time methods of [Bru17] and [Hil20]. We added the layer
+// of water soluble aerosols which contribute to the Mie scattering. Further, we found that using a spectrum of 8 different wavelengths with
+// equal gaps in the range [415,635] allows us to obtain a visual look that is similar to that of the model in [Wil21]. Using only three
+// wavelengths as in [Hil20] meant that the sky would look very purple during sunsets. Other spectrums could also work well for our
+// purposes but we wanted a multiple of four to optimally use the texture sampling capabilities of the hardware and we did not want to
+// actually try and solve the problem of finding four optimal wavelengths, if they exist.
+//
 
 ////////////////////////////////////////////////////////////////////
 // Literature
@@ -212,10 +225,12 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 // Sky Utils
 ////////////////////////////////////////////////////////////////////
 
+// [Hil20]
 __device__ float sky_unit_to_sub_uv(const float u, const float resolution) {
   return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f));
 }
 
+// [Hil20]
 __device__ float sky_sub_to_unit_uv(const float u, const float resolution) {
   return (u - 0.5f / resolution) * (resolution / (resolution - 1.0f));
 }
@@ -234,6 +249,7 @@ __device__ float sky_mie_phase(const float cos_angle) {
          / (4.0f * PI * 2.0f * (2.0f + g * g) * pow(1.0f + g * g - 2.0f * g * cos_angle, 3.0f / 2.0f));
 }
 
+// [Wil21]
 __device__ float sky_mie_density(const float height) {
   // INSO (insoluble = dust-like particles)
   const float INSO = expf(-height * (1.0f / device_scene.sky.mie_falloff));
@@ -294,6 +310,7 @@ __device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const floa
   return make_float2(start, distance);
 }
 
+// [Wil21]
 __device__ RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
   // Radiance to XYZ
   //  {{0.0076500,0.2345212,0.3027571,0.0357158,0.0698887,0.4671353,0.9607998,0.9384000},
