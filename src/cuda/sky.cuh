@@ -34,6 +34,22 @@ struct Spectrum {
   float v[8];
 } typedef Spectrum;
 
+// This is the spectrum that transforms to the identity color (1,1,1)
+__device__ Spectrum spectrum_get_ident() {
+  Spectrum result;
+
+  result.v[0] = 8.4205e-03f;
+  result.v[1] = 2.6449e-01f;
+  result.v[2] = 4.0273e-01f;
+  result.v[3] = 1.6624e-01f;
+  result.v[4] = 2.4324e-01f;
+  result.v[5] = 3.5849e-01f;
+  result.v[6] = 3.6342e-01f;
+  result.v[7] = 2.4177e-01f;
+
+  return result;
+}
+
 __device__ Spectrum spectrum_set1(const float v) {
   Spectrum result;
 
@@ -171,9 +187,8 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 #define SKY_WAVELENGTHS \
   spectrum_set(4.150000e+02f, 4.464286e+02f, 4.778571e+02f, 5.092857e+02f, 5.407143e+02f, 5.721428e+02f, 6.035714e+02f, 6.350000e+02f)
 
-// The SKY_SUN_RADIANCE is reduced by a factor of 10 due to the limited dynamic range of our 16bit render target
 #define SKY_SUN_RADIANCE \
-  spectrum_set(2.463170e+03f, 2.888721e+03f, 2.795153e+03f, 2.629836e+03f, 2.667237e+03f, 2.638737e+03f, 2.490630e+03f, 2.338930e+03f)
+  spectrum_set(2.463170e+04f, 2.888721e+04f, 2.795153e+04f, 2.629836e+04f, 2.667237e+04f, 2.638737e+04f, 2.490630e+04f, 2.338930e+04f)
 
 #define SKY_RAYLEIGH_SCATTERING \
   spectrum_set(3.945800e-02f, 2.939289e-02f, 2.235060e-02f, 1.730112e-02f, 1.360286e-02f, 1.084340e-02f, 8.750306e-03f, 7.139216e-03f)
@@ -649,7 +664,7 @@ __device__ Spectrum
   const float start    = path.x;
   const float distance = fminf(path.y, limit - start);
 
-  Spectrum transmittance = spectrum_set1(1.0f);
+  Spectrum transmittance = spectrum_get_ident();
 
   if (distance > 0.0f) {
     const int steps = device_scene.sky.steps;
