@@ -158,6 +158,10 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 4992889213596882256u:
       sscanf(value, "%d\n", &camera->purkinje);
       break;
+    /* RUSSIANR */
+    case 5930749542479910226u:
+      sscanf(value, "%f\n", &camera->russian_roulette_bias);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
       break;
@@ -220,6 +224,42 @@ static void parse_sky_settings(Sky* sky, char* line) {
     /* DENSITY_ */
     case 6870615380437386564u:
       sscanf(value, "%f\n", &sky->base_density);
+      break;
+    /* RAYLEDEN */
+    case 5639989172775764306u:
+      sscanf(value, "%f\n", &sky->rayleigh_density);
+      break;
+    /* MIEDENSI */
+    case 5283652847240825165u:
+      sscanf(value, "%f\n", &sky->mie_density);
+      break;
+    /* OZONEDEN */
+    case 5639989172808669775u:
+      sscanf(value, "%f\n", &sky->ozone_density);
+      break;
+    /* RAYLEFAL */
+    case 5494750283816321362u:
+      sscanf(value, "%f\n", &sky->rayleigh_falloff);
+      break;
+    /* MIEFALLO */
+    case 5714025870461847885u:
+      sscanf(value, "%f\n", &sky->mie_falloff);
+      break;
+    /* MIE_PH_G */
+    case 5142908809513355597u:
+      sscanf(value, "%f\n", &sky->mie_g);
+      break;
+    /* GROUNDVI */
+    case 5284486315995255367u:
+      sscanf(value, "%f\n", &sky->ground_visibility);
+      break;
+    /* OZONETHI */
+    case 5280563219735206479u:
+      sscanf(value, "%f\n", &sky->ozone_layer_thickness);
+      break;
+    /* MSFACTOR */
+    case 5931051882104902477u:
+      sscanf(value, "%f\n", &sky->multiscattering_factor);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
