@@ -530,7 +530,15 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  fog_preprocess_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+  if (instance->scene_gpu.sky.cloud.active || instance->scene_gpu.ocean.active) {
+    process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+
+  if (instance->scene_gpu.sky.cloud.active) {
+    clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
 
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 

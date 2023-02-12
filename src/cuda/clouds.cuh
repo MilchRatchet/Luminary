@@ -339,4 +339,32 @@ __device__ void trace_clouds(const vec3 origin, const vec3 ray, const float star
   }
 }
 
+////////////////////////////////////////////////////////////////////
+// Kernel
+////////////////////////////////////////////////////////////////////
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 4) void clouds_render_tasks() {
+  const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset  = get_task_address(i);
+    TraceTask task    = load_trace_task(device_trace_tasks + offset);
+    const float depth = __ldcs((float*) (device.trace_results + offset));
+
+    const vec3 sky_origin = world_to_sky_transform(task.origin);
+
+    const float sky_max_dist = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+    const float2 params      = cloud_get_intersection(sky_origin, task.ray, sky_max_dist);
+
+    const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
+
+    if (cloud_hit) {
+      trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
+
+      task.origin = add_vector(task.origin, scale_vector(task.ray, sky_to_world_scale(params.x)));
+      store_trace_task(device_trace_tasks + offset, task);
+    }
+  }
+}
+
 #endif /* CU_CLOUDS_H */
