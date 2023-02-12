@@ -19,8 +19,8 @@ __device__ float cloud_gradient(float4 gradient, float height) {
 }
 
 __device__ float cloud_height_fraction(const vec3 pos) {
-  const float low  = SKY_EARTH_RADIUS + device_scene.sky.cloud.height_min * 0.001f;
-  const float high = SKY_EARTH_RADIUS + device_scene.sky.cloud.height_max * 0.001f;
+  const float low  = SKY_EARTH_RADIUS + world_to_sky_scale(device_scene.sky.cloud.height_min);
+  const float high = SKY_EARTH_RADIUS + world_to_sky_scale(device_scene.sky.cloud.height_max);
   return remap(get_length(pos), low, high, 0.0f, 1.0f);
 }
 
@@ -114,7 +114,7 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
       break;
 
     if (height < 0.0f) {
-      const float h_min = device_scene.sky.cloud.height_min * 0.001f + SKY_EARTH_RADIUS;
+      const float h_min = world_to_sky_scale(device_scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
       reach += sph_ray_int_p0(ray, pos, h_min);
       continue;
     }
@@ -155,8 +155,9 @@ __device__ float cloud_powder(const float density, const float step_size) {
 __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, const float dist) {
   const int step_count = CLOUD_STEPS * (dist / (start + dist)) * (is_first_ray() ? 1.0f : 0.25f);
 
-  const float big_step     = 5.0f;
-  const float default_step = fminf(0.001f * (device_scene.sky.cloud.height_max - device_scene.sky.cloud.height_min), dist) / step_count;
+  const float big_step = 3.0f;
+  const float default_step =
+    fminf(world_to_sky_scale(device_scene.sky.cloud.height_max - device_scene.sky.cloud.height_min), dist) / step_count;
 
   int zero_density_streak = 0;
 
@@ -275,8 +276,8 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 }
 
 __device__ float2 cloud_get_intersection(const vec3 origin, const vec3 ray, const float limit) {
-  const float h_min = device_scene.sky.cloud.height_min * 0.001f + SKY_EARTH_RADIUS;
-  const float h_max = device_scene.sky.cloud.height_max * 0.001f + SKY_EARTH_RADIUS;
+  const float h_min = world_to_sky_scale(device_scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
+  const float h_max = world_to_sky_scale(device_scene.sky.cloud.height_max) + SKY_EARTH_RADIUS;
 
   const float height = get_length(origin);
 
