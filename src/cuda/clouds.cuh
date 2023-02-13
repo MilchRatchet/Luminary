@@ -205,22 +205,27 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       }
 
       // Celestial light (prefer sun but use the moon if possible)
-      int sun_visible  = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, pos)), pos, SKY_EARTH_RADIUS);
-      int moon_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_moon, pos)), pos, SKY_EARTH_RADIUS);
+      const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, pos)), pos, SKY_EARTH_RADIUS);
 
-      const vec3 celestial_pos     = (sun_visible || !moon_visible) ? device_sun : device_moon;
-      const float celestial_radius = (sun_visible || !moon_visible) ? SKY_SUN_RADIUS : SKY_MOON_RADIUS;
+      RGBF sun_color;
 
-      const vec3 ray_sun      = sample_sphere(celestial_pos, celestial_radius, pos);
-      const float light_angle = sample_sphere_solid_angle(celestial_pos, celestial_radius, pos);
+      if (sun_visible) {
+        const vec3 ray_sun      = sample_sphere(device_sun, SKY_SUN_RADIUS, pos);
+        const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos);
 
-      const float cos_angle_sun  = dot_product(ray, ray_sun);
-      const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
-        cos_angle_sun, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
-        device_scene.sky.cloud.lobe_lerp);
+        const float cos_angle_sun  = dot_product(ray, ray_sun);
+        const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
+          cos_angle_sun, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
+          device_scene.sky.cloud.lobe_lerp);
 
-      RGBF sun_color = sky_get_color(pos, ray_sun, FLT_MAX, true);
-      sun_color      = scale_color(sun_color, 0.25f * ONE_OVER_PI * light_angle * scattering_sun);
+        const float extinction_sun = cloud_extinction(pos, ray_sun);
+
+        sun_color = sky_get_color(pos, ray_sun, FLT_MAX, true);
+        sun_color = scale_color(sun_color, 0.25f * ONE_OVER_PI * light_angle * scattering_sun * extinction_sun);
+      }
+      else {
+        sun_color = get_color(0.0f, 0.0f, 0.0f);
+      }
 
       // Ambient light
       const float ambient_r1 = (2.0f * PI * white_noise()) - PI;
@@ -233,17 +238,15 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
         cos_angle_ambient, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
         device_scene.sky.cloud.lobe_lerp);
 
+      const float extinction_ambient = cloud_extinction(pos, ray_ambient);
+
       RGBF ambient_color = sky_get_color(pos, ray_ambient, FLT_MAX, false);
-      ambient_color      = scale_color(ambient_color, scattering_ambient);
+      ambient_color      = scale_color(ambient_color, scattering_ambient * extinction_ambient);
 
       const float scattering = density * 1000.0f * 0.05f;
       const float extinction = density * 1000.0f * 0.05f * 0.1f;
 
-      const float extinction_sun     = cloud_extinction(pos, ray_sun);
-      const float extinction_ambient = cloud_extinction(pos, ray_ambient);
-
-      RGBF S           = scale_color(sun_color, extinction_sun);
-      S                = add_color(S, scale_color(ambient_color, extinction_ambient));
+      RGBF S           = add_color(sun_color, ambient_color);
       S                = scale_color(S, scattering);
       S                = scale_color(S, cloud_powder(scattering, step));
       S                = scale_color(S, cloud_weather_wetness(weather));
