@@ -240,7 +240,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 
       const float extinction_ambient = cloud_extinction(pos, ray_ambient);
 
-      RGBF ambient_color = sky_get_color(pos, ray_ambient, FLT_MAX, false);
+      RGBF ambient_color = sky_get_color(pos, ray_ambient, FLT_MAX, false, device_scene.sky.steps / 2);
       ambient_color      = scale_color(ambient_color, scattering_ambient * extinction_ambient);
 
       const float scattering = density * 1000.0f * 0.05f;

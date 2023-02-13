@@ -669,8 +669,8 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
 // Atmosphere Integration
 ////////////////////////////////////////////////////////////////////
 
-__device__ Spectrum
-  sky_compute_atmosphere(Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials) {
+__device__ Spectrum sky_compute_atmosphere(
+  Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps) {
   Spectrum result = spectrum_set1(0.0f);
 
   const float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
@@ -684,8 +684,7 @@ __device__ Spectrum
   Spectrum transmittance = spectrum_get_ident();
 
   if (distance > 0.0f) {
-    const int steps = device_scene.sky.steps;
-    float reach     = start;
+    float reach = start;
     float step_size;
 
     const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device_scene.sky.sun_strength);
@@ -806,10 +805,10 @@ __device__ Spectrum
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials) {
+__device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps) {
   Spectrum unused = spectrum_set1(0.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials);
+  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, steps);
 
   return sky_compute_color_from_spectrum(radiance);
 }
@@ -841,7 +840,7 @@ __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false);
+  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, device_scene.sky.steps);
 
   const RGBAhalf inscattering = RGBF_to_RGBAhalf(mul_color(sky_compute_color_from_spectrum(radiance), new_record));
 
@@ -871,8 +870,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
     const vec3 origin     = world_to_sky_transform(task.origin);
     const uint32_t light  = device.light_sample_history[pixel];
 
-    const RGBAhalf sky =
-      mul_RGBAhalf(RGBF_to_RGBAhalf(sky_get_color(origin, task.ray, FLT_MAX, proper_light_sample(light, LIGHT_ID_SUN))), record);
+    const RGBAhalf sky = mul_RGBAhalf(
+      RGBF_to_RGBAhalf(sky_get_color(origin, task.ray, FLT_MAX, proper_light_sample(light, LIGHT_ID_SUN), device_scene.sky.steps)), record);
 
     store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), sky));
     write_albedo_buffer(RGBAhalf_to_RGBF(sky), pixel);
@@ -892,7 +891,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks(
 
     if (device_shading_mode == SHADING_ALBEDO) {
       store_RGBAhalf(
-        device.frame_buffer + pixel, RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true)));
+        device.frame_buffer + pixel,
+        RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device_scene.sky.steps)));
     }
     else if (device_shading_mode == SHADING_DEPTH) {
       const float value = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);
