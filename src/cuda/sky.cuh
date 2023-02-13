@@ -814,6 +814,24 @@ __device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float lim
   return sky_compute_color_from_spectrum(radiance);
 }
 
+// This is a quick way of obtaining the color of the sun disk times transmittance
+// Note that it is not checked whether the sun is actually hit by ray, it is simply assumed
+// Inscattering is not included
+__device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
+  const float height           = sky_height(origin);
+  const float zenith_cos_angle = dot_product(normalize_vector(origin), ray);
+
+  const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
+  const float4 transmittance_low  = tex2D<float4>(device.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
+  const float4 transmittance_high = tex2D<float4>(device.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
+  const Spectrum extinction_sun   = spectrum_mul(spectrum_get_ident(), spectrum_merge(transmittance_low, transmittance_high));
+
+  const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device_scene.sky.sun_strength);
+  const Spectrum radiance     = spectrum_mul(extinction_sun, sun_radiance);
+
+  return sky_compute_color_from_spectrum(radiance);
+}
+
 __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, ushort2 index) {
   int pixel = index.x + index.y * device_width;
 

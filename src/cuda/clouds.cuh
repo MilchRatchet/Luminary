@@ -107,7 +107,7 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
   float extinction = 0.0f;
 
   for (int i = 0; i < device_scene.sky.cloud.shadow_steps; i++) {
-    vec3 pos = add_vector(origin, scale_vector(ray, reach));
+    const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
     float height = cloud_height_fraction(pos);
     if (height > 1.0f)
@@ -121,7 +121,7 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
 
     height = __saturatef(height);
 
-    vec3 weather = cloud_weather(pos, height);
+    const vec3 weather = cloud_weather(pos, height);
 
     if (weather.x > 0.3f) {
       const float density = 1000.0f * 0.05f * 0.1f * cloud_density(pos, height, weather);
@@ -220,7 +220,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 
         const float extinction_sun = cloud_extinction(pos, ray_sun);
 
-        sun_color = sky_get_color(pos, ray_sun, FLT_MAX, true);
+        sun_color = sky_get_sun_color(pos, ray_sun);
         sun_color = scale_color(sun_color, 0.25f * ONE_OVER_PI * light_angle * scattering_sun * extinction_sun);
       }
       else {
