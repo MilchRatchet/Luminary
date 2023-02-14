@@ -13,8 +13,8 @@
  * The LMS to sRGB transformation could be optimized but it does not really matter.
  */
 
-#include "structs.h"
 #include "math.cuh"
+#include "structs.h"
 
 __device__ RGBF purkinje_shift(RGBF pixel) {
   // sRGB => LMSR
@@ -69,7 +69,7 @@ __device__ RGBF purkinje_shift(RGBF pixel) {
   sRGB.g = -0.9693f * XYZ.r + 1.876f * XYZ.g + 0.0416f * XYZ.b;
   sRGB.b = 0.0556f * XYZ.r - 0.2040f * XYZ.g + 1.0572f * XYZ.b;
 
-  float blend = __saturatef(1.0f - 1000.0f * luminance(pixel));
+  float blend = __saturatef(1.0f - 2500.0f * luminance(pixel));
 
   blend *= blend;
 
