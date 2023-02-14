@@ -253,30 +253,36 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
-    const bool use_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
+    const vec3 sky_origin = world_to_sky_transform(task.origin);
 
-    if (!use_inscattering) {
+    if (hit_id == FOG_HIT) {
       continue;
     }
 
-    const vec3 sky_origin    = world_to_sky_transform(task.origin);
-    float inscattering_limit = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+    const bool use_complete_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
 
-    if (device_scene.sky.cloud.active) {
-      inscattering_limit   = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
-      const float2 params  = cloud_get_intersection(sky_origin, task.ray, inscattering_limit);
-      const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
+    if (use_complete_inscattering) {
+      float inscattering_limit = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
 
-      if (cloud_hit) {
-        inscattering_limit = fmaxf(0.0f, fminf(inscattering_limit, params.x));
+      if (device_scene.sky.cloud.active) {
+        inscattering_limit   = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+        const float2 params  = cloud_get_intersection(sky_origin, task.ray, inscattering_limit);
+        const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
+
+        if (cloud_hit) {
+          inscattering_limit = fmaxf(0.0f, fminf(inscattering_limit, params.x));
+        }
       }
-    }
 
-    if (inscattering_limit == FLT_MAX) {
-      continue;
-    }
+      if (inscattering_limit == FLT_MAX) {
+        continue;
+      }
 
-    sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
+      sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
+    }
+    else {
+      sky_trace_inscattering_ms_only(sky_origin, task.ray, world_to_sky_scale(depth), task.index);
+    }
   }
 }
 
