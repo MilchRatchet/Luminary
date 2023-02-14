@@ -158,6 +158,10 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 4992889213596882256u:
       sscanf(value, "%d\n", &camera->purkinje);
       break;
+    /* RUSSIANR */
+    case 5930749542479910226u:
+      sscanf(value, "%f\n", &camera->russian_roulette_bias);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
       break;
@@ -169,10 +173,6 @@ static void parse_sky_settings(Sky* sky, char* line) {
   char* value        = line + 9;
 
   switch (key) {
-    /* SUNCOLOR */
-    case 5931043137585567059u:
-      sscanf(value, "%f %f %f\n", &sky->sun_color.r, &sky->sun_color.g, &sky->sun_color.b);
-      break;
     /* OFFSET__ */
     case 6872304213117257295u:
       sscanf(value, "%f %f %f\n", &sky->geometry_offset.x, &sky->geometry_offset.y, &sky->geometry_offset.z);
@@ -201,10 +201,6 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 6872316367824311379u:
       sscanf(value, "%d\n", &sky->steps);
       break;
-    /* SHASTEPS */
-    case 6003374531761227859u:
-      sscanf(value, "%d\n", &sky->shadow_steps);
-      break;
     /* STARSEED */
     case 4919414392136750163u:
       sscanf(value, "%d\n", &sky->stars_seed);
@@ -228,6 +224,42 @@ static void parse_sky_settings(Sky* sky, char* line) {
     /* DENSITY_ */
     case 6870615380437386564u:
       sscanf(value, "%f\n", &sky->base_density);
+      break;
+    /* RAYLEDEN */
+    case 5639989172775764306u:
+      sscanf(value, "%f\n", &sky->rayleigh_density);
+      break;
+    /* MIEDENSI */
+    case 5283652847240825165u:
+      sscanf(value, "%f\n", &sky->mie_density);
+      break;
+    /* OZONEDEN */
+    case 5639989172808669775u:
+      sscanf(value, "%f\n", &sky->ozone_density);
+      break;
+    /* RAYLEFAL */
+    case 5494750283816321362u:
+      sscanf(value, "%f\n", &sky->rayleigh_falloff);
+      break;
+    /* MIEFALLO */
+    case 5714025870461847885u:
+      sscanf(value, "%f\n", &sky->mie_falloff);
+      break;
+    /* MIE_PH_G */
+    case 5142908809513355597u:
+      sscanf(value, "%f\n", &sky->mie_g);
+      break;
+    /* GROUNDVI */
+    case 5284486315995255367u:
+      sscanf(value, "%f\n", &sky->ground_visibility);
+      break;
+    /* OZONETHI */
+    case 5280563219735206479u:
+      sscanf(value, "%f\n", &sky->ozone_layer_thickness);
+      break;
+    /* MSFACTOR */
+    case 5931051882104902477u:
+      sscanf(value, "%f\n", &sky->multiscattering_factor);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
@@ -639,6 +671,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CAMERA PURKINJE %d\n", instance->scene_gpu.camera.purkinje);
   fputs(line, file);
+  sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene_gpu.camera.russian_roulette_bias);
+  fputs(line, file);
 
   sprintf(line, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");
   fputs(line, file);
@@ -659,10 +693,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");
   fputs(line, file);
 
-  sprintf(
-    line, "SKY SUNCOLOR %f %f %f\n", instance->scene_gpu.sky.sun_color.r, instance->scene_gpu.sky.sun_color.g,
-    instance->scene_gpu.sky.sun_color.b);
-  fputs(line, file);
   sprintf(
     line, "SKY OFFSET__ %f %f %f\n", instance->scene_gpu.sky.geometry_offset.x, instance->scene_gpu.sky.geometry_offset.y,
     instance->scene_gpu.sky.geometry_offset.z);
@@ -685,7 +715,23 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "SKY STEPS___ %d\n", instance->scene_gpu.sky.steps);
   fputs(line, file);
-  sprintf(line, "SKY SHASTEPS %d\n", instance->scene_gpu.sky.shadow_steps);
+  sprintf(line, "SKY RAYLEDEN %f\n", instance->scene_gpu.sky.rayleigh_density);
+  fputs(line, file);
+  sprintf(line, "SKY MIEDENSI %f\n", instance->scene_gpu.sky.mie_density);
+  fputs(line, file);
+  sprintf(line, "SKY OZONEDEN %f\n", instance->scene_gpu.sky.ozone_density);
+  fputs(line, file);
+  sprintf(line, "SKY RAYLEFAL %f\n", instance->scene_gpu.sky.rayleigh_falloff);
+  fputs(line, file);
+  sprintf(line, "SKY MIEFALLO %f\n", instance->scene_gpu.sky.mie_falloff);
+  fputs(line, file);
+  sprintf(line, "SKY MIE_PH_G %f\n", instance->scene_gpu.sky.mie_g);
+  fputs(line, file);
+  sprintf(line, "SKY GROUNDVI %f\n", instance->scene_gpu.sky.ground_visibility);
+  fputs(line, file);
+  sprintf(line, "SKY OZONETHI %f\n", instance->scene_gpu.sky.ozone_layer_thickness);
+  fputs(line, file);
+  sprintf(line, "SKY MSFACTOR %f\n", instance->scene_gpu.sky.multiscattering_factor);
   fputs(line, file);
   sprintf(line, "SKY STARSEED %d\n", instance->scene_gpu.sky.stars_seed);
   fputs(line, file);

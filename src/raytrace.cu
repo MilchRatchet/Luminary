@@ -334,6 +334,18 @@ extern "C" void raytracing_init(RaytraceInstance** _instance, General general, T
   instance->spatial_samples    = 5;
   instance->spatial_iterations = 2;
 
+  instance->atmo_settings.base_density           = scene->sky.base_density;
+  instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
+  instance->atmo_settings.mie_density            = scene->sky.mie_density;
+  instance->atmo_settings.mie_falloff            = scene->sky.mie_falloff;
+  instance->atmo_settings.mie_g                  = scene->sky.mie_g;
+  instance->atmo_settings.ozone_absorption       = scene->sky.ozone_absorption;
+  instance->atmo_settings.ozone_density          = scene->sky.ozone_density;
+  instance->atmo_settings.ozone_layer_thickness  = scene->sky.ozone_layer_thickness;
+  instance->atmo_settings.rayleigh_density       = scene->sky.rayleigh_density;
+  instance->atmo_settings.rayleigh_falloff       = scene->sky.rayleigh_falloff;
+  instance->atmo_settings.multiscattering_factor = scene->sky.multiscattering_factor;
+
   device_buffer_init(&instance->light_trace);
   device_buffer_init(&instance->bounce_trace);
   device_buffer_init(&instance->light_trace_count);
@@ -383,6 +395,7 @@ extern "C" void raytracing_init(RaytraceInstance** _instance, General general, T
   gpuErrchk(cudaMemcpyToSymbol(
     device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment*), 0, cudaMemcpyHostToDevice));
 
+  sky_generate_LUTs(instance);
   clouds_generate(instance);
 
   raytrace_update_light_resampling_active(instance);
@@ -517,7 +530,15 @@ static void execute_kernels(RaytraceInstance* instance, int type) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  process_volumetrics_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  fog_preprocess_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+  if (instance->scene_gpu.sky.cloud.active || instance->scene_gpu.ocean.active) {
+    process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+
+  if (instance->scene_gpu.sky.cloud.active) {
+    clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
 
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
@@ -770,6 +791,8 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.state_buffer         = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
   ptrs.light_samples        = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
   ptrs.light_eval_data      = (LightEvalData*) device_buffer_get_pointer(instance->light_eval_data);
+  ptrs.sky_tm_luts          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_tm_luts);
+  ptrs.sky_ms_luts          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_ms_luts);
 
   gpuErrchk(cudaMemcpyToSymbol(device, &(ptrs), sizeof(DevicePointers), 0, cudaMemcpyHostToDevice));
   log_message("Updated device pointers.");

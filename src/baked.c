@@ -191,13 +191,13 @@ RaytraceInstance* load_baked(const char* filename) {
   TextureRGBA* normal_tex      = load_textures(file, instance->tex_atlas.normal_length, head[10]);
 
   TextureAtlas tex_atlas = {
-    .albedo             = cudatexture_allocate_to_buffer(albedo_tex, instance->tex_atlas.albedo_length),
+    .albedo             = cudatexture_allocate_to_buffer(albedo_tex, instance->tex_atlas.albedo_length, CUDA_TEX_FLAG_NONE),
     .albedo_length      = instance->tex_atlas.albedo_length,
-    .illuminance        = cudatexture_allocate_to_buffer(illuminance_tex, instance->tex_atlas.illuminance_length),
+    .illuminance        = cudatexture_allocate_to_buffer(illuminance_tex, instance->tex_atlas.illuminance_length, CUDA_TEX_FLAG_NONE),
     .illuminance_length = instance->tex_atlas.illuminance_length,
-    .material           = cudatexture_allocate_to_buffer(material_tex, instance->tex_atlas.material_length),
+    .material           = cudatexture_allocate_to_buffer(material_tex, instance->tex_atlas.material_length, CUDA_TEX_FLAG_NONE),
     .material_length    = instance->tex_atlas.material_length,
-    .normal             = cudatexture_allocate_to_buffer(normal_tex, instance->tex_atlas.normal_length),
+    .normal             = cudatexture_allocate_to_buffer(normal_tex, instance->tex_atlas.normal_length, CUDA_TEX_FLAG_NONE),
     .normal_length      = instance->tex_atlas.normal_length};
 
   free_textures(albedo_tex, instance->tex_atlas.albedo_length);

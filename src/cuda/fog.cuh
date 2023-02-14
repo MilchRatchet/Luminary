@@ -2,6 +2,7 @@
 #define CU_FOG_H
 
 #include "math.cuh"
+#include "ocean.cuh"
 #include "sky.cuh"
 
 #define FOG_DENSITY (0.0001f * device_scene.fog.density)
@@ -62,6 +63,10 @@ __device__ float2 fog_get_intersection(const vec3 origin, const vec3 ray, const 
 
   return make_float2(t, weight);
 }
+
+////////////////////////////////////////////////////////////////////
+// Kernel
+////////////////////////////////////////////////////////////////////
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
@@ -161,6 +166,57 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_fog_tasks
       const float value          = __saturatef((1.0f / task.distance) * 2.0f);
       device.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
+  }
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void fog_preprocess_tasks() {
+  const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset    = get_task_address(i);
+    TraceTask task      = load_trace_task(device_trace_tasks + offset);
+    const float2 result = __ldcs((float2*) (device.trace_results + offset));
+
+    float depth     = result.x;
+    uint32_t hit_id = __float_as_uint(result.y);
+
+    const int pixel = task.index.x + task.index.y * device_width;
+    RGBAhalf record = load_RGBAhalf(device_records + pixel);
+
+    if (device_scene.fog.active && is_first_ray()) {
+      const float2 fog = fog_get_intersection(task.origin, task.ray, depth);
+
+      const float weight = fog.y;
+
+      if (fog.x < depth) {
+        depth  = fog.x;
+        hit_id = FOG_HIT;
+        __stcs((float2*) (device.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
+      }
+
+      record = scale_RGBAhalf(record, weight);
+    }
+    else if (device_scene.fog.active) {
+      const float t      = fog_compute_path(task.origin, task.ray, depth).y;
+      const float weight = expf(-t * FOG_DENSITY);
+
+      record = scale_RGBAhalf(record, weight);
+    }
+
+    if (device_scene.ocean.active) {
+      const float underwater_dist = ocean_ray_underwater_length(task.origin, task.ray, depth);
+
+      RGBF extinction = ocean_get_extinction();
+
+      RGBF path_extinction;
+      path_extinction.r = expf(-underwater_dist * extinction.r);
+      path_extinction.g = expf(-underwater_dist * extinction.g);
+      path_extinction.b = expf(-underwater_dist * extinction.b);
+
+      record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(path_extinction));
+    }
+
+    store_RGBAhalf(device_records + pixel, record);
   }
 }
 

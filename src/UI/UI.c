@@ -165,6 +165,8 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Mouse Sensitivity", &(instance->scene_gpu.camera.mouse_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene_gpu.camera.smooth_movement), 0);
   panels[i++] = create_slider(ui, "Smoothing Factor", &(instance->scene_gpu.camera.smoothing_factor), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Russian Roulette Bias", &(instance->scene_gpu.camera.russian_roulette_bias), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -239,10 +241,6 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Geometry Offset X", &(instance->scene_gpu.sky.geometry_offset.x), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Geometry Offset Y", &(instance->scene_gpu.sky.geometry_offset.y), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Geometry Offset Z", &(instance->scene_gpu.sky.geometry_offset.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
-  panels[i++] = create_color(ui, "Sun Color", (float*) &(instance->scene_gpu.sky.sun_color));
-  panels[i++] = create_slider(ui, "  Red", &(instance->scene_gpu.sky.sun_color.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "  Green", &(instance->scene_gpu.sky.sun_color.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "  Blue", &(instance->scene_gpu.sky.sun_color.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Sun Azimuth", &(instance->scene_gpu.sky.azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Sun Altitude", &(instance->scene_gpu.sky.altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Sun Intensity", &(instance->scene_gpu.sky.sun_strength), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
@@ -273,10 +271,22 @@ static UITab create_sky_atmo_panels(UI* ui, RaytraceInstance* instance) {
 
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Celestial\nAtmosphere\nClouds\nFog");
-  panels[i++] = create_slider(ui, "Density", &(instance->scene_gpu.sky.base_density), 1, 0.001f, 0.0001f, FLT_MAX, 0, 0);
-  panels[i++] = create_check(ui, "Ozone Absorption", &(instance->scene_gpu.sky.ozone_absorption), 1);
-  panels[i++] = create_slider(ui, "Steps", &(instance->scene_gpu.sky.steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
-  panels[i++] = create_slider(ui, "Shadow Steps", &(instance->scene_gpu.sky.shadow_steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
+  panels[i++] = create_slider(ui, "Ray March Steps", &(instance->scene_gpu.sky.steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
+  panels[i++] = create_check(ui, "Ozone Absorption", &(instance->atmo_settings.ozone_absorption), 0);
+  panels[i++] = create_slider(ui, "Density", &(instance->atmo_settings.base_density), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Density (Rayleigh)", &(instance->atmo_settings.rayleigh_density), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Density (Mie)", &(instance->atmo_settings.mie_density), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Density (Ozone)", &(instance->atmo_settings.ozone_density), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Height Falloff (Rayleigh)", &(instance->atmo_settings.rayleigh_falloff), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Height Falloff (Mie)", &(instance->atmo_settings.mie_falloff), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Ground Visibility", &(instance->atmo_settings.ground_visibility), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Ozone Layer Thickness", &(instance->atmo_settings.ozone_layer_thickness), 0, 0.001f, 0.01f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Mie Phase G", &(instance->atmo_settings.mie_g), 0, 0.001f, -1.0f, 1.0f, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Multiscattering Factor", &(instance->atmo_settings.multiscattering_factor), 0, 0.001f, 0.01f, FLT_MAX, 0, 0);
+  panels[i++] = create_button(ui, "Apply Settings", instance, (void (*)(void*)) sky_generate_LUTs, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

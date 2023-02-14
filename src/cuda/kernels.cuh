@@ -242,7 +242,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trace_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering_tasks() {
   const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
   for (int i = 0; i < task_count; i++) {
@@ -250,81 +250,33 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void process_volumetrics_trac
     TraceTask task      = load_trace_task(device_trace_tasks + offset);
     const float2 result = __ldcs((float2*) (device.trace_results + offset));
 
-    float depth     = result.x;
-    uint32_t hit_id = __float_as_uint(result.y);
+    const float depth     = result.x;
+    const uint32_t hit_id = __float_as_uint(result.y);
 
-    const bool is_hit           = (hit_id != SKY_HIT);
     const bool use_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
-    bool modified_task          = false;
+
+    if (!use_inscattering) {
+      continue;
+    }
+
+    const vec3 sky_origin    = world_to_sky_transform(task.origin);
+    float inscattering_limit = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
 
     if (device_scene.sky.cloud.active) {
-      const vec3 sky_origin = world_to_sky_transform(task.origin);
-
-      float2 params =
-        cloud_get_intersection(sky_origin, task.ray, (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : 0.001f * depth);
-
+      inscattering_limit   = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+      const float2 params  = cloud_get_intersection(sky_origin, task.ray, inscattering_limit);
       const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
 
       if (cloud_hit) {
-        if (use_inscattering) {
-          const float inscattering_limit = fmaxf(0.0f, fminf(0.001f * depth, params.x));
-
-          sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
-        }
-
-        trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
-
-        if (!is_hit && use_inscattering) {
-          task.origin   = add_vector(task.origin, scale_vector(task.ray, params.x));
-          modified_task = true;
-        }
+        inscattering_limit = fmaxf(0.0f, fminf(inscattering_limit, params.x));
       }
     }
-    else if (is_hit && use_inscattering) {
-      sky_trace_inscattering(world_to_sky_transform(task.origin), task.ray, 0.001f * depth, task.index);
+
+    if (inscattering_limit == FLT_MAX) {
+      continue;
     }
 
-    const int pixel = task.index.x + task.index.y * device_width;
-    RGBAhalf record = load_RGBAhalf(device_records + pixel);
-
-    if (device_scene.fog.active && is_first_ray()) {
-      const float2 fog = fog_get_intersection(task.origin, task.ray, depth);
-
-      const float weight = fog.y;
-
-      if (fog.x < depth) {
-        depth  = fog.x;
-        hit_id = FOG_HIT;
-        __stcs((float2*) (device.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
-      }
-
-      record = scale_RGBAhalf(record, weight);
-    }
-    else if (device_scene.fog.active) {
-      const float t      = fog_compute_path(task.origin, task.ray, depth).y;
-      const float weight = expf(-t * FOG_DENSITY);
-
-      record = scale_RGBAhalf(record, weight);
-    }
-
-    if (device_scene.ocean.active) {
-      const float underwater_dist = ocean_ray_underwater_length(task.origin, task.ray, depth);
-
-      RGBF extinction = ocean_get_extinction();
-
-      RGBF path_extinction;
-      path_extinction.r = expf(-underwater_dist * extinction.r);
-      path_extinction.g = expf(-underwater_dist * extinction.g);
-      path_extinction.b = expf(-underwater_dist * extinction.b);
-
-      record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(path_extinction));
-    }
-
-    store_RGBAhalf(device_records + pixel, record);
-
-    if (modified_task) {
-      store_trace_task(device_trace_tasks + offset, task);
-    }
+    sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
   }
 }
 

@@ -110,10 +110,10 @@ Defines which of the available filters is used:
 `CAMERA PURKINJE [INT32]`<br/>
 Set 1 to activate purkinje effect.
 
-## Sky Settings
+`CAMERA RUSSIANR [FP32]`<br/>
+Factor used in russian roulette. A higher number means rays need to correspond to a smaller throughput to be removed early.
 
-`SKY SUNCOLOR [FP32] [FP32] [FP32]`<br/>
-Base color of the sun. Numbers must be in the range [0,1].
+## Sky Settings
 
 `SKY OFFSET__ [FP32] [FP32] [FP32]`<br/>
 Offset of geometry relative to sky. This allows to position the geometry outside the atmosphere.
@@ -133,9 +133,6 @@ Altitude of the moon.
 `SKY MOONALBE [FP32]`<br/>
 Albedo of the moon. Number must be in the range [0,1].
 
-`SKY INTENSIT [FP32]`<br/>
-Intensity of the sky. Number should be non-negative.
-
 `SKY SUNSTREN [FP32]`<br/>
 Sun light strength. Number should be non-negative.
 
@@ -145,11 +142,35 @@ Set 1 to activate ozone absorption, 0 else.
 `SKY STEPS___ [INT32]`<br/>
 Number of raymarch steps used in the sky computation. Number should be non-negative.
 
-`SKY SHASTEPS [INT32]`<br/>
-Number of raymarch steps used in the extinction integration in the sky computation. Number should be non-negative.
-
 `SKY DENSITY_ [FP32]`<br/>
 Density of the atmosphere. Number should be non-negative.
+
+`SKY RAYLEDEN [FP32]`<br/>
+Concentration of particles that contribute to Rayleigh scattering. Number should be non-negative.
+
+`SKY MIEDENSI [FP32]`<br/>
+Concentration of particles that contribute to Mie scattering. Number should be non-negative.
+
+`SKY OZONEDEN [FP32]`<br/>
+Concentration of ozone in atmosphere. Number should be non-negative.
+
+`SKY RAYLEFAL [FP32]`<br/>
+Exponential inverse height factor of the concentration distribution of particles that contribute to Rayleigh scattering. Number should be non-negative.
+
+`SKY MIEFALLO [FP32]`<br/>
+Exponential inverse height factor of the concentration distribution of insoluble particles that contribute to Mie scattering. Number should be non-negative.
+
+`SKY MIE_PH_G [FP32]`<br/>
+Mie phase function parameter. A positive number implies forward scattering while a negative number implies backward scattering. Number must be in the range [-1,1].
+
+`SKY GROUNDVI [FP32]`<br/>
+Ground visibility in kilometers. This acts as a concentration factor to water soluble particles that contribute to Mie scattering. Number should be non-negative.
+
+`SKY OZONETHI [FP32]`<br/>
+Thickness of ozone layer. Ozone layer is centered at a height of 25km. Number should be non-negative.
+
+`SKY MSFACTOR [FP32]`<br/>
+Factor to the multiscattering contribution. Number should be non-negative.
 
 `SKY STARSEED [INT32]`<br/>
 Seed used for the star generation.

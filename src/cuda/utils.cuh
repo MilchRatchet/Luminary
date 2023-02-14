@@ -30,7 +30,7 @@
 #define SKY_MOON_RADIUS 1737.4f
 #define SKY_MOON_DISTANCE 384399.0f
 #define SKY_ATMO_HEIGHT 100.0f
-#define SKY_ATMO_RADIUS SKY_ATMO_HEIGHT + SKY_EARTH_RADIUS
+#define SKY_ATMO_RADIUS (SKY_ATMO_HEIGHT + SKY_EARTH_RADIUS)
 
 struct LightSample {
   uint32_t id;
@@ -130,6 +130,8 @@ struct DevicePointers {
   cudaTextureObject_t* material_atlas;
   cudaTextureObject_t* normal_atlas;
   cudaTextureObject_t* cloud_noise;
+  cudaTextureObject_t* sky_ms_luts;
+  cudaTextureObject_t* sky_tm_luts;
   LightSample* light_samples;
   LightEvalData* light_eval_data;
 } typedef DevicePointers;

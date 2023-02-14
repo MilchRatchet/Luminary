@@ -29,6 +29,16 @@
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
+//////////////////////////
+// Cuda Texture Flags
+//////////////////////////
+#define CUDA_TEX_FLAG_NONE 0
+#define CUDA_TEX_FLAG_ADDRESSMODE_MASK 0b11
+#define CUDA_TEX_FLAG_WRAP 0b00
+#define CUDA_TEX_FLAG_CLAMP 0b01
+#define CUDA_TEX_FLAG_MIRROR 0b10
+#define CUDA_TEX_FLAG_BORDER 0b11
+
 enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
 
 enum ShadingMode {
@@ -105,6 +115,7 @@ struct Camera {
   int smooth_movement;
   float smoothing_factor;
   float temporal_blend_factor;
+  float russian_roulette_bias;
 } typedef Camera;
 
 struct Light {
@@ -157,9 +168,23 @@ struct Cloud {
   float anvil;
 } typedef Cloud;
 
+// Settings that affect the sky LUTs
+struct AtmoSettings {
+  float rayleigh_density;
+  float mie_density;
+  float ozone_density;
+  float rayleigh_falloff;
+  float mie_falloff;
+  float mie_g;
+  float ground_visibility;
+  float ozone_layer_thickness;
+  float base_density;
+  int ozone_absorption;
+  float multiscattering_factor;
+} typedef AtmoSettings;
+
 struct Sky {
   vec3 geometry_offset;
-  RGBF sun_color;
   float azimuth;
   float altitude;
   float moon_azimuth;
@@ -169,7 +194,6 @@ struct Sky {
   float base_density;
   int ozone_absorption;
   int steps;
-  int shadow_steps;
   Star* stars;
   int* stars_offsets;
   int settings_stars_count;
@@ -177,6 +201,16 @@ struct Sky {
   int stars_seed;
   float stars_intensity;
   Cloud cloud;
+  float rayleigh_density;
+  float mie_density;
+  float ozone_density;
+  float rayleigh_falloff;
+  float mie_falloff;
+  float mie_g;
+  float ground_visibility;
+  float ozone_layer_thickness;
+  float multiscattering_factor;
+  int lut_initialized;
 } typedef Sky;
 
 struct Ocean {
@@ -277,6 +311,8 @@ struct RaytraceInstance {
   DeviceBuffer* light_samples_2;
   DeviceBuffer* light_eval_data;
   DeviceBuffer* cloud_noise;
+  DeviceBuffer* sky_ms_luts;
+  DeviceBuffer* sky_tm_luts;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
@@ -293,6 +329,7 @@ struct RaytraceInstance {
   OutputImageFormat image_format;
   int post_process_menu;
   General settings;
+  AtmoSettings atmo_settings;
   void* denoise_setup;
   Jitter jitter;
   int accum_mode;

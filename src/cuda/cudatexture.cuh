@@ -3,14 +3,33 @@
 
 #include "utils.cuh"
 
-static void cudatexture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
+static void cudatexture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex, const uint32_t flags) {
   const size_t pixel_size = (tex->type == TexDataFP32) ? sizeof(RGBAF) : sizeof(RGBA8);
+
+  cudaTextureAddressMode address_mode;
+  switch (flags & CUDA_TEX_FLAG_ADDRESSMODE_MASK) {
+    case CUDA_TEX_FLAG_WRAP:
+      address_mode = cudaAddressModeWrap;
+      break;
+    case CUDA_TEX_FLAG_CLAMP:
+      address_mode = cudaAddressModeClamp;
+      break;
+    case CUDA_TEX_FLAG_MIRROR:
+      address_mode = cudaAddressModeMirror;
+      break;
+    case CUDA_TEX_FLAG_BORDER:
+      address_mode = cudaAddressModeBorder;
+      break;
+    default:
+      address_mode = cudaAddressModeWrap;
+      break;
+  }
 
   struct cudaTextureDesc texDesc;
   memset(&texDesc, 0, sizeof(texDesc));
-  texDesc.addressMode[0]   = cudaAddressModeWrap;
-  texDesc.addressMode[1]   = cudaAddressModeWrap;
-  texDesc.addressMode[2]   = cudaAddressModeWrap;
+  texDesc.addressMode[0]   = address_mode;
+  texDesc.addressMode[1]   = address_mode;
+  texDesc.addressMode[2]   = address_mode;
   texDesc.filterMode       = cudaFilterModeLinear;
   texDesc.maxAnisotropy    = 16;
   texDesc.readMode         = (tex->type == TexDataFP32) ? cudaReadModeElementType : cudaReadModeNormalizedFloat;
@@ -60,14 +79,15 @@ static void cudatexture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex)
     resDesc.res.pitch2D.devPtr       = data_gpu;
     resDesc.res.pitch2D.width        = width;
     resDesc.res.pitch2D.height       = height;
-    resDesc.res.pitch2D.desc         = cudaCreateChannelDesc<uchar4>();
+    resDesc.res.pitch2D.desc         = (tex->type == TexDataFP32) ? cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat)
+                                                                  : cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
     resDesc.res.pitch2D.pitchInBytes = pitch_gpu;
   }
 
   gpuErrchk(cudaCreateTextureObject(cudaTex, &resDesc, &texDesc, NULL));
 }
 
-extern "C" DeviceBuffer* cudatexture_allocate_to_buffer(TextureRGBA* textures, const int textures_length) {
+extern "C" DeviceBuffer* cudatexture_allocate_to_buffer(TextureRGBA* textures, const int textures_length, const uint32_t flags) {
   cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
   DeviceBuffer* textures_gpu;
 
@@ -75,7 +95,7 @@ extern "C" DeviceBuffer* cudatexture_allocate_to_buffer(TextureRGBA* textures, c
   device_buffer_malloc(textures_gpu, sizeof(cudaTextureObject_t), textures_length);
 
   for (int i = 0; i < textures_length; i++) {
-    cudatexture_allocate(textures_cpu + i, textures + i);
+    cudatexture_allocate(textures_cpu + i, textures + i, flags);
   }
 
   device_buffer_upload(textures_gpu, textures_cpu);

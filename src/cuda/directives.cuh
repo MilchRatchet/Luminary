@@ -18,11 +18,7 @@
  * are perceptively unaffected.
  */
 #define WEIGHT_BASED_EXIT
-#define BRIGHTEST_EMISSION                   \
-  (device_scene.camera.exposure              \
-   * fmaxf(                                  \
-     device_scene.sky.sun_strength * 0.001f, \
-     fmaxf(device_scene.material.default_material.b, device_scene.toy.active * device_scene.toy.material.b)))
+#define BRIGHTEST_EMISSION (device_scene.camera.exposure * device_scene.camera.russian_roulette_bias)
 #define CUTOFF ((4.0f) / (BRIGHTEST_EMISSION))
 #define PROBABILISTIC_CUTOFF (16.0f * CUTOFF)
 
@@ -36,7 +32,7 @@
  *
  * Tests show that this significantly darkens any GI contribution. This option is thus not advisable.
  */
-//#define LOW_QUALITY_LONG_BOUNCES
+// #define LOW_QUALITY_LONG_BOUNCES
 #define MIN_BOUNCES 1
 
 /*
@@ -47,7 +43,7 @@
  *
  * This option causes artifacts and is thus deprecated.
  */
-//#define SINGLE_CONTRIBUTION_ONLY
+// #define SINGLE_CONTRIBUTION_ONLY
 
 __device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
   int valid = 1;
