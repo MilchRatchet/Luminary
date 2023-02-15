@@ -285,64 +285,50 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       }
     }
     else if (device_iteration_type != TYPE_LIGHT) {
-      const float scattering_prob = (ray.y > 0.0f) ? 0.0f : 0.5f;
+      const float scattering_prob = (ray.y > 0.0f) ? 0.0f : (1.0f - albedo.a);
       const int scattering_pass   = white_noise() < scattering_prob;
 
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
-      uint32_t light_history_buffer_entry = LIGHT_ID_ANY_NO_SUN;
+      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-      {
+      // TODO: change this so that this coincides with the transparent pass from above, this here has nothing to do with surface bounces!
+      if (scattering_pass) {
         LightSample light = load_light_sample(device.light_samples, pixel);
 
         float light_weight;
         float underwater_sample;
         vec3 light_pos;
 
-        if (scattering_pass) {
-          underwater_sample            = 10.0f * white_noise();
-          const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
-          BRDFInstance brdf2           = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
-          light_pos                    = add_vector(task.position, scale_vector(brdf2.L, underwater_sample));
-          const float solid_angle      = brdf_light_sample_solid_angle(light, light_pos);
-          light_weight                 = brdf_light_sample_shading_weight(light) * solid_angle;
-        }
-        else {
-          light_pos    = task.position;
-          light_weight = brdf_light_sample_shading_weight(light) * light.solid_angle;
-        }
+        underwater_sample            = 10.0f * white_noise();
+        const float refraction_index = 1.0f / device_scene.ocean.refractive_index;
+        BRDFInstance brdf2           = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
+        light_pos                    = add_vector(task.position, scale_vector(brdf2.L, underwater_sample));
+        const float solid_angle      = brdf_light_sample_solid_angle(light, light_pos);
+        light_weight                 = brdf_light_sample_shading_weight(light) * solid_angle;
 
         if (light_weight > 0.0f) {
           RGBAhalf light_record;
 
-          if (scattering_pass) {
-            brdf.L                = brdf_sample_light_ray(light, light_pos);
-            const float cos_angle = dot_product(ray, brdf.L);
-            const float phase     = henvey_greenstein(cos_angle, device_scene.ocean.anisotropy);
+          brdf.L                = brdf_sample_light_ray(light, light_pos);
+          const float cos_angle = dot_product(ray, brdf.L);
+          const float phase     = henvey_greenstein(cos_angle, device_scene.ocean.anisotropy);
 
-            const RGBF S = scale_color(device_scene.ocean.scattering, 2.0f * PI * light_weight * phase * OCEAN_POLLUTION);
+          const RGBF S = scale_color(device_scene.ocean.scattering, 2.0f * PI * light_weight * phase * OCEAN_POLLUTION);
 
-            RGBF extinction = ocean_get_extinction();
+          RGBF extinction = ocean_get_extinction();
 
-            // Amount of light that gets lost along this step
-            RGBF step_transmittance;
-            step_transmittance.r = expf(-underwater_sample * extinction.r);
-            step_transmittance.g = expf(-underwater_sample * extinction.g);
-            step_transmittance.b = expf(-underwater_sample * extinction.b);
+          // Amount of light that gets lost along this step
+          RGBF step_transmittance;
+          step_transmittance.r = expf(-underwater_sample * extinction.r);
+          step_transmittance.g = expf(-underwater_sample * extinction.g);
+          step_transmittance.b = expf(-underwater_sample * extinction.b);
 
-            const RGBF weight = mul_color(sub_color(S, mul_color(S, step_transmittance)), inv_color(extinction));
+          const RGBF weight = mul_color(sub_color(S, mul_color(S, step_transmittance)), inv_color(extinction));
 
-            light_record = RGBF_to_RGBAhalf(mul_color(record, weight));
-            light_record = scale_RGBAhalf(light_record, 2.0f);
-          }
-          else {
-            brdf.L = brdf_sample_light_ray(light, task.position);
-
-            light_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf_evaluate(brdf).term, 0.5f * light_weight));
-
-            light_record = scale_RGBAhalf(light_record, 1.0f / (1.0f - scattering_prob));
-          }
+          light_record = RGBF_to_RGBAhalf(mul_color(record, weight));
+          light_record = scale_RGBAhalf(light_record, 1.0f / scattering_prob);
 
           TraceTask light_task;
           light_task.origin = light_pos;
@@ -363,7 +349,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
       brdf = brdf_sample_ray(brdf, task.index, task.state);
 
-      RGBAhalf bounce_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf.term, 0.5f));
+      RGBAhalf bounce_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf.term, 1.0f));
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
