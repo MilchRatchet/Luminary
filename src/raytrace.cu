@@ -370,6 +370,9 @@ extern "C" void raytracing_init(RaytraceInstance** _instance, General general, T
   device_buffer_init(&instance->light_samples_1);
   device_buffer_init(&instance->light_samples_2);
   device_buffer_init(&instance->light_eval_data);
+  device_buffer_init(&instance->cloud_noise);
+  device_buffer_init(&instance->sky_ms_luts);
+  device_buffer_init(&instance->sky_tm_luts);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 

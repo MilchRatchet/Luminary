@@ -63,9 +63,14 @@ extern "C" void _device_upload(void* dst, void* src, size_t size, char* dst_name
 }
 
 extern "C" void _device_buffer_init(DeviceBuffer** buffer, char* buf_name, char* func, int line) {
-  (*buffer) = (DeviceBuffer*) malloc(sizeof(DeviceBuffer));
+  if (*buffer) {
+    print_log("[%s:%d] Device buffer %s was already initialized.", func, line, buf_name);
+    return;
+  }
 
-  (*buffer)->allocated = 0;
+  (*buffer) = (DeviceBuffer*) calloc(1, sizeof(DeviceBuffer));
+
+  print_log("[%s:%d] Initialized device buffer %s.", func, line, buf_name);
 }
 
 extern "C" void _device_buffer_free(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
@@ -244,15 +249,16 @@ extern "C" int _device_buffer_is_allocated(DeviceBuffer* buffer, char* buf_name,
   return buffer->allocated;
 }
 
-extern "C" void _device_buffer_destroy(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
-  if (!buffer) {
+extern "C" void _device_buffer_destroy(DeviceBuffer** buffer, char* buf_name, char* func, int line) {
+  if (!buffer || !(*buffer)) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
   }
 
-  if (_device_buffer_is_allocated(buffer, buf_name, func, line)) {
-    _device_buffer_free(buffer, buf_name, func, line);
+  if (_device_buffer_is_allocated(*buffer, buf_name, func, line)) {
+    _device_buffer_free(*buffer, buf_name, func, line);
   }
 
-  free(buffer);
+  free(*buffer);
+  *buffer = (DeviceBuffer*) 0;
 }

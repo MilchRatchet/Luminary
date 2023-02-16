@@ -57,7 +57,7 @@ extern "C" void optix_denoise_create(RaytraceInstance* instance) {
       return;
   }
 
-  OptixDenoiseInstance* denoise_setup = (OptixDenoiseInstance*) malloc(sizeof(OptixDenoiseInstance));
+  OptixDenoiseInstance* denoise_setup = (OptixDenoiseInstance*) calloc(1, sizeof(OptixDenoiseInstance));
 
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &denoise_setup->ctx));
 
@@ -227,10 +227,10 @@ extern "C" void optix_denoise_free(RaytraceInstance* instance) {
 
   OptixDenoiseInstance denoise_setup = *(OptixDenoiseInstance*) instance->denoise_setup;
 
-  device_buffer_destroy(denoise_setup.hdr_intensity);
-  device_buffer_destroy(denoise_setup.avg_color);
-  device_buffer_destroy(denoise_setup.denoiserState);
-  device_buffer_destroy(denoise_setup.denoiserScratch);
+  device_buffer_destroy(&denoise_setup.hdr_intensity);
+  device_buffer_destroy(&denoise_setup.avg_color);
+  device_buffer_destroy(&denoise_setup.denoiserState);
+  device_buffer_destroy(&denoise_setup.denoiserScratch);
 
   OPTIX_CHECK(optixDeviceContextDestroy(denoise_setup.ctx));
   OPTIX_CHECK(optixDenoiserDestroy(denoise_setup.denoiser));

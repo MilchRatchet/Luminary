@@ -6,7 +6,7 @@
 #include "raytrace.h"
 
 WindowInstance* window_instance_init(RaytraceInstance* instance) {
-  WindowInstance* window = (WindowInstance*) malloc(sizeof(WindowInstance));
+  WindowInstance* window = (WindowInstance*) calloc(1, sizeof(WindowInstance));
 
   SDL_Init(SDL_INIT_VIDEO);
 
@@ -58,6 +58,6 @@ void window_instance_update_pointer(WindowInstance* window) {
 void window_instance_free(WindowInstance* window) {
   SDL_DestroyWindow(window->window);
   SDL_Quit();
-  device_buffer_destroy(window->gpu_buffer);
+  device_buffer_destroy(&window->gpu_buffer);
   free(window);
 }

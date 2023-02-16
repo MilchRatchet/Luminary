@@ -130,7 +130,7 @@ void offline_output(RaytraceInstance* instance) {
   if (instance->scene_gpu.camera.bloom)
     apply_bloom(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));
 
-  DeviceBuffer* scratch_buffer;
+  DeviceBuffer* scratch_buffer = (DeviceBuffer*) 0;
   device_buffer_init(&scratch_buffer);
   device_buffer_malloc(scratch_buffer, sizeof(XRGB8), instance->output_width * instance->output_height);
   XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->output_width * instance->output_height);
@@ -162,7 +162,7 @@ void offline_output(RaytraceInstance* instance) {
     device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
     instance->output_height, instance->output_width);
 
-  device_buffer_destroy(scratch_buffer);
+  device_buffer_destroy(&scratch_buffer);
 
   switch (instance->image_format) {
     case IMGFORMAT_QOI:

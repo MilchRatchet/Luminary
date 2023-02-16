@@ -191,14 +191,19 @@ RaytraceInstance* load_baked(const char* filename) {
   TextureRGBA* normal_tex      = load_textures(file, instance->tex_atlas.normal_length, head[10]);
 
   TextureAtlas tex_atlas = {
-    .albedo             = cudatexture_allocate_to_buffer(albedo_tex, instance->tex_atlas.albedo_length, CUDA_TEX_FLAG_NONE),
+    .albedo             = (DeviceBuffer*) 0,
     .albedo_length      = instance->tex_atlas.albedo_length,
-    .illuminance        = cudatexture_allocate_to_buffer(illuminance_tex, instance->tex_atlas.illuminance_length, CUDA_TEX_FLAG_NONE),
+    .illuminance        = (DeviceBuffer*) 0,
     .illuminance_length = instance->tex_atlas.illuminance_length,
-    .material           = cudatexture_allocate_to_buffer(material_tex, instance->tex_atlas.material_length, CUDA_TEX_FLAG_NONE),
+    .material           = (DeviceBuffer*) 0,
     .material_length    = instance->tex_atlas.material_length,
-    .normal             = cudatexture_allocate_to_buffer(normal_tex, instance->tex_atlas.normal_length, CUDA_TEX_FLAG_NONE),
+    .normal             = (DeviceBuffer*) 0,
     .normal_length      = instance->tex_atlas.normal_length};
+
+  cudatexture_create_atlas(&tex_atlas.albedo, albedo_tex, instance->tex_atlas.albedo_length, CUDA_TEX_FLAG_NONE);
+  cudatexture_create_atlas(&tex_atlas.illuminance, illuminance_tex, instance->tex_atlas.illuminance_length, CUDA_TEX_FLAG_NONE);
+  cudatexture_create_atlas(&tex_atlas.material, material_tex, instance->tex_atlas.material_length, CUDA_TEX_FLAG_NONE);
+  cudatexture_create_atlas(&tex_atlas.normal, normal_tex, instance->tex_atlas.normal_length, CUDA_TEX_FLAG_NONE);
 
   free_textures(albedo_tex, instance->tex_atlas.albedo_length);
   free_textures(illuminance_tex, instance->tex_atlas.illuminance_length);

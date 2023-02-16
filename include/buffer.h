@@ -46,7 +46,7 @@ void _device_buffer_copy(DeviceBuffer* src, DeviceBuffer* dest, char* src_name, 
 void* _device_buffer_get_pointer(DeviceBuffer* buffer, char* buf_name, char* func, int line);
 size_t _device_buffer_get_size(DeviceBuffer* buffer, char* buf_name, char* func, int line);
 int _device_buffer_is_allocated(DeviceBuffer* buffer, char* buf_name, char* func, int line);
-void _device_buffer_destroy(DeviceBuffer* buffer, char* buf_name, char* func, int line);
+void _device_buffer_destroy(DeviceBuffer** buffer, char* buf_name, char* func, int line);
 
 #if __cplusplus
 }

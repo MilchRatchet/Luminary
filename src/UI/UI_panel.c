@@ -21,8 +21,8 @@ static UIPanel init_UIPanel(UI* ui, int type, const char* text, void* data_bindi
   panel.data_text    = (SDL_Surface*) 0;
   panel.data         = data_binding;
   panel.voids_frames = voids_frames;
-  panel.render       = NULL;
-  panel.handle_mouse = NULL;
+  panel.render       = (void (*)(UI*, struct UIPanel*, int)) 0;
+  panel.handle_mouse = (void (*)(UI*, UIPanel*, int, int, int)) 0;
 
   return panel;
 }

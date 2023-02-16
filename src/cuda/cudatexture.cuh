@@ -84,25 +84,27 @@ static void cudatexture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex,
     resDesc.res.pitch2D.pitchInBytes = pitch_gpu;
   }
 
-  gpuErrchk(cudaCreateTextureObject(cudaTex, &resDesc, &texDesc, NULL));
+  gpuErrchk(cudaCreateTextureObject(cudaTex, &resDesc, &texDesc, (const cudaResourceViewDesc*) 0));
 }
 
-extern "C" DeviceBuffer* cudatexture_allocate_to_buffer(TextureRGBA* textures, const int textures_length, const uint32_t flags) {
-  cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
-  DeviceBuffer* textures_gpu;
+extern "C" void cudatexture_create_atlas(DeviceBuffer** buffer, TextureRGBA* textures, const int textures_length, const uint32_t flags) {
+  if (!buffer) {
+    error_message("buffer is NULL.");
+    return;
+  }
 
-  device_buffer_init(&textures_gpu);
-  device_buffer_malloc(textures_gpu, sizeof(cudaTextureObject_t), textures_length);
+  cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
+
+  device_buffer_init(buffer);
+  device_buffer_malloc(*buffer, sizeof(cudaTextureObject_t), textures_length);
 
   for (int i = 0; i < textures_length; i++) {
     cudatexture_allocate(textures_cpu + i, textures + i, flags);
   }
 
-  device_buffer_upload(textures_gpu, textures_cpu);
+  device_buffer_upload(*buffer, textures_cpu);
 
   free(textures_cpu);
-
-  return textures_gpu;
 }
 
 extern "C" void cudatexture_free_buffer(DeviceBuffer* texture_atlas, const int textures_length) {
@@ -113,7 +115,7 @@ extern "C" void cudatexture_free_buffer(DeviceBuffer* texture_atlas, const int t
     gpuErrchk(cudaDestroyTextureObject(textures_cpu[i]));
   }
 
-  device_buffer_destroy(texture_atlas);
+  device_buffer_destroy(&texture_atlas);
   free(textures_cpu);
 }
 

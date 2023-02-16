@@ -621,7 +621,7 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
 
   gpuErrchk(cudaDeviceSynchronize());
 
-  instance->sky_tm_luts = cudatexture_allocate_to_buffer(luts_tm_tex, 2, CUDA_TEX_FLAG_CLAMP);
+  cudatexture_create_atlas(&instance->sky_tm_luts, luts_tm_tex, 2, CUDA_TEX_FLAG_CLAMP);
 
   device_free(luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
   device_free(luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
@@ -653,7 +653,7 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
 
   gpuErrchk(cudaDeviceSynchronize());
 
-  instance->sky_ms_luts = cudatexture_allocate_to_buffer(luts_ms_tex, 2, CUDA_TEX_FLAG_CLAMP);
+  cudatexture_create_atlas(&instance->sky_ms_luts, luts_ms_tex, 2, CUDA_TEX_FLAG_CLAMP);
 
   device_free(luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
   device_free(luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));
