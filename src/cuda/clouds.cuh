@@ -5,23 +5,31 @@
 #include "sky.cuh"
 #include "utils.cuh"
 
-/*
- * The code of this file is based on the cloud rendering in https://github.com/turanszkij/WickedEngine.
- */
+//
+// The code of this file is based on the cloud rendering in https://github.com/turanszkij/WickedEngine.
+// It follows the basic ideas of using raymarching with noise based density.
+//
+
+////////////////////////////////////////////////////////////////////
+// Defines
+////////////////////////////////////////////////////////////////////
 
 #define CLOUD_STEPS 96
 #define CLOUD_EXTINCTION_STEP_SIZE 0.02f
 #define CLOUD_EXTINCTION_STEP_MULTIPLY 1.5f
 #define CLOUD_EXTINCTION_STEP_MAX 0.75f
 
+////////////////////////////////////////////////////////////////////
+// Utility functions
+////////////////////////////////////////////////////////////////////
+
 __device__ float cloud_gradient(float4 gradient, float height) {
   return smoothstep(height, gradient.x, gradient.y) - smoothstep(height, gradient.z, gradient.w);
 }
 
-__device__ float cloud_height_fraction(const vec3 pos) {
-  const float low  = SKY_EARTH_RADIUS + world_to_sky_scale(device_scene.sky.cloud.height_min);
-  const float high = SKY_EARTH_RADIUS + world_to_sky_scale(device_scene.sky.cloud.height_max);
-  return remap(get_length(pos), low, high, 0.0f, 1.0f);
+__device__ float cloud_height(const vec3 pos) {
+  return (sky_height(pos) - world_to_sky_scale(device_scene.sky.cloud.height_min))
+         / world_to_sky_scale(device_scene.sky.cloud.height_max - device_scene.sky.cloud.height_min);
 }
 
 __device__ vec3 cloud_weather(vec3 pos, float height) {
@@ -40,17 +48,85 @@ __device__ vec3 cloud_weather(vec3 pos, float height) {
   return get_vector(weather.x, weather.y, weather.z);
 }
 
-__device__ float cloud_density_height_gradient(const float height, const vec3 weather) {
-  float small  = 1.0f - __saturatef(weather.y * 2.0f);
-  float medium = 1.0f - fabsf(weather.y - 0.5f) * 2.0f;
-  float large  = __saturatef(weather.y - 0.5f) * 2.0f;
+__device__ vec3 cloud_weather_type(const vec3 weather) {
+  const float small  = 1.0f - __saturatef(weather.y * 2.0f);
+  const float medium = 1.0f - fabsf(weather.y - 0.5f) * 2.0f;
+  const float large  = __saturatef(weather.y - 0.5f) * 2.0f;
 
-  float4 gradient = make_float4(
-    0.02f * (small + medium + large), 0.07f * (small + medium + large), 0.12f * small + 0.39f * medium + 0.88f * large,
-    0.28f * small + 0.59f * medium + large);
+  return get_vector(small, medium, large);
+}
+
+__device__ float4 cloud_density_height_gradient_type(const vec3 weather) {
+  const vec3 weather_type = cloud_weather_type(weather);
+
+  return make_float4(
+    0.02f * (weather_type.x + weather_type.y + weather_type.z), 0.07f * (weather_type.x + weather_type.y + weather_type.z),
+    0.12f * weather_type.x + 0.39f * weather_type.y + 0.88f * weather_type.z,
+    0.28f * weather_type.x + 0.59f * weather_type.y + weather_type.z);
+}
+
+__device__ float cloud_density_height_gradient(const float height, const vec3 weather) {
+  const float4 gradient = cloud_density_height_gradient_type(weather);
 
   return cloud_gradient(gradient, height);
 }
+
+__device__ float cloud_weather_wetness(vec3 weather) {
+  return lerp(1.0f, 1.0f - device_scene.sky.cloud.wetness, __saturatef(weather.z));
+}
+
+__device__ float cloud_dual_lobe_henvey_greenstein(float cos_angle, float g0, float g1, float w) {
+  const float mie0 = henvey_greenstein(cos_angle, g0);
+  const float mie1 = henvey_greenstein(cos_angle, g1);
+  return lerp(mie0, mie1, w);
+}
+
+__device__ float cloud_powder(const float density, const float step_size) {
+  const float powder = 1.0f - expf(-density * step_size);
+  return lerp(1.0f, __saturatef(powder), device_scene.sky.cloud.powder);
+}
+
+__device__ float2 cloud_get_intersection(const vec3 origin, const vec3 ray, const float limit) {
+  const float h_min = world_to_sky_scale(device_scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
+  const float h_max = world_to_sky_scale(device_scene.sky.cloud.height_max) + SKY_EARTH_RADIUS;
+
+  const float height = get_length(origin);
+
+  float distance;
+  float start = 0.0f;
+  if (height > h_max) {
+    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
+
+    start = max_dist;
+
+    const float max_dist_back = sph_ray_int_back_p0(ray, origin, h_max);
+    const float min_dist      = sph_ray_int_p0(ray, origin, h_min);
+
+    distance = fminf(min_dist, max_dist_back) - start;
+  }
+  else if (height < h_min) {
+    const float min_dist = sph_ray_int_p0(ray, origin, h_min);
+    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
+
+    start    = min_dist;
+    distance = max_dist - start;
+  }
+  else {
+    const float min_dist = sph_ray_int_p0(ray, origin, h_min);
+    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
+    distance             = fminf(min_dist, max_dist);
+  }
+
+  const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
+  distance              = fminf(distance, fminf(earth_hit, limit) - start);
+  distance              = fmaxf(0.0f, distance);
+
+  return make_float2(start, distance);
+}
+
+////////////////////////////////////////////////////////////////////
+// Density function
+////////////////////////////////////////////////////////////////////
 
 __device__ float cloud_density(vec3 pos, const float height, const vec3 weather) {
   pos.x += device_scene.sky.cloud.offset_x;
@@ -101,6 +177,10 @@ __device__ float cloud_density(vec3 pos, const float height, const vec3 weather)
   return fmaxf(density * device_scene.sky.cloud.density, 0.0f);
 }
 
+////////////////////////////////////////////////////////////////////
+// Integrator functions
+////////////////////////////////////////////////////////////////////
+
 __device__ float cloud_extinction(vec3 origin, vec3 ray) {
   float step_size  = CLOUD_EXTINCTION_STEP_SIZE;
   float reach      = step_size * 0.5f;
@@ -109,7 +189,8 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
   for (int i = 0; i < device_scene.sky.cloud.shadow_steps; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
-    float height = cloud_height_fraction(pos);
+    const float height = cloud_height(pos);
+
     if (height > 1.0f)
       break;
 
@@ -118,8 +199,6 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
       reach += sph_ray_int_p0(ray, pos, h_min);
       continue;
     }
-
-    height = __saturatef(height);
 
     const vec3 weather = cloud_weather(pos, height);
 
@@ -135,21 +214,6 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
   }
 
   return expf(extinction);
-}
-
-__device__ float cloud_weather_wetness(vec3 weather) {
-  return lerp(1.0f, 1.0f - device_scene.sky.cloud.wetness, __saturatef(weather.z));
-}
-
-__device__ float cloud_dual_lobe_henvey_greenstein(float cos_angle, float g0, float g1, float w) {
-  const float mie0 = henvey_greenstein(cos_angle, g0);
-  const float mie1 = henvey_greenstein(cos_angle, g1);
-  return lerp(mie0, mie1, w);
-}
-
-__device__ float cloud_powder(const float density, const float step_size) {
-  const float powder = 1.0f - expf(-density * step_size);
-  return lerp(1.0f, __saturatef(powder), device_scene.sky.cloud.powder);
 }
 
 __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, const float dist) {
@@ -172,7 +236,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
   for (int i = 0; i < step_count; i++) {
     vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
-    float height = cloud_height_fraction(pos);
+    const float height = cloud_height(pos);
 
     if (height < 0.0f || height > 1.0f) {
       zero_density_streak++;
@@ -181,8 +245,6 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       reach += default_step * step;
       continue;
     }
-
-    height = __saturatef(height);
 
     vec3 weather = cloud_weather(pos, height);
 
@@ -279,43 +341,9 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
   return result;
 }
 
-__device__ float2 cloud_get_intersection(const vec3 origin, const vec3 ray, const float limit) {
-  const float h_min = world_to_sky_scale(device_scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
-  const float h_max = world_to_sky_scale(device_scene.sky.cloud.height_max) + SKY_EARTH_RADIUS;
-
-  const float height = get_length(origin);
-
-  float distance;
-  float start = 0.0f;
-  if (height > h_max) {
-    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
-
-    start = max_dist;
-
-    const float max_dist_back = sph_ray_int_back_p0(ray, origin, h_max);
-    const float min_dist      = sph_ray_int_p0(ray, origin, h_min);
-
-    distance = fminf(min_dist, max_dist_back) - start;
-  }
-  else if (height < h_min) {
-    const float min_dist = sph_ray_int_p0(ray, origin, h_min);
-    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
-
-    start    = min_dist;
-    distance = max_dist - start;
-  }
-  else {
-    const float min_dist = sph_ray_int_p0(ray, origin, h_min);
-    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
-    distance             = fminf(min_dist, max_dist);
-  }
-
-  const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-  distance              = fminf(distance, fminf(earth_hit, limit) - start);
-  distance              = fmaxf(0.0f, distance);
-
-  return make_float2(start, distance);
-}
+////////////////////////////////////////////////////////////////////
+// Wrapper
+////////////////////////////////////////////////////////////////////
 
 __device__ void trace_clouds(const vec3 origin, const vec3 ray, const float start, const float distance, ushort2 index) {
   int pixel = index.x + index.y * device_width;
