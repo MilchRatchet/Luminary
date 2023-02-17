@@ -308,6 +308,7 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_tab(ui, &(ui->tab), "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, &(ui->subtab), "Celestial\nAtmosphere\nClouds\nFog");
   panels[i++] = create_check(ui, "Active", &(instance->scene_gpu.sky.cloud.active), 1);
+  panels[i++] = create_slider(ui, "Steps", &(instance->scene_gpu.sky.cloud.steps), 1, 0.01f, 0.0f, 128.0f, 0, 1);
   panels[i++] = create_slider(ui, "Offset X", &(instance->scene_gpu.sky.cloud.offset_x), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Offset Z", &(instance->scene_gpu.sky.cloud.offset_z), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Height Minimum", &(instance->scene_gpu.sky.cloud.height_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);

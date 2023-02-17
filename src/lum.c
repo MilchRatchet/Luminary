@@ -344,6 +344,10 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
     case 6003374531761227859u:
       sscanf(value, "%d\n", &cloud->shadow_steps);
       break;
+    /* STEPS___ */
+    case 6872316367824311379u:
+      sscanf(value, "%d\n", &cloud->steps);
+      break;
     /* DENSITY_ */
     case 6870615380437386564u:
       sscanf(value, "%f\n", &cloud->density);
@@ -776,6 +780,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "CLOUD WETNESS_ %f\n", instance->scene_gpu.sky.cloud.wetness);
   fputs(line, file);
   sprintf(line, "CLOUD POWDER__ %f\n", instance->scene_gpu.sky.cloud.powder);
+  fputs(line, file);
+  sprintf(line, "CLOUD STEPS___ %d\n", instance->scene_gpu.sky.cloud.steps);
   fputs(line, file);
   sprintf(line, "CLOUD SHASTEPS %d\n", instance->scene_gpu.sky.cloud.shadow_steps);
   fputs(line, file);

@@ -158,6 +158,7 @@ struct Cloud {
   float lobe_lerp;
   float wetness;
   float powder;
+  int steps;
   int shadow_steps;
   float noise_shape_scale;
   float noise_detail_scale;

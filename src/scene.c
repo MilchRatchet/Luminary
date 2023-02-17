@@ -148,6 +148,7 @@ void scene_init(Scene** _scene) {
   scene->sky.cloud.wetness             = 0.0f;
   scene->sky.cloud.powder              = 0.5f;
   scene->sky.cloud.shadow_steps        = 16;
+  scene->sky.cloud.steps               = 36;
   scene->sky.cloud.density             = 1.0f;
 
   scene->fog.active     = 0;

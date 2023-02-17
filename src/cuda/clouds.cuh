@@ -14,7 +14,6 @@
 // Defines
 ////////////////////////////////////////////////////////////////////
 
-#define CLOUD_STEPS 96
 #define CLOUD_EXTINCTION_STEP_SIZE 0.02f
 #define CLOUD_EXTINCTION_STEP_MULTIPLY 1.5f
 #define CLOUD_EXTINCTION_STEP_MAX 0.75f
@@ -36,7 +35,7 @@ __device__ vec3 cloud_weather(vec3 pos, float height) {
   pos.x += device_scene.sky.cloud.offset_x;
   pos.z += device_scene.sky.cloud.offset_z;
 
-  const float weather_sample_scale = 0.025f * device_scene.sky.cloud.noise_weather_scale;
+  const float weather_sample_scale = 0.006f * device_scene.sky.cloud.noise_weather_scale;
 
   float4 weather = tex2D<float4>(device.cloud_noise[2], pos.x * weather_sample_scale, pos.z * weather_sample_scale);
 
@@ -202,7 +201,7 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
 
     const vec3 weather = cloud_weather(pos, height);
 
-    if (weather.x > 0.3f) {
+    if (weather.x > 0.1f) {
       const float density = 1000.0f * 0.05f * 0.1f * cloud_density(pos, height, weather);
 
       extinction -= density * step_size;
@@ -216,22 +215,22 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
   return expf(extinction);
 }
 
-__device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, const float dist) {
-  const int step_count = CLOUD_STEPS * (dist / (start + dist)) * (is_first_ray() ? 1.0f : 0.25f);
+__device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, float dist) {
+  dist = fminf(30.0f, dist);
 
-  const float big_step = 3.0f;
-  const float default_step =
-    fminf(world_to_sky_scale(device_scene.sky.cloud.height_max - device_scene.sky.cloud.height_min), dist) / step_count;
+  const int step_count = device_scene.sky.cloud.steps * __saturatef(dist / 15.0f);
 
-  int zero_density_streak = 0;
+  const int big_step_mult = 2;
+  const float big_step    = big_step_mult;
 
-  float reach = start;
-  float step  = big_step;
+  const float step_size = dist / step_count;
 
-  reach -= default_step * step * white_noise();
+  float reach = start + (white_noise() + 0.1f) * step_size;
 
   float transmittance = 1.0f;
   RGBF scatteredLight = get_color(0.0f, 0.0f, 0.0f);
+
+  const float sun_light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
   for (int i = 0; i < step_count; i++) {
     vec3 pos = add_vector(origin, scale_vector(ray, reach));
@@ -239,41 +238,27 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
     const float height = cloud_height(pos);
 
     if (height < 0.0f || height > 1.0f) {
-      zero_density_streak++;
-      if (zero_density_streak > 3)
-        break;
-      reach += default_step * step;
-      continue;
+      break;
     }
 
     vec3 weather = cloud_weather(pos, height);
 
-    if (weather.x < 0.3f) {
-      zero_density_streak++;
-      step = (zero_density_streak > 3) ? big_step : step;
-      reach += default_step * step;
+    if (weather.x < 0.1f) {
+      i += big_step_mult - 1;
+      reach += step_size * big_step;
       continue;
     }
 
     float density = cloud_density(pos, height, weather);
 
     if (density > 0.0f) {
-      zero_density_streak = 0;
-
-      if (step > 1.0f) {
-        reach -= default_step * (step - 1.0f);
-        step = 1.0f;
-        continue;
-      }
-
       // Celestial light (prefer sun but use the moon if possible)
       const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, pos)), pos, SKY_EARTH_RADIUS);
 
       RGBF sun_color;
 
       if (sun_visible) {
-        const vec3 ray_sun      = sample_sphere(device_sun, SKY_SUN_RADIUS, pos);
-        const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, pos);
+        const vec3 ray_sun = sample_sphere(device_sun, SKY_SUN_RADIUS, pos);
 
         const float cos_angle_sun  = dot_product(ray, ray_sun);
         const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
@@ -283,7 +268,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
         const float extinction_sun = cloud_extinction(pos, ray_sun);
 
         sun_color = sky_get_sun_color(pos, ray_sun);
-        sun_color = scale_color(sun_color, 0.25f * ONE_OVER_PI * light_angle * scattering_sun * extinction_sun);
+        sun_color = scale_color(sun_color, 0.25f * ONE_OVER_PI * sun_light_angle * scattering_sun * extinction_sun);
       }
       else {
         sun_color = get_color(0.0f, 0.0f, 0.0f);
@@ -302,7 +287,6 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 
       const float extinction_ambient = cloud_extinction(pos, ray_ambient);
 
-      // Culling this based on the extinction factor does not work well
       RGBF ambient_color = sky_get_color(pos, ray_ambient, FLT_MAX, false, device_scene.sky.steps / 2);
       ambient_color      = scale_color(ambient_color, scattering_ambient * extinction_ambient);
 
@@ -311,25 +295,20 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 
       RGBF S           = add_color(sun_color, ambient_color);
       S                = scale_color(S, scattering);
-      S                = scale_color(S, cloud_powder(scattering, step));
+      S                = scale_color(S, cloud_powder(scattering, step_size));
       S                = scale_color(S, cloud_weather_wetness(weather));
-      float step_trans = expf(-extinction * step);
+      float step_trans = expf(-extinction * step_size);
       S                = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
       scatteredLight   = add_color(scatteredLight, scale_color(S, transmittance));
       transmittance *= step_trans;
 
-      if (transmittance <= 0.1f) {
+      if (transmittance < 0.005f) {
         transmittance = 0.0f;
         break;
       }
-      step = (zero_density_streak > 3) ? big_step : 1.0f;
-    }
-    else {
-      zero_density_streak++;
-      step = (zero_density_streak > 3) ? big_step : step;
     }
 
-    reach += default_step * step;
+    reach += step_size;
   }
 
   RGBAF result;
