@@ -14,7 +14,9 @@
 // Defines
 ////////////////////////////////////////////////////////////////////
 
-#define CLOUD_EXTINCTION_STEP_SIZE 0.02f
+#define CLOUD_SCATTERING_DENSITY (1000.0f * 0.9f)
+#define CLOUD_EXTINCTION_DENSITY (1000.0f * 0.01f)
+#define CLOUD_EXTINCTION_STEP_SIZE 0.01f
 #define CLOUD_EXTINCTION_STEP_MULTIPLY 1.5f
 #define CLOUD_EXTINCTION_STEP_MAX 0.75f
 
@@ -202,7 +204,7 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
     const vec3 weather = cloud_weather(pos, height);
 
     if (weather.x > 0.1f) {
-      const float density = 1000.0f * 0.05f * 0.1f * cloud_density(pos, height, weather);
+      const float density = CLOUD_EXTINCTION_DENSITY * cloud_density(pos, height, weather);
 
       extinction -= density * step_size;
     }
@@ -275,10 +277,10 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       }
 
       // Ambient light
-      const float ambient_r1 = (2.0f * PI * white_noise()) - PI;
+      const float ambient_r1 = PI * white_noise();
       const float ambient_r2 = 2.0f * PI * white_noise();
 
-      const vec3 ray_ambient = angles_to_direction(ambient_r1, ambient_r2);
+      const vec3 ray_ambient = sample_hemisphere_basis(ambient_r2, ambient_r1, normalize_vector(pos));
 
       const float cos_angle_ambient  = dot_product(ray, ray_ambient);
       const float scattering_ambient = cloud_dual_lobe_henvey_greenstein(
@@ -288,10 +290,10 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       const float extinction_ambient = cloud_extinction(pos, ray_ambient);
 
       RGBF ambient_color = sky_get_color(pos, ray_ambient, FLT_MAX, false, device_scene.sky.steps / 2);
-      ambient_color      = scale_color(ambient_color, scattering_ambient * extinction_ambient);
+      ambient_color      = scale_color(ambient_color, scattering_ambient * extinction_ambient * 0.5f);
 
-      const float scattering = density * 1000.0f * 0.05f;
-      const float extinction = density * 1000.0f * 0.05f * 0.1f;
+      const float scattering = density * CLOUD_SCATTERING_DENSITY;
+      const float extinction = density * CLOUD_EXTINCTION_DENSITY;
 
       RGBF S           = add_color(sun_color, ambient_color);
       S                = scale_color(S, scattering);
