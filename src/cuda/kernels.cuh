@@ -259,30 +259,23 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
       continue;
     }
 
-    const bool use_complete_inscattering = (hit_id == SKY_HIT) || (hit_id == OCEAN_HIT);
+    float inscattering_limit = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
 
-    if (use_complete_inscattering) {
-      float inscattering_limit = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+    if (device_scene.sky.cloud.active) {
+      inscattering_limit   = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+      const float2 params  = cloud_get_intersection(sky_origin, task.ray, inscattering_limit);
+      const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
 
-      if (device_scene.sky.cloud.active) {
-        inscattering_limit   = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
-        const float2 params  = cloud_get_intersection(sky_origin, task.ray, inscattering_limit);
-        const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
-
-        if (cloud_hit) {
-          inscattering_limit = fmaxf(0.0f, fminf(inscattering_limit, params.x));
-        }
+      if (cloud_hit) {
+        inscattering_limit = fmaxf(0.0f, fminf(inscattering_limit, params.x));
       }
-
-      if (inscattering_limit == FLT_MAX) {
-        continue;
-      }
-
-      sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
     }
-    else {
-      sky_trace_inscattering_ms_only(sky_origin, task.ray, world_to_sky_scale(depth), task.index);
+
+    if (inscattering_limit == FLT_MAX) {
+      continue;
     }
+
+    sky_trace_inscattering_ms_only(sky_origin, task.ray, inscattering_limit, task.index);
   }
 }
 
