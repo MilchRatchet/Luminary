@@ -214,12 +214,22 @@ __device__ float cloud_density(vec3 pos, const float height, const vec3 weather)
 // Integrator functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ float cloud_extinction(vec3 origin, vec3 ray) {
-  float step_size  = CLOUD_EXTINCTION_STEP_SIZE;
-  float reach      = step_size * 0.5f;
-  float extinction = 0.0f;
+__device__ float cloud_extinction(const vec3 origin, const vec3 ray) {
+  float extinction      = 0.0f;
+  const float iter_step = 1.0f / device_scene.sky.cloud.shadow_steps;
 
-  for (int i = 0; i < device_scene.sky.cloud.shadow_steps; i++) {
+  // Sometimes the shadow ray goes below the cloud layer but misses the earth and reenters the cloud layer
+  float offset = 0.0f;
+
+  for (float i = 0.0f; i < 1.0f; i += iter_step) {
+    float t0 = offset + i;
+    float t1 = offset + i + iter_step;
+    t0       = t0 * t0;
+    t1       = t1 * t1;
+
+    const float step_size = t1 - t0;
+    const float reach     = t0 + step_size * 0.5f;
+
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
     const float height = cloud_height(pos);
@@ -229,7 +239,7 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
 
     if (height < 0.0f) {
       const float h_min = world_to_sky_scale(device_scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
-      reach += sph_ray_int_p0(ray, pos, h_min);
+      offset += sph_ray_int_p0(ray, pos, h_min);
       continue;
     }
 
@@ -240,10 +250,6 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
 
       extinction -= density * step_size;
     }
-
-    step_size *= CLOUD_EXTINCTION_STEP_MULTIPLY;
-    step_size = fminf(CLOUD_EXTINCTION_STEP_MAX, step_size);
-    reach += step_size;
   }
 
   return expf(extinction);
