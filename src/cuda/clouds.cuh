@@ -24,6 +24,10 @@
 #define CLOUD_GRADIENT_STRATOCUMULUS make_float4(0.01f, 0.08f, 0.3f, 0.4f)
 #define CLOUD_GRADIENT_CUMULUS make_float4(0.01f, 0.06f, 0.75f, 0.95f)
 
+#define CLOUD_WIND_DIR get_vector(1.0f, 0.0f, 0.0f)
+#define CLOUD_WIND_SKEW 0.7f
+#define CLOUD_WIND_SKEW_WEATHER 2.5f
+
 ////////////////////////////////////////////////////////////////////
 // Utility functions
 ////////////////////////////////////////////////////////////////////
@@ -37,12 +41,13 @@ __device__ float cloud_height(const vec3 pos) {
          / world_to_sky_scale(device_scene.sky.cloud.height_max - device_scene.sky.cloud.height_min);
 }
 
-__device__ vec3 cloud_weather(vec3 pos, float height) {
+__device__ vec3 cloud_weather(vec3 pos, const float height) {
   pos.x += device_scene.sky.cloud.offset_x;
   pos.z += device_scene.sky.cloud.offset_z;
 
   vec3 weather_pos = pos;
-  weather_pos      = scale_vector(weather_pos, 0.006f * device_scene.sky.cloud.noise_weather_scale);
+  weather_pos      = add_vector(weather_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW_WEATHER * height));
+  weather_pos      = scale_vector(weather_pos, 0.012f * device_scene.sky.cloud.noise_weather_scale);
 
   float4 weather = tex2D<float4>(device.cloud_noise[2], weather_pos.x, weather_pos.z);
 
@@ -141,6 +146,7 @@ __device__ float2 cloud_get_intersection(const vec3 origin, const vec3 ray, cons
 
 __device__ float cloud_base_density(const vec3 pos, const float height, const vec3 weather) {
   vec3 shape_pos = pos;
+  shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
   shape_pos      = scale_vector(shape_pos, 0.4f * device_scene.sky.cloud.noise_shape_scale);
 
   float4 shape = tex3D<float4>(device.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z);
@@ -177,6 +183,7 @@ __device__ float cloud_erode_density(const vec3 pos, float density, const float 
 
   vec3 detail_pos = pos;
   detail_pos      = add_vector(detail_pos, curl_shift);
+  detail_pos      = add_vector(detail_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
   detail_pos      = scale_vector(detail_pos, 2.0f * device_scene.sky.cloud.noise_detail_scale);
 
   const float4 detail = tex3D<float4>(device.cloud_noise[1], detail_pos.x, detail_pos.y, detail_pos.z);
