@@ -20,6 +20,10 @@
 #define CLOUD_EXTINCTION_STEP_MULTIPLY 1.5f
 #define CLOUD_EXTINCTION_STEP_MAX 0.75f
 
+#define CLOUD_GRADIENT_STRATUS make_float4(0.01f, 0.1f, 0.11f, 0.2f)
+#define CLOUD_GRADIENT_STRATOCUMULUS make_float4(0.01f, 0.08f, 0.3f, 0.4f)
+#define CLOUD_GRADIENT_CUMULUS make_float4(0.01f, 0.06f, 0.75f, 0.95f)
+
 ////////////////////////////////////////////////////////////////////
 // Utility functions
 ////////////////////////////////////////////////////////////////////
@@ -61,10 +65,15 @@ __device__ vec3 cloud_weather_type(const vec3 weather) {
 __device__ float4 cloud_density_height_gradient_type(const vec3 weather) {
   const vec3 weather_type = cloud_weather_type(weather);
 
+  const float4 stratus       = CLOUD_GRADIENT_STRATUS;
+  const float4 stratocumulus = CLOUD_GRADIENT_STRATOCUMULUS;
+  const float4 cumulus       = CLOUD_GRADIENT_CUMULUS;
+
   return make_float4(
-    0.02f * (weather_type.x + weather_type.y + weather_type.z), 0.07f * (weather_type.x + weather_type.y + weather_type.z),
-    0.12f * weather_type.x + 0.39f * weather_type.y + 0.88f * weather_type.z,
-    0.28f * weather_type.x + 0.59f * weather_type.y + weather_type.z);
+    weather_type.x * stratus.x + weather_type.y * stratocumulus.x + weather_type.z * cumulus.x,
+    weather_type.x * stratus.y + weather_type.y * stratocumulus.y + weather_type.z * cumulus.y,
+    weather_type.x * stratus.z + weather_type.y * stratocumulus.z + weather_type.z * cumulus.z,
+    weather_type.x * stratus.w + weather_type.y * stratocumulus.w + weather_type.z * cumulus.w);
 }
 
 __device__ float cloud_density_height_gradient(const float height, const vec3 weather) {
@@ -137,8 +146,8 @@ __device__ float cloud_base_density(const vec3 pos, const float height, const ve
   float4 shape = tex3D<float4>(device.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z);
 
   const vec3 gradient = get_vector(
-    cloud_gradient(make_float4(0.02f, 0.07f, 0.12f, 0.28f), height), cloud_gradient(make_float4(0.02f, 0.07f, 0.39f, 0.59f), height),
-    cloud_gradient(make_float4(0.02f, 0.07f, 0.88f, 1.0f), height));
+    cloud_gradient(CLOUD_GRADIENT_STRATUS, height), cloud_gradient(CLOUD_GRADIENT_STRATOCUMULUS, height),
+    cloud_gradient(CLOUD_GRADIENT_CUMULUS, height));
 
   shape.y *= gradient.x * 0.2f;
   shape.z *= gradient.y * 0.2f;
@@ -219,7 +228,7 @@ __device__ float cloud_extinction(vec3 origin, vec3 ray) {
 
     const vec3 weather = cloud_weather(pos, height);
 
-    if (weather.x > 0.1f) {
+    if (weather.x > 0.05f) {
       const float density = CLOUD_EXTINCTION_DENSITY * cloud_density(pos, height, weather);
 
       extinction -= density * step_size;
@@ -261,7 +270,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 
     vec3 weather = cloud_weather(pos, height);
 
-    if (weather.x < 0.1f) {
+    if (weather.x < 0.05f) {
       i += big_step_mult - 1;
       reach += step_size * big_step;
       continue;
