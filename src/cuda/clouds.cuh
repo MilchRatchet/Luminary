@@ -37,9 +37,10 @@ __device__ vec3 cloud_weather(vec3 pos, float height) {
   pos.x += device_scene.sky.cloud.offset_x;
   pos.z += device_scene.sky.cloud.offset_z;
 
-  const float weather_sample_scale = 0.006f * device_scene.sky.cloud.noise_weather_scale;
+  vec3 weather_pos = pos;
+  weather_pos      = scale_vector(weather_pos, 0.006f * device_scene.sky.cloud.noise_weather_scale);
 
-  float4 weather = tex2D<float4>(device.cloud_noise[2], pos.x * weather_sample_scale, pos.z * weather_sample_scale);
+  float4 weather = tex2D<float4>(device.cloud_noise[2], weather_pos.x, weather_pos.z);
 
   weather.x = powf(fabsf(weather.x), __saturatef(remap(height * 3.0f, 0.7f, 0.8f, 1.0f, lerp(1.0f, 0.5f, device_scene.sky.cloud.anvil))));
 
@@ -129,13 +130,11 @@ __device__ float2 cloud_get_intersection(const vec3 origin, const vec3 ray, cons
 // Density function
 ////////////////////////////////////////////////////////////////////
 
-__device__ float cloud_density(vec3 pos, const float height, const vec3 weather) {
-  pos.x += device_scene.sky.cloud.offset_x;
-  pos.z += device_scene.sky.cloud.offset_z;
+__device__ float cloud_base_density(const vec3 pos, const float height, const vec3 weather) {
+  vec3 shape_pos = pos;
+  shape_pos      = scale_vector(shape_pos, 0.4f * device_scene.sky.cloud.noise_shape_scale);
 
-  const float shape_sample_scale = 0.4f * device_scene.sky.cloud.noise_shape_scale;
-
-  float4 shape = tex3D<float4>(device.cloud_noise[0], pos.x * shape_sample_scale, pos.y * shape_sample_scale, pos.z * shape_sample_scale);
+  float4 shape = tex3D<float4>(device.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z);
 
   const vec3 gradient = get_vector(
     cloud_gradient(make_float4(0.02f, 0.07f, 0.12f, 0.28f), height), cloud_gradient(make_float4(0.02f, 0.07f, 0.39f, 0.59f), height),
@@ -154,25 +153,42 @@ __device__ float cloud_density(vec3 pos, const float height, const vec3 weather)
 
   density = __saturatef(density - (1.0f - weather.x)) * weather.x;
 
+  return density;
+}
+
+__device__ float cloud_erode_density(const vec3 pos, float density, const float height, const vec3 weather) {
+  vec3 curl_pos = pos;
+  curl_pos      = scale_vector(curl_pos, 3.0f * device_scene.sky.cloud.noise_curl_scale);
+
+  const float4 curl = tex2D<float4>(device.cloud_noise[3], curl_pos.x, curl_pos.z);
+
+  vec3 curl_shift = get_vector(curl.x, curl.y, curl.z);
+  curl_shift      = sub_vector(curl_shift, get_vector(0.5f, 0.5f, 0.5f));
+  curl_shift      = scale_vector(curl_shift, 2.0f * 0.55f * height);
+
+  vec3 detail_pos = pos;
+  detail_pos      = add_vector(detail_pos, curl_shift);
+  detail_pos      = scale_vector(detail_pos, 2.0f * device_scene.sky.cloud.noise_detail_scale);
+
+  const float4 detail = tex3D<float4>(device.cloud_noise[1], detail_pos.x, detail_pos.y, detail_pos.z);
+
+  float detail_fbm = __saturatef(detail.x * 0.625f + detail.y * 0.25f + detail.z * 0.125f);
+
+  float noise_modifier = lerp(1.0f - detail_fbm, detail_fbm, __saturatef(height * 10.0f));
+
+  density = remap(density, noise_modifier * 0.2f, 1.0f, 0.0f, 1.0f);
+
+  return density;
+}
+
+__device__ float cloud_density(vec3 pos, const float height, const vec3 weather) {
+  pos.x += device_scene.sky.cloud.offset_x;
+  pos.z += device_scene.sky.cloud.offset_z;
+
+  float density = cloud_base_density(pos, height, weather);
+
   if (density > 0.0f) {
-    const float curl_sample_scale = 3.0f * device_scene.sky.cloud.noise_curl_scale;
-
-    float4 curl = tex2D<float4>(device.cloud_noise[3], pos.x * curl_sample_scale, pos.z * curl_sample_scale);
-
-    pos.x += 2.0f * (curl.x - 0.5f) * height * 0.55f;
-    pos.y += 2.0f * (curl.z - 0.5f) * height * 0.55f;
-    pos.z += 2.0f * (curl.y - 0.5f) * height * 0.55f;
-
-    const float detail_sample_scale = 2.0f * device_scene.sky.cloud.noise_detail_scale;
-
-    float4 detail =
-      tex3D<float4>(device.cloud_noise[1], pos.x * detail_sample_scale, pos.y * detail_sample_scale, pos.z * detail_sample_scale);
-
-    float detail_fbm = __saturatef(detail.x * 0.625f + detail.y * 0.25f + detail.z * 0.125f);
-
-    float noise_modifier = lerp(1.0f - detail_fbm, detail_fbm, __saturatef(height * 10.0f));
-
-    density = remap(density, noise_modifier * 0.2f, 1.0f, 0.0f, 1.0f);
+    density = cloud_erode_density(pos, density, height, weather);
   }
 
   return fmaxf(density * device_scene.sky.cloud.density, 0.0f);
