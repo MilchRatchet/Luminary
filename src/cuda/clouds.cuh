@@ -270,6 +270,15 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
   float transmittance = 1.0f;
   RGBF scatteredLight = get_color(0.0f, 0.0f, 0.0f);
 
+  const float ambient_r1 = PI * white_noise();
+  const float ambient_r2 = 2.0f * PI * white_noise();
+
+  const vec3 ray_ambient         = sample_hemisphere_basis(ambient_r2, ambient_r1, normalize_vector(origin));
+  const float cos_angle_ambient  = dot_product(ray, ray_ambient);
+  const float scattering_ambient = cloud_dual_lobe_henvey_greenstein(
+    cos_angle_ambient, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
+    device_scene.sky.cloud.lobe_lerp);
+
   const float sun_light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
   for (int i = 0; i < step_count; i++) {
@@ -315,16 +324,6 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       }
 
       // Ambient light
-      const float ambient_r1 = PI * white_noise();
-      const float ambient_r2 = 2.0f * PI * white_noise();
-
-      const vec3 ray_ambient = sample_hemisphere_basis(ambient_r2, ambient_r1, normalize_vector(pos));
-
-      const float cos_angle_ambient  = dot_product(ray, ray_ambient);
-      const float scattering_ambient = cloud_dual_lobe_henvey_greenstein(
-        cos_angle_ambient, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
-        device_scene.sky.cloud.lobe_lerp);
-
       const float extinction_ambient = cloud_extinction(pos, ray_ambient);
 
       RGBF ambient_color = sky_get_color(pos, ray_ambient, FLT_MAX, false, device_scene.sky.steps / 2);
