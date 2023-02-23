@@ -1,7 +1,9 @@
 #ifndef CU_TOY_H
 #define CU_TOY_H
 
+#include "brdf.cuh"
 #include "math.cuh"
+#include "memory.cuh"
 
 /*
  * Requirement:

@@ -5,7 +5,9 @@
 #ifndef CU_OCEAN_H
 #define CU_OCEAN_H
 
+#include "brdf.cuh"
 #include "math.cuh"
+#include "memory.cuh"
 
 #define OCEAN_POLLUTION (device_scene.ocean.pollution * 0.01f)
 
