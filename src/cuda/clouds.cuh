@@ -14,8 +14,8 @@
 // Defines
 ////////////////////////////////////////////////////////////////////
 
-#define CLOUD_SCATTERING_DENSITY (1000.0f * 0.9f)
-#define CLOUD_EXTINCTION_DENSITY (1000.0f * 0.01f)
+#define CLOUD_SCATTERING_DENSITY (1000.0f * 0.1f * 0.9f)
+#define CLOUD_EXTINCTION_DENSITY (1000.0f * 0.1f)
 #define CLOUD_EXTINCTION_STEP_SIZE 0.01f
 #define CLOUD_EXTINCTION_STEP_MULTIPLY 1.5f
 #define CLOUD_EXTINCTION_STEP_MAX 0.75f
@@ -27,6 +27,23 @@
 #define CLOUD_WIND_DIR get_vector(1.0f, 0.0f, 0.0f)
 #define CLOUD_WIND_SKEW 0.7f
 #define CLOUD_WIND_SKEW_WEATHER 2.5f
+
+#define CLOUD_SCATTERING_OCTAVES 9
+#define CLOUD_OCTAVE_SCATTERING_FACTOR 0.5f
+#define CLOUD_OCTAVE_EXTINCTION_FACTOR 0.5f
+#define CLOUD_OCTAVE_ANGLE_FACTOR 0.5f
+
+////////////////////////////////////////////////////////////////////
+// Structs
+////////////////////////////////////////////////////////////////////
+
+struct CloudExtinctionOctaves {
+  float E[CLOUD_SCATTERING_OCTAVES];
+} typedef CloudExtinctionOctaves;
+
+struct CloudPhaseOctaves {
+  float P[CLOUD_SCATTERING_OCTAVES];
+} typedef CloudPhaseOctaves;
 
 ////////////////////////////////////////////////////////////////////
 // Utility functions
@@ -91,10 +108,10 @@ __device__ float cloud_weather_wetness(vec3 weather) {
   return lerp(1.0f, 1.0f - device_scene.sky.cloud.wetness, __saturatef(weather.z));
 }
 
-__device__ float cloud_dual_lobe_henvey_greenstein(float cos_angle, float g0, float g1, float w) {
-  const float mie0 = henvey_greenstein(cos_angle, g0);
-  const float mie1 = henvey_greenstein(cos_angle, g1);
-  return lerp(mie0, mie1, w);
+__device__ float cloud_dual_lobe_henvey_greenstein(const float cos_angle, const float factor) {
+  const float mie0 = henvey_greenstein(cos_angle, device_scene.sky.cloud.forward_scattering * factor);
+  const float mie1 = henvey_greenstein(cos_angle, device_scene.sky.cloud.backward_scattering * factor);
+  return lerp(mie0, mie1, device_scene.sky.cloud.lobe_lerp);
 }
 
 __device__ float cloud_powder(const float density, const float step_size) {
@@ -214,8 +231,13 @@ __device__ float cloud_density(vec3 pos, const float height, const vec3 weather)
 // Integrator functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ float cloud_extinction(const vec3 origin, const vec3 ray) {
-  float extinction      = 0.0f;
+__device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3 ray) {
+  CloudExtinctionOctaves extinction;
+
+  for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+    extinction.E[i] = 0.0f;
+  }
+
   const float iter_step = 1.0f / device_scene.sky.cloud.shadow_steps;
 
   // Sometimes the shadow ray goes below the cloud layer but misses the earth and reenters the cloud layer
@@ -248,11 +270,20 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray) {
     if (weather.x > 0.05f) {
       const float density = CLOUD_EXTINCTION_DENSITY * cloud_density(pos, height, weather);
 
-      extinction -= density * step_size;
+      float octave_factor = 1.0f;
+
+      for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+        extinction.E[i] -= octave_factor * density * step_size;
+        octave_factor *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
+      }
     }
   }
 
-  return expf(extinction);
+  for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+    extinction.E[i] = expf(extinction.E[i]);
+  }
+
+  return extinction;
 }
 
 __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, float dist) {
@@ -273,11 +304,15 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
   const float ambient_r1 = PI * white_noise();
   const float ambient_r2 = 2.0f * PI * white_noise();
 
-  const vec3 ray_ambient         = sample_hemisphere_basis(ambient_r2, ambient_r1, normalize_vector(origin));
-  const float cos_angle_ambient  = dot_product(ray, ray_ambient);
-  const float scattering_ambient = cloud_dual_lobe_henvey_greenstein(
-    cos_angle_ambient, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
-    device_scene.sky.cloud.lobe_lerp);
+  const vec3 ambient_ray        = sample_hemisphere_basis(ambient_r2, ambient_r1, normalize_vector(origin));
+  const float ambient_cos_angle = dot_product(ray, ambient_ray);
+
+  CloudPhaseOctaves ambient_phase;
+  float phase_factor = 1.0f;
+  for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+    ambient_phase.P[i] = cloud_dual_lobe_henvey_greenstein(ambient_cos_angle, phase_factor);
+    phase_factor *= CLOUD_OCTAVE_ANGLE_FACTOR;
+  }
 
   const float sun_light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
@@ -301,45 +336,66 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
     float density = cloud_density(pos, height, weather);
 
     if (density > 0.0f) {
-      // Celestial light (prefer sun but use the moon if possible)
-      const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, pos)), pos, SKY_EARTH_RADIUS);
-
       RGBF sun_color;
+      CloudPhaseOctaves sun_phase;
+      CloudExtinctionOctaves sun_extinction;
 
+      const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, pos)), pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
-        const vec3 ray_sun = sample_sphere(device_sun, SKY_SUN_RADIUS, pos);
+        const vec3 sun_ray = sample_sphere(device_sun, SKY_SUN_RADIUS, pos);
 
-        const float cos_angle_sun  = dot_product(ray, ray_sun);
-        const float scattering_sun = cloud_dual_lobe_henvey_greenstein(
-          cos_angle_sun, device_scene.sky.cloud.forward_scattering, device_scene.sky.cloud.backward_scattering,
-          device_scene.sky.cloud.lobe_lerp);
+        const float sun_cos_angle = dot_product(ray, sun_ray);
 
-        const float extinction_sun = cloud_extinction(pos, ray_sun);
+        float phase_factor = 1.0f;
+        for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+          sun_phase.P[i] = cloud_dual_lobe_henvey_greenstein(sun_cos_angle, phase_factor);
+          phase_factor *= CLOUD_OCTAVE_ANGLE_FACTOR;
+        }
 
-        sun_color = sky_get_sun_color(pos, ray_sun);
-        sun_color = scale_color(sun_color, 0.25f * ONE_OVER_PI * sun_light_angle * scattering_sun * extinction_sun);
+        sun_extinction = cloud_extinction(pos, sun_ray);
+
+        sun_color = sky_get_sun_color(pos, sun_ray);
+        sun_color = scale_color(sun_color, sun_light_angle);
       }
       else {
         sun_color = get_color(0.0f, 0.0f, 0.0f);
+        for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+          sun_phase.P[i]      = 0.0f;
+          sun_extinction.E[i] = 1.0f;
+        }
       }
 
       // Ambient light
-      const float extinction_ambient = cloud_extinction(pos, ray_ambient);
+      const CloudExtinctionOctaves ambient_extinction = cloud_extinction(pos, ambient_ray);
 
-      RGBF ambient_color = sky_get_color(pos, ray_ambient, FLT_MAX, false, device_scene.sky.steps / 2);
-      ambient_color      = scale_color(ambient_color, scattering_ambient * extinction_ambient / (2.0f * PI));
+      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device_scene.sky.steps / 2);
+      ambient_color      = scale_color(ambient_color, 2.0f * PI);
 
-      const float scattering = density * CLOUD_SCATTERING_DENSITY;
-      const float extinction = density * CLOUD_EXTINCTION_DENSITY;
+      float scattering_factor = 1.0f;
+      float extinction_factor = 1.0f;
+      for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+        const float scattering = scattering_factor * density * CLOUD_SCATTERING_DENSITY;
+        const float extinction = fmaxf(extinction_factor * density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
 
-      RGBF S           = add_color(sun_color, ambient_color);
-      S                = scale_color(S, scattering);
-      S                = scale_color(S, cloud_powder(scattering, step_size));
-      S                = scale_color(S, cloud_weather_wetness(weather));
-      float step_trans = expf(-extinction * step_size);
-      S                = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
-      scatteredLight   = add_color(scatteredLight, scale_color(S, transmittance));
-      transmittance *= step_trans;
+        scattering_factor *= CLOUD_OCTAVE_SCATTERING_FACTOR;
+        extinction_factor *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
+
+        const RGBF sun_color_i     = scale_color(sun_color, sun_extinction.E[i] * sun_phase.P[i]);
+        const RGBF ambient_color_i = scale_color(ambient_color, ambient_extinction.E[i] * ambient_phase.P[i]);
+
+        RGBF S = add_color(sun_color_i, ambient_color_i);
+        S      = scale_color(S, scattering);
+        S      = scale_color(S, cloud_powder(scattering, step_size));
+        S      = scale_color(S, cloud_weather_wetness(weather));
+
+        const float step_trans = expf(-extinction * step_size);
+
+        S              = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
+        scatteredLight = add_color(scatteredLight, scale_color(S, transmittance));
+      }
+
+      // Update transmittance
+      transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);
 
       if (transmittance < 0.005f) {
         transmittance = 0.0f;

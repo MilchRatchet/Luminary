@@ -142,13 +142,13 @@ void scene_init(Scene** _scene) {
   scene->sky.cloud.coverage            = 1.0f;
   scene->sky.cloud.anvil               = 0.0f;
   scene->sky.cloud.coverage_min        = 0.0f;
-  scene->sky.cloud.forward_scattering  = 0.8f;
+  scene->sky.cloud.forward_scattering  = 0.85f;
   scene->sky.cloud.backward_scattering = -0.2f;
   scene->sky.cloud.lobe_lerp           = 0.5f;
   scene->sky.cloud.wetness             = 0.0f;
   scene->sky.cloud.powder              = 0.5f;
-  scene->sky.cloud.shadow_steps        = 36;
-  scene->sky.cloud.steps               = 54;
+  scene->sky.cloud.shadow_steps        = 8;
+  scene->sky.cloud.steps               = 96;
   scene->sky.cloud.density             = 1.0f;
 
   scene->fog.active     = 0;
