@@ -11,9 +11,23 @@
 //
 
 ////////////////////////////////////////////////////////////////////
+// Literature
+////////////////////////////////////////////////////////////////////
+
+// [Hil16]
+// Sébastien Hillaire, "Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite", in Physically Based Shading in Theory and
+// Practice course, SIGGRAPH 2016. https://www.ea.com/frostbite/news/physically-based-sky-atmosphere-and-cloud-rendering
+
+// [Sch22]
+// Andrew Schneider, "Nubis, Evolved: Real-Time Volumetric Clouds for Skies, Environments, and VFX", in Advances in Real-Time Rendering in
+// Games cource, SIGGRAPH 2022.
+//
+
+////////////////////////////////////////////////////////////////////
 // Defines
 ////////////////////////////////////////////////////////////////////
 
+// It is important that extinction >= scattering to not amplify the energy in the system
 #define CLOUD_SCATTERING_DENSITY (1000.0f * 0.1f * 0.9f)
 #define CLOUD_EXTINCTION_DENSITY (1000.0f * 0.1f)
 #define CLOUD_EXTINCTION_STEP_SIZE 0.01f
@@ -28,10 +42,11 @@
 #define CLOUD_WIND_SKEW 0.7f
 #define CLOUD_WIND_SKEW_WEATHER 2.5f
 
+// CLOUD_SCATTERING_OCTAVES must be larger than 0, and EXTINCTION_FACTOR >= SCATTERING_FACTOR
 #define CLOUD_SCATTERING_OCTAVES 9
 #define CLOUD_OCTAVE_SCATTERING_FACTOR 0.5f
 #define CLOUD_OCTAVE_EXTINCTION_FACTOR 0.5f
-#define CLOUD_OCTAVE_ANGLE_FACTOR 0.5f
+#define CLOUD_OCTAVE_PHASE_FACTOR 0.5f
 
 ////////////////////////////////////////////////////////////////////
 // Structs
@@ -301,23 +316,23 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
   float transmittance = 1.0f;
   RGBF scatteredLight = get_color(0.0f, 0.0f, 0.0f);
 
-  const float ambient_r1 = PI * white_noise();
+  const float ambient_r1 = 2.0f * PI * white_noise();
   const float ambient_r2 = 2.0f * PI * white_noise();
 
-  const vec3 ambient_ray        = sample_hemisphere_basis(ambient_r2, ambient_r1, normalize_vector(origin));
+  const vec3 ambient_ray        = angles_to_direction(ambient_r1, ambient_r2);
   const float ambient_cos_angle = dot_product(ray, ambient_ray);
 
   CloudPhaseOctaves ambient_phase;
   float phase_factor = 1.0f;
   for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
     ambient_phase.P[i] = cloud_dual_lobe_henvey_greenstein(ambient_cos_angle, phase_factor);
-    phase_factor *= CLOUD_OCTAVE_ANGLE_FACTOR;
+    phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
   }
 
   const float sun_light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
   for (int i = 0; i < step_count; i++) {
-    vec3 pos = add_vector(origin, scale_vector(ray, reach));
+    const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
     const float height = cloud_height(pos);
 
@@ -325,7 +340,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       break;
     }
 
-    vec3 weather = cloud_weather(pos, height);
+    const vec3 weather = cloud_weather(pos, height);
 
     if (weather.x < 0.05f) {
       i += big_step_mult - 1;
@@ -333,7 +348,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       continue;
     }
 
-    float density = cloud_density(pos, height, weather);
+    const float density = cloud_density(pos, height, weather);
 
     if (density > 0.0f) {
       RGBF sun_color;
@@ -349,7 +364,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
         float phase_factor = 1.0f;
         for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
           sun_phase.P[i] = cloud_dual_lobe_henvey_greenstein(sun_cos_angle, phase_factor);
-          phase_factor *= CLOUD_OCTAVE_ANGLE_FACTOR;
+          phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
         }
 
         sun_extinction = cloud_extinction(pos, sun_ray);
@@ -369,7 +384,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       const CloudExtinctionOctaves ambient_extinction = cloud_extinction(pos, ambient_ray);
 
       RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device_scene.sky.steps / 2);
-      ambient_color      = scale_color(ambient_color, 2.0f * PI);
+      ambient_color      = scale_color(ambient_color, 4.0f * PI);
 
       float scattering_factor = 1.0f;
       float extinction_factor = 1.0f;
