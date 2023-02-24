@@ -1,5 +1,8 @@
 #include "buffer.h"
-#include "cuda/utils.cuh"
+
+#include <cuda_runtime_api.h>
+
+#include "log.h"
 
 #define gpuBufferErrchk(ans, buf_name, func, line)                                                                \
   {                                                                                                               \
@@ -11,21 +14,21 @@
 size_t memory_limit = 0;
 size_t memory_usage = 0;
 
-extern "C" size_t device_memory_usage() {
+size_t device_memory_usage() {
   return memory_usage;
 }
 
-extern "C" size_t device_memory_limit() {
+size_t device_memory_limit() {
   return memory_limit;
 }
 
-extern "C" void device_set_memory_limit(size_t limit) {
+void device_set_memory_limit(size_t limit) {
   memory_limit = limit;
 
   log_message("Set memory limit to %zu bytes.", limit);
 }
 
-extern "C" void _device_malloc(void** buffer, size_t size, char* buf_name, char* func, int line) {
+void _device_malloc(void** buffer, size_t size, char* buf_name, char* func, int line) {
   memory_usage += size;
 
   if (memory_usage > (size_t) (0.7 * memory_limit)) {
@@ -36,7 +39,7 @@ extern "C" void _device_malloc(void** buffer, size_t size, char* buf_name, char*
   gpuBufferErrchk(cudaMalloc(buffer, size), buf_name, func, line);
 }
 
-extern "C" size_t _device_malloc_pitch(void** buffer, size_t rowstride, size_t num_rows, char* buf_name, char* func, int line) {
+size_t _device_malloc_pitch(void** buffer, size_t rowstride, size_t num_rows, char* buf_name, char* func, int line) {
   size_t pitch;
 
   gpuBufferErrchk(cudaMallocPitch(buffer, &pitch, rowstride, num_rows), buf_name, func, line);
@@ -51,18 +54,18 @@ extern "C" size_t _device_malloc_pitch(void** buffer, size_t rowstride, size_t n
   return pitch;
 }
 
-extern "C" void _device_free(void* buffer, size_t size, char* buf_name, char* func, int line) {
+void _device_free(void* buffer, size_t size, char* buf_name, char* func, int line) {
   memory_usage -= size;
 
   gpuBufferErrchk(cudaFree(buffer), buf_name, func, line);
 }
 
-extern "C" void _device_upload(void* dst, void* src, size_t size, char* dst_name, char* src_name, char* func, int line) {
+void _device_upload(void* dst, void* src, size_t size, char* dst_name, char* src_name, char* func, int line) {
   gpuBufferErrchk(cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice), "none", func, line);
   print_log("[%s:%d] Uploaded %zu bytes from host %s to device %s.", func, line, size, src_name, dst_name);
 }
 
-extern "C" void _device_buffer_init(DeviceBuffer** buffer, char* buf_name, char* func, int line) {
+void _device_buffer_init(DeviceBuffer** buffer, char* buf_name, char* func, int line) {
   if (*buffer) {
     print_log("[%s:%d] Device buffer %s was already initialized.", func, line, buf_name);
     return;
@@ -73,7 +76,7 @@ extern "C" void _device_buffer_init(DeviceBuffer** buffer, char* buf_name, char*
   print_log("[%s:%d] Initialized device buffer %s.", func, line, buf_name);
 }
 
-extern "C" void _device_buffer_free(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
+void _device_buffer_free(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
@@ -90,7 +93,7 @@ extern "C" void _device_buffer_free(DeviceBuffer* buffer, char* buf_name, char* 
   print_log("[%s:%d] Freed device buffer %s of size %zu.", func, line, buf_name, buffer->size);
 }
 
-extern "C" void _device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t count, char* buf_name, char* func, int line) {
+void _device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t count, char* buf_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
@@ -115,7 +118,7 @@ extern "C" void _device_buffer_malloc(DeviceBuffer* buffer, size_t element_size,
   print_log("[%s:%d] Buffer %s allocated at address %zu with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
 }
 
-extern "C" void _device_buffer_zero(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
+void _device_buffer_zero(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
@@ -131,7 +134,7 @@ extern "C" void _device_buffer_zero(DeviceBuffer* buffer, char* buf_name, char* 
   print_log("[%s:%d] Buffer %s zeroed at address %zu with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
 }
 
-extern "C" void _device_buffer_upload(DeviceBuffer* buffer, void* data, char* buf_name, char* data_name, char* func, int line) {
+void _device_buffer_upload(DeviceBuffer* buffer, void* data, char* buf_name, char* data_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
@@ -151,8 +154,7 @@ extern "C" void _device_buffer_upload(DeviceBuffer* buffer, void* data, char* bu
   print_log("[%s:%d] Copied %zu bytes to device buffer %s.", func, line, buffer->size, buf_name);
 }
 
-extern "C" void _device_buffer_download(
-  DeviceBuffer* buffer, void* dest, size_t size, char* buf_name, char* dest_name, char* func, int line) {
+void _device_buffer_download(DeviceBuffer* buffer, void* dest, size_t size, char* buf_name, char* dest_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
@@ -177,7 +179,7 @@ extern "C" void _device_buffer_download(
   // print_log("[%s:%d] Copied %zu bytes from device buffer %s to host %s.", func, line, size, buf_name, dest_name);
 }
 
-extern "C" void _device_buffer_download_full(DeviceBuffer* buffer, void* dest, char* buf_name, char* dest_name, char* func, int line) {
+void _device_buffer_download_full(DeviceBuffer* buffer, void* dest, char* buf_name, char* dest_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
@@ -186,7 +188,7 @@ extern "C" void _device_buffer_download_full(DeviceBuffer* buffer, void* dest, c
   _device_buffer_download(buffer, dest, buffer->size, buf_name, dest_name, func, line);
 }
 
-extern "C" void _device_buffer_copy(DeviceBuffer* src, DeviceBuffer* dest, char* src_name, char* dest_name, char* func, int line) {
+void _device_buffer_copy(DeviceBuffer* src, DeviceBuffer* dest, char* src_name, char* dest_name, char* func, int line) {
   if (!src) {
     print_error("[%s:%d] Source Buffer %s is NULL.", func, line, src_name);
     return;
@@ -212,7 +214,7 @@ extern "C" void _device_buffer_copy(DeviceBuffer* src, DeviceBuffer* dest, char*
   print_log("[%s:%d] Copied %zu bytes from device buffer %s to device buffer %s.", func, line, src->size, src_name, dest_name);
 }
 
-extern "C" void* _device_buffer_get_pointer(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
+void* _device_buffer_get_pointer(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return (void*) 0;
@@ -226,7 +228,7 @@ extern "C" void* _device_buffer_get_pointer(DeviceBuffer* buffer, char* buf_name
   return buffer->device_pointer;
 }
 
-extern "C" size_t _device_buffer_get_size(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
+size_t _device_buffer_get_size(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return 0;
@@ -240,7 +242,7 @@ extern "C" size_t _device_buffer_get_size(DeviceBuffer* buffer, char* buf_name, 
   return buffer->size;
 }
 
-extern "C" int _device_buffer_is_allocated(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
+int _device_buffer_is_allocated(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
   if (!buffer) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return 0;
@@ -249,7 +251,7 @@ extern "C" int _device_buffer_is_allocated(DeviceBuffer* buffer, char* buf_name,
   return buffer->allocated;
 }
 
-extern "C" void _device_buffer_destroy(DeviceBuffer** buffer, char* buf_name, char* func, int line) {
+void _device_buffer_destroy(DeviceBuffer** buffer, char* buf_name, char* func, int line) {
   if (!buffer || !(*buffer)) {
     print_error("[%s:%d] DeviceBuffer %s is NULL.", func, line, buf_name);
     return;
