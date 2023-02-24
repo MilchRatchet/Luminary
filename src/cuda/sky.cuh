@@ -3,6 +3,7 @@
 
 #include <cuda_runtime_api.h>
 
+#include "cloud_shadow.cuh"
 #include "math.cuh"
 #include "raytrace.h"
 #include "sky_utils.cuh"
@@ -703,9 +704,12 @@ __device__ Spectrum sky_compute_atmosphere(
       const float phase_rayleigh   = sky_rayleigh_phase(cos_angle);
       const float phase_mie        = sky_mie_phase(cos_angle);
 
-      float shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : 1.0f;
-
+      float shadow;
       if (cloud_shadows) {
+        shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : cloud_shadow(pos, ray_scatter);
+      }
+      else {
+        shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : 1.0f;
       }
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
@@ -802,78 +806,6 @@ __device__ Spectrum sky_compute_atmosphere(
   return result;
 }
 
-// This driver is sky_compute_atmosphere without single scattering contribution
-__device__ Spectrum
-  sky_compute_atmosphere_ms_only(Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const int steps) {
-  Spectrum result = spectrum_set1(0.0f);
-
-  const float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
-
-  if (path.y == -FLT_MAX)
-    return result;
-
-  const float start    = path.x;
-  const float distance = fminf(path.y, limit - start);
-
-  Spectrum transmittance = spectrum_get_ident();
-
-  if (distance > 0.0f) {
-    float reach = start;
-    float step_size;
-
-    const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device_scene.sky.sun_strength);
-
-    const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, origin);
-
-    for (int i = 0; i < steps; i++) {
-      const float new_reach = start + distance * (i + 0.3f) / steps;
-      step_size             = new_reach - reach;
-      reach                 = new_reach;
-
-      const vec3 pos     = add_vector(origin, scale_vector(ray, reach));
-      const float height = sky_height(pos);
-
-      const vec3 ray_scatter       = normalize_vector(sub_vector(device_sun, pos));
-      const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
-
-      const float density_rayleigh = sky_rayleigh_density(height) * device_scene.sky.rayleigh_density;
-      const float density_mie      = sky_mie_density(height) * device_scene.sky.mie_density;
-      const float density_ozone    = sky_ozone_density(height) * device_scene.sky.ozone_density;
-
-      const Spectrum scattering_rayleigh = spectrum_scale(SKY_RAYLEIGH_SCATTERING, density_rayleigh);
-      const float scattering_mie         = SKY_MIE_SCATTERING * density_mie;
-
-      const Spectrum extinction_rayleigh = spectrum_scale(SKY_RAYLEIGH_EXTINCTION, density_rayleigh);
-      const float extinction_mie         = SKY_MIE_EXTINCTION * density_mie;
-      const Spectrum extinction_ozone    = spectrum_scale(SKY_OZONE_EXTINCTION, density_ozone);
-
-      const Spectrum scattering = spectrum_add(scattering_rayleigh, spectrum_set1(scattering_mie));
-      const Spectrum extinction = spectrum_add(spectrum_add(extinction_rayleigh, spectrum_set1(extinction_mie)), extinction_ozone);
-
-      const UV multiscattering_uv        = get_UV(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
-      const float4 multiscattering_low   = tex2D<float4>(device.sky_ms_luts[0], multiscattering_uv.u, multiscattering_uv.v);
-      const float4 multiscattering_high  = tex2D<float4>(device.sky_ms_luts[1], multiscattering_uv.u, multiscattering_uv.v);
-      const Spectrum multiscattering_tex = spectrum_merge(multiscattering_low, multiscattering_high);
-      const Spectrum ms_radiance         = spectrum_mul(multiscattering_tex, scattering);
-
-      const Spectrum S = spectrum_mul(sun_radiance, ms_radiance);
-
-      Spectrum step_transmittance = extinction;
-      step_transmittance          = spectrum_scale(step_transmittance, -step_size);
-      step_transmittance          = spectrum_exp(step_transmittance);
-
-      const Spectrum Sint = spectrum_mul(spectrum_sub(S, spectrum_mul(S, step_transmittance)), spectrum_inv(extinction));
-
-      result        = spectrum_add(result, spectrum_mul(Sint, transmittance));
-      transmittance = spectrum_mul(transmittance, step_transmittance);
-    }
-  }
-
-  transmittance_out = spectrum_mul(transmittance_out, transmittance);
-
-  return result;
-}
-
 ////////////////////////////////////////////////////////////////////
 // Wrapper
 ////////////////////////////////////////////////////////////////////
@@ -913,28 +845,7 @@ __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, false, device_scene.sky.steps / 3);
-
-  const RGBAhalf inscattering = RGBF_to_RGBAhalf(mul_color(sky_compute_color_from_spectrum(radiance), new_record));
-
-  if (any_RGBAhalf(inscattering)) {
-    store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), inscattering));
-  }
-
-  new_record = mul_color(new_record, sky_compute_color_from_spectrum(transmittance));
-  store_RGBAhalf(device_records + pixel, RGBF_to_RGBAhalf(new_record));
-}
-
-__device__ void sky_trace_inscattering_ms_only(const vec3 origin, const vec3 ray, const float limit, ushort2 index) {
-  int pixel = index.x + index.y * device_width;
-
-  const RGBAhalf record = load_RGBAhalf(device_records + pixel);
-
-  RGBF new_record = RGBAhalf_to_RGBF(record);
-
-  Spectrum transmittance = spectrum_set1(1.0f);
-
-  const Spectrum radiance = sky_compute_atmosphere_ms_only(transmittance, origin, ray, limit, device_scene.sky.steps / 3);
+  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, device_scene.sky.steps / 3);
 
   const RGBAhalf inscattering = RGBF_to_RGBAhalf(mul_color(sky_compute_color_from_spectrum(radiance), new_record));
 

@@ -276,7 +276,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
       continue;
     }
 
-    sky_trace_inscattering_ms_only(sky_origin, task.ray, inscattering_limit, task.index);
+    sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
   }
 }
 
