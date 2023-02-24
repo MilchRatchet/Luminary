@@ -854,7 +854,9 @@ __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, device_scene.sky.steps / 3);
+  const int steps = __saturatef(limit / 5.0f) * (device_scene.sky.steps / 3);
+
+  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps);
 
   const RGBAhalf inscattering = RGBF_to_RGBAhalf(mul_color(sky_compute_color_from_spectrum(radiance), new_record));
 
