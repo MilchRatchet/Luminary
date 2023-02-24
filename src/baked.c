@@ -13,7 +13,7 @@
 #include "texture.h"
 #include "utils.h"
 
-#define head_size 0x60
+#define head_size 0x70
 #define magic 4919420911629456716ul
 #define version LUMINARY_VERSION_HASH
 
