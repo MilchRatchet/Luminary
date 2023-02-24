@@ -1,5 +1,5 @@
-#ifndef CU_CLOUDGEN_H
-#define CU_CLOUDGEN_H
+#ifndef CU_CLOUD_NOISE_H
+#define CU_CLOUD_NOISE_H
 
 #include <cuda_runtime_api.h>
 #include <float.h>
@@ -495,4 +495,4 @@ extern "C" void clouds_generate(RaytraceInstance* instance) {
   bench_toc((char*) "Cloud Noise Generation");
 }
 
-#endif /* CU_CLOUDGEN_H */
+#endif /* CU_CLOUD_NOISE_H */

@@ -5,6 +5,7 @@
 
 #include "math.cuh"
 #include "raytrace.h"
+#include "sky_utils.cuh"
 #include "stars.h"
 #include "utils.cuh"
 
@@ -273,10 +274,6 @@ __device__ float sky_ozone_density(const float height) {
 
   const float min_val = (height > 25.0f) ? 0.0f : 0.1f;
   return device_scene.sky.base_density * fmaxf(min_val, 1.0f - fabsf(height - 25.0f) / device_scene.sky.ozone_layer_thickness);
-}
-
-__device__ float sky_height(const vec3 point) {
-  return get_length(point) - SKY_EARTH_RADIUS;
 }
 
 /*
@@ -670,7 +667,8 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
 ////////////////////////////////////////////////////////////////////
 
 __device__ Spectrum sky_compute_atmosphere(
-  Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps) {
+  Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials, const bool cloud_shadows,
+  const int steps) {
   Spectrum result = spectrum_set1(0.0f);
 
   const float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
@@ -705,7 +703,10 @@ __device__ Spectrum sky_compute_atmosphere(
       const float phase_rayleigh   = sky_rayleigh_phase(cos_angle);
       const float phase_mie        = sky_mie_phase(cos_angle);
 
-      const float shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : 1.0f;
+      float shadow = sph_ray_hit_p0(ray_scatter, pos, SKY_EARTH_RADIUS) ? 0.0f : 1.0f;
+
+      if (cloud_shadows) {
+      }
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
       const float4 transmittance_low  = tex2D<float4>(device.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
@@ -880,7 +881,7 @@ __device__ Spectrum
 __device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps) {
   Spectrum unused = spectrum_set1(0.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, steps);
+  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, false, steps);
 
   return sky_compute_color_from_spectrum(radiance);
 }
@@ -912,7 +913,7 @@ __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, device_scene.sky.steps / 3);
+  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, false, device_scene.sky.steps / 3);
 
   const RGBAhalf inscattering = RGBF_to_RGBAhalf(mul_color(sky_compute_color_from_spectrum(radiance), new_record));
 

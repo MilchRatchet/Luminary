@@ -24,14 +24,6 @@
 #define eps 0.001f
 #endif /* eps */
 
-#define SKY_EARTH_RADIUS 6371.0f
-#define SKY_SUN_RADIUS 696340.0f
-#define SKY_SUN_DISTANCE 149597870.0f
-#define SKY_MOON_RADIUS 1737.4f
-#define SKY_MOON_DISTANCE 384399.0f
-#define SKY_ATMO_HEIGHT 100.0f
-#define SKY_ATMO_RADIUS (SKY_ATMO_HEIGHT + SKY_EARTH_RADIUS)
-
 struct LightSample {
   uint32_t id;
   uint32_t M;

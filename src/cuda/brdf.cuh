@@ -6,6 +6,7 @@
 #include "math.cuh"
 #include "memory.cuh"
 #include "random.cuh"
+#include "sky_utils.cuh"
 #include "utils.cuh"
 
 struct BRDFInstance {

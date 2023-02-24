@@ -4,6 +4,7 @@
 #include "math.cuh"
 #include "ocean.cuh"
 #include "sky.cuh"
+#include "sky_utils.cuh"
 
 #define FOG_DENSITY (0.0001f * device_scene.fog.density)
 

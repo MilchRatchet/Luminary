@@ -4,12 +4,13 @@
 #include <cuda_runtime_api.h>
 
 #include "bvh.cuh"
-#include "clouds.cuh"
+#include "cloud.cuh"
 #include "fog.cuh"
 #include "geometry.cuh"
 #include "ocean.cuh"
 #include "purkinje.cuh"
 #include "sky.cuh"
+#include "sky_utils.cuh"
 #include "temporal.cuh"
 #include "toy.cuh"
 #include "utils.cuh"
