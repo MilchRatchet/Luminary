@@ -9,6 +9,8 @@
 #include "qoi.h"
 #include "raytrace.h"
 #include "stars.h"
+#include "structs.h"
+#include "texture.h"
 #include "utils.h"
 
 #define head_size 0x60
@@ -57,12 +59,14 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
     memcpy(&width, head + header_element_size * i + 0x04, sizeof(uint32_t));
     memcpy(&height, head + header_element_size * i + 0x08, sizeof(uint32_t));
 
-    textures[i].width      = width;
-    textures[i].height     = height;
-    textures[i].depth      = 1;
-    textures[i].type       = TexDataUINT8;
-    textures[i].gpu        = 0;
-    textures[i].volume_tex = 0;
+    textures[i].width     = width;
+    textures[i].height    = height;
+    textures[i].depth     = 1;
+    textures[i].type      = TexDataUINT8;
+    textures[i].storage   = TexStorageCPU;
+    textures[i].dim       = Tex3D;
+    textures[i].wrap_mode = TexModeWrap;
+    textures[i].filter    = TexFilterLinear;
 
     textures[i].data = (void*) ((uint64_t) (data_size));
     total_length += data_size;
@@ -200,10 +204,10 @@ RaytraceInstance* load_baked(const char* filename) {
     .normal             = (DeviceBuffer*) 0,
     .normal_length      = instance->tex_atlas.normal_length};
 
-  cudatexture_create_atlas(&tex_atlas.albedo, albedo_tex, instance->tex_atlas.albedo_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.illuminance, illuminance_tex, instance->tex_atlas.illuminance_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.material, material_tex, instance->tex_atlas.material_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.normal, normal_tex, instance->tex_atlas.normal_length, CUDA_TEX_FLAG_NONE);
+  texture_create_atlas(&tex_atlas.albedo, albedo_tex, instance->tex_atlas.albedo_length);
+  texture_create_atlas(&tex_atlas.illuminance, illuminance_tex, instance->tex_atlas.illuminance_length);
+  texture_create_atlas(&tex_atlas.material, material_tex, instance->tex_atlas.material_length);
+  texture_create_atlas(&tex_atlas.normal, normal_tex, instance->tex_atlas.normal_length);
 
   free_textures(albedo_tex, instance->tex_atlas.albedo_length);
   free_textures(illuminance_tex, instance->tex_atlas.illuminance_length);

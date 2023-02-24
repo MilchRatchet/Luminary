@@ -26,8 +26,6 @@ void free_inputs(RaytraceInstance* instance);
 void free_outputs(RaytraceInstance* instance);
 void clouds_generate(RaytraceInstance* instance);
 void sky_generate_LUTs(RaytraceInstance* instance);
-void cudatexture_create_atlas(DeviceBuffer** buffer, TextureRGBA* textures, const int textures_length, const uint32_t flags);
-void cudatexture_free_buffer(DeviceBuffer* texture_atlas, const int textures_length);
 void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height);
 void free_8bit_frame(RaytraceInstance* instance);
 void copy_framebuffer_to_8bit(RGBAhalf* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);

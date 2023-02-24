@@ -17,7 +17,6 @@
 #include "cuda/brdf_unittest.cuh"
 #include "cuda/bvh.cuh"
 #include "cuda/cloud_noise.cuh"
-#include "cuda/cudatexture.cuh"
 #include "cuda/denoise.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/kernels.cuh"
@@ -732,12 +731,15 @@ extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
     gpuErrchk(cudaMemcpy(cpu_ptr + offset, source, pitch * height, cudaMemcpyDeviceToHost));
 
     TextureRGBA tex;
-    tex.data   = (void*) (cpu_ptr + offset);
-    tex.width  = width;
-    tex.height = height;
-    tex.gpu    = 0;
-    tex.pitch  = pitch / sizeof(RGBA8);
-    tex.type   = TexDataUINT8;
+    tex.data      = (void*) (cpu_ptr + offset);
+    tex.width     = width;
+    tex.height    = height;
+    tex.pitch     = pitch / sizeof(RGBA8);
+    tex.type      = TexDataUINT8;
+    tex.storage   = TexStorageCPU;
+    tex.dim       = Tex2D;
+    tex.wrap_mode = TexModeWrap;
+    tex.filter    = TexFilterLinear;
 
     uint32_t encoded_size;
 

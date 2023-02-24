@@ -12,6 +12,7 @@
 #include "png.h"
 #include "raytrace.h"
 #include "stars.h"
+#include "texture.h"
 #include "utils.h"
 #include "wavefront.h"
 
@@ -251,10 +252,10 @@ RaytraceInstance* scene_load_lum(const char* filename) {
     .normal             = (DeviceBuffer*) 0,
     .normal_length      = content->normal_maps_length};
 
-  cudatexture_create_atlas(&tex_atlas.albedo, content->albedo_maps, content->albedo_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.illuminance, content->illuminance_maps, content->illuminance_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.material, content->material_maps, content->material_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length, CUDA_TEX_FLAG_NONE);
+  texture_create_atlas(&tex_atlas.albedo, content->albedo_maps, content->albedo_maps_length);
+  texture_create_atlas(&tex_atlas.illuminance, content->illuminance_maps, content->illuminance_maps_length);
+  texture_create_atlas(&tex_atlas.material, content->material_maps, content->material_maps_length);
+  texture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length);
 
   RaytraceInstance* instance;
   raytracing_init(&instance, general, tex_atlas, scene);
@@ -298,10 +299,10 @@ RaytraceInstance* scene_load_obj(char* filename) {
     .normal             = (DeviceBuffer*) 0,
     .normal_length      = content->normal_maps_length};
 
-  cudatexture_create_atlas(&tex_atlas.albedo, content->albedo_maps, content->albedo_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.illuminance, content->illuminance_maps, content->illuminance_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.material, content->material_maps, content->material_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length, CUDA_TEX_FLAG_NONE);
+  texture_create_atlas(&tex_atlas.albedo, content->albedo_maps, content->albedo_maps_length);
+  texture_create_atlas(&tex_atlas.illuminance, content->illuminance_maps, content->illuminance_maps_length);
+  texture_create_atlas(&tex_atlas.material, content->material_maps, content->material_maps_length);
+  texture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length);
 
   RaytraceInstance* instance;
   raytracing_init(&instance, general, tex_atlas, scene);
@@ -328,10 +329,10 @@ void scene_serialize(RaytraceInstance* instance) {
 }
 
 void free_atlases(RaytraceInstance* instance) {
-  cudatexture_free_buffer(instance->tex_atlas.albedo, instance->tex_atlas.albedo_length);
-  cudatexture_free_buffer(instance->tex_atlas.illuminance, instance->tex_atlas.illuminance_length);
-  cudatexture_free_buffer(instance->tex_atlas.material, instance->tex_atlas.material_length);
-  cudatexture_free_buffer(instance->tex_atlas.normal, instance->tex_atlas.normal_length);
+  texture_free_atlas(instance->tex_atlas.albedo, instance->tex_atlas.albedo_length);
+  texture_free_atlas(instance->tex_atlas.illuminance, instance->tex_atlas.illuminance_length);
+  texture_free_atlas(instance->tex_atlas.material, instance->tex_atlas.material_length);
+  texture_free_atlas(instance->tex_atlas.normal, instance->tex_atlas.normal_length);
 }
 
 void free_strings(RaytraceInstance* instance) {

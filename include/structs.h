@@ -178,6 +178,10 @@ struct TextureG {
 } typedef TextureG;
 
 enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1 } typedef TextureDataType;
+enum TextureWrappingMode { TexModeWrap = 0, TexModeClamp = 1, TexModeMirror = 2, TexModeBorder = 3 } typedef TextureWrappingMode;
+enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
+enum TextureStorageLocation { TexStorageCPU = 0, TexStorageGPU = 1 } typedef TextureStorageLocation;
+enum TextureFilterMode { TexFilterPoint = 0, TexFilterLinear = 1 } typedef TextureFilterMode;
 
 struct TextureRGBA {
   unsigned int width;
@@ -185,9 +189,11 @@ struct TextureRGBA {
   unsigned int depth;
   unsigned int pitch;
   TextureDataType type;
+  TextureWrappingMode wrap_mode;
+  TextureDimensionType dim;
+  TextureStorageLocation storage;
+  TextureFilterMode filter;
   void* data;
-  int gpu;
-  int volume_tex;
 } typedef TextureRGBA;
 
 #endif /* STRUCTS_H */

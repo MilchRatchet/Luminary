@@ -6,14 +6,13 @@
 #include <math.h>
 #include <stdlib.h>
 
-#include <cudatexture.cuh>
-#include <math.cuh>
-
 #include "bench.h"
 #include "buffer.h"
 #include "log.h"
+#include "math.cuh"
 #include "png.h"
 #include "raytrace.h"
+#include "texture.h"
 
 /*
  * This file contains code to generate noise textures needed for the clouds.
@@ -437,36 +436,44 @@ extern "C" void clouds_generate(RaytraceInstance* instance) {
   bench_tic();
 
   if (instance->scene_gpu.sky.cloud.initialized) {
-    cudatexture_free_buffer(instance->cloud_noise, 4);
+    texture_free_atlas(instance->cloud_noise, 4);
   }
 
   TextureRGBA noise_tex[4];
-  noise_tex[0].gpu        = 1;
-  noise_tex[0].volume_tex = 1;
-  noise_tex[0].width      = CLOUD_SHAPE_RES;
-  noise_tex[0].height     = CLOUD_SHAPE_RES;
-  noise_tex[0].pitch      = CLOUD_SHAPE_RES;
-  noise_tex[0].depth      = CLOUD_SHAPE_RES;
-  noise_tex[0].type       = TexDataUINT8;
-  noise_tex[1].gpu        = 1;
-  noise_tex[1].volume_tex = 1;
-  noise_tex[1].width      = CLOUD_DETAIL_RES;
-  noise_tex[1].height     = CLOUD_DETAIL_RES;
-  noise_tex[1].pitch      = CLOUD_DETAIL_RES;
-  noise_tex[1].depth      = CLOUD_DETAIL_RES;
-  noise_tex[1].type       = TexDataUINT8;
-  noise_tex[2].gpu        = 1;
-  noise_tex[2].volume_tex = 0;
-  noise_tex[2].width      = CLOUD_WEATHER_RES;
-  noise_tex[2].height     = CLOUD_WEATHER_RES;
-  noise_tex[2].pitch      = CLOUD_WEATHER_RES;
-  noise_tex[2].type       = TexDataUINT8;
-  noise_tex[3].gpu        = 1;
-  noise_tex[3].volume_tex = 0;
-  noise_tex[3].width      = CLOUD_CURL_RES;
-  noise_tex[3].height     = CLOUD_CURL_RES;
-  noise_tex[3].pitch      = CLOUD_CURL_RES;
-  noise_tex[3].type       = TexDataUINT8;
+  noise_tex[0].width     = CLOUD_SHAPE_RES;
+  noise_tex[0].height    = CLOUD_SHAPE_RES;
+  noise_tex[0].pitch     = CLOUD_SHAPE_RES;
+  noise_tex[0].depth     = CLOUD_SHAPE_RES;
+  noise_tex[0].type      = TexDataUINT8;
+  noise_tex[0].storage   = TexStorageGPU;
+  noise_tex[0].dim       = Tex3D;
+  noise_tex[0].wrap_mode = TexModeWrap;
+  noise_tex[0].filter    = TexFilterLinear;
+  noise_tex[1].width     = CLOUD_DETAIL_RES;
+  noise_tex[1].height    = CLOUD_DETAIL_RES;
+  noise_tex[1].pitch     = CLOUD_DETAIL_RES;
+  noise_tex[1].depth     = CLOUD_DETAIL_RES;
+  noise_tex[1].type      = TexDataUINT8;
+  noise_tex[1].storage   = TexStorageGPU;
+  noise_tex[1].dim       = Tex3D;
+  noise_tex[1].wrap_mode = TexModeWrap;
+  noise_tex[1].filter    = TexFilterLinear;
+  noise_tex[2].width     = CLOUD_WEATHER_RES;
+  noise_tex[2].height    = CLOUD_WEATHER_RES;
+  noise_tex[2].pitch     = CLOUD_WEATHER_RES;
+  noise_tex[2].type      = TexDataUINT8;
+  noise_tex[2].storage   = TexStorageGPU;
+  noise_tex[2].dim       = Tex2D;
+  noise_tex[2].wrap_mode = TexModeWrap;
+  noise_tex[2].filter    = TexFilterLinear;
+  noise_tex[3].width     = CLOUD_CURL_RES;
+  noise_tex[3].height    = CLOUD_CURL_RES;
+  noise_tex[3].pitch     = CLOUD_CURL_RES;
+  noise_tex[3].type      = TexDataUINT8;
+  noise_tex[3].storage   = TexStorageGPU;
+  noise_tex[3].dim       = Tex2D;
+  noise_tex[3].wrap_mode = TexModeWrap;
+  noise_tex[3].filter    = TexFilterLinear;
 
   device_malloc((void**) &noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
   generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[0].width, (uint8_t*) noise_tex[0].data);
@@ -481,7 +488,7 @@ extern "C" void clouds_generate(RaytraceInstance* instance) {
   device_malloc((void**) &noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
   generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[3].width, (uint8_t*) noise_tex[3].data);
 
-  cudatexture_create_atlas(&instance->cloud_noise, noise_tex, 4, CUDA_TEX_FLAG_NONE);
+  texture_create_atlas(&instance->cloud_noise, noise_tex, 4);
 
   device_free(noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
   device_free(noise_tex[1].data, noise_tex[1].depth * noise_tex[1].height * noise_tex[1].pitch * 4 * sizeof(uint8_t));

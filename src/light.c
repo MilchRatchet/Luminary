@@ -36,7 +36,7 @@ static int contains_illumination(Triangle triangle, TextureRGBA tex) {
   if (tex.type != TexDataUINT8)
     return 1;
 
-  if (tex.gpu) {
+  if (tex.storage != TexStorageCPU) {
     warn_message("Texture is allocated on the GPU. Assume that this triangle is a light.");
     return 1;
   }

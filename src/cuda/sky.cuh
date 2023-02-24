@@ -8,6 +8,7 @@
 #include "raytrace.h"
 #include "sky_utils.cuh"
 #include "stars.h"
+#include "texture.h"
 #include "utils.cuh"
 
 //
@@ -580,8 +581,8 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   bench_tic();
 
   if (instance->scene_gpu.sky.lut_initialized) {
-    cudatexture_free_buffer(instance->sky_tm_luts, 2);
-    cudatexture_free_buffer(instance->sky_ms_luts, 2);
+    texture_free_atlas(instance->sky_tm_luts, 2);
+    texture_free_atlas(instance->sky_ms_luts, 2);
   }
 
   instance->scene_gpu.sky.base_density           = instance->atmo_settings.base_density;
@@ -599,18 +600,22 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   update_device_scene(instance);
 
   TextureRGBA luts_tm_tex[2];
-  luts_tm_tex[0].gpu        = 1;
-  luts_tm_tex[0].volume_tex = 0;
-  luts_tm_tex[0].width      = SKY_TM_TEX_WIDTH;
-  luts_tm_tex[0].height     = SKY_TM_TEX_HEIGHT;
-  luts_tm_tex[0].pitch      = SKY_TM_TEX_WIDTH;
-  luts_tm_tex[0].type       = TexDataFP32;
-  luts_tm_tex[1].gpu        = 1;
-  luts_tm_tex[1].volume_tex = 0;
-  luts_tm_tex[1].width      = SKY_TM_TEX_WIDTH;
-  luts_tm_tex[1].height     = SKY_TM_TEX_HEIGHT;
-  luts_tm_tex[1].pitch      = SKY_TM_TEX_WIDTH;
-  luts_tm_tex[1].type       = TexDataFP32;
+  luts_tm_tex[0].width     = SKY_TM_TEX_WIDTH;
+  luts_tm_tex[0].height    = SKY_TM_TEX_HEIGHT;
+  luts_tm_tex[0].pitch     = SKY_TM_TEX_WIDTH;
+  luts_tm_tex[0].type      = TexDataFP32;
+  luts_tm_tex[0].storage   = TexStorageGPU;
+  luts_tm_tex[0].dim       = Tex2D;
+  luts_tm_tex[0].wrap_mode = TexModeClamp;
+  luts_tm_tex[0].filter    = TexFilterLinear;
+  luts_tm_tex[1].width     = SKY_TM_TEX_WIDTH;
+  luts_tm_tex[1].height    = SKY_TM_TEX_HEIGHT;
+  luts_tm_tex[1].pitch     = SKY_TM_TEX_WIDTH;
+  luts_tm_tex[1].type      = TexDataFP32;
+  luts_tm_tex[1].storage   = TexStorageGPU;
+  luts_tm_tex[1].dim       = Tex2D;
+  luts_tm_tex[1].wrap_mode = TexModeClamp;
+  luts_tm_tex[1].filter    = TexFilterLinear;
 
   device_malloc((void**) &luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
   device_malloc((void**) &luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
@@ -619,7 +624,7 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
 
   gpuErrchk(cudaDeviceSynchronize());
 
-  cudatexture_create_atlas(&instance->sky_tm_luts, luts_tm_tex, 2, CUDA_TEX_FLAG_CLAMP);
+  texture_create_atlas(&instance->sky_tm_luts, luts_tm_tex, 2);
 
   device_free(luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
   device_free(luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
@@ -627,18 +632,22 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   update_device_pointers(instance);
 
   TextureRGBA luts_ms_tex[2];
-  luts_ms_tex[0].gpu        = 1;
-  luts_ms_tex[0].volume_tex = 0;
-  luts_ms_tex[0].width      = SKY_MS_TEX_SIZE;
-  luts_ms_tex[0].height     = SKY_MS_TEX_SIZE;
-  luts_ms_tex[0].pitch      = SKY_MS_TEX_SIZE;
-  luts_ms_tex[0].type       = TexDataFP32;
-  luts_ms_tex[1].gpu        = 1;
-  luts_ms_tex[1].volume_tex = 0;
-  luts_ms_tex[1].width      = SKY_MS_TEX_SIZE;
-  luts_ms_tex[1].height     = SKY_MS_TEX_SIZE;
-  luts_ms_tex[1].pitch      = SKY_MS_TEX_SIZE;
-  luts_ms_tex[1].type       = TexDataFP32;
+  luts_ms_tex[0].width     = SKY_MS_TEX_SIZE;
+  luts_ms_tex[0].height    = SKY_MS_TEX_SIZE;
+  luts_ms_tex[0].pitch     = SKY_MS_TEX_SIZE;
+  luts_ms_tex[0].type      = TexDataFP32;
+  luts_ms_tex[0].storage   = TexStorageGPU;
+  luts_ms_tex[0].dim       = Tex2D;
+  luts_ms_tex[0].wrap_mode = TexModeClamp;
+  luts_ms_tex[0].filter    = TexFilterLinear;
+  luts_ms_tex[1].width     = SKY_MS_TEX_SIZE;
+  luts_ms_tex[1].height    = SKY_MS_TEX_SIZE;
+  luts_ms_tex[1].pitch     = SKY_MS_TEX_SIZE;
+  luts_ms_tex[1].type      = TexDataFP32;
+  luts_ms_tex[1].storage   = TexStorageGPU;
+  luts_ms_tex[1].dim       = Tex2D;
+  luts_ms_tex[1].wrap_mode = TexModeClamp;
+  luts_ms_tex[1].filter    = TexFilterLinear;
 
   device_malloc((void**) &luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
   device_malloc((void**) &luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));
@@ -651,7 +660,7 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
 
   gpuErrchk(cudaDeviceSynchronize());
 
-  cudatexture_create_atlas(&instance->sky_ms_luts, luts_ms_tex, 2, CUDA_TEX_FLAG_CLAMP);
+  texture_create_atlas(&instance->sky_ms_luts, luts_ms_tex, 2);
 
   device_free(luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
   device_free(luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));
