@@ -1,6 +1,7 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
+#include <cuda_runtime_api.h>
 #include <stdint.h>
 
 /********************************************************
@@ -195,5 +196,79 @@ struct TextureRGBA {
   TextureFilterMode filter;
   void* data;
 } typedef TextureRGBA;
+
+////////////////////////////////////////////////////////////////////
+// Kernel passing structs
+////////////////////////////////////////////////////////////////////
+struct LightSample {
+  uint32_t id;
+  uint32_t M;
+  float weight;
+  float solid_angle;
+} typedef LightSample;
+
+struct LightEvalData {
+  vec3 position;
+  uint32_t flags;
+} typedef LightEvalData;
+
+// state is 16 bits the depth and the last 16 bits the random_index
+
+// TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
+
+// ray_xz is horizontal angle
+struct GeometryTask {
+  ushort2 index;
+  vec3 position;
+  float ray_y;
+  float ray_xz;
+  uint32_t hit_id;
+  uint32_t state;
+} typedef GeometryTask;
+
+struct SkyTask {
+  ushort2 index;
+  vec3 origin;
+  vec3 ray;
+  uint32_t state;
+} typedef SkyTask;
+
+// Magnitude of ray gives distance
+struct OceanTask {
+  ushort2 index;
+  vec3 position;
+  float ray_y;
+  float ray_xz;
+  float distance;
+  uint32_t state;
+} typedef OceanTask;
+
+struct ToyTask {
+  ushort2 index;
+  vec3 position;
+  vec3 ray;
+  uint32_t state;
+} typedef ToyTask;
+
+struct FogTask {
+  ushort2 index;
+  vec3 position;
+  float ray_y;
+  float ray_xz;
+  float distance;
+  uint32_t state;
+} typedef FogTask;
+
+struct TraceTask {
+  vec3 origin;
+  vec3 ray;
+  ushort2 index;
+  uint32_t state;
+} typedef TraceTask;
+
+struct TraceResult {
+  float depth;
+  uint32_t hit_id;
+} typedef TraceResult;
 
 #endif /* STRUCTS_H */

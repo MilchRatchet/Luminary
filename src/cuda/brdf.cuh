@@ -154,9 +154,9 @@ __device__ vec3 brdf_sample_light_ray(const LightSample light, const vec3 origin
   switch (light.id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN:
-      return sample_sphere(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(origin));
+      return sample_sphere(device.sun, SKY_SUN_RADIUS, world_to_sky_transform(origin));
     case LIGHT_ID_TOY:
-      return sample_sphere(device_scene.toy.position, device_scene.toy.scale, origin);
+      return sample_sphere(device.scene.toy.position, device.scene.toy.scale, origin);
     default:
       const TriangleLight triangle = load_triangle_light(light.id);
       return sample_triangle(triangle, origin);
@@ -167,16 +167,16 @@ __device__ float brdf_light_sample_target_weight(const LightSample light) {
   float weight;
   switch (light.id) {
     case LIGHT_ID_SUN:
-      weight = 2e+04f * device_scene.sky.sun_strength;
+      weight = 2e+04f * device.scene.sky.sun_strength;
       break;
     case LIGHT_ID_TOY:
-      weight = device_scene.toy.material.b;
+      weight = device.scene.toy.material.b;
       break;
     case LIGHT_ID_NONE:
       weight = 0.0f;
       break;
     default: {
-      weight = device_scene.material.default_material.b;
+      weight = device.scene.material.default_material.b;
     } break;
   }
 
@@ -186,9 +186,9 @@ __device__ float brdf_light_sample_target_weight(const LightSample light) {
 __device__ float brdf_light_sample_solid_angle(const LightSample light, const vec3 pos) {
   switch (light.id) {
     case LIGHT_ID_SUN:
-      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, world_to_sky_transform(pos));
+      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun, SKY_SUN_RADIUS, world_to_sky_transform(pos));
     case LIGHT_ID_TOY:
-      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device_scene.toy.position, device_scene.toy.scale, pos);
+      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.scene.toy.position, device.scene.toy.scale, pos);
     case LIGHT_ID_NONE:
       return 0.0f;
     default:
@@ -215,12 +215,12 @@ __device__ LightSample brdf_light_sample_update(LightSample x, const LightSample
 __device__ LightSample sample_light(const vec3 position) {
   const vec3 sky_pos = world_to_sky_transform(position);
 
-  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
-  const int toy_visible = (device_scene.toy.active && device_scene.toy.emissive);
+  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+  const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
   uint32_t light_count  = 0;
   light_count += sun_visible;
   light_count += toy_visible;
-  light_count += (device_scene.material.lights_active) ? device_scene.triangle_lights_length : 0;
+  light_count += (device.scene.material.lights_active) ? device.scene.triangle_lights_length : 0;
 
   LightSample selected;
   selected.id          = LIGHT_ID_NONE;
@@ -233,7 +233,7 @@ __device__ LightSample sample_light(const vec3 position) {
 
   const float ran = white_noise();
 
-  if (device_iteration_type != TYPE_CAMERA && sun_visible && ran < 0.5f) {
+  if (device.iteration_type != TYPE_CAMERA && sun_visible && ran < 0.5f) {
     selected.id          = LIGHT_ID_SUN;
     selected.M           = 1;
     selected.solid_angle = brdf_light_sample_solid_angle(selected, position);
@@ -242,7 +242,7 @@ __device__ LightSample sample_light(const vec3 position) {
     return selected;
   }
 
-  const int reservoir_sampling_size = min(light_count, device_reservoir_size);
+  const int reservoir_sampling_size = min(light_count, device.reservoir_size);
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
 
@@ -255,7 +255,7 @@ __device__ LightSample sample_light(const vec3 position) {
     light_index += !sun_visible;
     light_index += (!toy_visible && light_index) ? 1 : 0;
 
-    if (light_index >= device_scene.triangle_lights_length + 2)
+    if (light_index >= device.scene.triangle_lights_length + 2)
       continue;
 
     LightSample light;
@@ -331,7 +331,7 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
   const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
   const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
 
-  switch (device_scene.material.fresnel) {
+  switch (device.scene.material.fresnel) {
     case SCHLICK:
       brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotL);
       break;
@@ -414,7 +414,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
   const float NdotH = __saturatef(dot_product(brdf.normal, H));
   const float HdotV = __saturatef(dot_product(H, brdf.V));
 
-  switch (device_scene.material.fresnel) {
+  switch (device.scene.material.fresnel) {
     case SCHLICK:
       brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotV);
       break;
@@ -488,7 +488,7 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
   const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
   const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
 
-  switch (device_scene.material.fresnel) {
+  switch (device.scene.material.fresnel) {
     case SCHLICK:
       brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotL);
       break;

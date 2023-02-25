@@ -26,6 +26,7 @@
 #include "cuda/sky.cuh"
 #include "cuda/sky_utils.cuh"
 #include "cuda/utils.cuh"
+#include "device.h"
 #include "log.h"
 #include "qoi.h"
 #include "raytrace.h"
@@ -52,7 +53,7 @@ static void update_special_lights(const Scene scene) {
   sun.y -= scene.sky.geometry_offset.y;
   sun.z -= scene.sky.geometry_offset.z;
 
-  gpuErrchk(cudaMemcpyToSymbol(device_sun, &(sun), sizeof(vec3), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(sun, sun);
 
   vec3 moon              = angles_to_direction(scene.sky.moon_altitude, scene.sky.moon_azimuth);
   const float scale_moon = 1.0f / (sqrtf(moon.x * moon.x + moon.y * moon.y + moon.z * moon.z));
@@ -64,18 +65,7 @@ static void update_special_lights(const Scene scene) {
   moon.y -= scene.sky.geometry_offset.y;
   moon.z -= scene.sky.geometry_offset.z;
 
-  gpuErrchk(cudaMemcpyToSymbol(device_moon, &(moon), sizeof(vec3), 0, cudaMemcpyHostToDevice));
-}
-
-/*
- * Computes whether light resampling is used.
- * @param instance RaytraceInstance
- */
-static void raytrace_update_light_resampling_active(RaytraceInstance* instance) {
-  instance->light_resampling =
-    instance->scene_gpu.material.lights_active || (instance->scene_gpu.toy.emissive && instance->scene_gpu.toy.active);
-
-  gpuErrchk(cudaMemcpyToSymbol(device_light_resampling, &(instance->light_resampling), sizeof(int), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(moon, moon);
 }
 
 /*
@@ -84,7 +74,7 @@ static void raytrace_update_light_resampling_active(RaytraceInstance* instance) 
  */
 extern "C" void update_temporal_matrix(RaytraceInstance* instance) {
   Quaternion q;
-  gpuErrchk(cudaMemcpyFromSymbol(&q, device_camera_rotation, sizeof(Quaternion), 0, cudaMemcpyDeviceToHost));
+  device_gather_symbol(camera_rotation, q);
 
   Mat4x4 mat;
   memset(&mat, 0, sizeof(Mat4x4));
@@ -106,7 +96,7 @@ extern "C" void update_temporal_matrix(RaytraceInstance* instance) {
   mat.f34 = -(offset.x * mat.f31 + offset.y * mat.f32 + offset.z * mat.f33);
   mat.f44 = 1.0f;
 
-  gpuErrchk(cudaMemcpyToSymbol(device_view_space, &(mat), sizeof(Mat4x4), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(view_space, mat);
 
   const float step = 2.0f * (instance->scene_gpu.camera.fov / instance->width);
   const float vfov = step * instance->height / 2.0f;
@@ -122,7 +112,7 @@ extern "C" void update_temporal_matrix(RaytraceInstance* instance) {
   mat.f43 = -1.0f;
   mat.f34 = -(2.0f * z_far * z_near) / (z_far - z_near);
 
-  gpuErrchk(cudaMemcpyToSymbol(device_projection, &(mat), sizeof(Mat4x4), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(projection, mat);
 }
 
 /*
@@ -157,7 +147,7 @@ void update_jitter(RaytraceInstance* instance) {
   jitter.y      = halton(instance->temporal_frames, 3);
 
   instance->jitter = jitter;
-  gpuErrchk(cudaMemcpyToSymbol(device_jitter, &(instance->jitter), sizeof(Jitter), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(jitter, jitter);
 }
 
 /*
@@ -194,13 +184,13 @@ static Quaternion get_rotation_quaternion(const vec3 rotation) {
  */
 static void update_camera_pos(const Scene scene, const unsigned int width, const unsigned int height) {
   const Quaternion q = get_rotation_quaternion(scene.camera.rotation);
-  gpuErrchk(cudaMemcpyToSymbol(device_camera_rotation, &(q), sizeof(Quaternion), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(camera_rotation, q);
 
   const float step = 2.0f * (scene.camera.fov / width);
   const float vfov = step * height / 2.0f;
 
-  gpuErrchk(cudaMemcpyToSymbol(device_step, &(step), sizeof(float), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_vfov, &(vfov), sizeof(float), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(step, step);
+  device_update_symbol(vfov, vfov);
 }
 
 /*
@@ -247,15 +237,14 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   const unsigned int amount        = instance->width * instance->height;
   const unsigned int output_amount = instance->output_width * instance->output_height;
 
-  gpuErrchk(cudaMemcpyToSymbol(device_width, &(instance->width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_height, &(instance->height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_output_width, &(instance->output_width), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_output_height, &(instance->output_height), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_max_ray_depth, &(instance->max_ray_depth), sizeof(int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_reservoir_size, &(instance->reservoir_size), sizeof(int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_amount, &(amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_output_amount, &(output_amount), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_denoiser, &(instance->denoiser), sizeof(int), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(width, instance->width);
+  device_update_symbol(height, instance->height);
+  device_update_symbol(output_width, instance->output_width);
+  device_update_symbol(output_height, instance->output_height);
+  device_update_symbol(max_ray_depth, instance->max_ray_depth);
+  device_update_symbol(reservoir_size, instance->reservoir_size);
+  device_update_symbol(amount, amount);
+  device_update_symbol(denoiser, instance->denoiser);
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->frame_temporal, sizeof(RGBAhalf), amount);
@@ -273,7 +262,7 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   const int pixels_per_thread = (amount + thread_count - 1) / thread_count;
   const int max_task_count    = pixels_per_thread * thread_count;
 
-  gpuErrchk(cudaMemcpyToSymbol(device_pixels_per_thread, &(pixels_per_thread), sizeof(int), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(pixels_per_thread, pixels_per_thread);
 
   device_buffer_malloc(instance->light_trace, sizeof(TraceTask), max_task_count);
   device_buffer_malloc(instance->bounce_trace, sizeof(TraceTask), max_task_count);
@@ -300,122 +289,8 @@ extern "C" void allocate_buffers(RaytraceInstance* instance) {
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }
 
-extern "C" void raytracing_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene) {
-  RaytraceInstance* instance = (RaytraceInstance*) calloc(1, sizeof(RaytraceInstance));
-
-  instance->width         = general.width;
-  instance->height        = general.height;
-  instance->output_width  = general.width;
-  instance->output_height = general.height;
-
-  if (general.denoiser == DENOISING_UPSCALING) {
-    if (instance->width * instance->height > 18144000) {
-      error_message(
-        "Internal resolution is too high for denoising with upscaling! The maximum is ~18144000 pixels. Upscaling is turned off!");
-      general.denoiser = DENOISING_ON;
-    }
-    else {
-      instance->output_width *= 2;
-      instance->output_height *= 2;
-    }
-  }
-
-  instance->max_ray_depth   = general.max_ray_depth;
-  instance->offline_samples = general.samples;
-  instance->denoiser        = general.denoiser;
-  instance->reservoir_size  = general.reservoir_size;
-
-  instance->tex_atlas = tex_atlas;
-
-  instance->scene_gpu          = *scene;
-  instance->settings           = general;
-  instance->shading_mode       = 0;
-  instance->accum_mode         = TEMPORAL_ACCUMULATION;
-  instance->spatial_samples    = 5;
-  instance->spatial_iterations = 2;
-
-  instance->atmo_settings.base_density           = scene->sky.base_density;
-  instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
-  instance->atmo_settings.mie_density            = scene->sky.mie_density;
-  instance->atmo_settings.mie_falloff            = scene->sky.mie_falloff;
-  instance->atmo_settings.mie_g                  = scene->sky.mie_g;
-  instance->atmo_settings.ozone_absorption       = scene->sky.ozone_absorption;
-  instance->atmo_settings.ozone_density          = scene->sky.ozone_density;
-  instance->atmo_settings.ozone_layer_thickness  = scene->sky.ozone_layer_thickness;
-  instance->atmo_settings.rayleigh_density       = scene->sky.rayleigh_density;
-  instance->atmo_settings.rayleigh_falloff       = scene->sky.rayleigh_falloff;
-  instance->atmo_settings.multiscattering_factor = scene->sky.multiscattering_factor;
-
-  device_buffer_init(&instance->light_trace);
-  device_buffer_init(&instance->bounce_trace);
-  device_buffer_init(&instance->light_trace_count);
-  device_buffer_init(&instance->bounce_trace_count);
-  device_buffer_init(&instance->trace_results);
-  device_buffer_init(&instance->task_counts);
-  device_buffer_init(&instance->task_offsets);
-  device_buffer_init(&instance->light_sample_history);
-  device_buffer_init(&instance->frame_output);
-  device_buffer_init(&instance->frame_temporal);
-  device_buffer_init(&instance->frame_buffer);
-  device_buffer_init(&instance->frame_variance);
-  device_buffer_init(&instance->albedo_buffer);
-  device_buffer_init(&instance->normal_buffer);
-  device_buffer_init(&instance->light_records);
-  device_buffer_init(&instance->bounce_records);
-  device_buffer_init(&instance->buffer_8bit);
-  device_buffer_init(&instance->randoms);
-  device_buffer_init(&instance->raydir_buffer);
-  device_buffer_init(&instance->trace_result_buffer);
-  device_buffer_init(&instance->state_buffer);
-  device_buffer_init(&instance->light_samples_1);
-  device_buffer_init(&instance->light_samples_2);
-  device_buffer_init(&instance->light_eval_data);
-  device_buffer_init(&instance->cloud_noise);
-  device_buffer_init(&instance->sky_ms_luts);
-  device_buffer_init(&instance->sky_tm_luts);
-
-  device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
-
-  device_malloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene->materials_length);
-  device_malloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length);
-  device_malloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(TraversalTriangle) * instance->scene_gpu.triangles_length);
-  device_malloc((void**) &(instance->scene_gpu.nodes), sizeof(Node8) * instance->scene_gpu.nodes_length);
-  device_malloc((void**) &(instance->scene_gpu.triangle_lights), sizeof(TriangleLight) * instance->scene_gpu.triangle_lights_length);
-
-  gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.texture_assignments, scene->texture_assignments, sizeof(TextureAssignment) * scene->materials_length,
-    cudaMemcpyHostToDevice));
-  gpuErrchk(
-    cudaMemcpy(instance->scene_gpu.triangles, scene->triangles, sizeof(Triangle) * scene->triangles_length, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.traversal_triangles, scene->traversal_triangles, sizeof(TraversalTriangle) * scene->triangles_length,
-    cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene->nodes, sizeof(Node8) * scene->nodes_length, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * scene->triangle_lights_length,
-    cudaMemcpyHostToDevice));
-
-  gpuErrchk(cudaMemcpyToSymbol(
-    device_texture_assignments, &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment*), 0, cudaMemcpyHostToDevice));
-
-  sky_generate_LUTs(instance);
-  clouds_generate(instance);
-
-  raytrace_update_light_resampling_active(instance);
-  allocate_buffers(instance);
-  allocate_bloom_mips(instance);
-  update_device_pointers(instance);
-  initialize_randoms<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  prepare_trace(instance);
-  update_temporal_matrix(instance);
-
-  instance->snap_resolution = SNAP_RESOLUTION_RENDER;
-
-  *_instance = instance;
-}
-
 extern "C" void reset_raytracing(RaytraceInstance* instance) {
-  free_bloom_mips(instance);
+  device_bloom_free_mips(instance);
 
   // If denoising was set to on but no denoise setup exists, then we do not create one either now
   const int allocate_denoise = instance->settings.denoiser && !(instance->denoiser && !instance->denoise_setup);
@@ -446,7 +321,7 @@ extern "C" void reset_raytracing(RaytraceInstance* instance) {
 
   raytrace_update_light_resampling_active(instance);
   allocate_buffers(instance);
-  allocate_bloom_mips(instance);
+  device_bloom_allocate_mips(instance);
   update_device_pointers(instance);
   initialize_randoms<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   prepare_trace(instance);
@@ -475,7 +350,7 @@ extern "C" void initialize_device() {
 }
 
 extern "C" void update_device_scene(RaytraceInstance* instance) {
-  gpuErrchk(cudaMemcpyToSymbol(device_scene, &(instance->scene_gpu), sizeof(Scene), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(scene, instance->scene_gpu);
 }
 
 /*
@@ -487,34 +362,28 @@ extern "C" void prepare_trace(RaytraceInstance* instance) {
     toy_flashlight_set_position(instance);
   }
   update_device_scene(instance);
-  gpuErrchk(cudaMemcpyToSymbol(device_shading_mode, &(instance->shading_mode), sizeof(unsigned int), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(shading_mode, instance->shading_mode);
   update_special_lights(instance->scene_gpu);
   update_camera_pos(instance->scene_gpu, instance->width, instance->height);
   update_jitter(instance);
-  gpuErrchk(cudaMemcpyToSymbol(device_accum_mode, &(instance->accum_mode), sizeof(int), 0, cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpyToSymbol(device_spatial_samples, &(instance->spatial_samples), sizeof(int), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(accum_mode, instance->accum_mode);
+  device_update_symbol(spatial_samples, instance->spatial_samples);
 }
 
 static void bind_type(RaytraceInstance* instance, int type) {
-  gpuErrchk(cudaMemcpyToSymbol(device_iteration_type, &(type), sizeof(int), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(iteration_type, type);
 
   switch (type) {
     case TYPE_CAMERA:
     case TYPE_BOUNCE:
-      gpuErrchk(
-        cudaMemcpyToSymbol(device_trace_tasks, &(instance->bounce_trace->device_pointer), sizeof(TraceTask*), 0, cudaMemcpyHostToDevice));
-      gpuErrchk(cudaMemcpyToSymbol(
-        device_trace_count, &(instance->bounce_trace_count->device_pointer), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
-      gpuErrchk(
-        cudaMemcpyToSymbol(device_records, &(instance->bounce_records->device_pointer), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
+      device_update_symbol(trace_tasks, instance->bounce_trace->device_pointer);
+      device_update_symbol(trace_count, instance->bounce_trace_count->device_pointer);
+      device_update_symbol(records, instance->bounce_records->device_pointer);
       break;
     case TYPE_LIGHT:
-      gpuErrchk(
-        cudaMemcpyToSymbol(device_trace_tasks, &(instance->light_trace->device_pointer), sizeof(TraceTask*), 0, cudaMemcpyHostToDevice));
-      gpuErrchk(cudaMemcpyToSymbol(
-        device_trace_count, &(instance->light_trace_count->device_pointer), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
-      gpuErrchk(
-        cudaMemcpyToSymbol(device_records, &(instance->light_records->device_pointer), sizeof(uint16_t*), 0, cudaMemcpyHostToDevice));
+      device_update_symbol(trace_tasks, instance->light_trace->device_pointer);
+      device_update_symbol(trace_count, instance->light_trace_count->device_pointer);
+      device_update_symbol(records, instance->light_records->device_pointer);
       break;
   }
 }
@@ -595,7 +464,7 @@ static void execute_debug_kernels(RaytraceInstance* instance, int type) {
 }
 
 extern "C" void trace_scene(RaytraceInstance* instance) {
-  gpuErrchk(cudaMemcpyToSymbol(device_temporal_frames, &(instance->temporal_frames), sizeof(int), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(temporal_frames, instance->temporal_frames);
 
   raytrace_update_light_resampling_active(instance);
 
@@ -663,6 +532,14 @@ extern "C" void free_inputs(RaytraceInstance* instance) {
   gpuErrchk(cudaDeviceSynchronize());
 }
 
+extern "C" void _device_update_symbol(const size_t offset, const void* src, const size_t size) {
+  gpuErrchk(cudaMemcpyToSymbol(device, src, size, offset, cudaMemcpyHostToDevice));
+}
+
+extern "C" void _device_gather_symbol(void* dst, const size_t offset, size_t size) {
+  gpuErrchk(cudaMemcpyFromSymbol(dst, device, size, offset, cudaMemcpyDeviceToHost));
+}
+
 extern "C" void free_outputs(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_output);
 
@@ -671,9 +548,13 @@ extern "C" void free_outputs(RaytraceInstance* instance) {
     device_buffer_free(instance->normal_buffer);
   }
 
-  free_bloom_mips(instance);
+  device_bloom_free_mips(instance);
 
   free(instance);
+}
+
+extern "C" void device_initialize_random_generators() {
+  initialize_randoms<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
 extern "C" void initialize_8bit_frame(RaytraceInstance* instance, const unsigned int width, const unsigned int height) {
@@ -790,7 +671,7 @@ extern "C" void update_device_pointers(RaytraceInstance* instance) {
   ptrs.sky_tm_luts          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_tm_luts);
   ptrs.sky_ms_luts          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_ms_luts);
 
-  gpuErrchk(cudaMemcpyToSymbol(device, &(ptrs), sizeof(DevicePointers), 0, cudaMemcpyHostToDevice));
+  device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");
 }
 

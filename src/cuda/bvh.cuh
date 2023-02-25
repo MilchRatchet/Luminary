@@ -29,9 +29,9 @@ __device__ int bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_
     return 0;
 
   const UV tex_coords = load_triangle_tex_coords(t_id, coords);
-  const float4 albedo = tex2D<float4>(device.albedo_atlas[t.albedo_tex], tex_coords.u, 1.0f - tex_coords.v);
+  const float4 albedo = tex2D<float4>(device.ptrs.albedo_atlas[t.albedo_tex], tex_coords.u, 1.0f - tex_coords.v);
 
-  if (albedo.w <= device_scene.material.alpha_cutoff) {
+  if (albedo.w <= device.scene.material.alpha_cutoff) {
     return 2;
   }
 
@@ -64,7 +64,7 @@ __device__ int bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_
   }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
-  const uint16_t trace_task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const uint16_t trace_task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
   uint16_t offset                 = 0;
 
   uint2 traversal_stack[STACK_SIZE];
@@ -90,8 +90,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       if (offset >= trace_task_count)
         break;
 
-      const TraceTask task = load_trace_task_essentials(device_trace_tasks + get_task_address(offset));
-      const float2 result  = __ldcs((float2*) (device.trace_results + get_task_address(offset)));
+      const TraceTask task = load_trace_task_essentials(device.trace_tasks + get_task_address(offset));
+      const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + get_task_address(offset)));
 
       node_task     = make_uint2(0, 0x80000000);
       triangle_task = make_uint2(0, 0);
@@ -135,7 +135,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         const unsigned int relative_index   = __popc(imask & ~(0xffffffff << slot_index));
         const unsigned int child_node_index = child_node_base_index + relative_index;
 
-        float4* data_ptr = (float4*) (device_scene.nodes + child_node_index);
+        float4* data_ptr = (float4*) (device.scene.nodes + child_node_index);
 
         const float4 data0 = __ldg(data_ptr + 0);
         const float4 data1 = __ldg(data_ptr + 1);
@@ -351,7 +351,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         if (d < depth) {
           const int alpha_result = bvh_triangle_intersection_alpha_test(triangle, triangle_index + triangle_task.x, coords);
 
-          if (device_iteration_type == TYPE_LIGHT && alpha_result == 0) {
+          if (device.iteration_type == TYPE_LIGHT && alpha_result == 0) {
             depth           = -1.0f;
             hit_id          = REJECT_HIT;
             triangle_task.y = 0;
@@ -376,15 +376,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           }
         }
         else {
-          if (device_shading_mode == SHADING_HEAT && hit_id > TRIANGLE_ID_LIMIT) {
+          if (device.shading_mode == SHADING_HEAT && hit_id > TRIANGLE_ID_LIMIT) {
             hit_id = 0;
           }
 
           float2 result;
-          result.x = (device_shading_mode == SHADING_HEAT) ? cost : depth;
+          result.x = (device.shading_mode == SHADING_HEAT) ? cost : depth;
           result.y = __uint_as_float(hit_id);
 
-          __stcs((float2*) (device.trace_results + get_task_address(offset++)), result);
+          __stcs((float2*) (device.ptrs.trace_results + get_task_address(offset++)), result);
 
           break;
         }

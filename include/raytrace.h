@@ -14,6 +14,7 @@ extern "C" {
 void initialize_device();
 void raytracing_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene);
 void reset_raytracing(RaytraceInstance* instance);
+void raytrace_update_light_resampling_active(RaytraceInstance* instance);
 void allocate_buffers(RaytraceInstance* instance);
 void update_jitter(RaytraceInstance* instance);
 void update_device_scene(RaytraceInstance* instance);

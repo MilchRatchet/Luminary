@@ -6,7 +6,7 @@
 #include "utils.cuh"
 
 __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
-  if (!device_scene.sky.cloud.active) {
+  if (!device.scene.sky.cloud.active) {
     return 1.0f;
   }
 
@@ -19,7 +19,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
     return 1.0f;
   }
 
-  const int step_count = device_scene.sky.cloud.steps / 3;
+  const int step_count = device.scene.sky.cloud.steps / 3;
 
   const int big_step_mult = 2;
   const float big_step    = big_step_mult;

@@ -1,6 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <cuda_runtime_api.h>
 #include <stdlib.h>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -329,6 +330,72 @@ struct RaytraceInstance {
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
 } typedef RaytraceInstance;
+
+struct DevicePointers {
+  TraceTask* light_trace;
+  TraceTask* bounce_trace;
+  uint16_t* light_trace_count;
+  uint16_t* bounce_trace_count;
+  TraceResult* trace_results;
+  uint16_t* task_counts;
+  uint16_t* task_offsets;
+  uint32_t* light_sample_history;
+  RGBAhalf* frame_output;
+  RGBAhalf* frame_temporal;
+  RGBAhalf* frame_buffer;
+  RGBAhalf* frame_variance;
+  RGBAhalf* albedo_buffer;
+  RGBAhalf* normal_buffer;
+  RGBAhalf* light_records;
+  RGBAhalf* bounce_records;
+  XRGB8* buffer_8bit;
+  vec3* raydir_buffer;
+  TraceResult* trace_result_buffer;
+  uint8_t* state_buffer;
+  void* randoms;
+  cudaTextureObject_t* albedo_atlas;
+  cudaTextureObject_t* illuminance_atlas;
+  cudaTextureObject_t* material_atlas;
+  cudaTextureObject_t* normal_atlas;
+  cudaTextureObject_t* cloud_noise;
+  cudaTextureObject_t* sky_ms_luts;
+  cudaTextureObject_t* sky_tm_luts;
+  LightSample* light_samples;
+  LightEvalData* light_eval_data;
+} typedef DevicePointers;
+
+struct DeviceConstantMemory {
+  DevicePointers ptrs;
+  Scene scene;
+  int max_ray_depth;
+  int pixels_per_thread;
+  int iteration_type;
+  TraceTask* trace_tasks;
+  uint16_t* trace_count;
+  RGBAhalf* records;
+  int temporal_frames;
+  int denoiser;
+  uint32_t reservoir_size;
+  int spatial_samples;
+  int light_resampling;
+  int width;
+  int height;
+  int amount;
+  int output_width;
+  int output_height;
+  float step;
+  float vfov;
+  Quaternion camera_rotation;
+  TextureAssignment* texture_assignments;
+  vec3 sun;
+  vec3 moon;
+  int shading_mode;
+  RGBF* bloom_scratch;
+  Jitter jitter;
+  Mat4x4 view_space;
+  Mat4x4 projection;
+  int accum_mode;
+} typedef DeviceConstantMemory;
 
 #ifndef min
 #define min(a, b) (((a) < (b)) ? (a) : (b))

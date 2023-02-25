@@ -28,7 +28,7 @@ __device__ vec3 world_to_sky_transform(vec3 input) {
   result.y = world_to_sky_scale(input.y) + SKY_EARTH_RADIUS;
   result.z = world_to_sky_scale(input.z);
 
-  result = add_vector(result, device_scene.sky.geometry_offset);
+  result = add_vector(result, device.scene.sky.geometry_offset);
 
   return result;
 }
@@ -36,7 +36,7 @@ __device__ vec3 world_to_sky_transform(vec3 input) {
 __device__ vec3 sky_to_world_transform(vec3 input) {
   vec3 result;
 
-  input = sub_vector(input, device_scene.sky.geometry_offset);
+  input = sub_vector(input, device.scene.sky.geometry_offset);
 
   result.x = sky_to_world_scale(input.x);
   result.y = sky_to_world_scale(input.y - SKY_EARTH_RADIUS);

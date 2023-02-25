@@ -1,6 +1,8 @@
 #ifndef CU_RANDOM_H
 #define CU_RANDOM_H
 
+#include "utils.cuh"
+
 // An Owen-scrambled Sobol sequence of 256 samples of 256 dimensions
 __device__ const int sobol_256spp_256d[256 * 256] = {
   32,  226, 72,  70,  57,  171, 246, 75,  112, 81,  109, 239, 120, 101, 230, 103, 103, 41,  249, 86,  253, 99,  132, 184, 214, 147, 128,
@@ -12156,7 +12158,7 @@ __device__ const int ranking_tile[128 * 128 * 8] = {
 #include "utils.cuh"
 
 __device__ float white_noise() {
-  return curand_uniform(device.randoms + threadIdx.x + blockIdx.x * blockDim.x);
+  return curand_uniform(((curandStateXORWOW_t*)device.ptrs.randoms) + threadIdx.x + blockIdx.x * blockDim.x);
 }
 
 /*
@@ -12183,6 +12185,14 @@ __device__ float blue_noise(int x, int y, int task_state, int sample_dimension) 
   value = value ^ __ldg(scrambling_tile + (sample_dimension % 8) + (x + y * 128) * 8);
 
   return (0.5f + value) / 256.0f;
+}
+
+__global__ void initialize_randoms() {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  curandStateXORWOW_t state;
+  curand_init(id, 0, 0, &state);
+  ((curandStateXORWOW_t*)device.ptrs.randoms)[id] = state;
 }
 
 #endif /* CU_RANDOM_H */

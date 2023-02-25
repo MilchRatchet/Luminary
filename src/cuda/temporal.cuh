@@ -87,33 +87,33 @@ __device__ RGBF sample_pixel_catmull_rom(const RGBAhalf* image, float x, float y
 }
 
 __global__ void temporal_accumulation() {
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    RGBAhalf buffer = load_RGBAhalf(device.frame_buffer + offset);
+  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device.amount; offset += blockDim.x * gridDim.x) {
+    RGBAhalf buffer = load_RGBAhalf(device.ptrs.frame_buffer + offset);
     RGBAhalf output;
     RGBAhalf variance;
 
-    if (device_temporal_frames == 0) {
+    if (device.temporal_frames == 0) {
       output   = buffer;
       variance = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
     }
     else {
-      output   = load_RGBAhalf(device.frame_output + offset);
-      variance = load_RGBAhalf(device.frame_variance + offset);
+      output   = load_RGBAhalf(device.ptrs.frame_output + offset);
+      variance = load_RGBAhalf(device.ptrs.frame_variance + offset);
     }
 
     RGBAhalf deviation;
     deviation.rg = h2sqrt(__hmax2(variance.rg, make_half2(eps, eps)));
     deviation.ba = h2sqrt(__hmax2(variance.ba, make_half2(eps, eps)));
 
-    if (device_temporal_frames) {
-      variance      = scale_RGBAhalf(variance, device_temporal_frames - 1.0f);
+    if (device.temporal_frames) {
+      variance      = scale_RGBAhalf(variance, device.temporal_frames - 1.0f);
       RGBAhalf diff = sub_RGBAhalf(buffer, output);
       diff          = mul_RGBAhalf(diff, diff);
       variance      = add_RGBAhalf(variance, diff);
-      variance      = scale_RGBAhalf(variance, 1.0f / device_temporal_frames);
+      variance      = scale_RGBAhalf(variance, 1.0f / device.temporal_frames);
     }
 
-    store_RGBAhalf(device.frame_variance + offset, variance);
+    store_RGBAhalf(device.ptrs.frame_variance + offset, variance);
 
     RGBAhalf firefly_rejection = add_RGBAhalf(get_RGBAhalf(0.1f, 0.1f, 0.1f, 0.1f), add_RGBAhalf(output, scale_RGBAhalf(deviation, 4.0f)));
     firefly_rejection          = max_RGBAhalf(get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f), sub_RGBAhalf(buffer, firefly_rejection));
@@ -122,22 +122,22 @@ __global__ void temporal_accumulation() {
 
     RGBAhalf old_output = output;
 
-    output = scale_RGBAhalf(output, device_temporal_frames);
+    output = scale_RGBAhalf(output, device.temporal_frames);
     output = add_RGBAhalf(buffer, output);
-    output = scale_RGBAhalf(output, 1.0f / (device_temporal_frames + 1));
+    output = scale_RGBAhalf(output, 1.0f / (device.temporal_frames + 1));
 
     if (infnan_RGBAhalf(output)) {
       output = old_output;
     }
 
-    store_RGBAhalf(device.frame_output + offset, bound_RGBAhalf(output));
+    store_RGBAhalf(device.ptrs.frame_output + offset, bound_RGBAhalf(output));
   }
 }
 
 __global__ void temporal_reprojection() {
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device_amount; offset += blockDim.x * gridDim.x) {
-    const int curr_x = offset % device_width;
-    const int curr_y = offset / device_width;
+  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device.amount; offset += blockDim.x * gridDim.x) {
+    const int curr_x = offset % device.width;
+    const int curr_y = offset / device.width;
 
     RGBF sum_color      = get_color(0.0f, 0.0f, 0.0f);
     float sum_weights   = 0.0f;
@@ -145,10 +145,10 @@ __global__ void temporal_reprojection() {
 
     for (int i = -1; i <= -1; i++) {
       for (int j = -1; j <= -1; j++) {
-        const int x = max(0, min(device_width, curr_x + j));
-        const int y = max(0, min(device_height, curr_y + i));
+        const int x = max(0, min(device.width, curr_x + j));
+        const int y = max(0, min(device.height, curr_y + i));
 
-        RGBF color = RGBAhalf_to_RGBF(device.frame_buffer[x + y * device_width]);
+        RGBF color = RGBAhalf_to_RGBF(device.ptrs.frame_buffer[x + y * device.width]);
 
         if (isnan(color.r) || isnan(color.g) || isnan(color.b) || isinf(color.r) || isinf(color.g) || isinf(color.b)) {
           color = get_color(0.0f, 0.0f, 0.0f);
@@ -159,7 +159,7 @@ __global__ void temporal_reprojection() {
         sum_color = add_color(sum_color, scale_color(color, weight));
         sum_weights += weight;
 
-        TraceResult trace = device.trace_result_buffer[x + y * device_width];
+        TraceResult trace = device.ptrs.trace_result_buffer[x + y * device.width];
 
         if (trace.depth < closest_depth) {
           closest_depth = trace.depth;
@@ -169,7 +169,7 @@ __global__ void temporal_reprojection() {
 
     RGBF output = scale_color(sum_color, 1.0f / sum_weights);
 
-    vec3 hit = add_vector(device_scene.camera.pos, scale_vector(device.raydir_buffer[offset], closest_depth));
+    vec3 hit = add_vector(device.scene.camera.pos, scale_vector(device.ptrs.raydir_buffer[offset], closest_depth));
 
     vec4 pos;
     pos.x = hit.x;
@@ -177,28 +177,28 @@ __global__ void temporal_reprojection() {
     pos.z = hit.z;
     pos.w = 1.0f;
 
-    vec4 prev_pixel = transform_vec4(device_projection, transform_vec4(device_view_space, pos));
+    vec4 prev_pixel = transform_vec4(device.projection, transform_vec4(device.view_space, pos));
 
     prev_pixel.x /= -prev_pixel.w;
     prev_pixel.y /= -prev_pixel.w;
 
-    prev_pixel.x = device_width * (1.0f - prev_pixel.x) * 0.5f;
-    prev_pixel.y = device_height * (prev_pixel.y + 1.0f) * 0.5f;
+    prev_pixel.x = device.width * (1.0f - prev_pixel.x) * 0.5f;
+    prev_pixel.y = device.height * (prev_pixel.y + 1.0f) * 0.5f;
 
-    prev_pixel.x -= device_jitter.x - 0.5f;
-    prev_pixel.y -= device_jitter.y - 0.5f;
+    prev_pixel.x -= device.jitter.x - 0.5f;
+    prev_pixel.y -= device.jitter.y - 0.5f;
 
     const int prev_x = prev_pixel.x;
     const int prev_y = prev_pixel.y;
 
-    if (prev_x >= 0 && prev_x < device_width && prev_y >= 0 && prev_y < device_height) {
-      RGBF temporal = sample_pixel_catmull_rom(device.frame_temporal, prev_pixel.x, prev_pixel.y, device_width, device_height);
+    if (prev_x >= 0 && prev_x < device.width && prev_y >= 0 && prev_y < device.height) {
+      RGBF temporal = sample_pixel_catmull_rom(device.ptrs.frame_temporal, prev_pixel.x, prev_pixel.y, device.width, device.height);
 
-      float alpha = device_scene.camera.temporal_blend_factor;
+      float alpha = device.scene.camera.temporal_blend_factor;
       output      = add_color(scale_color(output, alpha), scale_color(temporal, 1.0f - alpha));
     }
 
-    device.frame_output[offset] = RGBF_to_RGBAhalf(output);
+    device.ptrs.frame_output[offset] = RGBF_to_RGBAhalf(output);
 
     // Interesting motion vector visualization
     // device.frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));

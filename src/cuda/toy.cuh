@@ -12,26 +12,26 @@
  */
 
 __device__ float get_toy_distance(const vec3 origin, const vec3 ray) {
-  switch (device_scene.toy.shape) {
+  switch (device.scene.toy.shape) {
     case TOY_SPHERE:
-      return sphere_ray_intersection(ray, origin, device_scene.toy.position, device_scene.toy.scale);
+      return sphere_ray_intersection(ray, origin, device.scene.toy.position, device.scene.toy.scale);
   }
 
   return FLT_MAX;
 }
 
 __device__ vec3 toy_sphere_normal(const vec3 position) {
-  const vec3 diff = sub_vector(position, device_scene.toy.position);
+  const vec3 diff = sub_vector(position, device.scene.toy.position);
   vec3 normal     = normalize_vector(diff);
 
-  if (get_length(diff) < device_scene.toy.scale)
+  if (get_length(diff) < device.scene.toy.scale)
     normal = scale_vector(normal, -1.0f);
 
   return normal;
 }
 
 __device__ vec3 get_toy_normal(const vec3 position) {
-  switch (device_scene.toy.shape) {
+  switch (device.scene.toy.shape) {
     case TOY_SPHERE:
       return toy_sphere_normal(position);
   }
@@ -42,14 +42,14 @@ __device__ vec3 get_toy_normal(const vec3 position) {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count   = device.task_counts[id * 6 + 3];
-  const int task_offset  = device.task_offsets[id * 5 + 3];
-  int light_trace_count  = device.light_trace_count[id];
-  int bounce_trace_count = device.bounce_trace_count[id];
+  const int task_count   = device.ptrs.task_counts[id * 6 + 3];
+  const int task_offset  = device.ptrs.task_offsets[id * 5 + 3];
+  int light_trace_count  = device.ptrs.light_trace_count[id];
+  int bounce_trace_count = device.ptrs.bounce_trace_count[id];
 
   for (int i = 0; i < task_count; i++) {
-    ToyTask task    = load_toy_task(device_trace_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device_width + task.index.x;
+    ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
 
     task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
 
@@ -61,36 +61,36 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       from_inside = 1;
     }
 
-    RGBAF albedo          = device_scene.toy.albedo;
-    const float roughness = (1.0f - device_scene.toy.material.r);
-    const float metallic  = device_scene.toy.material.g;
-    const float intensity = device_scene.toy.material.b;
-    RGBAhalf emission     = get_RGBAhalf(device_scene.toy.emission.r, device_scene.toy.emission.g, device_scene.toy.emission.b, 0.0f);
+    RGBAF albedo          = device.scene.toy.albedo;
+    const float roughness = (1.0f - device.scene.toy.material.r);
+    const float metallic  = device.scene.toy.material.g;
+    const float intensity = device.scene.toy.material.b;
+    RGBAhalf emission     = get_RGBAhalf(device.scene.toy.emission.r, device.scene.toy.emission.g, device.scene.toy.emission.b, 0.0f);
     emission              = scale_RGBAhalf(emission, intensity);
 
-    if (albedo.a < device_scene.material.alpha_cutoff)
+    if (albedo.a < device.scene.material.alpha_cutoff)
       albedo.a = 0.0f;
 
-    if (device_scene.toy.flashlight_mode) {
-      const vec3 dir            = normalize_vector(rotate_vector_by_quaternion(get_vector(0.0f, 0.0f, -1.0f), device_camera_rotation));
+    if (device.scene.toy.flashlight_mode) {
+      const vec3 dir            = normalize_vector(rotate_vector_by_quaternion(get_vector(0.0f, 0.0f, -1.0f), device.camera_rotation));
       const float angle         = -dot_product(dir, task.ray);
       const float dir_intensity = remap01(angle, 0.85f, 1.0f);
       emission                  = scale_RGBAhalf(emission, dir_intensity);
     }
 
-    RGBAhalf record = load_RGBAhalf(device_records + pixel);
+    RGBAhalf record = load_RGBAhalf(device.records + pixel);
 
-    if (albedo.a > 0.0f && device_scene.toy.emissive) {
+    if (albedo.a > 0.0f && device.scene.toy.emissive) {
       emission = scale_RGBAhalf(emission, albedo.a);
 
       write_albedo_buffer(RGBAhalf_to_RGBF(emission), pixel);
 
       emission = mul_RGBAhalf(emission, record);
 
-      const uint32_t light = device.light_sample_history[pixel];
+      const uint32_t light = device.ptrs.light_sample_history[pixel];
 
       if (proper_light_sample(light, LIGHT_ID_TOY)) {
-        store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), emission));
+        store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), emission));
       }
     }
 
@@ -104,11 +104,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
       brdf.term = mul_RGBAhalf(brdf.term, RGBF_to_RGBAhalf(opaque_color(albedo)));
 
-      if (device_scene.toy.refractive_index != 1.0f) {
+      if (device.scene.toy.refractive_index != 1.0f) {
         const float alpha = blue_noise(task.index.x, task.index.y, task.state, 2);
         const float beta  = 2.0f * PI * blue_noise(task.index.x, task.index.y, task.state, 3);
 
-        const float refraction_index = (from_inside) ? device_scene.toy.refractive_index : 1.0f / device_scene.toy.refractive_index;
+        const float refraction_index = (from_inside) ? device.scene.toy.refractive_index : 1.0f / device.scene.toy.refractive_index;
 
         brdf = brdf_sample_ray_refraction(brdf, refraction_index, alpha, beta);
       }
@@ -124,28 +124,28 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       new_task.index  = task.index;
       new_task.state  = task.state;
 
-      switch (device_iteration_type) {
+      switch (device.iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          store_RGBAhalf(device.bounce_records + pixel, record);
-          store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+          store_RGBAhalf(device.ptrs.bounce_records + pixel, record);
+          store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
           if (white_noise() > 0.5f)
             break;
-          store_RGBAhalf(device.light_records + pixel, scale_RGBAhalf(record, 2.0f));
-          store_trace_task(device.light_trace + get_task_address(light_trace_count++), new_task);
-          device.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
+          store_RGBAhalf(device.ptrs.light_records + pixel, scale_RGBAhalf(record, 2.0f));
+          store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
+          device.ptrs.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           break;
       }
     }
-    else if (device_iteration_type != TYPE_LIGHT) {
+    else if (device.iteration_type != TYPE_LIGHT) {
       const int is_mirror = material_is_mirror(roughness, metallic);
 
       if (!is_mirror)
         write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
 
-      const int use_light_sample = !is_mirror && !(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
+      const int use_light_sample = !is_mirror && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
       task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
@@ -153,7 +153,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
       if (use_light_sample) {
-        LightSample light = load_light_sample(device.light_samples, pixel);
+        LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
         const float light_weight = brdf_light_sample_shading_weight(light) * light.solid_angle;
 
@@ -169,15 +169,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
           light_task.state  = task.state;
 
           if (any_RGBAhalf(light_record)) {
-            store_RGBAhalf(device.light_records + pixel, light_record);
+            store_RGBAhalf(device.ptrs.light_records + pixel, light_record);
             light_history_buffer_entry = light.id;
-            store_trace_task(device.light_trace + get_task_address(light_trace_count++), light_task);
+            store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
           }
         }
       }
 
-      if (!(device.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
-        device.light_sample_history[pixel] = light_history_buffer_entry;
+      if (!(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
+        device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
 
       brdf                   = brdf_sample_ray(brdf, task.index, task.state);
       RGBAhalf bounce_record = mul_RGBAhalf(record, brdf.term);
@@ -189,35 +189,35 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       bounce_task.state  = task.state;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
-        store_RGBAhalf(device.bounce_records + pixel, bounce_record);
-        store_trace_task(device.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+        store_RGBAhalf(device.ptrs.bounce_records + pixel, bounce_record);
+        store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }
     }
   }
 
-  device.light_trace_count[id]  = light_trace_count;
-  device.bounce_trace_count[id] = bounce_trace_count;
+  device.ptrs.light_trace_count[id]  = light_trace_count;
+  device.ptrs.bounce_trace_count[id] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device.task_counts[id * 6 + 3];
-  const int task_offset = device.task_offsets[id * 5 + 3];
+  const int task_count  = device.ptrs.task_counts[id * 6 + 3];
+  const int task_offset = device.ptrs.task_offsets[id * 5 + 3];
 
   for (int i = 0; i < task_count; i++) {
-    const ToyTask task = load_toy_task(device_trace_tasks + get_task_address(task_offset + i));
-    const int pixel    = task.index.y * device_width + task.index.x;
+    const ToyTask task = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel    = task.index.y * device.width + task.index.x;
 
-    if (device_shading_mode == SHADING_ALBEDO) {
-      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(opaque_color(device_scene.toy.albedo)));
+    if (device.shading_mode == SHADING_ALBEDO) {
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(opaque_color(device.scene.toy.albedo)));
     }
-    else if (device_shading_mode == SHADING_DEPTH) {
-      const float dist  = get_length(sub_vector(device_scene.camera.pos, task.position));
+    else if (device.shading_mode == SHADING_DEPTH) {
+      const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
       const float value = __saturatef((1.0f / dist) * 2.0f);
-      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(value, value, value)));
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(value, value, value)));
     }
-    else if (device_shading_mode == SHADING_NORMAL) {
+    else if (device.shading_mode == SHADING_NORMAL) {
       vec3 normal = get_toy_normal(task.position);
 
       if (dot_product(normal, task.ray) > 0.0f) {
@@ -229,18 +229,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       normal.z = 0.5f * normal.z + 0.5f;
 
       store_RGBAhalf(
-        device.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z))));
+        device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z))));
     }
-    else if (device_shading_mode == SHADING_LIGHTS) {
+    else if (device.shading_mode == SHADING_LIGHTS) {
       RGBF color;
-      if (device_scene.toy.emissive) {
+      if (device.scene.toy.emissive) {
         color = get_color(100.0f, 100.0f, 100.0f);
       }
       else {
-        color = scale_color(opaque_color(device_scene.toy.albedo), 0.1f);
+        color = scale_color(opaque_color(device.scene.toy.albedo), 0.1f);
       }
 
-      store_RGBAhalf(device.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
     }
   }
 }
