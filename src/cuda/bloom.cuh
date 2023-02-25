@@ -186,7 +186,7 @@ __global__ void bloom_upsample(
   }
 }
 
-extern "C" void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst) {
+extern "C" void device_bloom_apply(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst) {
   const int width  = instance->output_width;
   const int height = instance->output_height;
 

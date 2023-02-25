@@ -577,7 +577,7 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
   multiscattering_tex_higher[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
 }
 
-extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
+extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   bench_tic();
 
   if (instance->scene_gpu.sky.lut_initialized) {

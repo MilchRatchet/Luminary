@@ -25,22 +25,8 @@ void raytrace_update_temporal_matrix(RaytraceInstance* instance);
 void raytrace_update_jitter(RaytraceInstance* instance);
 void raytrace_update_camera_transform(const Scene scene, const unsigned int width, const unsigned int height);
 void raytrace_update_light_resampling_active(RaytraceInstance* instance);
-
-////////////////////////////////////////////////////////////////////
-// not yet ported
-////////////////////////////////////////////////////////////////////
-
 void raytrace_update_device_scene(RaytraceInstance* instance);
 void raytrace_center_toy_at_camera(RaytraceInstance* instance);
-void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst);
-void clouds_generate(RaytraceInstance* instance);
-void sky_generate_LUTs(RaytraceInstance* instance);
-void device_copy_framebuffer_to_8bit(
-  RGBAhalf* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);
-void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size);
-void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count);
-void free_host_memory(void* ptr);
-int brdf_unittest(const float tolerance);
 
 #if __cplusplus
 }

@@ -12,6 +12,7 @@
 #include "bench.h"
 #include "buffer.h"
 #include "denoise.h"
+#include "device.h"
 #include "frametime.h"
 #include "log.h"
 #include "png.h"
@@ -45,7 +46,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
     raytrace_update_device_scene(instance);
 
     if (instance->scene_gpu.camera.bloom)
-      apply_bloom(instance, gpu_source, gpu_output);
+      device_bloom_apply(instance, gpu_source, gpu_output);
 
     device_copy_framebuffer_to_8bit(gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld);
 
@@ -129,7 +130,7 @@ void offline_output(RaytraceInstance* instance) {
   device_buffer_copy(instance->frame_output, instance->frame_buffer);
 
   if (instance->scene_gpu.camera.bloom)
-    apply_bloom(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));
+    device_bloom_apply(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));
 
   DeviceBuffer* scratch_buffer = (DeviceBuffer*) 0;
   device_buffer_init(&scratch_buffer);
@@ -301,7 +302,7 @@ void realtime_output(RaytraceInstance* instance) {
       DeviceBuffer* denoise_output = denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
 
       if (instance->scene_gpu.camera.bloom)
-        apply_bloom(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
+        device_bloom_apply(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
 
       instance->frame_final_device = device_buffer_get_pointer(denoise_output);
     }

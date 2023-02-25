@@ -432,7 +432,7 @@ __global__ void generate_curl_noise(const int dim, uint8_t* tex) {
 #define CLOUD_WEATHER_RES 1024
 #define CLOUD_CURL_RES 128
 
-extern "C" void clouds_generate(RaytraceInstance* instance) {
+extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   bench_tic();
 
   if (instance->scene_gpu.sky.cloud.initialized) {

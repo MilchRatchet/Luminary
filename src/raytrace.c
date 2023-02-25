@@ -377,8 +377,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   device_update_symbol(texture_assignments, instance->scene_gpu.texture_assignments);
 
-  sky_generate_LUTs(instance);
-  clouds_generate(instance);
+  device_sky_generate_LUTs(instance);
+  device_cloud_noise_generate(instance);
 
   raytrace_update_light_resampling_active(instance);
   raytrace_allocate_buffers(instance);

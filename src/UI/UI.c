@@ -13,6 +13,7 @@
 #include "UI_panel.h"
 #include "UI_text.h"
 #include "baked.h"
+#include "device.h"
 #include "output.h"
 #include "raytrace.h"
 #include "scene.h"
@@ -286,7 +287,7 @@ static UITab create_sky_atmo_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Mie Phase G", &(instance->atmo_settings.mie_g), 0, 0.001f, -1.0f, 1.0f, 0, 0);
   panels[i++] =
     create_slider(ui, "Multiscattering Factor", &(instance->atmo_settings.multiscattering_factor), 0, 0.001f, 0.01f, FLT_MAX, 0, 0);
-  panels[i++] = create_button(ui, "Apply Settings", instance, (void (*)(void*)) sky_generate_LUTs, 1);
+  panels[i++] = create_button(ui, "Apply Settings", instance, (void (*)(void*)) device_sky_generate_LUTs, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -330,7 +331,7 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Beer Powder Effect", &(instance->scene_gpu.sky.cloud.powder), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Shadow Steps", &(instance->scene_gpu.sky.cloud.shadow_steps), 1, 0.01f, 0.0f, 128.0f, 0, 1);
   panels[i++] = create_slider(ui, "Seed", &(instance->scene_gpu.sky.cloud.seed), 0, 0.005f, 0.0f, FLT_MAX, 0, 1);
-  panels[i++] = create_button(ui, "Generate Noise Maps", instance, (void (*)(void*)) clouds_generate, 1);
+  panels[i++] = create_button(ui, "Generate Noise Maps", instance, (void (*)(void*)) device_cloud_noise_generate, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

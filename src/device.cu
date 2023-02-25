@@ -20,10 +20,6 @@
 #include "structs.h"
 #include "utils.h"
 
-//---------------------------------
-// Path Tracing
-//---------------------------------
-
 extern "C" void device_init() {
   gpuErrchk(cudaSetDeviceFlags(cudaDeviceMapHost));
 

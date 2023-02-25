@@ -175,7 +175,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (unittest) {
-    if (brdf_unittest(0.95f))
+    if (device_brdf_unittest(0.95f))
       error_message("UNITTEST - BRDF failed.");
 
     return 0;
