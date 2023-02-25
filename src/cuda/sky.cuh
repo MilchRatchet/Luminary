@@ -600,22 +600,10 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   update_device_scene(instance);
 
   TextureRGBA luts_tm_tex[2];
-  luts_tm_tex[0].width     = SKY_TM_TEX_WIDTH;
-  luts_tm_tex[0].height    = SKY_TM_TEX_HEIGHT;
-  luts_tm_tex[0].pitch     = SKY_TM_TEX_WIDTH;
-  luts_tm_tex[0].type      = TexDataFP32;
-  luts_tm_tex[0].storage   = TexStorageGPU;
-  luts_tm_tex[0].dim       = Tex2D;
+  texture_create(luts_tm_tex + 0, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
+  texture_create(luts_tm_tex + 1, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
   luts_tm_tex[0].wrap_mode = TexModeClamp;
-  luts_tm_tex[0].filter    = TexFilterLinear;
-  luts_tm_tex[1].width     = SKY_TM_TEX_WIDTH;
-  luts_tm_tex[1].height    = SKY_TM_TEX_HEIGHT;
-  luts_tm_tex[1].pitch     = SKY_TM_TEX_WIDTH;
-  luts_tm_tex[1].type      = TexDataFP32;
-  luts_tm_tex[1].storage   = TexStorageGPU;
-  luts_tm_tex[1].dim       = Tex2D;
   luts_tm_tex[1].wrap_mode = TexModeClamp;
-  luts_tm_tex[1].filter    = TexFilterLinear;
 
   device_malloc((void**) &luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
   device_malloc((void**) &luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
@@ -632,22 +620,10 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   update_device_pointers(instance);
 
   TextureRGBA luts_ms_tex[2];
-  luts_ms_tex[0].width     = SKY_MS_TEX_SIZE;
-  luts_ms_tex[0].height    = SKY_MS_TEX_SIZE;
-  luts_ms_tex[0].pitch     = SKY_MS_TEX_SIZE;
-  luts_ms_tex[0].type      = TexDataFP32;
-  luts_ms_tex[0].storage   = TexStorageGPU;
-  luts_ms_tex[0].dim       = Tex2D;
+  texture_create(luts_ms_tex + 0, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
+  texture_create(luts_ms_tex + 1, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
   luts_ms_tex[0].wrap_mode = TexModeClamp;
-  luts_ms_tex[0].filter    = TexFilterLinear;
-  luts_ms_tex[1].width     = SKY_MS_TEX_SIZE;
-  luts_ms_tex[1].height    = SKY_MS_TEX_SIZE;
-  luts_ms_tex[1].pitch     = SKY_MS_TEX_SIZE;
-  luts_ms_tex[1].type      = TexDataFP32;
-  luts_ms_tex[1].storage   = TexStorageGPU;
-  luts_ms_tex[1].dim       = Tex2D;
   luts_ms_tex[1].wrap_mode = TexModeClamp;
-  luts_ms_tex[1].filter    = TexFilterLinear;
 
   device_malloc((void**) &luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
   device_malloc((void**) &luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));

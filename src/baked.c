@@ -59,14 +59,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
     memcpy(&width, head + header_element_size * i + 0x04, sizeof(uint32_t));
     memcpy(&height, head + header_element_size * i + 0x08, sizeof(uint32_t));
 
-    textures[i].width     = width;
-    textures[i].height    = height;
-    textures[i].depth     = 1;
-    textures[i].type      = TexDataUINT8;
-    textures[i].storage   = TexStorageCPU;
-    textures[i].dim       = Tex3D;
-    textures[i].wrap_mode = TexModeWrap;
-    textures[i].filter    = TexFilterLinear;
+    texture_create(textures + i, width, height, 1, width, (void*) ((uint64_t) (data_size)), TexDataUINT8, TexStorageCPU);
 
     textures[i].data = (void*) ((uint64_t) (data_size));
     total_length += data_size;

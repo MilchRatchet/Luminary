@@ -731,15 +731,7 @@ extern "C" void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
     gpuErrchk(cudaMemcpy(cpu_ptr + offset, source, pitch * height, cudaMemcpyDeviceToHost));
 
     TextureRGBA tex;
-    tex.data      = (void*) (cpu_ptr + offset);
-    tex.width     = width;
-    tex.height    = height;
-    tex.pitch     = pitch / sizeof(RGBA8);
-    tex.type      = TexDataUINT8;
-    tex.storage   = TexStorageCPU;
-    tex.dim       = Tex2D;
-    tex.wrap_mode = TexModeWrap;
-    tex.filter    = TexFilterLinear;
+    texture_create(&tex, width, height, 1, pitch / sizeof(RGBA8), (void*) (cpu_ptr + offset), TexDataUINT8, TexStorageCPU);
 
     uint32_t encoded_size;
 

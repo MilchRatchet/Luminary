@@ -8,6 +8,7 @@
 #include "bench.h"
 #include "log.h"
 #include "structs.h"
+#include "texture.h"
 #include "utils.h"
 #include "zlib/zlib.h"
 
@@ -235,23 +236,15 @@ static int verify_header(FILE* file) {
 }
 
 static inline TextureRGBA default_texture() {
-  RGBA8* data          = malloc(sizeof(RGBA8) * 4);
-  RGBA8 default_pixel  = {.r = 255, .g = 0, .b = 0, .a = 255};
-  data[0]              = default_pixel;
-  data[1]              = default_pixel;
-  data[2]              = default_pixel;
-  data[3]              = default_pixel;
-  TextureRGBA fallback = {
-    .data      = data,
-    .height    = 2,
-    .width     = 2,
-    .pitch     = 2,
-    .depth     = 1,
-    .type      = TexDataUINT8,
-    .storage   = TexStorageCPU,
-    .dim       = Tex2D,
-    .wrap_mode = TexModeWrap,
-    .filter    = TexFilterPoint};
+  RGBA8* data         = malloc(sizeof(RGBA8) * 4);
+  RGBA8 default_pixel = {.r = 255, .g = 0, .b = 0, .a = 255};
+  data[0]             = default_pixel;
+  data[1]             = default_pixel;
+  data[2]             = default_pixel;
+  data[3]             = default_pixel;
+  TextureRGBA fallback;
+
+  texture_create(&fallback, 2, 2, 1, 2, data, TexDataUINT8, TexStorageCPU);
 
   return fallback;
 }
@@ -544,16 +537,8 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   free(IHDR);
 
-  TextureRGBA result = {
-    .width     = width,
-    .height    = height,
-    .depth     = 1,
-    .pitch     = width,
-    .type      = TexDataUINT8,
-    .storage   = TexStorageCPU,
-    .dim       = Tex2D,
-    .wrap_mode = TexModeWrap,
-    .filter    = TexFilterPoint};
+  TextureRGBA result;
+  texture_create(&result, width, height, 1, width, (void*) 0, TexDataUINT8, TexStorageCPU);
 
   uint8_t* chunk = (uint8_t*) malloc(8);
 

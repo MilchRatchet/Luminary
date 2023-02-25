@@ -4,6 +4,7 @@
 #include "bench.h"
 #include "log.h"
 #include "qoi.h"
+#include "texture.h"
 
 int store_as_qoi(const char* filename, const uint8_t* image, const uint32_t width, const uint32_t height, const uint8_t color_type) {
   bench_tic();
@@ -85,17 +86,7 @@ TextureRGBA* qoi_decode_RGBA8(const void* data, const int size) {
   void* decoded_data = qoi_decode(data, size, &desc, 4);
 
   TextureRGBA* tex = malloc(sizeof(TextureRGBA));
-
-  tex->data      = decoded_data;
-  tex->width     = desc.width;
-  tex->pitch     = desc.width;
-  tex->height    = desc.height;
-  tex->depth     = 1;
-  tex->type      = TexDataUINT8;
-  tex->storage   = TexStorageCPU;
-  tex->dim       = Tex2D;
-  tex->wrap_mode = TexModeWrap;
-  tex->filter    = TexFilterLinear;
+  texture_create(tex, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, TexStorageCPU);
 
   return tex;
 }

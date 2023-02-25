@@ -197,3 +197,24 @@ void texture_free_atlas(DeviceBuffer* texture_atlas, const int textures_length) 
   device_buffer_destroy(&texture_atlas);
   free(textures_cpu);
 }
+
+void texture_create(
+  TextureRGBA* tex, unsigned int width, unsigned int height, unsigned int depth, unsigned int pitch, void* data, TextureDataType type,
+  TextureStorageLocation storage) {
+  if (tex == (TextureRGBA*) 0)
+    return;
+
+  const TextureRGBA _tex = {
+    .width     = width,
+    .height    = height,
+    .depth     = depth,
+    .pitch     = pitch,
+    .data      = data,
+    .dim       = (depth > 1) ? Tex3D : Tex2D,
+    .storage   = storage,
+    .type      = type,
+    .wrap_mode = TexModeWrap,
+    .filter    = TexFilterLinear};
+
+  *tex = _tex;
+}
