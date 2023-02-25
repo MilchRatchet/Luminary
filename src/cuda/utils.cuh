@@ -13,13 +13,6 @@
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 1024
 
-#define gpuErrchk(ans)                                         \
-  {                                                            \
-    if (ans != cudaSuccess) {                                  \
-      crash_message("GPUassert: %s", cudaGetErrorString(ans)); \
-    }                                                          \
-  }
-
 #ifndef eps
 #define eps 0.001f
 #endif /* eps */
@@ -38,9 +31,6 @@
 #define TRIANGLE_ID_LIMIT 0xefffffffu
 #define LIGHT_ID_ANY 0xfffffff0u
 #define LIGHT_ID_ANY_NO_SUN 0xfffffff1u
-#define TYPE_CAMERA 0x0u
-#define TYPE_LIGHT 0x1u
-#define TYPE_BOUNCE 0x2u
 #define STATE_ALBEDO 0b1u
 #define STATE_LIGHT_OCCUPIED 0b10u
 #define STATE_BOUNCE_OCCUPIED 0b100u

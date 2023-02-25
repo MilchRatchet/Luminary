@@ -13,6 +13,13 @@
 #include "log.h"
 #include "structs.h"
 
+#define gpuErrchk(ans)                                         \
+  {                                                            \
+    if (ans != cudaSuccess) {                                  \
+      crash_message("GPUassert: %s", cudaGetErrorString(ans)); \
+    }                                                          \
+  }
+
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) (void) (x);
 
@@ -27,6 +34,10 @@
 #define LIGHT_ID_SUN 0xffffffffu
 #define LIGHT_ID_TOY 0xfffffffeu
 #define LIGHT_ID_NONE 0xfffffff1u
+
+#define TYPE_CAMERA 0x0u
+#define TYPE_LIGHT 0x1u
+#define TYPE_BOUNCE 0x2u
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 

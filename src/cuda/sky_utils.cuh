@@ -1,13 +1,7 @@
 #ifndef SKY_UTILS_CUH
 #define SKY_UTILS_CUH
 
-#define SKY_EARTH_RADIUS 6371.0f
-#define SKY_SUN_RADIUS 696340.0f
-#define SKY_SUN_DISTANCE 149597870.0f
-#define SKY_MOON_RADIUS 1737.4f
-#define SKY_MOON_DISTANCE 384399.0f
-#define SKY_ATMO_HEIGHT 100.0f
-#define SKY_ATMO_RADIUS (SKY_ATMO_HEIGHT + SKY_EARTH_RADIUS)
+#include "sky_defines.h"
 
 __device__ float sky_height(const vec3 point) {
   return get_length(point) - SKY_EARTH_RADIUS;

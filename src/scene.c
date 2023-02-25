@@ -258,7 +258,7 @@ RaytraceInstance* scene_load_lum(const char* filename) {
   texture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length);
 
   RaytraceInstance* instance;
-  raytracing_init(&instance, general, tex_atlas, scene);
+  raytrace_init(&instance, general, tex_atlas, scene);
 
   wavefront_clear(&content);
   scene_clear(&scene);
@@ -305,7 +305,7 @@ RaytraceInstance* scene_load_obj(char* filename) {
   texture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length);
 
   RaytraceInstance* instance;
-  raytracing_init(&instance, general, tex_atlas, scene);
+  raytrace_init(&instance, general, tex_atlas, scene);
 
   wavefront_clear(&content);
   scene_clear(&scene);

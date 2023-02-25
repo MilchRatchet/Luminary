@@ -597,7 +597,7 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   instance->scene_gpu.sky.rayleigh_falloff       = instance->atmo_settings.rayleigh_falloff;
   instance->scene_gpu.sky.multiscattering_factor = instance->atmo_settings.multiscattering_factor;
 
-  update_device_scene(instance);
+  raytrace_update_device_scene(instance);
 
   TextureRGBA luts_tm_tex[2];
   texture_create(luts_tm_tex + 0, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
@@ -617,7 +617,7 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   device_free(luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
   device_free(luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
 
-  update_device_pointers(instance);
+  raytrace_update_device_pointers(instance);
 
   TextureRGBA luts_ms_tex[2];
   texture_create(luts_ms_tex + 0, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
@@ -641,7 +641,7 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   device_free(luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
   device_free(luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));
 
-  update_device_pointers(instance);
+  raytrace_update_device_pointers(instance);
 
   instance->scene_gpu.sky.lut_initialized = 1;
 

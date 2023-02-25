@@ -11,6 +11,7 @@
 #include "UI/UI.h"
 #include "bench.h"
 #include "buffer.h"
+#include "denoise.h"
 #include "frametime.h"
 #include "log.h"
 #include "png.h"
@@ -41,12 +42,12 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
   while (!exit) {
     SDL_Event event;
 
-    update_device_scene(instance);
+    raytrace_update_device_scene(instance);
 
     if (instance->scene_gpu.camera.bloom)
       apply_bloom(instance, gpu_source, gpu_output);
 
-    copy_framebuffer_to_8bit(gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld);
+    device_copy_framebuffer_to_8bit(gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld);
 
     SDL_PumpEvents();
 
@@ -96,10 +97,10 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 void offline_output(RaytraceInstance* instance) {
   bench_tic();
   clock_t start_of_rt = clock();
-  prepare_trace(instance);
+  raytrace_prepare(instance);
   for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; instance->temporal_frames++) {
-    trace_scene(instance);
-    update_jitter(instance);
+    raytrace_execute(instance);
+    raytrace_update_jitter(instance);
     const double progress     = ((double) (instance->temporal_frames + 1)) / instance->offline_samples;
     const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
     const double time_left    = (time_elapsed / progress) - time_elapsed;
@@ -114,13 +115,13 @@ void offline_output(RaytraceInstance* instance) {
 
   bench_toc("Raytracing");
 
-  free_inputs(instance);
+  raytrace_free_work_buffers(instance);
 
   if (instance->denoiser) {
-    optix_denoise_create(instance);
-    DeviceBuffer* denoise_output = optix_denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
+    denoise_create(instance);
+    DeviceBuffer* denoise_output = denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
     device_buffer_copy(denoise_output, instance->frame_output);
-    optix_denoise_free(instance);
+    denoise_free(instance);
     device_buffer_free(denoise_output);
   }
 
@@ -137,7 +138,7 @@ void offline_output(RaytraceInstance* instance) {
   char* output_path = malloc(4096);
 
   if (instance->post_process_menu) {
-    copy_framebuffer_to_8bit(
+    device_copy_framebuffer_to_8bit(
       device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
       instance->output_height, instance->output_width);
 
@@ -158,7 +159,7 @@ void offline_output(RaytraceInstance* instance) {
 
   device_buffer_free(instance->frame_buffer);
 
-  copy_framebuffer_to_8bit(
+  device_copy_framebuffer_to_8bit(
     device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
     instance->output_height, instance->output_width);
 
@@ -228,7 +229,7 @@ static void make_snapshot(RaytraceInstance* instance, WindowInstance* window) {
       buffer = malloc(sizeof(XRGB8) * width * height);
       void* gpu_scratch;
       device_malloc(&gpu_scratch, sizeof(XRGB8) * width * height);
-      copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, buffer, width, height, width);
+      device_copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, buffer, width, height, width);
       device_free(gpu_scratch, sizeof(XRGB8) * width * height);
       break;
     default:
@@ -279,7 +280,7 @@ void realtime_output(RaytraceInstance* instance) {
   int make_image = 0;
 
   char* title = (char*) malloc(4096);
-  optix_denoise_create(instance);
+  denoise_create(instance);
 
   void* gpu_scratch = device_buffer_get_pointer(window->gpu_buffer);
 
@@ -290,14 +291,14 @@ void realtime_output(RaytraceInstance* instance) {
       instance->temporal_frames = temporal_frames_buffer;
 
     start_frametime(&frametime_trace);
-    prepare_trace(instance);
-    trace_scene(instance);
+    raytrace_prepare(instance);
+    raytrace_execute(instance);
     sample_frametime(&frametime_trace);
 
     start_frametime(&frametime_post);
 
     if (instance->denoiser) {
-      DeviceBuffer* denoise_output = optix_denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
+      DeviceBuffer* denoise_output = denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
 
       if (instance->scene_gpu.camera.bloom)
         apply_bloom(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
@@ -308,7 +309,7 @@ void realtime_output(RaytraceInstance* instance) {
       instance->frame_final_device = device_buffer_get_pointer(instance->frame_output);
     }
 
-    copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, window->buffer, window->width, window->height, window->ld);
+    device_copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, window->buffer, window->width, window->height, window->ld);
     sample_frametime(&frametime_post);
 
     instance->temporal_frames++;
@@ -494,12 +495,12 @@ void realtime_output(RaytraceInstance* instance) {
     }
 
     if (instance->scene_gpu.camera.auto_exposure) {
-      instance->scene_gpu.camera.exposure = optix_denoise_auto_exposure(instance);
+      instance->scene_gpu.camera.exposure = denoise_auto_exposure(instance);
     }
   }
 
   free(title);
-  optix_denoise_free(instance);
+  denoise_free(instance);
   window_instance_free(window);
   free_UI(&ui);
 }

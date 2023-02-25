@@ -466,7 +466,7 @@ extern "C" void clouds_generate(RaytraceInstance* instance) {
   device_free(noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
   device_free(noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
 
-  update_device_pointers(instance);
+  raytrace_update_device_pointers(instance);
 
   instance->scene_gpu.sky.cloud.initialized = 1;
 
