@@ -459,7 +459,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_results, sizeof(TraceResult), max_task_count);
   device_buffer_malloc(instance->task_counts, sizeof(uint16_t), 6 * thread_count);
   device_buffer_malloc(instance->task_offsets, sizeof(uint16_t), 5 * thread_count);
-  device_buffer_malloc(instance->randoms, /*sizeof(curandStateXORWOW_t)*/ 44, thread_count);
+  device_buffer_malloc(instance->randoms, sizeof(uint32_t), thread_count);
 
   device_buffer_malloc(instance->light_sample_history, sizeof(uint32_t), amount);
   device_buffer_malloc(instance->raydir_buffer, sizeof(vec3), amount);
@@ -501,7 +501,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.material_atlas       = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.material);
   ptrs.normal_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.normal);
   ptrs.cloud_noise          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->cloud_noise);
-  ptrs.randoms              = (void*) device_buffer_get_pointer(instance->randoms);
+  ptrs.randoms              = (uint32_t*) device_buffer_get_pointer(instance->randoms);
   ptrs.raydir_buffer        = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
   ptrs.trace_result_buffer  = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.state_buffer         = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);

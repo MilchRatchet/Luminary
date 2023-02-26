@@ -3,7 +3,6 @@
 
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
-#include <curand_kernel.h>
 #include <stdio.h>
 #include <stdlib.h>
 

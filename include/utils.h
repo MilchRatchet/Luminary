@@ -371,7 +371,7 @@ struct DevicePointers {
   vec3* raydir_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
-  void* randoms;
+  uint32_t* randoms;
   cudaTextureObject_t* albedo_atlas;
   cudaTextureObject_t* illuminance_atlas;
   cudaTextureObject_t* material_atlas;
