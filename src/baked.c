@@ -245,7 +245,7 @@ RaytraceInstance* load_baked(const char* filename) {
   Scene* scene;
   scene_init(&scene);
 
-  memcpy(scene, &instance->scene_gpu, sizeof(Scene));
+  memcpy(scene, &instance->scene, sizeof(Scene));
 
   scene->triangles = malloc(sizeof(Triangle) * scene->triangles_length);
   fseek(file, head[3], SEEK_SET);
@@ -293,8 +293,8 @@ RaytraceInstance* load_baked(const char* filename) {
   RaytraceInstance* final;
   raytrace_init(&final, instance->settings, tex_atlas, scene);
 
-  final->scene_gpu.sky.stars             = (Star*) 0;
-  final->scene_gpu.sky.cloud.initialized = 0;
+  final->scene.sky.stars             = (Star*) 0;
+  final->scene.sky.cloud.initialized = 0;
   generate_stars(final);
 
   uint64_t strings_count = head[12];
@@ -392,11 +392,10 @@ void serialize_baked(RaytraceInstance* instance) {
   head[0] = magic;
   head[1] = version;
   head[2] = write_data(file, 1, sizeof(RaytraceInstance), instance, CPU_PTR);
-  head[3] = write_data(file, instance->scene_gpu.triangles_length, sizeof(Triangle), instance->scene_gpu.triangles, GPU_PTR);
-  head[4] = write_data(file, instance->scene_gpu.nodes_length, sizeof(Node8), instance->scene_gpu.nodes, GPU_PTR);
-  head[5] =
-    write_data(file, instance->scene_gpu.triangle_lights_length, sizeof(TriangleLight), instance->scene_gpu.triangle_lights, GPU_PTR);
-  head[6] = write_data(file, instance->scene_gpu.materials_length, sizeof(TextureAssignment), instance->scene_gpu.texture_assignments, 1);
+  head[3] = write_data(file, instance->scene.triangles_length, sizeof(Triangle), instance->scene.triangles, GPU_PTR);
+  head[4] = write_data(file, instance->scene.nodes_length, sizeof(Node8), instance->scene.nodes, GPU_PTR);
+  head[5] = write_data(file, instance->scene.triangle_lights_length, sizeof(TriangleLight), instance->scene.triangle_lights, GPU_PTR);
+  head[6] = write_data(file, instance->scene.materials_length, sizeof(TextureAssignment), instance->scene.texture_assignments, 1);
   head[7] = write_data(file, instance->tex_atlas.albedo_length, 1, device_buffer_get_pointer(instance->tex_atlas.albedo), TEX_PTR);
   head[8] =
     write_data(file, instance->tex_atlas.illuminance_length, 1, device_buffer_get_pointer(instance->tex_atlas.illuminance), TEX_PTR);

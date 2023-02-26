@@ -275,6 +275,15 @@ struct Scene {
   GlobalMaterial material;
 } typedef Scene;
 
+struct RayEmitter {
+  Jitter jitter;
+  Mat4x4 view_space;
+  Mat4x4 projection;
+  float step;
+  float vfov;
+  Quaternion camera_rotation;
+} typedef RayEmitter;
+
 struct TextureAtlas {
   DeviceBuffer* albedo;
   int albedo_length;
@@ -320,7 +329,7 @@ struct RaytraceInstance {
   int reservoir_size;
   int offline_samples;
   int light_resampling;
-  Scene scene_gpu;
+  Scene scene;
   DenoisingMode denoiser;
   int temporal_frames;
   int spatial_samples;
@@ -336,6 +345,7 @@ struct RaytraceInstance {
   void* denoise_setup;
   Jitter jitter;
   int accum_mode;
+  RayEmitter emitter;
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
@@ -391,20 +401,14 @@ struct DeviceConstantMemory {
   int light_resampling;
   int width;
   int height;
-  int amount;
   int output_width;
   int output_height;
-  float step;
-  float vfov;
-  Quaternion camera_rotation;
   TextureAssignment* texture_assignments;
-  vec3 sun;
-  vec3 moon;
+  vec3 sun_pos;
+  vec3 moon_pos;
   int shading_mode;
   RGBF* bloom_scratch;
-  Jitter jitter;
-  Mat4x4 view_space;
-  Mat4x4 projection;
+  RayEmitter emitter;
   int accum_mode;
 } typedef DeviceConstantMemory;
 

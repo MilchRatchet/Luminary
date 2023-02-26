@@ -87,7 +87,9 @@ __device__ RGBF sample_pixel_catmull_rom(const RGBAhalf* image, float x, float y
 }
 
 __global__ void temporal_accumulation() {
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device.amount; offset += blockDim.x * gridDim.x) {
+  const int amount = device.width * device.height;
+
+  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBAhalf buffer = load_RGBAhalf(device.ptrs.frame_buffer + offset);
     RGBAhalf output;
     RGBAhalf variance;
@@ -135,7 +137,9 @@ __global__ void temporal_accumulation() {
 }
 
 __global__ void temporal_reprojection() {
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < device.amount; offset += blockDim.x * gridDim.x) {
+  const int amount = device.width * device.height;
+
+  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < amount; offset += blockDim.x * gridDim.x) {
     const int curr_x = offset % device.width;
     const int curr_y = offset / device.width;
 
@@ -177,7 +181,7 @@ __global__ void temporal_reprojection() {
     pos.z = hit.z;
     pos.w = 1.0f;
 
-    vec4 prev_pixel = transform_vec4(device.projection, transform_vec4(device.view_space, pos));
+    vec4 prev_pixel = transform_vec4(device.emitter.projection, transform_vec4(device.emitter.view_space, pos));
 
     prev_pixel.x /= -prev_pixel.w;
     prev_pixel.y /= -prev_pixel.w;
@@ -185,8 +189,8 @@ __global__ void temporal_reprojection() {
     prev_pixel.x = device.width * (1.0f - prev_pixel.x) * 0.5f;
     prev_pixel.y = device.height * (prev_pixel.y + 1.0f) * 0.5f;
 
-    prev_pixel.x -= device.jitter.x - 0.5f;
-    prev_pixel.y -= device.jitter.y - 0.5f;
+    prev_pixel.x -= device.emitter.jitter.x - 0.5f;
+    prev_pixel.y -= device.emitter.jitter.y - 0.5f;
 
     const int prev_x = prev_pixel.x;
     const int prev_y = prev_pixel.y;

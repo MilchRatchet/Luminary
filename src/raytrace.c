@@ -80,53 +80,6 @@ static vec3 angles_to_direction(const float altitude, const float azimuth) {
 ////////////////////////////////////////////////////////////////////
 
 /*
- * Computes matrices used for temporal reprojection.
- * @param instance RaytraceInstance to be used.
- */
-void raytrace_update_temporal_matrix(RaytraceInstance* instance) {
-  Quaternion q;
-  device_gather_symbol(camera_rotation, q);
-
-  Mat4x4 mat;
-  memset(&mat, 0, sizeof(Mat4x4));
-
-  mat.f11 = 1.0f - (q.y * q.y * 2.0f + q.z * q.z * 2.0f);
-  mat.f12 = q.x * q.y * 2.0f + q.w * q.z * 2.0f;
-  mat.f13 = q.x * q.z * 2.0f - q.w * q.y * 2.0f;
-  mat.f21 = q.x * q.y * 2.0f - q.w * q.z * 2.0f;
-  mat.f22 = 1.0f - (q.x * q.x * 2.0f + q.z * q.z * 2.0f);
-  mat.f23 = q.y * q.z * 2.0f + q.w * q.x * 2.0f;
-  mat.f31 = q.x * q.z * 2.0f + q.w * q.y * 2.0f;
-  mat.f32 = q.y * q.z * 2.0f - q.w * q.x * 2.0f;
-  mat.f33 = 1.0f - (q.x * q.x * 2.0f + q.y * q.y * 2.0f);
-
-  const vec3 offset = instance->scene_gpu.camera.pos;
-
-  mat.f14 = -(offset.x * mat.f11 + offset.y * mat.f12 + offset.z * mat.f13);
-  mat.f24 = -(offset.x * mat.f21 + offset.y * mat.f22 + offset.z * mat.f23);
-  mat.f34 = -(offset.x * mat.f31 + offset.y * mat.f32 + offset.z * mat.f33);
-  mat.f44 = 1.0f;
-
-  device_update_symbol(view_space, mat);
-
-  const float step = 2.0f * (instance->scene_gpu.camera.fov / instance->width);
-  const float vfov = step * instance->height / 2.0f;
-
-  memset(&mat, 0, sizeof(Mat4x4));
-
-  const float z_far  = instance->scene_gpu.camera.far_clip_distance;
-  const float z_near = 1.0f;
-
-  mat.f11 = 1.0f / instance->scene_gpu.camera.fov;
-  mat.f22 = 1.0f / vfov;
-  mat.f33 = -(z_far + z_near) / (z_far - z_near);
-  mat.f43 = -1.0f;
-  mat.f34 = -(2.0f * z_far * z_near) / (z_far - z_near);
-
-  device_update_symbol(projection, mat);
-}
-
-/*
  * Computes value in halton sequence.
  * @param index Index in halton sequence.
  * @param base Base of halton sequence.
@@ -145,37 +98,52 @@ static float halton(int index, int base) {
   return result;
 }
 
-/*
- * Updates the uniform per pixel jitter. Uploads updated jitter to GPU.
- * @param instance RaytraceInstance to be used.
- */
-void raytrace_update_jitter(RaytraceInstance* instance) {
-  Jitter jitter;
+void raytrace_update_ray_emitter(RaytraceInstance* instance) {
+  RayEmitter emitter = instance->emitter;
 
-  jitter.prev_x = instance->jitter.x;
-  jitter.prev_y = instance->jitter.y;
-  jitter.x      = halton(instance->temporal_frames, 2);
-  jitter.y      = halton(instance->temporal_frames, 3);
+  const Quaternion q = emitter.camera_rotation;
+  const vec3 offset  = instance->scene.camera.pos;
 
-  instance->jitter = jitter;
-  device_update_symbol(jitter, jitter);
-}
+  emitter.camera_rotation = get_rotation_quaternion(instance->scene.camera.rotation);
 
-/*
- * Computes and uploads to GPU camera rotation quaternions and fov step increments.
- * @param scene Scene which contains camera information.
- * @param width Number of pixel in horizontal in internal render buffer.
- * @param height Number of pixel in vertical in internal render buffer.
- */
-void raytrace_update_camera_transform(const Scene scene, const unsigned int width, const unsigned int height) {
-  const Quaternion q = get_rotation_quaternion(scene.camera.rotation);
-  device_update_symbol(camera_rotation, q);
+  memset(&emitter.view_space, 0, sizeof(Mat4x4));
 
-  const float step = 2.0f * (scene.camera.fov / width);
-  const float vfov = step * height / 2.0f;
+  emitter.view_space.f11 = 1.0f - (q.y * q.y * 2.0f + q.z * q.z * 2.0f);
+  emitter.view_space.f12 = q.x * q.y * 2.0f + q.w * q.z * 2.0f;
+  emitter.view_space.f13 = q.x * q.z * 2.0f - q.w * q.y * 2.0f;
+  emitter.view_space.f21 = q.x * q.y * 2.0f - q.w * q.z * 2.0f;
+  emitter.view_space.f22 = 1.0f - (q.x * q.x * 2.0f + q.z * q.z * 2.0f);
+  emitter.view_space.f23 = q.y * q.z * 2.0f + q.w * q.x * 2.0f;
+  emitter.view_space.f31 = q.x * q.z * 2.0f + q.w * q.y * 2.0f;
+  emitter.view_space.f32 = q.y * q.z * 2.0f - q.w * q.x * 2.0f;
+  emitter.view_space.f33 = 1.0f - (q.x * q.x * 2.0f + q.y * q.y * 2.0f);
 
-  device_update_symbol(step, step);
-  device_update_symbol(vfov, vfov);
+  emitter.view_space.f14 = -(offset.x * emitter.view_space.f11 + offset.y * emitter.view_space.f12 + offset.z * emitter.view_space.f13);
+  emitter.view_space.f24 = -(offset.x * emitter.view_space.f21 + offset.y * emitter.view_space.f22 + offset.z * emitter.view_space.f23);
+  emitter.view_space.f34 = -(offset.x * emitter.view_space.f31 + offset.y * emitter.view_space.f32 + offset.z * emitter.view_space.f33);
+  emitter.view_space.f44 = 1.0f;
+
+  memset(&emitter.projection, 0, sizeof(Mat4x4));
+
+  emitter.step = 2.0f * (instance->scene.camera.fov / instance->width);
+  emitter.vfov = emitter.step * instance->height / 2.0f;
+
+  const float z_far  = instance->scene.camera.far_clip_distance;
+  const float z_near = 1.0f;
+
+  emitter.projection.f11 = 1.0f / instance->scene.camera.fov;
+  emitter.projection.f22 = 1.0f / emitter.vfov;
+  emitter.projection.f33 = -(z_far + z_near) / (z_far - z_near);
+  emitter.projection.f43 = -1.0f;
+  emitter.projection.f34 = -(2.0f * z_far * z_near) / (z_far - z_near);
+
+  emitter.jitter.prev_x = emitter.jitter.x;
+  emitter.jitter.prev_y = emitter.jitter.y;
+  emitter.jitter.x      = halton(instance->temporal_frames, 2);
+  emitter.jitter.y      = halton(instance->temporal_frames, 3);
+
+  instance->emitter = emitter;
+  device_update_symbol(emitter, emitter);
 }
 
 /*
@@ -183,7 +151,7 @@ void raytrace_update_camera_transform(const Scene scene, const unsigned int widt
  * @param instance RaytraceInstance to be used.
  */
 static void toy_flashlight_set_position(RaytraceInstance* instance) {
-  const Quaternion q = get_rotation_quaternion(instance->scene_gpu.camera.rotation);
+  const Quaternion q = get_rotation_quaternion(instance->scene.camera.rotation);
 
   vec3 offset;
   offset.x = 0.0f;
@@ -192,9 +160,9 @@ static void toy_flashlight_set_position(RaytraceInstance* instance) {
 
   offset = rotate_vector_by_quaternion(offset, q);
 
-  instance->scene_gpu.toy.position.x = instance->scene_gpu.camera.pos.x + offset.x;
-  instance->scene_gpu.toy.position.y = instance->scene_gpu.camera.pos.y + offset.y;
-  instance->scene_gpu.toy.position.z = instance->scene_gpu.camera.pos.z + offset.z;
+  instance->scene.toy.position.x = instance->scene.camera.pos.x + offset.x;
+  instance->scene.toy.position.y = instance->scene.camera.pos.y + offset.y;
+  instance->scene.toy.position.z = instance->scene.camera.pos.z + offset.z;
 }
 
 /*
@@ -202,7 +170,7 @@ static void toy_flashlight_set_position(RaytraceInstance* instance) {
  * @param instance RaytraceInstance to be used.
  */
 void raytrace_center_toy_at_camera(RaytraceInstance* instance) {
-  const Quaternion q = get_rotation_quaternion(instance->scene_gpu.camera.rotation);
+  const Quaternion q = get_rotation_quaternion(instance->scene.camera.rotation);
 
   vec3 offset;
   offset.x = 0.0f;
@@ -211,13 +179,13 @@ void raytrace_center_toy_at_camera(RaytraceInstance* instance) {
 
   offset = rotate_vector_by_quaternion(offset, q);
 
-  offset.x *= 3.0f * instance->scene_gpu.toy.scale;
-  offset.y *= 3.0f * instance->scene_gpu.toy.scale;
-  offset.z *= 3.0f * instance->scene_gpu.toy.scale;
+  offset.x *= 3.0f * instance->scene.toy.scale;
+  offset.y *= 3.0f * instance->scene.toy.scale;
+  offset.z *= 3.0f * instance->scene.toy.scale;
 
-  instance->scene_gpu.toy.position.x = instance->scene_gpu.camera.pos.x + offset.x;
-  instance->scene_gpu.toy.position.y = instance->scene_gpu.camera.pos.y + offset.y;
-  instance->scene_gpu.toy.position.z = instance->scene_gpu.camera.pos.z + offset.z;
+  instance->scene.toy.position.x = instance->scene.camera.pos.x + offset.x;
+  instance->scene.toy.position.y = instance->scene.camera.pos.y + offset.y;
+  instance->scene.toy.position.z = instance->scene.camera.pos.z + offset.z;
 }
 
 /*
@@ -235,7 +203,7 @@ static void update_special_lights(const Scene scene) {
   sun.y -= scene.sky.geometry_offset.y;
   sun.z -= scene.sky.geometry_offset.z;
 
-  device_update_symbol(sun, sun);
+  device_update_symbol(sun_pos, sun);
 
   vec3 moon              = angles_to_direction(scene.sky.moon_altitude, scene.sky.moon_azimuth);
   const float scale_moon = 1.0f / (sqrtf(moon.x * moon.x + moon.y * moon.y + moon.z * moon.z));
@@ -247,7 +215,7 @@ static void update_special_lights(const Scene scene) {
   moon.y -= scene.sky.geometry_offset.y;
   moon.z -= scene.sky.geometry_offset.z;
 
-  device_update_symbol(moon, moon);
+  device_update_symbol(moon_pos, moon);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -274,8 +242,6 @@ void raytrace_execute(RaytraceInstance* instance) {
   }
 
   device_handle_accumulation(instance);
-
-  raytrace_update_temporal_matrix(instance);
 
   gpuErrchk(cudaDeviceSynchronize());
 }
@@ -307,7 +273,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   instance->tex_atlas = tex_atlas;
 
-  instance->scene_gpu          = *scene;
+  instance->scene              = *scene;
   instance->settings           = general;
   instance->shading_mode       = 0;
   instance->accum_mode         = TEMPORAL_ACCUMULATION;
@@ -356,26 +322,25 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
-  device_malloc((void**) &(instance->scene_gpu.texture_assignments), sizeof(TextureAssignment) * scene->materials_length);
-  device_malloc((void**) &(instance->scene_gpu.triangles), sizeof(Triangle) * instance->scene_gpu.triangles_length);
-  device_malloc((void**) &(instance->scene_gpu.traversal_triangles), sizeof(TraversalTriangle) * instance->scene_gpu.triangles_length);
-  device_malloc((void**) &(instance->scene_gpu.nodes), sizeof(Node8) * instance->scene_gpu.nodes_length);
-  device_malloc((void**) &(instance->scene_gpu.triangle_lights), sizeof(TriangleLight) * instance->scene_gpu.triangle_lights_length);
+  device_malloc((void**) &(instance->scene.texture_assignments), sizeof(TextureAssignment) * scene->materials_length);
+  device_malloc((void**) &(instance->scene.triangles), sizeof(Triangle) * instance->scene.triangles_length);
+  device_malloc((void**) &(instance->scene.traversal_triangles), sizeof(TraversalTriangle) * instance->scene.triangles_length);
+  device_malloc((void**) &(instance->scene.nodes), sizeof(Node8) * instance->scene.nodes_length);
+  device_malloc((void**) &(instance->scene.triangle_lights), sizeof(TriangleLight) * instance->scene.triangle_lights_length);
 
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.texture_assignments, scene->texture_assignments, sizeof(TextureAssignment) * scene->materials_length,
+    instance->scene.texture_assignments, scene->texture_assignments, sizeof(TextureAssignment) * scene->materials_length,
     cudaMemcpyHostToDevice));
-  gpuErrchk(
-    cudaMemcpy(instance->scene_gpu.triangles, scene->triangles, sizeof(Triangle) * scene->triangles_length, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(instance->scene.triangles, scene->triangles, sizeof(Triangle) * scene->triangles_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.traversal_triangles, scene->traversal_triangles, sizeof(TraversalTriangle) * scene->triangles_length,
+    instance->scene.traversal_triangles, scene->traversal_triangles, sizeof(TraversalTriangle) * scene->triangles_length,
     cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(instance->scene_gpu.nodes, scene->nodes, sizeof(Node8) * scene->nodes_length, cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(instance->scene.nodes, scene->nodes, sizeof(Node8) * scene->nodes_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene_gpu.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * scene->triangle_lights_length,
+    instance->scene.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * scene->triangle_lights_length,
     cudaMemcpyHostToDevice));
 
-  device_update_symbol(texture_assignments, instance->scene_gpu.texture_assignments);
+  device_update_symbol(texture_assignments, instance->scene.texture_assignments);
 
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
@@ -386,7 +351,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   raytrace_update_device_pointers(instance);
   device_initialize_random_generators();
   raytrace_prepare(instance);
-  raytrace_update_temporal_matrix(instance);
 
   instance->snap_resolution = SNAP_RESOLUTION_RENDER;
 
@@ -429,7 +393,6 @@ void raytrace_reset(RaytraceInstance* instance) {
   raytrace_update_device_pointers(instance);
   device_initialize_random_generators();
   raytrace_prepare(instance);
-  raytrace_update_temporal_matrix(instance);
 
   if (allocate_denoise) {
     denoise_create(instance);
@@ -443,14 +406,13 @@ void raytrace_reset(RaytraceInstance* instance) {
  * @param instance RaytraceInstance to be used.
  */
 void raytrace_prepare(RaytraceInstance* instance) {
-  if (instance->scene_gpu.toy.flashlight_mode) {
+  if (instance->scene.toy.flashlight_mode) {
     toy_flashlight_set_position(instance);
   }
   raytrace_update_device_scene(instance);
   device_update_symbol(shading_mode, instance->shading_mode);
-  update_special_lights(instance->scene_gpu);
-  raytrace_update_camera_transform(instance->scene_gpu, instance->width, instance->height);
-  raytrace_update_jitter(instance);
+  update_special_lights(instance->scene);
+  raytrace_update_ray_emitter(instance);
   device_update_symbol(accum_mode, instance->accum_mode);
   device_update_symbol(spatial_samples, instance->spatial_samples);
 }
@@ -469,7 +431,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_update_symbol(output_height, instance->output_height);
   device_update_symbol(max_ray_depth, instance->max_ray_depth);
   device_update_symbol(reservoir_size, instance->reservoir_size);
-  device_update_symbol(amount, amount);
   device_update_symbol(denoiser, instance->denoiser);
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), amount);
@@ -554,11 +515,11 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
 }
 
 void raytrace_free_work_buffers(RaytraceInstance* instance) {
-  gpuErrchk(cudaFree(instance->scene_gpu.texture_assignments));
-  gpuErrchk(cudaFree(instance->scene_gpu.triangles));
-  gpuErrchk(cudaFree(instance->scene_gpu.traversal_triangles));
-  gpuErrchk(cudaFree(instance->scene_gpu.nodes));
-  gpuErrchk(cudaFree(instance->scene_gpu.triangle_lights));
+  gpuErrchk(cudaFree(instance->scene.texture_assignments));
+  gpuErrchk(cudaFree(instance->scene.triangles));
+  gpuErrchk(cudaFree(instance->scene.traversal_triangles));
+  gpuErrchk(cudaFree(instance->scene.nodes));
+  gpuErrchk(cudaFree(instance->scene.triangle_lights));
   device_buffer_free(instance->light_trace);
   device_buffer_free(instance->bounce_trace);
   device_buffer_free(instance->light_trace_count);
@@ -610,12 +571,11 @@ void raytrace_free_8bit_frame(RaytraceInstance* instance) {
  * @param instance RaytraceInstance
  */
 void raytrace_update_light_resampling_active(RaytraceInstance* instance) {
-  instance->light_resampling =
-    instance->scene_gpu.material.lights_active || (instance->scene_gpu.toy.emissive && instance->scene_gpu.toy.active);
+  instance->light_resampling = instance->scene.material.lights_active || (instance->scene.toy.emissive && instance->scene.toy.active);
 
   device_update_symbol(light_resampling, instance->light_resampling);
 }
 
 void raytrace_update_device_scene(RaytraceInstance* instance) {
-  device_update_symbol(scene, instance->scene_gpu);
+  device_update_symbol(scene, instance->scene);
 }

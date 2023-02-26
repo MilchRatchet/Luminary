@@ -45,7 +45,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 
     raytrace_update_device_scene(instance);
 
-    if (instance->scene_gpu.camera.bloom)
+    if (instance->scene.camera.bloom)
       device_bloom_apply(instance, gpu_source, gpu_output);
 
     device_copy_framebuffer_to_8bit(gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld);
@@ -101,7 +101,7 @@ void offline_output(RaytraceInstance* instance) {
   raytrace_prepare(instance);
   for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; instance->temporal_frames++) {
     raytrace_execute(instance);
-    raytrace_update_jitter(instance);
+    raytrace_update_ray_emitter(instance);
     const double progress     = ((double) (instance->temporal_frames + 1)) / instance->offline_samples;
     const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
     const double time_left    = (time_elapsed / progress) - time_elapsed;
@@ -129,7 +129,7 @@ void offline_output(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), instance->output_width * instance->output_height);
   device_buffer_copy(instance->frame_output, instance->frame_buffer);
 
-  if (instance->scene_gpu.camera.bloom)
+  if (instance->scene.camera.bloom)
     device_bloom_apply(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));
 
   DeviceBuffer* scratch_buffer = (DeviceBuffer*) 0;
@@ -301,7 +301,7 @@ void realtime_output(RaytraceInstance* instance) {
     if (instance->denoiser) {
       DeviceBuffer* denoise_output = denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
 
-      if (instance->scene_gpu.camera.bloom)
+      if (instance->scene.camera.bloom)
         device_bloom_apply(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
 
       instance->frame_final_device = device_buffer_get_pointer(denoise_output);
@@ -330,8 +330,8 @@ void realtime_output(RaytraceInstance* instance) {
           mmotion += event.motion.xrel;
         }
         else {
-          mouse_y_diff += event.motion.xrel * (-0.005f) * instance->scene_gpu.camera.mouse_speed;
-          mouse_x_diff += event.motion.yrel * (-0.005f) * instance->scene_gpu.camera.mouse_speed;
+          mouse_y_diff += event.motion.xrel * (-0.005f) * instance->scene.camera.mouse_speed;
+          mouse_x_diff += event.motion.yrel * (-0.005f) * instance->scene.camera.mouse_speed;
 
           if (event.motion.xrel || event.motion.yrel)
             instance->temporal_frames = 0;
@@ -353,9 +353,9 @@ void realtime_output(RaytraceInstance* instance) {
       }
     }
 
-    if (instance->scene_gpu.camera.smooth_movement) {
-      mouse_x_speed += mouse_x_diff * instance->scene_gpu.camera.smoothing_factor;
-      mouse_y_speed += mouse_y_diff * instance->scene_gpu.camera.smoothing_factor;
+    if (instance->scene.camera.smooth_movement) {
+      mouse_x_speed += mouse_x_diff * instance->scene.camera.smoothing_factor;
+      mouse_y_speed += mouse_y_diff * instance->scene.camera.smoothing_factor;
     }
     else {
       mouse_x_speed = mouse_x_diff;
@@ -363,19 +363,19 @@ void realtime_output(RaytraceInstance* instance) {
     }
 
     if (mouse_x_speed != 0.0f || mouse_y_speed != 0.0f) {
-      instance->scene_gpu.camera.rotation.x += mouse_x_speed;
-      instance->scene_gpu.camera.rotation.y += mouse_y_speed;
+      instance->scene.camera.rotation.x += mouse_x_speed;
+      instance->scene.camera.rotation.y += mouse_y_speed;
 
       instance->temporal_frames = 0;
 
-      if (instance->scene_gpu.camera.smooth_movement) {
-        mouse_x_speed -= mouse_x_speed * instance->scene_gpu.camera.smoothing_factor * instance->scene_gpu.camera.mouse_speed;
-        mouse_y_speed -= mouse_y_speed * instance->scene_gpu.camera.smoothing_factor * instance->scene_gpu.camera.mouse_speed;
+      if (instance->scene.camera.smooth_movement) {
+        mouse_x_speed -= mouse_x_speed * instance->scene.camera.smoothing_factor * instance->scene.camera.mouse_speed;
+        mouse_y_speed -= mouse_y_speed * instance->scene.camera.smoothing_factor * instance->scene.camera.mouse_speed;
 
-        if (fabsf(mouse_x_speed) < 0.0001f * instance->scene_gpu.camera.mouse_speed)
+        if (fabsf(mouse_x_speed) < 0.0001f * instance->scene.camera.mouse_speed)
           mouse_x_speed = 0.0f;
 
-        if (fabsf(mouse_y_speed) < 0.0001f * instance->scene_gpu.camera.mouse_speed)
+        if (fabsf(mouse_y_speed) < 0.0001f * instance->scene.camera.mouse_speed)
           mouse_y_speed = 0.0f;
       }
       else {
@@ -416,9 +416,9 @@ void realtime_output(RaytraceInstance* instance) {
     SDL_SetWindowTitle(window->window, title);
     SDL_UpdateWindowSurface(window->window);
 
-    const float alpha = instance->scene_gpu.camera.rotation.x;
-    const float beta  = instance->scene_gpu.camera.rotation.y;
-    const float gamma = instance->scene_gpu.camera.rotation.z;
+    const float alpha = instance->scene.camera.rotation.x;
+    const float beta  = instance->scene.camera.rotation.y;
+    const float gamma = instance->scene.camera.rotation.z;
 
     const float cy = cosf(gamma * 0.5f);
     const float sy = sinf(gamma * 0.5f);
@@ -440,19 +440,19 @@ void realtime_output(RaytraceInstance* instance) {
     const uint8_t* keystate = SDL_GetKeyboardState((int*) 0);
 
     if (keystate[SDL_SCANCODE_LEFT]) {
-      instance->scene_gpu.sky.azimuth -= 0.005f * normalized_time;
+      instance->scene.sky.azimuth -= 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_RIGHT]) {
-      instance->scene_gpu.sky.azimuth += 0.005f * normalized_time;
+      instance->scene.sky.azimuth += 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_UP]) {
-      instance->scene_gpu.sky.altitude += 0.005f * normalized_time;
+      instance->scene.sky.altitude += 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_DOWN]) {
-      instance->scene_gpu.sky.altitude -= 0.005f * normalized_time;
+      instance->scene.sky.altitude -= 0.005f * normalized_time;
       instance->temporal_frames = 0;
     }
     if (keystate[SDL_SCANCODE_W]) {
@@ -483,20 +483,20 @@ void realtime_output(RaytraceInstance* instance) {
       shift_pressed = 2;
     }
 
-    const float movement_speed = 0.5f * shift_pressed * normalized_time * instance->scene_gpu.camera.wasd_speed;
+    const float movement_speed = 0.5f * shift_pressed * normalized_time * instance->scene.camera.wasd_speed;
 
     movement_vector = rotate_vector_by_quaternion(movement_vector, q);
-    instance->scene_gpu.camera.pos.x += movement_speed * movement_vector.x;
-    instance->scene_gpu.camera.pos.y += movement_speed * movement_vector.y;
-    instance->scene_gpu.camera.pos.z += movement_speed * movement_vector.z;
+    instance->scene.camera.pos.x += movement_speed * movement_vector.x;
+    instance->scene.camera.pos.y += movement_speed * movement_vector.y;
+    instance->scene.camera.pos.z += movement_speed * movement_vector.z;
 
-    if (instance->scene_gpu.ocean.update) {
+    if (instance->scene.ocean.update) {
       instance->temporal_frames = 0;
-      instance->scene_gpu.ocean.time += total_time * 0.001f * instance->scene_gpu.ocean.speed;
+      instance->scene.ocean.time += total_time * 0.001f * instance->scene.ocean.speed;
     }
 
-    if (instance->scene_gpu.camera.auto_exposure) {
-      instance->scene_gpu.camera.exposure = denoise_auto_exposure(instance);
+    if (instance->scene.camera.auto_exposure) {
+      instance->scene.camera.exposure = denoise_auto_exposure(instance);
     }
   }
 

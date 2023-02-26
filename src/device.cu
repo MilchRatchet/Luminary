@@ -81,7 +81,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene_gpu.ocean.active && type != TYPE_LIGHT) {
+  if (instance->scene.ocean.active && type != TYPE_LIGHT) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
@@ -89,7 +89,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene_gpu.sky.cloud.active) {
+  if (instance->scene.sky.cloud.active) {
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
@@ -97,7 +97,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   if (type != TYPE_LIGHT && instance->light_resampling) {
     generate_light_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    if (type == TYPE_CAMERA && instance->scene_gpu.material.lights_active) {
+    if (type == TYPE_CAMERA && instance->scene.material.lights_active) {
       LightSample* light_samples_1 = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
       LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
       for (int i = 0; i < instance->spatial_iterations; i++) {
@@ -109,13 +109,13 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene_gpu.ocean.active) {
+  if (instance->scene.ocean.active) {
     process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene_gpu.toy.active) {
+  if (instance->scene.toy.active) {
     process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
@@ -131,16 +131,16 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int typ
 
   process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene_gpu.ocean.active && type != TYPE_LIGHT) {
+  if (instance->scene.ocean.active && type != TYPE_LIGHT) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  if (instance->scene_gpu.ocean.active) {
+  if (instance->scene.ocean.active) {
     process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   process_debug_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  if (instance->scene_gpu.toy.active) {
+  if (instance->scene.toy.active) {
     process_debug_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   process_debug_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

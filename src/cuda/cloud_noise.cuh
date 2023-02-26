@@ -435,7 +435,7 @@ __global__ void generate_curl_noise(const int dim, uint8_t* tex) {
 extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   bench_tic();
 
-  if (instance->scene_gpu.sky.cloud.initialized) {
+  if (instance->scene.sky.cloud.initialized) {
     texture_free_atlas(instance->cloud_noise, 4);
   }
 
@@ -454,7 +454,7 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
 
   device_malloc((void**) &noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
   generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    noise_tex[2].width, (float) instance->scene_gpu.sky.cloud.seed, (uint8_t*) noise_tex[2].data);
+    noise_tex[2].width, (float) instance->scene.sky.cloud.seed, (uint8_t*) noise_tex[2].data);
 
   device_malloc((void**) &noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
   generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[3].width, (uint8_t*) noise_tex[3].data);
@@ -468,7 +468,7 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
 
   raytrace_update_device_pointers(instance);
 
-  instance->scene_gpu.sky.cloud.initialized = 1;
+  instance->scene.sky.cloud.initialized = 1;
 
   bench_toc((char*) "Cloud Noise Generation");
 }

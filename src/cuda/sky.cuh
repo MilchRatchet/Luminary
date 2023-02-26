@@ -580,22 +580,22 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
 extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   bench_tic();
 
-  if (instance->scene_gpu.sky.lut_initialized) {
+  if (instance->scene.sky.lut_initialized) {
     texture_free_atlas(instance->sky_tm_luts, 2);
     texture_free_atlas(instance->sky_ms_luts, 2);
   }
 
-  instance->scene_gpu.sky.base_density           = instance->atmo_settings.base_density;
-  instance->scene_gpu.sky.ground_visibility      = instance->atmo_settings.ground_visibility;
-  instance->scene_gpu.sky.mie_density            = instance->atmo_settings.mie_density;
-  instance->scene_gpu.sky.mie_falloff            = instance->atmo_settings.mie_falloff;
-  instance->scene_gpu.sky.mie_g                  = instance->atmo_settings.mie_g;
-  instance->scene_gpu.sky.ozone_absorption       = instance->atmo_settings.ozone_absorption;
-  instance->scene_gpu.sky.ozone_density          = instance->atmo_settings.ozone_density;
-  instance->scene_gpu.sky.ozone_layer_thickness  = instance->atmo_settings.ozone_layer_thickness;
-  instance->scene_gpu.sky.rayleigh_density       = instance->atmo_settings.rayleigh_density;
-  instance->scene_gpu.sky.rayleigh_falloff       = instance->atmo_settings.rayleigh_falloff;
-  instance->scene_gpu.sky.multiscattering_factor = instance->atmo_settings.multiscattering_factor;
+  instance->scene.sky.base_density           = instance->atmo_settings.base_density;
+  instance->scene.sky.ground_visibility      = instance->atmo_settings.ground_visibility;
+  instance->scene.sky.mie_density            = instance->atmo_settings.mie_density;
+  instance->scene.sky.mie_falloff            = instance->atmo_settings.mie_falloff;
+  instance->scene.sky.mie_g                  = instance->atmo_settings.mie_g;
+  instance->scene.sky.ozone_absorption       = instance->atmo_settings.ozone_absorption;
+  instance->scene.sky.ozone_density          = instance->atmo_settings.ozone_density;
+  instance->scene.sky.ozone_layer_thickness  = instance->atmo_settings.ozone_layer_thickness;
+  instance->scene.sky.rayleigh_density       = instance->atmo_settings.rayleigh_density;
+  instance->scene.sky.rayleigh_falloff       = instance->atmo_settings.rayleigh_falloff;
+  instance->scene.sky.multiscattering_factor = instance->atmo_settings.multiscattering_factor;
 
   raytrace_update_device_scene(instance);
 
@@ -643,7 +643,7 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
 
   raytrace_update_device_pointers(instance);
 
-  instance->scene_gpu.sky.lut_initialized = 1;
+  instance->scene.sky.lut_initialized = 1;
 
   bench_toc((char*) "Sky LUT Computation");
 }
@@ -673,7 +673,7 @@ __device__ Spectrum sky_compute_atmosphere(
 
     const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength);
 
-    const float light_angle = sample_sphere_solid_angle(device.sun, SKY_SUN_RADIUS, origin);
+    const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, origin);
 
     for (int i = 0; i < steps; i++) {
       const float new_reach = start + distance * (i + 0.3f) / steps;
@@ -683,7 +683,7 @@ __device__ Spectrum sky_compute_atmosphere(
       const vec3 pos     = add_vector(origin, scale_vector(ray, reach));
       const float height = sky_height(pos);
 
-      const vec3 ray_scatter       = normalize_vector(sub_vector(device.sun, pos));
+      const vec3 ray_scatter       = normalize_vector(sub_vector(device.sun_pos, pos));
       const float cos_angle        = dot_product(ray, ray_scatter);
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
       const float phase_rayleigh   = sky_rayleigh_phase(cos_angle);
@@ -740,9 +740,9 @@ __device__ Spectrum sky_compute_atmosphere(
   }
 
   if (celestials) {
-    const float sun_hit   = sphere_ray_intersection(ray, origin, device.sun, SKY_SUN_RADIUS);
+    const float sun_hit   = sphere_ray_intersection(ray, origin, device.sun_pos, SKY_SUN_RADIUS);
     const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-    const float moon_hit  = sphere_ray_intersection(ray, origin, device.moon, SKY_MOON_RADIUS);
+    const float moon_hit  = sphere_ray_intersection(ray, origin, device.moon_pos, SKY_MOON_RADIUS);
 
     if (earth_hit > sun_hit && moon_hit > sun_hit) {
       const Spectrum S = spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength));
@@ -751,12 +751,12 @@ __device__ Spectrum sky_compute_atmosphere(
     }
     else if (earth_hit > moon_hit) {
       const vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
-      const vec3 normal     = normalize_vector(sub_vector(moon_pos, device.moon));
-      const vec3 bounce_ray = normalize_vector(sub_vector(device.sun, moon_pos));
+      const vec3 normal     = normalize_vector(sub_vector(moon_pos, device.moon_pos));
+      const vec3 bounce_ray = normalize_vector(sub_vector(device.sun_pos, moon_pos));
       const float NdotL     = dot_product(normal, bounce_ray);
 
       if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && NdotL > 0.0f) {
-        const float light_angle = sample_sphere_solid_angle(device.sun, SKY_SUN_RADIUS, moon_pos);
+        const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, moon_pos);
         const float weight      = device.scene.sky.sun_strength * device.scene.sky.moon_albedo * NdotL * light_angle / (2.0f * PI);
 
         result = spectrum_add(result, spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, weight)));

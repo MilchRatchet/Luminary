@@ -154,7 +154,7 @@ __device__ vec3 brdf_sample_light_ray(const LightSample light, const vec3 origin
   switch (light.id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN:
-      return sample_sphere(device.sun, SKY_SUN_RADIUS, world_to_sky_transform(origin));
+      return sample_sphere(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(origin));
     case LIGHT_ID_TOY:
       return sample_sphere(device.scene.toy.position, device.scene.toy.scale, origin);
     default:
@@ -186,7 +186,7 @@ __device__ float brdf_light_sample_target_weight(const LightSample light) {
 __device__ float brdf_light_sample_solid_angle(const LightSample light, const vec3 pos) {
   switch (light.id) {
     case LIGHT_ID_SUN:
-      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun, SKY_SUN_RADIUS, world_to_sky_transform(pos));
+      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(pos));
     case LIGHT_ID_TOY:
       return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.scene.toy.position, device.scene.toy.scale, pos);
     case LIGHT_ID_NONE:
@@ -215,7 +215,7 @@ __device__ LightSample brdf_light_sample_update(LightSample x, const LightSample
 __device__ LightSample sample_light(const vec3 position) {
   const vec3 sky_pos = world_to_sky_transform(position);
 
-  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
   uint32_t light_count  = 0;
   light_count += sun_visible;

@@ -221,7 +221,7 @@ extern "C" void device_bloom_apply(RaytraceInstance* instance, RGBAhalf* src, RG
 
   bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
     (RGBAhalf*) instance->bloom_mips_gpu[0], width >> 1, height >> 1, (RGBAhalf*) dst, (RGBAhalf*) src, width, height, 1.0f,
-    0.01f * instance->scene_gpu.camera.bloom_strength / mip_count);
+    0.01f * instance->scene.camera.bloom_strength / mip_count);
 }
 
 extern "C" void device_bloom_allocate_mips(RaytraceInstance* instance) {

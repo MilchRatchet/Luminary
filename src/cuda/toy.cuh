@@ -72,8 +72,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       albedo.a = 0.0f;
 
     if (device.scene.toy.flashlight_mode) {
-      const vec3 dir            = normalize_vector(rotate_vector_by_quaternion(get_vector(0.0f, 0.0f, -1.0f), device.camera_rotation));
-      const float angle         = -dot_product(dir, task.ray);
+      const vec3 dir    = normalize_vector(rotate_vector_by_quaternion(get_vector(0.0f, 0.0f, -1.0f), device.emitter.camera_rotation));
+      const float angle = -dot_product(dir, task.ray);
       const float dir_intensity = remap01(angle, 0.85f, 1.0f);
       emission                  = scale_RGBAhalf(emission, dir_intensity);
     }

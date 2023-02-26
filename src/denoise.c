@@ -180,7 +180,7 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
   if (instance->shading_mode != SHADING_DEFAULT)
     return 1.0f;
 
-  const float exposure = instance->scene_gpu.camera.exposure;
+  const float exposure = instance->scene.camera.exposure;
 
   if (!instance->denoise_setup) {
     log_message("OptiX Denoise Instance is NULL.");
@@ -191,7 +191,7 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
 
   float target_exposure = 1.0f;
 
-  switch (instance->scene_gpu.camera.tonemap) {
+  switch (instance->scene.camera.tonemap) {
     case TONEMAP_NONE:
       target_exposure = 2.5f;
       break;

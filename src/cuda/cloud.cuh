@@ -112,7 +112,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
     phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
   }
 
-  const float sun_light_angle = sample_sphere_solid_angle(device.sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
+  const float sun_light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
@@ -138,9 +138,9 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       CloudPhaseOctaves sun_phase;
       CloudExtinctionOctaves sun_extinction;
 
-      const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun, pos)), pos, SKY_EARTH_RADIUS);
+      const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, pos)), pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
-        const vec3 sun_ray = sample_sphere(device.sun, SKY_SUN_RADIUS, pos);
+        const vec3 sun_ray = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, pos);
 
         const float sun_cos_angle = dot_product(ray, sun_ray);
 

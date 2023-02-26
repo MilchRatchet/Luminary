@@ -18,8 +18,9 @@
 __device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 default_ray;
 
-  default_ray.x = device.scene.camera.focal_length * (-device.scene.camera.fov + device.step * (task.index.x + device.jitter.x));
-  default_ray.y = device.scene.camera.focal_length * (device.vfov - device.step * (task.index.y + device.jitter.y));
+  default_ray.x =
+    device.scene.camera.focal_length * (-device.scene.camera.fov + device.emitter.step * (task.index.x + device.emitter.jitter.x));
+  default_ray.y = device.scene.camera.focal_length * (device.emitter.vfov - device.emitter.step * (task.index.y + device.emitter.jitter.y));
   default_ray.z = -device.scene.camera.focal_length;
 
   const float alpha =
@@ -31,18 +32,19 @@ __device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 
   default_ray       = sub_vector(default_ray, point_on_aperture);
-  point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device.camera_rotation);
+  point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device.emitter.camera_rotation);
 
-  task.ray    = normalize_vector(rotate_vector_by_quaternion(default_ray, device.camera_rotation));
+  task.ray    = normalize_vector(rotate_vector_by_quaternion(default_ray, device.emitter.camera_rotation));
   task.origin = add_vector(device.scene.camera.pos, point_on_aperture);
 
   return task;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() {
-  int offset = 0;
+  int offset       = 0;
+  const int amount = device.width * device.height;
 
-  for (int pixel = threadIdx.x + blockIdx.x * blockDim.x; pixel < device.amount; pixel += blockDim.x * gridDim.x) {
+  for (int pixel = threadIdx.x + blockIdx.x * blockDim.x; pixel < amount; pixel += blockDim.x * gridDim.x) {
     TraceTask task;
 
     task.index.x = (uint16_t) (pixel % device.width);
@@ -412,7 +414,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       else {
         if (hit_id == OCEAN_HIT || hit_id == TOY_HIT || hit_id <= TRIANGLE_ID_LIMIT) {
           const vec3 sky_pos    = world_to_sky_transform(task.origin);
-          const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+          const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
 
           LightSample selected;
           selected.id = LIGHT_ID_NONE;
