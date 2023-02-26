@@ -532,7 +532,6 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_variance);
   device_buffer_free(instance->light_records);
   device_buffer_free(instance->bounce_records);
-  device_buffer_free(instance->randoms);
   device_buffer_free(instance->light_sample_history);
   device_buffer_free(instance->raydir_buffer);
   device_buffer_free(instance->trace_result_buffer);

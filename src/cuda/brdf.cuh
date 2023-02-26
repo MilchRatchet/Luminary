@@ -437,9 +437,9 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
  */
 __device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const ushort2 index, const uint32_t state) {
   const float specular_prob = brdf_spec_probability(brdf.metallic);
-  const int use_specular    = blue_noise(index.x, index.y, state, 10) < specular_prob;
-  const float alpha         = blue_noise(index.x, index.y, state, 2);
-  const float beta          = 2.0f * PI * blue_noise(index.x, index.y, state, 3);
+  const int use_specular    = white_noise() < specular_prob;
+  const float alpha         = white_noise();
+  const float beta          = 2.0f * PI * white_noise();
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(brdf.V, rotation_to_z);

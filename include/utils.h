@@ -35,9 +35,7 @@
 #define LIGHT_ID_TOY 0xfffffffeu
 #define LIGHT_ID_NONE 0xfffffff1u
 
-#define TYPE_CAMERA 0x0u
-#define TYPE_LIGHT 0x1u
-#define TYPE_BOUNCE 0x2u
+enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 

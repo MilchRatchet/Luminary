@@ -23,11 +23,8 @@ __device__ TraceTask get_starting_ray(TraceTask task) {
   default_ray.y = device.scene.camera.focal_length * (device.emitter.vfov - device.emitter.step * (task.index.y + device.emitter.jitter.y));
   default_ray.z = -device.scene.camera.focal_length;
 
-  const float alpha =
-    (device.scene.camera.aperture_size == 0.0f) ? 0.0f : blue_noise(task.index.x, task.index.y, task.state, 0) * 2.0f * PI;
-  const float beta = (device.scene.camera.aperture_size == 0.0f)
-                       ? 0.0f
-                       : sqrtf(blue_noise(task.index.x, task.index.y, task.state, 1)) * device.scene.camera.aperture_size;
+  const float alpha = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : white_noise() * 2.0f * PI;
+  const float beta  = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : sqrtf(white_noise()) * device.scene.camera.aperture_size;
 
   vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 

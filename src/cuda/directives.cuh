@@ -55,7 +55,7 @@ __device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
   }
   else if (max < PROBABILISTIC_CUTOFF) {
     const float p = (max - CUTOFF) / (PROBABILISTIC_CUTOFF - CUTOFF);
-    if (blue_noise(task.index.x, task.index.y, task.state, 20) > p) {
+    if (white_noise() > p) {
       valid = 0;
     }
     else {
@@ -65,9 +65,7 @@ __device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
 #endif
 
 #ifdef LOW_QUALITY_LONG_BOUNCES
-  if (
-    ((task.state & DEPTH_LEFT) >> 16) <= (device.max_ray_depth - MIN_BOUNCES)
-    && blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f / (1 + device.max_ray_depth)) {
+  if (((task.state & DEPTH_LEFT) >> 16) <= (device.max_ray_depth - MIN_BOUNCES) && white_noise() < 1.0f / (1 + device.max_ray_depth)) {
     valid = 0;
   }
 #endif
