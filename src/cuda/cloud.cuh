@@ -36,7 +36,7 @@ __device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3
     extinction.E[i] = 0.0f;
   }
 
-  const float iter_step = 1.0f / device_scene.sky.cloud.shadow_steps;
+  const float iter_step = 1.0f / device.scene.sky.cloud.shadow_steps;
 
   // Sometimes the shadow ray goes below the cloud layer but misses the earth and reenters the cloud layer
   float offset = 0.0f;
@@ -58,7 +58,7 @@ __device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3
       break;
 
     if (height < 0.0f) {
-      const float h_min = world_to_sky_scale(device_scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
+      const float h_min = world_to_sky_scale(device.scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
       offset += sph_ray_int_p0(ray, pos, h_min);
       continue;
     }
@@ -87,7 +87,7 @@ __device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3
 __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, float dist) {
   dist = fminf(30.0f, dist);
 
-  const int step_count = device_scene.sky.cloud.steps * __saturatef(dist / 15.0f);
+  const int step_count = device.scene.sky.cloud.steps * __saturatef(dist / 15.0f);
 
   const int big_step_mult = 2;
   const float big_step    = big_step_mult;
@@ -112,7 +112,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
     phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
   }
 
-  const float sun_light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
+  const float sun_light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
@@ -138,9 +138,9 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       CloudPhaseOctaves sun_phase;
       CloudExtinctionOctaves sun_extinction;
 
-      const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device_sun, pos)), pos, SKY_EARTH_RADIUS);
+      const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, pos)), pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
-        const vec3 sun_ray = sample_sphere(device_sun, SKY_SUN_RADIUS, pos);
+        const vec3 sun_ray = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, pos);
 
         const float sun_cos_angle = dot_product(ray, sun_ray);
 
@@ -166,7 +166,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       // Ambient light
       const CloudExtinctionOctaves ambient_extinction = cloud_extinction(pos, ambient_ray);
 
-      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device_scene.sky.steps / 2);
+      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2);
       ambient_color      = scale_color(ambient_color, 4.0f * PI);
 
       float scattering_factor = 1.0f;
@@ -218,7 +218,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 ////////////////////////////////////////////////////////////////////
 
 __device__ void trace_clouds(const vec3 origin, const vec3 ray, const float start, const float distance, ushort2 index) {
-  int pixel = index.x + index.y * device_width;
+  int pixel = index.x + index.y * device.width;
 
   if (distance <= 0.0f)
     return;
@@ -226,20 +226,20 @@ __device__ void trace_clouds(const vec3 origin, const vec3 ray, const float star
   RGBAF result = cloud_render(origin, ray, start, distance);
 
   if ((result.r + result.g + result.b) != 0.0f) {
-    RGBF color  = RGBAhalf_to_RGBF(device.frame_buffer[pixel]);
-    RGBF record = RGBAhalf_to_RGBF(device_records[pixel]);
+    RGBF color  = RGBAhalf_to_RGBF(device.ptrs.frame_buffer[pixel]);
+    RGBF record = RGBAhalf_to_RGBF(device.records[pixel]);
 
     color.r += result.r * record.r;
     color.g += result.g * record.g;
     color.b += result.b * record.b;
 
-    device.frame_buffer[pixel] = RGBF_to_RGBAhalf(color);
+    device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(color);
   }
 
   if (result.a != 1.0f) {
-    RGBAhalf record = load_RGBAhalf(device_records + pixel);
+    RGBAhalf record = load_RGBAhalf(device.records + pixel);
     record          = scale_RGBAhalf(record, __float2half(result.a));
-    store_RGBAhalf(device_records + pixel, record);
+    store_RGBAhalf(device.records + pixel, record);
   }
 }
 
@@ -248,16 +248,16 @@ __device__ void trace_clouds(const vec3 origin, const vec3 ray, const float star
 ////////////////////////////////////////////////////////////////////
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 4) void clouds_render_tasks() {
-  const int task_count = device_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
   for (int i = 0; i < task_count; i++) {
     const int offset  = get_task_address(i);
-    TraceTask task    = load_trace_task(device_trace_tasks + offset);
-    const float depth = __ldcs((float*) (device.trace_results + offset));
+    TraceTask task    = load_trace_task(device.trace_tasks + offset);
+    const float depth = __ldcs((float*) (device.ptrs.trace_results + offset));
 
     const vec3 sky_origin = world_to_sky_transform(task.origin);
 
-    const float sky_max_dist = (depth == device_scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+    const float sky_max_dist = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
     const float2 params      = cloud_get_intersection(sky_origin, task.ray, sky_max_dist);
 
     const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
@@ -266,7 +266,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 4) void clouds_render_tasks() {
       trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
 
       task.origin = add_vector(task.origin, scale_vector(task.ray, sky_to_world_scale(params.x)));
-      store_trace_task(device_trace_tasks + offset, task);
+      store_trace_task(device.trace_tasks + offset, task);
     }
   }
 }

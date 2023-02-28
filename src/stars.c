@@ -26,17 +26,17 @@ void generate_stars(RaytraceInstance* instance) {
   const int grid_x = STARS_GRID_LD;
   const int grid_y = 32;
 
-  if (instance->scene_gpu.sky.stars) {
-    device_free(instance->scene_gpu.sky.stars, sizeof(Star) * instance->scene_gpu.sky.current_stars_count);
-    device_free(instance->scene_gpu.sky.stars_offsets, sizeof(int) * (grid_x * grid_y + 1));
+  if (instance->scene.sky.stars) {
+    device_free(instance->scene.sky.stars, sizeof(Star) * instance->scene.sky.current_stars_count);
+    device_free(instance->scene.sky.stars_offsets, sizeof(int) * (grid_x * grid_y + 1));
   }
 
-  const int count = instance->scene_gpu.sky.settings_stars_count;
-  const int seed  = instance->scene_gpu.sky.stars_seed;
+  const int count = instance->scene.sky.settings_stars_count;
+  const int seed  = instance->scene.sky.stars_seed;
 
   srand(seed);
 
-  instance->scene_gpu.sky.current_stars_count = count;
+  instance->scene.sky.current_stars_count = count;
 
   Star* stars = (Star*) malloc(sizeof(Star) * count);
 
@@ -89,11 +89,11 @@ void generate_stars(RaytraceInstance* instance) {
   free(stars);
   free(counts);
 
-  device_malloc((void**) &instance->scene_gpu.sky.stars, sizeof(Star) * count);
-  device_malloc((void**) &instance->scene_gpu.sky.stars_offsets, sizeof(int) * (grid_x * grid_y + 1));
+  device_malloc((void**) &instance->scene.sky.stars, sizeof(Star) * count);
+  device_malloc((void**) &instance->scene.sky.stars_offsets, sizeof(int) * (grid_x * grid_y + 1));
 
-  device_upload(instance->scene_gpu.sky.stars, grid, sizeof(Star) * count);
-  device_upload(instance->scene_gpu.sky.stars_offsets, offsets, sizeof(int) * (grid_x * grid_y + 1));
+  device_upload(instance->scene.sky.stars, grid, sizeof(Star) * count);
+  device_upload(instance->scene.sky.stars_offsets, offsets, sizeof(int) * (grid_x * grid_y + 1));
 
   free(grid);
   free(offsets);

@@ -8,16 +8,6 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-/*
- * Xorshift RNG by George Marsaglia
- */
-__device__ uint32_t xorshift_uint32(uint32_t x) {
-  x ^= x << 13;
-  x ^= x >> 17;
-  x ^= x << 5;
-  return x;
-}
-
 __device__ vec3 cross_product(const vec3 a, const vec3 b) {
   vec3 result;
 
@@ -658,7 +648,7 @@ __device__ RGBF opaque_color(const RGBAF a) {
 }
 
 __device__ float get_dithering(const int x, const int y) {
-  const float dither = 2.0f * blue_noise(x, y, 0, 0) - 1.0f;
+  const float dither = 2.0f * white_noise() - 1.0f;
 
   return copysignf(1.0f - sqrtf(1.0f - fabsf(dither)), dither);
 }

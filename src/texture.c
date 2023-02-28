@@ -7,13 +7,6 @@
 #include "log.h"
 #include "structs.h"
 
-#define gpuErrchk(ans)                                         \
-  {                                                            \
-    if (ans != cudaSuccess) {                                  \
-      crash_message("GPUassert: %s", cudaGetErrorString(ans)); \
-    }                                                          \
-  }
-
 static struct cudaExtent texture_make_cudaextent(size_t depth, size_t height, size_t width) {
   const struct cudaExtent extent = {.depth = depth, .height = height, .width = width};
 

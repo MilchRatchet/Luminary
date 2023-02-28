@@ -641,227 +641,217 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "\n#===============================\n# Camera Settings\n#===============================\n\n");
   fputs(line, file);
 
-  sprintf(
-    line, "CAMERA POSITION %f %f %f\n", instance->scene_gpu.camera.pos.x, instance->scene_gpu.camera.pos.y,
-    instance->scene_gpu.camera.pos.z);
+  sprintf(line, "CAMERA POSITION %f %f %f\n", instance->scene.camera.pos.x, instance->scene.camera.pos.y, instance->scene.camera.pos.z);
   fputs(line, file);
   sprintf(
-    line, "CAMERA ROTATION %f %f %f\n", instance->scene_gpu.camera.rotation.x, instance->scene_gpu.camera.rotation.y,
-    instance->scene_gpu.camera.rotation.z);
+    line, "CAMERA ROTATION %f %f %f\n", instance->scene.camera.rotation.x, instance->scene.camera.rotation.y,
+    instance->scene.camera.rotation.z);
   fputs(line, file);
-  sprintf(line, "CAMERA FOV_____ %f\n", instance->scene_gpu.camera.fov);
+  sprintf(line, "CAMERA FOV_____ %f\n", instance->scene.camera.fov);
   fputs(line, file);
-  sprintf(line, "CAMERA FOCALLEN %f\n", instance->scene_gpu.camera.focal_length);
+  sprintf(line, "CAMERA FOCALLEN %f\n", instance->scene.camera.focal_length);
   fputs(line, file);
-  sprintf(line, "CAMERA APERTURE %f\n", instance->scene_gpu.camera.aperture_size);
+  sprintf(line, "CAMERA APERTURE %f\n", instance->scene.camera.aperture_size);
   fputs(line, file);
-  sprintf(line, "CAMERA EXPOSURE %f\n", instance->scene_gpu.camera.exposure);
+  sprintf(line, "CAMERA EXPOSURE %f\n", instance->scene.camera.exposure);
   fputs(line, file);
-  sprintf(line, "CAMERA BLOOM___ %d\n", instance->scene_gpu.camera.bloom);
+  sprintf(line, "CAMERA BLOOM___ %d\n", instance->scene.camera.bloom);
   fputs(line, file);
-  sprintf(line, "CAMERA BLOOMSTR %f\n", instance->scene_gpu.camera.bloom_strength);
+  sprintf(line, "CAMERA BLOOMSTR %f\n", instance->scene.camera.bloom_strength);
   fputs(line, file);
-  sprintf(line, "CAMERA BLOOMTHR %f\n", instance->scene_gpu.camera.bloom_threshold);
+  sprintf(line, "CAMERA BLOOMTHR %f\n", instance->scene.camera.bloom_threshold);
   fputs(line, file);
-  sprintf(line, "CAMERA DITHER__ %d\n", instance->scene_gpu.camera.dithering);
+  sprintf(line, "CAMERA DITHER__ %d\n", instance->scene.camera.dithering);
   fputs(line, file);
-  sprintf(line, "CAMERA FARCLIPD %f\n", instance->scene_gpu.camera.far_clip_distance);
+  sprintf(line, "CAMERA FARCLIPD %f\n", instance->scene.camera.far_clip_distance);
   fputs(line, file);
-  sprintf(line, "CAMERA TONEMAP_ %d\n", instance->scene_gpu.camera.tonemap);
+  sprintf(line, "CAMERA TONEMAP_ %d\n", instance->scene.camera.tonemap);
   fputs(line, file);
-  sprintf(line, "CAMERA AUTOEXP_ %d\n", instance->scene_gpu.camera.auto_exposure);
+  sprintf(line, "CAMERA AUTOEXP_ %d\n", instance->scene.camera.auto_exposure);
   fputs(line, file);
-  sprintf(line, "CAMERA FILTER__ %d\n", instance->scene_gpu.camera.filter);
+  sprintf(line, "CAMERA FILTER__ %d\n", instance->scene.camera.filter);
   fputs(line, file);
-  sprintf(line, "CAMERA PURKINJE %d\n", instance->scene_gpu.camera.purkinje);
+  sprintf(line, "CAMERA PURKINJE %d\n", instance->scene.camera.purkinje);
   fputs(line, file);
-  sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene_gpu.camera.russian_roulette_bias);
+  sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene.camera.russian_roulette_bias);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");
   fputs(line, file);
 
-  sprintf(line, "MATERIAL LIGHTSON %d\n", instance->scene_gpu.material.lights_active);
+  sprintf(line, "MATERIAL LIGHTSON %d\n", instance->scene.material.lights_active);
   fputs(line, file);
-  sprintf(line, "MATERIAL SMOOTHNE %f\n", instance->scene_gpu.material.default_material.r);
+  sprintf(line, "MATERIAL SMOOTHNE %f\n", instance->scene.material.default_material.r);
   fputs(line, file);
-  sprintf(line, "MATERIAL METALLIC %f\n", instance->scene_gpu.material.default_material.g);
+  sprintf(line, "MATERIAL METALLIC %f\n", instance->scene.material.default_material.g);
   fputs(line, file);
-  sprintf(line, "MATERIAL EMISSION %f\n", instance->scene_gpu.material.default_material.b);
+  sprintf(line, "MATERIAL EMISSION %f\n", instance->scene.material.default_material.b);
   fputs(line, file);
-  sprintf(line, "MATERIAL FRESNEL_ %d\n", instance->scene_gpu.material.fresnel);
+  sprintf(line, "MATERIAL FRESNEL_ %d\n", instance->scene.material.fresnel);
   fputs(line, file);
-  sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene_gpu.material.alpha_cutoff);
+  sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene.material.alpha_cutoff);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");
   fputs(line, file);
 
   sprintf(
-    line, "SKY OFFSET__ %f %f %f\n", instance->scene_gpu.sky.geometry_offset.x, instance->scene_gpu.sky.geometry_offset.y,
-    instance->scene_gpu.sky.geometry_offset.z);
+    line, "SKY OFFSET__ %f %f %f\n", instance->scene.sky.geometry_offset.x, instance->scene.sky.geometry_offset.y,
+    instance->scene.sky.geometry_offset.z);
   fputs(line, file);
-  sprintf(line, "SKY AZIMUTH_ %f\n", instance->scene_gpu.sky.azimuth);
+  sprintf(line, "SKY AZIMUTH_ %f\n", instance->scene.sky.azimuth);
   fputs(line, file);
-  sprintf(line, "SKY ALTITUDE %f\n", instance->scene_gpu.sky.altitude);
+  sprintf(line, "SKY ALTITUDE %f\n", instance->scene.sky.altitude);
   fputs(line, file);
-  sprintf(line, "SKY MOONALTI %f\n", instance->scene_gpu.sky.moon_altitude);
+  sprintf(line, "SKY MOONALTI %f\n", instance->scene.sky.moon_altitude);
   fputs(line, file);
-  sprintf(line, "SKY MOONAZIM %f\n", instance->scene_gpu.sky.moon_azimuth);
+  sprintf(line, "SKY MOONAZIM %f\n", instance->scene.sky.moon_azimuth);
   fputs(line, file);
-  sprintf(line, "SKY MOONALBE %f\n", instance->scene_gpu.sky.moon_albedo);
+  sprintf(line, "SKY MOONALBE %f\n", instance->scene.sky.moon_albedo);
   fputs(line, file);
-  sprintf(line, "SKY SUNSTREN %f\n", instance->scene_gpu.sky.sun_strength);
+  sprintf(line, "SKY SUNSTREN %f\n", instance->scene.sky.sun_strength);
   fputs(line, file);
-  sprintf(line, "SKY DENSITY_ %f\n", instance->scene_gpu.sky.base_density);
+  sprintf(line, "SKY DENSITY_ %f\n", instance->scene.sky.base_density);
   fputs(line, file);
-  sprintf(line, "SKY OZONEABS %d\n", instance->scene_gpu.sky.ozone_absorption);
+  sprintf(line, "SKY OZONEABS %d\n", instance->scene.sky.ozone_absorption);
   fputs(line, file);
-  sprintf(line, "SKY STEPS___ %d\n", instance->scene_gpu.sky.steps);
+  sprintf(line, "SKY STEPS___ %d\n", instance->scene.sky.steps);
   fputs(line, file);
-  sprintf(line, "SKY RAYLEDEN %f\n", instance->scene_gpu.sky.rayleigh_density);
+  sprintf(line, "SKY RAYLEDEN %f\n", instance->scene.sky.rayleigh_density);
   fputs(line, file);
-  sprintf(line, "SKY MIEDENSI %f\n", instance->scene_gpu.sky.mie_density);
+  sprintf(line, "SKY MIEDENSI %f\n", instance->scene.sky.mie_density);
   fputs(line, file);
-  sprintf(line, "SKY OZONEDEN %f\n", instance->scene_gpu.sky.ozone_density);
+  sprintf(line, "SKY OZONEDEN %f\n", instance->scene.sky.ozone_density);
   fputs(line, file);
-  sprintf(line, "SKY RAYLEFAL %f\n", instance->scene_gpu.sky.rayleigh_falloff);
+  sprintf(line, "SKY RAYLEFAL %f\n", instance->scene.sky.rayleigh_falloff);
   fputs(line, file);
-  sprintf(line, "SKY MIEFALLO %f\n", instance->scene_gpu.sky.mie_falloff);
+  sprintf(line, "SKY MIEFALLO %f\n", instance->scene.sky.mie_falloff);
   fputs(line, file);
-  sprintf(line, "SKY MIE_PH_G %f\n", instance->scene_gpu.sky.mie_g);
+  sprintf(line, "SKY MIE_PH_G %f\n", instance->scene.sky.mie_g);
   fputs(line, file);
-  sprintf(line, "SKY GROUNDVI %f\n", instance->scene_gpu.sky.ground_visibility);
+  sprintf(line, "SKY GROUNDVI %f\n", instance->scene.sky.ground_visibility);
   fputs(line, file);
-  sprintf(line, "SKY OZONETHI %f\n", instance->scene_gpu.sky.ozone_layer_thickness);
+  sprintf(line, "SKY OZONETHI %f\n", instance->scene.sky.ozone_layer_thickness);
   fputs(line, file);
-  sprintf(line, "SKY MSFACTOR %f\n", instance->scene_gpu.sky.multiscattering_factor);
+  sprintf(line, "SKY MSFACTOR %f\n", instance->scene.sky.multiscattering_factor);
   fputs(line, file);
-  sprintf(line, "SKY STARSEED %d\n", instance->scene_gpu.sky.stars_seed);
+  sprintf(line, "SKY STARSEED %d\n", instance->scene.sky.stars_seed);
   fputs(line, file);
-  sprintf(line, "SKY STARINTE %f\n", instance->scene_gpu.sky.stars_intensity);
+  sprintf(line, "SKY STARINTE %f\n", instance->scene.sky.stars_intensity);
   fputs(line, file);
-  sprintf(line, "SKY STARNUM_ %d\n", instance->scene_gpu.sky.settings_stars_count);
+  sprintf(line, "SKY STARNUM_ %d\n", instance->scene.sky.settings_stars_count);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Cloud Settings\n#===============================\n\n");
   fputs(line, file);
 
-  sprintf(line, "CLOUD ACTIVE__ %d\n", instance->scene_gpu.sky.cloud.active);
+  sprintf(line, "CLOUD ACTIVE__ %d\n", instance->scene.sky.cloud.active);
   fputs(line, file);
-  sprintf(line, "CLOUD SEED____ %d\n", instance->scene_gpu.sky.cloud.seed);
+  sprintf(line, "CLOUD SEED____ %d\n", instance->scene.sky.cloud.seed);
   fputs(line, file);
-  sprintf(line, "CLOUD OFFSET__ %f %f\n", instance->scene_gpu.sky.cloud.offset_x, instance->scene_gpu.sky.cloud.offset_z);
+  sprintf(line, "CLOUD OFFSET__ %f %f\n", instance->scene.sky.cloud.offset_x, instance->scene.sky.cloud.offset_z);
   fputs(line, file);
-  sprintf(line, "CLOUD HEIGHTMA %f\n", instance->scene_gpu.sky.cloud.height_max);
+  sprintf(line, "CLOUD HEIGHTMA %f\n", instance->scene.sky.cloud.height_max);
   fputs(line, file);
-  sprintf(line, "CLOUD HEIGHTMI %f\n", instance->scene_gpu.sky.cloud.height_min);
+  sprintf(line, "CLOUD HEIGHTMI %f\n", instance->scene.sky.cloud.height_min);
   fputs(line, file);
-  sprintf(line, "CLOUD SHASCALE %f\n", instance->scene_gpu.sky.cloud.noise_shape_scale);
+  sprintf(line, "CLOUD SHASCALE %f\n", instance->scene.sky.cloud.noise_shape_scale);
   fputs(line, file);
-  sprintf(line, "CLOUD DETSCALE %f\n", instance->scene_gpu.sky.cloud.noise_detail_scale);
+  sprintf(line, "CLOUD DETSCALE %f\n", instance->scene.sky.cloud.noise_detail_scale);
   fputs(line, file);
-  sprintf(line, "CLOUD WEASCALE %f\n", instance->scene_gpu.sky.cloud.noise_weather_scale);
+  sprintf(line, "CLOUD WEASCALE %f\n", instance->scene.sky.cloud.noise_weather_scale);
   fputs(line, file);
-  sprintf(line, "CLOUD CURSCALE %f\n", instance->scene_gpu.sky.cloud.noise_curl_scale);
+  sprintf(line, "CLOUD CURSCALE %f\n", instance->scene.sky.cloud.noise_curl_scale);
   fputs(line, file);
-  sprintf(line, "CLOUD COVERAGE %f\n", instance->scene_gpu.sky.cloud.coverage);
+  sprintf(line, "CLOUD COVERAGE %f\n", instance->scene.sky.cloud.coverage);
   fputs(line, file);
-  sprintf(line, "CLOUD COVERMIN %f\n", instance->scene_gpu.sky.cloud.coverage_min);
+  sprintf(line, "CLOUD COVERMIN %f\n", instance->scene.sky.cloud.coverage_min);
   fputs(line, file);
-  sprintf(line, "CLOUD ANVIL___ %f\n", instance->scene_gpu.sky.cloud.anvil);
+  sprintf(line, "CLOUD ANVIL___ %f\n", instance->scene.sky.cloud.anvil);
   fputs(line, file);
-  sprintf(line, "CLOUD FWDSCATT %f\n", instance->scene_gpu.sky.cloud.forward_scattering);
+  sprintf(line, "CLOUD FWDSCATT %f\n", instance->scene.sky.cloud.forward_scattering);
   fputs(line, file);
-  sprintf(line, "CLOUD BWDSCATT %f\n", instance->scene_gpu.sky.cloud.backward_scattering);
+  sprintf(line, "CLOUD BWDSCATT %f\n", instance->scene.sky.cloud.backward_scattering);
   fputs(line, file);
-  sprintf(line, "CLOUD SCATLERP %f\n", instance->scene_gpu.sky.cloud.lobe_lerp);
+  sprintf(line, "CLOUD SCATLERP %f\n", instance->scene.sky.cloud.lobe_lerp);
   fputs(line, file);
-  sprintf(line, "CLOUD WETNESS_ %f\n", instance->scene_gpu.sky.cloud.wetness);
+  sprintf(line, "CLOUD WETNESS_ %f\n", instance->scene.sky.cloud.wetness);
   fputs(line, file);
-  sprintf(line, "CLOUD POWDER__ %f\n", instance->scene_gpu.sky.cloud.powder);
+  sprintf(line, "CLOUD POWDER__ %f\n", instance->scene.sky.cloud.powder);
   fputs(line, file);
-  sprintf(line, "CLOUD STEPS___ %d\n", instance->scene_gpu.sky.cloud.steps);
+  sprintf(line, "CLOUD STEPS___ %d\n", instance->scene.sky.cloud.steps);
   fputs(line, file);
-  sprintf(line, "CLOUD SHASTEPS %d\n", instance->scene_gpu.sky.cloud.shadow_steps);
+  sprintf(line, "CLOUD SHASTEPS %d\n", instance->scene.sky.cloud.shadow_steps);
   fputs(line, file);
-  sprintf(line, "CLOUD DENSITY_ %f\n", instance->scene_gpu.sky.cloud.density);
+  sprintf(line, "CLOUD DENSITY_ %f\n", instance->scene.sky.cloud.density);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Fog Settings\n#===============================\n\n");
   fputs(line, file);
 
-  sprintf(line, "FOG ACTIVE__ %d\n", instance->scene_gpu.fog.active);
+  sprintf(line, "FOG ACTIVE__ %d\n", instance->scene.fog.active);
   fputs(line, file);
-  sprintf(line, "FOG DENSITY_ %f\n", instance->scene_gpu.fog.density);
+  sprintf(line, "FOG DENSITY_ %f\n", instance->scene.fog.density);
   fputs(line, file);
-  sprintf(line, "FOG ANISOTRO %f\n", instance->scene_gpu.fog.anisotropy);
+  sprintf(line, "FOG ANISOTRO %f\n", instance->scene.fog.anisotropy);
   fputs(line, file);
-  sprintf(line, "FOG DISTANCE %f\n", instance->scene_gpu.fog.dist);
+  sprintf(line, "FOG DISTANCE %f\n", instance->scene.fog.dist);
   fputs(line, file);
-  sprintf(line, "FOG HEIGHT__ %f\n", instance->scene_gpu.fog.height);
+  sprintf(line, "FOG HEIGHT__ %f\n", instance->scene.fog.height);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Ocean Settings\n#===============================\n\n");
   fputs(line, file);
 
-  sprintf(line, "OCEAN ACTIVE__ %d\n", instance->scene_gpu.ocean.active);
+  sprintf(line, "OCEAN ACTIVE__ %d\n", instance->scene.ocean.active);
   fputs(line, file);
-  sprintf(line, "OCEAN HEIGHT__ %f\n", instance->scene_gpu.ocean.height);
+  sprintf(line, "OCEAN HEIGHT__ %f\n", instance->scene.ocean.height);
   fputs(line, file);
-  sprintf(line, "OCEAN AMPLITUD %f\n", instance->scene_gpu.ocean.amplitude);
+  sprintf(line, "OCEAN AMPLITUD %f\n", instance->scene.ocean.amplitude);
   fputs(line, file);
-  sprintf(line, "OCEAN FREQUENC %f\n", instance->scene_gpu.ocean.frequency);
+  sprintf(line, "OCEAN FREQUENC %f\n", instance->scene.ocean.frequency);
   fputs(line, file);
-  sprintf(line, "OCEAN CHOPPY__ %f\n", instance->scene_gpu.ocean.choppyness);
+  sprintf(line, "OCEAN CHOPPY__ %f\n", instance->scene.ocean.choppyness);
   fputs(line, file);
-  sprintf(line, "OCEAN SPEED___ %f\n", instance->scene_gpu.ocean.speed);
+  sprintf(line, "OCEAN SPEED___ %f\n", instance->scene.ocean.speed);
   fputs(line, file);
-  sprintf(line, "OCEAN ANIMATED %d\n", instance->scene_gpu.ocean.update);
+  sprintf(line, "OCEAN ANIMATED %d\n", instance->scene.ocean.update);
   fputs(line, file);
   sprintf(
-    line, "OCEAN COLOR___ %f %f %f %f\n", instance->scene_gpu.ocean.albedo.r, instance->scene_gpu.ocean.albedo.g,
-    instance->scene_gpu.ocean.albedo.b, instance->scene_gpu.ocean.albedo.a);
+    line, "OCEAN COLOR___ %f %f %f %f\n", instance->scene.ocean.albedo.r, instance->scene.ocean.albedo.g, instance->scene.ocean.albedo.b,
+    instance->scene.ocean.albedo.a);
   fputs(line, file);
-  sprintf(line, "OCEAN EMISSIVE %d\n", instance->scene_gpu.ocean.emissive);
+  sprintf(line, "OCEAN EMISSIVE %d\n", instance->scene.ocean.emissive);
   fputs(line, file);
-  sprintf(line, "OCEAN REFRACT_ %f\n", instance->scene_gpu.ocean.refractive_index);
+  sprintf(line, "OCEAN REFRACT_ %f\n", instance->scene.ocean.refractive_index);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Toy Settings\n#===============================\n\n");
   fputs(line, file);
 
-  sprintf(line, "TOY ACTIVE__ %d\n", instance->scene_gpu.toy.active);
+  sprintf(line, "TOY ACTIVE__ %d\n", instance->scene.toy.active);
+  fputs(line, file);
+  sprintf(line, "TOY POSITION %f %f %f\n", instance->scene.toy.position.x, instance->scene.toy.position.y, instance->scene.toy.position.z);
+  fputs(line, file);
+  sprintf(line, "TOY ROTATION %f %f %f\n", instance->scene.toy.rotation.x, instance->scene.toy.rotation.y, instance->scene.toy.rotation.z);
+  fputs(line, file);
+  sprintf(line, "TOY SHAPE___ %d\n", instance->scene.toy.shape);
+  fputs(line, file);
+  sprintf(line, "TOY SCALE___ %f\n", instance->scene.toy.scale);
   fputs(line, file);
   sprintf(
-    line, "TOY POSITION %f %f %f\n", instance->scene_gpu.toy.position.x, instance->scene_gpu.toy.position.y,
-    instance->scene_gpu.toy.position.z);
+    line, "TOY COLOR___ %f %f %f %f\n", instance->scene.toy.albedo.r, instance->scene.toy.albedo.g, instance->scene.toy.albedo.b,
+    instance->scene.toy.albedo.a);
   fputs(line, file);
-  sprintf(
-    line, "TOY ROTATION %f %f %f\n", instance->scene_gpu.toy.rotation.x, instance->scene_gpu.toy.rotation.y,
-    instance->scene_gpu.toy.rotation.z);
+  sprintf(line, "TOY MATERIAL %f %f %f\n", instance->scene.toy.material.r, instance->scene.toy.material.g, instance->scene.toy.material.b);
   fputs(line, file);
-  sprintf(line, "TOY SHAPE___ %d\n", instance->scene_gpu.toy.shape);
+  sprintf(line, "TOY EMISSION %f %f %f\n", instance->scene.toy.emission.r, instance->scene.toy.emission.g, instance->scene.toy.emission.b);
   fputs(line, file);
-  sprintf(line, "TOY SCALE___ %f\n", instance->scene_gpu.toy.scale);
+  sprintf(line, "TOY EMISSIVE %d\n", instance->scene.toy.emissive);
   fputs(line, file);
-  sprintf(
-    line, "TOY COLOR___ %f %f %f %f\n", instance->scene_gpu.toy.albedo.r, instance->scene_gpu.toy.albedo.g,
-    instance->scene_gpu.toy.albedo.b, instance->scene_gpu.toy.albedo.a);
+  sprintf(line, "TOY REFRACT_ %f\n", instance->scene.toy.refractive_index);
   fputs(line, file);
-  sprintf(
-    line, "TOY MATERIAL %f %f %f\n", instance->scene_gpu.toy.material.r, instance->scene_gpu.toy.material.g,
-    instance->scene_gpu.toy.material.b);
-  fputs(line, file);
-  sprintf(
-    line, "TOY EMISSION %f %f %f\n", instance->scene_gpu.toy.emission.r, instance->scene_gpu.toy.emission.g,
-    instance->scene_gpu.toy.emission.b);
-  fputs(line, file);
-  sprintf(line, "TOY EMISSIVE %d\n", instance->scene_gpu.toy.emissive);
-  fputs(line, file);
-  sprintf(line, "TOY REFRACT_ %f\n", instance->scene_gpu.toy.refractive_index);
-  fputs(line, file);
-  sprintf(line, "TOY FLASHLIG %d\n", instance->scene_gpu.toy.flashlight_mode);
+  sprintf(line, "TOY FLASHLIG %d\n", instance->scene.toy.flashlight_mode);
   fputs(line, file);
 
   free(line);

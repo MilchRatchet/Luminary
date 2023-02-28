@@ -243,11 +243,11 @@ __device__ float sky_rayleigh_phase(const float cos_angle) {
 }
 
 __device__ float sky_rayleigh_density(const float height) {
-  return 2.5f * device_scene.sky.base_density * expf(-height * (1.0f / device_scene.sky.rayleigh_falloff));
+  return 2.5f * device.scene.sky.base_density * expf(-height * (1.0f / device.scene.sky.rayleigh_falloff));
 }
 
 __device__ float sky_mie_phase(const float cos_angle) {
-  const float g = device_scene.sky.mie_g;
+  const float g = device.scene.sky.mie_g;
   return (3.0f * (1.0f - g * g) * (1.0f + cos_angle * cos_angle))
          / (4.0f * PI * 2.0f * (2.0f + g * g) * pow(1.0f + g * g - 2.0f * g * cos_angle, 3.0f / 2.0f));
 }
@@ -255,7 +255,7 @@ __device__ float sky_mie_phase(const float cos_angle) {
 // [Wil21]
 __device__ float sky_mie_density(const float height) {
   // INSO (insoluble = dust-like particles)
-  const float INSO = expf(-height * (1.0f / device_scene.sky.mie_falloff));
+  const float INSO = expf(-height * (1.0f / device.scene.sky.mie_falloff));
 
   // WASO (water soluble = biogenic particles, organic carbon)
   float WASO = 0.0f;
@@ -265,17 +265,17 @@ __device__ float sky_mie_density(const float height) {
   else if (height < 3.0f) {
     WASO = 3.0f - height;
   }
-  WASO *= 60.0f / device_scene.sky.ground_visibility;
+  WASO *= 60.0f / device.scene.sky.ground_visibility;
 
-  return device_scene.sky.base_density * (INSO + WASO);
+  return device.scene.sky.base_density * (INSO + WASO);
 }
 
 __device__ float sky_ozone_density(const float height) {
-  if (!device_scene.sky.ozone_absorption)
+  if (!device.scene.sky.ozone_absorption)
     return 0.0f;
 
   const float min_val = (height > 25.0f) ? 0.0f : 0.1f;
-  return device_scene.sky.base_density * fmaxf(min_val, 1.0f - fabsf(height - 25.0f) / device_scene.sky.ozone_layer_thickness);
+  return device.scene.sky.base_density * fmaxf(min_val, 1.0f - fabsf(height - 25.0f) / device.scene.sky.ozone_layer_thickness);
 }
 
 /*
@@ -376,9 +376,9 @@ __device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const
     const float reach  = i * step_size;
     const float height = sqrtf(reach * reach + 2.0f * r * mu * reach + r * r) - SKY_EARTH_RADIUS;
 
-    const float density_rayleigh = sky_rayleigh_density(height) * device_scene.sky.rayleigh_density;
-    const float density_mie      = sky_mie_density(height) * device_scene.sky.mie_density;
-    const float density_ozone    = sky_ozone_density(height) * device_scene.sky.ozone_density;
+    const float density_rayleigh = sky_rayleigh_density(height) * device.scene.sky.rayleigh_density;
+    const float density_mie      = sky_mie_density(height) * device.scene.sky.mie_density;
+    const float density_ozone    = sky_ozone_density(height) * device.scene.sky.ozone_density;
 
     const Spectrum extinction_rayleigh = spectrum_scale(SKY_RAYLEIGH_EXTINCTION, density_rayleigh);
     const float extinction_mie         = SKY_MIE_EXTINCTION * density_mie;
@@ -477,13 +477,13 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = tex2D<float4>(device.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
-      const float4 transmittance_high = tex2D<float4>(device.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
-      const float density_rayleigh = sky_rayleigh_density(height) * device_scene.sky.rayleigh_density;
-      const float density_mie      = sky_mie_density(height) * device_scene.sky.mie_density;
-      const float density_ozone    = sky_ozone_density(height) * device_scene.sky.ozone_density;
+      const float density_rayleigh = sky_rayleigh_density(height) * device.scene.sky.rayleigh_density;
+      const float density_mie      = sky_mie_density(height) * device.scene.sky.mie_density;
+      const float density_ozone    = sky_ozone_density(height) * device.scene.sky.ozone_density;
 
       const Spectrum scattering_rayleigh = spectrum_scale(SKY_RAYLEIGH_SCATTERING, density_rayleigh);
       const float scattering_mie         = SKY_MIE_SCATTERING * density_mie;
@@ -571,33 +571,33 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
 
   const Spectrum multiScatteringContribution = spectrum_inv(spectrum_sub(spectrum_set1(1.0f), multiscattering));
 
-  const Spectrum L = spectrum_scale(spectrum_mul(luminance, multiScatteringContribution), device_scene.sky.multiscattering_factor);
+  const Spectrum L = spectrum_scale(spectrum_mul(luminance, multiScatteringContribution), device.scene.sky.multiscattering_factor);
 
   multiscattering_tex_lower[x + y * SKY_MS_TEX_SIZE]  = spectrum_split_low(L);
   multiscattering_tex_higher[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
 }
 
-extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
+extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   bench_tic();
 
-  if (instance->scene_gpu.sky.lut_initialized) {
+  if (instance->scene.sky.lut_initialized) {
     texture_free_atlas(instance->sky_tm_luts, 2);
     texture_free_atlas(instance->sky_ms_luts, 2);
   }
 
-  instance->scene_gpu.sky.base_density           = instance->atmo_settings.base_density;
-  instance->scene_gpu.sky.ground_visibility      = instance->atmo_settings.ground_visibility;
-  instance->scene_gpu.sky.mie_density            = instance->atmo_settings.mie_density;
-  instance->scene_gpu.sky.mie_falloff            = instance->atmo_settings.mie_falloff;
-  instance->scene_gpu.sky.mie_g                  = instance->atmo_settings.mie_g;
-  instance->scene_gpu.sky.ozone_absorption       = instance->atmo_settings.ozone_absorption;
-  instance->scene_gpu.sky.ozone_density          = instance->atmo_settings.ozone_density;
-  instance->scene_gpu.sky.ozone_layer_thickness  = instance->atmo_settings.ozone_layer_thickness;
-  instance->scene_gpu.sky.rayleigh_density       = instance->atmo_settings.rayleigh_density;
-  instance->scene_gpu.sky.rayleigh_falloff       = instance->atmo_settings.rayleigh_falloff;
-  instance->scene_gpu.sky.multiscattering_factor = instance->atmo_settings.multiscattering_factor;
+  instance->scene.sky.base_density           = instance->atmo_settings.base_density;
+  instance->scene.sky.ground_visibility      = instance->atmo_settings.ground_visibility;
+  instance->scene.sky.mie_density            = instance->atmo_settings.mie_density;
+  instance->scene.sky.mie_falloff            = instance->atmo_settings.mie_falloff;
+  instance->scene.sky.mie_g                  = instance->atmo_settings.mie_g;
+  instance->scene.sky.ozone_absorption       = instance->atmo_settings.ozone_absorption;
+  instance->scene.sky.ozone_density          = instance->atmo_settings.ozone_density;
+  instance->scene.sky.ozone_layer_thickness  = instance->atmo_settings.ozone_layer_thickness;
+  instance->scene.sky.rayleigh_density       = instance->atmo_settings.rayleigh_density;
+  instance->scene.sky.rayleigh_falloff       = instance->atmo_settings.rayleigh_falloff;
+  instance->scene.sky.multiscattering_factor = instance->atmo_settings.multiscattering_factor;
 
-  update_device_scene(instance);
+  raytrace_update_device_scene(instance);
 
   TextureRGBA luts_tm_tex[2];
   texture_create(luts_tm_tex + 0, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
@@ -617,7 +617,7 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   device_free(luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
   device_free(luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
 
-  update_device_pointers(instance);
+  raytrace_update_device_pointers(instance);
 
   TextureRGBA luts_ms_tex[2];
   texture_create(luts_ms_tex + 0, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
@@ -641,9 +641,9 @@ extern "C" void sky_generate_LUTs(RaytraceInstance* instance) {
   device_free(luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
   device_free(luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));
 
-  update_device_pointers(instance);
+  raytrace_update_device_pointers(instance);
 
-  instance->scene_gpu.sky.lut_initialized = 1;
+  instance->scene.sky.lut_initialized = 1;
 
   bench_toc((char*) "Sky LUT Computation");
 }
@@ -671,9 +671,9 @@ __device__ Spectrum sky_compute_atmosphere(
     float reach = start;
     float step_size;
 
-    const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device_scene.sky.sun_strength);
+    const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength);
 
-    const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, origin);
+    const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, origin);
 
     for (int i = 0; i < steps; i++) {
       const float new_reach = start + distance * (i + 0.3f) / steps;
@@ -683,7 +683,7 @@ __device__ Spectrum sky_compute_atmosphere(
       const vec3 pos     = add_vector(origin, scale_vector(ray, reach));
       const float height = sky_height(pos);
 
-      const vec3 ray_scatter       = normalize_vector(sub_vector(device_sun, pos));
+      const vec3 ray_scatter       = normalize_vector(sub_vector(device.sun_pos, pos));
       const float cos_angle        = dot_product(ray, ray_scatter);
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
       const float phase_rayleigh   = sky_rayleigh_phase(cos_angle);
@@ -698,13 +698,13 @@ __device__ Spectrum sky_compute_atmosphere(
       }
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = tex2D<float4>(device.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
-      const float4 transmittance_high = tex2D<float4>(device.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
-      const float density_rayleigh = sky_rayleigh_density(height) * device_scene.sky.rayleigh_density;
-      const float density_mie      = sky_mie_density(height) * device_scene.sky.mie_density;
-      const float density_ozone    = sky_ozone_density(height) * device_scene.sky.ozone_density;
+      const float density_rayleigh = sky_rayleigh_density(height) * device.scene.sky.rayleigh_density;
+      const float density_mie      = sky_mie_density(height) * device.scene.sky.mie_density;
+      const float density_ozone    = sky_ozone_density(height) * device.scene.sky.ozone_density;
 
       const Spectrum scattering_rayleigh = spectrum_scale(SKY_RAYLEIGH_SCATTERING, density_rayleigh);
       const float scattering_mie         = SKY_MIE_SCATTERING * density_mie;
@@ -721,8 +721,8 @@ __device__ Spectrum sky_compute_atmosphere(
       const Spectrum ss_radiance = spectrum_scale(spectrum_mul(extinction_sun, phase_times_scattering), shadow * light_angle);
 
       const UV multiscattering_uv        = get_UV(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
-      const float4 multiscattering_low   = tex2D<float4>(device.sky_ms_luts[0], multiscattering_uv.u, multiscattering_uv.v);
-      const float4 multiscattering_high  = tex2D<float4>(device.sky_ms_luts[1], multiscattering_uv.u, multiscattering_uv.v);
+      const float4 multiscattering_low   = tex2D<float4>(device.ptrs.sky_ms_luts[0], multiscattering_uv.u, multiscattering_uv.v);
+      const float4 multiscattering_high  = tex2D<float4>(device.ptrs.sky_ms_luts[1], multiscattering_uv.u, multiscattering_uv.v);
       const Spectrum multiscattering_tex = spectrum_merge(multiscattering_low, multiscattering_high);
       const Spectrum ms_radiance         = spectrum_mul(multiscattering_tex, scattering);
 
@@ -740,24 +740,24 @@ __device__ Spectrum sky_compute_atmosphere(
   }
 
   if (celestials) {
-    const float sun_hit   = sphere_ray_intersection(ray, origin, device_sun, SKY_SUN_RADIUS);
+    const float sun_hit   = sphere_ray_intersection(ray, origin, device.sun_pos, SKY_SUN_RADIUS);
     const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-    const float moon_hit  = sphere_ray_intersection(ray, origin, device_moon, SKY_MOON_RADIUS);
+    const float moon_hit  = sphere_ray_intersection(ray, origin, device.moon_pos, SKY_MOON_RADIUS);
 
     if (earth_hit > sun_hit && moon_hit > sun_hit) {
-      const Spectrum S = spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, device_scene.sky.sun_strength));
+      const Spectrum S = spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength));
 
       result = spectrum_add(result, S);
     }
     else if (earth_hit > moon_hit) {
       const vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
-      const vec3 normal     = normalize_vector(sub_vector(moon_pos, device_moon));
-      const vec3 bounce_ray = normalize_vector(sub_vector(device_sun, moon_pos));
+      const vec3 normal     = normalize_vector(sub_vector(moon_pos, device.moon_pos));
+      const vec3 bounce_ray = normalize_vector(sub_vector(device.sun_pos, moon_pos));
       const float NdotL     = dot_product(normal, bounce_ray);
 
       if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && NdotL > 0.0f) {
-        const float light_angle = sample_sphere_solid_angle(device_sun, SKY_SUN_RADIUS, moon_pos);
-        const float weight      = device_scene.sky.sun_strength * device_scene.sky.moon_albedo * NdotL * light_angle / (2.0f * PI);
+        const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, moon_pos);
+        const float weight      = device.scene.sky.sun_strength * device.scene.sky.moon_albedo * NdotL * light_angle / (2.0f * PI);
 
         result = spectrum_add(result, spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, weight)));
       }
@@ -772,15 +772,15 @@ __device__ Spectrum sky_compute_atmosphere(
 
       const int grid = x + y * STARS_GRID_LD;
 
-      const int a = device_scene.sky.stars_offsets[grid];
-      const int b = device_scene.sky.stars_offsets[grid + 1];
+      const int a = device.scene.sky.stars_offsets[grid];
+      const int b = device.scene.sky.stars_offsets[grid + 1];
 
       for (int i = a; i < b; i++) {
-        const Star star     = device_scene.sky.stars[i];
+        const Star star     = device.scene.sky.stars[i];
         const vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
 
         if (sphere_ray_hit(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius)) {
-          result = spectrum_add(result, spectrum_scale(transmittance, star.intensity * device_scene.sky.stars_intensity));
+          result = spectrum_add(result, spectrum_scale(transmittance, star.intensity * device.scene.sky.stars_intensity));
         }
       }
     }
@@ -811,37 +811,37 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
   const float zenith_cos_angle = dot_product(normalize_vector(origin), ray);
 
   const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-  const float4 transmittance_low  = tex2D<float4>(device.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
-  const float4 transmittance_high = tex2D<float4>(device.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
+  const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
+  const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
   const Spectrum extinction_sun   = spectrum_mul(spectrum_get_ident(), spectrum_merge(transmittance_low, transmittance_high));
 
-  const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device_scene.sky.sun_strength);
+  const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength);
   const Spectrum radiance     = spectrum_mul(extinction_sun, sun_radiance);
 
   return sky_compute_color_from_spectrum(radiance);
 }
 
 __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, ushort2 index) {
-  int pixel = index.x + index.y * device_width;
+  int pixel = index.x + index.y * device.width;
 
-  const RGBAhalf record = load_RGBAhalf(device_records + pixel);
+  const RGBAhalf record = load_RGBAhalf(device.records + pixel);
 
   RGBF new_record = RGBAhalf_to_RGBF(record);
 
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const int steps = __saturatef(limit / 5.0f) * (device_scene.sky.steps / 3);
+  const int steps = __saturatef(limit / 5.0f) * (device.scene.sky.steps / 3);
 
   const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps);
 
   const RGBAhalf inscattering = RGBF_to_RGBAhalf(mul_color(sky_compute_color_from_spectrum(radiance), new_record));
 
   if (any_RGBAhalf(inscattering)) {
-    store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), inscattering));
+    store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), inscattering));
   }
 
   new_record = mul_color(new_record, sky_compute_color_from_spectrum(transmittance));
-  store_RGBAhalf(device_records + pixel, RGBF_to_RGBAhalf(new_record));
+  store_RGBAhalf(device.records + pixel, RGBF_to_RGBAhalf(new_record));
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -851,21 +851,21 @@ __device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device.task_counts[id * 6 + 2];
-  const int task_offset = device.task_offsets[id * 5 + 2];
+  const int task_count  = device.ptrs.task_counts[id * 6 + 2];
+  const int task_offset = device.ptrs.task_offsets[id * 5 + 2];
 
   for (int i = 0; i < task_count; i++) {
-    const SkyTask task = load_sky_task(device_trace_tasks + get_task_address(task_offset + i));
-    const int pixel    = task.index.y * device_width + task.index.x;
+    const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel    = task.index.y * device.width + task.index.x;
 
-    const RGBAhalf record = load_RGBAhalf(device_records + pixel);
+    const RGBAhalf record = load_RGBAhalf(device.records + pixel);
     const vec3 origin     = world_to_sky_transform(task.origin);
-    const uint32_t light  = device.light_sample_history[pixel];
+    const uint32_t light  = device.ptrs.light_sample_history[pixel];
 
     const RGBAhalf sky = mul_RGBAhalf(
-      RGBF_to_RGBAhalf(sky_get_color(origin, task.ray, FLT_MAX, proper_light_sample(light, LIGHT_ID_SUN), device_scene.sky.steps)), record);
+      RGBF_to_RGBAhalf(sky_get_color(origin, task.ray, FLT_MAX, proper_light_sample(light, LIGHT_ID_SUN), device.scene.sky.steps)), record);
 
-    store_RGBAhalf(device.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.frame_buffer + pixel), sky));
+    store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), sky));
     write_albedo_buffer(RGBAhalf_to_RGBF(sky), pixel);
     write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }
@@ -874,21 +874,21 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int task_count  = device.task_counts[id * 6 + 2];
-  const int task_offset = device.task_offsets[id * 5 + 2];
+  const int task_count  = device.ptrs.task_counts[id * 6 + 2];
+  const int task_offset = device.ptrs.task_offsets[id * 5 + 2];
 
   for (int i = 0; i < task_count; i++) {
-    const SkyTask task = load_sky_task(device_trace_tasks + get_task_address(task_offset + i));
-    const int pixel    = task.index.y * device_width + task.index.x;
+    const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel    = task.index.y * device.width + task.index.x;
 
-    if (device_shading_mode == SHADING_ALBEDO) {
+    if (device.shading_mode == SHADING_ALBEDO) {
       store_RGBAhalf(
-        device.frame_buffer + pixel,
-        RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device_scene.sky.steps)));
+        device.ptrs.frame_buffer + pixel,
+        RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps)));
     }
-    else if (device_shading_mode == SHADING_DEPTH) {
-      const float value = __saturatef((1.0f / device_scene.camera.far_clip_distance) * 2.0f);
-      store_RGBAhalf(device.frame_buffer + pixel, get_RGBAhalf(value, value, value, value));
+    else if (device.shading_mode == SHADING_DEPTH) {
+      const float value = __saturatef((1.0f / device.scene.camera.far_clip_distance) * 2.0f);
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, get_RGBAhalf(value, value, value, value));
     }
   }
 }

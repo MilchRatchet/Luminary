@@ -59,7 +59,7 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
   }
 }
 
-extern "C" int brdf_unittest(const float tolerance) {
+extern "C" int device_brdf_unittest(const float tolerance) {
   DeviceBuffer* bounce = (DeviceBuffer*) 0;
   device_buffer_init(&bounce);
   device_buffer_malloc(bounce, sizeof(float), BRDF_UNITTEST_TOTAL);

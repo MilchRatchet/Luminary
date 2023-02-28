@@ -1,6 +1,7 @@
 #ifndef CU_BLOOM_H
 #define CU_BLOOM_H
 
+#include "buffer.h"
 #include "math.cuh"
 #include "memory.cuh"
 #include "utils.cuh"
@@ -103,7 +104,7 @@ __global__ void bloom_downsample(RGBAhalf* source, const int sw, const int sh, R
 __global__ void bloom_downsample_truncate(RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const float thresh = device_scene.camera.bloom_threshold;
+  const float thresh = device.scene.camera.bloom_threshold;
 
   const float scale_x = 1.0f / (tw - 1);
   const float scale_y = 1.0f / (th - 1);
@@ -185,7 +186,7 @@ __global__ void bloom_upsample(
   }
 }
 
-extern "C" void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst) {
+extern "C" void device_bloom_apply(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst) {
   const int width  = instance->output_width;
   const int height = instance->output_height;
 
@@ -220,10 +221,10 @@ extern "C" void apply_bloom(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf*
 
   bloom_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
     (RGBAhalf*) instance->bloom_mips_gpu[0], width >> 1, height >> 1, (RGBAhalf*) dst, (RGBAhalf*) src, width, height, 1.0f,
-    0.01f * instance->scene_gpu.camera.bloom_strength / mip_count);
+    0.01f * instance->scene.camera.bloom_strength / mip_count);
 }
 
-static void allocate_bloom_mips(RaytraceInstance* instance) {
+extern "C" void device_bloom_allocate_mips(RaytraceInstance* instance) {
   int width  = instance->output_width;
   int height = instance->output_height;
 
@@ -236,7 +237,7 @@ static void allocate_bloom_mips(RaytraceInstance* instance) {
   }
 }
 
-static void free_bloom_mips(RaytraceInstance* instance) {
+extern "C" void device_bloom_free_mips(RaytraceInstance* instance) {
   int width  = instance->output_width;
   int height = instance->output_height;
 

@@ -5,6 +5,7 @@
 #include "baked.h"
 #include "bench.h"
 #include "config.h"
+#include "device.h"
 #include "log.h"
 #include "output.h"
 #include "raytrace.h"
@@ -147,7 +148,7 @@ int main(int argc, char* argv[]) {
 
   init_log(write_logs);
 
-  initialize_device();
+  device_init();
 
   assert(argc >= 2, "No scene description was given!", 1);
 
@@ -174,7 +175,7 @@ int main(int argc, char* argv[]) {
   }
 
   if (unittest) {
-    if (brdf_unittest(0.95f))
+    if (device_brdf_unittest(0.95f))
       error_message("UNITTEST - BRDF failed.");
 
     return 0;
@@ -192,7 +193,7 @@ int main(int argc, char* argv[]) {
     instance->settings.height = (height) ? height : instance->height;
   }
 
-  reset_raytracing(instance);
+  raytrace_reset(instance);
 
   instance->image_format      = img_format;
   instance->post_process_menu = post_process_menu;
@@ -207,7 +208,7 @@ int main(int argc, char* argv[]) {
   }
 
   free_atlases(instance);
-  free_outputs(instance);
+  raytrace_free_output_buffers(instance);
 
   write_log();
 
