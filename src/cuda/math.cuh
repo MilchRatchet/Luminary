@@ -8,16 +8,6 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-/*
- * Xorshift RNG by George Marsaglia
- */
-__device__ uint32_t xorshift_uint32(uint32_t x) {
-  x ^= x << 13;
-  x ^= x >> 17;
-  x ^= x << 5;
-  return x;
-}
-
 __device__ vec3 cross_product(const vec3 a, const vec3 b) {
   vec3 result;
 

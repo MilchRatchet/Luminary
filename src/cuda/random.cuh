@@ -1,6 +1,7 @@
 #ifndef CU_RANDOM_H
 #define CU_RANDOM_H
 
+#include "intrinsics.cuh"
 #include "utils.cuh"
 
 //
@@ -9,7 +10,8 @@
 // generator but we use a simply key that is the number of alternating 0s and 1s added to the ID of the
 // thread. This works well in practice and the both register and memory usage are tiny.
 // The paper proposes a method of computing a 64bit output using 64bit inputs. Since we only have 32bit
-// inputs, I adapted this method such that we obtain a 32bit output.
+// inputs, I adapted this method such that we obtain a 32bit output. For better performance, a version
+// producing only 16 bits is used wherever we don't need a huge range of possible random numbers.
 //
 
 ////////////////////////////////////////////////////////////////////
@@ -20,7 +22,11 @@
 // Bernard Widynski, "Squares: A Fast Counter-Based RNG", 2020
 // https://arxiv.org/abs/2004.06278
 
-__device__ float white_noise_offset(const uint32_t offset) {
+////////////////////////////////////////////////////////////////////
+// Random number generators
+////////////////////////////////////////////////////////////////////
+
+__device__ uint32_t random_uint32_t(const uint32_t offset) {
   // Key is supposed to be a number with roughly the same amount of 0 bits as 1 bits.
   // This key here seems to work well.
   const uint32_t key     = threadIdx.x + blockIdx.x * blockDim.x + 0x55555555;
@@ -31,26 +37,63 @@ __device__ float white_noise_offset(const uint32_t offset) {
   uint32_t z = y + key;
 
   x = x * x + y;
-  x = (x >> 16) | (x << 16);
+  x = __uswap16p(x);
 
   x = x * x + z;
-  x = (x >> 16) | (x << 16);
+  x = __uswap16p(x);
 
   x = x * x + y;
-  x = (x >> 16) | (x << 16);
+  x = __uswap16p(x);
 
   x = x * x + z;
   z = x;
-  x = (x >> 16) | (x << 16);
+  x = __uswap16p(x);
 
-  x = z ^ ((x * x + y) >> 16);
+  return z ^ ((x * x + y) >> 16);
+}
 
-  return ((float) x) / ((float) UINT32_MAX);
+__device__ uint16_t random_uint16_t(const uint32_t offset) {
+  // Key is supposed to be a number with roughly the same amount of 0 bits as 1 bits.
+  // This key here seems to work well.
+  const uint32_t key     = threadIdx.x + blockIdx.x * blockDim.x + 0x55555555;
+  const uint32_t counter = offset;
+
+  uint32_t x = counter * key;
+  uint32_t y = counter * key;
+  uint32_t z = y + key;
+
+  x = x * x + y;
+  x = __uswap16p(x);
+
+  x = x * x + z;
+  x = __uswap16p(x);
+
+  return (x * x + y) >> 16;
+}
+
+////////////////////////////////////////////////////////////////////
+// Wrapper
+////////////////////////////////////////////////////////////////////
+
+__device__ float white_noise_precise_offset(const uint32_t offset) {
+  return ((float) random_uint32_t(offset)) / ((float) UINT32_MAX);
+}
+
+__device__ float white_noise_offset(const uint32_t offset) {
+  return ((float) random_uint16_t(offset)) / ((float) UINT16_MAX);
+}
+
+__device__ float white_noise_precise() {
+  return white_noise_precise_offset(device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x]++);
 }
 
 __device__ float white_noise() {
   return white_noise_offset(device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x]++);
 }
+
+////////////////////////////////////////////////////////////////////
+// Kernels
+////////////////////////////////////////////////////////////////////
 
 __global__ void initialize_randoms() {
   device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = 1;

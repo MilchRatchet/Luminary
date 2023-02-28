@@ -212,7 +212,7 @@ __device__ LightSample brdf_light_sample_update(LightSample x, const LightSample
   return x;
 }
 
-__device__ LightSample sample_light(const vec3 position) {
+__device__ LightSample sample_light(const vec3 position, uint32_t& ran_offset) {
   const vec3 sky_pos = world_to_sky_transform(position);
 
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
@@ -231,7 +231,7 @@ __device__ LightSample sample_light(const vec3 position) {
   if (!light_count)
     return selected;
 
-  const float ran = white_noise();
+  const float ran = white_noise_offset(ran_offset++);
 
   if (device.iteration_type != TYPE_CAMERA && sun_visible && ran < 0.5f) {
     selected.id          = LIGHT_ID_SUN;
@@ -246,10 +246,8 @@ __device__ LightSample sample_light(const vec3 position) {
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
 
-  uint32_t ran_weight = (uint32_t) (ran * ((uint32_t) 0xffff));
-
   for (int i = 0; i < reservoir_sampling_size; i++) {
-    const float r1       = white_noise();
+    const float r1       = white_noise_precise_offset(ran_offset++);
     uint32_t light_index = (uint32_t) (r1 * light_count_float);
 
     light_index += !sun_visible;
@@ -281,8 +279,7 @@ __device__ LightSample sample_light(const vec3 position) {
     light.solid_angle = brdf_light_sample_solid_angle(light, position);
     light.weight      = brdf_light_sample_target_weight(light) * light_count_float;
 
-    ran_weight    = xorshift_uint32(ran_weight);
-    const float r = ((float) (ran_weight & 0xffff)) / ((float) 0xffff);
+    const float r = white_noise_offset(ran_offset++);
 
     selected = brdf_light_sample_update(selected, light, light.weight, r);
   }
