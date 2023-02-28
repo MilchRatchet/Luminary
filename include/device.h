@@ -1,7 +1,10 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
+#include <cuda_runtime_api.h>
+
 #include "stddef.h"
+#include "structs.h"
 #include "utils.h"
 
 #if __cplusplus
@@ -41,6 +44,12 @@ int device_brdf_unittest(const float tolerance);
 // cloud_noise.cuh
 ////////////////////////////////////////////////////////////////////
 void device_cloud_noise_generate(RaytraceInstance* instance);
+
+////////////////////////////////////////////////////////////////////
+// mipmap.cuh
+////////////////////////////////////////////////////////////////////
+void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, TextureRGBA* tex);
+unsigned int device_mipmap_compute_max_level(TextureRGBA* tex);
 
 ////////////////////////////////////////////////////////////////////
 // sky.cuh

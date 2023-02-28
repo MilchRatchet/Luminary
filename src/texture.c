@@ -4,22 +4,23 @@
 #include <string.h>
 
 #include "buffer.h"
+#include "device.h"
 #include "log.h"
 #include "structs.h"
 
-static struct cudaExtent texture_make_cudaextent(size_t depth, size_t height, size_t width) {
+struct cudaExtent texture_make_cudaextent(size_t depth, size_t height, size_t width) {
   const struct cudaExtent extent = {.depth = depth, .height = height, .width = width};
 
   return extent;
 }
 
-static struct cudaPitchedPtr texture_make_cudapitchedptr(void* ptr, size_t pitch, size_t xsize, size_t ysize) {
+struct cudaPitchedPtr texture_make_cudapitchedptr(void* ptr, size_t pitch, size_t xsize, size_t ysize) {
   const struct cudaPitchedPtr pitchedptr = {.pitch = pitch, .ptr = ptr, .xsize = xsize, .ysize = ysize};
 
   return pitchedptr;
 }
 
-static enum cudaTextureAddressMode texture_get_address_mode(TextureRGBA* tex) {
+enum cudaTextureAddressMode texture_get_address_mode(TextureRGBA* tex) {
   switch (tex->wrap_mode) {
     case TexModeWrap:
       return cudaAddressModeWrap;
@@ -35,7 +36,7 @@ static enum cudaTextureAddressMode texture_get_address_mode(TextureRGBA* tex) {
   }
 }
 
-static enum cudaTextureReadMode texture_get_read_mode(TextureRGBA* tex) {
+enum cudaTextureReadMode texture_get_read_mode(TextureRGBA* tex) {
   switch (tex->type) {
     case TexDataFP32:
       return cudaReadModeElementType;
@@ -47,7 +48,7 @@ static enum cudaTextureReadMode texture_get_read_mode(TextureRGBA* tex) {
   }
 }
 
-static enum cudaTextureFilterMode texture_get_filter_mode(TextureRGBA* tex) {
+enum cudaTextureFilterMode texture_get_filter_mode(TextureRGBA* tex) {
   switch (tex->filter) {
     case TexFilterPoint:
       return cudaFilterModePoint;
@@ -59,7 +60,7 @@ static enum cudaTextureFilterMode texture_get_filter_mode(TextureRGBA* tex) {
   }
 }
 
-static enum cudaMemcpyKind texture_get_copy_to_device_type(TextureRGBA* tex) {
+enum cudaMemcpyKind texture_get_copy_to_device_type(TextureRGBA* tex) {
   switch (tex->storage) {
     case TexStorageCPU:
       return cudaMemcpyHostToDevice;
@@ -71,7 +72,7 @@ static enum cudaMemcpyKind texture_get_copy_to_device_type(TextureRGBA* tex) {
   }
 }
 
-static struct cudaChannelFormatDesc texture_get_channel_format_desc(TextureRGBA* tex) {
+struct cudaChannelFormatDesc texture_get_channel_format_desc(TextureRGBA* tex) {
   switch (tex->type) {
     case TexDataFP32:
       return cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
@@ -83,7 +84,7 @@ static struct cudaChannelFormatDesc texture_get_channel_format_desc(TextureRGBA*
   }
 }
 
-static size_t texture_get_pixel_size(TextureRGBA* tex) {
+size_t texture_get_pixel_size(TextureRGBA* tex) {
   switch (tex->type) {
     case TexDataFP32:
       return sizeof(RGBAF);
@@ -100,63 +101,98 @@ static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
 
   enum cudaTextureAddressMode address_mode = texture_get_address_mode(tex);
 
-  struct cudaTextureDesc texDesc;
-  memset(&texDesc, 0, sizeof(texDesc));
-  texDesc.addressMode[0]   = address_mode;
-  texDesc.addressMode[1]   = address_mode;
-  texDesc.addressMode[2]   = address_mode;
-  texDesc.filterMode       = texture_get_filter_mode(tex);
-  texDesc.maxAnisotropy    = 16;
-  texDesc.readMode         = texture_get_read_mode(tex);
-  texDesc.normalizedCoords = 1;
+  struct cudaTextureDesc tex_desc;
+  memset(&tex_desc, 0, sizeof(tex_desc));
+  tex_desc.addressMode[0]      = address_mode;
+  tex_desc.addressMode[1]      = address_mode;
+  tex_desc.addressMode[2]      = address_mode;
+  tex_desc.filterMode          = texture_get_filter_mode(tex);
+  tex_desc.mipmapFilterMode    = cudaFilterModePoint;
+  tex_desc.maxAnisotropy       = 16;
+  tex_desc.readMode            = texture_get_read_mode(tex);
+  tex_desc.normalizedCoords    = 1;
+  tex_desc.minMipmapLevelClamp = 0;
 
-  struct cudaResourceDesc resDesc;
-  memset(&resDesc, 0, sizeof(resDesc));
+  struct cudaResourceDesc res_desc;
+  memset(&res_desc, 0, sizeof(res_desc));
+
+  struct cudaChannelFormatDesc channelDesc = texture_get_channel_format_desc(tex);
 
   const unsigned int width  = tex->width;
   const unsigned int height = tex->height;
+  const unsigned int depth  = tex->depth;
   const unsigned int pitch  = tex->pitch;
   void* data                = tex->data;
 
   switch (tex->dim) {
     case Tex2D: {
+      if (tex->mipmap != TexMipmapNone) {
+        warn_message("Mipmap mode %d is not implemented for 2D textures.", tex->mipmap);
+      }
       void* data_gpu;
       size_t pitch_gpu = device_malloc_pitch((void**) &data_gpu, pitch * pixel_size, height);
       gpuErrchk(
         cudaMemcpy2D(data_gpu, pitch_gpu, data, pitch * pixel_size, width * pixel_size, height, texture_get_copy_to_device_type(tex)));
 
-      resDesc.resType                  = cudaResourceTypePitch2D;
-      resDesc.res.pitch2D.devPtr       = data_gpu;
-      resDesc.res.pitch2D.width        = width;
-      resDesc.res.pitch2D.height       = height;
-      resDesc.res.pitch2D.desc         = texture_get_channel_format_desc(tex);
-      resDesc.res.pitch2D.pitchInBytes = pitch_gpu;
+      res_desc.resType                  = cudaResourceTypePitch2D;
+      res_desc.res.pitch2D.devPtr       = data_gpu;
+      res_desc.res.pitch2D.width        = width;
+      res_desc.res.pitch2D.height       = height;
+      res_desc.res.pitch2D.desc         = channelDesc;
+      res_desc.res.pitch2D.pitchInBytes = pitch_gpu;
     } break;
     case Tex3D: {
-      const unsigned int depth = tex->depth;
+      switch (tex->mipmap) {
+        default:
+          error_message("Invalid texture mipmap mode %d", tex->mipmap);
+        case TexMipmapNone: {
+          struct cudaArray* array_gpu;
+          gpuErrchk(cudaMalloc3DArray(&array_gpu, &channelDesc, texture_make_cudaextent(depth, height, pitch), 0));
 
-      struct cudaChannelFormatDesc channelDesc = texture_get_channel_format_desc(tex);
+          struct cudaMemcpy3DParms copy_params = {0};
+          copy_params.srcPtr                   = texture_make_cudapitchedptr(data, pitch * pixel_size, height, depth);
+          copy_params.dstArray                 = array_gpu;
+          copy_params.extent                   = texture_make_cudaextent(depth, height, pitch);
+          copy_params.kind                     = texture_get_copy_to_device_type(tex);
 
-      struct cudaArray* array_gpu;
-      gpuErrchk(cudaMalloc3DArray(&array_gpu, &channelDesc, texture_make_cudaextent(pitch, height, depth), 0));
+          gpuErrchk(cudaMemcpy3D(&copy_params));
 
-      struct cudaMemcpy3DParms copy_params = {0};
-      copy_params.srcPtr                   = texture_make_cudapitchedptr(data, pitch * pixel_size, height, depth);
-      copy_params.dstArray                 = array_gpu;
-      copy_params.extent                   = texture_make_cudaextent(pitch, height, depth);
-      copy_params.kind                     = texture_get_copy_to_device_type(tex);
+          res_desc.resType         = cudaResourceTypeArray;
+          res_desc.res.array.array = array_gpu;
+        } break;
+        case TexMipmapGenerate: {
+          const unsigned int levels    = device_mipmap_compute_max_level(tex);
+          tex->mipmap_max_level        = levels;
+          tex_desc.maxMipmapLevelClamp = levels;
 
-      gpuErrchk(cudaMemcpy3D(&copy_params));
+          cudaMipmappedArray_t mipmap_array;
+          gpuErrchk(cudaMallocMipmappedArray(&mipmap_array, &channelDesc, texture_make_cudaextent(depth, height, pitch), levels + 1, 0));
 
-      resDesc.resType         = cudaResourceTypeArray;
-      resDesc.res.array.array = array_gpu;
+          cudaArray_t level_0;
+          gpuErrchk(cudaGetMipmappedArrayLevel(&level_0, mipmap_array, 0));
+
+          struct cudaMemcpy3DParms copy_params = {0};
+          copy_params.srcPtr                   = texture_make_cudapitchedptr(data, pitch * pixel_size, height, depth);
+          copy_params.dstArray                 = level_0;
+          copy_params.extent                   = texture_make_cudaextent(pitch, height, depth);
+          copy_params.kind                     = texture_get_copy_to_device_type(tex);
+
+          gpuErrchk(cudaMemcpy3D(&copy_params));
+
+          device_mipmap_generate(mipmap_array, tex);
+
+          res_desc.resType           = cudaResourceTypeMipmappedArray;
+          res_desc.res.mipmap.mipmap = mipmap_array;
+        } break;
+      }
+
     } break;
     default:
       crash_message("Invalid texture dimension type %d\n", tex->dim);
       break;
   }
 
-  gpuErrchk(cudaCreateTextureObject(cudaTex, &resDesc, &texDesc, (const struct cudaResourceViewDesc*) 0));
+  gpuErrchk(cudaCreateTextureObject(cudaTex, &res_desc, &tex_desc, (const struct cudaResourceViewDesc*) 0));
 }
 
 void texture_create_atlas(DeviceBuffer** buffer, TextureRGBA* textures, const int textures_length) {
@@ -198,16 +234,18 @@ void texture_create(
     return;
 
   const TextureRGBA _tex = {
-    .width     = width,
-    .height    = height,
-    .depth     = depth,
-    .pitch     = pitch,
-    .data      = data,
-    .dim       = (depth > 1) ? Tex3D : Tex2D,
-    .storage   = storage,
-    .type      = type,
-    .wrap_mode = TexModeWrap,
-    .filter    = TexFilterLinear};
+    .width            = width,
+    .height           = height,
+    .depth            = depth,
+    .pitch            = pitch,
+    .data             = data,
+    .dim              = (depth > 1) ? Tex3D : Tex2D,
+    .storage          = storage,
+    .type             = type,
+    .wrap_mode        = TexModeWrap,
+    .filter           = TexFilterLinear,
+    .mipmap           = TexMipmapNone,
+    .mipmap_max_level = 0};
 
   *tex = _tex;
 }

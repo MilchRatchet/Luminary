@@ -159,7 +159,7 @@ __device__ float cloud_base_density(const vec3 pos, const float height, const ve
   shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
   shape_pos      = scale_vector(shape_pos, 0.4f * device.scene.sky.cloud.noise_shape_scale);
 
-  float4 shape = tex3D<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z);
+  float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, 0.0f);
 
   const vec3 gradient = get_vector(
     cloud_gradient(CLOUD_GRADIENT_STRATUS, height), cloud_gradient(CLOUD_GRADIENT_STRATOCUMULUS, height),
@@ -196,7 +196,7 @@ __device__ float cloud_erode_density(const vec3 pos, float density, const float 
   detail_pos      = add_vector(detail_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
   detail_pos      = scale_vector(detail_pos, 2.0f * device.scene.sky.cloud.noise_detail_scale);
 
-  const float4 detail = tex3D<float4>(device.ptrs.cloud_noise[1], detail_pos.x, detail_pos.y, detail_pos.z);
+  const float4 detail = tex3DLod<float4>(device.ptrs.cloud_noise[1], detail_pos.x, detail_pos.y, detail_pos.z, 0.0f);
 
   float detail_fbm = __saturatef(detail.x * 0.625f + detail.y * 0.25f + detail.z * 0.125f);
 

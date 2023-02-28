@@ -446,6 +446,9 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   texture_create(noise_tex + 2, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, CLOUD_WEATHER_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
   texture_create(noise_tex + 3, CLOUD_CURL_RES, CLOUD_CURL_RES, 1, CLOUD_CURL_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
 
+  noise_tex[0].mipmap = TexMipmapGenerate;
+  noise_tex[1].mipmap = TexMipmapGenerate;
+
   device_malloc((void**) &noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
   generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[0].width, (uint8_t*) noise_tex[0].data);
 
