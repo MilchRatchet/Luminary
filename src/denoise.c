@@ -214,7 +214,7 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
 
   const float lerp_factor = 0.2f * (1.0f - 1.0f / (1 + instance->temporal_frames));
 
-  return lerp(exposure, target_exposure * powf(1.0f + brightness, 0.45f), lerp_factor);
+  return lerp(exposure, target_exposure * powf(1.0f + brightness, 0.6f), lerp_factor);
 }
 
 void denoise_free(RaytraceInstance* instance) {
