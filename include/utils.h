@@ -167,6 +167,7 @@ struct Cloud {
   float coverage;
   float coverage_min;
   float anvil;
+  float mipmap_bias;
 } typedef Cloud;
 
 // Settings that affect the sky LUTs

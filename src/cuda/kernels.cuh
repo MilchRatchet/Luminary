@@ -254,7 +254,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
     float inscattering_limit = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
 
     if (device.scene.sky.cloud.active) {
-      inscattering_limit   = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
       const float2 params  = cloud_get_intersection(sky_origin, task.ray, inscattering_limit);
       const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
 

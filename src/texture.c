@@ -126,20 +126,48 @@ static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
 
   switch (tex->dim) {
     case Tex2D: {
-      if (tex->mipmap != TexMipmapNone) {
-        warn_message("Mipmap mode %d is not implemented for 2D textures.", tex->mipmap);
-      }
-      void* data_gpu;
-      size_t pitch_gpu = device_malloc_pitch((void**) &data_gpu, pitch * pixel_size, height);
-      gpuErrchk(
-        cudaMemcpy2D(data_gpu, pitch_gpu, data, pitch * pixel_size, width * pixel_size, height, texture_get_copy_to_device_type(tex)));
+      switch (tex->mipmap) {
+        default:
+          error_message("Invalid texture mipmap mode %d", tex->mipmap);
+        case TexMipmapNone: {
+          void* data_gpu;
+          size_t pitch_gpu = device_malloc_pitch((void**) &data_gpu, pitch * pixel_size, height);
+          gpuErrchk(
+            cudaMemcpy2D(data_gpu, pitch_gpu, data, pitch * pixel_size, width * pixel_size, height, texture_get_copy_to_device_type(tex)));
 
-      res_desc.resType                  = cudaResourceTypePitch2D;
-      res_desc.res.pitch2D.devPtr       = data_gpu;
-      res_desc.res.pitch2D.width        = width;
-      res_desc.res.pitch2D.height       = height;
-      res_desc.res.pitch2D.desc         = channelDesc;
-      res_desc.res.pitch2D.pitchInBytes = pitch_gpu;
+          res_desc.resType                  = cudaResourceTypePitch2D;
+          res_desc.res.pitch2D.devPtr       = data_gpu;
+          res_desc.res.pitch2D.width        = width;
+          res_desc.res.pitch2D.height       = height;
+          res_desc.res.pitch2D.desc         = channelDesc;
+          res_desc.res.pitch2D.pitchInBytes = pitch_gpu;
+        } break;
+        case TexMipmapGenerate: {
+          const unsigned int levels    = device_mipmap_compute_max_level(tex);
+          tex->mipmap_max_level        = levels;
+          tex_desc.maxMipmapLevelClamp = levels;
+
+          cudaMipmappedArray_t mipmap_array;
+          gpuErrchk(cudaMallocMipmappedArray(&mipmap_array, &channelDesc, texture_make_cudaextent(0, height, pitch), levels + 1, 0));
+
+          cudaArray_t level_0;
+          gpuErrchk(cudaGetMipmappedArrayLevel(&level_0, mipmap_array, 0));
+
+          struct cudaMemcpy3DParms copy_params = {0};
+          copy_params.srcPtr                   = texture_make_cudapitchedptr(data, pitch * pixel_size, width, height);
+          copy_params.dstArray                 = level_0;
+          copy_params.extent                   = texture_make_cudaextent(1, height, pitch);
+          copy_params.kind                     = texture_get_copy_to_device_type(tex);
+
+          gpuErrchk(cudaMemcpy3D(&copy_params));
+
+          device_mipmap_generate(mipmap_array, tex);
+
+          res_desc.resType           = cudaResourceTypeMipmappedArray;
+          res_desc.res.mipmap.mipmap = mipmap_array;
+
+        } break;
+      }
     } break;
     case Tex3D: {
       switch (tex->mipmap) {
@@ -150,7 +178,7 @@ static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
           gpuErrchk(cudaMalloc3DArray(&array_gpu, &channelDesc, texture_make_cudaextent(depth, height, pitch), 0));
 
           struct cudaMemcpy3DParms copy_params = {0};
-          copy_params.srcPtr                   = texture_make_cudapitchedptr(data, pitch * pixel_size, height, depth);
+          copy_params.srcPtr                   = texture_make_cudapitchedptr(data, pitch * pixel_size, width, height);
           copy_params.dstArray                 = array_gpu;
           copy_params.extent                   = texture_make_cudaextent(depth, height, pitch);
           copy_params.kind                     = texture_get_copy_to_device_type(tex);
@@ -172,9 +200,9 @@ static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
           gpuErrchk(cudaGetMipmappedArrayLevel(&level_0, mipmap_array, 0));
 
           struct cudaMemcpy3DParms copy_params = {0};
-          copy_params.srcPtr                   = texture_make_cudapitchedptr(data, pitch * pixel_size, height, depth);
+          copy_params.srcPtr                   = texture_make_cudapitchedptr(data, pitch * pixel_size, width, height);
           copy_params.dstArray                 = level_0;
-          copy_params.extent                   = texture_make_cudaextent(pitch, height, depth);
+          copy_params.extent                   = texture_make_cudaextent(depth, height, pitch);
           copy_params.kind                     = texture_get_copy_to_device_type(tex);
 
           gpuErrchk(cudaMemcpy3D(&copy_params));

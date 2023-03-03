@@ -47,7 +47,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
       continue;
     }
 
-    const float density = cloud_density(pos, height, weather);
+    const float density = cloud_density(pos, height, weather, 2.0f);
 
     if (density > 0.0f) {
       transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);

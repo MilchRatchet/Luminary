@@ -88,7 +88,9 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   fog_preprocess_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (type != TYPE_LIGHT) {
+    process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
 
   if (instance->scene.sky.cloud.active) {
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

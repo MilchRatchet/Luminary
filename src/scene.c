@@ -151,6 +151,7 @@ void scene_init(Scene** _scene) {
   scene->sky.cloud.shadow_steps        = 8;
   scene->sky.cloud.steps               = 96;
   scene->sky.cloud.density             = 1.0f;
+  scene->sky.cloud.mipmap_bias         = 0.0f;
 
   scene->fog.active     = 0;
   scene->fog.density    = 1.0f;

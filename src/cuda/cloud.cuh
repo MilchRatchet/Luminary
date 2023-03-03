@@ -66,7 +66,7 @@ __device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3
     const vec3 weather = cloud_weather(pos, height);
 
     if (weather.x > 0.05f) {
-      const float density = CLOUD_EXTINCTION_DENSITY * cloud_density(pos, height, weather);
+      const float density = CLOUD_EXTINCTION_DENSITY * cloud_density(pos, height, weather, 0.0f);
 
       float octave_factor = 1.0f;
 
@@ -131,7 +131,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
       continue;
     }
 
-    const float density = cloud_density(pos, height, weather);
+    const float density = cloud_density(pos, height, weather, 0.0f);
 
     if (density > 0.0f) {
       RGBF sun_color;
@@ -265,8 +265,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 4) void clouds_render_tasks() {
     if (cloud_hit) {
       trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
 
-      task.origin = add_vector(task.origin, scale_vector(task.ray, sky_to_world_scale(params.x)));
-      store_trace_task(device.trace_tasks + offset, task);
+      if (device.iteration_type != TYPE_LIGHT) {
+        // only perform this if atmosphere inscattering was performed
+        task.origin = add_vector(task.origin, scale_vector(task.ray, sky_to_world_scale(params.x)));
+        store_trace_task(device.trace_tasks + offset, task);
+      }
     }
   }
 }

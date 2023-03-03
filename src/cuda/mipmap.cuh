@@ -39,6 +39,83 @@ __global__ void mipmap_generate_level_3D_RGBA8(cudaTextureObject_t src, cudaSurf
   }
 }
 
+__global__ void mipmap_generate_level_2D_RGBA8(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int amount = width * height;
+
+  const float scale_x = 1.0f / (width - 1);
+  const float scale_y = 1.0f / (height - 1);
+
+  while (id < amount) {
+    const int x = id % width;
+    const int y = id / width;
+
+    const float sx = scale_x * x + scale_x * 0.5f;
+    const float sy = scale_y * y + scale_y * 0.5f;
+
+    float4 v = tex2D<float4>(src, sx, sy);
+
+    v.x = fminf(255.9f * v.x, 255.9f);
+    v.y = fminf(255.9f * v.y, 255.9f);
+    v.z = fminf(255.9f * v.z, 255.9f);
+    v.w = fminf(255.9f * v.w, 255.9f);
+
+    surf2Dwrite(make_uchar4(v.x, v.y, v.z, v.w), dst, x * sizeof(uchar4), y);
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
+__global__ void mipmap_generate_level_3D_RGBAF(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int amount = width * height * depth;
+
+  const float scale_x = 1.0f / (width - 1);
+  const float scale_y = 1.0f / (height - 1);
+  const float scale_z = 1.0f / (depth - 1);
+
+  while (id < amount) {
+    const int x = id % width;
+    const int y = (id % (width * height)) / width;
+    const int z = id / (width * height);
+
+    const float sx = scale_x * x + scale_x * 0.5f;
+    const float sy = scale_y * y + scale_y * 0.5f;
+    const float sz = scale_z * z + scale_z * 0.5f;
+
+    float4 v = tex3D<float4>(src, sx, sy, sz);
+
+    surf3Dwrite(v, dst, x * sizeof(float4), y, z);
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
+__global__ void mipmap_generate_level_2D_RGBAF(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int amount = width * height;
+
+  const float scale_x = 1.0f / (width - 1);
+  const float scale_y = 1.0f / (height - 1);
+
+  while (id < amount) {
+    const int x = id % width;
+    const int y = id / width;
+
+    const float sx = scale_x * x + scale_x * 0.5f;
+    const float sy = scale_y * y + scale_y * 0.5f;
+
+    float4 v = tex2D<float4>(src, sx, sy);
+
+    surf2Dwrite(v, dst, x * sizeof(float4), y);
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
 extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, TextureRGBA* tex) {
   const int num_levels = device_mipmap_compute_max_level(tex);
 
@@ -86,10 +163,32 @@ extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Textur
 
     switch (tex->dim) {
       case Tex2D:
+        switch (tex->type) {
+          case TexDataFP32:
+            mipmap_generate_level_2D_RGBAF<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src_tex, dst_surface, dst_size.width, dst_size.height);
+            break;
+          case TexDataUINT8:
+            mipmap_generate_level_2D_RGBA8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src_tex, dst_surface, dst_size.width, dst_size.height);
+            break;
+          default:
+            error_message("Invalid texture data type %d", tex->type);
+            break;
+        }
         break;
       case Tex3D:
-        mipmap_generate_level_3D_RGBA8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-          src_tex, dst_surface, dst_size.width, dst_size.height, dst_size.depth);
+        switch (tex->type) {
+          case TexDataFP32:
+            mipmap_generate_level_3D_RGBAF<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+              src_tex, dst_surface, dst_size.width, dst_size.height, dst_size.depth);
+            break;
+          case TexDataUINT8:
+            mipmap_generate_level_3D_RGBA8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+              src_tex, dst_surface, dst_size.width, dst_size.height, dst_size.depth);
+            break;
+          default:
+            error_message("Invalid texture data type %d", tex->type);
+            break;
+        }
         break;
       default:
         error_message("Invalid texture dim %d", tex->dim);
