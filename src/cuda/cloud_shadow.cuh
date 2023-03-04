@@ -10,7 +10,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
     return 1.0f;
   }
 
-  const float2 cloud_layer_intersect = cloud_get_layer_intersection(origin, ray, FLT_MAX);
+  const float2 cloud_layer_intersect = cloud_get_tropolayer_intersection(origin, ray, FLT_MAX);
 
   const float start = cloud_layer_intersect.x;
   const float dist  = fminf(cloud_layer_intersect.y, 30.0f);

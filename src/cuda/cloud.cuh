@@ -10,6 +10,7 @@
 //
 // The code of this file is based on the cloud rendering in https://github.com/turanszkij/WickedEngine.
 // It follows the basic ideas of using raymarching with noise based density.
+// The clouds are divided into a tropospheric layer, containing cumulus and alto clouds, and a cirrus cloud layer.
 //
 
 ////////////////////////////////////////////////////////////////////
@@ -84,8 +85,16 @@ __device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3
   return extinction;
 }
 
-__device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float start, float dist) {
-  dist = fminf(30.0f, dist);
+/*
+ * Returns an RGBAF where the RGB is the radiance and the A is the greyscale transmittance.
+ */
+__device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, float start, float dist) {
+  if (dist < 0.0f || start == FLT_MAX) {
+    return RGBAF_set(0.0f, 0.0f, 0.0f, 1.0f);
+  }
+
+  start = fmaxf(0.0f, start);
+  dist  = fminf(30.0f, dist);
 
   const int step_count = device.scene.sky.cloud.steps * __saturatef(dist / 15.0f);
 
@@ -213,35 +222,19 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
   return result;
 }
 
+__device__ RGBAF cloud_render_cirrus(const vec3 origin, const vec3 ray, const float start, const float dist) {
+  RGBAF result;
+  result.r = 0.0f;
+  result.g = 0.0f;
+  result.b = 0.0f;
+  result.a = 1.0f;
+
+  return result;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Wrapper
 ////////////////////////////////////////////////////////////////////
-
-__device__ void trace_clouds(const vec3 origin, const vec3 ray, const float start, const float distance, ushort2 index) {
-  if (distance <= 0.0f)
-    return;
-
-  const int pixel = index.x + index.y * device.width;
-
-  const RGBAF result = cloud_render(origin, ray, start, distance);
-
-  if ((result.r + result.g + result.b) != 0.0f) {
-    RGBF color        = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
-    const RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
-
-    color.r += result.r * record.r;
-    color.g += result.g * record.g;
-    color.b += result.b * record.b;
-
-    store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
-  }
-
-  if (result.a != 1.0f) {
-    RGBAhalf record = load_RGBAhalf(device.records + pixel);
-    record          = scale_RGBAhalf(record, __float2half(result.a));
-    store_RGBAhalf(device.records + pixel, record);
-  }
-}
 
 ////////////////////////////////////////////////////////////////////
 // Kernel
@@ -251,34 +244,64 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 4) void clouds_render_tasks() {
   const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
   for (int i = 0; i < task_count; i++) {
-    const int offset  = get_task_address(i);
-    TraceTask task    = load_trace_task(device.trace_tasks + offset);
-    const float depth = __ldcs((float*) (device.ptrs.trace_results + offset));
-
-    const vec3 sky_origin = world_to_sky_transform(task.origin);
-
+    const int offset         = get_task_address(i);
+    TraceTask task           = load_trace_task(device.trace_tasks + offset);
+    const float depth        = __ldcs((float*) (device.ptrs.trace_results + offset));
+    vec3 sky_origin          = world_to_sky_transform(task.origin);
     const float sky_max_dist = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
-    const float2 params      = cloud_get_layer_intersection(sky_origin, task.ray, sky_max_dist);
+    const int pixel          = task.index.y * device.width + task.index.x;
 
-    const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
+    const float2 tropo_int   = cloud_get_tropolayer_intersection(sky_origin, task.ray, sky_max_dist);
+    const RGBAF tropo_result = cloud_render_tropospheric(sky_origin, task.ray, tropo_int.x, tropo_int.y);
 
-    if (cloud_hit) {
+    const float2 cirrus_int   = cloud_get_cirruslayer_intersection(sky_origin, task.ray, sky_max_dist);
+    const RGBAF cirrus_result = cloud_render_cirrus(sky_origin, task.ray, cirrus_int.x, cirrus_int.y);
+
+    const bool tropo_first = (tropo_int.x <= cirrus_int.x);
+
+    const float start1  = (tropo_first) ? tropo_int.x : cirrus_int.x;
+    const float start2  = (tropo_first) ? cirrus_int.x : tropo_int.x;
+    const RGBAF result1 = (tropo_first) ? tropo_result : cirrus_result;
+    const RGBAF result2 = (tropo_first) ? cirrus_result : tropo_result;
+
+    if (start1 < FLT_MAX) {
+      RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
+      RGBF color  = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
+
       if (device.iteration_type != TYPE_LIGHT) {
-        sky_trace_inscattering(sky_origin, task.ray, params.x, task.index);
+        color      = add_color(color, sky_trace_inscattering(sky_origin, task.ray, start1, record));
+        sky_origin = add_vector(sky_origin, scale_vector(task.ray, start1));
       }
 
-      trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
+      color  = add_color(color, mul_color(opaque_color(result1), record));
+      record = scale_color(record, result1.a);
+
+      if (start2 < FLT_MAX) {
+        if (device.iteration_type != TYPE_LIGHT) {
+          color = add_color(color, sky_trace_inscattering(sky_origin, task.ray, start2 - start1, record));
+        }
+
+        color  = add_color(color, mul_color(opaque_color(result2), record));
+        record = scale_color(record, result2.a);
+      }
 
       if (device.iteration_type != TYPE_LIGHT) {
-        const float world_cloud_dist = sky_to_world_scale(params.x);
+        const float cloud_offset = (start2 == FLT_MAX) ? start1 : start2;
 
-        task.origin = add_vector(task.origin, scale_vector(task.ray, world_cloud_dist));
-        store_trace_task(device.trace_tasks + offset, task);
+        if (cloud_offset != FLT_MAX) {
+          const float cloud_world_offset = sky_to_world_scale(cloud_offset);
 
-        if (depth != device.scene.camera.far_clip_distance) {
-          __stcs((float*) (device.ptrs.trace_results + offset), depth - world_cloud_dist);
+          task.origin = add_vector(task.origin, scale_vector(task.ray, cloud_world_offset));
+          store_trace_task(device.trace_tasks + offset, task);
+
+          if (depth != device.scene.camera.far_clip_distance) {
+            __stcs((float*) (device.ptrs.trace_results + offset), depth - cloud_world_offset);
+          }
         }
       }
+
+      store_RGBAhalf(device.records + pixel, RGBF_to_RGBAhalf(record));
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
     }
   }
 }

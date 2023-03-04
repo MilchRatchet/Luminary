@@ -821,27 +821,18 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
   return sky_compute_color_from_spectrum(radiance);
 }
 
-__device__ void sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, ushort2 index) {
-  int pixel = index.x + index.y * device.width;
-
-  const RGBAhalf record = load_RGBAhalf(device.records + pixel);
-
-  RGBF new_record = RGBAhalf_to_RGBF(record);
-
+__device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const int steps = fmaxf(1.0f, limit / 30.0f) * (device.scene.sky.steps / 2);
+  const int steps = fmaxf(1.0f, limit / 30.0f) * (device.scene.sky.steps / 3);
 
   const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps);
 
-  const RGBAhalf inscattering = RGBF_to_RGBAhalf(mul_color(sky_compute_color_from_spectrum(radiance), new_record));
+  const RGBF inscattering = mul_color(sky_compute_color_from_spectrum(radiance), record);
 
-  if (any_RGBAhalf(inscattering)) {
-    store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), inscattering));
-  }
+  record = mul_color(record, sky_compute_color_from_spectrum(transmittance));
 
-  new_record = mul_color(new_record, sky_compute_color_from_spectrum(transmittance));
-  store_RGBAhalf(device.records + pixel, RGBF_to_RGBAhalf(new_record));
+  return inscattering;
 }
 
 ////////////////////////////////////////////////////////////////////

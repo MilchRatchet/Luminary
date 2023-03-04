@@ -647,6 +647,17 @@ __device__ RGBF opaque_color(const RGBAF a) {
   return get_color(a.r, a.g, a.b);
 }
 
+__device__ RGBAF RGBAF_set(const float r, const float g, const float b, const float a) {
+  RGBAF result;
+
+  result.r = r;
+  result.g = g;
+  result.b = b;
+  result.a = a;
+
+  return result;
+}
+
 __device__ float get_dithering(const int x, const int y) {
   const float dither = 2.0f * white_noise() - 1.0f;
 

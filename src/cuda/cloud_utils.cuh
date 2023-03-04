@@ -5,6 +5,9 @@
 // Defines
 ////////////////////////////////////////////////////////////////////
 
+#define CLOUD_CIRRUS_HEIGHT_MIN 7.5f
+#define CLOUD_CIRRUS_HEIGHT_MAX 8.5f
+
 // It is important that extinction >= scattering to not amplify the energy in the system
 #define CLOUD_SCATTERING_DENSITY (1000.0f * 0.1f * 0.9f)
 #define CLOUD_EXTINCTION_DENSITY (1000.0f * 0.1f)
@@ -112,42 +115,56 @@ __device__ float cloud_powder(const float density, const float step_size) {
   return lerp(1.0f, __saturatef(powder), device.scene.sky.cloud.powder);
 }
 
-__device__ float2 cloud_get_layer_intersection(const vec3 origin, const vec3 ray, const float limit) {
-  const float h_min = world_to_sky_scale(device.scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
-  const float h_max = world_to_sky_scale(device.scene.sky.cloud.height_max) + SKY_EARTH_RADIUS;
-
+__device__ float2 cloud_get_layer_intersection(const vec3 origin, const vec3 ray, const float limit, const float hmin, const float hmax) {
   const float height = get_length(origin);
 
-  float distance;
-  float start = 0.0f;
-  if (height > h_max) {
-    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
+  float distance = limit;
+  float start    = 0.0f;
+  if (height > hmax) {
+    const float max_dist = sph_ray_int_p0(ray, origin, hmax);
 
     start = max_dist;
 
-    const float max_dist_back = sph_ray_int_back_p0(ray, origin, h_max);
-    const float min_dist      = sph_ray_int_p0(ray, origin, h_min);
+    const float max_dist_back = sph_ray_int_back_p0(ray, origin, hmax);
+    const float min_dist      = sph_ray_int_p0(ray, origin, hmin);
 
     distance = fminf(min_dist, max_dist_back) - start;
   }
-  else if (height < h_min) {
-    const float min_dist = sph_ray_int_p0(ray, origin, h_min);
-    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
+  else if (height < hmin) {
+    const float min_dist = sph_ray_int_p0(ray, origin, hmin);
+    const float max_dist = sph_ray_int_p0(ray, origin, hmax);
 
     start    = min_dist;
     distance = max_dist - start;
   }
   else {
-    const float min_dist = sph_ray_int_p0(ray, origin, h_min);
-    const float max_dist = sph_ray_int_p0(ray, origin, h_max);
+    const float min_dist = sph_ray_int_p0(ray, origin, hmin);
+    const float max_dist = sph_ray_int_p0(ray, origin, hmax);
     distance             = fminf(min_dist, max_dist);
   }
 
   const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
   distance              = fminf(distance, fminf(earth_hit, limit) - start);
-  distance              = fmaxf(0.0f, distance);
+
+  if (distance < 0.0f) {
+    start = FLT_MAX;
+  }
 
   return make_float2(start, distance);
+}
+
+__device__ float2 cloud_get_tropolayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
+  const float hmin = world_to_sky_scale(device.scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
+  const float hmax = world_to_sky_scale(device.scene.sky.cloud.height_max) + SKY_EARTH_RADIUS;
+
+  return cloud_get_layer_intersection(origin, ray, limit, hmin, hmax);
+}
+
+__device__ float2 cloud_get_cirruslayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
+  const float hmin = CLOUD_CIRRUS_HEIGHT_MIN + SKY_EARTH_RADIUS;
+  const float hmax = CLOUD_CIRRUS_HEIGHT_MAX + SKY_EARTH_RADIUS;
+
+  return cloud_get_layer_intersection(origin, ray, limit, hmin, hmax);
 }
 
 ////////////////////////////////////////////////////////////////////

@@ -243,19 +243,25 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
+    if (hit_id == FOG_HIT || depth == device.scene.camera.far_clip_distance) {
+      continue;
+    }
+
+    const int pixel = task.index.y * device.width + task.index.x;
+
     const vec3 sky_origin = world_to_sky_transform(task.origin);
 
-    if (hit_id == FOG_HIT) {
-      continue;
-    }
+    const float inscattering_limit = world_to_sky_scale(depth);
 
-    const float inscattering_limit = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+    RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
 
-    if (inscattering_limit == FLT_MAX) {
-      continue;
-    }
+    RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record);
 
-    sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, task.index);
+    RGBF color = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
+    color      = add_color(color, inscattering);
+
+    store_RGBAhalf(device.records + pixel, RGBF_to_RGBAhalf(record));
+    store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
   }
 }
 
