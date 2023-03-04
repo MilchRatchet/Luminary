@@ -767,6 +767,10 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CLOUD COVERMIN %f\n", instance->scene.sky.cloud.coverage_min);
   fputs(line, file);
+  sprintf(line, "CLOUD TYPE____ %f\n", instance->scene.sky.cloud.type);
+  fputs(line, file);
+  sprintf(line, "CLOUD TYPEMIN_ %f\n", instance->scene.sky.cloud.type_min);
+  fputs(line, file);
   sprintf(line, "CLOUD ANVIL___ %f\n", instance->scene.sky.cloud.anvil);
   fputs(line, file);
   sprintf(line, "CLOUD FWDSCATT %f\n", instance->scene.sky.cloud.forward_scattering);

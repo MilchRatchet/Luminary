@@ -319,7 +319,9 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Noise Curl Scale", &(instance->scene.sky.cloud.noise_curl_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Density", &(instance->scene.sky.cloud.density), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Coverage", &(instance->scene.sky.cloud.coverage), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Minimum Coverage", &(instance->scene.sky.cloud.coverage_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Coverage", &(instance->scene.sky.cloud.coverage_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Type", &(instance->scene.sky.cloud.type), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Type", &(instance->scene.sky.cloud.type_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Anvil Overhang", &(instance->scene.sky.cloud.anvil), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Forward Scattering", &(instance->scene.sky.cloud.forward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Backward Scattering", &(instance->scene.sky.cloud.backward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);

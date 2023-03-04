@@ -61,10 +61,8 @@ __device__ vec3 cloud_weather(vec3 pos, const float height) {
 
   float4 weather = tex2D<float4>(device.ptrs.cloud_noise[2], weather_pos.x, weather_pos.z);
 
-  weather.x = powf(fabsf(weather.x), __saturatef(remap(height * 3.0f, 0.7f, 0.8f, 1.0f, lerp(1.0f, 0.5f, device.scene.sky.cloud.anvil))));
-
-  weather.x = __saturatef(
-    remap(weather.x * device.scene.sky.cloud.coverage, 0.0f, 1.0f, __saturatef(device.scene.sky.cloud.coverage_min - 1.0f), 1.0f));
+  weather.x = __saturatef(remap(weather.x * device.scene.sky.cloud.coverage, 0.0f, 1.0f, device.scene.sky.cloud.coverage_min, 1.0f));
+  weather.y = __saturatef(remap(weather.y * device.scene.sky.cloud.type, 0.0f, 1.0f, device.scene.sky.cloud.type_min, 1.0f));
 
   return get_vector(weather.x, weather.y, weather.z);
 }

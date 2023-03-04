@@ -166,6 +166,8 @@ struct Cloud {
   float noise_curl_scale;
   float coverage;
   float coverage_min;
+  float type;
+  float type_min;
   float anvil;
   float mipmap_bias;
 } typedef Cloud;
