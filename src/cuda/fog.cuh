@@ -86,8 +86,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
-
     RGBF record = RGBAhalf_to_RGBF(device.records[pixel]);
 
     {
@@ -105,7 +103,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
       bounce_task.origin = task.position;
       bounce_task.ray    = bounce_ray;
       bounce_task.index  = task.index;
-      bounce_task.state  = task.state;
 
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
@@ -135,15 +132,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
         light_task.origin = task.position;
         light_task.ray    = light_ray;
         light_task.index  = task.index;
-        light_task.state  = task.state;
 
         store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
       }
 
       device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
     }
-
-    task.state = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
   }
 
   device.ptrs.light_trace_count[id]  = light_trace_count;

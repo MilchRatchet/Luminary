@@ -228,8 +228,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
-
     vec3 normal = ocean_get_normal(task.position, ocean_get_normal_granularity(task.distance));
 
     if (ray.y > 0.0f) {
@@ -269,7 +267,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       new_task.origin = task.position;
       new_task.ray    = brdf.L;
       new_task.index  = task.index;
-      new_task.state  = task.state;
 
       switch (device.iteration_type) {
         case TYPE_CAMERA:
@@ -291,7 +288,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       const int scattering_pass   = white_noise() < scattering_prob;
 
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
-      task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
@@ -336,7 +332,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
           light_task.origin = light_pos;
           light_task.ray    = brdf.L;
           light_task.index  = task.index;
-          light_task.state  = task.state;
 
           if (any_RGBAhalf(light_record)) {
             store_RGBAhalf(device.ptrs.light_records + pixel, light_record);
@@ -349,7 +344,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       if (!(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
 
-      brdf = brdf_sample_ray(brdf, task.index, task.state);
+      brdf = brdf_sample_ray(brdf, task.index);
 
       RGBAhalf bounce_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf.term, 1.0f));
 
@@ -357,7 +352,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       bounce_task.origin = task.position;
       bounce_task.ray    = brdf.L;
       bounce_task.index  = task.index;
-      bounce_task.state  = task.state;
 
       store_RGBAhalf(device.ptrs.bounce_records + pixel, bounce_record);
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);

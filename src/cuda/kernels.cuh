@@ -47,8 +47,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     task.index.x = (uint16_t) (pixel % device.width);
     task.index.y = (uint16_t) (pixel / device.width);
 
-    task.state = (device.max_ray_depth << 16) | (device.temporal_frames & RANDOM_INDEX);
-
     task = get_starting_ray(task);
 
     device.ptrs.light_records[pixel]  = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
@@ -456,8 +454,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
         data1.z = __uint_as_float(hit_id);
       }
     }
-
-    data1.w = *((float*) &task.state);
 
     __stcs(ptr + 1, data1);
   }

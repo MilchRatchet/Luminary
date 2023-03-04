@@ -19,8 +19,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    task.state = (task.state & ~DEPTH_LEFT) | (((task.state & DEPTH_LEFT) - 1) & DEPTH_LEFT);
-
     const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
 
     const float4 t1 = __ldg(hit_address);
@@ -170,7 +168,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       new_task.origin = task.position;
       new_task.ray    = ray;
       new_task.index  = task.index;
-      new_task.state  = task.state;
 
       switch (device.iteration_type) {
         case TYPE_CAMERA:
@@ -198,7 +195,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
       task.position = terminator;
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
-      task.state    = (task.state & ~RANDOM_INDEX) | (((task.state & RANDOM_INDEX) + 1) & RANDOM_INDEX);
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
@@ -218,7 +214,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
           light_task.origin = task.position;
           light_task.ray    = brdf.L;
           light_task.index  = task.index;
-          light_task.state  = task.state;
 
           if (any_RGBAhalf(light_record)) {
             store_RGBAhalf(device.ptrs.light_records + pixel, light_record);
@@ -231,14 +226,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       if (!(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
 
-      brdf                   = brdf_sample_ray(brdf, task.index, task.state);
+      brdf                   = brdf_sample_ray(brdf, task.index);
       RGBAhalf bounce_record = mul_RGBAhalf(record, brdf.term);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
       bounce_task.ray    = brdf.L;
       bounce_task.index  = task.index;
-      bounce_task.state  = task.state;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
         store_RGBAhalf(device.ptrs.bounce_records + pixel, bounce_record);
