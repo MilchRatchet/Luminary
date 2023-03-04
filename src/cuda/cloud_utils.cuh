@@ -118,33 +118,27 @@ __device__ float cloud_powder(const float density, const float step_size) {
 __device__ float2 cloud_get_layer_intersection(const vec3 origin, const vec3 ray, const float limit, const float hmin, const float hmax) {
   const float height = get_length(origin);
 
-  float distance = limit;
-  float start    = 0.0f;
+  const float dist_hmax = sph_ray_int_p0(ray, origin, hmax);
+  const float dist_hmin = sph_ray_int_p0(ray, origin, hmin);
+
+  float start;
+
   if (height > hmax) {
-    const float max_dist = sph_ray_int_p0(ray, origin, hmax);
-
-    start = max_dist;
-
-    const float max_dist_back = sph_ray_int_back_p0(ray, origin, hmax);
-    const float min_dist      = sph_ray_int_p0(ray, origin, hmin);
-
-    distance = fminf(min_dist, max_dist_back) - start;
+    start = dist_hmax;
   }
   else if (height < hmin) {
-    const float min_dist = sph_ray_int_p0(ray, origin, hmin);
-    const float max_dist = sph_ray_int_p0(ray, origin, hmax);
-
-    start    = min_dist;
-    distance = max_dist - start;
+    start = dist_hmin;
   }
   else {
-    const float min_dist = sph_ray_int_p0(ray, origin, hmin);
-    const float max_dist = sph_ray_int_p0(ray, origin, hmax);
-    distance             = fminf(min_dist, max_dist);
+    start = 0.0f;
   }
 
+  const float end_1 = (height < hmin) ? dist_hmax : dist_hmin;
+  const float end_2 = (height > hmax) ? sph_ray_int_back_p0(ray, origin, hmax) : dist_hmax;
+
+  const float end_dist  = fminf(end_1, end_2);
   const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-  distance              = fminf(distance, fminf(earth_hit, limit) - start);
+  const float distance  = fminf(earth_hit, fminf(limit, end_dist)) - start;
 
   if (distance < 0.0f) {
     start = FLT_MAX;
