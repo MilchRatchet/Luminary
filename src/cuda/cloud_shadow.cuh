@@ -10,7 +10,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
     return 1.0f;
   }
 
-  const float2 cloud_layer_intersect = cloud_get_intersection(origin, ray, FLT_MAX);
+  const float2 cloud_layer_intersect = cloud_get_layer_intersection(origin, ray, FLT_MAX);
 
   const float start = cloud_layer_intersect.x;
   const float dist  = fminf(cloud_layer_intersect.y, 30.0f);
@@ -41,7 +41,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
 
     const vec3 weather = cloud_weather(pos, height);
 
-    if (weather.x < 0.05f) {
+    if (weather.x < CLOUD_WEATHER_CUTOFF) {
       i += big_step_mult - 1;
       reach += step_size * big_step;
       continue;

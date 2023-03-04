@@ -26,6 +26,8 @@
 #define CLOUD_OCTAVE_EXTINCTION_FACTOR 0.5f
 #define CLOUD_OCTAVE_PHASE_FACTOR 0.5f
 
+#define CLOUD_WEATHER_CUTOFF 0.05f
+
 ////////////////////////////////////////////////////////////////////
 // Structs
 ////////////////////////////////////////////////////////////////////
@@ -110,7 +112,7 @@ __device__ float cloud_powder(const float density, const float step_size) {
   return lerp(1.0f, __saturatef(powder), device.scene.sky.cloud.powder);
 }
 
-__device__ float2 cloud_get_intersection(const vec3 origin, const vec3 ray, const float limit) {
+__device__ float2 cloud_get_layer_intersection(const vec3 origin, const vec3 ray, const float limit) {
   const float h_min = world_to_sky_scale(device.scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
   const float h_max = world_to_sky_scale(device.scene.sky.cloud.height_max) + SKY_EARTH_RADIUS;
 

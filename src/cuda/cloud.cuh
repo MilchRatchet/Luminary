@@ -65,7 +65,7 @@ __device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3
 
     const vec3 weather = cloud_weather(pos, height);
 
-    if (weather.x > 0.05f) {
+    if (weather.x > CLOUD_WEATHER_CUTOFF) {
       const float density = CLOUD_EXTINCTION_DENSITY * cloud_density(pos, height, weather, 0.0f);
 
       float octave_factor = 1.0f;
@@ -125,7 +125,7 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 
     const vec3 weather = cloud_weather(pos, height);
 
-    if (weather.x < 0.05f) {
+    if (weather.x < CLOUD_WEATHER_CUTOFF) {
       i += big_step_mult - 1;
       reach += step_size * big_step;
       continue;
@@ -218,22 +218,22 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, const float sta
 ////////////////////////////////////////////////////////////////////
 
 __device__ void trace_clouds(const vec3 origin, const vec3 ray, const float start, const float distance, ushort2 index) {
-  int pixel = index.x + index.y * device.width;
-
   if (distance <= 0.0f)
     return;
 
-  RGBAF result = cloud_render(origin, ray, start, distance);
+  const int pixel = index.x + index.y * device.width;
+
+  const RGBAF result = cloud_render(origin, ray, start, distance);
 
   if ((result.r + result.g + result.b) != 0.0f) {
-    RGBF color  = RGBAhalf_to_RGBF(device.ptrs.frame_buffer[pixel]);
-    RGBF record = RGBAhalf_to_RGBF(device.records[pixel]);
+    RGBF color        = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
+    const RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
 
     color.r += result.r * record.r;
     color.g += result.g * record.g;
     color.b += result.b * record.b;
 
-    device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(color);
+    store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
   }
 
   if (result.a != 1.0f) {
@@ -258,7 +258,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 4) void clouds_render_tasks() {
     const vec3 sky_origin = world_to_sky_transform(task.origin);
 
     const float sky_max_dist = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
-    const float2 params      = cloud_get_intersection(sky_origin, task.ray, sky_max_dist);
+    const float2 params      = cloud_get_layer_intersection(sky_origin, task.ray, sky_max_dist);
 
     const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
 
