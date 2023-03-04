@@ -263,12 +263,21 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 4) void clouds_render_tasks() {
     const bool cloud_hit = (params.x < FLT_MAX && params.y > 0.0f);
 
     if (cloud_hit) {
+      if (device.iteration_type != TYPE_LIGHT) {
+        sky_trace_inscattering(sky_origin, task.ray, params.x, task.index);
+      }
+
       trace_clouds(sky_origin, task.ray, params.x, params.y, task.index);
 
       if (device.iteration_type != TYPE_LIGHT) {
-        // only perform this if atmosphere inscattering was performed
-        task.origin = add_vector(task.origin, scale_vector(task.ray, sky_to_world_scale(params.x)));
+        const float world_cloud_dist = sky_to_world_scale(params.x);
+
+        task.origin = add_vector(task.origin, scale_vector(task.ray, world_cloud_dist));
         store_trace_task(device.trace_tasks + offset, task);
+
+        if (depth != device.scene.camera.far_clip_distance) {
+          __stcs((float*) (device.ptrs.trace_results + offset), depth - world_cloud_dist);
+        }
       }
     }
   }
