@@ -64,9 +64,9 @@ __device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3
       continue;
     }
 
-    const vec3 weather = cloud_weather(pos, height);
+    const CloudWeather weather = cloud_weather(pos, height);
 
-    if (weather.x > CLOUD_WEATHER_CUTOFF) {
+    if (cloud_significant_point(height, weather)) {
       const float density = CLOUD_EXTINCTION_DENSITY * cloud_density(pos, height, weather, 0.0f);
 
       float octave_factor = 1.0f;
@@ -132,9 +132,9 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
       break;
     }
 
-    const vec3 weather = cloud_weather(pos, height);
+    const CloudWeather weather = cloud_weather(pos, height);
 
-    if (weather.x < CLOUD_WEATHER_CUTOFF) {
+    if (!cloud_significant_point(height, weather)) {
       i += big_step_mult - 1;
       reach += step_size * big_step;
       continue;
@@ -193,7 +193,6 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
         RGBF S = add_color(sun_color_i, ambient_color_i);
         S      = scale_color(S, scattering);
         S      = scale_color(S, cloud_powder(scattering, step_size));
-        S      = scale_color(S, cloud_weather_wetness(weather));
 
         const float step_trans = expf(-extinction * step_size);
 

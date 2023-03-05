@@ -39,9 +39,9 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
       break;
     }
 
-    const vec3 weather = cloud_weather(pos, height);
+    const CloudWeather weather = cloud_weather(pos, height);
 
-    if (weather.x < CLOUD_WEATHER_CUTOFF) {
+    if (!cloud_significant_point(height, weather)) {
       i += big_step_mult - 1;
       reach += step_size * big_step;
       continue;

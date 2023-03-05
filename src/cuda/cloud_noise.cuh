@@ -348,7 +348,8 @@ __global__ void generate_weather_map(const int dim, const float seed, uint8_t* t
 
     perlin1 = remap01(2.0f * perlin1, 0.05, 1.0);
 
-    dst[x + y * dim] = make_uchar4(__saturatef(perlin1) * 255.0f, __saturatef(perlin2) * 255.0f, __saturatef(perlin3) * 255.0f, 255);
+    dst[x + y * dim] = make_uchar4(
+      __saturatef(perlin1) * 255.0f, __saturatef(perlin2) * 255.0f, __saturatef(perlin3) * 255.0f, __saturatef(perlin4) * 255.0f);
 
     id += blockDim.x * gridDim.x;
   }
