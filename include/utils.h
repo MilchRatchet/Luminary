@@ -147,6 +147,9 @@ struct Star {
 struct Cloud {
   int active;
   int initialized;
+  int tropospheric_low;
+  int tropospheric_mid;
+  int cirrus;
   float offset_x;
   float offset_z;
   float height_max;

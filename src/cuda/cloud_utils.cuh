@@ -195,6 +195,10 @@ __device__ float2 cloud_get_layer_intersection(const vec3 origin, const vec3 ray
 }
 
 __device__ float2 cloud_get_tropolayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
+  if (!device.scene.sky.cloud.tropospheric_low && !device.scene.sky.cloud.tropospheric_mid) {
+    return make_float2(FLT_MAX, 0.0f);
+  }
+
   const float hmin = world_to_sky_scale(device.scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
   const float hmax = world_to_sky_scale(device.scene.sky.cloud.height_max) + SKY_EARTH_RADIUS;
 
@@ -202,6 +206,10 @@ __device__ float2 cloud_get_tropolayer_intersection(const vec3 origin, const vec
 }
 
 __device__ float2 cloud_get_cirruslayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
+  if (!device.scene.sky.cloud.cirrus) {
+    return make_float2(FLT_MAX, 0.0f);
+  }
+
   const float hmin = CLOUD_CIRRUS_HEIGHT_MIN + SKY_EARTH_RADIUS;
   const float hmax = CLOUD_CIRRUS_HEIGHT_MAX + SKY_EARTH_RADIUS;
 
@@ -231,19 +239,26 @@ __device__ float cloud_base_density(const vec3 pos, const float height, const Cl
 
   const float density_sum = (shape.x + shape.y + shape.z + shape.w) * 0.8f;
 
-  const float density_gradient_low = cloud_density_height_gradient_low_level(height, weather);
+  float density_low = 0.0f;
+  float density_mid = 0.0f;
 
-  float density_low = density_sum * density_gradient_low;
-  density_low       = powf(fabsf(density_low), __saturatef(height * 6.0f));
-  density_low       = smoothstep(density_low, 0.25f, 1.1f);
-  density_low       = __saturatef(density_low - (1.0f - weather.coverage_low)) * weather.coverage_low;
+  if (device.scene.sky.cloud.tropospheric_low) {
+    const float density_gradient_low = cloud_density_height_gradient_low_level(height, weather);
 
-  const float density_gradient_mid = cloud_density_height_gradient_mid_level(height, weather);
+    density_low = density_sum * density_gradient_low;
+    density_low = powf(fabsf(density_low), __saturatef(height * 6.0f));
+    density_low = smoothstep(density_low, 0.25f, 1.1f);
+    density_low = __saturatef(density_low - (1.0f - weather.coverage_low)) * weather.coverage_low;
+  }
 
-  float density_mid = density_sum * density_gradient_mid;
-  density_mid       = powf(fabsf(density_mid), __saturatef(height * 6.0f));
-  density_mid       = smoothstep(density_mid, 0.25f, 1.1f);
-  density_mid       = __saturatef(density_mid - (1.0f - weather.coverage_mid)) * weather.coverage_mid;
+  if (device.scene.sky.cloud.tropospheric_mid) {
+    const float density_gradient_mid = cloud_density_height_gradient_mid_level(height, weather);
+
+    density_mid = density_sum * density_gradient_mid;
+    density_mid = powf(fabsf(density_mid), __saturatef(height * 6.0f));
+    density_mid = smoothstep(density_mid, 0.25f, 1.1f);
+    density_mid = __saturatef(density_mid - (1.0f - weather.coverage_mid)) * weather.coverage_mid;
+  }
 
   return density_low + density_mid;
 }
@@ -297,14 +312,16 @@ __device__ float cloud_density(vec3 pos, const float height, const CloudWeather 
 __device__ bool cloud_significant_point(const float height, const CloudWeather weather) {
   const float4 type_low = cloud_density_height_gradient_type_low_level(weather);
 
-  const bool significant_low = (weather.coverage_low > CLOUD_WEATHER_CUTOFF) && (type_low.x < height) && (type_low.w > height);
+  const bool significant_low = device.scene.sky.cloud.tropospheric_low && (weather.coverage_low > CLOUD_WEATHER_CUTOFF)
+                               && (type_low.x < height) && (type_low.w > height);
 
   if (significant_low)
     return true;
 
   const float4 type_mid = cloud_density_height_gradient_type_mid_level(weather);
 
-  const bool significant_mid = (weather.coverage_mid > CLOUD_WEATHER_CUTOFF) && (type_mid.x < height) && (type_mid.w > height);
+  const bool significant_mid = device.scene.sky.cloud.tropospheric_mid && (weather.coverage_mid > CLOUD_WEATHER_CUTOFF)
+                               && (type_mid.x < height) && (type_mid.w > height);
 
   return significant_mid;
 }

@@ -747,6 +747,12 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
 
   sprintf(line, "CLOUD ACTIVE__ %d\n", instance->scene.sky.cloud.active);
   fputs(line, file);
+  sprintf(line, "CLOUD TROPOLOW %d\n", instance->scene.sky.cloud.tropospheric_low);
+  fputs(line, file);
+  sprintf(line, "CLOUD TROPOMID %d\n", instance->scene.sky.cloud.tropospheric_mid);
+  fputs(line, file);
+  sprintf(line, "CLOUD CIRRUS__ %d\n", instance->scene.sky.cloud.cirrus);
+  fputs(line, file);
   sprintf(line, "CLOUD SEED____ %d\n", instance->scene.sky.cloud.seed);
   fputs(line, file);
   sprintf(line, "CLOUD OFFSET__ %f %f\n", instance->scene.sky.cloud.offset_x, instance->scene.sky.cloud.offset_z);

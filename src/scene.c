@@ -131,6 +131,9 @@ void scene_init(Scene** _scene) {
   scene->sky.settings_stars_count      = 10000;
   scene->sky.cloud.active              = 0;
   scene->sky.cloud.initialized         = 0;
+  scene->sky.cloud.tropospheric_low    = 1;
+  scene->sky.cloud.tropospheric_mid    = 1;
+  scene->sky.cloud.cirrus              = 0;
   scene->sky.cloud.seed                = 1;
   scene->sky.cloud.offset_x            = 0.0f;
   scene->sky.cloud.offset_z            = 0.0f;
