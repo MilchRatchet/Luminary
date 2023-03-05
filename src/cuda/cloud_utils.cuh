@@ -104,8 +104,8 @@ __device__ float cloud_powder(const float density, const float step_size) {
 
 __device__ vec3 cloud_weather_type_low_level(const CloudWeather weather) {
   const float stratus       = 1.0f - __saturatef(weather.type_low * 2.0f);
-  const float stratocumulus = 1.0f - fabsf(weather.type_low - 0.5f) * 2.0f;
-  const float cumulus       = __saturatef(weather.type_low - 0.5f) * 2.0f;
+  const float stratocumulus = 1.0f - fabsf(2.0f * weather.type_low - 1.0f);
+  const float cumulus       = __saturatef(2.0f * weather.type_low - 1.0f);
 
   return get_vector(stratus, stratocumulus, cumulus);
 }
@@ -142,7 +142,7 @@ __device__ vec3 cloud_weather_type_mid_level(const CloudWeather weather) {
 }
 
 __device__ float4 cloud_density_height_gradient_type_mid_level(const CloudWeather weather) {
-  const vec3 weather_type = cloud_weather_type_low_level(weather);
+  const vec3 weather_type = cloud_weather_type_mid_level(weather);
 
   const float4 altostratus = CLOUD_GRADIENT_ALTOSTRATUS;
   const float4 altocumulus = CLOUD_GRADIENT_ALTOCUMULUS;
