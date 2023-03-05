@@ -143,6 +143,9 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
     const float density = cloud_density(pos, height, weather, 0.0f);
 
     if (density > 0.0f) {
+      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2);
+      ambient_color      = scale_color(ambient_color, 4.0f * PI);
+
       RGBF sun_color;
       CloudPhaseOctaves sun_phase;
       CloudExtinctionOctaves sun_extinction;
@@ -150,6 +153,9 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
       const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, pos)), pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
         const vec3 sun_ray = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, pos);
+
+        sun_color = sky_get_sun_color(pos, sun_ray);
+        sun_color = scale_color(sun_color, sun_light_angle);
 
         const float sun_cos_angle = dot_product(ray, sun_ray);
 
@@ -160,9 +166,6 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
         }
 
         sun_extinction = cloud_extinction(pos, sun_ray);
-
-        sun_color = sky_get_sun_color(pos, sun_ray);
-        sun_color = scale_color(sun_color, sun_light_angle);
       }
       else {
         sun_color = get_color(0.0f, 0.0f, 0.0f);
@@ -174,9 +177,6 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
 
       // Ambient light
       const CloudExtinctionOctaves ambient_extinction = cloud_extinction(pos, ambient_ray);
-
-      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2);
-      ambient_color      = scale_color(ambient_color, 4.0f * PI);
 
       float scattering_factor = 1.0f;
       float extinction_factor = 1.0f;
