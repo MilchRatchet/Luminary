@@ -251,7 +251,7 @@ void texture_free_atlas(DeviceBuffer* texture_atlas, const int textures_length) 
     gpuErrchk(cudaDestroyTextureObject(textures_cpu[i]));
   }
 
-  device_buffer_destroy(&texture_atlas);
+  device_buffer_free(texture_atlas);
   free(textures_cpu);
 }
 

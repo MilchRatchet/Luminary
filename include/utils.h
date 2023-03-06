@@ -13,11 +13,11 @@
 #include "log.h"
 #include "structs.h"
 
-#define gpuErrchk(ans)                                         \
-  {                                                            \
-    if (ans != cudaSuccess) {                                  \
-      crash_message("GPUassert: %s", cudaGetErrorString(ans)); \
-    }                                                          \
+#define gpuErrchk(ans)                                                                      \
+  {                                                                                         \
+    if (ans != cudaSuccess) {                                                               \
+      crash_message("CUDA Error: %s (%s)", cudaGetErrorName(ans), cudaGetErrorString(ans)); \
+    }                                                                                       \
   }
 
 // Flags variables as unused so that no warning is emitted
