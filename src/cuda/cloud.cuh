@@ -239,7 +239,7 @@ __device__ RGBAF cloud_render_cirrus(const vec3 origin, const vec3 ray, const fl
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 4) void clouds_render_tasks() {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
   const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
   for (int i = 0; i < task_count; i++) {

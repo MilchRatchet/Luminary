@@ -86,7 +86,9 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  fog_preprocess_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->scene.fog.active || instance->scene.ocean.active) {
+    fog_preprocess_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
 
   if (instance->scene.sky.cloud.active) {
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -122,7 +124,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (type != TYPE_LIGHT) {
+  if (type != TYPE_LIGHT && instance->scene.fog.active) {
     process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 }

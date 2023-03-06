@@ -221,8 +221,9 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 #define SKY_TM_TEX_WIDTH 256
 #define SKY_TM_TEX_HEIGHT 64
 
-// To change this value, you will also need to change the weighting and sampling in the kernel as it assumes that SKY_MS_ITER = 8 * 8
-#define SKY_MS_ITER 64
+// Value must be now larger than (1 << 5) because max Kernel Block Dimension in x is 1024 (for z it is only 64)
+#define SKY_MS_BASE (1 << 4)
+#define SKY_MS_ITER (SKY_MS_BASE * SKY_MS_BASE)
 
 ////////////////////////////////////////////////////////////////////
 // Sky Utils
@@ -362,7 +363,7 @@ __device__ UV sky_transmittance_lut_uv(float height, float zenith_cos_angle) {
 
 // [Bru17]
 __device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const float mu) {
-  const int steps = 500;
+  const int steps = 2500;
 
   // Distance to top of atmosphere
   const float disc = r * r * (mu * mu - 1.0f) + SKY_ATMO_RADIUS * SKY_ATMO_RADIUS;
@@ -453,7 +454,7 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
   const float distance = path.y;
 
   if (distance > 0.0f) {
-    const int steps = 40;
+    const int steps = 500;
     float reach     = start;
     float step_size;
 
@@ -519,10 +520,8 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
 
 // [Hil20]
 __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lower, float4* multiscattering_tex_higher) {
-  const unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int x = id % SKY_MS_TEX_SIZE;
-  const int y = id / SKY_MS_TEX_SIZE;
+  const int x = blockIdx.x;
+  const int y = blockIdx.y;
 
   float fx = ((float) x + 0.5f) / SKY_MS_TEX_SIZE;
   float fy = ((float) y + 0.5f) / SKY_MS_TEX_SIZE;
@@ -540,10 +539,10 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
   const vec3 pos     = get_vector(0.0f, height, 0.0f);
   const vec3 sun_pos = scale_vector(sun_dir, SKY_SUN_DISTANCE);
 
-  const float sqrt_sample = 8.0f;
+  const float sqrt_sample = (float) SKY_MS_BASE;
 
-  const float a     = 0.5f + threadIdx.z / 8;
-  const float b     = 0.5f + (threadIdx.z - ((threadIdx.z / 8) * 8));
+  const float a     = 0.5f + threadIdx.x / SKY_MS_BASE;
+  const float b     = 0.5f + (threadIdx.x - ((threadIdx.x / SKY_MS_BASE) * SKY_MS_BASE));
   const float randA = a / sqrt_sample;
   const float randB = b / sqrt_sample;
   const float theta = 2.0f * PI * randA;
@@ -552,18 +551,18 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
 
   msScatteringResult result = sky_compute_multiscattering_integration(pos, ray, sun_pos);
 
-  luminance_shared[threadIdx.z]       = result.L;
-  multiscattering_shared[threadIdx.z] = result.multiScatterAs1;
+  luminance_shared[threadIdx.x]       = result.L;
+  multiscattering_shared[threadIdx.x] = result.multiScatterAs1;
 
   for (int i = SKY_MS_ITER >> 1; i > 0; i = i >> 1) {
     __syncthreads();
-    if (threadIdx.z < i) {
-      luminance_shared[threadIdx.z]       = spectrum_add(luminance_shared[threadIdx.z], luminance_shared[threadIdx.z + i]);
-      multiscattering_shared[threadIdx.z] = spectrum_add(multiscattering_shared[threadIdx.z], multiscattering_shared[threadIdx.z + i]);
+    if (threadIdx.x < i) {
+      luminance_shared[threadIdx.x]       = spectrum_add(luminance_shared[threadIdx.x], luminance_shared[threadIdx.x + i]);
+      multiscattering_shared[threadIdx.x] = spectrum_add(multiscattering_shared[threadIdx.x], multiscattering_shared[threadIdx.x + i]);
     }
   }
 
-  if (threadIdx.z > 0)
+  if (threadIdx.x > 0)
     return;
 
   Spectrum luminance       = spectrum_scale(luminance_shared[0], 1.0f / (sqrt_sample * sqrt_sample));
@@ -629,8 +628,8 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   device_malloc((void**) &luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));
 
   // We use the z component to signify its special intention
-  dim3 threads_ms(1, 1, SKY_MS_ITER);
-  dim3 blocks_ms(SKY_MS_TEX_SIZE * SKY_MS_TEX_SIZE, 1, 1);
+  dim3 threads_ms(SKY_MS_ITER, 1, 1);
+  dim3 blocks_ms(SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1);
 
   sky_compute_multiscattering_lut<<<blocks_ms, threads_ms>>>((float4*) luts_ms_tex[0].data, (float4*) luts_ms_tex[1].data);
 
@@ -659,24 +658,21 @@ __device__ Spectrum sky_compute_atmosphere(
 
   const float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
 
-  if (path.y == -FLT_MAX)
-    return result;
-
   const float start    = path.x;
   const float distance = fminf(path.y, limit - start);
 
   Spectrum transmittance = spectrum_get_ident();
 
+  uint32_t random_key = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+
   if (distance > 0.0f) {
     float reach = start;
     float step_size;
 
-    const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength);
-
     const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, origin);
 
     for (int i = 0; i < steps; i++) {
-      const float new_reach = start + distance * (i + 0.3f) / steps;
+      const float new_reach = start + distance * (i + white_noise_offset(random_key)) / steps;
       step_size             = new_reach - reach;
       reach                 = new_reach;
 
@@ -726,7 +722,7 @@ __device__ Spectrum sky_compute_atmosphere(
       const Spectrum multiscattering_tex = spectrum_merge(multiscattering_low, multiscattering_high);
       const Spectrum ms_radiance         = spectrum_mul(multiscattering_tex, scattering);
 
-      const Spectrum S = spectrum_mul(sun_radiance, spectrum_add(ss_radiance, ms_radiance));
+      const Spectrum S = spectrum_add(ss_radiance, ms_radiance);
 
       Spectrum step_transmittance = extinction;
       step_transmittance          = spectrum_scale(step_transmittance, -step_size);
@@ -737,6 +733,9 @@ __device__ Spectrum sky_compute_atmosphere(
       result        = spectrum_add(result, spectrum_mul(Sint, transmittance));
       transmittance = spectrum_mul(transmittance, step_transmittance);
     }
+
+    const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength);
+    result                      = spectrum_mul(result, sun_radiance);
   }
 
   if (celestials) {
@@ -785,6 +784,8 @@ __device__ Spectrum sky_compute_atmosphere(
       }
     }
   }
+
+  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = random_key;
 
   transmittance_out = spectrum_mul(transmittance_out, transmittance);
 
