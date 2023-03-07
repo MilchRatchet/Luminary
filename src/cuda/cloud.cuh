@@ -30,13 +30,7 @@
 // Integrator functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3 ray) {
-  CloudExtinctionOctaves extinction;
-
-  for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-    extinction.E[i] = 0.0f;
-  }
-
+__device__ void cloud_extinction(CloudWeightOctaves& weights, const vec3 origin, const vec3 ray) {
   const float iter_step = 1.0f / device.scene.sky.cloud.shadow_steps;
 
   // Sometimes the shadow ray goes below the cloud layer but misses the earth and reenters the cloud layer
@@ -72,17 +66,11 @@ __device__ CloudExtinctionOctaves cloud_extinction(const vec3 origin, const vec3
       float octave_factor = 1.0f;
 
       for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-        extinction.E[i] -= octave_factor * density * step_size;
+        weights.O[i] *= expf(-octave_factor * density * step_size);
         octave_factor *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
       }
     }
   }
-
-  for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-    extinction.E[i] = expf(extinction.E[i]);
-  }
-
-  return extinction;
 }
 
 /*
@@ -108,21 +96,6 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
   float transmittance = 1.0f;
   RGBF scatteredLight = get_color(0.0f, 0.0f, 0.0f);
 
-  const float ambient_r1 = 2.0f * PI * white_noise();
-  const float ambient_r2 = 2.0f * PI * white_noise();
-
-  const vec3 ambient_ray        = angles_to_direction(ambient_r1, ambient_r2);
-  const float ambient_cos_angle = dot_product(ray, ambient_ray);
-
-  CloudPhaseOctaves ambient_phase;
-  float phase_factor = 1.0f;
-  for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-    ambient_phase.P[i] = cloud_dual_lobe_henvey_greenstein(ambient_cos_angle, phase_factor);
-    phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
-  }
-
-  const float sun_light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
-
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
@@ -143,16 +116,21 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
     const float density = cloud_density(pos, height, weather, 0.0f);
 
     if (density > 0.0f) {
-      RGBF ambient_color = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2);
-      ambient_color      = scale_color(ambient_color, 4.0f * PI);
+      const float ambient_r1 = 2.0f * PI * white_noise();
+      const float ambient_r2 = 2.0f * PI * white_noise();
+
+      const vec3 ambient_ray = angles_to_direction(ambient_r1, ambient_r2);
+      RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2);
+      ambient_color          = scale_color(ambient_color, 4.0f * PI);
 
       RGBF sun_color;
-      CloudPhaseOctaves sun_phase;
-      CloudExtinctionOctaves sun_extinction;
+      CloudWeightOctaves sun_weights;
 
       const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, pos)), pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
         const vec3 sun_ray = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, pos);
+
+        const float sun_light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, pos);
 
         sun_color = sky_get_sun_color(pos, sun_ray);
         sun_color = scale_color(sun_color, sun_light_angle);
@@ -161,22 +139,30 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
 
         float phase_factor = 1.0f;
         for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-          sun_phase.P[i] = cloud_dual_lobe_henvey_greenstein(sun_cos_angle, phase_factor);
+          sun_weights.O[i] = cloud_dual_lobe_henvey_greenstein(sun_cos_angle, phase_factor);
           phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
         }
 
-        sun_extinction = cloud_extinction(pos, sun_ray);
+        cloud_extinction(sun_weights, pos, sun_ray);
       }
       else {
         sun_color = get_color(0.0f, 0.0f, 0.0f);
         for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-          sun_phase.P[i]      = 0.0f;
-          sun_extinction.E[i] = 1.0f;
+          sun_weights.O[i] = 0.0f;
         }
       }
 
+      const float ambient_cos_angle = dot_product(ray, ambient_ray);
+
+      CloudWeightOctaves ambient_weights;
+      float phase_factor = 1.0f;
+      for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+        ambient_weights.O[i] = cloud_dual_lobe_henvey_greenstein(ambient_cos_angle, phase_factor);
+        phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
+      }
+
       // Ambient light
-      const CloudExtinctionOctaves ambient_extinction = cloud_extinction(pos, ambient_ray);
+      cloud_extinction(ambient_weights, pos, ambient_ray);
 
       float scattering_factor = 1.0f;
       float extinction_factor = 1.0f;
@@ -187,8 +173,8 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
         scattering_factor *= CLOUD_OCTAVE_SCATTERING_FACTOR;
         extinction_factor *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
 
-        const RGBF sun_color_i     = scale_color(sun_color, sun_extinction.E[i] * sun_phase.P[i]);
-        const RGBF ambient_color_i = scale_color(ambient_color, ambient_extinction.E[i] * ambient_phase.P[i]);
+        const RGBF sun_color_i     = scale_color(sun_color, sun_weights.O[i]);
+        const RGBF ambient_color_i = scale_color(ambient_color, ambient_weights.O[i]);
 
         RGBF S = add_color(sun_color_i, ambient_color_i);
         S      = scale_color(S, scattering);

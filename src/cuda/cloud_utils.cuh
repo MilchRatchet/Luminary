@@ -40,13 +40,9 @@
 // Structs
 ////////////////////////////////////////////////////////////////////
 
-struct CloudExtinctionOctaves {
-  float E[CLOUD_SCATTERING_OCTAVES];
-} typedef CloudExtinctionOctaves;
-
-struct CloudPhaseOctaves {
-  float P[CLOUD_SCATTERING_OCTAVES];
-} typedef CloudPhaseOctaves;
+struct CloudWeightOctaves {
+  float O[CLOUD_SCATTERING_OCTAVES];
+} typedef CloudWeightOctaves;
 
 struct CloudWeather {
   float coverage_low;
