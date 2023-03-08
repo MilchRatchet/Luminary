@@ -247,14 +247,10 @@ __device__ LightSample sample_light(const vec3 position, uint32_t& ran_offset) {
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
 
   for (int i = 0; i < reservoir_sampling_size; i++) {
-    const float r1       = white_noise_precise_offset(ran_offset++);
-    uint32_t light_index = (uint32_t) (r1 * light_count_float);
+    uint32_t light_index = random_uint32_t(ran_offset++) % light_count;
 
     light_index += !sun_visible;
     light_index += (!toy_visible && light_index) ? 1 : 0;
-
-    if (light_index >= device.scene.triangle_lights_length + 2)
-      continue;
 
     LightSample light;
     light.id = LIGHT_ID_NONE;
