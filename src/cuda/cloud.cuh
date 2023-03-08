@@ -34,11 +34,11 @@ __device__ void cloud_extinction(CloudWeightOctaves& weights, const vec3 origin,
   const float iter_step = 1.0f / device.scene.sky.cloud.shadow_steps;
 
   // Sometimes the shadow ray goes below the cloud layer but misses the earth and reenters the cloud layer
-  float offset = 0.0f;
+  float optical_depth = 0.0f;
 
   for (float i = 0.0f; i < 1.0f; i += iter_step) {
-    float t0 = offset + i;
-    float t1 = offset + i + iter_step;
+    float t0 = i;
+    float t1 = i + iter_step;
     t0       = t0 * t0;
     t1       = t1 * t1;
 
@@ -49,27 +49,22 @@ __device__ void cloud_extinction(CloudWeightOctaves& weights, const vec3 origin,
 
     const float height = cloud_height(pos);
 
-    if (height > 1.0f)
+    if (height > 1.0f || height < 0.0f)
       break;
-
-    if (height < 0.0f) {
-      const float h_min = world_to_sky_scale(device.scene.sky.cloud.height_min) + SKY_EARTH_RADIUS;
-      offset += sph_ray_int_p0(ray, pos, h_min);
-      continue;
-    }
 
     const CloudWeather weather = cloud_weather(pos, height);
 
     if (cloud_significant_point(height, weather)) {
-      const float density = CLOUD_EXTINCTION_DENSITY * cloud_density(pos, height, weather, 0.0f);
-
-      float octave_factor = 1.0f;
-
-      for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-        weights.O[i] *= expf(-octave_factor * density * step_size);
-        octave_factor *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
-      }
+      optical_depth -= cloud_density(pos, height, weather, 0.0f) * step_size;
     }
+  }
+
+  optical_depth *= CLOUD_EXTINCTION_DENSITY;
+
+  float octave_factor = 1.0f;
+  for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
+    weights.O[i] *= expf(octave_factor * optical_depth);
+    octave_factor *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
   }
 }
 

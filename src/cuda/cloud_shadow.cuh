@@ -28,7 +28,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
 
   float reach = start + (white_noise() + 0.1f) * step_size;
 
-  float transmittance = 1.0f;
+  float optical_depth = 0.0f;
 
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
@@ -49,17 +49,16 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
 
     const float density = cloud_density(pos, height, weather, 2.0f);
 
-    if (density > 0.0f) {
-      transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);
-      if (transmittance < 0.005f) {
-        transmittance = 0.0f;
-        break;
-      }
+    optical_depth -= cloud_density(pos, height, weather, 2.0f) * step_size * CLOUD_EXTINCTION_DENSITY;
+
+    if (optical_depth < -1.0f) {
+      break;
     }
+
     reach += step_size;
   }
 
-  return transmittance;
+  return expf(optical_depth);
 }
 
 #endif /* CLOUD_SHADOW_CUH */
