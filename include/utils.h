@@ -147,13 +147,18 @@ struct Star {
 struct Cloud {
   int active;
   int initialized;
-  int tropospheric_low;
-  int tropospheric_mid;
-  int cirrus;
+  int layer_low;
+  int layer_mid;
+  int layer_top;
+  int atmosphere_scattering;
   float offset_x;
   float offset_z;
-  float height_max;
-  float height_min;
+  float height_low_max;
+  float height_low_min;
+  float height_mid_max;
+  float height_mid_min;
+  float height_top_max;
+  float height_top_min;
   float density;
   int seed;
   float forward_scattering;

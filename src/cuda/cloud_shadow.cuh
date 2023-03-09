@@ -10,7 +10,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
     return 1.0f;
   }
 
-  const float2 cloud_layer_intersect = cloud_get_tropolayer_intersection(origin, ray, FLT_MAX);
+  const float2 cloud_layer_intersect = cloud_get_lowlayer_intersection(origin, ray, FLT_MAX);
 
   const float start = cloud_layer_intersect.x;
   const float dist  = fminf(cloud_layer_intersect.y, 30.0f);
@@ -33,7 +33,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
-    const float height = cloud_height(pos);
+    const float height = cloud_height(pos, CLOUD_LAYER_LOW);
 
     if (height < 0.0f || height > 1.0f) {
       break;
@@ -47,9 +47,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
       continue;
     }
 
-    const float density = cloud_density(pos, height, weather, 2.0f);
-
-    optical_depth -= cloud_density(pos, height, weather, 2.0f) * step_size * CLOUD_EXTINCTION_DENSITY;
+    optical_depth -= cloud_density(pos, height, weather, 2.0f, CLOUD_LAYER_LOW) * step_size * CLOUD_EXTINCTION_DENSITY;
 
     if (optical_depth < -1.0f) {
       break;

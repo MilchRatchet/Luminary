@@ -10,7 +10,10 @@
 //
 // The code of this file is based on the cloud rendering in https://github.com/turanszkij/WickedEngine.
 // It follows the basic ideas of using raymarching with noise based density.
-// The clouds are divided into a tropospheric layer, containing cumulus and alto clouds, and a cirrus cloud layer.
+// The clouds are divided into a 3 tropospheric layers: low, mid and top.
+// Low level layer: Stratus, Stratocumulus and Cumulus clouds.
+// Mid level layer: Altostratus and Altocumulus clouds.
+// Top level layer: Cirrostratus and Cirrus clouds.
 //
 
 ////////////////////////////////////////////////////////////////////
@@ -30,7 +33,7 @@
 // Integrator functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ float cloud_extinction(const vec3 origin, const vec3 ray) {
+__device__ float cloud_extinction(const vec3 origin, const vec3 ray, const CloudLayerType layer) {
   const float iter_step = 1.0f / device.scene.sky.cloud.shadow_steps;
 
   float optical_depth = 0.0f;
@@ -46,7 +49,7 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray) {
 
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
-    const float height = cloud_height(pos);
+    const float height = cloud_height(pos, layer);
 
     if (height > 1.0f || height < 0.0f)
       break;
@@ -54,7 +57,7 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray) {
     const CloudWeather weather = cloud_weather(pos, height);
 
     if (cloud_significant_point(height, weather)) {
-      optical_depth -= cloud_density(pos, height, weather, 0.0f) * step_size;
+      optical_depth -= cloud_density(pos, height, weather, 0.0f, layer) * step_size;
     }
   }
 
@@ -66,7 +69,7 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray) {
 /*
  * Returns an RGBAF where the RGB is the radiance and the A is the greyscale transmittance.
  */
-__device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, float start, float dist) {
+__device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, float dist, const CloudLayerType layer) {
   if (dist < 0.0f || start == FLT_MAX) {
     return RGBAF_set(0.0f, 0.0f, 0.0f, 1.0f);
   }
@@ -89,7 +92,7 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
-    const float height = cloud_height(pos);
+    const float height = cloud_height(pos, layer);
 
     if (height < 0.0f || height > 1.0f) {
       break;
@@ -103,7 +106,7 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
       continue;
     }
 
-    const float density = cloud_density(pos, height, weather, 0.0f);
+    const float density = cloud_density(pos, height, weather, 0.0f, layer);
 
     if (density > 0.0f) {
       const float ambient_r1 = 2.0f * PI * white_noise();
@@ -113,7 +116,7 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
       RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2);
       ambient_color          = scale_color(ambient_color, 4.0f * PI);
 
-      float ambient_extinction      = cloud_extinction(pos, ambient_ray);
+      float ambient_extinction      = cloud_extinction(pos, ambient_ray, layer);
       const float ambient_cos_angle = dot_product(ray, ambient_ray);
 
       RGBF sun_color;
@@ -131,7 +134,7 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
 
         sun_cos_angle = dot_product(ray, sun_ray);
 
-        sun_extinction = cloud_extinction(pos, sun_ray);
+        sun_extinction = cloud_extinction(pos, sun_ray, layer);
       }
       else {
         sun_color      = get_color(0.0f, 0.0f, 0.0f);
@@ -188,7 +191,7 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
   return result;
 }
 
-__device__ RGBAF cloud_render_cirrus(const vec3 origin, const vec3 ray, const float start, const float dist) {
+__device__ RGBAF cloud_render_toplayer(const vec3 origin, const vec3 ray, const float start, const float dist) {
   RGBAF result;
   result.r = 0.0f;
   result.g = 0.0f;
@@ -217,58 +220,86 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     const float sky_max_dist = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
     const int pixel          = task.index.y * device.width + task.index.x;
 
-    const float2 tropo_int   = cloud_get_tropolayer_intersection(sky_origin, task.ray, sky_max_dist);
-    const RGBAF tropo_result = cloud_render_tropospheric(sky_origin, task.ray, tropo_int.x, tropo_int.y);
+    float2 intersections[3];
+    RGBAF results[3];
 
-    const float2 cirrus_int   = cloud_get_cirruslayer_intersection(sky_origin, task.ray, sky_max_dist);
-    const RGBAF cirrus_result = cloud_render_cirrus(sky_origin, task.ray, cirrus_int.x, cirrus_int.y);
+    intersections[0] = cloud_get_lowlayer_intersection(sky_origin, task.ray, sky_max_dist);
+    results[0]       = cloud_render(sky_origin, task.ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW);
 
-    const bool tropo_first = (tropo_int.x <= cirrus_int.x);
+    intersections[1] = cloud_get_midlayer_intersection(sky_origin, task.ray, sky_max_dist);
+    results[1]       = cloud_render(sky_origin, task.ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID);
 
-    const float start1  = (tropo_first) ? tropo_int.x : cirrus_int.x;
-    const float start2  = (tropo_first) ? cirrus_int.x : tropo_int.x;
-    const RGBAF result1 = (tropo_first) ? tropo_result : cirrus_result;
-    const RGBAF result2 = (tropo_first) ? cirrus_result : tropo_result;
+    intersections[2] = cloud_get_toplayer_intersection(sky_origin, task.ray, sky_max_dist);
+    results[2]       = cloud_render(sky_origin, task.ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP);
 
-    if (start1 < FLT_MAX) {
-      RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
-      RGBF color  = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
+    const bool less01 = intersections[0].x <= intersections[1].x;
+    const bool less02 = intersections[0].x <= intersections[2].x;
+    const bool less12 = intersections[1].x <= intersections[2].x;
 
-      if (device.iteration_type != TYPE_LIGHT) {
-        color      = add_color(color, sky_trace_inscattering(sky_origin, task.ray, start1, record));
-        sky_origin = add_vector(sky_origin, scale_vector(task.ray, start1));
+    int order[3];
+    if (less01) {
+      if (less02) {
+        order[0] = 0;
+        order[1] = (less12) ? 1 : 2;
+        order[2] = (less12) ? 2 : 1;
       }
-
-      color  = add_color(color, mul_color(opaque_color(result1), record));
-      record = scale_color(record, result1.a);
-
-      if (start2 < FLT_MAX) {
-        if (device.iteration_type != TYPE_LIGHT) {
-          color = add_color(color, sky_trace_inscattering(sky_origin, task.ray, start2 - start1, record));
-        }
-
-        color  = add_color(color, mul_color(opaque_color(result2), record));
-        record = scale_color(record, result2.a);
+      else {
+        order[0] = 2;
+        order[1] = (less01) ? 0 : 1;
+        order[2] = (less01) ? 1 : 0;
       }
-
-      if (device.iteration_type != TYPE_LIGHT) {
-        const float cloud_offset = (start2 == FLT_MAX) ? start1 : start2;
-
-        if (cloud_offset != FLT_MAX) {
-          const float cloud_world_offset = sky_to_world_scale(cloud_offset);
-
-          task.origin = add_vector(task.origin, scale_vector(task.ray, cloud_world_offset));
-          store_trace_task(device.trace_tasks + offset, task);
-
-          if (depth != device.scene.camera.far_clip_distance) {
-            __stcs((float*) (device.ptrs.trace_results + offset), depth - cloud_world_offset);
-          }
-        }
-      }
-
-      store_RGBAhalf(device.records + pixel, RGBF_to_RGBAhalf(record));
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
     }
+    else if (less12) {
+      order[0] = 1;
+      order[1] = (less02) ? 0 : 2;
+      order[2] = (less02) ? 2 : 0;
+    }
+    else {
+      order[0] = 2;
+      order[1] = (less01) ? 0 : 1;
+      order[2] = (less01) ? 1 : 0;
+    }
+
+    float prev_start = 0.0f;
+
+    RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
+    RGBF color  = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
+
+    for (int i = 0; i < 3; i++) {
+      const float start  = intersections[order[i]].x;
+      const RGBAF result = results[order[i]];
+
+      if (start == FLT_MAX)
+        break;
+
+      if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
+        color      = add_color(color, sky_trace_inscattering(sky_origin, task.ray, start - prev_start, record));
+        sky_origin = add_vector(sky_origin, scale_vector(task.ray, start - prev_start));
+      }
+
+      color  = add_color(color, mul_color(opaque_color(result), record));
+      record = scale_color(record, result.a);
+
+      prev_start = start;
+    }
+
+    if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
+      const float cloud_offset = prev_start;
+
+      if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
+        const float cloud_world_offset = sky_to_world_scale(cloud_offset);
+
+        task.origin = add_vector(task.origin, scale_vector(task.ray, cloud_world_offset));
+        store_trace_task(device.trace_tasks + offset, task);
+
+        if (depth != device.scene.camera.far_clip_distance) {
+          __stcs((float*) (device.ptrs.trace_results + offset), depth - cloud_world_offset);
+        }
+      }
+    }
+
+    store_RGBAhalf(device.records + pixel, RGBF_to_RGBAhalf(record));
+    store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
   }
 }
 

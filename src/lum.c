@@ -286,11 +286,11 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
       break;
     /* HEIGHTMA */
     case 4705509855082399048u:
-      sscanf(value, "%f\n", &cloud->height_max);
+      sscanf(value, "%f\n", &cloud->height_low_max);
       break;
     /* HEIGHTMI */
     case 5281970607385822536u:
-      sscanf(value, "%f\n", &cloud->height_min);
+      sscanf(value, "%f\n", &cloud->height_low_min);
       break;
     /* SHASCALE */
     case 4993437844262438995u:
@@ -747,19 +747,29 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
 
   sprintf(line, "CLOUD ACTIVE__ %d\n", instance->scene.sky.cloud.active);
   fputs(line, file);
-  sprintf(line, "CLOUD TROPOLOW %d\n", instance->scene.sky.cloud.tropospheric_low);
+  sprintf(line, "CLOUD LAYERLOW %d\n", instance->scene.sky.cloud.layer_low);
   fputs(line, file);
-  sprintf(line, "CLOUD TROPOMID %d\n", instance->scene.sky.cloud.tropospheric_mid);
+  sprintf(line, "CLOUD LAYERMID %d\n", instance->scene.sky.cloud.layer_mid);
   fputs(line, file);
-  sprintf(line, "CLOUD CIRRUS__ %d\n", instance->scene.sky.cloud.cirrus);
+  sprintf(line, "CLOUD LAYERTOP %d\n", instance->scene.sky.cloud.layer_top);
+  fputs(line, file);
+  sprintf(line, "CLOUD INSCATTE %d\n", instance->scene.sky.cloud.atmosphere_scattering);
   fputs(line, file);
   sprintf(line, "CLOUD SEED____ %d\n", instance->scene.sky.cloud.seed);
   fputs(line, file);
   sprintf(line, "CLOUD OFFSET__ %f %f\n", instance->scene.sky.cloud.offset_x, instance->scene.sky.cloud.offset_z);
   fputs(line, file);
-  sprintf(line, "CLOUD HEIGHTMA %f\n", instance->scene.sky.cloud.height_max);
+  sprintf(line, "CLOUD LOWMAXHE %f\n", instance->scene.sky.cloud.height_low_max);
   fputs(line, file);
-  sprintf(line, "CLOUD HEIGHTMI %f\n", instance->scene.sky.cloud.height_min);
+  sprintf(line, "CLOUD LOWMINHE %f\n", instance->scene.sky.cloud.height_low_min);
+  fputs(line, file);
+  sprintf(line, "CLOUD MIDMAXHE %f\n", instance->scene.sky.cloud.height_mid_max);
+  fputs(line, file);
+  sprintf(line, "CLOUD MIDMINHE %f\n", instance->scene.sky.cloud.height_mid_min);
+  fputs(line, file);
+  sprintf(line, "CLOUD TOPMAXHE %f\n", instance->scene.sky.cloud.height_top_max);
+  fputs(line, file);
+  sprintf(line, "CLOUD TOPMINHE %f\n", instance->scene.sky.cloud.height_top_min);
   fputs(line, file);
   sprintf(line, "CLOUD SHASCALE %f\n", instance->scene.sky.cloud.noise_shape_scale);
   fputs(line, file);
