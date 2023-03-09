@@ -213,18 +213,19 @@ __device__ float2 cloud_get_cirruslayer_intersection(const vec3 origin, const ve
 ////////////////////////////////////////////////////////////////////
 
 __device__ float cloud_base_density(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
-  vec3 shape_pos = pos;
-  shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
-  shape_pos      = scale_vector(shape_pos, 0.4f * device.scene.sky.cloud.noise_shape_scale);
-
   mip_bias += device.scene.sky.cloud.mipmap_bias;
   mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
-  float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
 
   float density_low = 0.0f;
   float density_mid = 0.0f;
 
   if (device.scene.sky.cloud.tropospheric_low) {
+    vec3 shape_pos = pos;
+    shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
+    shape_pos      = scale_vector(shape_pos, 0.4f * device.scene.sky.cloud.noise_shape_scale);
+
+    float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
+
     float shape_sum = shape.x * 5.0f;
     shape_sum += shape.y * cloud_gradient(CLOUD_GRADIENT_STRATUS, height);
     shape_sum += shape.z * cloud_gradient(CLOUD_GRADIENT_STRATOCUMULUS, height);
@@ -240,7 +241,14 @@ __device__ float cloud_base_density(const vec3 pos, const float height, const Cl
   }
 
   if (device.scene.sky.cloud.tropospheric_mid) {
-    float shape_sum = shape.x * 5.0f;
+    vec3 shape_pos = pos;
+    shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
+    shape_pos      = scale_vector(shape_pos, 0.4f * device.scene.sky.cloud.noise_shape_scale);
+    shape_pos.x *= 0.2f;
+
+    float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
+
+    float shape_sum = shape.x;
     shape_sum += shape.y * cloud_gradient(CLOUD_GRADIENT_ALTOSTRATUS, height);
     shape_sum += shape.z * cloud_gradient(CLOUD_GRADIENT_ALTOCUMULUS, height);
     shape_sum *= 0.16f;
@@ -248,8 +256,7 @@ __device__ float cloud_base_density(const vec3 pos, const float height, const Cl
     const float density_gradient_mid = cloud_density_height_gradient_mid_level(height, weather);
 
     density_mid = shape_sum * density_gradient_mid;
-    density_mid = smoothstep(density_mid, 0.6f, 0.9f);
-    density_mid = __saturatef(density_mid - (1.0f - weather.coverage_mid)) * weather.coverage_mid;
+    density_mid = __saturatef(density_mid) * weather.coverage_mid;
   }
 
   return density_low + density_mid;
