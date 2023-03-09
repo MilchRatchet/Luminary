@@ -672,7 +672,7 @@ __device__ Spectrum sky_compute_atmosphere(
     const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, origin);
 
     for (int i = 0; i < steps; i++) {
-      const float new_reach = start + distance * (i + white_noise_offset(random_key)) / steps;
+      const float new_reach = start + distance * (i + white_noise_offset(random_key++)) / steps;
       step_size             = new_reach - reach;
       reach                 = new_reach;
 
