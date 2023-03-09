@@ -28,8 +28,8 @@
 #define CLOUD_WIND_SKEW 0.7f
 #define CLOUD_WIND_SKEW_WEATHER 2.5f
 
-// CLOUD_SCATTERING_OCTAVES must be larger than 0, and EXTINCTION_FACTOR >= SCATTERING_FACTOR
-#define CLOUD_SCATTERING_OCTAVES 9
+// EXTINCTION_FACTOR >= SCATTERING_FACTOR
+// Extinction factor must be 0.5f as the code is optimized with that in mind
 #define CLOUD_OCTAVE_SCATTERING_FACTOR 0.5f
 #define CLOUD_OCTAVE_EXTINCTION_FACTOR 0.5f
 #define CLOUD_OCTAVE_PHASE_FACTOR 0.5f
@@ -39,10 +39,6 @@
 ////////////////////////////////////////////////////////////////////
 // Structs
 ////////////////////////////////////////////////////////////////////
-
-struct CloudWeightOctaves {
-  float O[CLOUD_SCATTERING_OCTAVES];
-} typedef CloudWeightOctaves;
 
 struct CloudWeather {
   float coverage_low;
@@ -283,7 +279,7 @@ __device__ float cloud_erode_density(const vec3 pos, float density, const float 
 
   float noise_modifier = lerp(1.0f - detail_fbm, detail_fbm, __saturatef(height * 10.0f));
 
-  density = remap(density, noise_modifier * 0.2f, 1.0f, 0.0f, 1.0f);
+  density = remap(density, noise_modifier * device.scene.sky.cloud.erosion, 1.0f, 0.0f, 1.0f);
 
   return density;
 }

@@ -173,6 +173,8 @@ struct Cloud {
   float type_min;
   float anvil;
   float mipmap_bias;
+  float erosion;
+  int octaves;
 } typedef Cloud;
 
 // Settings that affect the sky LUTs

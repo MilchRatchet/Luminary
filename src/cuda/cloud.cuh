@@ -30,10 +30,9 @@
 // Integrator functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ void cloud_extinction(CloudWeightOctaves& weights, const vec3 origin, const vec3 ray) {
+__device__ float cloud_extinction(const vec3 origin, const vec3 ray) {
   const float iter_step = 1.0f / device.scene.sky.cloud.shadow_steps;
 
-  // Sometimes the shadow ray goes below the cloud layer but misses the earth and reenters the cloud layer
   float optical_depth = 0.0f;
 
   for (float i = 0.0f; i < 1.0f; i += iter_step) {
@@ -61,11 +60,7 @@ __device__ void cloud_extinction(CloudWeightOctaves& weights, const vec3 origin,
 
   optical_depth *= CLOUD_EXTINCTION_DENSITY;
 
-  float octave_factor = 1.0f;
-  for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-    weights.O[i] *= expf(octave_factor * optical_depth);
-    octave_factor *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
-  }
+  return expf(optical_depth);
 }
 
 /*
@@ -118,8 +113,12 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
       RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2);
       ambient_color          = scale_color(ambient_color, 4.0f * PI);
 
+      float ambient_extinction      = cloud_extinction(pos, ambient_ray);
+      const float ambient_cos_angle = dot_product(ray, ambient_ray);
+
       RGBF sun_color;
-      CloudWeightOctaves sun_weights;
+      float sun_extinction;
+      float sun_cos_angle;
 
       const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, pos)), pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
@@ -130,46 +129,33 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
         sun_color = sky_get_sun_color(pos, sun_ray);
         sun_color = scale_color(sun_color, sun_light_angle);
 
-        const float sun_cos_angle = dot_product(ray, sun_ray);
+        sun_cos_angle = dot_product(ray, sun_ray);
 
-        float phase_factor = 1.0f;
-        for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-          sun_weights.O[i] = cloud_dual_lobe_henvey_greenstein(sun_cos_angle, phase_factor);
-          phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
-        }
-
-        cloud_extinction(sun_weights, pos, sun_ray);
+        sun_extinction = cloud_extinction(pos, sun_ray);
       }
       else {
-        sun_color = get_color(0.0f, 0.0f, 0.0f);
-        for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-          sun_weights.O[i] = 0.0f;
-        }
+        sun_color      = get_color(0.0f, 0.0f, 0.0f);
+        sun_extinction = 1.0f;
+        sun_cos_angle  = 0.0f;
       }
 
-      const float ambient_cos_angle = dot_product(ray, ambient_ray);
-
-      CloudWeightOctaves ambient_weights;
+      float scattering   = density * CLOUD_SCATTERING_DENSITY;
+      float extinction   = fmaxf(density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
       float phase_factor = 1.0f;
-      for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-        ambient_weights.O[i] = cloud_dual_lobe_henvey_greenstein(ambient_cos_angle, phase_factor);
+      for (int i = 0; i < device.scene.sky.cloud.octaves; i++) {
+        scattering *= CLOUD_OCTAVE_SCATTERING_FACTOR;
+        extinction *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
+
+        const float sun_phase     = cloud_dual_lobe_henvey_greenstein(sun_cos_angle, phase_factor);
+        const float ambient_phase = cloud_dual_lobe_henvey_greenstein(ambient_cos_angle, phase_factor);
+
         phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
-      }
 
-      // Ambient light
-      cloud_extinction(ambient_weights, pos, ambient_ray);
+        const RGBF sun_color_i     = scale_color(sun_color, sun_extinction * sun_phase);
+        const RGBF ambient_color_i = scale_color(ambient_color, ambient_extinction * ambient_phase);
 
-      float scattering_factor = 1.0f;
-      float extinction_factor = 1.0f;
-      for (int i = 0; i < CLOUD_SCATTERING_OCTAVES; i++) {
-        const float scattering = scattering_factor * density * CLOUD_SCATTERING_DENSITY;
-        const float extinction = fmaxf(extinction_factor * density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
-
-        scattering_factor *= CLOUD_OCTAVE_SCATTERING_FACTOR;
-        extinction_factor *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
-
-        const RGBF sun_color_i     = scale_color(sun_color, sun_weights.O[i]);
-        const RGBF ambient_color_i = scale_color(ambient_color, ambient_weights.O[i]);
+        sun_extinction     = sqrtf(sun_extinction);
+        ambient_extinction = sqrtf(ambient_extinction);
 
         RGBF S = add_color(sun_color_i, ambient_color_i);
         S      = scale_color(S, scattering);
@@ -184,7 +170,7 @@ __device__ RGBAF cloud_render_tropospheric(const vec3 origin, const vec3 ray, fl
       // Update transmittance
       transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);
 
-      if (transmittance < 0.005f) {
+      if (transmittance < 0.01f) {
         transmittance = 0.0f;
         break;
       }

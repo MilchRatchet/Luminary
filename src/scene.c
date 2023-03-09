@@ -147,6 +147,8 @@ void scene_init(Scene** _scene) {
   scene->sky.cloud.coverage_min        = 0.0f;
   scene->sky.cloud.type                = 1.0f;
   scene->sky.cloud.type_min            = 0.0f;
+  scene->sky.cloud.erosion             = 0.2f;
+  scene->sky.cloud.octaves             = 9;
   scene->sky.cloud.anvil               = 0.0f;
   scene->sky.cloud.forward_scattering  = 0.85f;
   scene->sky.cloud.backward_scattering = -0.2f;

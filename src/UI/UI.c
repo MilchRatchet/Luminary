@@ -311,6 +311,7 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_check(ui, "Tropospheric Mid", &(instance->scene.sky.cloud.tropospheric_mid), 1);
   panels[i++] = create_check(ui, "Cirrus", &(instance->scene.sky.cloud.cirrus), 1);
   panels[i++] = create_slider(ui, "Steps", &(instance->scene.sky.cloud.steps), 1, 0.01f, 0.0f, 128.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Octaves", &(instance->scene.sky.cloud.octaves), 1, 0.01f, 1.0f, 128.0f, 0, 1);
   panels[i++] = create_slider(ui, "Mipmap Bias", &(instance->scene.sky.cloud.mipmap_bias), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Offset X", &(instance->scene.sky.cloud.offset_x), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Offset Z", &(instance->scene.sky.cloud.offset_z), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
@@ -325,6 +326,7 @@ static UITab create_sky_cloud_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Minimum Coverage", &(instance->scene.sky.cloud.coverage_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Type", &(instance->scene.sky.cloud.type), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Minimum Type", &(instance->scene.sky.cloud.type_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Erosion", &(instance->scene.sky.cloud.erosion), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Anvil Overhang", &(instance->scene.sky.cloud.anvil), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Forward Scattering", &(instance->scene.sky.cloud.forward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Backward Scattering", &(instance->scene.sky.cloud.backward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
