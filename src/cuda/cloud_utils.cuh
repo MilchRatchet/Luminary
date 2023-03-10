@@ -350,21 +350,20 @@ __device__ float cloud_density(vec3 pos, const float height, const CloudWeather 
 // Cutoff function
 ////////////////////////////////////////////////////////////////////
 
-__device__ bool cloud_significant_point(const float height, const CloudWeather weather) {
-  const float4 type_low = cloud_density_height_gradient_type_low_level(weather);
-
-  const bool significant_low =
-    device.scene.sky.cloud.layer_low && (weather.coverage_low > CLOUD_WEATHER_CUTOFF) && (type_low.x < height) && (type_low.w > height);
-
-  if (significant_low)
-    return true;
-
-  const float4 type_mid = cloud_density_height_gradient_type_mid_level(weather);
-
-  const bool significant_mid =
-    device.scene.sky.cloud.layer_mid && (weather.coverage_mid > CLOUD_WEATHER_CUTOFF) && (type_mid.x < height) && (type_mid.w > height);
-
-  return significant_mid;
+__device__ bool cloud_significant_point(const float height, const CloudWeather weather, const CloudLayerType layer) {
+  switch (layer) {
+    case CLOUD_LAYER_LOW: {
+      const float4 type = cloud_density_height_gradient_type_low_level(weather);
+      return (weather.coverage_low > CLOUD_WEATHER_CUTOFF) && (type.x < height) && (type.w > height);
+    }
+    case CLOUD_LAYER_MID: {
+      const float4 type = cloud_density_height_gradient_type_mid_level(weather);
+      return (weather.coverage_mid > CLOUD_WEATHER_CUTOFF) && (type.x < height) && (type.w > height);
+    }
+    case CLOUD_LAYER_TOP:
+    default:
+      return false;
+  }
 }
 
 #endif /* CLOUD_UTILS_CUH */

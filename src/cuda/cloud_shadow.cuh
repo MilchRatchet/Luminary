@@ -19,16 +19,10 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
     return 1.0f;
   }
 
-  const int step_count = device.scene.sky.cloud.steps / 3;
-
-  const int big_step_mult = 2;
-  const float big_step    = big_step_mult;
-
+  const int step_count  = device.scene.sky.cloud.steps / 4;
   const float step_size = dist / step_count;
 
   float reach = start + (white_noise() + 0.1f) * step_size;
-
-  float optical_depth = 0.0f;
 
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
@@ -41,22 +35,16 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
 
     const CloudWeather weather = cloud_weather(pos, height);
 
-    if (!cloud_significant_point(height, weather)) {
-      i += big_step_mult - 1;
-      reach += step_size * big_step;
-      continue;
-    }
-
-    optical_depth -= cloud_density(pos, height, weather, 2.0f, CLOUD_LAYER_LOW) * step_size * CLOUD_EXTINCTION_DENSITY;
-
-    if (optical_depth < -1.0f) {
-      break;
+    if (cloud_significant_point(height, weather, CLOUD_LAYER_LOW)) {
+      if (cloud_density(pos, height, weather, 2.0f, CLOUD_LAYER_LOW) > 0.0f) {
+        return 0.0f;
+      }
     }
 
     reach += step_size;
   }
 
-  return expf(optical_depth);
+  return 1.0f;
 }
 
 #endif /* CLOUD_SHADOW_CUH */

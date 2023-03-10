@@ -56,7 +56,7 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray, const Cloud
 
     const CloudWeather weather = cloud_weather(pos, height);
 
-    if (cloud_significant_point(height, weather)) {
+    if (cloud_significant_point(height, weather, layer)) {
       optical_depth -= cloud_density(pos, height, weather, 0.0f, layer) * step_size;
     }
   }
@@ -74,17 +74,32 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
     return RGBAF_set(0.0f, 0.0f, 0.0f, 1.0f);
   }
 
+  int step_count;
+
+  switch (layer) {
+    case CLOUD_LAYER_LOW: {
+      const float span = world_to_sky_scale(device.scene.sky.cloud.height_low_max - device.scene.sky.cloud.height_low_min);
+      dist             = fminf(6.0f * span, dist);
+      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / 15.0f);
+    } break;
+    case CLOUD_LAYER_MID: {
+      const float span = world_to_sky_scale(device.scene.sky.cloud.height_mid_max - device.scene.sky.cloud.height_mid_min);
+      dist             = fminf(6.0f * span, dist);
+      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / 7.5f);
+    } break;
+    case CLOUD_LAYER_TOP: {
+      const float span = world_to_sky_scale(device.scene.sky.cloud.height_top_max - device.scene.sky.cloud.height_top_min);
+      dist             = fminf(6.0f * span, dist);
+      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / 7.5f);
+    } break;
+    default:
+      return RGBAF_set(0.0f, 0.0f, 0.0f, 1.0f);
+  }
+
   start = fmaxf(0.0f, start);
-  dist  = fminf(30.0f, dist);
-
-  const int step_count = device.scene.sky.cloud.steps * __saturatef(dist / 15.0f);
-
-  const int big_step_mult = 2;
-  const float big_step    = big_step_mult;
 
   const float step_size = dist / step_count;
-
-  float reach = start + (white_noise() + 0.1f) * step_size;
+  float reach           = start + (0.3f + white_noise()) * step_size;
 
   float transmittance = 1.0f;
   RGBF scatteredLight = get_color(0.0f, 0.0f, 0.0f);
@@ -100,9 +115,8 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
 
     const CloudWeather weather = cloud_weather(pos, height);
 
-    if (!cloud_significant_point(height, weather)) {
-      i += big_step_mult - 1;
-      reach += step_size * big_step;
+    if (!cloud_significant_point(height, weather, layer)) {
+      reach += step_size;
       continue;
     }
 
@@ -170,10 +184,9 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
         scatteredLight = add_color(scatteredLight, scale_color(S, transmittance));
       }
 
-      // Update transmittance
       transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);
 
-      if (transmittance < 0.01f) {
+      if (transmittance < 0.1f) {
         transmittance = 0.0f;
         break;
       }
@@ -187,16 +200,6 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
   result.g = scatteredLight.g;
   result.b = scatteredLight.b;
   result.a = transmittance;
-
-  return result;
-}
-
-__device__ RGBAF cloud_render_toplayer(const vec3 origin, const vec3 ray, const float start, const float dist) {
-  RGBAF result;
-  result.r = 0.0f;
-  result.g = 0.0f;
-  result.b = 0.0f;
-  result.a = 1.0f;
 
   return result;
 }
