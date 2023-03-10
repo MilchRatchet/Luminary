@@ -80,17 +80,17 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
     case CLOUD_LAYER_LOW: {
       const float span = world_to_sky_scale(device.scene.sky.cloud.height_low_max - device.scene.sky.cloud.height_low_min);
       dist             = fminf(6.0f * span, dist);
-      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / 15.0f);
+      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / (6.0f * span));
     } break;
     case CLOUD_LAYER_MID: {
       const float span = world_to_sky_scale(device.scene.sky.cloud.height_mid_max - device.scene.sky.cloud.height_mid_min);
       dist             = fminf(6.0f * span, dist);
-      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / 7.5f);
+      step_count       = (device.scene.sky.cloud.steps / 2) * __saturatef(dist / (6.0f * span));
     } break;
     case CLOUD_LAYER_TOP: {
       const float span = world_to_sky_scale(device.scene.sky.cloud.height_top_max - device.scene.sky.cloud.height_top_min);
       dist             = fminf(6.0f * span, dist);
-      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / 7.5f);
+      step_count       = (device.scene.sky.cloud.steps / 2) * __saturatef(dist / (6.0f * span));
     } break;
     default:
       return RGBAF_set(0.0f, 0.0f, 0.0f, 1.0f);
