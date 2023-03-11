@@ -284,14 +284,6 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
     case 6872304213117257295u:
       sscanf(value, "%f %f\n", &cloud->offset_x, &cloud->offset_z);
       break;
-    /* HEIGHTMA */
-    case 4705509855082399048u:
-      sscanf(value, "%f\n", &cloud->height_low_max);
-      break;
-    /* HEIGHTMI */
-    case 5281970607385822536u:
-      sscanf(value, "%f\n", &cloud->height_low_min);
-      break;
     /* SHASCALE */
     case 4993437844262438995u:
       sscanf(value, "%f\n", &cloud->noise_shape_scale);

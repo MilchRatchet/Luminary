@@ -138,12 +138,12 @@ void scene_init(Scene** _scene) {
   scene->sky.cloud.seed                  = 1;
   scene->sky.cloud.offset_x              = 0.0f;
   scene->sky.cloud.offset_z              = 0.0f;
-  scene->sky.cloud.height_low_max        = 6500.0f;
+  scene->sky.cloud.height_low_max        = 5000.0f;
   scene->sky.cloud.height_low_min        = 1500.0f;
-  scene->sky.cloud.height_mid_max        = 7500.0f;
-  scene->sky.cloud.height_mid_min        = 6500.0f;
-  scene->sky.cloud.height_top_max        = 8500.0f;
-  scene->sky.cloud.height_top_min        = 7500.0f;
+  scene->sky.cloud.height_mid_max        = 6000.0f;
+  scene->sky.cloud.height_mid_min        = 5500.0f;
+  scene->sky.cloud.height_top_max        = 8000.0f;
+  scene->sky.cloud.height_top_min        = 7750.0f;
   scene->sky.cloud.noise_shape_scale     = 1.0f;
   scene->sky.cloud.noise_detail_scale    = 1.0f;
   scene->sky.cloud.noise_weather_scale   = 1.0f;

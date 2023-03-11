@@ -8,18 +8,15 @@
 // It is important that extinction >= scattering to not amplify the energy in the system
 #define CLOUD_SCATTERING_DENSITY (1000.0f * 0.1f * 0.9f)
 #define CLOUD_EXTINCTION_DENSITY (1000.0f * 0.1f)
-#define CLOUD_EXTINCTION_STEP_SIZE 0.01f
-#define CLOUD_EXTINCTION_STEP_MULTIPLY 1.5f
-#define CLOUD_EXTINCTION_STEP_MAX 0.75f
 
 // Low-level clouds
-#define CLOUD_GRADIENT_STRATUS make_float4(0.01f, 0.1f, 0.11f, 0.2f)
-#define CLOUD_GRADIENT_STRATOCUMULUS make_float4(0.01f, 0.08f, 0.3f, 0.4f)
-#define CLOUD_GRADIENT_CUMULUS make_float4(0.01f, 0.06f, 0.75f, 0.95f)
+#define CLOUD_GRADIENT_STRATUS make_float4(0.01f, 0.15f, 0.17f, 0.3f)
+#define CLOUD_GRADIENT_STRATOCUMULUS make_float4(0.01f, 0.12f, 0.45f, 0.6f)
+#define CLOUD_GRADIENT_CUMULUS make_float4(0.01f, 0.06f, 0.8f, 0.99f)
 
 // Mid-level clouds
-#define CLOUD_GRADIENT_ALTOSTRATUS make_float4(0.01f, 0.20f, 0.40f, 0.60f)
-#define CLOUD_GRADIENT_ALTOCUMULUS make_float4(0.01f, 0.30f, 0.60f, 0.95f)
+#define CLOUD_GRADIENT_ALTOSTRATUS make_float4(0.01f, 0.20f, 0.80f, 0.95f)
+#define CLOUD_GRADIENT_ALTOCUMULUS make_float4(0.25f, 0.30f, 0.60f, 0.75f)
 
 #define CLOUD_WIND_DIR get_vector(1.0f, 0.0f, 0.0f)
 #define CLOUD_WIND_SKEW 0.7f
@@ -272,19 +269,16 @@ __device__ float cloud_base_density_mid(const vec3 pos, const float height, cons
   if (device.scene.sky.cloud.layer_mid) {
     vec3 shape_pos = pos;
     shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
-    shape_pos      = scale_vector(shape_pos, 0.4f * device.scene.sky.cloud.noise_shape_scale);
-    shape_pos.x *= 0.2f;
+    shape_pos      = scale_vector(shape_pos, 0.2f * device.scene.sky.cloud.noise_shape_scale);
 
     float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
 
-    float shape_sum = shape.x;
-    shape_sum += shape.y * cloud_gradient(CLOUD_GRADIENT_ALTOSTRATUS, height);
-    shape_sum += shape.z * cloud_gradient(CLOUD_GRADIENT_ALTOCUMULUS, height);
-    shape_sum *= 0.16f;
+    float shape_sum = (shape.x + shape.y * 6.0f + shape.w + shape.z) * 0.1f;
 
     const float density_gradient = cloud_density_height_gradient_mid_level(height, weather);
 
     density = shape_sum * density_gradient;
+    density = remap(weather.type_mid, 0.0f, 1.0f, smoothstep(density, -0.1f, 1.0f), smoothstep(density, 0.50f, 1.0f));
     density = __saturatef(density) * weather.coverage_mid;
   }
 
