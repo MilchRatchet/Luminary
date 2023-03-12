@@ -111,7 +111,7 @@ UIPanel create_info(UI* ui, const char* text, void* data_binding, int data_type,
   return info;
 }
 
-UIPanel create_tab(UI* ui, int* data_binding, char* options) {
+UIPanel create_tab(UI* ui, int depth, char* options) {
   UIPanel tab;
 
   char* tmp = options;
@@ -153,7 +153,7 @@ UIPanel create_tab(UI* ui, int* data_binding, char* options) {
 
   free(starts);
 
-  tab = init_UIPanel(ui, PANEL_TAB, "", data_binding, 0);
+  tab = init_UIPanel(ui, PANEL_TAB, "", (void*) 0, 0);
 
   tab.data_text = (SDL_Surface*) malloc(sizeof(SDL_Surface*) * count);
 
@@ -171,6 +171,7 @@ UIPanel create_tab(UI* ui, int* data_binding, char* options) {
 
   tab.prop2        = (UI_WIDTH - total_width) / count;
   tab.prop3        = count;
+  tab.prop4        = depth;
   tab.render       = render_UIPanel_tab;
   tab.handle_mouse = handle_mouse_UIPanel_tab;
 
