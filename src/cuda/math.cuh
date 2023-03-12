@@ -1034,11 +1034,15 @@ __device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
   e2 = normalize_vector(e2);
 
   const float abs1 = __frsqrt_rn(t1.u * t1.u + t1.v * t1.v);
-  t1.u *= abs1;
-  t1.v *= abs1;
+  if (!isinf(abs1)) {
+    t1.u *= abs1;
+    t1.v *= abs1;
+  }
   const float abs2 = __frsqrt_rn(t2.u * t2.u + t2.v * t2.v);
-  t2.u *= abs2;
-  t2.v *= abs2;
+  if (!isinf(abs2)) {
+    t2.u *= abs2;
+    t2.v *= abs2;
+  }
 
   const vec3 a1 = cross_product(e2, normal);
   const vec3 a2 = cross_product(normal, e1);
