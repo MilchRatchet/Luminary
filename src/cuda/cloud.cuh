@@ -69,9 +69,15 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray, const Cloud
 /*
  * Returns an RGBAF where the RGB is the radiance and the A is the greyscale transmittance.
  */
-__device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, float dist, const CloudLayerType layer) {
+__device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, float start, float dist, const CloudLayerType layer) {
   if (dist < 0.0f || start == FLT_MAX) {
-    return RGBAF_set(0.0f, 0.0f, 0.0f, 1.0f);
+    CloudRenderResult result;
+
+    result.scattered_light = get_color(0.0f, 0.0f, 0.0f);
+    result.transmittance   = 1.0f;
+    result.hit_dist        = start;
+
+    return result;
   }
 
   int step_count;
@@ -92,8 +98,15 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
       dist             = fminf(6.0f * span, dist);
       step_count       = (device.scene.sky.cloud.steps / 2) * __saturatef(dist / (6.0f * span));
     } break;
-    default:
-      return RGBAF_set(0.0f, 0.0f, 0.0f, 1.0f);
+    default: {
+      CloudRenderResult result;
+
+      result.scattered_light = get_color(0.0f, 0.0f, 0.0f);
+      result.transmittance   = 1.0f;
+      result.hit_dist        = start;
+
+      return result;
+    }
   }
 
   start = fmaxf(0.0f, start);
@@ -101,8 +114,10 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
   const float step_size = dist / step_count;
   float reach           = start + (0.3f + white_noise()) * step_size;
 
-  float transmittance = 1.0f;
-  RGBF scatteredLight = get_color(0.0f, 0.0f, 0.0f);
+  float transmittance  = 1.0f;
+  RGBF scattered_light = get_color(0.0f, 0.0f, 0.0f);
+  float hit_dist       = start;
+  bool hit             = false;
 
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
@@ -123,6 +138,11 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
     const float density = cloud_density(pos, height, weather, 0.0f, layer);
 
     if (density > 0.0f) {
+      if (!hit) {
+        hit_dist = reach;
+        hit      = true;
+      }
+
       const float ambient_r1 = 2.0f * PI * white_noise();
       const float ambient_r2 = 2.0f * PI * white_noise();
 
@@ -180,8 +200,8 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
 
         const float step_trans = expf(-extinction * step_size);
 
-        S              = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
-        scatteredLight = add_color(scatteredLight, scale_color(S, transmittance));
+        S               = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
+        scattered_light = add_color(scattered_light, scale_color(S, transmittance));
       }
 
       transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);
@@ -195,11 +215,11 @@ __device__ RGBAF cloud_render(const vec3 origin, const vec3 ray, float start, fl
     reach += step_size;
   }
 
-  RGBAF result;
-  result.r = scatteredLight.r;
-  result.g = scatteredLight.g;
-  result.b = scatteredLight.b;
-  result.a = transmittance;
+  CloudRenderResult result;
+
+  result.scattered_light = scattered_light;
+  result.transmittance   = transmittance;
+  result.hit_dist        = hit_dist;
 
   return result;
 }
@@ -224,7 +244,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     const int pixel          = task.index.y * device.width + task.index.x;
 
     float2 intersections[3];
-    RGBAF results[3];
+    CloudRenderResult results[3];
 
     intersections[0] = cloud_get_lowlayer_intersection(sky_origin, task.ray, sky_max_dist);
     results[0]       = cloud_render(sky_origin, task.ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW);
@@ -269,21 +289,20 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     RGBF color  = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
 
     for (int i = 0; i < 3; i++) {
-      const float start  = intersections[order[i]].x;
-      const RGBAF result = results[order[i]];
+      const CloudRenderResult result = results[order[i]];
 
-      if (start == FLT_MAX)
+      if (result.hit_dist == FLT_MAX)
         break;
 
       if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
-        color      = add_color(color, sky_trace_inscattering(sky_origin, task.ray, start - prev_start, record));
-        sky_origin = add_vector(sky_origin, scale_vector(task.ray, start - prev_start));
+        color      = add_color(color, sky_trace_inscattering(sky_origin, task.ray, result.hit_dist - prev_start, record));
+        sky_origin = add_vector(sky_origin, scale_vector(task.ray, result.hit_dist - prev_start));
       }
 
-      color  = add_color(color, mul_color(opaque_color(result), record));
-      record = scale_color(record, result.a);
+      color  = add_color(color, mul_color(result.scattered_light, record));
+      record = scale_color(record, result.transmittance);
 
-      prev_start = start;
+      prev_start = result.hit_dist;
     }
 
     if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {

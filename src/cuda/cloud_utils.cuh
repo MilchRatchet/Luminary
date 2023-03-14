@@ -43,6 +43,12 @@ struct CloudWeather {
   float type_mid;
 } typedef CloudWeather;
 
+struct CloudRenderResult {
+  RGBF scattered_light;
+  float transmittance;
+  float hit_dist;
+} typedef CloudRenderResult;
+
 ////////////////////////////////////////////////////////////////////
 // Utility functions
 ////////////////////////////////////////////////////////////////////
