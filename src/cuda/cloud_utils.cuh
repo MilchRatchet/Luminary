@@ -292,20 +292,10 @@ __device__ float cloud_base_density_mid(const vec3 pos, const float height, cons
 }
 
 __device__ float cloud_erode_density(const vec3 pos, float density, const float height, const CloudWeather weather, float mip_bias) {
-  vec3 curl_pos = pos;
-  curl_pos      = scale_vector(curl_pos, 3.0f * device.scene.sky.cloud.noise_curl_scale);
-
   mip_bias += device.scene.sky.cloud.mipmap_bias;
   mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
 
-  const float4 curl = tex2DLod<float4>(device.ptrs.cloud_noise[3], curl_pos.x, curl_pos.z, mip_bias);
-
-  vec3 curl_shift = get_vector(curl.x, curl.y, curl.z);
-  curl_shift      = sub_vector(curl_shift, get_vector(0.5f, 0.5f, 0.5f));
-  curl_shift      = scale_vector(curl_shift, 2.0f * 0.55f * height);
-
   vec3 detail_pos = pos;
-  detail_pos      = add_vector(detail_pos, curl_shift);
   detail_pos      = add_vector(detail_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
   detail_pos      = scale_vector(detail_pos, 2.0f * device.scene.sky.cloud.noise_detail_scale);
 
