@@ -11,6 +11,41 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
     return 1.0f;
   }
 
+  if (device.scene.sky.cloud.layer_top) {
+    const float2 cloud_layer_intersect = cloud_get_toplayer_intersection(origin, ray, FLT_MAX);
+
+    const float start    = cloud_layer_intersect.x;
+    const float max_dist = 6.0f * world_to_sky_scale(device.scene.sky.cloud.height_top_max - device.scene.sky.cloud.height_top_min);
+    const float dist     = fminf(cloud_layer_intersect.y, max_dist);
+
+    if (start != FLT_MAX && dist > 0.0f) {
+      const int step_count  = device.scene.sky.cloud.steps / 16;
+      const float step_size = dist / step_count;
+
+      float reach = start + 0.1f * step_size;
+
+      for (int i = 0; i < step_count; i++) {
+        const vec3 pos = add_vector(origin, scale_vector(ray, reach));
+
+        const float height = cloud_height(pos, CLOUD_LAYER_TOP);
+
+        if (height < 0.0f || height > 1.0f) {
+          break;
+        }
+
+        const CloudWeather weather = cloud_weather(pos, height);
+
+        if (cloud_significant_point(height, weather, CLOUD_LAYER_TOP)) {
+          if (cloud_density(pos, height, weather, 2.0f, CLOUD_LAYER_TOP) > 0.0f) {
+            return 0.25f;
+          }
+        }
+
+        reach += step_size;
+      }
+    }
+  }
+
   if (device.scene.sky.cloud.layer_mid) {
     const float2 cloud_layer_intersect = cloud_get_midlayer_intersection(origin, ray, FLT_MAX);
 
@@ -37,7 +72,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
 
         if (cloud_significant_point(height, weather, CLOUD_LAYER_MID)) {
           if (cloud_density(pos, height, weather, 2.0f, CLOUD_LAYER_MID) > 0.0f) {
-            return 0.0f;
+            return 0.25f;
           }
         }
 
@@ -72,7 +107,7 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
 
         if (cloud_significant_point(height, weather, CLOUD_LAYER_LOW)) {
           if (cloud_density(pos, height, weather, 2.0f, CLOUD_LAYER_LOW) > 0.0f) {
-            return 0.0f;
+            return 0.25f;
           }
         }
 

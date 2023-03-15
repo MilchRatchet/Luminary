@@ -196,7 +196,6 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
 
         RGBF S = add_color(sun_color_i, ambient_color_i);
         S      = scale_color(S, scattering);
-        S      = scale_color(S, cloud_powder(scattering, step_size));
 
         const float step_trans = expf(-extinction * step_size);
 
