@@ -18,6 +18,8 @@
 #define CLOUD_GRADIENT_ALTOSTRATUS make_float4(0.01f, 0.20f, 0.80f, 0.95f)
 #define CLOUD_GRADIENT_ALTOCUMULUS make_float4(0.25f, 0.30f, 0.60f, 0.75f)
 
+#define CLOUD_GRADIENT_TOPLAYER make_float4(0.01f, 0.20f, 0.80f, 0.95f)
+
 #define CLOUD_WIND_DIR get_vector(1.0f, 0.0f, 0.0f)
 #define CLOUD_WIND_SKEW 0.7f
 #define CLOUD_WIND_SKEW_WEATHER 2.5f
@@ -37,10 +39,10 @@
 enum CloudLayerType { CLOUD_LAYER_LOW = 0, CLOUD_LAYER_MID = 1, CLOUD_LAYER_TOP = 2 } typedef CloudLayerType;
 
 struct CloudWeather {
-  float coverage_low;
-  float type_low;
-  float coverage_mid;
-  float type_mid;
+  float coverage;
+  float type;
+  float coverage1;
+  float coverage2;
 } typedef CloudWeather;
 
 struct CloudRenderResult {
@@ -73,23 +75,53 @@ __device__ float cloud_height(const vec3 pos, const CloudLayerType layer) {
   }
 }
 
-__device__ CloudWeather cloud_weather(vec3 pos, const float height) {
+__device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerType layer) {
   pos.x += device.scene.sky.cloud.offset_x;
   pos.z += device.scene.sky.cloud.offset_z;
 
-  vec3 low_pos = pos;
-  low_pos      = add_vector(low_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW_WEATHER * height));
-  low_pos      = scale_vector(low_pos, 0.012f * device.scene.sky.cloud.noise_weather_scale);
+  switch (layer) {
+    default:
+    case CLOUD_LAYER_LOW: {
+      vec3 wheather_pos = pos;
+      wheather_pos      = add_vector(wheather_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW_WEATHER * height));
+      wheather_pos      = scale_vector(wheather_pos, 0.012f * device.scene.sky.cloud.noise_weather_scale);
 
-  float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2], low_pos.x, low_pos.z);
+      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2], wheather_pos.x, wheather_pos.z);
 
-  CloudWeather weather;
-  weather.coverage_low = __saturatef(remap(tex.x * device.scene.sky.cloud.coverage, 0.0f, 1.0f, device.scene.sky.cloud.coverage_min, 1.0f));
-  weather.type_low     = __saturatef(remap(tex.y * device.scene.sky.cloud.type, 0.0f, 1.0f, device.scene.sky.cloud.type_min, 1.0f));
-  weather.coverage_mid = __saturatef(remap(tex.z * device.scene.sky.cloud.coverage, 0.0f, 1.0f, device.scene.sky.cloud.coverage_min, 1.0f));
-  weather.type_mid     = __saturatef(remap(tex.w * device.scene.sky.cloud.type, 0.0f, 1.0f, device.scene.sky.cloud.type_min, 1.0f));
+      CloudWeather weather;
+      weather.coverage = __saturatef(remap(tex.x * device.scene.sky.cloud.coverage, 0.0f, 1.0f, device.scene.sky.cloud.coverage_min, 1.0f));
+      weather.type     = __saturatef(remap(tex.y * device.scene.sky.cloud.type, 0.0f, 1.0f, device.scene.sky.cloud.type_min, 1.0f));
 
-  return weather;
+      return weather;
+    }
+    case CLOUD_LAYER_MID: {
+      vec3 wheather_pos = pos;
+      wheather_pos      = add_vector(wheather_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW_WEATHER * height));
+      wheather_pos      = scale_vector(wheather_pos, 0.01f * device.scene.sky.cloud.noise_weather_scale);
+
+      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2], wheather_pos.x, wheather_pos.z);
+
+      CloudWeather weather;
+      weather.coverage = __saturatef(remap(tex.z * device.scene.sky.cloud.coverage, 0.0f, 1.0f, device.scene.sky.cloud.coverage_min, 1.0f));
+      weather.type     = __saturatef(remap(tex.w * device.scene.sky.cloud.type, 0.0f, 1.0f, device.scene.sky.cloud.type_min, 1.0f));
+
+      return weather;
+    }
+    case CLOUD_LAYER_TOP: {
+      vec3 wheather_pos = pos;
+      wheather_pos      = add_vector(wheather_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW_WEATHER * height));
+      wheather_pos      = scale_vector(wheather_pos, 0.004f * device.scene.sky.cloud.noise_weather_scale);
+
+      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2], wheather_pos.x, wheather_pos.z);
+
+      CloudWeather w;
+      w.coverage  = __saturatef(remap(tex.x * device.scene.sky.cloud.coverage, 0.0f, 1.0f, device.scene.sky.cloud.coverage_min, 1.0f));
+      w.coverage1 = __saturatef(remap(tex.y * device.scene.sky.cloud.coverage, 0.0f, 1.0f, device.scene.sky.cloud.coverage_min, 1.0f));
+      w.coverage2 = __saturatef(remap(tex.z * device.scene.sky.cloud.coverage, 0.0f, 1.0f, device.scene.sky.cloud.coverage_min, 1.0f));
+
+      return w;
+    }
+  }
 }
 
 __device__ float cloud_dual_lobe_henvey_greenstein(const float cos_angle, const float factor) {
@@ -103,9 +135,9 @@ __device__ float cloud_dual_lobe_henvey_greenstein(const float cos_angle, const 
 ////////////////////////////////////////////////////////////////////
 
 __device__ vec3 cloud_weather_type_low_level(const CloudWeather weather) {
-  const float stratus       = 1.0f - __saturatef(weather.type_low * 2.0f);
-  const float stratocumulus = 1.0f - fabsf(2.0f * weather.type_low - 1.0f);
-  const float cumulus       = __saturatef(2.0f * weather.type_low - 1.0f);
+  const float stratus       = 1.0f - __saturatef(weather.type * 2.0f);
+  const float stratocumulus = 1.0f - fabsf(2.0f * weather.type - 1.0f);
+  const float cumulus       = __saturatef(2.0f * weather.type - 1.0f);
 
   return get_vector(stratus, stratocumulus, cumulus);
 }
@@ -135,8 +167,8 @@ __device__ float cloud_density_height_gradient_low_level(const float height, con
 ////////////////////////////////////////////////////////////////////
 
 __device__ vec3 cloud_weather_type_mid_level(const CloudWeather weather) {
-  const float altostratus = 1.0f - __saturatef(weather.type_mid);
-  const float altocumulus = __saturatef(weather.type_mid);
+  const float altostratus = 1.0f - __saturatef(weather.type);
+  const float altocumulus = __saturatef(weather.type);
 
   return get_vector(altostratus, altocumulus, 0.0f);
 }
@@ -162,26 +194,12 @@ __device__ float cloud_density_height_gradient_mid_level(const float height, con
 // Top level cloud functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ vec3 cloud_weather_type_top_level(const CloudWeather weather) {
-  const float altostratus = 1.0f - __saturatef(weather.type_mid);
-  const float altocumulus = __saturatef(weather.type_mid);
-
-  return get_vector(altostratus, altocumulus, 0.0f);
-}
-
-__device__ float4 cloud_density_height_gradient_type_top_level(const CloudWeather weather) {
-  const vec3 weather_type = cloud_weather_type_top_level(weather);
-
-  const float4 altostratus = CLOUD_GRADIENT_ALTOSTRATUS;
-  const float4 altocumulus = CLOUD_GRADIENT_ALTOCUMULUS;
-
-  return make_float4(
-    weather_type.x * altostratus.x + weather_type.y * altocumulus.x, weather_type.x * altostratus.y + weather_type.y * altocumulus.y,
-    weather_type.x * altostratus.z + weather_type.y * altocumulus.z, weather_type.x * altostratus.w + weather_type.y * altocumulus.w);
+__device__ float4 cloud_density_height_gradient_type_top_level() {
+  return CLOUD_GRADIENT_TOPLAYER;
 }
 
 __device__ float cloud_density_height_gradient_top_level(const float height, const CloudWeather weather) {
-  const float4 gradient = cloud_density_height_gradient_type_top_level(weather);
+  const float4 gradient = cloud_density_height_gradient_type_top_level();
 
   return cloud_gradient(gradient, height);
 }
@@ -270,7 +288,7 @@ __device__ float cloud_base_density_low(const vec3 pos, const float height, cons
     shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
     shape_pos      = scale_vector(shape_pos, 0.4f * device.scene.sky.cloud.noise_shape_scale);
 
-    float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
+    const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
 
     float shape_sum = shape.x * 5.0f;
     shape_sum += shape.y * cloud_gradient(CLOUD_GRADIENT_STRATUS, height);
@@ -283,7 +301,7 @@ __device__ float cloud_base_density_low(const vec3 pos, const float height, cons
     density = shape_sum * density_gradient;
     density = powf(fabsf(density), __saturatef(height * 6.0f));
     density = smoothstep(density, 0.25f, 1.1f);
-    density = __saturatef(density - (1.0f - weather.coverage_low)) * weather.coverage_low;
+    density = __saturatef(density - (1.0f - weather.coverage)) * weather.coverage;
   }
 
   return density;
@@ -297,18 +315,17 @@ __device__ float cloud_base_density_mid(const vec3 pos, const float height, cons
 
   if (device.scene.sky.cloud.layer_mid) {
     vec3 shape_pos = pos;
-    shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
     shape_pos      = scale_vector(shape_pos, 0.2f * device.scene.sky.cloud.noise_shape_scale);
 
-    float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
+    const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
 
-    float shape_sum = (shape.x + shape.y * 6.0f + shape.w + shape.z) * 0.1f;
+    const float shape_sum = (shape.x + shape.y * 7.0f + shape.w + shape.z) * 0.1f;
 
     const float density_gradient = cloud_density_height_gradient_mid_level(height, weather);
 
     density = shape_sum * density_gradient;
-    density = remap(weather.type_mid, 0.0f, 1.0f, smoothstep(density, -0.1f, 1.0f), smoothstep(density, 0.50f, 1.0f));
-    density = __saturatef(density) * weather.coverage_mid;
+    density = remap(weather.type, 0.0f, 1.0f, smoothstep(density, -0.1f, 1.0f), smoothstep(density, 0.50f, 1.0f));
+    density = __saturatef(density) * weather.coverage;
   }
 
   return density;
@@ -322,18 +339,27 @@ __device__ float cloud_base_density_top(const vec3 pos, const float height, cons
 
   if (device.scene.sky.cloud.layer_top) {
     vec3 shape_pos = pos;
-    shape_pos      = add_vector(shape_pos, scale_vector(CLOUD_WIND_DIR, CLOUD_WIND_SKEW * height));
     shape_pos      = scale_vector(shape_pos, 0.2f * device.scene.sky.cloud.noise_shape_scale);
 
-    float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
+    const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
 
-    float shape_sum = (shape.x + shape.y * 6.0f + shape.w + shape.z) * 0.1f;
+    /*shape_pos = pos;
+    shape_pos.x *= 0.025f;
+    shape_pos.y += (weather.coverage - 0.5f);
+    shape_pos = scale_vector(shape_pos, 0.8f * device.scene.sky.cloud.noise_shape_scale);
+
+    const float4 shape2 = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);*/
 
     const float density_gradient = cloud_density_height_gradient_top_level(height, weather);
 
-    density = shape_sum * density_gradient;
-    density = remap(weather.type_mid, 0.0f, 1.0f, smoothstep(density, -0.1f, 1.0f), smoothstep(density, 0.50f, 1.0f));
-    density = __saturatef(density) * weather.coverage_mid;
+    // Cirrostratus fibratus
+    // const float d0 = smoothstep(shape2.x * 0.1f + shape2.y * 0.7f + shape2.w * 0.1f + shape2.z * 0.1f, 0.25f, 1.0f) * weather.coverage;
+    // Cirrostratus nebulosus
+    const float d1 = (shape.x * 0.5f + shape.y * 0.5f) * sqrtf(weather.coverage1);
+    // Cirrocumulus
+    const float d2 = smoothstep(shape.x * 0.2f + shape.y * 0.4f + shape.w * 0.2f + shape.z * 0.2f, 0.50f, 1.0f) * weather.coverage2;
+
+    density = remap01(density_gradient * (d1 + d2) * 0.25f, 0.05f, 1.0f);
   }
 
   return density;
@@ -367,9 +393,15 @@ __device__ float cloud_density(vec3 pos, const float height, const CloudWeather 
   switch (layer) {
     case CLOUD_LAYER_LOW:
       density = cloud_base_density_low(pos, height, weather, mip_bias);
+      if (density > 0.0f) {
+        density = cloud_erode_density(pos, density, height, weather, mip_bias);
+      }
       break;
     case CLOUD_LAYER_MID:
       density = cloud_base_density_mid(pos, height, weather, mip_bias);
+      if (density > 0.0f) {
+        density = cloud_erode_density(pos, density, height, weather, mip_bias);
+      }
       break;
     case CLOUD_LAYER_TOP:
       density = cloud_base_density_top(pos, height, weather, mip_bias);
@@ -377,10 +409,6 @@ __device__ float cloud_density(vec3 pos, const float height, const CloudWeather 
     default:
       density = 0.0f;
       break;
-  }
-
-  if (density > 0.0f) {
-    density = cloud_erode_density(pos, density, height, weather, mip_bias);
   }
 
   return fmaxf(density * device.scene.sky.cloud.density, 0.0f);
@@ -394,15 +422,17 @@ __device__ bool cloud_significant_point(const float height, const CloudWeather w
   switch (layer) {
     case CLOUD_LAYER_LOW: {
       const float4 type = cloud_density_height_gradient_type_low_level(weather);
-      return (weather.coverage_low > CLOUD_WEATHER_CUTOFF) && (type.x < height) && (type.w > height);
+      return (weather.coverage > CLOUD_WEATHER_CUTOFF) && (type.x < height) && (type.w > height);
     }
     case CLOUD_LAYER_MID: {
       const float4 type = cloud_density_height_gradient_type_mid_level(weather);
-      return (weather.coverage_mid > CLOUD_WEATHER_CUTOFF) && (type.x < height) && (type.w > height);
+      return (weather.coverage > CLOUD_WEATHER_CUTOFF) && (type.x < height) && (type.w > height);
     }
     case CLOUD_LAYER_TOP: {
-      const float4 type = cloud_density_height_gradient_type_top_level(weather);
-      return (weather.coverage_mid > CLOUD_WEATHER_CUTOFF) && (type.x < height) && (type.w > height);
+      const float4 type = cloud_density_height_gradient_type_top_level();
+      return (weather.coverage > CLOUD_WEATHER_CUTOFF || weather.coverage1 > CLOUD_WEATHER_CUTOFF
+              || weather.coverage2 > CLOUD_WEATHER_CUTOFF)
+             && (type.x < height) && (type.w > height);
     }
     default:
       return false;

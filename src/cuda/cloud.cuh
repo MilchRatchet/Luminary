@@ -8,12 +8,22 @@
 #include "utils.cuh"
 
 //
-// The code of this file is based on the cloud rendering in https://github.com/turanszkij/WickedEngine.
+// The code of this file was initially based on the cloud rendering in https://github.com/turanszkij/WickedEngine.
 // It follows the basic ideas of using raymarching with noise based density.
+// The noise texture creation is very similar to that found in the Wicked Engine.
 // The clouds are divided into a 3 tropospheric layers: low, mid and top.
 // Low level layer: Stratus, Stratocumulus and Cumulus clouds.
 // Mid level layer: Altostratus and Altocumulus clouds.
-// Top level layer: Cirrostratus and Cirrus clouds.
+// Top level layer: Cirrus, Cirrostratus and Cirrocumulus clouds.
+//
+// Note:  Cirrus clouds have a special shape that is not simple to reproduce using noise.
+//        As a result, they are not currently implemented. Possible solutions include
+//        computing a texture specifically for it but it is unclear how to achieve
+//        a huge number of variations using that. As an alternative, I tested
+//        Cirrostratus fibratus clouds. However, they don't mix well with other
+//        top level clouds, causing a look that looks like interpolation artifacts.
+//        Thus, the top layer currently consists of only cirrocumulus clouds and
+//        cirrostratus nebulosus clouds.
 //
 
 ////////////////////////////////////////////////////////////////////
@@ -23,6 +33,7 @@
 // [Hil16]
 // Sébastien Hillaire, "Physically Based Sky, Atmosphere and Cloud Rendering in Frostbite", in Physically Based Shading in Theory and
 // Practice course, SIGGRAPH 2016. https://www.ea.com/frostbite/news/physically-based-sky-atmosphere-and-cloud-rendering
+//
 
 // [Sch22]
 // Andrew Schneider, "Nubis, Evolved: Real-Time Volumetric Clouds for Skies, Environments, and VFX", in Advances in Real-Time Rendering in
@@ -54,7 +65,7 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray, const Cloud
     if (height > 1.0f || height < 0.0f)
       break;
 
-    const CloudWeather weather = cloud_weather(pos, height);
+    const CloudWeather weather = cloud_weather(pos, height, layer);
 
     if (cloud_significant_point(height, weather, layer)) {
       optical_depth -= cloud_density(pos, height, weather, 0.0f, layer) * step_size;
@@ -96,7 +107,7 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
     case CLOUD_LAYER_TOP: {
       const float span = world_to_sky_scale(device.scene.sky.cloud.height_top_max - device.scene.sky.cloud.height_top_min);
       dist             = fminf(6.0f * span, dist);
-      step_count       = (device.scene.sky.cloud.steps / 2) * __saturatef(dist / (6.0f * span));
+      step_count       = (device.scene.sky.cloud.steps / 4) * __saturatef(dist / (6.0f * span));
     } break;
     default: {
       CloudRenderResult result;
@@ -128,7 +139,7 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
       break;
     }
 
-    const CloudWeather weather = cloud_weather(pos, height);
+    const CloudWeather weather = cloud_weather(pos, height, layer);
 
     if (!cloud_significant_point(height, weather, layer)) {
       reach += step_size;
