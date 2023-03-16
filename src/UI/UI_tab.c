@@ -1,6 +1,7 @@
 #include "UI_tab.h"
 
 #include <stdio.h>
+#include <string.h>
 
 #include "UI.h"
 #include "UI_blit.h"

@@ -13,15 +13,15 @@ __device__ bool cloud_shadow_layer(const vec3 origin, const vec3 ray, const int 
   switch (layer) {
     case CLOUD_LAYER_LOW: {
       cloud_layer_intersect = cloud_get_lowlayer_intersection(origin, ray, FLT_MAX);
-      max_dist              = 6.0f * world_to_sky_scale(device.scene.sky.cloud.height_low_max - device.scene.sky.cloud.height_low_min);
+      max_dist              = 6.0f * (device.scene.sky.cloud.low.height_max - device.scene.sky.cloud.low.height_min);
     } break;
     case CLOUD_LAYER_MID: {
       cloud_layer_intersect = cloud_get_midlayer_intersection(origin, ray, FLT_MAX);
-      max_dist              = 6.0f * world_to_sky_scale(device.scene.sky.cloud.height_mid_max - device.scene.sky.cloud.height_mid_min);
+      max_dist              = 6.0f * (device.scene.sky.cloud.mid.height_max - device.scene.sky.cloud.mid.height_min);
     } break;
     case CLOUD_LAYER_TOP: {
       cloud_layer_intersect = cloud_get_toplayer_intersection(origin, ray, FLT_MAX);
-      max_dist              = 6.0f * world_to_sky_scale(device.scene.sky.cloud.height_top_max - device.scene.sky.cloud.height_top_min);
+      max_dist              = 6.0f * (device.scene.sky.cloud.top.height_max - device.scene.sky.cloud.top.height_min);
     } break;
     default:
       return false;
@@ -64,19 +64,19 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
     return 1.0f;
   }
 
-  if (device.scene.sky.cloud.layer_low) {
+  if (device.scene.sky.cloud.low.active) {
     if (cloud_shadow_layer(origin, ray, device.scene.sky.cloud.steps / 3, CLOUD_LAYER_LOW)) {
       return 0.1f;
     }
   }
 
-  if (device.scene.sky.cloud.layer_mid) {
+  if (device.scene.sky.cloud.mid.active) {
     if (cloud_shadow_layer(origin, ray, device.scene.sky.cloud.steps / 16, CLOUD_LAYER_MID)) {
       return 0.25f;
     }
   }
 
-  if (device.scene.sky.cloud.layer_top) {
+  if (device.scene.sky.cloud.top.active) {
     if (cloud_shadow_layer(origin, ray, device.scene.sky.cloud.steps / 32, CLOUD_LAYER_TOP)) {
       return 0.75f;
     }

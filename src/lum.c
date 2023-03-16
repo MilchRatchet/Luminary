@@ -276,6 +276,14 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
     case 6872287793290429249u:
       sscanf(value, "%d\n", &cloud->active);
       break;
+    /* INSCATTE */
+    case 4995710525939863113u:
+      sscanf(value, "%d\n", &cloud->atmosphere_scattering);
+      break;
+    /* MIPMAPBI */
+    case 5278869954631846221u:
+      sscanf(value, "%f\n", &cloud->mipmap_bias);
+      break;
     /* SEED___ */
     case 6872316419162588499u:
       sscanf(value, "%d\n", &cloud->seed);
@@ -296,22 +304,6 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
     case 4993437844262438231u:
       sscanf(value, "%f\n", &cloud->noise_weather_scale);
       break;
-    /* CURSCALE */
-    case 4993437844263556419u:
-      sscanf(value, "%f\n", &cloud->noise_curl_scale);
-      break;
-    /* COVERAGE */
-    case 4992030533569892163u:
-      sscanf(value, "%f\n", &cloud->coverage);
-      break;
-    /* COVERMIN */
-    case 5641125024004198211u:
-      sscanf(value, "%f\n", &cloud->coverage_min);
-      break;
-    /* ANVIL___ */
-    case 6872316337643212353u:
-      sscanf(value, "%f\n", &cloud->anvil);
-      break;
     /* FWDSCATT */
     case 6076553554645243718u:
       sscanf(value, "%f\n", &cloud->forward_scattering);
@@ -324,14 +316,6 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
     case 5787764665257902931u:
       sscanf(value, "%f\n", &cloud->lobe_lerp);
       break;
-    /* WETNESS_ */
-    case 6868925413802132823u:
-      sscanf(value, "%f\n", &cloud->wetness);
-      break;
-    /* POWDER__ */
-    case 6872302013843459920u:
-      sscanf(value, "%f\n", &cloud->powder);
-      break;
     /* SHASTEPS */
     case 6003374531761227859u:
       sscanf(value, "%d\n", &cloud->shadow_steps);
@@ -343,6 +327,66 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
     /* DENSITY_ */
     case 6870615380437386564u:
       sscanf(value, "%f\n", &cloud->density);
+      break;
+    /* LOWACTIV */
+    case 6217593408397463372u:
+      sscanf(value, "%d\n", &cloud->low.active);
+      break;
+    /* LOWCOVER */
+    case 5928239382935326540u:
+      sscanf(value, "%f %f\n", &cloud->low.coverage_min, &cloud->low.coverage);
+      break;
+    /* LOWTYPE_ */
+    case 6864981551593508684u:
+      sscanf(value, "%f %f\n", &cloud->low.type_min, &cloud->low.type);
+      break;
+    /* LOWHEIGH */
+    case 5208212055992520524u:
+      sscanf(value, "%f %f\n", &cloud->low.height_min, &cloud->low.height_max);
+      break;
+    /* LOWWIND_ */
+    case 6864697808924397388u:
+      sscanf(value, "%f %f\n", &cloud->low.wind_speed, &cloud->low.wind_angle);
+      break;
+    /* MIDACTIV */
+    case 6217593408396216653u:
+      sscanf(value, "%d\n", &cloud->mid.active);
+      break;
+    /* MIDCOVER */
+    case 5928239382934079821u:
+      sscanf(value, "%f %f\n", &cloud->mid.coverage_min, &cloud->mid.coverage);
+      break;
+    /* MIDTYPE_ */
+    case 6864981551592261965u:
+      sscanf(value, "%f %f\n", &cloud->mid.type_min, &cloud->mid.type);
+      break;
+    /* MIDHEIGH */
+    case 5208212055991273805u:
+      sscanf(value, "%f %f\n", &cloud->mid.height_min, &cloud->mid.height_max);
+      break;
+    /* MIDWIND_ */
+    case 6864697808923150669u:
+      sscanf(value, "%f %f\n", &cloud->mid.wind_speed, &cloud->mid.wind_angle);
+      break;
+    /* TOPACTIV */
+    case 6217593408397004628u:
+      sscanf(value, "%d\n", &cloud->top.active);
+      break;
+    /* TOPCOVER */
+    case 5928239382934867796u:
+      sscanf(value, "%f %f\n", &cloud->top.coverage_min, &cloud->top.coverage);
+      break;
+    /* TOPTYPE_ */
+    case 6864981551593049940u:
+      sscanf(value, "%f %f\n", &cloud->top.type_min, &cloud->top.type);
+      break;
+    /* TOPHEIGH */
+    case 5208212055992061780u:
+      sscanf(value, "%f %f\n", &cloud->top.height_min, &cloud->top.height_max);
+      break;
+    /* TOPWIND_ */
+    case 6864697808923938644u:
+      sscanf(value, "%f %f\n", &cloud->top.wind_speed, &cloud->top.wind_angle);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid CLOUD setting.", line, key);
@@ -739,29 +783,13 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
 
   sprintf(line, "CLOUD ACTIVE__ %d\n", instance->scene.sky.cloud.active);
   fputs(line, file);
-  sprintf(line, "CLOUD LAYERLOW %d\n", instance->scene.sky.cloud.layer_low);
-  fputs(line, file);
-  sprintf(line, "CLOUD LAYERMID %d\n", instance->scene.sky.cloud.layer_mid);
-  fputs(line, file);
-  sprintf(line, "CLOUD LAYERTOP %d\n", instance->scene.sky.cloud.layer_top);
-  fputs(line, file);
   sprintf(line, "CLOUD INSCATTE %d\n", instance->scene.sky.cloud.atmosphere_scattering);
+  fputs(line, file);
+  sprintf(line, "CLOUD MIPMAPBI %f\n", instance->scene.sky.cloud.mipmap_bias);
   fputs(line, file);
   sprintf(line, "CLOUD SEED____ %d\n", instance->scene.sky.cloud.seed);
   fputs(line, file);
   sprintf(line, "CLOUD OFFSET__ %f %f\n", instance->scene.sky.cloud.offset_x, instance->scene.sky.cloud.offset_z);
-  fputs(line, file);
-  sprintf(line, "CLOUD LOWMAXHE %f\n", instance->scene.sky.cloud.height_low_max);
-  fputs(line, file);
-  sprintf(line, "CLOUD LOWMINHE %f\n", instance->scene.sky.cloud.height_low_min);
-  fputs(line, file);
-  sprintf(line, "CLOUD MIDMAXHE %f\n", instance->scene.sky.cloud.height_mid_max);
-  fputs(line, file);
-  sprintf(line, "CLOUD MIDMINHE %f\n", instance->scene.sky.cloud.height_mid_min);
-  fputs(line, file);
-  sprintf(line, "CLOUD TOPMAXHE %f\n", instance->scene.sky.cloud.height_top_max);
-  fputs(line, file);
-  sprintf(line, "CLOUD TOPMINHE %f\n", instance->scene.sky.cloud.height_top_min);
   fputs(line, file);
   sprintf(line, "CLOUD SHASCALE %f\n", instance->scene.sky.cloud.noise_shape_scale);
   fputs(line, file);
@@ -769,33 +797,47 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CLOUD WEASCALE %f\n", instance->scene.sky.cloud.noise_weather_scale);
   fputs(line, file);
-  sprintf(line, "CLOUD CURSCALE %f\n", instance->scene.sky.cloud.noise_curl_scale);
-  fputs(line, file);
-  sprintf(line, "CLOUD COVERAGE %f\n", instance->scene.sky.cloud.coverage);
-  fputs(line, file);
-  sprintf(line, "CLOUD COVERMIN %f\n", instance->scene.sky.cloud.coverage_min);
-  fputs(line, file);
-  sprintf(line, "CLOUD TYPE____ %f\n", instance->scene.sky.cloud.type);
-  fputs(line, file);
-  sprintf(line, "CLOUD TYPEMIN_ %f\n", instance->scene.sky.cloud.type_min);
-  fputs(line, file);
-  sprintf(line, "CLOUD ANVIL___ %f\n", instance->scene.sky.cloud.anvil);
-  fputs(line, file);
   sprintf(line, "CLOUD FWDSCATT %f\n", instance->scene.sky.cloud.forward_scattering);
   fputs(line, file);
   sprintf(line, "CLOUD BWDSCATT %f\n", instance->scene.sky.cloud.backward_scattering);
   fputs(line, file);
   sprintf(line, "CLOUD SCATLERP %f\n", instance->scene.sky.cloud.lobe_lerp);
   fputs(line, file);
-  sprintf(line, "CLOUD WETNESS_ %f\n", instance->scene.sky.cloud.wetness);
-  fputs(line, file);
-  sprintf(line, "CLOUD POWDER__ %f\n", instance->scene.sky.cloud.powder);
-  fputs(line, file);
   sprintf(line, "CLOUD STEPS___ %d\n", instance->scene.sky.cloud.steps);
   fputs(line, file);
   sprintf(line, "CLOUD SHASTEPS %d\n", instance->scene.sky.cloud.shadow_steps);
   fputs(line, file);
   sprintf(line, "CLOUD DENSITY_ %f\n", instance->scene.sky.cloud.density);
+  fputs(line, file);
+  sprintf(line, "CLOUD LOWACTIV %d\n", instance->scene.sky.cloud.low.active);
+  fputs(line, file);
+  sprintf(line, "CLOUD LOWCOVER %f %f\n", instance->scene.sky.cloud.low.coverage_min, instance->scene.sky.cloud.low.coverage);
+  fputs(line, file);
+  sprintf(line, "CLOUD LOWTYPE_ %f %f\n", instance->scene.sky.cloud.low.type_min, instance->scene.sky.cloud.low.type);
+  fputs(line, file);
+  sprintf(line, "CLOUD LOWHEIGH %f %f\n", instance->scene.sky.cloud.low.height_min, instance->scene.sky.cloud.low.height_max);
+  fputs(line, file);
+  sprintf(line, "CLOUD LOWWIND_ %f %f\n", instance->scene.sky.cloud.low.wind_speed, instance->scene.sky.cloud.low.wind_angle);
+  fputs(line, file);
+  sprintf(line, "CLOUD MIDACTIV %d\n", instance->scene.sky.cloud.mid.active);
+  fputs(line, file);
+  sprintf(line, "CLOUD MIDCOVER %f %f\n", instance->scene.sky.cloud.mid.coverage_min, instance->scene.sky.cloud.mid.coverage);
+  fputs(line, file);
+  sprintf(line, "CLOUD MIDTYPE_ %f %f\n", instance->scene.sky.cloud.mid.type_min, instance->scene.sky.cloud.mid.type);
+  fputs(line, file);
+  sprintf(line, "CLOUD MIDHEIGH %f %f\n", instance->scene.sky.cloud.mid.height_min, instance->scene.sky.cloud.mid.height_max);
+  fputs(line, file);
+  sprintf(line, "CLOUD MIDWIND_ %f %f\n", instance->scene.sky.cloud.mid.wind_speed, instance->scene.sky.cloud.mid.wind_angle);
+  fputs(line, file);
+  sprintf(line, "CLOUD TOPACTIV %d\n", instance->scene.sky.cloud.top.active);
+  fputs(line, file);
+  sprintf(line, "CLOUD TOPCOVER %f %f\n", instance->scene.sky.cloud.top.coverage_min, instance->scene.sky.cloud.top.coverage);
+  fputs(line, file);
+  sprintf(line, "CLOUD TOPTYPE_ %f %f\n", instance->scene.sky.cloud.top.type_min, instance->scene.sky.cloud.top.type);
+  fputs(line, file);
+  sprintf(line, "CLOUD TOPHEIGH %f %f\n", instance->scene.sky.cloud.top.height_min, instance->scene.sky.cloud.top.height_max);
+  fputs(line, file);
+  sprintf(line, "CLOUD TOPWIND_ %f %f\n", instance->scene.sky.cloud.top.wind_speed, instance->scene.sky.cloud.top.wind_angle);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Fog Settings\n#===============================\n\n");

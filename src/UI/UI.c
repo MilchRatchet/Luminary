@@ -310,6 +310,7 @@ static UITab create_sky_cloud_general_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.active), 1);
   panels[i++] = create_check(ui, "Inscattering", &(instance->scene.sky.cloud.atmosphere_scattering), 1);
   panels[i++] = create_slider(ui, "Steps", &(instance->scene.sky.cloud.steps), 1, 0.01f, 0.0f, 128.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Shadow Steps", &(instance->scene.sky.cloud.shadow_steps), 1, 0.01f, 0.0f, 128.0f, 0, 1);
   panels[i++] = create_slider(ui, "Octaves", &(instance->scene.sky.cloud.octaves), 1, 0.01f, 1.0f, 128.0f, 0, 1);
   panels[i++] = create_slider(ui, "Mipmap Bias", &(instance->scene.sky.cloud.mipmap_bias), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Offset X", &(instance->scene.sky.cloud.offset_x), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
@@ -317,20 +318,10 @@ static UITab create_sky_cloud_general_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_slider(ui, "Noise Shape Scale", &(instance->scene.sky.cloud.noise_shape_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Noise Detail Scale", &(instance->scene.sky.cloud.noise_detail_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Noise Weather Scale", &(instance->scene.sky.cloud.noise_weather_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Noise Curl Scale", &(instance->scene.sky.cloud.noise_curl_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Density", &(instance->scene.sky.cloud.density), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Coverage", &(instance->scene.sky.cloud.coverage), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Minimum Coverage", &(instance->scene.sky.cloud.coverage_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Type", &(instance->scene.sky.cloud.type), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Minimum Type", &(instance->scene.sky.cloud.type_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Erosion", &(instance->scene.sky.cloud.erosion), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Anvil Overhang", &(instance->scene.sky.cloud.anvil), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Forward Scattering", &(instance->scene.sky.cloud.forward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Backward Scattering", &(instance->scene.sky.cloud.backward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Direction Lerp", &(instance->scene.sky.cloud.lobe_lerp), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Wetness", &(instance->scene.sky.cloud.wetness), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Beer Powder Effect", &(instance->scene.sky.cloud.powder), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Shadow Steps", &(instance->scene.sky.cloud.shadow_steps), 1, 0.01f, 0.0f, 128.0f, 0, 1);
   panels[i++] = create_slider(ui, "Seed", &(instance->scene.sky.cloud.seed), 0, 0.005f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_button(ui, "Generate Noise Maps", instance, (void (*)(void*)) device_cloud_noise_generate, 1);
 
@@ -354,9 +345,15 @@ static UITab create_sky_cloud_lowlevel_panels(UI* ui, RaytraceInstance* instance
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, 1, "Celestial\nAtmosphere\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "General\nLow\nMid\nTop");
-  panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.layer_low), 1);
-  panels[i++] = create_slider(ui, "Height Minimum", &(instance->scene.sky.cloud.height_low_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Height Maximum", &(instance->scene.sky.cloud.height_low_max), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.low.active), 1);
+  panels[i++] = create_slider(ui, "Height Minimum", &(instance->scene.sky.cloud.low.height_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Height Maximum", &(instance->scene.sky.cloud.low.height_max), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Coverage", &(instance->scene.sky.cloud.low.coverage), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Coverage", &(instance->scene.sky.cloud.low.coverage_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Type", &(instance->scene.sky.cloud.low.type), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Type", &(instance->scene.sky.cloud.low.type_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Wind Speed", &(instance->scene.sky.cloud.low.wind_speed), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Wind Angle", &(instance->scene.sky.cloud.low.wind_angle), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -378,9 +375,15 @@ static UITab create_sky_cloud_midlevel_panels(UI* ui, RaytraceInstance* instance
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, 1, "Celestial\nAtmosphere\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "General\nLow\nMid\nTop");
-  panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.layer_mid), 1);
-  panels[i++] = create_slider(ui, "Height Minimum", &(instance->scene.sky.cloud.height_mid_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Height Maximum", &(instance->scene.sky.cloud.height_mid_max), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.mid.active), 1);
+  panels[i++] = create_slider(ui, "Height Minimum", &(instance->scene.sky.cloud.mid.height_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Height Maximum", &(instance->scene.sky.cloud.mid.height_max), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Coverage", &(instance->scene.sky.cloud.mid.coverage), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Coverage", &(instance->scene.sky.cloud.mid.coverage_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Type", &(instance->scene.sky.cloud.mid.type), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Type", &(instance->scene.sky.cloud.mid.type_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Wind Speed", &(instance->scene.sky.cloud.mid.wind_speed), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Wind Angle", &(instance->scene.sky.cloud.mid.wind_angle), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -402,9 +405,15 @@ static UITab create_sky_cloud_toplevel_panels(UI* ui, RaytraceInstance* instance
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, 1, "Celestial\nAtmosphere\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "General\nLow\nMid\nTop");
-  panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.layer_top), 1);
-  panels[i++] = create_slider(ui, "Height Minimum", &(instance->scene.sky.cloud.height_top_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Height Maximum", &(instance->scene.sky.cloud.height_top_max), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.top.active), 1);
+  panels[i++] = create_slider(ui, "Height Minimum", &(instance->scene.sky.cloud.top.height_min), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Height Maximum", &(instance->scene.sky.cloud.top.height_max), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Coverage", &(instance->scene.sky.cloud.top.coverage), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Coverage", &(instance->scene.sky.cloud.top.coverage_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Type", &(instance->scene.sky.cloud.top.type), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Minimum Type", &(instance->scene.sky.cloud.top.type_min), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Wind Speed", &(instance->scene.sky.cloud.top.wind_speed), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Wind Angle", &(instance->scene.sky.cloud.top.wind_angle), 1, 0.001f, -FLT_MAX, FLT_MAX, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

@@ -355,102 +355,26 @@ __global__ void generate_weather_map(const int dim, const float seed, uint8_t* t
   }
 }
 
-__global__ void generate_curl_noise(const int dim, uint8_t* tex) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  uchar4* dst = (uchar4*) tex;
-
-  const int amount    = dim * dim;
-  const float scale_x = 1.0f / dim;
-  const float scale_y = 1.0f / dim;
-
-  while (id < amount) {
-    const int x = id % dim;
-    const int y = id / dim;
-
-    const float sx = x * scale_x;
-    const float sy = y * scale_y;
-
-    const vec3 pos = get_vector(4.0f * sx, 4.0f * sy, 0.0f);
-
-    const float step      = 0.05f;
-    const float inv_2step = 1.0f / (2.0f * step);
-    vec3 curl;
-
-    {
-      float n1, n2;
-      n1      = perlin_octaves(add_vector(pos, get_vector(0.0f, step, 0.0f)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(0.0f, -step, 0.0f)), 1.0f, 5, false);
-      float a = (n1 - n2) * inv_2step;
-      n1      = perlin_octaves(add_vector(pos, get_vector(0.0f, 0.0f, step)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(0.0f, 0.0f, -step)), 1.0f, 5, false);
-      float b = (n1 - n2) * inv_2step;
-
-      curl.x = a - b;
-    }
-
-    {
-      float n1, n2;
-      n1      = perlin_octaves(add_vector(pos, get_vector(0.0f, 0.0f, step)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(0.0f, 0.0f, -step)), 1.0f, 5, false);
-      float a = (n1 - n2) * inv_2step;
-      n1      = perlin_octaves(add_vector(pos, get_vector(step, 0.0f, 0.0f)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(-step, 0.0f, 0.0f)), 1.0f, 5, false);
-      float b = (n1 - n2) * inv_2step;
-
-      curl.y = a - b;
-    }
-
-    {
-      float n1, n2;
-      n1      = perlin_octaves(add_vector(pos, get_vector(step, 0.0f, 0.0f)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(-step, 0.0f, 0.0f)), 1.0f, 5, false);
-      float a = (n1 - n2) * inv_2step;
-      n1      = perlin_octaves(add_vector(pos, get_vector(0.0f, step, 0.0f)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(0.0f, -step, 0.0f)), 1.0f, 5, false);
-      float b = (n1 - n2) * inv_2step;
-
-      curl.z = a - b;
-    }
-
-    const float remap_low  = -0.5f;
-    const float remap_high = 3.0f;
-
-    curl = get_vector(
-      remap(curl.x, remap_low, remap_high, 0.0f, 1.0f), remap(curl.y, remap_low, remap_high, 0.0f, 1.0f),
-      remap(curl.z, remap_low, remap_high, 0.0f, 1.0f));
-
-    curl = scale_vector(add_vector_const(curl, 1.0f), 0.5f);
-
-    dst[x + y * dim] = make_uchar4(__saturatef(curl.x) * 255.0f, __saturatef(curl.y) * 255.0f, __saturatef(curl.z) * 255.0f, 255);
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
 #define CLOUD_SHAPE_RES 128
 #define CLOUD_DETAIL_RES 32
 #define CLOUD_WEATHER_RES 1024
-#define CLOUD_CURL_RES 128
 
 extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   bench_tic();
 
   if (instance->scene.sky.cloud.initialized) {
-    texture_free_atlas(instance->cloud_noise, 4);
+    texture_free_atlas(instance->cloud_noise, 3);
   }
 
-  TextureRGBA noise_tex[4];
+  TextureRGBA noise_tex[3];
   texture_create(noise_tex + 0, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
   texture_create(
     noise_tex + 1, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
   texture_create(noise_tex + 2, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, CLOUD_WEATHER_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
-  texture_create(noise_tex + 3, CLOUD_CURL_RES, CLOUD_CURL_RES, 1, CLOUD_CURL_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
 
   noise_tex[0].mipmap = TexMipmapGenerate;
   noise_tex[1].mipmap = TexMipmapGenerate;
   noise_tex[2].mipmap = TexMipmapNone;
-  noise_tex[3].mipmap = TexMipmapGenerate;
 
   device_malloc((void**) &noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
   generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[0].width, (uint8_t*) noise_tex[0].data);
@@ -462,15 +386,11 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
     noise_tex[2].width, (float) instance->scene.sky.cloud.seed, (uint8_t*) noise_tex[2].data);
 
-  device_malloc((void**) &noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
-  generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[3].width, (uint8_t*) noise_tex[3].data);
-
-  texture_create_atlas(&instance->cloud_noise, noise_tex, 4);
+  texture_create_atlas(&instance->cloud_noise, noise_tex, 3);
 
   device_free(noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
   device_free(noise_tex[1].data, noise_tex[1].depth * noise_tex[1].height * noise_tex[1].pitch * 4 * sizeof(uint8_t));
   device_free(noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
-  device_free(noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
 
   raytrace_update_device_pointers(instance);
 

@@ -144,41 +144,38 @@ struct Star {
   float intensity;
 } typedef Star;
 
+struct CloudLayer {
+  int active;
+  float height_max;
+  float height_min;
+  float coverage;
+  float coverage_min;
+  float type;
+  float type_min;
+  float wind_speed;
+  float wind_angle;
+} typedef CloudLayer;
+
 struct Cloud {
   int active;
   int initialized;
-  int layer_low;
-  int layer_mid;
-  int layer_top;
   int atmosphere_scattering;
+  CloudLayer low;
+  CloudLayer mid;
+  CloudLayer top;
   float offset_x;
   float offset_z;
-  float height_low_max;
-  float height_low_min;
-  float height_mid_max;
-  float height_mid_min;
-  float height_top_max;
-  float height_top_min;
   float density;
   int seed;
   float forward_scattering;
   float backward_scattering;
   float lobe_lerp;
-  float wetness;
-  float powder;
   int steps;
   int shadow_steps;
   float noise_shape_scale;
   float noise_detail_scale;
   float noise_weather_scale;
-  float noise_curl_scale;
-  float coverage;
-  float coverage_min;
-  float type;
-  float type_min;
-  float anvil;
   float mipmap_bias;
-  float erosion;
   int octaves;
 } typedef Cloud;
 
