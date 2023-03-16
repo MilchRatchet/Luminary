@@ -97,17 +97,17 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
     case CLOUD_LAYER_LOW: {
       const float span = world_to_sky_scale(device.scene.sky.cloud.height_low_max - device.scene.sky.cloud.height_low_min);
       dist             = fminf(6.0f * span, dist);
-      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / (6.0f * span));
+      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / (6.0f * span)) + white_noise() - 0.5f;
     } break;
     case CLOUD_LAYER_MID: {
       const float span = world_to_sky_scale(device.scene.sky.cloud.height_mid_max - device.scene.sky.cloud.height_mid_min);
       dist             = fminf(6.0f * span, dist);
-      step_count       = (device.scene.sky.cloud.steps / 2) * __saturatef(dist / (6.0f * span));
+      step_count       = (device.scene.sky.cloud.steps / 4) * __saturatef(dist / (6.0f * span)) + white_noise() - 0.5f;
     } break;
     case CLOUD_LAYER_TOP: {
       const float span = world_to_sky_scale(device.scene.sky.cloud.height_top_max - device.scene.sky.cloud.height_top_min);
       dist             = fminf(6.0f * span, dist);
-      step_count       = (device.scene.sky.cloud.steps / 4) * __saturatef(dist / (6.0f * span));
+      step_count       = (device.scene.sky.cloud.steps / 8) * __saturatef(dist / (6.0f * span)) + white_noise() - 0.5f;
     } break;
     default: {
       CloudRenderResult result;
@@ -123,7 +123,7 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
   start = fmaxf(0.0f, start);
 
   const float step_size = dist / step_count;
-  float reach           = start + (0.3f + white_noise()) * step_size;
+  float reach           = start + (0.1f + white_noise() * 0.9f) * step_size;
 
   float transmittance  = 1.0f;
   RGBF scattered_light = get_color(0.0f, 0.0f, 0.0f);
