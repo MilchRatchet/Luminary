@@ -154,7 +154,7 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
         hit      = true;
       }
 
-      const float ambient_r1 = 2.0f * PI * white_noise();
+      const float ambient_r1 = 2.0f * PI * white_noise() - PI;
       const float ambient_r2 = 2.0f * PI * white_noise();
 
       const vec3 ambient_ray = angles_to_direction(ambient_r1, ambient_r2);
