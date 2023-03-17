@@ -348,7 +348,7 @@ __device__ float cloud_base_density_top(const vec3 pos, const float height, cons
   // Cirrostratus fibratus
   // const float d0 = smoothstep(shape2.x * 0.1f + shape2.y * 0.7f + shape2.w * 0.1f + shape2.z * 0.1f, 0.25f, 1.0f) * weather.coverage;
   // Cirrostratus nebulosus
-  const float d1 = (shape.x * 0.5f + shape.y * 0.3f + shape.z * 0.1f + shape.w * 0.1f) * sqrtf(weather.coverage1);
+  const float d1 = (shape.x * 0.3f + shape.y * 0.3f + shape.z * 0.2f + shape.w * 0.2f) * sqrtf(weather.coverage1);
   // Cirrocumulus
   const float d2 = smoothstep(shape.x * 0.2f + shape.y * 0.4f + shape.w * 0.2f + shape.z * 0.2f, 0.50f, 1.0f) * weather.coverage2;
 
