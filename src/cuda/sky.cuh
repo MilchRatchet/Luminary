@@ -827,7 +827,7 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 
   const float base_range = (is_first_ray()) ? 40.0f : 80.0f;
 
-  const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.scene.sky.steps / 6);
+  const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.scene.sky.steps / 6) + white_noise() - 0.5f;
 
   const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps);
 

@@ -133,6 +133,10 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
   for (int i = 0; i < step_count; i++) {
     const vec3 pos = add_vector(origin, scale_vector(ray, reach));
 
+    if (!hit) {
+      hit_dist = reach;
+    }
+
     const float height = cloud_height(pos, layer);
 
     if (height < 0.0f || height > 1.0f) {
@@ -149,10 +153,7 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
     const float density = cloud_density(pos, height, weather, 0.0f, layer);
 
     if (density > 0.0f) {
-      if (!hit) {
-        hit_dist = reach;
-        hit      = true;
-      }
+      hit = true;
 
       const float ambient_r1 = 2.0f * PI * white_noise() - PI;
       const float ambient_r2 = 2.0f * PI * white_noise();
