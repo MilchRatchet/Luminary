@@ -8,16 +8,6 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-/*
- * Xorshift RNG by George Marsaglia
- */
-__device__ uint32_t xorshift_uint32(uint32_t x) {
-  x ^= x << 13;
-  x ^= x >> 17;
-  x ^= x << 5;
-  return x;
-}
-
 __device__ vec3 cross_product(const vec3 a, const vec3 b) {
   vec3 result;
 
@@ -569,38 +559,6 @@ __device__ __host__ vec3 angles_to_direction(const float altitude, const float a
   return dir;
 }
 
-__device__ float world_to_sky_scale(float input) {
-  return input * 0.001f;
-}
-
-__device__ float sky_to_world_scale(float input) {
-  return input * 1000.0f;
-}
-
-__device__ vec3 world_to_sky_transform(vec3 input) {
-  vec3 result;
-
-  result.x = world_to_sky_scale(input.x);
-  result.y = world_to_sky_scale(input.y) + SKY_EARTH_RADIUS;
-  result.z = world_to_sky_scale(input.z);
-
-  result = add_vector(result, device_scene.sky.geometry_offset);
-
-  return result;
-}
-
-__device__ vec3 sky_to_world_transform(vec3 input) {
-  vec3 result;
-
-  input = sub_vector(input, device_scene.sky.geometry_offset);
-
-  result.x = sky_to_world_scale(input.x);
-  result.y = sky_to_world_scale(input.y - SKY_EARTH_RADIUS);
-  result.z = sky_to_world_scale(input.z);
-
-  return result;
-}
-
 __device__ RGBF get_color(const float r, const float g, const float b) {
   RGBF result;
 
@@ -689,8 +647,19 @@ __device__ RGBF opaque_color(const RGBAF a) {
   return get_color(a.r, a.g, a.b);
 }
 
+__device__ RGBAF RGBAF_set(const float r, const float g, const float b, const float a) {
+  RGBAF result;
+
+  result.r = r;
+  result.g = g;
+  result.b = b;
+  result.a = a;
+
+  return result;
+}
+
 __device__ float get_dithering(const int x, const int y) {
-  const float dither = 2.0f * blue_noise(x, y, 0, 0) - 1.0f;
+  const float dither = 2.0f * white_noise() - 1.0f;
 
   return copysignf(1.0f - sqrtf(1.0f - fabsf(dither)), dither);
 }
@@ -1065,11 +1034,15 @@ __device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
   e2 = normalize_vector(e2);
 
   const float abs1 = __frsqrt_rn(t1.u * t1.u + t1.v * t1.v);
-  t1.u *= abs1;
-  t1.v *= abs1;
+  if (!isinf(abs1)) {
+    t1.u *= abs1;
+    t1.v *= abs1;
+  }
   const float abs2 = __frsqrt_rn(t2.u * t2.u + t2.v * t2.v);
-  t2.u *= abs2;
-  t2.v *= abs2;
+  if (!isinf(abs2)) {
+    t2.u *= abs2;
+    t2.v *= abs2;
+  }
 
   const vec3 a1 = cross_product(e2, normal);
   const vec3 a2 = cross_product(normal, e1);

@@ -9,9 +9,15 @@
 #include "qoi.h"
 #include "raytrace.h"
 #include "stars.h"
+#include "structs.h"
+#include "texture.h"
 #include "utils.h"
 
-#define head_size 0x60
+////////////////////////////////////////////////////////////////////
+// Definition
+////////////////////////////////////////////////////////////////////
+
+#define head_size 0x70
 #define magic 4919420911629456716ul
 #define version LUMINARY_VERSION_HASH
 
@@ -40,6 +46,83 @@
  * First come all the headers, then the data.
  */
 
+////////////////////////////////////////////////////////////////////
+// GPU-CPU functions
+////////////////////////////////////////////////////////////////////
+
+static void* memcpy_gpu_to_cpu(void* gpu_ptr, size_t size) {
+  void* cpu_ptr;
+  gpuErrchk(cudaMallocHost((void**) &(cpu_ptr), size));
+  gpuErrchk(cudaMemcpy(cpu_ptr, gpu_ptr, size, cudaMemcpyDeviceToHost));
+  return cpu_ptr;
+}
+
+static void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
+  const uint64_t tex_count           = *count;
+  const uint64_t header_element_size = 12;
+  const uint64_t header_size         = header_element_size * tex_count;
+
+  cudaTextureObject_t* tex_objects;
+  gpuErrchk(cudaMallocHost((void**) &(tex_objects), sizeof(cudaTextureObject_t) * tex_count));
+  gpuErrchk(cudaMemcpy(tex_objects, textures_ptr, sizeof(cudaTextureObject_t) * tex_count, cudaMemcpyDeviceToHost));
+
+  struct cudaResourceDesc resource;
+  uint64_t buffer_size = header_size;
+
+  for (uint64_t i = 0; i < tex_count; i++) {
+    cudaGetTextureObjectResourceDesc(&resource, tex_objects[i]);
+    uint64_t pitch  = (uint64_t) resource.res.pitch2D.pitchInBytes;
+    uint64_t height = (uint64_t) resource.res.pitch2D.height;
+    buffer_size += (pitch + 32) * height;
+  }
+
+  uint8_t* cpu_ptr;
+  gpuErrchk(cudaMallocHost((void**) &(cpu_ptr), buffer_size));
+
+  uint64_t offset = header_size;
+
+  for (uint64_t i = 0; i < tex_count; i++) {
+    cudaGetTextureObjectResourceDesc(&resource, tex_objects[i]);
+    size_t pitch    = resource.res.pitch2D.pitchInBytes;
+    uint32_t width  = (uint32_t) resource.res.pitch2D.width;
+    uint32_t height = (uint32_t) resource.res.pitch2D.height;
+    void* source    = resource.res.pitch2D.devPtr;
+    gpuErrchk(cudaMemcpy(cpu_ptr + offset, source, pitch * height, cudaMemcpyDeviceToHost));
+
+    TextureRGBA tex;
+    texture_create(&tex, width, height, 1, pitch / sizeof(RGBA8), (void*) (cpu_ptr + offset), TexDataUINT8, TexStorageCPU);
+
+    uint32_t encoded_size;
+
+    void* encoded_data = qoi_encode_RGBA8(&tex, (int*) &encoded_size);
+
+    memcpy(cpu_ptr + header_element_size * i + 0x00, &encoded_size, sizeof(uint32_t));
+    memcpy(cpu_ptr + header_element_size * i + 0x04, &width, sizeof(uint32_t));
+    memcpy(cpu_ptr + header_element_size * i + 0x08, &height, sizeof(uint32_t));
+
+    memcpy(cpu_ptr + offset, encoded_data, encoded_size);
+    offset += encoded_size;
+
+    free(encoded_data);
+  }
+
+  buffer_size = offset;
+
+  gpuErrchk(cudaFreeHost(tex_objects));
+
+  *count = buffer_size;
+
+  return cpu_ptr;
+}
+
+static void free_host_memory(void* ptr) {
+  gpuErrchk(cudaFreeHost(ptr));
+}
+
+////////////////////////////////////////////////////////////////////
+// Baked file format handlers
+////////////////////////////////////////////////////////////////////
+
 static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
   const uint32_t header_element_size = 12;
   const uint64_t header_size         = header_element_size * count;
@@ -57,12 +140,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
     memcpy(&width, head + header_element_size * i + 0x04, sizeof(uint32_t));
     memcpy(&height, head + header_element_size * i + 0x08, sizeof(uint32_t));
 
-    textures[i].width      = width;
-    textures[i].height     = height;
-    textures[i].depth      = 1;
-    textures[i].type       = TexDataUINT8;
-    textures[i].gpu        = 0;
-    textures[i].volume_tex = 0;
+    texture_create(textures + i, width, height, 1, width, (void*) ((uint64_t) (data_size)), TexDataUINT8, TexStorageCPU);
 
     textures[i].data = (void*) ((uint64_t) (data_size));
     total_length += data_size;
@@ -167,7 +245,7 @@ RaytraceInstance* load_baked(const char* filename) {
   Scene* scene;
   scene_init(&scene);
 
-  memcpy(scene, &instance->scene_gpu, sizeof(Scene));
+  memcpy(scene, &instance->scene, sizeof(Scene));
 
   scene->triangles = malloc(sizeof(Triangle) * scene->triangles_length);
   fseek(file, head[3], SEEK_SET);
@@ -200,10 +278,10 @@ RaytraceInstance* load_baked(const char* filename) {
     .normal             = (DeviceBuffer*) 0,
     .normal_length      = instance->tex_atlas.normal_length};
 
-  cudatexture_create_atlas(&tex_atlas.albedo, albedo_tex, instance->tex_atlas.albedo_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.illuminance, illuminance_tex, instance->tex_atlas.illuminance_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.material, material_tex, instance->tex_atlas.material_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.normal, normal_tex, instance->tex_atlas.normal_length, CUDA_TEX_FLAG_NONE);
+  texture_create_atlas(&tex_atlas.albedo, albedo_tex, instance->tex_atlas.albedo_length);
+  texture_create_atlas(&tex_atlas.illuminance, illuminance_tex, instance->tex_atlas.illuminance_length);
+  texture_create_atlas(&tex_atlas.material, material_tex, instance->tex_atlas.material_length);
+  texture_create_atlas(&tex_atlas.normal, normal_tex, instance->tex_atlas.normal_length);
 
   free_textures(albedo_tex, instance->tex_atlas.albedo_length);
   free_textures(illuminance_tex, instance->tex_atlas.illuminance_length);
@@ -213,10 +291,10 @@ RaytraceInstance* load_baked(const char* filename) {
   scene->traversal_triangles = construct_traversal_triangles(scene->triangles, scene->triangles_length, scene->texture_assignments);
 
   RaytraceInstance* final;
-  raytracing_init(&final, instance->settings, tex_atlas, scene);
+  raytrace_init(&final, instance->settings, tex_atlas, scene);
 
-  final->scene_gpu.sky.stars             = (Star*) 0;
-  final->scene_gpu.sky.cloud.initialized = 0;
+  final->scene.sky.stars             = (Star*) 0;
+  final->scene.sky.cloud.initialized = 0;
   generate_stars(final);
 
   uint64_t strings_count = head[12];
@@ -314,11 +392,10 @@ void serialize_baked(RaytraceInstance* instance) {
   head[0] = magic;
   head[1] = version;
   head[2] = write_data(file, 1, sizeof(RaytraceInstance), instance, CPU_PTR);
-  head[3] = write_data(file, instance->scene_gpu.triangles_length, sizeof(Triangle), instance->scene_gpu.triangles, GPU_PTR);
-  head[4] = write_data(file, instance->scene_gpu.nodes_length, sizeof(Node8), instance->scene_gpu.nodes, GPU_PTR);
-  head[5] =
-    write_data(file, instance->scene_gpu.triangle_lights_length, sizeof(TriangleLight), instance->scene_gpu.triangle_lights, GPU_PTR);
-  head[6] = write_data(file, instance->scene_gpu.materials_length, sizeof(TextureAssignment), instance->scene_gpu.texture_assignments, 1);
+  head[3] = write_data(file, instance->scene.triangles_length, sizeof(Triangle), instance->scene.triangles, GPU_PTR);
+  head[4] = write_data(file, instance->scene.nodes_length, sizeof(Node8), instance->scene.nodes, GPU_PTR);
+  head[5] = write_data(file, instance->scene.triangle_lights_length, sizeof(TriangleLight), instance->scene.triangle_lights, GPU_PTR);
+  head[6] = write_data(file, instance->scene.materials_length, sizeof(TextureAssignment), instance->scene.texture_assignments, 1);
   head[7] = write_data(file, instance->tex_atlas.albedo_length, 1, device_buffer_get_pointer(instance->tex_atlas.albedo), TEX_PTR);
   head[8] =
     write_data(file, instance->tex_atlas.illuminance_length, 1, device_buffer_get_pointer(instance->tex_atlas.illuminance), TEX_PTR);

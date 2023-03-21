@@ -1,5 +1,8 @@
 #include "UI_tab.h"
 
+#include <stdio.h>
+#include <string.h>
+
 #include "UI.h"
 #include "UI_blit.h"
 #include "UI_text.h"
@@ -18,8 +21,8 @@ void handle_mouse_UIPanel_tab(UI* ui, UIPanel* panel, int mouse_state, int x, in
     if (x >= offset && x < offset + texts[i]->w + panel->prop2) {
       panel->prop1 = i;
       if (SDL_BUTTON_LMASK & mouse_state) {
-        ui->subtab            = 0;
-        *((int*) panel->data) = i;
+        memset(ui->tab + panel->prop4 + 1, 0, sizeof(int) * (UI_MAX_TAB_DEPTH - panel->prop4 - 1));
+        ui->tab[panel->prop4] = i;
         ui->scroll_pos        = 0;
         panel->hover          = 0;
       }
@@ -32,7 +35,7 @@ void handle_mouse_UIPanel_tab(UI* ui, UIPanel* panel, int mouse_state, int x, in
 void render_UIPanel_tab(UI* ui, UIPanel* panel, int y) {
   int offset          = 0;
   SDL_Surface** texts = (SDL_Surface**) panel->data_text;
-  int tab             = *((int*) (panel->data));
+  int tab             = ui->tab[panel->prop4];
 
   for (int i = 0; i < panel->prop3; i++) {
     blit_text(ui, texts[i], (panel->prop2 >> 1) + offset, ((PANEL_HEIGHT - texts[i]->h) >> 1) + y, UI_WIDTH, UI_HEIGHT_BUFFER);

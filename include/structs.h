@@ -1,6 +1,7 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
+#include <cuda_runtime_api.h>
 #include <stdint.h>
 
 /********************************************************
@@ -178,6 +179,11 @@ struct TextureG {
 } typedef TextureG;
 
 enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1 } typedef TextureDataType;
+enum TextureWrappingMode { TexModeWrap = 0, TexModeClamp = 1, TexModeMirror = 2, TexModeBorder = 3 } typedef TextureWrappingMode;
+enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
+enum TextureStorageLocation { TexStorageCPU = 0, TexStorageGPU = 1 } typedef TextureStorageLocation;
+enum TextureFilterMode { TexFilterPoint = 0, TexFilterLinear = 1 } typedef TextureFilterMode;
+enum TextureMipmapMode { TexMipmapNone = 0, TexMipmapGenerate = 1 } typedef TextureMipmapMode;
 
 struct TextureRGBA {
   unsigned int width;
@@ -185,9 +191,85 @@ struct TextureRGBA {
   unsigned int depth;
   unsigned int pitch;
   TextureDataType type;
+  TextureWrappingMode wrap_mode;
+  TextureDimensionType dim;
+  TextureStorageLocation storage;
+  TextureFilterMode filter;
+  TextureMipmapMode mipmap;
+  int mipmap_max_level;
   void* data;
-  int gpu;
-  int volume_tex;
 } typedef TextureRGBA;
+
+////////////////////////////////////////////////////////////////////
+// Kernel passing structs
+////////////////////////////////////////////////////////////////////
+struct LightSample {
+  uint32_t id;
+  uint32_t M;
+  float weight;
+  float solid_angle;
+} typedef LightSample;
+
+struct LightEvalData {
+  vec3 position;
+  uint32_t flags;
+} typedef LightEvalData;
+
+// TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
+
+// ray_xz is horizontal angle
+struct GeometryTask {
+  ushort2 index;
+  vec3 position;
+  float ray_y;
+  float ray_xz;
+  uint32_t hit_id;
+  uint32_t padding;
+} typedef GeometryTask;
+
+struct SkyTask {
+  ushort2 index;
+  vec3 origin;
+  vec3 ray;
+  uint32_t padding;
+} typedef SkyTask;
+
+// Magnitude of ray gives distance
+struct OceanTask {
+  ushort2 index;
+  vec3 position;
+  float ray_y;
+  float ray_xz;
+  float distance;
+  uint32_t padding;
+} typedef OceanTask;
+
+struct ToyTask {
+  ushort2 index;
+  vec3 position;
+  vec3 ray;
+  uint32_t padding;
+} typedef ToyTask;
+
+struct FogTask {
+  ushort2 index;
+  vec3 position;
+  float ray_y;
+  float ray_xz;
+  float distance;
+  uint32_t padding;
+} typedef FogTask;
+
+struct TraceTask {
+  vec3 origin;
+  vec3 ray;
+  ushort2 index;
+  uint32_t padding;
+} typedef TraceTask;
+
+struct TraceResult {
+  float depth;
+  uint32_t hit_id;
+} typedef TraceResult;
 
 #endif /* STRUCTS_H */

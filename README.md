@@ -21,11 +21,15 @@
   <img src="demo_images/Todano.png" alt="Todano Example">
 </p>
 
+<p align="center">
+  <img src="demo_images/Aranos.png" alt="Aranos Example">
+</p>
+
 # About
 
-Luminary is a renderer using pathtracing. It aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, the input consists of only meshes with albedo, material and illuminance textures. All other effects come parameterized.
+Luminary is a renderer using pathtracing. It aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, the input consists of only meshes with albedo, material, illuminance and normal textures. All other effects come parameterized.
 
-This project is for fun and to learn more about `Computer Graphics`. Current plans can be found in the `Issues` tab.
+This project is for fun and to learn more about `real-time rendering`. Current plans can be found in the `Issues` tab.
 
 The goal is to use as few libraries as feasible. Currently, these include `SDL2`, `zlib`, `qoi` and `OptiX`. However, only the denoiser is used from the Optix library.
 
@@ -93,7 +97,7 @@ In realtime mode, which is used by default, you can control the camera through `
 Requirements:
 - CUDA Toolkit 11.6
 - Optix 7.5 SDK
-- Nvidia driver R515
+- Nvidia driver R515 or later
 - SDL2 and SDL2_ttf
 - Modern CMake
 - Make or Ninja
@@ -187,7 +191,6 @@ This is a list of papers I have used for this project so far. Note that some tec
 - T. Karras, S. Laine, H. Ylitie, _Efficient Incoherent Ray Traversal on GPUs Through Compressed Wide BVHs_, HPG '17: Proceedings of High Performance Graphics, pp. 1-13, 2017.
 - J. Boksansky, _Crash Course in BRDF Implementation_, https://boksajak.github.io/blog/BRDF, 2021.
 - S. Lagarde, C. de Rousiers, _Moving Frostbite to Physically Based Rendering_, 2014.
-- L. Belcour, D. Coeurjolly, E. Heitz, J. Iehl and V. Ostromoukhov, _A Low-Discrepancy Sampler that Distributes Monte Carlo Errors as a Blue Noise in Screen Space_, SIGGRAPH'19 Talks, 2019.
 - A. Dietrich, H. Friedrich and M. Stich, _Spatial splits in bounding volume hierarchies_, HPG '09: Proceedings of the Conference on High Performance Graphics 2009, pp. 7-13, 2009.
 - E. Haines, T. Akenine-Möller, "Ray Tracing Gems", Apress, 2019.
 - J. Jimenez, _Next Generation Post Processing in Call of Duty: Advanced Warfare_, SIGGRAPH 2014.
@@ -200,6 +203,8 @@ This is a list of papers I have used for this project so far. Note that some tec
 - E. Bruneton, _A Qualitative and Quantitative Evaluation of 8 Clear Sky Models_, IEEE Transactions on Visualization and Computer Graphics, 23, pp. 2641–2655, 2016.
 - E. Bruneton, _Precomputed Atmospheric Scattering_, 2017. URL: https://github.com/ebruneton/precomputed_atmospheric_scattering
 - A. Schneider, _The Real-time Volumetric Cloudscapes of Horizon: Zero Dawn_, SIGGRAPH 2015.
+- A. Schneider, _Nubis, Evolved: Real-Time Volumetric Clouds for Skies, Environments, and VFX_, SIGGRAPH 2022.
 - C. Fdez-Agüera, _A Multiple-Scattering Microfacet Model for Real-Time Image Based Lighting_, Journal of Computer Graphics Techniques (JCGT), 8(1), pp. 45-55, 2019.
 - B. Bitterli, C. Wyman, M. Pharr, P. Shirley, A. Lefohn, W. Jarosz, _Spatiotemporal reservoir resampling for real-time ray tracing with dynamic direct lighting_, ACM Transactions on Graphics (Proceedings of SIGGRAPH), 39(4), 2020.
 - T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_, Journal of Computer Graphics Techniques, 6(1), pp. 1-8, 2017.
+- B. Widynski, _Squares: A Fast Counter-Based RNG_, arXiv preprint, 2020. URL: https://arxiv.org/abs/2004.06278

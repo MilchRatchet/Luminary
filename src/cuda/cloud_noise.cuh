@@ -1,19 +1,18 @@
-#ifndef CU_CLOUDGEN_H
-#define CU_CLOUDGEN_H
+#ifndef CU_CLOUD_NOISE_H
+#define CU_CLOUD_NOISE_H
 
 #include <cuda_runtime_api.h>
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>
 
-#include <cudatexture.cuh>
-#include <math.cuh>
-
 #include "bench.h"
 #include "buffer.h"
 #include "log.h"
+#include "math.cuh"
 #include "png.h"
 #include "raytrace.h"
+#include "texture.h"
 
 /*
  * This file contains code to generate noise textures needed for the clouds.
@@ -349,80 +348,8 @@ __global__ void generate_weather_map(const int dim, const float seed, uint8_t* t
 
     perlin1 = remap01(2.0f * perlin1, 0.05, 1.0);
 
-    dst[x + y * dim] = make_uchar4(__saturatef(perlin1) * 255.0f, __saturatef(perlin2) * 255.0f, __saturatef(perlin3) * 255.0f, 255);
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
-__global__ void generate_curl_noise(const int dim, uint8_t* tex) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  uchar4* dst = (uchar4*) tex;
-
-  const int amount    = dim * dim;
-  const float scale_x = 1.0f / dim;
-  const float scale_y = 1.0f / dim;
-
-  while (id < amount) {
-    const int x = id % dim;
-    const int y = id / dim;
-
-    const float sx = x * scale_x;
-    const float sy = y * scale_y;
-
-    const vec3 pos = get_vector(4.0f * sx, 4.0f * sy, 0.0f);
-
-    const float step      = 0.05f;
-    const float inv_2step = 1.0f / (2.0f * step);
-    vec3 curl;
-
-    {
-      float n1, n2;
-      n1      = perlin_octaves(add_vector(pos, get_vector(0.0f, step, 0.0f)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(0.0f, -step, 0.0f)), 1.0f, 5, false);
-      float a = (n1 - n2) * inv_2step;
-      n1      = perlin_octaves(add_vector(pos, get_vector(0.0f, 0.0f, step)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(0.0f, 0.0f, -step)), 1.0f, 5, false);
-      float b = (n1 - n2) * inv_2step;
-
-      curl.x = a - b;
-    }
-
-    {
-      float n1, n2;
-      n1      = perlin_octaves(add_vector(pos, get_vector(0.0f, 0.0f, step)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(0.0f, 0.0f, -step)), 1.0f, 5, false);
-      float a = (n1 - n2) * inv_2step;
-      n1      = perlin_octaves(add_vector(pos, get_vector(step, 0.0f, 0.0f)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(-step, 0.0f, 0.0f)), 1.0f, 5, false);
-      float b = (n1 - n2) * inv_2step;
-
-      curl.y = a - b;
-    }
-
-    {
-      float n1, n2;
-      n1      = perlin_octaves(add_vector(pos, get_vector(step, 0.0f, 0.0f)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(-step, 0.0f, 0.0f)), 1.0f, 5, false);
-      float a = (n1 - n2) * inv_2step;
-      n1      = perlin_octaves(add_vector(pos, get_vector(0.0f, step, 0.0f)), 1.0f, 5, false);
-      n2      = perlin_octaves(add_vector(pos, get_vector(0.0f, -step, 0.0f)), 1.0f, 5, false);
-      float b = (n1 - n2) * inv_2step;
-
-      curl.z = a - b;
-    }
-
-    const float remap_low  = -0.5f;
-    const float remap_high = 3.0f;
-
-    curl = get_vector(
-      remap(curl.x, remap_low, remap_high, 0.0f, 1.0f), remap(curl.y, remap_low, remap_high, 0.0f, 1.0f),
-      remap(curl.z, remap_low, remap_high, 0.0f, 1.0f));
-
-    curl = scale_vector(add_vector_const(curl, 1.0f), 0.5f);
-
-    dst[x + y * dim] = make_uchar4(__saturatef(curl.x) * 255.0f, __saturatef(curl.y) * 255.0f, __saturatef(curl.z) * 255.0f, 255);
+    dst[x + y * dim] = make_uchar4(
+      __saturatef(perlin1) * 255.0f, __saturatef(perlin2) * 255.0f, __saturatef(perlin3) * 255.0f, __saturatef(perlin4) * 255.0f);
 
     id += blockDim.x * gridDim.x;
   }
@@ -431,42 +358,23 @@ __global__ void generate_curl_noise(const int dim, uint8_t* tex) {
 #define CLOUD_SHAPE_RES 128
 #define CLOUD_DETAIL_RES 32
 #define CLOUD_WEATHER_RES 1024
-#define CLOUD_CURL_RES 128
 
-extern "C" void clouds_generate(RaytraceInstance* instance) {
+extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   bench_tic();
 
-  if (instance->scene_gpu.sky.cloud.initialized) {
-    cudatexture_free_buffer(instance->cloud_noise, 4);
+  if (instance->scene.sky.cloud.initialized) {
+    texture_free_atlas(instance->cloud_noise, 3);
   }
 
-  TextureRGBA noise_tex[4];
-  noise_tex[0].gpu        = 1;
-  noise_tex[0].volume_tex = 1;
-  noise_tex[0].width      = CLOUD_SHAPE_RES;
-  noise_tex[0].height     = CLOUD_SHAPE_RES;
-  noise_tex[0].pitch      = CLOUD_SHAPE_RES;
-  noise_tex[0].depth      = CLOUD_SHAPE_RES;
-  noise_tex[0].type       = TexDataUINT8;
-  noise_tex[1].gpu        = 1;
-  noise_tex[1].volume_tex = 1;
-  noise_tex[1].width      = CLOUD_DETAIL_RES;
-  noise_tex[1].height     = CLOUD_DETAIL_RES;
-  noise_tex[1].pitch      = CLOUD_DETAIL_RES;
-  noise_tex[1].depth      = CLOUD_DETAIL_RES;
-  noise_tex[1].type       = TexDataUINT8;
-  noise_tex[2].gpu        = 1;
-  noise_tex[2].volume_tex = 0;
-  noise_tex[2].width      = CLOUD_WEATHER_RES;
-  noise_tex[2].height     = CLOUD_WEATHER_RES;
-  noise_tex[2].pitch      = CLOUD_WEATHER_RES;
-  noise_tex[2].type       = TexDataUINT8;
-  noise_tex[3].gpu        = 1;
-  noise_tex[3].volume_tex = 0;
-  noise_tex[3].width      = CLOUD_CURL_RES;
-  noise_tex[3].height     = CLOUD_CURL_RES;
-  noise_tex[3].pitch      = CLOUD_CURL_RES;
-  noise_tex[3].type       = TexDataUINT8;
+  TextureRGBA noise_tex[3];
+  texture_create(noise_tex + 0, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
+  texture_create(
+    noise_tex + 1, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
+  texture_create(noise_tex + 2, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, CLOUD_WEATHER_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
+
+  noise_tex[0].mipmap = TexMipmapGenerate;
+  noise_tex[1].mipmap = TexMipmapGenerate;
+  noise_tex[2].mipmap = TexMipmapNone;
 
   device_malloc((void**) &noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
   generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[0].width, (uint8_t*) noise_tex[0].data);
@@ -476,23 +384,19 @@ extern "C" void clouds_generate(RaytraceInstance* instance) {
 
   device_malloc((void**) &noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
   generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    noise_tex[2].width, (float) instance->scene_gpu.sky.cloud.seed, (uint8_t*) noise_tex[2].data);
+    noise_tex[2].width, (float) instance->scene.sky.cloud.seed, (uint8_t*) noise_tex[2].data);
 
-  device_malloc((void**) &noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
-  generate_curl_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[3].width, (uint8_t*) noise_tex[3].data);
-
-  cudatexture_create_atlas(&instance->cloud_noise, noise_tex, 4, CUDA_TEX_FLAG_NONE);
+  texture_create_atlas(&instance->cloud_noise, noise_tex, 3);
 
   device_free(noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
   device_free(noise_tex[1].data, noise_tex[1].depth * noise_tex[1].height * noise_tex[1].pitch * 4 * sizeof(uint8_t));
   device_free(noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
-  device_free(noise_tex[3].data, noise_tex[3].height * noise_tex[3].pitch * 4 * sizeof(uint8_t));
 
-  update_device_pointers(instance);
+  raytrace_update_device_pointers(instance);
 
-  instance->scene_gpu.sky.cloud.initialized = 1;
+  instance->scene.sky.cloud.initialized = 1;
 
   bench_toc((char*) "Cloud Noise Generation");
 }
 
-#endif /* CU_CLOUDGEN_H */
+#endif /* CU_CLOUD_NOISE_H */

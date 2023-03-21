@@ -29,17 +29,17 @@ __device__ void stream_float4(const float4* source, float4* target) {
 
 __device__ void swap_trace_data(const int index0, const int index1) {
   const int offset0  = get_task_address(index0);
-  const float2 temp  = __ldca((float2*) (device.trace_results + offset0));
-  const float4 data0 = __ldcs((float4*) (device_trace_tasks + offset0));
-  const float4 data1 = __ldcs((float4*) (device_trace_tasks + offset0) + 1);
+  const float2 temp  = __ldca((float2*) (device.ptrs.trace_results + offset0));
+  const float4 data0 = __ldcs((float4*) (device.trace_tasks + offset0));
+  const float4 data1 = __ldcs((float4*) (device.trace_tasks + offset0) + 1);
 
   const int offset1 = get_task_address(index1);
-  stream_float2((float2*) (device.trace_results + offset1), (float2*) (device.trace_results + offset0));
-  stream_float4((float4*) (device_trace_tasks + offset1), (float4*) (device_trace_tasks + offset0));
-  stream_float4((float4*) (device_trace_tasks + offset1) + 1, (float4*) (device_trace_tasks + offset0) + 1);
-  __stcs((float2*) (device.trace_results + offset1), temp);
-  __stcs((float4*) (device_trace_tasks + offset1), data0);
-  __stcs((float4*) (device_trace_tasks + offset1) + 1, data1);
+  stream_float2((float2*) (device.ptrs.trace_results + offset1), (float2*) (device.ptrs.trace_results + offset0));
+  stream_float4((float4*) (device.trace_tasks + offset1), (float4*) (device.trace_tasks + offset0));
+  stream_float4((float4*) (device.trace_tasks + offset1) + 1, (float4*) (device.trace_tasks + offset0) + 1);
+  __stcs((float2*) (device.ptrs.trace_results + offset1), temp);
+  __stcs((float4*) (device.trace_tasks + offset1), data0);
+  __stcs((float4*) (device.trace_tasks + offset1) + 1, data1);
 }
 
 __device__ TraceTask load_trace_task(const void* ptr) {
@@ -56,7 +56,6 @@ __device__ TraceTask load_trace_task(const void* ptr) {
   task.ray.z   = data1.y;
   task.index.x = __float_as_uint(data1.z) & 0xffff;
   task.index.y = (__float_as_uint(data1.z) >> 16);
-  task.state   = __float_as_uint(data1.w);
 
   return task;
 }
@@ -73,7 +72,6 @@ __device__ void store_trace_task(const void* ptr, const TraceTask task) {
   data1.x = task.ray.y;
   data1.y = task.ray.z;
   data1.z = __uint_as_float((task.index.x & 0xffff) | (task.index.y << 16));
-  data1.w = __uint_as_float(task.state);
   __stcs(((float4*) ptr) + 1, data1);
 }
 
@@ -107,7 +105,6 @@ __device__ GeometryTask load_geometry_task(const void* ptr) {
 
   task.ray_xz = data1.y;
   task.hit_id = __float_as_uint(data1.z);
-  task.state  = __float_as_uint(data1.w);
 
   return task;
 }
@@ -125,7 +122,6 @@ __device__ OceanTask load_ocean_task(const void* ptr) {
   task.ray_y      = data1.x;
   task.ray_xz     = data1.y;
   task.distance   = data1.z;
-  task.state      = __float_as_uint(data1.w);
 
   return task;
 }
@@ -143,7 +139,6 @@ __device__ SkyTask load_sky_task(const void* ptr) {
   task.ray.x    = data1.x;
   task.ray.y    = data1.y;
   task.ray.z    = data1.z;
-  task.state    = __float_as_uint(data1.w);
 
   return task;
 }
@@ -161,7 +156,6 @@ __device__ ToyTask load_toy_task(const void* ptr) {
   task.ray.x      = data1.x;
   task.ray.y      = data1.y;
   task.ray.z      = data1.z;
-  task.state      = __float_as_uint(data1.w);
 
   return task;
 }
@@ -179,7 +173,6 @@ __device__ FogTask load_fog_task(const void* ptr) {
   task.ray_y      = data1.x;
   task.ray_xz     = data1.y;
   task.distance   = data1.z;
-  task.state      = __float_as_uint(data1.w);
 
   return task;
 }
@@ -208,25 +201,25 @@ __device__ void store_RGBAhalf(void* ptr, const RGBAhalf a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if (!device_denoiser || device.state_buffer[pixel] & STATE_ALBEDO || device_iteration_type == TYPE_LIGHT)
+  if (!device.denoiser || device.ptrs.state_buffer[pixel] & STATE_ALBEDO || device.iteration_type == TYPE_LIGHT)
     return;
 
-  if (device_temporal_frames && device_accum_mode == TEMPORAL_ACCUMULATION) {
-    RGBF out_albedo = RGBAhalf_to_RGBF(device.albedo_buffer[pixel]);
-    out_albedo      = scale_color(out_albedo, device_temporal_frames);
+  if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION) {
+    RGBF out_albedo = RGBAhalf_to_RGBF(device.ptrs.albedo_buffer[pixel]);
+    out_albedo      = scale_color(out_albedo, device.temporal_frames);
     albedo          = add_color(albedo, out_albedo);
-    albedo          = scale_color(albedo, 1.0f / (device_temporal_frames + 1));
+    albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1));
   }
 
-  device.albedo_buffer[pixel] = RGBF_to_RGBAhalf(albedo);
-  device.state_buffer[pixel] |= STATE_ALBEDO;
+  device.ptrs.albedo_buffer[pixel] = RGBF_to_RGBAhalf(albedo);
+  device.ptrs.state_buffer[pixel] |= STATE_ALBEDO;
 }
 
 __device__ void write_normal_buffer(vec3 normal, const int pixel) {
-  if (!device_denoiser || device_iteration_type != TYPE_CAMERA || (device_temporal_frames && device_accum_mode == TEMPORAL_ACCUMULATION))
+  if (!device.denoiser || device.iteration_type != TYPE_CAMERA || (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION))
     return;
 
-  normal = transform_vec4_3(device_view_space, normal);
+  normal = transform_vec4_3(device.emitter.view_space, normal);
 
   const float normal_norm = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
 
@@ -234,11 +227,11 @@ __device__ void write_normal_buffer(vec3 normal, const int pixel) {
     normal = scale_vector(normal, 1.0f / normal_norm);
   }
 
-  device.normal_buffer[pixel] = get_RGBAhalf(normal.x, normal.y, normal.z, 0.0f);
+  device.ptrs.normal_buffer[pixel] = get_RGBAhalf(normal.x, normal.y, normal.z, 0.0f);
 }
 
 __device__ LightEvalData load_light_eval_data(const int offset) {
-  const float4 packet = __ldcs((float4*) (device.light_eval_data + offset));
+  const float4 packet = __ldcs((float4*) (device.ptrs.light_eval_data + offset));
 
   LightEvalData result;
   result.position = get_vector(packet.x, packet.y, packet.z);
@@ -254,7 +247,7 @@ __device__ void store_light_eval_data(const LightEvalData data, const int offset
   packet.z = data.position.z;
   packet.w = __uint_as_float(data.flags);
 
-  __stcs((float4*) (device.light_eval_data + offset), packet);
+  __stcs((float4*) (device.ptrs.light_eval_data + offset), packet);
 }
 
 __device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {
@@ -280,7 +273,7 @@ __device__ void store_light_sample(LightSample* ptr, const LightSample sample, c
 }
 
 __device__ TraversalTriangle load_traversal_triangle(const int offset) {
-  const float4* ptr = (float4*) (device_scene.traversal_triangles + offset);
+  const float4* ptr = (float4*) (device.scene.traversal_triangles + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
   const float2 v3   = __ldg((float2*) (ptr + 2));
@@ -295,7 +288,7 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
 }
 
 __device__ UV load_triangle_tex_coords(const int offset, const UV coords) {
-  const float4* ptr      = (float4*) (device_scene.triangles + offset);
+  const float4* ptr      = (float4*) (device.scene.triangles + offset);
   const float2 bytes0x48 = __ldg(((float2*) (ptr + 4)) + 1);
   const float4 bytes0x50 = __ldg(ptr + 5);
 
@@ -307,7 +300,7 @@ __device__ UV load_triangle_tex_coords(const int offset, const UV coords) {
 }
 
 __device__ TriangleLight load_triangle_light(const int offset) {
-  const float4* ptr = (float4*) (device_scene.triangle_lights + offset);
+  const float4* ptr = (float4*) (device.scene.triangle_lights + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
   const float2 v3   = __ldg((float2*) (ptr + 2));

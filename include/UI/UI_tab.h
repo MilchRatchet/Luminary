@@ -7,6 +7,7 @@
  * prop1: Which options is hovered
  * prop2: Gap between options
  * prop3: Option Count
+ * prop4: Depth of tab
  *
  * prop1 is -1 if no option is hovered.
  * prop2 is halved for the gap to the left and right border.

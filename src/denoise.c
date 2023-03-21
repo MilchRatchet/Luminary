@@ -1,12 +1,11 @@
-#ifndef CU_DENOISE_H
-#define CU_DENOISE_H
-
 #include <math.h>
 #include <optix.h>
 #include <optix_function_table_definition.h>
 #include <optix_stubs.h>
 
+#include "buffer.h"
 #include "log.h"
+#include "raytrace.h"
 
 struct OptixDenoiseInstance {
   OptixDeviceContext ctx;
@@ -31,7 +30,7 @@ struct OptixDenoiseInstance {
     }                                                                                                    \
   }
 
-extern "C" void optix_denoise_create(RaytraceInstance* instance) {
+void denoise_create(RaytraceInstance* instance) {
   OPTIX_CHECK(optixInit());
 
   if (!instance) {
@@ -125,7 +124,7 @@ extern "C" void optix_denoise_create(RaytraceInstance* instance) {
   instance->denoise_setup = denoise_setup;
 }
 
-extern "C" DeviceBuffer* optix_denoise_apply(RaytraceInstance* instance, RGBF* src) {
+DeviceBuffer* denoise_apply(RaytraceInstance* instance, RGBF* src) {
   if (!instance) {
     log_message("Raytrace Instance is NULL.");
     return (DeviceBuffer*) 0;
@@ -168,7 +167,11 @@ extern "C" DeviceBuffer* optix_denoise_apply(RaytraceInstance* instance, RGBF* s
   return denoise_setup->output;
 }
 
-extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
+static float lerp(const float a, const float b, const float t) {
+  return a + t * (b - a);
+}
+
+float denoise_auto_exposure(RaytraceInstance* instance) {
   if (!instance) {
     log_message("Raytrace Instance is NULL.");
     return 0.0f;
@@ -177,7 +180,7 @@ extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
   if (instance->shading_mode != SHADING_DEFAULT)
     return 1.0f;
 
-  const float exposure = instance->scene_gpu.camera.exposure;
+  const float exposure = instance->scene.camera.exposure;
 
   if (!instance->denoise_setup) {
     log_message("OptiX Denoise Instance is NULL.");
@@ -188,7 +191,7 @@ extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
 
   float target_exposure = 1.0f;
 
-  switch (instance->scene_gpu.camera.tonemap) {
+  switch (instance->scene.camera.tonemap) {
     case TONEMAP_NONE:
       target_exposure = 2.5f;
       break;
@@ -211,10 +214,10 @@ extern "C" float optix_denoise_auto_exposure(RaytraceInstance* instance) {
 
   const float lerp_factor = 0.2f * (1.0f - 1.0f / (1 + instance->temporal_frames));
 
-  return lerp(exposure, target_exposure * powf(1.0f + brightness, 0.45f), lerp_factor);
+  return lerp(exposure, target_exposure * powf(1.0f + brightness, 0.6f), lerp_factor);
 }
 
-extern "C" void optix_denoise_free(RaytraceInstance* instance) {
+void denoise_free(RaytraceInstance* instance) {
   if (!instance) {
     log_message("Raytrace Instance is NULL.");
     return;
@@ -239,5 +242,3 @@ extern "C" void optix_denoise_free(RaytraceInstance* instance) {
 
   instance->denoise_setup = (void*) 0;
 }
-
-#endif /* CU_DENOISE_H */

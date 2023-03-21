@@ -12,6 +12,7 @@
 #include "png.h"
 #include "raytrace.h"
 #include "stars.h"
+#include "texture.h"
 #include "utils.h"
 #include "wavefront.h"
 
@@ -104,52 +105,74 @@ void scene_init(Scene** _scene) {
   scene->toy.emission.a       = 0.0f;
   scene->toy.flashlight_mode  = 0;
 
-  scene->sky.geometry_offset.x         = 0.0f;
-  scene->sky.geometry_offset.y         = 0.1f;
-  scene->sky.geometry_offset.z         = 0.0f;
-  scene->sky.altitude                  = 0.5f;
-  scene->sky.azimuth                   = 3.141f;
-  scene->sky.moon_altitude             = -0.5f;
-  scene->sky.moon_azimuth              = 0.0f;
-  scene->sky.moon_albedo               = 0.12f;
-  scene->sky.sun_strength              = 1.0f;
-  scene->sky.base_density              = 1.0f;
-  scene->sky.rayleigh_density          = 1.0f;
-  scene->sky.mie_density               = 1.0f;
-  scene->sky.ozone_density             = 1.0f;
-  scene->sky.ground_visibility         = 60.0f;
-  scene->sky.mie_g                     = 0.8f;
-  scene->sky.ozone_layer_thickness     = 15.0f;
-  scene->sky.rayleigh_falloff          = 8.0f;
-  scene->sky.mie_falloff               = 1.7f;
-  scene->sky.multiscattering_factor    = 1.0f;
-  scene->sky.steps                     = 30;
-  scene->sky.ozone_absorption          = 1;
-  scene->sky.stars_seed                = 0;
-  scene->sky.stars_intensity           = 1.0f;
-  scene->sky.settings_stars_count      = 10000;
-  scene->sky.cloud.active              = 0;
-  scene->sky.cloud.initialized         = 0;
-  scene->sky.cloud.seed                = 1;
-  scene->sky.cloud.offset_x            = 0.0f;
-  scene->sky.cloud.offset_z            = 0.0f;
-  scene->sky.cloud.height_max          = 4000.0f;
-  scene->sky.cloud.height_min          = 1500.0f;
-  scene->sky.cloud.noise_shape_scale   = 1.0f;
-  scene->sky.cloud.noise_detail_scale  = 1.0f;
-  scene->sky.cloud.noise_weather_scale = 1.0f;
-  scene->sky.cloud.noise_curl_scale    = 1.0f;
-  scene->sky.cloud.coverage            = 1.0f;
-  scene->sky.cloud.anvil               = 0.0f;
-  scene->sky.cloud.coverage_min        = 1.05f;
-  scene->sky.cloud.forward_scattering  = 0.8f;
-  scene->sky.cloud.backward_scattering = -0.2f;
-  scene->sky.cloud.lobe_lerp           = 0.5f;
-  scene->sky.cloud.wetness             = 0.0f;
-  scene->sky.cloud.powder              = 0.5f;
-  scene->sky.cloud.shadow_steps        = 16;
-  scene->sky.cloud.steps               = 36;
-  scene->sky.cloud.density             = 1.0f;
+  scene->sky.geometry_offset.x           = 0.0f;
+  scene->sky.geometry_offset.y           = 0.1f;
+  scene->sky.geometry_offset.z           = 0.0f;
+  scene->sky.altitude                    = 0.5f;
+  scene->sky.azimuth                     = 3.141f;
+  scene->sky.moon_altitude               = -0.5f;
+  scene->sky.moon_azimuth                = 0.0f;
+  scene->sky.moon_albedo                 = 0.12f;
+  scene->sky.sun_strength                = 1.0f;
+  scene->sky.base_density                = 1.0f;
+  scene->sky.rayleigh_density            = 1.0f;
+  scene->sky.mie_density                 = 1.0f;
+  scene->sky.ozone_density               = 1.0f;
+  scene->sky.ground_visibility           = 60.0f;
+  scene->sky.mie_g                       = 0.8f;
+  scene->sky.ozone_layer_thickness       = 15.0f;
+  scene->sky.rayleigh_falloff            = 8.0f;
+  scene->sky.mie_falloff                 = 1.7f;
+  scene->sky.multiscattering_factor      = 1.0f;
+  scene->sky.steps                       = 30;
+  scene->sky.ozone_absorption            = 1;
+  scene->sky.stars_seed                  = 0;
+  scene->sky.stars_intensity             = 1.0f;
+  scene->sky.settings_stars_count        = 10000;
+  scene->sky.cloud.active                = 0;
+  scene->sky.cloud.initialized           = 0;
+  scene->sky.cloud.steps                 = 96;
+  scene->sky.cloud.shadow_steps          = 8;
+  scene->sky.cloud.atmosphere_scattering = 1;
+  scene->sky.cloud.seed                  = 1;
+  scene->sky.cloud.offset_x              = 0.0f;
+  scene->sky.cloud.offset_z              = 0.0f;
+  scene->sky.cloud.noise_shape_scale     = 1.0f;
+  scene->sky.cloud.noise_detail_scale    = 1.0f;
+  scene->sky.cloud.noise_weather_scale   = 1.0f;
+  scene->sky.cloud.octaves               = 9;
+  scene->sky.cloud.forward_scattering    = 0.85f;
+  scene->sky.cloud.backward_scattering   = -0.2f;
+  scene->sky.cloud.lobe_lerp             = 0.5f;
+  scene->sky.cloud.density               = 1.0f;
+  scene->sky.cloud.mipmap_bias           = 0.0f;
+  scene->sky.cloud.low.active            = 1;
+  scene->sky.cloud.low.height_max        = 5.0f;
+  scene->sky.cloud.low.height_min        = 1.5f;
+  scene->sky.cloud.low.coverage          = 1.0f;
+  scene->sky.cloud.low.coverage_min      = 0.0f;
+  scene->sky.cloud.low.type              = 1.0f;
+  scene->sky.cloud.low.type_min          = 0.0f;
+  scene->sky.cloud.low.wind_speed        = 2.5f;
+  scene->sky.cloud.low.wind_angle        = 0.0f;
+  scene->sky.cloud.mid.active            = 1;
+  scene->sky.cloud.mid.height_max        = 6.0f;
+  scene->sky.cloud.mid.height_min        = 5.5f;
+  scene->sky.cloud.mid.coverage          = 1.0f;
+  scene->sky.cloud.mid.coverage_min      = 0.0f;
+  scene->sky.cloud.mid.type              = 1.0f;
+  scene->sky.cloud.mid.type_min          = 0.0f;
+  scene->sky.cloud.mid.wind_speed        = 2.5f;
+  scene->sky.cloud.mid.wind_angle        = 0.0f;
+  scene->sky.cloud.top.active            = 1;
+  scene->sky.cloud.top.height_max        = 8.0f;
+  scene->sky.cloud.top.height_min        = 7.95f;
+  scene->sky.cloud.top.coverage          = 1.0f;
+  scene->sky.cloud.top.coverage_min      = 0.0f;
+  scene->sky.cloud.top.type              = 1.0f;
+  scene->sky.cloud.top.type_min          = 0.0f;
+  scene->sky.cloud.top.wind_speed        = 1.0f;
+  scene->sky.cloud.top.wind_angle        = 0.0f;
 
   scene->fog.active     = 0;
   scene->fog.density    = 1.0f;
@@ -251,13 +274,13 @@ RaytraceInstance* scene_load_lum(const char* filename) {
     .normal             = (DeviceBuffer*) 0,
     .normal_length      = content->normal_maps_length};
 
-  cudatexture_create_atlas(&tex_atlas.albedo, content->albedo_maps, content->albedo_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.illuminance, content->illuminance_maps, content->illuminance_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.material, content->material_maps, content->material_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length, CUDA_TEX_FLAG_NONE);
+  texture_create_atlas(&tex_atlas.albedo, content->albedo_maps, content->albedo_maps_length);
+  texture_create_atlas(&tex_atlas.illuminance, content->illuminance_maps, content->illuminance_maps_length);
+  texture_create_atlas(&tex_atlas.material, content->material_maps, content->material_maps_length);
+  texture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length);
 
   RaytraceInstance* instance;
-  raytracing_init(&instance, general, tex_atlas, scene);
+  raytrace_init(&instance, general, tex_atlas, scene);
 
   wavefront_clear(&content);
   scene_clear(&scene);
@@ -298,13 +321,13 @@ RaytraceInstance* scene_load_obj(char* filename) {
     .normal             = (DeviceBuffer*) 0,
     .normal_length      = content->normal_maps_length};
 
-  cudatexture_create_atlas(&tex_atlas.albedo, content->albedo_maps, content->albedo_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.illuminance, content->illuminance_maps, content->illuminance_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.material, content->material_maps, content->material_maps_length, CUDA_TEX_FLAG_NONE);
-  cudatexture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length, CUDA_TEX_FLAG_NONE);
+  texture_create_atlas(&tex_atlas.albedo, content->albedo_maps, content->albedo_maps_length);
+  texture_create_atlas(&tex_atlas.illuminance, content->illuminance_maps, content->illuminance_maps_length);
+  texture_create_atlas(&tex_atlas.material, content->material_maps, content->material_maps_length);
+  texture_create_atlas(&tex_atlas.normal, content->normal_maps, content->normal_maps_length);
 
   RaytraceInstance* instance;
-  raytracing_init(&instance, general, tex_atlas, scene);
+  raytrace_init(&instance, general, tex_atlas, scene);
 
   wavefront_clear(&content);
   scene_clear(&scene);
@@ -328,10 +351,10 @@ void scene_serialize(RaytraceInstance* instance) {
 }
 
 void free_atlases(RaytraceInstance* instance) {
-  cudatexture_free_buffer(instance->tex_atlas.albedo, instance->tex_atlas.albedo_length);
-  cudatexture_free_buffer(instance->tex_atlas.illuminance, instance->tex_atlas.illuminance_length);
-  cudatexture_free_buffer(instance->tex_atlas.material, instance->tex_atlas.material_length);
-  cudatexture_free_buffer(instance->tex_atlas.normal, instance->tex_atlas.normal_length);
+  texture_free_atlas(instance->tex_atlas.albedo, instance->tex_atlas.albedo_length);
+  texture_free_atlas(instance->tex_atlas.illuminance, instance->tex_atlas.illuminance_length);
+  texture_free_atlas(instance->tex_atlas.material, instance->tex_atlas.material_length);
+  texture_free_atlas(instance->tex_atlas.normal, instance->tex_atlas.normal_length);
 }
 
 void free_strings(RaytraceInstance* instance) {

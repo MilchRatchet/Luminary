@@ -24,7 +24,7 @@ UIPanel create_check(UI* ui, const char* text, int* data_binding, int voids_fram
 UIPanel create_dropdown(UI* ui, const char* text, int* data_binding, int voids_frames, int option_count, char* options, int index);
 UIPanel create_color(UI* ui, const char* text, float* data_binding);
 UIPanel create_info(UI* ui, const char* text, void* data_binding, int data_type, int kind);
-UIPanel create_tab(UI* ui, int* data_binding, char* options);
+UIPanel create_tab(UI* ui, int depth, char* options);
 UIPanel create_button(UI* ui, const char* text, void* data_binding, void (*func)(void*), int voids_frames);
 void free_UIPanel(UIPanel* panel);
 

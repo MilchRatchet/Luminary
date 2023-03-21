@@ -1,6 +1,7 @@
 #ifndef UTILS_H
 #define UTILS_H
 
+#include <cuda_runtime_api.h>
 #include <stdlib.h>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -11,6 +12,13 @@
 #include "bvh.h"
 #include "log.h"
 #include "structs.h"
+
+#define gpuErrchk(ans)                                                                      \
+  {                                                                                         \
+    if (ans != cudaSuccess) {                                                               \
+      crash_message("CUDA Error: %s (%s)", cudaGetErrorName(ans), cudaGetErrorString(ans)); \
+    }                                                                                       \
+  }
 
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) (void) (x);
@@ -27,17 +35,9 @@
 #define LIGHT_ID_TOY 0xfffffffeu
 #define LIGHT_ID_NONE 0xfffffff1u
 
-#define TEXTURE_NONE ((uint16_t) 0xffffu)
+enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
 
-//////////////////////////
-// Cuda Texture Flags
-//////////////////////////
-#define CUDA_TEX_FLAG_NONE 0
-#define CUDA_TEX_FLAG_ADDRESSMODE_MASK 0b11
-#define CUDA_TEX_FLAG_WRAP 0b00
-#define CUDA_TEX_FLAG_CLAMP 0b01
-#define CUDA_TEX_FLAG_MIRROR 0b10
-#define CUDA_TEX_FLAG_BORDER 0b11
+#define TEXTURE_NONE ((uint16_t) 0xffffu)
 
 enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
 
@@ -144,29 +144,39 @@ struct Star {
   float intensity;
 } typedef Star;
 
+struct CloudLayer {
+  int active;
+  float height_max;
+  float height_min;
+  float coverage;
+  float coverage_min;
+  float type;
+  float type_min;
+  float wind_speed;
+  float wind_angle;
+} typedef CloudLayer;
+
 struct Cloud {
   int active;
   int initialized;
+  int atmosphere_scattering;
+  CloudLayer low;
+  CloudLayer mid;
+  CloudLayer top;
   float offset_x;
   float offset_z;
-  float height_max;
-  float height_min;
   float density;
   int seed;
   float forward_scattering;
   float backward_scattering;
   float lobe_lerp;
-  float wetness;
-  float powder;
   int steps;
   int shadow_steps;
   float noise_shape_scale;
   float noise_detail_scale;
   float noise_weather_scale;
-  float noise_curl_scale;
-  float coverage;
-  float coverage_min;
-  float anvil;
+  float mipmap_bias;
+  int octaves;
 } typedef Cloud;
 
 // Settings that affect the sky LUTs
@@ -273,6 +283,15 @@ struct Scene {
   GlobalMaterial material;
 } typedef Scene;
 
+struct RayEmitter {
+  Jitter jitter;
+  Mat4x4 view_space;
+  Mat4x4 projection;
+  float step;
+  float vfov;
+  Quaternion camera_rotation;
+} typedef RayEmitter;
+
 struct TextureAtlas {
   DeviceBuffer* albedo;
   int albedo_length;
@@ -318,7 +337,7 @@ struct RaytraceInstance {
   int reservoir_size;
   int offline_samples;
   int light_resampling;
-  Scene scene_gpu;
+  Scene scene;
   DenoisingMode denoiser;
   int temporal_frames;
   int spatial_samples;
@@ -334,11 +353,72 @@ struct RaytraceInstance {
   void* denoise_setup;
   Jitter jitter;
   int accum_mode;
+  RayEmitter emitter;
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
 } typedef RaytraceInstance;
+
+struct DevicePointers {
+  TraceTask* light_trace;
+  TraceTask* bounce_trace;
+  uint16_t* light_trace_count;
+  uint16_t* bounce_trace_count;
+  TraceResult* trace_results;
+  uint16_t* task_counts;
+  uint16_t* task_offsets;
+  uint32_t* light_sample_history;
+  RGBAhalf* frame_output;
+  RGBAhalf* frame_temporal;
+  RGBAhalf* frame_buffer;
+  RGBAhalf* frame_variance;
+  RGBAhalf* albedo_buffer;
+  RGBAhalf* normal_buffer;
+  RGBAhalf* light_records;
+  RGBAhalf* bounce_records;
+  XRGB8* buffer_8bit;
+  vec3* raydir_buffer;
+  TraceResult* trace_result_buffer;
+  uint8_t* state_buffer;
+  uint32_t* randoms;
+  cudaTextureObject_t* albedo_atlas;
+  cudaTextureObject_t* illuminance_atlas;
+  cudaTextureObject_t* material_atlas;
+  cudaTextureObject_t* normal_atlas;
+  cudaTextureObject_t* cloud_noise;
+  cudaTextureObject_t* sky_ms_luts;
+  cudaTextureObject_t* sky_tm_luts;
+  LightSample* light_samples;
+  LightEvalData* light_eval_data;
+} typedef DevicePointers;
+
+struct DeviceConstantMemory {
+  DevicePointers ptrs;
+  Scene scene;
+  int max_ray_depth;
+  int pixels_per_thread;
+  int iteration_type;
+  TraceTask* trace_tasks;
+  uint16_t* trace_count;
+  RGBAhalf* records;
+  int temporal_frames;
+  int denoiser;
+  uint32_t reservoir_size;
+  int spatial_samples;
+  int light_resampling;
+  int width;
+  int height;
+  int output_width;
+  int output_height;
+  TextureAssignment* texture_assignments;
+  vec3 sun_pos;
+  vec3 moon_pos;
+  int shading_mode;
+  RGBF* bloom_scratch;
+  RayEmitter emitter;
+  int accum_mode;
+} typedef DeviceConstantMemory;
 
 #ifndef min
 #define min(a, b) (((a) < (b)) ? (a) : (b))

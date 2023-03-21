@@ -18,7 +18,7 @@
  * are perceptively unaffected.
  */
 #define WEIGHT_BASED_EXIT
-#define BRIGHTEST_EMISSION (device_scene.camera.exposure * device_scene.camera.russian_roulette_bias)
+#define BRIGHTEST_EMISSION (device.scene.camera.exposure * device.scene.camera.russian_roulette_bias)
 #define CUTOFF ((4.0f) / (BRIGHTEST_EMISSION))
 #define PROBABILISTIC_CUTOFF (16.0f * CUTOFF)
 
@@ -55,7 +55,7 @@ __device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
   }
   else if (max < PROBABILISTIC_CUTOFF) {
     const float p = (max - CUTOFF) / (PROBABILISTIC_CUTOFF - CUTOFF);
-    if (blue_noise(task.index.x, task.index.y, task.state, 20) > p) {
+    if (white_noise() > p) {
       valid = 0;
     }
     else {
@@ -65,16 +65,14 @@ __device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
 #endif
 
 #ifdef LOW_QUALITY_LONG_BOUNCES
-  if (
-    ((task.state & DEPTH_LEFT) >> 16) <= (device_max_ray_depth - MIN_BOUNCES)
-    && blue_noise(task.index.x, task.index.y, task.state, 21) < 1.0f / (1 + device_max_ray_depth)) {
+  if (((task.state & DEPTH_LEFT) >> 16) <= (device.max_ray_depth - MIN_BOUNCES) && white_noise() < 1.0f / (1 + device.max_ray_depth)) {
     valid = 0;
   }
 #endif
 
 #ifdef SINGLE_CONTRIBUTION_ONLY
   {
-    RGBF color = device.frame_buffer[task.index.x + task.index.y * device_width];
+    RGBF color = device.frame_buffer[task.index.x + task.index.y * device.width];
     if (luminance(color) > eps)
       valid = 0;
   }

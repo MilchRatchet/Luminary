@@ -4,6 +4,8 @@
 #include "SDL.h"
 #include "SDL_ttf.h"
 
+#define UI_MAX_TAB_DEPTH 8
+
 typedef struct UIPanel UIPanel;
 typedef struct UITab UITab;
 typedef struct UI UI;
@@ -35,8 +37,7 @@ struct UITab {
 
 struct UI {
   int active;
-  int tab;
-  int subtab;
+  int tab[UI_MAX_TAB_DEPTH];
   int border_hover;
   int panel_hover;
   UIPanel* last_panel;

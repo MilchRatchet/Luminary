@@ -140,7 +140,7 @@ Sun light strength. Number should be non-negative.
 Set 1 to activate ozone absorption, 0 else.
 
 `SKY STEPS___ [INT32]`<br/>
-Number of raymarch steps used in the sky computation. Number should be non-negative.
+Number of raymarch steps used in the sky computation. Denser atmospheres require a larger number of steps. For the standard atmosphere settings, 200 steps and higher are recommended for best image quality. Number should be non-negative.
 
 `SKY DENSITY_ [FP32]`<br/>
 Density of the atmosphere. Number should be non-negative.
@@ -186,17 +186,17 @@ Number of stars generated.
 `CLOUD ACTIVE__ [INT32]`<br/>
 Set 1 to activate clouds, 0 else.
 
+`CLOUD INSCATTE [INT32]`<br/>
+Set 1 to activate atmospheric cloud inscattering in front of the clouds, 0 else.
+
+`CLOUD MIPMAPBI [FP32]`<br/>
+Bias applied to the mipmapped sampling of the cloud noise textures. Negative numbers cause higher quality clouds in reflections at the cost of performance. Positive numbers cause lower quality clouds but improves performance.
+
 `CLOUD SEED____ [INT32]`<br/>
 Seed used to generate the weather map.
 
 `CLOUD OFFSET__ [FP32] [FP32]`<br/>
 Horizontal offset of the clouds.
-
-`CLOUD HEIGHTMA [FP32]`<br/>
-Maximum height of the clouds. Number should be non-negative.
-
-`CLOUD HEIGHTMI [FP32]`<br/>
-Minimum height of the clouds. Number should be non-negative.
 
 `CLOUD SHASCALE [FP32]`<br/>
 Scaling used when sampling the shape noise texture. Number should be non-negative.
@@ -206,15 +206,6 @@ Scaling used when sampling the detail noise texture. Number should be non-negati
 
 `CLOUD WEASCALE [FP32]`<br/>
 Scaling used when sampling the weather noise texture. Number should be non-negative.
-
-`CLOUD CURSCALE [FP32]`<br/>
-Scaling used when sampling the curl noise texture. Number should be non-negative.
-
-`CLOUD COVERAGE [FP32]`<br/>
-Cloud coverage, higher numbers imply thicker clouds. Number should be non-negative.
-
-`CLOUD COVERMIN [FP32]`<br/>
-Cloud minimum coverage, higher numbers imply denser clouds. Number should be non-negative.
 
 `CLOUD ANVIL___ [FP32]`<br/>
 Anvil overhang. Number must be in the range [0,1].
@@ -228,17 +219,26 @@ Backward scattering g factor used in mie scattering. Number must be in the range
 `CLOUD SCATLERP [FP32]`<br/>
 Interpolation factor between forward and backward scattering in the dual lobe phase function. Number must be in the range [0,1].
 
-`CLOUD WETNESS_ [FP32]`<br/>
-Determines how wet the clouds are. Wetter clouds are darker. Number must be in the range [0,1].
-
-`CLOUD POWDER__ [FP32]`<br/>
-Determines how strong the beer-powder effect is applied. Number must be in the range [0,1].
-
 `CLOUD SHASTEPS [INT32]`<br/>
-Number of raymarching steps that are used for volumetric extinction/shadowing. Number should be non-negative.
+Number of raymarching steps that are used for volumetric extinction/shadowing. Values larger than 10 are generally not necessary. Number should be non-negative.
 
 `CLOUD DENSITY_ [FP32]`<br/>
 Cloud density scaling. Number should be non-negative.
+
+`CLOUD LOWACTIV/MIDACTIV/TOPACTIV [INT32]`<br/>
+Set 1 to activate low-layer-/mid-layer-/top-layer-clouds, 0 else.
+
+`CLOUD LOWCOVER/MIDCOVER/TOPCOVER [FP32] [FP32]`<br/>
+Cloud minimum coverage and coverage factor of the respective cloud layer. Number should be non-negative.
+
+`CLOUD LOWTYPE_/MIDTYPE_/TOPTYPE_ [FP32]`<br/>
+Cloud minimum type and type multiplier of the respective cloud layer. Number should be non-negative.
+
+`CLOUD LOWHEIGH/MIDHEIGH/TOPHEIGH [FP32] [FP32]`<br/>
+Minimum and maximum height of the respective cloud layer. Number should be non-negative.
+
+`CLOUD LOWWIND_/MIDWIND_/TOPWIND_ [FP32]`<br/>
+Wind speed and angle in the respective cloud layer. The angle determines the direction in which the wind blows. Number should be non-negative.
 
 ## Fog Settings
 

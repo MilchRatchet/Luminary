@@ -23,8 +23,8 @@ __device__ RGBF purkinje_shift(RGBF pixel) {
   float short_cone  = 0.002760510899553f * pixel.r - 0.008341563564118f * pixel.g + 0.067213551661950f * pixel.b;
   float rod         = -0.007607045462440f * pixel.r + 0.122492925567539f * pixel.g + 0.022445835141881f * pixel.b;
 
-  const float kappa1 = device_scene.camera.purkinje_kappa1;
-  const float kappa2 = device_scene.camera.purkinje_kappa2;
+  const float kappa1 = device.scene.camera.purkinje_kappa1;
+  const float kappa2 = device.scene.camera.purkinje_kappa2;
   const float lm     = 1.0f / 0.63721f;
   const float mm     = 1.0f / 0.39242f;
   const float sm     = 1.0f / 1.6064f;
