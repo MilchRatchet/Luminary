@@ -102,7 +102,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
       brdf.term = mul_RGBAhalf(brdf.term, RGBF_to_RGBAhalf(opaque_color(albedo)));
 
-      if (device.scene.toy.refractive_index != 1.0f) {
+      if (device.scene.toy.refractive_index != 1.0f && device.iteration_type != TYPE_LIGHT) {
         const float alpha = white_noise();
         const float beta  = 2.0f * PI * white_noise();
 
