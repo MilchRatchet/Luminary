@@ -16,16 +16,23 @@
  */
 #define THRESHOLD_TRIANGLES 1
 #define OBJECT_SPLIT_BIN_COUNT 8
-#define SPATIAL_SPLIT_THRESHOLD 0.00001f
+#define SPATIAL_SPLIT_THRESHOLD 0.00001
 #define SPATIAL_SPLIT_BIN_COUNT 64
-#define COST_OF_TRIANGLE 0.4f
-#define COST_OF_NODE 1.0f
+#define COST_OF_TRIANGLE 0.4
+#define COST_OF_NODE 1.0
+
+#define FRAGMENT_ERROR_COMP (FLT_EPSILON * 4.0f)
+#define SPATIAL_SPLIT_TOL (FLT_EPSILON * 16.0f)
+
+// We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
+#define MAX_VALUE 1e10f
+
+#define BINARY_BVH_ERROR_CHECK 1
 
 #define TRIANGLES_MAX 3
 
-#define BINARY_NODE_IS_INTERNAL_NODE 0b0
-#define BINARY_NODE_IS_LEAF_NODE 0b1
-#define BINARY_NODE_IS_NULL 0b10
+enum Axis { AxisX = 0, AxisY = 1, AxisZ = 2 } typedef Axis;
+enum OptimalStrategy { StrategyNull = 0, StrategyObjectSplit = 1, StrategySpatialSplit = 2 } typedef OptimalStrategy;
 
 struct vec3_p {
   float x;
@@ -34,60 +41,63 @@ struct vec3_p {
   float _p;
 } typedef vec3_p;
 
-struct fragment {
+struct Fragment {
   vec3_p high;
   vec3_p low;
   vec3_p middle;
   uint32_t id;
   uint32_t _p2;
   uint64_t _p3;
-} typedef fragment;
+} typedef Fragment;
 
-struct bin {
+struct Bin {
   vec3_p high;
   vec3_p low;
   int32_t entry;
   int32_t exit;
   uint64_t _p;
-} typedef bin;
+} typedef Bin;
 
-static float get_entry_by_axis(const vec3_p p, const int axis) {
-  return (axis) ? ((axis == 1) ? p.y : p.z) : p.x;
+static float get_entry_by_axis(const vec3_p p, const Axis axis) {
+  switch (axis) {
+    case AxisX:
+      return p.x;
+    case AxisY:
+      return p.y;
+    case AxisZ:
+    default:
+      return p.z;
+  }
 }
 
-static void __swap_fragments(fragment* a, fragment* b) {
-  fragment temp = *a;
+static void __swap_fragments(Fragment* a, Fragment* b) {
+  Fragment temp = *a;
   *a            = *b;
   *b            = temp;
 }
 
-static int __partition(fragment* fragments, int bottom, int top, const int axis) {
-  const int mid = (top - bottom) / 2 + bottom;
-  if (get_entry_by_axis(fragments[top].middle, axis) < get_entry_by_axis(fragments[bottom].middle, axis)) {
-    __swap_fragments(fragments + bottom, fragments + top);
-  }
-  if (get_entry_by_axis(fragments[mid].middle, axis) < get_entry_by_axis(fragments[bottom].middle, axis)) {
-    __swap_fragments(fragments + mid, fragments + bottom);
-  }
-  if (get_entry_by_axis(fragments[top].middle, axis) > get_entry_by_axis(fragments[mid].middle, axis)) {
-    __swap_fragments(fragments + mid, fragments + top);
-  }
-
-  const float x = get_entry_by_axis(fragments[top].middle, axis);
+static int __partition(Fragment* fragments, const int bottom, const int top, const Axis axis) {
+  const float x = get_entry_by_axis(fragments[(top + bottom) / 2].middle, axis);
   int i         = bottom - 1;
+  int j         = top + 1;
 
-  for (int j = bottom; j < top; j++) {
-    if (get_entry_by_axis(fragments[j].middle, axis) < x) {
+  while (1) {
+    do {
       i++;
-      __swap_fragments(fragments + i, fragments + j);
-    }
-  }
-  __swap_fragments(fragments + i + 1, fragments + top);
+    } while (get_entry_by_axis(fragments[i].middle, axis) < x);
 
-  return (i + 1);
+    do {
+      j--;
+    } while (get_entry_by_axis(fragments[j].middle, axis) > x);
+
+    if (i >= j)
+      return j;
+
+    __swap_fragments(fragments + i, fragments + j);
+  }
 }
 
-static void quick_sort_fragments(fragment* fragments, const unsigned int fragments_length, const int axis) {
+static void quick_sort_fragments(Fragment* fragments, const unsigned int fragments_length, const int axis) {
   int ptr = 1;
 
   int quick_sort_stack[64];
@@ -103,7 +113,7 @@ static void quick_sort_fragments(fragment* fragments, const unsigned int fragmen
 
     if (p - 1 > bottom) {
       quick_sort_stack[++ptr] = bottom;
-      quick_sort_stack[++ptr] = p - 1;
+      quick_sort_stack[++ptr] = p;
     }
 
     if (p + 1 < top) {
@@ -113,9 +123,9 @@ static void quick_sort_fragments(fragment* fragments, const unsigned int fragmen
   }
 }
 
-static void fit_bounds(const fragment* fragments, const unsigned int fragments_length, vec3_p* high_out, vec3_p* low_out) {
-  __m128 high = _mm_setr_ps(-FLT_MAX, -FLT_MAX, -FLT_MAX, -FLT_MAX);
-  __m128 low  = _mm_setr_ps(FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX);
+static void fit_bounds(const Fragment* fragments, const unsigned int fragments_length, vec3_p* high_out, vec3_p* low_out) {
+  __m128 high = _mm_set1_ps(-MAX_VALUE);
+  __m128 low  = _mm_set1_ps(MAX_VALUE);
 
   for (unsigned int i = 0; i < fragments_length; i++) {
     const float* baseptr = (float*) (fragments + i);
@@ -133,9 +143,9 @@ static void fit_bounds(const fragment* fragments, const unsigned int fragments_l
     _mm_storeu_ps((float*) low_out, low);
 }
 
-static void fit_bounds_of_bins(const bin* bins, const int bins_length, vec3_p* high_out, vec3_p* low_out) {
-  __m128 high = _mm_set1_ps(-FLT_MAX);
-  __m128 low  = _mm_set1_ps(FLT_MAX);
+static void fit_bounds_of_bins(const Bin* bins, const int bins_length, vec3_p* high_out, vec3_p* low_out) {
+  __m128 high = _mm_set1_ps(-MAX_VALUE);
+  __m128 low  = _mm_set1_ps(MAX_VALUE);
 
   for (int i = 0; i < bins_length; i++) {
     const float* baseptr = (float*) (bins + i);
@@ -153,7 +163,7 @@ static void fit_bounds_of_bins(const bin* bins, const int bins_length, vec3_p* h
     _mm_storeu_ps((float*) low_out, low);
 }
 
-static void update_bounds_of_bins(const bin* bins, vec3_p* restrict high_out, vec3_p* restrict low_out) {
+static void update_bounds_of_bins(const Bin* bins, vec3_p* restrict high_out, vec3_p* restrict low_out) {
   __m128 high = _mm_loadu_ps((float*) high_out);
   __m128 low  = _mm_loadu_ps((float*) low_out);
 
@@ -165,53 +175,49 @@ static void update_bounds_of_bins(const bin* bins, vec3_p* restrict high_out, ve
   high = _mm_max_ps(high, high_bin);
   low  = _mm_min_ps(low, low_bin);
 
-  if (high_out)
-    _mm_storeu_ps((float*) high_out, high);
-  if (low_out)
-    _mm_storeu_ps((float*) low_out, low);
+  _mm_storeu_ps((float*) high_out, high);
+  _mm_storeu_ps((float*) low_out, low);
 }
 
-static float construct_bins(
-  bin* restrict bins, const fragment* restrict fragments, const unsigned int fragments_length, const int axis, float* offset) {
+static double construct_bins(
+  Bin* restrict bins, const Fragment* restrict fragments, const unsigned int fragments_length, const Axis axis, double* offset) {
   vec3_p high, low;
   fit_bounds(fragments, fragments_length, &high, &low);
-  const float span     = get_entry_by_axis(high, axis) - get_entry_by_axis(low, axis);
-  const float interval = span / OBJECT_SPLIT_BIN_COUNT;
 
-  if (interval <= FLT_EPSILON * fabsf(get_entry_by_axis(low, axis)))
-    return 0.0f;
+  const double high_axis = get_entry_by_axis(high, axis);
+  const double low_axis  = get_entry_by_axis(low, axis);
 
-  *offset = get_entry_by_axis(low, axis);
+  const double span     = high_axis - low_axis;
+  const double interval = span / OBJECT_SPLIT_BIN_COUNT;
 
-  const bin b = {
-    .high.x = -FLT_MAX,
-    .high.y = -FLT_MAX,
-    .high.z = -FLT_MAX,
-    .low.x  = FLT_MAX,
-    .low.y  = FLT_MAX,
-    .low.z  = FLT_MAX,
+  if (interval <= FRAGMENT_ERROR_COMP * fabs(low_axis))
+    return 0.0;
+
+  *offset = low_axis;
+
+  const Bin b = {
+    .high.x = -MAX_VALUE,
+    .high.y = -MAX_VALUE,
+    .high.z = -MAX_VALUE,
+    .low.x  = MAX_VALUE,
+    .low.y  = MAX_VALUE,
+    .low.z  = MAX_VALUE,
     .entry  = 0,
     .exit   = 0};
   bins[0] = b;
 
   for (uint32_t i = 1; i < OBJECT_SPLIT_BIN_COUNT; i = i << 1) {
-    memcpy(bins + i, bins, i * sizeof(bin));
+    memcpy(bins + i, bins, i * sizeof(Bin));
   }
 
-  const float low_axis = get_entry_by_axis(low, axis);
-
   for (unsigned int i = 0; i < fragments_length; i++) {
-    fragment frag     = fragments[i];
+    Fragment frag     = fragments[i];
     const float value = get_entry_by_axis(frag.middle, axis);
-    int pos           = 0;
-    while ((pos + 1) * interval + low_axis < value) {
-      pos++;
-    }
+    int pos           = ((int) ceil((value - low_axis) / interval)) - 1;
+    if (pos < 0)
+      pos = 0;
 
-    if (pos == OBJECT_SPLIT_BIN_COUNT)
-      pos--;
-
-    bin b = bins[pos];
+    Bin b = bins[pos];
     b.entry++;
     b.exit++;
 
@@ -229,48 +235,55 @@ static float construct_bins(
   return interval;
 }
 
-static float construct_chopped_bins(
-  bin* restrict bins, const fragment* restrict fragments, const unsigned int fragments_length, const int axis, float* restrict offset) {
+static double construct_chopped_bins(
+  Bin* restrict bins, const Fragment* restrict fragments, const unsigned int fragments_length, const Axis axis, double* restrict offset) {
   vec3_p high, low;
   fit_bounds(fragments, fragments_length, &high, &low);
-  const float span     = get_entry_by_axis(high, axis) - get_entry_by_axis(low, axis);
-  const float interval = span / SPATIAL_SPLIT_BIN_COUNT;
 
-  if (interval <= FLT_EPSILON * fabsf(get_entry_by_axis(low, axis)))
-    return 0.0f;
+  const double high_axis = get_entry_by_axis(high, axis);
+  const double low_axis  = get_entry_by_axis(low, axis);
 
-  *offset = get_entry_by_axis(low, axis);
+  const double span     = high_axis - low_axis;
+  const double interval = span / SPATIAL_SPLIT_BIN_COUNT;
 
-  const bin b = {
-    .high.x = -FLT_MAX,
-    .high.y = -FLT_MAX,
-    .high.z = -FLT_MAX,
-    .low.x  = FLT_MAX,
-    .low.y  = FLT_MAX,
-    .low.z  = FLT_MAX,
+  if (interval <= FRAGMENT_ERROR_COMP * fabs(low_axis))
+    return 0.0;
+
+  *offset = low_axis;
+
+  const Bin b = {
+    .high.x = -MAX_VALUE,
+    .high.y = -MAX_VALUE,
+    .high.z = -MAX_VALUE,
+    .low.x  = MAX_VALUE,
+    .low.y  = MAX_VALUE,
+    .low.z  = MAX_VALUE,
     .entry  = 0,
     .exit   = 0};
   bins[0] = b;
 
   for (uint32_t i = 1; i < SPATIAL_SPLIT_BIN_COUNT; i = i << 1) {
-    memcpy(bins + i, bins, i * sizeof(bin));
+    memcpy(bins + i, bins, i * sizeof(Bin));
   }
 
-  const float low_axis = get_entry_by_axis(low, axis);
-
   for (unsigned int i = 0; i < fragments_length; i++) {
-    /*
-     * This maps value->pos as [0,1] to 0 and (i,i+1] to i
-     */
-    const float value1 = get_entry_by_axis(fragments[i].low, axis) - low_axis;
-    int pos1           = ((int) -floorf(-value1 / interval)) - 1;
+    const double value1 = get_entry_by_axis(fragments[i].low, axis);
+    int pos1            = ((int) ceil((value1 - low_axis) / interval)) - 1;
     if (pos1 < 0)
       pos1 = 0;
 
-    const float value2 = get_entry_by_axis(fragments[i].high, axis) - low_axis;
-    int pos2           = ((int) -floorf(-value2 / interval)) - 1;
+    if (fabs(value1 - low_axis - pos1 * interval) < SPATIAL_SPLIT_TOL * value1) {
+      return 0.0;
+    }
+
+    const double value2 = get_entry_by_axis(fragments[i].high, axis);
+    int pos2            = ((int) ceil((value2 - low_axis) / interval)) - 1;
     if (pos2 < 0)
       pos2 = 0;
+
+    if (fabs(value2 - low_axis - pos2 * interval) < SPATIAL_SPLIT_TOL * value2) {
+      return 0.0;
+    }
 
     const int entry = min(pos1, pos2);
     const int exit  = max(pos1, pos2);
@@ -295,96 +308,138 @@ static float construct_chopped_bins(
     }
   }
 
-  if (axis == 0) {
-    for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
-      bin b    = bins[i];
-      b.low.x  = fmaxf(b.low.x, low.x + i * interval);
-      b.high.x = fminf(b.high.x, low.x + (i + 1) * interval);
-      bins[i]  = b;
-    }
-  }
-  else if (axis == 1) {
-    for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
-      bin b    = bins[i];
-      b.low.y  = fmaxf(b.low.y, low.y + i * interval);
-      b.high.y = fminf(b.high.y, low.y + (i + 1) * interval);
-      bins[i]  = b;
-    }
-  }
-  else {
-    for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
-      bin b    = bins[i];
-      b.low.z  = fmaxf(b.low.z, low.z + i * interval);
-      b.high.z = fminf(b.high.z, low.z + (i + 1) * interval);
-      bins[i]  = b;
-    }
+  switch (axis) {
+    case AxisX:
+      for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
+        Bin b    = bins[i];
+        b.low.x  = fmaxf(b.low.x, low.x + i * interval);
+        b.high.x = fminf(b.high.x, low.x + (i + 1) * interval);
+        bins[i]  = b;
+      }
+      break;
+    case AxisY:
+      for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
+        Bin b    = bins[i];
+        b.low.y  = fmaxf(b.low.y, low.y + i * interval);
+        b.high.y = fminf(b.high.y, low.y + (i + 1) * interval);
+        bins[i]  = b;
+      }
+      break;
+    case AxisZ:
+    default:
+      for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
+        Bin b    = bins[i];
+        b.low.z  = fmaxf(b.low.z, low.z + i * interval);
+        b.high.z = fminf(b.high.z, low.z + (i + 1) * interval);
+        bins[i]  = b;
+      }
+      break;
   }
 
   return interval;
 }
 
 static void divide_middles_along_axis(
-  const float split, const int axis, fragment* restrict fragments_out, fragment* restrict fragments_in, const unsigned int fragments_length,
-  const int right_offset) {
+  const double split, const Axis axis, Fragment* restrict fragments_out, Fragment* restrict fragments_in,
+  const unsigned int fragments_length) {
   int left  = 0;
   int right = 0;
 
   for (unsigned int i = 0; i < fragments_length; i++) {
-    fragment frag = fragments_in[i];
+    Fragment frag = fragments_in[i];
 
-    const float middle = get_entry_by_axis(frag.middle, axis);
+    const double middle = get_entry_by_axis(frag.middle, axis);
 
     if (middle <= split) {
       fragments_out[left++] = frag;
     }
     else {
-      fragments_out[right_offset + right++] = frag;
+      fragments_out[fragments_length - 1 - right++] = frag;
     }
   }
 }
 
 static void divide_along_axis(
-  const float split, const int axis, fragment* fragments_out, fragment* fragments_in, const unsigned int fragments_length,
-  const int right_offset) {
+  const double split, const Axis axis, Fragment* fragments_out, Fragment* fragments_in, const unsigned int fragments_length,
+  const int right_offset, const int fragments_out_length) {
   int left  = 0;
   int right = 0;
 
   for (unsigned int i = 0; i < fragments_length; i++) {
-    const float low  = get_entry_by_axis(fragments_in[i].low, axis);
-    const float high = get_entry_by_axis(fragments_in[i].high, axis);
+    const double low  = get_entry_by_axis(fragments_in[i].low, axis);
+    const double high = get_entry_by_axis(fragments_in[i].high, axis);
 
-    if (low <= split) {
-      fragment frag_left = fragments_in[i];
-      if (axis == 0) {
-        frag_left.high.x   = min(frag_left.high.x, split);
-        frag_left.middle.x = (frag_left.low.x + frag_left.high.x) * 0.5f;
-      }
-      else if (axis == 1) {
-        frag_left.high.y   = min(frag_left.high.y, split);
-        frag_left.middle.y = (frag_left.low.y + frag_left.high.y) * 0.5f;
-      }
-      else {
-        frag_left.high.z   = min(frag_left.high.z, split);
-        frag_left.middle.z = (frag_left.low.z + frag_left.high.z) * 0.5f;
+    // The splits may happen so that the fragments are shrunk to a zero volume
+    // Through nextafterf, I ensure a minimal volume
+
+    if (low < split) {
+      Fragment frag_left = fragments_in[i];
+      switch (axis) {
+        case AxisX:
+          frag_left.high.x = min(frag_left.high.x, split);
+          if (frag_left.high.x == frag_left.low.x) {
+            frag_left.high.x = nextafterf(frag_left.high.x, FLT_MAX);
+          }
+          frag_left.middle.x = (frag_left.low.x + frag_left.high.x) * 0.5f;
+          break;
+        case AxisY:
+          frag_left.high.y = min(frag_left.high.y, split);
+          if (frag_left.high.y == frag_left.low.y) {
+            frag_left.high.y = nextafterf(frag_left.high.y, FLT_MAX);
+          }
+          frag_left.middle.y = (frag_left.low.y + frag_left.high.y) * 0.5f;
+          break;
+        case AxisZ:
+        default:
+          frag_left.high.z = min(frag_left.high.z, split);
+          if (frag_left.high.z == frag_left.low.z) {
+            frag_left.high.z = nextafterf(frag_left.high.z, FLT_MAX);
+          }
+          frag_left.middle.z = (frag_left.low.z + frag_left.high.z) * 0.5f;
+          break;
       }
       fragments_out[left++] = frag_left;
     }
+
     if (high > split) {
-      fragment frag_right = fragments_in[i];
-      if (axis == 0) {
-        frag_right.low.x    = max(frag_right.low.x, split);
-        frag_right.middle.x = (frag_right.low.x + frag_right.high.x) * 0.5f;
-      }
-      else if (axis == 1) {
-        frag_right.low.y    = max(frag_right.low.y, split);
-        frag_right.middle.y = (frag_right.low.y + frag_right.high.y) * 0.5f;
-      }
-      else {
-        frag_right.low.z    = max(frag_right.low.z, split);
-        frag_right.middle.z = (frag_right.low.z + frag_right.high.z) * 0.5f;
+      Fragment frag_right = fragments_in[i];
+      switch (axis) {
+        case AxisX:
+          frag_right.low.x = max(frag_right.low.x, split);
+          if (frag_right.high.x == frag_right.low.x) {
+            frag_right.low.x = nextafterf(frag_right.low.x, -FLT_MAX);
+          }
+          frag_right.middle.x = (frag_right.low.x + frag_right.high.x) * 0.5f;
+          break;
+        case AxisY:
+          frag_right.low.y = max(frag_right.low.y, split);
+          if (frag_right.high.y == frag_right.low.y) {
+            frag_right.low.y = nextafterf(frag_right.low.y, -FLT_MAX);
+          }
+          frag_right.middle.y = (frag_right.low.y + frag_right.high.y) * 0.5f;
+          break;
+        case AxisZ:
+        default:
+          frag_right.low.z = max(frag_right.low.z, split);
+          if (frag_right.high.z == frag_right.low.z) {
+            frag_right.low.z = nextafterf(frag_right.low.z, -FLT_MAX);
+          }
+          frag_right.middle.z = (frag_right.low.z + frag_right.high.z) * 0.5f;
+          break;
       }
       fragments_out[right_offset + right++] = frag_right;
     }
+  }
+
+  // Due to numerical errors we may see a different number of fragments than predicted
+  // Hence I just fill the remaining space
+
+  for (; left < right_offset; left++) {
+    fragments_out[left] = fragments_out[0];
+  }
+
+  for (; right_offset + right < fragments_out_length; right++) {
+    fragments_out[right_offset + right] = fragments_out[right_offset];
   }
 }
 
@@ -404,12 +459,12 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = triangles_length;
-  nodes[0].kind              = BINARY_NODE_IS_LEAF_NODE;
+  nodes[0].type              = NodeTypeLeaf;
 
   unsigned int* leaf_nodes     = malloc(sizeof(unsigned int) * node_count);
   unsigned int leaf_node_count = 0;
 
-  fragment* fragments           = _mm_malloc(sizeof(fragment) * triangles_length, 64);
+  Fragment* fragments           = _mm_malloc(sizeof(Fragment) * triangles_length, 64);
   unsigned int fragments_length = triangles_length;
 
   for (unsigned int i = 0; i < triangles_length; i++) {
@@ -422,27 +477,37 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
       .x = min(t.vertex.x, min(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
       .y = min(t.vertex.y, min(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
       .z = min(t.vertex.z, min(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
-    vec3_p middle = {.x = (high.x + low.x) / 2.0f, .y = (high.y + low.y) / 2.0f, .z = (high.z + low.z) / 2.0f};
+    vec3_p middle = {.x = (high.x + low.x) * 0.5f, .y = (high.y + low.y) * 0.5f, .z = (high.z + low.z) * 0.5f};
 
-    fragment frag = {.high = high, .low = low, .middle = middle, .id = i};
+    // Fragments are supposed to be hulls that contain a triangle
+    // They should be as tight as possible but if they are too tight then numerical errors
+    // could result in broken BVHs
+    high.x += fabsf(high.x) * FRAGMENT_ERROR_COMP;
+    high.y += fabsf(high.y) * FRAGMENT_ERROR_COMP;
+    high.z += fabsf(high.z) * FRAGMENT_ERROR_COMP;
+    low.x -= fabsf(low.x) * FRAGMENT_ERROR_COMP;
+    low.y -= fabsf(low.y) * FRAGMENT_ERROR_COMP;
+    low.z -= fabsf(low.z) * FRAGMENT_ERROR_COMP;
+
+    Fragment frag = {.high = high, .low = low, .middle = middle, .id = i};
     fragments[i]  = frag;
   }
 
-  fragment* fragments_buffer           = _mm_malloc(sizeof(fragment) * fragments_length * 2, 64);
+  Fragment* fragments_buffer           = _mm_malloc(sizeof(Fragment) * fragments_length * 2, 64);
   unsigned int fragments_buffer_length = fragments_length * 2;
   unsigned int fragments_buffer_count  = fragments_length;
 
-  float root_surface_area;
+  double root_surface_area;
   vec3_p high_root, low_root;
   {
     fit_bounds(fragments, fragments_length, &high_root, &low_root);
     vec3_p diff = {
       .x = high_root.x - low_root.x, .y = high_root.y - low_root.y, .z = high_root.z - low_root.z, ._p = high_root._p - low_root._p};
 
-    root_surface_area = diff.x * diff.y + diff.x * diff.z + diff.y * diff.z;
+    root_surface_area = (double) diff.x * (double) diff.y + (double) diff.x * (double) diff.z + (double) diff.y * (double) diff.z;
   }
 
-  bin* bins = (bin*) _mm_malloc(sizeof(bin) * max(OBJECT_SPLIT_BIN_COUNT, SPATIAL_SPLIT_BIN_COUNT), 32);
+  Bin* bins = (Bin*) _mm_malloc(sizeof(Bin) * max(OBJECT_SPLIT_BIN_COUNT, SPATIAL_SPLIT_BIN_COUNT), 32);
 
   unsigned int begin_of_current_nodes = 0;
   unsigned int end_of_current_nodes   = 1;
@@ -458,7 +523,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
       node.cost_computed = 0;
 
       if (fragments_ptr != node.triangles_address) {
-        memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * (node.triangles_address - fragments_ptr));
+        memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(Fragment) * (node.triangles_address - fragments_ptr));
         buffer_ptr += node.triangles_address - fragments_ptr;
         fragments_ptr += node.triangles_address - fragments_ptr;
       }
@@ -467,51 +532,47 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
         nodes[node_ptr].triangles_address = buffer_ptr;
         nodes[node_ptr].cost_computed     = 0;
 
-        memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * node.triangle_count);
+        memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(Fragment) * node.triangle_count);
         buffer_ptr += node.triangle_count;
         fragments_ptr += node.triangle_count;
         leaf_nodes[leaf_node_count + leaf_nodes_in_iteration++] = node_ptr;
         continue;
       }
 
-      float parent_surface_area;
+      double parent_surface_area;
       {
         vec3_p high_parent, low_parent;
         fit_bounds(fragments + fragments_ptr, node.triangle_count, &high_parent, &low_parent);
         vec3 diff = {.x = high_parent.x - low_parent.x, .y = high_parent.y - low_parent.y, .z = high_parent.z - low_parent.z};
 
-        parent_surface_area = diff.x * diff.y + diff.x * diff.z + diff.y * diff.z;
+        parent_surface_area = (double) diff.x * (double) diff.y + (double) diff.x * (double) diff.z + (double) diff.y * (double) diff.z;
       }
 
-      const float sequential_cost = COST_OF_TRIANGLE * node.triangle_count;
+      const double sequential_cost = COST_OF_NODE * 0.5 + COST_OF_TRIANGLE * node.triangle_count;
 
       vec3_p high, low;
       vec3_p optimal_high_right, optimal_low_right, optimal_high_left, optimal_low_left;
-      float optimal_cost = FLT_MAX;
-      int axis, optimal_split, optimal_method;
-      float optimal_splitting_plane;
-      int optimal_total_triangles;
-
-      optimal_method = 0;
+      double optimal_cost = DBL_MAX;
+      Axis axis;
+      double optimal_splitting_plane;
+      OptimalStrategy optimal_strategy = StrategyNull;
+      int optimal_split                = node.triangle_count / 2;
+      int optimal_total_triangles      = node.triangle_count;
 
       for (int a = 0; a < 3; a++) {
-        float low_split;
-        const float interval = construct_bins(bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
+        double low_split;
+        const double interval = construct_bins(bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
 
-        if (interval == 0.0f)
+        if (interval == 0.0)
           continue;
 
         int left  = 0;
-        int right = 0;
+        int right = node.triangle_count;
 
-        for (int k = 0; k < OBJECT_SPLIT_BIN_COUNT; k++) {
-          right += bins[k].exit;
-        }
-
-        vec3_p high_left  = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX, ._p = -FLT_MAX};
-        vec3_p high_right = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX, ._p = -FLT_MAX};
-        vec3_p low_left   = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX, ._p = FLT_MAX};
-        vec3_p low_right  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX, ._p = FLT_MAX};
+        vec3_p high_left  = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE, ._p = -MAX_VALUE};
+        vec3_p high_right = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE, ._p = -MAX_VALUE};
+        vec3_p low_left   = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE, ._p = MAX_VALUE};
+        vec3_p low_right  = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE, ._p = MAX_VALUE};
 
         for (int k = 1; k < OBJECT_SPLIT_BIN_COUNT; k++) {
           update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
@@ -526,21 +587,21 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
             .z  = high_right.z - low_right.z,
             ._p = high_right._p - low_right._p};
 
-          const float cost_L = diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
-
-          const float cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
+          const double cost_L = diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
+          const double cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
 
           left += bins[k - 1].entry;
           right -= bins[k - 1].exit;
 
-          const float total_cost =
-            COST_OF_NODE + COST_OF_TRIANGLE * cost_L / parent_surface_area * left + COST_OF_TRIANGLE * cost_R / parent_surface_area * right;
+          const double total_cost =
+            COST_OF_NODE + COST_OF_TRIANGLE * (cost_L / parent_surface_area * left + cost_R / parent_surface_area * right);
 
-          if (total_cost < optimal_cost) {
+          if (total_cost < optimal_cost && total_cost < sequential_cost) {
             optimal_cost            = total_cost;
             optimal_split           = left;
             optimal_total_triangles = node.triangle_count;
             optimal_splitting_plane = low_split + k * interval;
+            optimal_strategy        = StrategyObjectSplit;
             axis                    = a;
             optimal_high_left       = high_left;
             optimal_high_right      = high_right;
@@ -557,28 +618,24 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
         ._p = max(min(optimal_high_left._p, optimal_high_right._p) - max(optimal_low_left._p, optimal_low_right._p), 0.0f),
       };
 
-      const float o               = overlap.x * overlap.y + overlap.x * overlap.z + overlap.y * overlap.z;
+      const double o              = overlap.x * overlap.y + overlap.x * overlap.z + overlap.y * overlap.z;
       const int do_spatial_splits = ((o / root_surface_area) > SPATIAL_SPLIT_THRESHOLD);
 
       if (do_spatial_splits) {
         for (int a = 0; a < 3; a++) {
-          float low_split;
-          const float interval = construct_chopped_bins(bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
+          double low_split;
+          const double interval = construct_chopped_bins(bins, fragments + fragments_ptr, node.triangle_count, a, &low_split);
 
-          if (interval == 0.0f)
+          if (interval == 0.0)
             continue;
 
           int left  = 0;
-          int right = 0;
+          int right = node.triangle_count;
 
-          for (int k = 0; k < SPATIAL_SPLIT_BIN_COUNT; k++) {
-            right += bins[k].exit;
-          }
-
-          vec3_p high_left  = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
-          vec3_p high_right = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
-          vec3_p low_left   = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
-          vec3_p low_right  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
+          vec3_p high_left  = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
+          vec3_p high_right = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
+          vec3_p low_left   = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
+          vec3_p low_right  = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
 
           for (int k = 1; k < SPATIAL_SPLIT_BIN_COUNT; k++) {
             update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
@@ -596,22 +653,21 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
               .z  = high_right.z - low_right.z,
               ._p = high_right._p - low_right._p};
 
-            const float cost_L = diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
-
-            const float cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
+            const double cost_L = diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
+            const double cost_R = diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
 
             left += bins[k - 1].entry;
             right -= bins[k - 1].exit;
 
-            const float total_cost = COST_OF_NODE + COST_OF_TRIANGLE * cost_L / parent_surface_area * left
-                                     + COST_OF_TRIANGLE * cost_R / parent_surface_area * right;
+            const double total_cost =
+              COST_OF_NODE + COST_OF_TRIANGLE * (cost_L / parent_surface_area * left + cost_R / parent_surface_area * right);
 
             if (total_cost < optimal_cost && total_cost < sequential_cost) {
               optimal_cost            = total_cost;
               optimal_split           = left;
               optimal_total_triangles = left + right;
               optimal_splitting_plane = low_split + k * interval;
-              optimal_method          = 1;
+              optimal_strategy        = StrategySpatialSplit;
               axis                    = a;
               optimal_high_left       = high_left;
               optimal_high_right      = high_right;
@@ -622,36 +678,36 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
         }
       }
 
-      if (optimal_cost == FLT_MAX) {
-        optimal_split           = node.triangle_count / 2;
-        optimal_total_triangles = node.triangle_count;
-        optimal_method          = 2;
-      }
+      switch (optimal_strategy) {
+        case StrategyNull:
+          memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(Fragment) * node.triangle_count);
+          quick_sort_fragments(fragments_buffer + buffer_ptr, node.triangle_count, axis);
+          break;
+        case StrategyObjectSplit:
+          divide_middles_along_axis(
+            optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr, node.triangle_count);
+          break;
+        case StrategySpatialSplit: {
+          const unsigned int duplicated_triangles = optimal_total_triangles - node.triangle_count;
+          fragments_buffer_count += duplicated_triangles;
 
-      if (optimal_method == 0) {
-        divide_middles_along_axis(
-          optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr, node.triangle_count, optimal_split);
-      }
-      else if (optimal_method == 1) {
-        const unsigned int duplicated_triangles = optimal_total_triangles - node.triangle_count;
-        fragments_buffer_count += duplicated_triangles;
+          for (unsigned int k = 0; k < leaf_node_count; k++) {
+            if (nodes[leaf_nodes[k]].triangles_address > buffer_ptr)
+              nodes[leaf_nodes[k]].triangles_address += duplicated_triangles;
+          }
 
-        for (unsigned int k = 0; k < leaf_node_count; k++) {
-          if (nodes[leaf_nodes[k]].triangles_address > buffer_ptr)
-            nodes[leaf_nodes[k]].triangles_address += duplicated_triangles;
-        }
+          if (fragments_buffer_count >= fragments_buffer_length) {
+            fragments_buffer_length += triangles_length / 2 + 1;
+            fragments_buffer = safe_realloc(fragments_buffer, sizeof(Fragment) * fragments_buffer_length);
+          }
 
-        if (fragments_buffer_count >= fragments_buffer_length) {
-          fragments_buffer_length += triangles_length / 2 + 1;
-          fragments_buffer = safe_realloc(fragments_buffer, sizeof(fragment) * fragments_buffer_length);
-        }
-
-        divide_along_axis(
-          optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr, node.triangle_count, optimal_split);
-      }
-      else {
-        quick_sort_fragments(fragments + fragments_ptr, node.triangle_count, axis);
-        memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * node.triangle_count);
+          divide_along_axis(
+            optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr, node.triangle_count, optimal_split,
+            optimal_total_triangles);
+        } break;
+        default:
+          crash_message("Invalid strategy chosen in BVH construction!");
+          break;
       }
 
       fragments_ptr += node.triangle_count;
@@ -672,18 +728,20 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
       node.left_low.z    = low.z;
       node.child_address = write_ptr;
 
-      nodes[write_ptr].triangle_count    = optimal_split;
-      nodes[write_ptr].triangles_address = buffer_ptr;
-      nodes[write_ptr].kind              = BINARY_NODE_IS_LEAF_NODE;
-      nodes[write_ptr].surface_area =
-        (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z);
+      Node2 node_left = {
+        .triangle_count    = optimal_split,
+        .triangles_address = buffer_ptr,
+        .type              = NodeTypeLeaf,
+        .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
+        .self_high.x  = high.x,
+        .self_high.y  = high.y,
+        .self_high.z  = high.z,
+        .self_low.x   = low.x,
+        .self_low.y   = low.y,
+        .self_low.z   = low.z,
+      };
 
-      nodes[write_ptr].self_high.x = high.x;
-      nodes[write_ptr].self_high.y = high.y;
-      nodes[write_ptr].self_high.z = high.z;
-      nodes[write_ptr].self_low.x  = low.x;
-      nodes[write_ptr].self_low.y  = low.y;
-      nodes[write_ptr].self_low.z  = low.z;
+      nodes[write_ptr] = node_left;
 
       write_ptr++;
       buffer_ptr += optimal_split;
@@ -697,23 +755,26 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
       node.right_low.y  = low.y;
       node.right_low.z  = low.z;
 
-      nodes[write_ptr].triangle_count    = optimal_total_triangles - optimal_split;
-      nodes[write_ptr].triangles_address = buffer_ptr;
-      nodes[write_ptr].kind              = BINARY_NODE_IS_LEAF_NODE;
-      nodes[write_ptr].surface_area =
-        (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z);
-      nodes[write_ptr].self_high.x = high.x;
-      nodes[write_ptr].self_high.y = high.y;
-      nodes[write_ptr].self_high.z = high.z;
-      nodes[write_ptr].self_low.x  = low.x;
-      nodes[write_ptr].self_low.y  = low.y;
-      nodes[write_ptr].self_low.z  = low.z;
+      Node2 node_right = {
+        .triangle_count    = optimal_total_triangles - optimal_split,
+        .triangles_address = buffer_ptr,
+        .type              = NodeTypeLeaf,
+        .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
+        .self_high.x  = high.x,
+        .self_high.y  = high.y,
+        .self_high.z  = high.z,
+        .self_low.x   = low.x,
+        .self_low.y   = low.y,
+        .self_low.z   = low.z,
+      };
+
+      nodes[write_ptr] = node_right;
 
       write_ptr++;
       buffer_ptr += optimal_total_triangles - optimal_split;
 
       node.triangles_address = -1;
-      node.kind              = 0;
+      node.type              = NodeTypeInternal;
 
       nodes[node_ptr] = node;
     }
@@ -723,7 +784,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
     leaf_node_count += leaf_nodes_in_iteration;
 
     if (fragments_ptr != fragments_length) {
-      memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(fragment) * (fragments_length - fragments_ptr));
+      memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(Fragment) * (fragments_length - fragments_ptr));
       buffer_ptr += fragments_length - fragments_ptr;
       fragments_ptr += fragments_length - fragments_ptr;
     }
@@ -731,7 +792,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
     _mm_free(fragments);
     fragments               = fragments_buffer;
     fragments_length        = fragments_buffer_count;
-    fragments_buffer        = _mm_malloc(sizeof(fragment) * fragments_length * 2, 64);
+    fragments_buffer        = _mm_malloc(sizeof(Fragment) * fragments_length * 2, 64);
     fragments_buffer_length = fragments_length * 2;
   }
 
@@ -749,6 +810,32 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
     triangles[i] = triangles_swap[fragments[i].id];
   }
 
+#if BINARY_BVH_ERROR_CHECK
+  for (unsigned int i = 0; i < node_count; i++) {
+    Node2 node = nodes[i];
+
+    if (node.type == NodeTypeNull) {
+      printf("============== Node NULL ===========\n");
+      printf("index: %d (%d)\n", i, node_count);
+    }
+
+    if (node.type != NodeTypeLeaf)
+      continue;
+
+    int dim_errors = 0;
+    dim_errors += (node.self_low.x >= node.self_high.x);
+    dim_errors += (node.self_low.y >= node.self_high.y);
+    dim_errors += (node.self_low.z >= node.self_high.z);
+
+    if (dim_errors) {
+      printf("============== NO VOLUME ===========\n");
+      printf("self_high: %f %f %f\n", node.self_high.x, node.self_high.y, node.self_high.z);
+      printf("self_low: %f %f %f\n", node.self_low.x, node.self_low.y, node.self_low.z);
+      continue;
+    }
+  }
+#endif
+
   free(triangles_swap);
   _mm_free(fragments);
   _mm_free(bins);
@@ -765,7 +852,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 }
 
 static void compute_single_node_triangles(Node2* binary_nodes, const int index) {
-  if (binary_nodes[index].kind == BINARY_NODE_IS_LEAF_NODE)
+  if (binary_nodes[index].type == NodeTypeLeaf)
     return;
 
   const int child_address = binary_nodes[index].child_address;
@@ -801,7 +888,7 @@ static float cost_distribute(Node2* binary_nodes, Node2 node, int j, int* decisi
 #define OPTIMAL_LEAF 0xffff
 
 static void compute_single_node_costs(Node2* binary_nodes, const int index) {
-  if (binary_nodes[index].kind == BINARY_NODE_IS_LEAF_NODE) {
+  if (binary_nodes[index].type == NodeTypeLeaf) {
     Node2 node = binary_nodes[index];
 
     const float cost = node.surface_area * COST_OF_TRIANGLE;
@@ -871,14 +958,14 @@ static void apply_decision(Node2* node, int node_index, int decision, int slot, 
   decision_index++;
 
   if (split == OPTIMAL_LEAF) {
-    node->kind                       = BINARY_NODE_IS_LEAF_NODE;
+    node->type                       = NodeTypeLeaf;
     node_data.binary_children[slot]  = *node;
     node_data.low[slot]              = node->self_low;
     node_data.high[slot]             = node->self_high;
     node_data.binary_addresses[slot] = node_index;
   }
   else if (decision_index == 0) {
-    node->kind                       = BINARY_NODE_IS_INTERNAL_NODE;
+    node->type                       = NodeTypeInternal;
     node_data.binary_children[slot]  = *node;
     node_data.low[slot]              = node->self_low;
     node_data.high[slot]             = node->self_high;
@@ -938,7 +1025,7 @@ Node8* collapse_bvh(
       int binary_addresses[8];
 
       for (int i = 0; i < 8; i++) {
-        binary_children[i].kind = BINARY_NODE_IS_NULL;
+        binary_children[i].type = NodeTypeNull;
       }
 
       node_packed node_data = {
@@ -954,11 +1041,11 @@ Node8* collapse_bvh(
       apply_decision(binary_nodes + child_address, child_address, split, 0, node_data);
       apply_decision(binary_nodes + child_address + 1, child_address + 1, 8 - split, split, node_data);
 
-      vec3 node_low  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX};
-      vec3 node_high = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX};
+      vec3 node_low  = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
+      vec3 node_high = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
 
       for (int i = 0; i < 8; i++) {
-        if (binary_children[i].kind != BINARY_NODE_IS_NULL) {
+        if (binary_children[i].type != NodeTypeNull) {
           vec3 lo    = low[i];
           node_low.x = min(node_low.x, lo.x);
           node_low.y = min(node_low.y, lo.y);
@@ -994,7 +1081,7 @@ Node8* collapse_bvh(
         vec3 direction = {.x = ((i >> 2) & 0b1) ? -1.0f : 1.0f, .y = ((i >> 1) & 0b1) ? -1.0f : 1.0f, .z = ((i >> 0) & 0b1) ? -1.0f : 1.0f};
 
         for (int j = 0; j < 8; j++) {
-          if (binary_children[j].kind == BINARY_NODE_IS_NULL) {
+          if (binary_children[j].type == NodeTypeNull) {
             cost_table[i][j] = FLT_MAX;
           }
           else {
@@ -1070,12 +1157,12 @@ Node8* collapse_bvh(
 
       for (int i = 0; i < 8; i++) {
         Node2 base_child = binary_children[i];
-        if (base_child.kind == BINARY_NODE_IS_INTERNAL_NODE) {
+        if (base_child.type == NodeTypeInternal) {
           node.imask |= 1 << i;
           nodes[write_ptr++].child_node_base_index = binary_addresses[i];
           node.meta[i]                             = 0b00100000 + 0b11000 + i;
         }
-        else if (base_child.kind == BINARY_NODE_IS_LEAF_NODE) {
+        else if (base_child.type == NodeTypeLeaf) {
           assert(base_child.triangle_count < 4, "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
           int meta = 0;
           switch (base_child.triangle_count) {
@@ -1105,7 +1192,7 @@ Node8* collapse_bvh(
       }
 
       for (int i = 0; i < 8; i++) {
-        if (binary_children[i].kind == BINARY_NODE_IS_NULL) {
+        if (binary_children[i].type == NodeTypeNull) {
           node.low_x[i] = 0;
           node.low_y[i] = 0;
           node.low_z[i] = 0;

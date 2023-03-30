@@ -11,6 +11,8 @@ struct compressed_vec3 {
   uint8_t z;
 } typedef compressed_vec3;
 
+enum NodeType { NodeTypeNull = 0, NodeTypeInternal = 1, NodeTypeLeaf = 2 } typedef NodeType;
+
 struct Node2 {
   vec3 left_low;
   vec3 left_high;
@@ -25,7 +27,7 @@ struct Node2 {
   float sah_cost[7];
   int decision[7];
   int cost_computed;
-  uint8_t kind;
+  NodeType type;
 } typedef Node2;
 
 struct Node8 {

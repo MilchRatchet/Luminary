@@ -1,5 +1,6 @@
 #include "wavefront.h"
 
+#include <float.h>
 #include <immintrin.h>
 #include <math.h>
 #include <stdint.h>
@@ -773,8 +774,16 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
     triangle.object_maps = t.object;
     triangle.light_id    = LIGHT_ID_NONE;
 
+    if (
+      fabsf(triangle.edge1.x) < FLT_EPSILON && fabsf(triangle.edge1.y) < FLT_EPSILON && fabsf(triangle.edge1.z) < FLT_EPSILON
+      && fabsf(triangle.edge2.x) < FLT_EPSILON && fabsf(triangle.edge2.y) < FLT_EPSILON && fabsf(triangle.edge2.z) < FLT_EPSILON) {
+      continue;
+    }
+
     (*triangles)[ptr++] = triangle;
   }
+
+  *triangles = (Triangle*) realloc(*triangles, sizeof(Triangle) * ptr);
 
   bench_toc("Converting Mesh");
 
