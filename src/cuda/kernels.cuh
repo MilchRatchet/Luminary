@@ -219,7 +219,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
     const float far_distance   = ocean_far_distance(task.origin, task.ray);
     const float short_distance = ocean_short_distance(task.origin, task.ray);
 
-    if (depth <= far_distance && depth >= short_distance) {
+    if (depth <= far_distance && depth > short_distance) {
       const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
 
       if (ocean_depth < depth) {

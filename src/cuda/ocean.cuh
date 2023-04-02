@@ -19,12 +19,23 @@ __device__ float ocean_get_normal_granularity(const float distance) {
 }
 
 __device__ float ocean_ray_underwater_length(const vec3 origin, const vec3 ray, const float limit) {
-  if (origin.y < device.scene.ocean.height && ray.y < eps) {
-    return limit;
+  const float max_ocean_height = device.scene.ocean.height + 3.0f * device.scene.ocean.amplitude;
+
+  if (origin.y > max_ocean_height) {
+    const float ref_height = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
+
+    if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(max_ocean_height) + ref_height)) {
+      return 0.0f;
+    }
   }
 
   if (origin.y < device.scene.ocean.height) {
-    return fminf(limit, (device.scene.ocean.height - origin.y) / ray.y);
+    if (ray.y < eps) {
+      return limit;
+    }
+    else {
+      return fminf(limit, (device.scene.ocean.height - origin.y) / ray.y);
+    }
   }
 
   if (ray.y > -eps) {
@@ -150,6 +161,13 @@ __device__ vec3 ocean_get_normal(vec3 p, const float diff) {
 }
 
 __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
+  const float ref_height       = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
+  const float max_ocean_height = device.scene.ocean.height + 3.0f * device.scene.ocean.amplitude;
+
+  if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(max_ocean_height) + ref_height)) {
+    return FLT_MAX;
+  }
+
   const float d1 = device.scene.ocean.height - origin.y;
   const float d2 = d1 + 3.0f * device.scene.ocean.amplitude;
 
@@ -166,6 +184,13 @@ __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
 }
 
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
+  const float ref_height       = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
+  const float max_ocean_height = device.scene.ocean.height + 3.0f * device.scene.ocean.amplitude;
+
+  if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(max_ocean_height) + ref_height)) {
+    return FLT_MAX;
+  }
+
   const float d1 = device.scene.ocean.height - origin.y;
   const float d2 = d1 + 3.0f * device.scene.ocean.amplitude;
 
@@ -192,9 +217,7 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
 
   for (int i = 0; i < 8; i++) {
     mid = lerp(min, max, height_at_min / (height_at_min - height_at_max));
-    p.x = origin.x + mid * ray.x;
-    p.y = origin.y + mid * ray.y;
-    p.z = origin.z + mid * ray.z;
+    p   = add_vector(origin, scale_vector(ray, mid));
 
     float height_at_mid = ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
 
