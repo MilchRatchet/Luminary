@@ -308,7 +308,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     }
     else if (device.iteration_type != TYPE_LIGHT) {
       const float scattering_prob = (ray.y > 0.0f) ? 0.0f : (1.0f - albedo.a);
-      const int scattering_pass   = white_noise() < scattering_prob;
+      const int scattering_pass   = white_noise() < scattering_prob && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
       task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
 

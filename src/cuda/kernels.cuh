@@ -354,11 +354,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     }
   }
 
-  geometry_task_count = 0;
-  sky_task_count      = 0;
-  ocean_task_count    = 0;
-  toy_task_count      = 0;
-  fog_task_count      = 0;
+  if (device.iteration_type == TYPE_LIGHT) {
+    for (int i = 0; i < task_count; i++) {
+      const int offset     = get_task_address(i);
+      TraceTask task       = load_trace_task(device.trace_tasks + offset);
+      const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
+      device.ptrs.state_buffer[pixel] &= ~STATE_LIGHT_OCCUPIED;
+    }
+  }
 
   // process data
   for (int i = 0; i < num_tasks; i++) {
@@ -424,25 +427,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       }
     }
 
-    if (device.iteration_type == TYPE_LIGHT)
-      device.ptrs.state_buffer[pixel] &= ~STATE_LIGHT_OCCUPIED;
-
     float4* ptr = (float4*) (device.trace_tasks + offset);
     float4 data0;
     float4 data1;
 
-    data0.x = *((float*) &task.index);
+    data0.x = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
     data0.y = task.origin.x;
     data0.z = task.origin.y;
     data0.w = task.origin.z;
 
     __stcs(ptr, data0);
-
-    toy_task_count += (hit_id == TOY_HIT);
-    sky_task_count += (hit_id == SKY_HIT);
-    ocean_task_count += (hit_id == OCEAN_HIT);
-    fog_task_count += (hit_id == FOG_HIT);
-    geometry_task_count += (hit_id <= TRIANGLE_ID_LIMIT);
 
     if (hit_id == TOY_HIT || hit_id == SKY_HIT) {
       data1.x = task.ray.x;
@@ -464,14 +458,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     __stcs(ptr + 1, data1);
   }
 
-  const uint16_t new_task_count = geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + fog_task_count;
-
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 0] = geometry_task_count;
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 1] = ocean_task_count;
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 2] = sky_task_count;
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 3] = toy_task_count;
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 4] = fog_task_count;
-  device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5] = new_task_count;
+  device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5] = num_tasks;
   device.trace_count[threadIdx.x + blockIdx.x * blockDim.x]                = 0;
 }
 

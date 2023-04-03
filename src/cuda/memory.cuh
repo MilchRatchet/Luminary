@@ -71,7 +71,7 @@ __device__ void store_trace_task(const void* ptr, const TraceTask task) {
   float4 data1;
   data1.x = task.ray.y;
   data1.y = task.ray.z;
-  data1.z = __uint_as_float((task.index.x & 0xffff) | (task.index.y << 16));
+  data1.z = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
   __stcs(((float4*) ptr) + 1, data1);
 }
 
