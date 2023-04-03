@@ -801,28 +801,25 @@ __device__ RGBF filter_2bitgray(RGBF color, int x, int y) {
 }
 
 __device__ RGBF filter_crt(RGBF color, int x, int y) {
-  color = scale_color(color, 2.0f);
+  color = scale_color(color, 1.5f);
 
-  const int column = x % 3;
+  const int row = y % 3;
 
-  switch (column) {
+  switch (row) {
     case 0:
-      color.r *= 0.5f;
-      color.g *= 0.75f;
+      color.r = 0.0f;
+      color.g = 0.0f;
       break;
     case 1:
-      color.g *= 0.5f;
-      color.b *= 0.75f;
+      color.g = 0.0f;
+      color.b = 0.0f;
       break;
     case 2:
-      color.r *= 0.75f;
-      color.b *= 0.5f;
+      color.r = 0.0f;
+      color.b = 0.0f;
       break;
   }
 
-  if (y % 3 == 0) {
-    color = scale_color(color, 0.5f);
-  }
   return color;
 }
 
