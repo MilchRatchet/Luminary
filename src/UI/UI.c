@@ -250,6 +250,15 @@ static UITab create_sky_celestial_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Stars Seed", &(instance->scene.sky.stars_seed), 0, 1.0f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Stars Intensity", &(instance->scene.sky.stars_intensity), 1, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_button(ui, "Generate Stars", instance, (void (*)(void*)) generate_stars, 1);
+  panels[i++] = create_check(ui, "HDRI Active", &(instance->scene.sky.use_hdri), 1);
+  panels[i++] = create_slider(ui, "HDRI Dim", &(instance->scene.sky.settings_hdri_dim), 0, 1.0f, 1.0f, 8192.0f, 0, 1);
+  panels[i++] = create_slider(ui, "HDRI Samples", &(instance->scene.sky.hdri_samples), 0, 0.01f, 1.0f, 8192.0f, 0, 1);
+  panels[i++] = create_slider(ui, "HDRI Mip Bias", &(instance->scene.sky.hdri_mip_bias), 1, 0.001f, -16.0f, 16.0f, 0, 0);
+  panels[i++] = create_slider(ui, "HDRI Pos X", &(instance->scene.sky.hdri_pos.x), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "HDRI Pos Y", &(instance->scene.sky.hdri_pos.y), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "HDRI Pos Z", &(instance->scene.sky.hdri_pos.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_button(ui, "HDRI Pos To Camera", instance, (void (*)(void*)) sky_hdri_set_pos_to_cam, 0);
+  panels[i++] = create_button(ui, "HDRI Generate", instance, (void (*)(void*)) sky_hdri_generate_LUT, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

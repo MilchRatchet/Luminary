@@ -56,6 +56,12 @@ unsigned int device_mipmap_compute_max_level(TextureRGBA* tex);
 ////////////////////////////////////////////////////////////////////
 void device_sky_generate_LUTs(RaytraceInstance* instance);
 
+////////////////////////////////////////////////////////////////////
+// sky_hdri.cuh
+////////////////////////////////////////////////////////////////////
+void sky_hdri_generate_LUT(RaytraceInstance* instance);
+void sky_hdri_set_pos_to_cam(RaytraceInstance* instance);
+
 #if __cplusplus
 }
 #endif

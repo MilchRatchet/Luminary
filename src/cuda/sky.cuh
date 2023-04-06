@@ -401,7 +401,7 @@ __global__ void sky_compute_transmittance_lut(float4* transmittance_tex_lower, f
 
   const int amount = SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT;
 
-  if (id < amount) {
+  while (id < amount) {
     const int x = id % SKY_TM_TEX_WIDTH;
     const int y = id / SKY_TM_TEX_WIDTH;
 
@@ -853,23 +853,33 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
     const int pixel    = task.index.y * device.width + task.index.x;
 
     const RGBAhalf record = load_RGBAhalf(device.records + pixel);
-    const vec3 origin     = world_to_sky_transform(task.origin);
     const uint32_t light  = device.ptrs.light_sample_history[pixel];
 
-    const bool sample_sun = proper_light_sample(light, LIGHT_ID_SUN);
+    RGBAhalf sky;
 
-    RGBF sky_color;
-    if (device.iteration_type == TYPE_LIGHT && sample_sun) {
-      sky_color = sky_get_sun_color(origin, task.ray);
-    }
-    else if (device.iteration_type != TYPE_LIGHT) {
-      sky_color = sky_get_color(origin, task.ray, FLT_MAX, sample_sun, device.scene.sky.steps);
+    if (device.scene.sky.use_hdri) {
+      const float mip_bias = (device.iteration_type == TYPE_CAMERA) ? 0.0f : 1.0f;
+
+      sky = mul_RGBAhalf(RGBF_to_RGBAhalf(sky_hdri_sample(task.ray, mip_bias)), record);
     }
     else {
-      continue;
-    }
+      const vec3 origin = world_to_sky_transform(task.origin);
 
-    const RGBAhalf sky = mul_RGBAhalf(RGBF_to_RGBAhalf(sky_color), record);
+      const bool sample_sun = proper_light_sample(light, LIGHT_ID_SUN);
+
+      RGBF sky_color;
+      if (device.iteration_type == TYPE_LIGHT && sample_sun) {
+        sky_color = sky_get_sun_color(origin, task.ray);
+      }
+      else if (device.iteration_type != TYPE_LIGHT) {
+        sky_color = sky_get_color(origin, task.ray, FLT_MAX, sample_sun, device.scene.sky.steps);
+      }
+      else {
+        continue;
+      }
+
+      sky = mul_RGBAhalf(RGBF_to_RGBAhalf(sky_color), record);
+    }
 
     store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), sky));
     write_albedo_buffer(RGBAhalf_to_RGBF(sky), pixel);

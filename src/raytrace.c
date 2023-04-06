@@ -227,6 +227,10 @@ void raytrace_execute(RaytraceInstance* instance) {
 
   raytrace_update_light_resampling_active(instance);
 
+  if (instance->scene.sky.use_hdri && !instance->scene.sky.hdri_initialized) {
+    sky_hdri_generate_LUT(instance);
+  }
+
   device_generate_tasks();
 
   if (instance->shading_mode) {
@@ -319,6 +323,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->cloud_noise);
   device_buffer_init(&instance->sky_ms_luts);
   device_buffer_init(&instance->sky_tm_luts);
+  device_buffer_init(&instance->sky_hdri_luts);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
@@ -509,6 +514,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.light_eval_data      = (LightEvalData*) device_buffer_get_pointer(instance->light_eval_data);
   ptrs.sky_tm_luts          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_tm_luts);
   ptrs.sky_ms_luts          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_ms_luts);
+  ptrs.sky_hdri_luts        = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_hdri_luts);
 
   device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");

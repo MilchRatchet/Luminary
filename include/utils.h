@@ -222,6 +222,13 @@ struct Sky {
   float ozone_layer_thickness;
   float multiscattering_factor;
   int lut_initialized;
+  int hdri_initialized;
+  int hdri_dim;
+  int settings_hdri_dim;
+  int use_hdri;
+  int hdri_samples;
+  vec3 hdri_pos;
+  float hdri_mip_bias;
 } typedef Sky;
 
 struct Ocean {
@@ -333,6 +340,7 @@ struct RaytraceInstance {
   DeviceBuffer* cloud_noise;
   DeviceBuffer* sky_ms_luts;
   DeviceBuffer* sky_tm_luts;
+  DeviceBuffer* sky_hdri_luts;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
@@ -389,6 +397,7 @@ struct DevicePointers {
   cudaTextureObject_t* cloud_noise;
   cudaTextureObject_t* sky_ms_luts;
   cudaTextureObject_t* sky_tm_luts;
+  cudaTextureObject_t* sky_hdri_luts;
   LightSample* light_samples;
   LightEvalData* light_eval_data;
 } typedef DevicePointers;

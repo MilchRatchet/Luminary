@@ -39,4 +39,16 @@ __device__ vec3 sky_to_world_transform(vec3 input) {
   return result;
 }
 
+__device__ RGBF sky_hdri_sample(const vec3 ray, const float mip_bias) {
+  const float theta = atan2f(ray.z, ray.x);
+  const float phi   = asinf(ray.y);
+
+  const float u = (theta + PI) / (2.0f * PI);
+  const float v = 1.0f - ((phi + 0.5f * PI) / PI);
+
+  const float4 hdri = tex2DLod<float4>(device.ptrs.sky_hdri_luts[0], u, v, mip_bias + device.scene.sky.hdri_mip_bias);
+
+  return get_color(hdri.x, hdri.y, hdri.z);
+}
+
 #endif /* SKY_UTILS_CUH */

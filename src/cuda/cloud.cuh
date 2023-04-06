@@ -80,7 +80,7 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray, const Cloud
 /*
  * Returns an RGBAF where the RGB is the radiance and the A is the greyscale transmittance.
  */
-__device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, float start, float dist, const CloudLayerType layer) {
+__device__ CloudRenderResult clouds_compute(const vec3 origin, const vec3 ray, float start, float dist, const CloudLayerType layer) {
   if (dist < 0.0f || start == FLT_MAX) {
     CloudRenderResult result;
 
@@ -239,6 +239,69 @@ __device__ CloudRenderResult cloud_render(const vec3 origin, const vec3 ray, flo
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
+__device__ float clouds_render(vec3 origin, const vec3 ray, const float limit, RGBF& color, RGBF& transmittance) {
+  float2 intersections[3];
+  CloudRenderResult results[3];
+
+  intersections[0] = cloud_get_lowlayer_intersection(origin, ray, limit);
+  results[0]       = clouds_compute(origin, ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW);
+
+  intersections[1] = cloud_get_midlayer_intersection(origin, ray, limit);
+  results[1]       = clouds_compute(origin, ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID);
+
+  intersections[2] = cloud_get_toplayer_intersection(origin, ray, limit);
+  results[2]       = clouds_compute(origin, ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP);
+
+  const bool less01 = intersections[0].x <= intersections[1].x;
+  const bool less02 = intersections[0].x <= intersections[2].x;
+  const bool less12 = intersections[1].x <= intersections[2].x;
+
+  int order[3];
+  if (less01) {
+    if (less02) {
+      order[0] = 0;
+      order[1] = (less12) ? 1 : 2;
+      order[2] = (less12) ? 2 : 1;
+    }
+    else {
+      order[0] = 2;
+      order[1] = (less01) ? 0 : 1;
+      order[2] = (less01) ? 1 : 0;
+    }
+  }
+  else if (less12) {
+    order[0] = 1;
+    order[1] = (less02) ? 0 : 2;
+    order[2] = (less02) ? 2 : 0;
+  }
+  else {
+    order[0] = 2;
+    order[1] = (less01) ? 0 : 1;
+    order[2] = (less01) ? 1 : 0;
+  }
+
+  float prev_start = 0.0f;
+
+  for (int i = 0; i < 3; i++) {
+    const CloudRenderResult result = results[order[i]];
+
+    if (result.hit_dist == FLT_MAX)
+      break;
+
+    if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
+      color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance));
+      origin = add_vector(origin, scale_vector(ray, result.hit_dist - prev_start));
+    }
+
+    color         = add_color(color, mul_color(result.scattered_light, transmittance));
+    transmittance = scale_color(transmittance, result.transmittance);
+
+    prev_start = result.hit_dist;
+  }
+
+  return prev_start;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Kernel
 ////////////////////////////////////////////////////////////////////
@@ -254,71 +317,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     const float sky_max_dist = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
     const int pixel          = task.index.y * device.width + task.index.x;
 
-    float2 intersections[3];
-    CloudRenderResult results[3];
-
-    intersections[0] = cloud_get_lowlayer_intersection(sky_origin, task.ray, sky_max_dist);
-    results[0]       = cloud_render(sky_origin, task.ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW);
-
-    intersections[1] = cloud_get_midlayer_intersection(sky_origin, task.ray, sky_max_dist);
-    results[1]       = cloud_render(sky_origin, task.ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID);
-
-    intersections[2] = cloud_get_toplayer_intersection(sky_origin, task.ray, sky_max_dist);
-    results[2]       = cloud_render(sky_origin, task.ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP);
-
-    const bool less01 = intersections[0].x <= intersections[1].x;
-    const bool less02 = intersections[0].x <= intersections[2].x;
-    const bool less12 = intersections[1].x <= intersections[2].x;
-
-    int order[3];
-    if (less01) {
-      if (less02) {
-        order[0] = 0;
-        order[1] = (less12) ? 1 : 2;
-        order[2] = (less12) ? 2 : 1;
-      }
-      else {
-        order[0] = 2;
-        order[1] = (less01) ? 0 : 1;
-        order[2] = (less01) ? 1 : 0;
-      }
-    }
-    else if (less12) {
-      order[0] = 1;
-      order[1] = (less02) ? 0 : 2;
-      order[2] = (less02) ? 2 : 0;
-    }
-    else {
-      order[0] = 2;
-      order[1] = (less01) ? 0 : 1;
-      order[2] = (less01) ? 1 : 0;
-    }
-
-    float prev_start = 0.0f;
-
     RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
     RGBF color  = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
 
-    for (int i = 0; i < 3; i++) {
-      const CloudRenderResult result = results[order[i]];
-
-      if (result.hit_dist == FLT_MAX)
-        break;
-
-      if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
-        color      = add_color(color, sky_trace_inscattering(sky_origin, task.ray, result.hit_dist - prev_start, record));
-        sky_origin = add_vector(sky_origin, scale_vector(task.ray, result.hit_dist - prev_start));
-      }
-
-      color  = add_color(color, mul_color(result.scattered_light, record));
-      record = scale_color(record, result.transmittance);
-
-      prev_start = result.hit_dist;
-    }
+    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, color, record);
 
     if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
-      const float cloud_offset = prev_start;
-
       if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
         const float cloud_world_offset = sky_to_world_scale(cloud_offset);
 
