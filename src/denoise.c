@@ -183,7 +183,6 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
   const float exposure = instance->scene.camera.exposure;
 
   if (!instance->denoise_setup) {
-    log_message("OptiX Denoise Instance is NULL.");
     return exposure;
   }
 

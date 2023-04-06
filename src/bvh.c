@@ -1163,7 +1163,7 @@ Node8* collapse_bvh(
           node.meta[i]                             = 0b00100000 + 0b11000 + i;
         }
         else if (base_child.type == NodeTypeLeaf) {
-          assert(base_child.triangle_count < 4, "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
+          assert(base_child.triangle_count <= TRIANGLES_MAX, "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
           int meta = 0;
           switch (base_child.triangle_count) {
             case 3:
