@@ -129,13 +129,13 @@ void scene_init(Scene** _scene) {
   scene->sky.aerial_perspective          = 1;
   scene->sky.lut_initialized             = 0;
   scene->sky.hdri_initialized            = 0;
-  scene->sky.use_hdri                    = 0;
+  scene->sky.hdri_active                 = 0;
   scene->sky.hdri_dim                    = 0;
   scene->sky.settings_hdri_dim           = 2048;
   scene->sky.hdri_samples                = 50;
-  scene->sky.hdri_pos.x                  = 0.0f;
-  scene->sky.hdri_pos.y                  = 1.0f;
-  scene->sky.hdri_pos.z                  = 0.0f;
+  scene->sky.hdri_origin.x               = 0.0f;
+  scene->sky.hdri_origin.y               = 1.0f;
+  scene->sky.hdri_origin.z               = 0.0f;
   scene->sky.hdri_mip_bias               = 0.0f;
   scene->sky.stars_seed                  = 0;
   scene->sky.stars_intensity             = 1.0f;

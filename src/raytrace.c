@@ -227,7 +227,7 @@ void raytrace_execute(RaytraceInstance* instance) {
 
   raytrace_update_light_resampling_active(instance);
 
-  if (instance->scene.sky.use_hdri && !instance->scene.sky.hdri_initialized) {
+  if (instance->scene.sky.hdri_active && !instance->scene.sky.hdri_initialized) {
     sky_hdri_generate_LUT(instance);
   }
 

@@ -225,9 +225,9 @@ struct Sky {
   int hdri_initialized;
   int hdri_dim;
   int settings_hdri_dim;
-  int use_hdri;
+  int hdri_active;
   int hdri_samples;
-  vec3 hdri_pos;
+  vec3 hdri_origin;
   float hdri_mip_bias;
   int aerial_perspective;
 } typedef Sky;

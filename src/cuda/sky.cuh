@@ -861,7 +861,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
 
     RGBAhalf sky;
 
-    if (device.scene.sky.use_hdri) {
+    if (device.scene.sky.hdri_active) {
       const float mip_bias = (device.iteration_type == TYPE_CAMERA) ? 0.0f : 1.0f;
 
       sky = mul_RGBAhalf(RGBF_to_RGBAhalf(sky_hdri_sample(task.ray, mip_bias)), record);

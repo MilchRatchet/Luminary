@@ -181,6 +181,21 @@ Light strength of the stars. Number should be non-negative.
 `SKY STARNUM_ [INT32]`<br/>
 Number of stars generated.
 
+`SKY HDRIACTI [INT32]`<br/>
+Set 1 to activate HDRI based sky, 0 else.
+
+`SKY HDRIDIM_ [INT32]`<br/>
+Number of pixels of the HDRI sky in each dimension.
+
+`SKY HDRISAMP [INT32]`<br/>
+Number of samples used to compute the HDRI sky.
+
+`SKY HDRIMIPB [FP32]`<br/>
+Mipmap bias applied to the HDRI sky.
+
+`SKY HDRIORIG [FP32] [FP32] [FP32]`<br/>
+Position from which the HDRI sky is computed.
+
 ## Cloud Settings
 
 `CLOUD ACTIVE__ [INT32]`<br/>

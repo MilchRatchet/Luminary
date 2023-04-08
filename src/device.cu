@@ -91,7 +91,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     fog_preprocess_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (instance->scene.sky.cloud.active && !instance->scene.sky.use_hdri) {
+  if (instance->scene.sky.cloud.active && !instance->scene.sky.hdri_active) {
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 

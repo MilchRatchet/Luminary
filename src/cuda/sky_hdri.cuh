@@ -26,7 +26,7 @@ __global__ void sky_hdri_compute_hdri_lut(float4* dst) {
 
     RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
-    const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_pos);
+    const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
 
     for (int i = 0; i < device.scene.sky.hdri_samples; i++) {
       const float v = 1.0f - (((float) y) + white_noise() - 0.5f) * step_size;
@@ -102,7 +102,7 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
 }
 
 extern "C" void sky_hdri_set_pos_to_cam(RaytraceInstance* instance) {
-  instance->scene.sky.hdri_pos = instance->scene.camera.pos;
+  instance->scene.sky.hdri_origin = instance->scene.camera.pos;
 }
 
 #endif /* CU_SKY_HDRI_H */

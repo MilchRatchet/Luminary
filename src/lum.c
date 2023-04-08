@@ -261,6 +261,26 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 5931051882104902477u:
       sscanf(value, "%f\n", &sky->multiscattering_factor);
       break;
+    /* HDRIACTI */
+    case 5283922210494497864u:
+      sscanf(value, "%d\n", &sky->hdri_active);
+      break;
+    /* HDRIDIM_ */
+    case 6867225564446606408u:
+      sscanf(value, "%d\n", &sky->hdri_dim);
+      break;
+      /* HDRISAMP */
+    case 5786352922209174600u:
+      sscanf(value, "%d\n", &sky->hdri_samples);
+      break;
+      /* HDRIMIPB */
+    case 4778399800931533896u:
+      sscanf(value, "%f\n", &sky->hdri_mip_bias);
+      break;
+      /* HDRIORIG */
+    case 5136727350478783560u:
+      sscanf(value, "%f %f %f\n", &sky->hdri_origin.x, &sky->hdri_origin.y, &sky->hdri_origin.z);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
       break;
@@ -776,6 +796,18 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "SKY STARINTE %f\n", instance->scene.sky.stars_intensity);
   fputs(line, file);
   sprintf(line, "SKY STARNUM_ %d\n", instance->scene.sky.settings_stars_count);
+  fputs(line, file);
+  sprintf(line, "SKY HDRIACTI %d\n", instance->scene.sky.hdri_active);
+  fputs(line, file);
+  sprintf(line, "SKY HDRIDIM_ %d\n", instance->scene.sky.hdri_dim);
+  fputs(line, file);
+  sprintf(line, "SKY HDRISAMP %d\n", instance->scene.sky.hdri_samples);
+  fputs(line, file);
+  sprintf(line, "SKY HDRIMIPB %f\n", instance->scene.sky.hdri_mip_bias);
+  fputs(line, file);
+  sprintf(
+    line, "SKY HDRIORIG %f %f %f\n", instance->scene.sky.hdri_origin.x, instance->scene.sky.hdri_origin.y,
+    instance->scene.sky.hdri_origin.z);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Cloud Settings\n#===============================\n\n");
