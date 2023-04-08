@@ -229,6 +229,7 @@ struct Sky {
   int hdri_samples;
   vec3 hdri_pos;
   float hdri_mip_bias;
+  int aerial_perspective;
 } typedef Sky;
 
 struct Ocean {

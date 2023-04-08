@@ -95,7 +95,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (type != TYPE_LIGHT) {
+  if (type != TYPE_LIGHT && instance->scene.sky.aerial_perspective) {
     process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
