@@ -601,8 +601,10 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   TextureRGBA luts_tm_tex[2];
   texture_create(luts_tm_tex + 0, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
   texture_create(luts_tm_tex + 1, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
-  luts_tm_tex[0].wrap_mode = TexModeClamp;
-  luts_tm_tex[1].wrap_mode = TexModeClamp;
+  luts_tm_tex[0].wrap_mode_S = TexModeClamp;
+  luts_tm_tex[0].wrap_mode_T = TexModeClamp;
+  luts_tm_tex[1].wrap_mode_S = TexModeClamp;
+  luts_tm_tex[1].wrap_mode_T = TexModeClamp;
 
   device_malloc((void**) &luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
   device_malloc((void**) &luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
@@ -621,8 +623,10 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   TextureRGBA luts_ms_tex[2];
   texture_create(luts_ms_tex + 0, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
   texture_create(luts_ms_tex + 1, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
-  luts_ms_tex[0].wrap_mode = TexModeClamp;
-  luts_ms_tex[1].wrap_mode = TexModeClamp;
+  luts_ms_tex[0].wrap_mode_S = TexModeClamp;
+  luts_ms_tex[0].wrap_mode_T = TexModeClamp;
+  luts_ms_tex[1].wrap_mode_S = TexModeClamp;
+  luts_ms_tex[1].wrap_mode_T = TexModeClamp;
 
   device_malloc((void**) &luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
   device_malloc((void**) &luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));

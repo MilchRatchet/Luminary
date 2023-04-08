@@ -119,9 +119,8 @@ __global__ void mipmap_generate_level_2D_RGBAF(cudaTextureObject_t src, cudaSurf
 extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, TextureRGBA* tex) {
   const int num_levels = device_mipmap_compute_max_level(tex);
 
-  cudaTextureAddressMode address_mode = texture_get_address_mode(tex);
-  cudaTextureFilterMode filter_mode   = texture_get_filter_mode(tex);
-  cudaTextureReadMode read_mode       = texture_get_read_mode(tex);
+  cudaTextureFilterMode filter_mode = texture_get_filter_mode(tex);
+  cudaTextureReadMode read_mode     = texture_get_read_mode(tex);
 
   for (int level = 0; level < num_levels; level++) {
     cudaArray_t level_src;
@@ -145,9 +144,9 @@ extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Textur
     tex_desc.normalizedCoords = 1;
     tex_desc.filterMode       = filter_mode;
 
-    tex_desc.addressMode[0] = address_mode;
-    tex_desc.addressMode[1] = address_mode;
-    tex_desc.addressMode[2] = address_mode;
+    tex_desc.addressMode[0] = texture_get_address_mode(tex->wrap_mode_S);
+    tex_desc.addressMode[1] = texture_get_address_mode(tex->wrap_mode_T);
+    tex_desc.addressMode[2] = texture_get_address_mode(tex->wrap_mode_R);
 
     tex_desc.readMode = read_mode;
 

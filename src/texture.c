@@ -20,8 +20,8 @@ struct cudaPitchedPtr texture_make_cudapitchedptr(void* ptr, size_t pitch, size_
   return pitchedptr;
 }
 
-enum cudaTextureAddressMode texture_get_address_mode(TextureRGBA* tex) {
-  switch (tex->wrap_mode) {
+enum cudaTextureAddressMode texture_get_address_mode(TextureWrappingMode mode) {
+  switch (mode) {
     case TexModeWrap:
       return cudaAddressModeWrap;
     case TexModeClamp:
@@ -31,7 +31,7 @@ enum cudaTextureAddressMode texture_get_address_mode(TextureRGBA* tex) {
     case TexModeBorder:
       return cudaAddressModeBorder;
     default:
-      error_message("Invalid texture wrapping mode %d\n", tex->wrap_mode);
+      error_message("Invalid texture wrapping mode %d\n", mode);
       return cudaAddressModeWrap;
   }
 }
@@ -99,13 +99,11 @@ size_t texture_get_pixel_size(TextureRGBA* tex) {
 static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
   const size_t pixel_size = texture_get_pixel_size(tex);
 
-  enum cudaTextureAddressMode address_mode = texture_get_address_mode(tex);
-
   struct cudaTextureDesc tex_desc;
   memset(&tex_desc, 0, sizeof(tex_desc));
-  tex_desc.addressMode[0]      = address_mode;
-  tex_desc.addressMode[1]      = address_mode;
-  tex_desc.addressMode[2]      = address_mode;
+  tex_desc.addressMode[0]      = texture_get_address_mode(tex->wrap_mode_S);
+  tex_desc.addressMode[1]      = texture_get_address_mode(tex->wrap_mode_T);
+  tex_desc.addressMode[2]      = texture_get_address_mode(tex->wrap_mode_R);
   tex_desc.filterMode          = texture_get_filter_mode(tex);
   tex_desc.mipmapFilterMode    = cudaFilterModePoint;
   tex_desc.maxAnisotropy       = 16;
@@ -270,7 +268,9 @@ void texture_create(
     .dim              = (depth > 1) ? Tex3D : Tex2D,
     .storage          = storage,
     .type             = type,
-    .wrap_mode        = TexModeWrap,
+    .wrap_mode_S      = TexModeWrap,
+    .wrap_mode_T      = TexModeWrap,
+    .wrap_mode_R      = TexModeWrap,
     .filter           = TexFilterLinear,
     .mipmap           = TexMipmapNone,
     .mipmap_max_level = 0};

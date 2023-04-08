@@ -10,7 +10,7 @@ extern "C" {
 
 struct cudaExtent texture_make_cudaextent(size_t depth, size_t height, size_t width);
 struct cudaPitchedPtr texture_make_cudapitchedptr(void* ptr, size_t pitch, size_t xsize, size_t ysize);
-enum cudaTextureAddressMode texture_get_address_mode(TextureRGBA* tex);
+enum cudaTextureAddressMode texture_get_address_mode(TextureWrappingMode tex);
 enum cudaTextureReadMode texture_get_read_mode(TextureRGBA* tex);
 enum cudaTextureFilterMode texture_get_filter_mode(TextureRGBA* tex);
 enum cudaMemcpyKind texture_get_copy_to_device_type(TextureRGBA* tex);

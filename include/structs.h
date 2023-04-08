@@ -191,7 +191,9 @@ struct TextureRGBA {
   unsigned int depth;
   unsigned int pitch;
   TextureDataType type;
-  TextureWrappingMode wrap_mode;
+  TextureWrappingMode wrap_mode_S;
+  TextureWrappingMode wrap_mode_T;
+  TextureWrappingMode wrap_mode_R;
   TextureDimensionType dim;
   TextureStorageLocation storage;
   TextureFilterMode filter;
