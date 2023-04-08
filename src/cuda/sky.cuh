@@ -902,9 +902,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks(
     const int pixel    = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      store_RGBAhalf(
-        device.ptrs.frame_buffer + pixel,
-        RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps)));
+      RGBAhalf sky;
+      if (device.scene.sky.hdri_active) {
+        sky = RGBF_to_RGBAhalf(sky_hdri_sample(task.ray, device.scene.sky.hdri_mip_bias));
+      }
+      else {
+        sky = RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps));
+      }
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, sky);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float value = __saturatef((1.0f / device.scene.camera.far_clip_distance) * 2.0f);

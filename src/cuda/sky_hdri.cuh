@@ -13,7 +13,7 @@
 // The main goal is to eliminate the cost of the atmosphere if that is desired.
 // Sampling Sun => (pos - hdri_pos) and then precompute the sun pos based on hdri values instead.
 
-__global__ void sky_hdri_compute_hdri_lut(float4* dst) {
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lut(float4* dst) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int amount = device.scene.sky.hdri_dim * device.scene.sky.hdri_dim;
