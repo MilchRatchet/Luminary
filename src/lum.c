@@ -261,6 +261,10 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 5931051882104902477u:
       sscanf(value, "%f\n", &sky->multiscattering_factor);
       break;
+    /* AERIALPE */
+    case 4994575830040593729u:
+      sscanf(value, "%d\n", &sky->aerial_perspective);
+      break;
     /* HDRIACTI */
     case 5283922210494497864u:
       sscanf(value, "%d\n", &sky->hdri_active);
@@ -796,6 +800,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "SKY STARINTE %f\n", instance->scene.sky.stars_intensity);
   fputs(line, file);
   sprintf(line, "SKY STARNUM_ %d\n", instance->scene.sky.settings_stars_count);
+  fputs(line, file);
+  sprintf(line, "SKY AERIALPE %d\n", instance->scene.sky.aerial_perspective);
   fputs(line, file);
   sprintf(line, "SKY HDRIACTI %d\n", instance->scene.sky.hdri_active);
   fputs(line, file);

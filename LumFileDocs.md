@@ -181,6 +181,9 @@ Light strength of the stars. Number should be non-negative.
 `SKY STARNUM_ [INT32]`<br/>
 Number of stars generated.
 
+`SKY AERIALPE [INT32]`<br/>
+Set 1 to activate aerial perspective, 0 else.
+
 `SKY HDRIACTI [INT32]`<br/>
 Set 1 to activate HDRI based sky, 0 else.
 
