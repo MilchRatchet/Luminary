@@ -7,6 +7,7 @@
 #include "memory.cuh"
 #include "random.cuh"
 #include "sky_utils.cuh"
+#include "toy_utils.cuh"
 #include "utils.cuh"
 
 struct BRDFInstance {
@@ -156,7 +157,7 @@ __device__ vec3 brdf_sample_light_ray(const LightSample light, const vec3 origin
     case LIGHT_ID_SUN:
       return sample_sphere(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(origin));
     case LIGHT_ID_TOY:
-      return sample_sphere(device.scene.toy.position, device.scene.toy.scale, origin);
+      return toy_sample_ray(origin);
     default:
       const TriangleLight triangle = load_triangle_light(light.id);
       return sample_triangle(triangle, origin);
@@ -188,7 +189,7 @@ __device__ float brdf_light_sample_solid_angle(const LightSample light, const ve
     case LIGHT_ID_SUN:
       return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(pos));
     case LIGHT_ID_TOY:
-      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.scene.toy.position, device.scene.toy.scale, pos);
+      return 0.5f * ONE_OVER_PI * toy_get_solid_angle(pos);
     case LIGHT_ID_NONE:
       return 0.0f;
     default:
@@ -264,8 +265,7 @@ __device__ LightSample sample_light(const vec3 position, uint32_t& ran_offset) {
         light.id = LIGHT_ID_TOY;
         break;
       default: {
-        const TriangleLight triangle = load_triangle_light(light_index - 2);
-        light.id                     = light_index - 2;
+        light.id = light_index - 2;
       } break;
     }
 

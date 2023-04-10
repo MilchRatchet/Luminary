@@ -51,7 +51,7 @@ enum ShadingMode {
   SHADING_LIGHTS    = 6
 } typedef ShadingMode;
 
-enum ToyShape { TOY_SPHERE = 0 } typedef ToyShape;
+enum ToyShape { TOY_SPHERE = 0, TOY_PLANE = 1 } typedef ToyShape;
 
 enum ToneMap { TONEMAP_NONE = 0, TONEMAP_ACES = 1, TONEMAP_REINHARD = 2, TONEMAP_UNCHARTED2 = 3 } typedef ToneMap;
 
@@ -125,7 +125,7 @@ struct Light {
 
 struct Toy {
   int active;
-  int shape;
+  ToyShape shape;
   int emissive;
   vec3 position;
   vec3 rotation;
@@ -135,6 +135,7 @@ struct Toy {
   RGBAF material;
   RGBAF emission;
   int flashlight_mode;
+  Quaternion computed_rotation;
 } typedef Toy;
 
 struct Star {

@@ -591,7 +591,7 @@ static UITab create_toy_panels(UI* ui, RaytraceInstance* instance) {
 
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_check(ui, "Active", &(instance->scene.toy.active), 1);
-  panels[i++] = create_dropdown(ui, "Shape", &(instance->scene.toy.shape), 1, 1, "Sphere", 2);
+  panels[i++] = create_dropdown(ui, "Shape", &(instance->scene.toy.shape), 1, 2, "Sphere\0Plane", 2);
   panels[i++] = create_button(ui, "Center at Camera", instance, (void (*)(void*)) raytrace_center_toy_at_camera, 1);
   panels[i++] = create_check(ui, "Flashlight Mode", &(instance->scene.toy.flashlight_mode), 1);
   panels[i++] = create_slider(ui, "Position X", &(instance->scene.toy.position.x), 1, 0.005f, -FLT_MAX, FLT_MAX, 1, 0);

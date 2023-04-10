@@ -4,40 +4,7 @@
 #include "brdf.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-
-/*
- * Requirement:
- *      - Position should be the middle of the shape
- *      - Scale should be the radius of the shape
- */
-
-__device__ float get_toy_distance(const vec3 origin, const vec3 ray) {
-  switch (device.scene.toy.shape) {
-    case TOY_SPHERE:
-      return sphere_ray_intersection(ray, origin, device.scene.toy.position, device.scene.toy.scale);
-  }
-
-  return FLT_MAX;
-}
-
-__device__ vec3 toy_sphere_normal(const vec3 position) {
-  const vec3 diff = sub_vector(position, device.scene.toy.position);
-  vec3 normal     = normalize_vector(diff);
-
-  if (get_length(diff) < device.scene.toy.scale)
-    normal = scale_vector(normal, -1.0f);
-
-  return normal;
-}
-
-__device__ vec3 get_toy_normal(const vec3 position) {
-  switch (device.scene.toy.shape) {
-    case TOY_SPHERE:
-      return toy_sphere_normal(position);
-  }
-
-  return normalize_vector(position);
-}
+#include "toy_utils.cuh"
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;

@@ -321,6 +321,7 @@ Rotation of the toy.
 `TOY SHAPE__ [INT32]`<br/>
 Defines which of the available shapes is used for the toy:
   - 0 = Sphere
+  - 1 = Plane
 
 `TOY SCALE___ [FP32]`<br/>
 Scale of the toy.

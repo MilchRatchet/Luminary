@@ -146,6 +146,10 @@ void raytrace_update_ray_emitter(RaytraceInstance* instance) {
   device_update_symbol(emitter, emitter);
 }
 
+void raytrace_update_toy_rotation(RaytraceInstance* instance) {
+  instance->scene.toy.computed_rotation = get_rotation_quaternion(instance->scene.toy.rotation);
+}
+
 /*
  * Positions toy behind the camera.
  * @param instance RaytraceInstance to be used.
@@ -582,5 +586,6 @@ void raytrace_update_light_resampling_active(RaytraceInstance* instance) {
 }
 
 void raytrace_update_device_scene(RaytraceInstance* instance) {
+  raytrace_update_toy_rotation(instance);
   device_update_symbol(scene, instance->scene);
 }
