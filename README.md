@@ -95,7 +95,7 @@ In realtime mode, which is used by default, you can control the camera through `
 # Building
 
 Requirements:
-- CUDA Toolkit 11.6
+- CUDA Toolkit 12.1
 - Optix 7.5 SDK
 - Nvidia driver R515 or later
 - SDL2 and SDL2_ttf
@@ -104,7 +104,7 @@ Requirements:
 - SSE 4.1 compatible CPU
 - Supported Nvidia GPU (Recommended: Volta or later, Required: Pascal or later)
 
-The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed.
+The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed. This is due to the compiler limitations of CUDA on Windows which makes usage of zlib-ng inconvenient.
 >📝 `zlib` and `qoi` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
 
 ## CMake Options
@@ -174,6 +174,8 @@ Notes:
 - It is important to use either `clang-cl.exe` or `cl.exe` as the C compiler.
 - If you use the first option, run `vcvarsall.bat` only once per terminal.
 - `SDL2.dll` and `SDL2_ttf.dll` are automatically copied into the build dir and always need to reside in the same directory as `Luminary.exe`.
+
+>📝 This is all only necessary because CUDA only supports MSVC as a host compiler on Windows. If this changes in the future then the Windows build will look similar to the Linux build.
 
 # Licences
 

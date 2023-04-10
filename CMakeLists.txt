@@ -1,12 +1,12 @@
-﻿cmake_minimum_required (VERSION 3.19)
+﻿cmake_minimum_required (VERSION 3.25)
 
 IF(WIN32)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 ENDIF()
 
-project ("Luminary" LANGUAGES CUDA C)
+project ("Luminary" LANGUAGES C CUDA)
 
-set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD 23)
 
 option(DEBUG "Debug Mode" OFF)
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
@@ -53,7 +53,7 @@ include_directories("${CMAKE_SOURCE_DIR}/include")
 include_directories("${CMAKE_SOURCE_DIR}/include/UI")
 include_directories("${CMAKE_SOURCE_DIR}/src/cuda")
 include_directories("${OptiX_INCLUDE}")
-include_directories("${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES}")
+include_directories("${CUDAToolkit_INCLUDE_DIR}")
 
 #=============================================================
 # SDL2
@@ -101,7 +101,7 @@ endif()
 #=============================================================
 # Set CUDA flags
 #=============================================================
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --source-in-ptx --ptxas-options=-warn-double-usage --use_fast_math")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --source-in-ptx --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --use_fast_math --restrict")
 if(WIN32)
     set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O2 -fp:fast -arch:AVX2")
     set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Od -fp:fast -arch:AVX2 -g")
@@ -209,6 +209,8 @@ message("")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 add_executable(Luminary ${cpu_source_files} ${gpu_source_files})
 target_link_libraries(Luminary ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES})
+target_link_libraries(Luminary CUDA::cudart)
+target_link_libraries(Luminary CUDA::cuda_driver)
 
 if(WIN32)
     add_custom_command(TARGET Luminary POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
