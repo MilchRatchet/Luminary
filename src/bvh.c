@@ -27,7 +27,7 @@
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
 #define MAX_VALUE 1e10f
 
-#define BINARY_BVH_ERROR_CHECK 1
+#define BINARY_BVH_ERROR_CHECK 0
 
 #define TRIANGLES_MAX 3
 
@@ -69,6 +69,9 @@ static float get_entry_by_axis(const vec3_p p, const Axis axis) {
       return p.z;
   }
 }
+
+#define _get_entry_by_axis(ptr, axis) \
+  _mm_cvtss_f32(_mm_shuffle_ps(_mm_loadu_ps((float*) (ptr)), _mm_loadu_ps((float*) (ptr)), _MM_SHUFFLE(0, 0, 0, axis)))
 
 static void __swap_fragments(Fragment* a, Fragment* b) {
   Fragment temp = *a;
@@ -128,10 +131,8 @@ static void fit_bounds(const Fragment* fragments, const unsigned int fragments_l
   __m128 low  = _mm_set1_ps(MAX_VALUE);
 
   for (unsigned int i = 0; i < fragments_length; i++) {
-    const float* baseptr = (float*) (fragments + i);
-
-    __m128 high_frag = _mm_load_ps(baseptr);
-    __m128 low_frag  = _mm_load_ps(baseptr + 4);
+    __m128 high_frag = _mm_load_ps((float*) &(fragments[i].high));
+    __m128 low_frag  = _mm_load_ps((float*) &(fragments[i].low));
 
     high = _mm_max_ps(high, high_frag);
     low  = _mm_min_ps(low, low_frag);
@@ -148,10 +149,8 @@ static void fit_bounds_of_bins(const Bin* bins, const int bins_length, vec3_p* h
   __m128 low  = _mm_set1_ps(MAX_VALUE);
 
   for (int i = 0; i < bins_length; i++) {
-    const float* baseptr = (float*) (bins + i);
-
-    const __m128 high_bin = _mm_loadu_ps(baseptr);
-    const __m128 low_bin  = _mm_loadu_ps(baseptr + 4);
+    const __m128 high_bin = _mm_loadu_ps((float*) &(bins[i].high));
+    const __m128 low_bin  = _mm_loadu_ps((float*) &(bins[i].low));
 
     high = _mm_max_ps(high, high_bin);
     low  = _mm_min_ps(low, low_bin);
@@ -178,6 +177,30 @@ static void update_bounds_of_bins(const Bin* bins, vec3_p* restrict high_out, ve
   _mm_storeu_ps((float*) high_out, high);
   _mm_storeu_ps((float*) low_out, low);
 }
+
+#define _construct_bins_kernel(_axis_)                                         \
+  {                                                                            \
+    for (unsigned int i = 0; i < fragments_length; i++) {                      \
+      const double value = _get_entry_by_axis(&(fragments[i].middle), _axis_); \
+      int pos            = ((int) ceil((value - low_axis) / interval)) - 1;    \
+      if (pos < 0)                                                             \
+        pos = 0;                                                               \
+                                                                               \
+      bins[pos].entry++;                                                       \
+      bins[pos].exit++;                                                        \
+                                                                               \
+      __m128 high_bin  = _mm_loadu_ps((float*) &(bins[pos].high));             \
+      __m128 low_bin   = _mm_loadu_ps((float*) &(bins[pos].low));              \
+      __m128 high_frag = _mm_loadu_ps((float*) &(fragments[i].high));          \
+      __m128 low_frag  = _mm_loadu_ps((float*) &(fragments[i].low));           \
+                                                                               \
+      high_bin = _mm_max_ps(high_bin, high_frag);                              \
+      low_bin  = _mm_min_ps(low_bin, low_frag);                                \
+                                                                               \
+      _mm_storeu_ps((float*) &(bins[pos].high), high_bin);                     \
+      _mm_storeu_ps((float*) &(bins[pos].low), low_bin);                       \
+    }                                                                          \
+  }
 
 static double construct_bins(
   Bin* restrict bins, const Fragment* restrict fragments, const unsigned int fragments_length, const Axis axis, double* offset) {
@@ -210,26 +233,17 @@ static double construct_bins(
     memcpy(bins + i, bins, i * sizeof(Bin));
   }
 
-  for (unsigned int i = 0; i < fragments_length; i++) {
-    Fragment frag     = fragments[i];
-    const float value = get_entry_by_axis(frag.middle, axis);
-    int pos           = ((int) ceil((value - low_axis) / interval)) - 1;
-    if (pos < 0)
-      pos = 0;
-
-    Bin b = bins[pos];
-    b.entry++;
-    b.exit++;
-
-    b.high.x  = fmaxf(b.high.x, frag.high.x);
-    b.high.y  = fmaxf(b.high.y, frag.high.y);
-    b.high.z  = fmaxf(b.high.z, frag.high.z);
-    b.high._p = fmaxf(b.high._p, frag.high._p);
-    b.low.x   = fminf(b.low.x, frag.low.x);
-    b.low.y   = fminf(b.low.y, frag.low.y);
-    b.low.z   = fminf(b.low.z, frag.low.z);
-    b.low._p  = fminf(b.low._p, frag.low._p);
-    bins[pos] = b;
+  switch (axis) {
+    case AxisX:
+      _construct_bins_kernel(0);
+      break;
+    case AxisY:
+      _construct_bins_kernel(1);
+      break;
+    case AxisZ:
+    default:
+      _construct_bins_kernel(2);
+      break;
   }
 
   return interval;
@@ -288,8 +302,8 @@ static double construct_chopped_bins(
     const int entry = min(pos1, pos2);
     const int exit  = max(pos1, pos2);
 
-    const __m128 high_frag = _mm_loadu_ps((float*) (fragments + i));
-    const __m128 low_frag  = _mm_loadu_ps(((float*) (fragments + i)) + 4);
+    const __m128 high_frag = _mm_loadu_ps((float*) &(fragments[i].high));
+    const __m128 low_frag  = _mm_loadu_ps((float*) &(fragments[i].low));
 
     for (int j = entry; j <= exit; j++) {
       if (j == entry)
@@ -297,41 +311,35 @@ static double construct_chopped_bins(
       if (j == exit)
         bins[j].exit++;
 
-      __m128 high_bin = _mm_loadu_ps((float*) (bins + j));
-      __m128 low_bin  = _mm_loadu_ps(((float*) (bins + j)) + 4);
+      __m128 high_bin = _mm_loadu_ps((float*) &(bins[j].high));
+      __m128 low_bin  = _mm_loadu_ps((float*) &(bins[j].low));
 
       high_bin = _mm_max_ps(high_bin, high_frag);
       low_bin  = _mm_min_ps(low_bin, low_frag);
 
-      _mm_store_ps((float*) (bins + j), high_bin);
-      _mm_store_ps(((float*) (bins + j)) + 4, low_bin);
+      _mm_store_ps((float*) &(bins[j].high), high_bin);
+      _mm_store_ps((float*) &(bins[j].low), low_bin);
     }
   }
 
   switch (axis) {
     case AxisX:
       for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
-        Bin b    = bins[i];
-        b.low.x  = fmaxf(b.low.x, low.x + i * interval);
-        b.high.x = fminf(b.high.x, low.x + (i + 1) * interval);
-        bins[i]  = b;
+        bins[i].low.x  = fmaxf(bins[i].low.x, low.x + i * interval);
+        bins[i].high.x = fminf(bins[i].high.x, low.x + (i + 1) * interval);
       }
       break;
     case AxisY:
       for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
-        Bin b    = bins[i];
-        b.low.y  = fmaxf(b.low.y, low.y + i * interval);
-        b.high.y = fminf(b.high.y, low.y + (i + 1) * interval);
-        bins[i]  = b;
+        bins[i].low.y  = fmaxf(bins[i].low.y, low.y + i * interval);
+        bins[i].high.y = fminf(bins[i].high.y, low.y + (i + 1) * interval);
       }
       break;
     case AxisZ:
     default:
       for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
-        Bin b    = bins[i];
-        b.low.z  = fmaxf(b.low.z, low.z + i * interval);
-        b.high.z = fminf(b.high.z, low.z + (i + 1) * interval);
-        bins[i]  = b;
+        bins[i].low.z  = fmaxf(bins[i].low.z, low.z + i * interval);
+        bins[i].high.z = fminf(bins[i].high.z, low.z + (i + 1) * interval);
       }
       break;
   }
