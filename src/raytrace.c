@@ -2,6 +2,9 @@
 
 #include <cuda_runtime_api.h>
 #include <math.h>
+#include <optix.h>
+// This header must be included exactly be one translation unit
+#include <optix_function_table_definition.h>
 #include <string.h>
 
 #include "buffer.h"
@@ -273,6 +276,9 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
       instance->output_height *= 2;
     }
   }
+
+  OPTIX_CHECK(optixInit());
+  OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &instance->optix_ctx));
 
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;

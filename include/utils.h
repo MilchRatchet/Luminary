@@ -2,6 +2,8 @@
 #define UTILS_H
 
 #include <cuda_runtime_api.h>
+#include <optix.h>
+#include <optix_stubs.h>
 #include <stdlib.h>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -18,6 +20,15 @@
     if (ans != cudaSuccess) {                                                               \
       crash_message("CUDA Error: %s (%s)", cudaGetErrorName(ans), cudaGetErrorString(ans)); \
     }                                                                                       \
+  }
+
+#define OPTIX_CHECK(call)                                                                                \
+  {                                                                                                      \
+    OptixResult res = call;                                                                              \
+                                                                                                         \
+    if (res != OPTIX_SUCCESS) {                                                                          \
+      crash_message("Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(res), res, #call); \
+    }                                                                                                    \
   }
 
 // Flags variables as unused so that no warning is emitted
@@ -368,6 +379,7 @@ struct RaytraceInstance {
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
+  OptixDeviceContext optix_ctx;
 } typedef RaytraceInstance;
 
 struct DevicePointers {

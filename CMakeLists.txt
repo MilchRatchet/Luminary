@@ -37,8 +37,8 @@ endif()
 #=============================================================
 # Find Nvidia packages
 #=============================================================
-find_package(CUDAToolkit 11.6 REQUIRED QUIET)
-find_package(Optix 7.4 REQUIRED QUIET)
+find_package(CUDAToolkit 12.1 REQUIRED QUIET)
+find_package(Optix 7.7 REQUIRED QUIET)
 
 #=============================================================
 # Set files to compile
@@ -141,7 +141,7 @@ endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     if (CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4 -Wno-static-in-inline")
         set(CMAKE_C_FLAGS_RELEASE "/O2")
         set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG")
     elseif(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
