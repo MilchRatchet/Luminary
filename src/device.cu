@@ -164,6 +164,10 @@ extern "C" void _device_gather_symbol(void* dst, const size_t offset, size_t siz
   gpuErrchk(cudaMemcpyFromSymbol(dst, device, size, offset, cudaMemcpyDeviceToHost));
 }
 
+extern "C" void device_gather_device_table(void* dst, enum cudaMemcpyKind kind) {
+  gpuErrchk(cudaMemcpyFromSymbol(dst, device, sizeof(DeviceConstantMemory), 0, kind));
+}
+
 extern "C" void device_initialize_random_generators() {
   initialize_randoms<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }

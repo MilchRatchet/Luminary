@@ -46,6 +46,8 @@
 #define LIGHT_ID_TOY 0xfffffffeu
 #define LIGHT_ID_NONE 0xfffffff1u
 
+#define OPTIXRT_NUM_GROUPS 3
+
 enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
@@ -65,6 +67,8 @@ enum ShadingMode {
 enum ToyShape { TOY_SPHERE = 0, TOY_PLANE = 1 } typedef ToyShape;
 
 enum ToneMap { TONEMAP_NONE = 0, TONEMAP_ACES = 1, TONEMAP_REINHARD = 2, TONEMAP_UNCHARTED2 = 3 } typedef ToneMap;
+
+enum AccelerationStructureType { ACCEL_TYPE_LUMINARY = 0, ACCEL_TYPE_OPTIX = 1 } typedef AccelerationStructureType;
 
 enum Filter {
   FILTER_NONE       = 0,
@@ -290,6 +294,7 @@ struct Scene {
   Triangle* triangles;
   TraversalTriangle* traversal_triangles;
   TriangleLight* triangle_lights;
+  TriangleGeomData triangle_data;
   unsigned int triangles_length;
   unsigned int triangle_lights_length;
   Node8* nodes;
@@ -322,65 +327,6 @@ struct TextureAtlas {
   DeviceBuffer* normal;
   int normal_length;
 } typedef TextureAtlas;
-
-struct RaytraceInstance {
-  unsigned int width;
-  unsigned int height;
-  unsigned int output_width;
-  unsigned int output_height;
-  int realtime;
-  RGBAhalf* frame_final_device;
-  DeviceBuffer* light_trace;
-  DeviceBuffer* bounce_trace;
-  DeviceBuffer* light_trace_count;
-  DeviceBuffer* bounce_trace_count;
-  DeviceBuffer* trace_results;
-  DeviceBuffer* task_counts;
-  DeviceBuffer* task_offsets;
-  DeviceBuffer* light_sample_history;
-  DeviceBuffer* frame_output;
-  DeviceBuffer* frame_temporal;
-  DeviceBuffer* frame_buffer;
-  DeviceBuffer* frame_variance;
-  DeviceBuffer* albedo_buffer;
-  DeviceBuffer* normal_buffer;
-  DeviceBuffer* light_records;
-  DeviceBuffer* bounce_records;
-  DeviceBuffer* buffer_8bit;
-  DeviceBuffer* light_samples_1;
-  DeviceBuffer* light_samples_2;
-  DeviceBuffer* light_eval_data;
-  DeviceBuffer* cloud_noise;
-  DeviceBuffer* sky_ms_luts;
-  DeviceBuffer* sky_tm_luts;
-  DeviceBuffer* sky_hdri_luts;
-  int max_ray_depth;
-  int reservoir_size;
-  int offline_samples;
-  int light_resampling;
-  Scene scene;
-  DenoisingMode denoiser;
-  int temporal_frames;
-  int spatial_samples;
-  int spatial_iterations;
-  DeviceBuffer* randoms;
-  int shading_mode;
-  RGBAhalf** bloom_mips_gpu;
-  int snap_resolution;
-  OutputImageFormat image_format;
-  int post_process_menu;
-  General settings;
-  AtmoSettings atmo_settings;
-  void* denoise_setup;
-  Jitter jitter;
-  int accum_mode;
-  RayEmitter emitter;
-  DeviceBuffer* raydir_buffer;
-  DeviceBuffer* trace_result_buffer;
-  DeviceBuffer* state_buffer;
-  TextureAtlas tex_atlas;
-  OptixDeviceContext optix_ctx;
-} typedef RaytraceInstance;
 
 struct DevicePointers {
   TraceTask* light_trace;
@@ -442,6 +388,77 @@ struct DeviceConstantMemory {
   RayEmitter emitter;
   int accum_mode;
 } typedef DeviceConstantMemory;
+
+struct OptixBVH {
+  OptixTraversableHandle traversable;
+  void* bvh_data;
+  OptixModule module;
+  OptixPipelineCompileOptions pipeline_compile_options;
+  OptixPipeline pipeline;
+  OptixShaderBindingTable shaders;
+  OptixProgramGroup group[OPTIXRT_NUM_GROUPS];
+  DeviceConstantMemory* params;
+} typedef OptixBVH;
+
+struct RaytraceInstance {
+  unsigned int width;
+  unsigned int height;
+  unsigned int output_width;
+  unsigned int output_height;
+  int realtime;
+  RGBAhalf* frame_final_device;
+  DeviceBuffer* light_trace;
+  DeviceBuffer* bounce_trace;
+  DeviceBuffer* light_trace_count;
+  DeviceBuffer* bounce_trace_count;
+  DeviceBuffer* trace_results;
+  DeviceBuffer* task_counts;
+  DeviceBuffer* task_offsets;
+  DeviceBuffer* light_sample_history;
+  DeviceBuffer* frame_output;
+  DeviceBuffer* frame_temporal;
+  DeviceBuffer* frame_buffer;
+  DeviceBuffer* frame_variance;
+  DeviceBuffer* albedo_buffer;
+  DeviceBuffer* normal_buffer;
+  DeviceBuffer* light_records;
+  DeviceBuffer* bounce_records;
+  DeviceBuffer* buffer_8bit;
+  DeviceBuffer* light_samples_1;
+  DeviceBuffer* light_samples_2;
+  DeviceBuffer* light_eval_data;
+  DeviceBuffer* cloud_noise;
+  DeviceBuffer* sky_ms_luts;
+  DeviceBuffer* sky_tm_luts;
+  DeviceBuffer* sky_hdri_luts;
+  int max_ray_depth;
+  int reservoir_size;
+  int offline_samples;
+  int light_resampling;
+  Scene scene;
+  DenoisingMode denoiser;
+  int temporal_frames;
+  int spatial_samples;
+  int spatial_iterations;
+  DeviceBuffer* randoms;
+  int shading_mode;
+  RGBAhalf** bloom_mips_gpu;
+  int snap_resolution;
+  OutputImageFormat image_format;
+  int post_process_menu;
+  General settings;
+  AtmoSettings atmo_settings;
+  void* denoise_setup;
+  Jitter jitter;
+  int accum_mode;
+  RayEmitter emitter;
+  DeviceBuffer* raydir_buffer;
+  DeviceBuffer* trace_result_buffer;
+  DeviceBuffer* state_buffer;
+  TextureAtlas tex_atlas;
+  OptixDeviceContext optix_ctx;
+  OptixBVH optix_bvh;
+} typedef RaytraceInstance;
 
 #ifndef min
 #define min(a, b) (((a) < (b)) ? (a) : (b))

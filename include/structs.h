@@ -102,6 +102,17 @@ struct TriangleLight {
   float padding2;
 } typedef TriangleLight;
 
+// Traditional description through vertex buffer and index buffer which is required for OptiX RT.
+// Both vertex buffer and index buffer have a stride of 16 bytes for each triplet
+// but the counts only indicate the number of actual data entries.
+struct TriangleGeomData {
+  float* vertex_buffer;
+  uint32_t* index_buffer;
+  uint32_t vertex_count;
+  uint32_t index_count;
+  uint32_t triangle_count;
+} typedef TriangleGeomData;
+
 /********************************************************
  * Pixelformats
  ********************************************************/

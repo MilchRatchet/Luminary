@@ -211,7 +211,7 @@ static General get_default_settings() {
 }
 
 void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
-  scene->triangles_length = wavefront_convert_content(content, &scene->triangles);
+  scene->triangles_length = wavefront_convert_content(content, &scene->triangles, &scene->triangle_data);
 
   Node2* initial_nodes = build_bvh_structure(&scene->triangles, &scene->triangles_length, &scene->nodes_length);
 

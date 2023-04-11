@@ -1,5 +1,6 @@
 #include "wavefront.h"
 
+#include <assert.h>
 #include <float.h>
 #include <immintrin.h>
 #include <math.h>
@@ -591,13 +592,27 @@ TextureAssignment* wavefront_generate_texture_assignments(WavefrontContent* cont
   return texture_assignments;
 }
 
-unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles) {
+unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data) {
   bench_tic();
+
+  static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
   unsigned int count = content->triangles_length;
 
-  *triangles       = (Triangle*) malloc(sizeof(Triangle) * count);
-  unsigned int ptr = 0;
+  *triangles = (Triangle*) malloc(sizeof(Triangle) * count);
+
+  data->index_buffer  = (uint32_t*) malloc(sizeof(uint32_t) * 4 * count);
+  data->vertex_buffer = (float*) malloc(sizeof(float) * 4 * content->vertices_length);
+  data->vertex_count  = content->vertices_length;
+
+  for (int j = 0; j < content->vertices_length; j++) {
+    data->vertex_buffer[j * 4 + 0] = content->vertices[j].x;
+    data->vertex_buffer[j * 4 + 1] = content->vertices[j].y;
+    data->vertex_buffer[j * 4 + 2] = content->vertices[j].z;
+  }
+
+  unsigned int ptr                 = 0;
+  unsigned int index_triplet_count = 0;
 
   for (unsigned int j = 0; j < count; j++) {
     WavefrontTriangle t = content->triangles[j];
@@ -643,6 +658,16 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
     triangle.edge2.x = v.x - triangle.vertex.x;
     triangle.edge2.y = v.y - triangle.vertex.y;
     triangle.edge2.z = v.z - triangle.vertex.z;
+
+    if (
+      fabsf(triangle.edge1.x) < FLT_EPSILON && fabsf(triangle.edge1.y) < FLT_EPSILON && fabsf(triangle.edge1.z) < FLT_EPSILON
+      && fabsf(triangle.edge2.x) < FLT_EPSILON && fabsf(triangle.edge2.y) < FLT_EPSILON && fabsf(triangle.edge2.z) < FLT_EPSILON) {
+      continue;
+    }
+
+    data->index_buffer[index_triplet_count * 4 + 0] = t.v1;
+    data->index_buffer[index_triplet_count * 4 + 1] = t.v2;
+    data->index_buffer[index_triplet_count * 4 + 2] = t.v3;
 
     WavefrontUV uv;
 
@@ -774,16 +799,15 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
     triangle.object_maps = t.object;
     triangle.light_id    = LIGHT_ID_NONE;
 
-    if (
-      fabsf(triangle.edge1.x) < FLT_EPSILON && fabsf(triangle.edge1.y) < FLT_EPSILON && fabsf(triangle.edge1.z) < FLT_EPSILON
-      && fabsf(triangle.edge2.x) < FLT_EPSILON && fabsf(triangle.edge2.y) < FLT_EPSILON && fabsf(triangle.edge2.z) < FLT_EPSILON) {
-      continue;
-    }
-
     (*triangles)[ptr++] = triangle;
+    index_triplet_count++;
   }
 
   *triangles = (Triangle*) realloc(*triangles, sizeof(Triangle) * ptr);
+
+  data->index_buffer   = (uint32_t*) realloc(data->index_buffer, sizeof(uint32_t) * 4 * index_triplet_count);
+  data->index_count    = 3 * index_triplet_count;
+  data->triangle_count = index_triplet_count;
 
   bench_toc("Converting Mesh");
 
