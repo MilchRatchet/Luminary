@@ -213,17 +213,17 @@ static General get_default_settings() {
 void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
   scene->triangles_length = wavefront_convert_content(content, &scene->triangles, &scene->triangle_data);
 
-  Node2* initial_nodes = build_bvh_structure(&scene->triangles, &scene->triangles_length, &scene->nodes_length);
+  // Node2* initial_nodes = build_bvh_structure(&scene->triangles, &scene->triangles_length, &scene->nodes_length);
 
   if (!scene->triangles_length) {
     crash_message("No triangles are left. Did the scene not contain any faces?");
   }
 
-  scene->nodes = collapse_bvh(initial_nodes, scene->nodes_length, &scene->triangles, scene->triangles_length, &scene->nodes_length);
+  // scene->nodes = collapse_bvh(initial_nodes, scene->nodes_length, &scene->triangles, scene->triangles_length, &scene->nodes_length);
 
-  free(initial_nodes);
+  // free(initial_nodes);
 
-  sort_traversal_elements(&scene->nodes, scene->nodes_length, &scene->triangles, scene->triangles_length);
+  // sort_traversal_elements(&scene->nodes, scene->nodes_length, &scene->triangles, scene->triangles_length);
 
   scene->materials_length    = content->materials_length;
   scene->texture_assignments = wavefront_generate_texture_assignments(content);

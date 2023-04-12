@@ -239,8 +239,6 @@ void raytrace_execute(RaytraceInstance* instance) {
     sky_hdri_generate_LUT(instance);
   }
 
-  optixrt_execute(instance);
-
   device_generate_tasks();
 
   if (instance->shading_mode) {
@@ -296,6 +294,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->accum_mode         = TEMPORAL_ACCUMULATION;
   instance->spatial_samples    = 5;
   instance->spatial_iterations = 2;
+  instance->bvh_type           = BVH_OPTIX;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;

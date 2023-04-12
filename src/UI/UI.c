@@ -55,6 +55,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_dropdown(ui, "Optix Denoiser", &(instance->settings.denoiser), 0, 3, "Off\0On\0Upscaling 4x", 5);
   panels[i++] = create_button(ui, "Reset Renderer", instance, (void (*)(void*)) raytrace_reset, 1);
   panels[i++] = create_info(ui, "Triangle Count", &(instance->scene.triangles_length), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
+  panels[i++] = create_dropdown(ui, "BVH Type", &(instance->bvh_type), 1, 2, "Luminary\0OptiX", 8);
   panels[i++] = create_dropdown(
     ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Wireframe\0Lights", 8);
   panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 9);

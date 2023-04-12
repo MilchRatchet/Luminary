@@ -5,10 +5,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define UTILS_NO_DEVICE_TABLE
+#define UTILS_NO_DEVICE_FUNCTIONS
+
 #include "bench.h"
 #include "buffer.h"
 #include "device.h"
+#include "utils.cuh"
 #include "utils.h"
+
+#define OPTIX_CHECK_LOGS(call, log)                                                                      \
+  {                                                                                                      \
+    OptixResult res = call;                                                                              \
+                                                                                                         \
+    if (res != OPTIX_SUCCESS) {                                                                          \
+      error_message("Optix returned message: %s", log);                                                  \
+      crash_message("Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(res), res, #call); \
+    }                                                                                                    \
+  }
+
+#define OPTIXRT_PTX_MAX_LENGTH 104857600
 
 void optixrt_build_bvh(RaytraceInstance* instance) {
   bench_tic();
@@ -69,6 +85,7 @@ void optixrt_build_bvh(RaytraceInstance* instance) {
   device_free(temp_buffer, buffer_sizes.tempSizeInBytes);
 
   if (compact_size < buffer_sizes.outputSizeInBytes) {
+    log_message("OptiX BVH is being compacted from size %zu to size %zu", buffer_sizes.outputSizeInBytes, compact_size);
     void* output_buffer_compact;
     device_malloc(&output_buffer_compact, compact_size);
 
@@ -95,17 +112,17 @@ void optixrt_compile_kernels(RaytraceInstance* instance) {
     crash_message("Failed to load OptiX Kernels. Make sure that the file /ptx/optix_kernels.ptx exists.");
   }
 
-  fseek(file, 0, SEEK_END);
-  long length = ftell(file);
-  fseek(file, 0, SEEK_SET);
-  char* ptx = malloc(length);
+  // We use a max length and obtain the actual length through fread.
+  // This is because retrieving the length using SEEK_END is not reliable
+  // because the C standard does not require SEEK_END to be implemented correctly.
+  char* ptx = malloc(OPTIXRT_PTX_MAX_LENGTH);
 
   if (!ptx) {
     fclose(file);
     crash_message("Failed to allocate ptx string buffer.");
   }
 
-  fread(ptx, 1, length, file);
+  size_t ptx_length = fread(ptx, 1, OPTIXRT_PTX_MAX_LENGTH, file);
   fclose(file);
 
   OptixModuleCompileOptions module_compile_options;
@@ -117,17 +134,20 @@ void optixrt_compile_kernels(RaytraceInstance* instance) {
 
   instance->optix_bvh.pipeline_compile_options.usesMotionBlur                   = 0;
   instance->optix_bvh.pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
-  instance->optix_bvh.pipeline_compile_options.numPayloadValues                 = 0;
+  instance->optix_bvh.pipeline_compile_options.numPayloadValues                 = 2;
   instance->optix_bvh.pipeline_compile_options.numAttributeValues               = 2;
   instance->optix_bvh.pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
-  instance->optix_bvh.pipeline_compile_options.pipelineLaunchParamsVariableName = "optix_params";
+  instance->optix_bvh.pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
+  instance->optix_bvh.pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
 
   char log[4096];
   size_t log_size = sizeof(log);
 
-  OPTIX_CHECK(optixModuleCreate(
-    instance->optix_ctx, &module_compile_options, &instance->optix_bvh.pipeline_compile_options, ptx, length, log, &log_size,
-    &instance->optix_bvh.module));
+  OPTIX_CHECK_LOGS(
+    optixModuleCreate(
+      instance->optix_ctx, &module_compile_options, &instance->optix_bvh.pipeline_compile_options, ptx, ptx_length, log, &log_size,
+      &instance->optix_bvh.module),
+    log);
 
   free(ptx);
 
@@ -145,16 +165,24 @@ void optixrt_create_groups(RaytraceInstance* instance) {
 
   group_desc[0].kind                     = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
   group_desc[0].raygen.module            = instance->optix_bvh.module;
-  group_desc[0].raygen.entryFunctionName = "__raygen__example";
+  group_desc[0].raygen.entryFunctionName = "__raygen__optix";
 
-  group_desc[1].kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-  group_desc[2].kind = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+  group_desc[1].kind                   = OPTIX_PROGRAM_GROUP_KIND_MISS;
+  group_desc[1].miss.module            = instance->optix_bvh.module;
+  group_desc[1].miss.entryFunctionName = "__miss__optix";
+
+  group_desc[2].kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+  group_desc[2].hitgroup.moduleAH            = instance->optix_bvh.module;
+  group_desc[2].hitgroup.entryFunctionNameAH = "__anyhit__optix";
+  group_desc[2].hitgroup.moduleCH            = instance->optix_bvh.module;
+  group_desc[2].hitgroup.entryFunctionNameCH = "__closesthit__optix";
 
   char log[4096];
   size_t log_size = sizeof(log);
 
-  OPTIX_CHECK(optixProgramGroupCreate(
-    instance->optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, instance->optix_bvh.group));
+  OPTIX_CHECK_LOGS(
+    optixProgramGroupCreate(instance->optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, instance->optix_bvh.group),
+    log);
 
   bench_toc("Groups Creation (OptiX)");
 }
@@ -168,9 +196,11 @@ void optixrt_create_pipeline(RaytraceInstance* instance) {
   char log[4096];
   size_t log_size = sizeof(log);
 
-  OPTIX_CHECK(optixPipelineCreate(
-    instance->optix_ctx, &instance->optix_bvh.pipeline_compile_options, &pipeline_link_options, instance->optix_bvh.group,
-    OPTIXRT_NUM_GROUPS, log, &log_size, &instance->optix_bvh.pipeline));
+  OPTIX_CHECK_LOGS(
+    optixPipelineCreate(
+      instance->optix_ctx, &instance->optix_bvh.pipeline_compile_options, &pipeline_link_options, instance->optix_bvh.group,
+      OPTIXRT_NUM_GROUPS, log, &log_size, &instance->optix_bvh.pipeline),
+    log);
 
   bench_toc("Pipeline Creation (OptiX)");
 }
@@ -204,6 +234,8 @@ void optixrt_create_shader_bindings(RaytraceInstance* instance) {
 
 void optixrt_create_params(RaytraceInstance* instance) {
   device_malloc((void**) &instance->optix_bvh.params, sizeof(DeviceConstantMemory));
+
+  device_update_symbol(optix_bvh, instance->optix_bvh.traversable);
 }
 
 void optixrt_update_params(RaytraceInstance* instance) {
@@ -215,5 +247,5 @@ void optixrt_execute(RaytraceInstance* instance) {
   optixrt_update_params(instance);
   OPTIX_CHECK(optixLaunch(
     instance->optix_bvh.pipeline, 0, (CUdeviceptr) instance->optix_bvh.params, sizeof(DeviceConstantMemory), &instance->optix_bvh.shaders,
-    10, 1, 1));
+    THREADS_PER_BLOCK, BLOCKS_PER_GRID, 1));
 }

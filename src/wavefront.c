@@ -665,9 +665,9 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
       continue;
     }
 
-    data->index_buffer[index_triplet_count * 4 + 0] = t.v1;
-    data->index_buffer[index_triplet_count * 4 + 1] = t.v2;
-    data->index_buffer[index_triplet_count * 4 + 2] = t.v3;
+    data->index_buffer[index_triplet_count * 4 + 0] = t.v1 - 1;
+    data->index_buffer[index_triplet_count * 4 + 1] = t.v2 - 1;
+    data->index_buffer[index_triplet_count * 4 + 2] = t.v3 - 1;
 
     WavefrontUV uv;
 

@@ -68,7 +68,7 @@ enum ToyShape { TOY_SPHERE = 0, TOY_PLANE = 1 } typedef ToyShape;
 
 enum ToneMap { TONEMAP_NONE = 0, TONEMAP_ACES = 1, TONEMAP_REINHARD = 2, TONEMAP_UNCHARTED2 = 3 } typedef ToneMap;
 
-enum AccelerationStructureType { ACCEL_TYPE_LUMINARY = 0, ACCEL_TYPE_OPTIX = 1 } typedef AccelerationStructureType;
+enum BVHType { BVH_LUMINARY = 0, BVH_OPTIX = 1 } typedef BVHType;
 
 enum Filter {
   FILTER_NONE       = 0,
@@ -387,6 +387,7 @@ struct DeviceConstantMemory {
   RGBF* bloom_scratch;
   RayEmitter emitter;
   int accum_mode;
+  OptixTraversableHandle optix_bvh;
 } typedef DeviceConstantMemory;
 
 struct OptixBVH {
@@ -458,6 +459,7 @@ struct RaytraceInstance {
   TextureAtlas tex_atlas;
   OptixDeviceContext optix_ctx;
   OptixBVH optix_bvh;
+  BVHType bvh_type;
 } typedef RaytraceInstance;
 
 #ifndef min
