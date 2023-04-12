@@ -47,10 +47,11 @@ struct Node8 {
   uint8_t high_z[8];
 } typedef Node8;
 
-Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, unsigned int* nodes_length_out);
+Node2* build_bvh_structure(
+  Triangle** triangles_io, unsigned int* triangles_length_io, unsigned int* nodes_length_out, TriangleGeomData* geom_data);
 Node8* collapse_bvh(
   Node2* binary_nodes, const unsigned int binary_nodes_length, Triangle** triangles_io, const int triangles_length,
-  unsigned int* nodes_length_out);
+  unsigned int* nodes_length_out, TriangleGeomData* geom_data);
 void sort_traversal_elements(Node8** nodes_io, const int nodes_length, Triangle** triangles_io, const int triangles_length);
 
 #endif /* BVH_H */

@@ -141,7 +141,12 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int typ
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->bvh_type == BVH_LUMINARY) {
+    process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+  else {
+    optixrt_execute(instance);
+  }
 
   if (instance->scene.ocean.active && type != TYPE_LIGHT) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

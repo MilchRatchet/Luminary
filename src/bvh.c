@@ -451,7 +451,8 @@ static void divide_along_axis(
   }
 }
 
-Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, unsigned int* nodes_length_out) {
+Node2* build_bvh_structure(
+  Triangle** triangles_io, unsigned int* triangles_length_io, unsigned int* nodes_length_out, TriangleGeomData* geom_data) {
   bench_tic();
   unsigned int triangles_length = *triangles_length_io;
   Triangle* triangles           = *triangles_io;
@@ -814,8 +815,19 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
   memcpy(triangles_swap, triangles, sizeof(Triangle) * initial_triangles_length);
   triangles = safe_realloc(triangles, sizeof(Triangle) * fragments_length);
 
+  uint32_t* index_buffer_swap = malloc(sizeof(uint32_t) * 4 * geom_data->triangle_count);
+  memcpy(index_buffer_swap, geom_data->index_buffer, sizeof(uint32_t) * 4 * geom_data->triangle_count);
+  geom_data->index_buffer   = safe_realloc(geom_data->index_buffer, sizeof(uint32_t) * 4 * fragments_length);
+  geom_data->triangle_count = fragments_length;
+  geom_data->index_count    = 3 * fragments_length;
+
   for (unsigned int i = 0; i < fragments_length; i++) {
-    triangles[i] = triangles_swap[fragments[i].id];
+    const uint32_t j                   = fragments[i].id;
+    triangles[i]                       = triangles_swap[j];
+    geom_data->index_buffer[4 * i + 0] = index_buffer_swap[4 * j + 0];
+    geom_data->index_buffer[4 * i + 1] = index_buffer_swap[4 * j + 1];
+    geom_data->index_buffer[4 * i + 2] = index_buffer_swap[4 * j + 2];
+    geom_data->index_buffer[4 * i + 3] = index_buffer_swap[4 * j + 3];
   }
 
 #if BINARY_BVH_ERROR_CHECK
@@ -845,6 +857,7 @@ Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_leng
 #endif
 
   free(triangles_swap);
+  free(index_buffer_swap);
   _mm_free(fragments);
   _mm_free(bins);
 
@@ -987,7 +1000,7 @@ static void apply_decision(Node2* node, int node_index, int decision, int slot, 
 
 Node8* collapse_bvh(
   Node2* binary_nodes, const unsigned int binary_nodes_length, Triangle** triangles_io, const int triangles_length,
-  unsigned int* nodes_length_out) {
+  unsigned int* nodes_length_out, TriangleGeomData* geom_data) {
   compute_node_triangle_properties(binary_nodes);
   compute_sah_costs(binary_nodes);
 
@@ -1235,11 +1248,20 @@ Node8* collapse_bvh(
   Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
   memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
 
+  uint32_t* index_buffer_swap = malloc(sizeof(uint32_t) * 4 * geom_data->triangle_count);
+  memcpy(index_buffer_swap, geom_data->index_buffer, sizeof(uint32_t) * 4 * geom_data->triangle_count);
+
   for (int i = 0; i < triangles_length; i++) {
-    triangles[i] = triangles_swap[bvh_triangles[i]];
+    const uint32_t j                   = bvh_triangles[i];
+    triangles[i]                       = triangles_swap[j];
+    geom_data->index_buffer[4 * i + 0] = index_buffer_swap[4 * j + 0];
+    geom_data->index_buffer[4 * i + 1] = index_buffer_swap[4 * j + 1];
+    geom_data->index_buffer[4 * i + 2] = index_buffer_swap[4 * j + 2];
+    geom_data->index_buffer[4 * i + 3] = index_buffer_swap[4 * j + 3];
   }
 
   free(triangles_swap);
+  free(index_buffer_swap);
 
   _mm_free(new_triangles);
 

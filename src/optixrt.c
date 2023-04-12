@@ -129,12 +129,12 @@ void optixrt_compile_kernels(RaytraceInstance* instance) {
   memset(&module_compile_options, 0, sizeof(OptixModuleCompileOptions));
 
   module_compile_options.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
-  module_compile_options.optLevel         = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
+  module_compile_options.optLevel         = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
   module_compile_options.debugLevel       = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
 
   instance->optix_bvh.pipeline_compile_options.usesMotionBlur                   = 0;
   instance->optix_bvh.pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
-  instance->optix_bvh.pipeline_compile_options.numPayloadValues                 = 2;
+  instance->optix_bvh.pipeline_compile_options.numPayloadValues                 = 3;
   instance->optix_bvh.pipeline_compile_options.numAttributeValues               = 2;
   instance->optix_bvh.pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   instance->optix_bvh.pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
