@@ -239,6 +239,10 @@ void raytrace_execute(RaytraceInstance* instance) {
     sky_hdri_generate_LUT(instance);
   }
 
+  if (instance->bvh_type == BVH_OPTIX && !instance->optix_bvh.initialized) {
+    optixrt_init(instance);
+  }
+
   device_generate_tasks();
 
   if (instance->shading_mode) {
@@ -370,13 +374,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
-
-  optixrt_build_bvh(instance);
-  optixrt_compile_kernels(instance);
-  optixrt_create_groups(instance);
-  optixrt_create_pipeline(instance);
-  optixrt_create_shader_bindings(instance);
-  optixrt_create_params(instance);
 
   raytrace_update_light_resampling_active(instance);
   raytrace_allocate_buffers(instance);

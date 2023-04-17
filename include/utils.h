@@ -391,13 +391,11 @@ struct DeviceConstantMemory {
 } typedef DeviceConstantMemory;
 
 struct OptixBVH {
+  int initialized;
   OptixTraversableHandle traversable;
   void* bvh_data;
-  OptixModule module;
-  OptixPipelineCompileOptions pipeline_compile_options;
   OptixPipeline pipeline;
   OptixShaderBindingTable shaders;
-  OptixProgramGroup group[OPTIXRT_NUM_GROUPS];
   DeviceConstantMemory* params;
 } typedef OptixBVH;
 
