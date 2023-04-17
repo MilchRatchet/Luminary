@@ -8,6 +8,8 @@
 #include <string.h>
 
 #include "bench.h"
+#include "buffer.h"
+#include "device.h"
 #include "structs.h"
 #include "utils.h"
 
@@ -57,6 +59,55 @@ struct Bin {
   int32_t exit;
   uint64_t _p;
 } typedef Bin;
+
+struct BVHWork {
+  Fragment* fragments;
+  uint32_t fragments_count;
+  uint32_t fragments_size;
+  Node2* binary_nodes;
+  uint32_t binary_nodes_count;
+  Node8* nodes;
+  uint32_t nodes_count;
+} typedef BVHWork;
+
+static void _bvh_create_fragments(RaytraceInstance* instance, BVHWork* work) {
+  const uint32_t triangle_count = instance->scene.triangle_data.triangle_count;
+
+  Triangle* triangles = malloc(sizeof(Triangle) * triangle_count);
+  device_download(triangles, instance->scene.triangles, sizeof(Triangle) * triangle_count);
+
+  work->fragments       = malloc(sizeof(Fragment) * triangle_count);
+  work->fragments_size  = triangle_count;
+  work->fragments_count = triangle_count;
+
+  for (uint32_t i = 0; i < triangle_count; i++) {
+    Triangle t  = triangles[i];
+    vec3_p high = {
+      .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
+      .y = max(t.vertex.y, max(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
+      .z = max(t.vertex.z, max(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
+    vec3_p low = {
+      .x = min(t.vertex.x, min(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
+      .y = min(t.vertex.y, min(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
+      .z = min(t.vertex.z, min(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
+    vec3_p middle = {.x = (high.x + low.x) * 0.5f, .y = (high.y + low.y) * 0.5f, .z = (high.z + low.z) * 0.5f};
+
+    // Fragments are supposed to be hulls that contain a triangle
+    // They should be as tight as possible but if they are too tight then numerical errors
+    // could result in broken BVHs
+    high.x += fabsf(high.x) * FRAGMENT_ERROR_COMP;
+    high.y += fabsf(high.y) * FRAGMENT_ERROR_COMP;
+    high.z += fabsf(high.z) * FRAGMENT_ERROR_COMP;
+    low.x -= fabsf(low.x) * FRAGMENT_ERROR_COMP;
+    low.y -= fabsf(low.y) * FRAGMENT_ERROR_COMP;
+    low.z -= fabsf(low.z) * FRAGMENT_ERROR_COMP;
+
+    Fragment frag      = {.high = high, .low = low, .middle = middle, .id = i};
+    work->fragments[i] = frag;
+  }
+
+  free(triangles);
+}
 
 static float get_entry_by_axis(const vec3_p p, const Axis axis) {
   switch (axis) {
@@ -131,8 +182,8 @@ static void fit_bounds(const Fragment* fragments, const unsigned int fragments_l
   __m128 low  = _mm_set1_ps(MAX_VALUE);
 
   for (unsigned int i = 0; i < fragments_length; i++) {
-    __m128 high_frag = _mm_load_ps((float*) &(fragments[i].high));
-    __m128 low_frag  = _mm_load_ps((float*) &(fragments[i].low));
+    __m128 high_frag = _mm_loadu_ps((float*) &(fragments[i].high));
+    __m128 low_frag  = _mm_loadu_ps((float*) &(fragments[i].low));
 
     high = _mm_max_ps(high, high_frag);
     low  = _mm_min_ps(low, low_frag);
@@ -317,8 +368,8 @@ static double construct_chopped_bins(
       high_bin = _mm_max_ps(high_bin, high_frag);
       low_bin  = _mm_min_ps(low_bin, low_frag);
 
-      _mm_store_ps((float*) &(bins[j].high), high_bin);
-      _mm_store_ps((float*) &(bins[j].low), low_bin);
+      _mm_storeu_ps((float*) &(bins[j].high), high_bin);
+      _mm_storeu_ps((float*) &(bins[j].low), low_bin);
     }
   }
 
@@ -451,83 +502,46 @@ static void divide_along_axis(
   }
 }
 
-Node2* build_bvh_structure(
-  Triangle** triangles_io, unsigned int* triangles_length_io, unsigned int* nodes_length_out, TriangleGeomData* geom_data) {
-  bench_tic();
-  unsigned int triangles_length = *triangles_length_io;
-  Triangle* triangles           = *triangles_io;
-  unsigned int node_count       = 1 + triangles_length / THRESHOLD_TRIANGLES;
+static void _bvh_build_binary_bvh(BVHWork* work) {
+  Fragment* fragments      = work->fragments;
+  uint32_t fragments_count = work->fragments_count;
 
-  const unsigned int initial_triangles_length = triangles_length;
+  Fragment* fragments_buffer          = (Fragment*) malloc(sizeof(Fragment) * fragments_count * 2);
+  unsigned int fragments_buffer_size  = fragments_count * 2;
+  unsigned int fragments_buffer_count = fragments_count;
 
-  Node2* nodes = (Node2*) malloc(sizeof(Node2) * node_count);
-
-  assert((unsigned long long) nodes, "Failed to allocate BVH nodes!", 1);
-
+  uint32_t node_count = 1 + fragments_count / THRESHOLD_TRIANGLES;
+  Node2* nodes        = malloc(sizeof(Node2) * node_count);
   memset(nodes, 0, sizeof(Node2) * node_count);
-
   nodes[0].triangles_address = 0;
-  nodes[0].triangle_count    = triangles_length;
+  nodes[0].triangle_count    = fragments_count;
   nodes[0].type              = NodeTypeLeaf;
 
-  unsigned int* leaf_nodes     = malloc(sizeof(unsigned int) * node_count);
-  unsigned int leaf_node_count = 0;
-
-  Fragment* fragments           = _mm_malloc(sizeof(Fragment) * triangles_length, 64);
-  unsigned int fragments_length = triangles_length;
-
-  for (unsigned int i = 0; i < triangles_length; i++) {
-    Triangle t  = triangles[i];
-    vec3_p high = {
-      .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
-      .y = max(t.vertex.y, max(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
-      .z = max(t.vertex.z, max(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
-    vec3_p low = {
-      .x = min(t.vertex.x, min(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
-      .y = min(t.vertex.y, min(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
-      .z = min(t.vertex.z, min(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
-    vec3_p middle = {.x = (high.x + low.x) * 0.5f, .y = (high.y + low.y) * 0.5f, .z = (high.z + low.z) * 0.5f};
-
-    // Fragments are supposed to be hulls that contain a triangle
-    // They should be as tight as possible but if they are too tight then numerical errors
-    // could result in broken BVHs
-    high.x += fabsf(high.x) * FRAGMENT_ERROR_COMP;
-    high.y += fabsf(high.y) * FRAGMENT_ERROR_COMP;
-    high.z += fabsf(high.z) * FRAGMENT_ERROR_COMP;
-    low.x -= fabsf(low.x) * FRAGMENT_ERROR_COMP;
-    low.y -= fabsf(low.y) * FRAGMENT_ERROR_COMP;
-    low.z -= fabsf(low.z) * FRAGMENT_ERROR_COMP;
-
-    Fragment frag = {.high = high, .low = low, .middle = middle, .id = i};
-    fragments[i]  = frag;
-  }
-
-  Fragment* fragments_buffer           = _mm_malloc(sizeof(Fragment) * fragments_length * 2, 64);
-  unsigned int fragments_buffer_length = fragments_length * 2;
-  unsigned int fragments_buffer_count  = fragments_length;
+  uint32_t* leaf_nodes     = malloc(sizeof(uint32_t) * node_count);
+  uint32_t leaf_node_count = 0;
 
   double root_surface_area;
   vec3_p high_root, low_root;
   {
-    fit_bounds(fragments, fragments_length, &high_root, &low_root);
-    vec3_p diff = {
+    fit_bounds(fragments, fragments_count, &high_root, &low_root);
+    const vec3_p diff = {
       .x = high_root.x - low_root.x, .y = high_root.y - low_root.y, .z = high_root.z - low_root.z, ._p = high_root._p - low_root._p};
 
     root_surface_area = (double) diff.x * (double) diff.y + (double) diff.x * (double) diff.z + (double) diff.y * (double) diff.z;
   }
 
-  Bin* bins = (Bin*) _mm_malloc(sizeof(Bin) * max(OBJECT_SPLIT_BIN_COUNT, SPATIAL_SPLIT_BIN_COUNT), 32);
+  Bin* bins = (Bin*) malloc(sizeof(Bin) * max(OBJECT_SPLIT_BIN_COUNT, SPATIAL_SPLIT_BIN_COUNT));
 
-  unsigned int begin_of_current_nodes = 0;
-  unsigned int end_of_current_nodes   = 1;
-  unsigned int write_ptr              = 1;
+  uint32_t begin_of_current_nodes = 0;
+  uint32_t end_of_current_nodes   = 1;
+  uint32_t write_ptr              = 1;
 
   while (begin_of_current_nodes != end_of_current_nodes) {
-    unsigned int fragments_ptr           = 0;
-    unsigned int buffer_ptr              = 0;
-    unsigned int leaf_nodes_in_iteration = 0;
+    uint32_t fragments_ptr           = 0;
+    uint32_t buffer_ptr              = 0;
+    uint32_t leaf_nodes_in_iteration = 0;
 
-    for (unsigned int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
+    for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
       Node2 node         = nodes[node_ptr];
       node.cost_computed = 0;
 
@@ -552,7 +566,7 @@ Node2* build_bvh_structure(
       {
         vec3_p high_parent, low_parent;
         fit_bounds(fragments + fragments_ptr, node.triangle_count, &high_parent, &low_parent);
-        vec3 diff = {.x = high_parent.x - low_parent.x, .y = high_parent.y - low_parent.y, .z = high_parent.z - low_parent.z};
+        const vec3 diff = {.x = high_parent.x - low_parent.x, .y = high_parent.y - low_parent.y, .z = high_parent.z - low_parent.z};
 
         parent_surface_area = (double) diff.x * (double) diff.y + (double) diff.x * (double) diff.z + (double) diff.y * (double) diff.z;
       }
@@ -705,9 +719,9 @@ Node2* build_bvh_structure(
               nodes[leaf_nodes[k]].triangles_address += duplicated_triangles;
           }
 
-          if (fragments_buffer_count >= fragments_buffer_length) {
-            fragments_buffer_length += triangles_length / 2 + 1;
-            fragments_buffer = safe_realloc(fragments_buffer, sizeof(Fragment) * fragments_buffer_length);
+          if (fragments_buffer_count >= fragments_buffer_size) {
+            fragments_buffer_size += fragments_count / 2 + 1;
+            fragments_buffer = safe_realloc(fragments_buffer, sizeof(Fragment) * fragments_buffer_size);
           }
 
           divide_along_axis(
@@ -722,7 +736,7 @@ Node2* build_bvh_structure(
       fragments_ptr += node.triangle_count;
 
       if (write_ptr + 2 >= node_count) {
-        node_count += triangles_length / THRESHOLD_TRIANGLES;
+        node_count += fragments_count / THRESHOLD_TRIANGLES;
         nodes      = safe_realloc(nodes, sizeof(Node2) * node_count);
         leaf_nodes = safe_realloc(leaf_nodes, sizeof(unsigned int) * node_count);
       }
@@ -782,7 +796,8 @@ Node2* build_bvh_structure(
       write_ptr++;
       buffer_ptr += optimal_total_triangles - optimal_split;
 
-      node.triangles_address = -1;
+      node.triangles_address = 0;
+      node.triangle_count    = 0;
       node.type              = NodeTypeInternal;
 
       nodes[node_ptr] = node;
@@ -792,17 +807,17 @@ Node2* build_bvh_structure(
     end_of_current_nodes   = write_ptr;
     leaf_node_count += leaf_nodes_in_iteration;
 
-    if (fragments_ptr != fragments_length) {
-      memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(Fragment) * (fragments_length - fragments_ptr));
-      buffer_ptr += fragments_length - fragments_ptr;
-      fragments_ptr += fragments_length - fragments_ptr;
+    if (fragments_ptr != fragments_count) {
+      memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(Fragment) * (fragments_count - fragments_ptr));
+      buffer_ptr += fragments_count - fragments_ptr;
+      fragments_ptr += fragments_count - fragments_ptr;
     }
 
-    _mm_free(fragments);
-    fragments               = fragments_buffer;
-    fragments_length        = fragments_buffer_count;
-    fragments_buffer        = _mm_malloc(sizeof(Fragment) * fragments_length * 2, 64);
-    fragments_buffer_length = fragments_length * 2;
+    free(fragments);
+    fragments             = fragments_buffer;
+    fragments_count       = fragments_buffer_count;
+    fragments_buffer      = malloc(sizeof(Fragment) * fragments_count * 2);
+    fragments_buffer_size = fragments_count * 2;
   }
 
   node_count = write_ptr;
@@ -811,65 +826,13 @@ Node2* build_bvh_structure(
 
   nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
 
-  Triangle* triangles_swap = malloc(sizeof(Triangle) * initial_triangles_length);
-  memcpy(triangles_swap, triangles, sizeof(Triangle) * initial_triangles_length);
-  triangles = safe_realloc(triangles, sizeof(Triangle) * fragments_length);
+  free(bins);
 
-  uint32_t* index_buffer_swap = malloc(sizeof(uint32_t) * 4 * geom_data->triangle_count);
-  memcpy(index_buffer_swap, geom_data->index_buffer, sizeof(uint32_t) * 4 * geom_data->triangle_count);
-  geom_data->index_buffer   = safe_realloc(geom_data->index_buffer, sizeof(uint32_t) * 4 * fragments_length);
-  geom_data->triangle_count = fragments_length;
-  geom_data->index_count    = 3 * fragments_length;
-
-  for (unsigned int i = 0; i < fragments_length; i++) {
-    const uint32_t j                   = fragments[i].id;
-    triangles[i]                       = triangles_swap[j];
-    geom_data->index_buffer[4 * i + 0] = index_buffer_swap[4 * j + 0];
-    geom_data->index_buffer[4 * i + 1] = index_buffer_swap[4 * j + 1];
-    geom_data->index_buffer[4 * i + 2] = index_buffer_swap[4 * j + 2];
-    geom_data->index_buffer[4 * i + 3] = index_buffer_swap[4 * j + 3];
-  }
-
-#if BINARY_BVH_ERROR_CHECK
-  for (unsigned int i = 0; i < node_count; i++) {
-    Node2 node = nodes[i];
-
-    if (node.type == NodeTypeNull) {
-      printf("============== Node NULL ===========\n");
-      printf("index: %d (%d)\n", i, node_count);
-    }
-
-    if (node.type != NodeTypeLeaf)
-      continue;
-
-    int dim_errors = 0;
-    dim_errors += (node.self_low.x >= node.self_high.x);
-    dim_errors += (node.self_low.y >= node.self_high.y);
-    dim_errors += (node.self_low.z >= node.self_high.z);
-
-    if (dim_errors) {
-      printf("============== NO VOLUME ===========\n");
-      printf("self_high: %f %f %f\n", node.self_high.x, node.self_high.y, node.self_high.z);
-      printf("self_low: %f %f %f\n", node.self_low.x, node.self_low.y, node.self_low.z);
-      continue;
-    }
-  }
-#endif
-
-  free(triangles_swap);
-  free(index_buffer_swap);
-  _mm_free(fragments);
-  _mm_free(bins);
-
-  *triangles_io = triangles;
-
-  *triangles_length_io = fragments_length;
-
-  *nodes_length_out = node_count;
-
-  bench_toc("Binary BVH Construction");
-
-  return nodes;
+  work->fragments          = fragments;
+  work->fragments_count    = fragments_count;
+  work->fragments_size     = fragments_count;
+  work->binary_nodes       = nodes;
+  work->binary_nodes_count = node_count;
 }
 
 static void compute_single_node_triangles(Node2* binary_nodes, const int index) {
@@ -887,9 +850,7 @@ static void compute_single_node_triangles(Node2* binary_nodes, const int index) 
 
 // recursion seems to be a sufficient solution in this case
 static void compute_node_triangle_properties(Node2* binary_nodes) {
-  bench_tic();
   compute_single_node_triangles(binary_nodes, 0);
-  bench_toc("Node Triangle Property Recovery");
 }
 
 static float cost_distribute(Node2* binary_nodes, Node2 node, int j, int* decision) {
@@ -955,9 +916,7 @@ static void compute_single_node_costs(Node2* binary_nodes, const int index) {
 
 // recursion seems to be a sufficient solution in this case
 static void compute_sah_costs(Node2* binary_nodes) {
-  bench_tic();
   compute_single_node_costs(binary_nodes, 0);
-  bench_toc("SAH Cost Computation");
 }
 
 struct node_packed {
@@ -998,44 +957,41 @@ static void apply_decision(Node2* node, int node_index, int decision, int slot, 
   }
 }
 
-Node8* collapse_bvh(
-  Node2* binary_nodes, const unsigned int binary_nodes_length, Triangle** triangles_io, const int triangles_length,
-  unsigned int* nodes_length_out, TriangleGeomData* geom_data) {
-  compute_node_triangle_properties(binary_nodes);
-  compute_sah_costs(binary_nodes);
+static void _bvh_collapse_bvh(BVHWork* work) {
+  compute_node_triangle_properties(work->binary_nodes);
+  compute_sah_costs(work->binary_nodes);
 
-  bench_tic();
+  const uint32_t fragments_count = work->fragments_count;
 
-  Triangle* triangles = *triangles_io;
-  int node_count      = binary_nodes_length;
+  Node2* binary_nodes               = work->binary_nodes;
+  const uint32_t binary_nodes_count = work->binary_nodes_count;
+
+  uint32_t node_count = binary_nodes_count;
 
   Node8* nodes = (Node8*) malloc(sizeof(Node8) * node_count);
-
-  assert((unsigned long long) nodes, "Failed to allocate BVH nodes!", 1);
-
   memset(nodes, 0, sizeof(Node8) * node_count);
 
-  uint32_t* bvh_triangles = _mm_malloc(sizeof(uint32_t) * triangles_length, 64);
-  uint32_t* new_triangles = _mm_malloc(sizeof(uint32_t) * triangles_length, 64);
+  uint32_t* bvh_fragments = malloc(sizeof(uint32_t) * fragments_count);
+  uint32_t* new_fragments = malloc(sizeof(uint32_t) * fragments_count);
 
-  for (int i = 0; i < triangles_length; i++) {
-    bvh_triangles[i] = i;
-    new_triangles[i] = i;
+  for (uint32_t i = 0; i < fragments_count; i++) {
+    bvh_fragments[i] = i;
+    new_fragments[i] = i;
   }
 
   nodes[0].triangle_base_index   = 0;
   nodes[0].child_node_base_index = 0;
 
-  int begin_of_current_nodes = 0;
-  int end_of_current_nodes   = 1;
-  int write_ptr              = 1;
-  int triangles_ptr          = 0;
+  uint32_t begin_of_current_nodes = 0;
+  uint32_t end_of_current_nodes   = 1;
+  uint32_t write_ptr              = 1;
+  uint32_t triangles_ptr          = 0;
 
   while (begin_of_current_nodes != end_of_current_nodes) {
-    for (int node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
+    for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
       Node8 node = nodes[node_ptr];
 
-      int binary_index = node.child_node_base_index;
+      const uint32_t binary_index = node.child_node_base_index;
 
       node.child_node_base_index = write_ptr;
       node.triangle_base_index   = triangles_ptr;
@@ -1172,7 +1128,7 @@ Node8* collapse_bvh(
       int triangle_counting_address = 0;
 
       if (write_ptr + 8 >= node_count) {
-        node_count += binary_nodes_length;
+        node_count += binary_nodes_count;
         nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
       }
 
@@ -1202,7 +1158,7 @@ Node8* collapse_bvh(
 
           node.meta[i] = meta;
 
-          memcpy(new_triangles + triangles_ptr, bvh_triangles + base_child.triangles_address, sizeof(uint32_t) * base_child.triangle_count);
+          memcpy(new_fragments + triangles_ptr, bvh_fragments + base_child.triangles_address, sizeof(uint32_t) * base_child.triangle_count);
 
           triangles_ptr += base_child.triangle_count;
           triangle_counting_address += base_child.triangle_count;
@@ -1242,48 +1198,33 @@ Node8* collapse_bvh(
     end_of_current_nodes   = write_ptr;
   }
 
-  _mm_free(bvh_triangles);
-  bvh_triangles = new_triangles;
+  free(bvh_fragments);
+  bvh_fragments = new_fragments;
 
-  Triangle* triangles_swap = malloc(sizeof(Triangle) * triangles_length);
-  memcpy(triangles_swap, triangles, sizeof(Triangle) * triangles_length);
+  Fragment* fragments_swap = malloc(sizeof(Fragment) * fragments_count);
+  memcpy(fragments_swap, work->fragments, sizeof(Fragment) * fragments_count);
 
-  uint32_t* index_buffer_swap = malloc(sizeof(uint32_t) * 4 * geom_data->triangle_count);
-  memcpy(index_buffer_swap, geom_data->index_buffer, sizeof(uint32_t) * 4 * geom_data->triangle_count);
-
-  for (int i = 0; i < triangles_length; i++) {
-    const uint32_t j                   = bvh_triangles[i];
-    triangles[i]                       = triangles_swap[j];
-    geom_data->index_buffer[4 * i + 0] = index_buffer_swap[4 * j + 0];
-    geom_data->index_buffer[4 * i + 1] = index_buffer_swap[4 * j + 1];
-    geom_data->index_buffer[4 * i + 2] = index_buffer_swap[4 * j + 2];
-    geom_data->index_buffer[4 * i + 3] = index_buffer_swap[4 * j + 3];
+  for (uint32_t i = 0; i < fragments_count; i++) {
+    work->fragments[i] = fragments_swap[bvh_fragments[i]];
   }
 
-  free(triangles_swap);
-  free(index_buffer_swap);
-
-  _mm_free(new_triangles);
+  free(fragments_swap);
+  free(new_fragments);
 
   node_count = write_ptr;
 
   nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
 
-  *triangles_io = triangles;
-
-  *nodes_length_out = node_count;
-
-  bench_toc("Collapsing BVH");
-
-  return nodes;
+  work->nodes       = nodes;
+  work->nodes_count = node_count;
 }
 
-static void sort_triangles_depth_first(Triangle* src, Triangle* dst, Node8* nodes, const int node_index, int* offset) {
+static void sort_fragments_depth_first(Fragment* src, Fragment* dst, Node8* nodes, const int node_index, int* offset) {
   Node8* node = nodes + node_index;
 
   const uint8_t imask = node->imask;
 
-  const int new_triangle_base_index = *offset;
+  const int new_fragment_base_index = *offset;
   int new_rel_offset                = 0;
 
   // Insert Leaf Nodes
@@ -1307,7 +1248,7 @@ static void sort_triangles_depth_first(Triangle* src, Triangle* dst, Node8* node
     new_rel_offset += count;
   }
 
-  node->triangle_base_index = new_triangle_base_index;
+  node->triangle_base_index = new_fragment_base_index;
 
   int child_index = node->child_node_base_index;
 
@@ -1317,7 +1258,7 @@ static void sort_triangles_depth_first(Triangle* src, Triangle* dst, Node8* node
       continue;
 
     const int index = child_index++;
-    sort_triangles_depth_first(src, dst, nodes, index, offset);
+    sort_fragments_depth_first(src, dst, nodes, index, offset);
   }
 }
 
@@ -1354,16 +1295,9 @@ static void sort_nodes_depth_first(Node8* src, Node8* dst, const int src_index, 
   }
 }
 
-/*
- * Sorts both nodes and triangles into depth first order.
- */
-void sort_traversal_elements(Node8** nodes_io, const int nodes_length, Triangle** triangles_io, const int triangles_length) {
-  bench_tic();
-
-  Triangle* triangles = *triangles_io;
-  Node8* nodes        = *nodes_io;
-
-  Node8* new_nodes = (Node8*) malloc(sizeof(Node8) * nodes_length);
+static void _bvh_postprocess_sort(BVHWork* work) {
+  Node8* nodes     = work->nodes;
+  Node8* new_nodes = (Node8*) malloc(sizeof(Node8) * work->nodes_count);
 
   new_nodes[0] = nodes[0];
 
@@ -1372,20 +1306,89 @@ void sort_traversal_elements(Node8** nodes_io, const int nodes_length, Triangle*
   sort_nodes_depth_first(nodes, new_nodes, 0, 0, &offset);
 
   free(nodes);
+  work->nodes = new_nodes;
 
-  *nodes_io = new_nodes;
-
-  nodes = new_nodes;
-
-  Triangle* new_triangles = (Triangle*) malloc(sizeof(Triangle) * triangles_length);
+  Fragment* fragments     = work->fragments;
+  Fragment* new_fragments = (Fragment*) malloc(sizeof(Fragment) * work->fragments_count);
 
   offset = 0;
 
-  sort_triangles_depth_first(triangles, new_triangles, nodes, 0, &offset);
+  sort_fragments_depth_first(fragments, new_fragments, work->nodes, 0, &offset);
 
+  free(fragments);
+  work->fragments = new_fragments;
+}
+
+static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
+  const uint32_t triangle_count = instance->scene.triangle_data.triangle_count;
+
+  // TODO: The traversal triangle construction could be performed on the GPU.
+  Triangle* triangles = malloc(sizeof(Triangle) * triangle_count);
+  device_download(triangles, instance->scene.triangles, sizeof(Triangle) * triangle_count);
+
+  TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * instance->scene.materials_count);
+  device_download(texture_assignments, instance->scene.texture_assignments, sizeof(TextureAssignment) * instance->scene.materials_count);
+
+  TraversalTriangle* traversal_triangles = malloc(sizeof(TraversalTriangle) * work->fragments_count);
+
+  for (unsigned int i = 0; i < work->fragments_count; i++) {
+    const Fragment frag = work->fragments[i];
+
+    const Triangle triangle = triangles[frag.id];
+
+    const uint32_t albedo_tex = texture_assignments[triangle.object_maps].albedo_map;
+
+    TraversalTriangle tt = {
+      .vertex     = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
+      .edge1      = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
+      .edge2      = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z},
+      .albedo_tex = albedo_tex,
+      .id         = frag.id};
+    traversal_triangles[i] = tt;
+  }
   free(triangles);
+  free(texture_assignments);
 
-  *triangles_io = new_triangles;
+  void* bvh_triangles;
+  device_malloc(&bvh_triangles, sizeof(TraversalTriangle) * work->fragments_count);
+  device_upload(bvh_triangles, traversal_triangles, sizeof(TraversalTriangle) * work->fragments_count);
 
-  bench_toc("Sorting Traversal Structures");
+  void* nodes;
+  device_malloc(&nodes, sizeof(Node8) * work->nodes_count);
+  device_upload(nodes, work->nodes, sizeof(Node8) * work->nodes_count);
+
+  device_update_symbol(bvh_triangles, bvh_triangles);
+  device_update_symbol(bvh_nodes, nodes);
+
+  // Must be freed only when corresponding upload is known to be finished.
+  free(traversal_triangles);
+
+  instance->luminary_bvh_initialized = 1;
+  instance->temporal_frames          = 0;
+}
+
+static void _bvh_clear_work(BVHWork* work) {
+  if (work->fragments) {
+    free(work->fragments);
+  }
+
+  if (work->binary_nodes) {
+    free(work->binary_nodes);
+  }
+}
+
+void bvh_init(RaytraceInstance* instance) {
+  bench_tic();
+
+  BVHWork work;
+  memset(&work, 0, sizeof(BVHWork));
+
+  _bvh_create_fragments(instance, &work);
+  _bvh_build_binary_bvh(&work);
+  _bvh_collapse_bvh(&work);
+  _bvh_postprocess_sort(&work);
+  _bvh_finalize(instance, &work);
+  _bvh_clear_work(&work);
+
+  bench_toc("BVH Setup (Luminary)");
 }

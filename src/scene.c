@@ -211,36 +211,10 @@ static General get_default_settings() {
 }
 
 void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
-  scene->triangles_length = wavefront_convert_content(content, &scene->triangles, &scene->triangle_data);
+  wavefront_convert_content(content, &scene->triangles, &scene->triangle_data);
 
-  Node2* initial_nodes = build_bvh_structure(&scene->triangles, &scene->triangles_length, &scene->nodes_length, &scene->triangle_data);
-
-  if (!scene->triangles_length) {
-    crash_message("No triangles are left. Did the scene not contain any faces?");
-  }
-
-  scene->nodes = collapse_bvh(
-    initial_nodes, scene->nodes_length, &scene->triangles, scene->triangles_length, &scene->nodes_length, &scene->triangle_data);
-
-  free(initial_nodes);
-
-  // sort_traversal_elements(&scene->nodes, scene->nodes_length, &scene->triangles, scene->triangles_length);
-
-  scene->materials_length    = content->materials_length;
+  scene->materials_count     = content->materials_length;
   scene->texture_assignments = wavefront_generate_texture_assignments(content);
-
-  scene->traversal_triangles = malloc(sizeof(TraversalTriangle) * scene->triangles_length);
-
-  for (unsigned int i = 0; i < scene->triangles_length; i++) {
-    const Triangle triangle   = scene->triangles[i];
-    const uint32_t albedo_tex = scene->texture_assignments[triangle.object_maps].albedo_map;
-    TraversalTriangle tt      = {
-           .vertex     = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
-           .edge1      = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},
-           .edge2      = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z},
-           .albedo_tex = albedo_tex};
-    scene->traversal_triangles[i] = tt;
-  }
 }
 
 RaytraceInstance* scene_load_lum(const char* filename) {
@@ -384,8 +358,6 @@ void scene_clear(Scene** scene) {
   }
 
   free((*scene)->triangles);
-  free((*scene)->traversal_triangles);
-  free((*scene)->nodes);
   free((*scene)->triangle_lights);
   free((*scene)->texture_assignments);
 

@@ -128,14 +128,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           STACK_PUSH(node_task);
         }
 
-        cost += 1.0f;
-
         const unsigned int slot_index       = (child_bit_index - 24) ^ octant;
         const unsigned int inverse_octant4  = octant * 0x01010101u;
         const unsigned int relative_index   = __popc(imask & ~(0xffffffff << slot_index));
         const unsigned int child_node_index = child_node_base_index + relative_index;
 
-        float4* data_ptr = (float4*) (device.scene.nodes + child_node_index);
+        float4* data_ptr = (float4*) (device.bvh_nodes + child_node_index);
 
         const float4 data0 = __ldg(data_ptr + 0);
         const float4 data1 = __ldg(data_ptr + 1);
@@ -338,8 +336,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           break;
         }
 
-        cost += 0.5f;
-
         const int triangle_index = __bfind(triangle_task.y);
         triangle_task.y ^= (1 << triangle_index);
 
@@ -349,6 +345,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         const float d = bvh_triangle_intersection_uv(triangle, origin, ray, coords);
 
         if (d < depth) {
+          cost += 1.0f;
+
           const int alpha_result = bvh_triangle_intersection_alpha_test(triangle, triangle_index + triangle_task.x, coords);
 
           if (device.iteration_type == TYPE_LIGHT && alpha_result == 0) {
@@ -361,7 +359,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           }
           else if (alpha_result != 2) {
             depth  = d;
-            hit_id = triangle_index + triangle_task.x;
+            hit_id = triangle.id;
           }
         }
       }

@@ -11,7 +11,6 @@
 #include <intrin.h>
 #endif
 
-#include "bvh.h"
 #include "log.h"
 #include "structs.h"
 
@@ -292,14 +291,10 @@ struct GlobalMaterial {
 struct Scene {
   Camera camera;
   Triangle* triangles;
-  TraversalTriangle* traversal_triangles;
   TriangleLight* triangle_lights;
   TriangleGeomData triangle_data;
-  unsigned int triangles_length;
-  unsigned int triangle_lights_length;
-  Node8* nodes;
-  unsigned int nodes_length;
-  uint16_t materials_length;
+  unsigned int triangle_lights_count;
+  uint16_t materials_count;
   TextureAssignment* texture_assignments;
   Ocean ocean;
   Sky sky;
@@ -388,6 +383,8 @@ struct DeviceConstantMemory {
   RayEmitter emitter;
   int accum_mode;
   OptixTraversableHandle optix_bvh;
+  Node8* bvh_nodes;
+  TraversalTriangle* bvh_triangles;
 } typedef DeviceConstantMemory;
 
 struct OptixBVH {
@@ -458,6 +455,7 @@ struct RaytraceInstance {
   OptixDeviceContext optix_ctx;
   OptixBVH optix_bvh;
   BVHType bvh_type;
+  int luminary_bvh_initialized;
 } typedef RaytraceInstance;
 
 #ifndef min

@@ -135,11 +135,11 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
 
   Scene data = *scene;
 
-  unsigned int lights_length = 16;
-  TriangleLight* lights      = (TriangleLight*) malloc(sizeof(TriangleLight) * lights_length);
-  unsigned int light_count   = 0;
+  uint32_t lights_length = 16;
+  TriangleLight* lights  = (TriangleLight*) malloc(sizeof(TriangleLight) * lights_length);
+  uint32_t light_count   = 0;
 
-  for (unsigned int i = 0; i < data.triangles_length; i++) {
+  for (uint32_t i = 0; i < data.triangle_data.triangle_count; i++) {
     const Triangle triangle = data.triangles[i];
 
     const uint16_t tex_index = data.texture_assignments[triangle.object_maps].illuminance_map;
@@ -157,8 +157,8 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
 
   lights = safe_realloc(lights, sizeof(TriangleLight) * light_count);
 
-  data.triangle_lights        = lights;
-  data.triangle_lights_length = light_count;
+  data.triangle_lights       = lights;
+  data.triangle_lights_count = light_count;
 
   *scene = data;
 

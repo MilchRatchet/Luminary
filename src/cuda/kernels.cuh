@@ -146,32 +146,41 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       light_id = device.ptrs.light_sample_history[pixel];
     }
 
-    if (is_first_ray() || (device.iteration_type == TYPE_LIGHT && light_id <= TRIANGLE_ID_LIMIT)) {
-      uint32_t t_id;
-      if (device.iteration_type == TYPE_LIGHT) {
-        const TriangleLight tri_light = load_triangle_light(light_id);
-        t_id                          = tri_light.triangle_id;
-      }
-      else {
-        t_id = device.ptrs.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
-      }
+    if (device.shading_mode != SHADING_HEAT) {
+      if (is_first_ray() || (device.iteration_type == TYPE_LIGHT && light_id <= TRIANGLE_ID_LIMIT)) {
+        uint32_t t_id;
+        if (device.iteration_type == TYPE_LIGHT) {
+          const TriangleLight tri_light = load_triangle_light(light_id);
+          t_id                          = tri_light.triangle_id;
+        }
+        else {
+          t_id = device.ptrs.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
+        }
 
-      if (t_id <= TRIANGLE_ID_LIMIT) {
-        TraversalTriangle t = load_traversal_triangle(t_id);
+        if (t_id <= TRIANGLE_ID_LIMIT) {
+          // TODO: Refactor this into a more efficient version
+          Triangle t = device.scene.triangles[t_id];
+          TraversalTriangle tt;
+          tt.vertex     = t.vertex;
+          tt.edge1      = t.edge1;
+          tt.edge2      = t.edge2;
+          tt.albedo_tex = device.scene.texture_assignments[t.object_maps].albedo_map;
+          tt.id         = t_id;
 
-        UV coords;
-        const float dist = bvh_triangle_intersection_uv(t, task.origin, task.ray, coords);
+          UV coords;
+          const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
 
-        if (dist < depth) {
-          const int alpha_result = bvh_triangle_intersection_alpha_test(t, t_id, coords);
+          if (dist < depth) {
+            const int alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
 
-          if (alpha_result != 2) {
-            depth  = dist;
-            hit_id = t_id;
-          }
-          else if (device.iteration_type == TYPE_LIGHT) {
-            depth  = -1.0f;
-            hit_id = REJECT_HIT;
+            if (alpha_result != 2) {
+              depth  = dist;
+              hit_id = t_id;
+            }
+            else if (device.iteration_type == TYPE_LIGHT) {
+              depth  = -1.0f;
+              hit_id = REJECT_HIT;
+            }
           }
         }
       }

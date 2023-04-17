@@ -63,7 +63,8 @@ extern "C" __global__ void __raygen__optix() {
 __device__ bool discard_transparent_hit() {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
-  const uint32_t tex = device.scene.traversal_triangles[hit_id].albedo_tex;
+  const uint32_t maps = device.scene.triangles[hit_id].object_maps;
+  const uint32_t tex  = device.scene.texture_assignments[maps].albedo_map;
 
   if (tex) {
     float2 ba = optixGetTriangleBarycentrics();
@@ -81,7 +82,7 @@ __device__ bool discard_transparent_hit() {
 }
 
 extern "C" __global__ void __anyhit__optix() {
-  optixSetPayload_2(optixGetPayload_2() + 5);
+  optixSetPayload_2(optixGetPayload_2() + 1);
 
   if (discard_transparent_hit()) {
     optixIgnoreIntersection();
