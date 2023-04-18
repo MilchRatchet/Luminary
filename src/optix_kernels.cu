@@ -100,6 +100,3 @@ extern "C" __global__ void __closesthit__optix() {
   optixSetPayload_0(__float_as_uint(optixGetRayTmax()));
   optixSetPayload_1(optixGetPrimitiveIndex());
 }
-
-extern "C" __global__ void __miss__optix() {
-}

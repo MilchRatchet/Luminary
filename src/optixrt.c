@@ -170,9 +170,7 @@ void optixrt_init(RaytraceInstance* instance) {
   group_desc[0].raygen.module            = module;
   group_desc[0].raygen.entryFunctionName = "__raygen__optix";
 
-  group_desc[1].kind                   = OPTIX_PROGRAM_GROUP_KIND_MISS;
-  group_desc[1].miss.module            = module;
-  group_desc[1].miss.entryFunctionName = "__miss__optix";
+  group_desc[1].kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
 
   group_desc[2].kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
   group_desc[2].hitgroup.moduleAH            = module;
