@@ -39,13 +39,13 @@ extern "C" __global__ void __raygen__optix() {
     const float3 origin = make_float3(task.origin.x, task.origin.y, task.origin.z);
     const float3 ray    = make_float3(task.ray.x, task.ray.y, task.ray.z);
 
-    const float tmax = result.x - eps * fabsf(result.x);
+    const float tmax = result.x;
 
     unsigned int depth  = __float_as_uint(result.x);
     unsigned int hit_id = __float_as_uint(result.y);
     unsigned int cost   = 0;
 
-    optixTrace(device.optix_bvh, origin, ray, eps, tmax, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, 0, 0, 0, depth, hit_id, cost);
+    optixTrace(device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, 0, 0, 0, depth, hit_id, cost);
 
     float2 trace_result;
 

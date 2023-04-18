@@ -61,6 +61,8 @@ struct Bin {
 } typedef Bin;
 
 struct BVHWork {
+  Triangle* triangles;
+  uint32_t triangles_count;
   Fragment* fragments;
   uint32_t fragments_count;
   uint32_t fragments_size;
@@ -75,6 +77,9 @@ static void _bvh_create_fragments(RaytraceInstance* instance, BVHWork* work) {
 
   Triangle* triangles = malloc(sizeof(Triangle) * triangle_count);
   device_download(triangles, instance->scene.triangles, sizeof(Triangle) * triangle_count);
+
+  work->triangles       = triangles;
+  work->triangles_count = triangle_count;
 
   work->fragments       = malloc(sizeof(Fragment) * triangle_count);
   work->fragments_size  = triangle_count;
@@ -105,8 +110,6 @@ static void _bvh_create_fragments(RaytraceInstance* instance, BVHWork* work) {
     Fragment frag      = {.high = high, .low = low, .middle = middle, .id = i};
     work->fragments[i] = frag;
   }
-
-  free(triangles);
 }
 
 static float get_entry_by_axis(const vec3_p p, const Axis axis) {
@@ -1320,12 +1323,7 @@ static void _bvh_postprocess_sort(BVHWork* work) {
 }
 
 static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
-  const uint32_t triangle_count = instance->scene.triangle_data.triangle_count;
-
   // TODO: The traversal triangle construction could be performed on the GPU.
-  Triangle* triangles = malloc(sizeof(Triangle) * triangle_count);
-  device_download(triangles, instance->scene.triangles, sizeof(Triangle) * triangle_count);
-
   TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * instance->scene.materials_count);
   device_download(texture_assignments, instance->scene.texture_assignments, sizeof(TextureAssignment) * instance->scene.materials_count);
 
@@ -1334,7 +1332,7 @@ static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
   for (unsigned int i = 0; i < work->fragments_count; i++) {
     const Fragment frag = work->fragments[i];
 
-    const Triangle triangle = triangles[frag.id];
+    const Triangle triangle = work->triangles[frag.id];
 
     const uint32_t albedo_tex = texture_assignments[triangle.object_maps].albedo_map;
 
@@ -1346,7 +1344,6 @@ static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
       .id         = frag.id};
     traversal_triangles[i] = tt;
   }
-  free(triangles);
   free(texture_assignments);
 
   void* bvh_triangles;
@@ -1368,6 +1365,10 @@ static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
 }
 
 static void _bvh_clear_work(BVHWork* work) {
+  if (work->triangles) {
+    free(work->triangles);
+  }
+
   if (work->fragments) {
     free(work->fragments);
   }
