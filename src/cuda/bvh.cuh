@@ -347,7 +347,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
         if (d < depth) {
           cost += 1.0f;
 
-          const int alpha_result = bvh_triangle_intersection_alpha_test(triangle, triangle_index + triangle_task.x, coords);
+          const int alpha_result = bvh_triangle_intersection_alpha_test(triangle, triangle.id, coords);
 
           if (device.iteration_type == TYPE_LIGHT && alpha_result == 0) {
             depth           = -1.0f;
