@@ -31,7 +31,7 @@ Luminary is a renderer using pathtracing. It aims at rendering high quality imag
 
 This project is for fun and to learn more about `real-time rendering`. Current plans can be found in the `Issues` tab.
 
-The goal is to use as few libraries as feasible. Currently, these include `SDL2`, `zlib`, `qoi` and `OptiX`. However, only the denoiser is used from the Optix library.
+The goal is to use as few libraries as feasible. Currently, the following libraries are used: `SDL2`, `zlib`, `qoi` and `OptiX`.
 
 Meshes and textures in the example images are taken from the Ratchet and Clank HD Trilogy and were exported using [Replanetizer](https://github.com/RatchetModding/Replanetizer).
 
