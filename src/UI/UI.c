@@ -91,6 +91,7 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] =
     create_slider(ui, "Default Light Intensity", &(instance->scene.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 7);
+  panels[i++] = create_check(ui, "Colored Transparency", &(instance->scene.material.colored_transparency), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

@@ -87,6 +87,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 6076837219871509569u:
       sscanf(value, "%f\n", &material->alpha_cutoff);
       break;
+    /* COLORTRA */
+    case 4706917273050042179u:
+      sscanf(value, "%d\n", &material->colored_transparency);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
       break;
@@ -744,6 +748,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL FRESNEL_ %d\n", instance->scene.material.fresnel);
   fputs(line, file);
   sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene.material.alpha_cutoff);
+  fputs(line, file);
+  sprintf(line, "MATERIAL COLORTRA %d\n", instance->scene.material.colored_transparency);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");

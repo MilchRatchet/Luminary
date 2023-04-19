@@ -162,7 +162,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     if (albedo.a < 1.0f && white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
-      record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(opaque_color(albedo)));
+      if (device.scene.material.colored_transparency) {
+        record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(opaque_color(albedo)));
+      }
 
       TraceTask new_task;
       new_task.origin = task.position;

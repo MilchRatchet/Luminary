@@ -52,6 +52,9 @@ Defines which of the available fresnel approximations is used:
 `MATERIAL ALPHACUT [FP32]`<br/>
 Every alpha value smaller than this value is automatically treated as 0, i.e., fully transparent. Number must be in the range [0,1].
 
+`MATERIAL COLORTRA [INT32]`<br/>
+Set 1 to enable colored transparency for geometry, 0 else. Enabling this will use the albedo color to change the color of rays passing through the geometry. Note that this can cause artifacts with some albedo textures.
+
 ## Camera Settings
 
 `CAMERA POSITION [FP32] [FP32] [FP32]`<br/>

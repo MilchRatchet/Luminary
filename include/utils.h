@@ -285,6 +285,7 @@ struct GlobalMaterial {
   MaterialFresnel fresnel;
   int lights_active;
   float alpha_cutoff;
+  int colored_transparency;
 } typedef GlobalMaterial;
 
 struct Scene {
