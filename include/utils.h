@@ -118,8 +118,7 @@ struct Camera {
   int tonemap;
   int filter;
   int bloom;
-  float bloom_strength;
-  float bloom_threshold;
+  float bloom_blend;
   int dithering;
   int purkinje;
   float purkinje_kappa1;
@@ -439,6 +438,7 @@ struct RaytraceInstance {
   DeviceBuffer* randoms;
   int shading_mode;
   RGBAhalf** bloom_mips_gpu;
+  int bloom_mips_count;
   int snap_resolution;
   OutputImageFormat image_format;
   int post_process_menu;
@@ -500,16 +500,5 @@ static inline void* ___s_realloc(void* ptr, const size_t size) {
       ptr = safe_realloc(ptr, size * length);     \
     }                                             \
   }
-
-#if defined(__GNUC__) || defined(__clang__)
-#define bsr(input, output) \
-  { output = 32 - __builtin_clz(input | 1); }
-#elif defined(__MSVC__)
-#define bsr(input, output) _BitScanReverse((DWORD*) &output, (DWORD) input | 1);
-#elif defined(__CUDACC__)
-#define bsr(input, output) _BitScanReverse((unsigned long*) &output, (unsigned long) input | 1);
-#else
-#error No implementation of bsr is available for the given compiler. Consider adding an implementation.
-#endif
 
 #endif /* UTILS_H */

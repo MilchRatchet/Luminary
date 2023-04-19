@@ -130,13 +130,9 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 6872316342038383682u:
       sscanf(value, "%d\n", &camera->bloom);
       break;
-    /* BLOOMSTR */
-    case 5932458200661969986u:
-      sscanf(value, "%f\n", &camera->bloom_strength);
-      break;
-    /* BLOOMTHR */
-    case 5929081600453069890u:
-      sscanf(value, "%f\n", &camera->bloom_threshold);
+    /* BLOOMBLE */
+    case 4993438986657549378u:
+      sscanf(value, "%f\n", &camera->bloom_blend);
       break;
     /* DITHER__ */
     case 6872302013910370628u:
@@ -717,9 +713,7 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CAMERA BLOOM___ %d\n", instance->scene.camera.bloom);
   fputs(line, file);
-  sprintf(line, "CAMERA BLOOMSTR %f\n", instance->scene.camera.bloom_strength);
-  fputs(line, file);
-  sprintf(line, "CAMERA BLOOMTHR %f\n", instance->scene.camera.bloom_threshold);
+  sprintf(line, "CAMERA BLOOMBLE %f\n", instance->scene.camera.bloom_blend);
   fputs(line, file);
   sprintf(line, "CAMERA DITHER__ %d\n", instance->scene.camera.dithering);
   fputs(line, file);
