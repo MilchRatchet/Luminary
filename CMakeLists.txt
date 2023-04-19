@@ -37,14 +37,16 @@ endif()
 #=============================================================
 # Find Nvidia packages
 #=============================================================
-find_package(CUDAToolkit 11.6 REQUIRED QUIET)
-find_package(Optix 7.4 REQUIRED QUIET)
+find_package(CUDAToolkit 12.1 REQUIRED QUIET)
+find_package(Optix 7.7 REQUIRED QUIET)
 
 #=============================================================
 # Set files to compile
 #=============================================================
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
+
+list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu")
 
 #=============================================================
 # Set include directories
@@ -141,7 +143,7 @@ endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     if (CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4 -Wno-static-in-inline")
         set(CMAKE_C_FLAGS_RELEASE "/O2")
         set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG")
     elseif(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
@@ -212,6 +214,16 @@ target_link_libraries(Luminary ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES})
 target_link_libraries(Luminary CUDA::cudart)
 target_link_libraries(Luminary CUDA::cuda_driver)
 
+#=============================================================
+# Create PTX files
+#=============================================================
+include(PTXUtilities)
+
+add_ptx_targets(Luminary optix_kernels)
+
+#=============================================================
+# File copying
+#=============================================================
 if(WIN32)
     add_custom_command(TARGET Luminary POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${SDL2_LIBRARIES_DIR}/SDL2.dll"

@@ -95,8 +95,10 @@ __device__ float white_noise() {
 // Kernels
 ////////////////////////////////////////////////////////////////////
 
+#ifndef RANDOM_NO_KERNELS
 __global__ void initialize_randoms() {
   device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = 1;
 }
+#endif
 
 #endif /* CU_RANDOM_H */

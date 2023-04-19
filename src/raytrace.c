@@ -2,11 +2,15 @@
 
 #include <cuda_runtime_api.h>
 #include <math.h>
+#include <optix.h>
+// This header must be included exactly be one translation unit
+#include <optix_function_table_definition.h>
 #include <string.h>
 
 #include "buffer.h"
 #include "denoise.h"
 #include "device.h"
+#include "optixrt.h"
 #include "sky_defines.h"
 #include "utils.h"
 
@@ -235,6 +239,14 @@ void raytrace_execute(RaytraceInstance* instance) {
     sky_hdri_generate_LUT(instance);
   }
 
+  if (instance->bvh_type == BVH_OPTIX && !instance->optix_bvh.initialized) {
+    optixrt_init(instance);
+  }
+
+  if (instance->bvh_type == BVH_LUMINARY && !instance->luminary_bvh_initialized) {
+    bvh_init(instance);
+  }
+
   device_generate_tasks();
 
   if (instance->shading_mode) {
@@ -274,6 +286,9 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
     }
   }
 
+  OPTIX_CHECK(optixInit());
+  OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &instance->optix_ctx));
+
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;
   instance->denoiser        = general.denoiser;
@@ -287,6 +302,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->accum_mode         = TEMPORAL_ACCUMULATION;
   instance->spatial_samples    = 5;
   instance->spatial_iterations = 2;
+  instance->bvh_type           = BVH_OPTIX;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
@@ -331,23 +347,27 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
-  device_malloc((void**) &(instance->scene.texture_assignments), sizeof(TextureAssignment) * scene->materials_length);
-  device_malloc((void**) &(instance->scene.triangles), sizeof(Triangle) * instance->scene.triangles_length);
-  device_malloc((void**) &(instance->scene.traversal_triangles), sizeof(TraversalTriangle) * instance->scene.triangles_length);
-  device_malloc((void**) &(instance->scene.nodes), sizeof(Node8) * instance->scene.nodes_length);
-  device_malloc((void**) &(instance->scene.triangle_lights), sizeof(TriangleLight) * instance->scene.triangle_lights_length);
+  device_malloc((void**) &(instance->scene.texture_assignments), sizeof(TextureAssignment) * instance->scene.materials_count);
+  device_malloc((void**) &(instance->scene.triangles), sizeof(Triangle) * instance->scene.triangle_data.triangle_count);
+  device_malloc((void**) &(instance->scene.triangle_lights), sizeof(TriangleLight) * instance->scene.triangle_lights_count);
+  device_malloc((void**) &(instance->scene.triangle_data.vertex_buffer), instance->scene.triangle_data.vertex_count * 4 * sizeof(float));
+  device_malloc(
+    (void**) &(instance->scene.triangle_data.index_buffer), instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t));
 
   gpuErrchk(cudaMemcpy(
-    instance->scene.texture_assignments, scene->texture_assignments, sizeof(TextureAssignment) * scene->materials_length,
+    instance->scene.texture_assignments, scene->texture_assignments, sizeof(TextureAssignment) * instance->scene.materials_count,
     cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(instance->scene.triangles, scene->triangles, sizeof(Triangle) * scene->triangles_length, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene.traversal_triangles, scene->traversal_triangles, sizeof(TraversalTriangle) * scene->triangles_length,
-    cudaMemcpyHostToDevice));
-  gpuErrchk(cudaMemcpy(instance->scene.nodes, scene->nodes, sizeof(Node8) * scene->nodes_length, cudaMemcpyHostToDevice));
+    instance->scene.triangles, scene->triangles, sizeof(Triangle) * instance->scene.triangle_data.triangle_count, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * scene->triangle_lights_length,
+    instance->scene.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * instance->scene.triangle_lights_count,
     cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(
+    instance->scene.triangle_data.vertex_buffer, scene->triangle_data.vertex_buffer,
+    instance->scene.triangle_data.vertex_count * 4 * sizeof(float), cudaMemcpyHostToDevice));
+  gpuErrchk(cudaMemcpy(
+    instance->scene.triangle_data.index_buffer, scene->triangle_data.index_buffer,
+    instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
   device_update_symbol(texture_assignments, instance->scene.texture_assignments);
 
@@ -527,8 +547,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
 void raytrace_free_work_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene.texture_assignments));
   gpuErrchk(cudaFree(instance->scene.triangles));
-  gpuErrchk(cudaFree(instance->scene.traversal_triangles));
-  gpuErrchk(cudaFree(instance->scene.nodes));
   gpuErrchk(cudaFree(instance->scene.triangle_lights));
   device_buffer_free(instance->light_trace);
   device_buffer_free(instance->bounce_trace);

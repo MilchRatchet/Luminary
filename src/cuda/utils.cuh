@@ -38,12 +38,15 @@
 // Device Variables
 //===========================================================================================
 
+#ifndef UTILS_NO_DEVICE_TABLE
 __constant__ DeviceConstantMemory device;
+#endif
 
 //===========================================================================================
 // Functions
 //===========================================================================================
 
+#ifndef UTILS_NO_DEVICE_FUNCTIONS
 __device__ static uint32_t get_pixel_id(const int x, const int y) {
   return x + device.width * y;
 }
@@ -58,6 +61,10 @@ __device__ static int get_task_address(const int number) {
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
 }
 
+__device__ static int get_task_address2(const unsigned int x, const unsigned int y, const int number) {
+  return get_task_address_of_thread(x, y, number);
+}
+
 __device__ static int is_first_ray() {
   return (device.iteration_type == TYPE_CAMERA);
 }
@@ -67,5 +74,6 @@ __device__ static bool proper_light_sample(const uint32_t target_light, const ui
     device.iteration_type == TYPE_CAMERA || ((device.iteration_type == TYPE_LIGHT) && (target_light == source_light))
     || target_light == LIGHT_ID_ANY || (source_light != LIGHT_ID_SUN && target_light == LIGHT_ID_ANY_NO_SUN));
 }
+#endif
 
 #endif /* CU_UTILS_H */

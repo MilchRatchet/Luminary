@@ -273,16 +273,17 @@ __device__ void store_light_sample(LightSample* ptr, const LightSample sample, c
 }
 
 __device__ TraversalTriangle load_traversal_triangle(const int offset) {
-  const float4* ptr = (float4*) (device.scene.traversal_triangles + offset);
+  const float4* ptr = (float4*) (device.bvh_triangles + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
-  const float2 v3   = __ldg((float2*) (ptr + 2));
+  const float4 v3   = __ldg(ptr + 2);
 
   TraversalTriangle triangle;
   triangle.vertex     = get_vector(v1.x, v1.y, v1.z);
   triangle.edge1      = get_vector(v1.w, v2.x, v2.y);
   triangle.edge2      = get_vector(v2.z, v2.w, v3.x);
   triangle.albedo_tex = __float_as_uint(v3.y);
+  triangle.id         = __float_as_uint(v3.z);
 
   return triangle;
 }

@@ -65,6 +65,11 @@ void _device_upload(void* dst, void* src, size_t size, char* dst_name, char* src
   print_log("[%s:%d] Uploaded %zu bytes from host %s to device %s.", func, line, size, src_name, dst_name);
 }
 
+void _device_download(void* dst, void* src, size_t size, char* dst_name, char* src_name, char* func, int line) {
+  gpuBufferErrchk(cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost), "none", func, line);
+  print_log("[%s:%d] Downloaded %zu bytes from device %s to host %s.", func, line, size, src_name, dst_name);
+}
+
 void _device_buffer_init(DeviceBuffer** buffer, char* buf_name, char* func, int line) {
   if (*buffer) {
     print_log("[%s:%d] Device buffer %s was already initialized.", func, line, buf_name);

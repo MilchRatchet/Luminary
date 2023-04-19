@@ -19,6 +19,7 @@
 #include "cuda/utils.cuh"
 #include "device.h"
 #include "log.h"
+#include "optixrt.h"
 #include "structs.h"
 #include "utils.h"
 
@@ -81,7 +82,12 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->bvh_type == BVH_LUMINARY) {
+    process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+  else {
+    optixrt_execute(instance);
+  }
 
   if (instance->scene.ocean.active && type != TYPE_LIGHT) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -135,7 +141,12 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int typ
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->bvh_type == BVH_LUMINARY) {
+    process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+  else {
+    optixrt_execute(instance);
+  }
 
   if (instance->scene.ocean.active && type != TYPE_LIGHT) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -162,6 +173,10 @@ extern "C" void _device_update_symbol(const size_t offset, const void* src, cons
 
 extern "C" void _device_gather_symbol(void* dst, const size_t offset, size_t size) {
   gpuErrchk(cudaMemcpyFromSymbol(dst, device, size, offset, cudaMemcpyDeviceToHost));
+}
+
+extern "C" void device_gather_device_table(void* dst, enum cudaMemcpyKind kind) {
+  gpuErrchk(cudaMemcpyFromSymbol(dst, device, sizeof(DeviceConstantMemory), 0, kind));
 }
 
 extern "C" void device_initialize_random_generators() {

@@ -89,7 +89,7 @@ struct TraversalTriangle {
   vec3 edge1;
   vec3 edge2;
   uint32_t albedo_tex;
-  float padding1;
+  uint32_t id;
   float padding2;
 } typedef TraversalTriangle;
 
@@ -101,6 +101,34 @@ struct TriangleLight {
   float padding1;
   float padding2;
 } typedef TriangleLight;
+
+// Traditional description through vertex buffer and index buffer which is required for OptiX RT.
+// Both vertex buffer and index buffer have a stride of 16 bytes for each triplet
+// but the counts only indicate the number of actual data entries.
+struct TriangleGeomData {
+  float* vertex_buffer;
+  uint32_t* index_buffer;
+  uint32_t vertex_count;
+  uint32_t index_count;
+  uint32_t triangle_count;
+} typedef TriangleGeomData;
+
+struct Node8 {
+  vec3 p;
+  int8_t ex;
+  int8_t ey;
+  int8_t ez;
+  uint8_t imask;
+  int32_t child_node_base_index;
+  int32_t triangle_base_index;
+  uint8_t meta[8];
+  uint8_t low_x[8];
+  uint8_t low_y[8];
+  uint8_t low_z[8];
+  uint8_t high_x[8];
+  uint8_t high_y[8];
+  uint8_t high_z[8];
+} typedef Node8;
 
 /********************************************************
  * Pixelformats

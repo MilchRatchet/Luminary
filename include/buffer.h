@@ -12,6 +12,7 @@ extern "C" {
   _device_malloc_pitch(buffer, rowstride, num_rows, (char*) #buffer, (char*) __func__, __LINE__)
 #define device_free(buffer, size) _device_free(buffer, size, (char*) #buffer, (char*) __func__, __LINE__)
 #define device_upload(dst, src, size) _device_upload(dst, src, size, (char*) #dst, (char*) #src, (char*) __func__, __LINE__)
+#define device_download(dst, src, size) _device_download(dst, src, size, (char*) #dst, (char*) #src, (char*) __func__, __LINE__)
 #define device_buffer_init(buffer) _device_buffer_init(buffer, (char*) #buffer, (char*) __func__, __LINE__)
 #define device_buffer_free(buffer) _device_buffer_free(buffer, (char*) #buffer, (char*) __func__, __LINE__)
 #define device_buffer_malloc(buffer, element_size, count) \
@@ -35,6 +36,7 @@ void _device_malloc(void** buffer, size_t size, char* buf_name, char* func, int 
 size_t _device_malloc_pitch(void** buffer, size_t rowstride, size_t num_rows, char* buf_name, char* func, int line);
 void _device_free(void* buffer, size_t size, char* buf_name, char* func, int line);
 void _device_upload(void* dst, void* src, size_t size, char* dst_name, char* src_name, char* func, int line);
+void _device_download(void* dst, void* src, size_t size, char* dst_name, char* src_name, char* func, int line);
 void _device_buffer_init(DeviceBuffer** buffer, char* buf_name, char* func, int line);
 void _device_buffer_free(DeviceBuffer* buffer, char* buf_name, char* func, int line);
 void _device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t count, char* buf_name, char* func, int line);

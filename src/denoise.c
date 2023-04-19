@@ -1,14 +1,13 @@
 #include <math.h>
 #include <optix.h>
-#include <optix_function_table_definition.h>
 #include <optix_stubs.h>
 
 #include "buffer.h"
 #include "log.h"
 #include "raytrace.h"
+#include "utils.h"
 
 struct OptixDenoiseInstance {
-  OptixDeviceContext ctx;
   OptixDenoiser denoiser;
   OptixDenoiserOptions opt;
   OptixDenoiserSizes denoiserReturnSizes;
@@ -21,18 +20,7 @@ struct OptixDenoiseInstance {
   DeviceBuffer* output;
 } typedef OptixDenoiseInstance;
 
-#define OPTIX_CHECK(call)                                                                                \
-  {                                                                                                      \
-    OptixResult res = call;                                                                              \
-                                                                                                         \
-    if (res != OPTIX_SUCCESS) {                                                                          \
-      crash_message("Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(res), res, #call); \
-    }                                                                                                    \
-  }
-
 void denoise_create(RaytraceInstance* instance) {
-  OPTIX_CHECK(optixInit());
-
   if (!instance) {
     log_message("Raytrace Instance is NULL.");
     instance->denoise_setup = (void*) 0;
@@ -58,12 +46,10 @@ void denoise_create(RaytraceInstance* instance) {
 
   OptixDenoiseInstance* denoise_setup = (OptixDenoiseInstance*) calloc(1, sizeof(OptixDenoiseInstance));
 
-  OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &denoise_setup->ctx));
-
   denoise_setup->opt.guideAlbedo = 1;
   denoise_setup->opt.guideNormal = 1;
 
-  OPTIX_CHECK(optixDenoiserCreate(denoise_setup->ctx, kind, &denoise_setup->opt, &denoise_setup->denoiser));
+  OPTIX_CHECK(optixDenoiserCreate(instance->optix_ctx, kind, &denoise_setup->opt, &denoise_setup->denoiser));
 
   OPTIX_CHECK(
     optixDenoiserComputeMemoryResources(denoise_setup->denoiser, instance->width, instance->height, &denoise_setup->denoiserReturnSizes));
@@ -234,7 +220,6 @@ void denoise_free(RaytraceInstance* instance) {
   device_buffer_destroy(&denoise_setup.denoiserState);
   device_buffer_destroy(&denoise_setup.denoiserScratch);
 
-  OPTIX_CHECK(optixDeviceContextDestroy(denoise_setup.ctx));
   OPTIX_CHECK(optixDenoiserDestroy(denoise_setup.denoiser));
 
   free(instance->denoise_setup);

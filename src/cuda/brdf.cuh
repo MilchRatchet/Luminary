@@ -221,7 +221,7 @@ __device__ LightSample sample_light(const vec3 position, uint32_t& ran_offset) {
   uint32_t light_count  = 0;
   light_count += sun_visible;
   light_count += toy_visible;
-  light_count += (device.scene.material.lights_active) ? device.scene.triangle_lights_length : 0;
+  light_count += (device.scene.material.lights_active) ? device.scene.triangle_lights_count : 0;
 
   LightSample selected;
   selected.id          = LIGHT_ID_NONE;

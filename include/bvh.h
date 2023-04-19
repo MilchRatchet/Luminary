@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "structs.h"
+#include "utils.h"
 
 struct compressed_vec3 {
   uint8_t x;
@@ -30,27 +31,6 @@ struct Node2 {
   NodeType type;
 } typedef Node2;
 
-struct Node8 {
-  vec3 p;
-  int8_t ex;
-  int8_t ey;
-  int8_t ez;
-  uint8_t imask;
-  int32_t child_node_base_index;
-  int32_t triangle_base_index;
-  uint8_t meta[8];
-  uint8_t low_x[8];
-  uint8_t low_y[8];
-  uint8_t low_z[8];
-  uint8_t high_x[8];
-  uint8_t high_y[8];
-  uint8_t high_z[8];
-} typedef Node8;
-
-Node2* build_bvh_structure(Triangle** triangles_io, unsigned int* triangles_length_io, unsigned int* nodes_length_out);
-Node8* collapse_bvh(
-  Node2* binary_nodes, const unsigned int binary_nodes_length, Triangle** triangles_io, const int triangles_length,
-  unsigned int* nodes_length_out);
-void sort_traversal_elements(Node8** nodes_io, const int nodes_length, Triangle** triangles_io, const int triangles_length);
+void bvh_init(RaytraceInstance* instance);
 
 #endif /* BVH_H */
