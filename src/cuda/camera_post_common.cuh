@@ -7,13 +7,6 @@
 #include "utils.h"
 
 __device__ RGBAhalf sample_pixel(const RGBAhalf* image, float x, float y, const int width, const int height) {
-  x = fmaxf(x, 0.0f);
-  y = fmaxf(y, 0.0f);
-
-  // clamp with largest float below 1.0f
-  x = fminf(x, __uint_as_float(0b00111111011111111111111111111111));
-  y = fminf(y, __uint_as_float(0b00111111011111111111111111111111));
-
   const float source_x = fmaxf(0.0f, x * (width - 1) - 0.5f);
   const float source_y = fmaxf(0.0f, y * (height - 1) - 0.5f);
 
@@ -48,6 +41,29 @@ __device__ RGBAhalf sample_pixel(const RGBAhalf* image, float x, float y, const 
   return result;
 }
 
+__device__ RGBAhalf sample_pixel_clamp(const RGBAhalf* image, float x, float y, const int width, const int height) {
+  x = fmaxf(x, 0.0f);
+  y = fmaxf(y, 0.0f);
+
+  // clamp with largest float below 1.0f
+  x = fminf(x, __uint_as_float(0b00111111011111111111111111111111));
+  y = fminf(y, __uint_as_float(0b00111111011111111111111111111111));
+
+  return sample_pixel(image, x, y, width, height);
+}
+
+__device__ RGBAhalf sample_pixel_border(const RGBAhalf* image, float x, float y, const int width, const int height) {
+  if (x > __uint_as_float(0b00111111011111111111111111111111) || x < 0.0f) {
+    return get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+  }
+
+  if (y > __uint_as_float(0b00111111011111111111111111111111) || y < 0.0f) {
+    return get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+  }
+
+  return sample_pixel(image, x, y, width, height);
+}
+
 __global__ void image_downsample(RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -63,24 +79,67 @@ __global__ void image_downsample(RGBAhalf* source, const int sw, const int sh, R
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
 
-    RGBAhalf a1 = sample_pixel(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBAhalf a2 = sample_pixel(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBAhalf a3 = sample_pixel(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
-    RGBAhalf a4 = sample_pixel(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBAhalf a1 = sample_pixel_clamp(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBAhalf a2 = sample_pixel_clamp(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBAhalf a3 = sample_pixel_clamp(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBAhalf a4 = sample_pixel_clamp(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
 
     RGBAhalf pixel = add_RGBAhalf(add_RGBAhalf(a1, a2), add_RGBAhalf(a3, a4));
 
-    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx, sy, sw, sh));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy - step_y, sw, sh), (__half) 0.5f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy, sw, sh), (__half) 0.5f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy, sw, sh), (__half) 0.5f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy + step_y, sw, sh), (__half) 0.5f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy - step_y, sw, sh), (__half) 0.25f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy - step_y, sw, sh), (__half) 0.25f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy + step_y, sw, sh), (__half) 0.25f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy + step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, sample_pixel_clamp(source, sx, sy, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx, sy - step_y, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx - step_x, sy, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx + step_x, sy, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx, sy + step_y, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx - step_x, sy - step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx + step_x, sy - step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx - step_x, sy + step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx + step_x, sy + step_y, sw, sh), (__half) 0.25f));
 
     pixel = scale_RGBAhalf(pixel, (__half) 0.125f);
+
+    store_RGBAhalf(target + x + y * tw, bound_RGBAhalf(pixel));
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
+__global__ void image_downsample_threshold(
+  RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th, const float thresh) {
+  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const float scale_x = 1.0f / (tw - 1);
+  const float scale_y = 1.0f / (th - 1);
+  const float step_x  = 1.0f / (sw - 1);
+  const float step_y  = 1.0f / (sh - 1);
+
+  while (id < tw * th) {
+    const int x = id % tw;
+    const int y = id / tw;
+
+    const float sx = scale_x * x + 0.5f * scale_x;
+    const float sy = scale_y * y + 0.5f * scale_y;
+
+    RGBAhalf a1 = sample_pixel_clamp(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBAhalf a2 = sample_pixel_clamp(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBAhalf a3 = sample_pixel_clamp(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBAhalf a4 = sample_pixel_clamp(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+
+    RGBAhalf pixel = add_RGBAhalf(add_RGBAhalf(a1, a2), add_RGBAhalf(a3, a4));
+
+    pixel = add_RGBAhalf(pixel, sample_pixel_clamp(source, sx, sy, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx, sy - step_y, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx - step_x, sy, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx + step_x, sy, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx, sy + step_y, sw, sh), (__half) 0.5f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx - step_x, sy - step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx + step_x, sy - step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx - step_x, sy + step_y, sw, sh), (__half) 0.25f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx + step_x, sy + step_y, sw, sh), (__half) 0.25f));
+
+    pixel = scale_RGBAhalf(pixel, (__half) 0.125f);
+
+    pixel = max_RGBAhalf(sub_RGBAhalf(pixel, get_RGBAhalf(thresh, thresh, thresh, thresh)), get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f));
 
     store_RGBAhalf(target + x + y * tw, bound_RGBAhalf(pixel));
 
@@ -105,16 +164,16 @@ __global__ void image_upsample(
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
 
-    RGBAhalf pixel = sample_pixel(source, sx - step_x, sy - step_y, sw, sh);
+    RGBAhalf pixel = sample_pixel_clamp(source, sx - step_x, sy - step_y, sw, sh);
 
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy - step_y, sw, sh), (__half) 2.0f));
-    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx + step_x, sy - step_y, sw, sh));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx - step_x, sy, sw, sh), (__half) 2.0f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy, sw, sh), 4.0f));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx + step_x, sy, sw, sh), (__half) 2.0f));
-    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx - step_x, sy + step_y, sw, sh));
-    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel(source, sx, sy + step_y, sw, sh), (__half) 2.0f));
-    pixel = add_RGBAhalf(pixel, sample_pixel(source, sx + step_x, sy + step_y, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx, sy - step_y, sw, sh), (__half) 2.0f));
+    pixel = add_RGBAhalf(pixel, sample_pixel_clamp(source, sx + step_x, sy - step_y, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx - step_x, sy, sw, sh), (__half) 2.0f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx, sy, sw, sh), 4.0f));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx + step_x, sy, sw, sh), (__half) 2.0f));
+    pixel = add_RGBAhalf(pixel, sample_pixel_clamp(source, sx - step_x, sy + step_y, sw, sh));
+    pixel = add_RGBAhalf(pixel, scale_RGBAhalf(sample_pixel_clamp(source, sx, sy + step_y, sw, sh), (__half) 2.0f));
+    pixel = add_RGBAhalf(pixel, sample_pixel_clamp(source, sx + step_x, sy + step_y, sw, sh));
 
     pixel = scale_RGBAhalf(pixel, (__half) (0.0625f * sa));
 

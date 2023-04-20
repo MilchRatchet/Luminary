@@ -120,6 +120,7 @@ struct Camera {
   int bloom;
   float bloom_blend;
   int lens_flare;
+  float lens_flare_threshold;
   int dithering;
   int purkinje;
   float purkinje_kappa1;
@@ -441,6 +442,7 @@ struct RaytraceInstance {
   int shading_mode;
   RGBAhalf** bloom_mips_gpu;
   int bloom_mips_count;
+  RGBAhalf** lens_flare_buffers_gpu;
   int snap_resolution;
   OutputImageFormat image_format;
   int post_process_menu;

@@ -87,6 +87,9 @@ Interpolation value for the bloom. A value of 0 turns bloom off while a value of
 `CAMERA LENSFLAR [INT32]`<br/>
 Set 1 to activate lens flares, 0 else.
 
+`CAMERA LENSFTHR [FP32]`<br/>
+Threshold brightness used for the lens flare effect. Number must be non-negative.
+
 `CAMERA DITHER__ [INT32]`<br/>
 Set 1 to activate randomized dithering, 0 else.
 

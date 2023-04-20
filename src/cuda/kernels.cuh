@@ -490,7 +490,7 @@ __global__ void convert_RGBhalf_to_XRGB8(const RGBAhalf* source, XRGB8* dest, co
     const float sx = x * scale_x;
     const float sy = y * scale_y;
 
-    RGBF pixel = RGBAhalf_to_RGBF(sample_pixel(source, sx, sy, device.output_width, device.output_height));
+    RGBF pixel = RGBAhalf_to_RGBF(sample_pixel_clamp(source, sx, sy, device.output_width, device.output_height));
 
     if (device.scene.camera.purkinje) {
       pixel = purkinje_shift(pixel);

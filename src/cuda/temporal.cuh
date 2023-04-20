@@ -71,17 +71,17 @@ __device__ RGBF sample_pixel_catmull_rom(const RGBAhalf* image, float x, float y
 
   RGBAhalf result = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
 
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x0, y0, width, height), (__half) (wx0 * wy0)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x12, y0, width, height), (__half) (wx12 * wy0)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x3, y0, width, height), (__half) (wx3 * wy0)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x0, y0, width, height), (__half) (wx0 * wy0)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x12, y0, width, height), (__half) (wx12 * wy0)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x3, y0, width, height), (__half) (wx3 * wy0)));
 
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x0, y12, width, height), (__half) (wx0 * wy12)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x12, y12, width, height), (__half) (wx12 * wy12)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x3, y12, width, height), (__half) (wx3 * wy12)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x0, y12, width, height), (__half) (wx0 * wy12)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x12, y12, width, height), (__half) (wx12 * wy12)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x3, y12, width, height), (__half) (wx3 * wy12)));
 
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x0, y3, width, height), (__half) (wx0 * wy3)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x12, y3, width, height), (__half) (wx12 * wy3)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel(image, x3, y3, width, height), (__half) (wx3 * wy3)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x0, y3, width, height), (__half) (wx0 * wy3)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x12, y3, width, height), (__half) (wx12 * wy3)));
+  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x3, y3, width, height), (__half) (wx3 * wy3)));
 
   return RGBAhalf_to_RGBF(result);
 }

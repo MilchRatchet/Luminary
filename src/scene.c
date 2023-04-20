@@ -42,7 +42,8 @@ void scene_init(Scene** _scene) {
   scene->camera.auto_exposure         = 1;
   scene->camera.bloom                 = 1;
   scene->camera.bloom_blend           = 0.025f;
-  scene->camera.lens_flare            = 1;
+  scene->camera.lens_flare            = 0;
+  scene->camera.lens_flare_threshold  = 1.0f;
   scene->camera.dithering             = 1;
   scene->camera.far_clip_distance     = 50000.0f;
   scene->camera.tonemap               = TONEMAP_ACES;

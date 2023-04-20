@@ -69,16 +69,14 @@ extern "C" void device_bloom_apply(RaytraceInstance* instance, RGBAhalf* src, RG
 
   const float blend = instance->scene.camera.bloom_blend;
 
-  image_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    (RGBAhalf*) src, width, height, (RGBAhalf*) instance->bloom_mips_gpu[0], width >> 1, height >> 1);
+  image_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src, width, height, instance->bloom_mips_gpu[0], width >> 1, height >> 1);
 
   for (int i = 0; i < mip_count - 1; i++) {
     const int sw = width >> (i + 1);
     const int sh = height >> (i + 1);
     const int tw = width >> (i + 2);
     const int th = height >> (i + 2);
-    image_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-      (RGBAhalf*) instance->bloom_mips_gpu[i], sw, sh, (RGBAhalf*) instance->bloom_mips_gpu[i + 1], tw, th);
+    image_downsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i + 1], tw, th);
   }
 
   for (int i = mip_count - 1; i > 0; i--) {
@@ -87,13 +85,11 @@ extern "C" void device_bloom_apply(RaytraceInstance* instance, RGBAhalf* src, RG
     const int tw = width >> i;
     const int th = height >> i;
     image_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-      (RGBAhalf*) instance->bloom_mips_gpu[i], sw, sh, (RGBAhalf*) instance->bloom_mips_gpu[i - 1],
-      (RGBAhalf*) instance->bloom_mips_gpu[i - 1], tw, th, 1.0f, 1.0f);
+      instance->bloom_mips_gpu[i], sw, sh, instance->bloom_mips_gpu[i - 1], instance->bloom_mips_gpu[i - 1], tw, th, 1.0f, 1.0f);
   }
 
   image_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    (RGBAhalf*) instance->bloom_mips_gpu[0], width >> 1, height >> 1, (RGBAhalf*) dst, (RGBAhalf*) src, width, height, blend / mip_count,
-    1.0f - blend);
+    instance->bloom_mips_gpu[0], width >> 1, height >> 1, dst, src, width, height, blend / mip_count, 1.0f - blend);
 }
 
 extern "C" void device_bloom_clear(RaytraceInstance* instance) {
