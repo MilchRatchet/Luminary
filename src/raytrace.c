@@ -376,7 +376,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   raytrace_update_light_resampling_active(instance);
   raytrace_allocate_buffers(instance);
-  device_bloom_allocate_mips(instance);
+  device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
   device_initialize_random_generators();
   raytrace_prepare(instance);
@@ -387,7 +387,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 }
 
 void raytrace_reset(RaytraceInstance* instance) {
-  device_bloom_free_mips(instance);
+  device_camera_post_clear(instance);
 
   // If denoising was set to on but no denoise setup exists, then we do not create one either now
   const int allocate_denoise = instance->settings.denoiser && !(instance->denoiser && !instance->denoise_setup);
@@ -418,7 +418,7 @@ void raytrace_reset(RaytraceInstance* instance) {
 
   raytrace_update_light_resampling_active(instance);
   raytrace_allocate_buffers(instance);
-  device_bloom_allocate_mips(instance);
+  device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
   device_initialize_random_generators();
   raytrace_prepare(instance);
@@ -579,7 +579,7 @@ void raytrace_free_output_buffers(RaytraceInstance* instance) {
     device_buffer_free(instance->normal_buffer);
   }
 
-  device_bloom_free_mips(instance);
+  device_camera_post_clear(instance);
 
   free(instance);
 }

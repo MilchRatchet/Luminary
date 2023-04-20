@@ -119,6 +119,7 @@ struct Camera {
   int filter;
   int bloom;
   float bloom_blend;
+  int lens_flare;
   int dithering;
   int purkinje;
   float purkinje_kappa1;

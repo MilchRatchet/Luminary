@@ -84,6 +84,9 @@ Set 1 to activate bloom, 0 else.
 `CAMERA BLOOMBLE [FP32]`<br/>
 Interpolation value for the bloom. A value of 0 turns bloom off while a value of 1 blurs the whole image. Number must be in the range [0,1].
 
+`CAMERA LENSFLAR [INT32]`<br/>
+Set 1 to activate lens flares, 0 else.
+
 `CAMERA DITHER__ [INT32]`<br/>
 Set 1 to activate randomized dithering, 0 else.
 

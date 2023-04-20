@@ -4,9 +4,9 @@
 
 #include "buffer.h"
 #include "config.h"
-#include "cuda/bloom.cuh"
 #include "cuda/brdf_unittest.cuh"
 #include "cuda/bvh.cuh"
+#include "cuda/camera_post.cuh"
 #include "cuda/cloud_noise.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/kernels.cuh"

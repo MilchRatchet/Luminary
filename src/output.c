@@ -45,8 +45,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 
     raytrace_update_device_scene(instance);
 
-    if (instance->scene.camera.bloom)
-      device_bloom_apply(instance, gpu_source, gpu_output);
+    device_camera_post_apply(instance, gpu_source, gpu_output);
 
     device_copy_framebuffer_to_8bit(gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld);
 
@@ -129,8 +128,7 @@ void offline_output(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), instance->output_width * instance->output_height);
   device_buffer_copy(instance->frame_output, instance->frame_buffer);
 
-  if (instance->scene.camera.bloom)
-    device_bloom_apply(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));
+  device_camera_post_apply(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));
 
   DeviceBuffer* scratch_buffer = (DeviceBuffer*) 0;
   device_buffer_init(&scratch_buffer);
@@ -301,8 +299,7 @@ void realtime_output(RaytraceInstance* instance) {
     if (instance->denoiser) {
       DeviceBuffer* denoise_output = denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
 
-      if (instance->scene.camera.bloom)
-        device_bloom_apply(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
+      device_camera_post_apply(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
 
       instance->frame_final_device = device_buffer_get_pointer(denoise_output);
     }

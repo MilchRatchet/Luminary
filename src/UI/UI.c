@@ -197,6 +197,7 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Exposure", &(instance->scene.camera.exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
   panels[i++] = create_check(ui, "Bloom", &(instance->scene.camera.bloom), 0);
   panels[i++] = create_slider(ui, "Bloom Blend", &(instance->scene.camera.bloom_blend), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_check(ui, "Lens Flare", &(instance->scene.camera.lens_flare), 0);
   panels[i++] = create_check(ui, "Dithering", &(instance->scene.camera.dithering), 0);
   panels[i++] = create_slider(ui, "Temporal Blend Factor", &(instance->scene.camera.temporal_blend_factor), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_check(ui, "Purkinje Shift", &(instance->scene.camera.purkinje), 0);
