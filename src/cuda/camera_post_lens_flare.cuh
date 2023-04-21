@@ -68,6 +68,14 @@ extern "C" void device_lens_flare_apply(RaytraceInstance* instance, RGBAhalf* sr
   int width  = instance->output_width;
   int height = instance->output_height;
 
+  if (!instance->lens_flare_buffers_gpu) {
+    device_lens_flare_init(instance);
+
+    if (!instance->lens_flare_buffers_gpu) {
+      crash_message("Failed to initialize lens flare buffers.");
+    }
+  }
+
   image_downsample_threshold<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
     src, width, height, instance->lens_flare_buffers_gpu[0], width >> 1, height >> 1, instance->scene.camera.lens_flare_threshold);
 
