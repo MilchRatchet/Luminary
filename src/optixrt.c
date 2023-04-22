@@ -10,6 +10,7 @@
 
 #include "bench.h"
 #include "buffer.h"
+#include "ceb.h"
 #include "device.h"
 #include "utils.cuh"
 #include "utils.h"
@@ -23,8 +24,6 @@
       crash_message("Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(res), res, #call); \
     }                                                                                                    \
   }
-
-#define OPTIXRT_PTX_MAX_LENGTH 104857600
 
 void optixrt_init(RaytraceInstance* instance) {
   bench_tic();
@@ -108,24 +107,22 @@ void optixrt_init(RaytraceInstance* instance) {
   // Module Compilation
   ////////////////////////////////////////////////////////////////////
 
-  FILE* file = fopen("ptx/optix_kernels.ptx", "r");
+  int64_t ptx_length = -1;
+  uint64_t ptx_info;
 
-  if (!file) {
-    crash_message("Failed to load OptiX Kernels. Make sure that the file /ptx/optix_kernels.ptx exists.");
+  ceb_load("optix_kernels.ptx", (void*) 0, &ptx_length, &ptx_info);
+
+  if (ptx_info || !ptx_length) {
+    crash_message("Failed to load OptiX kernels. Ceb Error Code: %zu", ptx_info);
   }
 
-  // We use a max length and obtain the actual length through fread.
-  // This is because retrieving the length using SEEK_END is not reliable
-  // because the C standard does not require SEEK_END to be implemented correctly.
-  char* ptx = malloc(OPTIXRT_PTX_MAX_LENGTH);
+  char* ptx = malloc(ptx_length);
 
-  if (!ptx) {
-    fclose(file);
-    crash_message("Failed to allocate ptx string buffer.");
+  ceb_load("optix_kernels.ptx", ptx, &ptx_length, &ptx_info);
+
+  if (ptx_info) {
+    crash_message("Failed to load OptiX kernels. Ceb Error Code: %zu", ptx_info);
   }
-
-  size_t ptx_length = fread(ptx, 1, OPTIXRT_PTX_MAX_LENGTH, file);
-  fclose(file);
 
   OptixModuleCompileOptions module_compile_options;
   memset(&module_compile_options, 0, sizeof(OptixModuleCompileOptions));

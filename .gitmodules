@@ -4,3 +4,6 @@
 [submodule "include/qoi"]
 	path = include/qoi
 	url = https://github.com/phoboslab/qoi.git
+[submodule "Ceb"]
+	path = Ceb
+	url = https://github.com/MilchRatchet/Ceb.git

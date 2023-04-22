@@ -1,4 +1,4 @@
-﻿cmake_minimum_required (VERSION 3.25)
+﻿cmake_minimum_required(VERSION 3.25)
 
 IF(WIN32)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
@@ -18,7 +18,7 @@ if (DEBUG)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
-set(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/CMake" ${CMAKE_MODULE_PATH})
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMake")
 
 #=============================================================
 # Link MSVC and Windows SDK libraries
@@ -160,6 +160,13 @@ else()
 endif()
 
 #=============================================================
+# Add Ceb
+#=============================================================
+
+add_subdirectory(Ceb)
+include_directories(${CEB_INCLUDE_DIR})
+
+#=============================================================
 # Print directories
 #=============================================================
 message("")
@@ -206,10 +213,19 @@ message("=======================================================================
 message("")
 
 #=============================================================
+# Embed files
+#=============================================================
+
+set(EMBED_FILE_NAME "embed_file")
+include(ceb_embed_files)
+ceb_embed_files(PROJECT Luminary OUTPUT ${EMBED_FILE_NAME} INPUT $<TARGET_OBJECTS:optix_kernels> ${CMAKE_CURRENT_SOURCE_DIR}/LuminaryFont.ttf)
+
+#=============================================================
 # Executable
 #=============================================================
+
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-add_executable(Luminary ${cpu_source_files} ${gpu_source_files})
+add_executable(Luminary ${cpu_source_files} ${gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
 target_link_libraries(Luminary ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES})
 target_link_libraries(Luminary CUDA::cudart)
 target_link_libraries(Luminary CUDA::cuda_driver)
@@ -217,9 +233,10 @@ target_link_libraries(Luminary CUDA::cuda_driver)
 #=============================================================
 # Create PTX files
 #=============================================================
-include(PTXUtilities)
 
-add_ptx_targets(Luminary optix_kernels)
+add_library(optix_kernels OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu)
+set_target_properties(optix_kernels PROPERTIES CUDA_PTX_COMPILATION ON)
+add_dependencies(Luminary optix_kernels)
 
 #=============================================================
 # File copying
@@ -228,11 +245,6 @@ if(WIN32)
     add_custom_command(TARGET Luminary POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${SDL2_LIBRARIES_DIR}/SDL2.dll"
         "${SDL2_TTF_LIBRARIES_DIR}/SDL2_ttf.dll"
-        "${CMAKE_SOURCE_DIR}/LuminaryFont.ttf"
-        ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
-else()
-    add_custom_command(TARGET Luminary POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${CMAKE_SOURCE_DIR}/LuminaryFont.ttf"
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
