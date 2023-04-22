@@ -107,20 +107,13 @@ void optixrt_init(RaytraceInstance* instance) {
   // Module Compilation
   ////////////////////////////////////////////////////////////////////
 
-  int64_t ptx_length = -1;
+  int64_t ptx_length;
+  char* ptx;
   uint64_t ptx_info;
 
-  ceb_load("optix_kernels.ptx", (void*) 0, &ptx_length, &ptx_info);
+  ceb_access("optix_kernels.ptx", (void**) &ptx, &ptx_length, &ptx_info);
 
   if (ptx_info || !ptx_length) {
-    crash_message("Failed to load OptiX kernels. Ceb Error Code: %zu", ptx_info);
-  }
-
-  char* ptx = malloc(ptx_length);
-
-  ceb_load("optix_kernels.ptx", ptx, &ptx_length, &ptx_info);
-
-  if (ptx_info) {
     crash_message("Failed to load OptiX kernels. Ceb Error Code: %zu", ptx_info);
   }
 
@@ -150,8 +143,6 @@ void optixrt_init(RaytraceInstance* instance) {
   OPTIX_CHECK_LOGS(
     optixModuleCreate(instance->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module),
     log);
-
-  free(ptx);
 
   ////////////////////////////////////////////////////////////////////
   // Group Creation

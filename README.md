@@ -31,7 +31,7 @@ Luminary is a renderer using pathtracing. It aims at rendering high quality imag
 
 This project is for fun and to learn more about `real-time rendering`. Current plans can be found in the `Issues` tab.
 
-The goal is to use as few libraries as feasible. Currently, the following libraries are used: `SDL2`, `zlib`, `qoi` and `OptiX`.
+The goal is to use as few libraries as feasible. Currently, the following libraries are used: `SDL2`, `zlib`, `qoi`, `OptiX` and `Ceb`.
 
 Meshes and textures in the example images are taken from the Ratchet and Clank HD Trilogy and were exported using [Replanetizer](https://github.com/RatchetModding/Replanetizer).
 
@@ -103,7 +103,7 @@ Requirements:
 - SSE 4.1 compatible CPU
 - Supported Nvidia GPU (Recommended: Volta or later, Required: Pascal or later)
 
-The `LuminaryFont.ttf` file is automatically copied to the build directory and needs to reside in the same folder as the Luminary executable. You may replace the font with any other font as long as it has the same name. `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed. This is due to the compiler limitations of CUDA on Windows which makes usage of zlib-ng inconvenient.
+`zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed. This is due to the compiler limitations of CUDA on Windows which makes usage of zlib-ng inconvenient.
 >📝 `zlib` and `qoi` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
 
 ## CMake Options
