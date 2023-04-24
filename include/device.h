@@ -33,7 +33,7 @@ void device_copy_framebuffer_to_8bit(
 // camera_post.cuh
 ////////////////////////////////////////////////////////////////////
 void device_camera_post_init(RaytraceInstance* instance);
-void device_camera_post_apply(RaytraceInstance* instance, RGBAhalf* src, RGBAhalf* dst);
+void device_camera_post_apply(RaytraceInstance* instance, const RGBAhalf* src, RGBAhalf* dst);
 void device_camera_post_clear(RaytraceInstance* instance);
 
 ////////////////////////////////////////////////////////////////////

@@ -64,7 +64,7 @@ __device__ RGBAhalf sample_pixel_border(const RGBAhalf* image, float x, float y,
   return sample_pixel(image, x, y, width, height);
 }
 
-__global__ void image_downsample(RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th) {
+__global__ void image_downsample(const RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const float scale_x = 1.0f / (tw - 1);
@@ -105,7 +105,7 @@ __global__ void image_downsample(RGBAhalf* source, const int sw, const int sh, R
 }
 
 __global__ void image_downsample_threshold(
-  RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th, const float thresh) {
+  const RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th, const float thresh) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const float scale_x = 1.0f / (tw - 1);
@@ -148,7 +148,7 @@ __global__ void image_downsample_threshold(
 }
 
 __global__ void image_upsample(
-  RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, RGBAhalf* base, const int tw, const int th, const float sa,
+  const RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const RGBAhalf* base, const int tw, const int th, const float sa,
   const float sb) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
