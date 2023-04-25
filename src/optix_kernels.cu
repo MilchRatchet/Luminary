@@ -27,7 +27,6 @@ extern "C" __global__ void __raygen__optix() {
       ray_flags = OPTIX_RAY_FLAG_NONE;
       break;
     case TYPE_LIGHT:
-      ray_flags = OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT;
       ray_flags = OPTIX_RAY_FLAG_NONE;
       break;
   }
