@@ -28,6 +28,7 @@ extern "C" __global__ void __raygen__optix() {
       break;
     case TYPE_LIGHT:
       ray_flags = OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT;
+      ray_flags = OPTIX_RAY_FLAG_NONE;
       break;
   }
 
@@ -60,35 +61,45 @@ extern "C" __global__ void __raygen__optix() {
   }
 }
 
-__device__ bool discard_transparent_hit() {
+/*
+ * Performs alpha test on triangle
+ * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
+ */
+__device__ int perform_alpha_test() {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
   const uint32_t maps = device.scene.triangles[hit_id].object_maps;
-  const uint32_t tex  = device.scene.texture_assignments[maps].albedo_map;
+  const uint16_t tex  = device.scene.texture_assignments[maps].albedo_map;
 
-  if (tex) {
+  if (tex != TEXTURE_NONE) {
     float2 ba = optixGetTriangleBarycentrics();
 
     const UV uv = load_triangle_tex_coords(hit_id, get_UV(ba.x, ba.y));
 
     const float4 albedo = tex2D<float4>(device.ptrs.albedo_atlas[tex], uv.u, 1.0f - uv.v);
 
-    if (albedo.w <= device.scene.material.alpha_cutoff) {
-      return true;
+    if (albedo.w < device.scene.material.alpha_cutoff) {
+      return 2;
+    }
+
+    if (albedo.w < 1.0f) {
+      return 1;
     }
   }
 
-  return false;
+  return 0;
 }
 
 extern "C" __global__ void __anyhit__optix() {
   optixSetPayload_2(optixGetPayload_2() + 1);
 
-  if (discard_transparent_hit()) {
+  const int alpha_test = perform_alpha_test();
+
+  if (alpha_test == 2) {
     optixIgnoreIntersection();
   }
 
-  if (device.iteration_type == TYPE_LIGHT) {
+  if (device.iteration_type == TYPE_LIGHT && alpha_test == 0) {
     optixSetPayload_0(__float_as_uint(0.0f));
     optixSetPayload_1(REJECT_HIT);
 
