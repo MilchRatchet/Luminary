@@ -101,7 +101,7 @@ Requirements:
 - Modern CMake
 - Make or Ninja
 - SSE 4.1 compatible CPU
-- Supported Nvidia GPU (Recommended: Volta or later, Required: Pascal or later)
+- Supported Nvidia GPU (Turing or later)
 
 `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed. This is due to the compiler limitations of CUDA on Windows which makes usage of zlib-ng inconvenient.
 >📝 `zlib` and `qoi` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.

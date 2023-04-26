@@ -5,6 +5,7 @@
 #include <optix.h>
 // This header must be included exactly be one translation unit
 #include <optix_function_table_definition.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "buffer.h"
@@ -13,6 +14,29 @@
 #include "optixrt.h"
 #include "sky_defines.h"
 #include "utils.h"
+
+////////////////////////////////////////////////////////////////////
+// OptiX Log Callback
+////////////////////////////////////////////////////////////////////
+
+static void _raytrace_optix_log_callback(unsigned int level, const char* tag, const char* message, void* cbdata) {
+  (void) cbdata;
+
+  switch (level) {
+    case 1:
+      print_crash("[OptiX Log Message][%s] %s", tag, message);
+      break;
+    case 2:
+      print_error("[OptiX Log Message][%s] %s", tag, message);
+      break;
+    case 3:
+      print_warn("[OptiX Log Message][%s] %s", tag, message);
+      break;
+    default:
+      print_info("[OptiX Log Message][%s] %s", tag, message);
+      break;
+  }
+}
 
 ////////////////////////////////////////////////////////////////////
 // Math utility functions
@@ -288,6 +312,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   OPTIX_CHECK(optixInit());
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &instance->optix_ctx));
+  OPTIX_CHECK(optixDeviceContextSetLogCallback(instance->optix_ctx, _raytrace_optix_log_callback, (void*) 0, 3));
 
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;

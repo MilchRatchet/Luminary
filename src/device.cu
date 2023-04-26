@@ -12,6 +12,7 @@
 #include "cuda/kernels.cuh"
 #include "cuda/light.cuh"
 #include "cuda/math.cuh"
+#include "cuda/micromap.cuh"
 #include "cuda/mipmap.cuh"
 #include "cuda/random.cuh"
 #include "cuda/sky.cuh"
