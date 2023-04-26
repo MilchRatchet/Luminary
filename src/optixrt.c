@@ -34,74 +34,7 @@ void optixrt_init(RaytraceInstance* instance) {
   // Opacity Micromaps Building
   ////////////////////////////////////////////////////////////////////
 
-  // START MICROMAP GENERATION DEPENDEND DATA
-  void* opacity_micromap_data;
-  micromap_opacity_build(instance, &opacity_micromap_data);
-
-  OptixOpacityMicromapHistogramEntry opacity_micromap_histogram[NUM_HISTOGRAMS];
-  opacity_micromap_histogram[0].count            = instance->scene.triangle_data.triangle_count;
-  opacity_micromap_histogram[0].subdivisionLevel = 4;
-  opacity_micromap_histogram[0].format           = OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE;
-
-  OptixOpacityMicromapUsageCount opacity_micromap_usage[NUM_HISTOGRAMS];
-  opacity_micromap_usage[0].count            = instance->scene.triangle_data.triangle_count;
-  opacity_micromap_usage[0].subdivisionLevel = 4;
-  opacity_micromap_usage[0].format           = OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE;
-
-  OptixOpacityMicromapDesc opacity_micromap_desc[NUM_HISTOGRAMS];
-  opacity_micromap_desc[0].byteOffset       = 0;
-  opacity_micromap_desc[0].subdivisionLevel = 4;
-  opacity_micromap_desc[0].format           = OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE;
-
-  void* opacity_micromap_desc_buffer;
-  device_malloc(&opacity_micromap_desc_buffer, sizeof(OptixOpacityMicromapDesc) * NUM_HISTOGRAMS);
-  device_upload(opacity_micromap_desc_buffer, opacity_micromap_desc, sizeof(OptixOpacityMicromapDesc) * NUM_HISTOGRAMS);
-
-  // END MICROMAP GENERATION DEPENDEND DATA
-
-  OptixOpacityMicromapArrayBuildInput opacity_micromap_build_input;
-  memset(&opacity_micromap_build_input, 0, sizeof(OptixOpacityMicromapArrayBuildInput));
-
-  opacity_micromap_build_input.flags                        = OPTIX_OPACITY_MICROMAP_FLAG_PREFER_FAST_TRACE;
-  opacity_micromap_build_input.inputBuffer                  = (CUdeviceptr) opacity_micromap_data;
-  opacity_micromap_build_input.numMicromapHistogramEntries  = NUM_HISTOGRAMS;
-  opacity_micromap_build_input.micromapHistogramEntries     = opacity_micromap_histogram;
-  opacity_micromap_build_input.perMicromapDescBuffer        = (CUdeviceptr) opacity_micromap_desc_buffer;
-  opacity_micromap_build_input.perMicromapDescStrideInBytes = sizeof(OptixOpacityMicromapDesc);
-
-  OptixMicromapBufferSizes opacity_micromap_buffers_sizes;
-  memset(&opacity_micromap_buffers_sizes, 0, sizeof(OptixMicromapBufferSizes));
-
-  OPTIX_CHECK(
-    optixOpacityMicromapArrayComputeMemoryUsage(instance->optix_ctx, &opacity_micromap_build_input, &opacity_micromap_buffers_sizes));
-
-  void* omm_output_buffer;
-  device_malloc(&omm_output_buffer, opacity_micromap_buffers_sizes.outputSizeInBytes);
-  void* omm_temp_buffer;
-  device_malloc(&omm_temp_buffer, opacity_micromap_buffers_sizes.tempSizeInBytes);
-
-  ///////////////////////
-
-  OptixMicromapBuffers opacity_micromap_buffers;
-  memset(&opacity_micromap_buffers, 0, sizeof(OptixMicromapBuffers));
-
-  opacity_micromap_buffers.output            = (CUdeviceptr) omm_output_buffer;
-  opacity_micromap_buffers.outputSizeInBytes = opacity_micromap_buffers_sizes.outputSizeInBytes;
-  opacity_micromap_buffers.temp              = (CUdeviceptr) omm_temp_buffer;
-  opacity_micromap_buffers.tempSizeInBytes   = opacity_micromap_buffers_sizes.tempSizeInBytes;
-
-  OPTIX_CHECK(optixOpacityMicromapArrayBuild(instance->optix_ctx, 0, &opacity_micromap_build_input, &opacity_micromap_buffers));
-
-  device_free(opacity_micromap_desc_buffer, sizeof(OptixOpacityMicromapDesc) * NUM_HISTOGRAMS);
-  device_free(omm_temp_buffer, opacity_micromap_buffers_sizes.tempSizeInBytes);
-
-  OptixBuildInputOpacityMicromap opacity_micromap_bvh_input;
-  memset(&opacity_micromap_bvh_input, 0, sizeof(OptixBuildInputOpacityMicromap));
-
-  opacity_micromap_bvh_input.indexingMode           = OPTIX_OPACITY_MICROMAP_ARRAY_INDEXING_MODE_LINEAR;
-  opacity_micromap_bvh_input.opacityMicromapArray   = (CUdeviceptr) omm_output_buffer;
-  opacity_micromap_bvh_input.numMicromapUsageCounts = NUM_HISTOGRAMS;
-  opacity_micromap_bvh_input.micromapUsageCounts    = opacity_micromap_usage;
+  OptixBuildInputOpacityMicromap omm = micromap_opacity_build(instance);
 
   ////////////////////////////////////////////////////////////////////
   // BVH Building
@@ -131,7 +64,7 @@ void optixrt_init(RaytraceInstance* instance) {
   unsigned int inputFlags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING};
 
   build_inputs.triangleArray.flags           = inputFlags;
-  build_inputs.triangleArray.opacityMicromap = opacity_micromap_bvh_input;
+  build_inputs.triangleArray.opacityMicromap = omm;
   build_inputs.triangleArray.numSbtRecords   = 1;
 
   OptixAccelBufferSizes buffer_sizes;
@@ -178,6 +111,8 @@ void optixrt_init(RaytraceInstance* instance) {
 
   instance->optix_bvh.bvh_data    = output_buffer;
   instance->optix_bvh.traversable = traversable;
+
+  micromap_opacity_free(omm);
 
   ////////////////////////////////////////////////////////////////////
   // Module Compilation

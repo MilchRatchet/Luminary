@@ -2,6 +2,8 @@
 #define DEVICE_H
 
 #include <cuda_runtime_api.h>
+#include <optix.h>
+#include <optix_stubs.h>
 
 #include "stddef.h"
 #include "structs.h"
@@ -49,7 +51,8 @@ void device_cloud_noise_generate(RaytraceInstance* instance);
 ////////////////////////////////////////////////////////////////////
 // micromap.cuh
 ////////////////////////////////////////////////////////////////////
-void micromap_opacity_build(RaytraceInstance* instance, void** ptr);
+OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance);
+void micromap_opacity_free(OptixBuildInputOpacityMicromap data);
 
 ////////////////////////////////////////////////////////////////////
 // mipmap.cuh
