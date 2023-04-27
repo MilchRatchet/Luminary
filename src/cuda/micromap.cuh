@@ -17,37 +17,20 @@ __device__ int micromap_get_opacity(const uint32_t t_id, const uint32_t level, c
 
 //
 // This kernel computes a level 0 format 4 base micromap array.
-// The triangles are grouped in 4 so that the state of the four triangles make 1 byte.
 //
 __global__ void micromap_opacity_level_0_format_4(uint8_t* dst, uint8_t* level_record) {
   int id                        = threadIdx.x + blockIdx.x * blockDim.x;
-  const uint32_t triangle_count = (device.scene.triangle_data.triangle_count + 3) / 4;
+  const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
 
   while (id < triangle_count) {
-    uint8_t* ptr = dst + id;
+    const int opacity = micromap_get_opacity(id, 0, 0);
 
-    const int opacity0 = micromap_get_opacity(4 * id + 0, 0, 0);
-    const int opacity1 = micromap_get_opacity(4 * id + 1, 0, 0);
-    const int opacity2 = micromap_get_opacity(4 * id + 2, 0, 0);
-    const int opacity3 = micromap_get_opacity(4 * id + 3, 0, 0);
+    uint8_t v = opacity;
 
-    if (opacity0 ^ 0b10)
-      level_record[4 * id + 0] = 0;
-    if (opacity1 ^ 0b10)
-      level_record[4 * id + 1] = 0;
-    if (opacity2 ^ 0b10)
-      level_record[4 * id + 2] = 0;
-    if (opacity3 ^ 0b10)
-      level_record[4 * id + 3] = 0;
+    if (opacity ^ 0b10)
+      level_record[id] = 0;
 
-    uint8_t v = 0;
-
-    v |= (opacity0 << 6);
-    v |= (opacity1 << 4);
-    v |= (opacity2 << 2);
-    v |= (opacity3 << 0);
-
-    ptr[id] = v;
+    dst[id] = v;
 
     id += blockDim.x * gridDim.x;
   }
@@ -59,22 +42,7 @@ static size_t _micromap_opacity_get_micromap_array_size(
     return 0;
   }
 
-  if (level == 0) {
-    if (format == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) {
-      return (count + 7) / 8;
-    }
-
-    if (format == OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE) {
-      return (count + 3) / 4;
-    }
-  }
-
-  if (level == 1) {
-    if (format == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) {
-      return (count + 1) / 2;
-    }
-  }
-
+  // OMMs are byte aligned, hence even the low subdivision levels are at least 1 byte in size
   const uint32_t state_size = OPACITY_MICROMAP_STATE_SIZE(level, format);
 
   return state_size * count;
@@ -136,7 +104,6 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   OptixOpacityMicromapHistogramEntry* histogram =
     (OptixOpacityMicromapHistogramEntry*) malloc(sizeof(OptixOpacityMicromapHistogramEntry) * num_levels);
   OptixOpacityMicromapUsageCount* usage = (OptixOpacityMicromapUsageCount*) malloc(sizeof(OptixOpacityMicromapUsageCount) * num_levels);
-  OptixOpacityMicromapDesc* desc        = (OptixOpacityMicromapDesc*) malloc(sizeof(OptixOpacityMicromapDesc) * num_levels);
   for (uint32_t i = 0; i < num_levels; i++) {
     histogram[i].count            = triangles_per_level[i];
     histogram[i].subdivisionLevel = i;
@@ -145,9 +112,13 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
     usage[i].count            = triangles_per_level[i];
     usage[i].subdivisionLevel = i;
     usage[i].format           = format;
+  }
 
-    desc[i].byteOffset       = 0;
-    desc[i].subdivisionLevel = i;
+  OptixOpacityMicromapDesc* desc =
+    (OptixOpacityMicromapDesc*) malloc(sizeof(OptixOpacityMicromapDesc) * instance->scene.triangle_data.triangle_count);
+  for (uint32_t i = 0; i < instance->scene.triangle_data.triangle_count; i++) {
+    desc[i].byteOffset       = i;
+    desc[i].subdivisionLevel = 0;
     desc[i].format           = format;
   }
 
@@ -156,8 +127,8 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   device_free(triangle_level_buffer, instance->scene.triangle_data.triangle_count);
 
   void* desc_buffer;
-  device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * num_levels);
-  device_upload(desc_buffer, desc, sizeof(OptixOpacityMicromapDesc) * num_levels);
+  device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * instance->scene.triangle_data.triangle_count);
+  device_upload(desc_buffer, desc, sizeof(OptixOpacityMicromapDesc) * instance->scene.triangle_data.triangle_count);
 
   OptixOpacityMicromapArrayBuildInput array_build_input;
   memset(&array_build_input, 0, sizeof(OptixOpacityMicromapArrayBuildInput));
