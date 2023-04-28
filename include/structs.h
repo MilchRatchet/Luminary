@@ -230,6 +230,12 @@ struct TextureRGBA {
   void* data;
 } typedef TextureRGBA;
 
+struct DeviceTexture {
+  cudaTextureObject_t tex;
+  float inv_width;
+  float inv_height;
+} typedef DeviceTexture;
+
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////

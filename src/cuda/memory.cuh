@@ -288,7 +288,7 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   return triangle;
 }
 
-__device__ UV load_triangle_tex_coords(const int offset, const UV coords) {
+__device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
   const float4* ptr      = (float4*) (device.scene.triangles + offset);
   const float2 bytes0x48 = __ldg(((float2*) (ptr + 4)) + 1);
   const float4 bytes0x50 = __ldg(ptr + 5);

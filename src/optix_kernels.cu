@@ -73,11 +73,11 @@ __device__ int perform_alpha_test() {
   if (tex != TEXTURE_NONE) {
     float2 ba = optixGetTriangleBarycentrics();
 
-    const UV uv = load_triangle_tex_coords(hit_id, get_UV(ba.x, ba.y));
+    const UV uv = load_triangle_tex_coords(hit_id, make_float2(ba.x, ba.y));
 
-    const float4 albedo = tex2D<float4>(device.ptrs.albedo_atlas[tex], uv.u, 1.0f - uv.v);
+    const float4 albedo = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v);
 
-    if (albedo.w < device.scene.material.alpha_cutoff) {
+    if (albedo.w <= device.scene.material.alpha_cutoff) {
       return 2;
     }
 

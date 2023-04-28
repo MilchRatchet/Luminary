@@ -550,20 +550,20 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.light_records        = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
   ptrs.bounce_records       = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);
   ptrs.buffer_8bit          = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
-  ptrs.albedo_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.albedo);
-  ptrs.illuminance_atlas    = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.illuminance);
-  ptrs.material_atlas       = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.material);
-  ptrs.normal_atlas         = (cudaTextureObject_t*) device_buffer_get_pointer(instance->tex_atlas.normal);
-  ptrs.cloud_noise          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->cloud_noise);
+  ptrs.albedo_atlas         = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
+  ptrs.illuminance_atlas    = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.illuminance);
+  ptrs.material_atlas       = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.material);
+  ptrs.normal_atlas         = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.normal);
+  ptrs.cloud_noise          = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);
   ptrs.randoms              = (uint32_t*) device_buffer_get_pointer(instance->randoms);
   ptrs.raydir_buffer        = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
   ptrs.trace_result_buffer  = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.state_buffer         = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
   ptrs.light_samples        = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
   ptrs.light_eval_data      = (LightEvalData*) device_buffer_get_pointer(instance->light_eval_data);
-  ptrs.sky_tm_luts          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_tm_luts);
-  ptrs.sky_ms_luts          = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_ms_luts);
-  ptrs.sky_hdri_luts        = (cudaTextureObject_t*) device_buffer_get_pointer(instance->sky_hdri_luts);
+  ptrs.sky_tm_luts          = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
+  ptrs.sky_ms_luts          = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
+  ptrs.sky_hdri_luts        = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
 
   device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");

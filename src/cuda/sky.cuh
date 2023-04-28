@@ -478,8 +478,8 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
-      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0].tex, transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1].tex, transmittance_uv.u, transmittance_uv.v);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
       const float density_rayleigh = sky_rayleigh_density(height) * device.scene.sky.rayleigh_density;
@@ -698,8 +698,8 @@ __device__ Spectrum sky_compute_atmosphere(
       }
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
-      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0].tex, transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1].tex, transmittance_uv.u, transmittance_uv.v);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
       const float density_rayleigh = sky_rayleigh_density(height) * device.scene.sky.rayleigh_density;
@@ -721,8 +721,8 @@ __device__ Spectrum sky_compute_atmosphere(
       const Spectrum ss_radiance = spectrum_scale(spectrum_mul(extinction_sun, phase_times_scattering), shadow * light_angle);
 
       const UV multiscattering_uv        = get_UV(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
-      const float4 multiscattering_low   = tex2D<float4>(device.ptrs.sky_ms_luts[0], multiscattering_uv.u, multiscattering_uv.v);
-      const float4 multiscattering_high  = tex2D<float4>(device.ptrs.sky_ms_luts[1], multiscattering_uv.u, multiscattering_uv.v);
+      const float4 multiscattering_low   = tex2D<float4>(device.ptrs.sky_ms_luts[0].tex, multiscattering_uv.u, multiscattering_uv.v);
+      const float4 multiscattering_high  = tex2D<float4>(device.ptrs.sky_ms_luts[1].tex, multiscattering_uv.u, multiscattering_uv.v);
       const Spectrum multiscattering_tex = spectrum_merge(multiscattering_low, multiscattering_high);
       const Spectrum ms_radiance         = spectrum_mul(multiscattering_tex, scattering);
 
@@ -816,8 +816,8 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
   const float zenith_cos_angle = dot_product(normalize_vector(origin), ray);
 
   const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-  const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0], transmittance_uv.u, transmittance_uv.v);
-  const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1], transmittance_uv.u, transmittance_uv.v);
+  const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0].tex, transmittance_uv.u, transmittance_uv.v);
+  const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1].tex, transmittance_uv.u, transmittance_uv.v);
   const Spectrum extinction_sun   = spectrum_mul(spectrum_get_ident(), spectrum_merge(transmittance_low, transmittance_high));
 
   const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength);

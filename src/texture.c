@@ -227,13 +227,15 @@ void texture_create_atlas(DeviceBuffer** buffer, TextureRGBA* textures, const in
     return;
   }
 
-  cudaTextureObject_t* textures_cpu = (cudaTextureObject_t*) malloc(sizeof(cudaTextureObject_t) * textures_length);
+  DeviceTexture* textures_cpu = (DeviceTexture*) malloc(sizeof(DeviceTexture) * textures_length);
 
   device_buffer_init(buffer);
-  device_buffer_malloc(*buffer, sizeof(cudaTextureObject_t), textures_length);
+  device_buffer_malloc(*buffer, sizeof(DeviceTexture), textures_length);
 
   for (int i = 0; i < textures_length; i++) {
-    texture_allocate(textures_cpu + i, textures + i);
+    texture_allocate(&textures_cpu[i].tex, textures + i);
+    textures_cpu[i].inv_width  = 1.0f / (textures[i].width - 1);
+    textures_cpu[i].inv_height = 1.0f / (textures[i].height - 1);
   }
 
   device_buffer_upload(*buffer, textures_cpu);

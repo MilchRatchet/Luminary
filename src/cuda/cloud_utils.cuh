@@ -83,7 +83,7 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
       weather_pos.z    = weather_pos.z + device.scene.sky.cloud.low.wind_speed * height * sinf(device.scene.sky.cloud.low.wind_angle);
       weather_pos      = scale_vector(weather_pos, 0.012f * device.scene.sky.cloud.noise_weather_scale);
 
-      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2], weather_pos.x, weather_pos.z);
+      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2].tex, weather_pos.x, weather_pos.z);
 
       CloudWeather weather;
       weather.coverage =
@@ -98,7 +98,7 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
       weather_pos.z    = weather_pos.z + device.scene.sky.cloud.mid.wind_speed * height * sinf(device.scene.sky.cloud.mid.wind_angle);
       weather_pos      = scale_vector(weather_pos, 0.01f * device.scene.sky.cloud.noise_weather_scale);
 
-      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2], weather_pos.x, weather_pos.z);
+      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2].tex, weather_pos.x, weather_pos.z);
 
       CloudWeather weather;
       weather.coverage =
@@ -113,7 +113,7 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
       weather_pos.z    = weather_pos.z + device.scene.sky.cloud.top.wind_speed * height * sinf(device.scene.sky.cloud.top.wind_angle);
       weather_pos      = scale_vector(weather_pos, 0.004f * device.scene.sky.cloud.noise_weather_scale);
 
-      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2], weather_pos.x, weather_pos.z);
+      float4 tex = tex2D<float4>(device.ptrs.cloud_noise[2].tex, weather_pos.x, weather_pos.z);
 
       CloudWeather w;
       w.coverage =
@@ -290,7 +290,7 @@ __device__ float cloud_base_density_low(const vec3 pos, const float height, cons
   shape_pos.z    = shape_pos.z + device.scene.sky.cloud.mid.wind_speed * height * sinf(device.scene.sky.cloud.mid.wind_angle) * 0.33f;
   shape_pos      = scale_vector(shape_pos, 0.4f * device.scene.sky.cloud.noise_shape_scale);
 
-  const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
+  const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0].tex, shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
 
   float shape_sum = shape.x * 5.0f;
   shape_sum += shape.y * cloud_gradient(CLOUD_GRADIENT_STRATUS, height);
@@ -315,7 +315,7 @@ __device__ float cloud_base_density_mid(const vec3 pos, const float height, cons
   vec3 shape_pos = pos;
   shape_pos      = scale_vector(shape_pos, 0.2f * device.scene.sky.cloud.noise_shape_scale);
 
-  const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
+  const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0].tex, shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
 
   const float density_gradient = cloud_density_height_gradient_mid_level(height, weather);
 
@@ -334,14 +334,14 @@ __device__ float cloud_base_density_top(const vec3 pos, const float height, cons
   vec3 shape_pos = pos;
   shape_pos      = scale_vector(shape_pos, 0.2f * device.scene.sky.cloud.noise_shape_scale);
 
-  const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
+  const float4 shape = tex3DLod<float4>(device.ptrs.cloud_noise[0].tex, shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);
 
   /*shape_pos = pos;
   shape_pos.x *= 0.025f;
   shape_pos.y += (weather.coverage - 0.5f);
   shape_pos = scale_vector(shape_pos, 0.8f * device.scene.sky.cloud.noise_shape_scale);
 
-  const float4 shape2 = tex3DLod<float4>(device.ptrs.cloud_noise[0], shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);*/
+  const float4 shape2 = tex3DLod<float4>(device.ptrs.cloud_noise[0].tex, shape_pos.x, shape_pos.y, shape_pos.z, mip_bias);*/
 
   const float density_gradient = cloud_density_height_gradient_top_level(height, weather);
 
@@ -363,7 +363,7 @@ __device__ float cloud_erode_density(const vec3 pos, float density, const float 
     vec3 detail_pos = pos;
     detail_pos      = scale_vector(detail_pos, 2.0f * device.scene.sky.cloud.noise_detail_scale);
 
-    const float4 detail = tex3DLod<float4>(device.ptrs.cloud_noise[1], detail_pos.x, detail_pos.y, detail_pos.z, mip_bias);
+    const float4 detail = tex3DLod<float4>(device.ptrs.cloud_noise[1].tex, detail_pos.x, detail_pos.y, detail_pos.z, mip_bias);
 
     const float detail_fbm = __saturatef(detail.x * 0.625f + detail.y * 0.25f + detail.z * 0.125f);
 
