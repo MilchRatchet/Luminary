@@ -10,37 +10,56 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
-#define OPACITY_MICROMAP_STATE_SIZE(__level__, __format__) \
+#define OMM_STATE_SIZE(__level__, __format__) \
   (((1 << (__level__ * 2)) * ((__format__ == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) ? 1 : 2) + 7) / 8)
 
-// Load triangle only once for the refinement steps
-__device__ int micromap_get_opacity(const uint32_t t_id, const uint32_t level, const uint32_t mt_id) {
-  const float* t_ptr = (float*) (device.scene.triangles + t_id);
+struct OMMTextureTriangle {
+  UV vertex;
+  UV edge1;
+  UV edge2;
+  DeviceTexture tex;
+  uint16_t tex_id;
+} typedef OMMTextureTriangle;
 
-  float2 data0 = __ldg((float2*) (t_ptr + 18));
-  float4 data1 = __ldg((float4*) (t_ptr + 20));
+__device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id) {
+  const float* t_ptr = (float*) (device.scene.triangles + id);
 
   uint32_t object_map = __ldg((uint32_t*) (t_ptr + 24));
   uint16_t tex        = device.scene.texture_assignments[object_map].albedo_map;
 
+  OMMTextureTriangle tri;
+  tri.tex_id = tex;
+
   if (tex == TEXTURE_NONE) {
-    return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
+    return tri;
   }
 
-  const DeviceTexture dev_tex = device.ptrs.albedo_atlas[tex];
+  float2 data0 = __ldg((float2*) (t_ptr + 18));
+  float4 data1 = __ldg((float4*) (t_ptr + 20));
 
-  const UV vertex_texture = get_UV(data0.x, data0.y);
-  const UV edge1_texture  = get_UV(data1.x, data1.y);
-  const UV edge2_texture  = get_UV(data1.z, data1.w);
+  tri.tex = device.ptrs.albedo_atlas[tex];
+
+  tri.vertex = get_UV(data0.x, data0.y);
+  tri.edge1  = get_UV(data1.x, data1.y);
+  tri.edge2  = get_UV(data1.z, data1.w);
+
+  return tri;
+}
+
+// Load triangle only once for the refinement steps
+__device__ int micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
+  if (tri.tex_id == TEXTURE_NONE) {
+    return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
+  }
 
   float2 bary0;
   float2 bary1;
   float2 bary2;
   optixMicromapIndexToBaseBarycentrics(mt_id, level, bary0, bary1, bary2);
 
-  const UV uv0 = lerp_uv(vertex_texture, edge1_texture, edge2_texture, bary0);
-  const UV uv1 = lerp_uv(vertex_texture, edge1_texture, edge2_texture, bary1);
-  const UV uv2 = lerp_uv(vertex_texture, edge1_texture, edge2_texture, bary2);
+  const UV uv0 = lerp_uv(tri.vertex, tri.edge1, tri.edge2, bary0);
+  const UV uv1 = lerp_uv(tri.vertex, tri.edge1, tri.edge2, bary1);
+  const UV uv2 = lerp_uv(tri.vertex, tri.edge1, tri.edge2, bary2);
 
   const float max_u = fmaxf(uv0.u, fmaxf(uv1.u, uv2.u));
   const float min_u = fminf(uv0.u, fminf(uv1.u, uv2.u));
@@ -50,9 +69,9 @@ __device__ int micromap_get_opacity(const uint32_t t_id, const uint32_t level, c
   bool found_opaque      = false;
   bool found_transparent = false;
 
-  for (float v = min_v; v <= max_v; v += dev_tex.inv_height) {
-    for (float u = min_u; u <= max_u; u += dev_tex.inv_width) {
-      float4 value = tex2D<float4>(dev_tex.tex, u, 1.0f - v);
+  for (float v = min_v; v <= max_v; v += tri.tex.inv_height) {
+    for (float u = min_u; u <= max_u; u += tri.tex.inv_width) {
+      float4 value = tex2D<float4>(tri.tex.tex, u, 1.0f - v);
 
       if (value.w > 0.0f)
         found_opaque = true;
@@ -74,16 +93,18 @@ __device__ int micromap_get_opacity(const uint32_t t_id, const uint32_t level, c
 //
 // This kernel computes a level 0 format 4 base micromap array.
 //
-__global__ void micromap_opacity_level_0_format_4(uint8_t* dst, uint8_t* level_record) {
+__global__ void omm_level_0_format_4(uint8_t* dst, uint8_t* level_record) {
   int id                        = threadIdx.x + blockIdx.x * blockDim.x;
   const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
 
   while (id < triangle_count) {
-    const int opacity = micromap_get_opacity(id, 0, 0);
+    OMMTextureTriangle tri = micromap_get_ommtexturetriangle(id);
+
+    const int opacity = micromap_get_opacity(tri, 0, 0);
 
     const uint8_t v = opacity;
 
-    if (opacity ^ 0b10)
+    if (opacity != OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE)
       level_record[id] = 0;
 
     dst[id] = v;
@@ -92,76 +113,175 @@ __global__ void micromap_opacity_level_0_format_4(uint8_t* dst, uint8_t* level_r
   }
 }
 
-static size_t _micromap_opacity_get_micromap_array_size(
-  const uint32_t count, const uint32_t level, const OptixOpacityMicromapFormat format) {
+__global__ void omm_refine_format_4(uint8_t* dst, const uint8_t* src, uint8_t* level_record, const uint32_t src_level) {
+  int id                        = threadIdx.x + blockIdx.x * blockDim.x;
+  const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
+
+  while (id < triangle_count) {
+    if (level_record[id] != 0xFF) {
+      id += blockDim.x * gridDim.x;
+      continue;
+    }
+
+    OMMTextureTriangle tri = micromap_get_ommtexturetriangle(id);
+
+    const uint32_t src_tri_count  = 1 << (2 * src_level);
+    const uint32_t src_state_size = (src_tri_count + 3) / 4;
+    const uint32_t dst_state_size = src_tri_count;
+
+    const uint8_t* src_tri_ptr = src + id * src_state_size;
+    uint8_t* dst_tri_ptr       = dst + id * dst_state_size;
+
+    bool unknowns_left = false;
+
+    for (uint32_t i = 0; i < src_tri_count; i++) {
+      uint8_t src_v = src_tri_ptr[i / 4];
+      src_v         = (src_v >> (2 * (i & 0b11))) & 0b11;
+
+      uint8_t dst_v = 0;
+      if (src_v == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE) {
+        for (uint32_t j = 0; j < 4; j++) {
+          const uint8_t opacity = micromap_get_opacity(tri, src_level + 1, 4 * i + j);
+
+          if (opacity == OPTIX_OPACITY_MICROMAP_STATE_UNKNOWN_OPAQUE)
+            unknowns_left = true;
+
+          dst_v = dst_v | (opacity << (2 * j));
+        }
+      }
+      else {
+        dst_v = src_v | (src_v << 2) | (src_v << 4) | (src_v << 6);
+      }
+
+      dst_tri_ptr[i] = dst_v;
+    }
+
+    if (!unknowns_left)
+      level_record[id] = src_level + 1;
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
+static size_t _omm_array_size(const uint32_t count, const uint32_t level, const OptixOpacityMicromapFormat format) {
   if (format != OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE && format != OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE) {
     return 0;
   }
 
   // OMMs are byte aligned, hence even the low subdivision levels are at least 1 byte in size
-  const uint32_t state_size = OPACITY_MICROMAP_STATE_SIZE(level, format);
+  const uint32_t state_size = OMM_STATE_SIZE(level, format);
 
   return state_size * count;
 }
 
 OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance) {
-  const uint32_t level                    = 0;
   const OptixOpacityMicromapFormat format = OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE;
+  const uint32_t total_tri_count          = instance->scene.triangle_data.triangle_count;
 
   // Highest allowed level is 12 according to OptiX Docs
-  const uint32_t max_num_levels = 1;
+  const uint32_t max_num_levels = 6;
   uint32_t num_levels           = 0;
 
   uint32_t* triangles_per_level = (uint32_t*) calloc(1, sizeof(uint32_t) * max_num_levels);
-
-  void* data;
-  device_malloc(&data, _micromap_opacity_get_micromap_array_size(instance->scene.triangle_data.triangle_count, level, format));
+  void** data                   = (void**) malloc(sizeof(void*) * max_num_levels);
 
   // For each triangle, we store the final level, 0xFF specifies that the triangle has not reached its final level yet
-  uint8_t* triangle_level = (uint8_t*) malloc(instance->scene.triangle_data.triangle_count);
+  uint8_t* triangle_level = (uint8_t*) malloc(total_tri_count);
   void* triangle_level_buffer;
-  device_malloc(&triangle_level_buffer, instance->scene.triangle_data.triangle_count);
+  device_malloc(&triangle_level_buffer, total_tri_count);
 
-  for (uint32_t i = 0; i < instance->scene.triangle_data.triangle_count; i++) {
+  for (uint32_t i = 0; i < total_tri_count; i++) {
     triangle_level[i] = 0xFF;
   }
-  device_upload(triangle_level_buffer, triangle_level, instance->scene.triangle_data.triangle_count);
-
-  micromap_opacity_level_0_format_4<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((uint8_t*) data, (uint8_t*) triangle_level_buffer);
-  gpuErrchk(cudaDeviceSynchronize());
-
-  device_download(triangle_level, triangle_level_buffer, instance->scene.triangle_data.triangle_count);
-  gpuErrchk(cudaDeviceSynchronize());
+  device_upload(triangle_level_buffer, triangle_level, total_tri_count);
 
   uint32_t remaining_triangles = 0;
-  for (uint32_t i = 0; i < instance->scene.triangle_data.triangle_count; i++) {
-    if (triangle_level[i] == 0xFF)
-      remaining_triangles++;
-  }
-
-  triangles_per_level[num_levels] = instance->scene.triangle_data.triangle_count - remaining_triangles;
-
-  num_levels++;
-
-  while (remaining_triangles && num_levels < max_num_levels) {
-    // Refine triangles
-    device_download(triangle_level, triangle_level_buffer, instance->scene.triangle_data.triangle_count);
+  for (; num_levels < max_num_levels;) {
+    const size_t data_size = _omm_array_size(total_tri_count, num_levels, format);
+    device_malloc(data + num_levels, data_size);
     gpuErrchk(cudaDeviceSynchronize());
 
-    for (uint32_t i = 0; i < instance->scene.triangle_data.triangle_count; i++) {
+    if (num_levels) {
+      omm_refine_format_4<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+        (uint8_t*) data[num_levels], (uint8_t*) data[num_levels - 1], (uint8_t*) triangle_level_buffer, num_levels - 1);
+    }
+    else {
+      omm_level_0_format_4<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((uint8_t*) data[0], (uint8_t*) triangle_level_buffer);
+    }
+    gpuErrchk(cudaDeviceSynchronize());
+
+    device_download(triangle_level, triangle_level_buffer, total_tri_count);
+    gpuErrchk(cudaDeviceSynchronize());
+
+    remaining_triangles         = 0;
+    uint32_t triangles_at_level = 0;
+
+    for (uint32_t i = 0; i < total_tri_count; i++) {
       if (triangle_level[i] == 0xFF)
         remaining_triangles++;
+
+      if (triangle_level[i] == num_levels)
+        triangles_at_level++;
     }
 
-    triangles_per_level[num_levels] = triangles_per_level[num_levels - 1] - remaining_triangles;
+    log_message("[OptiX OMM] Remaining triangles after %u iterations: %u", num_levels, remaining_triangles);
+
+    triangles_per_level[num_levels] = triangles_at_level;
 
     num_levels++;
+
+    if (!remaining_triangles) {
+      break;
+    }
   }
 
   // Some triangles needed more refinement but max level was reached.
   if (remaining_triangles) {
     triangles_per_level[num_levels - 1] += remaining_triangles;
   }
+
+  size_t final_array_size = 0;
+  for (uint32_t i = 0; i < num_levels; i++) {
+    const size_t state_size = OMM_STATE_SIZE(i, format);
+
+    log_message("[OptiX OMM] Total triangles at subdivision level %u: %u", i, triangles_per_level[i]);
+
+    final_array_size += state_size * triangles_per_level[i];
+  }
+
+  void* omm_array;
+  device_malloc(&omm_array, final_array_size);
+
+  OptixOpacityMicromapDesc* desc = (OptixOpacityMicromapDesc*) malloc(sizeof(OptixOpacityMicromapDesc) * total_tri_count);
+
+  size_t omm_array_offset = 0;
+  for (uint32_t i = 0; i < total_tri_count; i++) {
+    const uint32_t level = (triangle_level[i] == 0xFF) ? max_num_levels - 1 : triangle_level[i];
+
+    desc[i].byteOffset       = omm_array_offset;
+    desc[i].subdivisionLevel = level;
+    desc[i].format           = format;
+
+    const size_t state_size = OMM_STATE_SIZE(level, format);
+
+    void* dst = (void*) ((uint8_t*) omm_array + omm_array_offset);
+    void* src = (void*) ((uint8_t*) data[level] + state_size * i);
+
+    gpuErrchk(cudaMemcpy(dst, src, state_size, cudaMemcpyDeviceToDevice));
+
+    omm_array_offset += state_size;
+  }
+
+  for (uint32_t i = 0; i < num_levels; i++) {
+    const size_t data_size = _omm_array_size(total_tri_count, i, format);
+    device_free(data[i], data_size);
+  }
+
+  free(data);
+
+  void* desc_buffer;
+  device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * total_tri_count);
+  device_upload(desc_buffer, desc, sizeof(OptixOpacityMicromapDesc) * total_tri_count);
 
   OptixOpacityMicromapHistogramEntry* histogram =
     (OptixOpacityMicromapHistogramEntry*) malloc(sizeof(OptixOpacityMicromapHistogramEntry) * num_levels);
@@ -176,27 +296,15 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
     usage[i].format           = format;
   }
 
-  OptixOpacityMicromapDesc* desc =
-    (OptixOpacityMicromapDesc*) malloc(sizeof(OptixOpacityMicromapDesc) * instance->scene.triangle_data.triangle_count);
-  for (uint32_t i = 0; i < instance->scene.triangle_data.triangle_count; i++) {
-    desc[i].byteOffset       = i;
-    desc[i].subdivisionLevel = 0;
-    desc[i].format           = format;
-  }
-
   free(triangles_per_level);
   free(triangle_level);
-  device_free(triangle_level_buffer, instance->scene.triangle_data.triangle_count);
-
-  void* desc_buffer;
-  device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * instance->scene.triangle_data.triangle_count);
-  device_upload(desc_buffer, desc, sizeof(OptixOpacityMicromapDesc) * instance->scene.triangle_data.triangle_count);
+  device_free(triangle_level_buffer, total_tri_count);
 
   OptixOpacityMicromapArrayBuildInput array_build_input;
   memset(&array_build_input, 0, sizeof(OptixOpacityMicromapArrayBuildInput));
 
   array_build_input.flags                        = OPTIX_OPACITY_MICROMAP_FLAG_PREFER_FAST_TRACE;
-  array_build_input.inputBuffer                  = (CUdeviceptr) data;
+  array_build_input.inputBuffer                  = (CUdeviceptr) omm_array;
   array_build_input.numMicromapHistogramEntries  = num_levels;
   array_build_input.micromapHistogramEntries     = histogram;
   array_build_input.perMicromapDescBuffer        = (CUdeviceptr) desc_buffer;
