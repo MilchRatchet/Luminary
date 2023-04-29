@@ -99,6 +99,12 @@ void offline_output(RaytraceInstance* instance) {
   clock_t start_of_rt = clock();
   raytrace_prepare(instance);
   for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; instance->temporal_frames++) {
+    // We reset the clock to account for setup cost during the first frame.
+    if (instance->temporal_frames == 1) {
+      bench_tic();
+      start_of_rt = clock();
+    }
+
     raytrace_execute(instance);
     raytrace_update_ray_emitter(instance);
     const double progress     = ((double) (instance->temporal_frames + 1)) / instance->offline_samples;
