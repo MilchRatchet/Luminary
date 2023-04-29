@@ -15,8 +15,6 @@
 #include "utils.cuh"
 #include "utils.h"
 
-#define NUM_HISTOGRAMS 1
-
 #define OPTIX_CHECK_LOGS(call, log)                                                                      \
   {                                                                                                      \
     OptixResult res = call;                                                                              \

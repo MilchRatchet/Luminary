@@ -71,17 +71,15 @@ __device__ int perform_alpha_test() {
   const uint16_t tex  = device.scene.texture_assignments[maps].albedo_map;
 
   if (tex != TEXTURE_NONE) {
-    float2 ba = optixGetTriangleBarycentrics();
+    const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
 
-    const UV uv = load_triangle_tex_coords(hit_id, make_float2(ba.x, ba.y));
+    const float alpha = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v).w;
 
-    const float4 albedo = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v);
-
-    if (albedo.w <= device.scene.material.alpha_cutoff) {
+    if (alpha <= device.scene.material.alpha_cutoff) {
       return 2;
     }
 
-    if (albedo.w < 1.0f) {
+    if (alpha < 1.0f) {
       return 1;
     }
   }

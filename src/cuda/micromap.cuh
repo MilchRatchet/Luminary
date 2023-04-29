@@ -196,6 +196,26 @@ __global__ void omm_refine_format_4(uint8_t* dst, const uint8_t* src, uint8_t* l
   }
 }
 
+__global__ void omm_gather_array_format_4(
+  uint8_t* dst, const uint8_t* src, const uint32_t level, const uint8_t* level_record, const OptixOpacityMicromapDesc* desc) {
+  int id                        = threadIdx.x + blockIdx.x * blockDim.x;
+  const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
+  const uint32_t state_size     = OMM_STATE_SIZE(level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
+
+  while (id < triangle_count) {
+    if (level_record[id] != level) {
+      id += blockDim.x * gridDim.x;
+      continue;
+    }
+
+    for (uint32_t j = 0; j < state_size; j++) {
+      dst[desc[id].byteOffset + j] = src[id * state_size + j];
+    }
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
 static size_t _omm_array_size(const uint32_t count, const uint32_t level, const OptixOpacityMicromapFormat format) {
   if (format != OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE && format != OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE) {
     return 0;
@@ -271,15 +291,28 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   // Some triangles needed more refinement but max level was reached.
   if (remaining_triangles) {
     triangles_per_level[num_levels - 1] += remaining_triangles;
+
+    for (uint32_t i = 0; i < total_tri_count; i++) {
+      if (triangle_level[i] == 0xFF) {
+        triangle_level[i] = num_levels - 1;
+      }
+    }
+
+    device_upload(triangle_level_buffer, triangle_level, total_tri_count);
   }
 
-  size_t final_array_size = 0;
+  size_t final_array_size        = 0;
+  size_t* array_offset_per_level = (size_t*) malloc(sizeof(size_t) * num_levels);
+  size_t* array_size_per_level   = (size_t*) malloc(sizeof(size_t) * num_levels);
   for (uint32_t i = 0; i < num_levels; i++) {
     const size_t state_size = OMM_STATE_SIZE(i, format);
 
     log_message("[OptiX OMM] Total triangles at subdivision level %u: %u", i, triangles_per_level[i]);
 
-    final_array_size += state_size * triangles_per_level[i];
+    array_size_per_level[i]   = state_size * triangles_per_level[i];
+    array_offset_per_level[i] = (i) ? array_offset_per_level[i - 1] + array_size_per_level[i - 1] : 0;
+
+    final_array_size += array_size_per_level[i];
   }
 
   void* omm_array;
@@ -287,23 +320,30 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
 
   OptixOpacityMicromapDesc* desc = (OptixOpacityMicromapDesc*) malloc(sizeof(OptixOpacityMicromapDesc) * total_tri_count);
 
-  size_t omm_array_offset = 0;
   for (uint32_t i = 0; i < total_tri_count; i++) {
     const uint32_t level = (triangle_level[i] == 0xFF) ? max_num_levels - 1 : triangle_level[i];
 
-    desc[i].byteOffset       = omm_array_offset;
+    desc[i].byteOffset       = array_offset_per_level[level];
     desc[i].subdivisionLevel = level;
     desc[i].format           = format;
 
     const size_t state_size = OMM_STATE_SIZE(level, format);
 
-    void* dst = (void*) ((uint8_t*) omm_array + omm_array_offset);
-    void* src = (void*) ((uint8_t*) data[level] + state_size * i);
-
-    gpuErrchk(cudaMemcpy(dst, src, state_size, cudaMemcpyDeviceToDevice));
-
-    omm_array_offset += state_size;
+    array_offset_per_level[level] += state_size;
   }
+
+  free(array_offset_per_level);
+  free(array_size_per_level);
+
+  void* desc_buffer;
+  device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * total_tri_count);
+  device_upload(desc_buffer, desc, sizeof(OptixOpacityMicromapDesc) * total_tri_count);
+
+  for (uint32_t i = 0; i < num_levels; i++) {
+    omm_gather_array_format_4<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+      (uint8_t*) omm_array, (uint8_t*) data[i], i, (uint8_t*) triangle_level_buffer, (OptixOpacityMicromapDesc*) desc_buffer);
+  }
+  gpuErrchk(cudaDeviceSynchronize());
 
   for (uint32_t i = 0; i < num_levels; i++) {
     const size_t data_size = _omm_array_size(total_tri_count, i, format);
@@ -311,10 +351,6 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   }
 
   free(data);
-
-  void* desc_buffer;
-  device_malloc(&desc_buffer, sizeof(OptixOpacityMicromapDesc) * total_tri_count);
-  device_upload(desc_buffer, desc, sizeof(OptixOpacityMicromapDesc) * total_tri_count);
 
   OptixOpacityMicromapHistogramEntry* histogram =
     (OptixOpacityMicromapHistogramEntry*) malloc(sizeof(OptixOpacityMicromapHistogramEntry) * num_levels);
