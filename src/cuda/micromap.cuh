@@ -61,17 +61,50 @@ __device__ int micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t
   const UV uv1 = lerp_uv(tri.vertex, tri.edge1, tri.edge2, bary1);
   const UV uv2 = lerp_uv(tri.vertex, tri.edge1, tri.edge2, bary2);
 
-  const float max_u = fmaxf(uv0.u, fmaxf(uv1.u, uv2.u));
-  const float min_u = fminf(uv0.u, fminf(uv1.u, uv2.u));
   const float max_v = fmaxf(uv0.v, fmaxf(uv1.v, uv2.v));
   const float min_v = fminf(uv0.v, fminf(uv1.v, uv2.v));
+
+  float m0 = (uv0.u - uv1.u) / (uv0.v - uv1.v);
+  float m1 = (uv1.u - uv2.u) / (uv1.v - uv2.v);
+  float m2 = (uv2.u - uv0.u) / (uv2.v - uv0.v);
+
+  if (isinf(m0) || isnan(m0)) {
+    m0 = 1.0f;
+  }
+
+  if (isinf(m1) || isnan(m1)) {
+    m1 = 1.0f;
+  }
+
+  if (isinf(m2) || isnan(m2)) {
+    m2 = 1.0f;
+  }
+
+  const float a0 = uv0.u - m0 * uv0.v;
+  const float a1 = uv1.u - m1 * uv1.v;
+  const float a2 = uv2.u - m2 * uv2.v;
+
+  const float min_e_0 = a0 + fminf(uv0.v * m0, uv1.v * m0);
+  const float max_e_0 = a0 + fmaxf(uv0.v * m0, uv1.v * m0);
+
+  const float min_e_1 = a1 + fminf(uv1.v * m1, uv2.v * m1);
+  const float max_e_1 = a1 + fmaxf(uv1.v * m1, uv2.v * m1);
+
+  const float min_e_2 = a2 + fminf(uv2.v * m2, uv0.v * m2);
+  const float max_e_2 = a2 + fmaxf(uv2.v * m2, uv0.v * m2);
 
   bool found_opaque      = false;
   bool found_transparent = false;
 
   for (float v = min_v; v <= max_v; v += tri.tex.inv_height) {
+    const float e0    = fmaxf(fminf(a0 + v * m0, max_e_0), min_e_0);
+    const float e1    = fmaxf(fminf(a1 + v * m1, max_e_1), min_e_1);
+    const float e2    = fmaxf(fminf(a2 + v * m2, max_e_2), min_e_2);
+    const float min_u = fminf(e0, fminf(e1, e2));
+    const float max_u = fmaxf(e0, fmaxf(e1, e2));
+
     for (float u = min_u; u <= max_u; u += tri.tex.inv_width) {
-      float4 value = tex2D<float4>(tri.tex.tex, u, 1.0f - v);
+      const float4 value = tex2D<float4>(tri.tex.tex, u, 1.0f - v);
 
       if (value.w > 0.0f)
         found_opaque = true;

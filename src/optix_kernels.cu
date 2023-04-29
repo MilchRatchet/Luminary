@@ -107,6 +107,15 @@ extern "C" __global__ void __anyhit__optix() {
 }
 
 extern "C" __global__ void __closesthit__optix() {
+  if (device.iteration_type == TYPE_LIGHT) {
+    // If anyhit was never executed, then we must have hit fully opaque geometry.
+    if (!optixGetPayload_2()) {
+      optixSetPayload_0(__float_as_uint(0.0f));
+      optixSetPayload_1(REJECT_HIT);
+      return;
+    }
+  }
+
   optixSetPayload_0(__float_as_uint(optixGetRayTmax()));
   optixSetPayload_1(optixGetPrimitiveIndex());
 }
