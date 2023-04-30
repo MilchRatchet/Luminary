@@ -10,6 +10,9 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
+// OMMs should not occupy too much memory
+#define MAX_MEMORY_USAGE 100000000ul
+
 #define OMM_STATE_SIZE(__level__, __format__) \
   (((1 << (__level__ * 2)) * ((__format__ == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) ? 1 : 2) + 7) / 8)
 
@@ -101,17 +104,23 @@ __device__ int micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t
     const float e1    = fmaxf(fminf(a1 + v * m1, max_e_1), min_e_1);
     const float e2    = fmaxf(fminf(a2 + v * m2, max_e_2), min_e_2);
     const float min_u = fminf(e0, fminf(e1, e2));
-    const float max_u = fmaxf(e0, fmaxf(e1, e2));
+    float max_u       = fmaxf(e0, fmaxf(e1, e2));
+
+    if (max_u > min_u + 1.0f)
+      max_u = min_u + 1.0f;
 
     for (float u = min_u; u <= max_u; u += tri.tex.inv_width) {
-      const float4 value = tex2D<float4>(tri.tex.tex, u, 1.0f - v);
+      const float alpha = tex2D<float4>(tri.tex.tex, u, 1.0f - v).w;
 
-      if (value.w > 0.0f)
+      if (alpha > 0.0f)
         found_opaque = true;
 
-      if (value.w < 1.0f)
+      if (alpha < 1.0f)
         found_transparent = true;
     }
+
+    if (found_opaque && found_transparent)
+      break;
   }
 
   if (found_transparent && !found_opaque)
@@ -248,6 +257,8 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   }
   device_upload(triangle_level_buffer, triangle_level, total_tri_count);
 
+  size_t memory_usage = 0;
+
   uint32_t remaining_triangles = 0;
   for (; num_levels < max_num_levels;) {
     const size_t data_size = _omm_array_size(total_tri_count, num_levels, format);
@@ -277,13 +288,20 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
         triangles_at_level++;
     }
 
-    log_message("[OptiX OMM] Remaining triangles after %u iterations: %u", num_levels, remaining_triangles);
+    log_message("[OptiX OMM] Remaining triangles after %u iterations: %u.", num_levels, remaining_triangles);
 
     triangles_per_level[num_levels] = triangles_at_level;
+
+    memory_usage += triangles_at_level * OMM_STATE_SIZE(num_levels, format);
 
     num_levels++;
 
     if (!remaining_triangles) {
+      break;
+    }
+
+    if (memory_usage + remaining_triangles * OMM_STATE_SIZE(num_levels, format) > MAX_MEMORY_USAGE) {
+      log_message("[OptiX OMM] Exceeded memory budget at subdivision level %u.", num_levels);
       break;
     }
   }
@@ -307,7 +325,7 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   for (uint32_t i = 0; i < num_levels; i++) {
     const size_t state_size = OMM_STATE_SIZE(i, format);
 
-    log_message("[OptiX OMM] Total triangles at subdivision level %u: %u", i, triangles_per_level[i]);
+    log_message("[OptiX OMM] Total triangles at subdivision level %u: %u.", i, triangles_per_level[i]);
 
     array_size_per_level[i]   = state_size * triangles_per_level[i];
     array_offset_per_level[i] = (i) ? array_offset_per_level[i - 1] + array_size_per_level[i - 1] : 0;
@@ -345,6 +363,9 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   }
   gpuErrchk(cudaDeviceSynchronize());
 
+  free(triangle_level);
+  device_free(triangle_level_buffer, total_tri_count);
+
   for (uint32_t i = 0; i < num_levels; i++) {
     const size_t data_size = _omm_array_size(total_tri_count, i, format);
     device_free(data[i], data_size);
@@ -366,8 +387,6 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   }
 
   free(triangles_per_level);
-  free(triangle_level);
-  device_free(triangle_level_buffer, total_tri_count);
 
   OptixOpacityMicromapArrayBuildInput array_build_input;
   memset(&array_build_input, 0, sizeof(OptixOpacityMicromapArrayBuildInput));
@@ -401,6 +420,7 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
 
   device_free(desc_buffer, sizeof(OptixOpacityMicromapDesc) * num_levels);
   device_free(temp_buffer, buffer_sizes.tempSizeInBytes);
+  device_free(omm_array, final_array_size);
 
   OptixBuildInputOpacityMicromap bvh_input;
   memset(&bvh_input, 0, sizeof(OptixBuildInputOpacityMicromap));
