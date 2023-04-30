@@ -228,12 +228,14 @@ struct TextureRGBA {
   TextureMipmapMode mipmap;
   int mipmap_max_level;
   void* data;
+  float gamma;
 } typedef TextureRGBA;
 
 struct DeviceTexture {
   cudaTextureObject_t tex;
   float inv_width;
   float inv_height;
+  float gamma;
 } typedef DeviceTexture;
 
 ////////////////////////////////////////////////////////////////////

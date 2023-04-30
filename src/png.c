@@ -12,7 +12,9 @@
 #include "utils.h"
 #include "zlib/zlib.h"
 
-static inline void write_int_big_endian(uint8_t* buffer, uint32_t value) {
+enum ChunkTypes { CHUNK_IHDR = 1229472850u, CHUNK_IDAT = 1229209940u, CHUNK_gAMA = 1732332865u } typedef ChunkTypes;
+
+static inline void write_uint32_big_endian(uint8_t* buffer, uint32_t value) {
   buffer[0] = value >> 24;
   buffer[1] = value >> 16;
   buffer[2] = value >> 8;
@@ -45,15 +47,15 @@ static void write_IHDR_chunk_to_file(
   const uint8_t interlace_method) {
   uint8_t* chunk = (uint8_t*) malloc(25);
 
-  write_int_big_endian(chunk, 13u);
+  write_uint32_big_endian(chunk, 13u);
 
   chunk[4] = 'I';
   chunk[5] = 'H';
   chunk[6] = 'D';
   chunk[7] = 'R';
 
-  write_int_big_endian(chunk + 8, width);
-  write_int_big_endian(chunk + 12, height);
+  write_uint32_big_endian(chunk + 8, width);
+  write_uint32_big_endian(chunk + 12, height);
 
   chunk[16] = bit_depth;
   chunk[17] = color_type;
@@ -61,7 +63,7 @@ static void write_IHDR_chunk_to_file(
   chunk[19] = 0u;
   chunk[20] = interlace_method;
 
-  write_int_big_endian(chunk + 21, (uint32_t) crc32(0, chunk + 4, 17));
+  write_uint32_big_endian(chunk + 21, (uint32_t) crc32(0, chunk + 4, 17));
 
   fwrite(chunk, 1, 25, file);
 
@@ -71,7 +73,7 @@ static void write_IHDR_chunk_to_file(
 static void write_IDAT_chunk_to_file(FILE* file, const uint8_t* compressed_image, const uint32_t compressed_length) {
   uint8_t* chunk = (uint8_t*) malloc(12 + compressed_length);
 
-  write_int_big_endian(chunk, compressed_length);
+  write_uint32_big_endian(chunk, compressed_length);
 
   chunk[4] = 'I';
   chunk[5] = 'D';
@@ -80,7 +82,7 @@ static void write_IDAT_chunk_to_file(FILE* file, const uint8_t* compressed_image
 
   memcpy(chunk + 8, compressed_image, compressed_length);
 
-  write_int_big_endian(chunk + 8 + compressed_length, (uint32_t) crc32(0, chunk + 4, 4 + compressed_length));
+  write_uint32_big_endian(chunk + 8 + compressed_length, (uint32_t) crc32(0, chunk + 4, 4 + compressed_length));
 
   fwrite(chunk, 1, 12 + compressed_length, file);
 
@@ -90,14 +92,14 @@ static void write_IDAT_chunk_to_file(FILE* file, const uint8_t* compressed_image
 static void write_IEND_chunk_to_file(FILE* file) {
   uint8_t* chunk = (uint8_t*) malloc(12);
 
-  write_int_big_endian(chunk, 0u);
+  write_uint32_big_endian(chunk, 0u);
 
   chunk[4] = 'I';
   chunk[5] = 'E';
   chunk[6] = 'N';
   chunk[7] = 'D';
 
-  write_int_big_endian(chunk + 8, (uint32_t) crc32(0, chunk + 4, 4));
+  write_uint32_big_endian(chunk + 8, (uint32_t) crc32(0, chunk + 4, 4));
 
   fwrite(chunk, 1ul, 12ul, file);
 
@@ -198,7 +200,7 @@ int store_as_png(
   return 0;
 }
 
-static inline uint32_t read_int_big_endian(uint8_t* buffer) {
+static inline uint32_t read_uint32_big_endian(uint8_t* buffer) {
   uint32_t result = 0;
 
   result += ((uint32_t) buffer[0]) << 24;
@@ -487,20 +489,20 @@ TextureRGBA load_texture_from_png(const char* filename) {
 
   fread(IHDR, 1, 25, file);
 
-  if (read_int_big_endian(IHDR) != 13u) {
+  if (read_uint32_big_endian(IHDR) != 13u) {
     free(IHDR);
     fclose(file);
     return default_failure();
   }
 
-  if (read_int_big_endian(IHDR + 4) != 1229472850u) {
+  if (read_uint32_big_endian(IHDR + 4) != CHUNK_IHDR) {
     free(IHDR);
     fclose(file);
     return default_failure();
   }
 
-  const uint32_t width         = read_int_big_endian(IHDR + 8);
-  const uint32_t height        = read_int_big_endian(IHDR + 12);
+  const uint32_t width         = read_uint32_big_endian(IHDR + 8);
+  const uint32_t height        = read_uint32_big_endian(IHDR + 12);
   const uint8_t bit_depth      = IHDR[16];
   const uint8_t color_type     = IHDR[17];
   const uint8_t interlace_type = IHDR[20];
@@ -526,7 +528,7 @@ TextureRGBA load_texture_from_png(const char* filename) {
     return default_texture();
   }
 
-  if ((uint32_t) crc32(0, IHDR + 4, 17) != read_int_big_endian(IHDR + 21)) {
+  if ((uint32_t) crc32(0, IHDR + 4, 17) != read_uint32_big_endian(IHDR + 21)) {
     free(IHDR);
     error_message("Texture is corrupted!");
     fclose(file);
@@ -555,18 +557,20 @@ TextureRGBA load_texture_from_png(const char* filename) {
   int data_left = (fread(chunk, 1, 8, file) == 8);
 
   while (data_left) {
-    const int length = read_int_big_endian(chunk);
+    const uint32_t length = read_uint32_big_endian(chunk);
 
-    if (read_int_big_endian(chunk + 4) == 1229209940u) {
+    const uint32_t chunk_type = read_uint32_big_endian(chunk + 4);
+
+    if (chunk_type == CHUNK_IDAT) {
       uint8_t* compressed_data = (uint8_t*) malloc(length + 4);
 
-      write_int_big_endian(compressed_data, 1229209940u);
+      write_uint32_big_endian(compressed_data, CHUNK_IDAT);
 
       fread(compressed_data + 4, 1, length, file);
 
       fread(chunk, 1, 4, file);
 
-      if ((uint32_t) crc32(0, compressed_data, length + 4) != read_int_big_endian(chunk)) {
+      if ((uint32_t) crc32(0, compressed_data, length + 4) != read_uint32_big_endian(chunk)) {
         return default_failure();
       }
 
@@ -575,6 +579,29 @@ TextureRGBA load_texture_from_png(const char* filename) {
       combined_compressed_length += length;
 
       free(compressed_data);
+    }
+    else if (chunk_type == CHUNK_gAMA) {
+      if (length != 4) {
+        error_message("Texture %s has a broken gAMA chunk. Ignoring it.", filename);
+        fseek(file, length + 4u, SEEK_CUR);
+      }
+      else {
+        uint8_t data[8];
+        data[0] = 'g';
+        data[1] = 'A';
+        data[2] = 'M';
+        data[3] = 'A';
+        fread(data + 4, 1, 4, file);
+        fread(chunk, 1, 4, file);
+
+        if ((uint32_t) crc32(0, data, length + 4) != read_uint32_big_endian(chunk)) {
+          error_message("Texture %s has a broken gAMA chunk. Ignoring it.", filename);
+        }
+        else {
+          const uint32_t gAMA_val = read_uint32_big_endian(data + 4);
+          result.gamma            = 100000.0f / ((float) gAMA_val);
+        }
+      }
     }
     else {
       fseek(file, length + 4u, SEEK_CUR);

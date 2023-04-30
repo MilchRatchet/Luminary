@@ -236,6 +236,7 @@ void texture_create_atlas(DeviceBuffer** buffer, TextureRGBA* textures, const in
     texture_allocate(&textures_cpu[i].tex, textures + i);
     textures_cpu[i].inv_width  = 1.0f / (textures[i].width - 1);
     textures_cpu[i].inv_height = 1.0f / (textures[i].height - 1);
+    textures_cpu[i].gamma      = textures[i].gamma;
   }
 
   device_buffer_upload(*buffer, textures_cpu);
@@ -275,7 +276,8 @@ void texture_create(
     .wrap_mode_R      = TexModeWrap,
     .filter           = TexFilterLinear,
     .mipmap           = TexMipmapNone,
-    .mipmap_max_level = 0};
+    .mipmap_max_level = 0,
+    .gamma            = 1.0f};
 
   *tex = _tex;
 }
