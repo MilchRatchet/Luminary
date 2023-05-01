@@ -70,6 +70,73 @@ static void write_IHDR_chunk_to_file(
   free(chunk);
 }
 
+static void write_sRGB_chunk_to_file(FILE* file) {
+  uint8_t* chunk = (uint8_t*) malloc(13);
+
+  write_uint32_big_endian(chunk, 1u);
+
+  chunk[4] = 's';
+  chunk[5] = 'R';
+  chunk[6] = 'G';
+  chunk[7] = 'B';
+
+  // Perceptual sRGB
+  chunk[8] = 0;
+
+  write_uint32_big_endian(chunk + 9, (uint32_t) crc32(0, chunk + 4, 5));
+
+  fwrite(chunk, 1, 13, file);
+
+  free(chunk);
+}
+
+static void write_gAMA_chunk_to_file(FILE* file) {
+  uint8_t* chunk = (uint8_t*) malloc(16);
+
+  write_uint32_big_endian(chunk, 4u);
+
+  chunk[4] = 'g';
+  chunk[5] = 'A';
+  chunk[6] = 'M';
+  chunk[7] = 'A';
+
+  // PNG standard defines this value to be stored in the gAMA chunk if sRGB chunk is present
+  write_uint32_big_endian(chunk + 8, 45455u);
+
+  write_uint32_big_endian(chunk + 12, (uint32_t) crc32(0, chunk + 4, 8));
+
+  fwrite(chunk, 1, 16, file);
+
+  free(chunk);
+}
+
+static void write_cHRM_chunk_to_file(FILE* file) {
+  uint8_t* chunk = (uint8_t*) malloc(44);
+
+  write_uint32_big_endian(chunk, 32u);
+
+  chunk[4] = 'c';
+  chunk[5] = 'H';
+  chunk[6] = 'R';
+  chunk[7] = 'M';
+
+  // PNG standard defines these values to be stored in the cHRM chunk if sRGB chunk is present
+  write_uint32_big_endian(chunk + 8, 31270u);
+  write_uint32_big_endian(chunk + 12, 32900u);
+  write_uint32_big_endian(chunk + 16, 64000u);
+  write_uint32_big_endian(chunk + 20, 33000u);
+  write_uint32_big_endian(chunk + 24, 30000u);
+  write_uint32_big_endian(chunk + 28, 60000u);
+  write_uint32_big_endian(chunk + 32, 15000u);
+  write_uint32_big_endian(chunk + 36, 6000u);
+
+  write_uint32_big_endian(chunk + 40, (uint32_t) crc32(0, chunk + 4, 36));
+
+  fwrite(chunk, 1, 44, file);
+
+  free(chunk);
+}
+
 static void write_IDAT_chunk_to_file(FILE* file, const uint8_t* compressed_image, const uint32_t compressed_length) {
   uint8_t* chunk = (uint8_t*) malloc(12 + compressed_length);
 
@@ -166,6 +233,10 @@ int store_as_png(
   write_header_to_file(file);
 
   write_IHDR_chunk_to_file(file, width, height, bit_depth, color_type, PNG_INTERLACE_OFF);
+
+  write_sRGB_chunk_to_file(file);
+  write_gAMA_chunk_to_file(file);
+  write_cHRM_chunk_to_file(file);
 
   uint8_t* compressed_image = (uint8_t*) malloc(image_length + height);
 
