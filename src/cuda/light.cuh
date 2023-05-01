@@ -64,7 +64,7 @@ __global__ void spatial_resampling(LightSample* input, LightSample* output) {
 
         LightSample spatial = load_light_sample(input, sample_x + sample_y * device.width);
 
-        if (spatial.id == LIGHT_ID_NONE || spatial.id == selected.id)
+        if (spatial.id == LIGHT_ID_NONE)
           continue;
 
         const float target_weight = brdf_light_sample_target_weight(spatial);

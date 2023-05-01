@@ -176,9 +176,9 @@ __device__ float brdf_light_sample_target_weight(const LightSample light) {
     case LIGHT_ID_NONE:
       weight = 0.0f;
       break;
-    default: {
+    default:
       weight = device.scene.material.default_material.b;
-    } break;
+      break;
   }
 
   return weight * light.solid_angle;
@@ -264,13 +264,10 @@ __device__ LightSample sample_light(const vec3 position, uint32_t& ran_offset) {
       case 1:
         light.id = LIGHT_ID_TOY;
         break;
-      default: {
+      default:
         light.id = light_index - 2;
-      } break;
+        break;
     }
-
-    if (light.id == selected.id)
-      continue;
 
     light.solid_angle = brdf_light_sample_solid_angle(light, position);
     light.weight      = brdf_light_sample_target_weight(light) * light_count_float;
