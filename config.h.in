@@ -17,7 +17,7 @@
   "${CUDAToolkit_VERSION_MAJOR}" \
   "."                            \
   "${CUDAToolkit_VERSION_MINOR}"
-#define LUMINARY_OPTIX_VERSION "${OptiX_version}"
+#define LUMINARY_OPTIX_VERSION "${OptiX_VERSION}"
 #define LUMINARY_VERSION_HASH (uint64_t)(strtol("${GIT_COMMIT_HASH}", (char**) 0, 16))
 
 #endif /* CONFIG_H */

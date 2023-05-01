@@ -40,6 +40,10 @@ endif()
 find_package(CUDAToolkit 12.1 REQUIRED QUIET)
 find_package(Optix 7.7 REQUIRED QUIET)
 
+if(NOT OptiX_VERSION)
+  set(OptiX_VERSION "7.7")
+endif()
+
 #=============================================================
 # Set files to compile
 #=============================================================
