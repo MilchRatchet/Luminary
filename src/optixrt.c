@@ -32,19 +32,26 @@ void optixrt_init(RaytraceInstance* instance) {
   // Displacement Micromaps Building
   ////////////////////////////////////////////////////////////////////
 
-  OptixBuildInputDisplacementMicromap dmm = micromap_displacement_build(instance);
+  OptixBuildInputDisplacementMicromap dmm;
+  if (instance->device_info.rt_core_version >= 1) {
+    dmm = micromap_displacement_build(instance);
+  }
+  else {
+    log_message("No OMM is built due to device constraints.");
+    memset(&dmm, 0, sizeof(OptixBuildInputDisplacementMicromap));
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Opacity Micromaps Building
   ////////////////////////////////////////////////////////////////////
 
   OptixBuildInputOpacityMicromap omm;
-
-  // Make it so that OMM is built on Ada Lovelace GPUs even if DMM exists
-  if (!dmm.displacementMicromapArray) {
+  // OMM and DMM at the same time are only supported on RT core version 3.0 (Ada Lovelace)
+  if ((instance->device_info.rt_core_version >= 1 && !dmm.displacementMicromapArray) || instance->device_info.rt_core_version >= 3) {
     omm = micromap_opacity_build(instance);
   }
   else {
+    log_message("No DMM is built due to device constraints.");
     memset(&omm, 0, sizeof(OptixBuildInputOpacityMicromap));
   }
 
