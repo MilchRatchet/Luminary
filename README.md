@@ -103,6 +103,8 @@ Requirements:
 - SSE 4.1 compatible CPU
 - Supported Nvidia GPU (Turing or later)
 
+>📝 The use of opacity micromaps and displacement micromaps at the same time is only possible on Ada Lovelace Arch GPUs. (This seems to not be documented anywhere.)
+
 `zlib` comes as a submodule and is compiled with Luminary, it is not required to have `zlib` installed. This is due to the compiler limitations of CUDA on Windows which makes usage of zlib-ng inconvenient.
 >📝 `zlib` and `qoi` come as git submodules. Make sure to clone the submodules by using `git submodule update --init` after cloning Luminary.
 

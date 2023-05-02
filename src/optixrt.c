@@ -29,10 +29,24 @@ void optixrt_init(RaytraceInstance* instance) {
   bench_tic();
 
   ////////////////////////////////////////////////////////////////////
+  // Displacement Micromaps Building
+  ////////////////////////////////////////////////////////////////////
+
+  OptixBuildInputDisplacementMicromap dmm = micromap_displacement_build(instance);
+
+  ////////////////////////////////////////////////////////////////////
   // Opacity Micromaps Building
   ////////////////////////////////////////////////////////////////////
 
-  OptixBuildInputOpacityMicromap omm = micromap_opacity_build(instance);
+  OptixBuildInputOpacityMicromap omm;
+
+  // Make it so that OMM is built on Ada Lovelace GPUs even if DMM exists
+  if (!dmm.displacementMicromapArray) {
+    omm = micromap_opacity_build(instance);
+  }
+  else {
+    memset(&omm, 0, sizeof(OptixBuildInputOpacityMicromap));
+  }
 
   ////////////////////////////////////////////////////////////////////
   // BVH Building
@@ -61,9 +75,10 @@ void optixrt_init(RaytraceInstance* instance) {
 
   unsigned int inputFlags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING};
 
-  build_inputs.triangleArray.flags           = inputFlags;
-  build_inputs.triangleArray.opacityMicromap = omm;
-  build_inputs.triangleArray.numSbtRecords   = 1;
+  build_inputs.triangleArray.flags                = inputFlags;
+  build_inputs.triangleArray.opacityMicromap      = omm;
+  build_inputs.triangleArray.displacementMicromap = dmm;
+  build_inputs.triangleArray.numSbtRecords        = 1;
 
   OptixAccelBufferSizes buffer_sizes;
 
@@ -144,6 +159,10 @@ void optixrt_init(RaytraceInstance* instance) {
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
   pipeline_compile_options.allowOpacityMicromaps            = 1;
+
+  if (dmm.displacementMicromapArray) {
+    pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
+  }
 
   char log[4096];
   size_t log_size = sizeof(log);

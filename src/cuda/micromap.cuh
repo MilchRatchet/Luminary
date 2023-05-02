@@ -437,4 +437,268 @@ void micromap_opacity_free(OptixBuildInputOpacityMicromap data) {
   free((void*) data.micromapUsageCounts);
 }
 
+__global__ void dmm_precompute_indices(uint32_t* dst) {
+  int id                        = threadIdx.x + blockIdx.x * blockDim.x;
+  const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
+
+  while (id < triangle_count) {
+    const uint32_t object_map = device.scene.triangles->object_maps;
+    const uint16_t tex        = device.scene.texture_assignments[object_map].normal_map;
+
+    dst[id] = (tex == TEXTURE_NONE) ? 0 : 1;
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
+__global__ void dmm_setup_vertex_directions(half* dst, const uint32_t* mapping, const uint32_t count) {
+  int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  while (id < count) {
+    const uint32_t tri_id = mapping[id];
+
+    vec3 v0;
+    vec3 v1;
+    vec3 v2;
+
+    if (tri_id == 0xFFFFFFFF) {
+      v0 = get_vector(0.0f, 1.0f, 0.0f);
+      v1 = get_vector(0.0f, 1.0f, 0.0f);
+      v2 = get_vector(0.0f, 1.0f, 0.0f);
+    }
+    else {
+      const float4* ptr = (float4*) (device.scene.triangles + tri_id);
+
+      const float4 data0 = __ldg(ptr + 2);
+      const float4 data1 = __ldg(ptr + 3);
+      const float4 data2 = __ldg(ptr + 4);
+
+      const vec3 vertex_normal = get_vector(data0.y, data0.z, data0.w);
+      const vec3 edge1_normal  = get_vector(data1.x, data1.y, data1.z);
+      const vec3 edge2_normal  = get_vector(data1.w, data2.x, data2.y);
+
+      v0 = vertex_normal;
+      v1 = add_vector(vertex_normal, edge1_normal);
+      v2 = add_vector(vertex_normal, edge2_normal);
+    }
+
+    dst[9 * id + 0] = (half) v0.x;
+    dst[9 * id + 1] = (half) v0.y;
+    dst[9 * id + 2] = (half) v0.z;
+    dst[9 * id + 3] = (half) v1.x;
+    dst[9 * id + 4] = (half) v1.y;
+    dst[9 * id + 5] = (half) v1.z;
+    dst[9 * id + 6] = (half) v2.x;
+    dst[9 * id + 7] = (half) v2.y;
+    dst[9 * id + 8] = (half) v2.z;
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
+__global__ void dmm_build_level_3_format_64(uint8_t* dst, const uint32_t* mapping, const uint32_t count) {
+  int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  while (id < count) {
+    const uint32_t tri_id = mapping[id];
+
+    if (tri_id == 0xFFFFFFFF) {
+    }
+    else {
+    }
+
+    for (int i = 0; i < 8; i++) {
+      dst[8 * id + i] = 0;
+    }
+
+    id += blockDim.x * gridDim.x;
+  }
+}
+
+OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance* instance) {
+  // Initial implementation only supports the basic one uncompressed block as a DMM
+  // It is planned to at least support uncompressed blocks that sum to 1024 microtriangles in the future
+  const uint32_t level                         = 3;
+  const OptixDisplacementMicromapFormat format = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES;
+
+  const uint32_t total_tri_count = instance->scene.triangle_data.triangle_count;
+
+  ////////////////////////////////////////////////////////////////////
+  // Index computation
+  ////////////////////////////////////////////////////////////////////
+
+  void* indices_buffer;
+  device_malloc(&indices_buffer, total_tri_count * sizeof(uint32_t));
+
+  dmm_precompute_indices<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((uint32_t*) indices_buffer);
+  gpuErrchk(cudaDeviceSynchronize());
+
+  uint32_t* indices = (uint32_t*) malloc(sizeof(uint32_t) * total_tri_count);
+  uint32_t* mapping = (uint32_t*) malloc(sizeof(uint32_t) * total_tri_count);
+
+  device_download(indices, indices_buffer, total_tri_count * sizeof(uint32_t));
+  gpuErrchk(cudaDeviceSynchronize());
+
+  mapping[0] = 0xFFFFFFFF;
+
+  uint32_t dmm_count = 1;
+  for (uint32_t i = 0; i < total_tri_count; i++) {
+    if (indices[i]) {
+      indices[i]         = dmm_count;
+      mapping[dmm_count] = i;
+      dmm_count++;
+    }
+  }
+
+  if (dmm_count == 1) {
+    log_message("[Optix DMM] No displacement maps exist. No DMM was built.");
+
+    OptixBuildInputDisplacementMicromap empty_result;
+    memset(&empty_result, 0, sizeof(OptixBuildInputDisplacementMicromap));
+
+    free(indices);
+    free(mapping);
+    device_free(indices_buffer, total_tri_count * sizeof(uint32_t));
+
+    return empty_result;
+  }
+
+  device_upload(indices_buffer, indices, total_tri_count * sizeof(uint32_t));
+  gpuErrchk(cudaDeviceSynchronize());
+
+  void* mapping_buffer;
+  device_malloc(&mapping_buffer, dmm_count * sizeof(uint32_t));
+  device_upload(mapping_buffer, mapping, dmm_count * sizeof(uint32_t));
+
+  ////////////////////////////////////////////////////////////////////
+  // Vertex direction computation
+  ////////////////////////////////////////////////////////////////////
+
+  void* vertex_direction_buffer;
+  device_malloc(&vertex_direction_buffer, dmm_count * sizeof(half) * 9);
+
+  dmm_setup_vertex_directions<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+    (half*) vertex_direction_buffer, (uint32_t*) mapping_buffer, dmm_count);
+  gpuErrchk(cudaDeviceSynchronize());
+
+  ////////////////////////////////////////////////////////////////////
+  // Usage count setup
+  ////////////////////////////////////////////////////////////////////
+
+  OptixDisplacementMicromapUsageCount* usage =
+    (OptixDisplacementMicromapUsageCount*) malloc(sizeof(OptixDisplacementMicromapUsageCount) * 2);
+
+  usage[0].count            = 1;
+  usage[0].format           = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES;
+  usage[0].subdivisionLevel = 0;
+
+  usage[1].count            = dmm_count - 1;
+  usage[1].format           = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES;
+  usage[1].subdivisionLevel = 3;
+
+  ////////////////////////////////////////////////////////////////////
+  // Description setup
+  ////////////////////////////////////////////////////////////////////
+
+  OptixDisplacementMicromapDesc* desc = (OptixDisplacementMicromapDesc*) malloc(sizeof(OptixDisplacementMicromapDesc) * dmm_count);
+  for (uint32_t i = 0; i < dmm_count; i++) {
+    desc[i].byteOffset       = i * 64;
+    desc[i].format           = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES;
+    desc[i].subdivisionLevel = (i) ? 3 : 0;
+  }
+
+  void* desc_buffer;
+  device_malloc(&desc_buffer, sizeof(OptixDisplacementMicromapDesc) * dmm_count);
+  device_upload(desc_buffer, desc, sizeof(OptixDisplacementMicromapDesc) * dmm_count);
+
+  ////////////////////////////////////////////////////////////////////
+  // Histogram setup
+  ////////////////////////////////////////////////////////////////////
+
+  OptixDisplacementMicromapHistogramEntry* histogram =
+    (OptixDisplacementMicromapHistogramEntry*) malloc(sizeof(OptixDisplacementMicromapHistogramEntry) * 2);
+
+  histogram[0].count            = 1;
+  histogram[0].format           = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES;
+  histogram[0].subdivisionLevel = 0;
+
+  histogram[1].count            = dmm_count - 1;
+  histogram[1].format           = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES;
+  histogram[1].subdivisionLevel = 3;
+
+  ////////////////////////////////////////////////////////////////////
+  // DMM construction
+  ////////////////////////////////////////////////////////////////////
+
+  void* data;
+  device_malloc(&data, 64 * dmm_count);
+
+  dmm_build_level_3_format_64<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((uint8_t*) data, (uint32_t*) mapping_buffer, dmm_count);
+  gpuErrchk(cudaDeviceSynchronize());
+
+  ////////////////////////////////////////////////////////////////////
+  // DMM array construction
+  ////////////////////////////////////////////////////////////////////
+
+  OptixDisplacementMicromapArrayBuildInput array_build_input;
+  memset(&array_build_input, 0, sizeof(OptixDisplacementMicromapArrayBuildInput));
+
+  array_build_input.flags = OPTIX_DISPLACEMENT_MICROMAP_FLAG_PREFER_FAST_TRACE;
+
+  array_build_input.displacementMicromapHistogramEntries    = histogram;
+  array_build_input.numDisplacementMicromapHistogramEntries = 2;
+
+  array_build_input.perDisplacementMicromapDescBuffer        = (CUdeviceptr) desc_buffer;
+  array_build_input.perDisplacementMicromapDescStrideInBytes = 0;
+
+  array_build_input.displacementValuesBuffer = (CUdeviceptr) data;
+
+  OptixMicromapBufferSizes buffer_sizes;
+  memset(&buffer_sizes, 0, sizeof(OptixMicromapBufferSizes));
+
+  OPTIX_CHECK(optixDisplacementMicromapArrayComputeMemoryUsage(instance->optix_ctx, &array_build_input, &buffer_sizes));
+
+  void* output_buffer;
+  device_malloc(&output_buffer, buffer_sizes.outputSizeInBytes);
+  void* temp_buffer;
+  device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes);
+
+  OptixMicromapBuffers buffers;
+  memset(&buffers, 0, sizeof(OptixMicromapBuffers));
+
+  buffers.output            = (CUdeviceptr) output_buffer;
+  buffers.outputSizeInBytes = buffer_sizes.outputSizeInBytes;
+  buffers.temp              = (CUdeviceptr) temp_buffer;
+  buffers.tempSizeInBytes   = buffer_sizes.tempSizeInBytes;
+
+  OPTIX_CHECK(optixDisplacementMicromapArrayBuild(instance->optix_ctx, 0, &array_build_input, &buffers));
+
+  device_free(temp_buffer, buffer_sizes.tempSizeInBytes);
+
+  ////////////////////////////////////////////////////////////////////
+  // BVH input construction
+  ////////////////////////////////////////////////////////////////////
+
+  OptixBuildInputDisplacementMicromap bvh_input;
+  memset(&bvh_input, 0, sizeof(OptixBuildInputDisplacementMicromap));
+
+  bvh_input.indexingMode = OPTIX_DISPLACEMENT_MICROMAP_ARRAY_INDEXING_MODE_INDEXED;
+
+  bvh_input.displacementMicromapUsageCounts    = usage;
+  bvh_input.numDisplacementMicromapUsageCounts = 2;
+
+  bvh_input.displacementMicromapArray = (CUdeviceptr) output_buffer;
+
+  bvh_input.displacementMicromapIndexBuffer        = (CUdeviceptr) indices_buffer;
+  bvh_input.displacementMicromapIndexSizeInBytes   = 4;
+  bvh_input.displacementMicromapIndexStrideInBytes = 0;
+  bvh_input.displacementMicromapIndexOffset        = 0;
+
+  bvh_input.vertexDirectionsBuffer       = (CUdeviceptr) vertex_direction_buffer;
+  bvh_input.vertexDirectionFormat        = OPTIX_DISPLACEMENT_MICROMAP_DIRECTION_FORMAT_HALF3;
+  bvh_input.vertexDirectionStrideInBytes = 6;
+
+  return bvh_input;
+}
+
 #endif /* CU_MICROMAP_H */
