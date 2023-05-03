@@ -437,12 +437,47 @@ void micromap_opacity_free(OptixBuildInputOpacityMicromap data) {
   free((void*) data.micromapUsageCounts);
 }
 
+#define DMM_NONE 0xFFFFFFFF
+
+struct DMMTextureTriangle {
+  UV vertex;
+  UV edge1;
+  UV edge2;
+  DeviceTexture tex;
+  uint16_t tex_id;
+} typedef DMMTextureTriangle;
+
+__device__ DMMTextureTriangle micromap_get_dmmtexturetriangle(const uint32_t id) {
+  const float* t_ptr = (float*) (device.scene.triangles + id);
+
+  uint32_t object_map = __ldg((uint32_t*) (t_ptr + 24));
+  uint16_t tex        = device.scene.texture_assignments[object_map].normal_map;
+
+  DMMTextureTriangle tri;
+  tri.tex_id = tex;
+
+  if (tex == TEXTURE_NONE) {
+    return tri;
+  }
+
+  float2 data0 = __ldg((float2*) (t_ptr + 18));
+  float4 data1 = __ldg((float4*) (t_ptr + 20));
+
+  tri.tex = device.ptrs.normal_atlas[tex];
+
+  tri.vertex = get_UV(data0.x, data0.y);
+  tri.edge1  = get_UV(data1.x, data1.y);
+  tri.edge2  = get_UV(data1.z, data1.w);
+
+  return tri;
+}
+
 __global__ void dmm_precompute_indices(uint32_t* dst) {
   int id                        = threadIdx.x + blockIdx.x * blockDim.x;
   const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
 
   while (id < triangle_count) {
-    const uint32_t object_map = device.scene.triangles->object_maps;
+    const uint32_t object_map = device.scene.triangles[id].object_maps;
     const uint16_t tex        = device.scene.texture_assignments[object_map].normal_map;
 
     dst[id] = (tex == TEXTURE_NONE) ? 0 : 1;
@@ -461,7 +496,7 @@ __global__ void dmm_setup_vertex_directions(half* dst, const uint32_t* mapping, 
     vec3 v1;
     vec3 v2;
 
-    if (tri_id == 0xFFFFFFFF) {
+    if (tri_id == DMM_NONE) {
       v0 = get_vector(0.0f, 1.0f, 0.0f);
       v1 = get_vector(0.0f, 1.0f, 0.0f);
       v2 = get_vector(0.0f, 1.0f, 0.0f);
@@ -480,6 +515,10 @@ __global__ void dmm_setup_vertex_directions(half* dst, const uint32_t* mapping, 
       v0 = vertex_normal;
       v1 = add_vector(vertex_normal, edge1_normal);
       v2 = add_vector(vertex_normal, edge2_normal);
+
+      v0 = scale_vector(v0, 0.1f);
+      v1 = scale_vector(v1, 0.1f);
+      v2 = scale_vector(v2, 0.1f);
     }
 
     dst[9 * id + 0] = (half) v0.x;
@@ -496,19 +535,97 @@ __global__ void dmm_setup_vertex_directions(half* dst, const uint32_t* mapping, 
   }
 }
 
+__device__ const uint8_t dmm_umajor_id_level_3_format_64[45] = {0,  15, 6, 21, 3, 39, 12, 42, 2,  17, 16, 23, 22, 41, 40,
+                                                                44, 43, 8, 18, 7, 24, 14, 36, 13, 20, 19, 26, 25, 38, 37,
+                                                                5,  27, 9, 33, 4, 29, 28, 35, 34, 11, 30, 10, 32, 31, 1};
+
+//
+// This function is taken from the optixDisplacementMicromesh example code provided in the OptiX 7.7 installation.
+//
+__device__ void dmm_set_displacement(uint8_t* dst, const uint32_t u_vert_id, const float disp) {
+  const uint32_t vert_id = dmm_umajor_id_level_3_format_64[u_vert_id];
+
+  const uint16_t v = (uint16_t) (disp * ((uint16_t) 0x7FF));
+
+  uint32_t bit_offset = 11 * vert_id;
+  uint32_t v_offset   = 0;
+
+  while (v_offset < 11) {
+    if (bit_offset >= 495) {
+      // REMOVE
+      printf("BIT_OFFSET: %u\n", bit_offset);
+      break;
+    }
+
+    uint32_t num = (~bit_offset & 7) + 1;
+
+    if (11 - v_offset < num) {
+      num = 11 - v_offset;
+    }
+
+    const uint16_t mask  = (1u << num) - 1u;
+    const uint32_t id    = bit_offset >> 3;
+    const uint32_t shift = bit_offset & 7;
+
+    if (id >= 64) {
+      // REMOVE
+      printf("ID: %u\n", id);
+      break;
+    }
+
+    const uint8_t bits = (uint8_t) ((v >> v_offset) & mask);
+    dst[id] &= ~(mask << shift);
+    dst[id] |= bits << shift;
+
+    bit_offset += num;
+    v_offset += num;
+  }
+}
+
 __global__ void dmm_build_level_3_format_64(uint8_t* dst, const uint32_t* mapping, const uint32_t count) {
   int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   while (id < count) {
     const uint32_t tri_id = mapping[id];
 
-    if (tri_id == 0xFFFFFFFF) {
+    if (tri_id == DMM_NONE) {
+      uint4* ptr    = (uint4*) (dst + 64 * id);
+      const uint4 v = make_uint4(0, 0, 0, 0);
+
+      __stcs(ptr + 0, v);
+      __stcs(ptr + 1, v);
+      __stcs(ptr + 2, v);
+      __stcs(ptr + 3, v);
     }
     else {
-    }
+      const DMMTextureTriangle tri = micromap_get_dmmtexturetriangle(tri_id);
 
-    for (int i = 0; i < 8; i++) {
-      dst[8 * id + i] = 0;
+      float2 bary0;
+      float2 bary1;
+      float2 bary2;
+      optixMicromapIndexToBaseBarycentrics(0, 0, bary0, bary1, bary2);
+
+      const UV uv0 = lerp_uv(tri.vertex, tri.edge1, tri.edge2, bary0);
+      const UV uv1 = lerp_uv(tri.vertex, tri.edge1, tri.edge2, bary1);
+      const UV uv2 = lerp_uv(tri.vertex, tri.edge1, tri.edge2, bary2);
+
+      uint32_t u_vert_id          = 0;
+      const uint32_t num_segments = 1 << 3;
+
+      for (uint32_t i = 0; i < num_segments + 1; i++) {
+        for (uint32_t j = 0; j < num_segments + 1 - i; j++) {
+          const float2 micro_vertex_bary = make_float2(((float) i) / num_segments, ((float) j) / num_segments);
+
+          UV uv;
+          uv.u = (1.0f - micro_vertex_bary.x - micro_vertex_bary.y) * uv0.u + micro_vertex_bary.x * uv1.u + micro_vertex_bary.y * uv2.u;
+          uv.v = (1.0f - micro_vertex_bary.x - micro_vertex_bary.y) * uv0.v + micro_vertex_bary.x * uv1.v + micro_vertex_bary.y * uv2.v;
+
+          const float disp = tex2D<float4>(tri.tex.tex, uv.u, 1.0f - uv.v).w;
+
+          dmm_set_displacement(dst + 64 * id, u_vert_id, disp);
+          u_vert_id++;
+        }
+      }
     }
 
     id += blockDim.x * gridDim.x;
@@ -539,7 +656,7 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
   device_download(indices, indices_buffer, total_tri_count * sizeof(uint32_t));
   gpuErrchk(cudaDeviceSynchronize());
 
-  mapping[0] = 0xFFFFFFFF;
+  mapping[0] = DMM_NONE;
 
   uint32_t dmm_count = 1;
   for (uint32_t i = 0; i < total_tri_count; i++) {

@@ -37,7 +37,7 @@ void optixrt_init(RaytraceInstance* instance) {
     dmm = micromap_displacement_build(instance);
   }
   else {
-    log_message("No OMM is built due to device constraints.");
+    log_message("No DMM is built due to device constraints.");
     memset(&dmm, 0, sizeof(OptixBuildInputDisplacementMicromap));
   }
 
@@ -51,7 +51,7 @@ void optixrt_init(RaytraceInstance* instance) {
     omm = micromap_opacity_build(instance);
   }
   else {
-    log_message("No DMM is built due to device constraints.");
+    log_message("No OMM is built due to device constraints.");
     memset(&omm, 0, sizeof(OptixBuildInputOpacityMicromap));
   }
 
@@ -90,6 +90,7 @@ void optixrt_init(RaytraceInstance* instance) {
   OptixAccelBufferSizes buffer_sizes;
 
   OPTIX_CHECK(optixAccelComputeMemoryUsage(instance->optix_ctx, &build_options, &build_inputs, 1, &buffer_sizes));
+  gpuErrchk(cudaDeviceSynchronize());
 
   void* temp_buffer;
   device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes);
@@ -108,6 +109,7 @@ void optixrt_init(RaytraceInstance* instance) {
   OPTIX_CHECK(optixAccelBuild(
     instance->optix_ctx, 0, &build_options, &build_inputs, 1, (CUdeviceptr) temp_buffer, buffer_sizes.tempSizeInBytes,
     (CUdeviceptr) output_buffer, buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
+  gpuErrchk(cudaDeviceSynchronize());
 
   size_t compact_size;
 
@@ -122,6 +124,7 @@ void optixrt_init(RaytraceInstance* instance) {
     device_malloc(&output_buffer_compact, compact_size);
 
     OPTIX_CHECK(optixAccelCompact(instance->optix_ctx, 0, traversable, (CUdeviceptr) output_buffer_compact, compact_size, &traversable));
+    gpuErrchk(cudaDeviceSynchronize());
 
     device_free(output_buffer, buffer_sizes.outputSizeInBytes);
 
