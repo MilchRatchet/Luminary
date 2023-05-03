@@ -65,37 +65,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     vec3 normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, coords, face_normal);
 
-    if (dot_product(face_normal, normal) < 0.0f) {
-      normal        = scale_vector(normal, -1.0f);
-      vertex_normal = scale_vector(vertex_normal, -1.0f);
-      edge1_normal  = scale_vector(edge1_normal, -1.0f);
-      edge2_normal  = scale_vector(edge2_normal, -1.0f);
-    }
-
-    if (dot_product(face_normal, ray) > 0.0f) {
-      face_normal   = scale_vector(face_normal, -1.0f);
-      normal        = scale_vector(normal, -1.0f);
-      vertex_normal = scale_vector(vertex_normal, -1.0f);
-      edge1_normal  = scale_vector(edge1_normal, -1.0f);
-      edge2_normal  = scale_vector(edge2_normal, -1.0f);
-    }
-
-    /*
-     * I came up with this quickly, problem is that we need to rotate the normal
-     * towards the face normal with our ray is "behind" the shading normal
-     */
-    if (dot_product(normal, ray) > 0.0f) {
-      const float a = sqrtf(1.0f - dot_product(face_normal, ray));
-      const float b = dot_product(face_normal, normal);
-      const float t = a / (a + b + eps);
-      normal        = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(normal, 1.0f - t)));
-      vertex_normal = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(vertex_normal, 1.0f - t)));
-      edge1_normal  = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(edge1_normal, 1.0f - t)));
-      edge2_normal  = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(edge2_normal, 1.0f - t)));
-    }
-
-    vec3 terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
-
+    vec3 terminator;
     if (maps.w != TEXTURE_NONE) {
       const float4 normal_f = geometry_texture_load(device.ptrs.normal_atlas[maps.w], tex_coords);
 
@@ -106,7 +76,47 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
       Mat3x3 tangent_space = cotangent_frame(normal, edge1, edge2, edge1_texture, edge2_texture);
 
-      normal = normalize_vector(transform_vec3(tangent_space, map_normal));
+      normal     = normalize_vector(transform_vec3(tangent_space, map_normal));
+      terminator = task.position;
+
+      if (dot_product(normal, ray) > 0.0f) {
+        normal        = scale_vector(normal, -1.0f);
+        vertex_normal = scale_vector(vertex_normal, -1.0f);
+        edge1_normal  = scale_vector(edge1_normal, -1.0f);
+        edge2_normal  = scale_vector(edge2_normal, -1.0f);
+      }
+    }
+    else {
+      if (dot_product(face_normal, normal) < 0.0f) {
+        normal        = scale_vector(normal, -1.0f);
+        vertex_normal = scale_vector(vertex_normal, -1.0f);
+        edge1_normal  = scale_vector(edge1_normal, -1.0f);
+        edge2_normal  = scale_vector(edge2_normal, -1.0f);
+      }
+
+      if (dot_product(face_normal, ray) > 0.0f) {
+        face_normal   = scale_vector(face_normal, -1.0f);
+        normal        = scale_vector(normal, -1.0f);
+        vertex_normal = scale_vector(vertex_normal, -1.0f);
+        edge1_normal  = scale_vector(edge1_normal, -1.0f);
+        edge2_normal  = scale_vector(edge2_normal, -1.0f);
+      }
+
+      /*
+       * I came up with this quickly, problem is that we need to rotate the normal
+       * towards the face normal with our ray is "behind" the shading normal
+       */
+      if (dot_product(normal, ray) > 0.0f) {
+        const float a = sqrtf(1.0f - dot_product(face_normal, ray));
+        const float b = dot_product(face_normal, normal);
+        const float t = a / (a + b + eps);
+        normal        = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(normal, 1.0f - t)));
+        vertex_normal = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(vertex_normal, 1.0f - t)));
+        edge1_normal  = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(edge1_normal, 1.0f - t)));
+        edge2_normal  = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(edge2_normal, 1.0f - t)));
+      }
+
+      terminator = terminator_fix(task.position, vertex, edge1, edge2, vertex_normal, edge1_normal, edge2_normal, coords);
     }
 
     float roughness;
