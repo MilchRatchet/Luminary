@@ -33,7 +33,7 @@ void optixrt_init(RaytraceInstance* instance) {
   ////////////////////////////////////////////////////////////////////
 
   OptixBuildInputDisplacementMicromap dmm;
-  if (instance->device_info.rt_core_version >= 1) {
+  if ((instance->device_info.rt_core_version >= 1 && instance->optix_bvh.force_dmm_usage) || instance->device_info.rt_core_version >= 3) {
     dmm = micromap_displacement_build(instance);
   }
   else {

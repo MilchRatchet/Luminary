@@ -75,6 +75,9 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
 -v, --version
         print build information and exit
 
+    --force-displacement
+        turn on displacement map usage on Ampere and Turing architecture GPUs
+
     --qoi
         set output image format to QOI
 

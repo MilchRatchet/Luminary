@@ -407,6 +407,7 @@ struct OptixBVH {
   OptixPipeline pipeline;
   OptixShaderBindingTable shaders;
   DeviceConstantMemory* params;
+  int force_dmm_usage;
 } typedef OptixBVH;
 
 struct DeviceInfo {
