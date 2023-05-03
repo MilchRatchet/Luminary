@@ -244,6 +244,10 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   const uint32_t max_num_levels = 6;
   uint32_t num_levels           = 0;
 
+  ////////////////////////////////////////////////////////////////////
+  // OMM construction
+  ////////////////////////////////////////////////////////////////////
+
   uint32_t* triangles_per_level = (uint32_t*) calloc(1, sizeof(uint32_t) * max_num_levels);
   void** data                   = (void**) malloc(sizeof(void*) * max_num_levels);
 
@@ -336,6 +340,10 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   void* omm_array;
   device_malloc(&omm_array, final_array_size);
 
+  ////////////////////////////////////////////////////////////////////
+  // Description setup
+  ////////////////////////////////////////////////////////////////////
+
   OptixOpacityMicromapDesc* desc = (OptixOpacityMicromapDesc*) malloc(sizeof(OptixOpacityMicromapDesc) * total_tri_count);
 
   for (uint32_t i = 0; i < total_tri_count; i++) {
@@ -373,20 +381,35 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
 
   free(data);
 
+  ////////////////////////////////////////////////////////////////////
+  // Histogram setup
+  ////////////////////////////////////////////////////////////////////
+
   OptixOpacityMicromapHistogramEntry* histogram =
     (OptixOpacityMicromapHistogramEntry*) malloc(sizeof(OptixOpacityMicromapHistogramEntry) * num_levels);
-  OptixOpacityMicromapUsageCount* usage = (OptixOpacityMicromapUsageCount*) malloc(sizeof(OptixOpacityMicromapUsageCount) * num_levels);
+
   for (uint32_t i = 0; i < num_levels; i++) {
     histogram[i].count            = triangles_per_level[i];
     histogram[i].subdivisionLevel = i;
     histogram[i].format           = format;
+  }
 
+  ////////////////////////////////////////////////////////////////////
+  // Usage count setup
+  ////////////////////////////////////////////////////////////////////
+
+  OptixOpacityMicromapUsageCount* usage = (OptixOpacityMicromapUsageCount*) malloc(sizeof(OptixOpacityMicromapUsageCount) * num_levels);
+  for (uint32_t i = 0; i < num_levels; i++) {
     usage[i].count            = triangles_per_level[i];
     usage[i].subdivisionLevel = i;
     usage[i].format           = format;
   }
 
   free(triangles_per_level);
+
+  ////////////////////////////////////////////////////////////////////
+  // DMM array construction
+  ////////////////////////////////////////////////////////////////////
 
   OptixOpacityMicromapArrayBuildInput array_build_input;
   memset(&array_build_input, 0, sizeof(OptixOpacityMicromapArrayBuildInput));
@@ -421,6 +444,10 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   device_free(desc_buffer, sizeof(OptixOpacityMicromapDesc) * num_levels);
   device_free(temp_buffer, buffer_sizes.tempSizeInBytes);
   device_free(omm_array, final_array_size);
+
+  ////////////////////////////////////////////////////////////////////
+  // BVH input construction
+  ////////////////////////////////////////////////////////////////////
 
   OptixBuildInputOpacityMicromap bvh_input;
   memset(&bvh_input, 0, sizeof(OptixBuildInputOpacityMicromap));
@@ -610,8 +637,8 @@ __global__ void dmm_build_level_3_format_64(uint8_t* dst, const uint32_t* mappin
 OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance* instance) {
   // Initial implementation only supports the basic one uncompressed block as a DMM
   // It is planned to at least support uncompressed blocks that sum to 1024 microtriangles in the future
-  const uint32_t level                         = 3;
-  const OptixDisplacementMicromapFormat format = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES;
+  // level  = 3
+  // format = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES
 
   const uint32_t total_tri_count = instance->scene.triangle_data.triangle_count;
 

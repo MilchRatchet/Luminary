@@ -104,7 +104,7 @@ Requirements:
 - Modern CMake
 - Make or Ninja
 - SSE 4.1 compatible CPU
-- Supported Nvidia GPU (Turing or later)
+- Supported Nvidia GPU (Pascal or later)
 
 >📝 The use of opacity micromaps and displacement micromaps at the same time is only possible on Ada Lovelace Arch GPUs. (This seems to not be documented anywhere.)
 
