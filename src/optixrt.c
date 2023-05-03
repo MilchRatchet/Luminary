@@ -168,7 +168,10 @@ void optixrt_init(RaytraceInstance* instance) {
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
-  pipeline_compile_options.allowOpacityMicromaps            = 1;
+
+  if (omm.opacityMicromapArray) {
+    pipeline_compile_options.allowOpacityMicromaps = 1;
+  }
 
   if (dmm.displacementMicromapArray) {
     pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;

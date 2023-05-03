@@ -486,40 +486,27 @@ __global__ void dmm_precompute_indices(uint32_t* dst) {
   }
 }
 
-__global__ void dmm_setup_vertex_directions(half* dst, const uint32_t* mapping, const uint32_t count) {
+__global__ void dmm_setup_vertex_directions(half* dst) {
   int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  while (id < count) {
-    const uint32_t tri_id = mapping[id];
+  while (id < device.scene.triangle_data.triangle_count) {
+    const float4* ptr = (float4*) (device.scene.triangles + id);
 
-    vec3 v0;
-    vec3 v1;
-    vec3 v2;
+    const float4 data0 = __ldg(ptr + 2);
+    const float4 data1 = __ldg(ptr + 3);
+    const float4 data2 = __ldg(ptr + 4);
 
-    if (tri_id == DMM_NONE) {
-      v0 = get_vector(0.0f, 1.0f, 0.0f);
-      v1 = get_vector(0.0f, 1.0f, 0.0f);
-      v2 = get_vector(0.0f, 1.0f, 0.0f);
-    }
-    else {
-      const float4* ptr = (float4*) (device.scene.triangles + tri_id);
+    const vec3 vertex_normal = get_vector(data0.y, data0.z, data0.w);
+    const vec3 edge1_normal  = get_vector(data1.x, data1.y, data1.z);
+    const vec3 edge2_normal  = get_vector(data1.w, data2.x, data2.y);
 
-      const float4 data0 = __ldg(ptr + 2);
-      const float4 data1 = __ldg(ptr + 3);
-      const float4 data2 = __ldg(ptr + 4);
+    vec3 v0 = vertex_normal;
+    vec3 v1 = add_vector(vertex_normal, edge1_normal);
+    vec3 v2 = add_vector(vertex_normal, edge2_normal);
 
-      const vec3 vertex_normal = get_vector(data0.y, data0.z, data0.w);
-      const vec3 edge1_normal  = get_vector(data1.x, data1.y, data1.z);
-      const vec3 edge2_normal  = get_vector(data1.w, data2.x, data2.y);
-
-      v0 = vertex_normal;
-      v1 = add_vector(vertex_normal, edge1_normal);
-      v2 = add_vector(vertex_normal, edge2_normal);
-
-      v0 = scale_vector(v0, 0.1f);
-      v1 = scale_vector(v1, 0.1f);
-      v2 = scale_vector(v2, 0.1f);
-    }
+    v0 = scale_vector(v0, 0.1f);
+    v1 = scale_vector(v1, 0.1f);
+    v2 = scale_vector(v2, 0.1f);
 
     dst[9 * id + 0] = (half) v0.x;
     dst[9 * id + 1] = (half) v0.y;
@@ -551,12 +538,6 @@ __device__ void dmm_set_displacement(uint8_t* dst, const uint32_t u_vert_id, con
   uint32_t v_offset   = 0;
 
   while (v_offset < 11) {
-    if (bit_offset >= 495) {
-      // REMOVE
-      printf("BIT_OFFSET: %u\n", bit_offset);
-      break;
-    }
-
     uint32_t num = (~bit_offset & 7) + 1;
 
     if (11 - v_offset < num) {
@@ -566,12 +547,6 @@ __device__ void dmm_set_displacement(uint8_t* dst, const uint32_t u_vert_id, con
     const uint16_t mask  = (1u << num) - 1u;
     const uint32_t id    = bit_offset >> 3;
     const uint32_t shift = bit_offset & 7;
-
-    if (id >= 64) {
-      // REMOVE
-      printf("ID: %u\n", id);
-      break;
-    }
 
     const uint8_t bits = (uint8_t) ((v >> v_offset) & mask);
     dst[id] &= ~(mask << shift);
@@ -682,20 +657,22 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
 
   device_upload(indices_buffer, indices, total_tri_count * sizeof(uint32_t));
   gpuErrchk(cudaDeviceSynchronize());
+  free(indices);
 
   void* mapping_buffer;
   device_malloc(&mapping_buffer, dmm_count * sizeof(uint32_t));
   device_upload(mapping_buffer, mapping, dmm_count * sizeof(uint32_t));
+  gpuErrchk(cudaDeviceSynchronize());
+  free(mapping);
 
   ////////////////////////////////////////////////////////////////////
   // Vertex direction computation
   ////////////////////////////////////////////////////////////////////
 
   void* vertex_direction_buffer;
-  device_malloc(&vertex_direction_buffer, dmm_count * sizeof(half) * 9);
+  device_malloc(&vertex_direction_buffer, total_tri_count * sizeof(half) * 9);
 
-  dmm_setup_vertex_directions<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    (half*) vertex_direction_buffer, (uint32_t*) mapping_buffer, dmm_count);
+  dmm_setup_vertex_directions<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((half*) vertex_direction_buffer);
   gpuErrchk(cudaDeviceSynchronize());
 
   ////////////////////////////////////////////////////////////////////
@@ -705,7 +682,7 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
   OptixDisplacementMicromapUsageCount* usage =
     (OptixDisplacementMicromapUsageCount*) malloc(sizeof(OptixDisplacementMicromapUsageCount) * 2);
 
-  usage[0].count            = 1;
+  usage[0].count            = total_tri_count - (dmm_count - 1);
   usage[0].format           = OPTIX_DISPLACEMENT_MICROMAP_FORMAT_64_MICRO_TRIS_64_BYTES;
   usage[0].subdivisionLevel = 0;
 
@@ -727,6 +704,9 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
   void* desc_buffer;
   device_malloc(&desc_buffer, sizeof(OptixDisplacementMicromapDesc) * dmm_count);
   device_upload(desc_buffer, desc, sizeof(OptixDisplacementMicromapDesc) * dmm_count);
+  gpuErrchk(cudaDeviceSynchronize());
+
+  free(desc);
 
   ////////////////////////////////////////////////////////////////////
   // Histogram setup
@@ -747,11 +727,15 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
   // DMM construction
   ////////////////////////////////////////////////////////////////////
 
+  const size_t dmm_data_size = 64 * dmm_count;
+
   void* data;
-  device_malloc(&data, 64 * dmm_count);
+  device_malloc(&data, dmm_data_size);
 
   dmm_build_level_3_format_64<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((uint8_t*) data, (uint32_t*) mapping_buffer, dmm_count);
   gpuErrchk(cudaDeviceSynchronize());
+
+  device_free(mapping_buffer, dmm_count * sizeof(uint32_t));
 
   ////////////////////////////////////////////////////////////////////
   // DMM array construction
@@ -774,6 +758,7 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
   memset(&buffer_sizes, 0, sizeof(OptixMicromapBufferSizes));
 
   OPTIX_CHECK(optixDisplacementMicromapArrayComputeMemoryUsage(instance->optix_ctx, &array_build_input, &buffer_sizes));
+  gpuErrchk(cudaDeviceSynchronize());
 
   void* output_buffer;
   device_malloc(&output_buffer, buffer_sizes.outputSizeInBytes);
@@ -789,8 +774,11 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
   buffers.tempSizeInBytes   = buffer_sizes.tempSizeInBytes;
 
   OPTIX_CHECK(optixDisplacementMicromapArrayBuild(instance->optix_ctx, 0, &array_build_input, &buffers));
+  gpuErrchk(cudaDeviceSynchronize());
 
   device_free(temp_buffer, buffer_sizes.tempSizeInBytes);
+  device_free(data, dmm_data_size);
+  free(histogram);
 
   ////////////////////////////////////////////////////////////////////
   // BVH input construction
@@ -813,7 +801,7 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
 
   bvh_input.vertexDirectionsBuffer       = (CUdeviceptr) vertex_direction_buffer;
   bvh_input.vertexDirectionFormat        = OPTIX_DISPLACEMENT_MICROMAP_DIRECTION_FORMAT_HALF3;
-  bvh_input.vertexDirectionStrideInBytes = 6;
+  bvh_input.vertexDirectionStrideInBytes = 0;
 
   return bvh_input;
 }
