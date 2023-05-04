@@ -167,19 +167,22 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
           tt.albedo_tex = device.scene.texture_assignments[t.object_maps].albedo_map;
           tt.id         = t_id;
 
-          float2 coords;
-          const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
+          // This feature does not work for displacement triangles
+          if (device.scene.texture_assignments[t.object_maps].normal_map == TEXTURE_NONE) {
+            float2 coords;
+            const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
 
-          if (dist < depth) {
-            const int alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
+            if (dist < depth) {
+              const int alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
 
-            if (alpha_result != 2) {
-              depth  = dist;
-              hit_id = t_id;
-            }
-            else if (device.iteration_type == TYPE_LIGHT) {
-              depth  = -1.0f;
-              hit_id = REJECT_HIT;
+              if (alpha_result != 2) {
+                depth  = dist;
+                hit_id = t_id;
+              }
+              else if (device.iteration_type == TYPE_LIGHT) {
+                depth  = -1.0f;
+                hit_id = REJECT_HIT;
+              }
             }
           }
         }

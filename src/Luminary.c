@@ -108,6 +108,7 @@ int main(int argc, char* argv[]) {
   int post_process_menu        = 0;
   int unittest                 = 0;
   int version_output           = 0;
+  int force_displacement       = 0;
 
   for (int i = 1; i < argc; i++) {
     if (custom_samples) {
@@ -131,6 +132,7 @@ int main(int argc, char* argv[]) {
     post_process_menu |= parse_command(argv[i], "-p", "--post-menu");
     unittest |= parse_command(argv[i], "-u", "--unittest");
     version_output |= parse_command(argv[i], "-v", "--version");
+    force_displacement |= parse_command(argv[i], (char*) 0, "--force-displacement");
 
     if (parse_command(argv[i], (char*) 0, "--png")) {
       img_format = IMGFORMAT_PNG;
@@ -179,6 +181,11 @@ int main(int argc, char* argv[]) {
       error_message("UNITTEST - BRDF failed.");
 
     return 0;
+  }
+
+  if (force_displacement) {
+    log_message("DMM Usage was forced on by the user.");
+    instance->optix_bvh.force_dmm_usage = 1;
   }
 
   instance->realtime = !offline;

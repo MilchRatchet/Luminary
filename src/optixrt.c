@@ -29,10 +29,31 @@ void optixrt_init(RaytraceInstance* instance) {
   bench_tic();
 
   ////////////////////////////////////////////////////////////////////
+  // Displacement Micromaps Building
+  ////////////////////////////////////////////////////////////////////
+
+  OptixBuildInputDisplacementMicromap dmm;
+  if ((instance->device_info.rt_core_version >= 1 && instance->optix_bvh.force_dmm_usage) || instance->device_info.rt_core_version >= 3) {
+    dmm = micromap_displacement_build(instance);
+  }
+  else {
+    log_message("No DMM is built due to device constraints.");
+    memset(&dmm, 0, sizeof(OptixBuildInputDisplacementMicromap));
+  }
+
+  ////////////////////////////////////////////////////////////////////
   // Opacity Micromaps Building
   ////////////////////////////////////////////////////////////////////
 
-  OptixBuildInputOpacityMicromap omm = micromap_opacity_build(instance);
+  OptixBuildInputOpacityMicromap omm;
+  // OMM and DMM at the same time are only supported on RT core version 3.0 (Ada Lovelace)
+  if ((instance->device_info.rt_core_version >= 1 && !dmm.displacementMicromapArray) || instance->device_info.rt_core_version >= 3) {
+    omm = micromap_opacity_build(instance);
+  }
+  else {
+    log_message("No OMM is built due to device constraints.");
+    memset(&omm, 0, sizeof(OptixBuildInputOpacityMicromap));
+  }
 
   ////////////////////////////////////////////////////////////////////
   // BVH Building
@@ -61,13 +82,15 @@ void optixrt_init(RaytraceInstance* instance) {
 
   unsigned int inputFlags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING};
 
-  build_inputs.triangleArray.flags           = inputFlags;
-  build_inputs.triangleArray.opacityMicromap = omm;
-  build_inputs.triangleArray.numSbtRecords   = 1;
+  build_inputs.triangleArray.flags                = inputFlags;
+  build_inputs.triangleArray.opacityMicromap      = omm;
+  build_inputs.triangleArray.displacementMicromap = dmm;
+  build_inputs.triangleArray.numSbtRecords        = 1;
 
   OptixAccelBufferSizes buffer_sizes;
 
   OPTIX_CHECK(optixAccelComputeMemoryUsage(instance->optix_ctx, &build_options, &build_inputs, 1, &buffer_sizes));
+  gpuErrchk(cudaDeviceSynchronize());
 
   void* temp_buffer;
   device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes);
@@ -86,6 +109,7 @@ void optixrt_init(RaytraceInstance* instance) {
   OPTIX_CHECK(optixAccelBuild(
     instance->optix_ctx, 0, &build_options, &build_inputs, 1, (CUdeviceptr) temp_buffer, buffer_sizes.tempSizeInBytes,
     (CUdeviceptr) output_buffer, buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
+  gpuErrchk(cudaDeviceSynchronize());
 
   size_t compact_size;
 
@@ -100,6 +124,7 @@ void optixrt_init(RaytraceInstance* instance) {
     device_malloc(&output_buffer_compact, compact_size);
 
     OPTIX_CHECK(optixAccelCompact(instance->optix_ctx, 0, traversable, (CUdeviceptr) output_buffer_compact, compact_size, &traversable));
+    gpuErrchk(cudaDeviceSynchronize());
 
     device_free(output_buffer, buffer_sizes.outputSizeInBytes);
 
@@ -143,7 +168,14 @@ void optixrt_init(RaytraceInstance* instance) {
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
-  pipeline_compile_options.allowOpacityMicromaps            = 1;
+
+  if (omm.opacityMicromapArray) {
+    pipeline_compile_options.allowOpacityMicromaps = 1;
+  }
+
+  if (dmm.displacementMicromapArray) {
+    pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
+  }
 
   char log[4096];
   size_t log_size = sizeof(log);

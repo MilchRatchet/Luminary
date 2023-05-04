@@ -290,8 +290,102 @@ void raytrace_execute(RaytraceInstance* instance) {
   gpuErrchk(cudaDeviceSynchronize());
 }
 
+static void _raytrace_gather_device_info(RaytraceInstance* instance) {
+  struct cudaDeviceProp prop;
+  cudaGetDeviceProperties(&prop, 0);
+
+  instance->device_info.global_mem_size = prop.totalGlobalMem;
+
+  const int major = prop.major;
+  const int minor = prop.minor;
+
+  if (major < 6) {
+    crash_message("Pre Pascal architecture GPU detected. This GPU is not supported.");
+  }
+
+  switch (major) {
+    case 6: {
+      if (minor == 0 || minor == 1 || minor == 2) {
+        instance->device_info.arch            = DEVICE_ARCH_PASCAL;
+        instance->device_info.rt_core_version = 0;
+      }
+      else {
+        instance->device_info.arch            = DEVICE_ARCH_UNKNOWN;
+        instance->device_info.rt_core_version = 0;
+      }
+    } break;
+    case 7: {
+      if (minor == 0 || minor == 2) {
+        instance->device_info.arch            = DEVICE_ARCH_VOLTA;
+        instance->device_info.rt_core_version = 0;
+      }
+      else if (minor == 5) {
+        instance->device_info.arch            = DEVICE_ARCH_TURING;
+        instance->device_info.rt_core_version = 1;
+
+        // TU116 and TU117 do not have RT cores, these can be detected by searching for GTX in the name
+        for (int i = 0; i < 256; i++) {
+          if (prop.name[i] == 'G') {
+            instance->device_info.rt_core_version = 0;
+          }
+        }
+      }
+      else {
+        instance->device_info.arch            = DEVICE_ARCH_UNKNOWN;
+        instance->device_info.rt_core_version = 0;
+      }
+    } break;
+    case 8: {
+      if (minor == 0) {
+        // GA100 has no RT cores
+        instance->device_info.arch            = DEVICE_ARCH_AMPERE;
+        instance->device_info.rt_core_version = 0;
+      }
+      else if (minor == 6 || minor == 7) {
+        instance->device_info.arch            = DEVICE_ARCH_AMPERE;
+        instance->device_info.rt_core_version = 2;
+      }
+      else if (minor == 9) {
+        instance->device_info.arch            = DEVICE_ARCH_ADA;
+        instance->device_info.rt_core_version = 3;
+      }
+      else {
+        instance->device_info.arch            = DEVICE_ARCH_UNKNOWN;
+        instance->device_info.rt_core_version = 0;
+      }
+    } break;
+    case 9: {
+      if (minor == 0) {
+        instance->device_info.arch            = DEVICE_ARCH_HOPPER;
+        instance->device_info.rt_core_version = 0;
+      }
+      else {
+        instance->device_info.arch            = DEVICE_ARCH_UNKNOWN;
+        instance->device_info.rt_core_version = 0;
+      }
+    } break;
+    default:
+      instance->device_info.arch            = DEVICE_ARCH_UNKNOWN;
+      instance->device_info.rt_core_version = 0;
+      break;
+  }
+
+  if (instance->device_info.arch == DEVICE_ARCH_UNKNOWN) {
+    warn_message(
+      "Luminary failed to identify architecture of CUDA compute capability %d.%d. Some features may not be working.", major, minor);
+  }
+
+  log_message("===========DEVICE INFO===========");
+  log_message("GLOBAL MEM SIZE:   %zu", instance->device_info.global_mem_size);
+  log_message("ARCH:              %d", instance->device_info.arch);
+  log_message("RT CORE VERSION:   %d", instance->device_info.rt_core_version);
+  log_message("=================================");
+}
+
 void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene) {
   RaytraceInstance* instance = (RaytraceInstance*) calloc(1, sizeof(RaytraceInstance));
+
+  _raytrace_gather_device_info(instance);
 
   instance->width         = general.width;
   instance->height        = general.height;

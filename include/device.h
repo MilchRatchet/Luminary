@@ -53,6 +53,7 @@ void device_cloud_noise_generate(RaytraceInstance* instance);
 ////////////////////////////////////////////////////////////////////
 OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance);
 void micromap_opacity_free(OptixBuildInputOpacityMicromap data);
+OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance* instance);
 
 ////////////////////////////////////////////////////////////////////
 // mipmap.cuh

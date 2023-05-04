@@ -87,6 +87,17 @@ enum MaterialFresnel { SCHLICK = 0, FDEZ_AGUERA = 1 } typedef MaterialFresnel;
 
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
+// Set of architectures supported by Luminary
+enum DeviceArch {
+  DEVICE_ARCH_UNKNOWN = 0,
+  DEVICE_ARCH_PASCAL  = 1,
+  DEVICE_ARCH_VOLTA   = 11,
+  DEVICE_ARCH_TURING  = 2,
+  DEVICE_ARCH_AMPERE  = 3,
+  DEVICE_ARCH_ADA     = 4,
+  DEVICE_ARCH_HOPPER  = 41
+} typedef DeviceArch;
+
 struct DeviceBuffer {
   void* device_pointer;
   size_t size;
@@ -396,7 +407,14 @@ struct OptixBVH {
   OptixPipeline pipeline;
   OptixShaderBindingTable shaders;
   DeviceConstantMemory* params;
+  int force_dmm_usage;
 } typedef OptixBVH;
+
+struct DeviceInfo {
+  size_t global_mem_size;
+  DeviceArch arch;
+  int rt_core_version;
+} typedef DeviceInfo;
 
 struct RaytraceInstance {
   unsigned int width;
@@ -460,6 +478,7 @@ struct RaytraceInstance {
   OptixBVH optix_bvh;
   BVHType bvh_type;
   int luminary_bvh_initialized;
+  DeviceInfo device_info;
 } typedef RaytraceInstance;
 
 #ifndef min

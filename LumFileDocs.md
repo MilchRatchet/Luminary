@@ -382,7 +382,7 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
    - Red: Tangent X
    - Green: Tangent Y
    - Blue: Tangent Z
-   - Alpha: Unused
+   - Alpha: Displacement
 
 >📝 Textures must contain gamma information if they are not encoded linearly. Note that GIMP does not correctly export the correct gamma value. Hence, it is important to uncheck "Save gamma" during png export ([See Thread](https://gitlab.gnome.org/GNOME/gimp/-/issues/5363)). If textures are not displayed correctly, make sure that the gamma value used in the png file correctly approximates the color profile otherwise defined in the file.
 
