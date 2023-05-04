@@ -15,6 +15,10 @@
 #include "structs.h"
 #include "utils.h"
 
+//
+// Limitation: Paths may not contain spaces. Since spaces are used for tokenization using spaces would be a terrible idea anyway.
+//
+
 #define LINE_SIZE 4096
 #define READ_BUFFER_SIZE 262144  // 256kb
 
@@ -33,10 +37,10 @@ void wavefront_init(WavefrontContent** content) {
   (*content)->materials_length = 1;
 
   (*content)->materials[0].hash                = 0;
-  (*content)->materials[0].albedo_texture      = 0;
-  (*content)->materials[0].illuminance_texture = 0;
-  (*content)->materials[0].material_texture    = 0;
-  (*content)->materials[0].normal_texture      = 0;
+  (*content)->materials[0].albedo_texture      = TEXTURE_NONE;
+  (*content)->materials[0].illuminance_texture = TEXTURE_NONE;
+  (*content)->materials[0].material_texture    = TEXTURE_NONE;
+  (*content)->materials[0].normal_texture      = TEXTURE_NONE;
 
   (*content)->albedo_maps             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
   (*content)->albedo_maps_length      = 0;
@@ -161,7 +165,10 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
     else if (line[0] == 'm' && line[1] == 'a' && line[2] == 'p' && line[3] == '_') {
       if (line[4] == 'K' && line[5] == 'd') {
         ensure_capacity(content.albedo_maps, albedo_maps_count, content.albedo_maps_length, sizeof(TextureRGBA));
-        sscanf(line, "%*s %[^\n]\n", path);
+
+        const char* albedo_map_path = strrchr(line, ' ') + 1;
+        sscanf(albedo_map_path, "%[^\n]\n", path);
+
         const size_t hash   = hash_djb2((unsigned char*) path);
         uint16_t texture_id = find_texture(content.texture_list, hash, WF_ALBEDO);
 
@@ -175,7 +182,10 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
       }
       else if (line[4] == 'K' && line[5] == 'e') {
         ensure_capacity(content.illuminance_maps, illuminance_maps_count, content.illuminance_maps_length, sizeof(TextureRGBA));
-        sscanf(line, "%*s %[^\n]\n", path);
+
+        const char* illuminance_map_path = strrchr(line, ' ') + 1;
+        sscanf(illuminance_map_path, "%[^\n]\n", path);
+
         const size_t hash   = hash_djb2((unsigned char*) path);
         uint16_t texture_id = find_texture(content.texture_list, hash, WF_ILLUMINANCE);
 
@@ -189,7 +199,10 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
       }
       else if (line[4] == 'N' && line[5] == 's') {
         ensure_capacity(content.material_maps, material_maps_count, content.material_maps_length, sizeof(TextureRGBA));
-        sscanf(line, "%*s %[^\n]\n", path);
+
+        const char* material_map_path = strrchr(line, ' ') + 1;
+        sscanf(material_map_path, "%[^\n]\n", path);
+
         const size_t hash   = hash_djb2((unsigned char*) path);
         uint16_t texture_id = find_texture(content.texture_list, hash, WF_MATERIAL);
 
@@ -204,9 +217,6 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
       else if (line[4] == 'B' || line[4] == 'b') {
         ensure_capacity(content.normal_maps, normal_maps_count, content.normal_maps_length, sizeof(TextureRGBA));
 
-        // This breaks if the path has a space in it
-        // Blender uses the option -bm 1.0 to specify that the normals are scaled by 1.0
-        // Hence the output is map_Bump -bm 1.0 [Path]
         const char* normal_map_path = strrchr(line, ' ') + 1;
         sscanf(normal_map_path, "%[^\n]\n", path);
 
