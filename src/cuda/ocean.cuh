@@ -412,15 +412,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
 
       device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
     }
-    else if (device.shading_mode == SHADING_WIREFRAME) {
-      int a = fabsf(floorf(task.position.x) - task.position.x) < 0.001f;
-      int b = fabsf(floorf(task.position.z) - task.position.z) < 0.001f;
-      int c = fabsf(ceilf(task.position.x) - task.position.x) < 0.001f;
-      int d = fabsf(ceilf(task.position.z) - task.position.z) < 0.001f;
+    else if (device.shading_mode == SHADING_IDENTIFICATION) {
+      const RGBAhalf color = get_RGBAhalf(0.0f, 0.0f, 1.0f, 0.0f);
 
-      float light = (a || b || c || d) ? 1.0f : 0.0f;
-
-      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(0.0f, 0.5f * light, light));
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, color);
     }
   }
 }

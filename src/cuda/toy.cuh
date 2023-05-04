@@ -192,6 +192,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       store_RGBAhalf(
         device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z))));
     }
+    else if (device.shading_mode == SHADING_IDENTIFICATION) {
+      const RGBAhalf color = get_RGBAhalf(1.0f, 0.63f, 0.0f, 0.0f);
+
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, color);
+    }
     else if (device.shading_mode == SHADING_LIGHTS) {
       RGBF color;
       if (device.scene.toy.emissive) {

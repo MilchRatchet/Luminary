@@ -54,13 +54,13 @@ enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typed
 enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
 
 enum ShadingMode {
-  SHADING_DEFAULT   = 0,
-  SHADING_ALBEDO    = 1,
-  SHADING_DEPTH     = 2,
-  SHADING_NORMAL    = 3,
-  SHADING_HEAT      = 4,
-  SHADING_WIREFRAME = 5,
-  SHADING_LIGHTS    = 6
+  SHADING_DEFAULT        = 0,
+  SHADING_ALBEDO         = 1,
+  SHADING_DEPTH          = 2,
+  SHADING_NORMAL         = 3,
+  SHADING_HEAT           = 4,
+  SHADING_IDENTIFICATION = 5,
+  SHADING_LIGHTS         = 6
 } typedef ShadingMode;
 
 enum ToyShape { TOY_SPHERE = 0, TOY_PLANE = 1 } typedef ToyShape;

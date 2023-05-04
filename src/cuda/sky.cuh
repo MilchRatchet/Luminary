@@ -915,6 +915,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks(
       const float value = __saturatef((1.0f / device.scene.camera.far_clip_distance) * 2.0f);
       store_RGBAhalf(device.ptrs.frame_buffer + pixel, get_RGBAhalf(value, value, value, value));
     }
+    else if (device.shading_mode == SHADING_IDENTIFICATION) {
+      const RGBAhalf color = get_RGBAhalf(0.0f, 0.63f, 1.0f, 0.0f);
+
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, color);
+    }
   }
 }
 

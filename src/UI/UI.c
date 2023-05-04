@@ -58,7 +58,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
     create_info(ui, "Triangle Count", &(instance->scene.triangle_data.triangle_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_dropdown(ui, "BVH Type", &(instance->bvh_type), 1, 2, "Luminary\0OptiX", 8);
   panels[i++] = create_dropdown(
-    ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Wireframe\0Lights", 8);
+    ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Identification\0Lights", 8);
   panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 9);
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);

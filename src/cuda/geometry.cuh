@@ -387,26 +387,20 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
       store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(red, green, blue)));
     }
-    else if (device.shading_mode == SHADING_WIREFRAME) {
-      const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
+    else if (device.shading_mode == SHADING_IDENTIFICATION) {
+      const uint32_t v = random_uint32_t_base(0, task.hit_id);
 
-      const float4 t1 = __ldg(hit_address);
-      const float4 t2 = __ldg(hit_address + 1);
-      const float t3  = __ldg((float*) (hit_address + 2));
+      const uint16_t r = v & 0x7ff;
+      const uint16_t g = (v >> 10) & 0x7ff;
+      const uint16_t b = (v >> 20) & 0x7ff;
 
-      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
-      vec3 edge2  = get_vector(t2.z, t2.w, t3);
+      const float cr = ((float) r) / 0x7ff;
+      const float cg = ((float) g) / 0x7ff;
+      const float cb = ((float) b) / 0x7ff;
 
-      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+      const RGBAhalf color = get_RGBAhalf(cr, cg, cb, 0.0f);
 
-      int a = fabsf(coords.x + coords.y - 1.0f) < 0.001f;
-      int b = fabsf(coords.x) < 0.001f;
-      int c = fabsf(coords.y) < 0.001f;
-
-      float light = (a || b || c) ? 1.0f : 0.0f;
-
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(light, 0.5f * light, 0.0f)));
+      store_RGBAhalf(device.ptrs.frame_buffer + pixel, color);
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
       const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);

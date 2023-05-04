@@ -26,10 +26,11 @@
 // Random number generators
 ////////////////////////////////////////////////////////////////////
 
-__device__ uint32_t random_uint32_t(const uint32_t offset) {
+// This is the base generator for random 32 bits.
+__device__ uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32_t offset) {
   // Key is supposed to be a number with roughly the same amount of 0 bits as 1 bits.
   // This key here seems to work well.
-  const uint32_t key     = threadIdx.x + blockIdx.x * blockDim.x + 0x55555555;
+  const uint32_t key     = key_offset + 0x55555555;
   const uint32_t counter = offset;
 
   uint32_t x = counter * key;
@@ -52,10 +53,11 @@ __device__ uint32_t random_uint32_t(const uint32_t offset) {
   return z ^ ((x * x + y) >> 16);
 }
 
-__device__ uint16_t random_uint16_t(const uint32_t offset) {
+// This is the base generator for random 16 bits.
+__device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32_t offset) {
   // Key is supposed to be a number with roughly the same amount of 0 bits as 1 bits.
   // This key here seems to work well.
-  const uint32_t key     = threadIdx.x + blockIdx.x * blockDim.x + 0x55555555;
+  const uint32_t key     = key_offset + 0x55555555;
   const uint32_t counter = offset;
 
   uint32_t x = counter * key;
@@ -74,6 +76,14 @@ __device__ uint16_t random_uint16_t(const uint32_t offset) {
 ////////////////////////////////////////////////////////////////////
 // Wrapper
 ////////////////////////////////////////////////////////////////////
+
+__device__ uint32_t random_uint32_t(const uint32_t offset) {
+  return random_uint32_t_base(threadIdx.x + blockIdx.x * blockDim.x, offset);
+}
+
+__device__ uint16_t random_uint16_t(const uint32_t offset) {
+  return random_uint16_t_base(threadIdx.x + blockIdx.x * blockDim.x, offset);
+}
 
 __device__ float white_noise_precise_offset(const uint32_t offset) {
   return ((float) random_uint32_t(offset)) / ((float) UINT32_MAX);
