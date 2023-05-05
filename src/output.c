@@ -155,7 +155,7 @@ void offline_output(RaytraceInstance* instance) {
       case IMGFORMAT_PNG:
       default:
         sprintf(output_path, "%s.png1", instance->settings.output_path);
-        store_XRGB8_png(output_path, frame, instance->output_width, instance->output_height);
+        png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
         break;
     }
 
@@ -179,7 +179,7 @@ void offline_output(RaytraceInstance* instance) {
     case IMGFORMAT_PNG:
     default:
       sprintf(output_path, "%s.png", instance->settings.output_path);
-      store_XRGB8_png(output_path, frame, instance->output_width, instance->output_height);
+      png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
       info_message("PNG file created.");
       break;
   }
@@ -246,7 +246,7 @@ static void make_snapshot(RaytraceInstance* instance, WindowInstance* window) {
   switch (instance->image_format) {
     case IMGFORMAT_PNG:
       sprintf(filename, "Snap-%s.png", timestring);
-      store_XRGB8_png(filename, buffer, width, height);
+      png_store_XRGB8(filename, buffer, width, height);
       break;
     case IMGFORMAT_QOI:
       sprintf(filename, "Snap-%s.qoi", timestring);

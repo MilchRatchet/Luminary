@@ -5,29 +5,40 @@
 
 #include "structs.h"
 
-#define PNG_COLORTYPE_GRAYSCALE 0
-#define PNG_COLORTYPE_TRUECOLOR 2
-#define PNG_COLORTYPE_INDEXED 3
-#define PNG_COLORTYPE_GRAYSCALE_ALPHA 4
-#define PNG_COLORTYPE_TRUECOLOR_ALPHA 6
+enum PNGColortype {
+  PNG_COLORTYPE_GRAYSCALE       = 0,
+  PNG_COLORTYPE_TRUECOLOR       = 2,
+  PNG_COLORTYPE_INDEXED         = 3,
+  PNG_COLORTYPE_GRAYSCALE_ALPHA = 4,
+  PNG_COLORTYPE_TRUECOLOR_ALPHA = 6
+} typedef PNGColortype;
 
-#define PNG_BITDEPTH_1 1
-#define PNG_BITDEPTH_2 2
-#define PNG_BITDEPTH_4 4
-#define PNG_BITDEPTH_8 8
-#define PNG_BITDEPTH_16 16
+enum PNGBitdepth {
+  PNG_BITDEPTH_1  = 1,
+  PNG_BITDEPTH_2  = 2,
+  PNG_BITDEPTH_4  = 4,
+  PNG_BITDEPTH_8  = 8,
+  PNG_BITDEPTH_16 = 16
+} typedef PNGBitdepth;
 
-#define PNG_COMPRESSION_METHOD 0
+// There is only one method defined each. The idea was to allow for other methods in future standards but that never happened.
+enum PNGCompressionMethod { PNG_COMPRESSION_METHOD_0 = 0 } typedef PNGCompressionMethod;
+enum PNGFilterMethod { PNG_FILTER_METHOD_0 = 0 } typedef PNGFilterMethod;
 
-#define PNG_FILTER_METHOD 0
+enum PNGInterlaceMethod { PNG_INTERLACE_OFF = 0, PNG_INTERLACE_ADAM7 = 1 } typedef PNGInterlaceMethod;
 
-#define PNG_INTERLACE_OFF 0
-#define PNG_INTERLACE_ADAM7 1
+enum PNGFilterFunction {
+  PNG_FILTER_NONE    = 0,
+  PNG_FILTER_SUB     = 1,
+  PNG_FILTER_UP      = 2,
+  PNG_FILTER_AVERAGE = 3,
+  PNG_FILTER_PAETH   = 4
+} typedef PNGFilterFunction;
 
-int store_XRGB8_png(const char* filename, const XRGB8* image, const int width, const int height);
-int store_as_png(
+void png_store_XRGB8(const char* filename, const XRGB8* image, const int width, const int height);
+void png_store(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
-  const uint8_t color_type, const uint8_t bit_depth);
-TextureRGBA load_texture_from_png(const char* filename);
+  const PNGColortype color_type, const PNGBitdepth bit_depth);
+TextureRGBA png_load(const char* filename);
 
 #endif /* PNG_H */

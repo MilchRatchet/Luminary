@@ -41,6 +41,7 @@ enum cudaTextureReadMode texture_get_read_mode(TextureRGBA* tex) {
     case TexDataFP32:
       return cudaReadModeElementType;
     case TexDataUINT8:
+    case TexDataUINT16:
       return cudaReadModeNormalizedFloat;
     default:
       error_message("Invalid texture data type %d\n", tex->type);
@@ -78,6 +79,8 @@ struct cudaChannelFormatDesc texture_get_channel_format_desc(TextureRGBA* tex) {
       return cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
     case TexDataUINT8:
       return cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
+    case TexDataUINT16:
+      return cudaCreateChannelDesc(16, 16, 16, 16, cudaChannelFormatKindUnsigned);
     default:
       crash_message("Invalid texture data type %d\n", tex->type);
       return cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
@@ -90,6 +93,8 @@ size_t texture_get_pixel_size(TextureRGBA* tex) {
       return sizeof(RGBAF);
     case TexDataUINT8:
       return sizeof(RGBA8);
+    case TexDataUINT16:
+      return sizeof(RGBA16);
     default:
       crash_message("Invalid texture data type %d\n", tex->type);
       return sizeof(RGBA8);

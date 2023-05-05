@@ -160,6 +160,13 @@ struct RGB16 {
   uint16_t b;
 } typedef RGB16;
 
+struct RGBA16 {
+  uint16_t r;
+  uint16_t g;
+  uint16_t b;
+  uint16_t a;
+} typedef RGBA16;
+
 struct RGBF {
   float r;
   float g;
@@ -206,7 +213,7 @@ struct TextureG {
   float* data;
 } typedef TextureG;
 
-enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1 } typedef TextureDataType;
+enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1, TexDataUINT16 = 2 } typedef TextureDataType;
 enum TextureWrappingMode { TexModeWrap = 0, TexModeClamp = 1, TexModeMirror = 2, TexModeBorder = 3 } typedef TextureWrappingMode;
 enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
 enum TextureStorageLocation { TexStorageCPU = 0, TexStorageGPU = 1 } typedef TextureStorageLocation;

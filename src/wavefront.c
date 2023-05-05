@@ -175,7 +175,7 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
         if (texture_id == TEXTURE_NONE) {
           texture_id = albedo_maps_count++;
           add_texture(content.texture_list, hash, WF_ALBEDO, texture_id);
-          content.albedo_maps[texture_id] = load_texture_from_png(path);
+          content.albedo_maps[texture_id] = png_load(path);
         }
 
         content.materials[materials_count - 1].albedo_texture = texture_id;
@@ -192,7 +192,7 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
         if (texture_id == TEXTURE_NONE) {
           texture_id = illuminance_maps_count++;
           add_texture(content.texture_list, hash, WF_ILLUMINANCE, texture_id);
-          content.illuminance_maps[texture_id] = load_texture_from_png(path);
+          content.illuminance_maps[texture_id] = png_load(path);
         }
 
         content.materials[materials_count - 1].illuminance_texture = texture_id;
@@ -209,7 +209,7 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
         if (texture_id == TEXTURE_NONE) {
           texture_id = material_maps_count++;
           add_texture(content.texture_list, hash, WF_MATERIAL, texture_id);
-          content.material_maps[texture_id] = load_texture_from_png(path);
+          content.material_maps[texture_id] = png_load(path);
         }
 
         content.materials[materials_count - 1].material_texture = texture_id;
@@ -226,7 +226,7 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
         if (texture_id == TEXTURE_NONE) {
           texture_id = normal_maps_count++;
           add_texture(content.texture_list, hash, WF_NORMAL, texture_id);
-          content.normal_maps[texture_id] = load_texture_from_png(path);
+          content.normal_maps[texture_id] = png_load(path);
         }
 
         content.materials[materials_count - 1].normal_texture = texture_id;
