@@ -49,7 +49,7 @@ __device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
-  const float max = hmax_RGBAhalf(record);
+  const float max = luminance(RGBAhalf_to_RGBF(record));
   if (max < CUTOFF) {
     valid = 0;
   }
