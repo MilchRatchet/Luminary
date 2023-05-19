@@ -111,7 +111,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
       const int use_light_sample = !is_mirror && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
-      task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
+      task.position = add_vector(task.position, scale_vector(task.ray, -8.0f * eps));
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 

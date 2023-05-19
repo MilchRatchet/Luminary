@@ -310,7 +310,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       const float scattering_prob = (ray.y > 0.0f) ? 0.0f : (1.0f - albedo.a);
       const int scattering_pass   = white_noise() < scattering_prob && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
-      task.position = add_vector(task.position, scale_vector(normal, 8.0f * eps));
+      task.position = add_vector(task.position, scale_vector(ray, -8.0f * eps));
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
