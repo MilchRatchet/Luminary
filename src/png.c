@@ -307,7 +307,7 @@ static int _png_verify_header(FILE* file) {
 
 static inline TextureRGBA _png_default_texture() {
   RGBA8* data         = malloc(sizeof(RGBA8) * 4);
-  RGBA8 default_pixel = {.r = 255, .g = 0, .b = 0, .a = 255};
+  RGBA8 default_pixel = {.r = 0, .g = 0, .b = 255, .a = 255};
   data[0]             = default_pixel;
   data[1]             = default_pixel;
   data[2]             = default_pixel;
