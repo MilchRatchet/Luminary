@@ -18,7 +18,7 @@ struct BRDFInstance {
   vec3 normal;
   float roughness;
   float metallic;
-  RGBAhalf term;
+  RGBF term;
   vec3 V;
   vec3 L;
 } typedef BRDFInstance;
@@ -151,135 +151,6 @@ __device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, cons
   return normalize_vector(normal_hemi);
 }
 
-__device__ vec3 brdf_sample_light_ray(const LightSample light, const vec3 origin) {
-  switch (light.id) {
-    case LIGHT_ID_NONE:
-    case LIGHT_ID_SUN:
-      return sample_sphere(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(origin));
-    case LIGHT_ID_TOY:
-      return toy_sample_ray(origin);
-    default:
-      const TriangleLight triangle = load_triangle_light(light.id);
-      return sample_triangle(triangle, origin);
-  }
-}
-
-__device__ float brdf_light_sample_target_weight(const LightSample light) {
-  float weight;
-  switch (light.id) {
-    case LIGHT_ID_SUN:
-      weight = 2e+04f * device.scene.sky.sun_strength;
-      break;
-    case LIGHT_ID_TOY:
-      weight = device.scene.toy.material.b;
-      break;
-    case LIGHT_ID_NONE:
-      weight = 0.0f;
-      break;
-    default:
-      weight = device.scene.material.default_material.b;
-      break;
-  }
-
-  return weight * light.solid_angle;
-}
-
-__device__ float brdf_light_sample_solid_angle(const LightSample light, const vec3 pos) {
-  switch (light.id) {
-    case LIGHT_ID_SUN:
-      return 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(pos));
-    case LIGHT_ID_TOY:
-      return 0.5f * ONE_OVER_PI * toy_get_solid_angle(pos);
-    case LIGHT_ID_NONE:
-      return 0.0f;
-    default:
-      const TriangleLight triangle = load_triangle_light(light.id);
-      return 0.5f * ONE_OVER_PI * sample_triangle_solid_angle(triangle, pos);
-  }
-}
-
-__device__ float brdf_light_sample_shading_weight(const LightSample light) {
-  return (1.0f / brdf_light_sample_target_weight(light)) * (light.weight / light.M);
-}
-
-__device__ LightSample brdf_light_sample_update(LightSample x, const LightSample y, const float update_weight, const float r) {
-  x.weight += update_weight;
-  x.M += y.M;
-  if (r < (update_weight / x.weight)) {
-    x.id          = y.id;
-    x.solid_angle = y.solid_angle;
-  }
-
-  return x;
-}
-
-__device__ LightSample sample_light(const vec3 position, uint32_t& ran_offset) {
-  const vec3 sky_pos = world_to_sky_transform(position);
-
-  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
-  const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
-  uint32_t light_count  = 0;
-  light_count += sun_visible;
-  light_count += toy_visible;
-  light_count += (device.scene.material.lights_active) ? device.scene.triangle_lights_count : 0;
-
-  LightSample selected;
-  selected.id          = LIGHT_ID_NONE;
-  selected.M           = 0;
-  selected.solid_angle = 0.0f;
-  selected.weight      = 0.0f;
-
-  if (!light_count)
-    return selected;
-
-  const float ran = white_noise_offset(ran_offset++);
-
-  if (device.iteration_type != TYPE_CAMERA && sun_visible && ran < 0.5f) {
-    selected.id          = LIGHT_ID_SUN;
-    selected.M           = 1;
-    selected.solid_angle = brdf_light_sample_solid_angle(selected, position);
-    selected.weight      = 2.0f * brdf_light_sample_target_weight(selected);
-
-    return selected;
-  }
-
-  const int reservoir_sampling_size = min(light_count, device.reservoir_size);
-
-  const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
-
-  for (int i = 0; i < reservoir_sampling_size; i++) {
-    uint32_t light_index = random_uint32_t(ran_offset++) % light_count;
-
-    light_index += !sun_visible;
-    light_index += (!toy_visible && light_index) ? 1 : 0;
-
-    LightSample light;
-    light.id = LIGHT_ID_NONE;
-    light.M  = 1;
-
-    switch (light_index) {
-      case 0:
-        light.id = LIGHT_ID_SUN;
-        break;
-      case 1:
-        light.id = LIGHT_ID_TOY;
-        break;
-      default:
-        light.id = light_index - 2;
-        break;
-    }
-
-    light.solid_angle = brdf_light_sample_solid_angle(light, position);
-    light.weight      = brdf_light_sample_target_weight(light) * light_count_float;
-
-    const float r = white_noise_offset(ran_offset++);
-
-    selected = brdf_light_sample_update(selected, light, light.weight, r);
-  }
-
-  return selected;
-}
-
 __device__ vec3 brdf_sample_microfacet(const vec3 V_local, const float roughness2, const float alpha, const float beta) {
   return brdf_sample_microfacet_GGX(V_local, roughness2, alpha, beta);
 }
@@ -335,7 +206,7 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
 
   const RGBAhalf F = brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, brdf_term);
 
-  brdf.term = mul_RGBAhalf(brdf.term, F);
+  brdf.term = mul_color(brdf.term, RGBAhalf_to_RGBF(F));
 
   brdf.L = L_local;
 
@@ -378,7 +249,21 @@ __device__ BRDFInstance
   brdf.roughness   = roughness;
   brdf.metallic    = metallic;
   brdf.normal      = normal;
-  brdf.term        = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
+  brdf.term        = get_color(1.0f, 1.0f, 1.0f);
+
+  return brdf;
+}
+
+__device__ BRDFInstance brdf_get_instance_scattering() {
+  BRDFInstance brdf;
+  brdf.albedo      = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+  brdf.diffuse     = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+  brdf.specular_f0 = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+  brdf.V           = get_vector(0.0f, 0.0f, 0.0f);
+  brdf.roughness   = 0.0f;
+  brdf.metallic    = 0.0f;
+  brdf.normal      = get_vector(0.0f, 0.0f, 0.0f);
+  brdf.term        = get_color(1.0f, 1.0f, 1.0f);
 
   return brdf;
 }
@@ -394,7 +279,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
   float NdotV = dot_product(brdf.normal, brdf.V);
 
   if (NdotL <= 0.0f || NdotV <= 0.0f) {
-    brdf.term = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+    brdf.term = get_color(0.0f, 0.0f, 0.0f);
     return brdf;
   }
 
@@ -416,9 +301,64 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
 
   RGBAhalf specular = brdf_evaluate_microfacet(brdf, NdotH, NdotL, NdotV);
 
-  brdf.term = mul_RGBAhalf(brdf.term, specular);
+  brdf.term = mul_color(brdf.term, RGBAhalf_to_RGBF(specular));
 
   return brdf;
+}
+
+__device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos) {
+  BRDFInstance result = brdf;
+
+  switch (light.id) {
+    case LIGHT_ID_NONE:
+    case LIGHT_ID_SUN: {
+      vec3 sky_pos = world_to_sky_transform(pos);
+      result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos);
+      result.term  = scale_color(result.term, 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, sky_pos));
+    } break;
+    case LIGHT_ID_TOY:
+      result.L    = toy_sample_ray(pos);
+      result.term = scale_color(result.term, 0.5f * ONE_OVER_PI * toy_get_solid_angle(pos));
+      break;
+    default: {
+      const TriangleLight triangle = load_triangle_light(light.id);
+      result.L                     = sample_triangle(triangle, pos);
+      result.term                  = scale_color(result.term, 0.5f * ONE_OVER_PI * sample_triangle_solid_angle(triangle, pos));
+    } break;
+  }
+
+  result.term = scale_color(result.term, light.weight);
+
+  return brdf_evaluate(result);
+}
+
+__device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, vec3 ray, float anisotropy) {
+  BRDFInstance result = brdf_get_instance_scattering();
+
+  switch (light.id) {
+    case LIGHT_ID_NONE:
+    case LIGHT_ID_SUN: {
+      vec3 sky_pos = world_to_sky_transform(pos);
+      result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos);
+      result.term  = scale_color(result.term, 0.25f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, sky_pos));
+    } break;
+    case LIGHT_ID_TOY:
+      result.L    = toy_sample_ray(pos);
+      result.term = scale_color(result.term, 0.25f * ONE_OVER_PI * toy_get_solid_angle(pos));
+      break;
+    default: {
+      const TriangleLight triangle = load_triangle_light(light.id);
+      result.L                     = sample_triangle(triangle, pos);
+      result.term                  = scale_color(result.term, 0.25f * ONE_OVER_PI * sample_triangle_solid_angle(triangle, pos));
+    } break;
+  }
+
+  result.term = scale_color(result.term, light.weight);
+
+  float cos_angle   = dot_product(ray, result.L);
+  const float phase = henvey_greenstein(cos_angle, anisotropy);
+
+  return result;
 }
 
 /*
@@ -492,7 +432,7 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
 
   const RGBAhalf F = brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, brdf_term);
 
-  brdf.term = mul_RGBAhalf(brdf.term, F);
+  brdf.term = mul_color(brdf.term, RGBAhalf_to_RGBF(F));
 
   const float b = 1.0f - index * index * (1.0f - HdotV * HdotV);
 

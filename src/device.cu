@@ -10,11 +10,11 @@
 #include "cuda/cloud_noise.cuh"
 #include "cuda/directives.cuh"
 #include "cuda/kernels.cuh"
-#include "cuda/light.cuh"
 #include "cuda/math.cuh"
 #include "cuda/micromap.cuh"
 #include "cuda/mipmap.cuh"
 #include "cuda/random.cuh"
+#include "cuda/restir.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/sky_hdri.cuh"
 #include "cuda/utils.cuh"
@@ -57,8 +57,9 @@ void device_handle_accumulation(RaytraceInstance* instance) {
   }
 }
 
-static void bind_type(RaytraceInstance* instance, int type) {
+static void bind_type(RaytraceInstance* instance, int type, int depth) {
   device_update_symbol(iteration_type, type);
+  device_update_symbol(depth, depth);
 
   switch (type) {
     case TYPE_CAMERA:
@@ -75,8 +76,8 @@ static void bind_type(RaytraceInstance* instance, int type) {
   }
 }
 
-extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type) {
-  bind_type(instance, type);
+extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type, int depth) {
+  bind_type(instance, type, depth);
 
   if (type != TYPE_CAMERA)
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -109,14 +110,17 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   if (type != TYPE_LIGHT && instance->light_resampling) {
-    generate_light_samples<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    LightSample* light_samples_1 = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
+    LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
+
+    restir_initial_sampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1);
     if (type == TYPE_CAMERA && instance->scene.material.lights_active) {
-      LightSample* light_samples_1 = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
-      LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
+      restir_temporal_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
       for (int i = 0; i < instance->spatial_iterations; i++) {
-        spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
-        spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_2, light_samples_1);
+        restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
+        restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_2, light_samples_1);
       }
+      device_buffer_copy(instance->light_samples_1, instance->light_samples_2);
     }
   }
 
@@ -135,10 +139,15 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
   if (type != TYPE_LIGHT && instance->scene.fog.active) {
     process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
+
+  if (type == TYPE_LIGHT && instance->scene.material.lights_active && depth == 0) {
+    LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
+    restir_temporal_visibility<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_2);
+  }
 }
 
 extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int type) {
-  bind_type(instance, type);
+  bind_type(instance, type, 0);
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 

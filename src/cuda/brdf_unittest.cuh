@@ -38,16 +38,16 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
 
       brdf = brdf_sample_ray(brdf, make_ushort2(0, 0));
 
-      float weight = luminance(RGBAhalf_to_RGBF(brdf.term));
+      float weight = luminance(brdf.term);
 
       sum_bounce += weight;
 
       brdf.L    = angles_to_direction(ran3, ran4);
-      brdf.term = get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f);
+      brdf.term = get_color(1.0f, 1.0f, 1.0f);
 
       brdf = brdf_evaluate(brdf);
 
-      weight = luminance(RGBAhalf_to_RGBF(brdf.term));
+      weight = luminance(brdf.term);
 
       sum_light += weight;
     }

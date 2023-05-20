@@ -856,15 +856,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
     const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel    = task.index.y * device.width + task.index.x;
 
-    const RGBAhalf record = load_RGBAhalf(device.records + pixel);
-    const uint32_t light  = device.ptrs.light_sample_history[pixel];
+    const RGBF record    = load_RGBF(device.records + pixel);
+    const uint32_t light = device.ptrs.light_sample_history[pixel];
 
-    RGBAhalf sky;
+    RGBF sky;
 
     if (device.scene.sky.hdri_active) {
       const float mip_bias = (device.iteration_type == TYPE_CAMERA) ? 0.0f : 1.0f;
 
-      sky = mul_RGBAhalf(RGBF_to_RGBAhalf(sky_hdri_sample(task.ray, mip_bias)), record);
+      sky = mul_color(sky_hdri_sample(task.ray, mip_bias), record);
     }
     else {
       const vec3 origin = world_to_sky_transform(task.origin);
@@ -882,11 +882,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
         continue;
       }
 
-      sky = mul_RGBAhalf(RGBF_to_RGBAhalf(sky_color), record);
+      sky = mul_color(sky_color, record);
     }
 
-    store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), sky));
-    write_albedo_buffer(RGBAhalf_to_RGBF(sky), pixel);
+    store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), RGBF_to_RGBAhalf(sky)));
+    write_albedo_buffer(sky, pixel);
     write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }
 }

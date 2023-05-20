@@ -9,6 +9,7 @@
 #include "geometry.cuh"
 #include "ocean.cuh"
 #include "purkinje.cuh"
+#include "restir.cuh"
 #include "sky.cuh"
 #include "sky_utils.cuh"
 #include "temporal.cuh"
@@ -49,8 +50,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
 
     task = get_starting_ray(task);
 
-    device.ptrs.light_records[pixel]  = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
-    device.ptrs.bounce_records[pixel] = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
+    device.ptrs.light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
+    device.ptrs.bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
     device.ptrs.frame_buffer[pixel]   = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
     device.ptrs.state_buffer[pixel]   = 0;
 
@@ -265,14 +266,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
 
     const float inscattering_limit = world_to_sky_scale(depth);
 
-    RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
+    RGBF record = load_RGBF(device.records + pixel);
 
     RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record);
 
     RGBF color = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
     color      = add_color(color, inscattering);
 
-    store_RGBAhalf(device.records + pixel, RGBF_to_RGBAhalf(record));
+    store_RGBF(device.records + pixel, record);
     store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
   }
 }
@@ -422,17 +423,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
           const vec3 sky_pos    = world_to_sky_transform(task.origin);
           const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
 
-          LightSample selected;
-          selected.id = LIGHT_ID_NONE;
-          selected.M  = 0;
+          LightSample selected = restir_sample_empty();
 
           if (sun_visible) {
-            selected.id = LIGHT_ID_SUN;
-            selected.M  = 1;
+            selected.id     = LIGHT_ID_SUN;
+            selected.M      = 1;
+            selected.weight = 1.0f;
           }
 
-          selected.solid_angle = brdf_light_sample_solid_angle(selected, task.origin);
-          selected.weight      = brdf_light_sample_target_weight(selected);
+          selected = restir_compute_weight(selected, task.origin);
 
           store_light_sample(device.ptrs.light_samples, selected, pixel);
         }

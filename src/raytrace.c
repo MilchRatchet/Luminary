@@ -277,11 +277,11 @@ void raytrace_execute(RaytraceInstance* instance) {
     device_execute_debug_kernels(instance, TYPE_CAMERA);
   }
   else {
-    device_execute_main_kernels(instance, TYPE_CAMERA);
-    device_execute_main_kernels(instance, TYPE_LIGHT);
+    device_execute_main_kernels(instance, TYPE_CAMERA, 0);
+    device_execute_main_kernels(instance, TYPE_LIGHT, 0);
     for (int i = 0; i < instance->max_ray_depth; i++) {
-      device_execute_main_kernels(instance, TYPE_BOUNCE);
-      device_execute_main_kernels(instance, TYPE_LIGHT);
+      device_execute_main_kernels(instance, TYPE_BOUNCE, 1 + i);
+      device_execute_main_kernels(instance, TYPE_LIGHT, 1 + i);
     }
   }
 
@@ -585,8 +585,8 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_temporal, sizeof(RGBAhalf), amount);
   device_buffer_malloc(instance->frame_output, sizeof(RGBAhalf), output_amount);
   device_buffer_malloc(instance->frame_variance, sizeof(RGBAhalf), amount);
-  device_buffer_malloc(instance->light_records, sizeof(RGBAhalf), amount);
-  device_buffer_malloc(instance->bounce_records, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
 
   if (instance->denoiser) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBAhalf), amount);
@@ -641,8 +641,8 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.frame_variance       = (RGBAhalf*) device_buffer_get_pointer(instance->frame_variance);
   ptrs.albedo_buffer        = (RGBAhalf*) device_buffer_get_pointer(instance->albedo_buffer);
   ptrs.normal_buffer        = (RGBAhalf*) device_buffer_get_pointer(instance->normal_buffer);
-  ptrs.light_records        = (RGBAhalf*) device_buffer_get_pointer(instance->light_records);
-  ptrs.bounce_records       = (RGBAhalf*) device_buffer_get_pointer(instance->bounce_records);
+  ptrs.light_records        = (RGBF*) device_buffer_get_pointer(instance->light_records);
+  ptrs.bounce_records       = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
   ptrs.buffer_8bit          = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
   ptrs.albedo_atlas         = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
   ptrs.illuminance_atlas    = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.illuminance);

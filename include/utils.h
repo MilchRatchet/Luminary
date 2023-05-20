@@ -351,8 +351,8 @@ struct DevicePointers {
   RGBAhalf* frame_variance;
   RGBAhalf* albedo_buffer;
   RGBAhalf* normal_buffer;
-  RGBAhalf* light_records;
-  RGBAhalf* bounce_records;
+  RGBF* light_records;
+  RGBF* bounce_records;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
   TraceResult* trace_result_buffer;
@@ -376,9 +376,10 @@ struct DeviceConstantMemory {
   int max_ray_depth;
   int pixels_per_thread;
   int iteration_type;
+  int depth;
   TraceTask* trace_tasks;
   uint16_t* trace_count;
-  RGBAhalf* records;
+  RGBF* records;
   int temporal_frames;
   int denoiser;
   uint32_t reservoir_size;

@@ -22,34 +22,11 @@
 #define CUTOFF ((4.0f) / (BRIGHTEST_EMISSION))
 #define PROBABILISTIC_CUTOFF (16.0f * CUTOFF)
 
-/*
- * Define LOW_QUALITY_LONG_BOUNCES for the following to apply
- *
- * After each bounce there is a 1/(max_depth) chance for the sample to exit early
- * This provides much better performance at the cost of noisy indirectly lit areas
- *
- * MIN_BOUNCES controls the minimum amount of bounces that have to happen before this may happen
- *
- * Tests show that this significantly darkens any GI contribution. This option is thus not advisable.
- */
-// #define LOW_QUALITY_LONG_BOUNCES
-#define MIN_BOUNCES 1
-
-/*
- * Define SINGLE_CONTRIBUTIONS_ONLY for the following to apply
- *
- * A sample exits early when light information have already been gathered
- * This improves performance at the cost of reflections in directly lit surfaces
- *
- * This option causes artifacts and is thus deprecated.
- */
-// #define SINGLE_CONTRIBUTION_ONLY
-
-__device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
+__device__ int validate_trace_task(TraceTask task, RGBF& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
-  const float max = luminance(RGBAhalf_to_RGBF(record));
+  const float max = luminance(record);
   if (max < CUTOFF) {
     valid = 0;
   }
@@ -59,22 +36,8 @@ __device__ int validate_trace_task(TraceTask task, RGBAhalf& record) {
       valid = 0;
     }
     else {
-      record = scale_RGBAhalf(record, 1.0f / p);
+      record = scale_color(record, 1.0f / p);
     }
-  }
-#endif
-
-#ifdef LOW_QUALITY_LONG_BOUNCES
-  if (((task.state & DEPTH_LEFT) >> 16) <= (device.max_ray_depth - MIN_BOUNCES) && white_noise() < 1.0f / (1 + device.max_ray_depth)) {
-    valid = 0;
-  }
-#endif
-
-#ifdef SINGLE_CONTRIBUTION_ONLY
-  {
-    RGBF color = device.frame_buffer[task.index.x + task.index.y * device.width];
-    if (luminance(color) > eps)
-      valid = 0;
   }
 #endif
 

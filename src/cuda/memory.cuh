@@ -195,6 +195,14 @@ __device__ void store_RGBAhalf(void* ptr, const RGBAhalf a) {
   __stcs((ushort4*) ptr, data0);
 }
 
+__device__ RGBF load_RGBF(const void* ptr) {
+  return *((RGBF*) ptr);
+}
+
+__device__ void store_RGBF(void* ptr, const RGBF a) {
+  *((RGBF*) ptr) = a;
+}
+
 /*
  * Updates the albedo buffer if criteria are met.
  * @param albedo Albedo color to be added to the albedo buffer.
@@ -254,10 +262,10 @@ __device__ LightSample load_light_sample(const LightSample* ptr, const int offse
   const float4 packet = __ldcs((float4*) (ptr + offset));
 
   LightSample sample;
-  sample.id          = __float_as_uint(packet.x);
-  sample.M           = __float_as_uint(packet.y);
-  sample.weight      = packet.z;
-  sample.solid_angle = packet.w;
+  sample.id         = __float_as_uint(packet.x);
+  sample.M          = __float_as_uint(packet.y);
+  sample.weight     = packet.z;
+  sample.target_pdf = packet.w;
 
   return sample;
 }
@@ -267,7 +275,7 @@ __device__ void store_light_sample(LightSample* ptr, const LightSample sample, c
   packet.x = __uint_as_float(sample.id);
   packet.y = __uint_as_float(sample.M);
   packet.z = sample.weight;
-  packet.w = sample.solid_angle;
+  packet.w = sample.target_pdf;
 
   __stcs((float4*) (ptr + offset), packet);
 }

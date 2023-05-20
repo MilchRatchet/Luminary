@@ -252,7 +252,7 @@ struct LightSample {
   uint32_t id;
   uint32_t M;
   float weight;
-  float solid_angle;
+  float target_pdf;
 } typedef LightSample;
 
 struct LightEvalData {
