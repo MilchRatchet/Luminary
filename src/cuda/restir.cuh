@@ -32,12 +32,9 @@ __device__ LightSample restir_sample_empty() {
 __device__ LightSample restir_sample_update(LightSample x, uint32_t id, float weight, uint32_t& seed) {
   x.M++;
 
-  // The weight only increases if the chance of selection lowers
-  if (x.id != id) {
-    x.weight += weight;
-    if (white_noise_offset(seed++) * x.weight < weight) {
-      x.id = id;
-    }
+  x.weight += weight;
+  if (white_noise_offset(seed++) * x.weight < weight) {
+    x.id = id;
   }
 
   return x;
@@ -169,8 +166,7 @@ __device__ LightSample restir_combine_reservoirs_execute(LightSample x, LightSam
   if (y.id != LIGHT_ID_NONE) {
     s.M += y.M;
 
-    // The weight only increases if the chance of selection lowers
-    if (s.id != y.id && y.visible) {
+    if (y.visible) {
       const float target_pdf          = restir_sample_target_pdf(y, pos);
       const float target_pdf_over_pdf = y.weight * y.M * target_pdf;
 
