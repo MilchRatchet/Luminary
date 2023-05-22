@@ -203,7 +203,7 @@ static General get_default_settings() {
     .max_ray_depth     = 3,
     .samples           = 16,
     .denoiser          = DENOISING_ON,
-    .reservoir_size    = 8,
+    .reservoir_size    = 32,
     .output_path       = malloc(LINE_SIZE),
     .mesh_files        = malloc(sizeof(char*) * 10),
     .mesh_files_count  = 0,

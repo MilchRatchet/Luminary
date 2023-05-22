@@ -419,8 +419,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->settings           = general;
   instance->shading_mode       = 0;
   instance->accum_mode         = TEMPORAL_ACCUMULATION;
-  instance->spatial_samples    = 5;
-  instance->spatial_iterations = 2;
+  instance->spatial_samples    = 0;
+  instance->spatial_iterations = 1;
   instance->bvh_type           = BVH_OPTIX;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
