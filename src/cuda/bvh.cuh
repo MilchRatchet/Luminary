@@ -350,12 +350,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           const int alpha_result = bvh_triangle_intersection_alpha_test(triangle, triangle.id, coords);
 
           if (device.iteration_type == TYPE_LIGHT && alpha_result == 0) {
-            depth           = -1.0f;
-            hit_id          = REJECT_HIT;
-            triangle_task.y = 0;
-            node_task.y     = 0;
-            stack_ptr       = 0;
-            break;
+            if (triangle.id != hit_id) {
+              depth           = -1.0f;
+              hit_id          = REJECT_HIT;
+              triangle_task.y = 0;
+              node_task.y     = 0;
+              stack_ptr       = 0;
+              break;
+            }
+            else {
+              depth = d;
+            }
           }
           else if (alpha_result != 2) {
             depth  = d;
