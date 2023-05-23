@@ -51,7 +51,6 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Width", &(instance->settings.width), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Height", &(instance->settings.height), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Max Ray Depth", &(instance->settings.max_ray_depth), 0, 0.02f, 0.0f, 1024.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Reservoir Size", &(instance->settings.reservoir_size), 0, 0.02f, 1.0f, 1024.0f, 0, 1);
   panels[i++] = create_dropdown(ui, "Optix Denoiser", &(instance->settings.denoiser), 0, 3, "Off\0On\0Upscaling 4x", 5);
   panels[i++] = create_button(ui, "Reset Renderer", instance, (void (*)(void*)) raytrace_reset, 1);
   panels[i++] =
@@ -62,8 +61,11 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 9);
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[i++] = create_slider(ui, "Spatial Resampling Samples", &(instance->spatial_samples), 0, 0.02f, 0.0f, 16.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Spatial Resampling Iterations", &(instance->spatial_iterations), 0, 0.02f, 0.0f, 16.0f, 0, 1);
+  panels[i++] =
+    create_slider(ui, "ReSTIR Initial Reservoir Size", &(instance->restir.initial_reservoir_size), 0, 0.02f, 1.0f, 1024.0f, 0, 1);
+  panels[i++] = create_check(ui, "ReSTIR Temporal Resampling", &(instance->restir.use_temporal_resampling), 1);
+  panels[i++] = create_check(ui, "ReSTIR Spatial Resampling", &(instance->restir.use_spatial_resampling), 1);
+  panels[i++] = create_slider(ui, "ReSTIR Spatial Samples", &(instance->restir.spatial_sample_count), 0, 0.02f, 0.0f, 16.0f, 0, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

@@ -119,10 +119,12 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     restir_initial_sampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1);
 
     if (type == TYPE_CAMERA && instance->scene.material.lights_active) {
-      LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
-      restir_temporal_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
-      restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
-      device_buffer_copy(instance->light_samples_1, instance->light_samples_2);
+      if (instance->restir.use_temporal_resampling || instance->restir.use_spatial_resampling) {
+        LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
+        restir_temporal_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
+        restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
+        device_buffer_copy(instance->light_samples_1, instance->light_samples_2);
+      }
     }
   }
 

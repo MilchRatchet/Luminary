@@ -109,7 +109,6 @@ struct General {
   int height;
   int samples;
   int max_ray_depth;
-  int reservoir_size;
   DenoisingMode denoiser;
   char** mesh_files;
   int mesh_files_count;
@@ -143,11 +142,6 @@ struct Camera {
   float temporal_blend_factor;
   float russian_roulette_bias;
 } typedef Camera;
-
-struct Light {
-  vec3 pos;
-  float radius;
-} typedef Light;
 
 struct Toy {
   int active;
@@ -336,6 +330,13 @@ struct TextureAtlas {
   int normal_length;
 } typedef TextureAtlas;
 
+struct ReSTIRSettings {
+  int use_temporal_resampling;
+  int use_spatial_resampling;
+  int spatial_sample_count;
+  int initial_reservoir_size;
+} typedef ReSTIRSettings;
+
 struct DevicePointers {
   TraceTask* light_trace;
   TraceTask* bounce_trace;
@@ -373,6 +374,7 @@ struct DevicePointers {
 struct DeviceConstantMemory {
   DevicePointers ptrs;
   Scene scene;
+  ReSTIRSettings restir;
   int max_ray_depth;
   int pixels_per_thread;
   int iteration_type;
@@ -382,8 +384,6 @@ struct DeviceConstantMemory {
   RGBF* records;
   int temporal_frames;
   int denoiser;
-  uint32_t reservoir_size;
-  int spatial_samples;
   int light_resampling;
   int width;
   int height;
@@ -455,8 +455,6 @@ struct RaytraceInstance {
   Scene scene;
   DenoisingMode denoiser;
   int temporal_frames;
-  int spatial_samples;
-  int spatial_iterations;
   DeviceBuffer* randoms;
   int shading_mode;
   RGBAhalf** bloom_mips_gpu;
@@ -471,6 +469,7 @@ struct RaytraceInstance {
   Jitter jitter;
   int accum_mode;
   RayEmitter emitter;
+  ReSTIRSettings restir;
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;

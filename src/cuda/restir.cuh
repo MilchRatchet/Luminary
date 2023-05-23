@@ -120,7 +120,7 @@ __device__ LightSample restir_sample_reservoir(vec3 pos, uint32_t& seed) {
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
 
-  for (int i = 0; i < device.reservoir_size; i++) {
+  for (int i = 0; i < device.restir.initial_reservoir_size; i++) {
     uint32_t light_index = random_uint32_t(seed++) % light_count;
 
     light_index += !sun_visible;
@@ -251,13 +251,16 @@ __global__ void restir_temporal_resampling(LightSample* samples, LightSample* sa
 
     if (data.flags) {
       LightSample selected = load_light_sample(samples, pixel);
-      selected             = restir_combine_reservoirs_start(selected);
 
-      LightSample temporal = load_light_sample(samples_prev, pixel);
-      temporal             = restir_cap_M(temporal, device.reservoir_size * 20);
+      if (device.restir.use_temporal_resampling) {
+        selected = restir_combine_reservoirs_start(selected);
 
-      selected = restir_combine_reservoirs_execute(selected, temporal, data.position, seed);
-      selected = restir_combine_reservoirs_finalize(selected, data.position);
+        LightSample temporal = load_light_sample(samples_prev, pixel);
+        temporal             = restir_cap_M(temporal, device.restir.initial_reservoir_size * 20);
+
+        selected = restir_combine_reservoirs_execute(selected, temporal, data.position, seed);
+        selected = restir_combine_reservoirs_finalize(selected, data.position);
+      }
 
       store_light_sample(samples_prev, selected, pixel);
     }
@@ -281,10 +284,10 @@ __global__ void restir_spatial_resampling(LightSample* samples, const LightSampl
     if (data.flags) {
       LightSample selected = restir_sample_empty();
 
-      if (device.spatial_samples) {
+      if (device.restir.use_spatial_resampling && device.restir.spatial_sample_count) {
         selected = restir_combine_reservoirs_start(selected);
 
-        for (int i = 0; i < device.spatial_samples; i++) {
+        for (int i = 0; i < device.restir.spatial_sample_count; i++) {
           const uint32_t ran_x = random_uint32_t(seed++);
           const uint32_t ran_y = random_uint32_t(seed++);
 

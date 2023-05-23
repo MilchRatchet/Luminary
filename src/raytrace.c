@@ -411,17 +411,19 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;
   instance->denoiser        = general.denoiser;
-  instance->reservoir_size  = general.reservoir_size;
 
   instance->tex_atlas = tex_atlas;
 
-  instance->scene              = *scene;
-  instance->settings           = general;
-  instance->shading_mode       = 0;
-  instance->accum_mode         = TEMPORAL_ACCUMULATION;
-  instance->spatial_samples    = 0;
-  instance->spatial_iterations = 1;
-  instance->bvh_type           = BVH_OPTIX;
+  instance->scene        = *scene;
+  instance->settings     = general;
+  instance->shading_mode = 0;
+  instance->accum_mode   = TEMPORAL_ACCUMULATION;
+  instance->bvh_type     = BVH_OPTIX;
+
+  instance->restir.initial_reservoir_size  = 32;
+  instance->restir.use_temporal_resampling = 1;
+  instance->restir.use_spatial_resampling  = 1;
+  instance->restir.spatial_sample_count    = 3;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
@@ -515,13 +517,12 @@ void raytrace_reset(RaytraceInstance* instance) {
     denoise_free(instance);
   }
 
-  instance->width          = instance->settings.width;
-  instance->height         = instance->settings.height;
-  instance->output_width   = instance->settings.width;
-  instance->output_height  = instance->settings.height;
-  instance->max_ray_depth  = instance->settings.max_ray_depth;
-  instance->denoiser       = instance->settings.denoiser;
-  instance->reservoir_size = instance->settings.reservoir_size;
+  instance->width         = instance->settings.width;
+  instance->height        = instance->settings.height;
+  instance->output_width  = instance->settings.width;
+  instance->output_height = instance->settings.height;
+  instance->max_ray_depth = instance->settings.max_ray_depth;
+  instance->denoiser      = instance->settings.denoiser;
 
   if (instance->denoiser == DENOISING_UPSCALING) {
     if (instance->width * instance->height > 18144000) {
@@ -562,7 +563,7 @@ void raytrace_prepare(RaytraceInstance* instance) {
   update_special_lights(instance->scene);
   raytrace_update_ray_emitter(instance);
   device_update_symbol(accum_mode, instance->accum_mode);
-  device_update_symbol(spatial_samples, instance->spatial_samples);
+  device_update_symbol(restir, instance->restir);
 }
 
 /*
@@ -578,7 +579,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_update_symbol(output_width, instance->output_width);
   device_update_symbol(output_height, instance->output_height);
   device_update_symbol(max_ray_depth, instance->max_ray_depth);
-  device_update_symbol(reservoir_size, instance->reservoir_size);
   device_update_symbol(denoiser, instance->denoiser);
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), amount);
