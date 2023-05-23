@@ -83,6 +83,7 @@ __device__ LightSample restir_compute_weight(LightSample s, vec3 pos) {
 
 __device__ LightSample restir_sample_reservoir(vec3 pos, uint32_t& seed) {
   LightSample selected = restir_sample_empty();
+  selected.visible     = 1;
 
   const vec3 sky_pos = world_to_sky_transform(pos);
 
@@ -236,7 +237,7 @@ __global__ void restir_temporal_visibility(LightSample* samples) {
   }
 }
 
-__global__ void restir_spatiotemporal_resampling(LightSample* samples, const LightSample* samples_prev) {
+__global__ void restir_temporal_resampling(LightSample* samples, LightSample* samples_prev) {
   const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
 
   uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
@@ -246,34 +247,68 @@ __global__ void restir_spatiotemporal_resampling(LightSample* samples, const Lig
     const ushort2 index  = __ldcs((ushort2*) (device.trace_tasks + offset));
     const uint32_t pixel = get_pixel_id(index.x, index.y);
 
-    const LightEvalData data  = load_light_eval_data(pixel);
-    const LightSample current = load_light_sample(samples, pixel);
-
-    LightSample selected = current;
+    const LightEvalData data = load_light_eval_data(pixel);
 
     if (data.flags) {
-      selected = restir_combine_reservoirs_start(selected);
-      for (int i = 0; i < device.spatial_samples; i++) {
-        const uint32_t ran_x = random_uint32_t(seed++);
-        const uint32_t ran_y = random_uint32_t(seed++);
+      LightSample selected = load_light_sample(samples, pixel);
+      selected             = restir_combine_reservoirs_start(selected);
 
-        int sample_x = index.x + ((ran_x & 0x3f) - 32);
-        int sample_y = index.y + ((ran_y & 0x3f) - 32);
+      LightSample temporal = load_light_sample(samples_prev, pixel);
+      temporal             = restir_cap_M(temporal, device.reservoir_size * 20);
 
-        sample_x = max(sample_x, 0);
-        sample_y = max(sample_y, 0);
-        sample_x = min(sample_x, device.width - 1);
-        sample_y = min(sample_y, device.height - 1);
-
-        LightSample temporal = load_light_sample(samples_prev, get_pixel_id(sample_x, sample_y));
-        temporal             = restir_cap_M(temporal, device.reservoir_size * 5);
-
-        selected = restir_combine_reservoirs_execute(selected, temporal, data.position, seed);
-      }
+      selected = restir_combine_reservoirs_execute(selected, temporal, data.position, seed);
       selected = restir_combine_reservoirs_finalize(selected, data.position);
-    }
 
-    store_light_sample(samples, selected, pixel);
+      store_light_sample(samples_prev, selected, pixel);
+    }
+  }
+
+  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
+}
+
+__global__ void restir_spatial_resampling(LightSample* samples, const LightSample* samples_prev) {
+  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
+
+  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset     = get_task_address(i);
+    const ushort2 index  = __ldcs((ushort2*) (device.trace_tasks + offset));
+    const uint32_t pixel = get_pixel_id(index.x, index.y);
+
+    const LightEvalData data = load_light_eval_data(pixel);
+
+    if (data.flags) {
+      LightSample selected = restir_sample_empty();
+
+      if (device.spatial_samples) {
+        selected = restir_combine_reservoirs_start(selected);
+
+        for (int i = 0; i < device.spatial_samples; i++) {
+          const uint32_t ran_x = random_uint32_t(seed++);
+          const uint32_t ran_y = random_uint32_t(seed++);
+
+          int sample_x = index.x + ((ran_x & 0x3f) - 32);
+          int sample_y = index.y + ((ran_y & 0x3f) - 32);
+
+          sample_x = max(sample_x, 0);
+          sample_y = max(sample_y, 0);
+          sample_x = min(sample_x, device.width - 1);
+          sample_y = min(sample_y, device.height - 1);
+
+          LightSample spatial = load_light_sample(samples_prev, get_pixel_id(sample_x, sample_y));
+
+          selected = restir_combine_reservoirs_execute(selected, spatial, data.position, seed);
+        }
+
+        selected = restir_combine_reservoirs_finalize(selected, data.position);
+      }
+      else {
+        selected = load_light_sample(samples_prev, pixel);
+      }
+
+      store_light_sample(samples, selected, pixel);
+    }
   }
 
   device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
