@@ -123,6 +123,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
         LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
         restir_temporal_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
         restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
+        restir_visibility_zero<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1);
         device_buffer_copy(instance->light_samples_1, instance->light_samples_2);
       }
     }
