@@ -255,8 +255,14 @@ struct LightSample {
   float target_pdf;
 } typedef LightSample;
 
+enum LightEvalDataFlags { LIGHT_EVAL_DATA_REQUIRES_SAMPLING = 0b1, LIGHT_EVAL_DATA_VOLUME_HIT = 0b10 } typedef LightEvalDataFlags;
+
 struct LightEvalData {
   vec3 position;
+  vec3 V;
+  vec3 normal;
+  float roughness;
+  float metallic;
   uint32_t flags;
 } typedef LightEvalData;
 

@@ -193,7 +193,8 @@ __global__ void restir_initial_sampling(LightSample* samples) {
 
     const LightEvalData data = load_light_eval_data(pixel);
 
-    LightSample sample = (data.flags) ? restir_sample_reservoir(data.position, seed) : restir_sample_empty();
+    LightSample sample =
+      (data.flags & LIGHT_EVAL_DATA_REQUIRES_SAMPLING) ? restir_sample_reservoir(data.position, seed) : restir_sample_empty();
 
     store_light_sample(device.ptrs.light_samples, sample, pixel);
 
@@ -225,7 +226,7 @@ __global__ void restir_temporal_resampling(const LightSample* samples, LightSamp
 
     const LightEvalData data = load_light_eval_data(pixel);
 
-    if (data.flags) {
+    if (data.flags & LIGHT_EVAL_DATA_REQUIRES_SAMPLING) {
       LightSample selected = load_light_sample(samples, pixel);
 
       if (device.restir.use_temporal_resampling) {
@@ -257,7 +258,7 @@ __global__ void restir_spatial_resampling(LightSample* samples, const LightSampl
 
     const LightEvalData data = load_light_eval_data(pixel);
 
-    if (data.flags) {
+    if (data.flags & LIGHT_EVAL_DATA_REQUIRES_SAMPLING) {
       LightSample selected = restir_sample_empty();
 
       if (device.restir.use_spatial_resampling && device.restir.spatial_sample_count) {

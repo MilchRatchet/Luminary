@@ -6,6 +6,32 @@
 #include "memory.cuh"
 #include "toy_utils.cuh"
 
+__global__ void toy_generate_light_eval_data() {
+  const int task_count  = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 3];
+  const int task_offset = device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3];
+
+  for (int i = 0; i < task_count; i++) {
+    ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
+
+    vec3 normal = get_toy_normal(task.position);
+
+    if (dot_product(normal, task.ray) > 0.0f) {
+      normal = scale_vector(normal, -1.0f);
+    }
+
+    LightEvalData data;
+    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING;
+    data.normal    = normal;
+    data.position  = task.position;
+    data.V         = scale_vector(task.ray, -1.0f);
+    data.roughness = (1.0f - device.scene.toy.material.r);
+    data.metallic  = device.scene.toy.material.g;
+
+    store_light_eval_data(data, pixel);
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 

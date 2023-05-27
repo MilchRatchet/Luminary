@@ -239,23 +239,42 @@ __device__ void write_normal_buffer(vec3 normal, const int pixel) {
 }
 
 __device__ LightEvalData load_light_eval_data(const int offset) {
-  const float4 packet = __ldcs((float4*) (device.ptrs.light_eval_data + offset));
+  const float4* ptr  = (float4*) (device.ptrs.light_eval_data + offset);
+  const float4 data0 = __ldcs(ptr + 0);
+  const float4 data1 = __ldcs(ptr + 1);
+  const float4 data2 = __ldcs(ptr + 2);
 
   LightEvalData result;
-  result.position = get_vector(packet.x, packet.y, packet.z);
-  result.flags    = __float_as_uint(packet.w);
+  result.position  = get_vector(data0.x, data0.y, data0.z);
+  result.V         = get_vector(data0.w, data1.x, data1.y);
+  result.normal    = get_vector(data1.z, data1.w, data2.x);
+  result.roughness = data2.y;
+  result.metallic  = data2.z;
+  result.flags     = __float_as_uint(data2.w);
 
   return result;
 }
 
 __device__ void store_light_eval_data(const LightEvalData data, const int offset) {
-  float4 packet;
-  packet.x = data.position.x;
-  packet.y = data.position.y;
-  packet.z = data.position.z;
-  packet.w = __uint_as_float(data.flags);
+  float4 data0, data1, data2;
 
-  __stcs((float4*) (device.ptrs.light_eval_data + offset), packet);
+  data0.x = data.position.x;
+  data0.y = data.position.y;
+  data0.z = data.position.z;
+  data0.w = data.V.x;
+  data1.x = data.V.y;
+  data1.y = data.V.z;
+  data1.z = data.normal.x;
+  data1.w = data.normal.y;
+  data2.x = data.normal.z;
+  data2.y = data.roughness;
+  data2.z = data.metallic;
+  data2.w = __uint_as_float(data.flags);
+
+  float4* ptr = (float4*) (device.ptrs.light_eval_data + offset);
+  __stcs(ptr + 0, data0);
+  __stcs(ptr + 1, data1);
+  __stcs(ptr + 2, data2);
 }
 
 __device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {

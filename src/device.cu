@@ -110,6 +110,16 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   if (type != TYPE_LIGHT && instance->light_resampling) {
+    geometry_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+    if (instance->scene.ocean.active) {
+      ocean_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
+
+    if (instance->scene.toy.active) {
+      toy_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
+
     LightSample* light_samples_1 = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
     restir_initial_sampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1);
 

@@ -234,6 +234,31 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
   return mid < 0.0f ? FLT_MAX : mid;
 }
 
+__global__ void ocean_generate_light_eval_data() {
+  const int task_count  = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 1];
+  const int task_offset = device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1];
+
+  for (int i = 0; i < task_count; i++) {
+    OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
+
+    vec3 ray;
+    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+    ray.y = sinf(task.ray_y);
+    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
+    LightEvalData data;
+    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING | LIGHT_EVAL_DATA_VOLUME_HIT;
+    data.normal    = get_vector(0.0f, 0.0f, 0.0f);
+    data.position  = task.position;
+    data.V         = scale_vector(ray, -1.0f);
+    data.roughness = 1.0f;
+    data.metallic  = 0.0f;
+
+    store_light_eval_data(data, pixel);
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
