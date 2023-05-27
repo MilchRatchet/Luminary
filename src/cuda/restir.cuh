@@ -22,7 +22,6 @@ __device__ LightSample restir_sample_empty() {
 
   s.id         = LIGHT_ID_NONE;
   s.M          = 0;
-  s.visible    = 0;
   s.target_pdf = 0.0f;
   s.weight     = 0.0f;
 
@@ -83,7 +82,6 @@ __device__ LightSample restir_compute_weight(LightSample s, vec3 pos) {
 
 __device__ LightSample restir_sample_reservoir(vec3 pos, uint32_t& seed) {
   LightSample selected = restir_sample_empty();
-  selected.visible     = 1;
 
   const vec3 sky_pos = world_to_sky_transform(pos);
 
@@ -165,18 +163,14 @@ __device__ LightSample restir_combine_reservoirs_execute(LightSample x, LightSam
   LightSample s = x;
 
   if (y.id != LIGHT_ID_NONE) {
-    s.M += y.M - 1;
+    const float target_pdf          = restir_sample_target_pdf(y, pos);
+    const float target_pdf_over_pdf = y.weight * y.M * target_pdf;
 
-    if (y.visible) {
-      const float target_pdf          = restir_sample_target_pdf(y, pos);
-      const float target_pdf_over_pdf = y.weight * y.M * target_pdf;
-
-      s.weight += target_pdf_over_pdf;
-      s.M += 1;
-      if (white_noise_offset(seed++) * s.weight < target_pdf_over_pdf) {
-        s.id         = y.id;
-        s.target_pdf = target_pdf;
-      }
+    s.weight += target_pdf_over_pdf;
+    s.M += y.M;
+    if (white_noise_offset(seed++) * s.weight < target_pdf_over_pdf) {
+      s.id         = y.id;
+      s.target_pdf = target_pdf;
     }
   }
 
@@ -219,26 +213,7 @@ __device__ LightSample restir_cap_M(LightSample s, uint32_t cap) {
   return s;
 }
 
-__global__ void restir_temporal_visibility(LightSample* samples) {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
-
-  for (int i = 0; i < task_count; i++) {
-    const int offset     = get_task_address(i);
-    TraceTask task       = load_trace_task(device.trace_tasks + offset);
-    const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
-
-    LightSample current = load_light_sample(samples, pixel);
-
-    const uint32_t hit_id = __ldca((uint32_t*) (device.ptrs.trace_results + offset) + 1);
-
-    if (hit_id != REJECT_HIT) {
-      current.visible = 1;
-      store_light_sample(samples, current, pixel);
-    }
-  }
-}
-
-__global__ void restir_temporal_resampling(LightSample* samples, LightSample* samples_prev) {
+__global__ void restir_temporal_resampling(const LightSample* samples, LightSample* samples_prev) {
   const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
 
   uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
@@ -257,7 +232,7 @@ __global__ void restir_temporal_resampling(LightSample* samples, LightSample* sa
         selected = restir_combine_reservoirs_start(selected);
 
         LightSample temporal = load_light_sample(samples_prev, pixel);
-        temporal             = restir_cap_M(temporal, selected.M * 20);
+        temporal             = restir_cap_M(temporal, device.restir.initial_reservoir_size * 20);
 
         selected = restir_combine_reservoirs_execute(selected, temporal, data.position, seed);
         selected = restir_combine_reservoirs_finalize(selected, data.position);
@@ -312,26 +287,6 @@ __global__ void restir_spatial_resampling(LightSample* samples, const LightSampl
       }
 
       store_light_sample(samples, selected, pixel);
-    }
-  }
-
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
-}
-
-__global__ void restir_visibility_zero(LightSample* samples) {
-  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
-
-  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
-
-  for (int i = 0; i < task_count; i++) {
-    const int offset     = get_task_address(i);
-    const ushort2 index  = __ldcs((ushort2*) (device.trace_tasks + offset));
-    const uint32_t pixel = get_pixel_id(index.x, index.y);
-
-    const LightEvalData data = load_light_eval_data(pixel);
-
-    if (data.flags) {
-      samples[pixel].visible = 0;
     }
   }
 

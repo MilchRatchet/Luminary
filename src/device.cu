@@ -95,11 +95,6 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (type == TYPE_LIGHT && instance->scene.material.lights_active && depth == 0) {
-    LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
-    restir_temporal_visibility<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_2);
-  }
-
   if (instance->scene.fog.active || instance->scene.ocean.active) {
     fog_preprocess_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -123,7 +118,6 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
         LightSample* light_samples_2 = (LightSample*) device_buffer_get_pointer(instance->light_samples_2);
         restir_temporal_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
         restir_spatial_resampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1, light_samples_2);
-        restir_visibility_zero<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(light_samples_1);
         device_buffer_copy(instance->light_samples_1, instance->light_samples_2);
       }
     }

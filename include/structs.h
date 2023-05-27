@@ -250,8 +250,7 @@ struct DeviceTexture {
 ////////////////////////////////////////////////////////////////////
 struct LightSample {
   uint32_t id;
-  uint16_t M;
-  uint16_t visible;
+  uint32_t M;
   float weight;
   float target_pdf;
 } typedef LightSample;

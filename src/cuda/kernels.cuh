@@ -428,11 +428,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
           if (sun_visible) {
             selected.id         = LIGHT_ID_SUN;
             selected.M          = 1;
-            selected.target_pdf = restir_sample_target_pdf(selected, task.origin);
-            selected.weight     = selected.target_pdf / 1.0f;
+            selected.target_pdf = 1.0f;
+            selected.weight     = 1.0f;
           }
-
-          selected = restir_compute_weight(selected, task.origin);
 
           store_light_sample(device.ptrs.light_samples, selected, pixel);
         }
