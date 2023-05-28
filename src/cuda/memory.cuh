@@ -281,20 +281,20 @@ __device__ LightSample load_light_sample(const LightSample* ptr, const int offse
   const float4 packet = __ldcs((float4*) (ptr + offset));
 
   LightSample sample;
-  sample.id         = __float_as_uint(packet.x);
-  sample.M          = __float_as_uint(packet.y);
-  sample.weight     = packet.z;
-  sample.target_pdf = packet.w;
+  sample.seed   = __float_as_uint(packet.x);
+  sample.id     = __float_as_uint(packet.y);
+  sample.M      = __float_as_uint(packet.z);
+  sample.weight = packet.w;
 
   return sample;
 }
 
 __device__ void store_light_sample(LightSample* ptr, const LightSample sample, const int offset) {
   float4 packet;
-  packet.x = __uint_as_float(sample.id);
-  packet.y = __uint_as_float(sample.M);
-  packet.z = sample.weight;
-  packet.w = sample.target_pdf;
+  packet.x = __uint_as_float(sample.seed);
+  packet.y = __uint_as_float(sample.id);
+  packet.z = __uint_as_float(sample.M);
+  packet.w = sample.weight;
 
   __stcs((float4*) (ptr + offset), packet);
 }

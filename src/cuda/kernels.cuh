@@ -407,10 +407,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
         LightSample selected = restir_sample_empty();
 
         if (sun_visible) {
-          selected.id         = LIGHT_ID_SUN;
-          selected.M          = 1;
-          selected.target_pdf = 1.0f;
-          selected.weight     = 1.0f;
+          selected.seed   = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x]++;
+          selected.id     = LIGHT_ID_SUN;
+          selected.M      = 1;
+          selected.weight = 1.0f;
         }
 
         store_light_sample(device.ptrs.light_samples, selected, pixel);

@@ -20,10 +20,10 @@
 __device__ LightSample restir_sample_empty() {
   LightSample s;
 
-  s.id         = LIGHT_ID_NONE;
-  s.M          = 0;
-  s.target_pdf = 0.0f;
-  s.weight     = 0.0f;
+  s.seed   = 0;
+  s.id     = LIGHT_ID_NONE;
+  s.M      = 0;
+  s.weight = 0.0f;
 
   return s;
 }
@@ -69,12 +69,11 @@ __device__ float restir_sample_target_pdf(LightSample x, vec3 pos) {
  */
 __device__ LightSample restir_compute_weight(LightSample s, vec3 pos) {
   if (s.id == LIGHT_ID_NONE) {
-    s.weight     = 0.0f;
-    s.target_pdf = 0.0f;
+    s.weight = 0.0f;
   }
   else {
-    s.target_pdf = restir_sample_target_pdf(s, pos);
-    s.weight     = (1.0f / s.target_pdf) * (s.weight / s.M);
+    const float target_pdf = restir_sample_target_pdf(s, pos);
+    s.weight               = (1.0f / target_pdf) * (s.weight / s.M);
   }
 
   return s;
@@ -151,10 +150,12 @@ __device__ LightSample restir_sample_reservoir(vec3 pos, uint32_t& seed) {
   return selected;
 }
 
-__device__ LightSample restir_combine_reservoirs_start(LightSample x) {
+__device__ LightSample restir_combine_reservoirs_start(LightSample x, vec3 pos) {
   LightSample s = x;
 
-  s.weight = x.weight * x.M * x.target_pdf;
+  const float target_pdf = restir_sample_target_pdf(s, pos);
+
+  s.weight = s.weight * s.M * target_pdf;
 
   return s;
 }
@@ -169,8 +170,7 @@ __device__ LightSample restir_combine_reservoirs_execute(LightSample x, LightSam
     s.weight += target_pdf_over_pdf;
     s.M += y.M;
     if (white_noise_offset(seed++) * s.weight < target_pdf_over_pdf) {
-      s.id         = y.id;
-      s.target_pdf = target_pdf;
+      s.id = y.id;
     }
   }
 
@@ -230,7 +230,7 @@ __global__ void restir_temporal_resampling(const LightSample* samples, LightSamp
       LightSample selected = load_light_sample(samples, pixel);
 
       if (device.restir.use_temporal_resampling) {
-        selected = restir_combine_reservoirs_start(selected);
+        selected = restir_combine_reservoirs_start(selected, data.position);
 
         LightSample temporal = load_light_sample(samples_prev, pixel);
         temporal             = restir_cap_M(temporal, device.restir.initial_reservoir_size * 20);
@@ -262,7 +262,7 @@ __global__ void restir_spatial_resampling(LightSample* samples, const LightSampl
       LightSample selected = restir_sample_empty();
 
       if (device.restir.use_spatial_resampling && device.restir.spatial_sample_count) {
-        selected = restir_combine_reservoirs_start(selected);
+        selected = restir_combine_reservoirs_start(selected, data.position);
 
         for (int i = 0; i < device.restir.spatial_sample_count; i++) {
           const uint32_t ran_x = random_uint32_t(seed++);

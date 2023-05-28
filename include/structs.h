@@ -249,10 +249,10 @@ struct DeviceTexture {
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////
 struct LightSample {
+  uint32_t seed;
   uint32_t id;
   uint32_t M;
   float weight;
-  float target_pdf;
 } typedef LightSample;
 
 enum LightEvalDataFlags { LIGHT_EVAL_DATA_REQUIRES_SAMPLING = 0b1, LIGHT_EVAL_DATA_VOLUME_HIT = 0b10 } typedef LightEvalDataFlags;
