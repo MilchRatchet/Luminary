@@ -45,19 +45,35 @@ __device__ LightSample restir_sample_update(LightSample x, uint32_t id, float we
  * @param pos Position to compute the solid angle from.
  * @result Target PDF of light sample.
  */
-__device__ float restir_sample_target_pdf(LightSample x, vec3 pos) {
+__device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
+  if (x.id == LIGHT_ID_NONE) {
+    return 0.0f;
+  }
+
+  BRDFInstance brdf = brdf_get_instance(get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f), data.V, data.normal, data.roughness, data.metallic);
+
+  // We overwrite the local scope copy of the light sample
+  x.weight = 1.0f;
+
+  BRDFInstance result = (data.flags & LIGHT_EVAL_DATA_VOLUME_HIT)
+                          ? brdf_apply_sample_scattering(brdf, x, data.position, device.scene.ocean.anisotropy)
+                          : brdf_apply_sample(brdf, x, data.position);
+
+  float value = luminance(result.term);
+
   switch (x.id) {
     case LIGHT_ID_SUN:
-      return (2e+04f * device.scene.sky.sun_strength)
-             * sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(pos));
+      value *= (2e+04f * device.scene.sky.sun_strength);
+      break;
     case LIGHT_ID_TOY:
-      return device.scene.toy.material.b * toy_get_solid_angle(pos);
-    case LIGHT_ID_NONE:
-      return 0.0f;
+      value *= device.scene.toy.material.b;
+      break;
     default:
-      const TriangleLight triangle = load_triangle_light(x.id);
-      return device.scene.material.default_material.b * sample_triangle_solid_angle(triangle, pos);
+      value *= device.scene.material.default_material.b;
+      break;
   }
+
+  return value;
 }
 
 /**
@@ -67,22 +83,22 @@ __device__ float restir_sample_target_pdf(LightSample x, vec3 pos) {
  * @param pos Position to compute the solid angle from.
  * @result Copy of the LightSample s with computed weight.
  */
-__device__ LightSample restir_compute_weight(LightSample s, vec3 pos) {
+__device__ LightSample restir_compute_weight(LightSample s, LightEvalData data) {
   if (s.id == LIGHT_ID_NONE) {
     s.weight = 0.0f;
   }
   else {
-    const float target_pdf = restir_sample_target_pdf(s, pos);
+    const float target_pdf = restir_sample_target_pdf(s, data);
     s.weight               = (1.0f / target_pdf) * (s.weight / s.M);
   }
 
   return s;
 }
 
-__device__ LightSample restir_sample_reservoir(vec3 pos, uint32_t& seed) {
+__device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& seed) {
   LightSample selected = restir_sample_empty();
 
-  const vec3 sky_pos = world_to_sky_transform(pos);
+  const vec3 sky_pos = world_to_sky_transform(data.position);
 
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
@@ -104,12 +120,12 @@ __device__ LightSample restir_sample_reservoir(vec3 pos, uint32_t& seed) {
       sampled.id = LIGHT_ID_SUN;
       sampled.M  = 1;
 
-      const float sampled_target_pdf = restir_sample_target_pdf(sampled, pos);
+      const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
       const float sampled_pdf        = base_probability;
 
       selected = restir_sample_update(selected, sampled.id, sampled_target_pdf / sampled_pdf, seed);
 
-      selected = restir_compute_weight(selected, pos);
+      selected = restir_compute_weight(selected, data);
 
       return selected;
     }
@@ -124,8 +140,9 @@ __device__ LightSample restir_sample_reservoir(vec3 pos, uint32_t& seed) {
     light_index += (!toy_visible && light_index) ? 1 : 0;
 
     LightSample sampled;
-    sampled.id = LIGHT_ID_NONE;
-    sampled.M  = 1;
+    sampled.seed = random_uint32_t(seed++);
+    sampled.id   = LIGHT_ID_NONE;
+    sampled.M    = 1;
 
     switch (light_index) {
       case 0:
@@ -139,32 +156,32 @@ __device__ LightSample restir_sample_reservoir(vec3 pos, uint32_t& seed) {
         break;
     }
 
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, pos);
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
     const float sampled_pdf        = base_probability * 1.0f / light_count_float;
 
     selected = restir_sample_update(selected, sampled.id, sampled_target_pdf / sampled_pdf, seed);
   }
 
-  selected = restir_compute_weight(selected, pos);
+  selected = restir_compute_weight(selected, data);
 
   return selected;
 }
 
-__device__ LightSample restir_combine_reservoirs_start(LightSample x, vec3 pos) {
+__device__ LightSample restir_combine_reservoirs_start(LightSample x, LightEvalData data) {
   LightSample s = x;
 
-  const float target_pdf = restir_sample_target_pdf(s, pos);
+  const float target_pdf = restir_sample_target_pdf(s, data);
 
   s.weight = s.weight * s.M * target_pdf;
 
   return s;
 }
 
-__device__ LightSample restir_combine_reservoirs_execute(LightSample x, LightSample y, vec3 pos, uint32_t& seed) {
+__device__ LightSample restir_combine_reservoirs_execute(LightSample x, LightSample y, LightEvalData data, uint32_t& seed) {
   LightSample s = x;
 
   if (y.id != LIGHT_ID_NONE) {
-    const float target_pdf          = restir_sample_target_pdf(y, pos);
+    const float target_pdf          = restir_sample_target_pdf(y, data);
     const float target_pdf_over_pdf = y.weight * y.M * target_pdf;
 
     s.weight += target_pdf_over_pdf;
@@ -177,8 +194,8 @@ __device__ LightSample restir_combine_reservoirs_execute(LightSample x, LightSam
   return s;
 }
 
-__device__ LightSample restir_combine_reservoirs_finalize(LightSample x, vec3 pos) {
-  return restir_compute_weight(x, pos);
+__device__ LightSample restir_combine_reservoirs_finalize(LightSample x, LightEvalData data) {
+  return restir_compute_weight(x, data);
 }
 
 __global__ void restir_initial_sampling(LightSample* samples) {
@@ -193,8 +210,7 @@ __global__ void restir_initial_sampling(LightSample* samples) {
 
     const LightEvalData data = load_light_eval_data(pixel);
 
-    LightSample sample =
-      (data.flags & LIGHT_EVAL_DATA_REQUIRES_SAMPLING) ? restir_sample_reservoir(data.position, seed) : restir_sample_empty();
+    LightSample sample = (data.flags & LIGHT_EVAL_DATA_REQUIRES_SAMPLING) ? restir_sample_reservoir(data, seed) : restir_sample_empty();
 
     store_light_sample(device.ptrs.light_samples, sample, pixel);
 
@@ -230,13 +246,13 @@ __global__ void restir_temporal_resampling(const LightSample* samples, LightSamp
       LightSample selected = load_light_sample(samples, pixel);
 
       if (device.restir.use_temporal_resampling) {
-        selected = restir_combine_reservoirs_start(selected, data.position);
+        selected = restir_combine_reservoirs_start(selected, data);
 
         LightSample temporal = load_light_sample(samples_prev, pixel);
         temporal             = restir_cap_M(temporal, device.restir.initial_reservoir_size * 20);
 
-        selected = restir_combine_reservoirs_execute(selected, temporal, data.position, seed);
-        selected = restir_combine_reservoirs_finalize(selected, data.position);
+        selected = restir_combine_reservoirs_execute(selected, temporal, data, seed);
+        selected = restir_combine_reservoirs_finalize(selected, data);
       }
 
       store_light_sample(samples_prev, selected, pixel);
@@ -262,7 +278,7 @@ __global__ void restir_spatial_resampling(LightSample* samples, const LightSampl
       LightSample selected = restir_sample_empty();
 
       if (device.restir.use_spatial_resampling && device.restir.spatial_sample_count) {
-        selected = restir_combine_reservoirs_start(selected, data.position);
+        selected = restir_combine_reservoirs_start(selected, data);
 
         for (int i = 0; i < device.restir.spatial_sample_count; i++) {
           const uint32_t ran_x = random_uint32_t(seed++);
@@ -278,10 +294,10 @@ __global__ void restir_spatial_resampling(LightSample* samples, const LightSampl
 
           LightSample spatial = load_light_sample(samples_prev, get_pixel_id(sample_x, sample_y));
 
-          selected = restir_combine_reservoirs_execute(selected, spatial, data.position, seed);
+          selected = restir_combine_reservoirs_execute(selected, spatial, data, seed);
         }
 
-        selected = restir_combine_reservoirs_finalize(selected, data.position);
+        selected = restir_combine_reservoirs_finalize(selected, data);
       }
       else {
         selected = load_light_sample(samples_prev, pixel);

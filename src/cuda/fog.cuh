@@ -117,7 +117,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
       BRDFInstance brdf = brdf_get_instance_scattering();
 
       if (light.weight > 0.0f) {
-        BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, ray, device.scene.fog.anisotropy);
+        BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, device.scene.fog.anisotropy);
 
         const float weight = (FOG_DENSITY - FOG_DENSITY * expf(-task.distance * FOG_DENSITY)) / FOG_DENSITY;
 

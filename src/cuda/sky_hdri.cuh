@@ -16,6 +16,8 @@
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lut(float4* dst) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
+  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+
   const int amount = device.scene.sky.hdri_dim * device.scene.sky.hdri_dim;
 
   const float step_size = 1.0f / (device.scene.sky.hdri_dim - 1);
@@ -43,12 +45,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
       RGBF cloud_transmittance = get_color(1.0f, 1.0f, 1.0f);
 
       if (device.scene.sky.cloud.active) {
-        const float offset = clouds_render(sky_origin, ray, FLT_MAX, color, cloud_transmittance);
+        const float offset = clouds_render(sky_origin, ray, FLT_MAX, color, cloud_transmittance, seed);
 
         iter_origin = add_vector(iter_origin, scale_vector(ray, offset));
       }
 
-      const RGBF sky = sky_get_color(iter_origin, ray, FLT_MAX, true, device.scene.sky.steps);
+      const RGBF sky = sky_get_color(iter_origin, ray, FLT_MAX, true, device.scene.sky.steps, seed);
 
       color  = add_color(color, mul_color(sky, cloud_transmittance));
       result = add_color(result, color);
@@ -60,6 +62,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
 
     id += blockDim.x * gridDim.x;
   }
+
+  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
 }
 
 extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {

@@ -93,6 +93,11 @@ __device__ float white_noise_offset(const uint32_t offset) {
   return ((float) random_uint16_t(offset)) / ((float) UINT16_MAX);
 }
 
+// ReSTIR and GRIS reuse seeds across threads and hence we use the same key of 0
+__device__ float white_noise_offset_restir(const uint32_t offset) {
+  return ((float) random_uint16_t_base(0, offset)) / ((float) UINT16_MAX);
+}
+
 __device__ float white_noise_precise() {
   return white_noise_precise_offset(device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x]++);
 }

@@ -420,7 +420,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->accum_mode   = TEMPORAL_ACCUMULATION;
   instance->bvh_type     = BVH_OPTIX;
 
-  instance->restir.initial_reservoir_size  = 32;
+  instance->restir.initial_reservoir_size  = 8;
   instance->restir.use_temporal_resampling = 1;
   instance->restir.use_spatial_resampling  = 1;
   instance->restir.spatial_sample_count    = 3;

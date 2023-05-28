@@ -248,6 +248,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering_tasks() {
   const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
+  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device.trace_tasks + offset);
@@ -268,7 +270,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
 
     RGBF record = load_RGBF(device.records + pixel);
 
-    RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record);
+    RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, seed);
 
     RGBF color = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
     color      = add_color(color, inscattering);
@@ -276,6 +278,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
     store_RGBF(device.records + pixel, record);
     store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
   }
+
+  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {

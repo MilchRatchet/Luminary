@@ -862,8 +862,8 @@ __device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, 
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the triangle.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin) {
-  const float u     = white_noise();
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, uint32_t& seed) {
+  const float u     = white_noise_offset_restir(seed++);
   const uint32_t uf = u * __uint_as_float(0x4f800000u);  // u * 2^32
   float2 a          = make_float2(1.0f, 0.0f);
   float2 b          = make_float2(0.0f, 1.0f);
@@ -956,9 +956,9 @@ __device__ float sample_triangle_solid_angle(const TriangleLight triangle, const
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the sphere.
  */
-__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin) {
-  const float u1 = sqrtf(white_noise());
-  const float u2 = white_noise() * 2.0f * PI;
+__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, uint32_t& seed) {
+  const float u1 = sqrtf(white_noise_offset_restir(seed++));
+  const float u2 = white_noise_offset_restir(seed++) * 2.0f * PI;
 
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);
