@@ -4,6 +4,28 @@
 #include "memory.cuh"
 #include "utils.cuh"
 
+//
+// This file implements light sampling based on ReSTIR. However, I ultimately decided to only use
+// weighted reservoir sampling using the BRDF as the target pdf. This is because I want to avoid
+// introducing any bias here. Initially, the plan was to reuse visibility that was computed in
+// the previous frame. However, to achieve an unbiased implementation we need to evaluate the target
+// pdf of the chosen sample for all neighbours. If I include visibility then I must reevaluate visibility
+// for each neighbour which is not feasible. [Wym21] suggested not computing visibility but using
+// heuristics and MIS weights to keep the bias to a minimum but I am not happy with that.
+//
+// Since I don't use visibility, there is no need for temporal resampling, the main point behind temporal resampling is
+// that the chosen candidate from the initial candidate sampling may be occluded and hence through temporal
+// resampling we increase the likelihood that a pixel has a non occluded sample ready for spatial resampling.
+// Spatial resampling then redistributes those samples so that any single pixel has a high chance of visiting
+// a new and likely unoccluded light. Obviously, we also additionally increase the number of samples any pixel
+// has visited exponentially with a non exponential cost.
+//
+// The increased sample quality through spatial resampling turns out to not be worth much in my case where
+// no visibility is used in the target pdf. Hence both temporal and spatial resampling are not part of this
+// algorithm. This also has some additional benefits in that it reduces memory consumption since we don't need
+// two light sample buffers and because light sampling is equally good for all bounce depths.
+//
+
 ////////////////////////////////////////////////////////////////////
 // Literature
 ////////////////////////////////////////////////////////////////////
@@ -28,12 +50,13 @@ __device__ LightSample restir_sample_empty() {
   return s;
 }
 
-__device__ LightSample restir_sample_update(LightSample x, uint32_t id, float weight, uint32_t& seed) {
+__device__ LightSample restir_sample_update(LightSample x, uint32_t id, float weight, uint32_t random_key, uint32_t& seed) {
   x.M++;
 
   x.weight += weight;
   if (white_noise_offset(seed++) * x.weight < weight) {
-    x.id = id;
+    x.id   = id;
+    x.seed = random_key;
   }
 
   return x;
@@ -121,13 +144,14 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
     base_probability *= 0.5f;
     if (white_noise_offset(seed++) < 0.5f) {
       LightSample sampled;
-      sampled.id = LIGHT_ID_SUN;
-      sampled.M  = 1;
+      sampled.seed = random_uint32_t(seed++);
+      sampled.id   = LIGHT_ID_SUN;
+      sampled.M    = 1;
 
       const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
       const float sampled_pdf        = base_probability;
 
-      selected = restir_sample_update(selected, sampled.id, sampled_target_pdf / sampled_pdf, seed);
+      selected = restir_sample_update(selected, sampled.id, sampled_target_pdf / sampled_pdf, sampled.seed, seed);
 
       selected = restir_compute_weight(selected, data);
 
@@ -163,7 +187,7 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
     const float sampled_pdf        = base_probability * 1.0f / light_count_float;
 
-    selected = restir_sample_update(selected, sampled.id, sampled_target_pdf / sampled_pdf, seed);
+    selected = restir_sample_update(selected, sampled.id, sampled_target_pdf / sampled_pdf, sampled.seed, seed);
   }
 
   selected = restir_compute_weight(selected, data);
@@ -191,7 +215,8 @@ __device__ LightSample restir_combine_reservoirs_execute(LightSample x, LightSam
     s.weight += target_pdf_over_pdf;
     s.M += y.M;
     if (white_noise_offset(seed++) * s.weight < target_pdf_over_pdf) {
-      s.id = y.id;
+      s.id   = y.id;
+      s.seed = y.seed;
     }
   }
 
@@ -284,6 +309,9 @@ __global__ void restir_spatial_resampling(LightSample* samples, const LightSampl
       if (device.restir.use_spatial_resampling && device.restir.spatial_sample_count) {
         selected = restir_combine_reservoirs_start(selected, data);
 
+        uint32_t neighbours[16];
+        uint32_t M_neighbours[16];
+
         for (int i = 0; i < device.restir.spatial_sample_count; i++) {
           const uint32_t ran_x = random_uint32_t(seed++);
           const uint32_t ran_y = random_uint32_t(seed++);
@@ -296,10 +324,31 @@ __global__ void restir_spatial_resampling(LightSample* samples, const LightSampl
           sample_x = min(sample_x, device.width - 1);
           sample_y = min(sample_y, device.height - 1);
 
-          LightSample spatial = load_light_sample(samples_prev, get_pixel_id(sample_x, sample_y));
+          const uint32_t neighbour_id = get_pixel_id(sample_x, sample_y);
+
+          neighbours[i] = neighbour_id;
+
+          LightSample spatial = load_light_sample(samples_prev, neighbour_id);
+
+          M_neighbours[i] = (spatial.id != LIGHT_ID_NONE) ? spatial.M : 0;
 
           selected = restir_combine_reservoirs_execute(selected, spatial, data, seed);
         }
+
+        uint32_t Z = 0;
+
+        for (int i = 0; i < device.restir.spatial_sample_count; i++) {
+          if (M_neighbours[i] != 0) {
+            const LightEvalData data_neighbour  = load_light_eval_data(neighbours[i]);
+            const float target_pdf_at_neighbour = restir_sample_target_pdf(selected, data_neighbour);
+
+            if (target_pdf_at_neighbour > 0.0f) {
+              Z += M_neighbours[i];
+            }
+          }
+        }
+
+        selected.M = Z;
 
         selected = restir_combine_reservoirs_finalize(selected, data);
       }
