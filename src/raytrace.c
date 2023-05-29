@@ -420,10 +420,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->accum_mode   = TEMPORAL_ACCUMULATION;
   instance->bvh_type     = BVH_OPTIX;
 
-  instance->restir.initial_reservoir_size  = 32;
-  instance->restir.use_temporal_resampling = 0;
-  instance->restir.use_spatial_resampling  = 0;
-  instance->restir.spatial_sample_count    = 3;
+  instance->restir.initial_reservoir_size = 32;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
@@ -458,8 +455,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->raydir_buffer);
   device_buffer_init(&instance->trace_result_buffer);
   device_buffer_init(&instance->state_buffer);
-  device_buffer_init(&instance->light_samples_1);
-  device_buffer_init(&instance->light_samples_2);
+  device_buffer_init(&instance->light_samples);
   device_buffer_init(&instance->light_eval_data);
   device_buffer_init(&instance->cloud_noise);
   device_buffer_init(&instance->sky_ms_luts);
@@ -614,10 +610,9 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_result_buffer, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
 
-  device_buffer_malloc(instance->light_samples_1, sizeof(LightSample), amount);
+  device_buffer_malloc(instance->light_samples, sizeof(LightSample), amount);
 
   if (instance->realtime || instance->light_resampling) {
-    device_buffer_malloc(instance->light_samples_2, sizeof(LightSample), amount);
     device_buffer_malloc(instance->light_eval_data, sizeof(LightEvalData), amount);
   }
 
@@ -653,7 +648,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.raydir_buffer        = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
   ptrs.trace_result_buffer  = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.state_buffer         = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
-  ptrs.light_samples        = (LightSample*) device_buffer_get_pointer(instance->light_samples_1);
+  ptrs.light_samples        = (LightSample*) device_buffer_get_pointer(instance->light_samples);
   ptrs.light_eval_data      = (LightEvalData*) device_buffer_get_pointer(instance->light_eval_data);
   ptrs.sky_tm_luts          = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
   ptrs.sky_ms_luts          = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
@@ -683,8 +678,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->raydir_buffer);
   device_buffer_free(instance->trace_result_buffer);
   device_buffer_free(instance->state_buffer);
-  device_buffer_free(instance->light_samples_1);
-  device_buffer_free(instance->light_samples_2);
+  device_buffer_free(instance->light_samples);
   device_buffer_free(instance->light_eval_data);
 
   gpuErrchk(cudaDeviceSynchronize());

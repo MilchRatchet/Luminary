@@ -63,9 +63,6 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] =
     create_slider(ui, "ReSTIR Initial Reservoir Size", &(instance->restir.initial_reservoir_size), 0, 0.02f, 1.0f, 1024.0f, 0, 1);
-  panels[i++] = create_check(ui, "ReSTIR Temporal Resampling", &(instance->restir.use_temporal_resampling), 1);
-  panels[i++] = create_check(ui, "ReSTIR Spatial Resampling", &(instance->restir.use_spatial_resampling), 1);
-  panels[i++] = create_slider(ui, "ReSTIR Spatial Samples", &(instance->restir.spatial_sample_count), 0, 0.02f, 0.0f, 16.0f, 0, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

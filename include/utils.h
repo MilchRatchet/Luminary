@@ -331,9 +331,6 @@ struct TextureAtlas {
 } typedef TextureAtlas;
 
 struct ReSTIRSettings {
-  int use_temporal_resampling;
-  int use_spatial_resampling;
-  int spatial_sample_count;
   int initial_reservoir_size;
 } typedef ReSTIRSettings;
 
@@ -441,8 +438,7 @@ struct RaytraceInstance {
   DeviceBuffer* light_records;
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
-  DeviceBuffer* light_samples_1;
-  DeviceBuffer* light_samples_2;
+  DeviceBuffer* light_samples;
   DeviceBuffer* light_eval_data;
   DeviceBuffer* cloud_noise;
   DeviceBuffer* sky_ms_luts;
