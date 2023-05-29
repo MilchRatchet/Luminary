@@ -61,6 +61,10 @@ __device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
 
   float value = luminance(result.term);
 
+  if (isinf(value) || isnan(value)) {
+    value = 0.0f;
+  }
+
   switch (x.id) {
     case LIGHT_ID_SUN:
       value *= (2e+04f * device.scene.sky.sun_strength);

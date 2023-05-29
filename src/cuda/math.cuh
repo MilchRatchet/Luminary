@@ -994,7 +994,7 @@ __device__ float sample_sphere_solid_angle(const vec3 p, const float r, const ve
 }
 
 __device__ int material_is_mirror(const float roughness, const float metallic) {
-  return (roughness < 0.1f && metallic > 0.99f);
+  return (roughness < 0.01f && metallic > 0.99f);
 }
 
 // Computes tangent space for use with normal mapping without precomputation
@@ -1131,6 +1131,15 @@ __device__ RGBAhalf max_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
 
   result.rg = __hmax2(a.rg, b.rg);
   result.ba = __hmax2(a.ba, b.ba);
+
+  return result;
+}
+
+__device__ RGBAhalf min_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+  RGBAhalf result;
+
+  result.rg = __hmin2(a.rg, b.rg);
+  result.ba = __hmin2(a.ba, b.ba);
 
   return result;
 }

@@ -239,8 +239,10 @@ __device__ RGBAhalf brdf_evaluate_microfacet(BRDFInstance brdf, const float Ndot
   return brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, D * G2 * NdotL);
 }
 
-__device__ BRDFInstance
-  brdf_get_instance(const RGBAhalf albedo, const vec3 V, const vec3 normal, const float roughness, const float metallic) {
+__device__ BRDFInstance brdf_get_instance(RGBAhalf albedo, const vec3 V, const vec3 normal, const float roughness, const float metallic) {
+  // An albedo of all 1 produces incorrect results
+  albedo = min_RGBAhalf(albedo, get_RGBAhalf(1.0f - eps, 1.0f - eps, 1.0f - eps, 1.0f));
+
   BRDFInstance brdf;
   brdf.albedo      = albedo;
   brdf.diffuse     = brdf_albedo_as_diffuse(albedo, metallic);
@@ -273,8 +275,6 @@ __device__ BRDFInstance brdf_get_instance_scattering() {
  * Writes term of the BRDFInstance.
  */
 __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
-  const vec3 H = normalize_vector(add_vector(brdf.V, brdf.L));
-
   float NdotL = dot_product(brdf.normal, brdf.L);
   float NdotV = dot_product(brdf.normal, brdf.V);
 
@@ -283,8 +283,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
     return brdf;
   }
 
-  NdotL = fminf(fmaxf(0.0001f, NdotL), 1.0f);
-  NdotV = fminf(fmaxf(0.0001f, NdotV), 1.0f);
+  const vec3 H = normalize_vector(add_vector(brdf.V, brdf.L));
 
   const float NdotH = __saturatef(dot_product(brdf.normal, H));
   const float HdotV = __saturatef(dot_product(H, brdf.V));
