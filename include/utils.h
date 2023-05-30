@@ -381,7 +381,6 @@ struct DeviceConstantMemory {
   RGBF* records;
   int temporal_frames;
   int denoiser;
-  int light_resampling;
   int width;
   int height;
   int output_width;
@@ -447,7 +446,6 @@ struct RaytraceInstance {
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
-  int light_resampling;
   Scene scene;
   DenoisingMode denoiser;
   int temporal_frames;

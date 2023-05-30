@@ -403,24 +403,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     if (hit_id != SKY_HIT)
       task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    if (device.iteration_type != TYPE_LIGHT && !device.light_resampling) {
-      if (hit_id == OCEAN_HIT || hit_id == TOY_HIT || hit_id <= TRIANGLE_ID_LIMIT) {
-        const vec3 sky_pos    = world_to_sky_transform(task.origin);
-        const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
-
-        LightSample selected = restir_sample_empty();
-
-        if (sun_visible) {
-          selected.seed   = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x]++;
-          selected.id     = LIGHT_ID_SUN;
-          selected.M      = 1;
-          selected.weight = 1.0f;
-        }
-
-        store_light_sample(device.ptrs.light_samples, selected, pixel);
-      }
-    }
-
     float4* ptr = (float4*) (device.trace_tasks + offset);
     float4 data0;
     float4 data1;

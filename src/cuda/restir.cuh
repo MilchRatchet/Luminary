@@ -160,8 +160,9 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
   }
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
+  const int reservoir_size      = min(device.restir.initial_reservoir_size, light_count);
 
-  for (int i = 0; i < device.restir.initial_reservoir_size; i++) {
+  for (int i = 0; i < reservoir_size; i++) {
     uint32_t light_index = random_uint32_t(seed++) % light_count;
 
     light_index += !sun_visible;

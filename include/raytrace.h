@@ -23,7 +23,6 @@ void raytrace_init_8bit_frame(RaytraceInstance* instance, const unsigned int wid
 void raytrace_free_8bit_frame(RaytraceInstance* instance);
 void raytrace_update_ray_emitter(RaytraceInstance* instance);
 void raytrace_update_toy_rotation(RaytraceInstance* instance);
-void raytrace_update_light_resampling_active(RaytraceInstance* instance);
 void raytrace_update_device_scene(RaytraceInstance* instance);
 void raytrace_center_toy_at_camera(RaytraceInstance* instance);
 

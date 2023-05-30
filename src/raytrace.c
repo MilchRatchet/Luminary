@@ -257,8 +257,6 @@ static void update_special_lights(const Scene scene) {
 void raytrace_execute(RaytraceInstance* instance) {
   device_update_symbol(temporal_frames, instance->temporal_frames);
 
-  raytrace_update_light_resampling_active(instance);
-
   if (instance->scene.sky.hdri_active && !instance->scene.sky.hdri_initialized) {
     sky_hdri_generate_LUT(instance);
   }
@@ -491,7 +489,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
 
-  raytrace_update_light_resampling_active(instance);
   raytrace_allocate_buffers(instance);
   device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
@@ -532,7 +529,6 @@ void raytrace_reset(RaytraceInstance* instance) {
     }
   }
 
-  raytrace_update_light_resampling_active(instance);
   raytrace_allocate_buffers(instance);
   device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
@@ -611,10 +607,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
 
   device_buffer_malloc(instance->light_samples, sizeof(LightSample), amount);
-
-  if (instance->realtime || instance->light_resampling) {
-    device_buffer_malloc(instance->light_eval_data, sizeof(LightEvalData), amount);
-  }
+  device_buffer_malloc(instance->light_eval_data, sizeof(LightEvalData), amount);
 
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }
@@ -704,16 +697,6 @@ void raytrace_init_8bit_frame(RaytraceInstance* instance, const unsigned int wid
 
 void raytrace_free_8bit_frame(RaytraceInstance* instance) {
   device_buffer_free(instance->buffer_8bit);
-}
-
-/*
- * Computes whether light resampling is used.
- * @param instance RaytraceInstance
- */
-void raytrace_update_light_resampling_active(RaytraceInstance* instance) {
-  instance->light_resampling = instance->scene.material.lights_active || (instance->scene.toy.emissive && instance->scene.toy.active);
-
-  device_update_symbol(light_resampling, instance->light_resampling);
 }
 
 void raytrace_update_device_scene(RaytraceInstance* instance) {
