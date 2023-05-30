@@ -39,6 +39,10 @@
 // C. Wyman, A. Panteleev, "Rearchitecting Spatiotemporal Resampling for Production",
 // High-Performance Graphics - Symposium Papers, 2021
 
+/**
+ * Returns an empty light sample.
+ * @result Empty light sample.
+ */
 __device__ LightSample restir_sample_empty() {
   LightSample s;
 
@@ -50,22 +54,10 @@ __device__ LightSample restir_sample_empty() {
   return s;
 }
 
-__device__ LightSample restir_sample_update(LightSample x, uint32_t id, float weight, uint32_t random_key, uint32_t& seed) {
-  x.M++;
-
-  x.weight += weight;
-  if (white_noise_offset(seed++) * x.weight < weight) {
-    x.id   = id;
-    x.seed = random_key;
-  }
-
-  return x;
-}
-
 /**
- * Compute the target PDF of a light sample. Currently, this is a basic light intensity multiplied with the solid angle of the object.
+ * Compute the target PDF of a light sample. Currently, this is basically BRDF weight multiplied by general light intensity.
  * @param x Light sample
- * @param pos Position to compute the solid angle from.
+ * @param data Data to compute the target pdf from.
  * @result Target PDF of light sample.
  */
 __device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
@@ -104,24 +96,11 @@ __device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
 }
 
 /**
- * Compute the weight of a light sample. This is supposed to be called after resampling where the weight field contains
- * the sum of weights.
- * @param s Light sample
- * @param pos Position to compute the solid angle from.
- * @result Copy of the LightSample s with computed weight.
+ * Samples a light sample using WRS and MIS.
+ * @param data Data used for evaluating a lights importance.
+ * @param seed Seed used for random number generation, the seed is overwritten on use.
+ * @result Sampled light sample.
  */
-__device__ LightSample restir_compute_weight(LightSample s, LightEvalData data) {
-  if (s.id == LIGHT_ID_NONE) {
-    s.weight = 0.0f;
-  }
-  else {
-    const float target_pdf = restir_sample_target_pdf(s, data);
-    s.weight               = (1.0f / target_pdf) * (s.weight / s.M);
-  }
-
-  return s;
-}
-
 __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& seed) {
   LightSample selected = restir_sample_empty();
 
@@ -137,30 +116,33 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
   if (!light_count)
     return selected;
 
-  float base_probability = 1.0f;
+  // Sampling pdf used when the selected light was selected, this is used for the MIS balance heuristic
+  float selection_pdf = 1.0f;
 
-  // Sun as a hero light is being sampled more often
+  // Importance sample the sun
   if (sun_visible) {
-    base_probability *= 0.5f;
-    if (white_noise_offset(seed++) < 0.5f) {
-      LightSample sampled;
-      sampled.seed = random_uint32_t(seed++);
-      sampled.id   = LIGHT_ID_SUN;
-      sampled.M    = 1;
+    LightSample sampled;
+    sampled.seed = random_uint32_t(seed++);
+    sampled.id   = LIGHT_ID_SUN;
 
-      const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
-      const float sampled_pdf        = base_probability;
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
+    const float sampled_pdf        = 1.0f;
 
-      selected = restir_sample_update(selected, sampled.id, sampled_target_pdf / sampled_pdf, sampled.seed, seed);
+    const float weight = sampled_target_pdf / sampled_pdf;
 
-      selected = restir_compute_weight(selected, data);
-
-      return selected;
+    selected.M++;
+    selected.weight += weight;
+    if (white_noise_offset(seed++) * selected.weight < weight) {
+      selected.id   = sampled.id;
+      selected.seed = sampled.seed;
+      selection_pdf = sampled_pdf;
     }
   }
 
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
   const int reservoir_size      = min(device.restir.initial_reservoir_size, light_count);
+
+  const float reservoir_sampling_pdf = 1.0f / light_count_float;
 
   for (int i = 0; i < reservoir_size; i++) {
     uint32_t light_index = random_uint32_t(seed++) % light_count;
@@ -171,7 +153,6 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
     LightSample sampled;
     sampled.seed = random_uint32_t(seed++);
     sampled.id   = LIGHT_ID_NONE;
-    sampled.M    = 1;
 
     switch (light_index) {
       case 0:
@@ -186,16 +167,43 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
     }
 
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
-    const float sampled_pdf        = base_probability * 1.0f / light_count_float;
+    const float sampled_pdf        = reservoir_sampling_pdf;
 
-    selected = restir_sample_update(selected, sampled.id, sampled_target_pdf / sampled_pdf, sampled.seed, seed);
+    const float weight = sampled_target_pdf / sampled_pdf;
+
+    selected.M++;
+    selected.weight += weight;
+    if (white_noise_offset(seed++) * selected.weight < weight) {
+      selected.id   = sampled.id;
+      selected.seed = sampled.seed;
+      selection_pdf = sampled_pdf;
+    }
   }
 
-  selected = restir_compute_weight(selected, data);
+  // Compute the sum of the sampling PDFs of the selected light for MIS balance heuristic
+  float sum_pdf = 0.0f;
+  sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
+  sum_pdf += reservoir_size * reservoir_sampling_pdf;
+
+  // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
+  if (selected.id == LIGHT_ID_NONE) {
+    selected.weight = 0.0f;
+  }
+  else {
+    const float selected_target_pdf = restir_sample_target_pdf(selected, data);
+    selected.weight                 = (selected.weight * selection_pdf) / (sum_pdf * selected_target_pdf);
+  }
 
   return selected;
 }
 
+/**
+ * Kernel that determines a light sample to be used in next event estimation
+ *
+ * Light sample is stored in device.ptrs.light_samples.
+ *
+ * Light samples are only generated for pixels for which the flag LIGHT_EVAL_DATA_REQUIRES_SAMPLING is set.
+ */
 __global__ void restir_weighted_reservoir_sampling() {
   const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
 
