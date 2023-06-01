@@ -104,7 +104,6 @@ void scene_init(Scene** _scene) {
   scene->toy.emission.r       = 0.0f;
   scene->toy.emission.g       = 0.0f;
   scene->toy.emission.b       = 0.0f;
-  scene->toy.emission.a       = 0.0f;
   scene->toy.flashlight_mode  = 0;
 
   scene->sky.geometry_offset.x           = 0.0f;

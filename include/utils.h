@@ -47,6 +47,8 @@
 
 #define OPTIXRT_NUM_GROUPS 3
 
+#define RESTIR_CANDIDATE_POOL_MAX (1 << 20)
+
 enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
@@ -153,7 +155,7 @@ struct Toy {
   float refractive_index;
   RGBAF albedo;
   RGBAF material;
-  RGBAF emission;
+  RGBF emission;
   int flashlight_mode;
   Quaternion computed_rotation;
 } typedef Toy;
@@ -332,6 +334,7 @@ struct TextureAtlas {
 
 struct ReSTIRSettings {
   int initial_reservoir_size;
+  int light_candidate_pool_size_log2;
 } typedef ReSTIRSettings;
 
 struct DevicePointers {
@@ -366,6 +369,7 @@ struct DevicePointers {
   DeviceTexture* sky_hdri_luts;
   LightSample* light_samples;
   LightEvalData* light_eval_data;
+  uint32_t* light_candidates;
 } typedef DevicePointers;
 
 struct DeviceConstantMemory {
@@ -439,6 +443,7 @@ struct RaytraceInstance {
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* light_samples;
   DeviceBuffer* light_eval_data;
+  DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;
   DeviceBuffer* sky_ms_luts;
   DeviceBuffer* sky_tm_luts;

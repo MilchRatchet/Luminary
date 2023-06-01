@@ -85,7 +85,7 @@ __device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
       value *= (2e+04f * device.scene.sky.sun_strength);
       break;
     case LIGHT_ID_TOY:
-      value *= device.scene.toy.material.b;
+      value *= device.scene.toy.material.b * luminance(device.scene.toy.emission);
       break;
     default:
       value *= device.scene.material.default_material.b;
@@ -108,13 +108,6 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
 
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
-  uint32_t light_count  = 0;
-  light_count += sun_visible;
-  light_count += toy_visible;
-  light_count += (device.scene.material.lights_active) ? device.scene.triangle_lights_count : 0;
-
-  if (!light_count)
-    return selected;
 
   // Sampling pdf used when the selected light was selected, this is used for the MIS balance heuristic
   float selection_pdf = 1.0f;
@@ -139,32 +132,36 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
     }
   }
 
+  // Importance sample the toy
+  if (toy_visible) {
+    LightSample sampled;
+    sampled.seed = random_uint32_t(seed++);
+    sampled.id   = LIGHT_ID_TOY;
+
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
+    const float sampled_pdf        = 1.0f;
+
+    const float weight = sampled_target_pdf / sampled_pdf;
+
+    selected.M++;
+    selected.weight += weight;
+    if (white_noise_offset(seed++) * selected.weight < weight) {
+      selected.id   = sampled.id;
+      selected.seed = sampled.seed;
+      selection_pdf = sampled_pdf;
+    }
+  }
+
+  const uint32_t light_count    = (device.scene.material.lights_active) ? (1 << device.restir.light_candidate_pool_size_log2) : 0;
   const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
   const int reservoir_size      = min(device.restir.initial_reservoir_size, light_count);
 
-  const float reservoir_sampling_pdf = 1.0f / light_count_float;
+  const float reservoir_sampling_pdf = (1.0f / device.scene.triangle_lights_count);
 
   for (int i = 0; i < reservoir_size; i++) {
-    uint32_t light_index = random_uint32_t(seed++) % light_count;
-
-    light_index += !sun_visible;
-    light_index += (!toy_visible && light_index) ? 1 : 0;
-
     LightSample sampled;
     sampled.seed = random_uint32_t(seed++);
-    sampled.id   = LIGHT_ID_NONE;
-
-    switch (light_index) {
-      case 0:
-        sampled.id = LIGHT_ID_SUN;
-        break;
-      case 1:
-        sampled.id = LIGHT_ID_TOY;
-        break;
-      default:
-        sampled.id = light_index - 2;
-        break;
-    }
+    sampled.id   = device.ptrs.light_candidates[random_uint32_t(seed++) & (light_count - 1)];
 
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
     const float sampled_pdf        = reservoir_sampling_pdf;
@@ -183,7 +180,8 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
   // Compute the sum of the sampling PDFs of the selected light for MIS balance heuristic
   float sum_pdf = 0.0f;
   sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
-  sum_pdf += reservoir_size * reservoir_sampling_pdf;
+  sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
+  sum_pdf += (selected.id <= TRIANGLE_ID_LIMIT) ? reservoir_size * reservoir_sampling_pdf : 0.0f;
 
   // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
   if (selected.id == LIGHT_ID_NONE) {
@@ -223,6 +221,22 @@ __global__ void restir_weighted_reservoir_sampling() {
     if (device.iteration_type != TYPE_CAMERA) {
       device.ptrs.light_eval_data[pixel].flags = 0;
     }
+  }
+
+  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
+}
+
+__global__ void restir_candidates_pool_generation() {
+  int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+
+  const int light_sample_bin_count = 1 << device.restir.light_candidate_pool_size_log2;
+
+  while (id < light_sample_bin_count) {
+    device.ptrs.light_candidates[id] = random_uint32_t(seed++) % device.scene.triangle_lights_count;
+
+    id += blockDim.x * gridDim.x;
   }
 
   device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
