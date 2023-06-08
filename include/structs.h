@@ -250,8 +250,8 @@ struct DeviceTexture {
 ////////////////////////////////////////////////////////////////////
 struct LightSample {
   uint32_t seed;
+  uint32_t presampled_id;
   uint32_t id;
-  uint32_t M;
   float weight;
 } typedef LightSample;
 

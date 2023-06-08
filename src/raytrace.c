@@ -470,6 +470,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_malloc((void**) &(instance->scene.triangle_data.vertex_buffer), instance->scene.triangle_data.vertex_count * 4 * sizeof(float));
   device_malloc(
     (void**) &(instance->scene.triangle_data.index_buffer), instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t));
+  device_malloc((void**) &(instance->restir.presampled_triangle_lights), sizeof(TriangleLight) * RESTIR_CANDIDATE_POOL_MAX);
 
   gpuErrchk(cudaMemcpy(
     instance->scene.texture_assignments, scene->texture_assignments, sizeof(TextureAssignment) * instance->scene.materials_count,
@@ -659,6 +660,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene.texture_assignments));
   gpuErrchk(cudaFree(instance->scene.triangles));
   gpuErrchk(cudaFree(instance->scene.triangle_lights));
+  gpuErrchk(cudaFree(instance->restir.presampled_triangle_lights));
   device_buffer_free(instance->light_trace);
   device_buffer_free(instance->bounce_trace);
   device_buffer_free(instance->light_trace_count);

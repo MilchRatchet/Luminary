@@ -46,10 +46,10 @@
 __device__ LightSample restir_sample_empty() {
   LightSample s;
 
-  s.seed   = 0;
-  s.id     = LIGHT_ID_NONE;
-  s.M      = 0;
-  s.weight = 0.0f;
+  s.seed          = 0;
+  s.presampled_id = LIGHT_ID_NONE;
+  s.id            = LIGHT_ID_NONE;
+  s.weight        = 0.0f;
 
   return s;
 }
@@ -61,7 +61,7 @@ __device__ LightSample restir_sample_empty() {
  * @result Target PDF of light sample.
  */
 __device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
-  if (x.id == LIGHT_ID_NONE) {
+  if (x.presampled_id == LIGHT_ID_NONE) {
     return 0.0f;
   }
 
@@ -80,7 +80,7 @@ __device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
     value = 0.0f;
   }
 
-  switch (x.id) {
+  switch (x.presampled_id) {
     case LIGHT_ID_SUN:
       value *= (2e+04f * device.scene.sky.sun_strength);
       break;
@@ -115,65 +115,64 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
   // Importance sample the sun
   if (sun_visible) {
     LightSample sampled;
-    sampled.seed = random_uint32_t(seed++);
-    sampled.id   = LIGHT_ID_SUN;
+    sampled.seed          = random_uint32_t(seed++);
+    sampled.presampled_id = LIGHT_ID_SUN;
 
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
     const float sampled_pdf        = 1.0f;
 
     const float weight = sampled_target_pdf / sampled_pdf;
 
-    selected.M++;
     selected.weight += weight;
     if (white_noise_offset(seed++) * selected.weight < weight) {
-      selected.id   = sampled.id;
-      selected.seed = sampled.seed;
-      selection_pdf = sampled_pdf;
+      selected.id            = LIGHT_ID_SUN;
+      selected.presampled_id = LIGHT_ID_SUN;
+      selected.seed          = sampled.seed;
+      selection_pdf          = sampled_pdf;
     }
   }
 
   // Importance sample the toy
   if (toy_visible) {
     LightSample sampled;
-    sampled.seed = random_uint32_t(seed++);
-    sampled.id   = LIGHT_ID_TOY;
+    sampled.seed          = random_uint32_t(seed++);
+    sampled.presampled_id = LIGHT_ID_TOY;
 
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
     const float sampled_pdf        = 1.0f;
 
     const float weight = sampled_target_pdf / sampled_pdf;
 
-    selected.M++;
     selected.weight += weight;
     if (white_noise_offset(seed++) * selected.weight < weight) {
-      selected.id   = sampled.id;
-      selected.seed = sampled.seed;
-      selection_pdf = sampled_pdf;
+      selected.id            = LIGHT_ID_TOY;
+      selected.presampled_id = LIGHT_ID_TOY;
+      selected.seed          = sampled.seed;
+      selection_pdf          = sampled_pdf;
     }
   }
 
-  const uint32_t light_count    = (device.scene.material.lights_active) ? (1 << device.restir.light_candidate_pool_size_log2) : 0;
-  const float light_count_float = ((float) light_count) - 1.0f + 0.9999999f;
-  const int reservoir_size      = min(device.restir.initial_reservoir_size, light_count);
+  const uint32_t light_count = (device.scene.material.lights_active) ? (1 << device.restir.light_candidate_pool_size_log2) : 0;
+  const int reservoir_size   = (device.scene.triangle_lights_count > 0) ? min(device.restir.initial_reservoir_size, light_count) : 0;
 
   const float reservoir_sampling_pdf = (1.0f / device.scene.triangle_lights_count);
 
   for (int i = 0; i < reservoir_size; i++) {
     LightSample sampled;
-    sampled.seed = random_uint32_t(seed++);
-    sampled.id   = device.ptrs.light_candidates[random_uint32_t(seed++) & (light_count - 1)];
+    sampled.seed          = random_uint32_t(seed++);
+    sampled.presampled_id = random_uint32_t(seed++) & (light_count - 1);
 
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
     const float sampled_pdf        = reservoir_sampling_pdf;
 
     const float weight = sampled_target_pdf / sampled_pdf;
 
-    selected.M++;
     selected.weight += weight;
     if (white_noise_offset(seed++) * selected.weight < weight) {
-      selected.id   = sampled.id;
-      selected.seed = sampled.seed;
-      selection_pdf = sampled_pdf;
+      selected.id            = device.ptrs.light_candidates[sampled.presampled_id];
+      selected.presampled_id = sampled.presampled_id;
+      selected.seed          = sampled.seed;
+      selection_pdf          = sampled_pdf;
     }
   }
 
@@ -233,8 +232,14 @@ __global__ void restir_candidates_pool_generation() {
 
   const int light_sample_bin_count = 1 << device.restir.light_candidate_pool_size_log2;
 
+  if (device.scene.triangle_lights_count == 0)
+    return;
+
   while (id < light_sample_bin_count) {
-    device.ptrs.light_candidates[id] = random_uint32_t(seed++) % device.scene.triangle_lights_count;
+    const uint32_t sampled_id = random_uint32_t(seed++) % device.scene.triangle_lights_count;
+
+    device.ptrs.light_candidates[id]             = sampled_id;
+    device.restir.presampled_triangle_lights[id] = device.scene.triangle_lights[sampled_id];
 
     id += blockDim.x * gridDim.x;
   }

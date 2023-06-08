@@ -151,7 +151,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       if (is_first_ray() || (device.iteration_type == TYPE_LIGHT && light_id <= TRIANGLE_ID_LIMIT)) {
         uint32_t t_id;
         if (device.iteration_type == TYPE_LIGHT) {
-          const TriangleLight tri_light = load_triangle_light(light_id);
+          const TriangleLight tri_light = load_triangle_light(device.scene.triangle_lights, light_id);
           t_id                          = tri_light.triangle_id;
         }
         else {

@@ -335,6 +335,7 @@ struct TextureAtlas {
 struct ReSTIRSettings {
   int initial_reservoir_size;
   int light_candidate_pool_size_log2;
+  TriangleLight* presampled_triangle_lights;
 } typedef ReSTIRSettings;
 
 struct DevicePointers {

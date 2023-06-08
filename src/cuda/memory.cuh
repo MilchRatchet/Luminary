@@ -281,10 +281,10 @@ __device__ LightSample load_light_sample(const LightSample* ptr, const int offse
   const float4 packet = __ldcs((float4*) (ptr + offset));
 
   LightSample sample;
-  sample.seed   = __float_as_uint(packet.x);
-  sample.id     = __float_as_uint(packet.y);
-  sample.M      = __float_as_uint(packet.z);
-  sample.weight = packet.w;
+  sample.seed          = __float_as_uint(packet.x);
+  sample.presampled_id = __float_as_uint(packet.y);
+  sample.id            = __float_as_uint(packet.z);
+  sample.weight        = packet.w;
 
   return sample;
 }
@@ -292,8 +292,8 @@ __device__ LightSample load_light_sample(const LightSample* ptr, const int offse
 __device__ void store_light_sample(LightSample* ptr, const LightSample sample, const int offset) {
   float4 packet;
   packet.x = __uint_as_float(sample.seed);
-  packet.y = __uint_as_float(sample.id);
-  packet.z = __uint_as_float(sample.M);
+  packet.y = __uint_as_float(sample.presampled_id);
+  packet.z = __uint_as_float(sample.id);
   packet.w = sample.weight;
 
   __stcs((float4*) (ptr + offset), packet);
@@ -327,8 +327,8 @@ __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
   return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 }
 
-__device__ TriangleLight load_triangle_light(const int offset) {
-  const float4* ptr = (float4*) (device.scene.triangle_lights + offset);
+__device__ TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {
+  const float4* ptr = (float4*) (data + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
   const float2 v3   = __ldg((float2*) (ptr + 2));

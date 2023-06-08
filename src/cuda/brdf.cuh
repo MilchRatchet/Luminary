@@ -308,7 +308,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
 __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos) {
   BRDFInstance result = brdf;
 
-  switch (light.id) {
+  switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
@@ -320,7 +320,7 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
       result.term = scale_color(result.term, 0.5f * ONE_OVER_PI * toy_get_solid_angle(pos));
       break;
     default: {
-      const TriangleLight triangle = load_triangle_light(light.id);
+      const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
       result.L                     = sample_triangle(triangle, pos, light.seed);
       result.term                  = scale_color(result.term, 0.5f * ONE_OVER_PI * sample_triangle_solid_angle(triangle, pos));
     } break;
@@ -334,7 +334,7 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
 __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, float anisotropy) {
   BRDFInstance result = brdf_get_instance_scattering();
 
-  switch (light.id) {
+  switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
@@ -346,7 +346,7 @@ __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSam
       result.term = scale_color(result.term, 0.25f * ONE_OVER_PI * toy_get_solid_angle(pos));
       break;
     default: {
-      const TriangleLight triangle = load_triangle_light(light.id);
+      const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
       result.L                     = sample_triangle(triangle, pos, light.seed);
       result.term                  = scale_color(result.term, 0.25f * ONE_OVER_PI * sample_triangle_solid_angle(triangle, pos));
     } break;
