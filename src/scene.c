@@ -104,7 +104,6 @@ void scene_init(Scene** _scene) {
   scene->toy.emission.r       = 0.0f;
   scene->toy.emission.g       = 0.0f;
   scene->toy.emission.b       = 0.0f;
-  scene->toy.emission.a       = 0.0f;
   scene->toy.flashlight_mode  = 0;
 
   scene->sky.geometry_offset.x           = 0.0f;
@@ -203,7 +202,6 @@ static General get_default_settings() {
     .max_ray_depth     = 3,
     .samples           = 16,
     .denoiser          = DENOISING_ON,
-    .reservoir_size    = 8,
     .output_path       = malloc(LINE_SIZE),
     .mesh_files        = malloc(sizeof(char*) * 10),
     .mesh_files_count  = 0,

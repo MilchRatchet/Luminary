@@ -86,7 +86,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    RGBF record = RGBAhalf_to_RGBF(device.records[pixel]);
+    RGBF record = device.records[pixel];
 
     {
       const vec3 bounce_ray = angles_to_direction(white_noise() * PI, white_noise() * 2.0f * PI);
@@ -97,7 +97,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
       const float S      = 4.0f * PI * phase * FOG_DENSITY;
       const float weight = (S - S * expf(-task.distance * FOG_DENSITY)) / FOG_DENSITY;
 
-      device.ptrs.bounce_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, weight));
+      device.ptrs.bounce_records[pixel] = scale_color(record, weight);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
@@ -110,27 +110,23 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
     const int light_occupied = (device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
     if (!light_occupied) {
-      LightSample light        = load_light_sample(device.ptrs.light_samples, pixel);
-      const float light_weight = brdf_light_sample_shading_weight(light) * light.solid_angle;
+      LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-      if (light_weight > 0.0f) {
-        const vec3 light_ray  = brdf_sample_light_ray(light, task.position);
-        const float cos_angle = dot_product(ray, light_ray);
-        const float phase     = henvey_greenstein(cos_angle, device.scene.fog.anisotropy);
+      BRDFInstance brdf = brdf_get_instance_scattering();
 
-        // solid angle is normalized for hemisphere and phase is normalized for full sphere
-        // so we need to multiply out the hemisphere normalization
-        const float S      = 2.0f * PI * light_weight * phase * FOG_DENSITY;
-        const float weight = (S - S * expf(-task.distance * FOG_DENSITY)) / FOG_DENSITY;
+      if (light.weight > 0.0f) {
+        BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, device.scene.fog.anisotropy);
 
-        device.ptrs.light_records[pixel] = RGBF_to_RGBAhalf(scale_color(record, weight));
+        const float weight = (FOG_DENSITY - FOG_DENSITY * expf(-task.distance * FOG_DENSITY)) / FOG_DENSITY;
+
+        device.ptrs.light_records[pixel] = mul_color(record, scale_color(brdf_sample.term, weight));
         light_history_buffer_entry       = light.id;
 
         TraceTask light_task;
         light_task.origin = task.position;
-        light_task.ray    = light_ray;
+        light_task.ray    = brdf_sample.L;
         light_task.index  = task.index;
 
         store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
@@ -176,7 +172,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void fog_preprocess_tasks() 
     uint32_t hit_id = __float_as_uint(result.y);
 
     const int pixel = task.index.x + task.index.y * device.width;
-    RGBAhalf record = load_RGBAhalf(device.records + pixel);
+    RGBF record     = load_RGBF(device.records + pixel);
 
     if (device.scene.fog.active && is_first_ray()) {
       const float2 fog = fog_get_intersection(task.origin, task.ray, depth);
@@ -189,13 +185,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void fog_preprocess_tasks() 
         __stcs((float2*) (device.ptrs.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
       }
 
-      record = scale_RGBAhalf(record, weight);
+      record = scale_color(record, weight);
     }
     else if (device.scene.fog.active) {
       const float t      = fog_compute_path(task.origin, task.ray, depth).y;
       const float weight = expf(-t * FOG_DENSITY);
 
-      record = scale_RGBAhalf(record, weight);
+      record = scale_color(record, weight);
     }
 
     if (device.scene.ocean.active) {
@@ -208,10 +204,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void fog_preprocess_tasks() 
       path_extinction.g = expf(-underwater_dist * extinction.g);
       path_extinction.b = expf(-underwater_dist * extinction.b);
 
-      record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(path_extinction));
+      record = mul_color(record, path_extinction);
     }
 
-    store_RGBAhalf(device.records + pixel, record);
+    store_RGBF(device.records + pixel, record);
   }
 }
 

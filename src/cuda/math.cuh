@@ -857,72 +857,20 @@ __device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, 
 }
 
 /*
- * Sample a random point on a triangle using Basu and Owen's mapping.
+ * Sample a random point on a triangle.
  * @param triangle Triangle.
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the triangle.
+ *
+ * This implementation originally uses Basu and Owen's mapping which is slightly better. However, the
+ * performance cost is significant and the original implementation had a bug because very special input noise
+ * values are required but just standard white noise was used. This special noise is van der Corput points.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin) {
-  const float u     = white_noise();
-  const uint32_t uf = u * __uint_as_float(0x4f800000u);  // u * 2^32
-  float2 a          = make_float2(1.0f, 0.0f);
-  float2 b          = make_float2(0.0f, 1.0f);
-  float2 c          = make_float2(0.0f, 0.0f);
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, uint32_t& seed) {
+  const float r1 = sqrtf(white_noise_offset_restir(seed++));
+  const float r2 = white_noise_offset_restir(seed++);
 
-  for (int i = 0; i < 16; i++) {
-    const int d = (uf >> (2 * (15 - i))) & 0x3;
-    float2 ai;
-    float2 bi;
-    float2 ci;
-    switch (d) {
-      case 0:
-        ai.x = b.x + c.x;
-        ai.y = b.y + c.y;
-        bi.x = a.x + c.x;
-        bi.y = a.y + c.y;
-        ci.x = a.x + b.x;
-        ci.y = a.y + b.y;
-        break;
-      case 1:
-        ai   = a;
-        bi.x = a.x + b.x;
-        bi.y = a.y + b.y;
-        ci.x = a.x + c.x;
-        ci.y = a.y + c.y;
-        break;
-      case 2:
-        ai.x = b.x + a.x;
-        ai.y = b.y + a.y;
-        bi   = b;
-        ci.x = b.x + c.x;
-        ci.y = b.y + c.y;
-        break;
-      case 3:
-        ai.x = c.x + a.x;
-        ai.y = c.y + a.y;
-        bi.x = c.x + b.x;
-        bi.y = c.y + b.y;
-        ci   = c;
-        break;
-    }
-    if (d != 1) {
-      ai.x *= 0.5f;
-      ai.y *= 0.5f;
-    }
-    if (d != 2) {
-      bi.x *= 0.5f;
-      bi.y *= 0.5f;
-    }
-    if (d != 3) {
-      ci.x *= 0.5f;
-      ci.y *= 0.5f;
-    }
-    a = ai;
-    b = bi;
-    c = ci;
-  }
-
-  const float2 uv = make_float2((a.x + b.x + c.x) * 1.0f / 3.0f, (a.y + b.y + c.y) * 1.0f / 3.0f);
+  const float2 uv = make_float2(1.0f - r1, r2 * r1);
 
   const vec3 p = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
 
@@ -956,9 +904,9 @@ __device__ float sample_triangle_solid_angle(const TriangleLight triangle, const
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the sphere.
  */
-__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin) {
-  const float u1 = sqrtf(white_noise());
-  const float u2 = white_noise() * 2.0f * PI;
+__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, uint32_t& seed) {
+  const float u1 = sqrtf(white_noise_offset_restir(seed++));
+  const float u2 = white_noise_offset_restir(seed++) * 2.0f * PI;
 
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);
@@ -994,7 +942,7 @@ __device__ float sample_sphere_solid_angle(const vec3 p, const float r, const ve
 }
 
 __device__ int material_is_mirror(const float roughness, const float metallic) {
-  return (roughness < 0.1f && metallic > 0.99f);
+  return (roughness < 0.01f && metallic > 0.99f);
 }
 
 // Computes tangent space for use with normal mapping without precomputation
@@ -1131,6 +1079,15 @@ __device__ RGBAhalf max_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
 
   result.rg = __hmax2(a.rg, b.rg);
   result.ba = __hmax2(a.ba, b.ba);
+
+  return result;
+}
+
+__device__ RGBAhalf min_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+  RGBAhalf result;
+
+  result.rg = __hmin2(a.rg, b.rg);
+  result.ba = __hmin2(a.ba, b.ba);
 
   return result;
 }

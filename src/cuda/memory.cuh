@@ -195,6 +195,14 @@ __device__ void store_RGBAhalf(void* ptr, const RGBAhalf a) {
   __stcs((ushort4*) ptr, data0);
 }
 
+__device__ RGBF load_RGBF(const void* ptr) {
+  return *((RGBF*) ptr);
+}
+
+__device__ void store_RGBF(void* ptr, const RGBF a) {
+  *((RGBF*) ptr) = a;
+}
+
 /*
  * Updates the albedo buffer if criteria are met.
  * @param albedo Albedo color to be added to the albedo buffer.
@@ -231,43 +239,62 @@ __device__ void write_normal_buffer(vec3 normal, const int pixel) {
 }
 
 __device__ LightEvalData load_light_eval_data(const int offset) {
-  const float4 packet = __ldcs((float4*) (device.ptrs.light_eval_data + offset));
+  const float4* ptr  = (float4*) (device.ptrs.light_eval_data + offset);
+  const float4 data0 = __ldcs(ptr + 0);
+  const float4 data1 = __ldcs(ptr + 1);
+  const float4 data2 = __ldcs(ptr + 2);
 
   LightEvalData result;
-  result.position = get_vector(packet.x, packet.y, packet.z);
-  result.flags    = __float_as_uint(packet.w);
+  result.position  = get_vector(data0.x, data0.y, data0.z);
+  result.V         = get_vector(data0.w, data1.x, data1.y);
+  result.normal    = get_vector(data1.z, data1.w, data2.x);
+  result.roughness = data2.y;
+  result.metallic  = data2.z;
+  result.flags     = __float_as_uint(data2.w);
 
   return result;
 }
 
 __device__ void store_light_eval_data(const LightEvalData data, const int offset) {
-  float4 packet;
-  packet.x = data.position.x;
-  packet.y = data.position.y;
-  packet.z = data.position.z;
-  packet.w = __uint_as_float(data.flags);
+  float4 data0, data1, data2;
 
-  __stcs((float4*) (device.ptrs.light_eval_data + offset), packet);
+  data0.x = data.position.x;
+  data0.y = data.position.y;
+  data0.z = data.position.z;
+  data0.w = data.V.x;
+  data1.x = data.V.y;
+  data1.y = data.V.z;
+  data1.z = data.normal.x;
+  data1.w = data.normal.y;
+  data2.x = data.normal.z;
+  data2.y = data.roughness;
+  data2.z = data.metallic;
+  data2.w = __uint_as_float(data.flags);
+
+  float4* ptr = (float4*) (device.ptrs.light_eval_data + offset);
+  __stcs(ptr + 0, data0);
+  __stcs(ptr + 1, data1);
+  __stcs(ptr + 2, data2);
 }
 
 __device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {
   const float4 packet = __ldcs((float4*) (ptr + offset));
 
   LightSample sample;
-  sample.id          = __float_as_uint(packet.x);
-  sample.M           = __float_as_uint(packet.y);
-  sample.weight      = packet.z;
-  sample.solid_angle = packet.w;
+  sample.seed          = __float_as_uint(packet.x);
+  sample.presampled_id = __float_as_uint(packet.y);
+  sample.id            = __float_as_uint(packet.z);
+  sample.weight        = packet.w;
 
   return sample;
 }
 
 __device__ void store_light_sample(LightSample* ptr, const LightSample sample, const int offset) {
   float4 packet;
-  packet.x = __uint_as_float(sample.id);
-  packet.y = __uint_as_float(sample.M);
-  packet.z = sample.weight;
-  packet.w = sample.solid_angle;
+  packet.x = __uint_as_float(sample.seed);
+  packet.y = __uint_as_float(sample.presampled_id);
+  packet.z = __uint_as_float(sample.id);
+  packet.w = sample.weight;
 
   __stcs((float4*) (ptr + offset), packet);
 }
@@ -300,8 +327,8 @@ __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
   return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 }
 
-__device__ TriangleLight load_triangle_light(const int offset) {
-  const float4* ptr = (float4*) (device.scene.triangle_lights + offset);
+__device__ TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {
+  const float4* ptr = (float4*) (data + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
   const float2 v3   = __ldg((float2*) (ptr + 2));

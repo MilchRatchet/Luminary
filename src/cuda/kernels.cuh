@@ -9,6 +9,7 @@
 #include "geometry.cuh"
 #include "ocean.cuh"
 #include "purkinje.cuh"
+#include "restir.cuh"
 #include "sky.cuh"
 #include "sky_utils.cuh"
 #include "temporal.cuh"
@@ -49,8 +50,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
 
     task = get_starting_ray(task);
 
-    device.ptrs.light_records[pixel]  = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
-    device.ptrs.bounce_records[pixel] = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
+    device.ptrs.light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
+    device.ptrs.bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
     device.ptrs.frame_buffer[pixel]   = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
     device.ptrs.state_buffer[pixel]   = 0;
 
@@ -150,7 +151,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       if (is_first_ray() || (device.iteration_type == TYPE_LIGHT && light_id <= TRIANGLE_ID_LIMIT)) {
         uint32_t t_id;
         if (device.iteration_type == TYPE_LIGHT) {
-          const TriangleLight tri_light = load_triangle_light(light_id);
+          const TriangleLight tri_light = load_triangle_light(device.scene.triangle_lights, light_id);
           t_id                          = tri_light.triangle_id;
         }
         else {
@@ -247,6 +248,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering_tasks() {
   const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
+  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device.trace_tasks + offset);
@@ -265,16 +268,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
 
     const float inscattering_limit = world_to_sky_scale(depth);
 
-    RGBF record = RGBAhalf_to_RGBF(load_RGBAhalf(device.records + pixel));
+    RGBF record = load_RGBF(device.records + pixel);
 
-    RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record);
+    RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, seed);
 
     RGBF color = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
     color      = add_color(color, inscattering);
 
-    store_RGBAhalf(device.records + pixel, RGBF_to_RGBAhalf(record));
+    store_RGBF(device.records + pixel, record);
     store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
   }
+
+  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {
@@ -397,47 +402,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     if (hit_id != SKY_HIT)
       task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
-
-    if (device.iteration_type != TYPE_LIGHT) {
-      if (device.light_resampling) {
-        LightEvalData light_data;
-        light_data.position = task.origin;
-        light_data.flags    = 0;
-
-        switch (hit_id) {
-          case SKY_HIT:
-          case FOG_HIT:
-            break;
-          case OCEAN_HIT:
-          case TOY_HIT:
-          default:
-            light_data.flags = 1;
-            break;
-        }
-
-        store_light_eval_data(light_data, pixel);
-      }
-      else {
-        if (hit_id == OCEAN_HIT || hit_id == TOY_HIT || hit_id <= TRIANGLE_ID_LIMIT) {
-          const vec3 sky_pos    = world_to_sky_transform(task.origin);
-          const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
-
-          LightSample selected;
-          selected.id = LIGHT_ID_NONE;
-          selected.M  = 0;
-
-          if (sun_visible) {
-            selected.id = LIGHT_ID_SUN;
-            selected.M  = 1;
-          }
-
-          selected.solid_angle = brdf_light_sample_solid_angle(selected, task.origin);
-          selected.weight      = brdf_light_sample_target_weight(selected);
-
-          store_light_sample(device.ptrs.light_samples, selected, pixel);
-        }
-      }
-    }
 
     float4* ptr = (float4*) (device.trace_tasks + offset);
     float4 data0;

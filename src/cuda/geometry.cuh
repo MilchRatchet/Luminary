@@ -16,6 +16,125 @@ __device__ float4 geometry_texture_load(DeviceTexture tex, UV uv) {
   return v;
 }
 
+__device__ vec3 geometry_compute_normal(
+  vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 e1, vec3 e2, UV e1_tex, UV e2_tex, unsigned short normal_map, float2 coords,
+  UV tex_coords) {
+  vec3 face_normal = normalize_vector(cross_product(e1, e2));
+  vec3 normal      = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
+
+  if (normal_map != TEXTURE_NONE) {
+    const float4 normal_f = geometry_texture_load(device.ptrs.normal_atlas[normal_map], tex_coords);
+
+    vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
+
+    map_normal = scale_vector(map_normal, 2.0f);
+    map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
+
+    Mat3x3 tangent_space = cotangent_frame(normal, e1, e2, e1_tex, e2_tex);
+
+    normal = normalize_vector(transform_vec3(tangent_space, map_normal));
+
+    if (dot_product(normal, ray) > 0.0f) {
+      normal = scale_vector(normal, -1.0f);
+    }
+  }
+  else {
+    if (dot_product(face_normal, normal) < 0.0f) {
+      normal = scale_vector(normal, -1.0f);
+    }
+
+    if (dot_product(face_normal, ray) > 0.0f) {
+      face_normal = scale_vector(face_normal, -1.0f);
+      normal      = scale_vector(normal, -1.0f);
+    }
+
+    /*
+     * I came up with this quickly, problem is that we need to rotate the normal
+     * towards the face normal with our ray is "behind" the shading normal
+     */
+    if (dot_product(normal, ray) > 0.0f) {
+      const float a = sqrtf(1.0f - dot_product(face_normal, ray));
+      const float b = dot_product(face_normal, normal);
+      const float t = a / (a + b + eps);
+      normal        = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(normal, 1.0f - t)));
+    }
+  }
+
+  return normal;
+}
+
+__global__ void geometry_generate_light_eval_data() {
+  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
+
+  for (int i = 0; i < task_count; i++) {
+    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(i));
+    const int pixel   = task.index.y * device.width + task.index.x;
+
+    vec3 ray;
+    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+    ray.y = sinf(task.ray_y);
+    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
+    const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
+
+    const float4 t1 = __ldg(hit_address);
+    const float4 t2 = __ldg(hit_address + 1);
+    const float4 t3 = __ldg(hit_address + 2);
+    const float4 t4 = __ldg(hit_address + 3);
+    const float4 t5 = __ldg(hit_address + 4);
+    const float4 t6 = __ldg(hit_address + 5);
+    const float2 t7 = __ldg((float2*) (hit_address + 6));
+
+    const vec3 vertex = get_vector(t1.x, t1.y, t1.z);
+    const vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+    const vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
+
+    const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+
+    const UV vertex_texture = get_UV(t5.z, t5.w);
+    const UV edge1_texture  = get_UV(t6.x, t6.y);
+    const UV edge2_texture  = get_UV(t6.z, t6.w);
+
+    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+
+    const int texture_object         = __float_as_int(t7.x);
+    const uint32_t triangle_light_id = __float_as_uint(t7.y);
+
+    const ushort4 maps = __ldg((ushort4*) (device.texture_assignments + texture_object));
+
+    const vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
+    const vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
+    const vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
+
+    const vec3 normal = geometry_compute_normal(
+      vertex_normal, edge1_normal, edge2_normal, ray, edge1, edge2, edge1_texture, edge2_texture, maps.w, coords, tex_coords);
+
+    float roughness;
+    float metallic;
+
+    if (maps.z != TEXTURE_NONE) {
+      const float4 material_f = geometry_texture_load(device.ptrs.material_atlas[maps.z], tex_coords);
+
+      roughness = (1.0f - material_f.x);
+      metallic  = material_f.y;
+    }
+    else {
+      roughness = (1.0f - device.scene.material.default_material.r);
+      metallic  = device.scene.material.default_material.g;
+    }
+
+    LightEvalData data;
+    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING;
+    data.normal    = normal;
+    data.position  = task.position;
+    data.V         = scale_vector(ray, -1.0f);
+    data.roughness = roughness;
+    data.metallic  = metallic;
+
+    store_light_eval_data(data, pixel);
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks() {
   const int task_count   = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
   int light_trace_count  = device.ptrs.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
@@ -44,8 +163,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     const vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
     const vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
-    vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
-
     const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
     const UV vertex_texture = get_UV(t5.z, t5.w);
@@ -59,49 +176,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     const ushort4 maps = __ldg((ushort4*) (device.texture_assignments + texture_object));
 
-    vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
-    vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
-    vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
+    const vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
+    const vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
+    const vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
-    vec3 normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, coords, face_normal);
-
-    if (maps.w != TEXTURE_NONE) {
-      const float4 normal_f = geometry_texture_load(device.ptrs.normal_atlas[maps.w], tex_coords);
-
-      vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
-
-      map_normal = scale_vector(map_normal, 2.0f);
-      map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
-
-      Mat3x3 tangent_space = cotangent_frame(normal, edge1, edge2, edge1_texture, edge2_texture);
-
-      normal = normalize_vector(transform_vec3(tangent_space, map_normal));
-
-      if (dot_product(normal, ray) > 0.0f) {
-        normal = scale_vector(normal, -1.0f);
-      }
-    }
-    else {
-      if (dot_product(face_normal, normal) < 0.0f) {
-        normal = scale_vector(normal, -1.0f);
-      }
-
-      if (dot_product(face_normal, ray) > 0.0f) {
-        face_normal = scale_vector(face_normal, -1.0f);
-        normal      = scale_vector(normal, -1.0f);
-      }
-
-      /*
-       * I came up with this quickly, problem is that we need to rotate the normal
-       * towards the face normal with our ray is "behind" the shading normal
-       */
-      if (dot_product(normal, ray) > 0.0f) {
-        const float a = sqrtf(1.0f - dot_product(face_normal, ray));
-        const float b = dot_product(face_normal, normal);
-        const float t = a / (a + b + eps);
-        normal        = normalize_vector(add_vector(scale_vector(face_normal, t), scale_vector(normal, 1.0f - t)));
-      }
-    }
+    const vec3 normal = geometry_compute_normal(
+      vertex_normal, edge1_normal, edge2_normal, ray, edge1, edge2, edge1_texture, edge2_texture, maps.w, coords, tex_coords);
 
     float roughness;
     float metallic;
@@ -146,14 +226,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     if (albedo.a < device.scene.material.alpha_cutoff)
       albedo.a = 0.0f;
 
-    RGBAhalf record = load_RGBAhalf(device.records + pixel);
+    RGBF record = load_RGBF(device.records + pixel);
 
     if (albedo.a > 0.0f && any_RGBAhalf(emission)) {
       emission = scale_RGBAhalf(emission, albedo.a);
 
       write_albedo_buffer(add_color(RGBAhalf_to_RGBF(emission), opaque_color(albedo)), pixel);
 
-      emission = mul_RGBAhalf(emission, record);
+      emission = mul_RGBAhalf(emission, RGBF_to_RGBAhalf(record));
 
       const uint32_t light = device.ptrs.light_sample_history[pixel];
 
@@ -168,7 +248,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
 
       if (device.scene.material.colored_transparency) {
-        record = mul_RGBAhalf(record, RGBF_to_RGBAhalf(opaque_color(albedo)));
+        record = mul_color(record, opaque_color(albedo));
       }
 
       TraceTask new_task;
@@ -179,13 +259,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       switch (device.iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          store_RGBAhalf(device.ptrs.bounce_records + pixel, record);
+          store_RGBF(device.ptrs.bounce_records + pixel, record);
           store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
           if (white_noise() > 0.5f)
             break;
-          store_RGBAhalf(device.ptrs.light_records + pixel, scale_RGBAhalf(record, 2.0f));
+          store_RGBF(device.ptrs.light_records + pixel, scale_color(record, 2.0f));
           store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
           device.ptrs.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           break;
@@ -209,20 +289,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       if (use_light_sample) {
         LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
-        const float light_weight = brdf_light_sample_shading_weight(light) * light.solid_angle;
+        if (light.weight > 0.0f) {
+          const BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, task.position);
 
-        if (light_weight > 0.0f) {
-          brdf.L = brdf_sample_light_ray(light, task.position);
-
-          const RGBAhalf light_record = mul_RGBAhalf(record, scale_RGBAhalf(brdf_evaluate(brdf).term, light_weight));
+          const RGBF light_record = mul_color(record, brdf_sample.term);
 
           TraceTask light_task;
           light_task.origin = task.position;
-          light_task.ray    = brdf.L;
+          light_task.ray    = brdf_sample.L;
           light_task.index  = task.index;
 
-          if (any_RGBAhalf(light_record)) {
-            store_RGBAhalf(device.ptrs.light_records + pixel, light_record);
+          if (luminance(light_record) > 0.0f) {
+            store_RGBF(device.ptrs.light_records + pixel, light_record);
             light_history_buffer_entry = light.id;
             store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
           }
@@ -232,8 +310,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       if (!(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
 
-      brdf                   = brdf_sample_ray(brdf, task.index);
-      RGBAhalf bounce_record = mul_RGBAhalf(record, brdf.term);
+      brdf               = brdf_sample_ray(brdf, task.index);
+      RGBF bounce_record = mul_color(record, brdf.term);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
@@ -241,7 +319,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       bounce_task.index  = task.index;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
-        store_RGBAhalf(device.ptrs.bounce_records + pixel, bounce_record);
+        store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
         store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }
     }
@@ -318,11 +396,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float4 t6 = __ldg(hit_address + 5);
       const float t7  = __ldg((float*) (hit_address + 6));
 
+      vec3 ray;
+      ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+      ray.y = sinf(task.ray_y);
+      ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
       vec3 vertex = get_vector(t1.x, t1.y, t1.z);
       vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
       vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
-
-      vec3 face_normal = normalize_vector(cross_product(edge1, edge2));
 
       const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
@@ -332,28 +413,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
 
       const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 
-      vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
-      vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
-      vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
-
-      vec3 normal = lerp_normals(vertex_normal, edge1_normal, edge2_normal, coords, face_normal);
+      const vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
+      const vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
+      const vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
       const int texture_object = __float_as_int(t7);
 
       const ushort4 maps = __ldg((ushort4*) (device.texture_assignments + texture_object));
 
-      if (maps.w != TEXTURE_NONE) {
-        const float4 normal_f = geometry_texture_load(device.ptrs.normal_atlas[maps.w], tex_coords);
-
-        vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
-
-        map_normal = scale_vector(map_normal, 2.0f);
-        map_normal = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
-
-        Mat3x3 tangent_space = cotangent_frame(normal, edge1, edge2, edge1_texture, edge2_texture);
-
-        normal = normalize_vector(transform_vec3(tangent_space, map_normal));
-      }
+      vec3 normal = geometry_compute_normal(
+        vertex_normal, edge1_normal, edge2_normal, ray, edge1, edge2, edge1_texture, edge2_texture, maps.w, coords, tex_coords);
 
       normal.x = 0.5f * normal.x + 0.5f;
       normal.y = 0.5f * normal.y + 0.5f;

@@ -97,15 +97,20 @@ extern "C" __global__ void __anyhit__optix() {
   }
 
   if (device.iteration_type == TYPE_LIGHT && alpha_test == 0) {
-    optixSetPayload_0(__float_as_uint(0.0f));
-    optixSetPayload_1(REJECT_HIT);
+    if (optixGetPrimitiveIndex() != optixGetPayload_1()) {
+      optixSetPayload_0(__float_as_uint(0.0f));
+      optixSetPayload_1(REJECT_HIT);
 
-    optixTerminateRay();
+      optixTerminateRay();
+    }
+    else {
+      optixIgnoreIntersection();
+    }
   }
 }
 
 extern "C" __global__ void __closesthit__optix() {
-  if (device.iteration_type == TYPE_LIGHT) {
+  if (device.iteration_type == TYPE_LIGHT && optixGetPrimitiveIndex() != optixGetPayload_1()) {
     // If anyhit was never executed, then we must have hit fully opaque geometry.
     if (!optixGetPayload_2()) {
       optixSetPayload_0(__float_as_uint(0.0f));

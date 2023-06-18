@@ -234,6 +234,31 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
   return mid < 0.0f ? FLT_MAX : mid;
 }
 
+__global__ void ocean_generate_light_eval_data() {
+  const int task_count  = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 1];
+  const int task_offset = device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1];
+
+  for (int i = 0; i < task_count; i++) {
+    OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
+
+    vec3 ray;
+    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+    ray.y = sinf(task.ray_y);
+    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
+    LightEvalData data;
+    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING | LIGHT_EVAL_DATA_VOLUME_HIT;
+    data.normal    = get_vector(0.0f, 0.0f, 0.0f);
+    data.position  = task.position;
+    data.V         = scale_vector(ray, -1.0f);
+    data.roughness = 1.0f;
+    data.metallic  = 0.0f;
+
+    store_light_eval_data(data, pixel);
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -258,7 +283,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     }
 
     RGBAF albedo = device.scene.ocean.albedo;
-    RGBF record  = RGBAhalf_to_RGBF(device.records[pixel]);
+    RGBF record  = device.records[pixel];
 
     if (device.scene.ocean.emissive) {
       RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
@@ -284,7 +309,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
       brdf = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
 
-      RGBAhalf alpha_record = RGBF_to_RGBAhalf(record);
+      RGBF alpha_record = record;
 
       TraceTask new_task;
       new_task.origin = task.position;
@@ -294,13 +319,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       switch (device.iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          store_RGBAhalf(device.ptrs.bounce_records + pixel, alpha_record);
+          store_RGBF(device.ptrs.bounce_records + pixel, alpha_record);
           store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
           if (white_noise() > 0.5f)
             break;
-          store_RGBAhalf(device.ptrs.light_records + pixel, scale_RGBAhalf(alpha_record, 2.0f));
+          store_RGBF(device.ptrs.light_records + pixel, scale_color(alpha_record, 2.0f));
           store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
           device.ptrs.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           break;
@@ -318,7 +343,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       if (scattering_pass) {
         LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
-        float light_weight;
         float underwater_sample;
         vec3 light_pos;
 
@@ -326,17 +350,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
         const float refraction_index = 1.0f / device.scene.ocean.refractive_index;
         BRDFInstance brdf2           = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
         light_pos                    = add_vector(task.position, scale_vector(brdf2.L, underwater_sample));
-        const float solid_angle      = brdf_light_sample_solid_angle(light, light_pos);
-        light_weight                 = brdf_light_sample_shading_weight(light) * solid_angle;
 
-        if (light_weight > 0.0f) {
-          RGBAhalf light_record;
+        if (light.weight > 0.0f) {
+          RGBF light_record;
 
-          brdf.L                = brdf_sample_light_ray(light, light_pos);
-          const float cos_angle = dot_product(ray, brdf.L);
-          const float phase     = henvey_greenstein(cos_angle, device.scene.ocean.anisotropy);
+          BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, light_pos, device.scene.ocean.anisotropy);
 
-          const RGBF S = scale_color(device.scene.ocean.scattering, 2.0f * PI * light_weight * phase * OCEAN_POLLUTION);
+          const RGBF S = mul_color(device.scene.ocean.scattering, scale_color(brdf_sample.term, OCEAN_POLLUTION));
 
           RGBF extinction = ocean_get_extinction();
 
@@ -348,16 +368,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
           const RGBF weight = mul_color(sub_color(S, mul_color(S, step_transmittance)), inv_color(extinction));
 
-          light_record = RGBF_to_RGBAhalf(mul_color(record, weight));
-          light_record = scale_RGBAhalf(light_record, 1.0f / scattering_prob);
+          light_record = mul_color(record, weight);
+          light_record = scale_color(light_record, 1.0f / scattering_prob);
 
           TraceTask light_task;
           light_task.origin = light_pos;
-          light_task.ray    = brdf.L;
+          light_task.ray    = brdf_sample.L;
           light_task.index  = task.index;
 
-          if (any_RGBAhalf(light_record)) {
-            store_RGBAhalf(device.ptrs.light_records + pixel, light_record);
+          if (luminance(light_record) > 0.0f) {
+            store_RGBF(device.ptrs.light_records + pixel, light_record);
             light_history_buffer_entry = light.id;
             store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
           }
@@ -369,14 +389,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
       brdf = brdf_sample_ray(brdf, task.index);
 
-      RGBAhalf bounce_record = mul_RGBAhalf(RGBF_to_RGBAhalf(record), scale_RGBAhalf(brdf.term, 1.0f));
+      RGBF bounce_record = mul_color(record, brdf.term);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
       bounce_task.ray    = brdf.L;
       bounce_task.index  = task.index;
 
-      store_RGBAhalf(device.ptrs.bounce_records + pixel, bounce_record);
+      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
   }

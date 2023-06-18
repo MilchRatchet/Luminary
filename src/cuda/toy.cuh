@@ -6,6 +6,32 @@
 #include "memory.cuh"
 #include "toy_utils.cuh"
 
+__global__ void toy_generate_light_eval_data() {
+  const int task_count  = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 3];
+  const int task_offset = device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3];
+
+  for (int i = 0; i < task_count; i++) {
+    ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
+
+    vec3 normal = get_toy_normal(task.position);
+
+    if (dot_product(normal, task.ray) > 0.0f) {
+      normal = scale_vector(normal, -1.0f);
+    }
+
+    LightEvalData data;
+    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING;
+    data.normal    = normal;
+    data.position  = task.position;
+    data.V         = scale_vector(task.ray, -1.0f);
+    data.roughness = (1.0f - device.scene.toy.material.r);
+    data.metallic  = device.scene.toy.material.g;
+
+    store_light_eval_data(data, pixel);
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -43,14 +69,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       emission                  = scale_RGBAhalf(emission, dir_intensity);
     }
 
-    RGBAhalf record = load_RGBAhalf(device.records + pixel);
+    RGBF record = load_RGBF(device.records + pixel);
 
     if (albedo.a > 0.0f && device.scene.toy.emissive) {
       emission = scale_RGBAhalf(emission, albedo.a);
 
       write_albedo_buffer(RGBAhalf_to_RGBF(emission), pixel);
 
-      emission = mul_RGBAhalf(emission, record);
+      emission = mul_RGBAhalf(emission, RGBF_to_RGBAhalf(record));
 
       const uint32_t light = device.ptrs.light_sample_history[pixel];
 
@@ -67,7 +93,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     if (albedo.a < 1.0f && white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps));
 
-      brdf.term = mul_RGBAhalf(brdf.term, RGBF_to_RGBAhalf(opaque_color(albedo)));
+      brdf.term = mul_color(brdf.term, opaque_color(albedo));
 
       if (device.scene.toy.refractive_index != 1.0f && device.iteration_type != TYPE_LIGHT) {
         const float alpha = white_noise();
@@ -81,7 +107,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         brdf.L = task.ray;
       }
 
-      record = mul_RGBAhalf(record, brdf.term);
+      record = mul_color(record, brdf.term);
 
       TraceTask new_task;
       new_task.origin = task.position;
@@ -91,13 +117,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       switch (device.iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          store_RGBAhalf(device.ptrs.bounce_records + pixel, record);
+          store_RGBF(device.ptrs.bounce_records + pixel, record);
           store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
           if (white_noise() > 0.5f)
             break;
-          store_RGBAhalf(device.ptrs.light_records + pixel, scale_RGBAhalf(record, 2.0f));
+          store_RGBF(device.ptrs.light_records + pixel, scale_color(record, 2.0f));
           store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
           device.ptrs.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
           break;
@@ -118,20 +144,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       if (use_light_sample) {
         LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
-        const float light_weight = brdf_light_sample_shading_weight(light) * light.solid_angle;
+        if (light.weight > 0.0f) {
+          BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, task.position);
 
-        if (light_weight > 0.0f) {
-          brdf.L = brdf_sample_light_ray(light, task.position);
-
-          const RGBAhalf light_record = mul_RGBAhalf(record, scale_RGBAhalf(brdf_evaluate(brdf).term, light_weight));
+          const RGBF light_record = mul_color(record, brdf_sample.term);
 
           TraceTask light_task;
           light_task.origin = task.position;
-          light_task.ray    = brdf.L;
+          light_task.ray    = brdf_sample.L;
           light_task.index  = task.index;
 
-          if (any_RGBAhalf(light_record)) {
-            store_RGBAhalf(device.ptrs.light_records + pixel, light_record);
+          if (luminance(light_record)) {
+            store_RGBF(device.ptrs.light_records + pixel, light_record);
             light_history_buffer_entry = light.id;
             store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
           }
@@ -141,8 +165,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       if (!(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
 
-      brdf                   = brdf_sample_ray(brdf, task.index);
-      RGBAhalf bounce_record = mul_RGBAhalf(record, brdf.term);
+      brdf               = brdf_sample_ray(brdf, task.index);
+      RGBF bounce_record = mul_color(record, brdf.term);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
@@ -150,7 +174,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       bounce_task.index  = task.index;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
-        store_RGBAhalf(device.ptrs.bounce_records + pixel, bounce_record);
+        store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
         store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }
     }

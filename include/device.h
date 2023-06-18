@@ -25,7 +25,7 @@ void device_initialize_random_generators();
 unsigned int device_get_thread_count();
 void device_init();
 void device_generate_tasks();
-void device_execute_main_kernels(RaytraceInstance* instance, int type);
+void device_execute_main_kernels(RaytraceInstance* instance, int type, int depth);
 void device_execute_debug_kernels(RaytraceInstance* instance, int type);
 void device_handle_accumulation(RaytraceInstance* instance);
 void device_copy_framebuffer_to_8bit(

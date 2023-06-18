@@ -47,6 +47,8 @@
 
 #define OPTIXRT_NUM_GROUPS 3
 
+#define RESTIR_CANDIDATE_POOL_MAX (1 << 20)
+
 enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
@@ -109,7 +111,6 @@ struct General {
   int height;
   int samples;
   int max_ray_depth;
-  int reservoir_size;
   DenoisingMode denoiser;
   char** mesh_files;
   int mesh_files_count;
@@ -144,11 +145,6 @@ struct Camera {
   float russian_roulette_bias;
 } typedef Camera;
 
-struct Light {
-  vec3 pos;
-  float radius;
-} typedef Light;
-
 struct Toy {
   int active;
   ToyShape shape;
@@ -159,7 +155,7 @@ struct Toy {
   float refractive_index;
   RGBAF albedo;
   RGBAF material;
-  RGBAF emission;
+  RGBF emission;
   int flashlight_mode;
   Quaternion computed_rotation;
 } typedef Toy;
@@ -336,6 +332,12 @@ struct TextureAtlas {
   int normal_length;
 } typedef TextureAtlas;
 
+struct ReSTIRSettings {
+  int initial_reservoir_size;
+  int light_candidate_pool_size_log2;
+  TriangleLight* presampled_triangle_lights;
+} typedef ReSTIRSettings;
+
 struct DevicePointers {
   TraceTask* light_trace;
   TraceTask* bounce_trace;
@@ -351,8 +353,8 @@ struct DevicePointers {
   RGBAhalf* frame_variance;
   RGBAhalf* albedo_buffer;
   RGBAhalf* normal_buffer;
-  RGBAhalf* light_records;
-  RGBAhalf* bounce_records;
+  RGBF* light_records;
+  RGBF* bounce_records;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
   TraceResult* trace_result_buffer;
@@ -368,22 +370,22 @@ struct DevicePointers {
   DeviceTexture* sky_hdri_luts;
   LightSample* light_samples;
   LightEvalData* light_eval_data;
+  uint32_t* light_candidates;
 } typedef DevicePointers;
 
 struct DeviceConstantMemory {
   DevicePointers ptrs;
   Scene scene;
+  ReSTIRSettings restir;
   int max_ray_depth;
   int pixels_per_thread;
   int iteration_type;
+  int depth;
   TraceTask* trace_tasks;
   uint16_t* trace_count;
-  RGBAhalf* records;
+  RGBF* records;
   int temporal_frames;
   int denoiser;
-  uint32_t reservoir_size;
-  int spatial_samples;
-  int light_resampling;
   int width;
   int height;
   int output_width;
@@ -440,9 +442,9 @@ struct RaytraceInstance {
   DeviceBuffer* light_records;
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
-  DeviceBuffer* light_samples_1;
-  DeviceBuffer* light_samples_2;
+  DeviceBuffer* light_samples;
   DeviceBuffer* light_eval_data;
+  DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;
   DeviceBuffer* sky_ms_luts;
   DeviceBuffer* sky_tm_luts;
@@ -450,12 +452,9 @@ struct RaytraceInstance {
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
-  int light_resampling;
   Scene scene;
   DenoisingMode denoiser;
   int temporal_frames;
-  int spatial_samples;
-  int spatial_iterations;
   DeviceBuffer* randoms;
   int shading_mode;
   RGBAhalf** bloom_mips_gpu;
@@ -470,6 +469,7 @@ struct RaytraceInstance {
   Jitter jitter;
   int accum_mode;
   RayEmitter emitter;
+  ReSTIRSettings restir;
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
