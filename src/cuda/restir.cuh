@@ -37,7 +37,7 @@
 
 // [Wym21]
 // C. Wyman, A. Panteleev, "Rearchitecting Spatiotemporal Resampling for Production",
-// High-Performance Graphics - Symposium Papers, 2021
+// High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
 
 /**
  * Returns an empty light sample.
