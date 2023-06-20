@@ -38,10 +38,7 @@ struct WavefrontTriangle {
 
 struct WavefrontMaterial {
   size_t hash;
-  uint16_t albedo_texture;
-  uint16_t illuminance_texture;
-  uint16_t material_texture;
-  uint16_t normal_texture;
+  uint16_t texture[4];
 } typedef WavefrontMaterial;
 
 enum WavefrontTextureInstanceType {
@@ -74,14 +71,10 @@ struct WavefrontContent {
   unsigned int triangles_length;
   WavefrontMaterial* materials;
   unsigned int materials_length;
-  TextureRGBA* albedo_maps;
-  unsigned int albedo_maps_length;
-  TextureRGBA* illuminance_maps;
-  unsigned int illuminance_maps_length;
-  TextureRGBA* material_maps;
-  unsigned int material_maps_length;
-  TextureRGBA* normal_maps;
-  unsigned int normal_maps_length;
+  unsigned int materials_count;
+  TextureRGBA* maps[4];
+  unsigned int maps_length[4];
+  unsigned int maps_count[4];
   WavefrontTextureList* texture_list;
 } typedef WavefrontContent;
 

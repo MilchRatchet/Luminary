@@ -517,7 +517,8 @@ static inline void* ___s_realloc(void* ptr, const size_t size) {
 
 #define ensure_capacity(ptr, count, length, size) \
   {                                               \
-    if (count == length) {                        \
+    if (count >= length) {                        \
+      length = count;                             \
       length += 1;                                \
       length *= 2;                                \
       ptr = safe_realloc(ptr, size * length);     \

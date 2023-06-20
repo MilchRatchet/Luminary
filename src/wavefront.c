@@ -16,7 +16,7 @@
 #include "utils.h"
 
 //
-// Limitation: Paths may not contain spaces. Since spaces are used for tokenization using spaces would be a terrible idea anyway.
+// Implementation of mtl parser based on http://paulbourke.net/dataformats/mtl/.
 //
 
 #define LINE_SIZE 4096
@@ -36,20 +36,24 @@ void wavefront_init(WavefrontContent** content) {
   (*content)->materials        = malloc(sizeof(WavefrontMaterial) * 1);
   (*content)->materials_length = 1;
 
-  (*content)->materials[0].hash                = 0;
-  (*content)->materials[0].albedo_texture      = TEXTURE_NONE;
-  (*content)->materials[0].illuminance_texture = TEXTURE_NONE;
-  (*content)->materials[0].material_texture    = TEXTURE_NONE;
-  (*content)->materials[0].normal_texture      = TEXTURE_NONE;
+  (*content)->materials[0].hash                    = 0;
+  (*content)->materials[0].texture[WF_ALBEDO]      = TEXTURE_NONE;
+  (*content)->materials[0].texture[WF_ILLUMINANCE] = TEXTURE_NONE;
+  (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
+  (*content)->materials[0].texture[WF_NORMAL]      = TEXTURE_NONE;
 
-  (*content)->albedo_maps             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  (*content)->albedo_maps_length      = 0;
-  (*content)->illuminance_maps        = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  (*content)->illuminance_maps_length = 0;
-  (*content)->material_maps           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  (*content)->material_maps_length    = 0;
-  (*content)->normal_maps             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  (*content)->normal_maps_length      = 0;
+  (*content)->maps[WF_ALBEDO]             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps_count[WF_ALBEDO]       = 0;
+  (*content)->maps_length[WF_ALBEDO]      = 1;
+  (*content)->maps[WF_ILLUMINANCE]        = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps_count[WF_ILLUMINANCE]  = 0;
+  (*content)->maps_length[WF_ILLUMINANCE] = 1;
+  (*content)->maps[WF_MATERIAL]           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps_count[WF_MATERIAL]     = 0;
+  (*content)->maps_length[WF_MATERIAL]    = 1;
+  (*content)->maps[WF_NORMAL]             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps_count[WF_NORMAL]       = 0;
+  (*content)->maps_length[WF_NORMAL]      = 1;
 
   (*content)->texture_list           = malloc(sizeof(WavefrontTextureList));
   (*content)->texture_list->textures = malloc(sizeof(WavefrontTextureInstance) * 16);
@@ -69,23 +73,23 @@ void wavefront_clear(WavefrontContent** content) {
   free((*content)->triangles);
   free((*content)->materials);
 
-  for (unsigned int i = 0; i < (*content)->albedo_maps_length; i++) {
-    free((*content)->albedo_maps[i].data);
+  for (unsigned int i = 0; i < (*content)->maps_count[WF_ALBEDO]; i++) {
+    free((*content)->maps[WF_ALBEDO][i].data);
   }
-  for (unsigned int i = 0; i < (*content)->illuminance_maps_length; i++) {
-    free((*content)->illuminance_maps[i].data);
+  for (unsigned int i = 0; i < (*content)->maps_count[WF_ILLUMINANCE]; i++) {
+    free((*content)->maps[WF_ILLUMINANCE][i].data);
   }
-  for (unsigned int i = 0; i < (*content)->material_maps_length; i++) {
-    free((*content)->material_maps[i].data);
+  for (unsigned int i = 0; i < (*content)->maps_count[WF_MATERIAL]; i++) {
+    free((*content)->maps[WF_MATERIAL][i].data);
   }
-  for (unsigned int i = 0; i < (*content)->normal_maps_length; i++) {
-    free((*content)->normal_maps[i].data);
+  for (unsigned int i = 0; i < (*content)->maps_count[WF_NORMAL]; i++) {
+    free((*content)->maps[WF_NORMAL][i].data);
   }
 
-  free((*content)->albedo_maps);
-  free((*content)->illuminance_maps);
-  free((*content)->material_maps);
-  free((*content)->normal_maps);
+  free((*content)->maps[WF_ALBEDO]);
+  free((*content)->maps[WF_ILLUMINANCE]);
+  free((*content)->maps[WF_MATERIAL]);
+  free((*content)->maps[WF_NORMAL]);
   free((*content)->texture_list->textures);
   free((*content)->texture_list);
 
@@ -127,7 +131,101 @@ static void add_texture(WavefrontTextureList* textures, uint32_t hash, Wavefront
   textures->textures[textures->count++] = tex;
 }
 
-static void read_materials_file(WavefrontContent* _content, const char* filename) {
+static void _wavefront_parse_map(WavefrontContent* content, const char* line, const size_t line_len) {
+  if (line_len < 8) {
+    // Line is too short to be a valid map_ line.
+    return;
+  }
+
+  if (strncmp(line, "map_", 4)) {
+    return;
+  }
+
+  // Determine type of map
+  WavefrontTextureInstanceType type;
+  if (!strncmp(line + 4, "Kd", 2)) {
+    type = WF_ALBEDO;
+  }
+  else if (!strncmp(line + 4, "Ke", 2)) {
+    type = WF_ILLUMINANCE;
+  }
+  else if (!strncmp(line + 4, "Ns", 2)) {
+    type = WF_MATERIAL;
+  }
+  else if (!strncmp(line + 4, "Bb", 2)) {
+    type = WF_NORMAL;
+  }
+  else {
+    // Not a supported type.
+    return;
+  }
+
+  // Find path
+  const char* path = line + 7;
+
+  const char* next_space = strchr(path, ' ');
+
+  // The next character is a valid memory address because at least a \0 must follow.
+  if (next_space != (char*) 0 && next_space[1] == '-') {
+    // We now parse all commands until we find a word that is not a command argument and does not start with a -.
+
+    // Valid address, same argument.
+    const char* command = next_space + 2;
+
+    while (1) {
+      // This tells us how many arguments will follow this command, this is how often we have to skip words.
+      int num_args = 0;
+
+      if (command[0] == 'o' || command[0] == 's') {
+        num_args = 3;  // o or s
+      }
+      else if (command[0] == 't') {
+        if (command[1] == ' ') {
+          num_args = 3;  // t
+        }
+        else {
+          num_args = 1;  // texres
+        }
+      }
+      else if (command[0] == 'm') {
+        num_args = 2;  // mm
+      }
+      else if (command[0] == 'c' || command[0] == 'b') {
+        num_args = 1;  // cc or clamp or blendu or blendv
+      }
+
+      for (int i = 0; i <= num_args; i++) {
+        command = strchr(command, ' ');
+      }
+
+      if (command == (char*) 0) {
+        error_message("Something went wrong parsing the following line in an *.mtl file: %s", line);
+        return;
+      }
+
+      if (command[0] != '-')
+        break;
+
+      command++;
+    }
+
+    path = command;
+  }
+
+  const size_t hash   = hash_djb2((unsigned char*) path);
+  uint16_t texture_id = find_texture(content->texture_list, hash, type);
+
+  if (texture_id == TEXTURE_NONE) {
+    ensure_capacity(content->maps[type], content->maps_count[type], content->maps_length[type], sizeof(TextureRGBA));
+    texture_id = content->maps_count[type]++;
+    add_texture(content->texture_list, hash, type, texture_id);
+    content->maps[type][texture_id] = png_load(path);
+  }
+
+  content->materials[content->materials_count - 1].texture[type] = texture_id;
+}
+
+static void read_materials_file(WavefrontContent* content, const char* filename) {
   log_message("Reading *.mtl file (%s)", filename);
   FILE* file = fopen(filename, "r");
 
@@ -136,122 +234,44 @@ static void read_materials_file(WavefrontContent* _content, const char* filename
     return;
   }
 
-  WavefrontContent content = *_content;
-
-  unsigned int materials_count        = content.materials_length;
-  unsigned int albedo_maps_count      = content.albedo_maps_length;
-  unsigned int illuminance_maps_count = content.illuminance_maps_length;
-  unsigned int material_maps_count    = content.material_maps_length;
-  unsigned int normal_maps_count      = content.normal_maps_length;
-
   char* line = malloc(LINE_SIZE);
-  char* path = malloc(LINE_SIZE);
 
   while (!feof(file)) {
     fgets(line, LINE_SIZE, file);
 
+    size_t line_len = strlen(line);
+
+    if (!line_len)
+      continue;
+
+    // Get rid of the newline character. This makes things easier because any file path will be the end of the line.
+    if (line[line_len - 1] == '\n')
+      line[line_len - 1] = '\0';
+
     if (line[0] == 'n' && line[1] == 'e' && line[2] == 'w' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
-      ensure_capacity(content.materials, materials_count, content.materials_length, sizeof(WavefrontMaterial));
-      sscanf(line, "%*s %s\n", path);
-      size_t hash = hash_djb2((unsigned char*) path);
+      char* name  = line + 7;
+      size_t hash = hash_djb2((unsigned char*) name);
 
-      content.materials[materials_count].hash                = hash;
-      content.materials[materials_count].albedo_texture      = TEXTURE_NONE;
-      content.materials[materials_count].illuminance_texture = TEXTURE_NONE;
-      content.materials[materials_count].material_texture    = TEXTURE_NONE;
-      content.materials[materials_count].normal_texture      = TEXTURE_NONE;
-      materials_count++;
+      ensure_capacity(content->materials, content->materials_count, content->materials_length, sizeof(WavefrontMaterial));
+
+      content->materials[content->materials_count].hash                    = hash;
+      content->materials[content->materials_count].texture[WF_ALBEDO]      = TEXTURE_NONE;
+      content->materials[content->materials_count].texture[WF_ILLUMINANCE] = TEXTURE_NONE;
+      content->materials[content->materials_count].texture[WF_MATERIAL]    = TEXTURE_NONE;
+      content->materials[content->materials_count].texture[WF_NORMAL]      = TEXTURE_NONE;
+      content->materials_count++;
     }
-    else if (line[0] == 'm' && line[1] == 'a' && line[2] == 'p' && line[3] == '_') {
-      if (line[4] == 'K' && line[5] == 'd') {
-        ensure_capacity(content.albedo_maps, albedo_maps_count, content.albedo_maps_length, sizeof(TextureRGBA));
-
-        const char* albedo_map_path = strrchr(line, ' ') + 1;
-        sscanf(albedo_map_path, "%[^\n]\n", path);
-
-        const size_t hash   = hash_djb2((unsigned char*) path);
-        uint16_t texture_id = find_texture(content.texture_list, hash, WF_ALBEDO);
-
-        if (texture_id == TEXTURE_NONE) {
-          texture_id = albedo_maps_count++;
-          add_texture(content.texture_list, hash, WF_ALBEDO, texture_id);
-          content.albedo_maps[texture_id] = png_load(path);
-        }
-
-        content.materials[materials_count - 1].albedo_texture = texture_id;
-      }
-      else if (line[4] == 'K' && line[5] == 'e') {
-        ensure_capacity(content.illuminance_maps, illuminance_maps_count, content.illuminance_maps_length, sizeof(TextureRGBA));
-
-        const char* illuminance_map_path = strrchr(line, ' ') + 1;
-        sscanf(illuminance_map_path, "%[^\n]\n", path);
-
-        const size_t hash   = hash_djb2((unsigned char*) path);
-        uint16_t texture_id = find_texture(content.texture_list, hash, WF_ILLUMINANCE);
-
-        if (texture_id == TEXTURE_NONE) {
-          texture_id = illuminance_maps_count++;
-          add_texture(content.texture_list, hash, WF_ILLUMINANCE, texture_id);
-          content.illuminance_maps[texture_id] = png_load(path);
-        }
-
-        content.materials[materials_count - 1].illuminance_texture = texture_id;
-      }
-      else if (line[4] == 'N' && line[5] == 's') {
-        ensure_capacity(content.material_maps, material_maps_count, content.material_maps_length, sizeof(TextureRGBA));
-
-        const char* material_map_path = strrchr(line, ' ') + 1;
-        sscanf(material_map_path, "%[^\n]\n", path);
-
-        const size_t hash   = hash_djb2((unsigned char*) path);
-        uint16_t texture_id = find_texture(content.texture_list, hash, WF_MATERIAL);
-
-        if (texture_id == TEXTURE_NONE) {
-          texture_id = material_maps_count++;
-          add_texture(content.texture_list, hash, WF_MATERIAL, texture_id);
-          content.material_maps[texture_id] = png_load(path);
-        }
-
-        content.materials[materials_count - 1].material_texture = texture_id;
-      }
-      else if (line[4] == 'B' || line[4] == 'b') {
-        ensure_capacity(content.normal_maps, normal_maps_count, content.normal_maps_length, sizeof(TextureRGBA));
-
-        const char* normal_map_path = strrchr(line, ' ') + 1;
-        sscanf(normal_map_path, "%[^\n]\n", path);
-
-        const size_t hash   = hash_djb2((unsigned char*) path);
-        uint16_t texture_id = find_texture(content.texture_list, hash, WF_NORMAL);
-
-        if (texture_id == TEXTURE_NONE) {
-          texture_id = normal_maps_count++;
-          add_texture(content.texture_list, hash, WF_NORMAL, texture_id);
-          content.normal_maps[texture_id] = png_load(path);
-        }
-
-        content.materials[materials_count - 1].normal_texture = texture_id;
-      }
+    else {
+      _wavefront_parse_map(content, line, line_len);
     }
   }
 
-  content.materials_length        = materials_count;
-  content.materials               = safe_realloc(content.materials, sizeof(WavefrontMaterial) * content.materials_length);
-  content.albedo_maps_length      = albedo_maps_count;
-  content.albedo_maps             = safe_realloc(content.albedo_maps, sizeof(TextureRGBA) * content.albedo_maps_length);
-  content.illuminance_maps_length = illuminance_maps_count;
-  content.illuminance_maps        = safe_realloc(content.illuminance_maps, sizeof(TextureRGBA) * content.illuminance_maps_length);
-  content.material_maps_length    = material_maps_count;
-  content.material_maps           = safe_realloc(content.material_maps, sizeof(TextureRGBA) * content.material_maps_length);
-  content.normal_maps_length      = normal_maps_count;
-  content.normal_maps             = safe_realloc(content.normal_maps, sizeof(TextureRGBA) * content.normal_maps_length);
-
-  *_content = content;
-
+  free(line);
   fclose(file);
 
   log_message(
-    "Material counts: %d (%d %d %d %d)", materials_count, albedo_maps_count, illuminance_maps_count, material_maps_count,
-    normal_maps_count);
+    "Material counts: %d (%d %d %d %d)", content->materials_count, content->maps_count[WF_ALBEDO], content->maps_count[WF_ILLUMINANCE],
+    content->maps_count[WF_MATERIAL], content->maps_count[WF_NORMAL]);
 }
 
 /*
@@ -447,7 +467,6 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
   int vertices_count           = content.vertices_length;
   int normals_count            = content.normals_length;
   int uvs_count                = content.uvs_length;
-  unsigned int materials_count = content.materials_length;
 
   size_t* loaded_mtls             = malloc(sizeof(size_t) * 16);
   unsigned int loaded_mtls_count  = 0;
@@ -542,14 +561,13 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
           ensure_capacity(loaded_mtls, loaded_mtls_count, loaded_mtls_length, sizeof(size_t));
           loaded_mtls[loaded_mtls_count++] = hash;
           read_materials_file(&content, path);
-          materials_count = content.materials_length;
         }
       }
       else if (line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
         sscanf(line, "%*s %[^\n]", path);
         size_t hash      = hash_djb2((unsigned char*) path);
         current_material = 0;
-        for (unsigned int i = 1; i < materials_count; i++) {
+        for (unsigned int i = 1; i < content.materials_count; i++) {
           if (content.materials[i].hash == hash) {
             current_material = i;
             break;
@@ -587,14 +605,14 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
 }
 
 TextureAssignment* wavefront_generate_texture_assignments(WavefrontContent* content) {
-  TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * content->materials_length);
+  TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * content->materials_count);
 
-  for (unsigned int i = 0; i < content->materials_length; i++) {
+  for (unsigned int i = 0; i < content->materials_count; i++) {
     TextureAssignment assignment;
-    assignment.albedo_map      = content->materials[i].albedo_texture;
-    assignment.illuminance_map = content->materials[i].illuminance_texture;
-    assignment.material_map    = content->materials[i].material_texture;
-    assignment.normal_map      = content->materials[i].normal_texture;
+    assignment.albedo_map      = content->materials[i].texture[WF_ALBEDO];
+    assignment.illuminance_map = content->materials[i].texture[WF_ILLUMINANCE];
+    assignment.material_map    = content->materials[i].texture[WF_MATERIAL];
+    assignment.normal_map      = content->materials[i].texture[WF_NORMAL];
 
     texture_assignments[i] = assignment;
   }
