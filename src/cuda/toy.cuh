@@ -91,7 +91,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, roughness, metallic);
 
     if (albedo.a < 1.0f && white_noise() > albedo.a) {
-      task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps));
+      task.position = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
 
       brdf.term = mul_color(brdf.term, opaque_color(albedo));
 
@@ -134,7 +134,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
       const int use_light_sample = !is_mirror && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
-      task.position = add_vector(task.position, scale_vector(task.ray, -8.0f * eps));
+      task.position = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 

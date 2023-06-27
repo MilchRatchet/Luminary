@@ -261,7 +261,7 @@ __device__ Quaternion inverse_quaternion(const Quaternion q) {
 
 __device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
   Quaternion res;
-  if (v.z < -1.0f + eps * eps) {
+  if (v.z < -1.0f + eps) {
     res.x = 1.0f;
     res.y = 0.0f;
     res.z = 0.0f;

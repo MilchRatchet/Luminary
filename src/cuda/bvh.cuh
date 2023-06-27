@@ -102,9 +102,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
       origin = task.origin;
       ray    = task.ray;
 
-      inv_ray.x = 1.0f / (fabsf(task.ray.x) > eps * eps ? task.ray.x : copysignf(eps * eps, task.ray.x));
-      inv_ray.y = 1.0f / (fabsf(task.ray.y) > eps * eps ? task.ray.y : copysignf(eps * eps, task.ray.y));
-      inv_ray.z = 1.0f / (fabsf(task.ray.z) > eps * eps ? task.ray.z : copysignf(eps * eps, task.ray.z));
+      inv_ray.x = 1.0f / (fabsf(task.ray.x) > eps ? task.ray.x : copysignf(eps, task.ray.x));
+      inv_ray.y = 1.0f / (fabsf(task.ray.y) > eps ? task.ray.y : copysignf(eps, task.ray.y));
+      inv_ray.z = 1.0f / (fabsf(task.ray.z) > eps ? task.ray.z : copysignf(eps, task.ray.z));
 
       octant    = ((task.ray.x < 0.0f) ? 0b100 : 0) | ((task.ray.y < 0.0f) ? 0b10 : 0) | ((task.ray.z < 0.0f) ? 0b1 : 0);
       octant    = 0b111 - octant;
@@ -160,7 +160,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
 
         const float diag_shift = (p.x - origin.x) * inv_ray.x;
 
-        const float shifted_eps   = eps * eps - diag_shift;
+        const float shifted_eps   = eps * fabsf(diag_shift) - diag_shift;
         const float shifted_depth = depth - diag_shift;
 
         const float shifted_origin_y = (p.y - origin.y) * inv_ray.y - diag_shift;

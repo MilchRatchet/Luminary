@@ -245,7 +245,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     write_normal_buffer(normal, pixel);
 
     if (albedo.a < 1.0f && white_noise() > albedo.a) {
-      task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps));
+      task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
 
       if (device.scene.material.colored_transparency) {
         record = mul_color(record, opaque_color(albedo));
@@ -280,7 +280,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       const vec3 V               = scale_vector(ray, -1.0f);
       const int use_light_sample = !is_mirror && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
-      task.position = add_vector(task.position, scale_vector(ray, -8.0f * eps));
+      task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
