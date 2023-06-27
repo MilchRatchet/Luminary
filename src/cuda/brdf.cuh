@@ -100,55 +100,43 @@ __device__ float brdf_smith_G2_height_correlated_GGX(const float roughness4, con
   return 0.5f / (a + b);
 }
 
+__device__ vec3 brdf_sample_microfacet_GGX_hemisphere(const vec3 v, const float r1, const float r2) {
+  const float tmp = v.x * v.x + v.y * v.y;
+
+  vec3 w1 = (tmp > 0.0f) ? scale_vector(get_vector(-v.y, v.x, 0.0f), rsqrtf(tmp)) : get_vector(1.0f, 0.0f, 0.0f);
+  vec3 w2 = cross_product(v, w1);
+
+  float phi = 2.0f * PI * r1;
+  float r   = sqrtf(r2);
+
+  float t1 = r * cosf(phi);
+  float t2 = r * sinf(phi);
+
+  float s  = (1.0f + v.z) * 0.5f;
+  t2       = (1.0f - s) * sqrtf(1.0f - t1 * t1) + s * t2;
+  float ti = sqrtf(fmaxf(1.0f - t1 * t1 - t2 * t2, 0.0f));
+
+  vec3 result = scale_vector(v, ti);
+  result      = add_vector(result, scale_vector(w1, t1));
+  result      = add_vector(result, scale_vector(w2, t2));
+
+  return result;
+}
+
 /*
  * Computes a vector based on GGX distribution.
  * @param v Opposite of ray direction.
  * @param alpha Squared roughness.
  * @param random1 Uniform random number in [0,1).
- * @param random2 Uniform random number in [0,2 * PI).
+ * @param random2 Uniform random number in [0,1).
  * @result Vector randomly sampled according to GGX distribution.
  */
 __device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, const float random1, const float random2) {
-  if (alpha == 0.0f)
-    return get_vector(0.0f, 0.0f, 1.0f);
+  vec3 v_hemi = normalize_vector(get_vector(alpha * v.x, alpha * v.y, v.z));
 
-  vec3 v_hemi;
+  vec3 sampled = brdf_sample_microfacet_GGX_hemisphere(v_hemi, random1, random2);
 
-  v_hemi.x = alpha * v.x;
-  v_hemi.y = alpha * v.y;
-  v_hemi.z = v.z;
-
-  const float length_squared = v_hemi.x * v_hemi.x + v_hemi.y * v_hemi.y;
-  vec3 T1;
-
-  if (length_squared == 0.0f) {
-    T1.x = 1.0f;
-    T1.y = 0.0f;
-    T1.z = 0.0f;
-  }
-  else {
-    const float length = rsqrtf(length_squared);
-    T1.x               = -v_hemi.y * length;
-    T1.y               = v_hemi.x * length;
-    T1.z               = 0.0f;
-  }
-
-  const vec3 T2 = cross_product(v_hemi, T1);
-
-  const float r   = sqrtf(random1);
-  const float phi = random2;
-  const float t1  = r * cosf(phi);
-  const float s   = 0.5f * (1.0f + v_hemi.z);
-  const float t2  = lerp(sqrtf(1.0f - t1 * t1), r * sinf(phi), s);
-
-  vec3 normal_hemi;
-
-  const float scalar = sqrtf(fmaxf(0.0f, 1.0f - t1 * t1 - t2 * t2));
-  normal_hemi.x      = alpha * (t1 * T1.x + t2 * T2.x + scalar * v_hemi.x);
-  normal_hemi.y      = alpha * (t1 * T1.y + t2 * T2.y + scalar * v_hemi.y);
-  normal_hemi.z      = fmaxf(0.0f, t1 * T1.z + t2 * T2.z + scalar * v_hemi.z);
-
-  return normalize_vector(normal_hemi);
+  return normalize_vector(get_vector(sampled.x * alpha, sampled.y * alpha, sampled.z));
 }
 
 __device__ vec3 brdf_sample_microfacet(const vec3 V_local, const float roughness2, const float alpha, const float beta) {
@@ -215,7 +203,17 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
 
 __device__ vec3 brdf_sample_ray_hemisphere(const float alpha, const float beta) {
   const float a = sqrtf(alpha);
-  return get_vector(a * cosf(beta), a * sinf(beta), sqrtf(1.0f - alpha));
+  const float b = 2.0f * PI * beta;
+
+  // How this works:
+  // Standard way is a = acosf(alpha) and then return (sinf(a) * cosf(b), sinf(a) * sinf(b), cosf(a)).
+  // What we can do instead is sample a point uniformly on the disk on which the hemisphere lies. (i.e. z = 0.0f).
+  // Then since we want a normalized direction the ray must satisfy 1.0f = sqrtf(x * x + y * y + z * z).
+  // Further, since we only want the upper hemisphere it must be that z >= 0.0f.
+  // Using these constraints, we get that z = sqrtf(1.0f - x * x + y * y).
+  // Then we can use that x * x + y * y = a * a * (cosf(b) * cosf(b) + sinf(b) * sinf(b)) = a * a.
+  // Hence, we have that z = sqrtf(1.0f - a * a) = sqrtf(1.0f - sqrtf(alpha) * sqrtf(alpha)) = sqrtf(1.0f - alpha).
+  return get_vector(a * cosf(b), a * sinf(b), sqrtf(1.0f - alpha));
 }
 
 __device__ vec3 brdf_sample_ray_diffuse(const float alpha, const float beta) {
@@ -368,7 +366,7 @@ __device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const ushort2 index) 
   const float specular_prob = brdf_spec_probability(brdf.metallic);
   const int use_specular    = white_noise() < specular_prob;
   const float alpha         = white_noise();
-  const float beta          = 2.0f * PI * white_noise();
+  const float beta          = white_noise();
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(brdf.V, rotation_to_z);
@@ -396,9 +394,6 @@ __device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const ushort2 index) 
  * it probably doesnt matter too much.
  */
 __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const float r1, const float r2) {
-  const float alpha = r1;
-  const float beta  = r2;
-
   const float roughness2 = brdf.roughness * brdf.roughness;
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
@@ -407,7 +402,7 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
   vec3 H_local = get_vector(0.0f, 0.0f, 1.0f);
 
   if (roughness2 > 0.0f) {
-    H_local = brdf_sample_microfacet(V_local, roughness2, alpha, beta);
+    H_local = brdf_sample_microfacet(V_local, roughness2, r1, r2);
   }
 
   vec3 L_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);

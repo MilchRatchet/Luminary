@@ -96,12 +96,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       brdf.term = mul_color(brdf.term, opaque_color(albedo));
 
       if (device.scene.toy.refractive_index != 1.0f && device.iteration_type != TYPE_LIGHT) {
-        const float alpha = white_noise();
-        const float beta  = 2.0f * PI * white_noise();
-
         const float refraction_index = (from_inside) ? device.scene.toy.refractive_index : 1.0f / device.scene.toy.refractive_index;
 
-        brdf = brdf_sample_ray_refraction(brdf, refraction_index, alpha, beta);
+        brdf = brdf_sample_ray_refraction(brdf, refraction_index, white_noise(), white_noise());
       }
       else {
         brdf.L = task.ray;
