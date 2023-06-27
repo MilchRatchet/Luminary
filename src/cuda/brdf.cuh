@@ -43,7 +43,7 @@ __device__ float brdf_shadowed_F90(const RGBAhalf specular_f0) {
 
 __device__ RGBAhalf brdf_albedo_as_specular_f0(const RGBAhalf albedo, const float metallic) {
   const RGBAhalf specular_f0 = get_RGBAhalf(0.04f, 0.04f, 0.04f, 0.00f);
-  const RGBAhalf diff        = sub_RGBAhalf(sqrt_RGBAhalf(albedo), specular_f0);
+  const RGBAhalf diff        = sub_RGBAhalf(albedo, specular_f0);
 
   return fma_RGBAhalf(diff, metallic, specular_f0);
 }
