@@ -100,25 +100,18 @@ __device__ float brdf_smith_G2_height_correlated_GGX(const float roughness4, con
   return 0.5f / (a + b);
 }
 
+/*
+ * Samples a normal from the hemisphere with GGX VNDF. Method found in [DupB23].
+ *
+ * [DupB23] J. Dupuy and A. Benyoub, "Sampling Visible GGX Normals with Spherical Caps", 2023. arXiv:2306.05044
+ */
 __device__ vec3 brdf_sample_microfacet_GGX_hemisphere(const vec3 v, const float r1, const float r2) {
-  const float tmp = v.x * v.x + v.y * v.y;
-
-  vec3 w1 = (tmp > 0.0f) ? scale_vector(get_vector(-v.y, v.x, 0.0f), rsqrtf(tmp)) : get_vector(1.0f, 0.0f, 0.0f);
-  vec3 w2 = cross_product(v, w1);
-
-  float phi = 2.0f * PI * r1;
-  float r   = sqrtf(r2);
-
-  float t1 = r * cosf(phi);
-  float t2 = r * sinf(phi);
-
-  float s  = (1.0f + v.z) * 0.5f;
-  t2       = (1.0f - s) * sqrtf(1.0f - t1 * t1) + s * t2;
-  float ti = sqrtf(fmaxf(1.0f - t1 * t1 - t2 * t2, 0.0f));
-
-  vec3 result = scale_vector(v, ti);
-  result      = add_vector(result, scale_vector(w1, t1));
-  result      = add_vector(result, scale_vector(w2, t2));
+  const float phi       = 2.0f * PI * r1;
+  const float z         = (1.0f - r2) * (1.0f + v.z) - v.z;
+  const float sin_theta = sqrtf(__saturatef(1.0f - z * z));
+  const float x         = sin_theta * cosf(phi);
+  const float y         = sin_theta * sinf(phi);
+  const vec3 result     = add_vector(get_vector(x, y, z), v);
 
   return result;
 }
@@ -127,14 +120,14 @@ __device__ vec3 brdf_sample_microfacet_GGX_hemisphere(const vec3 v, const float 
  * Computes a vector based on GGX distribution.
  * @param v Opposite of ray direction.
  * @param alpha Squared roughness.
- * @param random1 Uniform random number in [0,1).
- * @param random2 Uniform random number in [0,1).
+ * @param r1 Uniform random number in [0,1).
+ * @param r2 Uniform random number in [0,1).
  * @result Vector randomly sampled according to GGX distribution.
  */
-__device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, const float random1, const float random2) {
+__device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, const float r1, const float r2) {
   vec3 v_hemi = normalize_vector(get_vector(alpha * v.x, alpha * v.y, v.z));
 
-  vec3 sampled = brdf_sample_microfacet_GGX_hemisphere(v_hemi, random1, random2);
+  vec3 sampled = brdf_sample_microfacet_GGX_hemisphere(v_hemi, r1, r2);
 
   return normalize_vector(get_vector(sampled.x * alpha, sampled.y * alpha, sampled.z));
 }
