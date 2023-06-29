@@ -253,13 +253,13 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 5714025870461847885u:
       sscanf(value, "%f\n", &sky->mie_falloff);
       break;
-    /* MIE_PH_G */
-    case 5142908809513355597u:
-      sscanf(value, "%f\n", &sky->mie_g);
-      break;
     /* GROUNDVI */
     case 5284486315995255367u:
       sscanf(value, "%f\n", &sky->ground_visibility);
+      break;
+    /* DIAMETER */
+    case 5928237141128726852u:
+      sscanf(value, "%f\n", &sky->mie_diameter);
       break;
     /* OZONETHI */
     case 5280563219735206479u:
@@ -336,17 +336,9 @@ static void parse_cloud_settings(Cloud* cloud, char* line) {
     case 4993437844262438231u:
       sscanf(value, "%f\n", &cloud->noise_weather_scale);
       break;
-    /* FWDSCATT */
-    case 6076553554645243718u:
-      sscanf(value, "%f\n", &cloud->forward_scattering);
-      break;
-    /* BWDSCATT */
-    case 6076553554645243714u:
-      sscanf(value, "%f\n", &cloud->backward_scattering);
-      break;
-    /* SCATLERP */
-    case 5787764665257902931u:
-      sscanf(value, "%f\n", &cloud->lobe_lerp);
+    /* DIAMETER */
+    case 5928237141128726852u:
+      sscanf(value, "%f\n", &cloud->droplet_diameter);
       break;
     /* SHASTEPS */
     case 6003374531761227859u:
@@ -439,9 +431,9 @@ static void parse_fog_settings(Fog* fog, char* line) {
     case 6870615380437386564u:
       sscanf(value, "%f\n", &fog->density);
       break;
-    /* ANISOTRO */
-    case 5715723576763043393u:
-      sscanf(value, "%f\n", &fog->anisotropy);
+    /* DIAMETER */
+    case 5928237141128726852u:
+      sscanf(value, "%f\n", &fog->droplet_diameter);
       break;
     /* DISTANCE */
     case 4990918854551226692u:
@@ -799,7 +791,7 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "SKY MIEFALLO %f\n", instance->scene.sky.mie_falloff);
   fputs(line, file);
-  sprintf(line, "SKY MIE_PH_G %f\n", instance->scene.sky.mie_g);
+  sprintf(line, "SKY DIAMETER %f\n", instance->scene.sky.mie_diameter);
   fputs(line, file);
   sprintf(line, "SKY GROUNDVI %f\n", instance->scene.sky.ground_visibility);
   fputs(line, file);
@@ -847,11 +839,7 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CLOUD WEASCALE %f\n", instance->scene.sky.cloud.noise_weather_scale);
   fputs(line, file);
-  sprintf(line, "CLOUD FWDSCATT %f\n", instance->scene.sky.cloud.forward_scattering);
-  fputs(line, file);
-  sprintf(line, "CLOUD BWDSCATT %f\n", instance->scene.sky.cloud.backward_scattering);
-  fputs(line, file);
-  sprintf(line, "CLOUD SCATLERP %f\n", instance->scene.sky.cloud.lobe_lerp);
+  sprintf(line, "CLOUD DIAMETER %f\n", instance->scene.sky.cloud.droplet_diameter);
   fputs(line, file);
   sprintf(line, "CLOUD STEPS___ %d\n", instance->scene.sky.cloud.steps);
   fputs(line, file);
@@ -897,7 +885,7 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "FOG DENSITY_ %f\n", instance->scene.fog.density);
   fputs(line, file);
-  sprintf(line, "FOG ANISOTRO %f\n", instance->scene.fog.anisotropy);
+  sprintf(line, "FOG DIAMETER %f\n", instance->scene.fog.droplet_diameter);
   fputs(line, file);
   sprintf(line, "FOG DISTANCE %f\n", instance->scene.fog.dist);
   fputs(line, file);

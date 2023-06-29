@@ -66,19 +66,19 @@ __device__ float cloud_shadow(const vec3 origin, const vec3 ray) {
 
   if (device.scene.sky.cloud.low.active) {
     if (cloud_shadow_layer(origin, ray, device.scene.sky.cloud.steps / 3, CLOUD_LAYER_LOW)) {
-      return 0.1f;
+      return 0.0f;
     }
   }
 
   if (device.scene.sky.cloud.mid.active) {
     if (cloud_shadow_layer(origin, ray, device.scene.sky.cloud.steps / 16, CLOUD_LAYER_MID)) {
-      return 0.25f;
+      return 0.1f;
     }
   }
 
   if (device.scene.sky.cloud.top.active) {
     if (cloud_shadow_layer(origin, ray, device.scene.sky.cloud.steps / 32, CLOUD_LAYER_TOP)) {
-      return 0.75f;
+      return 0.5f;
     }
   }
 

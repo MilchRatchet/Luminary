@@ -425,7 +425,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
   instance->atmo_settings.mie_density            = scene->sky.mie_density;
   instance->atmo_settings.mie_falloff            = scene->sky.mie_falloff;
-  instance->atmo_settings.mie_g                  = scene->sky.mie_g;
+  instance->atmo_settings.mie_diameter           = scene->sky.mie_diameter;
   instance->atmo_settings.ozone_absorption       = scene->sky.ozone_absorption;
   instance->atmo_settings.ozone_density          = scene->sky.ozone_density;
   instance->atmo_settings.ozone_layer_thickness  = scene->sky.ozone_layer_thickness;

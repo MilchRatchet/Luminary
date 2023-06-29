@@ -190,9 +190,7 @@ struct Cloud {
   float offset_z;
   float density;
   int seed;
-  float forward_scattering;
-  float backward_scattering;
-  float lobe_lerp;
+  float droplet_diameter;
   int steps;
   int shadow_steps;
   float noise_shape_scale;
@@ -209,7 +207,7 @@ struct AtmoSettings {
   float ozone_density;
   float rayleigh_falloff;
   float mie_falloff;
-  float mie_g;
+  float mie_diameter;
   float ground_visibility;
   float ozone_layer_thickness;
   float base_density;
@@ -240,7 +238,7 @@ struct Sky {
   float ozone_density;
   float rayleigh_falloff;
   float mie_falloff;
-  float mie_g;
+  float mie_diameter;
   float ground_visibility;
   float ozone_layer_thickness;
   float multiscattering_factor;
@@ -267,7 +265,6 @@ struct Ocean {
   float time;
   RGBAF albedo;
   float refractive_index;
-  float anisotropy;
   RGBF scattering;
   RGBF absorption;
   float pollution;
@@ -277,7 +274,7 @@ struct Ocean {
 struct Fog {
   int active;
   float density;
-  float anisotropy;
+  float droplet_diameter;
   float height;
   float dist;
 } typedef Fog;

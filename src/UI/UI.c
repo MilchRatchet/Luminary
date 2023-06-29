@@ -290,7 +290,7 @@ static UITab create_sky_general_atmo_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Ground Visibility", &(instance->atmo_settings.ground_visibility), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
   panels[i++] =
     create_slider(ui, "Ozone Layer Thickness", &(instance->atmo_settings.ozone_layer_thickness), 0, 0.001f, 0.01f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Mie Phase G", &(instance->atmo_settings.mie_g), 0, 0.001f, -1.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->atmo_settings.mie_diameter), 1, 0.001f, 5.0f, 50.0f, 0, 0);
   panels[i++] =
     create_slider(ui, "Multiscattering Factor", &(instance->atmo_settings.multiscattering_factor), 0, 0.001f, 0.01f, FLT_MAX, 0, 0);
   panels[i++] = create_button(ui, "Apply Settings", instance, (void (*)(void*)) device_sky_generate_LUTs, 1);
@@ -375,9 +375,7 @@ static UITab create_sky_cloud_general_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_slider(ui, "Noise Detail Scale", &(instance->scene.sky.cloud.noise_detail_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Noise Weather Scale", &(instance->scene.sky.cloud.noise_weather_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Density", &(instance->scene.sky.cloud.density), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Forward Scattering", &(instance->scene.sky.cloud.forward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Backward Scattering", &(instance->scene.sky.cloud.backward_scattering), 1, 0.001f, -1.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Direction Lerp", &(instance->scene.sky.cloud.lobe_lerp), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->scene.sky.cloud.droplet_diameter), 1, 0.001f, 5.0f, 50.0f, 0, 0);
   panels[i++] = create_slider(ui, "Seed", &(instance->scene.sky.cloud.seed), 0, 0.005f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_button(ui, "Generate Noise Maps", instance, (void (*)(void*)) device_cloud_noise_generate, 1);
 
@@ -511,7 +509,7 @@ static UITab create_sky_fog_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_check(ui, "Active", &(instance->scene.fog.active), 1);
   panels[i++] = create_slider(ui, "Density", &(instance->scene.fog.density), 1, 0.001f, 0.001f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Anisotropy", &(instance->scene.fog.anisotropy), 1, 0.001f, -0.95f, 0.95f, 0, 0);
+  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->scene.fog.droplet_diameter), 1, 0.001f, 5.0f, 50.0f, 0, 0);
   panels[i++] = create_slider(ui, "Distance", &(instance->scene.fog.dist), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Height", &(instance->scene.fog.height), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
 
@@ -575,7 +573,6 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "  Red", &(instance->scene.ocean.absorption.r), 1, 0.001f, 0.001f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene.ocean.absorption.g), 1, 0.001f, 0.001f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Blue", &(instance->scene.ocean.absorption.b), 1, 0.001f, 0.001f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Anisotropy", &(instance->scene.ocean.anisotropy), 1, 0.005f, -1.0f, 1.0f, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

@@ -91,7 +91,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
     {
       const vec3 bounce_ray = angles_to_direction(white_noise() * PI, white_noise() * 2.0f * PI);
       const float cos_angle = dot_product(ray, bounce_ray);
-      const float phase     = henvey_greenstein(cos_angle, device.scene.fog.anisotropy);
+      const float phase     = jendersie_eon_phase_function(cos_angle, device.scene.fog.droplet_diameter);
 
       // solid angle is 4.0 * PI
       const float S      = 4.0f * PI * phase * FOG_DENSITY;
@@ -117,7 +117,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
       BRDFInstance brdf = brdf_get_instance_scattering();
 
       if (light.weight > 0.0f) {
-        BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, device.scene.fog.anisotropy);
+        BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, device.scene.fog.droplet_diameter);
 
         const float weight = (FOG_DENSITY - FOG_DENSITY * expf(-task.distance * FOG_DENSITY)) / FOG_DENSITY;
 

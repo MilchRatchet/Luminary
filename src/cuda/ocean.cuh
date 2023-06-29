@@ -354,7 +354,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
         if (light.weight > 0.0f) {
           RGBF light_record;
 
-          BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, light_pos, device.scene.ocean.anisotropy);
+          BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, light_pos, 50.0f);
 
           const RGBF S = mul_color(device.scene.ocean.scattering, scale_color(brdf_sample.term, OCEAN_POLLUTION));
 

@@ -812,8 +812,32 @@ __device__ RGBF filter_blackwhite(RGBF color, int x, int y) {
   }
 }
 
-__device__ float henvey_greenstein(const float cos_angle, const float g) {
+__device__ float henvey_greenstein_phase_function(const float cos_angle, const float g) {
   return (1.0f - g * g) / (4.0f * PI * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
+}
+
+__device__ float draine_phase_function(const float cos_angle, const float g, const float alpha) {
+  return henvey_greenstein_phase_function(cos_angle, g)
+         * ((1.0f + alpha * cos_angle * cos_angle) / (1.0f + (alpha / 3.0f) * (1.0f + 2.0f * g * g)));
+}
+
+/*
+ * Fog phase function from [JenE23].
+ *
+ * [JenE23] J. Jendersie and E. d'Eon, "An Approximate Mie Scattering Function for Fog and Cloud Rendering", SIGGRAPH 2023 Talks, 2023.
+ *
+ * @param diameter Diameter of water droplets in [5,50] in micrometer.
+ */
+__device__ float jendersie_eon_phase_function(const float cos_angle, const float diameter, const float ms_factor = 1.0f) {
+  const float g_hg  = ms_factor * expf(-0.0990567f / (diameter - 1.67154f));
+  const float g_d   = ms_factor * expf(-(2.20679f / (diameter + 3.91029f)) - 0.428934f);
+  const float alpha = expf(3.62489f - (8.29288f / (diameter + 5.52825f)));
+  const float w_d   = expf(-(0.599085f / (diameter - 0.641583f)) - 0.665888f);
+
+  const float phase_hg = henvey_greenstein_phase_function(cos_angle, g_hg);
+  const float phase_d  = draine_phase_function(cos_angle, g_d, alpha);
+
+  return (1.0f - w_d) * phase_hg + w_d * phase_d;
 }
 
 __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {

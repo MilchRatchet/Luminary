@@ -166,8 +166,8 @@ Exponential inverse height factor of the concentration distribution of particles
 `SKY MIEFALLO [FP32]`<br/>
 Exponential inverse height factor of the concentration distribution of insoluble particles that contribute to Mie scattering. Number should be non-negative.
 
-`SKY MIE_PH_G [FP32]`<br/>
-Mie phase function parameter. A positive number implies forward scattering while a negative number implies backward scattering. Number must be in the range [-1,1].
+`SKY DIAMETER [FP32]`<br/>
+Water droplet diameter. Number must be in the range [5,50].
 
 `SKY GROUNDVI [FP32]`<br/>
 Ground visibility in kilometers. This acts as a concentration factor to water soluble particles that contribute to Mie scattering. Number should be non-negative.
@@ -234,14 +234,8 @@ Scaling used when sampling the weather noise texture. Number should be non-negat
 `CLOUD ANVIL___ [FP32]`<br/>
 Anvil overhang. Number must be in the range [0,1].
 
-`CLOUD FWDSCATT [FP32]`<br/>
-Forward scattering g factor used in mie scattering. Number must be in the range [-1,1].
-
-`CLOUD BWDSCATT [FP32]`<br/>
-Backward scattering g factor used in mie scattering. Number must be in the range [-1,1].
-
-`CLOUD SCATLERP [FP32]`<br/>
-Interpolation factor between forward and backward scattering in the dual lobe phase function. Number must be in the range [0,1].
+`CLOUD DIAMETER [FP32]`<br/>
+Water droplet diameter. Number must be in the range [5,50].
 
 `CLOUD SHASTEPS [INT32]`<br/>
 Number of raymarching steps that are used for volumetric extinction/shadowing. Values larger than 10 are generally not necessary. Number should be non-negative.
@@ -272,8 +266,8 @@ Set 1 to activate fog, 0 else.
 `FOG SCATTERI [FP32]`<br/>
 Scattering coefficient determining the amout of light being scattered. Number should be non-negative.
 
-`FOG ANISOTRO [FP32]`<br/>
-Anisotropy determines the wether light is more likely to be scattered forward than backward. Numbers must be in the range [0,1].
+`FOG DIAMETER [FP32]`<br/>
+Water droplet diameter. Numbers must be in the range [5,50].
 
 `FOG DISTANCE [FP32]`<br/>
 Maximum distance of the fog from the camera. Number should be non-negative.

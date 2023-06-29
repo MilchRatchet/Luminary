@@ -128,12 +128,6 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
   }
 }
 
-__device__ float cloud_dual_lobe_henvey_greenstein(const float cos_angle, const float factor) {
-  const float mie0 = henvey_greenstein(cos_angle, device.scene.sky.cloud.forward_scattering * factor);
-  const float mie1 = henvey_greenstein(cos_angle, device.scene.sky.cloud.backward_scattering * factor);
-  return lerp(mie0, mie1, device.scene.sky.cloud.lobe_lerp);
-}
-
 ////////////////////////////////////////////////////////////////////
 // Low level cloud functions
 ////////////////////////////////////////////////////////////////////

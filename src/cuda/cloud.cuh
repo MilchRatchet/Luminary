@@ -195,9 +195,8 @@ __device__ CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float start, 
         scattering *= CLOUD_OCTAVE_SCATTERING_FACTOR;
         extinction *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
 
-        const float sun_phase     = cloud_dual_lobe_henvey_greenstein(sun_cos_angle, phase_factor);
-        const float ambient_phase = cloud_dual_lobe_henvey_greenstein(ambient_cos_angle, phase_factor);
-
+        const float sun_phase     = jendersie_eon_phase_function(sun_cos_angle, device.scene.sky.cloud.droplet_diameter, phase_factor);
+        const float ambient_phase = jendersie_eon_phase_function(ambient_cos_angle, device.scene.sky.cloud.droplet_diameter, phase_factor);
         phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
 
         const RGBF sun_color_i     = scale_color(sun_color, sun_extinction * sun_phase);

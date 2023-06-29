@@ -248,9 +248,7 @@ __device__ float sky_rayleigh_density(const float height) {
 }
 
 __device__ float sky_mie_phase(const float cos_angle) {
-  const float g = device.scene.sky.mie_g;
-  return (3.0f * (1.0f - g * g) * (1.0f + cos_angle * cos_angle))
-         / (4.0f * PI * 2.0f * (2.0f + g * g) * pow(1.0f + g * g - 2.0f * g * cos_angle, 3.0f / 2.0f));
+  return jendersie_eon_phase_function(cos_angle, device.scene.sky.mie_diameter);
 }
 
 // [Wil21]
@@ -588,7 +586,7 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   instance->scene.sky.ground_visibility      = instance->atmo_settings.ground_visibility;
   instance->scene.sky.mie_density            = instance->atmo_settings.mie_density;
   instance->scene.sky.mie_falloff            = instance->atmo_settings.mie_falloff;
-  instance->scene.sky.mie_g                  = instance->atmo_settings.mie_g;
+  instance->scene.sky.mie_diameter           = instance->atmo_settings.mie_diameter;
   instance->scene.sky.ozone_absorption       = instance->atmo_settings.ozone_absorption;
   instance->scene.sky.ozone_density          = instance->atmo_settings.ozone_density;
   instance->scene.sky.ozone_layer_thickness  = instance->atmo_settings.ozone_layer_thickness;

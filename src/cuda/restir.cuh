@@ -70,9 +70,8 @@ __device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
   // We overwrite the local scope copy of the light sample
   x.weight = 1.0f;
 
-  BRDFInstance result = (data.flags & LIGHT_EVAL_DATA_VOLUME_HIT)
-                          ? brdf_apply_sample_scattering(brdf, x, data.position, device.scene.ocean.anisotropy)
-                          : brdf_apply_sample(brdf, x, data.position);
+  BRDFInstance result = (data.flags & LIGHT_EVAL_DATA_VOLUME_HIT) ? brdf_apply_sample_scattering(brdf, x, data.position, 50.0f)
+                                                                  : brdf_apply_sample(brdf, x, data.position);
 
   float value = luminance(result.term);
 

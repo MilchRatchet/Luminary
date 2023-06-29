@@ -72,7 +72,6 @@ void scene_init(Scene** _scene) {
   scene->ocean.albedo.b            = 0.0f;
   scene->ocean.albedo.a            = 0.9f;
   scene->ocean.refractive_index    = 1.333f;
-  scene->ocean.anisotropy          = 0.0f;
   scene->ocean.scattering.r        = 0.0f;
   scene->ocean.scattering.g        = 0.2f;
   scene->ocean.scattering.b        = 1.0f;
@@ -120,7 +119,7 @@ void scene_init(Scene** _scene) {
   scene->sky.mie_density                 = 1.0f;
   scene->sky.ozone_density               = 1.0f;
   scene->sky.ground_visibility           = 60.0f;
-  scene->sky.mie_g                       = 0.8f;
+  scene->sky.mie_diameter                = 10.0f;
   scene->sky.ozone_layer_thickness       = 15.0f;
   scene->sky.rayleigh_falloff            = 8.0f;
   scene->sky.mie_falloff                 = 1.7f;
@@ -153,9 +152,7 @@ void scene_init(Scene** _scene) {
   scene->sky.cloud.noise_detail_scale    = 1.0f;
   scene->sky.cloud.noise_weather_scale   = 1.0f;
   scene->sky.cloud.octaves               = 9;
-  scene->sky.cloud.forward_scattering    = 0.85f;
-  scene->sky.cloud.backward_scattering   = -0.2f;
-  scene->sky.cloud.lobe_lerp             = 0.5f;
+  scene->sky.cloud.droplet_diameter      = 25.0f;
   scene->sky.cloud.density               = 1.0f;
   scene->sky.cloud.mipmap_bias           = 0.0f;
   scene->sky.cloud.low.active            = 1;
@@ -186,11 +183,11 @@ void scene_init(Scene** _scene) {
   scene->sky.cloud.top.wind_speed        = 1.0f;
   scene->sky.cloud.top.wind_angle        = 0.0f;
 
-  scene->fog.active     = 0;
-  scene->fog.density    = 1.0f;
-  scene->fog.anisotropy = 0.0f;
-  scene->fog.height     = 500.0f;
-  scene->fog.dist       = 500.0f;
+  scene->fog.active           = 0;
+  scene->fog.density          = 1.0f;
+  scene->fog.droplet_diameter = 10.0f;
+  scene->fog.height           = 500.0f;
+  scene->fog.dist             = 500.0f;
 
   *_scene = scene;
 }

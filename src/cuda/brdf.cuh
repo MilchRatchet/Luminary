@@ -322,7 +322,7 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
   return brdf_evaluate(result);
 }
 
-__device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, float anisotropy) {
+__device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, float droplet_diameter) {
   BRDFInstance result = brdf_get_instance_scattering();
 
   switch (light.presampled_id) {
@@ -346,7 +346,7 @@ __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSam
   result.term = scale_color(result.term, light.weight);
 
   const float cos_angle = dot_product(scale_vector(brdf.V, -1.0f), result.L);
-  const float phase     = henvey_greenstein(cos_angle, anisotropy);
+  const float phase     = jendersie_eon_phase_function(cos_angle, droplet_diameter);
 
   return result;
 }
