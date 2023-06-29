@@ -13,10 +13,6 @@ struct traversal_result {
   float depth;
 } typedef traversal_result;
 
-__device__ unsigned char get_8bit(const unsigned int input, const unsigned int bitshift) {
-  return (input >> bitshift) & 0x000000FF;
-}
-
 /*
  * Performs alpha test on traversal triangle
  * @param t Triangle to test.
@@ -180,6 +176,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           const unsigned int low_z  = __uslctf(__float_as_uint(data3.x), __float_as_uint(data4.z), inv_ray.z);
           const unsigned int high_z = __uslctf(__float_as_uint(data4.z), __float_as_uint(data3.x), inv_ray.z);
 
+          const uchar4 low4_x  = *((const uchar4*) (&low_x));
+          const uchar4 high4_x = *((const uchar4*) (&high_x));
+          const uchar4 low4_y  = *((const uchar4*) (&low_y));
+          const uchar4 high4_y = *((const uchar4*) (&high_y));
+          const uchar4 low4_z  = *((const uchar4*) (&low_z));
+          const uchar4 high4_z = *((const uchar4*) (&high_z));
+
           float min_x[4];
           float max_x[4];
           float min_y[4];
@@ -187,35 +190,35 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           float min_z[4];
           float max_z[4];
 
-          min_x[0] = get_8bit(low_x, 0) * scaled_inv_ray.x;
-          min_x[1] = get_8bit(low_x, 8) * scaled_inv_ray.x;
-          min_x[2] = get_8bit(low_x, 16) * scaled_inv_ray.x;
-          min_x[3] = get_8bit(low_x, 24) * scaled_inv_ray.x;
+          min_x[0] = low4_x.x * scaled_inv_ray.x;
+          min_x[1] = low4_x.y * scaled_inv_ray.x;
+          min_x[2] = low4_x.z * scaled_inv_ray.x;
+          min_x[3] = low4_x.w * scaled_inv_ray.x;
 
-          max_x[0] = get_8bit(high_x, 0) * scaled_inv_ray.x;
-          max_x[1] = get_8bit(high_x, 8) * scaled_inv_ray.x;
-          max_x[2] = get_8bit(high_x, 16) * scaled_inv_ray.x;
-          max_x[3] = get_8bit(high_x, 24) * scaled_inv_ray.x;
+          max_x[0] = high4_x.x * scaled_inv_ray.x;
+          max_x[1] = high4_x.y * scaled_inv_ray.x;
+          max_x[2] = high4_x.z * scaled_inv_ray.x;
+          max_x[3] = high4_x.w * scaled_inv_ray.x;
 
-          min_y[0] = get_8bit(low_y, 0) * scaled_inv_ray.y + shifted_origin_y;
-          min_y[1] = get_8bit(low_y, 8) * scaled_inv_ray.y + shifted_origin_y;
-          min_y[2] = get_8bit(low_y, 16) * scaled_inv_ray.y + shifted_origin_y;
-          min_y[3] = get_8bit(low_y, 24) * scaled_inv_ray.y + shifted_origin_y;
+          min_y[0] = low4_y.x * scaled_inv_ray.y + shifted_origin_y;
+          min_y[1] = low4_y.y * scaled_inv_ray.y + shifted_origin_y;
+          min_y[2] = low4_y.z * scaled_inv_ray.y + shifted_origin_y;
+          min_y[3] = low4_y.w * scaled_inv_ray.y + shifted_origin_y;
 
-          max_y[0] = get_8bit(high_y, 0) * scaled_inv_ray.y + shifted_origin_y;
-          max_y[1] = get_8bit(high_y, 8) * scaled_inv_ray.y + shifted_origin_y;
-          max_y[2] = get_8bit(high_y, 16) * scaled_inv_ray.y + shifted_origin_y;
-          max_y[3] = get_8bit(high_y, 24) * scaled_inv_ray.y + shifted_origin_y;
+          max_y[0] = high4_y.x * scaled_inv_ray.y + shifted_origin_y;
+          max_y[1] = high4_y.y * scaled_inv_ray.y + shifted_origin_y;
+          max_y[2] = high4_y.z * scaled_inv_ray.y + shifted_origin_y;
+          max_y[3] = high4_y.w * scaled_inv_ray.y + shifted_origin_y;
 
-          min_z[0] = get_8bit(low_z, 0) * scaled_inv_ray.z + shifted_origin_z;
-          min_z[1] = get_8bit(low_z, 8) * scaled_inv_ray.z + shifted_origin_z;
-          min_z[2] = get_8bit(low_z, 16) * scaled_inv_ray.z + shifted_origin_z;
-          min_z[3] = get_8bit(low_z, 24) * scaled_inv_ray.z + shifted_origin_z;
+          min_z[0] = low4_z.x * scaled_inv_ray.z + shifted_origin_z;
+          min_z[1] = low4_z.y * scaled_inv_ray.z + shifted_origin_z;
+          min_z[2] = low4_z.z * scaled_inv_ray.z + shifted_origin_z;
+          min_z[3] = low4_z.w * scaled_inv_ray.z + shifted_origin_z;
 
-          max_z[0] = get_8bit(high_z, 0) * scaled_inv_ray.z + shifted_origin_z;
-          max_z[1] = get_8bit(high_z, 8) * scaled_inv_ray.z + shifted_origin_z;
-          max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin_z;
-          max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin_z;
+          max_z[0] = high4_z.x * scaled_inv_ray.z + shifted_origin_z;
+          max_z[1] = high4_z.y * scaled_inv_ray.z + shifted_origin_z;
+          max_z[2] = high4_z.z * scaled_inv_ray.z + shifted_origin_z;
+          max_z[3] = high4_z.w * scaled_inv_ray.z + shifted_origin_z;
 
           // We don't use fmax_fmax/fmin_fmin here because we are ALU bound on Ampere
           float slab_min, slab_max;
@@ -262,6 +265,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           const unsigned int low_z  = __uslctf(__float_as_uint(data3.y), __float_as_uint(data4.w), inv_ray.z);
           const unsigned int high_z = __uslctf(__float_as_uint(data4.w), __float_as_uint(data3.y), inv_ray.z);
 
+          const uchar4 low4_x  = *((const uchar4*) (&low_x));
+          const uchar4 high4_x = *((const uchar4*) (&high_x));
+          const uchar4 low4_y  = *((const uchar4*) (&low_y));
+          const uchar4 high4_y = *((const uchar4*) (&high_y));
+          const uchar4 low4_z  = *((const uchar4*) (&low_z));
+          const uchar4 high4_z = *((const uchar4*) (&high_z));
+
           float min_x[4];
           float max_x[4];
           float min_y[4];
@@ -269,35 +279,35 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           float min_z[4];
           float max_z[4];
 
-          min_x[0] = get_8bit(low_x, 0) * scaled_inv_ray.x;
-          min_x[1] = get_8bit(low_x, 8) * scaled_inv_ray.x;
-          min_x[2] = get_8bit(low_x, 16) * scaled_inv_ray.x;
-          min_x[3] = get_8bit(low_x, 24) * scaled_inv_ray.x;
+          min_x[0] = low4_x.x * scaled_inv_ray.x;
+          min_x[1] = low4_x.y * scaled_inv_ray.x;
+          min_x[2] = low4_x.z * scaled_inv_ray.x;
+          min_x[3] = low4_x.w * scaled_inv_ray.x;
 
-          max_x[0] = get_8bit(high_x, 0) * scaled_inv_ray.x;
-          max_x[1] = get_8bit(high_x, 8) * scaled_inv_ray.x;
-          max_x[2] = get_8bit(high_x, 16) * scaled_inv_ray.x;
-          max_x[3] = get_8bit(high_x, 24) * scaled_inv_ray.x;
+          max_x[0] = high4_x.x * scaled_inv_ray.x;
+          max_x[1] = high4_x.y * scaled_inv_ray.x;
+          max_x[2] = high4_x.z * scaled_inv_ray.x;
+          max_x[3] = high4_x.w * scaled_inv_ray.x;
 
-          min_y[0] = get_8bit(low_y, 0) * scaled_inv_ray.y + shifted_origin_y;
-          min_y[1] = get_8bit(low_y, 8) * scaled_inv_ray.y + shifted_origin_y;
-          min_y[2] = get_8bit(low_y, 16) * scaled_inv_ray.y + shifted_origin_y;
-          min_y[3] = get_8bit(low_y, 24) * scaled_inv_ray.y + shifted_origin_y;
+          min_y[0] = low4_y.x * scaled_inv_ray.y + shifted_origin_y;
+          min_y[1] = low4_y.y * scaled_inv_ray.y + shifted_origin_y;
+          min_y[2] = low4_y.z * scaled_inv_ray.y + shifted_origin_y;
+          min_y[3] = low4_y.w * scaled_inv_ray.y + shifted_origin_y;
 
-          max_y[0] = get_8bit(high_y, 0) * scaled_inv_ray.y + shifted_origin_y;
-          max_y[1] = get_8bit(high_y, 8) * scaled_inv_ray.y + shifted_origin_y;
-          max_y[2] = get_8bit(high_y, 16) * scaled_inv_ray.y + shifted_origin_y;
-          max_y[3] = get_8bit(high_y, 24) * scaled_inv_ray.y + shifted_origin_y;
+          max_y[0] = high4_y.x * scaled_inv_ray.y + shifted_origin_y;
+          max_y[1] = high4_y.y * scaled_inv_ray.y + shifted_origin_y;
+          max_y[2] = high4_y.z * scaled_inv_ray.y + shifted_origin_y;
+          max_y[3] = high4_y.w * scaled_inv_ray.y + shifted_origin_y;
 
-          min_z[0] = get_8bit(low_z, 0) * scaled_inv_ray.z + shifted_origin_z;
-          min_z[1] = get_8bit(low_z, 8) * scaled_inv_ray.z + shifted_origin_z;
-          min_z[2] = get_8bit(low_z, 16) * scaled_inv_ray.z + shifted_origin_z;
-          min_z[3] = get_8bit(low_z, 24) * scaled_inv_ray.z + shifted_origin_z;
+          min_z[0] = low4_z.x * scaled_inv_ray.z + shifted_origin_z;
+          min_z[1] = low4_z.y * scaled_inv_ray.z + shifted_origin_z;
+          min_z[2] = low4_z.z * scaled_inv_ray.z + shifted_origin_z;
+          min_z[3] = low4_z.w * scaled_inv_ray.z + shifted_origin_z;
 
-          max_z[0] = get_8bit(high_z, 0) * scaled_inv_ray.z + shifted_origin_z;
-          max_z[1] = get_8bit(high_z, 8) * scaled_inv_ray.z + shifted_origin_z;
-          max_z[2] = get_8bit(high_z, 16) * scaled_inv_ray.z + shifted_origin_z;
-          max_z[3] = get_8bit(high_z, 24) * scaled_inv_ray.z + shifted_origin_z;
+          max_z[0] = high4_z.x * scaled_inv_ray.z + shifted_origin_z;
+          max_z[1] = high4_z.y * scaled_inv_ray.z + shifted_origin_z;
+          max_z[2] = high4_z.z * scaled_inv_ray.z + shifted_origin_z;
+          max_z[3] = high4_z.w * scaled_inv_ray.z + shifted_origin_z;
 
           // We don't use fmax_fmax/fmin_fmin here because we are ALU bound on Ampere
           float slab_min, slab_max;
