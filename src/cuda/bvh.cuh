@@ -219,30 +219,33 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
 
           // We don't use fmax_fmax/fmin_fmin here because we are ALU bound on Ampere
           float slab_min, slab_max;
+          // We store the shifted hit mask in a separate register and apply the condition by using sel instead of bra for better
+          // performance.
+          unsigned int shl_hit_mask;
 
           slab_min = fmaxf(fmaxf(min_x[0], fmaxf(min_y[0], min_z[0])), shifted_eps);
           slab_max = fminf(fminf(max_x[0], fminf(max_y[0], max_z[0])), shifted_depth);
 
-          if (slab_min <= slab_max)
-            asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(shl_hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          hit_mask = (slab_min <= slab_max) ? shl_hit_mask : hit_mask;
 
           slab_min = fmaxf(fmaxf(min_x[1], fmaxf(min_y[1], min_z[1])), shifted_eps);
           slab_max = fminf(fminf(max_x[1], fminf(max_y[1], max_z[1])), shifted_depth);
 
-          if (slab_min <= slab_max)
-            asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(shl_hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          hit_mask = (slab_min <= slab_max) ? shl_hit_mask : hit_mask;
 
           slab_min = fmaxf(fmaxf(min_x[2], fmaxf(min_y[2], min_z[2])), shifted_eps);
           slab_max = fminf(fminf(max_x[2], fminf(max_y[2], max_z[2])), shifted_depth);
 
-          if (slab_min <= slab_max)
-            asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(shl_hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          hit_mask = (slab_min <= slab_max) ? shl_hit_mask : hit_mask;
 
           slab_min = fmaxf(fmaxf(min_x[3], fmaxf(min_y[3], min_z[3])), shifted_eps);
           slab_max = fminf(fminf(max_x[3], fminf(max_y[3], max_z[3])), shifted_depth);
 
-          if (slab_min <= slab_max)
-            asm("vshl.u32.u32.u32.wrap.add %0, %1.b3, %2.b3, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          asm("vshl.u32.u32.u32.wrap.add %0, %1.b3, %2.b3, %3;" : "=r"(shl_hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          hit_mask = (slab_min <= slab_max) ? shl_hit_mask : hit_mask;
         }
 
         {
@@ -298,30 +301,33 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
 
           // We don't use fmax_fmax/fmin_fmin here because we are ALU bound on Ampere
           float slab_min, slab_max;
+          // We store the shifted hit mask in a separate register and apply the condition by using sel instead of bra for better
+          // performance.
+          unsigned int shl_hit_mask;
 
           slab_min = fmaxf(fmaxf(min_x[0], fmaxf(min_y[0], min_z[0])), shifted_eps);
           slab_max = fminf(fminf(max_x[0], fminf(max_y[0], max_z[0])), shifted_depth);
 
-          if (slab_min <= slab_max)
-            asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          asm("vshl.u32.u32.u32.wrap.add %0, %1.b0, %2.b0, %3;" : "=r"(shl_hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          hit_mask = (slab_min <= slab_max) ? shl_hit_mask : hit_mask;
 
           slab_min = fmaxf(fmaxf(min_x[1], fmaxf(min_y[1], min_z[1])), shifted_eps);
           slab_max = fminf(fminf(max_x[1], fminf(max_y[1], max_z[1])), shifted_depth);
 
-          if (slab_min <= slab_max)
-            asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          asm("vshl.u32.u32.u32.wrap.add %0, %1.b1, %2.b1, %3;" : "=r"(shl_hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          hit_mask = (slab_min <= slab_max) ? shl_hit_mask : hit_mask;
 
           slab_min = fmaxf(fmaxf(min_x[2], fmaxf(min_y[2], min_z[2])), shifted_eps);
           slab_max = fminf(fminf(max_x[2], fminf(max_y[2], max_z[2])), shifted_depth);
 
-          if (slab_min <= slab_max)
-            asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          asm("vshl.u32.u32.u32.wrap.add %0, %1.b2, %2.b2, %3;" : "=r"(shl_hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          hit_mask = (slab_min <= slab_max) ? shl_hit_mask : hit_mask;
 
           slab_min = fmaxf(fmaxf(min_x[3], fmaxf(min_y[3], min_z[3])), shifted_eps);
           slab_max = fminf(fminf(max_x[3], fminf(max_y[3], max_z[3])), shifted_depth);
 
-          if (slab_min <= slab_max)
-            asm("vshl.u32.u32.u32.wrap.add %0, %1.b3, %2.b3, %3;" : "=r"(hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          asm("vshl.u32.u32.u32.wrap.add %0, %1.b3, %2.b3, %3;" : "=r"(shl_hit_mask) : "r"(child_bits4), "r"(bit_index4), "r"(hit_mask));
+          hit_mask = (slab_min <= slab_max) ? shl_hit_mask : hit_mask;
         }
 
         node_task.y     = (hit_mask & 0xff000000) | (*((unsigned char*) &data0.w + 3));
