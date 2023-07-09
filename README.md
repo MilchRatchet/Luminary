@@ -124,11 +124,11 @@ You need a `nvcc` compatible host compiler. Which compilers are supported can be
 
 ```
 mkdir build
-cmake -B ./build -S . -DOptiX_INSTALL_DIR="{OptiX Path}"
+cmake -B ./build -S .
 cd build
 make
 ```
-Note that there is a bug in a version of G++ 11. If `nvcc` happens to use that version of G++ 11 as CUDA host compiler, the build will fail. Select a different compiler in that case using for example`-DCMAKE_CUDA_HOST_COMPILER=clang`. If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
+If `cmake` fails to find some packages you will have to specify the directory. For this look at the `Windows` section.
 
 ## Windows
 
@@ -137,7 +137,7 @@ Additional requirements:
 - Windows SDK
 - clang-cl
 
-Clang-cl comes for example with mingw-w64 or Visual Studio. MSVC and Windows SDK come with Visual Studio. However, if at some point it is possible to get them standalone, that would probably also suffice. Note that the paths to the CUDA Toolkit, CMake and Ninja binaries must be defined in the PATH environment variable, otherwise they will need to be defined in cmake.
+Clang-cl comes for example with mingw-w64 or Visual Studio. MSVC and Windows SDK come with Visual Studio. However, if at some point it is possible to get them standalone, that would probably also suffice. Note that the paths to the CUDA Toolkit, OptiX, SDL2 and SDL2_ttf must be defined in the PATH environment variable, otherwise they need to be defined in CMake using `-D{PACKAGENAME}_ROOT="{PATH}"`.
 
 Regarding MSVC and Windows SDK paths, there are two possibilities:
 
@@ -164,13 +164,13 @@ You can build using the following commands in the main project directory:
 ```
 mkdir build
 call "{VS Path}/VC/Auxiliary/Build/vcvarsall.bat" amd64
-cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}"
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe"
 cd build && ninja
 ```
 or alternatively:
 ```
 mkdir build
-cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DSDL2_DIR="{SDL2 Path}" -DSDL2_TTF_DIR="{SDL2_TTF Path}" -DOptiX_INSTALL_DIR="{OptiX Path}" -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/10.0.19041.0" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/10.0.19041.0" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
 cd build && ninja
 ```
 

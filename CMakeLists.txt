@@ -53,56 +53,10 @@ file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
 list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu")
 
 #=============================================================
-# Set include directories
-#=============================================================
-include_directories("${CMAKE_SOURCE_DIR}/include")
-include_directories("${CMAKE_SOURCE_DIR}/include/UI")
-include_directories("${CMAKE_SOURCE_DIR}/src/cuda")
-include_directories("${OptiX_INCLUDE}")
-include_directories("${CUDAToolkit_INCLUDE_DIR}")
-
-#=============================================================
 # SDL2
 #=============================================================
-if(WIN32)
-    if (DEFINED SDL2_DIR)
-        set(SDL2_INCLUDE_DIRS "${SDL2_DIR}/include")
-        set(SDL2_LIBRARIES_DIR "${SDL2_DIR}/lib/x64")
-    else()
-        find_package(SDL2 QUIET)
-        if (SDL2_FOUND)
-        else()
-            message(FATAL_ERROR "Could not find SDL2. Specify the directory using -DSDL2_DIR")
-        endif()
-    endif()
-else()
-    find_package(SDL2 REQUIRED QUIET)
-endif()
-
-if(WIN32)
-    if(DEFINED SDL2_TTF_DIR)
-        set(SDL2_TTF_INCLUDE_DIRS "${SDL2_TTF_DIR}/include")
-        set(SDL2_TTF_LIBRARIES_DIR "${SDL2_TTF_DIR}/lib/x64")
-    else()
-        message(FATAL_ERROR "Could not find SDL2_ttf. Specify the directory using -DSDL2_TTF_DIR")
-    endif()
-elseif(UNIX)
-    set(SDL2_TTF_INCLUDE_DIRS "${SDL2_INCLUDE_DIRS}")
-    set(SDL2_TTF_LIBRARIES -lSDL2_ttf)
-else()
-    message(FATAL_ERROR "No handling for SDL2_ttf for the current OS.")
-endif()
-
-include_directories(${SDL2_INCLUDE_DIRS})
-include_directories(${SDL2_TTF_INCLUDE_DIRS})
-
-if (WIN32)
-    link_directories(${SDL2_LIBRARIES_DIR})
-    link_directories(${SDL2_TTF_LIBRARIES_DIR})
-    set(SDL2_LIBRARIES "SDL2")
-    set(SDL2_TTF_LIBRARIES "SDL2_ttf")
-endif()
-
+find_package(SDL2 REQUIRED CONFIG)
+find_package(SDL2_ttf REQUIRED CONFIG)
 
 #=============================================================
 # Set CUDA flags
@@ -179,15 +133,8 @@ message("CUDA Toolkit Include:        ${CUDAToolkit_INCLUDE_DIR}")
 message("CUDA Toolkit Libraries:      ${CUDAToolkit_LIBRARY_DIR}")
 message("CUDA Toolkit NVCC:           ${CUDAToolkit_NVCC_EXECUTABLE}")
 message("Optix Include:               ${OptiX_INCLUDE}")
-if (WIN32)
-    message("SDL2 Include:                ${SDL2_INCLUDE_DIRS}")
-    message("SDL2 Libraries:              ${SDL2_LIBRARIES_DIR}")
-    message("SDL2_TTF Include:            ${SDL2_TTF_INCLUDE_DIRS}")
-    message("SDL2_TTF Libraries:          ${SDL2_TTF_LIBRARIES_DIR}")
-else()
-    message("SDL2 Include:                ${SDL2_INCLUDE_DIRS}")
-    message("SDL2 Libraries:              ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES}")
-endif()
+message("SDL2                         ${SDL2_DIR}")
+message("SDL2_ttf                     ${SDL2_ttf_DIR}")
 message("=======================================================================")
 #=============================================================
 # Print compile flags
@@ -212,7 +159,6 @@ else()
     message("CUDA Release Flags:            ${CMAKE_CUDA_FLAGS_RELEASE}")
 endif()
 
-
 message("=======================================================================")
 message("")
 
@@ -230,9 +176,19 @@ ceb_embed_files(PROJECT Luminary OUTPUT ${EMBED_FILE_NAME} INPUT $<TARGET_OBJECT
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 add_executable(Luminary ${cpu_source_files} ${gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
-target_link_libraries(Luminary ${SDL2_LIBRARIES} ${SDL2_TTF_LIBRARIES})
-target_link_libraries(Luminary CUDA::cudart)
-target_link_libraries(Luminary CUDA::cuda_driver)
+
+target_link_libraries(Luminary PRIVATE SDL2::SDL2)
+target_link_libraries(Luminary PRIVATE SDL2_ttf::SDL2_ttf)
+target_link_libraries(Luminary PRIVATE CUDA::cudart)
+target_link_libraries(Luminary PRIVATE CUDA::cuda_driver)
+
+target_include_directories(Luminary PRIVATE "${CMAKE_SOURCE_DIR}/include")
+target_include_directories(Luminary PRIVATE "${CMAKE_SOURCE_DIR}/include/UI")
+target_include_directories(Luminary PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
+target_include_directories(Luminary PRIVATE SDL2::Headers)
+target_include_directories(Luminary PRIVATE SDL2_ttf::SDL2_ttf)
+target_include_directories(Luminary PRIVATE "${OptiX_INCLUDE}")
+target_include_directories(Luminary PRIVATE CUDA::toolkit)
 
 #=============================================================
 # Create PTX files
@@ -242,13 +198,18 @@ add_library(optix_kernels OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.c
 set_target_properties(optix_kernels PROPERTIES CUDA_PTX_COMPILATION ON)
 add_dependencies(Luminary optix_kernels)
 
+target_include_directories(optix_kernels PRIVATE "${CMAKE_SOURCE_DIR}/include")
+target_include_directories(optix_kernels PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
+target_include_directories(optix_kernels PRIVATE "${OptiX_INCLUDE}")
+target_include_directories(optix_kernels PRIVATE CUDA::toolkit)
+
 #=============================================================
 # File copying
 #=============================================================
 if(WIN32)
     add_custom_command(TARGET Luminary POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "${SDL2_LIBRARIES_DIR}/SDL2.dll"
-        "${SDL2_TTF_LIBRARIES_DIR}/SDL2_ttf.dll"
+        "$<TARGET_FILE:SDL2::SDL2>"
+        "$<TARGET_FILE:SDL2_ttf::SDL2_ttf>"
         ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 endif()
 
