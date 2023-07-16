@@ -69,6 +69,33 @@ __device__ float2 fog_get_intersection(const vec3 origin, const vec3 ray, const 
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
+__global__ void fog_generate_light_eval_data() {
+  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+
+  const int task_count  = device.ptrs.task_counts[id * 6 + 4];
+  const int task_offset = device.ptrs.task_offsets[id * 5 + 4];
+
+  for (int i = 0; i < task_count; i++) {
+    FogTask task    = load_fog_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
+
+    vec3 ray;
+    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
+    ray.y = sinf(task.ray_y);
+    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+
+    LightEvalData data;
+    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING | LIGHT_EVAL_DATA_VOLUME_HIT;
+    data.normal    = get_vector(0.0f, 0.0f, 0.0f);
+    data.position  = task.position;
+    data.V         = scale_vector(ray, -1.0f);
+    data.roughness = 1.0f;
+    data.metallic  = 0.0f;
+
+    store_light_eval_data(data, pixel);
+  }
+}
+
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -174,7 +201,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void fog_preprocess_tasks() 
     const int pixel = task.index.x + task.index.y * device.width;
     RGBF record     = load_RGBF(device.records + pixel);
 
-    if (device.scene.fog.active && is_first_ray()) {
+    if (device.scene.fog.active && device.iteration_type != TYPE_LIGHT) {
       const float2 fog = fog_get_intersection(task.origin, task.ray, depth);
 
       const float weight = fog.y;
@@ -187,7 +214,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void fog_preprocess_tasks() 
 
       record = scale_color(record, weight);
     }
-    else if (device.scene.fog.active) {
+
+    if (device.scene.fog.active) {
       const float t      = fog_compute_path(task.origin, task.ray, depth).y;
       const float weight = expf(-t * FOG_DENSITY);
 

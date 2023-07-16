@@ -120,6 +120,10 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
       toy_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     }
 
+    if (instance->scene.fog.active) {
+      fog_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
+
     restir_candidates_pool_generation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     restir_weighted_reservoir_sampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
