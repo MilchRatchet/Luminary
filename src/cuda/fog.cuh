@@ -1,10 +1,20 @@
 #ifndef CU_FOG_H
 #define CU_FOG_H
 
+#include "brdf.cuh"
 #include "math.cuh"
 #include "ocean.cuh"
 #include "sky.cuh"
 #include "sky_utils.cuh"
+#include "utils.cuh"
+
+////////////////////////////////////////////////////////////////////
+// Literature
+////////////////////////////////////////////////////////////////////
+
+// [FonWKH17]
+// J. Fong, M. Wrenninge, C. Kulla, R. Habel, "Production Volume Rendering", SIGGRAPH 2017 Course, 2017
+// https://graphics.pixar.com/library/ProductionVolumeRendering/
 
 #define FOG_DENSITY (0.0001f * device.scene.fog.density)
 
@@ -33,36 +43,30 @@ __device__ float2 fog_compute_path(const vec3 origin, const vec3 ray, const floa
 }
 
 /*
- * Computes randomly a scattering point for fog.
+ * Computes a random fog intersection point by perfectly importance sampling the transmittance
+ * based pdf.
+ *
  * @param origin Origin of ray in world space.
  * @param ray Direction of ray.
  * @param limit Depth of ray without scattering in world space.
- * @result Two floats:
- *                  - [x] = Sampled Depth in world space
- *                  - [y] = Weight associated with this sample
+ * @result Distance of intersection point and origin.
  */
-__device__ float2 fog_get_intersection(const vec3 origin, const vec3 ray, const float limit) {
+__device__ float fog_get_intersection(const vec3 origin, const vec3 ray, const float limit) {
   const float2 path = fog_compute_path(origin, ray, limit);
 
   if (path.y == -FLT_MAX)
-    return make_float2(FLT_MAX, 1.0f);
+    return FLT_MAX;
 
   const float start    = sky_to_world_scale(path.x);
-  const float distance = sky_to_world_scale(path.y);
+  const float max_dist = sky_to_world_scale(path.y);
 
-  if (start > limit)
-    return make_float2(FLT_MAX, 1.0f);
+  // [FonWKH17] Equation 15
+  const float t = (-logf(1.0f - white_noise())) / FOG_DENSITY;
 
-  float t = start + 2.0f * white_noise() * distance;
+  if (t > max_dist)
+    return FLT_MAX;
 
-  float weight = 2.0f * distance * expf(-(t - start) * FOG_DENSITY);
-
-  if (t > start + distance) {
-    t      = FLT_MAX;
-    weight = 2.0f * expf(-distance * FOG_DENSITY);
-  }
-
-  return make_float2(t, weight);
+  return start + t;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -120,9 +124,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
       const float cos_angle = dot_product(ray, bounce_ray);
       const float phase     = jendersie_eon_phase_function(cos_angle, device.scene.fog.droplet_diameter);
 
-      // solid angle is 4.0 * PI
-      const float S      = 4.0f * PI * phase * FOG_DENSITY;
-      const float weight = (S - S * expf(-task.distance * FOG_DENSITY)) / FOG_DENSITY;
+      const float weight = 4.0f * PI * phase;
 
       device.ptrs.bounce_records[pixel] = scale_color(record, weight);
 
@@ -146,9 +148,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_fog_tasks() {
       if (light.weight > 0.0f) {
         BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, device.scene.fog.droplet_diameter);
 
-        const float weight = (FOG_DENSITY - FOG_DENSITY * expf(-task.distance * FOG_DENSITY)) / FOG_DENSITY;
-
-        device.ptrs.light_records[pixel] = mul_color(record, scale_color(brdf_sample.term, weight));
+        device.ptrs.light_records[pixel] = mul_color(record, brdf_sample.term);
         light_history_buffer_entry       = light.id;
 
         TraceTask light_task;
@@ -202,20 +202,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void fog_preprocess_tasks() 
     RGBF record     = load_RGBF(device.records + pixel);
 
     if (device.scene.fog.active && device.iteration_type != TYPE_LIGHT) {
-      const float2 fog = fog_get_intersection(task.origin, task.ray, depth);
+      const float fog_dist = fog_get_intersection(task.origin, task.ray, depth);
 
-      const float weight = fog.y;
-
-      if (fog.x < depth) {
-        depth  = fog.x;
+      if (fog_dist < depth) {
+        depth  = fog_dist;
         hit_id = FOG_HIT;
         __stcs((float2*) (device.ptrs.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
       }
-
-      record = scale_color(record, weight);
     }
 
-    if (device.scene.fog.active) {
+    if (device.scene.fog.active && device.iteration_type == TYPE_LIGHT) {
       const float t      = fog_compute_path(task.origin, task.ray, depth).y;
       const float weight = expf(-t * FOG_DENSITY);
 
