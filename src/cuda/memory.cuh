@@ -160,19 +160,20 @@ __device__ ToyTask load_toy_task(const void* ptr) {
   return task;
 }
 
-__device__ FogTask load_fog_task(const void* ptr) {
+__device__ VolumeTask load_volume_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
-  FogTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-  task.ray_y      = data1.x;
-  task.ray_xz     = data1.y;
-  task.distance   = data1.z;
+  VolumeTask task;
+  task.index.x     = __float_as_uint(data0.x) & 0xffff;
+  task.index.y     = (__float_as_uint(data0.x) >> 16);
+  task.position.x  = data0.y;
+  task.position.y  = data0.z;
+  task.position.z  = data0.w;
+  task.ray_y       = data1.x;
+  task.ray_xz      = data1.y;
+  task.distance    = data1.z;
+  task.volume_type = __float_as_uint(data1.w);
 
   return task;
 }

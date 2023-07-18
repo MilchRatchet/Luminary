@@ -616,6 +616,10 @@ __device__ int color_any(const RGBF a) {
   return (a.r > 0.0f || a.g > 0.0f || a.b > 0.0f);
 }
 
+__device__ float RGBF_avg(const RGBF a) {
+  return (a.r + a.g + a.b) * (1.0f / 3.0f);
+}
+
 __device__ RGBF opaque_color(const RGBAF a) {
   return get_color(a.r, a.g, a.b);
 }

@@ -25,7 +25,7 @@
 #define SKY_HIT 0xffffffffu
 #define OCEAN_HIT 0xfffffffeu
 #define TOY_HIT 0xfffffffdu
-#define FOG_HIT 0xfffffffcu
+#define VOLUME_HIT 0xfffffffcu
 #define REJECT_HIT 0xfffffff0u
 #define TRIANGLE_ID_LIMIT 0xefffffffu
 #define LIGHT_ID_ANY 0xfffffff0u

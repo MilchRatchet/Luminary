@@ -5,7 +5,6 @@
 
 #include "bvh.cuh"
 #include "cloud.cuh"
-#include "fog.cuh"
 #include "geometry.cuh"
 #include "ocean.cuh"
 #include "purkinje.cuh"
@@ -15,6 +14,7 @@
 #include "temporal.cuh"
 #include "toy.cuh"
 #include "utils.cuh"
+#include "volume.cuh"
 
 __device__ TraceTask get_starting_ray(TraceTask task) {
   vec3 default_ray;
@@ -258,7 +258,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
-    if (hit_id == FOG_HIT || depth == device.scene.camera.far_clip_distance) {
+    if (depth == device.scene.camera.far_clip_distance) {
       continue;
     }
 
@@ -288,7 +288,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   uint16_t sky_task_count      = 0;
   uint16_t ocean_task_count    = 0;
   uint16_t toy_task_count      = 0;
-  uint16_t fog_task_count      = 0;
+  uint16_t volume_task_count   = 0;
 
   // count data
   for (int i = 0; i < task_count; i++) {
@@ -304,8 +304,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     else if (hit_id == TOY_HIT) {
       toy_task_count++;
     }
-    else if (hit_id == FOG_HIT) {
-      fog_task_count++;
+    else if (hit_id == VOLUME_HIT) {
+      volume_task_count++;
     }
     else if (hit_id <= TRIANGLE_ID_LIMIT) {
       geometry_task_count++;
@@ -316,15 +316,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   int ocean_offset    = geometry_offset + geometry_task_count;
   int sky_offset      = ocean_offset + ocean_task_count;
   int toy_offset      = sky_offset + sky_task_count;
-  int fog_offset      = toy_offset + toy_task_count;
-  int rejects_offset  = fog_offset + fog_task_count;
+  int volume_offset   = toy_offset + toy_task_count;
+  int rejects_offset  = volume_offset + volume_task_count;
   int k               = 0;
 
   device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 0] = geometry_offset;
   device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1] = ocean_offset;
   device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 2] = sky_offset;
   device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_offset;
-  device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = fog_offset;
+  device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = volume_offset;
 
   const int num_tasks = rejects_offset;
 
@@ -353,14 +353,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count)
                        || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count);
     }
-    else if (hit_id == FOG_HIT) {
-      index          = fog_offset++;
+    else if (hit_id == VOLUME_HIT) {
+      index          = volume_offset++;
       needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count)
-                       || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + fog_task_count);
+                       || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + volume_task_count);
     }
     else {
       index          = rejects_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + fog_task_count);
+      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + volume_task_count);
     }
 
     if (needs_swapping) {
@@ -423,11 +423,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       data1.x = asinf(task.ray.y);
       data1.y = atan2f(task.ray.z, task.ray.x);
 
-      if (hit_id == OCEAN_HIT || hit_id == FOG_HIT) {
+      if (hit_id == OCEAN_HIT || hit_id == VOLUME_HIT) {
         data1.z = depth;
       }
       else {
         data1.z = __uint_as_float(hit_id);
+      }
+
+      if (hit_id == VOLUME_HIT) {
+        data1.w = volume_get_type(task.origin);
       }
     }
 
@@ -438,7 +442,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 1] = ocean_task_count;
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 2] = sky_task_count;
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 3] = toy_task_count;
-  device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 4] = fog_task_count;
+  device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 4] = volume_task_count;
   device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5] = num_tasks;
   device.trace_count[threadIdx.x + blockIdx.x * blockDim.x]                = 0;
 }

@@ -266,7 +266,7 @@ struct LightEvalData {
   uint32_t flags;
 } typedef LightEvalData;
 
-// TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: FogCount
+// TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: VolumeCount
 
 // ray_xz is horizontal angle
 struct GeometryTask {
@@ -302,14 +302,14 @@ struct ToyTask {
   uint32_t padding;
 } typedef ToyTask;
 
-struct FogTask {
+struct VolumeTask {
   ushort2 index;
   vec3 position;
   float ray_y;
   float ray_xz;
   float distance;
-  uint32_t padding;
-} typedef FogTask;
+  uint32_t volume_type;
+} typedef VolumeTask;
 
 struct TraceTask {
   vec3 origin;
