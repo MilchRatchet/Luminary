@@ -27,19 +27,13 @@ struct VolumeDescriptor {
   float water_droplet_diameter;
   RGBF absorption;
   RGBF scattering;
-  float height; /* Sky space */
+  float avg_transmittance;
+  float max_height; /* Sky space */
+  float min_height;
 } typedef VolumeDescriptor;
 
-__device__ VolumeDescriptor volume_get_descriptor_preset_none() {
-  VolumeDescriptor volume;
-
-  volume.type                   = VOLUME_TYPE_NONE;
-  volume.water_droplet_diameter = 0.0f;
-  volume.absorption             = get_color(0.0f, 0.0f, 0.0f);
-  volume.scattering             = get_color(0.0f, 0.0f, 0.0f);
-  volume.height                 = FLT_MAX;
-
-  return volume;
+__device__ RGBF volume_get_transmittance(const VolumeDescriptor volume) {
+  return add_color(volume.absorption, volume.scattering);
 }
 
 __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
@@ -49,7 +43,9 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
   volume.water_droplet_diameter = device.scene.fog.droplet_diameter;
   volume.absorption             = get_color(0.0f, 0.0f, 0.0f);
   volume.scattering             = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
-  volume.height                 = world_to_sky_scale(device.scene.fog.height);
+  volume.avg_transmittance      = FOG_DENSITY;
+  volume.max_height             = world_to_sky_scale(device.scene.fog.height);
+  volume.min_height             = world_to_sky_scale(OCEAN_MAX_HEIGHT);
 
   return volume;
 }
@@ -61,7 +57,10 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.water_droplet_diameter = 50.0f;
   volume.absorption             = OCEAN_ABSORPTION;
   volume.scattering             = OCEAN_SCATTERING;
-  volume.height                 = world_to_sky_scale(OCEAN_MIN_HEIGHT);
+  volume.max_height             = world_to_sky_scale(OCEAN_MIN_HEIGHT);
+  volume.min_height             = 0.0f;
+
+  volume.avg_transmittance = RGBF_avg(volume_get_transmittance(volume));
 
   return volume;
 }
@@ -73,33 +72,8 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
     case VOLUME_TYPE_OCEAN:
       return volume_get_descriptor_preset_ocean();
     default:
-      return volume_get_descriptor_preset_none();
+      return {};
   }
-}
-
-__device__ VolumeType volume_get_type(const vec3 origin) {
-  const vec3 sky_origin = world_to_sky_transform(origin);
-
-  VolumeType type           = VOLUME_TYPE_NONE;
-  float current_type_height = FLT_MAX;
-
-  const float fog_height = SKY_EARTH_RADIUS + world_to_sky_scale(device.scene.fog.height);
-  if (fog_height < current_type_height && get_length(sky_origin) < fog_height) {
-    type                = VOLUME_TYPE_FOG;
-    current_type_height = fog_height;
-  }
-
-  const float ocean_height = SKY_EARTH_RADIUS + world_to_sky_scale(OCEAN_MIN_HEIGHT);
-  if (ocean_height < current_type_height && get_length(sky_origin) < ocean_height) {
-    type                = VOLUME_TYPE_OCEAN;
-    current_type_height = ocean_height;
-  }
-
-  return type;
-}
-
-__device__ RGBF volume_get_transmittance(const VolumeDescriptor volume) {
-  return add_color(volume.absorption, volume.scattering);
 }
 
 /*
@@ -113,7 +87,7 @@ __device__ RGBF volume_get_transmittance(const VolumeDescriptor volume) {
  */
 __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
   const vec3 sky_origin = world_to_sky_transform(origin);
-  const float2 path     = sky_compute_path(sky_origin, ray, SKY_EARTH_RADIUS, SKY_EARTH_RADIUS + volume.height);
+  const float2 path     = sky_compute_path(sky_origin, ray, SKY_EARTH_RADIUS, SKY_EARTH_RADIUS + volume.max_height);
 
   if (path.y == -FLT_MAX)
     return make_float2(-FLT_MAX, -FLT_MAX);
@@ -144,16 +118,12 @@ __device__ float volume_sample_intersection(const VolumeDescriptor volume, const
   const float max_dist = path.y;
 
   // [FonWKH17] Equation 15
-  const float t = (-logf(1.0f - white_noise())) / RGBF_avg(volume_get_transmittance(volume));
+  const float t = (-logf(1.0f - white_noise())) / volume.avg_transmittance;
 
   if (t > max_dist)
     return FLT_MAX;
 
   return start + t;
-}
-
-__device__ bool volume_is_inside(const VolumeDescriptor volume, const vec3 origin) {
-  return (get_length(world_to_sky_transform(origin)) < SKY_EARTH_RADIUS + volume.height);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -201,38 +171,45 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void volume_process_events()
     const int pixel = task.index.x + task.index.y * device.width;
     RGBF record     = load_RGBF(device.records + pixel);
 
-    VolumeDescriptor volume = volume_get_descriptor_preset_none();
+    if (device.scene.fog.active) {
+      const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
+      if (device.iteration_type == TYPE_LIGHT) {
+        const float t = volume_compute_path(volume, task.origin, task.ray, depth).y;
 
-    VolumeDescriptor volume_fog = (device.scene.fog.active) ? volume_get_descriptor_preset_fog() : volume_get_descriptor_preset_none();
-    if (volume_fog.height < volume.height && volume_is_inside(volume_fog, task.origin)) {
-      volume = volume_fog;
-    }
+        record = scale_color(record, expf(-t * volume.avg_transmittance));
+      }
+      else {
+        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, depth);
 
-    VolumeDescriptor volume_ocean =
-      (device.scene.ocean.active) ? volume_get_descriptor_preset_ocean() : volume_get_descriptor_preset_none();
-    if (volume_ocean.height < volume.height && volume_is_inside(volume_ocean, task.origin)) {
-      volume = volume_ocean;
-    }
-
-    if (device.iteration_type == TYPE_LIGHT) {
-      const float t = volume_compute_path(volume, task.origin, task.ray, depth).y;
-
-      RGBF volume_transmittance = volume_get_transmittance(volume);
-
-      record.r *= expf(-t * volume_transmittance.r);
-      record.g *= expf(-t * volume_transmittance.g);
-      record.b *= expf(-t * volume_transmittance.b);
-    }
-    else {
-      const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, depth);
-
-      if (volume_dist < depth) {
-        depth  = volume_dist;
-        hit_id = VOLUME_HIT;
-        __stcs((float2*) (device.ptrs.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
+        if (volume_dist < depth) {
+          depth  = volume_dist;
+          hit_id = VOLUME_FOG_HIT;
+        }
       }
     }
 
+    if (device.scene.ocean.active) {
+      const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
+      if (device.iteration_type == TYPE_LIGHT) {
+        const float t = volume_compute_path(volume, task.origin, task.ray, depth).y;
+
+        RGBF volume_transmittance = volume_get_transmittance(volume);
+
+        record.r *= expf(-t * volume_transmittance.r);
+        record.g *= expf(-t * volume_transmittance.g);
+        record.b *= expf(-t * volume_transmittance.b);
+      }
+      else {
+        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, depth);
+
+        if (volume_dist < depth) {
+          depth  = volume_dist;
+          hit_id = VOLUME_OCEAN_HIT;
+        }
+      }
+    }
+
+    __stcs((float2*) (device.ptrs.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
     store_RGBF(device.records + pixel, record);
   }
 }

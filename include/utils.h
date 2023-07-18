@@ -89,7 +89,7 @@ enum MaterialFresnel { SCHLICK = 0, FDEZ_AGUERA = 1 } typedef MaterialFresnel;
 
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
-enum VolumeType { VOLUME_TYPE_NONE = 0, VOLUME_TYPE_FOG = 1, VOLUME_TYPE_OCEAN = 2 } typedef VolumeType;
+enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1 } typedef VolumeType;
 
 // Set of architectures supported by Luminary
 enum DeviceArch {

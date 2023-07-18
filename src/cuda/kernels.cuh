@@ -304,7 +304,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     else if (hit_id == TOY_HIT) {
       toy_task_count++;
     }
-    else if (hit_id == VOLUME_HIT) {
+    else if (VOLUME_HIT_CHECK(hit_id)) {
       volume_task_count++;
     }
     else if (hit_id <= TRIANGLE_ID_LIMIT) {
@@ -353,7 +353,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count)
                        || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count);
     }
-    else if (hit_id == VOLUME_HIT) {
+    else if (VOLUME_HIT_CHECK(hit_id)) {
       index          = volume_offset++;
       needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count)
                        || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + volume_task_count);
@@ -423,15 +423,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
       data1.x = asinf(task.ray.y);
       data1.y = atan2f(task.ray.z, task.ray.x);
 
-      if (hit_id == OCEAN_HIT || hit_id == VOLUME_HIT) {
+      if (hit_id == OCEAN_HIT || VOLUME_HIT_CHECK(hit_id)) {
         data1.z = depth;
       }
       else {
         data1.z = __uint_as_float(hit_id);
       }
 
-      if (hit_id == VOLUME_HIT) {
-        data1.w = volume_get_type(task.origin);
+      if (VOLUME_HIT_CHECK(hit_id)) {
+        data1.w = __uint_as_float(VOLUME_HIT_TYPE(hit_id));
       }
     }
 
