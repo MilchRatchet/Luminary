@@ -229,17 +229,27 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
     float depth     = result.x;
     uint32_t hit_id = __float_as_uint(result.y);
 
-    const float far_distance   = ocean_far_distance(task.origin, task.ray);
-    const float short_distance = ocean_short_distance(task.origin, task.ray);
+    if (device.iteration_type != TYPE_LIGHT) {
+      const float far_distance   = ocean_far_distance(task.origin, task.ray);
+      const float short_distance = ocean_short_distance(task.origin, task.ray);
 
-    if (depth <= far_distance && depth > short_distance) {
+      if (depth <= far_distance && depth > short_distance) {
+        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
+
+        if (ocean_depth < depth) {
+          float2 result;
+          result.x = ocean_depth;
+          result.y = __uint_as_float(OCEAN_HIT);
+          __stcs((float2*) (device.ptrs.trace_results + offset), result);
+        }
+      }
+    }
+    else {
       const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
 
       if (ocean_depth < depth) {
-        float2 result;
-        result.x = ocean_depth;
-        result.y = __uint_as_float(OCEAN_HIT);
-        __stcs((float2*) (device.ptrs.trace_results + offset), result);
+        const int pixel = task.index.y * device.width + task.index.x;
+        store_RGBF(device.records + pixel, scale_color(load_RGBF(device.records + pixel), 1.0f - device.scene.ocean.albedo.a));
       }
     }
   }

@@ -94,7 +94,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     optixrt_execute(instance);
   }
 
-  if (instance->scene.ocean.active && type != TYPE_LIGHT) {
+  if (instance->scene.ocean.active) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 

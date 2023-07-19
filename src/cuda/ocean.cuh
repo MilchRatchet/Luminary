@@ -257,8 +257,6 @@ __device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-// Light rays ignore ocean surface.
-// TODO: Apply alpha of surface to light ray record.
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
