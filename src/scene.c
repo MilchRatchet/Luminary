@@ -78,7 +78,7 @@ void scene_init(Scene** _scene) {
   scene->ocean.absorption.r        = 1.0f;
   scene->ocean.absorption.g        = 0.15f;
   scene->ocean.absorption.b        = 0.01f;
-  scene->ocean.pollution           = 0.5f;
+  scene->ocean.pollution           = 1.0f;
   scene->ocean.absorption_strength = 1.0f;
 
   scene->toy.active           = 0;

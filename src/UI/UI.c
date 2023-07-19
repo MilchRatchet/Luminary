@@ -563,7 +563,7 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Alpha", &(instance->scene.ocean.albedo.a), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_check(ui, "Animated", &(instance->scene.ocean.update), 1);
   panels[i++] = create_slider(ui, "Speed", &(instance->scene.ocean.speed), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Pollution", &(instance->scene.ocean.pollution), 1, 0.005f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Pollution", &(instance->scene.ocean.pollution), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_color(ui, "Scattering", (float*) &(instance->scene.ocean.scattering));
   panels[i++] = create_slider(ui, "  Red", &(instance->scene.ocean.scattering.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene.ocean.scattering.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);

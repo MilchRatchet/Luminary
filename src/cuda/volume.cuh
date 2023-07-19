@@ -27,7 +27,7 @@ struct VolumeDescriptor {
   float water_droplet_diameter;
   RGBF absorption;
   RGBF scattering;
-  float avg_transmittance;
+  float avg_scattering;
   float max_height; /* Sky space */
   float min_height;
 } typedef VolumeDescriptor;
@@ -43,7 +43,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
   volume.water_droplet_diameter = device.scene.fog.droplet_diameter;
   volume.absorption             = get_color(0.0f, 0.0f, 0.0f);
   volume.scattering             = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
-  volume.avg_transmittance      = FOG_DENSITY;
+  volume.avg_scattering         = FOG_DENSITY;
   volume.max_height             = world_to_sky_scale(device.scene.fog.height);
   volume.min_height             = world_to_sky_scale(OCEAN_MAX_HEIGHT);
 
@@ -60,7 +60,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.max_height             = world_to_sky_scale(OCEAN_MIN_HEIGHT);
   volume.min_height             = 0.0f;
 
-  volume.avg_transmittance = RGBF_avg(volume_get_transmittance(volume));
+  volume.avg_scattering = RGBF_avg(volume.scattering);
 
   return volume;
 }
@@ -118,7 +118,7 @@ __device__ float volume_sample_intersection(const VolumeDescriptor volume, const
   const float max_dist = path.y;
 
   // [FonWKH17] Equation 15
-  const float t = (-logf(1.0f - white_noise())) / volume.avg_transmittance;
+  const float t = (-logf(1.0f - white_noise())) / volume.avg_scattering;
 
   if (t > max_dist)
     return FLT_MAX;
@@ -176,7 +176,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void volume_process_events()
       if (device.iteration_type == TYPE_LIGHT) {
         const float t = volume_compute_path(volume, task.origin, task.ray, depth).y;
 
-        record = scale_color(record, expf(-t * volume.avg_transmittance));
+        record = scale_color(record, expf(-t * volume.avg_scattering));
       }
       else {
         const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, depth);
@@ -203,8 +203,23 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void volume_process_events()
         const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, depth);
 
         if (volume_dist < depth) {
+          record.r *= (volume.scattering.r * expf(-volume_dist * volume.scattering.r))
+                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
+          record.g *= (volume.scattering.g * expf(-volume_dist * volume.scattering.g))
+                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
+          record.b *= (volume.scattering.b * expf(-volume_dist * volume.scattering.b))
+                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
+
           depth  = volume_dist;
           hit_id = VOLUME_OCEAN_HIT;
+        }
+
+        if (volume_dist != FLT_MAX) {
+          const float t = fminf(volume_compute_path(volume, task.origin, task.ray, depth).y, depth);
+
+          record.r *= expf(-t * volume.absorption.r);
+          record.g *= expf(-t * volume.absorption.g);
+          record.b *= expf(-t * volume.absorption.b);
         }
       }
     }

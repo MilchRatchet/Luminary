@@ -151,19 +151,7 @@ __device__ vec3 normalize_vector(vec3 vector) {
   return vector;
 }
 
-__device__ vec3 reflect_vector(const vec3 v, const vec3 n) {
-  vec3 result;
-
-  const float dot = dot_product(v, n);
-
-  result.x = v.x - 2.0f * dot * n.x;
-  result.y = v.y - 2.0f * dot * n.y;
-  result.z = v.z - 2.0f * dot * n.z;
-
-  return normalize_vector(result);
-}
-
-__device__ __host__ vec3 scale_vector(vec3 vector, const float scale) {
+__device__ vec3 scale_vector(vec3 vector, const float scale) {
   vector.x *= scale;
   vector.y *= scale;
   vector.z *= scale;
@@ -171,7 +159,14 @@ __device__ __host__ vec3 scale_vector(vec3 vector, const float scale) {
   return vector;
 }
 
-__device__ __host__ float get_length(const vec3 vector) {
+__device__ vec3 reflect_vector(const vec3 ray, const vec3 normal) {
+  const float dot   = dot_product(ray, normal);
+  const vec3 result = sub_vector(ray, scale_vector(normal, 2.0f * dot));
+
+  return normalize_vector(result);
+}
+
+__device__ float get_length(const vec3 vector) {
   return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
 }
 
@@ -532,16 +527,17 @@ __device__ __host__ vec3 angles_to_direction(const float altitude, const float a
   return dir;
 }
 
+// PBRT v3 Chapter "Specular Reflection and Transmission", Refract() function
 __device__ vec3 refract_ray(const vec3 ray, const vec3 normal, const float index_ratio) {
-  const float NdotR = dot_product(normal, ray);
+  const float dot = -dot_product(normal, ray);
 
-  const float b = 1.0f - index_ratio * index_ratio * (1.0f - NdotR * NdotR);
+  const float b = 1.0f - index_ratio * index_ratio * (1.0f - dot * dot);
 
   if (b < 0.0f) {
-    return reflect_vector(ray, scale_vector(normal, -1.0f));
+    return reflect_vector(ray, normal);
   }
   else {
-    return normalize_vector(add_vector(scale_vector(ray, -index_ratio), scale_vector(normal, index_ratio * NdotR - sqrtf(b))));
+    return normalize_vector(add_vector(scale_vector(ray, index_ratio), scale_vector(normal, index_ratio * dot - sqrtf(b))));
   }
 }
 
