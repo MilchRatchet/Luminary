@@ -336,7 +336,9 @@ __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
 
 /*
  * Computes the distance to the first intersection of a ray with a sphere. To check for any hit use sphere_ray_hit.
- * @param ray Ray direction.
+ * This implementation is based on Chapter 7 in Ray Tracing Gems I, "Precision Improvements for Ray/Sphere Intersection".
+ *
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param p Center of the sphere.
  * @param r Radius of the sphere.
@@ -346,16 +348,15 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = 4.0f * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const vec3 h   = add_vector(diff, scale_vector(ray, -dot));
+  const float sd = sqrtf((r2 - dot_product(h, h)));
   const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
   const float t0 = c / q;
@@ -363,13 +364,13 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
   if (t0 >= 0.0f)
     return t0;
 
-  const float t1 = q / a;
+  const float t1 = q;
   return (t1 < 0.0f) ? FLT_MAX : t1;
 }
 
 /*
  * Computes the distance to the first intersection of a ray with a sphere with (0,0,0) as its center.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param r Radius of the sphere.
  * @result Value a such that origin + a * ray is a point on the sphere.
@@ -377,16 +378,15 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
 __device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = 4.0f * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const vec3 h   = add_vector(origin, scale_vector(ray, -dot));
+  const float sd = sqrtf((r2 - dot_product(h, h)));
   const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
   const float t0 = c / q;
@@ -394,13 +394,13 @@ __device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r
   if (t0 >= 0.0f)
     return t0;
 
-  const float t1 = q / a;
+  const float t1 = q;
   return (t1 < 0.0f) ? FLT_MAX : t1;
 }
 
 /*
  * Computes whether a ray hits a sphere. To compute the distance see sphere_ray_intersection.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param p Center of the sphere.
  * @param r Radius of the sphere.
@@ -410,16 +410,15 @@ __device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, c
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = 4.0f * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return 0;
 
-  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const vec3 h   = add_vector(diff, scale_vector(ray, -dot));
+  const float sd = sqrtf((r2 - dot_product(h, h)));
   const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
   const float t0 = c / q;
@@ -429,7 +428,7 @@ __device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, c
 
 /*
  * Computes whether a ray hits a sphere with (0,0,0) as its center. To compute the distance see sph_ray_int_p0.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param r Radius of the sphere.
  * @result 1 if the ray hits the sphere, 0 else.
@@ -437,16 +436,15 @@ __device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, c
 __device__ int sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = 4.0f * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return 0;
 
-  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const vec3 h   = add_vector(origin, scale_vector(ray, -dot));
+  const float sd = sqrtf((r2 - dot_product(h, h)));
   const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
   const float t0 = c / q;
@@ -456,7 +454,7 @@ __device__ int sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) 
 
 /*
  * Computes the distance to the last intersection of a ray with a sphere. To compute the first hit use sphere_ray_intersection.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param p Center of the sphere.
  * @param r Radius of the sphere.
@@ -466,19 +464,18 @@ __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, co
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = 4.0f * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const vec3 h   = add_vector(diff, scale_vector(ray, -dot));
+  const float sd = sqrtf((r2 - dot_product(h, h)));
   const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
-  const float t1 = q / a;
+  const float t1 = q;
 
   if (t1 >= 0.0f)
     return t1;
@@ -489,7 +486,7 @@ __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, co
 
 /*
  * Computes the distance to the last intersection of a ray with a sphere with (0,0,0) as its center.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param r Radius of the sphere.
  * @result Value a such that origin + a * ray is a point on the sphere.
@@ -497,19 +494,18 @@ __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, co
 __device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = 4.0f * (r2 - dot_product(k, k));
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
+  const vec3 h   = add_vector(origin, scale_vector(ray, -dot));
+  const float sd = sqrtf((r2 - dot_product(h, h)));
   const float q  = -dot + copysignf(1.0f, -dot) * sd;
 
-  const float t1 = q / a;
+  const float t1 = q;
 
   if (t1 >= 0.0f)
     return t1;
