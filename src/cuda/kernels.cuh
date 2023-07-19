@@ -6,7 +6,6 @@
 #include "bvh.cuh"
 #include "cloud.cuh"
 #include "geometry.cuh"
-#include "ocean.cuh"
 #include "purkinje.cuh"
 #include "restir.cuh"
 #include "sky.cuh"
@@ -202,11 +201,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     }
 
     if (device.scene.ocean.active && device.iteration_type != TYPE_LIGHT) {
-      const float ocean_dist = ocean_far_distance(task.origin, task.ray);
+      const float far_distance   = ocean_far_distance(task.origin, task.ray);
+      const float short_distance = ocean_short_distance(task.origin, task.ray);
 
-      if (ocean_dist < depth) {
-        depth  = ocean_dist;
-        hit_id = OCEAN_HIT;
+      if (far_distance < depth && short_distance != far_distance) {
+        depth  = far_distance;
+        hit_id = REJECT_HIT;
       }
     }
 
@@ -215,43 +215,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     result.y = __uint_as_float(hit_id);
 
     __stcs((float2*) (device.ptrs.trace_results + offset), result);
-  }
-}
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
-
-  for (int i = 0; i < task_count; i++) {
-    const int offset    = get_task_address(i);
-    TraceTask task      = load_trace_task(device.trace_tasks + offset);
-    const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
-
-    float depth     = result.x;
-    uint32_t hit_id = __float_as_uint(result.y);
-
-    if (device.iteration_type != TYPE_LIGHT) {
-      const float far_distance   = ocean_far_distance(task.origin, task.ray);
-      const float short_distance = ocean_short_distance(task.origin, task.ray);
-
-      if (depth <= far_distance && depth > short_distance) {
-        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
-
-        if (ocean_depth < depth) {
-          float2 result;
-          result.x = ocean_depth;
-          result.y = __uint_as_float(OCEAN_HIT);
-          __stcs((float2*) (device.ptrs.trace_results + offset), result);
-        }
-      }
-    }
-    else {
-      const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
-
-      if (ocean_depth < depth) {
-        const int pixel = task.index.y * device.width + task.index.x;
-        store_RGBF(device.records + pixel, scale_color(load_RGBF(device.records + pixel), 1.0f - device.scene.ocean.albedo.a));
-      }
-    }
   }
 }
 

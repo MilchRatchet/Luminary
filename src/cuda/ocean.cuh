@@ -21,34 +21,8 @@
 #define OCEAN_ITERATIONS_NORMAL 6
 
 __device__ float ocean_get_normal_granularity(const float distance) {
+  // TODO: Improve this.
   return fmaxf(eps, distance / device.width);
-}
-
-__device__ float ocean_ray_underwater_length(const vec3 origin, const vec3 ray, const float limit) {
-  const float max_ocean_height = OCEAN_MAX_HEIGHT;
-
-  if (origin.y > max_ocean_height) {
-    const float ref_height = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
-
-    if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(max_ocean_height) + ref_height)) {
-      return 0.0f;
-    }
-  }
-
-  if (origin.y < device.scene.ocean.height) {
-    if (ray.y < eps) {
-      return limit;
-    }
-    else {
-      return fminf(limit, (device.scene.ocean.height - origin.y) / ray.y);
-    }
-  }
-
-  if (ray.y > -eps) {
-    return 0.0f;
-  }
-
-  return fmaxf(0.0f, limit - (device.scene.ocean.height - origin.y) / ray.y);
 }
 
 __device__ float ocean_hash(const float2 p) {
@@ -159,6 +133,7 @@ __device__ vec3 ocean_get_normal(vec3 p, const float diff) {
   return normalize_vector(normal);
 }
 
+// FLT_MAX signals no hit.
 __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
   const float ref_height = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
 
@@ -167,20 +142,17 @@ __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
   }
 
   const float d1 = OCEAN_MIN_HEIGHT - origin.y;
-  const float d2 = d1 + 3.0f * device.scene.ocean.amplitude;
+  const float d2 = OCEAN_MAX_HEIGHT - origin.y;
 
   const float s1 = d1 / ray.y;
   const float s2 = d2 / ray.y;
-
-  // inbetween top and bottom is inconclusive
-  if (s1 * s2 < 0.0f)
-    return FLT_MAX;
 
   const float s = fmaxf(s1, s2);
 
   return (s >= eps) ? s : FLT_MAX;
 }
 
+// FLT_MAX signals no hit.
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
   const float ref_height = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
 
@@ -189,23 +161,15 @@ __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
   }
 
   const float d1 = OCEAN_MIN_HEIGHT - origin.y;
-  const float d2 = d1 + 3.0f * device.scene.ocean.amplitude;
+  const float d2 = OCEAN_MAX_HEIGHT - origin.y;
 
   const float s1 = d1 / ray.y;
   const float s2 = d2 / ray.y;
 
-  // inbetween top and bottom is inconclusive
-  if (s1 * s2 < 0.0f)
-    return 0.0f;
+  if (s1 < 0.0f && s2 < 0.0f)
+    return FLT_MAX;
 
-  return fabsf(fminf(s1, s2));
-}
-
-__device__ bool ocean_is_underwater(const vec3 origin) {
-  const float ref_height    = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
-  const float origin_height = get_length(world_to_sky_transform(origin));
-
-  return (origin_height < ref_height + world_to_sky_scale(OCEAN_MAX_HEIGHT));
+  return (s1 * s2 < 0.0f) ? fmaxf(s1, s2) : fminf(s1, s2);
 }
 
 __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, float max) {
@@ -256,6 +220,39 @@ __device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
 ////////////////////////////////////////////////////////////////////
 // Kernel
 ////////////////////////////////////////////////////////////////////
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks() {
+  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset  = get_task_address(i);
+    TraceTask task    = load_trace_task(device.trace_tasks + offset);
+    const float depth = __ldcs(&((device.ptrs.trace_results + offset)->depth));
+
+    if (device.iteration_type != TYPE_LIGHT) {
+      const float short_distance = ocean_short_distance(task.origin, task.ray);
+
+      if (short_distance != FLT_MAX && short_distance <= depth) {
+        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
+
+        if (ocean_depth < depth) {
+          float2 result;
+          result.x = ocean_depth;
+          result.y = __uint_as_float(OCEAN_HIT);
+          __stcs((float2*) (device.ptrs.trace_results + offset), result);
+        }
+      }
+    }
+    else if (device.scene.ocean.albedo.a > 0.0f) {
+      const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
+
+      if (ocean_depth < depth) {
+        const int pixel = task.index.y * device.width + task.index.x;
+        store_RGBF(device.records + pixel, scale_color(load_RGBF(device.records + pixel), 1.0f - device.scene.ocean.albedo.a));
+      }
+    }
+  }
+}
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
