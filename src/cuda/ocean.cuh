@@ -238,31 +238,27 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
   return mid < 0.0f ? FLT_MAX : mid;
 }
 
-__global__ void ocean_generate_light_eval_data() {
-  const int task_count  = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 1];
-  const int task_offset = device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1];
+__device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
+  const float dot = dot_product(ray, normal);
 
-  for (int i = 0; i < task_count; i++) {
-    OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device.width + task.index.x;
-
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
-
-    LightEvalData data;
-    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING | LIGHT_EVAL_DATA_VOLUME_HIT;
-    data.normal    = get_vector(0.0f, 0.0f, 0.0f);
-    data.position  = task.position;
-    data.V         = scale_vector(ray, -1.0f);
-    data.roughness = 1.0f;
-    data.metallic  = 0.0f;
-
-    store_light_eval_data(data, pixel);
+  RGBAhalf specular_f0 = get_RGBAhalf(0.02f, 0.02f, 0.02f, 0.0f);
+  switch (device.scene.material.fresnel) {
+    case SCHLICK:
+      return RGBAhalf_to_RGBF(brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), dot));
+      break;
+    case FDEZ_AGUERA:
+    default:
+      return RGBAhalf_to_RGBF(brdf_fresnel_roughness(specular_f0, 0.0f, dot));
+      break;
   }
 }
 
+////////////////////////////////////////////////////////////////////
+// Kernel
+////////////////////////////////////////////////////////////////////
+
+// Light rays ignore ocean surface.
+// TODO: Apply alpha of surface to light ray record.
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
   const int id = threadIdx.x + blockIdx.x * blockDim.x;
 
@@ -282,15 +278,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     vec3 normal = ocean_get_normal(task.position, ocean_get_normal_granularity(task.distance));
 
-    if (ray.y > 0.0f) {
-      normal = scale_vector(normal, -1.0f);
+    float refraction_index_ratio;
+    if (dot_product(ray, normal) > 0.0f) {
+      normal                 = scale_vector(normal, -1.0f);
+      refraction_index_ratio = device.scene.ocean.refractive_index;
+    }
+    else {
+      refraction_index_ratio = 1.0f / device.scene.ocean.refractive_index;
     }
 
-    RGBAF albedo = device.scene.ocean.albedo;
-    RGBF record  = device.records[pixel];
+    RGBF record = device.records[pixel];
 
     if (device.scene.ocean.emissive) {
-      RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
+      RGBF emission = get_color(device.scene.ocean.albedo.r, device.scene.ocean.albedo.g, device.scene.ocean.albedo.b);
 
       write_albedo_buffer(emission, pixel);
 
@@ -303,107 +303,24 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     write_normal_buffer(normal, pixel);
 
-    const vec3 V      = scale_vector(ray, -1.0f);
-    BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, 0.0f, 1.0f);
-    brdf.specular_f0  = get_RGBAhalf(0.02f, 0.02f, 0.02f, 0.02f);
-
-    if (white_noise() > albedo.a) {
+    if (white_noise() > device.scene.ocean.albedo.a) {
       task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
-
-      const float refraction_index = 1.0f / device.scene.ocean.refractive_index;
-
-      brdf = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
-
-      RGBF alpha_record = record;
-
-      TraceTask new_task;
-      new_task.origin = task.position;
-      new_task.ray    = brdf.L;
-      new_task.index  = task.index;
-
-      switch (device.iteration_type) {
-        case TYPE_CAMERA:
-        case TYPE_BOUNCE:
-          store_RGBF(device.ptrs.bounce_records + pixel, alpha_record);
-          store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
-          break;
-        case TYPE_LIGHT:
-          if (white_noise() > 0.5f)
-            break;
-          store_RGBF(device.ptrs.light_records + pixel, scale_color(alpha_record, 2.0f));
-          store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
-          device.ptrs.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
-          break;
-      }
+      ray           = refract_ray(ray, normal, refraction_index_ratio);
     }
-    else if (device.iteration_type != TYPE_LIGHT) {
-      const float scattering_prob = (ray.y > 0.0f) ? 0.0f : (1.0f - albedo.a);
-      const int scattering_pass   = white_noise() < scattering_prob && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
-
+    else {
       task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
-
-      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-
-      // TODO: change this so that this coincides with the transparent pass from above, this here has nothing to do with surface bounces!
-      if (scattering_pass) {
-        LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
-
-        float underwater_sample;
-        vec3 light_pos;
-
-        underwater_sample            = 10.0f * white_noise();
-        const float refraction_index = 1.0f / device.scene.ocean.refractive_index;
-        BRDFInstance brdf2           = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
-        light_pos                    = add_vector(task.position, scale_vector(brdf2.L, underwater_sample));
-
-        if (light.weight > 0.0f) {
-          RGBF light_record;
-
-          BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, light_pos, 50.0f);
-
-          const RGBF S = mul_color(device.scene.ocean.scattering, scale_color(brdf_sample.term, OCEAN_POLLUTION));
-
-          RGBF extinction = OCEAN_EXTINCTION;
-
-          // Amount of light that gets lost along this step
-          RGBF step_transmittance;
-          step_transmittance.r = expf(-underwater_sample * extinction.r);
-          step_transmittance.g = expf(-underwater_sample * extinction.g);
-          step_transmittance.b = expf(-underwater_sample * extinction.b);
-
-          const RGBF weight = mul_color(sub_color(S, mul_color(S, step_transmittance)), inv_color(extinction));
-
-          light_record = mul_color(record, weight);
-          light_record = scale_color(light_record, 1.0f / scattering_prob);
-
-          TraceTask light_task;
-          light_task.origin = light_pos;
-          light_task.ray    = brdf_sample.L;
-          light_task.index  = task.index;
-
-          if (luminance(light_record) > 0.0f) {
-            store_RGBF(device.ptrs.light_records + pixel, light_record);
-            light_history_buffer_entry = light.id;
-            store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
-          }
-        }
-      }
-
-      if (!(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
-        device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
-
-      brdf = brdf_sample_ray(brdf, task.index);
-
-      RGBF bounce_record = mul_color(record, brdf.term);
-
-      TraceTask bounce_task;
-      bounce_task.origin = task.position;
-      bounce_task.ray    = brdf.L;
-      bounce_task.index  = task.index;
-
-      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
-      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      ray           = reflect_vector(ray, normal);
     }
+
+    record = mul_color(record, ocean_brdf(ray, normal));
+
+    TraceTask new_task;
+    new_task.origin = task.position;
+    new_task.ray    = ray;
+    new_task.index  = task.index;
+
+    store_RGBF(device.ptrs.bounce_records + pixel, record);
+    store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
   }
 
   device.ptrs.light_trace_count[id]  = light_trace_count;

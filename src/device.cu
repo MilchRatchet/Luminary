@@ -115,10 +115,6 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
   if (type != TYPE_LIGHT) {
     geometry_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-    if (instance->scene.ocean.active) {
-      ocean_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
-
     if (instance->scene.toy.active) {
       toy_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     }
