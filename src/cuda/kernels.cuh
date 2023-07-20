@@ -201,12 +201,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
     }
 
     if (device.scene.ocean.active && device.iteration_type != TYPE_LIGHT) {
-      const float far_distance   = ocean_far_distance(task.origin, task.ray);
-      const float short_distance = ocean_short_distance(task.origin, task.ray);
+      if (task.origin.y < OCEAN_MIN_HEIGHT && task.origin.y > OCEAN_MAX_HEIGHT) {
+        const float far_distance = ocean_far_distance(task.origin, task.ray);
 
-      if (far_distance < depth && short_distance != far_distance) {
-        depth  = far_distance;
-        hit_id = REJECT_HIT;
+        if (far_distance < depth) {
+          depth  = far_distance;
+          hit_id = REJECT_HIT;
+        }
       }
     }
 

@@ -2,6 +2,7 @@
 #define CU_VOLUME_H
 
 #include "math.cuh"
+#include "ocean.cuh"
 #include "utils.cuh"
 
 //
@@ -87,7 +88,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
  */
 __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
   const vec3 sky_origin = world_to_sky_transform(origin);
-  const float2 path     = sky_compute_path(sky_origin, ray, SKY_EARTH_RADIUS, SKY_EARTH_RADIUS + volume.max_height);
+  const float2 path     = sky_compute_path(sky_origin, ray, SKY_EARTH_RADIUS, SKY_WORLD_REFERENCE_HEIGHT + volume.max_height);
 
   if (path.y == -FLT_MAX)
     return make_float2(-FLT_MAX, -FLT_MAX);
