@@ -265,6 +265,10 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
 __device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
   const float dot = dot_product(ray, normal);
 
+  if (dot < 0.0f) {
+    return get_color(1.0f, 1.0f, 1.0f);
+  }
+
   RGBAhalf specular_f0 = get_RGBAhalf(0.02f, 0.02f, 0.02f, 0.0f);
   switch (device.scene.material.fresnel) {
     case SCHLICK:
