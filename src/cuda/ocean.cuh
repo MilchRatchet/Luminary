@@ -293,9 +293,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
     const float depth = __ldcs(&((device.ptrs.trace_results + offset)->depth));
 
     if (device.iteration_type != TYPE_LIGHT) {
-      const float short_distance = ocean_short_distance(task.origin, task.ray);
+      bool intersection_possible = true;
+      if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
+        const float short_distance = ocean_short_distance(task.origin, task.ray);
+        intersection_possible      = (short_distance != FLT_MAX) && (short_distance <= depth);
+      }
 
-      if (short_distance != FLT_MAX && short_distance <= depth) {
+      if (intersection_possible) {
         const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
 
         if (ocean_depth < depth) {
