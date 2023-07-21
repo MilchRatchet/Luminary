@@ -32,12 +32,10 @@ __device__ float ocean_noise(const float2 p) {
   integral.x = floorf(p.x);
   integral.y = floorf(p.y);
 
-  float2 fractional;
-  fractional.x = fractf(p.x);
-  fractional.y = fractf(p.y);
+  float2 fractional = make_float2(p.x - integral.x, p.y - integral.y);
 
-  fractional.x *= fractional.x * (3.0f - 2.0f * fractional.x);
-  fractional.y *= fractional.y * (3.0f - 2.0f * fractional.y);
+  fractional.x = fractional.x * fractional.x * (3.0f - 2.0f * fractional.x);
+  fractional.y = fractional.y * fractional.y * (3.0f - 2.0f * fractional.y);
 
   const float hash1 = ocean_hash(integral);
   integral.x += 1.0f;
@@ -252,11 +250,16 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
     return start;
   }
 
-  if (get_length(sub_vector(add_vector(origin, scale_vector(ray, start)), device.scene.camera.pos)) > 50.0f) {
-    return ocean_intersection_solver(origin, ray, start, limit);
+  if (device.iteration_type != TYPE_LIGHT) {
+    if (get_length(sub_vector(add_vector(origin, scale_vector(ray, start)), device.scene.camera.pos)) > 30.0f) {
+      return ocean_intersection_solver(origin, ray, start, limit);
+    }
+    else {
+      return ocean_ray_marcher(origin, ray, start, limit);
+    }
   }
   else {
-    return ocean_ray_marcher(origin, ray, start, limit);
+    return ocean_intersection_solver(origin, ray, start, limit);
   }
 
   return FLT_MAX;
