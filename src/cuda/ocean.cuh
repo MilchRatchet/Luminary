@@ -19,13 +19,8 @@
 
 #define OCEAN_LIPSCHITZ (device.scene.ocean.amplitude * 3.0f)
 
-#define OCEAN_ITERATIONS_INTERSECTION 4
-#define OCEAN_ITERATIONS_NORMAL 6
-
-__device__ float ocean_get_normal_granularity(const float distance) {
-  // TODO: Improve this.
-  return fmaxf(eps, distance / device.width);
-}
+#define OCEAN_ITERATIONS_INTERSECTION 5
+#define OCEAN_ITERATIONS_NORMAL 8
 
 __device__ float ocean_hash(const float2 p) {
   const float x = p.x * 127.1f + p.y * 311.7f;
@@ -105,21 +100,23 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
   return h;
 }
 
-__device__ vec3 ocean_get_normal(vec3 p, const float diff) {
+__device__ vec3 ocean_get_normal(const vec3 p) {
+  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+
   // Sobel filter
   float h[8];
-  h[0] = ocean_get_height(add_vector(p, get_vector(-diff, 0.0f, diff)), OCEAN_ITERATIONS_NORMAL);
-  h[1] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, diff)), OCEAN_ITERATIONS_NORMAL);
-  h[2] = ocean_get_height(add_vector(p, get_vector(diff, 0.0f, diff)), OCEAN_ITERATIONS_NORMAL);
-  h[3] = ocean_get_height(add_vector(p, get_vector(-diff, 0.0f, 0.0f)), OCEAN_ITERATIONS_NORMAL);
-  h[4] = ocean_get_height(add_vector(p, get_vector(diff, 0.0f, 0.0f)), OCEAN_ITERATIONS_NORMAL);
-  h[5] = ocean_get_height(add_vector(p, get_vector(-diff, 0.0f, -diff)), OCEAN_ITERATIONS_NORMAL);
-  h[6] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -diff)), OCEAN_ITERATIONS_NORMAL);
-  h[7] = ocean_get_height(add_vector(p, get_vector(diff, 0.0f, -diff)), OCEAN_ITERATIONS_NORMAL);
+  h[0] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), OCEAN_ITERATIONS_NORMAL);
+  h[1] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), OCEAN_ITERATIONS_NORMAL);
+  h[2] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, d)), OCEAN_ITERATIONS_NORMAL);
+  h[3] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), OCEAN_ITERATIONS_NORMAL);
+  h[4] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, 0.0f)), OCEAN_ITERATIONS_NORMAL);
+  h[5] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, -d)), OCEAN_ITERATIONS_NORMAL);
+  h[6] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), OCEAN_ITERATIONS_NORMAL);
+  h[7] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, -d)), OCEAN_ITERATIONS_NORMAL);
 
   vec3 normal;
   normal.x = -((h[7] + 2.0f * h[4] + h[2]) - (h[5] + 2.0f * h[3] + h[0])) / 8.0f;
-  normal.y = diff;
+  normal.y = d;
   normal.z = -((h[0] + 2.0f * h[1] + h[2]) - (h[5] + 2.0f * h[6] + h[7])) / 8.0f;
 
   return normalize_vector(normal);
@@ -338,7 +335,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    vec3 normal = ocean_get_normal(task.position, ocean_get_normal_granularity(task.distance));
+    vec3 normal = ocean_get_normal(task.position);
 
     float refraction_index_ratio;
     if (dot_product(ray, normal) > 0.0f) {
@@ -409,7 +406,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
       device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
     else if (device.shading_mode == SHADING_NORMAL) {
-      vec3 normal = ocean_get_normal(task.position, ocean_get_normal_granularity(task.distance));
+      vec3 normal = ocean_get_normal(task.position);
 
       normal.x = 0.5f * normal.x + 0.5f;
       normal.y = 0.5f * normal.y + 0.5f;
