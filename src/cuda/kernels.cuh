@@ -6,6 +6,7 @@
 #include "bvh.cuh"
 #include "cloud.cuh"
 #include "geometry.cuh"
+#include "ocean.cuh"
 #include "purkinje.cuh"
 #include "restir.cuh"
 #include "sky.cuh"

@@ -2,8 +2,8 @@
 #define CU_VOLUME_H
 
 #include "math.cuh"
-#include "ocean.cuh"
 #include "utils.cuh"
+#include "volume_utils.cuh"
 
 //
 // This implements a volume renderer. These volumes are homogenous and bound by a maximum height relative to the planet's
@@ -20,83 +20,65 @@
 // J. Fong, M. Wrenninge, C. Kulla, R. Habel, "Production Volume Rendering", SIGGRAPH 2017 Course, 2017
 // https://graphics.pixar.com/library/ProductionVolumeRendering/
 
-#define FOG_DENSITY (0.001f * device.scene.fog.density)
-
-struct VolumeDescriptor {
-  // TODO: Correctly pass descriptor to G-Buffer and use in ReSTIR.
-  VolumeType type;
-  float water_droplet_diameter;
-  RGBF absorption;
-  RGBF scattering;
-  float avg_scattering;
-  float max_height; /* Sky space */
-  float min_height;
-} typedef VolumeDescriptor;
-
-__device__ RGBF volume_get_transmittance(const VolumeDescriptor volume) {
-  return add_color(volume.absorption, volume.scattering);
-}
-
-__device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
-  VolumeDescriptor volume;
-
-  volume.type                   = VOLUME_TYPE_FOG;
-  volume.water_droplet_diameter = device.scene.fog.droplet_diameter;
-  volume.absorption             = get_color(0.0f, 0.0f, 0.0f);
-  volume.scattering             = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
-  volume.avg_scattering         = FOG_DENSITY;
-  volume.max_height             = world_to_sky_scale(device.scene.fog.height);
-  volume.min_height             = world_to_sky_scale(OCEAN_MAX_HEIGHT);
-
-  return volume;
-}
-
-__device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
-  VolumeDescriptor volume;
-
-  volume.type                   = VOLUME_TYPE_OCEAN;
-  volume.water_droplet_diameter = 50.0f;
-  volume.absorption             = OCEAN_ABSORPTION;
-  volume.scattering             = OCEAN_SCATTERING;
-  volume.max_height             = world_to_sky_scale(OCEAN_MIN_HEIGHT);
-  volume.min_height             = 0.0f;
-
-  volume.avg_scattering = RGBF_avg(volume.scattering);
-
-  return volume;
-}
-
-__device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) {
-  switch (type) {
-    case VOLUME_TYPE_FOG:
-      return volume_get_descriptor_preset_fog();
-    case VOLUME_TYPE_OCEAN:
-      return volume_get_descriptor_preset_ocean();
-    default:
-      return {};
-  }
-}
-
 /*
  * Computes the start and length of a ray path through a volume.
+ * The output path is only valid if the start is non-negative.
+ *
  * @param origin Start point of ray in world space.
  * @param ray Direction of ray.
  * @param limit Maximum distance a ray may travel in world space.
  * @result Two floats:
- *                  - [x] = Start in world space
- *                  - [y] = Distance through fog in world space
+ *                  - [x] = Start in world space.
+ *                  - [y] = Distance through fog in world space.
  */
 __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
-  const vec3 sky_origin = world_to_sky_transform(origin);
-  const float2 path     = sky_compute_path(sky_origin, ray, SKY_EARTH_RADIUS, SKY_WORLD_REFERENCE_HEIGHT + volume.max_height);
+  // Vertical intersection
+  const float dy1 = volume.min_height - origin.y;
+  const float dy2 = volume.max_height - origin.y;
 
-  if (path.y == -FLT_MAX)
-    return make_float2(-FLT_MAX, -FLT_MAX);
+  const float sy1 = dy1 / ray.y;
+  const float sy2 = dy2 / ray.y;
 
-  const float start    = fmaxf(sky_to_world_scale(path.x), 0.0f);
-  const float distance = fmaxf(fminf(sky_to_world_scale(path.y), limit - start), 0.0f);
+  const float start_y = fmaxf(fminf(sy1, sy2), 0.0f);
+  const float end_y   = fmaxf(sy1, sy2);
 
-  return make_float2(start, distance);
+  // Horizontal intersection
+
+  const float rn = 1.0f / sqrtf(ray.x * ray.x + ray.z * ray.z);
+  const float rx = ray.x * rn;
+  const float rz = ray.z * rn;
+
+  const float dx = origin.x - device.scene.camera.pos.x;
+  const float dz = origin.z - device.scene.camera.pos.z;
+
+  const float dot = dx * rx + dz * rz;
+  const float r2  = volume.dist * volume.dist;
+  const float c   = (dx * dx + dz * dz) - r2;
+
+  const float kx = dx - rx * dot;
+  const float kz = dz - rz * dot;
+
+  const float d = r2 - (kx * kx + kz * kz);
+
+  if (d < 0.0f)
+    return make_float2(-FLT_MAX, 0.0f);
+
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
+
+  const float t0 = fmaxf(0.0f, c / q);
+  const float t1 = fmaxf(0.0f, q);
+
+  const float start_xz = fminf(t0, t1);
+  const float end_xz   = fmaxf(t0, t1);
+
+  const float start = fmaxf(start_xz, start_y);
+  const float dist  = fminf(fminf(end_xz, end_y) - start, limit - start);
+
+  if (dist < 0.0f)
+    return make_float2(-FLT_MAX, 0.0f);
+
+  return make_float2(start, dist);
 }
 
 /*
@@ -106,18 +88,12 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
  * @param volume VolumeDescriptor of the corresponding volume.
  * @param origin Origin of ray in world space.
  * @param ray Direction of ray.
- * @param limit Depth of ray without scattering in world space.
+ * @param start Start offset of ray.
+ * @param max_dist Maximum dist ray may travel after start.
  * @result Distance of intersection point and origin in world space.
  */
-__device__ float volume_sample_intersection(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit = FLT_MAX) {
-  const float2 path = volume_compute_path(volume, origin, ray, limit);
-
-  if (path.y == -FLT_MAX)
-    return FLT_MAX;
-
-  const float start    = path.x;
-  const float max_dist = path.y;
-
+__device__ float volume_sample_intersection(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist) {
   // [FonWKH17] Equation 15
   const float t = (-logf(1.0f - white_noise())) / volume.avg_scattering;
 
@@ -174,53 +150,53 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void volume_process_events()
 
     if (device.scene.fog.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-      if (device.iteration_type == TYPE_LIGHT) {
-        const float t = volume_compute_path(volume, task.origin, task.ray, depth).y;
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
-        record = scale_color(record, expf(-t * volume.avg_scattering));
-      }
-      else {
-        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, depth);
+      if (path.x >= 0.0f) {
+        if (device.iteration_type == TYPE_LIGHT) {
+          record = scale_color(record, expf(-path.y * volume.avg_scattering));
+        }
+        else {
+          const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y);
 
-        if (volume_dist < depth) {
-          depth  = volume_dist;
-          hit_id = VOLUME_FOG_HIT;
+          if (volume_dist < depth) {
+            depth  = volume_dist;
+            hit_id = VOLUME_FOG_HIT;
+          }
         }
       }
     }
 
     if (device.scene.ocean.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-      if (device.iteration_type == TYPE_LIGHT) {
-        const float t = volume_compute_path(volume, task.origin, task.ray, depth).y;
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
-        RGBF volume_transmittance = volume_get_transmittance(volume);
+      if (path.x >= 0.0f) {
+        if (device.iteration_type == TYPE_LIGHT) {
+          RGBF volume_transmittance = volume_get_transmittance(volume);
 
-        record.r *= expf(-t * volume_transmittance.r);
-        record.g *= expf(-t * volume_transmittance.g);
-        record.b *= expf(-t * volume_transmittance.b);
-      }
-      else {
-        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, depth);
-
-        if (volume_dist < depth) {
-          record.r *= (volume.scattering.r * expf(-volume_dist * volume.scattering.r))
-                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
-          record.g *= (volume.scattering.g * expf(-volume_dist * volume.scattering.g))
-                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
-          record.b *= (volume.scattering.b * expf(-volume_dist * volume.scattering.b))
-                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
-
-          depth  = volume_dist;
-          hit_id = VOLUME_OCEAN_HIT;
+          record.r *= expf(-path.y * volume_transmittance.r);
+          record.g *= expf(-path.y * volume_transmittance.g);
+          record.b *= expf(-path.y * volume_transmittance.b);
         }
+        else {
+          const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y);
 
-        if (volume_dist != FLT_MAX) {
-          const float t = fminf(volume_compute_path(volume, task.origin, task.ray, depth).y, depth);
+          if (volume_dist < depth) {
+            record.r *= (volume.scattering.r * expf(-volume_dist * volume.scattering.r))
+                        / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
+            record.g *= (volume.scattering.g * expf(-volume_dist * volume.scattering.g))
+                        / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
+            record.b *= (volume.scattering.b * expf(-volume_dist * volume.scattering.b))
+                        / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
 
-          record.r *= expf(-t * volume.absorption.r);
-          record.g *= expf(-t * volume.absorption.g);
-          record.b *= expf(-t * volume.absorption.b);
+            depth  = volume_dist;
+            hit_id = VOLUME_OCEAN_HIT;
+          }
+
+          record.r *= expf(-depth * volume.absorption.r);
+          record.g *= expf(-depth * volume.absorption.g);
+          record.b *= expf(-depth * volume.absorption.b);
         }
       }
     }
@@ -242,12 +218,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
     VolumeTask task = load_volume_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
+    VolumeType volume_type = VOLUME_HIT_TYPE(task.volume_type);
+
     vec3 ray;
     ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    const VolumeDescriptor volume = volume_get_descriptor_preset((VolumeType) task.volume_type);
+    const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
     RGBF record = device.records[pixel];
 
@@ -279,7 +257,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
       BRDFInstance brdf = brdf_get_instance_scattering();
 
       if (light.weight > 0.0f) {
-        BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, volume.water_droplet_diameter);
+        BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, volume_type);
 
         device.ptrs.light_records[pixel] = mul_color(record, brdf_sample.term);
         light_history_buffer_entry       = light.id;

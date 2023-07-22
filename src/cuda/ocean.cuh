@@ -8,14 +8,7 @@
 #include "brdf.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-
-#define OCEAN_POLLUTION (device.scene.ocean.pollution * 0.1f)
-#define OCEAN_SCATTERING (scale_color(device.scene.ocean.scattering, OCEAN_POLLUTION))
-#define OCEAN_ABSORPTION (scale_color(device.scene.ocean.absorption, device.scene.ocean.absorption_strength * 0.1f))
-#define OCEAN_EXTINCTION (add_color(OCEAN_SCATTERING, OCEAN_ABSORPTION))
-
-#define OCEAN_MAX_HEIGHT (device.scene.ocean.height + 2.66f * device.scene.ocean.amplitude)
-#define OCEAN_MIN_HEIGHT (device.scene.ocean.height)
+#include "ocean_utils.cuh"
 
 #define OCEAN_LIPSCHITZ (device.scene.ocean.amplitude * 3.0f)
 
@@ -314,14 +307,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
         }
       }
     }
-    else if (device.scene.ocean.albedo.a > 0.0f) {
-      const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
-
-      if (ocean_depth < depth) {
-        const int pixel = task.index.y * device.width + task.index.x;
-        store_RGBF(device.records + pixel, scale_color(load_RGBF(device.records + pixel), 1.0f - device.scene.ocean.albedo.a));
-      }
-    }
   }
 }
 
@@ -353,33 +338,25 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
       refraction_index_ratio = 1.0f / device.scene.ocean.refractive_index;
     }
 
-    RGBF record = device.records[pixel];
-
-    if (device.scene.ocean.emissive) {
-      RGBF emission = get_color(device.scene.ocean.albedo.r, device.scene.ocean.albedo.g, device.scene.ocean.albedo.b);
-
-      write_albedo_buffer(emission, pixel);
-
-      emission.r *= record.r;
-      emission.g *= record.g;
-      emission.b *= record.b;
-
-      // TODO: This is wrong.
-      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(emission);
-    }
-
     write_normal_buffer(normal, pixel);
 
-    if (white_noise() > device.scene.ocean.albedo.a) {
+    if (normal.y > 0.0f) {
+      if (white_noise() > device.scene.ocean.albedo.a) {
+        ray           = refract_ray(ray, normal, refraction_index_ratio);
+        task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
+      }
+      else {
+        task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
+        ray           = reflect_vector(ray, normal);
+      }
+    }
+    else {
       ray           = refract_ray(ray, normal, refraction_index_ratio);
       task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
     }
-    else {
-      task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
-      ray           = reflect_vector(ray, normal);
-    }
 
-    record = mul_color(record, ocean_brdf(ray, normal));
+    RGBF record = load_RGBF(device.records + pixel);
+    record      = mul_color(record, ocean_brdf(ray, normal));
 
     TraceTask new_task;
     new_task.origin = task.position;

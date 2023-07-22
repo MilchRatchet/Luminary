@@ -9,6 +9,7 @@
 #include "sky_utils.cuh"
 #include "toy_utils.cuh"
 #include "utils.cuh"
+#include "volume_utils.cuh"
 
 struct BRDFInstance {
   RGBAhalf albedo;
@@ -322,8 +323,10 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
   return brdf_evaluate(result);
 }
 
-__device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, float droplet_diameter) {
+__device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, VolumeType volume_hit_type) {
   BRDFInstance result = brdf_get_instance_scattering();
+
+  const float droplet_diameter = volume_get_descriptor_preset(volume_hit_type).water_droplet_diameter;
 
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
