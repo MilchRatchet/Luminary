@@ -32,13 +32,16 @@
  *                  - [y] = Distance through fog in world space.
  */
 __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
+  if (volume.max_height <= volume.min_height)
+    return make_float2(-FLT_MAX, 0.0f);
+
   // Vertical intersection
   float start_y;
   float end_y;
-  if (fabsf(ray.y) < eps) {
-    if (origin.y >= OCEAN_MIN_HEIGHT && origin.y <= OCEAN_MAX_HEIGHT) {
+  if (fabsf(ray.y) < 0.005f) {
+    if (origin.y >= volume.min_height && origin.y <= volume.max_height) {
       start_y = 0.0f;
-      end_y   = FLT_MAX;
+      end_y   = volume.dist;
     }
     else {
       return make_float2(-FLT_MAX, 0.0f);
