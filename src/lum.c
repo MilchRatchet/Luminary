@@ -130,6 +130,14 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 4995148753008613445u:
       sscanf(value, "%f\n", &camera->exposure);
       break;
+    /* MINEXPOS */
+    case 6003105168358263117u:
+      sscanf(value, "%f\n", &camera->min_exposure);
+      break;
+    /* MAXEXPOS */
+    case 6003105168358916429u:
+      sscanf(value, "%f\n", &camera->max_exposure);
+      break;
     /* BLOOM___ */
     case 6872316342038383682u:
       sscanf(value, "%d\n", &camera->bloom);
@@ -714,6 +722,10 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "CAMERA APERTURE %f\n", instance->scene.camera.aperture_size);
   fputs(line, file);
   sprintf(line, "CAMERA EXPOSURE %f\n", instance->scene.camera.exposure);
+  fputs(line, file);
+  sprintf(line, "CAMERA MINEXPOS %f\n", instance->scene.camera.min_exposure);
+  fputs(line, file);
+  sprintf(line, "CAMERA MAXEXPOS %f\n", instance->scene.camera.max_exposure);
   fputs(line, file);
   sprintf(line, "CAMERA BLOOM___ %d\n", instance->scene.camera.bloom);
   fputs(line, file);

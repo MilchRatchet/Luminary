@@ -195,6 +195,8 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] =
     create_dropdown(ui, "Filter", &(instance->scene.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 3);
   panels[i++] = create_check(ui, "Auto Exposure", &(instance->scene.camera.auto_exposure), 0);
+  panels[i++] = create_slider(ui, "Min Exposure", &(instance->scene.camera.min_exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Max Exposure", &(instance->scene.camera.max_exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Exposure", &(instance->scene.camera.exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
   panels[i++] = create_check(ui, "Bloom", &(instance->scene.camera.bloom), 0);
   panels[i++] = create_slider(ui, "Bloom Blend", &(instance->scene.camera.bloom_blend), 0, 0.0001f, 0.0f, 1.0f, 0, 0);

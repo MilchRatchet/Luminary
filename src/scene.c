@@ -39,6 +39,8 @@ void scene_init(Scene** _scene) {
   scene->camera.focal_length          = 1.0f;
   scene->camera.aperture_size         = 0.00f;
   scene->camera.exposure              = 1.0f;
+  scene->camera.min_exposure          = 40.0f;
+  scene->camera.max_exposure          = 300.0f;
   scene->camera.auto_exposure         = 1;
   scene->camera.bloom                 = 1;
   scene->camera.bloom_blend           = 0.025f;

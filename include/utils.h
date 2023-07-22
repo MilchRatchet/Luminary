@@ -127,6 +127,8 @@ struct Camera {
   float focal_length;
   float aperture_size;
   float exposure;
+  float max_exposure;
+  float min_exposure;
   int auto_exposure;
   float far_clip_distance;
   int tonemap;

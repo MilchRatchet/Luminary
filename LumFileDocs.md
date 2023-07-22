@@ -78,6 +78,12 @@ Exposure of the camera. Number must be non-negative.
 `CAMERA AUTOEXP_ [INT32]`<br/>
 Set 1 to activate auto exposure in realtime mode, 0 else.
 
+`CAMERA MINEXPOS [FP32]`<br/>
+Minimum exposure of the camera obtained through auto exposure. Number must be non-negative.
+
+`CAMERA MAXEXPOS [FP32]`<br/>
+Maximum exposure of the camera obtained through auto exposure. Number must be non-negative.
+
 `CAMERA BLOOM___ [INT32]`<br/>
 Set 1 to activate bloom, 0 else.
 
