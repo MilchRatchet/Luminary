@@ -255,16 +255,19 @@ struct LightSample {
   float weight;
 } typedef LightSample;
 
-enum LightEvalDataFlags { LIGHT_EVAL_DATA_REQUIRES_SAMPLING = 0b1, LIGHT_EVAL_DATA_VOLUME_HIT = 0b10 } typedef LightEvalDataFlags;
+enum GBufferFlags { G_BUFFER_REQUIRES_SAMPLING = 0b1, G_BUFFER_VOLUME_HIT = 0b10 } typedef GBufferFlags;
 
-struct LightEvalData {
+struct GBufferData {
+  uint32_t hit_id;
+  RGBAF albedo;
+  RGBF emission;
   vec3 position;
   vec3 V;
   vec3 normal;
   float roughness;
   float metallic;
   uint32_t flags;
-} typedef LightEvalData;
+} typedef GBufferData;
 
 // TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: VolumeCount
 

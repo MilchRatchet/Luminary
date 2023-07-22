@@ -6,7 +6,7 @@
 #include "memory.cuh"
 #include "toy_utils.cuh"
 
-__global__ void toy_generate_light_eval_data() {
+__global__ void toy_generate_g_buffer() {
   const int task_count  = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 3];
   const int task_offset = device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3];
 
@@ -20,15 +20,19 @@ __global__ void toy_generate_light_eval_data() {
       normal = scale_vector(normal, -1.0f);
     }
 
-    LightEvalData data;
-    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING;
+    GBufferData data;
+    data.hit_id = TOY_HIT;
+    data.albedo = device.scene.toy.albedo;
+    data.emission =
+      (device.scene.toy.emissive) ? scale_color(device.scene.toy.emission, device.scene.toy.material.b) : get_color(0.0f, 0.0f, 0.0f);
+    data.flags     = G_BUFFER_REQUIRES_SAMPLING;
     data.normal    = normal;
     data.position  = task.position;
     data.V         = scale_vector(task.ray, -1.0f);
     data.roughness = (1.0f - device.scene.toy.material.r);
     data.metallic  = device.scene.toy.material.g;
 
-    store_light_eval_data(data, pixel);
+    store_g_buffer_data(data, pixel);
   }
 }
 

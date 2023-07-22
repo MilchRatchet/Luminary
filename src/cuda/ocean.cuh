@@ -119,6 +119,10 @@ __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
     return FLT_MAX;
   }
 
+  if (fabsf(ray.y) < eps) {
+    return (origin.y >= OCEAN_MIN_HEIGHT && origin.y <= OCEAN_MAX_HEIGHT) ? FLT_MAX : FLT_MAX;
+  }
+
   const float d1 = OCEAN_MIN_HEIGHT - origin.y;
   const float d2 = OCEAN_MAX_HEIGHT - origin.y;
 
@@ -134,6 +138,10 @@ __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
   if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
     return FLT_MAX;
+  }
+
+  if (fabsf(ray.y) < eps) {
+    return (origin.y >= OCEAN_MIN_HEIGHT && origin.y <= OCEAN_MAX_HEIGHT) ? 0.0f : FLT_MAX;
   }
 
   const float d1 = OCEAN_MIN_HEIGHT - origin.y;

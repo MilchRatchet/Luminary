@@ -33,14 +33,27 @@
  */
 __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
   // Vertical intersection
-  const float dy1 = volume.min_height - origin.y;
-  const float dy2 = volume.max_height - origin.y;
+  float start_y;
+  float end_y;
+  if (fabsf(ray.y) < eps) {
+    if (origin.y >= OCEAN_MIN_HEIGHT && origin.y <= OCEAN_MAX_HEIGHT) {
+      start_y = 0.0f;
+      end_y   = FLT_MAX;
+    }
+    else {
+      return make_float2(-FLT_MAX, 0.0f);
+    }
+  }
+  else {
+    const float dy1 = volume.min_height - origin.y;
+    const float dy2 = volume.max_height - origin.y;
 
-  const float sy1 = dy1 / ray.y;
-  const float sy2 = dy2 / ray.y;
+    const float sy1 = dy1 / ray.y;
+    const float sy2 = dy2 / ray.y;
 
-  const float start_y = fmaxf(fminf(sy1, sy2), 0.0f);
-  const float end_y   = fmaxf(sy1, sy2);
+    start_y = fmaxf(fminf(sy1, sy2), 0.0f);
+    end_y   = fmaxf(sy1, sy2);
+  }
 
   // Horizontal intersection
 
@@ -122,15 +135,18 @@ __global__ void volume_generate_g_buffer() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    LightEvalData data;
-    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING | LIGHT_EVAL_DATA_VOLUME_HIT;
+    GBufferData data;
+    data.hit_id    = task.volume_type;
+    data.albedo    = RGBAF_set(0.0f, 0.0f, 0.0f, 0.0f);
+    data.emission  = get_color(0.0f, 0.0f, 0.0f);
+    data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
     data.normal    = get_vector(0.0f, 0.0f, 0.0f);
     data.position  = task.position;
     data.V         = scale_vector(ray, -1.0f);
     data.roughness = 1.0f;
     data.metallic  = 0.0f;
 
-    store_light_eval_data(data, pixel);
+    store_g_buffer_data(data, pixel);
   }
 }
 

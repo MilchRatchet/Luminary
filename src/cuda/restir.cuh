@@ -60,19 +60,24 @@ __device__ LightSample restir_sample_empty() {
  * @param data Data to compute the target pdf from.
  * @result Target PDF of light sample.
  */
-__device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
+__device__ float restir_sample_target_pdf(LightSample x, GBufferData data) {
   if (x.presampled_id == LIGHT_ID_NONE) {
     return 0.0f;
   }
 
-  BRDFInstance brdf = brdf_get_instance(get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f), data.V, data.normal, data.roughness, data.metallic);
+  BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(data.albedo), data.V, data.normal, data.roughness, data.metallic);
 
   // We overwrite the local scope copy of the light sample
   x.weight = 1.0f;
 
-  BRDFInstance result = (data.flags & LIGHT_EVAL_DATA_VOLUME_HIT)
-                          ? brdf_apply_sample_scattering(brdf, x, data.position, VOLUME_HIT_TYPE(VOLUME_FOG_HIT))
-                          : brdf_apply_sample(brdf, x, data.position);
+  BRDFInstance result;
+
+  if (data.flags & G_BUFFER_VOLUME_HIT) {
+    result = brdf_apply_sample_scattering(brdf, x, data.position, VOLUME_HIT_TYPE(data.hit_id));
+  }
+  else {
+    result = brdf_apply_sample(brdf, x, data.position);
+  }
 
   float value = luminance(result.term);
 
@@ -101,7 +106,7 @@ __device__ float restir_sample_target_pdf(LightSample x, LightEvalData data) {
  * @param seed Seed used for random number generation, the seed is overwritten on use.
  * @result Sampled light sample.
  */
-__device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& seed) {
+__device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed) {
   LightSample selected = restir_sample_empty();
 
   const vec3 sky_pos = world_to_sky_transform(data.position);
@@ -199,7 +204,7 @@ __device__ LightSample restir_sample_reservoir(LightEvalData data, uint32_t& see
  *
  * Light sample is stored in device.ptrs.light_samples.
  *
- * Light samples are only generated for pixels for which the flag LIGHT_EVAL_DATA_REQUIRES_SAMPLING is set.
+ * Light samples are only generated for pixels for which the flag G_BUFFER_REQUIRES_SAMPLING is set.
  */
 __global__ void restir_weighted_reservoir_sampling() {
   const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
@@ -211,14 +216,14 @@ __global__ void restir_weighted_reservoir_sampling() {
     const ushort2 index  = __ldg((ushort2*) (device.trace_tasks + offset));
     const uint32_t pixel = get_pixel_id(index.x, index.y);
 
-    const LightEvalData data = load_light_eval_data(pixel);
+    const GBufferData data = load_g_buffer_data(pixel);
 
-    LightSample sample = (data.flags & LIGHT_EVAL_DATA_REQUIRES_SAMPLING) ? restir_sample_reservoir(data, seed) : restir_sample_empty();
+    LightSample sample = (data.flags & G_BUFFER_REQUIRES_SAMPLING) ? restir_sample_reservoir(data, seed) : restir_sample_empty();
 
     store_light_sample(device.ptrs.light_samples, sample, pixel);
 
     if (device.iteration_type != TYPE_CAMERA) {
-      device.ptrs.light_eval_data[pixel].flags = 0;
+      device.ptrs.g_buffer[pixel].flags = 0;
     }
   }
 

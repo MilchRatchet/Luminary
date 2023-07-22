@@ -368,7 +368,7 @@ struct DevicePointers {
   DeviceTexture* sky_tm_luts;
   DeviceTexture* sky_hdri_luts;
   LightSample* light_samples;
-  LightEvalData* light_eval_data;
+  GBufferData* g_buffer;
   uint32_t* light_candidates;
 } typedef DevicePointers;
 
@@ -442,7 +442,7 @@ struct RaytraceInstance {
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* light_samples;
-  DeviceBuffer* light_eval_data;
+  DeviceBuffer* g_buffer;
   DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;
   DeviceBuffer* sky_ms_luts;
