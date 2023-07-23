@@ -250,19 +250,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
     RGBF record = device.records[pixel];
 
     {
-      // TODO: Importance sample phase function using inverse CDF LUT.
-      const vec3 bounce_ray = angles_to_direction(white_noise() * PI, white_noise() * 2.0f * PI);
-      const float cos_angle = dot_product(ray, bounce_ray);
-      const float phase     = jendersie_eon_phase_function(cos_angle, volume.water_droplet_diameter);
-
-      const float weight = 4.0f * PI * phase;
+      const vec3 bounce_ray = jendersie_eon_phase_sample(ray, volume.water_droplet_diameter);
 
       TraceTask bounce_task;
       bounce_task.origin = task.position;
       bounce_task.ray    = bounce_ray;
       bounce_task.index  = task.index;
 
-      store_RGBF(device.ptrs.bounce_records + pixel, scale_color(record, weight));
+      store_RGBF(device.ptrs.bounce_records + pixel, record);
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
 

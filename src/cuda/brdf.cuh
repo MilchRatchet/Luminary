@@ -195,23 +195,8 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
   return brdf;
 }
 
-__device__ vec3 brdf_sample_ray_hemisphere(const float alpha, const float beta) {
-  const float a = sqrtf(alpha);
-  const float b = 2.0f * PI * beta;
-
-  // How this works:
-  // Standard way is a = acosf(alpha) and then return (sinf(a) * cosf(b), sinf(a) * sinf(b), cosf(a)).
-  // What we can do instead is sample a point uniformly on the disk on which the hemisphere lies. (i.e. z = 0.0f).
-  // Then since we want a normalized direction the ray must satisfy 1.0f = sqrtf(x * x + y * y + z * z).
-  // Further, since we only want the upper hemisphere it must be that z >= 0.0f.
-  // Using these constraints, we get that z = sqrtf(1.0f - x * x + y * y).
-  // Then we can use that x * x + y * y = a * a * (cosf(b) * cosf(b) + sinf(b) * sinf(b)) = a * a.
-  // Hence, we have that z = sqrtf(1.0f - a * a) = sqrtf(1.0f - sqrtf(alpha) * sqrtf(alpha)) = sqrtf(1.0f - alpha).
-  return get_vector(a * cosf(b), a * sinf(b), sqrtf(1.0f - alpha));
-}
-
 __device__ vec3 brdf_sample_ray_diffuse(const float alpha, const float beta) {
-  return brdf_sample_ray_hemisphere(alpha, beta);
+  return sample_ray_sphere(alpha, beta);
 }
 
 __device__ float brdf_spec_probability(const float metallic) {
