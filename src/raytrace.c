@@ -589,7 +589,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   }
 
   const int thread_count      = device_get_thread_count();
-  const int pixels_per_thread = (amount + thread_count - 1) / thread_count;
+  const int pixels_per_thread = 1 + ((amount + thread_count - 1) / thread_count);
   const int max_task_count    = pixels_per_thread * thread_count;
 
   device_update_symbol(pixels_per_thread, pixels_per_thread);

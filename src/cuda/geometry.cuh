@@ -4,6 +4,7 @@
 #include "brdf.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "state.cuh"
 
 __device__ float4 geometry_texture_load(DeviceTexture tex, UV uv) {
   float4 v = tex2D<float4>(tex.tex, uv.u, 1.0f - uv.v);
@@ -219,52 +220,54 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
           store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
-          if (white_noise() > 0.5f)
-            break;
-          store_RGBF(device.ptrs.light_records + pixel, scale_color(record, 2.0f));
-          store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
-          device.ptrs.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
+          if (white_noise() > 0.5f) {
+            if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+              store_RGBF(device.ptrs.light_records + pixel, scale_color(record, 2.0f));
+              store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
+            }
+          }
           break;
       }
     }
     else if (device.iteration_type != TYPE_LIGHT) {
-      const int is_mirror = material_is_mirror(data.roughness, data.metallic);
-
-      if (!is_mirror)
-        write_albedo_buffer(opaque_color(data.albedo), pixel);
-
-      const vec3 V               = scale_vector(ray, -1.0f);
-      const int use_light_sample = !is_mirror && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
+      const vec3 V = scale_vector(ray, -1.0f);
 
       task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
 
-      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-
       BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(data.albedo), data.V, data.normal, data.roughness, data.metallic);
 
-      if (use_light_sample) {
-        LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
+      if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+        const int is_mirror = material_is_mirror(data.roughness, data.metallic);
 
-        if (light.weight > 0.0f) {
-          const BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, task.position);
+        if (!is_mirror)
+          write_albedo_buffer(opaque_color(data.albedo), pixel);
 
-          const RGBF light_record = mul_color(record, brdf_sample.term);
+        const int use_light_sample          = !is_mirror;
+        uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-          TraceTask light_task;
-          light_task.origin = task.position;
-          light_task.ray    = brdf_sample.L;
-          light_task.index  = task.index;
+        if (use_light_sample) {
+          LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
-          if (luminance(light_record) > 0.0f) {
-            store_RGBF(device.ptrs.light_records + pixel, light_record);
-            light_history_buffer_entry = light.id;
-            store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
+          if (light.weight > 0.0f) {
+            const BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, task.position);
+
+            const RGBF light_record = mul_color(record, brdf_sample.term);
+
+            TraceTask light_task;
+            light_task.origin = task.position;
+            light_task.ray    = brdf_sample.L;
+            light_task.index  = task.index;
+
+            if (luminance(light_record) > 0.0f) {
+              store_RGBF(device.ptrs.light_records + pixel, light_record);
+              light_history_buffer_entry = light.id;
+              store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
+            }
           }
         }
-      }
 
-      if (!(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
+      }
 
       brdf               = brdf_sample_ray(brdf, task.index);
       RGBF bounce_record = mul_color(record, brdf.term);

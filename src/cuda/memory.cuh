@@ -1,6 +1,7 @@
 #ifndef CU_MEMORY_H
 #define CU_MEMORY_H
 
+#include "state.cuh"
 #include "utils.cuh"
 
 //===========================================================================================
@@ -210,18 +211,19 @@ __device__ void store_RGBF(void* ptr, const RGBF a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if (!device.denoiser || device.ptrs.state_buffer[pixel] & STATE_ALBEDO || device.iteration_type == TYPE_LIGHT)
+  if (!device.denoiser || device.iteration_type == TYPE_LIGHT)
     return;
 
-  if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION) {
-    RGBF out_albedo = RGBAhalf_to_RGBF(device.ptrs.albedo_buffer[pixel]);
-    out_albedo      = scale_color(out_albedo, device.temporal_frames);
-    albedo          = add_color(albedo, out_albedo);
-    albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1));
-  }
+  if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
+    if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION) {
+      RGBF out_albedo = RGBAhalf_to_RGBF(device.ptrs.albedo_buffer[pixel]);
+      out_albedo      = scale_color(out_albedo, device.temporal_frames);
+      albedo          = add_color(albedo, out_albedo);
+      albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1));
+    }
 
-  device.ptrs.albedo_buffer[pixel] = RGBF_to_RGBAhalf(albedo);
-  device.ptrs.state_buffer[pixel] |= STATE_ALBEDO;
+    device.ptrs.albedo_buffer[pixel] = RGBF_to_RGBAhalf(albedo);
+  }
 }
 
 __device__ void write_normal_buffer(vec3 normal, const int pixel) {

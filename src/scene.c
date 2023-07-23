@@ -74,11 +74,11 @@ void scene_init(Scene** _scene) {
   scene->ocean.albedo.b            = 0.0f;
   scene->ocean.albedo.a            = 0.9f;
   scene->ocean.refractive_index    = 1.333f;
-  scene->ocean.scattering.r        = 0.0f;
-  scene->ocean.scattering.g        = 0.2f;
+  scene->ocean.scattering.r        = 0.05f;
+  scene->ocean.scattering.g        = 0.15f;
   scene->ocean.scattering.b        = 1.0f;
   scene->ocean.absorption.r        = 1.0f;
-  scene->ocean.absorption.g        = 0.15f;
+  scene->ocean.absorption.g        = 0.2f;
   scene->ocean.absorption.b        = 0.01f;
   scene->ocean.pollution           = 1.0f;
   scene->ocean.absorption_strength = 1.0f;

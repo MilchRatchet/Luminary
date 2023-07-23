@@ -25,10 +25,11 @@ struct OMMTextureTriangle {
 } typedef OMMTextureTriangle;
 
 __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id) {
-  const float* t_ptr = (float*) (device.scene.triangles + id);
+  const Triangle* t_ptr = (Triangle*) (device.scene.triangles + id);
 
-  uint32_t object_map = __ldg((uint32_t*) (t_ptr + 24));
-  uint16_t tex        = device.scene.texture_assignments[object_map].albedo_map;
+  uint32_t object_map = __ldg(&(t_ptr->object_maps));
+
+  uint16_t tex = device.scene.texture_assignments[object_map].albedo_map;
 
   OMMTextureTriangle tri;
   tri.tex_id = tex;
@@ -37,8 +38,8 @@ __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id)
     return tri;
   }
 
-  float2 data0 = __ldg((float2*) (t_ptr + 18));
-  float4 data1 = __ldg((float4*) (t_ptr + 20));
+  float2 data0 = __ldg((float2*) &(t_ptr->vertex_texture));
+  float4 data1 = __ldg((float4*) &(t_ptr->edge1_texture));
 
   tri.tex = device.ptrs.albedo_atlas[tex];
 

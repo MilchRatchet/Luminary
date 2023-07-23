@@ -2,6 +2,7 @@
 #define CU_VOLUME_H
 
 #include "math.cuh"
+#include "state.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
@@ -256,19 +257,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
 
       const float weight = 4.0f * PI * phase;
 
-      device.ptrs.bounce_records[pixel] = scale_color(record, weight);
-
       TraceTask bounce_task;
       bounce_task.origin = task.position;
       bounce_task.ray    = bounce_ray;
       bounce_task.index  = task.index;
 
+      store_RGBF(device.ptrs.bounce_records + pixel, scale_color(record, weight));
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
 
-    const int light_occupied = (device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
-
-    if (!light_occupied) {
+    if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
       LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
@@ -278,15 +276,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
       if (light.weight > 0.0f) {
         BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, volume_type);
 
-        device.ptrs.light_records[pixel] = mul_color(record, brdf_sample.term);
-        light_history_buffer_entry       = light.id;
+        const RGBF light_record = mul_color(record, brdf_sample.term);
 
         TraceTask light_task;
         light_task.origin = task.position;
         light_task.ray    = brdf_sample.L;
         light_task.index  = task.index;
 
-        store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
+        if (luminance(light_record) > 0.0f) {
+          store_RGBF(device.ptrs.light_records + pixel, light_record);
+          light_history_buffer_entry = light.id;
+          store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
+        }
       }
 
       device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;

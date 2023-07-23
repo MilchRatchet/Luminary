@@ -118,7 +118,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     toy_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (instance->scene.fog.active || instance->scene.ocean.active) {
+  if ((instance->scene.fog.active || instance->scene.ocean.active) && type != TYPE_LIGHT) {
     volume_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
