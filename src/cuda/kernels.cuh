@@ -302,6 +302,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = volume_offset;
 
   const int num_tasks = rejects_offset;
+  const int initial_geometry_offset = geometry_offset;
+  const int initial_ocean_offset    = ocean_offset;
+  const int initial_sky_offset      = sky_offset;
+  const int initial_toy_offset      = toy_offset;
+  const int initial_volume_offset   = volume_offset;
+  const int initial_rejects_offset  = rejects_offset;
 
   // order data
   while (k < task_count) {
@@ -312,30 +318,46 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     int needs_swapping;
 
     if (hit_id <= TRIANGLE_ID_LIMIT) {
-      index          = geometry_offset++;
-      needs_swapping = (k >= geometry_task_count);
+      index          = geometry_offset;
+      needs_swapping = (k < initial_geometry_offset) || (k >= geometry_task_count + initial_geometry_offset);
+      if (needs_swapping || k >= geometry_offset) {
+        geometry_offset++;
+      }
     }
     else if (hit_id == OCEAN_HIT) {
-      index          = ocean_offset++;
-      needs_swapping = (k < geometry_task_count) || (k >= geometry_task_count + ocean_task_count);
+      index          = ocean_offset;
+      needs_swapping = (k < initial_ocean_offset) || (k >= ocean_task_count + initial_ocean_offset);
+      if (needs_swapping || k >= ocean_offset) {
+        ocean_offset++;
+      }
     }
     else if (hit_id == SKY_HIT) {
-      index          = sky_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count) || (k >= geometry_task_count + ocean_task_count + sky_task_count);
+      index          = sky_offset;
+      needs_swapping = (k < initial_sky_offset) || (k >= sky_task_count + initial_sky_offset);
+      if (needs_swapping || k >= sky_offset) {
+        sky_offset++;
+      }
     }
     else if (hit_id == TOY_HIT) {
-      index          = toy_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count)
-                       || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count);
+      index          = toy_offset;
+      needs_swapping = (k < initial_toy_offset) || (k >= toy_task_count + initial_toy_offset);
+      if (needs_swapping || k >= toy_offset) {
+        toy_offset++;
+      }
     }
     else if (VOLUME_HIT_CHECK(hit_id)) {
-      index          = volume_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count)
-                       || (k >= geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + volume_task_count);
+      index          = volume_offset;
+      needs_swapping = (k < initial_volume_offset) || (k >= volume_task_count + initial_volume_offset);
+      if (needs_swapping || k >= volume_offset) {
+        volume_offset++;
+      }
     }
     else {
-      index          = rejects_offset++;
-      needs_swapping = (k < geometry_task_count + ocean_task_count + sky_task_count + toy_task_count + volume_task_count);
+      index          = rejects_offset;
+      needs_swapping = (k < initial_rejects_offset);
+      if (needs_swapping || k >= rejects_offset) {
+        rejects_offset++;
+      }
     }
 
     if (needs_swapping) {
