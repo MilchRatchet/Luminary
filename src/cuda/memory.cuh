@@ -1,6 +1,7 @@
 #ifndef CU_MEMORY_H
 #define CU_MEMORY_H
 
+#include "state.cuh"
 #include "utils.cuh"
 
 //===========================================================================================
@@ -160,19 +161,20 @@ __device__ ToyTask load_toy_task(const void* ptr) {
   return task;
 }
 
-__device__ FogTask load_fog_task(const void* ptr) {
+__device__ VolumeTask load_volume_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
-  FogTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-  task.ray_y      = data1.x;
-  task.ray_xz     = data1.y;
-  task.distance   = data1.z;
+  VolumeTask task;
+  task.index.x     = __float_as_uint(data0.x) & 0xffff;
+  task.index.y     = (__float_as_uint(data0.x) >> 16);
+  task.position.x  = data0.y;
+  task.position.y  = data0.z;
+  task.position.z  = data0.w;
+  task.ray_y       = data1.x;
+  task.ray_xz      = data1.y;
+  task.distance    = data1.z;
+  task.volume_type = __float_as_uint(data1.w);
 
   return task;
 }
@@ -209,18 +211,19 @@ __device__ void store_RGBF(void* ptr, const RGBF a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if (!device.denoiser || device.ptrs.state_buffer[pixel] & STATE_ALBEDO || device.iteration_type == TYPE_LIGHT)
+  if (!device.denoiser || device.iteration_type == TYPE_LIGHT)
     return;
 
-  if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION) {
-    RGBF out_albedo = RGBAhalf_to_RGBF(device.ptrs.albedo_buffer[pixel]);
-    out_albedo      = scale_color(out_albedo, device.temporal_frames);
-    albedo          = add_color(albedo, out_albedo);
-    albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1));
-  }
+  if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
+    if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION) {
+      RGBF out_albedo = RGBAhalf_to_RGBF(device.ptrs.albedo_buffer[pixel]);
+      out_albedo      = scale_color(out_albedo, device.temporal_frames);
+      albedo          = add_color(albedo, out_albedo);
+      albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1));
+    }
 
-  device.ptrs.albedo_buffer[pixel] = RGBF_to_RGBAhalf(albedo);
-  device.ptrs.state_buffer[pixel] |= STATE_ALBEDO;
+    device.ptrs.albedo_buffer[pixel] = RGBF_to_RGBAhalf(albedo);
+  }
 }
 
 __device__ void write_normal_buffer(vec3 normal, const int pixel) {
@@ -238,43 +241,58 @@ __device__ void write_normal_buffer(vec3 normal, const int pixel) {
   device.ptrs.normal_buffer[pixel] = get_RGBAhalf(normal.x, normal.y, normal.z, 0.0f);
 }
 
-__device__ LightEvalData load_light_eval_data(const int offset) {
-  const float4* ptr  = (float4*) (device.ptrs.light_eval_data + offset);
+__device__ GBufferData load_g_buffer_data(const int offset) {
+  const float4* ptr  = (float4*) (device.ptrs.g_buffer + offset);
   const float4 data0 = __ldcs(ptr + 0);
   const float4 data1 = __ldcs(ptr + 1);
   const float4 data2 = __ldcs(ptr + 2);
+  const float4 data3 = __ldcs(ptr + 3);
+  const float4 data4 = __ldcs(ptr + 4);
 
-  LightEvalData result;
-  result.position  = get_vector(data0.x, data0.y, data0.z);
-  result.V         = get_vector(data0.w, data1.x, data1.y);
-  result.normal    = get_vector(data1.z, data1.w, data2.x);
-  result.roughness = data2.y;
-  result.metallic  = data2.z;
-  result.flags     = __float_as_uint(data2.w);
+  GBufferData result;
+  result.hit_id    = __float_as_uint(data0.x);
+  result.albedo    = RGBAF_set(data0.y, data0.z, data0.w, data1.x);
+  result.emission  = get_color(data1.y, data1.z, data1.w);
+  result.position  = get_vector(data2.x, data2.y, data2.z);
+  result.V         = get_vector(data2.w, data3.x, data3.y);
+  result.normal    = get_vector(data3.z, data3.w, data4.x);
+  result.roughness = data4.y;
+  result.metallic  = data4.z;
+  result.flags     = __float_as_uint(data4.w);
 
   return result;
 }
 
-__device__ void store_light_eval_data(const LightEvalData data, const int offset) {
-  float4 data0, data1, data2;
+__device__ void store_g_buffer_data(const GBufferData data, const int offset) {
+  float4 data0, data1, data2, data3, data4;
 
-  data0.x = data.position.x;
-  data0.y = data.position.y;
-  data0.z = data.position.z;
-  data0.w = data.V.x;
-  data1.x = data.V.y;
-  data1.y = data.V.z;
-  data1.z = data.normal.x;
-  data1.w = data.normal.y;
-  data2.x = data.normal.z;
-  data2.y = data.roughness;
-  data2.z = data.metallic;
-  data2.w = __uint_as_float(data.flags);
+  data0.x = __uint_as_float(data.hit_id);
+  data0.y = data.albedo.r;
+  data0.z = data.albedo.g;
+  data0.w = data.albedo.b;
+  data1.x = data.albedo.a;
+  data1.y = data.emission.r;
+  data1.z = data.emission.g;
+  data1.w = data.emission.b;
+  data2.x = data.position.x;
+  data2.y = data.position.y;
+  data2.z = data.position.z;
+  data2.w = data.V.x;
+  data3.x = data.V.y;
+  data3.y = data.V.z;
+  data3.z = data.normal.x;
+  data3.w = data.normal.y;
+  data4.x = data.normal.z;
+  data4.y = data.roughness;
+  data4.z = data.metallic;
+  data4.w = __uint_as_float(data.flags);
 
-  float4* ptr = (float4*) (device.ptrs.light_eval_data + offset);
+  float4* ptr = (float4*) (device.ptrs.g_buffer + offset);
   __stcs(ptr + 0, data0);
   __stcs(ptr + 1, data1);
   __stcs(ptr + 2, data2);
+  __stcs(ptr + 3, data3);
+  __stcs(ptr + 4, data4);
 }
 
 __device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {

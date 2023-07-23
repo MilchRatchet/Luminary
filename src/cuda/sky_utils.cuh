@@ -51,4 +51,6 @@ __device__ RGBF sky_hdri_sample(const vec3 ray, const float mip_bias) {
   return get_color(hdri.x, hdri.y, hdri.z);
 }
 
+#define SKY_WORLD_REFERENCE_HEIGHT (get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f))))
+
 #endif /* SKY_UTILS_CUH */

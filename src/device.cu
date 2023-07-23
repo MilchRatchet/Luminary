@@ -13,11 +13,14 @@
 #include "cuda/math.cuh"
 #include "cuda/micromap.cuh"
 #include "cuda/mipmap.cuh"
+#include "cuda/ocean.cuh"
 #include "cuda/random.cuh"
 #include "cuda/restir.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/sky_hdri.cuh"
+#include "cuda/toy.cuh"
 #include "cuda/utils.cuh"
+#include "cuda/volume.cuh"
 #include "device.h"
 #include "log.h"
 #include "optixrt.h"
@@ -96,7 +99,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
   }
 
   if (instance->scene.fog.active || instance->scene.ocean.active) {
-    fog_preprocess_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
   if (instance->scene.sky.cloud.active && !instance->scene.sky.hdri_active) {
@@ -109,21 +112,17 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
+  geometry_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+  if (instance->scene.toy.active) {
+    toy_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+
+  if ((instance->scene.fog.active || instance->scene.ocean.active) && type != TYPE_LIGHT) {
+    volume_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+
   if (type != TYPE_LIGHT) {
-    geometry_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-
-    if (instance->scene.ocean.active) {
-      ocean_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
-
-    if (instance->scene.toy.active) {
-      toy_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
-
-    if (instance->scene.fog.active) {
-      fog_generate_light_eval_data<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
-
     restir_candidates_pool_generation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
     restir_weighted_reservoir_sampling<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -140,8 +139,8 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (type != TYPE_LIGHT && instance->scene.fog.active) {
-    process_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (type != TYPE_LIGHT && (instance->scene.fog.active || instance->scene.ocean.active)) {
+    volume_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 }
 
@@ -169,7 +168,6 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int typ
   if (instance->scene.toy.active) {
     process_debug_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
-  process_debug_fog_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
 extern "C" void device_generate_tasks() {

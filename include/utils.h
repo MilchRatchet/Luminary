@@ -89,6 +89,8 @@ enum MaterialFresnel { SCHLICK = 0, FDEZ_AGUERA = 1 } typedef MaterialFresnel;
 
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
+enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1 } typedef VolumeType;
+
 // Set of architectures supported by Luminary
 enum DeviceArch {
   DEVICE_ARCH_UNKNOWN = 0,
@@ -125,6 +127,8 @@ struct Camera {
   float focal_length;
   float aperture_size;
   float exposure;
+  float max_exposure;
+  float min_exposure;
   int auto_exposure;
   float far_clip_distance;
   int tonemap;
@@ -255,15 +259,11 @@ struct Sky {
 
 struct Ocean {
   int active;
-  int emissive;
-  int update;
   float height;
   float amplitude;
   float frequency;
   float choppyness;
-  float speed;
-  float time;
-  RGBAF albedo;
+  float transparency;
   float refractive_index;
   RGBF scattering;
   RGBF absorption;
@@ -366,7 +366,7 @@ struct DevicePointers {
   DeviceTexture* sky_tm_luts;
   DeviceTexture* sky_hdri_luts;
   LightSample* light_samples;
-  LightEvalData* light_eval_data;
+  GBufferData* g_buffer;
   uint32_t* light_candidates;
 } typedef DevicePointers;
 
@@ -440,7 +440,7 @@ struct RaytraceInstance {
   DeviceBuffer* bounce_records;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* light_samples;
-  DeviceBuffer* light_eval_data;
+  DeviceBuffer* g_buffer;
   DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;
   DeviceBuffer* sky_ms_luts;

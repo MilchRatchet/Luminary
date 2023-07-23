@@ -141,30 +141,6 @@ __device__ vec3 floor_vector(const vec3 x) {
   return get_vector(floorf(x.x), floorf(x.y), floorf(x.z));
 }
 
-__device__ vec3 reflect_vector(const vec3 v, const vec3 n) {
-  vec3 result;
-
-  const float dot = dot_product(v, n);
-
-  result.x = v.x - 2.0f * dot * n.x;
-  result.y = v.y - 2.0f * dot * n.y;
-  result.z = v.z - 2.0f * dot * n.z;
-
-  return result;
-}
-
-__device__ __host__ vec3 scale_vector(vec3 vector, const float scale) {
-  vector.x *= scale;
-  vector.y *= scale;
-  vector.z *= scale;
-
-  return vector;
-}
-
-__device__ __host__ float get_length(const vec3 vector) {
-  return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
-}
-
 __device__ vec3 normalize_vector(vec3 vector) {
   const float scale = rnorm3df(vector.x, vector.y, vector.z);
 
@@ -173,6 +149,25 @@ __device__ vec3 normalize_vector(vec3 vector) {
   vector.z *= scale;
 
   return vector;
+}
+
+__device__ vec3 scale_vector(vec3 vector, const float scale) {
+  vector.x *= scale;
+  vector.y *= scale;
+  vector.z *= scale;
+
+  return vector;
+}
+
+__device__ vec3 reflect_vector(const vec3 ray, const vec3 normal) {
+  const float dot   = dot_product(ray, normal);
+  const vec3 result = sub_vector(ray, scale_vector(normal, 2.0f * dot));
+
+  return normalize_vector(result);
+}
+
+__device__ float get_length(const vec3 vector) {
+  return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
 }
 
 __device__ float2 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
@@ -222,7 +217,7 @@ __device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV 
  * Uses a orthonormal basis which is built as described in
  * T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_
  */
-__device__ vec3 sample_hemisphere_basis(const float theta, const float phi, const vec3 basis) {
+__device__ vec3 sample_hemisphere_basis(const float altitude, const float azimuth, const vec3 basis) {
   vec3 u1, u2;
   // Orthonormal basis building
   {
@@ -233,9 +228,9 @@ __device__ vec3 sample_hemisphere_basis(const float theta, const float phi, cons
     u2               = get_vector(b, sign + basis.y * basis.y * a, -basis.y);
   }
 
-  const float c1 = sinf(theta) * cosf(phi);
-  const float c2 = sinf(theta) * sinf(phi);
-  const float c3 = cosf(theta);
+  const float c1 = sinf(altitude) * cosf(azimuth);
+  const float c2 = sinf(altitude) * sinf(azimuth);
+  const float c3 = cosf(altitude);
 
   vec3 result;
 
@@ -244,6 +239,28 @@ __device__ vec3 sample_hemisphere_basis(const float theta, const float phi, cons
   result.z = c1 * u1.z + c2 * u2.z + c3 * basis.z;
 
   return normalize_vector(result);
+}
+
+/*
+ * This function samples a ray on the unit sphere.
+ *
+ * @param alpha Number between [-1,1]. To sample only the upper hemisphere use [0,1] and vice versa.
+ * @param beta Number between [0,1].
+ * @result Unit vector on the sphere given by the two parameters.
+ */
+__device__ vec3 sample_ray_sphere(const float alpha, const float beta) {
+  const float a = sqrtf(1.0f - alpha * alpha);
+  const float b = 2.0f * PI * beta;
+
+  // How this works:
+  // Standard way is a = acosf(alpha) and then return (sinf(a) * cosf(b), sinf(a) * sinf(b), cosf(a)).
+  // What we can do instead is sample a point uniformly on the disk, i.e., x and y such that
+  // sqrtf(x * x + y * y) = 1 through x = cosf(2.0f * PI * beta) and y = sinf(2.0f * PI * beta).
+  // We have that z = alpha. We need a factor 'a' so that the direction, obtained by using the point on the disk
+  // scaled by 'a' and using the z value alpha, is normalized. Hence: 1.0f = sqrtf(a * a * (x * x + y * y) + alpha * alpha).
+  // Rearranging the terms yields: a = sqrtf((1.0f - alpha * alpha) / (x * x + y * y)).
+  // Since (x * x + y * y) = 1, we obtain our formula.
+  return get_vector(a * cosf(b), a * sinf(b), alpha);
 }
 
 __device__ int trailing_zeros(const unsigned int n) {
@@ -341,91 +358,86 @@ __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
 
 /*
  * Computes the distance to the first intersection of a ray with a sphere. To check for any hit use sphere_ray_hit.
- * @param ray Ray direction.
+ * This implementation is based on Chapter 7 in Ray Tracing Gems I, "Precision Improvements for Ray/Sphere Intersection".
+ *
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param p Center of the sphere.
  * @param r Radius of the sphere.
- * @result Value a such that origin + a * ray is a point on the sphere.
+ * @result Value t such that origin + t * ray is a point on the sphere.
  */
 __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = r2 - dot_product(k, k);
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
-  const float q  = -dot + copysignf(1.0f, -dot) * sd;
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
 
   const float t0 = c / q;
 
   if (t0 >= 0.0f)
     return t0;
 
-  const float t1 = q / a;
-  return (t1 < 0.0f) ? FLT_MAX : t1;
+  const float t1 = q;
+  return (t1 >= 0.0f) ? t1 : FLT_MAX;
 }
 
 /*
  * Computes the distance to the first intersection of a ray with a sphere with (0,0,0) as its center.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param r Radius of the sphere.
- * @result Value a such that origin + a * ray is a point on the sphere.
+ * @result Value t such that origin + t * ray is a point on the sphere.
  */
 __device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
-  const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = r2 - dot_product(k, k);
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
-  const float q  = -dot + copysignf(1.0f, -dot) * sd;
-
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
+  const float c  = dot_product(origin, origin) - r2;
   const float t0 = c / q;
 
   if (t0 >= 0.0f)
     return t0;
 
-  const float t1 = q / a;
-  return (t1 < 0.0f) ? FLT_MAX : t1;
+  const float t1 = q;
+  return (t1 >= 0.0f) ? t1 : FLT_MAX;
 }
 
 /*
  * Computes whether a ray hits a sphere. To compute the distance see sphere_ray_intersection.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param p Center of the sphere.
  * @param r Radius of the sphere.
  * @result 1 if the ray hits the sphere, 0 else.
  */
-__device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
+__device__ bool sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = r2 - dot_product(k, k);
 
   if (d < 0.0f)
-    return 0;
+    return false;
 
-  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
-  const float q  = -dot + copysignf(1.0f, -dot) * sd;
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
 
   const float t0 = c / q;
 
@@ -434,26 +446,23 @@ __device__ int sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, c
 
 /*
  * Computes whether a ray hits a sphere with (0,0,0) as its center. To compute the distance see sph_ray_int_p0.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param r Radius of the sphere.
  * @result 1 if the ray hits the sphere, 0 else.
  */
-__device__ int sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) {
+__device__ bool sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
-  const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = r2 - dot_product(k, k);
 
   if (d < 0.0f)
-    return 0;
+    return false;
 
-  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
-  const float q  = -dot + copysignf(1.0f, -dot) * sd;
-
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
+  const float c  = dot_product(origin, origin) - r2;
   const float t0 = c / q;
 
   return (t0 >= 0.0f);
@@ -461,66 +470,61 @@ __device__ int sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) 
 
 /*
  * Computes the distance to the last intersection of a ray with a sphere. To compute the first hit use sphere_ray_intersection.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param p Center of the sphere.
  * @param r Radius of the sphere.
- * @result Value a such that origin + a * ray is a point on the sphere.
+ * @result Value t such that origin + t * ray is a point on the sphere.
  */
 __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
   const float c   = dot_product(diff, diff) - r2;
   const vec3 k    = sub_vector(diff, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = r2 - dot_product(k, k);
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  const vec3 h   = add_vector(diff, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
-  const float q  = -dot + copysignf(1.0f, -dot) * sd;
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
 
-  const float t1 = q / a;
+  const float t1 = q;
 
   if (t1 >= 0.0f)
     return t1;
 
   const float t0 = c / q;
-  return (t0 < 0.0f) ? FLT_MAX : t0;
+  return (t0 >= 0.0f) ? t0 : FLT_MAX;
 }
 
 /*
  * Computes the distance to the last intersection of a ray with a sphere with (0,0,0) as its center.
- * @param ray Ray direction.
+ * @param ray Normalized ray direction.
  * @param origin Ray origin.
  * @param r Radius of the sphere.
- * @result Value a such that origin + a * ray is a point on the sphere.
+ * @result Value t such that origin + t * ray is a point on the sphere.
  */
 __device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
-  const float a   = dot_product(ray, ray);
-  const float c   = dot_product(origin, origin) - r2;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
-  const float d   = 4.0f * a * (r2 - dot_product(k, k));
+  const float d   = r2 - dot_product(k, k);
 
   if (d < 0.0f)
     return FLT_MAX;
 
-  const vec3 h   = add_vector(origin, scale_vector(ray, -dot / a));
-  const float sd = sqrtf(a * (r2 - dot_product(h, h)));
-  const float q  = -dot + copysignf(1.0f, -dot) * sd;
-
-  const float t1 = q / a;
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
+  const float c  = dot_product(origin, origin) - r2;
+  const float t1 = q;
 
   if (t1 >= 0.0f)
     return t1;
 
   const float t0 = c / q;
-  return (t0 < 0.0f) ? FLT_MAX : t0;
+  return (t0 >= 0.0f) ? t0 : FLT_MAX;
 }
 
 __device__ __host__ vec3 angles_to_direction(const float altitude, const float azimuth) {
@@ -530,6 +534,20 @@ __device__ __host__ vec3 angles_to_direction(const float altitude, const float a
   dir.z = sinf(azimuth) * cosf(altitude);
 
   return dir;
+}
+
+// PBRT v3 Chapter "Specular Reflection and Transmission", Refract() function
+__device__ vec3 refract_ray(const vec3 ray, const vec3 normal, const float index_ratio) {
+  const float dot = -dot_product(normal, ray);
+
+  const float b = 1.0f - index_ratio * index_ratio * (1.0f - dot * dot);
+
+  if (b < 0.0f) {
+    return reflect_vector(ray, normal);
+  }
+  else {
+    return normalize_vector(add_vector(scale_vector(ray, index_ratio), scale_vector(normal, index_ratio * dot - sqrtf(b))));
+  }
 }
 
 __device__ RGBF get_color(const float r, const float g, const float b) {
@@ -614,6 +632,10 @@ __device__ RGBF inv_color(const RGBF a) {
 
 __device__ int color_any(const RGBF a) {
   return (a.r > 0.0f || a.g > 0.0f || a.b > 0.0f);
+}
+
+__device__ float RGBF_avg(const RGBF a) {
+  return (a.r + a.g + a.b) * (1.0f / 3.0f);
 }
 
 __device__ RGBF opaque_color(const RGBAF a) {
@@ -812,13 +834,63 @@ __device__ RGBF filter_blackwhite(RGBF color, int x, int y) {
   }
 }
 
-__device__ float henvey_greenstein_phase_function(const float cos_angle, const float g) {
+__device__ float henyey_greenstein_phase_function(const float cos_angle, const float g) {
   return (1.0f - g * g) / (4.0f * PI * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
 }
 
 __device__ float draine_phase_function(const float cos_angle, const float g, const float alpha) {
-  return henvey_greenstein_phase_function(cos_angle, g)
+  return henyey_greenstein_phase_function(cos_angle, g)
          * ((1.0f + alpha * cos_angle * cos_angle) / (1.0f + (alpha / 3.0f) * (1.0f + 2.0f * g * g)));
+}
+
+struct JendersieEonParams {
+  float g_hg;
+  float g_d;
+  float alpha;
+  float w_d;
+} typedef JendersieEonParams;
+
+__device__ JendersieEonParams jendersie_eon_phase_parameters(const float diameter, const float ms_factor) {
+  JendersieEonParams params;
+
+  // Renaming to a shorter name.
+  const float d = diameter;
+
+  // TODO: Allow precomputation of these so that the actual functions take these parameters as arguments.
+
+  if (d >= 5.0f && d <= 50.0f) {
+    params.g_hg  = expf(-0.0990567f / (d - 1.67154f));
+    params.g_d   = expf(-(2.20679f / (d + 3.91029f)) - 0.428934f);
+    params.alpha = expf(3.62489f - (8.29288f / (d + 5.52825f)));
+    params.w_d   = expf(-(0.599085f / (d - 0.641583f)) - 0.665888f);
+  }
+  else if (d >= 1.5f && d < 5.0f) {
+    params.g_hg  = 0.0604931f * logf(logf(d)) + 0.940256f;
+    params.g_d   = 0.500411f - (0.081287f / (-2.0f * logf(d) + tanf(logf(d)) + 1.27551f));
+    params.alpha = 7.30354f * logf(d) + 6.31675f;
+    params.w_d   = 0.026914f * (logf(d) - cosf(5.68947f * (logf(logf(d)) - 0.0292149f))) + 0.376475f;
+  }
+  else if (d >= 0.1f && d < 1.5f) {
+    params.g_hg = 0.862f - 0.143f * logf(d) * logf(d);
+    params.g_d  = 0.379685f
+                   * cosf(
+                     1.19692f * cosf(((logf(d) - 0.238604f) * (logf(d) + 1.00667f)) / (0.507522f - 0.15677f * logf(d))) + 1.37932f * logf(d)
+                     + 0.0625835f)
+                 + 0.344213f;
+    params.alpha = 250.0f;
+    params.w_d   = 0.146209f * cosf(3.38707f * logf(d) + 2.11193f) + 0.316072f + 0.0778917f * logf(d);
+  }
+  else if (d < 0.1f) {
+    params.g_hg  = 13.8f * d * d;
+    params.g_d   = 1.1456f * d * sinf(9.29044f * d);
+    params.alpha = 250.0f;
+    params.w_d   = 0.252977f - 312.983f * powf(d, 4.3f);
+  }
+
+  params.g_hg *= ms_factor;
+  params.g_d *= ms_factor;
+
+  return params;
 }
 
 /*
@@ -829,15 +901,86 @@ __device__ float draine_phase_function(const float cos_angle, const float g, con
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
 __device__ float jendersie_eon_phase_function(const float cos_angle, const float diameter, const float ms_factor = 1.0f) {
-  const float g_hg  = ms_factor * expf(-0.0990567f / (diameter - 1.67154f));
-  const float g_d   = ms_factor * expf(-(2.20679f / (diameter + 3.91029f)) - 0.428934f);
-  const float alpha = expf(3.62489f - (8.29288f / (diameter + 5.52825f)));
-  const float w_d   = expf(-(0.599085f / (diameter - 0.641583f)) - 0.665888f);
+  JendersieEonParams params = jendersie_eon_phase_parameters(diameter, ms_factor);
 
-  const float phase_hg = henvey_greenstein_phase_function(cos_angle, g_hg);
-  const float phase_d  = draine_phase_function(cos_angle, g_d, alpha);
+  const float phase_hg = henyey_greenstein_phase_function(cos_angle, params.g_hg);
+  const float phase_d  = draine_phase_function(cos_angle, params.g_d, params.alpha);
 
-  return (1.0f - w_d) * phase_hg + w_d * phase_d;
+  return (1.0f - params.w_d) * phase_hg + params.w_d * phase_d;
+}
+
+/*
+ * Uses a orthonormal basis which is built as described in
+ * T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_
+ */
+__device__ vec3 phase_sample_basis(const float alpha, const float beta, const vec3 basis) {
+  const float sign = copysignf(1.0f, basis.z);
+  const float a    = -1.0f / (sign + basis.z);
+  const float b    = basis.x * basis.y * a;
+  const vec3 u1    = get_vector(1.0f + sign * basis.x * basis.x * a, sign * b, -sign * basis.x);
+  const vec3 u2    = get_vector(b, sign + basis.y * basis.y * a, -basis.y);
+
+  const vec3 s = sample_ray_sphere(alpha, beta);
+
+  vec3 result;
+  result.x = s.x * u1.x + s.y * u2.x + s.z * basis.x;
+  result.y = s.x * u1.y + s.y * u2.y + s.z * basis.y;
+  result.z = s.x * u1.z + s.y * u2.z + s.z * basis.z;
+
+  return normalize_vector(result);
+}
+
+__device__ float henyey_greenstein_phase_sample(const float g, const float r) {
+  const float g2 = g * g;
+
+  const float t = (1.0f - g2) / (1.0f - g + 2.0f * g * r);
+
+  return (1.0f + g2 - t) / (2.0f * g);
+}
+
+__device__ float draine_phase_sample(const float g, const float alpha, const float r) {
+  const float g2 = g * g;
+  const float g4 = g2 * g2;
+
+  const float t0 = alpha - alpha * g2;
+  const float t1 = alpha * g4 - alpha;
+  const float t2 = -3.0f * (4.0f * (g4 - g2) + t1 * (1.0f + g2));
+  const float t3 = g * (2.0f * r - 1.0f);
+  const float t4 = 3.0f * g2 * (1.0f + t3) + alpha * (2.0f + g2 * (1.0f + (1.0f + 2.0f * g2) * t3));
+  const float t5 = t0 * (t1 * t2 + t4 * t4) + t1 * t1 * t1;
+  const float t6 = t0 * 4.0f * (g4 - g2);
+  const float t7 = powf(t5 + sqrtf(t5 * t5 - t6 * t6 * t6), 1.0f / 3.0f);
+  const float t8 = 2.0f * ((t1 + (t6 / t7) + t7) / t0);
+  const float t9 = sqrtf(6.0f * (1.0f + g2) + t8);
+
+  const float h = sqrtf(6.0f * (1.0f + g2) - t8 + 8.0f * t4 / (t0 * t9)) - t9;
+
+  return 0.5f * g + ((1.0f / (2.0f * g)) - (1.0f / (8.0f * g)) * (h * h));
+}
+
+/*
+ * This function perfectly importance samples the phase function from [JenE23]. The details of this are presented in the
+ * supplement of the paper.
+ *
+ * [JenE23] J. Jendersie and E. d'Eon, "An Approximate Mie Scattering Function for Fog and Cloud Rendering", SIGGRAPH 2023 Talks, 2023.
+ *
+ * @param diameter Diameter of water droplets in [5,50] in micrometer.
+ */
+__device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float ms_factor = 1.0f) {
+  const float r1 = white_noise();
+  const float r2 = white_noise();
+
+  JendersieEonParams params = jendersie_eon_phase_parameters(diameter, ms_factor);
+
+  float u;
+  if (white_noise() < params.w_d) {
+    u = draine_phase_sample(params.g_d, params.alpha, r1);
+  }
+  else {
+    u = henyey_greenstein_phase_sample(params.g_hg, r1);
+  }
+
+  return phase_sample_basis(u, r2, ray);
 }
 
 __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
@@ -929,20 +1072,20 @@ __device__ float sample_triangle_solid_angle(const TriangleLight triangle, const
  * @result Normalized direction to the point on the sphere.
  */
 __device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, uint32_t& seed) {
-  const float u1 = sqrtf(white_noise_offset_restir(seed++));
-  const float u2 = white_noise_offset_restir(seed++) * 2.0f * PI;
+  const float u1 = white_noise_offset_restir(seed++);
+  const float u2 = white_noise_offset_restir(seed++);
 
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);
 
   if (d < r) {
-    return normalize_vector(angles_to_direction(u1 * u1 * 2.0f * PI, u2));
+    return normalize_vector(sample_ray_sphere(2.0f * u1 - 1.0f, u2));
   }
 
   dir               = normalize_vector(dir);
   const float angle = asinf(r / d);
 
-  return normalize_vector(sample_hemisphere_basis(u1 * angle, u2, dir));
+  return normalize_vector(sample_hemisphere_basis(sqrtf(u1) * angle, 2.0f * PI * u2, dir));
 }
 
 /*

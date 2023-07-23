@@ -110,9 +110,26 @@ __global__ void temporal_accumulation() {
     if (device.temporal_frames) {
       variance      = scale_RGBAhalf(variance, device.temporal_frames - 1.0f);
       RGBAhalf diff = sub_RGBAhalf(buffer, output);
-      diff          = mul_RGBAhalf(diff, diff);
-      variance      = add_RGBAhalf(variance, diff);
-      variance      = scale_RGBAhalf(variance, 1.0f / device.temporal_frames);
+
+      // Hard firefly rejection.
+      // Fireflies that appear during the first frame are accepted by our method since there is
+      // no reference yet to reject them from. This trick here hard rejects them by taking the
+      // dimmer of the two frames. This is not unbiased but since it only happens exactly once
+      // the bias will decrease with the number of frames.
+      // Taking neighbouring pixels as reference is not the target since I want to consider each
+      // pixel as its own independent entity to preserve fine details.
+      // TODO: Improve this method to remove the visible dimming during the second frame.
+      if (device.temporal_frames == 1) {
+        RGBAhalf min = min_RGBAhalf(buffer, output);
+
+        output = min;
+        buffer = min;
+      }
+
+      diff = mul_RGBAhalf(diff, diff);
+
+      variance = add_RGBAhalf(variance, diff);
+      variance = scale_RGBAhalf(variance, 1.0f / device.temporal_frames);
     }
 
     store_RGBAhalf(device.ptrs.frame_variance + offset, variance);

@@ -78,6 +78,12 @@ Exposure of the camera. Number must be non-negative.
 `CAMERA AUTOEXP_ [INT32]`<br/>
 Set 1 to activate auto exposure in realtime mode, 0 else.
 
+`CAMERA MINEXPOS [FP32]`<br/>
+Minimum exposure of the camera obtained through auto exposure. Number must be non-negative.
+
+`CAMERA MAXEXPOS [FP32]`<br/>
+Maximum exposure of the camera obtained through auto exposure. Number must be non-negative.
+
 `CAMERA BLOOM___ [INT32]`<br/>
 Set 1 to activate bloom, 0 else.
 
@@ -167,7 +173,7 @@ Exponential inverse height factor of the concentration distribution of particles
 Exponential inverse height factor of the concentration distribution of insoluble particles that contribute to Mie scattering. Number should be non-negative.
 
 `SKY DIAMETER [FP32]`<br/>
-Water droplet diameter. Number must be in the range [5,50].
+Water droplet diameter. Number must be in the range [0.01,50].
 
 `SKY GROUNDVI [FP32]`<br/>
 Ground visibility in kilometers. This acts as a concentration factor to water soluble particles that contribute to Mie scattering. Number should be non-negative.
@@ -235,7 +241,7 @@ Scaling used when sampling the weather noise texture. Number should be non-negat
 Anvil overhang. Number must be in the range [0,1].
 
 `CLOUD DIAMETER [FP32]`<br/>
-Water droplet diameter. Number must be in the range [5,50].
+Water droplet diameter. Number must be in the range [0.01,50].
 
 `CLOUD SHASTEPS [INT32]`<br/>
 Number of raymarching steps that are used for volumetric extinction/shadowing. Values larger than 10 are generally not necessary. Number should be non-negative.
@@ -267,7 +273,7 @@ Set 1 to activate fog, 0 else.
 Scattering coefficient determining the amout of light being scattered. Number should be non-negative.
 
 `FOG DIAMETER [FP32]`<br/>
-Water droplet diameter. Numbers must be in the range [5,50].
+Water droplet diameter. Number must be in the range [0.01,50].
 
 `FOG DISTANCE [FP32]`<br/>
 Maximum distance of the fog from the camera. Number should be non-negative.
@@ -295,20 +301,23 @@ Frequency of the ocean waves. Number should be non-negative.
 `OCEAN CHOPPY__ [FP32]`<br/>
 Choppyness of the ocean waves. Number should be non-negative.
 
-`OCEAN ANIMATED [INT32]`<br/>
-Set 1 to activate the ocean animation, 0 else.
-
-`OCEAN SPEED___ [FP32]`<br/>
-Speed of the ocean waves when the ocean is animated. Number should be non-negative.
-
-`OCEAN COLOR___ [FP32] [FP32] [FP32]`<br/>
-Albedo of the ocean. Numbers must be in the range [0,1].
-
-`OCEAN EMISSIVE [INT32]`<br/>
-Set 1 to make the albedo of the ocean act as emission, 0 else.
-
 `OCEAN REFRACT_ [FP32]`<br/>
 Refraction index of the ocean relative to the air. Number must be at least 1.
+
+`OCEAN TRANSPAR [FP32]`<br/>
+Transparency of the ocean surface. Number must be in the range [0,1].
+
+`OCEAN ABSORBST [FP32]`<br/>
+Absorption strength of the water. Number should be non-negative.
+
+`OCEAN ABSORBTI [FP32] [FP32] [FP32]`<br/>
+Absorption color of the water. Numbers must be in the range [0,1].
+
+`OCEAN POLLUTIO [FP32]`<br/>
+Pollution of the water. This controls the strength of the scattering in the water. Number should be non-negative.
+
+`OCEAN SCATTERI [FP32] [FP32] [FP32]`<br/>
+Scattering color of the water. Numbers must be in the range [0,1].
 
 ## Toy Settings
 

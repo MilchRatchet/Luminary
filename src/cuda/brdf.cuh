@@ -9,6 +9,7 @@
 #include "sky_utils.cuh"
 #include "toy_utils.cuh"
 #include "utils.cuh"
+#include "volume_utils.cuh"
 
 struct BRDFInstance {
   RGBAhalf albedo;
@@ -194,23 +195,8 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
   return brdf;
 }
 
-__device__ vec3 brdf_sample_ray_hemisphere(const float alpha, const float beta) {
-  const float a = sqrtf(alpha);
-  const float b = 2.0f * PI * beta;
-
-  // How this works:
-  // Standard way is a = acosf(alpha) and then return (sinf(a) * cosf(b), sinf(a) * sinf(b), cosf(a)).
-  // What we can do instead is sample a point uniformly on the disk on which the hemisphere lies. (i.e. z = 0.0f).
-  // Then since we want a normalized direction the ray must satisfy 1.0f = sqrtf(x * x + y * y + z * z).
-  // Further, since we only want the upper hemisphere it must be that z >= 0.0f.
-  // Using these constraints, we get that z = sqrtf(1.0f - x * x + y * y).
-  // Then we can use that x * x + y * y = a * a * (cosf(b) * cosf(b) + sinf(b) * sinf(b)) = a * a.
-  // Hence, we have that z = sqrtf(1.0f - a * a) = sqrtf(1.0f - sqrtf(alpha) * sqrtf(alpha)) = sqrtf(1.0f - alpha).
-  return get_vector(a * cosf(b), a * sinf(b), sqrtf(1.0f - alpha));
-}
-
 __device__ vec3 brdf_sample_ray_diffuse(const float alpha, const float beta) {
-  return brdf_sample_ray_hemisphere(alpha, beta);
+  return sample_ray_sphere(alpha, beta);
 }
 
 __device__ float brdf_spec_probability(const float metallic) {
@@ -322,8 +308,10 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
   return brdf_evaluate(result);
 }
 
-__device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, float droplet_diameter) {
+__device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, VolumeType volume_hit_type) {
   BRDFInstance result = brdf_get_instance_scattering();
+
+  const float droplet_diameter = volume_get_descriptor_preset(volume_hit_type).water_droplet_diameter;
 
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
@@ -400,10 +388,10 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
 
   vec3 L_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
 
-  const float HdotL = fmaxf(0.00001f, fminf(1.0f, dot_product(H_local, L_local)));
-  const float HdotV = fmaxf(0.00001f, fminf(1.0f, dot_product(H_local, V_local)));
-  const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
-  const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
+  const float HdotL = fmaxf(eps, fminf(1.0f, dot_product(H_local, L_local)));
+  const float HdotV = fmaxf(eps, fminf(1.0f, dot_product(H_local, V_local)));
+  const float NdotL = fmaxf(eps, fminf(1.0f, L_local.z));
+  const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
 
   switch (device.scene.material.fresnel) {
     case SCHLICK:
@@ -426,7 +414,7 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
   const vec3 ray_local = scale_vector(V_local, -1.0f);
 
   if (b < 0.0f) {
-    L_local = normalize_vector(reflect_vector(ray_local, scale_vector(H_local, -1.0f)));
+    L_local = reflect_vector(ray_local, scale_vector(H_local, -1.0f));
   }
   else {
     L_local = normalize_vector(add_vector(scale_vector(ray_local, index), scale_vector(H_local, index * HdotV - sqrtf(b))));

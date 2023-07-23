@@ -39,6 +39,8 @@ void scene_init(Scene** _scene) {
   scene->camera.focal_length          = 1.0f;
   scene->camera.aperture_size         = 0.00f;
   scene->camera.exposure              = 1.0f;
+  scene->camera.min_exposure          = 40.0f;
+  scene->camera.max_exposure          = 300.0f;
   scene->camera.auto_exposure         = 1;
   scene->camera.bloom                 = 1;
   scene->camera.bloom_blend           = 0.025f;
@@ -59,26 +61,19 @@ void scene_init(Scene** _scene) {
   scene->camera.russian_roulette_bias = 10.0f;
 
   scene->ocean.active              = 0;
-  scene->ocean.emissive            = 0;
-  scene->ocean.update              = 0;
   scene->ocean.height              = 0.0f;
   scene->ocean.amplitude           = 0.2f;
   scene->ocean.frequency           = 0.12f;
   scene->ocean.choppyness          = 4.0f;
-  scene->ocean.speed               = 1.0f;
-  scene->ocean.time                = 0.0f;
-  scene->ocean.albedo.r            = 0.0f;
-  scene->ocean.albedo.g            = 0.0f;
-  scene->ocean.albedo.b            = 0.0f;
-  scene->ocean.albedo.a            = 0.9f;
+  scene->ocean.transparency        = 0.9f;
   scene->ocean.refractive_index    = 1.333f;
-  scene->ocean.scattering.r        = 0.0f;
-  scene->ocean.scattering.g        = 0.2f;
+  scene->ocean.scattering.r        = 0.05f;
+  scene->ocean.scattering.g        = 0.15f;
   scene->ocean.scattering.b        = 1.0f;
   scene->ocean.absorption.r        = 1.0f;
-  scene->ocean.absorption.g        = 0.15f;
+  scene->ocean.absorption.g        = 0.2f;
   scene->ocean.absorption.b        = 0.01f;
-  scene->ocean.pollution           = 0.5f;
+  scene->ocean.pollution           = 1.0f;
   scene->ocean.absorption_strength = 1.0f;
 
   scene->toy.active           = 0;
@@ -119,7 +114,7 @@ void scene_init(Scene** _scene) {
   scene->sky.mie_density                 = 1.0f;
   scene->sky.ozone_density               = 1.0f;
   scene->sky.ground_visibility           = 60.0f;
-  scene->sky.mie_diameter                = 10.0f;
+  scene->sky.mie_diameter                = 2.0f;
   scene->sky.ozone_layer_thickness       = 15.0f;
   scene->sky.rayleigh_falloff            = 8.0f;
   scene->sky.mie_falloff                 = 1.7f;

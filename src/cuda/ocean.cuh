@@ -8,49 +8,12 @@
 #include "brdf.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "ocean_utils.cuh"
 
-#define OCEAN_POLLUTION (device.scene.ocean.pollution * 0.01f)
+#define OCEAN_LIPSCHITZ (device.scene.ocean.amplitude * 3.0f)
 
-#define OCEAN_ITERATIONS_INTERSECTION 4
-#define OCEAN_ITERATIONS_NORMAL 6
-
-__device__ float ocean_get_normal_granularity(const float distance) {
-  return fmaxf(eps, distance / device.width);
-}
-
-__device__ float ocean_ray_underwater_length(const vec3 origin, const vec3 ray, const float limit) {
-  const float max_ocean_height = device.scene.ocean.height + 3.0f * device.scene.ocean.amplitude;
-
-  if (origin.y > max_ocean_height) {
-    const float ref_height = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
-
-    if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(max_ocean_height) + ref_height)) {
-      return 0.0f;
-    }
-  }
-
-  if (origin.y < device.scene.ocean.height) {
-    if (ray.y < eps) {
-      return limit;
-    }
-    else {
-      return fminf(limit, (device.scene.ocean.height - origin.y) / ray.y);
-    }
-  }
-
-  if (ray.y > -eps) {
-    return 0.0f;
-  }
-
-  return fmaxf(0.0f, limit - (device.scene.ocean.height - origin.y) / ray.y);
-}
-
-__device__ RGBF ocean_get_extinction() {
-  RGBF extinction = scale_color(device.scene.ocean.absorption, device.scene.ocean.absorption_strength * 0.02f);
-  extinction      = add_color(extinction, scale_color(device.scene.ocean.scattering, OCEAN_POLLUTION));
-
-  return extinction;
-}
+#define OCEAN_ITERATIONS_INTERSECTION 5
+#define OCEAN_ITERATIONS_NORMAL 8
 
 __device__ float ocean_hash(const float2 p) {
   const float x = p.x * 127.1f + p.y * 311.7f;
@@ -62,12 +25,10 @@ __device__ float ocean_noise(const float2 p) {
   integral.x = floorf(p.x);
   integral.y = floorf(p.y);
 
-  float2 fractional;
-  fractional.x = fractf(p.x);
-  fractional.y = fractf(p.y);
+  float2 fractional = make_float2(p.x - integral.x, p.y - integral.y);
 
-  fractional.x *= fractional.x * (3.0f - 2.0f * fractional.x);
-  fractional.y *= fractional.y * (3.0f - 2.0f * fractional.y);
+  fractional.x = fractional.x * fractional.x * (3.0f - 2.0f * fractional.x);
+  fractional.y = fractional.y * fractional.y * (3.0f - 2.0f * fractional.y);
 
   const float hash1 = ocean_hash(integral);
   integral.x += 1.0f;
@@ -109,23 +70,11 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
 
   float2 q = make_float2(p.x * 0.75f, p.z);
 
-  float d = 0.0f;
   float h = 0.0f;
 
-  float t = 1.0f + device.scene.ocean.time * device.scene.ocean.speed;
-
   for (int i = 0; i < steps; i++) {
-    float2 a;
-    a.x = (q.x + t) * frequency;
-    a.y = (q.y + t) * frequency;
-    d   = ocean_octave(a, choppyness);
-
-    float2 b;
-    b.x = (q.x - t) * frequency;
-    b.y = (q.y - t) * frequency;
-    d += ocean_octave(b, choppyness);
-
-    h += d * amplitude;
+    float2 a = make_float2(q.x * frequency, q.y * frequency);
+    h += ocean_octave(a, choppyness) * amplitude;
 
     const float u = q.x;
     const float v = q.y;
@@ -137,125 +86,235 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
     choppyness = lerp(choppyness, 1.0f, 0.2f);
   }
 
-  return p.y - h - device.scene.ocean.height;
+  h *= 2.0f;
+
+  return h;
 }
 
-__device__ vec3 ocean_get_normal(vec3 p, const float diff) {
+__device__ vec3 ocean_get_normal(const vec3 p) {
+  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+
   // Sobel filter
   float h[8];
-  h[0] = ocean_get_height(add_vector(p, get_vector(-diff, 0.0f, diff)), OCEAN_ITERATIONS_NORMAL);
-  h[1] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, diff)), OCEAN_ITERATIONS_NORMAL);
-  h[2] = ocean_get_height(add_vector(p, get_vector(diff, 0.0f, diff)), OCEAN_ITERATIONS_NORMAL);
-  h[3] = ocean_get_height(add_vector(p, get_vector(-diff, 0.0f, 0.0f)), OCEAN_ITERATIONS_NORMAL);
-  h[4] = ocean_get_height(add_vector(p, get_vector(diff, 0.0f, 0.0f)), OCEAN_ITERATIONS_NORMAL);
-  h[5] = ocean_get_height(add_vector(p, get_vector(-diff, 0.0f, -diff)), OCEAN_ITERATIONS_NORMAL);
-  h[6] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -diff)), OCEAN_ITERATIONS_NORMAL);
-  h[7] = ocean_get_height(add_vector(p, get_vector(diff, 0.0f, -diff)), OCEAN_ITERATIONS_NORMAL);
+  h[0] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), OCEAN_ITERATIONS_NORMAL);
+  h[1] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), OCEAN_ITERATIONS_NORMAL);
+  h[2] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, d)), OCEAN_ITERATIONS_NORMAL);
+  h[3] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), OCEAN_ITERATIONS_NORMAL);
+  h[4] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, 0.0f)), OCEAN_ITERATIONS_NORMAL);
+  h[5] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, -d)), OCEAN_ITERATIONS_NORMAL);
+  h[6] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), OCEAN_ITERATIONS_NORMAL);
+  h[7] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, -d)), OCEAN_ITERATIONS_NORMAL);
 
   vec3 normal;
-  normal.x = ((h[7] + 2.0f * h[4] + h[2]) - (h[5] + 2.0f * h[3] + h[0])) / 8.0f;
-  normal.y = diff;
-  normal.z = ((h[0] + 2.0f * h[1] + h[2]) - (h[5] + 2.0f * h[6] + h[7])) / 8.0f;
+  normal.x = -((h[7] + 2.0f * h[4] + h[2]) - (h[5] + 2.0f * h[3] + h[0])) / 8.0f;
+  normal.y = d;
+  normal.z = -((h[0] + 2.0f * h[1] + h[2]) - (h[5] + 2.0f * h[6] + h[7])) / 8.0f;
 
   return normalize_vector(normal);
 }
 
+// FLT_MAX signals no hit.
 __device__ float ocean_far_distance(const vec3 origin, const vec3 ray) {
-  const float ref_height       = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
-  const float max_ocean_height = device.scene.ocean.height + 3.0f * device.scene.ocean.amplitude;
-
-  if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(max_ocean_height) + ref_height)) {
+  if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
     return FLT_MAX;
   }
 
-  const float d1 = device.scene.ocean.height - origin.y;
-  const float d2 = d1 + 3.0f * device.scene.ocean.amplitude;
+  if (fabsf(ray.y) < eps) {
+    return (origin.y >= OCEAN_MIN_HEIGHT && origin.y <= OCEAN_MAX_HEIGHT) ? FLT_MAX : FLT_MAX;
+  }
+
+  const float d1 = OCEAN_MIN_HEIGHT - origin.y;
+  const float d2 = OCEAN_MAX_HEIGHT - origin.y;
 
   const float s1 = d1 / ray.y;
   const float s2 = d2 / ray.y;
-
-  // inbetween top and bottom is inconclusive
-  if (s1 * s2 < 0.0f)
-    return FLT_MAX;
 
   const float s = fmaxf(s1, s2);
 
   return (s >= eps) ? s : FLT_MAX;
 }
 
+// FLT_MAX signals no hit.
 __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
-  const float ref_height       = get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f)));
-  const float max_ocean_height = device.scene.ocean.height + 3.0f * device.scene.ocean.amplitude;
-
-  if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(max_ocean_height) + ref_height)) {
+  if (!sph_ray_hit_p0(ray, world_to_sky_transform(origin), world_to_sky_scale(OCEAN_MAX_HEIGHT) + SKY_WORLD_REFERENCE_HEIGHT)) {
     return FLT_MAX;
   }
 
-  const float d1 = device.scene.ocean.height - origin.y;
-  const float d2 = d1 + 3.0f * device.scene.ocean.amplitude;
+  if (fabsf(ray.y) < eps) {
+    return (origin.y >= OCEAN_MIN_HEIGHT && origin.y <= OCEAN_MAX_HEIGHT) ? 0.0f : FLT_MAX;
+  }
+
+  const float d1 = OCEAN_MIN_HEIGHT - origin.y;
+  const float d2 = OCEAN_MAX_HEIGHT - origin.y;
 
   const float s1 = d1 / ray.y;
   const float s2 = d2 / ray.y;
 
-  // inbetween top and bottom is inconclusive
-  if (s1 * s2 < 0.0f)
-    return 0.0f;
+  if (s1 < 0.0f && s2 < 0.0f)
+    return FLT_MAX;
 
-  return fabsf(fminf(s1, s2));
+  return (s1 * s2 < 0.0f) ? fmaxf(s1, s2) : fminf(s1, s2);
 }
 
-__device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, float max) {
-  float min = 0.0f;
+__device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, const float start, const float limit) {
+  const float target_residual = 400.0f * device.scene.ocean.amplitude * eps;
 
-  vec3 p = add_vector(origin, scale_vector(ray, max));
+  float min = start + target_residual;
+  float max = limit;
 
-  float height_at_max = ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
+  const float far_distance = ocean_far_distance(origin, ray);
 
-  float height_at_min = ocean_get_height(origin, OCEAN_ITERATIONS_INTERSECTION);
+  if (far_distance == FLT_MAX) {
+    return FLT_MAX;
+  }
+
+  max = fminf(max, far_distance);
+
+  vec3 p;
+
+  p                     = add_vector(origin, scale_vector(ray, max));
+  float residual_at_max = (p.y - device.scene.ocean.height) - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
+
+  p                     = add_vector(origin, scale_vector(ray, min));
+  float residual_at_min = (p.y - device.scene.ocean.height) - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
 
   float mid = 0.0f;
 
-  for (int i = 0; i < 8; i++) {
-    mid = lerp(min, max, height_at_min / (height_at_min - height_at_max));
+  for (int i = 0; i < 20; i++) {
+    mid = lerp(min, max, residual_at_min / (residual_at_min - residual_at_max));
     p   = add_vector(origin, scale_vector(ray, mid));
 
-    float height_at_mid = ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
-
-    if (height_at_mid < 0.0f) {
-      max           = mid;
-      height_at_max = height_at_mid;
+    float residual_at_mid = (p.y - device.scene.ocean.height) - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
+    if (residual_at_mid < 0.0f) {
+      if (ray.y > 0.0f) {
+        min             = mid;
+        residual_at_min = residual_at_mid;
+      }
+      else {
+        max             = mid;
+        residual_at_max = residual_at_mid;
+      }
     }
     else {
-      min           = mid;
-      height_at_min = height_at_mid;
+      if (ray.y > 0.0f) {
+        max             = mid;
+        residual_at_max = residual_at_mid;
+      }
+      else {
+        min             = mid;
+        residual_at_min = residual_at_mid;
+      }
     }
   }
 
-  return mid < 0.0f ? FLT_MAX : mid;
+  return (mid < target_residual) ? FLT_MAX : mid;
 }
 
-__global__ void ocean_generate_light_eval_data() {
-  const int task_count  = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 1];
-  const int task_offset = device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 1];
+__device__ float ocean_ray_marcher(const vec3 origin, const vec3 ray, const float start, const float limit) {
+  const float target_residual = 400.0f * device.scene.ocean.amplitude * eps;
+
+  float t = start + target_residual;
+
+  const float slope_confidence_factor = 1.0f / (OCEAN_LIPSCHITZ + fabsf(ray.y));
+
+  for (int i = 0; i < 500; i++) {
+    const vec3 p = add_vector(origin, scale_vector(ray, t));
+
+    const float residual_at_t = fabsf((p.y - device.scene.ocean.height) - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION));
+
+    if (residual_at_t < target_residual)
+      return t;
+
+    t += residual_at_t * slope_confidence_factor;
+
+    if (t >= limit)
+      break;
+  }
+
+  return FLT_MAX;
+}
+
+__device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, const float limit) {
+  float start = 0.0f;
+
+  if (origin.y < OCEAN_MIN_HEIGHT || origin.y > OCEAN_MAX_HEIGHT) {
+    const float short_distance = ocean_short_distance(origin, ray);
+
+    if (short_distance == FLT_MAX) {
+      return FLT_MAX;
+    }
+
+    start = short_distance;
+  }
+
+  if (device.scene.ocean.amplitude == 0.0f) {
+    return start;
+  }
+
+  if (device.iteration_type != TYPE_LIGHT) {
+    if (get_length(sub_vector(add_vector(origin, scale_vector(ray, start)), device.scene.camera.pos)) > 30.0f) {
+      return ocean_intersection_solver(origin, ray, start, limit);
+    }
+    else {
+      return ocean_ray_marcher(origin, ray, start, limit);
+    }
+  }
+  else {
+    return ocean_intersection_solver(origin, ray, start, limit);
+  }
+
+  return FLT_MAX;
+}
+
+__device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
+  const float dot = dot_product(ray, normal);
+
+  if (dot < 0.0f) {
+    return get_color(1.0f, 1.0f, 1.0f);
+  }
+
+  RGBAhalf specular_f0 = get_RGBAhalf(0.02f, 0.02f, 0.02f, 0.0f);
+  switch (device.scene.material.fresnel) {
+    case SCHLICK:
+      return RGBAhalf_to_RGBF(brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), dot));
+      break;
+    case FDEZ_AGUERA:
+    default:
+      return RGBAhalf_to_RGBF(brdf_fresnel_roughness(specular_f0, 0.0f, dot));
+      break;
+  }
+}
+
+////////////////////////////////////////////////////////////////////
+// Kernel
+////////////////////////////////////////////////////////////////////
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks() {
+  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
   for (int i = 0; i < task_count; i++) {
-    OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device.width + task.index.x;
+    const int offset  = get_task_address(i);
+    TraceTask task    = load_trace_task(device.trace_tasks + offset);
+    const float depth = __ldcs(&((device.ptrs.trace_results + offset)->depth));
 
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+    if (device.iteration_type != TYPE_LIGHT) {
+      bool intersection_possible = true;
+      if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
+        const float short_distance = ocean_short_distance(task.origin, task.ray);
+        intersection_possible      = (short_distance != FLT_MAX) && (short_distance <= depth);
+      }
 
-    LightEvalData data;
-    data.flags     = LIGHT_EVAL_DATA_REQUIRES_SAMPLING | LIGHT_EVAL_DATA_VOLUME_HIT;
-    data.normal    = get_vector(0.0f, 0.0f, 0.0f);
-    data.position  = task.position;
-    data.V         = scale_vector(ray, -1.0f);
-    data.roughness = 1.0f;
-    data.metallic  = 0.0f;
+      if (intersection_possible) {
+        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
 
-    store_light_eval_data(data, pixel);
+        if (ocean_depth < depth) {
+          float2 result;
+          result.x = ocean_depth;
+          result.y = __uint_as_float(OCEAN_HIT);
+          __stcs((float2*) (device.ptrs.trace_results + offset), result);
+        }
+      }
+    }
   }
 }
 
@@ -276,129 +335,44 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
-    vec3 normal = ocean_get_normal(task.position, ocean_get_normal_granularity(task.distance));
+    vec3 normal = ocean_get_normal(task.position);
 
-    if (ray.y > 0.0f) {
-      normal = scale_vector(normal, -1.0f);
+    float refraction_index_ratio;
+    if (dot_product(ray, normal) > 0.0f) {
+      normal                 = scale_vector(normal, -1.0f);
+      refraction_index_ratio = device.scene.ocean.refractive_index;
     }
-
-    RGBAF albedo = device.scene.ocean.albedo;
-    RGBF record  = device.records[pixel];
-
-    if (device.scene.ocean.emissive) {
-      RGBF emission = get_color(albedo.r, albedo.g, albedo.b);
-
-      write_albedo_buffer(emission, pixel);
-
-      emission.r *= record.r;
-      emission.g *= record.g;
-      emission.b *= record.b;
-
-      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(emission);
+    else {
+      refraction_index_ratio = 1.0f / device.scene.ocean.refractive_index;
     }
 
     write_normal_buffer(normal, pixel);
 
-    const vec3 V      = scale_vector(ray, -1.0f);
-    BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, 0.0f, 1.0f);
-
-    if (white_noise() > albedo.a) {
+    if (normal.y > 0.0f) {
+      if (white_noise() > device.scene.ocean.transparency) {
+        ray           = refract_ray(ray, normal, refraction_index_ratio);
+        task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
+      }
+      else {
+        task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
+        ray           = reflect_vector(ray, normal);
+      }
+    }
+    else {
+      ray           = refract_ray(ray, normal, refraction_index_ratio);
       task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
-
-      const float refraction_index = 1.0f / device.scene.ocean.refractive_index;
-
-      brdf = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
-
-      RGBF alpha_record = record;
-
-      TraceTask new_task;
-      new_task.origin = task.position;
-      new_task.ray    = brdf.L;
-      new_task.index  = task.index;
-
-      switch (device.iteration_type) {
-        case TYPE_CAMERA:
-        case TYPE_BOUNCE:
-          store_RGBF(device.ptrs.bounce_records + pixel, alpha_record);
-          store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
-          break;
-        case TYPE_LIGHT:
-          if (white_noise() > 0.5f)
-            break;
-          store_RGBF(device.ptrs.light_records + pixel, scale_color(alpha_record, 2.0f));
-          store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
-          device.ptrs.state_buffer[pixel] |= STATE_LIGHT_OCCUPIED;
-          break;
-      }
     }
-    else if (device.iteration_type != TYPE_LIGHT) {
-      const float scattering_prob = (ray.y > 0.0f) ? 0.0f : (1.0f - albedo.a);
-      const int scattering_pass   = white_noise() < scattering_prob && !(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED);
 
-      task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
+    RGBF record = load_RGBF(device.records + pixel);
+    record      = mul_color(record, ocean_brdf(ray, normal));
 
-      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
+    TraceTask new_task;
+    new_task.origin = task.position;
+    new_task.ray    = ray;
+    new_task.index  = task.index;
 
-      // TODO: change this so that this coincides with the transparent pass from above, this here has nothing to do with surface bounces!
-      if (scattering_pass) {
-        LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
-
-        float underwater_sample;
-        vec3 light_pos;
-
-        underwater_sample            = 10.0f * white_noise();
-        const float refraction_index = 1.0f / device.scene.ocean.refractive_index;
-        BRDFInstance brdf2           = brdf_sample_ray_refraction(brdf, refraction_index, 0.0f, 0.0f);
-        light_pos                    = add_vector(task.position, scale_vector(brdf2.L, underwater_sample));
-
-        if (light.weight > 0.0f) {
-          RGBF light_record;
-
-          BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, light_pos, 50.0f);
-
-          const RGBF S = mul_color(device.scene.ocean.scattering, scale_color(brdf_sample.term, OCEAN_POLLUTION));
-
-          RGBF extinction = ocean_get_extinction();
-
-          // Amount of light that gets lost along this step
-          RGBF step_transmittance;
-          step_transmittance.r = expf(-underwater_sample * extinction.r);
-          step_transmittance.g = expf(-underwater_sample * extinction.g);
-          step_transmittance.b = expf(-underwater_sample * extinction.b);
-
-          const RGBF weight = mul_color(sub_color(S, mul_color(S, step_transmittance)), inv_color(extinction));
-
-          light_record = mul_color(record, weight);
-          light_record = scale_color(light_record, 1.0f / scattering_prob);
-
-          TraceTask light_task;
-          light_task.origin = light_pos;
-          light_task.ray    = brdf_sample.L;
-          light_task.index  = task.index;
-
-          if (luminance(light_record) > 0.0f) {
-            store_RGBF(device.ptrs.light_records + pixel, light_record);
-            light_history_buffer_entry = light.id;
-            store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
-          }
-        }
-      }
-
-      if (!(device.ptrs.state_buffer[pixel] & STATE_LIGHT_OCCUPIED))
-        device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
-
-      brdf = brdf_sample_ray(brdf, task.index);
-
-      RGBF bounce_record = mul_color(record, brdf.term);
-
-      TraceTask bounce_task;
-      bounce_task.origin = task.position;
-      bounce_task.ray    = brdf.L;
-      bounce_task.index  = task.index;
-
-      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
-      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
-    }
+    store_RGBF(device.ptrs.bounce_records + pixel, record);
+    store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
   }
 
   device.ptrs.light_trace_count[id]  = light_trace_count;
@@ -416,15 +390,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
     const int pixel = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      RGBAF albedo                    = device.scene.ocean.albedo;
-      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(albedo.r, albedo.g, albedo.b));
+      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(0.0f, 0.0f, 0.0f));
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float value               = __saturatef((1.0f / task.distance) * 2.0f);
       device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
     }
     else if (device.shading_mode == SHADING_NORMAL) {
-      vec3 normal = ocean_get_normal(task.position, ocean_get_normal_granularity(task.distance));
+      vec3 normal = ocean_get_normal(task.position);
 
       normal.x = 0.5f * normal.x + 0.5f;
       normal.y = 0.5f * normal.y + 0.5f;

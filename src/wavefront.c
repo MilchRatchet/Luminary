@@ -23,7 +23,7 @@
 #define READ_BUFFER_SIZE 262144  // 256kb
 
 void wavefront_init(WavefrontContent** content) {
-  *content = malloc(sizeof(WavefrontContent));
+  *content = calloc(1, sizeof(WavefrontContent));
 
   (*content)->vertices         = malloc(sizeof(WavefrontVertex) * 1);
   (*content)->vertices_length  = 0;
@@ -35,6 +35,7 @@ void wavefront_init(WavefrontContent** content) {
   (*content)->triangles_length = 0;
   (*content)->materials        = malloc(sizeof(WavefrontMaterial) * 1);
   (*content)->materials_length = 1;
+  (*content)->materials_count  = 1;
 
   (*content)->materials[0].hash                    = 0;
   (*content)->materials[0].texture[WF_ALBEDO]      = TEXTURE_NONE;

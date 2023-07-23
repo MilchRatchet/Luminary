@@ -155,10 +155,10 @@ __device__ CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float start, 
     if (density > 0.0f) {
       hit = true;
 
-      const float ambient_r1 = 2.0f * PI * white_noise_offset(seed++) - PI;
-      const float ambient_r2 = 2.0f * PI * white_noise_offset(seed++);
+      const float ambient_r1 = 2.0f * white_noise_offset(seed++) - 1.0f;
+      const float ambient_r2 = white_noise_offset(seed++);
 
-      const vec3 ambient_ray = angles_to_direction(ambient_r1, ambient_r2);
+      const vec3 ambient_ray = sample_ray_sphere(ambient_r1, ambient_r2);
       RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2, seed);
       ambient_color          = scale_color(ambient_color, 4.0f * PI);
 

@@ -543,9 +543,7 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
   const float b     = (threadIdx.x - ((threadIdx.x / SKY_MS_BASE) * SKY_MS_BASE));
   const float randA = a / sqrt_sample;
   const float randB = b / sqrt_sample;
-  const float theta = 2.0f * PI * randA;
-  const float phi   = 2.0f * PI * randB - PI;
-  const vec3 ray    = angles_to_direction(phi, theta);
+  const vec3 ray    = sample_ray_sphere(2.0f * randA - 1.0f, randB);
 
   msScatteringResult result = sky_compute_multiscattering_integration(pos, ray, sun_pos);
 

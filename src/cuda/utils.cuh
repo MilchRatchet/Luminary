@@ -21,18 +21,20 @@
 //===========================================================================================
 
 #define RANDOM_INDEX 0x0000ffffu
-#define DEPTH_LEFT 0xffff0000u
 #define SKY_HIT 0xffffffffu
 #define OCEAN_HIT 0xfffffffeu
 #define TOY_HIT 0xfffffffdu
-#define FOG_HIT 0xfffffffcu
 #define REJECT_HIT 0xfffffff0u
 #define TRIANGLE_ID_LIMIT 0xefffffffu
 #define LIGHT_ID_ANY 0xfffffff0u
 #define LIGHT_ID_ANY_NO_SUN 0xfffffff1u
-#define STATE_ALBEDO 0b1u
-#define STATE_LIGHT_OCCUPIED 0b10u
-#define STATE_BOUNCE_OCCUPIED 0b100u
+
+#define VOLUME_FOG_HIT 0xfffffff2u
+#define VOLUME_OCEAN_HIT 0xfffffff3u
+
+// VOLUME_FOG_HIT is supposed to always have the volume type bits set to 0.
+#define VOLUME_HIT_CHECK(X) ((X & VOLUME_FOG_HIT) == VOLUME_FOG_HIT)
+#define VOLUME_HIT_TYPE(X) ((VolumeType) (X & 0x00000001u))
 
 //===========================================================================================
 // Device Variables
