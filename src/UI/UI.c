@@ -556,15 +556,8 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Amplitude", &(instance->scene.ocean.amplitude), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Choppyness", &(instance->scene.ocean.choppyness), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Frequency", &(instance->scene.ocean.frequency), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_color(ui, "Albedo", (float*) &(instance->scene.ocean.albedo));
-  panels[i++] = create_slider(ui, "  Red", &(instance->scene.ocean.albedo.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "  Green", &(instance->scene.ocean.albedo.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "  Blue", &(instance->scene.ocean.albedo.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene.ocean.refractive_index), 1, 0.001f, 1.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_check(ui, "Emissive", &(instance->scene.ocean.emissive), 1);
-  panels[i++] = create_slider(ui, "Alpha", &(instance->scene.ocean.albedo.a), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_check(ui, "Animated", &(instance->scene.ocean.update), 1);
-  panels[i++] = create_slider(ui, "Speed", &(instance->scene.ocean.speed), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Alpha", &(instance->scene.ocean.transparency), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Pollution", &(instance->scene.ocean.pollution), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_color(ui, "Scattering", (float*) &(instance->scene.ocean.scattering));
   panels[i++] = create_slider(ui, "  Red", &(instance->scene.ocean.scattering.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);

@@ -349,7 +349,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     write_normal_buffer(normal, pixel);
 
     if (normal.y > 0.0f) {
-      if (white_noise() > device.scene.ocean.albedo.a) {
+      if (white_noise() > device.scene.ocean.transparency) {
         ray           = refract_ray(ray, normal, refraction_index_ratio);
         task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
       }
@@ -390,8 +390,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
     const int pixel = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      RGBAF albedo                    = device.scene.ocean.albedo;
-      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(albedo.r, albedo.g, albedo.b));
+      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(0.0f, 0.0f, 0.0f));
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float value               = __saturatef((1.0f / task.distance) * 2.0f);

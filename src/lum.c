@@ -482,25 +482,29 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
     case 6872309757870295107u:
       sscanf(value, "%f\n", &ocean->choppyness);
       break;
-    /* SPEED___ */
-    case 6872316303215251539u:
-      sscanf(value, "%f\n", &ocean->speed);
-      break;
-    /* ANIMATED */
-    case 4919430807418392129u:
-      sscanf(value, "%d\n", &ocean->update);
-      break;
-    /* COLOR___ */
-    case 6872316363513024323u:
-      sscanf(value, "%f %f %f %f\n", &ocean->albedo.r, &ocean->albedo.g, &ocean->albedo.b, &ocean->albedo.a);
-      break;
-    /* EMISSIVE */
-    case 4996261458842570053u:
-      sscanf(value, "%d\n", &ocean->emissive);
-      break;
     /* REFRACT_ */
     case 6869189279479121234u:
       sscanf(value, "%f\n", &ocean->refractive_index);
+      break;
+    /* TRANSPAR */
+    case 5927106903321694804u:
+      sscanf(value, "%f\n", &ocean->transparency);
+      break;
+    /* ABSORBST */
+    case 6076273243538539073u:
+      sscanf(value, "%f\n", &ocean->absorption_strength);
+      break;
+    /* ABSORBTI */
+    case 5283921184098042433u:
+      sscanf(value, "%f %f %f\n", &ocean->absorption.r, &ocean->absorption.g, &ocean->absorption.b);
+      break;
+    /* POLLUTIO */
+    case 5713190327625207632u:
+      sscanf(value, "%f\n", &ocean->pollution);
+      break;
+    /* SCATTERI */
+    case 5283361541352145747u:
+      sscanf(value, "%f %f %f\n", &ocean->scattering.r, &ocean->scattering.g, &ocean->scattering.b);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
@@ -917,17 +921,21 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "OCEAN CHOPPY__ %f\n", instance->scene.ocean.choppyness);
   fputs(line, file);
-  sprintf(line, "OCEAN SPEED___ %f\n", instance->scene.ocean.speed);
+  sprintf(line, "OCEAN REFRACT_ %f\n", instance->scene.ocean.refractive_index);
   fputs(line, file);
-  sprintf(line, "OCEAN ANIMATED %d\n", instance->scene.ocean.update);
+  sprintf(line, "OCEAN TRANSPAR %f\n", instance->scene.ocean.transparency);
+  fputs(line, file);
+  sprintf(line, "OCEAN ABSORBST %f\n", instance->scene.ocean.absorption_strength);
   fputs(line, file);
   sprintf(
-    line, "OCEAN COLOR___ %f %f %f %f\n", instance->scene.ocean.albedo.r, instance->scene.ocean.albedo.g, instance->scene.ocean.albedo.b,
-    instance->scene.ocean.albedo.a);
+    line, "OCEAN ABSORBTI %f %f %f\n", instance->scene.ocean.absorption.r, instance->scene.ocean.absorption.g,
+    instance->scene.ocean.absorption.b);
   fputs(line, file);
-  sprintf(line, "OCEAN EMISSIVE %d\n", instance->scene.ocean.emissive);
+  sprintf(line, "OCEAN POLLUTIO %f\n", instance->scene.ocean.pollution);
   fputs(line, file);
-  sprintf(line, "OCEAN REFRACT_ %f\n", instance->scene.ocean.refractive_index);
+  sprintf(
+    line, "OCEAN SCATTERI %f %f %f\n", instance->scene.ocean.scattering.r, instance->scene.ocean.scattering.g,
+    instance->scene.ocean.scattering.b);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Toy Settings\n#===============================\n\n");

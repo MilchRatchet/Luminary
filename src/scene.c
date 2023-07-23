@@ -61,18 +61,11 @@ void scene_init(Scene** _scene) {
   scene->camera.russian_roulette_bias = 10.0f;
 
   scene->ocean.active              = 0;
-  scene->ocean.emissive            = 0;
-  scene->ocean.update              = 0;
   scene->ocean.height              = 0.0f;
   scene->ocean.amplitude           = 0.2f;
   scene->ocean.frequency           = 0.12f;
   scene->ocean.choppyness          = 4.0f;
-  scene->ocean.speed               = 1.0f;
-  scene->ocean.time                = 0.0f;
-  scene->ocean.albedo.r            = 0.0f;
-  scene->ocean.albedo.g            = 0.0f;
-  scene->ocean.albedo.b            = 0.0f;
-  scene->ocean.albedo.a            = 0.9f;
+  scene->ocean.transparency        = 0.9f;
   scene->ocean.refractive_index    = 1.333f;
   scene->ocean.scattering.r        = 0.05f;
   scene->ocean.scattering.g        = 0.15f;

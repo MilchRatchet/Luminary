@@ -273,7 +273,7 @@ Set 1 to activate fog, 0 else.
 Scattering coefficient determining the amout of light being scattered. Number should be non-negative.
 
 `FOG DIAMETER [FP32]`<br/>
-Water droplet diameter. Numbers must be in the range [0.01,50].
+Water droplet diameter. Number must be in the range [0.01,50].
 
 `FOG DISTANCE [FP32]`<br/>
 Maximum distance of the fog from the camera. Number should be non-negative.
@@ -301,20 +301,23 @@ Frequency of the ocean waves. Number should be non-negative.
 `OCEAN CHOPPY__ [FP32]`<br/>
 Choppyness of the ocean waves. Number should be non-negative.
 
-`OCEAN ANIMATED [INT32]`<br/>
-Set 1 to activate the ocean animation, 0 else.
-
-`OCEAN SPEED___ [FP32]`<br/>
-Speed of the ocean waves when the ocean is animated. Number should be non-negative.
-
-`OCEAN COLOR___ [FP32] [FP32] [FP32]`<br/>
-Albedo of the ocean. Numbers must be in the range [0,1].
-
-`OCEAN EMISSIVE [INT32]`<br/>
-Set 1 to make the albedo of the ocean act as emission, 0 else.
-
 `OCEAN REFRACT_ [FP32]`<br/>
 Refraction index of the ocean relative to the air. Number must be at least 1.
+
+`OCEAN TRANSPAR [FP32]`<br/>
+Transparency of the ocean surface. Number must be in the range [0,1].
+
+`OCEAN ABSORBST [FP32]`<br/>
+Absorption strength of the water. Number should be non-negative.
+
+`OCEAN ABSORBTI [FP32] [FP32] [FP32]`<br/>
+Absorption color of the water. Numbers must be in the range [0,1].
+
+`OCEAN POLLUTIO [FP32]`<br/>
+Pollution of the water. This controls the strength of the scattering in the water. Number should be non-negative.
+
+`OCEAN SCATTERI [FP32] [FP32] [FP32]`<br/>
+Scattering color of the water. Numbers must be in the range [0,1].
 
 ## Toy Settings
 

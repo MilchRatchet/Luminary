@@ -493,11 +493,6 @@ void realtime_output(RaytraceInstance* instance) {
     instance->scene.camera.pos.y += movement_speed * movement_vector.y;
     instance->scene.camera.pos.z += movement_speed * movement_vector.z;
 
-    if (instance->scene.ocean.update) {
-      instance->temporal_frames = 0;
-      instance->scene.ocean.time += total_time * 0.001f * instance->scene.ocean.speed;
-    }
-
     if (instance->scene.camera.auto_exposure) {
       instance->scene.camera.exposure = denoise_auto_exposure(instance);
     }

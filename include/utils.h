@@ -259,15 +259,11 @@ struct Sky {
 
 struct Ocean {
   int active;
-  int emissive;
-  int update;
   float height;
   float amplitude;
   float frequency;
   float choppyness;
-  float speed;
-  float time;
-  RGBAF albedo;
+  float transparency;
   float refractive_index;
   RGBF scattering;
   RGBF absorption;
