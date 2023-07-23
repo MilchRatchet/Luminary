@@ -173,10 +173,10 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
   vec3 p;
 
   p                     = add_vector(origin, scale_vector(ray, max));
-  float residual_at_max = p.y - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION) - device.scene.ocean.height;
+  float residual_at_max = (p.y - device.scene.ocean.height) - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
 
   p                     = add_vector(origin, scale_vector(ray, min));
-  float residual_at_min = p.y - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION) - device.scene.ocean.height;
+  float residual_at_min = (p.y - device.scene.ocean.height) - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
 
   float mid = 0.0f;
 
@@ -184,7 +184,7 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
     mid = lerp(min, max, residual_at_min / (residual_at_min - residual_at_max));
     p   = add_vector(origin, scale_vector(ray, mid));
 
-    float residual_at_mid = p.y - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION) - device.scene.ocean.height;
+    float residual_at_mid = (p.y - device.scene.ocean.height) - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION);
     if (residual_at_mid < 0.0f) {
       if (ray.y > 0.0f) {
         min             = mid;
@@ -220,7 +220,7 @@ __device__ float ocean_ray_marcher(const vec3 origin, const vec3 ray, const floa
   for (int i = 0; i < 500; i++) {
     const vec3 p = add_vector(origin, scale_vector(ray, t));
 
-    const float residual_at_t = fabsf(p.y - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION) - device.scene.ocean.height);
+    const float residual_at_t = fabsf((p.y - device.scene.ocean.height) - ocean_get_height(p, OCEAN_ITERATIONS_INTERSECTION));
 
     if (residual_at_t < target_residual)
       return t;
