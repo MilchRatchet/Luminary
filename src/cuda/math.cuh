@@ -853,15 +853,42 @@ struct JendersieEonParams {
 __device__ JendersieEonParams jendersie_eon_phase_parameters(const float diameter, const float ms_factor) {
   JendersieEonParams params;
 
-  // TODO: Implement other ranges.
+  // Renaming to a shorter name.
+  const float d = diameter;
+
   // TODO: Allow precomputation of these so that the actual functions take these parameters as arguments.
 
-  if (diameter >= 5.0f && diameter <= 50.0f) {
-    params.g_hg  = ms_factor * expf(-0.0990567f / (diameter - 1.67154f));
-    params.g_d   = ms_factor * expf(-(2.20679f / (diameter + 3.91029f)) - 0.428934f);
-    params.alpha = expf(3.62489f - (8.29288f / (diameter + 5.52825f)));
-    params.w_d   = expf(-(0.599085f / (diameter - 0.641583f)) - 0.665888f);
+  if (d >= 5.0f && d <= 50.0f) {
+    params.g_hg  = expf(-0.0990567f / (d - 1.67154f));
+    params.g_d   = expf(-(2.20679f / (d + 3.91029f)) - 0.428934f);
+    params.alpha = expf(3.62489f - (8.29288f / (d + 5.52825f)));
+    params.w_d   = expf(-(0.599085f / (d - 0.641583f)) - 0.665888f);
   }
+  else if (d >= 1.5f && d < 5.0f) {
+    params.g_hg  = 0.0604931f * logf(logf(d)) + 0.940256f;
+    params.g_d   = 0.500411f - (0.081287f / (-2.0f * logf(d) + tanf(logf(d)) + 1.27551f));
+    params.alpha = 7.30354f * logf(d) + 6.31675f;
+    params.w_d   = 0.026914f * (logf(d) - cosf(5.68947f * (logf(logf(d)) - 0.0292149f))) + 0.376475f;
+  }
+  else if (d >= 0.1f && d < 1.5f) {
+    params.g_hg = 0.862f - 0.143f * logf(d) * logf(d);
+    params.g_d  = 0.379685f
+                   * cosf(
+                     1.19692f * cosf(((logf(d) - 0.238604f) * (logf(d) + 1.00667f)) / (0.507522f - 0.15677f * logf(d))) + 1.37932f * logf(d)
+                     + 0.0625835f)
+                 + 0.344213f;
+    params.alpha = 250.0f;
+    params.w_d   = 0.146209f * cosf(3.38707f * logf(d) + 2.11193f) + 0.316072f + 0.0778917f * logf(d);
+  }
+  else if (d < 0.1f) {
+    params.g_hg  = 13.8f * d * d;
+    params.g_d   = 1.1456f * d * sinf(9.29044f * d);
+    params.alpha = 250.0f;
+    params.w_d   = 0.252977f - 312.983f * powf(d, 4.3f);
+  }
+
+  params.g_hg *= ms_factor;
+  params.g_d *= ms_factor;
 
   return params;
 }

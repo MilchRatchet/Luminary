@@ -121,7 +121,7 @@ void scene_init(Scene** _scene) {
   scene->sky.mie_density                 = 1.0f;
   scene->sky.ozone_density               = 1.0f;
   scene->sky.ground_visibility           = 60.0f;
-  scene->sky.mie_diameter                = 10.0f;
+  scene->sky.mie_diameter                = 2.0f;
   scene->sky.ozone_layer_thickness       = 15.0f;
   scene->sky.rayleigh_falloff            = 8.0f;
   scene->sky.mie_falloff                 = 1.7f;

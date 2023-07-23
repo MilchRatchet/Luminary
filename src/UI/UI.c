@@ -292,7 +292,7 @@ static UITab create_sky_general_atmo_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Ground Visibility", &(instance->atmo_settings.ground_visibility), 0, 0.001f, 0.0001f, FLT_MAX, 0, 0);
   panels[i++] =
     create_slider(ui, "Ozone Layer Thickness", &(instance->atmo_settings.ozone_layer_thickness), 0, 0.001f, 0.01f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->atmo_settings.mie_diameter), 1, 0.001f, 5.0f, 50.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->atmo_settings.mie_diameter), 1, 0.001f, 0.01f, 50.0f, 0, 0);
   panels[i++] =
     create_slider(ui, "Multiscattering Factor", &(instance->atmo_settings.multiscattering_factor), 0, 0.001f, 0.01f, FLT_MAX, 0, 0);
   panels[i++] = create_button(ui, "Apply Settings", instance, (void (*)(void*)) device_sky_generate_LUTs, 1);
@@ -377,7 +377,7 @@ static UITab create_sky_cloud_general_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_slider(ui, "Noise Detail Scale", &(instance->scene.sky.cloud.noise_detail_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Noise Weather Scale", &(instance->scene.sky.cloud.noise_weather_scale), 1, 0.01f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Density", &(instance->scene.sky.cloud.density), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->scene.sky.cloud.droplet_diameter), 1, 0.001f, 5.0f, 50.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->scene.sky.cloud.droplet_diameter), 1, 0.001f, 0.01f, 50.0f, 0, 0);
   panels[i++] = create_slider(ui, "Seed", &(instance->scene.sky.cloud.seed), 0, 0.005f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_button(ui, "Generate Noise Maps", instance, (void (*)(void*)) device_cloud_noise_generate, 1);
 
@@ -511,7 +511,7 @@ static UITab create_sky_fog_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_check(ui, "Active", &(instance->scene.fog.active), 1);
   panels[i++] = create_slider(ui, "Density", &(instance->scene.fog.density), 1, 0.001f, 0.001f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->scene.fog.droplet_diameter), 1, 0.001f, 5.0f, 50.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->scene.fog.droplet_diameter), 1, 0.001f, 0.01f, 50.0f, 0, 0);
   panels[i++] = create_slider(ui, "Distance", &(instance->scene.fog.dist), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Height", &(instance->scene.fog.height), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
 
