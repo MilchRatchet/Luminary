@@ -7,10 +7,10 @@
 #include "volume_utils.cuh"
 
 //
-// This implements a volume renderer. These volumes are homogenous and bound by a maximum height relative to the planet's
-// surface. Closed form tracking is used to solve any light interaction with such a volume.
-// While this implementation is mostly generic, some details are handled simply with the constraint that Luminary only has
-// two types of volumes, fog and ocean water.
+// This implements a volume renderer. These volumes are homogenous and bound by a disk-box (A horizontal disk with a width in the vertical
+// axis). Closed form tracking is used to solve any light interaction with such a volume. While this implementation is mostly generic, some
+// details are handled simply with the constraint that Luminary only has two types of volumes, fog and ocean water. Fog does not use
+// absorption and only has scalar scattering values while ocean scattering and absorption is performed using three color channels.
 //
 
 ////////////////////////////////////////////////////////////////////

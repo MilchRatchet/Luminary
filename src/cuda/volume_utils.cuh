@@ -45,7 +45,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.absorption             = OCEAN_ABSORPTION;
   volume.scattering             = OCEAN_SCATTERING;
   volume.dist                   = 10000.0f;
-  volume.max_height             = OCEAN_MIN_HEIGHT;
+  volume.max_height             = OCEAN_MIN_HEIGHT * (1.0f - eps);
   volume.min_height             = 0.0f;
 
   volume.avg_scattering = RGBF_avg(volume.scattering);
