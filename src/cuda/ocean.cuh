@@ -168,9 +168,7 @@ __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
 __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, const float start, const float limit) {
   const float target_residual = (1.0f + fabsf(device.scene.ocean.height) + start / 10.0f) * 0.5f * eps;
 
-  const float initial_offset = target_residual / OCEAN_LIPSCHITZ;
-
-  float t                       = start + initial_offset;
+  float t                       = start;
   float last_residual           = 0.0f;
   float slope_confidence_factor = 6.0f / (OCEAN_LIPSCHITZ + fabsf(ray.y));
 
@@ -189,14 +187,16 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
 
     last_residual = residual_at_t;
 
-    t += fminf(0.1f * (limit - start), res_abs * slope_confidence_factor);
+    const float step_size = fminf(0.1f * (limit - start), res_abs * fabsf(slope_confidence_factor));
+
+    t += copysignf(step_size, slope_confidence_factor);
 
     // Sometimes we may overstep beyond the limit and then require to backtrack, hence we abort
     // only if we are far beyond the limit.
-    if (t >= 2.0f * limit) {
+    if (t >= limit + 0.2f * (limit - start)) {
       break;
     }
-    else if (t <= start - (limit - start)) {
+    else if (t <= start - 0.2f * (limit - start)) {
       break;
     }
   }
