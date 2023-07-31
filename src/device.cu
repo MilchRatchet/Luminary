@@ -99,7 +99,12 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
   }
 
   if (instance->scene.fog.active || instance->scene.ocean.active) {
-    volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    if (type == TYPE_LIGHT) {
+      volume_process_events_light<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
+    else {
+      volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
   }
 
   if (instance->scene.sky.cloud.active && !instance->scene.sky.hdri_active) {
