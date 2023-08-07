@@ -154,45 +154,6 @@ __global__ void volume_generate_g_buffer() {
   }
 }
 
-__global__ void volume_process_events_light() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
-
-  for (int i = 0; i < task_count; i++) {
-    const int offset    = get_task_address(i);
-    TraceTask task      = load_trace_task(device.trace_tasks + offset);
-    const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
-
-    float depth = result.x;
-
-    const int pixel = task.index.x + task.index.y * device.width;
-    RGBF record     = load_RGBF(device.records + pixel);
-
-    if (device.scene.fog.active) {
-      const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
-
-      if (path.x >= 0.0f) {
-        record = scale_color(record, expf(-path.y * volume.avg_scattering));
-      }
-    }
-
-    if (device.scene.ocean.active) {
-      const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
-
-      if (path.x >= 0.0f) {
-        RGBF volume_transmittance = volume_get_transmittance(volume);
-
-        record.r *= expf(-path.y * volume_transmittance.r);
-        record.g *= expf(-path.y * volume_transmittance.g);
-        record.b *= expf(-path.y * volume_transmittance.b);
-      }
-    }
-
-    store_RGBF(device.records + pixel, record);
-  }
-}
-
 __global__ void volume_process_events() {
   const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
 
@@ -223,30 +184,74 @@ __global__ void volume_process_events() {
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
-        const int pixel         = task.index.x + task.index.y * device.width;
-        RGBF record             = load_RGBF(device.records + pixel);
         const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y);
 
         if (volume_dist < depth) {
-          record.r *= (volume.scattering.r * expf(-volume_dist * volume.scattering.r))
-                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
-          record.g *= (volume.scattering.g * expf(-volume_dist * volume.scattering.g))
-                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
-          record.b *= (volume.scattering.b * expf(-volume_dist * volume.scattering.b))
-                      / (volume.avg_scattering * expf(-volume_dist * volume.avg_scattering));
-
           depth  = volume_dist;
           hit_id = VOLUME_OCEAN_HIT;
         }
-
-        record.r *= expf(-depth * volume.absorption.r);
-        record.g *= expf(-depth * volume.absorption.g);
-        record.b *= expf(-depth * volume.absorption.b);
-        store_RGBF(device.records + pixel, record);
       }
     }
 
     __stcs((float2*) (device.ptrs.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
+  }
+}
+
+__global__ void volume_process_events_weight() {
+  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+
+  for (int i = 0; i < task_count; i++) {
+    const int offset    = get_task_address(i);
+    TraceTask task      = load_trace_task(device.trace_tasks + offset);
+    const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
+
+    float depth     = result.x;
+    uint32_t hit_id = __float_as_uint(result.y);
+
+    const int pixel = task.index.x + task.index.y * device.width;
+    RGBF record     = load_RGBF(device.records + pixel);
+
+    if (device.scene.fog.active) {
+      if (device.iteration_type == TYPE_LIGHT) {
+        const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
+        const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+
+        if (path.x >= 0.0f) {
+          record = scale_color(record, expf(-path.y * volume.avg_scattering));
+        }
+      }
+    }
+
+    if (device.scene.ocean.active) {
+      const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+
+      if (path.x >= 0.0f) {
+        if (device.iteration_type == TYPE_LIGHT) {
+          RGBF volume_transmittance = volume_get_transmittance(volume);
+
+          record.r *= expf(-path.y * volume_transmittance.r);
+          record.g *= expf(-path.y * volume_transmittance.g);
+          record.b *= expf(-path.y * volume_transmittance.b);
+        }
+        else {
+          if (hit_id == VOLUME_OCEAN_HIT) {
+            record.r *=
+              (volume.scattering.r * expf(-path.y * volume.scattering.r)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
+            record.g *=
+              (volume.scattering.g * expf(-path.y * volume.scattering.g)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
+            record.b *=
+              (volume.scattering.b * expf(-path.y * volume.scattering.b)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
+          }
+
+          record.r *= expf(-path.y * volume.absorption.r);
+          record.g *= expf(-path.y * volume.absorption.g);
+          record.b *= expf(-path.y * volume.absorption.b);
+        }
+      }
+    }
+
+    store_RGBF(device.records + pixel, record);
   }
 }
 

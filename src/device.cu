@@ -87,6 +87,10 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
+  if ((instance->scene.fog.active || instance->scene.ocean.active) && type != TYPE_LIGHT) {
+    volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+
   if (instance->bvh_type == BVH_LUMINARY) {
     process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -99,12 +103,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
   }
 
   if (instance->scene.fog.active || instance->scene.ocean.active) {
-    if (type == TYPE_LIGHT) {
-      volume_process_events_light<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
-    else {
-      volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
+    volume_process_events_weight<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
   if (instance->scene.sky.cloud.active && !instance->scene.sky.hdri_active) {
