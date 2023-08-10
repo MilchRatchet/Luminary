@@ -25,7 +25,7 @@ __device__ float __fslctf(const float a, const float b, const float c) {
 
 /*
  * Semantic:
- * ____uswap16p(a) = (a >> 16) | (a >> 16);
+ * ____uswap16p(a) = (a >> 16) | (a << 16);
  */
 __device__ uint32_t __uswap16p(const uint32_t a) {
   uint32_t result;

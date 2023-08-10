@@ -242,7 +242,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
-    if (depth == device.scene.camera.far_clip_distance) {
+    if (hit_id == SKY_HIT) {
       continue;
     }
 
@@ -310,7 +310,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3] = toy_offset;
   device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 4] = volume_offset;
 
-  const int num_tasks = rejects_offset;
+  const int num_tasks               = rejects_offset;
   const int initial_geometry_offset = geometry_offset;
   const int initial_ocean_offset    = ocean_offset;
   const int initial_sky_offset      = sky_offset;

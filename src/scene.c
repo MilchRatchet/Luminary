@@ -43,7 +43,7 @@ void scene_init(Scene** _scene) {
   scene->camera.max_exposure          = 300.0f;
   scene->camera.auto_exposure         = 1;
   scene->camera.bloom                 = 1;
-  scene->camera.bloom_blend           = 0.025f;
+  scene->camera.bloom_blend           = 0.01f;
   scene->camera.lens_flare            = 0;
   scene->camera.lens_flare_threshold  = 1.0f;
   scene->camera.dithering             = 1;
@@ -58,20 +58,20 @@ void scene_init(Scene** _scene) {
   scene->camera.purkinje              = 1;
   scene->camera.purkinje_kappa1       = 0.2f;
   scene->camera.purkinje_kappa2       = 0.29f;
-  scene->camera.russian_roulette_bias = 10.0f;
+  scene->camera.russian_roulette_bias = 100.0f;
 
   scene->ocean.active              = 0;
   scene->ocean.height              = 0.0f;
   scene->ocean.amplitude           = 0.2f;
   scene->ocean.frequency           = 0.12f;
   scene->ocean.choppyness          = 4.0f;
-  scene->ocean.transparency        = 0.9f;
+  scene->ocean.transparency        = 0.75f;
   scene->ocean.refractive_index    = 1.333f;
-  scene->ocean.scattering.r        = 0.05f;
-  scene->ocean.scattering.g        = 0.15f;
+  scene->ocean.scattering.r        = 0.1f;
+  scene->ocean.scattering.g        = 0.2f;
   scene->ocean.scattering.b        = 1.0f;
   scene->ocean.absorption.r        = 1.0f;
-  scene->ocean.absorption.g        = 0.2f;
+  scene->ocean.absorption.g        = 0.3f;
   scene->ocean.absorption.b        = 0.01f;
   scene->ocean.pollution           = 1.0f;
   scene->ocean.absorption_strength = 1.0f;
@@ -119,7 +119,7 @@ void scene_init(Scene** _scene) {
   scene->sky.rayleigh_falloff            = 8.0f;
   scene->sky.mie_falloff                 = 1.7f;
   scene->sky.multiscattering_factor      = 1.0f;
-  scene->sky.steps                       = 30;
+  scene->sky.steps                       = 40;
   scene->sky.ozone_absorption            = 1;
   scene->sky.aerial_perspective          = 1;
   scene->sky.lut_initialized             = 0;
