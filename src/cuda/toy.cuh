@@ -168,7 +168,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
       }
 
-      brdf               = brdf_sample_ray(brdf, task.index);
+      brdf               = brdf_sample_ray(brdf);
       RGBF bounce_record = mul_color(record, brdf.term);
 
       TraceTask bounce_task;

@@ -343,7 +343,7 @@ __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSam
  * Samples a ray based on the BRDFs and multiplies record with sampling weight.
  * Writes L and term of the BRDFInstance.
  */
-__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const ushort2 index) {
+__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf) {
   const float specular_prob = brdf_spec_probability(brdf.metallic);
   const int use_specular    = white_noise() < specular_prob;
   const float alpha         = white_noise();
