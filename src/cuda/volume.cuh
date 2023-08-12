@@ -278,19 +278,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
 
     RGBF record = device.records[pixel];
 
-    {
-      const vec3 bounce_ray = jendersie_eon_phase_sample(ray, volume.water_droplet_diameter);
+    const vec3 bounce_ray = jendersie_eon_phase_sample(ray, volume.water_droplet_diameter);
 
-      TraceTask bounce_task;
-      bounce_task.origin = task.position;
-      bounce_task.ray    = bounce_ray;
-      bounce_task.index  = task.index;
+    TraceTask bounce_task;
+    bounce_task.origin = task.position;
+    bounce_task.ray    = bounce_ray;
+    bounce_task.index  = task.index;
 
-      store_RGBF(device.ptrs.bounce_records + pixel, record);
-      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
-    }
+    store_RGBF(device.ptrs.bounce_records + pixel, record);
+    store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
 
-    if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+    if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
       LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
@@ -307,7 +305,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
         light_task.ray    = brdf_sample.L;
         light_task.index  = task.index;
 
-        if (luminance(light_record) > 0.0f) {
+        if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
           store_RGBF(device.ptrs.light_records + pixel, light_record);
           light_history_buffer_entry = light.id;
           store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);

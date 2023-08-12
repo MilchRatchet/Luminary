@@ -135,7 +135,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     else if (device.iteration_type != TYPE_LIGHT) {
       task.position = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
 
-      if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+      if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
         const int is_mirror = material_is_mirror(roughness, metallic);
 
         if (!is_mirror)
@@ -157,7 +157,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
             light_task.ray    = brdf_sample.L;
             light_task.index  = task.index;
 
-            if (luminance(light_record)) {
+            if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
               store_RGBF(device.ptrs.light_records + pixel, light_record);
               light_history_buffer_entry = light.id;
               store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);

@@ -26,6 +26,10 @@ __device__ bool state_consume(const int pixel, const StateFlag flag) {
   }
 }
 
+__device__ bool state_peek(const int pixel, const StateFlag flag) {
+  return (device.ptrs.state_buffer[pixel] & flag) ? true : false;
+}
+
 __device__ void state_release(const int pixel, const StateFlag flag) {
   device.ptrs.state_buffer[pixel] &= ~flag;
 }
