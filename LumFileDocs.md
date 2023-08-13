@@ -304,6 +304,19 @@ Choppyness of the ocean waves. Number should be non-negative.
 `OCEAN REFRACT_ [FP32]`<br/>
 Refraction index of the ocean relative to the air. Number must be at least 1.
 
+`OCEAN WATERTYP [INT32]`<br/>
+Jerlov water type used for the underwater volume rendering. Higher numbered types are more polluted. The types are as follows:
+ - 0 = Open Ocean Type (I)
+ - 1 = Open Ocean Type (IA)
+ - 2 = Open Ocean Type (IB)
+ - 3 = Open Ocean Type (II)
+ - 4 = Open Ocean Type (III)
+ - 5 = Coastal Type (1C)
+ - 6 = Coastal Type (3C)
+ - 7 = Coastal Type (5C)
+ - 8 = Coastal Type (7C)
+ - 9 = Coastal Type (9C)
+
 ## Toy Settings
 
 `TOY ACTIVE__ [INT32]`<br/>

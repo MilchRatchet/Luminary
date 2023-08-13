@@ -486,6 +486,10 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
     case 6869189279479121234u:
       sscanf(value, "%f\n", &ocean->refractive_index);
       break;
+    /* WATERTYP */
+    case 5789751508288684375u:
+      sscanf(value, "%d\n", &ocean->water_type);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
       break;
@@ -902,6 +906,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "OCEAN CHOPPY__ %f\n", instance->scene.ocean.choppyness);
   fputs(line, file);
   sprintf(line, "OCEAN REFRACT_ %f\n", instance->scene.ocean.refractive_index);
+  fputs(line, file);
+  sprintf(line, "OCEAN WATERTYP %d\n", instance->scene.ocean.water_type);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Toy Settings\n#===============================\n\n");
