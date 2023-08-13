@@ -311,30 +311,31 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
 __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, VolumeType volume_hit_type) {
   BRDFInstance result = brdf_get_instance_scattering();
 
-  const float droplet_diameter = volume_get_descriptor_preset(volume_hit_type).water_droplet_diameter;
-
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
       result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, light.seed);
-      result.term  = scale_color(result.term, 0.25f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, sky_pos));
+      result.term  = scale_color(result.term, sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, sky_pos));
     } break;
     case LIGHT_ID_TOY:
       result.L    = toy_sample_ray(pos, light.seed);
-      result.term = scale_color(result.term, 0.25f * ONE_OVER_PI * toy_get_solid_angle(pos));
+      result.term = scale_color(result.term, toy_get_solid_angle(pos));
       break;
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
       result.L                     = sample_triangle(triangle, pos, light.seed);
-      result.term                  = scale_color(result.term, 0.25f * ONE_OVER_PI * sample_triangle_solid_angle(triangle, pos));
+      result.term                  = scale_color(result.term, sample_triangle_solid_angle(triangle, pos));
     } break;
   }
 
   result.term = scale_color(result.term, light.weight);
 
   const float cos_angle = dot_product(scale_vector(brdf.V, -1.0f), result.L);
-  const float phase     = jendersie_eon_phase_function(cos_angle, droplet_diameter);
+  const float phase     = (volume_hit_type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_function(cos_angle, device.scene.fog.droplet_diameter)
+                                                               : ocean_phase(cos_angle);
+
+  result.term = scale_color(result.term, phase);
 
   return result;
 }

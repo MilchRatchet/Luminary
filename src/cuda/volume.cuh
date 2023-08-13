@@ -2,6 +2,7 @@
 #define CU_VOLUME_H
 
 #include "math.cuh"
+#include "ocean_utils.cuh"
 #include "state.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -278,7 +279,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
 
     RGBF record = device.records[pixel];
 
-    const vec3 bounce_ray = jendersie_eon_phase_sample(ray, volume.water_droplet_diameter);
+    const vec3 bounce_ray =
+      (volume.type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_sample(ray, device.scene.fog.droplet_diameter) : ocean_phase_sampling(ray);
 
     TraceTask bounce_task;
     bounce_task.origin = task.position;

@@ -6,6 +6,10 @@
 #define OCEAN_MAX_HEIGHT (device.scene.ocean.height + 2.66f * device.scene.ocean.amplitude)
 #define OCEAN_MIN_HEIGHT (device.scene.ocean.height)
 
+// Coefficients taken from
+// M. Droske, J. Hanika, J. Vorba, A. Weidlich, M. Sabbadin, _Path Tracing in Production: The Path of Water_, ACM SIGGRAPH 2023 Courses,
+// 2023.
+
 __device__ RGBF ocean_jerlov_scattering_coefficient(const JerlovWaterType type) {
   switch (type) {
     case JERLOV_WATER_TYPE_I:
@@ -58,6 +62,82 @@ __device__ RGBF ocean_jerlov_absorption_coefficient(const JerlovWaterType type) 
   }
 
   return get_color(0.0f, 0.0f, 0.0f);
+}
+
+__device__ float ocean_molecular_weight(const JerlovWaterType type) {
+  switch (type) {
+    case JERLOV_WATER_TYPE_I:
+      return 0.93f;
+    case JERLOV_WATER_TYPE_IA:
+      return 0.44f;
+    case JERLOV_WATER_TYPE_IB:
+      return 0.06f;
+    case JERLOV_WATER_TYPE_II:
+      return 0.007f;
+    case JERLOV_WATER_TYPE_III:
+      return 0.003f;
+    case JERLOV_WATER_TYPE_1C:
+      return 0.005f;
+    case JERLOV_WATER_TYPE_3C:
+      return 0.003f;
+    case JERLOV_WATER_TYPE_5C:
+      return 0.001f;
+    case JERLOV_WATER_TYPE_7C:
+      return 0.0f;
+    case JERLOV_WATER_TYPE_9C:
+      return 0.0f;
+  }
+
+  return 0.0f;
+}
+
+// Henyey Greenstein importance sampling for g = 0
+// pbrt v3 - Light Transport II: Volume Rendering - Sampling Volume Scattering
+__device__ float ocean_molecular_phase_sampling_cosine(const vec3 ray, const float r) {
+  return 2.0f * r - 1.0f;
+}
+
+// Henyey Greenstein importance sampling for g != 0
+// pbrt v3 - Light Transport II: Volume Rendering - Sampling Volume Scattering
+__device__ float ocean_particle_phase_sampling_cosine(const vec3 ray, const float r) {
+  const float g = 0.924f;
+
+  const float s = (1.0f - g * g) / (1.0f - g + 2.0f * g * r);
+
+  return (1.0f + g * g - s * s) / (2.0f * g);
+}
+
+__device__ vec3 ocean_phase_sampling(const vec3 ray) {
+  const float molecular_weight = ocean_molecular_weight(device.scene.ocean.water_type);
+
+  const float r = white_noise();
+
+  float cos_angle;
+  if (white_noise() < molecular_weight) {
+    cos_angle = ocean_molecular_phase_sampling_cosine(ray, r);
+  }
+  else {
+    cos_angle = ocean_particle_phase_sampling_cosine(ray, r);
+  }
+
+  return phase_sample_basis(cos_angle, white_noise(), ray);
+}
+
+__device__ float ocean_molecular_phase(const float cos_angle) {
+  return henyey_greenstein_phase_function(cos_angle, 0.0f);
+}
+
+__device__ float ocean_particle_phase(const float cos_angle) {
+  return henyey_greenstein_phase_function(cos_angle, 0.924f);
+}
+
+__device__ float ocean_phase(const float cos_angle) {
+  const float molecular_weight = ocean_molecular_weight(device.scene.ocean.water_type);
+
+  const float molecular_phase = ocean_molecular_phase(cos_angle);
+  const float particle_phase  = ocean_particle_phase(cos_angle);
+
+  return molecular_phase * molecular_weight + particle_phase * (1.0f - molecular_weight);
 }
 
 #endif /* CU_OCEAN_UTILS_H */
