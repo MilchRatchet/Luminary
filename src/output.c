@@ -302,18 +302,22 @@ void realtime_output(RaytraceInstance* instance) {
 
     start_frametime(&frametime_post);
 
-    if (instance->denoiser) {
-      DeviceBuffer* denoise_output = denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
+    // If window is not minimized
+    if (!(SDL_GetWindowFlags(window->window) & SDL_WINDOW_MINIMIZED)) {
+      if (instance->denoiser) {
+        DeviceBuffer* denoise_output = denoise_apply(instance, device_buffer_get_pointer(instance->frame_output));
 
-      device_camera_post_apply(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
+        device_camera_post_apply(instance, device_buffer_get_pointer(denoise_output), device_buffer_get_pointer(denoise_output));
 
-      instance->frame_final_device = device_buffer_get_pointer(denoise_output);
+        instance->frame_final_device = device_buffer_get_pointer(denoise_output);
+      }
+      else {
+        instance->frame_final_device = device_buffer_get_pointer(instance->frame_output);
+      }
+
+      device_copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, window->buffer, window->width, window->height, window->ld);
     }
-    else {
-      instance->frame_final_device = device_buffer_get_pointer(instance->frame_output);
-    }
 
-    device_copy_framebuffer_to_8bit(instance->frame_final_device, gpu_scratch, window->buffer, window->width, window->height, window->ld);
     sample_frametime(&frametime_post);
 
     instance->temporal_frames++;
@@ -390,10 +394,15 @@ void realtime_output(RaytraceInstance* instance) {
     window_instance_update_pointer(window);
 
     start_frametime(&frametime_UI);
-    set_input_events_UI(&ui, mmotion, mwheel);
-    handle_mouse_UI(&ui);
-    render_UI(&ui);
-    blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
+
+    // If window is not minimized
+    if (!(SDL_GetWindowFlags(window->window) & SDL_WINDOW_MINIMIZED)) {
+      set_input_events_UI(&ui, mmotion, mwheel);
+      handle_mouse_UI(&ui);
+      render_UI(&ui);
+      blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
+    }
+
     sample_frametime(&frametime_UI);
 
     if (make_image) {
