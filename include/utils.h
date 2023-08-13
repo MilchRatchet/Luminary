@@ -276,7 +276,6 @@ struct Ocean {
   float amplitude;
   float frequency;
   float choppyness;
-  float transparency;
   float refractive_index;
   JerlovWaterType water_type;
 } typedef Ocean;

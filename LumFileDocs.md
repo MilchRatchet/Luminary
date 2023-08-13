@@ -304,9 +304,6 @@ Choppyness of the ocean waves. Number should be non-negative.
 `OCEAN REFRACT_ [FP32]`<br/>
 Refraction index of the ocean relative to the air. Number must be at least 1.
 
-`OCEAN TRANSPAR [FP32]`<br/>
-Transparency of the ocean surface. Number must be in the range [0,1].
-
 ## Toy Settings
 
 `TOY ACTIVE__ [INT32]`<br/>

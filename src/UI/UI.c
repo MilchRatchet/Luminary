@@ -560,7 +560,6 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Choppyness", &(instance->scene.ocean.choppyness), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Frequency", &(instance->scene.ocean.frequency), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene.ocean.refractive_index), 1, 0.001f, 1.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Alpha", &(instance->scene.ocean.transparency), 1, 0.001f, 0.0f, 1.0f, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

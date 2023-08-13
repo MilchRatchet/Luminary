@@ -65,7 +65,6 @@ void scene_init(Scene** _scene) {
   scene->ocean.amplitude        = 0.2f;
   scene->ocean.frequency        = 0.12f;
   scene->ocean.choppyness       = 4.0f;
-  scene->ocean.transparency     = 0.75f;
   scene->ocean.refractive_index = 1.333f;
   scene->ocean.water_type       = JERLOV_WATER_TYPE_IB;
 

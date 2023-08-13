@@ -310,23 +310,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     write_normal_buffer(normal, pixel);
 
-    if (normal.y > 0.0f) {
-      if (white_noise() > device.scene.ocean.transparency) {
-        ray           = refract_ray(ray, normal, refraction_index_ratio);
-        task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps * (1.0f + get_length(task.position))));
-      }
-      else {
-        task.position = add_vector(task.position, scale_vector(ray, -2.0f * eps * (1.0f + get_length(task.position))));
-        ray           = reflect_vector(ray, normal);
-      }
-    }
-    else {
+    if (white_noise() > 0.5f) {
       ray           = refract_ray(ray, normal, refraction_index_ratio);
       task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps * (1.0f + get_length(task.position))));
+    }
+    else {
+      task.position = add_vector(task.position, scale_vector(ray, -2.0f * eps * (1.0f + get_length(task.position))));
+      ray           = reflect_vector(ray, normal);
     }
 
     RGBF record = load_RGBF(device.records + pixel);
     record      = mul_color(record, ocean_brdf(ray, normal));
+    record      = scale_color(record, 2.0f);  // 1.0 / probability of refraction/reflection
 
     TraceTask new_task;
     new_task.origin = task.position;

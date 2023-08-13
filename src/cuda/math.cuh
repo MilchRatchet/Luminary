@@ -543,6 +543,7 @@ __device__ vec3 refract_ray(const vec3 ray, const vec3 normal, const float index
   const float b = 1.0f - index_ratio * index_ratio * (1.0f - dot * dot);
 
   if (b < 0.0f) {
+    // Total reflection
     return reflect_vector(ray, normal);
   }
   else {
