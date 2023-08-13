@@ -307,18 +307,6 @@ Refraction index of the ocean relative to the air. Number must be at least 1.
 `OCEAN TRANSPAR [FP32]`<br/>
 Transparency of the ocean surface. Number must be in the range [0,1].
 
-`OCEAN ABSORBST [FP32]`<br/>
-Absorption strength of the water. Number should be non-negative.
-
-`OCEAN ABSORBTI [FP32] [FP32] [FP32]`<br/>
-Absorption color of the water. Numbers must be in the range [0,1].
-
-`OCEAN POLLUTIO [FP32]`<br/>
-Pollution of the water. This controls the strength of the scattering in the water. Number should be non-negative.
-
-`OCEAN SCATTERI [FP32] [FP32] [FP32]`<br/>
-Scattering color of the water. Numbers must be in the range [0,1].
-
 ## Toy Settings
 
 `TOY ACTIVE__ [INT32]`<br/>

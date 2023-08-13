@@ -490,22 +490,6 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
     case 5927106903321694804u:
       sscanf(value, "%f\n", &ocean->transparency);
       break;
-    /* ABSORBST */
-    case 6076273243538539073u:
-      sscanf(value, "%f\n", &ocean->absorption_strength);
-      break;
-    /* ABSORBTI */
-    case 5283921184098042433u:
-      sscanf(value, "%f %f %f\n", &ocean->absorption.r, &ocean->absorption.g, &ocean->absorption.b);
-      break;
-    /* POLLUTIO */
-    case 5713190327625207632u:
-      sscanf(value, "%f\n", &ocean->pollution);
-      break;
-    /* SCATTERI */
-    case 5283361541352145747u:
-      sscanf(value, "%f %f %f\n", &ocean->scattering.r, &ocean->scattering.g, &ocean->scattering.b);
-      break;
     default:
       warn_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
       break;
@@ -924,18 +908,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "OCEAN REFRACT_ %f\n", instance->scene.ocean.refractive_index);
   fputs(line, file);
   sprintf(line, "OCEAN TRANSPAR %f\n", instance->scene.ocean.transparency);
-  fputs(line, file);
-  sprintf(line, "OCEAN ABSORBST %f\n", instance->scene.ocean.absorption_strength);
-  fputs(line, file);
-  sprintf(
-    line, "OCEAN ABSORBTI %f %f %f\n", instance->scene.ocean.absorption.r, instance->scene.ocean.absorption.g,
-    instance->scene.ocean.absorption.b);
-  fputs(line, file);
-  sprintf(line, "OCEAN POLLUTIO %f\n", instance->scene.ocean.pollution);
-  fputs(line, file);
-  sprintf(
-    line, "OCEAN SCATTERI %f %f %f\n", instance->scene.ocean.scattering.r, instance->scene.ocean.scattering.g,
-    instance->scene.ocean.scattering.b);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Toy Settings\n#===============================\n\n");

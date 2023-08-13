@@ -257,6 +257,19 @@ struct Sky {
   int aerial_perspective;
 } typedef Sky;
 
+enum JerlovWaterType {
+  JERLOV_WATER_TYPE_I   = 0,
+  JERLOV_WATER_TYPE_IA  = 1,
+  JERLOV_WATER_TYPE_IB  = 2,
+  JERLOV_WATER_TYPE_II  = 3,
+  JERLOV_WATER_TYPE_III = 4,
+  JERLOV_WATER_TYPE_1C  = 5,
+  JERLOV_WATER_TYPE_3C  = 6,
+  JERLOV_WATER_TYPE_5C  = 7,
+  JERLOV_WATER_TYPE_7C  = 8,
+  JERLOV_WATER_TYPE_9C  = 9
+} typedef JerlovWaterType;
+
 struct Ocean {
   int active;
   float height;
@@ -265,10 +278,7 @@ struct Ocean {
   float choppyness;
   float transparency;
   float refractive_index;
-  RGBF scattering;
-  RGBF absorption;
-  float pollution;
-  float absorption_strength;
+  JerlovWaterType water_type;
 } typedef Ocean;
 
 struct Fog {

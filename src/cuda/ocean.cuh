@@ -8,11 +8,13 @@
 
 //
 // In this ocean implementation the surface shape is defined by a function based on the shadertoy by
-// Alexander Alekseev aka TDM (https://www.shadertoy.com/view/Ms2SD1). The surface acts like a perfect mirror
-// with a for water typical reflectance value of 0.02. The surface has a transparency value based on which
-// refraction through the surface may happen. No light samples are performed from the ocean surface.
+// Alexander Alekseev aka TDM (https://www.shadertoy.com/view/Ms2SD1).
 // The intersection of the ray with the surface is handled through a ray marcher that uses an
 // approximate Lipschitz factor of the surface function to obtain a function similar to an SDF.
+// The shading of the ocean and the water beneath is based on
+// M. Droske, J. Hanika, J. Vorba, A. Weidlich, M. Sabbadin, "Path Tracing in Production: The Path of Water", ACM SIGGRAPH 2023 Courses,
+// 2023.
+// The water is handled by the volume implementation.
 //
 
 #define OCEAN_LIPSCHITZ (device.scene.ocean.amplitude * 4.0f)

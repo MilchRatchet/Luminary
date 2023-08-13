@@ -42,8 +42,8 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
 
   volume.type                   = VOLUME_TYPE_OCEAN;
   volume.water_droplet_diameter = 50.0f;
-  volume.absorption             = OCEAN_ABSORPTION;
-  volume.scattering             = OCEAN_SCATTERING;
+  volume.absorption             = ocean_jerlov_absorption_coefficient(device.scene.ocean.water_type);
+  volume.scattering             = ocean_jerlov_scattering_coefficient(device.scene.ocean.water_type);
   volume.dist                   = 10000.0f;
   volume.max_height             = OCEAN_MIN_HEIGHT * (1.0f - eps);
   volume.min_height             = 0.0f;

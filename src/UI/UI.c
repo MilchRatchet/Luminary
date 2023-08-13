@@ -552,22 +552,15 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
 
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_check(ui, "Active", &(instance->scene.ocean.active), 1);
+  panels[i++] = create_dropdown(
+    ui, "Jerlov Water Type", &(instance->scene.ocean.water_type), 1, 10,
+    "Open (I)\0Open (IA)\0Open (IB)\0Open (II)\0Open (III)\0Coastal (1C)\0Coastal (3C)\0Coastal (5C)\0Coastal (7C)\0Coastal (9C)", 2);
   panels[i++] = create_slider(ui, "Height", &(instance->scene.ocean.height), 1, 0.005f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Amplitude", &(instance->scene.ocean.amplitude), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Choppyness", &(instance->scene.ocean.choppyness), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Frequency", &(instance->scene.ocean.frequency), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene.ocean.refractive_index), 1, 0.001f, 1.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Alpha", &(instance->scene.ocean.transparency), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Pollution", &(instance->scene.ocean.pollution), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_color(ui, "Scattering", (float*) &(instance->scene.ocean.scattering));
-  panels[i++] = create_slider(ui, "  Red", &(instance->scene.ocean.scattering.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "  Green", &(instance->scene.ocean.scattering.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "  Blue", &(instance->scene.ocean.scattering.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Absorption Strength", &(instance->scene.ocean.absorption_strength), 1, 0.005f, 0.001f, FLT_MAX, 0, 0);
-  panels[i++] = create_color(ui, "Absorption", (float*) &(instance->scene.ocean.absorption));
-  panels[i++] = create_slider(ui, "  Red", &(instance->scene.ocean.absorption.r), 1, 0.001f, 0.001f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "  Green", &(instance->scene.ocean.absorption.g), 1, 0.001f, 0.001f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "  Blue", &(instance->scene.ocean.absorption.b), 1, 0.001f, 0.001f, 1.0f, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;
