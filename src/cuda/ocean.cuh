@@ -330,6 +330,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     store_RGBF(device.ptrs.bounce_records + pixel, record);
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+
+    if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+      // If no light ray is queued yet, make sure that this bounce ray is allowed to gather energy from any light it hits.
+      device.ptrs.light_sample_history[pixel] = LIGHT_ID_ANY;
+    }
   }
 
   device.ptrs.light_trace_count[id]  = light_trace_count;
