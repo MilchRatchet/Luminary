@@ -37,31 +37,7 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
   if (volume.max_height <= volume.min_height)
     return make_float2(-FLT_MAX, 0.0f);
 
-  // Vertical intersection
-  float start_y;
-  float end_y;
-  if (fabsf(ray.y) < 0.005f) {
-    if (origin.y >= volume.min_height && origin.y <= volume.max_height) {
-      start_y = 0.0f;
-      end_y   = volume.dist;
-    }
-    else {
-      return make_float2(-FLT_MAX, 0.0f);
-    }
-  }
-  else {
-    const float dy1 = volume.min_height - origin.y;
-    const float dy2 = volume.max_height - origin.y;
-
-    const float sy1 = dy1 / ray.y;
-    const float sy2 = dy2 / ray.y;
-
-    start_y = fmaxf(fminf(sy1, sy2), 0.0f);
-    end_y   = fmaxf(sy1, sy2);
-  }
-
   // Horizontal intersection
-
   const float rn = 1.0f / sqrtf(ray.x * ray.x + ray.z * ray.z);
   const float rx = ray.x * rn;
   const float rz = ray.z * rn;
@@ -89,6 +65,45 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
 
   const float start_xz = fminf(t0, t1);
   const float end_xz   = fmaxf(t0, t1);
+
+  // Vertical intersection
+  float start_y;
+  float end_y;
+  if (volume.type == VOLUME_TYPE_OCEAN) {
+    const bool above_surface = ocean_get_relative_height(origin, OCEAN_ITERATIONS_INTERSECTION) > 0.0f;
+
+    const float surface_intersect = ocean_intersection_distance(origin, ray, limit);
+
+    if (above_surface) {
+      start_y = surface_intersect;
+      end_y   = FLT_MAX;
+    }
+    else {
+      start_y = 0.0f;
+      end_y   = surface_intersect;
+    }
+  }
+  else {
+    if (fabsf(ray.y) < 0.005f) {
+      if (origin.y >= volume.min_height && origin.y <= volume.max_height) {
+        start_y = 0.0f;
+        end_y   = volume.dist;
+      }
+      else {
+        return make_float2(-FLT_MAX, 0.0f);
+      }
+    }
+    else {
+      const float dy1 = volume.min_height - origin.y;
+      const float dy2 = volume.max_height - origin.y;
+
+      const float sy1 = dy1 / ray.y;
+      const float sy2 = dy2 / ray.y;
+
+      start_y = fmaxf(fminf(sy1, sy2), 0.0f);
+      end_y   = fmaxf(sy1, sy2);
+    }
+  }
 
   const float start = fmaxf(start_xz, start_y);
   const float dist  = fminf(fminf(end_xz, end_y) - start, limit - start);
