@@ -473,6 +473,22 @@ __global__ void convert_RGBhalf_to_XRGB8(const RGBAhalf* source, XRGB8* dest, co
       pixel = purkinje_shift(pixel);
     }
 
+    if (device.scene.camera.use_color_correction) {
+      RGBF hsv = rgb_to_hsv(pixel);
+
+      hsv = add_color(hsv, device.scene.camera.color_correction);
+
+      if (hsv.r < 0.0f)
+        hsv.r += 1.0f;
+      if (hsv.r > 1.0f)
+        hsv.r -= 1.0f;
+      hsv.g = __saturatef(hsv.g);
+      if (hsv.b < 0.0f)
+        hsv.b = 0.0f;
+
+      pixel = hsv_to_rgb(hsv);
+    }
+
     pixel.r *= device.scene.camera.exposure;
     pixel.g *= device.scene.camera.exposure;
     pixel.b *= device.scene.camera.exposure;

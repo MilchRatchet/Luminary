@@ -1330,4 +1330,64 @@ __device__ RGBAhalf get_RGBAhalf(const float r, const float g, const float b, co
   return result;
 }
 
+__device__ RGBF rgb_to_hsv(const RGBF rgb) {
+  const float max_value = fmaxf(rgb.r, fmaxf(rgb.g, rgb.b));
+  const float min_value = fminf(rgb.r, fminf(rgb.g, rgb.b));
+
+  const float v = max_value;
+  const float s = (max_value - min_value) / max_value;
+
+  float h = 0.0f;
+  if (s != 0.0f) {
+    const float delta = max_value - min_value;
+    if (max_value == rgb.r) {
+      h = (rgb.g - rgb.b) / delta;
+    }
+    else if (max_value == rgb.g) {
+      h = 2.0f + (rgb.b - rgb.r) / delta;
+    }
+    else {
+      h = 4.0f + (rgb.r - rgb.g) / delta;
+    }
+
+    h *= 1.0f / 6.0f;
+
+    if (h < 0.0f) {
+      h += 1.0f;
+    }
+  }
+
+  return get_color(h, s, v);
+}
+
+//
+// Taken from the shader toy https://www.shadertoy.com/view/lsS3Wc by Inigo Quilez
+//
+__device__ RGBF hsv_to_rgb(RGBF hsv) {
+  const float s = hsv.g;
+  const float v = hsv.b;
+
+  if (s == 0.0f) {
+    return get_color(v, v, v);
+  }
+
+  const float h = hsv.r * 6.0f;
+
+  RGBF hue = get_color(h, h, h);
+  hue      = add_color(hue, get_color(0.0f, 4.0f, 2.0f));
+  hue.r    = fmodf(hue.r, 6.0f);
+  hue.g    = fmodf(hue.g, 6.0f);
+  hue.b    = fmodf(hue.b, 6.0f);
+  hue      = add_color(hue, get_color(-3.0f, -3.0f, -3.0f));
+  hue.r    = fabsf(hue.r);
+  hue.g    = fabsf(hue.g);
+  hue.b    = fabsf(hue.b);
+  hue      = add_color(hue, get_color(-1.0f, -1.0f, -1.0f));
+  hue.r    = __saturatef(hue.r);
+  hue.g    = __saturatef(hue.g);
+  hue.b    = __saturatef(hue.b);
+
+  return scale_color(add_color(scale_color(get_color(1.0f, 1.0f, 1.0f), 1.0f - s), scale_color(hue, s)), v);
+}
+
 #endif /* CU_MATH_H */

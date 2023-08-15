@@ -202,11 +202,15 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Bloom Blend", &(instance->scene.camera.bloom_blend), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_check(ui, "Lens Flare", &(instance->scene.camera.lens_flare), 0);
   panels[i++] = create_slider(ui, "Lens Flare Threshold", &(instance->scene.camera.lens_flare_threshold), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_check(ui, "Dithering", &(instance->scene.camera.dithering), 0);
-  panels[i++] = create_slider(ui, "Temporal Blend Factor", &(instance->scene.camera.temporal_blend_factor), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_check(ui, "Color Correction", &(instance->scene.camera.use_color_correction), 0);
+  panels[i++] = create_slider(ui, "Hue", &(instance->scene.camera.color_correction.r), 0, 0.0001f, -1.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Saturation", &(instance->scene.camera.color_correction.g), 0, 0.0001f, -1.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Value", &(instance->scene.camera.color_correction.b), 0, 0.0001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Purkinje Shift", &(instance->scene.camera.purkinje), 0);
   panels[i++] = create_slider(ui, "Purkinje Blueness", &(instance->scene.camera.purkinje_kappa1), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Purkinje Brightness", &(instance->scene.camera.purkinje_kappa2), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Dithering", &(instance->scene.camera.dithering), 0);
+  panels[i++] = create_slider(ui, "Temporal Blend Factor", &(instance->scene.camera.temporal_blend_factor), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

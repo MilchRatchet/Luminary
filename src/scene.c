@@ -59,6 +59,10 @@ void scene_init(Scene** _scene) {
   scene->camera.purkinje_kappa1       = 0.2f;
   scene->camera.purkinje_kappa2       = 0.29f;
   scene->camera.russian_roulette_bias = 100.0f;
+  scene->camera.use_color_correction  = 0;
+  scene->camera.color_correction.r    = 0.0f;
+  scene->camera.color_correction.g    = 0.0f;
+  scene->camera.color_correction.b    = 0.0f;
 
   scene->ocean.active           = 0;
   scene->ocean.height           = 0.0f;

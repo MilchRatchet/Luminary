@@ -147,6 +147,8 @@ struct Camera {
   float smoothing_factor;
   float temporal_blend_factor;
   float russian_roulette_bias;
+  int use_color_correction;
+  RGBF color_correction;
 } typedef Camera;
 
 struct Toy {
