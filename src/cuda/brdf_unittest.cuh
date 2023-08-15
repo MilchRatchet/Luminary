@@ -34,7 +34,7 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
       const vec3 V     = angles_to_direction(ran1, ran2);
 
       BRDFInstance brdf =
-        brdf_get_instance(get_RGBAhalf(1.0f, 1.0f, 1.0f, 1.0f), V, get_vector(0.0f, 1.0f, 0.0f), 1.0f - smoothness, metallic);
+        brdf_get_instance(get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f), V, get_vector(0.0f, 1.0f, 0.0f), 1.0f - smoothness, metallic);
 
       brdf = brdf_sample_ray(brdf);
 

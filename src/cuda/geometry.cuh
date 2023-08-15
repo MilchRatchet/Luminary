@@ -194,8 +194,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       const uint32_t triangle_light_id = __ldg(&(device.scene.triangles[task.hit_id].light_id));
 
       if (proper_light_sample(light, triangle_light_id)) {
-        store_RGBAhalf(
-          device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), RGBF_to_RGBAhalf(emission)));
+        store_RGBF(device.ptrs.frame_buffer + pixel, add_color(load_RGBF(device.ptrs.frame_buffer + pixel), emission));
       }
     }
 
@@ -234,7 +233,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
       task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
 
-      BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(data.albedo), data.V, data.normal, data.roughness, data.metallic);
+      BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
 
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
         const int is_mirror = material_is_mirror(data.roughness, data.metallic);
@@ -337,12 +336,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
         color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
       }
 
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
+      store_RGBF(device.ptrs.frame_buffer + pixel, color);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
       const float value = __saturatef((1.0f / dist) * 2.0f);
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, get_RGBAhalf(value, value, value, value));
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(value, value, value));
     }
     else if (device.shading_mode == SHADING_NORMAL) {
       const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
@@ -387,8 +386,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      store_RGBAhalf(
-        device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z))));
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
     }
     else if (device.shading_mode == SHADING_HEAT) {
       const float cost  = device.ptrs.trace_result_buffer[pixel].depth;
@@ -396,7 +394,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float red   = __saturatef(2.0f * value);
       const float green = __saturatef(2.0f * (value - 0.5f));
       const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(red, green, blue)));
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(red, green, blue));
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
       const uint32_t v = random_uint32_t_base(0, task.hit_id);
@@ -409,9 +407,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const float cg = ((float) g) / 0x7ff;
       const float cb = ((float) b) / 0x7ff;
 
-      const RGBAhalf color = get_RGBAhalf(cr, cg, cb, 0.0f);
+      const RGBF color = get_color(cr, cg, cb);
 
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, color);
+      store_RGBF(device.ptrs.frame_buffer + pixel, color);
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
       const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
@@ -457,7 +455,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
         color = scale_color(color, 0.1f);
       }
 
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
+      store_RGBF(device.ptrs.frame_buffer + pixel, color);
     }
   }
 }

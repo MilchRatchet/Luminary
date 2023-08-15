@@ -53,12 +53,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
 
     device.ptrs.light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
     device.ptrs.bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
-    device.ptrs.frame_buffer[pixel]   = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+    device.ptrs.frame_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
     device.ptrs.state_buffer[pixel]   = 0;
 
     if (device.denoiser && !device.temporal_frames) {
-      device.ptrs.albedo_buffer[pixel] = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
-      device.ptrs.normal_buffer[pixel] = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+      device.ptrs.albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+      device.ptrs.normal_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
 
     store_trace_task(device.ptrs.bounce_trace + get_task_address(offset++), task);
@@ -256,11 +256,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
 
     RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, seed);
 
-    RGBF color = RGBAhalf_to_RGBF(load_RGBAhalf(device.ptrs.frame_buffer + pixel));
+    RGBF color = load_RGBF(device.ptrs.frame_buffer + pixel);
     color      = add_color(color, inscattering);
 
     store_RGBF(device.records + pixel, record);
-    store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
+    store_RGBF(device.ptrs.frame_buffer + pixel, color);
   }
 
   device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
@@ -453,7 +453,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.trace_count[threadIdx.x + blockIdx.x * blockDim.x]                = 0;
 }
 
-__global__ void convert_RGBhalf_to_XRGB8(const RGBAhalf* source, XRGB8* dest, const int width, const int height, const int ld) {
+__global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int width, const int height, const int ld) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const int amount    = width * height;
@@ -467,7 +467,7 @@ __global__ void convert_RGBhalf_to_XRGB8(const RGBAhalf* source, XRGB8* dest, co
     const float sx = x * scale_x;
     const float sy = y * scale_y;
 
-    RGBF pixel = RGBAhalf_to_RGBF(sample_pixel_clamp(source, sx, sy, device.output_width, device.output_height));
+    RGBF pixel = sample_pixel_clamp(source, sx, sy, device.output_width, device.output_height);
 
     if (device.scene.camera.purkinje) {
       pixel = purkinje_shift(pixel);

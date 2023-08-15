@@ -880,7 +880,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
       sky = mul_color(sky_color, record);
     }
 
-    store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), RGBF_to_RGBAhalf(sky)));
+    store_RGBF(device.ptrs.frame_buffer + pixel, add_color(load_RGBF(device.ptrs.frame_buffer + pixel), sky));
     write_albedo_buffer(sky, pixel);
     write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }
@@ -901,23 +901,21 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks(
     const int pixel    = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      RGBAhalf sky;
+      RGBF sky;
       if (device.scene.sky.hdri_active) {
-        sky = RGBF_to_RGBAhalf(sky_hdri_sample(task.ray, device.scene.sky.hdri_mip_bias));
+        sky = sky_hdri_sample(task.ray, device.scene.sky.hdri_mip_bias);
       }
       else {
-        sky = RGBF_to_RGBAhalf(sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps, seed));
+        sky = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps, seed);
       }
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, sky);
+      store_RGBF(device.ptrs.frame_buffer + pixel, sky);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float value = __saturatef((1.0f / device.scene.camera.far_clip_distance) * 2.0f);
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, get_RGBAhalf(value, value, value, value));
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(value, value, value));
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      const RGBAhalf color = get_RGBAhalf(0.0f, 0.63f, 1.0f, 0.0f);
-
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, color);
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(0.0f, 0.63f, 1.0f));
     }
   }
 

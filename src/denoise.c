@@ -73,30 +73,30 @@ void denoise_create(RaytraceInstance* instance) {
   denoise_setup->layer.input.data               = (CUdeviceptr) 0;
   denoise_setup->layer.input.width              = instance->width;
   denoise_setup->layer.input.height             = instance->height;
-  denoise_setup->layer.input.rowStrideInBytes   = instance->width * sizeof(RGBAhalf);
-  denoise_setup->layer.input.pixelStrideInBytes = sizeof(RGBAhalf);
-  denoise_setup->layer.input.format             = OPTIX_PIXEL_FORMAT_HALF3;
+  denoise_setup->layer.input.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  denoise_setup->layer.input.pixelStrideInBytes = sizeof(RGBF);
+  denoise_setup->layer.input.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   denoise_setup->layer.output.data               = (CUdeviceptr) 0;
   denoise_setup->layer.output.width              = instance->output_width;
   denoise_setup->layer.output.height             = instance->output_height;
-  denoise_setup->layer.output.rowStrideInBytes   = instance->output_width * sizeof(RGBAhalf);
-  denoise_setup->layer.output.pixelStrideInBytes = sizeof(RGBAhalf);
-  denoise_setup->layer.output.format             = OPTIX_PIXEL_FORMAT_HALF3;
+  denoise_setup->layer.output.rowStrideInBytes   = instance->output_width * sizeof(RGBF);
+  denoise_setup->layer.output.pixelStrideInBytes = sizeof(RGBF);
+  denoise_setup->layer.output.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   denoise_setup->guide_layer.albedo.data               = (CUdeviceptr) device_buffer_get_pointer(instance->albedo_buffer);
   denoise_setup->guide_layer.albedo.width              = instance->width;
   denoise_setup->guide_layer.albedo.height             = instance->height;
-  denoise_setup->guide_layer.albedo.rowStrideInBytes   = instance->width * sizeof(RGBAhalf);
-  denoise_setup->guide_layer.albedo.pixelStrideInBytes = sizeof(RGBAhalf);
-  denoise_setup->guide_layer.albedo.format             = OPTIX_PIXEL_FORMAT_HALF3;
+  denoise_setup->guide_layer.albedo.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  denoise_setup->guide_layer.albedo.pixelStrideInBytes = sizeof(RGBF);
+  denoise_setup->guide_layer.albedo.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   denoise_setup->guide_layer.normal.data               = (CUdeviceptr) device_buffer_get_pointer(instance->normal_buffer);
   denoise_setup->guide_layer.normal.width              = instance->width;
   denoise_setup->guide_layer.normal.height             = instance->height;
-  denoise_setup->guide_layer.normal.rowStrideInBytes   = instance->width * sizeof(RGBAhalf);
-  denoise_setup->guide_layer.normal.pixelStrideInBytes = sizeof(RGBAhalf);
-  denoise_setup->guide_layer.normal.format             = OPTIX_PIXEL_FORMAT_HALF3;
+  denoise_setup->guide_layer.normal.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  denoise_setup->guide_layer.normal.pixelStrideInBytes = sizeof(RGBF);
+  denoise_setup->guide_layer.normal.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   device_buffer_init(&denoise_setup->hdr_intensity);
   device_buffer_malloc(denoise_setup->hdr_intensity, sizeof(float), 1);
@@ -105,7 +105,7 @@ void denoise_create(RaytraceInstance* instance) {
   device_buffer_malloc(denoise_setup->avg_color, sizeof(float), 3);
 
   device_buffer_init(&denoise_setup->output);
-  device_buffer_malloc(denoise_setup->output, sizeof(RGBAhalf), denoise_setup->layer.output.width * denoise_setup->layer.output.height);
+  device_buffer_malloc(denoise_setup->output, sizeof(RGBF), denoise_setup->layer.output.width * denoise_setup->layer.output.height);
 
   instance->denoise_setup = denoise_setup;
 }

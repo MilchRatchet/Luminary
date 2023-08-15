@@ -15,7 +15,7 @@ extern "C" void device_camera_post_init(RaytraceInstance* instance) {
   }
 }
 
-extern "C" void device_camera_post_apply(RaytraceInstance* instance, const RGBAhalf* src, RGBAhalf* dst) {
+extern "C" void device_camera_post_apply(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
   if (instance->scene.camera.lens_flare) {
     device_lens_flare_apply(instance, src, dst);
   }

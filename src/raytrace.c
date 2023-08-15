@@ -576,16 +576,16 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_update_symbol(max_ray_depth, instance->max_ray_depth);
   device_update_symbol(denoiser, instance->denoiser);
 
-  device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), amount);
-  device_buffer_malloc(instance->frame_temporal, sizeof(RGBAhalf), amount);
-  device_buffer_malloc(instance->frame_output, sizeof(RGBAhalf), output_amount);
-  device_buffer_malloc(instance->frame_variance, sizeof(RGBAhalf), amount);
+  device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_temporal, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
+  device_buffer_malloc(instance->frame_variance, sizeof(RGBF), amount);
   device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
 
   if (instance->denoiser) {
-    device_buffer_malloc(instance->albedo_buffer, sizeof(RGBAhalf), amount);
-    device_buffer_malloc(instance->normal_buffer, sizeof(RGBAhalf), amount);
+    device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);
+    device_buffer_malloc(instance->normal_buffer, sizeof(RGBF), amount);
   }
 
   const int thread_count      = device_get_thread_count();
@@ -627,12 +627,12 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.task_counts          = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets         = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
   ptrs.light_sample_history = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
-  ptrs.frame_output         = (RGBAhalf*) device_buffer_get_pointer(instance->frame_output);
-  ptrs.frame_temporal       = (RGBAhalf*) device_buffer_get_pointer(instance->frame_temporal);
-  ptrs.frame_buffer         = (RGBAhalf*) device_buffer_get_pointer(instance->frame_buffer);
-  ptrs.frame_variance       = (RGBAhalf*) device_buffer_get_pointer(instance->frame_variance);
-  ptrs.albedo_buffer        = (RGBAhalf*) device_buffer_get_pointer(instance->albedo_buffer);
-  ptrs.normal_buffer        = (RGBAhalf*) device_buffer_get_pointer(instance->normal_buffer);
+  ptrs.frame_output         = (RGBF*) device_buffer_get_pointer(instance->frame_output);
+  ptrs.frame_temporal       = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
+  ptrs.frame_buffer         = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
+  ptrs.frame_variance       = (RGBF*) device_buffer_get_pointer(instance->frame_variance);
+  ptrs.albedo_buffer        = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
+  ptrs.normal_buffer        = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
   ptrs.light_records        = (RGBF*) device_buffer_get_pointer(instance->light_records);
   ptrs.bounce_records       = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
   ptrs.buffer_8bit          = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);

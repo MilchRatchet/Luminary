@@ -561,6 +561,17 @@ __device__ RGBF get_color(const float r, const float g, const float b) {
   return result;
 }
 
+__device__ RGBAF get_RGBAF(const float r, const float g, const float b, const float a) {
+  RGBAF result;
+
+  result.r = r;
+  result.g = g;
+  result.b = b;
+  result.a = a;
+
+  return result;
+}
+
 __device__ RGBF add_color(const RGBF a, const RGBF b) {
   RGBF result;
 
@@ -599,6 +610,10 @@ __device__ RGBF scale_color(const RGBF a, const float b) {
   result.b = a.b * b;
 
   return result;
+}
+
+__device__ RGBF fma_color(const RGBF a, const float b, const RGBF c) {
+  return add_color(c, scale_color(a, b));
 }
 
 __device__ RGBF min_color(const RGBF a, const RGBF b) {

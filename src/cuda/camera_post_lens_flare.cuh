@@ -14,23 +14,22 @@ extern "C" void device_lens_flare_init(RaytraceInstance* instance) {
   int width  = instance->output_width;
   int height = instance->output_height;
 
-  instance->lens_flare_buffers_gpu = (RGBAhalf**) malloc(sizeof(RGBAhalf*) * LENS_FLARE_NUM_BUFFERS);
+  instance->lens_flare_buffers_gpu = (RGBF**) malloc(sizeof(RGBF*) * LENS_FLARE_NUM_BUFFERS);
 
-  device_malloc((void**) &(instance->lens_flare_buffers_gpu[0]), sizeof(RGBAhalf) * width * height);
-  device_malloc((void**) &(instance->lens_flare_buffers_gpu[1]), sizeof(RGBAhalf) * (width >> 1) * (height >> 1));
-  device_malloc((void**) &(instance->lens_flare_buffers_gpu[2]), sizeof(RGBAhalf) * (width >> 1) * (height >> 1));
-  device_malloc((void**) &(instance->lens_flare_buffers_gpu[3]), sizeof(RGBAhalf) * (width >> 2) * (height >> 2));
+  device_malloc((void**) &(instance->lens_flare_buffers_gpu[0]), sizeof(RGBF) * width * height);
+  device_malloc((void**) &(instance->lens_flare_buffers_gpu[1]), sizeof(RGBF) * (width >> 1) * (height >> 1));
+  device_malloc((void**) &(instance->lens_flare_buffers_gpu[2]), sizeof(RGBF) * (width >> 1) * (height >> 1));
+  device_malloc((void**) &(instance->lens_flare_buffers_gpu[3]), sizeof(RGBF) * (width >> 2) * (height >> 2));
 }
 
-__global__ void _lens_flare_ghosts(const RGBAhalf* source, const int sw, const int sh, RGBAhalf* target, const int tw, const int th) {
+__global__ void _lens_flare_ghosts(const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
-  const int ghost_count         = 8;
-  const float ghost_scales[]    = {-1.0f, -0.5f, -0.25f, -2.0f, -3.0f, -4.0f, 2.0f, 0.25f};
-  const RGBAhalf ghost_colors[] = {get_RGBAhalf(1.0f, 0.5f, 1.0f, 1.0f),   get_RGBAhalf(0.1f, 0.5f, 1.0f, 0.4f),
-                                   get_RGBAhalf(1.0f, 1.0f, 0.5f, 0.2f),   get_RGBAhalf(1.0f, 0.75f, 0.1f, 0.7f),
-                                   get_RGBAhalf(1.0f, 0.1f, 1.0f, 0.5f),   get_RGBAhalf(1.0f, 0.5f, 0.1f, 0.3f),
-                                   get_RGBAhalf(0.25f, 0.1f, 0.75f, 0.5f), get_RGBAhalf(0.75f, 0.1f, 0.25f, 0.2f)};
+  const int ghost_count      = 8;
+  const float ghost_scales[] = {-1.0f, -0.5f, -0.25f, -2.0f, -3.0f, -4.0f, 2.0f, 0.25f};
+  const RGBF ghost_colors[]  = {get_color(1.0f, 0.5f, 1.0f),   get_color(0.1f, 0.5f, 1.0f),  get_color(1.0f, 1.0f, 0.5f),
+                                get_color(1.0f, 0.75f, 0.1f),  get_color(1.0f, 0.1f, 1.0f),  get_color(1.0f, 0.5f, 0.1f),
+                                get_color(0.25f, 0.1f, 0.75f), get_color(0.75f, 0.1f, 0.25f)};
 
   const float scale_x = 1.0f / (tw - 1);
   const float scale_y = 1.0f / (th - 1);
@@ -42,27 +41,27 @@ __global__ void _lens_flare_ghosts(const RGBAhalf* source, const int sw, const i
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
 
-    RGBAhalf pixel = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+    RGBF pixel = get_color(0.0f, 0.0f, 0.0f);
 
     for (int i = 0; i < ghost_count; i++) {
       const float sxi = ((sx - 0.5f) * ghost_scales[i]) + 0.5f;
       const float syi = ((sy - 0.5f) * ghost_scales[i]) + 0.5f;
 
-      RGBAhalf ghost = sample_pixel_border(source, sxi, syi, sw, sh);
+      RGBF ghost = sample_pixel_border(source, sxi, syi, sw, sh);
 
-      ghost = scale_RGBAhalf(ghost, 0.0005f);
-      ghost = mul_RGBAhalf(ghost, ghost_colors[i]);
+      ghost = scale_color(ghost, 0.0005f);
+      ghost = mul_color(ghost, ghost_colors[i]);
 
-      pixel = add_RGBAhalf(pixel, ghost);
+      pixel = add_color(pixel, ghost);
     }
 
-    store_RGBAhalf(target + x + y * tw, bound_RGBAhalf(pixel));
+    store_RGBF(target + x + y * tw, pixel);
 
     id += blockDim.x * gridDim.x;
   }
 }
 
-static void _lens_flare_apply_ghosts(RaytraceInstance* instance, const RGBAhalf* src, RGBAhalf* dst) {
+static void _lens_flare_apply_ghosts(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
   int width  = instance->output_width;
   int height = instance->output_height;
 
@@ -86,7 +85,7 @@ __device__ UV _lens_flare_fisheye(UV uv, const float compression, const float zo
   return result;
 }
 
-__global__ void _lens_flare_halo(const RGBAhalf* src, const int sw, const int sh, RGBAhalf* target, const int tw, const int th) {
+__global__ void _lens_flare_halo(const RGBF* src, const int sw, const int sh, RGBF* target, const int tw, const int th) {
   unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
 
   const float scale_x = 1.0f / (tw - 1);
@@ -121,26 +120,26 @@ __global__ void _lens_flare_halo(const RGBAhalf* src, const int sw, const int sh
     src_uv_b.u = (fish_uv.u - 0.5f) * (1.0f - chroma_shift) + 0.5f + v_halo.x;
     src_uv_b.v = (fish_uv.v - 0.5f) * (1.0f - chroma_shift) + 0.5f + v_halo.y;
 
-    const RGBAhalf pr = sample_pixel_border(src, src_uv_r.u, src_uv_r.v, sw, sh);
-    const RGBAhalf pg = sample_pixel_border(src, src_uv_g.u, src_uv_g.v, sw, sh);
-    const RGBAhalf pb = sample_pixel_border(src, src_uv_b.u, src_uv_b.v, sw, sh);
+    const RGBF pr = sample_pixel_border(src, src_uv_r.u, src_uv_r.v, sw, sh);
+    const RGBF pg = sample_pixel_border(src, src_uv_g.u, src_uv_g.v, sw, sh);
+    const RGBF pb = sample_pixel_border(src, src_uv_b.u, src_uv_b.v, sw, sh);
 
-    RGBAhalf pixel = get_RGBAhalf(pr.rg.x, pg.rg.y, pb.ba.x, 0.0f);
+    RGBF pixel = get_color(pr.r, pg.g, pb.b);
 
-    store_RGBAhalf(target + x + y * tw, bound_RGBAhalf(pixel));
+    store_RGBF(target + x + y * tw, pixel);
 
     id += blockDim.x * gridDim.x;
   }
 }
 
-static void _lens_flare_apply_halo(RaytraceInstance* instance, const RGBAhalf* src, RGBAhalf* dst) {
+static void _lens_flare_apply_halo(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
   int width  = instance->output_width;
   int height = instance->output_height;
 
   _lens_flare_halo<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src, width >> 1, height >> 1, dst, width >> 1, height >> 1);
 }
 
-extern "C" void device_lens_flare_apply(RaytraceInstance* instance, const RGBAhalf* src, RGBAhalf* dst) {
+extern "C" void device_lens_flare_apply(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
   int width  = instance->output_width;
   int height = instance->output_height;
 
@@ -173,10 +172,10 @@ extern "C" void device_lens_flare_clear(RaytraceInstance* instance) {
   int width  = instance->output_width;
   int height = instance->output_height;
 
-  device_free(instance->lens_flare_buffers_gpu[0], sizeof(RGBAhalf) * width * height);
-  device_free(instance->lens_flare_buffers_gpu[1], sizeof(RGBAhalf) * (width >> 1) * (height >> 1));
-  device_free(instance->lens_flare_buffers_gpu[2], sizeof(RGBAhalf) * (width >> 1) * (height >> 1));
-  device_free(instance->lens_flare_buffers_gpu[3], sizeof(RGBAhalf) * (width >> 2) * (height >> 2));
+  device_free(instance->lens_flare_buffers_gpu[0], sizeof(RGBF) * width * height);
+  device_free(instance->lens_flare_buffers_gpu[1], sizeof(RGBF) * (width >> 1) * (height >> 1));
+  device_free(instance->lens_flare_buffers_gpu[2], sizeof(RGBF) * (width >> 1) * (height >> 1));
+  device_free(instance->lens_flare_buffers_gpu[3], sizeof(RGBF) * (width >> 2) * (height >> 2));
 
   free(instance->lens_flare_buffers_gpu);
 }

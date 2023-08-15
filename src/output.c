@@ -131,7 +131,7 @@ void offline_output(RaytraceInstance* instance) {
     device_buffer_free(denoise_output);
   }
 
-  device_buffer_malloc(instance->frame_buffer, sizeof(RGBAhalf), instance->output_width * instance->output_height);
+  device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), instance->output_width * instance->output_height);
   device_buffer_copy(instance->frame_output, instance->frame_buffer);
 
   device_camera_post_apply(instance, device_buffer_get_pointer(instance->frame_buffer), device_buffer_get_pointer(instance->frame_output));

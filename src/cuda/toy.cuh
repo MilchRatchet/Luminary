@@ -61,8 +61,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     const float roughness = (1.0f - device.scene.toy.material.r);
     const float metallic  = device.scene.toy.material.g;
     const float intensity = device.scene.toy.material.b;
-    RGBAhalf emission     = get_RGBAhalf(device.scene.toy.emission.r, device.scene.toy.emission.g, device.scene.toy.emission.b, 0.0f);
-    emission              = scale_RGBAhalf(emission, intensity);
+    RGBF emission         = get_color(device.scene.toy.emission.r, device.scene.toy.emission.g, device.scene.toy.emission.b);
+    emission              = scale_color(emission, intensity);
 
     if (albedo.a < device.scene.material.alpha_cutoff)
       albedo.a = 0.0f;
@@ -71,29 +71,29 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       const vec3 dir    = normalize_vector(rotate_vector_by_quaternion(get_vector(0.0f, 0.0f, -1.0f), device.emitter.camera_rotation));
       const float angle = -dot_product(dir, task.ray);
       const float dir_intensity = remap01(angle, 0.85f, 1.0f);
-      emission                  = scale_RGBAhalf(emission, dir_intensity);
+      emission                  = scale_color(emission, dir_intensity);
     }
 
     RGBF record = load_RGBF(device.records + pixel);
 
     if (albedo.a > 0.0f && device.scene.toy.emissive) {
-      emission = scale_RGBAhalf(emission, albedo.a);
+      emission = scale_color(emission, albedo.a);
 
-      write_albedo_buffer(RGBAhalf_to_RGBF(emission), pixel);
+      write_albedo_buffer(emission, pixel);
 
-      emission = mul_RGBAhalf(emission, RGBF_to_RGBAhalf(record));
+      emission = mul_color(emission, record);
 
       const uint32_t light = device.ptrs.light_sample_history[pixel];
 
       if (proper_light_sample(light, LIGHT_ID_TOY)) {
-        store_RGBAhalf(device.ptrs.frame_buffer + pixel, add_RGBAhalf(load_RGBAhalf(device.ptrs.frame_buffer + pixel), emission));
+        store_RGBF(device.ptrs.frame_buffer + pixel, add_color(load_RGBF(device.ptrs.frame_buffer + pixel), emission));
       }
     }
 
     write_normal_buffer(normal, pixel);
 
     const vec3 V      = scale_vector(task.ray, -1.0f);
-    BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(albedo), V, normal, roughness, metallic);
+    BRDFInstance brdf = brdf_get_instance(albedo, V, normal, roughness, metallic);
 
     if (albedo.a < 1.0f && white_noise() > albedo.a) {
       task.position = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
@@ -198,12 +198,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
     const int pixel    = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(opaque_color(device.scene.toy.albedo)));
+      store_RGBF(device.ptrs.frame_buffer + pixel, opaque_color(device.scene.toy.albedo));
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
       const float value = __saturatef((1.0f / dist) * 2.0f);
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(value, value, value)));
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(value, value, value));
     }
     else if (device.shading_mode == SHADING_NORMAL) {
       vec3 normal = get_toy_normal(task.position);
@@ -216,13 +216,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      store_RGBAhalf(
-        device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z))));
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      const RGBAhalf color = get_RGBAhalf(1.0f, 0.63f, 0.0f, 0.0f);
-
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, color);
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(1.0f, 0.63f, 0.0f));
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
       RGBF color;
@@ -233,7 +230,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
         color = scale_color(opaque_color(device.scene.toy.albedo), 0.1f);
       }
 
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, RGBF_to_RGBAhalf(color));
+      store_RGBF(device.ptrs.frame_buffer + pixel, color);
     }
   }
 }

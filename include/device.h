@@ -29,13 +29,13 @@ void device_execute_main_kernels(RaytraceInstance* instance, int type, int depth
 void device_execute_debug_kernels(RaytraceInstance* instance, int type);
 void device_handle_accumulation(RaytraceInstance* instance);
 void device_copy_framebuffer_to_8bit(
-  RGBAhalf* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);
+  RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);
 
 ////////////////////////////////////////////////////////////////////
 // camera_post.cuh
 ////////////////////////////////////////////////////////////////////
 void device_camera_post_init(RaytraceInstance* instance);
-void device_camera_post_apply(RaytraceInstance* instance, const RGBAhalf* src, RGBAhalf* dst);
+void device_camera_post_apply(RaytraceInstance* instance, const RGBF* src, RGBF* dst);
 void device_camera_post_clear(RaytraceInstance* instance);
 
 ////////////////////////////////////////////////////////////////////

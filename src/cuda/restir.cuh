@@ -65,7 +65,7 @@ __device__ float restir_sample_target_pdf(LightSample x, GBufferData data) {
     return 0.0f;
   }
 
-  BRDFInstance brdf = brdf_get_instance(RGBAF_to_RGBAhalf(data.albedo), data.V, data.normal, data.roughness, data.metallic);
+  BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
 
   // We overwrite the local scope copy of the light sample
   x.weight = 1.0f;

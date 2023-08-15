@@ -12,10 +12,11 @@
 #include "volume_utils.cuh"
 
 struct BRDFInstance {
-  RGBAhalf albedo;
-  RGBAhalf diffuse;
-  RGBAhalf specular_f0;
-  RGBAhalf fresnel;
+  RGBF albedo;
+  float transparency;
+  RGBF diffuse;
+  RGBF specular_f0;
+  RGBF fresnel;
   vec3 normal;
   float roughness;
   float metallic;
@@ -37,20 +38,20 @@ struct BRDFInstance {
  * There are two fresnel approximations. One is the standard Schlick approximation. The other is some
  * approximation found in the paper by Fdez-Aguera.
  */
-__device__ float brdf_shadowed_F90(const RGBAhalf specular_f0) {
+__device__ float brdf_shadowed_F90(const RGBF specular_f0) {
   const float t = 1.0f / 0.04f;
-  return fminf(1.0f, t * luminance(RGBAhalf_to_RGBF(specular_f0)));
+  return fminf(1.0f, t * luminance(specular_f0));
 }
 
-__device__ RGBAhalf brdf_albedo_as_specular_f0(const RGBAhalf albedo, const float metallic) {
-  const RGBAhalf specular_f0 = get_RGBAhalf(0.04f, 0.04f, 0.04f, 0.00f);
-  const RGBAhalf diff        = sub_RGBAhalf(albedo, specular_f0);
+__device__ RGBF brdf_albedo_as_specular_f0(const RGBF albedo, const float metallic) {
+  const RGBF specular_f0 = get_color(0.04f, 0.04f, 0.04f);
+  const RGBF diff        = sub_color(albedo, specular_f0);
 
-  return fma_RGBAhalf(diff, metallic, specular_f0);
+  return fma_color(diff, metallic, specular_f0);
 }
 
-__device__ RGBAhalf brdf_albedo_as_diffuse(const RGBAhalf albedo, const float metallic) {
-  return scale_RGBAhalf(albedo, 1.0f - metallic);
+__device__ RGBF brdf_albedo_as_diffuse(const RGBF albedo, const float metallic) {
+  return scale_color(albedo, 1.0f - metallic);
 }
 
 /*
@@ -60,12 +61,12 @@ __device__ RGBAhalf brdf_albedo_as_diffuse(const RGBAhalf albedo, const float me
  * @param NdotV Cosine Angle.
  * @result Fresnel approximation.
  */
-__device__ RGBAhalf brdf_fresnel_schlick(const RGBAhalf f0, const float f90, const float NdotV) {
+__device__ RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float NdotV) {
   const float t = powf(1.0f - NdotV, 5.0f);
 
-  RGBAhalf result = f0;
-  RGBAhalf diff   = sub_RGBAhalf(get_RGBAhalf(f90, f90, f90, 0.0f), f0);
-  result          = fma_RGBAhalf(diff, t, result);
+  RGBF result = f0;
+  RGBF diff   = sub_color(get_color(f90, f90, f90), f0);
+  result      = fma_color(diff, t, result);
 
   return result;
 }
@@ -77,12 +78,12 @@ __device__ RGBAhalf brdf_fresnel_schlick(const RGBAhalf f0, const float f90, con
  * @param NdotV Cosine Angle.
  * @result Fresnel approximation.
  */
-__device__ RGBAhalf brdf_fresnel_roughness(const RGBAhalf f0, const float roughness, const float NdotV) {
-  const float t     = powf(1.0f - NdotV, 5.0f);
-  const __half s    = 1.0f - roughness;
-  const RGBAhalf Fr = sub_RGBAhalf(max_RGBAhalf(get_RGBAhalf(s, s, s, 0.0f), f0), f0);
+__device__ RGBF brdf_fresnel_roughness(const RGBF f0, const float roughness, const float NdotV) {
+  const float t = powf(1.0f - NdotV, 5.0f);
+  const float s = 1.0f - roughness;
+  const RGBF Fr = sub_color(max_color(get_color(s, s, s), f0), f0);
 
-  return fma_RGBAhalf(Fr, t, f0);
+  return fma_color(Fr, t, f0);
 }
 
 __device__ float brdf_smith_G1_GGX(const float roughness4, const float NdotS2) {
@@ -140,9 +141,9 @@ __device__ vec3 brdf_sample_microfacet(const vec3 V_local, const float roughness
 /*
  * Multiscattering microfacet model by Fdez-Aguera.
  */
-__device__ RGBAhalf brdf_microfacet_multiscattering(
-  const float NdotV, const RGBAhalf fresnel, const RGBF specular_f0, const RGBAhalf diffuse, const float brdf_term) {
-  const RGBF FssEss = scale_color(RGBAhalf_to_RGBF(fresnel), brdf_term);
+__device__ RGBF brdf_microfacet_multiscattering(
+  const float NdotV, const RGBF fresnel, const RGBF specular_f0, const RGBF diffuse, const float brdf_term) {
+  const RGBF FssEss = scale_color(fresnel, brdf_term);
 
   const float Ems = (1.0f - brdf_term);
 
@@ -151,13 +152,13 @@ __device__ RGBAhalf brdf_microfacet_multiscattering(
 
   const RGBF FmsEms = get_color(F_avg.r / (1.0f - F_avg.r * Ems), F_avg.g / (1.0f - F_avg.g * Ems), F_avg.b / (1.0f - F_avg.b * Ems));
 
-  const RGBAhalf SSMS = RGBF_to_RGBAhalf(add_color(FssEss, scale_color(mul_color(FssEss, FmsEms), Ems)));
+  const RGBF SSMS = add_color(FssEss, scale_color(mul_color(FssEss, FmsEms), Ems));
 
-  const RGBAhalf Edss = sub_RGBAhalf(get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f), SSMS);
+  const RGBF Edss = sub_color(get_color(1.0f, 1.0f, 1.0f), SSMS);
 
-  const RGBAhalf Kd = mul_RGBAhalf(diffuse, Edss);
+  const RGBF Kd = mul_color(diffuse, Edss);
 
-  return add_RGBAhalf(Kd, SSMS);
+  return add_color(Kd, SSMS);
 }
 
 __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3 V_local, float alpha, float beta) {
@@ -186,9 +187,9 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
 
   const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
 
-  const RGBAhalf F = brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, brdf_term);
+  const RGBF F = brdf_microfacet_multiscattering(NdotV, brdf.fresnel, brdf.specular_f0, brdf.diffuse, brdf_term);
 
-  brdf.term = mul_color(brdf.term, RGBAhalf_to_RGBF(F));
+  brdf.term = mul_color(brdf.term, F);
 
   brdf.L = L_local;
 
@@ -208,41 +209,42 @@ __device__ float brdf_evaluate_microfacet_GGX(const float roughness4, const floa
   return roughness4 / (PI * a * a);
 }
 
-__device__ RGBAhalf brdf_evaluate_microfacet(BRDFInstance brdf, const float NdotH, const float NdotL, const float NdotV) {
+__device__ RGBF brdf_evaluate_microfacet(BRDFInstance brdf, const float NdotH, const float NdotL, const float NdotV) {
   const float roughness4 = brdf.roughness * brdf.roughness * brdf.roughness * brdf.roughness;
   const float D          = brdf_evaluate_microfacet_GGX(roughness4, NdotH);
   const float G2         = brdf_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  return brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, D * G2 * NdotL);
+  return brdf_microfacet_multiscattering(NdotV, brdf.fresnel, brdf.specular_f0, brdf.diffuse, D * G2 * NdotL);
 }
 
-__device__ BRDFInstance brdf_get_instance(RGBAhalf albedo, const vec3 V, const vec3 normal, const float roughness, const float metallic) {
-  // An albedo of all 1 produces incorrect results
-  albedo = min_RGBAhalf(albedo, get_RGBAhalf(1.0f - eps, 1.0f - eps, 1.0f - eps, 1.0f));
-
+__device__ BRDFInstance brdf_get_instance(RGBAF albedo, const vec3 V, const vec3 normal, const float roughness, const float metallic) {
   BRDFInstance brdf;
-  brdf.albedo      = albedo;
-  brdf.diffuse     = brdf_albedo_as_diffuse(albedo, metallic);
-  brdf.specular_f0 = brdf_albedo_as_specular_f0(albedo, metallic);
-  brdf.V           = V;
-  brdf.roughness   = roughness;
-  brdf.metallic    = metallic;
-  brdf.normal      = normal;
-  brdf.term        = get_color(1.0f, 1.0f, 1.0f);
+
+  // An albedo of all 1 produces incorrect results
+  brdf.albedo       = min_color(opaque_color(albedo), get_color(1.0f - eps, 1.0f - eps, 1.0f - eps));
+  brdf.transparency = albedo.a;
+  brdf.diffuse      = brdf_albedo_as_diffuse(opaque_color(albedo), metallic);
+  brdf.specular_f0  = brdf_albedo_as_specular_f0(opaque_color(albedo), metallic);
+  brdf.V            = V;
+  brdf.roughness    = roughness;
+  brdf.metallic     = metallic;
+  brdf.normal       = normal;
+  brdf.term         = get_color(1.0f, 1.0f, 1.0f);
 
   return brdf;
 }
 
 __device__ BRDFInstance brdf_get_instance_scattering() {
   BRDFInstance brdf;
-  brdf.albedo      = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
-  brdf.diffuse     = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
-  brdf.specular_f0 = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
-  brdf.V           = get_vector(0.0f, 0.0f, 0.0f);
-  brdf.roughness   = 0.0f;
-  brdf.metallic    = 0.0f;
-  brdf.normal      = get_vector(0.0f, 0.0f, 0.0f);
-  brdf.term        = get_color(1.0f, 1.0f, 1.0f);
+  brdf.albedo       = get_color(0.0f, 0.0f, 0.0f);
+  brdf.transparency = 1.0f;
+  brdf.diffuse      = get_color(0.0f, 0.0f, 0.0f);
+  brdf.specular_f0  = get_color(0.0f, 0.0f, 0.0f);
+  brdf.V            = get_vector(0.0f, 0.0f, 0.0f);
+  brdf.roughness    = 0.0f;
+  brdf.metallic     = 0.0f;
+  brdf.normal       = get_vector(0.0f, 0.0f, 0.0f);
+  brdf.term         = get_color(1.0f, 1.0f, 1.0f);
 
   return brdf;
 }
@@ -275,9 +277,9 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
       break;
   }
 
-  RGBAhalf specular = brdf_evaluate_microfacet(brdf, NdotH, NdotL, NdotV);
+  RGBF specular = brdf_evaluate_microfacet(brdf, NdotH, NdotL, NdotV);
 
-  brdf.term = mul_color(brdf.term, RGBAhalf_to_RGBF(specular));
+  brdf.term = mul_color(brdf.term, specular);
 
   return brdf;
 }
@@ -406,9 +408,9 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
 
   const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
 
-  const RGBAhalf F = brdf_microfacet_multiscattering(NdotV, brdf.fresnel, RGBAhalf_to_RGBF(brdf.specular_f0), brdf.diffuse, brdf_term);
+  const RGBF F = brdf_microfacet_multiscattering(NdotV, brdf.fresnel, brdf.specular_f0, brdf.diffuse, brdf_term);
 
-  brdf.term = mul_color(brdf.term, RGBAhalf_to_RGBF(F));
+  brdf.term = mul_color(brdf.term, F);
 
   const float b = 1.0f - index * index * (1.0f - HdotV * HdotV);
 

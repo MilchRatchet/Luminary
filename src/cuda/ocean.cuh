@@ -235,14 +235,14 @@ __device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
     return get_color(1.0f, 1.0f, 1.0f);
   }
 
-  RGBAhalf specular_f0 = get_RGBAhalf(0.02f, 0.02f, 0.02f, 0.0f);
+  RGBF specular_f0 = get_color(0.02f, 0.02f, 0.02f);
   switch (device.scene.material.fresnel) {
     case SCHLICK:
-      return RGBAhalf_to_RGBF(brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), dot));
+      return brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), dot);
       break;
     case FDEZ_AGUERA:
     default:
-      return RGBAhalf_to_RGBF(brdf_fresnel_roughness(specular_f0, 0.0f, dot));
+      return brdf_fresnel_roughness(specular_f0, 0.0f, dot);
       break;
   }
 }
@@ -352,11 +352,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
     const int pixel = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(0.0f, 0.0f, 0.0f));
+      device.ptrs.frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float value               = __saturatef((1.0f / task.distance) * 2.0f);
-      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(value, value, value));
+      device.ptrs.frame_buffer[pixel] = get_color(value, value, value);
     }
     else if (device.shading_mode == SHADING_NORMAL) {
       vec3 normal = ocean_get_normal(task.position);
@@ -365,12 +365,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      device.ptrs.frame_buffer[pixel] = RGBF_to_RGBAhalf(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
+      device.ptrs.frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      const RGBAhalf color = get_RGBAhalf(0.0f, 0.0f, 1.0f, 0.0f);
-
-      store_RGBAhalf(device.ptrs.frame_buffer + pixel, color);
+      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(0.0f, 0.0f, 1.0f));
     }
   }
 }

@@ -41,17 +41,17 @@ extern "C" void device_bloom_init(RaytraceInstance* instance) {
 
   const int mip_count = _bloom_mip_count(width, height);
 
-  instance->bloom_mips_gpu   = (RGBAhalf**) malloc(sizeof(RGBAhalf*) * mip_count);
+  instance->bloom_mips_gpu   = (RGBF**) malloc(sizeof(RGBF*) * mip_count);
   instance->bloom_mips_count = mip_count;
 
   for (int i = 0; i < mip_count; i++) {
     width  = width >> 1;
     height = height >> 1;
-    device_malloc((void**) &(instance->bloom_mips_gpu[i]), sizeof(RGBAhalf) * width * height);
+    device_malloc((void**) &(instance->bloom_mips_gpu[i]), sizeof(RGBF) * width * height);
   }
 }
 
-extern "C" void device_bloom_apply(RaytraceInstance* instance, const RGBAhalf* src, RGBAhalf* dst) {
+extern "C" void device_bloom_apply(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
   const int width  = instance->output_width;
   const int height = instance->output_height;
 
@@ -101,7 +101,7 @@ extern "C" void device_bloom_clear(RaytraceInstance* instance) {
   for (int i = 0; i < mip_count; i++) {
     width  = width >> 1;
     height = height >> 1;
-    device_free(instance->bloom_mips_gpu[i], sizeof(RGBAhalf) * width * height);
+    device_free(instance->bloom_mips_gpu[i], sizeof(RGBF) * width * height);
   }
 
   free(instance->bloom_mips_gpu);

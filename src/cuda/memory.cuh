@@ -216,13 +216,13 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
 
   if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
     if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION) {
-      RGBF out_albedo = RGBAhalf_to_RGBF(device.ptrs.albedo_buffer[pixel]);
+      RGBF out_albedo = device.ptrs.albedo_buffer[pixel];
       out_albedo      = scale_color(out_albedo, device.temporal_frames);
       albedo          = add_color(albedo, out_albedo);
       albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1));
     }
 
-    device.ptrs.albedo_buffer[pixel] = RGBF_to_RGBAhalf(albedo);
+    device.ptrs.albedo_buffer[pixel] = albedo;
   }
 }
 
@@ -238,7 +238,7 @@ __device__ void write_normal_buffer(vec3 normal, const int pixel) {
     normal = scale_vector(normal, 1.0f / normal_norm);
   }
 
-  device.ptrs.normal_buffer[pixel] = get_RGBAhalf(normal.x, normal.y, normal.z, 0.0f);
+  device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
 }
 
 __device__ GBufferData load_g_buffer_data(const int offset) {

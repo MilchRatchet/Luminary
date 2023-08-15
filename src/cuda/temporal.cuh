@@ -33,7 +33,7 @@ __device__ float mitchell_netravali(int x, int y) {
   return temporal_cubic_filter(len, 1.0f / 3.0f, 1.0f / 3.0f);
 }
 
-__device__ RGBF sample_pixel_catmull_rom(const RGBAhalf* image, float x, float y, const int width, const int height) {
+__device__ RGBF sample_pixel_catmull_rom(const RGBF* image, float x, float y, const int width, const int height) {
   float px = floorf(x - 0.5f) + 0.5f;
   float py = floorf(y - 0.5f) + 0.5f;
 
@@ -69,47 +69,49 @@ __device__ RGBF sample_pixel_catmull_rom(const RGBAhalf* image, float x, float y
   x12 /= (width - 1);
   y12 /= (height - 1);
 
-  RGBAhalf result = get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f);
+  RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x0, y0, width, height), (__half) (wx0 * wy0)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x12, y0, width, height), (__half) (wx12 * wy0)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x3, y0, width, height), (__half) (wx3 * wy0)));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x0, y0, width, height), wx0 * wy0));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x12, y0, width, height), wx12 * wy0));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x3, y0, width, height), wx3 * wy0));
 
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x0, y12, width, height), (__half) (wx0 * wy12)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x12, y12, width, height), (__half) (wx12 * wy12)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x3, y12, width, height), (__half) (wx3 * wy12)));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x0, y12, width, height), wx0 * wy12));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x12, y12, width, height), wx12 * wy12));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x3, y12, width, height), wx3 * wy12));
 
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x0, y3, width, height), (__half) (wx0 * wy3)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x12, y3, width, height), (__half) (wx12 * wy3)));
-  result = add_RGBAhalf(result, scale_RGBAhalf(sample_pixel_clamp(image, x3, y3, width, height), (__half) (wx3 * wy3)));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x0, y3, width, height), wx0 * wy3));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x12, y3, width, height), wx12 * wy3));
+  result = add_color(result, scale_color(sample_pixel_clamp(image, x3, y3, width, height), wx3 * wy3));
 
-  return RGBAhalf_to_RGBF(result);
+  return result;
 }
 
 __global__ void temporal_accumulation() {
   const int amount = device.width * device.height;
 
   for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < amount; offset += blockDim.x * gridDim.x) {
-    RGBAhalf buffer = load_RGBAhalf(device.ptrs.frame_buffer + offset);
-    RGBAhalf output;
-    RGBAhalf variance;
+    RGBF buffer = load_RGBF(device.ptrs.frame_buffer + offset);
+    RGBF output;
+    RGBF variance;
 
     if (device.temporal_frames == 0) {
       output   = buffer;
-      variance = get_RGBAhalf(1.0f, 1.0f, 1.0f, 0.0f);
+      variance = get_color(1.0f, 1.0f, 1.0f);
     }
     else {
-      output   = load_RGBAhalf(device.ptrs.frame_output + offset);
-      variance = load_RGBAhalf(device.ptrs.frame_variance + offset);
+      output   = load_RGBF(device.ptrs.frame_output + offset);
+      variance = load_RGBF(device.ptrs.frame_variance + offset);
     }
 
-    RGBAhalf deviation;
-    deviation.rg = h2sqrt(__hmax2(variance.rg, make_half2(eps, eps)));
-    deviation.ba = h2sqrt(__hmax2(variance.ba, make_half2(eps, eps)));
+    RGBF deviation = max_color(variance, get_color(eps, eps, eps));
+
+    deviation.r = sqrtf(deviation.r);
+    deviation.g = sqrtf(deviation.g);
+    deviation.b = sqrtf(deviation.b);
 
     if (device.temporal_frames) {
-      variance      = scale_RGBAhalf(variance, device.temporal_frames - 1.0f);
-      RGBAhalf diff = sub_RGBAhalf(buffer, output);
+      variance  = scale_color(variance, device.temporal_frames - 1.0f);
+      RGBF diff = sub_color(buffer, output);
 
       // Hard firefly rejection.
       // Fireflies that appear during the first frame are accepted by our method since there is
@@ -120,36 +122,32 @@ __global__ void temporal_accumulation() {
       // pixel as its own independent entity to preserve fine details.
       // TODO: Improve this method to remove the visible dimming during the second frame.
       if (device.temporal_frames == 1) {
-        RGBAhalf min = min_RGBAhalf(buffer, output);
+        RGBF min = min_color(buffer, output);
 
         output = min;
         buffer = min;
       }
 
-      diff = mul_RGBAhalf(diff, diff);
+      diff = mul_color(diff, diff);
 
-      variance = add_RGBAhalf(variance, diff);
-      variance = scale_RGBAhalf(variance, 1.0f / device.temporal_frames);
+      variance = add_color(variance, diff);
+      variance = scale_color(variance, 1.0f / device.temporal_frames);
     }
 
-    store_RGBAhalf(device.ptrs.frame_variance + offset, variance);
+    store_RGBF(device.ptrs.frame_variance + offset, variance);
 
-    RGBAhalf firefly_rejection = add_RGBAhalf(get_RGBAhalf(0.1f, 0.1f, 0.1f, 0.1f), add_RGBAhalf(output, scale_RGBAhalf(deviation, 4.0f)));
-    firefly_rejection          = max_RGBAhalf(get_RGBAhalf(0.0f, 0.0f, 0.0f, 0.0f), sub_RGBAhalf(buffer, firefly_rejection));
+    RGBF firefly_rejection = add_color(get_color(0.1f, 0.1f, 0.1f), add_color(output, scale_color(deviation, 4.0f)));
+    firefly_rejection      = max_color(get_color(0.0f, 0.0f, 0.0f), sub_color(buffer, firefly_rejection));
 
-    buffer = sub_RGBAhalf(buffer, firefly_rejection);
+    buffer = sub_color(buffer, firefly_rejection);
 
-    RGBAhalf old_output = output;
+    RGBF old_output = output;
 
-    output = scale_RGBAhalf(output, device.temporal_frames);
-    output = add_RGBAhalf(buffer, output);
-    output = scale_RGBAhalf(output, 1.0f / (device.temporal_frames + 1));
+    output = scale_color(output, device.temporal_frames);
+    output = add_color(buffer, output);
+    output = scale_color(output, 1.0f / (device.temporal_frames + 1));
 
-    if (infnan_RGBAhalf(output)) {
-      output = old_output;
-    }
-
-    store_RGBAhalf(device.ptrs.frame_output + offset, bound_RGBAhalf(output));
+    store_RGBF(device.ptrs.frame_output + offset, output);
   }
 }
 
@@ -169,7 +167,7 @@ __global__ void temporal_reprojection() {
         const int x = max(0, min(device.width, curr_x + j));
         const int y = max(0, min(device.height, curr_y + i));
 
-        RGBF color = RGBAhalf_to_RGBF(device.ptrs.frame_buffer[x + y * device.width]);
+        RGBF color = device.ptrs.frame_buffer[x + y * device.width];
 
         if (isnan(color.r) || isnan(color.g) || isnan(color.b) || isinf(color.r) || isinf(color.g) || isinf(color.b)) {
           color = get_color(0.0f, 0.0f, 0.0f);
@@ -219,7 +217,7 @@ __global__ void temporal_reprojection() {
       output      = add_color(scale_color(output, alpha), scale_color(temporal, 1.0f - alpha));
     }
 
-    device.ptrs.frame_output[offset] = RGBF_to_RGBAhalf(output);
+    device.ptrs.frame_output[offset] = output;
 
     // Interesting motion vector visualization
     // device.frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));
