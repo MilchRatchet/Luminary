@@ -217,6 +217,10 @@ __global__ void temporal_reprojection() {
       output      = add_color(scale_color(output, alpha), scale_color(temporal, 1.0f - alpha));
     }
 
+    if (isinf(output.r) || isnan(output.r) || isinf(output.g) || isnan(output.g) || isinf(output.b) || isnan(output.b)) {
+      output = get_color(0.0f, 0.0f, 0.0f);
+    }
+
     device.ptrs.frame_output[offset] = output;
 
     // Interesting motion vector visualization
