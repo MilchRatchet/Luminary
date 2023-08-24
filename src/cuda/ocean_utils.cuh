@@ -102,9 +102,15 @@ __device__ float ocean_molecular_phase_sampling_cosine(const vec3 ray, const flo
 __device__ float ocean_particle_phase_sampling_cosine(const vec3 ray, const float r) {
   const float g = 0.924f;
 
-  const float s = (1.0f - g * g) / (1.0f - g + 2.0f * g * r);
+  float denom = (1.0f - g + 2.0f * g * r);
+  if (fabsf(denom) < eps) {
+    denom = copysignf(eps, denom);
+  }
 
-  return (1.0f + g * g - s * s) / (2.0f * g);
+  const float s = (1.0f - g * g) / denom;
+
+  const float ret = (1.0f + g * g - s * s) / (2.0f * g);
+  return fmaxf(ret, -1.0f + eps);
 }
 
 __device__ vec3 ocean_phase_sampling(const vec3 ray) {
