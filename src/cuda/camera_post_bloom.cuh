@@ -89,7 +89,7 @@ extern "C" void device_bloom_apply(RaytraceInstance* instance, const RGBF* src, 
   }
 
   image_upsample<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    instance->bloom_mips_gpu[0], width >> 1, height >> 1, dst, src, width, height, blend / mip_count, 1.0f - blend);
+    instance->bloom_mips_gpu[0], width >> 1, height >> 1, dst, dst, width, height, blend / mip_count, 1.0f - blend);
 }
 
 extern "C" void device_bloom_clear(RaytraceInstance* instance) {

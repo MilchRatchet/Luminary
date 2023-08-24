@@ -355,10 +355,11 @@ struct DevicePointers {
   uint16_t* task_counts;
   uint16_t* task_offsets;
   uint32_t* light_sample_history;
-  RGBF* frame_output;
-  RGBF* frame_temporal;
   RGBF* frame_buffer;
+  RGBF* frame_temporal;
   RGBF* frame_variance;
+  RGBF* frame_accumulate;
+  RGBF* frame_output;
   RGBF* albedo_buffer;
   RGBF* normal_buffer;
   RGBF* light_records;
@@ -432,7 +433,6 @@ struct RaytraceInstance {
   unsigned int output_width;
   unsigned int output_height;
   int realtime;
-  RGBF* frame_final_device;
   DeviceBuffer* light_trace;
   DeviceBuffer* bounce_trace;
   DeviceBuffer* light_trace_count;
@@ -441,10 +441,11 @@ struct RaytraceInstance {
   DeviceBuffer* task_counts;
   DeviceBuffer* task_offsets;
   DeviceBuffer* light_sample_history;
-  DeviceBuffer* frame_output;
-  DeviceBuffer* frame_temporal;
   DeviceBuffer* frame_buffer;
+  DeviceBuffer* frame_temporal;
   DeviceBuffer* frame_variance;
+  DeviceBuffer* frame_accumulate;
+  DeviceBuffer* frame_output;
   DeviceBuffer* albedo_buffer;
   DeviceBuffer* normal_buffer;
   DeviceBuffer* light_records;

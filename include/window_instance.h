@@ -1,5 +1,5 @@
-#ifndef REALTIME_H
-#define REALTIME_H
+#ifndef WINDOW_INSTANCE_H
+#define WINDOW_INSTANCE_H
 
 #include "SDL.h"
 #include "utils.h"
@@ -20,4 +20,4 @@ WindowInstance* window_instance_init(RaytraceInstance* instance);
 void window_instance_update_pointer(WindowInstance* window);
 void window_instance_free(WindowInstance* window);
 
-#endif /* REALTIME_H */
+#endif /* WINDOW_INSTANCE_H */

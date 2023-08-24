@@ -6,8 +6,8 @@
 #include "SDL_ttf.h"
 #include "UI_panel.h"
 #include "UI_structs.h"
-#include "realtime.h"
 #include "utils.h"
+#include "window_instance.h"
 
 #define UI_HEIGHT_IN_PANELS 20
 

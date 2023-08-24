@@ -441,10 +441,11 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->task_counts);
   device_buffer_init(&instance->task_offsets);
   device_buffer_init(&instance->light_sample_history);
-  device_buffer_init(&instance->frame_output);
-  device_buffer_init(&instance->frame_temporal);
   device_buffer_init(&instance->frame_buffer);
+  device_buffer_init(&instance->frame_temporal);
   device_buffer_init(&instance->frame_variance);
+  device_buffer_init(&instance->frame_accumulate);
+  device_buffer_init(&instance->frame_output);
   device_buffer_init(&instance->albedo_buffer);
   device_buffer_init(&instance->normal_buffer);
   device_buffer_init(&instance->light_records);
@@ -578,8 +579,9 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_temporal, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->frame_variance, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
 
@@ -627,10 +629,11 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.task_counts          = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets         = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
   ptrs.light_sample_history = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
-  ptrs.frame_output         = (RGBF*) device_buffer_get_pointer(instance->frame_output);
-  ptrs.frame_temporal       = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
   ptrs.frame_buffer         = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
+  ptrs.frame_temporal       = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
   ptrs.frame_variance       = (RGBF*) device_buffer_get_pointer(instance->frame_variance);
+  ptrs.frame_accumulate     = (RGBF*) device_buffer_get_pointer(instance->frame_accumulate);
+  ptrs.frame_output         = (RGBF*) device_buffer_get_pointer(instance->frame_output);
   ptrs.albedo_buffer        = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
   ptrs.normal_buffer        = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
   ptrs.light_records        = (RGBF*) device_buffer_get_pointer(instance->light_records);
@@ -684,7 +687,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
 }
 
 void raytrace_free_output_buffers(RaytraceInstance* instance) {
-  device_buffer_free(instance->frame_output);
+  device_buffer_free(instance->frame_accumulate);
 
   if (instance->denoiser) {
     device_buffer_free(instance->albedo_buffer);

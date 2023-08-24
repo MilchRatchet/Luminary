@@ -1,10 +1,11 @@
-#include "realtime.h"
+#include "window_instance.h"
 
 #include <stdlib.h>
 
 #include "buffer.h"
 #include "raytrace.h"
 
+// TODO: If window is not maximum height then position the window in the middle rather then the top.
 WindowInstance* window_instance_init(RaytraceInstance* instance) {
   WindowInstance* window = (WindowInstance*) calloc(1, sizeof(WindowInstance));
 

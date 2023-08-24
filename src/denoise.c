@@ -224,6 +224,7 @@ void denoise_free(RaytraceInstance* instance) {
   device_buffer_destroy(&denoise_setup.avg_color);
   device_buffer_destroy(&denoise_setup.denoiserState);
   device_buffer_destroy(&denoise_setup.denoiserScratch);
+  device_buffer_destroy(&denoise_setup.output);
 
   OPTIX_CHECK(optixDenoiserDestroy(denoise_setup.denoiser));
 

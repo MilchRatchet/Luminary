@@ -671,13 +671,25 @@ static UITab create_post_process_menu_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_dropdown(ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 4, "None\0ACES\0Reinhard\0Uncharted 2", 0);
   panels[i++] =
     create_dropdown(ui, "Filter", &(instance->scene.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 1);
+
+  // Toggling denoising is off if it is not allocated or if it is an upscaling denoiser
+  if (instance->denoiser == DENOISING_ON) {
+    panels[i++] = create_check(ui, "Denoising", &(instance->denoiser), 0);
+  }
+
   panels[i++] = create_slider(ui, "Exposure", &(instance->scene.camera.exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
   panels[i++] = create_check(ui, "Bloom", &(instance->scene.camera.bloom), 0);
   panels[i++] = create_slider(ui, "Bloom Blend", &(instance->scene.camera.bloom_blend), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_check(ui, "Dithering", &(instance->scene.camera.dithering), 0);
+  panels[i++] = create_check(ui, "Lens Flare", &(instance->scene.camera.lens_flare), 0);
+  panels[i++] = create_slider(ui, "Lens Flare Threshold", &(instance->scene.camera.lens_flare_threshold), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Color Correction", &(instance->scene.camera.use_color_correction), 0);
+  panels[i++] = create_slider(ui, "Hue", &(instance->scene.camera.color_correction.r), 0, 0.0001f, -1.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Saturation", &(instance->scene.camera.color_correction.g), 0, 0.0001f, -1.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Value", &(instance->scene.camera.color_correction.b), 0, 0.0001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Purkinje Shift", &(instance->scene.camera.purkinje), 0);
   panels[i++] = create_slider(ui, "Purkinje Blueness", &(instance->scene.camera.purkinje_kappa1), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Purkinje Brightness", &(instance->scene.camera.purkinje_kappa2), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Dithering", &(instance->scene.camera.dithering), 0);
   panels[i++] = create_button(ui, "Finish", (void*) instance, (void (*)(void*)) offline_exit_post_process_menu, 0);
 
   tab.panels      = panels;

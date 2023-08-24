@@ -99,7 +99,7 @@ __global__ void temporal_accumulation() {
       variance = get_color(1.0f, 1.0f, 1.0f);
     }
     else {
-      output   = load_RGBF(device.ptrs.frame_output + offset);
+      output   = load_RGBF(device.ptrs.frame_accumulate + offset);
       variance = load_RGBF(device.ptrs.frame_variance + offset);
     }
 
@@ -141,13 +141,11 @@ __global__ void temporal_accumulation() {
 
     buffer = sub_color(buffer, firefly_rejection);
 
-    RGBF old_output = output;
-
     output = scale_color(output, device.temporal_frames);
     output = add_color(buffer, output);
     output = scale_color(output, 1.0f / (device.temporal_frames + 1));
 
-    store_RGBF(device.ptrs.frame_output + offset, output);
+    store_RGBF(device.ptrs.frame_accumulate + offset, output);
   }
 }
 
@@ -221,7 +219,7 @@ __global__ void temporal_reprojection() {
       output = get_color(0.0f, 0.0f, 0.0f);
     }
 
-    device.ptrs.frame_output[offset] = output;
+    device.ptrs.frame_accumulate[offset] = output;
 
     // Interesting motion vector visualization
     // device.frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));

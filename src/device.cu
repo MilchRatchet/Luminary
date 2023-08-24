@@ -45,13 +45,13 @@ extern "C" void device_init() {
 void device_handle_accumulation(RaytraceInstance* instance) {
   switch (instance->accum_mode) {
     case NO_ACCUMULATION:
-      device_buffer_copy(instance->frame_buffer, instance->frame_output);
+      device_buffer_copy(instance->frame_buffer, instance->frame_accumulate);
       break;
     case TEMPORAL_ACCUMULATION:
       temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
       break;
     case TEMPORAL_REPROJECTION:
-      device_buffer_copy(instance->frame_output, instance->frame_temporal);
+      device_buffer_copy(instance->frame_accumulate, instance->frame_temporal);
       temporal_reprojection<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
       break;
     default:
