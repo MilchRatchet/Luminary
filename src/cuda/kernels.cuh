@@ -13,6 +13,7 @@
 #include "sky_utils.cuh"
 #include "state.cuh"
 #include "temporal.cuh"
+#include "tonemap.cuh"
 #include "toy.cuh"
 #include "utils.cuh"
 #include "volume.cuh"
@@ -497,13 +498,13 @@ __global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int
       case TONEMAP_NONE:
         break;
       case TONEMAP_ACES:
-        pixel = aces_tonemap(pixel);
+        pixel = tonemap_aces(pixel);
         break;
       case TONEMAP_REINHARD:
-        pixel = reinhard_tonemap(pixel);
+        pixel = tonemap_reinhard(pixel);
         break;
       case TONEMAP_UNCHARTED2:
-        pixel = uncharted2_tonemap(pixel);
+        pixel = tonemap_uncharted2(pixel);
         break;
     }
 
