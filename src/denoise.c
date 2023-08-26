@@ -189,6 +189,9 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
     case TONEMAP_UNCHARTED2:
       target_exposure = 3.0f;
       break;
+    default:
+      target_exposure = 1.0f;
+      break;
   }
 
   float brightness;

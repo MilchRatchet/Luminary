@@ -49,6 +49,9 @@ void scene_init(Scene** _scene) {
   scene->camera.dithering             = 1;
   scene->camera.far_clip_distance     = 50000.0f;
   scene->camera.tonemap               = TONEMAP_ACES;
+  scene->camera.agx_custom_slope      = 1.0f;
+  scene->camera.agx_custom_power      = 1.0f;
+  scene->camera.agx_custom_saturation = 1.0f;
   scene->camera.filter                = FILTER_NONE;
   scene->camera.wasd_speed            = 1.0f;
   scene->camera.mouse_speed           = 1.0f;

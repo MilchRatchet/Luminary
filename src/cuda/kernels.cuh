@@ -509,11 +509,11 @@ __global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int
       case TONEMAP_AGX:
         pixel = tonemap_agx(pixel);
         break;
-      case TONEMAP_AGX_GOLDEN:
-        pixel = tonemap_agx_golden(pixel);
-        break;
       case TONEMAP_AGX_PUNCHY:
         pixel = tonemap_agx_punchy(pixel);
+        break;
+      case TONEMAP_AGX_CUSTOM:
+        pixel = tonemap_agx_custom(pixel);
         break;
     }
 

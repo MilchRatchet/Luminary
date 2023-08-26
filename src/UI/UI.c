@@ -192,9 +192,12 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, 1, "Properties\nPost Processing");
   panels[i++] = create_dropdown(
-    ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 7, "None\0ACES\0Reinhard\0Uncharted 2\0AgX\0AgX Golden\0AgX Punchy", 2);
+    ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 7, "None\0ACES\0Reinhard\0Uncharted 2\0AgX\0AgX Punchy\0AgX Custom", 2);
+  panels[i++] = create_slider(ui, "AgX Custom Slope", &(instance->scene.camera.agx_custom_slope), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "AgX Custom Power", &(instance->scene.camera.agx_custom_power), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Saturation", &(instance->scene.camera.agx_custom_saturation), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] =
-    create_dropdown(ui, "Filter", &(instance->scene.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 3);
+    create_dropdown(ui, "Filter", &(instance->scene.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 6);
   panels[i++] = create_check(ui, "Auto Exposure", &(instance->scene.camera.auto_exposure), 0);
   panels[i++] = create_slider(ui, "Min Exposure", &(instance->scene.camera.min_exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Max Exposure", &(instance->scene.camera.max_exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
@@ -670,9 +673,12 @@ static UITab create_post_process_menu_panels(UI* ui, RaytraceInstance* instance)
   int i = 0;
 
   panels[i++] = create_dropdown(
-    ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 7, "None\0ACES\0Reinhard\0Uncharted 2\0AgX\0AgX Golden\0AgX Punchy", 0);
+    ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 7, "None\0ACES\0Reinhard\0Uncharted 2\0AgX\0AgX Punchy\0AgX Custom", 0);
+  panels[i++] = create_slider(ui, "AgX Custom Slope", &(instance->scene.camera.agx_custom_slope), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "AgX Custom Power", &(instance->scene.camera.agx_custom_power), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Saturation", &(instance->scene.camera.agx_custom_saturation), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] =
-    create_dropdown(ui, "Filter", &(instance->scene.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 1);
+    create_dropdown(ui, "Filter", &(instance->scene.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 4);
 
   // Toggling denoising is off if it is not allocated or if it is an upscaling denoiser
   if (instance->denoiser == DENOISING_ON) {

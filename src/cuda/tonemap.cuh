@@ -149,17 +149,21 @@ __device__ RGBF tonemap_agx(RGBF pixel) {
   return pixel;
 }
 
-__device__ RGBF tonemap_agx_golden(RGBF pixel) {
+__device__ RGBF tonemap_agx_punchy(RGBF pixel) {
   pixel = agx_conversion(pixel);
-  pixel = agx_look(pixel, get_color(1.0f, 0.9f, 0.5f), get_color(0.8f, 0.8f, 0.8f), 0.8f);
+  pixel = agx_look(pixel, get_color(1.0f, 1.0f, 1.0f), get_color(1.35f, 1.35f, 1.35f), 1.4f);
   pixel = agx_inv_conversion(pixel);
 
   return pixel;
 }
 
-__device__ RGBF tonemap_agx_punchy(RGBF pixel) {
+__device__ RGBF tonemap_agx_custom(RGBF pixel) {
   pixel = agx_conversion(pixel);
-  pixel = agx_look(pixel, get_color(1.0f, 1.0f, 1.0f), get_color(1.35f, 1.35f, 1.35f), 1.4f);
+
+  RGBF slope = get_color(device.scene.camera.agx_custom_slope, device.scene.camera.agx_custom_slope, device.scene.camera.agx_custom_slope);
+  RGBF power = get_color(device.scene.camera.agx_custom_power, device.scene.camera.agx_custom_power, device.scene.camera.agx_custom_power);
+
+  pixel = agx_look(pixel, slope, power, device.scene.camera.agx_custom_saturation);
   pixel = agx_inv_conversion(pixel);
 
   return pixel;

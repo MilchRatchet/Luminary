@@ -73,8 +73,8 @@ enum ToneMap {
   TONEMAP_REINHARD   = 2,
   TONEMAP_UNCHARTED2 = 3,
   TONEMAP_AGX        = 4,
-  TONEMAP_AGX_GOLDEN = 5,
-  TONEMAP_AGX_PUNCHY = 6
+  TONEMAP_AGX_PUNCHY = 5,
+  TONEMAP_AGX_CUSTOM = 6
 } typedef ToneMap;
 
 enum BVHType { BVH_LUMINARY = 0, BVH_OPTIX = 1 } typedef BVHType;
@@ -139,8 +139,11 @@ struct Camera {
   float min_exposure;
   int auto_exposure;
   float far_clip_distance;
-  int tonemap;
-  int filter;
+  ToneMap tonemap;
+  float agx_custom_slope;
+  float agx_custom_power;
+  float agx_custom_saturation;
+  Filter filter;
   int bloom;
   float bloom_blend;
   int lens_flare;
