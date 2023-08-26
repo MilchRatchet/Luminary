@@ -63,4 +63,111 @@ __device__ RGBF tonemap_reinhard(RGBF pixel) {
   return pixel;
 }
 
+//
+// AgX approximation based on https://iolite-engine.com/blog_posts/minimal_agx_implementation
+//
+
+__device__ float agx_constrast_approx_polynomial(float v) {
+  const float v2 = v * v;
+  const float v4 = v2 * v2;
+
+  return 15.5f * v4 * v2 - 40.14f * v4 * v + 31.96f * v4 - 6.868f * v2 * v + 0.4298f * v2 + 0.1191f * v - 0.00232f;
+}
+
+__device__ RGBF agx_contrast_approx(RGBF pixel) {
+  const float r = agx_constrast_approx_polynomial(pixel.r);
+  const float g = agx_constrast_approx_polynomial(pixel.g);
+  const float b = agx_constrast_approx_polynomial(pixel.b);
+
+  return get_color(r, g, b);
+}
+
+__device__ RGBF agx_conversion(RGBF pixel) {
+  RGBF agx;
+
+  /*agx.r = 0.842479062253094f * pixel.r + 0.0423282422610123f * pixel.g + 0.0423756549057051f * pixel.b;
+  agx.g = 0.0784335999999992f * pixel.r + 0.878468636469772f * pixel.g + 0.0784336f * pixel.b;
+  agx.b = 0.0792237451477643f * pixel.r + 0.0791661274605434f * pixel.g + 0.879142973793104f * pixel.b;*/
+
+  agx = get_color(0.0f, 0.0f, 0.0f);
+  agx = add_color(agx, scale_color(get_color(0.842479062253094f, 0.0423282422610123f, 0.0423756549057051f), pixel.r));
+  agx = add_color(agx, scale_color(get_color(0.0784335999999992f, 0.878468636469772f, 0.0784336f), pixel.g));
+  agx = add_color(agx, scale_color(get_color(0.0792237451477643f, 0.0791661274605434f, 0.879142973793104f), pixel.b));
+
+  const float min_val = -12.47393f;
+  const float max_val = 4.026069f;
+
+  // Clamp Value to inbetween the allowed values first
+  agx = max_color(agx, get_color(0.00017578139f, 0.00017578139f, 0.00017578139f));
+
+  agx.r = fminf(fmaxf(log2f(agx.r), min_val), max_val);
+  agx.g = fminf(fmaxf(log2f(agx.g), min_val), max_val);
+  agx.b = fminf(fmaxf(log2f(agx.b), min_val), max_val);
+
+  agx.r = (agx.r - min_val) / (max_val - min_val);
+  agx.g = (agx.g - min_val) / (max_val - min_val);
+  agx.b = (agx.b - min_val) / (max_val - min_val);
+
+  return agx_contrast_approx(agx);
+}
+
+__device__ RGBF agx_inv_conversion(RGBF pixel) {
+  RGBF agx;
+
+  /*agx.r = 1.19687900512017f * pixel.r - 0.0528968517574562f * pixel.g - 0.0529716355144438f * pixel.b;
+  agx.g = -0.0980208811401368f * pixel.r + 1.15190312990417f * pixel.g - 0.0980434501171241f * pixel.b;
+  agx.b = -0.0990297440797205f * pixel.r - 0.0989611768448433f * pixel.g + 1.15107367264116f * pixel.b;*/
+
+  agx = get_color(0.0f, 0.0f, 0.0f);
+  agx = add_color(agx, scale_color(get_color(1.19687900512017f, -0.0528968517574562f, -0.0529716355144438f), pixel.r));
+  agx = add_color(agx, scale_color(get_color(-0.0980208811401368f, 1.15190312990417f, -0.0980434501171241f), pixel.g));
+  agx = add_color(agx, scale_color(get_color(-0.0990297440797205f, -0.0989611768448433f, 1.15107367264116f), pixel.b));
+
+  // This should be sRGB to linear conversion
+  agx.r = powf(agx.r, 2.2f);
+  agx.g = powf(agx.g, 2.2f);
+  agx.b = powf(agx.b, 2.2f);
+
+  return agx;
+}
+
+__device__ RGBF agx_look(RGBF pixel, const RGBF slope, const RGBF power, const float saturation) {
+  const float lum = luminance(pixel);
+
+  pixel = mul_color(pixel, slope);
+
+  pixel.r = powf(pixel.r, power.r);
+  pixel.g = powf(pixel.g, power.g);
+  pixel.b = powf(pixel.b, power.b);
+
+  pixel.r = lerp(lum, pixel.r, saturation);
+  pixel.g = lerp(lum, pixel.g, saturation);
+  pixel.b = lerp(lum, pixel.b, saturation);
+
+  return pixel;
+}
+
+__device__ RGBF tonemap_agx(RGBF pixel) {
+  pixel = agx_conversion(pixel);
+  pixel = agx_inv_conversion(pixel);
+
+  return pixel;
+}
+
+__device__ RGBF tonemap_agx_golden(RGBF pixel) {
+  pixel = agx_conversion(pixel);
+  pixel = agx_look(pixel, get_color(1.0f, 0.9f, 0.5f), get_color(0.8f, 0.8f, 0.8f), 0.8f);
+  pixel = agx_inv_conversion(pixel);
+
+  return pixel;
+}
+
+__device__ RGBF tonemap_agx_punchy(RGBF pixel) {
+  pixel = agx_conversion(pixel);
+  pixel = agx_look(pixel, get_color(1.0f, 1.0f, 1.0f), get_color(1.35f, 1.35f, 1.35f), 1.4f);
+  pixel = agx_inv_conversion(pixel);
+
+  return pixel;
+}
+
 #endif /* CU_TONEMAP_H */

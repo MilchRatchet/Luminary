@@ -67,7 +67,15 @@ enum ShadingMode {
 
 enum ToyShape { TOY_SPHERE = 0, TOY_PLANE = 1 } typedef ToyShape;
 
-enum ToneMap { TONEMAP_NONE = 0, TONEMAP_ACES = 1, TONEMAP_REINHARD = 2, TONEMAP_UNCHARTED2 = 3 } typedef ToneMap;
+enum ToneMap {
+  TONEMAP_NONE       = 0,
+  TONEMAP_ACES       = 1,
+  TONEMAP_REINHARD   = 2,
+  TONEMAP_UNCHARTED2 = 3,
+  TONEMAP_AGX        = 4,
+  TONEMAP_AGX_GOLDEN = 5,
+  TONEMAP_AGX_PUNCHY = 6
+} typedef ToneMap;
 
 enum BVHType { BVH_LUMINARY = 0, BVH_OPTIX = 1 } typedef BVHType;
 

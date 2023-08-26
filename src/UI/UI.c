@@ -191,7 +191,8 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
 
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
   panels[i++] = create_tab(ui, 1, "Properties\nPost Processing");
-  panels[i++] = create_dropdown(ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 4, "None\0ACES\0Reinhard\0Uncharted 2", 2);
+  panels[i++] = create_dropdown(
+    ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 7, "None\0ACES\0Reinhard\0Uncharted 2\0AgX\0AgX Golden\0AgX Punchy", 2);
   panels[i++] =
     create_dropdown(ui, "Filter", &(instance->scene.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 3);
   panels[i++] = create_check(ui, "Auto Exposure", &(instance->scene.camera.auto_exposure), 0);
@@ -668,7 +669,8 @@ static UITab create_post_process_menu_panels(UI* ui, RaytraceInstance* instance)
 
   int i = 0;
 
-  panels[i++] = create_dropdown(ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 4, "None\0ACES\0Reinhard\0Uncharted 2", 0);
+  panels[i++] = create_dropdown(
+    ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 7, "None\0ACES\0Reinhard\0Uncharted 2\0AgX\0AgX Golden\0AgX Punchy", 0);
   panels[i++] =
     create_dropdown(ui, "Filter", &(instance->scene.camera.filter), 0, 7, "None\0Gray\0Sepia\0Gameboy\0002 Bit Gray\0CRT\0Black/White", 1);
 
