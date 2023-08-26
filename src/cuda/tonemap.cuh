@@ -85,10 +85,6 @@ __device__ RGBF agx_contrast_approx(RGBF pixel) {
 __device__ RGBF agx_conversion(RGBF pixel) {
   RGBF agx;
 
-  /*agx.r = 0.842479062253094f * pixel.r + 0.0423282422610123f * pixel.g + 0.0423756549057051f * pixel.b;
-  agx.g = 0.0784335999999992f * pixel.r + 0.878468636469772f * pixel.g + 0.0784336f * pixel.b;
-  agx.b = 0.0792237451477643f * pixel.r + 0.0791661274605434f * pixel.g + 0.879142973793104f * pixel.b;*/
-
   agx = get_color(0.0f, 0.0f, 0.0f);
   agx = add_color(agx, scale_color(get_color(0.842479062253094f, 0.0423282422610123f, 0.0423756549057051f), pixel.r));
   agx = add_color(agx, scale_color(get_color(0.0784335999999992f, 0.878468636469772f, 0.0784336f), pixel.g));
@@ -114,19 +110,18 @@ __device__ RGBF agx_conversion(RGBF pixel) {
 __device__ RGBF agx_inv_conversion(RGBF pixel) {
   RGBF agx;
 
-  /*agx.r = 1.19687900512017f * pixel.r - 0.0528968517574562f * pixel.g - 0.0529716355144438f * pixel.b;
-  agx.g = -0.0980208811401368f * pixel.r + 1.15190312990417f * pixel.g - 0.0980434501171241f * pixel.b;
-  agx.b = -0.0990297440797205f * pixel.r - 0.0989611768448433f * pixel.g + 1.15107367264116f * pixel.b;*/
-
   agx = get_color(0.0f, 0.0f, 0.0f);
   agx = add_color(agx, scale_color(get_color(1.19687900512017f, -0.0528968517574562f, -0.0529716355144438f), pixel.r));
   agx = add_color(agx, scale_color(get_color(-0.0980208811401368f, 1.15190312990417f, -0.0980434501171241f), pixel.g));
   agx = add_color(agx, scale_color(get_color(-0.0990297440797205f, -0.0989611768448433f, 1.15107367264116f), pixel.b));
 
+  // Color could be negative now
+  agx = max_color(agx, get_color(0.0f, 0.0f, 0.0f));
+
   // This should be sRGB to linear conversion
-  agx.r = powf(agx.r, 2.2f);
-  agx.g = powf(agx.g, 2.2f);
-  agx.b = powf(agx.b, 2.2f);
+  agx.r = SRGB_to_linearRGB(agx.r);
+  agx.g = SRGB_to_linearRGB(agx.g);
+  agx.b = SRGB_to_linearRGB(agx.b);
 
   return agx;
 }

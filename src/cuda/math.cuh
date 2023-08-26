@@ -675,12 +675,26 @@ __device__ float get_dithering(const int x, const int y) {
   return copysignf(1.0f - sqrtf(1.0f - fabsf(dither)), dither);
 }
 
+//
+// Linear RGB / sRGB conversion taken from https://www.shadertoy.com/view/lsd3zN
+// which is based os D3DX implementations
+//
+
 __device__ float linearRGB_to_SRGB(const float value) {
   if (value <= 0.0031308f) {
     return 12.92f * value;
   }
   else {
     return 1.055f * powf(value, 0.416666666667f) - 0.055f;
+  }
+}
+
+__device__ float SRGB_to_linearRGB(const float value) {
+  if (value <= 0.04045f) {
+    return value / 12.92f;
+  }
+  else {
+    return powf((value + 0.055f) / 1.055f, 2.4f);
   }
 }
 
