@@ -1082,7 +1082,7 @@ __device__ float sample_sphere_solid_angle(const vec3 p, const float r, const ve
 }
 
 __device__ int material_is_mirror(const float roughness, const float metallic) {
-  return (roughness < 0.01f && metallic > 0.99f);
+  return (roughness < 0.5f && metallic > 0.9f);
 }
 
 // Computes tangent space for use with normal mapping without precomputation
