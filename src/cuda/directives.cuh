@@ -27,7 +27,7 @@ __device__ int validate_trace_task(TraceTask task, RGBF& record) {
 
 #ifdef WEIGHT_BASED_EXIT
   const float max = luminance(record);
-  if (max < CUTOFF) {
+  if (isnan(max) || isinf(max) || max < CUTOFF) {
     valid = 0;
   }
   else if (max < PROBABILISTIC_CUTOFF) {
