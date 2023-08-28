@@ -109,8 +109,7 @@ __device__ float ocean_particle_phase_sampling_cosine(const vec3 ray, const floa
 
   const float s = (1.0f - g * g) / denom;
 
-  const float ret = (1.0f + g * g - s * s) / (2.0f * g);
-  return fmaxf(ret, -1.0f + eps);
+  return (1.0f + g * g - s * s) / (2.0f * g);
 }
 
 __device__ vec3 ocean_phase_sampling(const vec3 ray) {

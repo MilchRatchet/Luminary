@@ -249,6 +249,10 @@ __device__ vec3 sample_hemisphere_basis(const float altitude, const float azimut
  * @result Unit vector on the sphere given by the two parameters.
  */
 __device__ vec3 sample_ray_sphere(const float alpha, const float beta) {
+  if (fabsf(alpha) > 1.0f - eps) {
+    return get_vector(0.0f, 0.0f, copysignf(1.0f, alpha));
+  }
+
   const float a = sqrtf(1.0f - alpha * alpha);
   const float b = 2.0f * PI * beta;
 
@@ -948,8 +952,6 @@ __device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter,
   else {
     u = henyey_greenstein_phase_sample(params.g_hg, r);
   }
-
-  u = fmaxf(u, -1.0f + eps);
 
   return phase_sample_basis(u, white_noise(), ray);
 }
