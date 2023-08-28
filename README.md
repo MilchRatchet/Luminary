@@ -99,7 +99,7 @@ In realtime mode, which is used by default, you can control the camera through `
 
 Requirements:
 - CUDA Toolkit 12.1
-- Optix 7.7 SDK
+- Optix 8.0 SDK
 - SDL2 and SDL2_ttf
 - Modern CMake
 - Make or Ninja

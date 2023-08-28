@@ -31,7 +31,10 @@ void denoise_create(RaytraceInstance* instance) {
 
   switch (instance->denoiser) {
     case DENOISING_ON:
-      kind = OPTIX_DENOISER_MODEL_KIND_HDR;
+      // We only need OPTIX_DENOISER_MODEL_KIND_HDR, however, a forum post by Nvidia
+      // (https://forums.developer.nvidia.com/t/optix-8-0-denoiser-camera-space-vs-world-space/262875/2) suggests that these are legacy and
+      // no longer being improved. This is not documented anywhere else but we use the AOV model instead then.
+      kind = OPTIX_DENOISER_MODEL_KIND_AOV;
       break;
     case DENOISING_UPSCALING: {
       if (instance->width * instance->height > 18144000) {
@@ -46,8 +49,9 @@ void denoise_create(RaytraceInstance* instance) {
 
   OptixDenoiseInstance* denoise_setup = (OptixDenoiseInstance*) calloc(1, sizeof(OptixDenoiseInstance));
 
-  denoise_setup->opt.guideAlbedo = 1;
-  denoise_setup->opt.guideNormal = 1;
+  denoise_setup->opt.guideAlbedo  = 1;
+  denoise_setup->opt.guideNormal  = 1;
+  denoise_setup->opt.denoiseAlpha = OPTIX_DENOISER_ALPHA_MODE_COPY;
 
   OPTIX_CHECK(optixDenoiserCreate(instance->optix_ctx, kind, &denoise_setup->opt, &denoise_setup->denoiser));
 
@@ -140,7 +144,6 @@ DeviceBuffer* denoise_apply(RaytraceInstance* instance, RGBF* src) {
     (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserScratch), device_buffer_get_size(denoise_setup->denoiserScratch)));
 
   OptixDenoiserParams denoiserParams;
-  denoiserParams.denoiseAlpha    = OPTIX_DENOISER_ALPHA_MODE_COPY;
   denoiserParams.hdrIntensity    = (CUdeviceptr) device_buffer_get_pointer(denoise_setup->hdr_intensity);
   denoiserParams.blendFactor     = 0.0f;
   denoiserParams.hdrAverageColor = (CUdeviceptr) device_buffer_get_pointer(denoise_setup->avg_color);

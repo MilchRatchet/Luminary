@@ -230,8 +230,6 @@ __device__ void write_normal_buffer(vec3 normal, const int pixel) {
   if (!device.denoiser || device.iteration_type != TYPE_CAMERA || (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION))
     return;
 
-  normal = transform_vec4_3(device.emitter.view_space, normal);
-
   const float normal_norm = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
 
   if (normal_norm > eps) {

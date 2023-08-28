@@ -38,10 +38,10 @@ endif()
 # Find Nvidia packages
 #=============================================================
 find_package(CUDAToolkit 12.1 REQUIRED QUIET)
-find_package(Optix 7.7 REQUIRED QUIET)
+find_package(Optix 8.0 REQUIRED QUIET)
 
 if(NOT OptiX_VERSION)
-  set(OptiX_VERSION "7.7")
+  set(OptiX_VERSION "8.0")
 endif()
 
 #=============================================================
