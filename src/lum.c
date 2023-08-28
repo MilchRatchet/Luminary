@@ -166,6 +166,18 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 6868061231871053652u:
       sscanf(value, "%d\n", &camera->tonemap);
       break;
+    /* AGXSLOPE */
+    case 4994579175988283201u:
+      sscanf(value, "%f\n", &camera->agx_custom_slope);
+      break;
+    /* AGXPOWER */
+    case 5928240482665121601u:
+      sscanf(value, "%f\n", &camera->agx_custom_power);
+      break;
+    /* AGXSATUR */
+    case 5932740723678398273u:
+      sscanf(value, "%f\n", &camera->agx_custom_saturation);
+      break;
     /* FILTER__ */
     case 6872302014111172934u:
       sscanf(value, "%d\n", &camera->filter);
@@ -728,6 +740,12 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "CAMERA FARCLIPD %f\n", instance->scene.camera.far_clip_distance);
   fputs(line, file);
   sprintf(line, "CAMERA TONEMAP_ %d\n", instance->scene.camera.tonemap);
+  fputs(line, file);
+  sprintf(line, "CAMERA AGXSLOPE %f\n", instance->scene.camera.agx_custom_slope);
+  fputs(line, file);
+  sprintf(line, "CAMERA AGXPOWER %f\n", instance->scene.camera.agx_custom_power);
+  fputs(line, file);
+  sprintf(line, "CAMERA AGXSATUR %f\n", instance->scene.camera.agx_custom_saturation);
   fputs(line, file);
   sprintf(line, "CAMERA AUTOEXP_ %d\n", instance->scene.camera.auto_exposure);
   fputs(line, file);

@@ -108,6 +108,18 @@ Defines which of the available tonemaps is used:
   - 1 = ACES
   - 2 = Reinhard
   - 3 = Uncharted 2
+  - 4 = AgX
+  - 5 = AgX Punchy
+  - 6 = AgX Custom
+
+`CAMERA AGXSLOPE [FP32]`<br/>
+Slope amplification used in the custom AgX tonemapper. Number must be non-negative.
+
+`CAMERA AGXPOWER [FP32]`<br/>
+Power applied in the custom AgX tonemapper. Number must be non-negative.
+
+`CAMERA AGXSATUR [FP32]`<br/>
+Saturation used in the custom AgX tonemapper. Number must be non-negative.
 
 `CAMERA FILTER__ [INT32]`<br/>
 Defines which of the available filters is used:
