@@ -294,6 +294,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
 
     RGBF record = device.records[pixel];
 
+    write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
+
     const vec3 bounce_ray =
       (volume.type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_sample(ray, device.scene.fog.droplet_diameter) : ocean_phase_sampling(ray);
 
