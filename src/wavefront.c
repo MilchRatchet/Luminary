@@ -142,6 +142,8 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
     return;
   }
 
+  int path_offset = 7;
+
   // Determine type of map
   WavefrontTextureInstanceType type;
   if (!strncmp(line + 4, "Kd", 2)) {
@@ -153,8 +155,9 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
   else if (!strncmp(line + 4, "Ns", 2)) {
     type = WF_MATERIAL;
   }
-  else if (!strncmp(line + 4, "Bb", 2)) {
-    type = WF_NORMAL;
+  else if (!strncmp(line + 4, "Bump", 4)) {
+    type        = WF_NORMAL;
+    path_offset = 9;
   }
   else {
     // Not a supported type.
@@ -162,18 +165,17 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
   }
 
   // Find path
-  const char* path = line + 7;
-
-  const char* next_space = strchr(path, ' ');
+  const char* path = line + path_offset;
 
   // The next character is a valid memory address because at least a \0 must follow.
-  if (next_space != (char*) 0 && next_space[1] == '-') {
+  if (path[0] == '-') {
     // We now parse all commands until we find a word that is not a command argument and does not start with a -.
 
     // Valid address, same argument.
-    const char* command = next_space + 2;
+    const char* command = path + 1;
+    int is_command      = 1;
 
-    while (1) {
+    while (is_command) {
       // This tells us how many arguments will follow this command, this is how often we have to skip words.
       int num_args = 0;
 
@@ -192,22 +194,20 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
         num_args = 2;  // mm
       }
       else if (command[0] == 'c' || command[0] == 'b') {
-        num_args = 1;  // cc or clamp or blendu or blendv
+        num_args = 1;  // cc or clamp or blendu or blendv or bm
       }
 
       for (int i = 0; i <= num_args; i++) {
         command = strchr(command, ' ');
+
+        if (command == (char*) 0) {
+          error_message("Something went wrong parsing the following line in an *.mtl file: %s", line);
+          return;
+        }
+
+        is_command = (command[0] == '-');
+        command++;
       }
-
-      if (command == (char*) 0) {
-        error_message("Something went wrong parsing the following line in an *.mtl file: %s", line);
-        return;
-      }
-
-      if (command[0] != '-')
-        break;
-
-      command++;
     }
 
     path = command;
