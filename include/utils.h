@@ -430,6 +430,7 @@ struct OptixBVH {
   OptixShaderBindingTable shaders;
   DeviceConstantMemory* params;
   int force_dmm_usage;
+  int disable_omm;
 } typedef OptixBVH;
 
 struct DeviceInfo {

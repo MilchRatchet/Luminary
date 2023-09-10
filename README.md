@@ -78,6 +78,9 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
     --force-displacement
         turn on displacement map usage on Ampere and Turing architecture GPUs
 
+    --no-omm
+        turn off opacity micromap usage
+
     --qoi
         set output image format to QOI
 

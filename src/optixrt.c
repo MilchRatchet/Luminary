@@ -47,11 +47,13 @@ void optixrt_init(RaytraceInstance* instance) {
 
   OptixBuildInputOpacityMicromap omm;
   // OMM and DMM at the same time are only supported on RT core version 3.0 (Ada Lovelace)
-  if ((instance->device_info.rt_core_version >= 1 && !dmm.displacementMicromapArray) || instance->device_info.rt_core_version >= 3) {
+  if (
+    (!instance->optix_bvh.disable_omm)
+    && (((instance->device_info.rt_core_version >= 1 && !dmm.displacementMicromapArray) || instance->device_info.rt_core_version >= 3))) {
     omm = micromap_opacity_build(instance);
   }
   else {
-    log_message("No OMM is built due to device constraints.");
+    log_message("No OMM is built due to device constraints or user preference.");
     memset(&omm, 0, sizeof(OptixBuildInputOpacityMicromap));
   }
 

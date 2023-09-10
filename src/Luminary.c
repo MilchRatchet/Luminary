@@ -109,6 +109,7 @@ int main(int argc, char* argv[]) {
   int unittest                 = 0;
   int version_output           = 0;
   int force_displacement       = 0;
+  int disable_omm              = 0;
 
   for (int i = 1; i < argc; i++) {
     if (custom_samples) {
@@ -133,6 +134,7 @@ int main(int argc, char* argv[]) {
     unittest |= parse_command(argv[i], "-u", "--unittest");
     version_output |= parse_command(argv[i], "-v", "--version");
     force_displacement |= parse_command(argv[i], (char*) 0, "--force-displacement");
+    disable_omm |= parse_command(argv[i], (char*) 0, "--no-omm");
 
     if (parse_command(argv[i], (char*) 0, "--png")) {
       img_format = IMGFORMAT_PNG;
@@ -186,6 +188,11 @@ int main(int argc, char* argv[]) {
   if (force_displacement) {
     log_message("DMM Usage was forced on by the user.");
     instance->optix_bvh.force_dmm_usage = 1;
+  }
+
+  if (disable_omm) {
+    log_message("OMM Usage was forced off by the user.");
+    instance->optix_bvh.disable_omm = 1;
   }
 
   instance->realtime = !offline;
