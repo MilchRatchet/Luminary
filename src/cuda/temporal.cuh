@@ -7,30 +7,13 @@
 /*
  * TAA implementation based on blog by Alex Tardiff (http://alextardif.com/TAA.html)
  * CatmullRom filter implementation based on https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
- * Mitchell-Netravali filter based on https://github.com/TheRealMJP/MSAAFilter
  */
 
-__device__ float temporal_cubic_filter(float x, float a, float b) {
-  float y  = 0.0f;
-  float x2 = x * x;
-  float x3 = x2 * x;
-  if (x < 1.0f) {
-    y = (12.0f - 9.0f * a - 6.0f * b) * x3 + (-18.0f + 12.0f * a + 6.0f * b) * x2 + (6.0f - 2.0f * a);
-  }
-  else if (x <= 2.0f) {
-    y = (-a - 6.0f * b) * x3 + (6.0f * a + 30.0f * b) * x2 + (-12.0f * a - 48.0f * b) * x + (8.0f * a + 24.0f * b);
-  }
+__device__ float tent_filter(const float dx, const float dy) {
+  const float dist = sqrtf(dx * dx + dy * dy);
 
-  return y / 6.0f;
-}
-
-__device__ float mitchell_netravali(int x, int y) {
-  float fx = (float) x;
-  float fy = (float) y;
-
-  float len = sqrtf(fx * fx + fy * fy);
-
-  return temporal_cubic_filter(len, 1.0f / 3.0f, 1.0f / 3.0f);
+  // The absolute value is not computed, it is mandatory to check for weight > 0 afterwards.
+  return 1.0f - dist;
 }
 
 __device__ RGBF sample_pixel_catmull_rom(const RGBF* image, float x, float y, const int width, const int height) {
@@ -90,10 +73,41 @@ __global__ void temporal_accumulation() {
   const int amount = device.width * device.height;
 
   for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < amount; offset += blockDim.x * gridDim.x) {
-    RGBF buffer = load_RGBF(device.ptrs.frame_buffer + offset);
+    const int x = offset % device.width;
+    const int y = offset / device.width;
+
+    const int radius = 1;
+
+    const float center_x = x + 0.5f;
+    const float center_y = y + 0.5f;
+
+    const int x_start = max(x - radius, 0);
+    const int x_end   = min(x + radius, device.width - 1);
+    const int y_start = max(y - radius, 0);
+    const int y_end   = min(y + radius, device.height - 1);
+
+    RGBF buffer       = get_color(0.0f, 0.0f, 0.0f);
+    float sum_weights = 0.0f;
+
+    for (int iy = y_start; iy <= y_end; iy++) {
+      for (int ix = x_start; ix <= x_end; ix++) {
+        const float jdx = (ix + device.emitter.jitter.x) - center_x;
+        const float jdy = (iy + device.emitter.jitter.y) - center_y;
+
+        const float weight = tent_filter(jdx, jdy);
+
+        if (weight > 0.0f) {
+          const RGBF color = load_RGBF(device.ptrs.frame_buffer + ix + iy * device.width);
+          buffer           = add_color(buffer, scale_color(color, weight));
+          sum_weights += weight;
+        }
+      }
+    }
+
+    buffer = scale_color(buffer, 1.0f / sum_weights);
+
     RGBF output;
     RGBF variance;
-
     if (device.temporal_frames == 0) {
       output   = buffer;
       variance = get_color(1.0f, 1.0f, 1.0f);
@@ -160,26 +174,24 @@ __global__ void temporal_reprojection() {
     float sum_weights   = 0.0f;
     float closest_depth = FLT_MAX;
 
-    for (int i = -1; i <= -1; i++) {
-      for (int j = -1; j <= -1; j++) {
+    for (int i = -1; i <= 1; i++) {
+      for (int j = -1; j <= 1; j++) {
         const int x = max(0, min(device.width, curr_x + j));
         const int y = max(0, min(device.height, curr_y + i));
 
-        RGBF color = device.ptrs.frame_buffer[x + y * device.width];
+        const float weight = tent_filter(i, j);
 
-        if (isnan(color.r) || isnan(color.g) || isnan(color.b) || isinf(color.r) || isinf(color.g) || isinf(color.b)) {
-          color = get_color(0.0f, 0.0f, 0.0f);
-        }
+        if (weight > 0.0f) {
+          const RGBF color = device.ptrs.frame_buffer[x + y * device.width];
 
-        float weight = mitchell_netravali(i, j);
+          sum_color = add_color(sum_color, scale_color(color, weight));
+          sum_weights += weight;
 
-        sum_color = add_color(sum_color, scale_color(color, weight));
-        sum_weights += weight;
+          const TraceResult trace = device.ptrs.trace_result_buffer[x + y * device.width];
 
-        TraceResult trace = device.ptrs.trace_result_buffer[x + y * device.width];
-
-        if (trace.depth < closest_depth) {
-          closest_depth = trace.depth;
+          if (trace.depth < closest_depth) {
+            closest_depth = trace.depth;
+          }
         }
       }
     }
