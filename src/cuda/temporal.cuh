@@ -9,13 +9,6 @@
  * CatmullRom filter implementation based on https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
  */
 
-__device__ float tent_filter(const float dx, const float dy) {
-  const float dist = sqrtf(dx * dx + dy * dy);
-
-  // The absolute value is not computed, it is mandatory to check for weight > 0 afterwards.
-  return 1.0f - dist;
-}
-
 __device__ RGBF sample_pixel_catmull_rom(const RGBF* image, float x, float y, const int width, const int height) {
   float px = floorf(x - 0.5f) + 0.5f;
   float py = floorf(y - 0.5f) + 0.5f;
@@ -73,41 +66,10 @@ __global__ void temporal_accumulation() {
   const int amount = device.width * device.height;
 
   for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < amount; offset += blockDim.x * gridDim.x) {
-    const int x = offset % device.width;
-    const int y = offset / device.width;
-
-    const int radius = 1;
-
-    const float center_x = x + 0.5f;
-    const float center_y = y + 0.5f;
-
-    const int x_start = max(x - radius, 0);
-    const int x_end   = min(x + radius, device.width - 1);
-    const int y_start = max(y - radius, 0);
-    const int y_end   = min(y + radius, device.height - 1);
-
-    RGBF buffer       = get_color(0.0f, 0.0f, 0.0f);
-    float sum_weights = 0.0f;
-
-    for (int iy = y_start; iy <= y_end; iy++) {
-      for (int ix = x_start; ix <= x_end; ix++) {
-        const float jdx = (ix + device.emitter.jitter.x) - center_x;
-        const float jdy = (iy + device.emitter.jitter.y) - center_y;
-
-        const float weight = tent_filter(jdx, jdy);
-
-        if (weight > 0.0f) {
-          const RGBF color = load_RGBF(device.ptrs.frame_buffer + ix + iy * device.width);
-          buffer           = add_color(buffer, scale_color(color, weight));
-          sum_weights += weight;
-        }
-      }
-    }
-
-    buffer = scale_color(buffer, 1.0f / sum_weights);
-
+    RGBF buffer = load_RGBF(device.ptrs.frame_buffer + offset);
     RGBF output;
     RGBF variance;
+
     if (device.temporal_frames == 0) {
       output   = buffer;
       variance = get_color(1.0f, 1.0f, 1.0f);
@@ -167,36 +129,8 @@ __global__ void temporal_reprojection() {
   const int amount = device.width * device.height;
 
   for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < amount; offset += blockDim.x * gridDim.x) {
-    const int curr_x = offset % device.width;
-    const int curr_y = offset / device.width;
-
-    RGBF sum_color      = get_color(0.0f, 0.0f, 0.0f);
-    float sum_weights   = 0.0f;
-    float closest_depth = FLT_MAX;
-
-    for (int i = -1; i <= 1; i++) {
-      for (int j = -1; j <= 1; j++) {
-        const int x = max(0, min(device.width, curr_x + j));
-        const int y = max(0, min(device.height, curr_y + i));
-
-        const float weight = tent_filter(i, j);
-
-        if (weight > 0.0f) {
-          const RGBF color = device.ptrs.frame_buffer[x + y * device.width];
-
-          sum_color = add_color(sum_color, scale_color(color, weight));
-          sum_weights += weight;
-
-          const TraceResult trace = device.ptrs.trace_result_buffer[x + y * device.width];
-
-          if (trace.depth < closest_depth) {
-            closest_depth = trace.depth;
-          }
-        }
-      }
-    }
-
-    RGBF output = scale_color(sum_color, 1.0f / sum_weights);
+    RGBF output               = load_RGBF(device.ptrs.frame_buffer + offset);
+    const float closest_depth = device.ptrs.trace_result_buffer[offset].depth;
 
     vec3 hit = add_vector(device.scene.camera.pos, scale_vector(device.ptrs.raydir_buffer[offset], closest_depth));
 
