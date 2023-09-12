@@ -494,13 +494,6 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
   const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
   texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, TexStorageCPU);
 
-  uint8_t* chunk = (uint8_t*) malloc(8);
-
-  if (chunk == (uint8_t*) 0) {
-    error_message("Failed to allocate memory!");
-    return _png_default_texture();
-  }
-
   uint8_t* filtered_data     = (uint8_t*) malloc(width * height * byte_per_pixel + height);
   uint8_t* compressed_buffer = (uint8_t*) malloc(2 * (width * height * byte_per_pixel + height));
 
@@ -511,73 +504,52 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
 
   uint32_t combined_compressed_length = 0;
 
-  memcpy(chunk, file + file_offset, 8);
-  int data_left = (file_offset + 8 <= file_length);
-  file_offset += 8;
+  // File offset is now at the 0th byte of the first chunk
+  const uint8_t* chunk = file + file_offset;
+  int data_left        = (file_offset + 8 <= file_length);
+  file_offset += 8; /* This moves the offset to the data section of the first chunk. */
 
   while (data_left) {
     const uint32_t length = _png_read_uint32_big_endian(chunk);
+    file_offset += length; /* This moves the offset to the CRC section of the chunk. */
 
-    const uint32_t chunk_type = _png_read_uint32_big_endian(chunk + 4);
+    const uint8_t* chunk_data = chunk + 4;
+    const uint32_t chunk_type = _png_read_uint32_big_endian(chunk_data);
 
     if (chunk_type == CHUNK_IDAT) {
-      uint8_t* compressed_data = (uint8_t*) malloc(length + 4);
+      chunk = file + file_offset;
 
-      _png_write_uint32_big_endian(compressed_data, CHUNK_IDAT);
-
-      memcpy(compressed_data + 4, file + file_offset, length);
-      file_offset += length;
-
-      memcpy(chunk, file + file_offset, 4);
-      file_offset += 4;
-
-      if ((uint32_t) crc32(0, compressed_data, length + 4) != _png_read_uint32_big_endian(chunk)) {
+      if ((uint32_t) crc32(0, chunk_data, length + 4) != _png_read_uint32_big_endian(chunk)) {
         return _png_default_failure();
       }
 
-      memcpy(compressed_buffer + combined_compressed_length, compressed_data + 4, length);
+      memcpy(compressed_buffer + combined_compressed_length, chunk_data + 4, length);
 
       combined_compressed_length += length;
-
-      free(compressed_data);
     }
     else if (chunk_type == CHUNK_gAMA) {
       if (length != 4) {
         error_message("Texture %s has a broken gAMA chunk. Ignoring it.", hint_name);
-        file_offset += length + 4;
       }
       else {
-        uint8_t data[8];
-        data[0] = 'g';
-        data[1] = 'A';
-        data[2] = 'M';
-        data[3] = 'A';
+        chunk = file + file_offset;
 
-        memcpy(data + 4, file + file_offset, 4);
-        file_offset += 4;
-
-        memcpy(chunk, file + file_offset, 4);
-        file_offset += 4;
-
-        if ((uint32_t) crc32(0, data, length + 4) != _png_read_uint32_big_endian(chunk)) {
+        if ((uint32_t) crc32(0, chunk_data, length + 4) != _png_read_uint32_big_endian(chunk)) {
           error_message("Texture %s has a broken gAMA chunk. Ignoring it.", hint_name);
         }
         else {
-          const uint32_t gAMA_val = _png_read_uint32_big_endian(data + 4);
+          const uint32_t gAMA_val = _png_read_uint32_big_endian(chunk_data + 4);
           result.gamma            = 100000.0f / ((float) gAMA_val);
         }
       }
     }
-    else {
-      file_offset += length + 4;
-    }
 
-    memcpy(chunk, file + file_offset, 8);
+    file_offset += 4; /* This moves the offset to the 0th byte of the next chunk. */
+
+    chunk     = file + file_offset;
     data_left = (file_offset + 8 <= file_length);
-    file_offset += 8;
+    file_offset += 8; /* This moves the offset to the data section of the chunk. */
   }
-
-  free(chunk);
 
   z_stream defstream;
   defstream.zalloc = Z_NULL;
