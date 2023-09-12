@@ -909,7 +909,8 @@ __device__ float henyey_greenstein_phase_sample(const float g, const float r) {
 
   const float t = (1.0f - g2) / (1.0f - g + 2.0f * g * r);
 
-  return (1.0f + g2 - t) / (2.0f * g);
+  // Note that the Jendersie-Eon paper supplement claims only t, but t^2 is correct according to all other sources.
+  return (1.0f + g2 - t * t) / (2.0f * g);
 }
 
 __device__ float draine_phase_sample(const float g, const float alpha, const float r) {
