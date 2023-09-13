@@ -9,10 +9,13 @@
 #include <string.h>
 
 #include "buffer.h"
+#include "ceb.h"
 #include "denoise.h"
 #include "device.h"
 #include "optixrt.h"
+#include "png.h"
 #include "sky_defines.h"
+#include "texture.h"
 #include "utils.h"
 
 ////////////////////////////////////////////////////////////////////
@@ -124,6 +127,32 @@ static float halton(int index, int base) {
   }
 
   return result;
+}
+
+static void raytrace_load_moon_textures(RaytraceInstance* instance) {
+  uint64_t info = 0;
+
+  void* moon_albedo_data;
+  int64_t moon_albedo_data_length;
+  ceb_access("moon_albedo.png", &moon_albedo_data, &moon_albedo_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load moon_albedo texture.");
+  }
+
+  void* moon_normal_data;
+  int64_t moon_normal_data_length;
+  ceb_access("moon_normal.png", &moon_normal_data, &moon_normal_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load moon_normal texture.");
+  }
+
+  TextureRGBA moon_albedo_tex = png_load(moon_albedo_data, moon_albedo_data_length, "moon_albedo.png");
+  TextureRGBA moon_normal_tex = png_load(moon_normal_data, moon_normal_data_length, "moon_normal.png");
+
+  texture_create_atlas(&instance->sky_moon_albedo_tex, &moon_albedo_tex, 1);
+  texture_create_atlas(&instance->sky_moon_normal_tex, &moon_normal_tex, 1);
 }
 
 /*
@@ -482,6 +511,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->sky_ms_luts);
   device_buffer_init(&instance->sky_tm_luts);
   device_buffer_init(&instance->sky_hdri_luts);
+  device_buffer_init(&instance->sky_moon_albedo_tex);
+  device_buffer_init(&instance->sky_moon_normal_tex);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
@@ -509,6 +540,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
     instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t), cudaMemcpyHostToDevice));
 
   device_update_symbol(texture_assignments, instance->scene.texture_assignments);
+
+  raytrace_load_moon_textures(instance);
 
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
@@ -674,6 +707,8 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.sky_tm_luts          = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
   ptrs.sky_ms_luts          = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
   ptrs.sky_hdri_luts        = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
+  ptrs.sky_moon_albedo_tex  = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_albedo_tex);
+  ptrs.sky_moon_normal_tex  = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_normal_tex);
 
   device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");

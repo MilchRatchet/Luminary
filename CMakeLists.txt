@@ -1,4 +1,4 @@
-﻿cmake_minimum_required(VERSION 3.25)
+cmake_minimum_required(VERSION 3.25)
 
 IF(WIN32)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
@@ -168,7 +168,7 @@ message("")
 
 set(EMBED_FILE_NAME "embed_file")
 include(ceb_embed_files)
-ceb_embed_files(PROJECT Luminary OUTPUT ${EMBED_FILE_NAME} INPUT $<TARGET_OBJECTS:optix_kernels> ${CMAKE_CURRENT_SOURCE_DIR}/LuminaryFont.ttf)
+ceb_embed_files(PROJECT Luminary OUTPUT ${EMBED_FILE_NAME} INPUT $<TARGET_OBJECTS:optix_kernels> ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png)
 
 #=============================================================
 # Executable

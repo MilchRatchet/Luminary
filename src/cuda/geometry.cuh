@@ -6,17 +6,6 @@
 #include "memory.cuh"
 #include "state.cuh"
 
-__device__ float4 geometry_texture_load(DeviceTexture tex, UV uv) {
-  float4 v = tex2D<float4>(tex.tex, uv.u, 1.0f - uv.v);
-
-  v.x = powf(v.x, tex.gamma);
-  v.y = powf(v.y, tex.gamma);
-  v.z = powf(v.z, tex.gamma);
-  // Gamma is never applied to the alpha of a texture according to PNG standard.
-
-  return v;
-}
-
 __device__ vec3 geometry_compute_normal(
   vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 e1, vec3 e2, UV e1_tex, UV e2_tex, unsigned short normal_map, float2 coords,
   UV tex_coords) {
@@ -24,7 +13,7 @@ __device__ vec3 geometry_compute_normal(
   vec3 normal      = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
 
   if (normal_map != TEXTURE_NONE) {
-    const float4 normal_f = geometry_texture_load(device.ptrs.normal_atlas[normal_map], tex_coords);
+    const float4 normal_f = texture_load(device.ptrs.normal_atlas[normal_map], tex_coords);
 
     vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
@@ -112,7 +101,7 @@ __global__ void geometry_generate_g_buffer() {
     RGBAF albedo;
 
     if (maps.x != TEXTURE_NONE) {
-      const float4 albedo_f = geometry_texture_load(device.ptrs.albedo_atlas[maps.x], tex_coords);
+      const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[maps.x], tex_coords);
       albedo.r              = albedo_f.x;
       albedo.g              = albedo_f.y;
       albedo.b              = albedo_f.z;
@@ -131,7 +120,7 @@ __global__ void geometry_generate_g_buffer() {
     RGBF emission = get_color(0.0f, 0.0f, 0.0f);
 
     if (maps.y != TEXTURE_NONE && device.scene.material.lights_active) {
-      const float4 illuminance_f = geometry_texture_load(device.ptrs.illuminance_atlas[maps.y], tex_coords);
+      const float4 illuminance_f = texture_load(device.ptrs.illuminance_atlas[maps.y], tex_coords);
 
       emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
       emission = scale_color(emission, device.scene.material.default_material.b * illuminance_f.w * albedo.a);
@@ -141,7 +130,7 @@ __global__ void geometry_generate_g_buffer() {
     float metallic;
 
     if (maps.z != TEXTURE_NONE) {
-      const float4 material_f = geometry_texture_load(device.ptrs.material_atlas[maps.z], tex_coords);
+      const float4 material_f = texture_load(device.ptrs.material_atlas[maps.z], tex_coords);
 
       roughness = (1.0f - material_f.x);
       metallic  = material_f.y;
@@ -323,7 +312,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       const ushort4 maps = __ldg((ushort4*) (device.texture_assignments + texture_object));
 
       if (maps.x != TEXTURE_NONE) {
-        const float4 albedo_f = geometry_texture_load(device.ptrs.albedo_atlas[maps.x], tex_coords);
+        const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[maps.x], tex_coords);
         color                 = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
       }
       else {
@@ -331,7 +320,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       }
 
       if (maps.y != TEXTURE_NONE && device.scene.material.lights_active) {
-        const float4 illuminance_f = geometry_texture_load(device.ptrs.illuminance_atlas[maps.y], tex_coords);
+        const float4 illuminance_f = texture_load(device.ptrs.illuminance_atlas[maps.y], tex_coords);
 
         color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
       }
@@ -445,7 +434,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
         const ushort4 maps = __ldg((ushort4*) (device.texture_assignments + texture_object));
 
         if (maps.x != TEXTURE_NONE) {
-          const float4 albedo_f = geometry_texture_load(device.ptrs.albedo_atlas[maps.x], tex_coords);
+          const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[maps.x], tex_coords);
           color                 = get_color(albedo_f.x, albedo_f.y, albedo_f.z);
         }
         else {

@@ -933,6 +933,17 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
   return 0.5f * g + ((1.0f / (2.0f * g)) - (1.0f / (8.0f * g)) * (h * h));
 }
 
+__device__ float4 texture_load(const DeviceTexture tex, const UV uv) {
+  float4 v = tex2D<float4>(tex.tex, uv.u, 1.0f - uv.v);
+
+  v.x = powf(v.x, tex.gamma);
+  v.y = powf(v.y, tex.gamma);
+  v.z = powf(v.z, tex.gamma);
+  // Gamma is never applied to the alpha of a texture according to PNG standard.
+
+  return v;
+}
+
 /*
  * This function perfectly importance samples the phase function from [JenE23]. The details of this are presented in the
  * supplement of the paper.
