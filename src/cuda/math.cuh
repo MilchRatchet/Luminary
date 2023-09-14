@@ -241,6 +241,28 @@ __device__ vec3 sample_hemisphere_basis(const float altitude, const float azimut
   return normalize_vector(result);
 }
 
+__device__ Mat3x3 create_basis(const vec3 basis) {
+  const float sign = copysignf(1.0f, basis.z);
+  const float a    = -1.0f / (sign + basis.z);
+  const float b    = basis.x * basis.y * a;
+  const vec3 u1    = get_vector(1.0f + sign * basis.x * basis.x * a, sign * b, -sign * basis.x);
+  const vec3 u2    = get_vector(b, sign + basis.y * basis.y * a, -basis.y);
+
+  Mat3x3 mat;
+
+  mat.f11 = u1.x;
+  mat.f21 = u1.y;
+  mat.f31 = u1.z;
+  mat.f12 = u2.x;
+  mat.f22 = u2.y;
+  mat.f32 = u2.z;
+  mat.f13 = basis.x;
+  mat.f23 = basis.y;
+  mat.f33 = basis.z;
+
+  return mat;
+}
+
 /*
  * This function samples a ray on the unit sphere.
  *

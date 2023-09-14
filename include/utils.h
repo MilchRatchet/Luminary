@@ -4,7 +4,6 @@
 #include <cuda_runtime_api.h>
 #include <optix.h>
 #include <optix_stubs.h>
-#include <stdlib.h>
 
 #if defined(__GNUC__) || defined(__clang__)
 #elif defined(__MSVC__) || defined(__CUDACC__)

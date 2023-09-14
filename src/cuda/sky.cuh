@@ -748,22 +748,36 @@ __device__ Spectrum sky_compute_atmosphere(
     }
     else if (earth_hit > moon_hit) {
       const vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
-      const vec3 normal     = normalize_vector(sub_vector(moon_pos, device.moon_pos));
       const vec3 bounce_ray = normalize_vector(sub_vector(device.sun_pos, moon_pos));
-      const float NdotL     = dot_product(normal, bounce_ray);
 
-      if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && NdotL > 0.0f) {
+      if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS)) {
+        vec3 normal = normalize_vector(sub_vector(moon_pos, device.moon_pos));
+
         const float tex_u = 0.5f + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
         const float tex_v = 0.5f + asinf(normal.y) * (1.0f / PI);
 
         const UV uv = get_UV(tex_u, tex_v);
 
-        const float albedo = texture_load(*device.ptrs.sky_moon_albedo_tex, uv).x;
+        const Mat3x3 tangent_space = create_basis(normal);
 
-        const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, moon_pos);
-        const float weight      = albedo * device.scene.sky.sun_strength * NdotL * light_angle / (2.0f * PI);
+        const float4 normal_vals = texture_load(*device.ptrs.sky_moon_normal_tex, uv);
 
-        result = spectrum_add(result, spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, weight)));
+        vec3 map_normal = get_vector(normal_vals.x, normal_vals.y, normal_vals.z);
+        map_normal      = scale_vector(map_normal, 2.0f);
+        map_normal      = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
+
+        normal = normalize_vector(transform_vec3(tangent_space, map_normal));
+
+        const float NdotL = dot_product(normal, bounce_ray);
+
+        if (NdotL > 0.0f) {
+          const float albedo = texture_load(*device.ptrs.sky_moon_albedo_tex, uv).x;
+
+          const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, moon_pos);
+          const float weight      = albedo * device.scene.sky.sun_strength * NdotL * light_angle / (2.0f * PI);
+
+          result = spectrum_add(result, spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, weight)));
+        }
       }
     }
 
