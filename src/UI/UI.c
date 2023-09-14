@@ -261,7 +261,7 @@ static UITab create_sky_general_celestial_panels(UI* ui, RaytraceInstance* insta
   panels[i++] = create_slider(ui, "Sun Intensity", &(instance->scene.sky.sun_strength), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Moon Azimuth", &(instance->scene.sky.moon_azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Moon Altitude", &(instance->scene.sky.moon_altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 0, 0);
-  panels[i++] = create_slider(ui, "Moon Albedo", &(instance->scene.sky.moon_albedo), 1, 0.0001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Moon Texture Offset", &(instance->scene.sky.moon_tex_offset), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Stars Count", &(instance->scene.sky.settings_stars_count), 0, 1.0f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Stars Seed", &(instance->scene.sky.stars_seed), 0, 1.0f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Stars Intensity", &(instance->scene.sky.stars_intensity), 1, 0.0001f, 0.0f, FLT_MAX, 0, 0);

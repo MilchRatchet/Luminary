@@ -237,7 +237,7 @@ struct Sky {
   float altitude;
   float moon_azimuth;
   float moon_altitude;
-  float moon_albedo;
+  float moon_tex_offset;
   float sun_strength;
   float base_density;
   int ozone_absorption;

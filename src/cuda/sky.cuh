@@ -753,7 +753,7 @@ __device__ Spectrum sky_compute_atmosphere(
       if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS)) {
         vec3 normal = normalize_vector(sub_vector(moon_pos, device.moon_pos));
 
-        const float tex_u = 0.5f + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
+        const float tex_u = 0.5f + device.scene.sky.moon_tex_offset + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
         const float tex_v = 0.5f + asinf(normal.y) * (1.0f / PI);
 
         const UV uv = get_UV(tex_u, tex_v);
