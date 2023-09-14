@@ -215,6 +215,10 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 #define SKY_OZONE_EXTINCTION \
   spectrum_set(1.484836e-05f, 8.501668e-05f, 2.646158e-04f, 7.953520e-04f, 1.661103e-03f, 2.510733e-03f, 2.697211e-03f, 1.727741e-03f)
 
+// Roughly based on the solar flux reported in "The spectral irradiance of the moon" by H. Kieffer and T. Stone,
+// however, I only looked at the table and didn't read the paper.
+#define SKY_MOON_SOLAR_FLUX spectrum_set(1.7f, 1.8f, 2.0f, 1.9f, 1.87f, 1.7f, 1.65f, 1.55f)
+
 #define SKY_HEIGHT_OFFSET 0.0005f
 
 #define SKY_MS_TEX_SIZE 32
@@ -776,7 +780,8 @@ __device__ Spectrum sky_compute_atmosphere(
           const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, moon_pos);
           const float weight      = albedo * device.scene.sky.sun_strength * NdotL * light_angle / (2.0f * PI);
 
-          result = spectrum_add(result, spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, weight)));
+          result =
+            spectrum_add(result, spectrum_mul(transmittance, spectrum_mul(SKY_MOON_SOLAR_FLUX, spectrum_scale(SKY_SUN_RADIANCE, weight))));
         }
       }
     }
