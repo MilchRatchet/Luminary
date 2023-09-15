@@ -154,8 +154,8 @@ Azimuth of the moon.
 `SKY MOONALTI [FP32]`<br/>
 Altitude of the moon.
 
-`SKY MOONALBE [FP32]`<br/>
-Albedo of the moon. Number must be in the range [0,1].
+`SKY MOONTEXO [FP32]`<br/>
+Horizontal offset applied to the moon texture.
 
 `SKY SUNSTREN [FP32]`<br/>
 Sun light strength. Number should be non-negative.

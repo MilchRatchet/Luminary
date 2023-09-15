@@ -215,6 +215,10 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 #define SKY_OZONE_EXTINCTION \
   spectrum_set(1.484836e-05f, 8.501668e-05f, 2.646158e-04f, 7.953520e-04f, 1.661103e-03f, 2.510733e-03f, 2.697211e-03f, 1.727741e-03f)
 
+// Roughly based on the solar flux reported in "The spectral irradiance of the moon" by H. Kieffer and T. Stone,
+// however, I only looked at the table and didn't read the paper.
+#define SKY_MOON_SOLAR_FLUX spectrum_set(1.7f, 1.8f, 2.0f, 1.9f, 1.87f, 1.7f, 1.65f, 1.55f)
+
 #define SKY_HEIGHT_OFFSET 0.0005f
 
 #define SKY_MS_TEX_SIZE 32
@@ -748,15 +752,37 @@ __device__ Spectrum sky_compute_atmosphere(
     }
     else if (earth_hit > moon_hit) {
       const vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
-      const vec3 normal     = normalize_vector(sub_vector(moon_pos, device.moon_pos));
       const vec3 bounce_ray = normalize_vector(sub_vector(device.sun_pos, moon_pos));
-      const float NdotL     = dot_product(normal, bounce_ray);
 
-      if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS) && NdotL > 0.0f) {
-        const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, moon_pos);
-        const float weight      = device.scene.sky.sun_strength * device.scene.sky.moon_albedo * NdotL * light_angle / (2.0f * PI);
+      if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS)) {
+        vec3 normal = normalize_vector(sub_vector(moon_pos, device.moon_pos));
 
-        result = spectrum_add(result, spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, weight)));
+        const float tex_u = 0.5f + device.scene.sky.moon_tex_offset + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
+        const float tex_v = 0.5f + asinf(normal.y) * (1.0f / PI);
+
+        const UV uv = get_UV(tex_u, tex_v);
+
+        const Mat3x3 tangent_space = create_basis(normal);
+
+        const float4 normal_vals = texture_load(*device.ptrs.sky_moon_normal_tex, uv);
+
+        vec3 map_normal = get_vector(normal_vals.x, normal_vals.y, normal_vals.z);
+        map_normal      = scale_vector(map_normal, 2.0f);
+        map_normal      = sub_vector(map_normal, get_vector(1.0f, 1.0f, 1.0f));
+
+        normal = normalize_vector(transform_vec3(tangent_space, map_normal));
+
+        const float NdotL = dot_product(normal, bounce_ray);
+
+        if (NdotL > 0.0f) {
+          const float albedo = texture_load(*device.ptrs.sky_moon_albedo_tex, uv).x;
+
+          const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, moon_pos);
+          const float weight      = albedo * device.scene.sky.sun_strength * NdotL * light_angle / (2.0f * PI);
+
+          result =
+            spectrum_add(result, spectrum_mul(transmittance, spectrum_mul(SKY_MOON_SOLAR_FLUX, spectrum_scale(SKY_SUN_RADIANCE, weight))));
+        }
       }
     }
 

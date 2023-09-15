@@ -106,7 +106,7 @@ void scene_init(Scene** _scene) {
   scene->sky.azimuth                     = 3.141f;
   scene->sky.moon_altitude               = -0.5f;
   scene->sky.moon_azimuth                = 0.0f;
-  scene->sky.moon_albedo                 = 0.12f;
+  scene->sky.moon_tex_offset             = 0.0f;
   scene->sky.sun_strength                = 1.0f;
   scene->sky.base_density                = 1.0f;
   scene->sky.rayleigh_density            = 1.0f;

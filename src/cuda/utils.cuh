@@ -3,8 +3,6 @@
 
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 #include "log.h"
 #include "utils.h"

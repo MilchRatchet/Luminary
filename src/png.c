@@ -14,6 +14,8 @@
 
 enum PNGChunkTypes { CHUNK_IHDR = 1229472850u, CHUNK_IDAT = 1229209940u, CHUNK_gAMA = 1732332865u } typedef PNGChunkTypes;
 
+#define PNG_HEADER_SIZE 8
+
 static inline void _png_write_uint32_big_endian(uint8_t* buffer, const uint32_t value) {
   buffer[0] = value >> 24;
   buffer[1] = value >> 16;
@@ -22,7 +24,7 @@ static inline void _png_write_uint32_big_endian(uint8_t* buffer, const uint32_t 
 }
 
 static void _png_write_header_to_file(FILE* file) {
-  uint8_t* header = (uint8_t*) malloc(8);
+  uint8_t* header = (uint8_t*) malloc(PNG_HEADER_SIZE);
 
   header[0] = 0x89u;
 
@@ -37,7 +39,7 @@ static void _png_write_header_to_file(FILE* file) {
 
   header[7] = 0x0Au;
 
-  fwrite(header, 1, 8, file);
+  fwrite(header, 1, PNG_HEADER_SIZE, file);
 
   free(header);
 }
@@ -259,7 +261,7 @@ void png_store(
   bench_toc("Storing PNG");
 }
 
-static inline uint32_t _png_read_uint32_big_endian(uint8_t* buffer) {
+static inline uint32_t _png_read_uint32_big_endian(const uint8_t* buffer) {
   uint32_t result = 0;
 
   result |= ((uint32_t) buffer[0]) << 24;
@@ -279,15 +281,13 @@ static inline uint16_t _png_read_uint16_big_endian(uint8_t* buffer) {
   return result;
 }
 
-static int _png_verify_header(FILE* file) {
-  uint8_t* header = (uint8_t*) malloc(8);
-
-  if (header == (uint8_t*) 0) {
-    puts("png.c: Failed to allocate memory!");
+static int _png_verify_header(const uint8_t* file, const size_t file_length) {
+  if (file_length < PNG_HEADER_SIZE) {
+    error_message("PNG file is too small to contain a header.");
     return 1;
   }
 
-  fread(header, 1, 8, file);
+  const uint8_t* header = file;
 
   int result = 0;
 
@@ -299,8 +299,6 @@ static int _png_verify_header(FILE* file) {
   result += header[5] ^ 0x0Au;
   result += header[6] ^ 0x1Au;
   result += header[7] ^ 0x0Au;
-
-  free(header);
 
   return result;
 }
@@ -439,41 +437,25 @@ static void _png_reconstruction_4(uint8_t* line, const uint32_t line_length, con
   }
 }
 
-TextureRGBA png_load(const char* filename) {
-  log_message("Loading png file (%s)", filename);
-
-  FILE* file = fopen(filename, "rb");
-
-  if (!file) {
-    error_message("File %s could not be opened!", filename);
-    return _png_default_texture();
-  }
-
-  if (_png_verify_header(file)) {
+TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* hint_name) {
+  if (_png_verify_header(file, file_length)) {
     error_message("File header does not correspond to png!");
-    fclose(file);
     return _png_default_texture();
   }
 
-  uint8_t* IHDR = (uint8_t*) malloc(25);
-
-  if (IHDR == (uint8_t*) 0) {
-    error_message("Failed to allocate memory!");
-    fclose(file);
-    return _png_default_texture();
+  if (file_length < PNG_HEADER_SIZE + 25) {
+    error_message("PNG file is too small to contain a IHDR block.");
+    return _png_default_failure();
   }
 
-  fread(IHDR, 1, 25, file);
+  size_t file_offset  = PNG_HEADER_SIZE;
+  const uint8_t* IHDR = file + file_offset;
 
   if (_png_read_uint32_big_endian(IHDR) != 13u) {
-    free(IHDR);
-    fclose(file);
     return _png_default_failure();
   }
 
   if (_png_read_uint32_big_endian(IHDR + 4) != CHUNK_IHDR) {
-    free(IHDR);
-    fclose(file);
     return _png_default_failure();
   }
 
@@ -484,109 +466,112 @@ TextureRGBA png_load(const char* filename) {
   const uint8_t interlace_type = IHDR[20];
 
   if ((uint32_t) crc32(0, IHDR + 4, 17) != _png_read_uint32_big_endian(IHDR + 21)) {
-    free(IHDR);
-    error_message("Texture %s is corrupted!", filename);
-    fclose(file);
+    error_message("Texture %s is corrupted!", hint_name);
     return _png_default_failure();
   }
 
-  free(IHDR);
-
-  if (color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA && color_type != PNG_COLORTYPE_TRUECOLOR) {
-    error_message("Texture %s is not in RGB/RGBA format!", filename);
-    fclose(file);
+  if (
+    color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA && color_type != PNG_COLORTYPE_TRUECOLOR && color_type != PNG_COLORTYPE_GRAYSCALE
+    && color_type != PNG_COLORTYPE_GRAYSCALE_ALPHA) {
+    error_message("Texture %s is either using a color palette or a non standard format!", hint_name);
     return _png_default_texture();
   }
 
   if (bit_depth != PNG_BITDEPTH_8 && bit_depth != PNG_BITDEPTH_16) {
-    error_message("Texture %s does not have 8 or 16 bit depth!", filename);
-    fclose(file);
+    error_message("Texture %s does not have 8 or 16 bit depth!", hint_name);
     return _png_default_texture();
   }
 
   if (interlace_type == PNG_INTERLACE_ADAM7) {
-    error_message("Texture %s is interlaced, which is not supported.", filename);
-    fclose(file);
+    error_message("Texture %s is interlaced, which is not supported.", hint_name);
     return _png_default_texture();
   }
 
+  file_offset += 25;
+
   const uint32_t byte_per_channel = (bit_depth == PNG_BITDEPTH_8) ? 1u : 2u;
-  const uint32_t byte_per_pixel   = byte_per_channel * ((color_type == PNG_COLORTYPE_TRUECOLOR) ? 3u : 4u);
+
+  uint32_t num_channels;
+  switch (color_type) {
+    case PNG_COLORTYPE_GRAYSCALE:
+      num_channels = 1;
+      break;
+    case PNG_COLORTYPE_GRAYSCALE_ALPHA:
+      num_channels = 2;
+      break;
+    case PNG_COLORTYPE_TRUECOLOR:
+      num_channels = 3;
+      break;
+    case PNG_COLORTYPE_TRUECOLOR_ALPHA:
+      num_channels = 4;
+      break;
+    default:
+      error_message("Invalid color type encountered!");
+      return _png_default_texture();
+  }
+
+  const uint32_t byte_per_pixel = byte_per_channel * num_channels;
 
   TextureRGBA result;
   const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
   texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, TexStorageCPU);
 
-  uint8_t* chunk = (uint8_t*) malloc(8);
+  uint8_t* filtered_data     = (uint8_t*) malloc(width * height * byte_per_pixel + height);
+  uint8_t* compressed_buffer = (uint8_t*) malloc(2 * (width * height * byte_per_pixel + height));
 
-  if (chunk == (uint8_t*) 0) {
+  if (filtered_data == (uint8_t*) 0 || compressed_buffer == (uint8_t*) 0) {
     error_message("Failed to allocate memory!");
     return _png_default_texture();
   }
 
-  uint8_t* filtered_data     = (uint8_t*) malloc(width * height * byte_per_pixel + height);
-  uint8_t* compressed_buffer = (uint8_t*) malloc(2 * (width * height * byte_per_pixel + height));
-
   uint32_t combined_compressed_length = 0;
 
-  int data_left = (fread(chunk, 1, 8, file) == 8);
+  // File offset is now at the 0th byte of the first chunk
+  const uint8_t* chunk = file + file_offset;
+  int data_left        = (file_offset + 8 <= file_length);
+  file_offset += 8; /* This moves the offset to the data section of the first chunk. */
 
   while (data_left) {
     const uint32_t length = _png_read_uint32_big_endian(chunk);
+    file_offset += length; /* This moves the offset to the CRC section of the chunk. */
 
-    const uint32_t chunk_type = _png_read_uint32_big_endian(chunk + 4);
+    const uint8_t* chunk_data = chunk + 4;
+    const uint32_t chunk_type = _png_read_uint32_big_endian(chunk_data);
 
     if (chunk_type == CHUNK_IDAT) {
-      uint8_t* compressed_data = (uint8_t*) malloc(length + 4);
+      chunk = file + file_offset;
 
-      _png_write_uint32_big_endian(compressed_data, CHUNK_IDAT);
-
-      fread(compressed_data + 4, 1, length, file);
-
-      fread(chunk, 1, 4, file);
-
-      if ((uint32_t) crc32(0, compressed_data, length + 4) != _png_read_uint32_big_endian(chunk)) {
+      if ((uint32_t) crc32(0, chunk_data, length + 4) != _png_read_uint32_big_endian(chunk)) {
         return _png_default_failure();
       }
 
-      memcpy(compressed_buffer + combined_compressed_length, compressed_data + 4, length);
+      memcpy(compressed_buffer + combined_compressed_length, chunk_data + 4, length);
 
       combined_compressed_length += length;
-
-      free(compressed_data);
     }
     else if (chunk_type == CHUNK_gAMA) {
       if (length != 4) {
-        error_message("Texture %s has a broken gAMA chunk. Ignoring it.", filename);
-        fseek(file, length + 4u, SEEK_CUR);
+        error_message("Texture %s has a broken gAMA chunk. Ignoring it.", hint_name);
       }
       else {
-        uint8_t data[8];
-        data[0] = 'g';
-        data[1] = 'A';
-        data[2] = 'M';
-        data[3] = 'A';
-        fread(data + 4, 1, 4, file);
-        fread(chunk, 1, 4, file);
+        chunk = file + file_offset;
 
-        if ((uint32_t) crc32(0, data, length + 4) != _png_read_uint32_big_endian(chunk)) {
-          error_message("Texture %s has a broken gAMA chunk. Ignoring it.", filename);
+        if ((uint32_t) crc32(0, chunk_data, length + 4) != _png_read_uint32_big_endian(chunk)) {
+          error_message("Texture %s has a broken gAMA chunk. Ignoring it.", hint_name);
         }
         else {
-          const uint32_t gAMA_val = _png_read_uint32_big_endian(data + 4);
+          const uint32_t gAMA_val = _png_read_uint32_big_endian(chunk_data + 4);
           result.gamma            = 100000.0f / ((float) gAMA_val);
         }
       }
     }
-    else {
-      fseek(file, length + 4u, SEEK_CUR);
-    }
 
-    data_left = (fread(chunk, 1, 8, file) == 8);
+    file_offset += 4; /* This moves the offset to the 0th byte of the next chunk. */
+
+    chunk     = file + file_offset;
+    data_left = (file_offset + 8 <= file_length);
+    file_offset += 8; /* This moves the offset to the data section of the chunk. */
   }
-
-  fclose(file);
-  free(chunk);
 
   z_stream defstream;
   defstream.zalloc = Z_NULL;
@@ -655,7 +640,23 @@ TextureRGBA png_load(const char* filename) {
   if (bit_depth == PNG_BITDEPTH_8) {
     output_data = malloc(width * height * sizeof(RGBA8));
 
-    if (color_type == PNG_COLORTYPE_TRUECOLOR) {
+    if (color_type == PNG_COLORTYPE_GRAYSCALE) {
+      for (uint32_t i = 0; i < width * height; i++) {
+        const size_t offset = i * byte_per_pixel;
+        const RGBA8 pixel   = {.r = data[offset], .g = data[offset], .b = data[offset], .a = 255};
+
+        ((RGBA8*) output_data)[i] = pixel;
+      }
+    }
+    else if (color_type == PNG_COLORTYPE_GRAYSCALE_ALPHA) {
+      for (uint32_t i = 0; i < width * height; i++) {
+        const size_t offset = i * byte_per_pixel;
+        const RGBA8 pixel   = {.r = data[offset], .g = data[offset], .b = data[offset], .a = data[offset + 1]};
+
+        ((RGBA8*) output_data)[i] = pixel;
+      }
+    }
+    else if (color_type == PNG_COLORTYPE_TRUECOLOR) {
       for (uint32_t i = 0; i < width * height; i++) {
         const size_t offset = i * byte_per_pixel;
         const RGBA8 pixel   = {.r = data[offset], .g = data[offset + 1], .b = data[offset + 2], .a = 255};
@@ -670,7 +671,32 @@ TextureRGBA png_load(const char* filename) {
   else {
     output_data = malloc(width * height * sizeof(RGBA16));
 
-    if (color_type == PNG_COLORTYPE_TRUECOLOR) {
+    if (color_type == PNG_COLORTYPE_GRAYSCALE) {
+      for (uint32_t i = 0; i < width * height; i++) {
+        const size_t o     = i * byte_per_pixel;
+        const RGBA16 pixel = {
+          .r = _png_read_uint16_big_endian(data + o),
+          .g = _png_read_uint16_big_endian(data + o),
+          .b = _png_read_uint16_big_endian(data + o),
+          .a = 65535};
+
+        ((RGBA16*) output_data)[i] = pixel;
+      }
+    }
+    else if (color_type == PNG_COLORTYPE_GRAYSCALE_ALPHA) {
+      for (uint32_t i = 0; i < width * height; i++) {
+        const size_t o     = i * byte_per_pixel + 0 * byte_per_channel;
+        const size_t oa    = i * byte_per_pixel + 1 * byte_per_channel;
+        const RGBA16 pixel = {
+          .r = _png_read_uint16_big_endian(data + o),
+          .g = _png_read_uint16_big_endian(data + o),
+          .b = _png_read_uint16_big_endian(data + o),
+          .a = _png_read_uint16_big_endian(data + oa)};
+
+        ((RGBA16*) output_data)[i] = pixel;
+      }
+    }
+    else if (color_type == PNG_COLORTYPE_TRUECOLOR) {
       for (uint32_t i = 0; i < width * height; i++) {
         const size_t or    = i * byte_per_pixel + 0 * byte_per_channel;
         const size_t og    = i * byte_per_pixel + 1 * byte_per_channel;
@@ -707,9 +733,41 @@ TextureRGBA png_load(const char* filename) {
 
   free(filtered_data);
 
-  log_message("PNG (%s) Size: %dx%d Depth: %d Colortype: %d", filename, width, height, bit_depth, color_type);
+  log_message("PNG (%s) Size: %dx%d Depth: %d Colortype: %d", hint_name, width, height, bit_depth, color_type);
 
   return result;
+}
+
+TextureRGBA png_load_from_file(const char* filename) {
+  log_message("Loading png file (%s)", filename);
+
+  FILE* file = fopen(filename, "rb");
+
+  if (!file) {
+    error_message("File %s could not be opened!", filename);
+    return _png_default_texture();
+  }
+
+  const size_t block_size = 4096;
+  size_t file_length      = 0;
+  uint8_t* file_mem       = malloc(block_size);
+  size_t read_size;
+
+  while (read_size = fread(file_mem + file_length, 1, block_size, file), read_size == block_size) {
+    file_length += block_size;
+    file_mem = safe_realloc(file_mem, file_length + block_size);
+  }
+
+  fclose(file);
+
+  file_length += read_size;
+  file_mem = safe_realloc(file_mem, file_length);
+
+  TextureRGBA tex = png_load(file_mem, file_length, filename);
+
+  free(file_mem);
+
+  return tex;
 }
 
 void png_store_XRGB8(const char* filename, const XRGB8* image, const int width, const int height) {

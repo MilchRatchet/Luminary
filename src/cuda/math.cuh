@@ -241,6 +241,28 @@ __device__ vec3 sample_hemisphere_basis(const float altitude, const float azimut
   return normalize_vector(result);
 }
 
+__device__ Mat3x3 create_basis(const vec3 basis) {
+  const float sign = copysignf(1.0f, basis.z);
+  const float a    = -1.0f / (sign + basis.z);
+  const float b    = basis.x * basis.y * a;
+  const vec3 u1    = get_vector(1.0f + sign * basis.x * basis.x * a, sign * b, -sign * basis.x);
+  const vec3 u2    = get_vector(b, sign + basis.y * basis.y * a, -basis.y);
+
+  Mat3x3 mat;
+
+  mat.f11 = u1.x;
+  mat.f21 = u1.y;
+  mat.f31 = u1.z;
+  mat.f12 = u2.x;
+  mat.f22 = u2.y;
+  mat.f32 = u2.z;
+  mat.f13 = basis.x;
+  mat.f23 = basis.y;
+  mat.f33 = basis.z;
+
+  return mat;
+}
+
 /*
  * This function samples a ray on the unit sphere.
  *
@@ -909,7 +931,8 @@ __device__ float henyey_greenstein_phase_sample(const float g, const float r) {
 
   const float t = (1.0f - g2) / (1.0f - g + 2.0f * g * r);
 
-  return (1.0f + g2 - t) / (2.0f * g);
+  // Note that the Jendersie-Eon paper supplement claims only t, but t^2 is correct according to all other sources.
+  return (1.0f + g2 - t * t) / (2.0f * g);
 }
 
 __device__ float draine_phase_sample(const float g, const float alpha, const float r) {
@@ -930,6 +953,17 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
   const float h = sqrtf(6.0f * (1.0f + g2) - t8 + 8.0f * t4 / (t0 * t9)) - t9;
 
   return 0.5f * g + ((1.0f / (2.0f * g)) - (1.0f / (8.0f * g)) * (h * h));
+}
+
+__device__ float4 texture_load(const DeviceTexture tex, const UV uv) {
+  float4 v = tex2D<float4>(tex.tex, uv.u, 1.0f - uv.v);
+
+  v.x = powf(v.x, tex.gamma);
+  v.y = powf(v.y, tex.gamma);
+  v.z = powf(v.z, tex.gamma);
+  // Gamma is never applied to the alpha of a texture according to PNG standard.
+
+  return v;
 }
 
 /*

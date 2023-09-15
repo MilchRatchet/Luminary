@@ -220,7 +220,7 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
     ensure_capacity(content->maps[type], content->maps_count[type], content->maps_length[type], sizeof(TextureRGBA));
     texture_id = content->maps_count[type]++;
     add_texture(content->texture_list, hash, type, texture_id);
-    content->maps[type][texture_id] = png_load(path);
+    content->maps[type][texture_id] = png_load_from_file(path);
   }
 
   content->materials[content->materials_count - 1].texture[type] = texture_id;

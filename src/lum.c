@@ -213,9 +213,9 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 5569081650753523533u:
       sscanf(value, "%f\n", &sky->moon_azimuth);
       break;
-    /* MOONALBE */
-    case 4990635180450336589u:
-      sscanf(value, "%f\n", &sky->moon_albedo);
+    /* MOONTEXO */
+    case 5717395955340234573u:
+      sscanf(value, "%f\n", &sky->moon_tex_offset);
       break;
     /* SUNSTREN */
     case 5640004630479787347u:
@@ -789,7 +789,7 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "SKY MOONAZIM %f\n", instance->scene.sky.moon_azimuth);
   fputs(line, file);
-  sprintf(line, "SKY MOONALBE %f\n", instance->scene.sky.moon_albedo);
+  sprintf(line, "SKY MOONTEXO %f\n", instance->scene.sky.moon_tex_offset);
   fputs(line, file);
   sprintf(line, "SKY SUNSTREN %f\n", instance->scene.sky.sun_strength);
   fputs(line, file);

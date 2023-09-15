@@ -4,7 +4,6 @@
 #include <cuda_runtime_api.h>
 #include <optix.h>
 #include <optix_stubs.h>
-#include <stdlib.h>
 
 #if defined(__GNUC__) || defined(__clang__)
 #elif defined(__MSVC__) || defined(__CUDACC__)
@@ -238,7 +237,7 @@ struct Sky {
   float altitude;
   float moon_azimuth;
   float moon_altitude;
-  float moon_albedo;
+  float moon_tex_offset;
   float sun_strength;
   float base_density;
   int ozone_absorption;
@@ -388,6 +387,8 @@ struct DevicePointers {
   DeviceTexture* sky_ms_luts;
   DeviceTexture* sky_tm_luts;
   DeviceTexture* sky_hdri_luts;
+  DeviceTexture* sky_moon_albedo_tex;
+  DeviceTexture* sky_moon_normal_tex;
   LightSample* light_samples;
   GBufferData* g_buffer;
   uint32_t* light_candidates;
@@ -470,6 +471,8 @@ struct RaytraceInstance {
   DeviceBuffer* sky_ms_luts;
   DeviceBuffer* sky_tm_luts;
   DeviceBuffer* sky_hdri_luts;
+  DeviceBuffer* sky_moon_albedo_tex;
+  DeviceBuffer* sky_moon_normal_tex;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
