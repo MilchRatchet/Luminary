@@ -470,8 +470,10 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
     return _png_default_failure();
   }
 
-  if (color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA && color_type != PNG_COLORTYPE_TRUECOLOR) {
-    error_message("Texture %s is not in RGB/RGBA format!", hint_name);
+  if (
+    color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA && color_type != PNG_COLORTYPE_TRUECOLOR && color_type != PNG_COLORTYPE_GRAYSCALE
+    && color_type != PNG_COLORTYPE_GRAYSCALE_ALPHA) {
+    error_message("Texture %s is either using a color palette or a non standard format!", hint_name);
     return _png_default_texture();
   }
 
@@ -488,7 +490,27 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
   file_offset += 25;
 
   const uint32_t byte_per_channel = (bit_depth == PNG_BITDEPTH_8) ? 1u : 2u;
-  const uint32_t byte_per_pixel   = byte_per_channel * ((color_type == PNG_COLORTYPE_TRUECOLOR) ? 3u : 4u);
+
+  uint32_t num_channels;
+  switch (color_type) {
+    case PNG_COLORTYPE_GRAYSCALE:
+      num_channels = 1;
+      break;
+    case PNG_COLORTYPE_GRAYSCALE_ALPHA:
+      num_channels = 2;
+      break;
+    case PNG_COLORTYPE_TRUECOLOR:
+      num_channels = 3;
+      break;
+    case PNG_COLORTYPE_TRUECOLOR_ALPHA:
+      num_channels = 4;
+      break;
+    default:
+      error_message("Invalid color type encountered!");
+      return _png_default_texture();
+  }
+
+  const uint32_t byte_per_pixel = byte_per_channel * num_channels;
 
   TextureRGBA result;
   const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
@@ -618,7 +640,23 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
   if (bit_depth == PNG_BITDEPTH_8) {
     output_data = malloc(width * height * sizeof(RGBA8));
 
-    if (color_type == PNG_COLORTYPE_TRUECOLOR) {
+    if (color_type == PNG_COLORTYPE_GRAYSCALE) {
+      for (uint32_t i = 0; i < width * height; i++) {
+        const size_t offset = i * byte_per_pixel;
+        const RGBA8 pixel   = {.r = data[offset], .g = data[offset], .b = data[offset], .a = 255};
+
+        ((RGBA8*) output_data)[i] = pixel;
+      }
+    }
+    else if (color_type == PNG_COLORTYPE_GRAYSCALE_ALPHA) {
+      for (uint32_t i = 0; i < width * height; i++) {
+        const size_t offset = i * byte_per_pixel;
+        const RGBA8 pixel   = {.r = data[offset], .g = data[offset], .b = data[offset], .a = data[offset + 1]};
+
+        ((RGBA8*) output_data)[i] = pixel;
+      }
+    }
+    else if (color_type == PNG_COLORTYPE_TRUECOLOR) {
       for (uint32_t i = 0; i < width * height; i++) {
         const size_t offset = i * byte_per_pixel;
         const RGBA8 pixel   = {.r = data[offset], .g = data[offset + 1], .b = data[offset + 2], .a = 255};
@@ -633,7 +671,32 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
   else {
     output_data = malloc(width * height * sizeof(RGBA16));
 
-    if (color_type == PNG_COLORTYPE_TRUECOLOR) {
+    if (color_type == PNG_COLORTYPE_GRAYSCALE) {
+      for (uint32_t i = 0; i < width * height; i++) {
+        const size_t o     = i * byte_per_pixel;
+        const RGBA16 pixel = {
+          .r = _png_read_uint16_big_endian(data + o),
+          .g = _png_read_uint16_big_endian(data + o),
+          .b = _png_read_uint16_big_endian(data + o),
+          .a = 65535};
+
+        ((RGBA16*) output_data)[i] = pixel;
+      }
+    }
+    else if (color_type == PNG_COLORTYPE_GRAYSCALE_ALPHA) {
+      for (uint32_t i = 0; i < width * height; i++) {
+        const size_t o     = i * byte_per_pixel + 0 * byte_per_channel;
+        const size_t oa    = i * byte_per_pixel + 1 * byte_per_channel;
+        const RGBA16 pixel = {
+          .r = _png_read_uint16_big_endian(data + o),
+          .g = _png_read_uint16_big_endian(data + o),
+          .b = _png_read_uint16_big_endian(data + o),
+          .a = _png_read_uint16_big_endian(data + oa)};
+
+        ((RGBA16*) output_data)[i] = pixel;
+      }
+    }
+    else if (color_type == PNG_COLORTYPE_TRUECOLOR) {
       for (uint32_t i = 0; i < width * height; i++) {
         const size_t or    = i * byte_per_pixel + 0 * byte_per_channel;
         const size_t og    = i * byte_per_pixel + 1 * byte_per_channel;
