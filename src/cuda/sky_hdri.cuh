@@ -38,7 +38,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
     const int x = id % device.scene.sky.hdri_dim;
     const int y = id / device.scene.sky.hdri_dim;
 
-    RGBF result = get_color(0.0f, 0.0f, 0.0f);
+    RGBF result   = get_color(0.0f, 0.0f, 0.0f);
+    RGBF variance = get_color(1.0f, 1.0f, 1.0f);
 
     const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
 
@@ -67,7 +68,42 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
 
       const RGBF sky = sky_get_color(iter_origin, ray, FLT_MAX, true, device.scene.sky.steps, seed);
 
-      color  = add_color(color, mul_color(sky, cloud_transmittance));
+      color = add_color(color, mul_color(sky, cloud_transmittance));
+
+      if (i) {
+        RGBF deviation = max_color(variance, get_color(eps, eps, eps));
+
+        deviation.r = sqrtf(deviation.r);
+        deviation.g = sqrtf(deviation.g);
+        deviation.b = sqrtf(deviation.b);
+
+        result = scale_color(result, 1.0f / i);
+
+        variance  = scale_color(variance, i - 1.0f);
+        RGBF diff = sub_color(color, result);
+        diff      = mul_color(diff, diff);
+
+        variance = add_color(variance, diff);
+        variance = scale_color(variance, 1.0f / i);
+
+        // Same as in temporal accumulation
+        // Here this trick has no real downside
+        // Just got to make sure we don't do this in the case of 2 samples
+        if (i == 1 && device.scene.sky.hdri_samples != 2) {
+          RGBF min = min_color(color, result);
+
+          result = min;
+          color  = min;
+        }
+
+        RGBF firefly_rejection = add_color(get_color(0.1f, 0.1f, 0.1f), add_color(result, scale_color(deviation, 4.0f)));
+        firefly_rejection      = max_color(get_color(0.0f, 0.0f, 0.0f), sub_color(color, firefly_rejection));
+
+        result = scale_color(result, i);
+
+        color = sub_color(color, firefly_rejection);
+      }
+
       result = add_color(result, color);
     }
 
