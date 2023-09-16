@@ -25,7 +25,6 @@
 #define REJECT_HIT 0xfffffff0u
 #define TRIANGLE_ID_LIMIT 0xefffffffu
 #define LIGHT_ID_ANY 0xfffffff0u
-#define LIGHT_ID_ANY_NO_SUN 0xfffffff1u
 
 #define VOLUME_FOG_HIT 0xfffffff2u
 #define VOLUME_OCEAN_HIT 0xfffffff3u
@@ -71,8 +70,8 @@ __device__ static int is_first_ray() {
 
 __device__ static bool proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
   return (
-    device.iteration_type == TYPE_CAMERA || ((device.iteration_type == TYPE_LIGHT) && (target_light == source_light))
-    || target_light == LIGHT_ID_ANY || (source_light != LIGHT_ID_SUN && target_light == LIGHT_ID_ANY_NO_SUN));
+    device.iteration_type == TYPE_CAMERA || (device.iteration_type == TYPE_BOUNCE && target_light != source_light)
+    || ((device.iteration_type == TYPE_LIGHT) && (target_light == source_light)) || target_light == LIGHT_ID_ANY);
 }
 #endif
 
