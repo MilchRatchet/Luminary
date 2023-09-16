@@ -299,6 +299,7 @@ static void parse_sky_settings(Sky* sky, char* line) {
       break;
     /* HDRIDIM_ */
     case 6867225564446606408u:
+      sscanf(value, "%d\n", &sky->settings_hdri_dim);
       sscanf(value, "%d\n", &sky->hdri_dim);
       break;
       /* HDRISAMP */
