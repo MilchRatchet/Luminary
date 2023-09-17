@@ -60,16 +60,15 @@ __device__ LightSample restir_sample_empty() {
  * @param data Data to compute the target pdf from.
  * @result Target PDF of light sample.
  */
-__device__ float restir_sample_target_pdf(LightSample x, GBufferData data) {
+__device__ float restir_sample_target_pdf(LightSample x, const GBufferData data) {
   if (x.presampled_id == LIGHT_ID_NONE) {
     return 0.0f;
   }
 
-  BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
-
   // We overwrite the local scope copy of the light sample
   x.weight = 1.0f;
 
+  BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
   BRDFInstance result;
 
   if (data.flags & G_BUFFER_VOLUME_HIT) {
@@ -115,7 +114,8 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
   const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
 
   // Sampling pdf used when the selected light was selected, this is used for the MIS balance heuristic
-  float selection_pdf = 1.0f;
+  float selection_pdf        = 1.0f;
+  float selection_target_pdf = 1.0f;
 
   // Importance sample the sun
   if (sun_visible) {
@@ -134,6 +134,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
       selected.presampled_id = LIGHT_ID_SUN;
       selected.seed          = sampled.seed;
       selection_pdf          = sampled_pdf;
+      selection_target_pdf   = sampled_target_pdf;
     }
   }
 
@@ -154,6 +155,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
       selected.presampled_id = LIGHT_ID_TOY;
       selected.seed          = sampled.seed;
       selection_pdf          = sampled_pdf;
+      selection_target_pdf   = sampled_target_pdf;
     }
   }
 
@@ -178,6 +180,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
       selected.presampled_id = sampled.presampled_id;
       selected.seed          = sampled.seed;
       selection_pdf          = sampled_pdf;
+      selection_target_pdf   = sampled_target_pdf;
     }
   }
 
@@ -192,8 +195,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     selected.weight = 0.0f;
   }
   else {
-    const float selected_target_pdf = restir_sample_target_pdf(selected, data);
-    selected.weight                 = (selected.weight * selection_pdf) / (sum_pdf * selected_target_pdf);
+    selected.weight = (selected.weight * selection_pdf) / (sum_pdf * selection_target_pdf);
   }
 
   return selected;

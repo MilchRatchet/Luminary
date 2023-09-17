@@ -234,13 +234,13 @@ __device__ BRDFInstance brdf_get_instance(RGBAF albedo, const vec3 V, const vec3
   return brdf;
 }
 
-__device__ BRDFInstance brdf_get_instance_scattering() {
+__device__ BRDFInstance brdf_get_instance_scattering(const vec3 V) {
   BRDFInstance brdf;
   brdf.albedo       = get_color(0.0f, 0.0f, 0.0f);
   brdf.transparency = 1.0f;
   brdf.diffuse      = get_color(0.0f, 0.0f, 0.0f);
   brdf.specular_f0  = get_color(0.0f, 0.0f, 0.0f);
-  brdf.V            = get_vector(0.0f, 0.0f, 0.0f);
+  brdf.V            = V;
   brdf.roughness    = 0.0f;
   brdf.metallic     = 0.0f;
   brdf.normal       = get_vector(0.0f, 0.0f, 0.0f);
@@ -311,7 +311,7 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
 }
 
 __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, VolumeType volume_hit_type) {
-  BRDFInstance result = brdf_get_instance_scattering();
+  BRDFInstance result = brdf_get_instance_scattering(brdf.V);
 
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
