@@ -1030,25 +1030,59 @@ __device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, 
   return __fslctf(t, FLT_MAX, t);
 }
 
+__device__ vec3 slerp(const vec3 start, const vec3 end, const float v) {
+  const float cos_angle = dot_product(start, end);
+  const float angle     = acosf(cos_angle) * v;
+  const vec3 rel        = normalize_vector(sub_vector(end, scale_vector(start, cos_angle)));
+  return add_vector(scale_vector(start, cosf(angle)), scale_vector(rel, sinf(angle)));
+}
+
 /*
- * Sample a random point on a triangle.
+ * Sample the solid angle of a triangle.
  * @param triangle Triangle.
  * @param origin Point to sample from.
+ * @param area Solid angle of the triangle.
  * @result Normalized direction to the point on the triangle.
  *
- * This implementation originally uses Basu and Owen's mapping which is slightly better. However, the
- * performance cost is significant and the original implementation had a bug because very special input noise
- * values are required but just standard white noise was used. This special noise is van der Corput points.
+ * This implementation is based on "Stratified Sampling of Spherical Triangles" by J. Arvo.
+ * Some modification like the slerp are taken from https://www.shadertoy.com/view/4tGGzd.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, uint32_t& seed) {
-  const float r1 = sqrtf(white_noise_offset_restir(seed++));
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed) {
+  const float r1 = white_noise_offset_restir(seed++);
   const float r2 = white_noise_offset_restir(seed++);
 
-  const float2 uv = make_float2(1.0f - r1, r2 * r1);
+  // Projection of triangle onto unit sphere
+  const vec3 A = normalize_vector(sub_vector(triangle.vertex, origin));
+  const vec3 B = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), origin));
+  const vec3 C = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), origin));
 
-  const vec3 p = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
+  // Arclengths of the edges
+  const float a = acosf(dot_product(B, C));
+  const float b = acosf(dot_product(A, C));
+  const float c = acosf(dot_product(A, B));
 
-  return normalize_vector(sub_vector(p, origin));
+  // Angles of the spherical triangle using the cosine rule for sides
+  const float alpha = acosf((cosf(a) - cosf(b) * cosf(c)) / (sinf(b) * sinf(c)));
+  const float beta  = acosf((cosf(b) - cosf(a) * cosf(c)) / (sinf(a) * sinf(c)));
+  const float gamma = acosf((cosf(c) - cosf(a) * cosf(b)) / (sinf(a) * sinf(b)));
+
+  area = alpha + beta + gamma - PI;
+
+  const float area_sampled = r1 * area;
+
+  const float s = sinf(area_sampled - alpha);
+  const float t = cosf(area_sampled - alpha);
+
+  const float u = t - cosf(alpha);
+  const float v = s + sinf(alpha) * cosf(c);
+
+  const float q = (1.0f / b) * acosf(((v * t - u * s) * cosf(alpha) - v) / ((v * s + u * t) * sinf(alpha)));
+
+  const vec3 C_sampled = slerp(A, C, q);
+
+  const float z = acosf(1.0f - r2 * (1.0f - dot_product(C_sampled, B))) / acosf(dot_product(C_sampled, B));
+
+  return slerp(B, C_sampled, z);
 }
 
 /*
@@ -1072,13 +1106,13 @@ __device__ float sample_triangle_solid_angle(const TriangleLight triangle, const
 }
 
 /*
- * Sample a random point on a sphere.
+ * Samples the solid angle of a sphere.
  * @param p Center of the sphere.
  * @param r Radius of the sphere.
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the sphere.
  */
-__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, uint32_t& seed) {
+__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, float& area, uint32_t& seed) {
   const float u1 = white_noise_offset_restir(seed++);
   const float u2 = white_noise_offset_restir(seed++);
 
@@ -1089,8 +1123,11 @@ __device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, ui
     return normalize_vector(sample_ray_sphere(2.0f * u1 - 1.0f, u2));
   }
 
-  dir               = normalize_vector(dir);
+  dir = scale_vector(dir, 1.0f / d);
+
   const float angle = asinf(r / d);
+
+  area = 2.0f * PI * angle * angle;
 
   return normalize_vector(sample_hemisphere_basis(sqrtf(u1) * angle, 2.0f * PI * u2, dir));
 }

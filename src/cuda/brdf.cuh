@@ -287,25 +287,27 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
 __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos) {
   BRDFInstance result = brdf;
 
+  float solid_angle;
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
-      result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, light.seed);
-      result.term  = scale_color(result.term, 0.5f * ONE_OVER_PI * sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, sky_pos));
+      result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
     } break;
     case LIGHT_ID_TOY:
       result.L    = toy_sample_ray(pos, light.seed);
-      result.term = scale_color(result.term, 0.5f * ONE_OVER_PI * toy_get_solid_angle(pos));
+      solid_angle = toy_get_solid_angle(pos);
       break;
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
-      result.L                     = sample_triangle(triangle, pos, light.seed);
-      result.term                  = scale_color(result.term, 0.5f * ONE_OVER_PI * sample_triangle_solid_angle(triangle, pos));
+      result.L                     = sample_triangle(triangle, pos, solid_angle, light.seed);
     } break;
   }
 
-  result.term = scale_color(result.term, light.weight);
+  if (solid_angle < 0.0f || isnan(solid_angle) || isinf(solid_angle))
+    solid_angle = 0.0f;
+
+  result.term = scale_color(result.term, light.weight * 0.5f * ONE_OVER_PI * solid_angle);
 
   return brdf_evaluate(result);
 }
@@ -313,25 +315,27 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
 __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, VolumeType volume_hit_type) {
   BRDFInstance result = brdf_get_instance_scattering(brdf.V);
 
+  float solid_angle;
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
-      result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, light.seed);
-      result.term  = scale_color(result.term, sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, sky_pos));
+      result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
     } break;
     case LIGHT_ID_TOY:
       result.L    = toy_sample_ray(pos, light.seed);
-      result.term = scale_color(result.term, toy_get_solid_angle(pos));
+      solid_angle = toy_get_solid_angle(pos);
       break;
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
-      result.L                     = sample_triangle(triangle, pos, light.seed);
-      result.term                  = scale_color(result.term, sample_triangle_solid_angle(triangle, pos));
+      result.L                     = sample_triangle(triangle, pos, solid_angle, light.seed);
     } break;
   }
 
-  result.term = scale_color(result.term, light.weight);
+  if (solid_angle < 0.0f || isnan(solid_angle) || isinf(solid_angle))
+    solid_angle = 0.0f;
+
+  result.term = scale_color(result.term, light.weight * solid_angle);
 
   const float cos_angle = dot_product(scale_vector(brdf.V, -1.0f), result.L);
   const float phase     = (volume_hit_type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_function(cos_angle, device.scene.fog.droplet_diameter)

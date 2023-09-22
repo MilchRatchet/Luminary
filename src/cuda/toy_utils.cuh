@@ -108,7 +108,8 @@ __device__ vec3 toy_plane_sample_ray(const vec3 position, uint32_t& seed) {
 __device__ vec3 toy_sample_ray(const vec3 position, uint32_t& seed) {
   switch (device.scene.toy.shape) {
     case TOY_SPHERE:
-      return sample_sphere(device.scene.toy.position, device.scene.toy.scale, position, seed);
+      float dummy;
+      return sample_sphere(device.scene.toy.position, device.scene.toy.scale, position, dummy, seed);
     case TOY_PLANE:
       return toy_plane_sample_ray(position, seed);
   }

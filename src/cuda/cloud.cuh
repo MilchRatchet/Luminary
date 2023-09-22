@@ -171,9 +171,8 @@ __device__ CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float start, 
 
       const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, pos)), pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
-        const vec3 sun_ray = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, pos, seed);
-
-        const float sun_light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, pos);
+        float sun_light_angle;
+        const vec3 sun_ray = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, pos, sun_light_angle, seed);
 
         sun_color = sky_get_sun_color(pos, sun_ray);
         sun_color = scale_color(sun_color, sun_light_angle);
