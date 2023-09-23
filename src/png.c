@@ -748,7 +748,9 @@ TextureRGBA png_load_from_file(const char* filename) {
     return _png_default_texture();
   }
 
-  const size_t block_size = 4096;
+  // Block size is very important for performance, it seems that the larger this is the better,
+  // however, too large block sizes also means large memory consumption.
+  const size_t block_size = 16 * 1024 * 1024;
   size_t file_length      = 0;
   uint8_t* file_mem       = malloc(block_size);
   size_t read_size;

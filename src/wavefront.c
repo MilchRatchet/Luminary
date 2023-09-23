@@ -19,8 +19,8 @@
 // Implementation of mtl parser based on http://paulbourke.net/dataformats/mtl/.
 //
 
-#define LINE_SIZE 4096
-#define READ_BUFFER_SIZE 262144  // 256kb
+#define LINE_SIZE 256 * 1024               // 256 KB
+#define READ_BUFFER_SIZE 16 * 1024 * 1024  // 16 MB
 
 void wavefront_init(WavefrontContent** content) {
   *content = calloc(1, sizeof(WavefrontContent));
