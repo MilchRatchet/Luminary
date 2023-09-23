@@ -1030,11 +1030,25 @@ __device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, 
   return __fslctf(t, FLT_MAX, t);
 }
 
-__device__ vec3 slerp(const vec3 start, const vec3 end, const float v) {
-  const float cos_angle = dot_product(start, end);
-  const float angle     = acosf(cos_angle) * v;
-  const vec3 rel        = normalize_vector(sub_vector(end, scale_vector(start, cos_angle)));
-  return add_vector(scale_vector(start, cosf(angle)), scale_vector(rel, sinf(angle)));
+__device__ float clampf(const float x, const float a, const float b) {
+  return fminf(b, fmaxf(a, x));
+}
+
+/*
+ * Helper function for sample_triangle.
+ */
+__device__ vec3 sample_triangle_slerp(const vec3 start, const vec3 end, const float v) {
+  vec3 plane_normal = cross_product(start, end);
+
+  const float v_scaled  = 0.5f * v;
+  const float sin_angle = sqrtf(0.5f - v_scaled);
+  const float cos_angle = sqrtf(0.5f + v_scaled);
+
+  plane_normal = scale_vector(plane_normal, sin_angle);
+
+  const vec3 precomp_part = scale_vector(cross_product(plane_normal, start), 2.0f);
+
+  return normalize_vector(add_vector(start, add_vector(scale_vector(precomp_part, cos_angle), cross_product(plane_normal, precomp_part))));
 }
 
 /*
@@ -1045,7 +1059,10 @@ __device__ vec3 slerp(const vec3 start, const vec3 end, const float v) {
  * @result Normalized direction to the point on the triangle.
  *
  * This implementation is based on "Stratified Sampling of Spherical Triangles" by J. Arvo.
- * Some modification like the slerp are taken from https://www.shadertoy.com/view/4tGGzd.
+ * The modifications that reduce this to only one acos is taken from
+ * "https://www.linkedin.com/pulse/spherical-triangle-sampling-only-onearccos-call-matt-kielan/"
+ * This function can and will produce NaNs when the solid angle is zero (or close to zero).
+ * Hence always check for that!
  */
 __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed) {
   const float r1 = white_noise_offset_restir(seed++);
@@ -1057,32 +1074,52 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
   const vec3 C = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), origin));
 
   // Arclengths of the edges
-  const float a = acosf(dot_product(B, C));
-  const float b = acosf(dot_product(A, C));
-  const float c = acosf(dot_product(A, B));
+  const float cos_a = dot_product(B, C);
+  const float cos_b = dot_product(A, C);
+  const float cos_c = dot_product(A, B);
+
+  const float rsin_a = rsqrtf(1.0f - cos_a * cos_a);
+  const float rsin_b = rsqrtf(1.0f - cos_b * cos_b);
+  const float rsin_c = rsqrtf(1.0f - cos_c * cos_c);
 
   // Angles of the spherical triangle using the cosine rule for sides
-  const float alpha = acosf((cosf(a) - cosf(b) * cosf(c)) / (sinf(b) * sinf(c)));
-  const float beta  = acosf((cosf(b) - cosf(a) * cosf(c)) / (sinf(a) * sinf(c)));
-  const float gamma = acosf((cosf(c) - cosf(a) * cosf(b)) / (sinf(a) * sinf(b)));
+  const float cos_alpha = (cos_a - cos_b * cos_c) * rsin_b * rsin_c;
+  const float cos_beta  = (cos_b - cos_c * cos_a) * rsin_c * rsin_a;
+  const float cos_gamma = (cos_c - cos_a * cos_b) * rsin_a * rsin_b;
 
-  area = alpha + beta + gamma - PI;
+  const float sin_alpha = sqrtf(1.0f - cos_alpha * cos_alpha);
+  const float sin_beta  = sqrtf(1.0f - cos_beta * cos_beta);
+  const float sin_gamma = sqrtf(1.0f - cos_gamma * cos_gamma);
+
+  const bool bool0               = cos_alpha < (-cos_beta);
+  const float cos_sum_alpha_beta = cos_alpha * cos_beta - sin_alpha * sin_beta;
+  const bool bool1               = cos_sum_alpha_beta < (-cos_gamma);
+  const bool bool2               = cos_sum_alpha_beta < cos_gamma;
+
+  const float cos_abs_sum = cos_sum_alpha_beta * cos_gamma - (cos_alpha * sin_beta + sin_alpha * cos_beta) * sin_gamma;
+  const float abs_sum     = acosf(cos_abs_sum);
+
+  area = ((bool0 ? bool2 : bool1) ? -abs_sum : abs_sum) + ((bool0 || bool1) ? PI : -PI);
 
   const float area_sampled = r1 * area;
 
-  const float s = sinf(area_sampled - alpha);
-  const float t = cosf(area_sampled - alpha);
+  const float neg_sin_sub_area = sinf(area_sampled - PI);
+  const float neg_cos_sub_area = cosf(area_sampled - PI);
 
-  const float u = t - cosf(alpha);
-  const float v = s + sinf(alpha) * cosf(c);
+  const float p = neg_cos_sub_area * sin_alpha - neg_sin_sub_area * cos_alpha;
+  const float q = -neg_sin_sub_area * sin_alpha - neg_cos_sub_area * cos_alpha;
 
-  const float q = (1.0f / b) * acosf(((v * t - u * s) * cosf(alpha) - v) / ((v * s + u * t) * sinf(alpha)));
+  const float u = q - cos_alpha;
+  const float v = p + sin_alpha * cos_c;
 
-  const vec3 C_sampled = slerp(A, C, q);
+  const float cos_angle_along_AC = clampf(((v * q - u * p) * cos_alpha - v) / ((v * p + u * q) * sin_alpha), -1.0f, 1.0f);
 
-  const float z = acosf(1.0f - r2 * (1.0f - dot_product(C_sampled, B))) / acosf(dot_product(C_sampled, B));
+  const vec3 C_sampled = sample_triangle_slerp(A, scale_vector(C, rsin_b), cos_angle_along_AC);
 
-  return slerp(B, C_sampled, z);
+  const float cos_BC_sampled             = dot_product(C_sampled, B);
+  const float cos_angle_along_BC_sampled = 1.0f + cos_BC_sampled * r2 - r2;
+
+  return sample_triangle_slerp(B, scale_vector(C_sampled, rsqrtf(1.0f - cos_BC_sampled * cos_BC_sampled)), cos_angle_along_BC_sampled);
 }
 
 /*

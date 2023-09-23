@@ -257,7 +257,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
   float NdotL = dot_product(brdf.normal, brdf.L);
   float NdotV = dot_product(brdf.normal, brdf.V);
 
-  if (NdotL <= 0.0f || NdotV <= 0.0f) {
+  if (NdotL <= 0.0f || NdotV <= 0.0f || !color_any(brdf.term)) {
     brdf.term = get_color(0.0f, 0.0f, 0.0f);
     return brdf;
   }
@@ -301,11 +301,9 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
       result.L                     = sample_triangle(triangle, pos, solid_angle, light.seed);
+      solid_angle                  = isnan(solid_angle) ? 0.0f : solid_angle;
     } break;
   }
-
-  if (solid_angle < 0.0f || isnan(solid_angle) || isinf(solid_angle))
-    solid_angle = 0.0f;
 
   result.term = scale_color(result.term, light.weight * 0.5f * ONE_OVER_PI * solid_angle);
 
@@ -329,11 +327,9 @@ __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSam
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
       result.L                     = sample_triangle(triangle, pos, solid_angle, light.seed);
+      solid_angle                  = isnan(solid_angle) ? 0.0f : solid_angle;
     } break;
   }
-
-  if (solid_angle < 0.0f || isnan(solid_angle) || isinf(solid_angle))
-    solid_angle = 0.0f;
 
   result.term = scale_color(result.term, light.weight * solid_angle);
 
