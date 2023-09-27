@@ -140,6 +140,19 @@ __global__ void geometry_generate_g_buffer() {
       metallic  = device.scene.material.default_material.g;
     }
 
+    uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
+
+    if (albedo.a < 1.0f && white_noise() > albedo.a) {
+      flags |= G_BUFFER_TRANSPARENT_PASS;
+    }
+
+    if (flags & G_BUFFER_TRANSPARENT_PASS) {
+      task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
+    }
+    else {
+      task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
+    }
+
     GBufferData data;
     data.hit_id    = task.hit_id;
     data.albedo    = albedo;
@@ -149,7 +162,7 @@ __global__ void geometry_generate_g_buffer() {
     data.V         = scale_vector(ray, -1.0f);
     data.roughness = roughness;
     data.metallic  = metallic;
-    data.flags     = G_BUFFER_REQUIRES_SAMPLING;
+    data.flags     = flags;
 
     store_g_buffer_data(data, pixel);
   }
@@ -189,15 +202,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     write_normal_buffer(data.normal, pixel);
 
-    if (data.albedo.a < 1.0f && white_noise() > data.albedo.a) {
-      task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
-
+    if (data.flags & G_BUFFER_TRANSPARENT_PASS) {
       if (device.scene.material.colored_transparency) {
         record = mul_color(record, opaque_color(data.albedo));
       }
 
       TraceTask new_task;
-      new_task.origin = task.position;
+      new_task.origin = data.position;
       new_task.ray    = ray;
       new_task.index  = task.index;
 
@@ -220,8 +231,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     else if (device.iteration_type != TYPE_LIGHT) {
       const vec3 V = scale_vector(ray, -1.0f);
 
-      task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
-
       BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
 
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
@@ -237,12 +246,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
           LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
           if (light.weight > 0.0f) {
-            const BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, task.position);
+            const BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, data.position);
 
             const RGBF light_record = mul_color(record, brdf_sample.term);
 
             TraceTask light_task;
-            light_task.origin = task.position;
+            light_task.origin = data.position;
             light_task.ray    = brdf_sample.L;
             light_task.index  = task.index;
 
@@ -261,7 +270,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       RGBF bounce_record = mul_color(record, brdf.term);
 
       TraceTask bounce_task;
-      bounce_task.origin = task.position;
+      bounce_task.origin = data.position;
       bounce_task.ray    = brdf.L;
       bounce_task.index  = task.index;
 
@@ -284,48 +293,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
     const int pixel   = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      RGBF color = get_color(0.0f, 0.0f, 0.0f);
+      const GBufferData data = load_g_buffer_data(pixel);
 
-      const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
-
-      const float4 t1 = __ldg(hit_address);
-      const float4 t2 = __ldg(hit_address + 1);
-      const float4 t3 = __ldg(hit_address + 2);
-      const float4 t5 = __ldg(hit_address + 4);
-      const float4 t6 = __ldg(hit_address + 5);
-      const float t7  = __ldg((float*) (hit_address + 6));
-
-      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
-      vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
-
-      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
-
-      UV vertex_texture = get_UV(t5.z, t5.w);
-      UV edge1_texture  = get_UV(t6.x, t6.y);
-      UV edge2_texture  = get_UV(t6.z, t6.w);
-
-      const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
-
-      const int texture_object = __float_as_int(t7);
-
-      const ushort4 maps = __ldg((ushort4*) (device.texture_assignments + texture_object));
-
-      if (maps.x != TEXTURE_NONE) {
-        const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[maps.x], tex_coords);
-        color                 = add_color(color, get_color(albedo_f.x, albedo_f.y, albedo_f.z));
-      }
-      else {
-        color = add_color(color, get_color(0.9f, 0.9f, 0.9f));
-      }
-
-      if (maps.y != TEXTURE_NONE && device.scene.material.lights_active) {
-        const float4 illuminance_f = texture_load(device.ptrs.illuminance_atlas[maps.y], tex_coords);
-
-        color = add_color(color, get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z));
-      }
-
-      store_RGBF(device.ptrs.frame_buffer + pixel, color);
+      store_RGBF(device.ptrs.frame_buffer + pixel, add_color(opaque_color(data.albedo), data.emission));
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
@@ -333,47 +303,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       store_RGBF(device.ptrs.frame_buffer + pixel, get_color(value, value, value));
     }
     else if (device.shading_mode == SHADING_NORMAL) {
-      const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
+      const GBufferData data = load_g_buffer_data(pixel);
 
-      const float4 t1 = __ldg(hit_address);
-      const float4 t2 = __ldg(hit_address + 1);
-      const float4 t3 = __ldg(hit_address + 2);
-      const float4 t4 = __ldg(hit_address + 3);
-      const float4 t5 = __ldg(hit_address + 4);
-      const float4 t6 = __ldg(hit_address + 5);
-      const float t7  = __ldg((float*) (hit_address + 6));
-
-      vec3 ray;
-      ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-      ray.y = sinf(task.ray_y);
-      ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
-
-      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
-      vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
-
-      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
-
-      const UV vertex_texture = get_UV(t5.z, t5.w);
-      const UV edge1_texture  = get_UV(t6.x, t6.y);
-      const UV edge2_texture  = get_UV(t6.z, t6.w);
-
-      const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
-
-      const vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
-      const vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
-      const vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
-
-      const int texture_object = __float_as_int(t7);
-
-      const ushort4 maps = __ldg((ushort4*) (device.texture_assignments + texture_object));
-
-      vec3 normal = geometry_compute_normal(
-        vertex_normal, edge1_normal, edge2_normal, ray, edge1, edge2, edge1_texture, edge2_texture, maps.w, coords, tex_coords);
-
-      normal.x = 0.5f * normal.x + 0.5f;
-      normal.y = 0.5f * normal.y + 0.5f;
-      normal.z = 0.5f * normal.z + 0.5f;
+      const vec3 normal = data.normal;
 
       store_RGBF(device.ptrs.frame_buffer + pixel, get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
     }

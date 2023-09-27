@@ -21,17 +21,37 @@ __global__ void toy_generate_g_buffer() {
       normal = scale_vector(normal, -1.0f);
     }
 
+    uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
+
+    if (device.scene.toy.albedo.a < 1.0f && white_noise() > device.scene.toy.albedo.a) {
+      flags |= G_BUFFER_TRANSPARENT_PASS;
+    }
+
+    if (flags & G_BUFFER_TRANSPARENT_PASS) {
+      task.position = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
+    }
+    else {
+      task.position = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
+    }
+
+    RGBF emission;
+    if (device.scene.toy.emissive) {
+      emission = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+    }
+    else {
+      emission = get_color(0.0f, 0.0f, 0.0f);
+    }
+
     GBufferData data;
-    data.hit_id = TOY_HIT;
-    data.albedo = device.scene.toy.albedo;
-    data.emission =
-      (device.scene.toy.emissive) ? scale_color(device.scene.toy.emission, device.scene.toy.material.b) : get_color(0.0f, 0.0f, 0.0f);
-    data.flags     = G_BUFFER_REQUIRES_SAMPLING;
+    data.hit_id    = TOY_HIT;
+    data.albedo    = device.scene.toy.albedo;
+    data.emission  = emission;
     data.normal    = normal;
     data.position  = task.position;
     data.V         = scale_vector(task.ray, -1.0f);
     data.roughness = (1.0f - device.scene.toy.material.r);
     data.metallic  = device.scene.toy.material.g;
+    data.flags     = flags;
 
     store_g_buffer_data(data, pixel);
   }
@@ -49,7 +69,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    vec3 normal     = get_toy_normal(task.position);
+    const GBufferData data = load_g_buffer_data(pixel);
+
+    vec3 normal     = get_toy_normal(data.position);
     int from_inside = 0;
 
     if (dot_product(normal, task.ray) > 0.0f) {
@@ -92,12 +114,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
     write_normal_buffer(normal, pixel);
 
-    const vec3 V      = scale_vector(task.ray, -1.0f);
-    BRDFInstance brdf = brdf_get_instance(albedo, V, normal, roughness, metallic);
+    BRDFInstance brdf = brdf_get_instance(albedo, data.V, normal, roughness, metallic);
 
-    if (albedo.a < 1.0f && white_noise() > albedo.a) {
-      task.position = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
-
+    if (data.flags & G_BUFFER_TRANSPARENT_PASS) {
       brdf.term = mul_color(brdf.term, opaque_color(albedo));
 
       if (device.scene.toy.refractive_index != 1.0f && device.iteration_type != TYPE_LIGHT) {
@@ -112,7 +131,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       record = mul_color(record, brdf.term);
 
       TraceTask new_task;
-      new_task.origin = task.position;
+      new_task.origin = data.position;
       new_task.ray    = brdf.L;
       new_task.index  = task.index;
 
@@ -133,8 +152,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       }
     }
     else if (device.iteration_type != TYPE_LIGHT) {
-      task.position = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
-
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
         const int is_mirror = material_is_mirror(roughness, metallic);
 
@@ -148,12 +165,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
           LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
           if (light.weight > 0.0f) {
-            BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, task.position);
+            BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, data.position);
 
             const RGBF light_record = mul_color(record, brdf_sample.term);
 
             TraceTask light_task;
-            light_task.origin = task.position;
+            light_task.origin = data.position;
             light_task.ray    = brdf_sample.L;
             light_task.index  = task.index;
 
@@ -172,7 +189,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       RGBF bounce_record = mul_color(record, brdf.term);
 
       TraceTask bounce_task;
-      bounce_task.origin = task.position;
+      bounce_task.origin = data.position;
       bounce_task.ray    = brdf.L;
       bounce_task.index  = task.index;
 

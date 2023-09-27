@@ -155,16 +155,19 @@ __global__ void volume_generate_g_buffer() {
     ray.y = sinf(task.ray_y);
     ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
+    uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
+    flags |= G_BUFFER_VOLUME_HIT;
+
     GBufferData data;
     data.hit_id    = task.volume_type;
     data.albedo    = RGBAF_set(0.0f, 0.0f, 0.0f, 0.0f);
     data.emission  = get_color(0.0f, 0.0f, 0.0f);
-    data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
     data.normal    = get_vector(0.0f, 0.0f, 0.0f);
     data.position  = task.position;
     data.V         = scale_vector(ray, -1.0f);
     data.roughness = 1.0f;
     data.metallic  = 0.0f;
+    data.flags     = flags;
 
     store_g_buffer_data(data, pixel);
   }
