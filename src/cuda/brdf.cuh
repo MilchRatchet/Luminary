@@ -301,7 +301,6 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
       result.L                     = sample_triangle(triangle, pos, solid_angle, light.seed);
-      solid_angle                  = isnan(solid_angle) ? 0.0f : solid_angle;
     } break;
   }
 

@@ -195,6 +195,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
                 hit_id = REJECT_HIT;
               }
             }
+            else if (device.iteration_type == TYPE_LIGHT && dist == FLT_MAX) {
+              depth  = -1.0f;
+              hit_id = REJECT_HIT;
+            }
+          }
+          else if (device.iteration_type == TYPE_LIGHT) {
+            depth  = -1.0f;
+            hit_id = REJECT_HIT;
           }
         }
       }
