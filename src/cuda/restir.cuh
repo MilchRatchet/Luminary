@@ -258,7 +258,7 @@ __global__ void restir_weighted_reservoir_sampling() {
     store_light_sample(device.ptrs.light_samples, sample, pixel);
 
     if (device.iteration_type != TYPE_CAMERA) {
-      device.ptrs.g_buffer[pixel].flags = 0;
+      device.ptrs.g_buffer[pixel].flags = data.flags & (~G_BUFFER_REQUIRES_SAMPLING);
     }
   }
 

@@ -46,20 +46,11 @@ __device__ float get_toy_distance(const vec3 origin, const vec3 ray) {
 
 __device__ vec3 toy_sphere_normal(const vec3 position) {
   const vec3 diff = sub_vector(position, device.scene.toy.position);
-  vec3 normal     = normalize_vector(diff);
-
-  if (get_length(diff) < device.scene.toy.scale)
-    normal = scale_vector(normal, -1.0f);
-
-  return normal;
+  return normalize_vector(diff);
 }
 
 __device__ vec3 toy_plane_normal(const vec3 position) {
-  const vec3 n = rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
-
-  const float dot = dot_product(n, sub_vector(position, device.scene.toy.position));
-
-  return (dot >= 0.0f) ? n : scale_vector(n, -1.0f);
+  return rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
 }
 
 __device__ vec3 get_toy_normal(const vec3 position) {
@@ -71,6 +62,30 @@ __device__ vec3 get_toy_normal(const vec3 position) {
   }
 
   return get_vector(0.0f, 1.0f, 0.0f);
+}
+
+__device__ bool toy_sphere_is_inside(const vec3 position) {
+  const vec3 diff = sub_vector(position, device.scene.toy.position);
+  return (dot_product(diff, diff) < device.scene.toy.scale * device.scene.toy.scale);
+}
+
+__device__ bool toy_plane_is_inside(const vec3 position) {
+  const vec3 n = toy_plane_normal(position);
+
+  const float dot = dot_product(n, sub_vector(position, device.scene.toy.position));
+
+  return (dot < 0.0f);
+}
+
+__device__ bool toy_is_inside(const vec3 position) {
+  switch (device.scene.toy.shape) {
+    case TOY_SPHERE:
+      return toy_sphere_is_inside(position);
+    case TOY_PLANE:
+      return toy_plane_is_inside(position);
+  }
+
+  return false;
 }
 
 __device__ float toy_plane_solid_angle(const vec3 position) {

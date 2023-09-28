@@ -21,10 +21,14 @@ __global__ void toy_generate_g_buffer() {
       normal = scale_vector(normal, -1.0f);
     }
 
-    uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
+    uint32_t flags = 0;
 
     if (device.scene.toy.albedo.a < 1.0f && white_noise() > device.scene.toy.albedo.a) {
       flags |= G_BUFFER_TRANSPARENT_PASS;
+    }
+
+    if (!(flags & G_BUFFER_TRANSPARENT_PASS) && !state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+      flags |= G_BUFFER_REQUIRES_SAMPLING;
     }
 
     if (flags & G_BUFFER_TRANSPARENT_PASS) {
@@ -71,13 +75,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
     const GBufferData data = load_g_buffer_data(pixel);
 
-    vec3 normal     = get_toy_normal(data.position);
-    int from_inside = 0;
-
-    if (dot_product(normal, task.ray) > 0.0f) {
-      normal      = scale_vector(normal, -1.0f);
-      from_inside = 1;
-    }
+    const bool is_inside = toy_is_inside(task.position);
+    const vec3 normal    = data.normal;
 
     RGBAF albedo          = device.scene.toy.albedo;
     const float roughness = (1.0f - device.scene.toy.material.r);
@@ -120,7 +119,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       brdf.term = mul_color(brdf.term, opaque_color(albedo));
 
       if (device.scene.toy.refractive_index != 1.0f && device.iteration_type != TYPE_LIGHT) {
-        const float refraction_index = (from_inside) ? device.scene.toy.refractive_index : 1.0f / device.scene.toy.refractive_index;
+        const float refraction_index = (is_inside) ? device.scene.toy.refractive_index : 1.0f / device.scene.toy.refractive_index;
 
         brdf = brdf_sample_ray_refraction(brdf, refraction_index, white_noise(), white_noise());
       }

@@ -140,10 +140,14 @@ __global__ void geometry_generate_g_buffer() {
       metallic  = device.scene.material.default_material.g;
     }
 
-    uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
+    uint32_t flags = 0;
 
     if (albedo.a < 1.0f && white_noise() > albedo.a) {
       flags |= G_BUFFER_TRANSPARENT_PASS;
+    }
+
+    if (!(flags & G_BUFFER_TRANSPARENT_PASS) && !state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+      flags |= G_BUFFER_REQUIRES_SAMPLING;
     }
 
     if (flags & G_BUFFER_TRANSPARENT_PASS) {
