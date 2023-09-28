@@ -150,8 +150,8 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     }
   }
 
-  // Importance sample the toy
-  if (toy_visible) {
+  // Importance sample the toy (but only if we are not originating from the toy)
+  if (toy_visible && data.hit_id != TOY_HIT) {
     LightSample sampled;
     sampled.seed          = random_uint32_t(seed++);
     sampled.presampled_id = LIGHT_ID_TOY;
@@ -176,10 +176,21 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
 
   const float reservoir_sampling_pdf = (1.0f / device.scene.triangle_lights_count);
 
+  // Don't allow triangles to sample themselves.
+  uint32_t blocked_light_id = TRIANGLE_ID_LIMIT + 1;
+  if (data.hit_id <= TRIANGLE_ID_LIMIT) {
+    blocked_light_id = __ldg(&(device.scene.triangles[data.hit_id].light_id));
+  }
+
   for (int i = 0; i < reservoir_size; i++) {
     LightSample sampled;
     sampled.seed          = random_uint32_t(seed++);
     sampled.presampled_id = random_uint32_t(seed++) & (light_count - 1);
+
+    const uint32_t sampled_light_global_id = device.ptrs.light_candidates[sampled.presampled_id];
+
+    if (sampled_light_global_id == blocked_light_id)
+      continue;
 
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
     const float sampled_pdf        = reservoir_sampling_pdf;
@@ -188,7 +199,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
 
     selected.weight += weight;
     if (white_noise_offset(seed++) * selected.weight < weight) {
-      selected.id            = device.ptrs.light_candidates[sampled.presampled_id];
+      selected.id            = sampled_light_global_id;
       selected.presampled_id = sampled.presampled_id;
       selected.seed          = sampled.seed;
       selection_pdf          = sampled_pdf;
