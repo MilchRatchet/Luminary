@@ -1087,8 +1087,8 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
  * Robust triangle sampling.
  */
 __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed) {
-  const float r1 = white_noise_offset_restir(seed++);
-  const float r2 = white_noise_offset_restir(seed++);
+  float r1 = white_noise_offset_restir(seed++);
+  float r2 = white_noise_offset_restir(seed++);
 
   // We use solid angle when we shouldn't. However, I don't want to change everything now just because
   // there is this little bias in the triangle light sampling weight. Instead, I would like to solid
@@ -1104,13 +1104,12 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
-  float u = fmaxf(0.1f, 1.0f - r1);
-  float v = fmaxf(0.1f, r1 * r2);
+  // Map random numbers uniformly into [0.025,0.975].
+  r1 = 0.025f + 0.95f * r1;
+  r2 = 0.025f + 0.95f * r2;
 
-  if (u + v >= 0.9f) {
-    u *= 0.9f;
-    v *= 0.9f;
-  }
+  float u = 1.0f - r1;
+  float v = r1 * r2;
 
   const vec3 p = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
 
@@ -1125,23 +1124,30 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
  * @result Normalized direction to the point on the sphere.
  */
 __device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, float& area, uint32_t& seed) {
-  const float u1 = white_noise_offset_restir(seed++);
-  const float u2 = white_noise_offset_restir(seed++);
+  float r1 = white_noise_offset_restir(seed++);
+  float r2 = white_noise_offset_restir(seed++);
 
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);
 
   if (d < r) {
-    return normalize_vector(sample_ray_sphere(2.0f * u1 - 1.0f, u2));
+    return normalize_vector(sample_ray_sphere(2.0f * r1 - 1.0f, r2));
   }
+
+  // Map random numbers uniformly into [0.0,0.999].
+  r1 = 0.999f * r1;
+  r2 = 0.999f * r2;
 
   dir = scale_vector(dir, 1.0f / d);
 
-  const float angle = asinf(r / d);
+  const float angle = asinf(__saturatef(r / d));
 
   area = 2.0f * PI * angle * angle;
 
-  return normalize_vector(sample_hemisphere_basis(sqrtf(u1) * angle, 2.0f * PI * u2, dir));
+  const float u = sqrtf(r1) * angle;
+  const float v = 2.0f * PI * r2;
+
+  return normalize_vector(sample_hemisphere_basis(u, v, dir));
 }
 
 /*
