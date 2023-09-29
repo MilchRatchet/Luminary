@@ -104,6 +104,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
       emission = mul_color(emission, record);
 
+      if (device.iteration_type == TYPE_BOUNCE) {
+        const float mis_weight = device.ptrs.mis_buffer[pixel];
+        emission               = scale_color(emission, mis_weight);
+      }
+
       const uint32_t light = device.ptrs.light_sample_history[pixel];
 
       if (proper_light_sample(light, LIGHT_ID_TOY)) {
@@ -151,48 +156,51 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       }
     }
     else if (device.iteration_type != TYPE_LIGHT) {
+      if (!material_is_mirror(roughness, metallic))
+        write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
+
+      bool bounce_is_specular;
+      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, bounce_is_specular);
+
+      float bounce_mis_weight = 1.0f;
+
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-        const int is_mirror = material_is_mirror(roughness, metallic);
-
-        if (!is_mirror)
-          write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
-
-        const int use_light_sample          = !is_mirror;
         uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-        if (use_light_sample) {
-          LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
+        LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
-          if (light.weight > 0.0f) {
-            BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, data.position);
+        if (light.weight > 0.0f) {
+          BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, data.position);
 
-            const RGBF light_record = mul_color(record, brdf_sample.term);
+          const RGBF light_record = mul_color(record, brdf_sample.term);
 
-            TraceTask light_task;
-            light_task.origin = data.position;
-            light_task.ray    = brdf_sample.L;
-            light_task.index  = task.index;
+          TraceTask light_task;
+          light_task.origin = data.position;
+          light_task.ray    = brdf_sample.L;
+          light_task.index  = task.index;
 
-            if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-              store_RGBF(device.ptrs.light_records + pixel, light_record);
-              light_history_buffer_entry = light.id;
-              store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
-            }
+          if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+            const float light_mis_weight = (bounce_is_specular) ? data.roughness * data.roughness : 1.0f;
+            bounce_mis_weight            = 1.0f - light_mis_weight;
+
+            store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
+            light_history_buffer_entry = light.id;
+            store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
           }
         }
 
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
       }
 
-      brdf               = brdf_sample_ray(brdf);
-      RGBF bounce_record = mul_color(record, brdf.term);
+      RGBF bounce_record = mul_color(record, bounce_brdf.term);
 
       TraceTask bounce_task;
       bounce_task.origin = data.position;
-      bounce_task.ray    = brdf.L;
+      bounce_task.ray    = bounce_brdf.L;
       bounce_task.index  = task.index;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
+        device.ptrs.mis_buffer[pixel] = bounce_mis_weight;
         store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
         store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }

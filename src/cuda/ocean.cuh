@@ -328,6 +328,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     new_task.ray    = ray;
     new_task.index  = task.index;
 
+    device.ptrs.mis_buffer[pixel] = 1.0f;
     store_RGBF(device.ptrs.bounce_records + pixel, record);
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
 

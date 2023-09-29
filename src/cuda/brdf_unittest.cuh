@@ -36,7 +36,8 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
       BRDFInstance brdf =
         brdf_get_instance(get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f), V, get_vector(0.0f, 1.0f, 0.0f), 1.0f - smoothness, metallic);
 
-      brdf = brdf_sample_ray(brdf);
+      bool dummy;
+      brdf = brdf_sample_ray(brdf, dummy);
 
       float weight = luminance(brdf.term);
 

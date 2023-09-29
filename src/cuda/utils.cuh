@@ -68,17 +68,9 @@ __device__ static int is_first_ray() {
   return (device.iteration_type == TYPE_CAMERA);
 }
 
-/*
- * To be exact, it is incorrect to allow the bounce rays to sample lights if the source light is not the target light.
- * This does cause double counting, but it is not all that bad. Most very significant examples where something like this
- * can go wrong are handled by it. The improvement in sampling quality is massive though and the only other option is some
- * heuristic like only allow this for specular bounces. This is not so easy though since we use a combined BRDF for
- * specular and diffuse so we cannot easily remove the specular term from the BRDF when evaluating the light rays.
- * Hence either worse sampling or some double counting. I choose the double counting for now.
- */
 __device__ static bool proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
   return (
-    device.iteration_type == TYPE_CAMERA || (device.iteration_type == TYPE_BOUNCE && target_light != source_light)
+    (device.iteration_type == TYPE_CAMERA) || (device.iteration_type == TYPE_BOUNCE)
     || ((device.iteration_type == TYPE_LIGHT) && (target_light == source_light)) || target_light == LIGHT_ID_ANY);
 }
 #endif

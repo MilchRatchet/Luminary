@@ -376,6 +376,7 @@ struct DevicePointers {
   RGBF* bounce_records;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
+  float* mis_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
   uint32_t* randoms;
@@ -473,6 +474,7 @@ struct RaytraceInstance {
   DeviceBuffer* sky_hdri_luts;
   DeviceBuffer* sky_moon_albedo_tex;
   DeviceBuffer* sky_moon_normal_tex;
+  DeviceBuffer* mis_buffer;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;

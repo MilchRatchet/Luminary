@@ -513,6 +513,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->sky_hdri_luts);
   device_buffer_init(&instance->sky_moon_albedo_tex);
   device_buffer_init(&instance->sky_moon_normal_tex);
+  device_buffer_init(&instance->mis_buffer);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
@@ -637,6 +638,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->mis_buffer, sizeof(float), amount);
 
   if (instance->denoiser) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);
@@ -709,6 +711,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.sky_hdri_luts        = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
   ptrs.sky_moon_albedo_tex  = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_albedo_tex);
   ptrs.sky_moon_normal_tex  = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_normal_tex);
+  ptrs.mis_buffer           = (float*) device_buffer_get_pointer(instance->mis_buffer);
 
   device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");
@@ -737,6 +740,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->state_buffer);
   device_buffer_free(instance->light_samples);
   device_buffer_free(instance->g_buffer);
+  device_buffer_free(instance->mis_buffer);
 
   gpuErrchk(cudaDeviceSynchronize());
 }

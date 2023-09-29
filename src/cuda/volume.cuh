@@ -307,6 +307,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 
+    device.ptrs.mis_buffer[pixel] = 0.0f;
     store_RGBF(device.ptrs.bounce_records + pixel, record);
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
 

@@ -345,11 +345,12 @@ __device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSam
  * Samples a ray based on the BRDFs and multiplies record with sampling weight.
  * Writes L and term of the BRDFInstance.
  */
-__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf) {
+__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, bool& use_specular) {
   const float specular_prob = brdf_spec_probability(brdf.metallic);
-  const int use_specular    = white_noise() < specular_prob;
-  const float alpha         = white_noise();
-  const float beta          = white_noise();
+  use_specular              = white_noise() < specular_prob;
+
+  const float alpha = white_noise();
+  const float beta  = white_noise();
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(brdf.V, rotation_to_z);
