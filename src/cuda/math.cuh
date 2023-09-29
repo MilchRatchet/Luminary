@@ -1087,7 +1087,7 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
  * Robust triangle sampling.
  */
 __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed) {
-  float r1 = white_noise_offset_restir(seed++);
+  float r1 = sqrtf(white_noise_offset_restir(seed++));
   float r2 = white_noise_offset_restir(seed++);
 
   // We use solid angle when we shouldn't. However, I don't want to change everything now just because
