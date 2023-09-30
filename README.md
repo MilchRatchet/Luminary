@@ -221,4 +221,3 @@ This is a list of papers I have used for this project so far. Note that some tec
 - J. Dupuy, A. Benyoub, _Sampling Visible GGX Normals with Spherical Caps_, 2023. arXiv:2306.05044
 - J. Jendersie and E. d'Eon, _An Approximate Mie Scattering Function for Fog and Cloud Rendering_, SIGGRAPH 2023 Talks, 2023.
 - M. Droske, J. Hanika, J. Vorba, A. Weidlich, M. Sabbadin, _Path Tracing in Production: The Path of Water_, ACM SIGGRAPH 2023 Courses, 2023.
-- J. Arvo, _Stratified sampling of spherical triangles_, SIGGRAPH 95: Proceedings of the 22nd annual conference on Computer graphics and interactive techniques, pp. 437-438, 1995.

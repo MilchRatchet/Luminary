@@ -332,11 +332,11 @@ __device__ RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
   const float z = 0.0362100f * radiance.v[0] + 1.1380633f * radiance.v[1] + 1.7012999f * radiance.v[2] + 0.4867545f * radiance.v[3]
                   + 0.0752499f * radiance.v[4] + 0.0074643f * radiance.v[5] + 0.0014714f * radiance.v[6] + 0.0002400f * radiance.v[7];
 
+  // Negative numbers can show up, hence we need to clamp to 0 here.
   RGBF result;
-
-  result.r = 3.2406f * x - 1.5372f * y - 0.4986f * z;
-  result.g = -0.9689f * x + 1.8758f * y + 0.0415f * z;
-  result.b = 0.0557f * x - 0.2040f * y + 1.0570f * z;
+  result.r = fmaxf(3.2406f * x - 1.5372f * y - 0.4986f * z, 0.0f);
+  result.g = fmaxf(-0.9689f * x + 1.8758f * y + 0.0415f * z, 0.0f);
+  result.b = fmaxf(0.0557f * x - 0.2040f * y + 1.0570f * z, 0.0f);
 
   return result;
 }
