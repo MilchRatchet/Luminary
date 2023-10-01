@@ -40,15 +40,19 @@
 #define ONE_OVER_PI 0.31830988618f
 #endif
 
-#define LIGHT_ID_SUN 0xffffffffu
-#define LIGHT_ID_TOY 0xfffffffeu
-#define LIGHT_ID_NONE 0xfffffff1u
-
 #define OPTIXRT_NUM_GROUPS 3
 
 #define RESTIR_CANDIDATE_POOL_MAX (1 << 20)
 
 enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
+
+enum LightID : uint32_t {
+  LIGHT_ID_SUN               = 0xffffffffu,
+  LIGHT_ID_TOY               = 0xfffffffeu,
+  LIGHT_ID_NONE              = 0xfffffff1u,
+  LIGHT_ID_ANY               = 0xfffffff0u,
+  LIGHT_ID_TRIANGLE_ID_LIMIT = 0xefffffffu
+} typedef LightID;
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 

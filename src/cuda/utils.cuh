@@ -14,23 +14,19 @@
 #define eps 0.000001f
 #endif /* eps */
 
-//===========================================================================================
-// Bit Masks
-//===========================================================================================
-
-#define RANDOM_INDEX 0x0000ffffu
-#define SKY_HIT 0xffffffffu
-#define OCEAN_HIT 0xfffffffeu
-#define TOY_HIT 0xfffffffdu
-#define REJECT_HIT 0xfffffff0u
-#define TRIANGLE_ID_LIMIT 0xefffffffu
-#define LIGHT_ID_ANY 0xfffffff0u
-
-#define VOLUME_FOG_HIT 0xfffffff2u
-#define VOLUME_OCEAN_HIT 0xfffffff3u
+enum HitType : uint32_t {
+  HIT_TYPE_SKY               = 0xffffffffu,
+  HIT_TYPE_OCEAN             = 0xfffffffeu,
+  HIT_TYPE_TOY               = 0xfffffffdu,
+  HIT_TYPE_PARTICLE          = 0xfffffffcu,
+  HIT_TYPE_VOLUME_OCEAN      = 0xfffffff3u,
+  HIT_TYPE_VOLUME_FOG        = 0xfffffff2u,
+  HIT_TYPE_REJECT            = 0xfffffff0u,
+  HIT_TYPE_TRIANGLE_ID_LIMIT = 0xefffffffu
+} typedef HitType;
 
 // VOLUME_FOG_HIT is supposed to always have the volume type bits set to 0.
-#define VOLUME_HIT_CHECK(X) ((X & VOLUME_FOG_HIT) == VOLUME_FOG_HIT)
+#define VOLUME_HIT_CHECK(X) ((X & HIT_TYPE_VOLUME_FOG) == HIT_TYPE_VOLUME_FOG)
 #define VOLUME_HIT_TYPE(X) ((VolumeType) (X & 0x00000001u))
 
 //===========================================================================================

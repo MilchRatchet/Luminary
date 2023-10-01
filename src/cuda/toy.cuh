@@ -47,7 +47,7 @@ __global__ void toy_generate_g_buffer() {
     }
 
     GBufferData data;
-    data.hit_id    = TOY_HIT;
+    data.hit_id    = HIT_TYPE_TOY;
     data.albedo    = device.scene.toy.albedo;
     data.emission  = emission;
     data.normal    = normal;

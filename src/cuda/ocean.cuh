@@ -272,7 +272,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
         if (ocean_depth < depth) {
           float2 result;
           result.x = ocean_depth;
-          result.y = __uint_as_float(OCEAN_HIT);
+          result.y = __uint_as_float(HIT_TYPE_OCEAN);
           __stcs((float2*) (device.ptrs.trace_results + offset), result);
         }
       }

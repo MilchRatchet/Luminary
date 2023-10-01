@@ -151,7 +151,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
   }
 
   // Importance sample the toy (but only if we are not originating from the toy)
-  if (toy_visible && data.hit_id != TOY_HIT) {
+  if (toy_visible && data.hit_id != HIT_TYPE_TOY) {
     LightSample sampled;
     sampled.seed          = random_uint32_t(seed++);
     sampled.presampled_id = LIGHT_ID_TOY;
@@ -177,8 +177,8 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
   const float reservoir_sampling_pdf = (1.0f / device.scene.triangle_lights_count);
 
   // Don't allow triangles to sample themselves.
-  uint32_t blocked_light_id = TRIANGLE_ID_LIMIT + 1;
-  if (data.hit_id <= TRIANGLE_ID_LIMIT) {
+  uint32_t blocked_light_id = LIGHT_ID_TRIANGLE_ID_LIMIT + 1;
+  if (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) {
     blocked_light_id = __ldg(&(device.scene.triangles[data.hit_id].light_id));
   }
 
@@ -217,7 +217,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     float sum_pdf = 0.0f;
     sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
     sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf += (selected.id <= TRIANGLE_ID_LIMIT) ? reservoir_size : 0.0f;
+    sum_pdf += (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? reservoir_size : 0.0f;
 
     const float mis_weight = 1.0f / sum_pdf;
 #elif RESTIR_MIS_WEIGHT_METHOD == 1
@@ -225,7 +225,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     float sum_pdf = 0.0f;
     sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
     sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf += (selected.id <= TRIANGLE_ID_LIMIT) ? reservoir_size * reservoir_sampling_pdf : 0.0f;
+    sum_pdf += (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? reservoir_size * reservoir_sampling_pdf : 0.0f;
 
     const float mis_weight = selection_pdf / sum_pdf;
 #else
@@ -233,8 +233,9 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     float sum_pdf = 0.0f;
     sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
     sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf +=
-      (selected.id <= TRIANGLE_ID_LIMIT) ? reservoir_size * reservoir_sampling_pdf * reservoir_size * reservoir_sampling_pdf : 0.0f;
+    sum_pdf += (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT)
+                 ? reservoir_size * reservoir_sampling_pdf * reservoir_size * reservoir_sampling_pdf
+                 : 0.0f;
 
     const float mis_weight = (selection_pdf * selection_pdf) / sum_pdf;
 #endif

@@ -193,7 +193,7 @@ __global__ void volume_process_events() {
 
         if (volume_dist < depth) {
           depth  = volume_dist;
-          hit_id = VOLUME_FOG_HIT;
+          hit_id = HIT_TYPE_VOLUME_FOG;
         }
       }
     }
@@ -207,7 +207,7 @@ __global__ void volume_process_events() {
 
         if (volume_dist < depth) {
           depth  = volume_dist;
-          hit_id = VOLUME_OCEAN_HIT;
+          hit_id = HIT_TYPE_VOLUME_OCEAN;
         }
       }
     }
@@ -254,7 +254,7 @@ __global__ void volume_process_events_weight() {
           record.b *= expf(-path.y * volume_transmittance.b);
         }
         else {
-          if (hit_id == VOLUME_OCEAN_HIT) {
+          if (hit_id == HIT_TYPE_VOLUME_OCEAN) {
             record.r *=
               (volume.scattering.r * expf(-path.y * volume.scattering.r)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
             record.g *=
