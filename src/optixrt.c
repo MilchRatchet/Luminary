@@ -25,6 +25,127 @@
     }                                                                                                    \
   }
 
+void optixrt_compile_kernel(RaytraceInstance* instance) {
+  bench_tic();
+
+  ////////////////////////////////////////////////////////////////////
+  // Module Compilation
+  ////////////////////////////////////////////////////////////////////
+
+  int64_t ptx_length;
+  char* ptx;
+  uint64_t ptx_info;
+
+  ceb_access("optix_kernels.ptx", (void**) &ptx, &ptx_length, &ptx_info);
+
+  if (ptx_info || !ptx_length) {
+    crash_message("Failed to load OptiX kernels. Ceb Error Code: %zu", ptx_info);
+  }
+
+  OptixModuleCompileOptions module_compile_options;
+  memset(&module_compile_options, 0, sizeof(OptixModuleCompileOptions));
+
+  module_compile_options.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
+  module_compile_options.optLevel         = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
+  module_compile_options.debugLevel       = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
+
+  OptixPipelineCompileOptions pipeline_compile_options;
+  memset(&pipeline_compile_options, 0, sizeof(OptixPipelineCompileOptions));
+
+  pipeline_compile_options.usesMotionBlur                   = 0;
+  pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
+  pipeline_compile_options.numPayloadValues                 = 3;
+  pipeline_compile_options.numAttributeValues               = 2;
+  pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
+  pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
+  pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
+
+  pipeline_compile_options.allowOpacityMicromaps = 1;
+  pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
+
+  char log[4096];
+  size_t log_size = sizeof(log);
+
+  OptixModule module;
+
+  OPTIX_CHECK_LOGS(
+    optixModuleCreate(instance->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module),
+    log);
+
+  ////////////////////////////////////////////////////////////////////
+  // Group Creation
+  ////////////////////////////////////////////////////////////////////
+
+  OptixProgramGroupOptions group_options;
+  memset(&group_options, 0, sizeof(OptixProgramGroupOptions));
+
+  OptixProgramGroupDesc group_desc[OPTIXRT_NUM_GROUPS];
+  memset(group_desc, 0, OPTIXRT_NUM_GROUPS * sizeof(OptixProgramGroupDesc));
+
+  group_desc[0].kind                     = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
+  group_desc[0].raygen.module            = module;
+  group_desc[0].raygen.entryFunctionName = "__raygen__optix";
+
+  group_desc[1].kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
+
+  group_desc[2].kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+  group_desc[2].hitgroup.moduleAH            = module;
+  group_desc[2].hitgroup.entryFunctionNameAH = "__anyhit__optix";
+  group_desc[2].hitgroup.moduleCH            = module;
+  group_desc[2].hitgroup.entryFunctionNameCH = "__closesthit__optix";
+
+  OptixProgramGroup groups[OPTIXRT_NUM_GROUPS];
+
+  OPTIX_CHECK_LOGS(
+    optixProgramGroupCreate(instance->optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, groups), log);
+
+  ////////////////////////////////////////////////////////////////////
+  // Pipeline Creation
+  ////////////////////////////////////////////////////////////////////
+
+  OptixPipelineLinkOptions pipeline_link_options;
+  pipeline_link_options.maxTraceDepth = 1;
+
+  OPTIX_CHECK_LOGS(
+    optixPipelineCreate(
+      instance->optix_ctx, &pipeline_compile_options, &pipeline_link_options, groups, OPTIXRT_NUM_GROUPS, log, &log_size,
+      &instance->optix_kernel.pipeline),
+    log);
+
+  ////////////////////////////////////////////////////////////////////
+  // Shader Binding Table Creation
+  ////////////////////////////////////////////////////////////////////
+
+  char* records;
+  device_malloc((void**) &records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE);
+
+  char host_records[OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE];
+
+  for (int i = 0; i < OPTIXRT_NUM_GROUPS; i++) {
+    OPTIX_CHECK(optixSbtRecordPackHeader(groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
+  }
+
+  gpuErrchk(cudaMemcpy(records, host_records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE, cudaMemcpyHostToDevice));
+
+  instance->optix_kernel.shaders.raygenRecord       = (CUdeviceptr) (records + 0 * OPTIX_SBT_RECORD_HEADER_SIZE);
+  instance->optix_kernel.shaders.missRecordBase     = (CUdeviceptr) (records + 1 * OPTIX_SBT_RECORD_HEADER_SIZE);
+  instance->optix_kernel.shaders.hitgroupRecordBase = (CUdeviceptr) (records + 2 * OPTIX_SBT_RECORD_HEADER_SIZE);
+
+  instance->optix_kernel.shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
+  instance->optix_kernel.shaders.missRecordCount         = 1;
+
+  instance->optix_kernel.shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
+  instance->optix_kernel.shaders.hitgroupRecordCount         = 1;
+
+  ////////////////////////////////////////////////////////////////////
+  // Params Creation
+  ////////////////////////////////////////////////////////////////////
+
+  device_malloc((void**) &instance->optix_kernel.params, sizeof(DeviceConstantMemory));
+
+  bench_toc("BVH Kernel Setup (OptiX)");
+}
+
 void optixrt_init(RaytraceInstance* instance) {
   bench_tic();
 
@@ -139,126 +260,6 @@ void optixrt_init(RaytraceInstance* instance) {
 
   micromap_opacity_free(omm);
 
-  ////////////////////////////////////////////////////////////////////
-  // Module Compilation
-  ////////////////////////////////////////////////////////////////////
-
-  int64_t ptx_length;
-  char* ptx;
-  uint64_t ptx_info;
-
-  ceb_access("optix_kernels.ptx", (void**) &ptx, &ptx_length, &ptx_info);
-
-  if (ptx_info || !ptx_length) {
-    crash_message("Failed to load OptiX kernels. Ceb Error Code: %zu", ptx_info);
-  }
-
-  OptixModuleCompileOptions module_compile_options;
-  memset(&module_compile_options, 0, sizeof(OptixModuleCompileOptions));
-
-  module_compile_options.maxRegisterCount = OPTIX_COMPILE_DEFAULT_MAX_REGISTER_COUNT;
-  module_compile_options.optLevel         = OPTIX_COMPILE_OPTIMIZATION_LEVEL_3;
-  module_compile_options.debugLevel       = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
-
-  OptixPipelineCompileOptions pipeline_compile_options;
-  memset(&pipeline_compile_options, 0, sizeof(OptixPipelineCompileOptions));
-
-  pipeline_compile_options.usesMotionBlur                   = 0;
-  pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
-  pipeline_compile_options.numPayloadValues                 = 3;
-  pipeline_compile_options.numAttributeValues               = 2;
-  pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
-  pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
-  pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
-
-  if (omm.opacityMicromapArray) {
-    pipeline_compile_options.allowOpacityMicromaps = 1;
-  }
-
-  if (dmm.displacementMicromapArray) {
-    pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
-  }
-
-  char log[4096];
-  size_t log_size = sizeof(log);
-
-  OptixModule module;
-
-  OPTIX_CHECK_LOGS(
-    optixModuleCreate(instance->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module),
-    log);
-
-  ////////////////////////////////////////////////////////////////////
-  // Group Creation
-  ////////////////////////////////////////////////////////////////////
-
-  OptixProgramGroupOptions group_options;
-  memset(&group_options, 0, sizeof(OptixProgramGroupOptions));
-
-  OptixProgramGroupDesc group_desc[OPTIXRT_NUM_GROUPS];
-  memset(group_desc, 0, OPTIXRT_NUM_GROUPS * sizeof(OptixProgramGroupDesc));
-
-  group_desc[0].kind                     = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-  group_desc[0].raygen.module            = module;
-  group_desc[0].raygen.entryFunctionName = "__raygen__optix";
-
-  group_desc[1].kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
-
-  group_desc[2].kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-  group_desc[2].hitgroup.moduleAH            = module;
-  group_desc[2].hitgroup.entryFunctionNameAH = "__anyhit__optix";
-  group_desc[2].hitgroup.moduleCH            = module;
-  group_desc[2].hitgroup.entryFunctionNameCH = "__closesthit__optix";
-
-  OptixProgramGroup groups[OPTIXRT_NUM_GROUPS];
-
-  OPTIX_CHECK_LOGS(
-    optixProgramGroupCreate(instance->optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, groups), log);
-
-  ////////////////////////////////////////////////////////////////////
-  // Pipeline Creation
-  ////////////////////////////////////////////////////////////////////
-
-  OptixPipelineLinkOptions pipeline_link_options;
-  pipeline_link_options.maxTraceDepth = 1;
-
-  OPTIX_CHECK_LOGS(
-    optixPipelineCreate(
-      instance->optix_ctx, &pipeline_compile_options, &pipeline_link_options, groups, OPTIXRT_NUM_GROUPS, log, &log_size,
-      &instance->optix_bvh.pipeline),
-    log);
-
-  ////////////////////////////////////////////////////////////////////
-  // Shader Binding Table Creation
-  ////////////////////////////////////////////////////////////////////
-
-  char* records;
-  device_malloc((void**) &records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE);
-
-  char host_records[OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE];
-
-  for (int i = 0; i < OPTIXRT_NUM_GROUPS; i++) {
-    OPTIX_CHECK(optixSbtRecordPackHeader(groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
-  }
-
-  gpuErrchk(cudaMemcpy(records, host_records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE, cudaMemcpyHostToDevice));
-
-  instance->optix_bvh.shaders.raygenRecord       = (CUdeviceptr) (records + 0 * OPTIX_SBT_RECORD_HEADER_SIZE);
-  instance->optix_bvh.shaders.missRecordBase     = (CUdeviceptr) (records + 1 * OPTIX_SBT_RECORD_HEADER_SIZE);
-  instance->optix_bvh.shaders.hitgroupRecordBase = (CUdeviceptr) (records + 2 * OPTIX_SBT_RECORD_HEADER_SIZE);
-
-  instance->optix_bvh.shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
-  instance->optix_bvh.shaders.missRecordCount         = 1;
-
-  instance->optix_bvh.shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
-  instance->optix_bvh.shaders.hitgroupRecordCount         = 1;
-
-  ////////////////////////////////////////////////////////////////////
-  // Params Creation
-  ////////////////////////////////////////////////////////////////////
-
-  device_malloc((void**) &instance->optix_bvh.params, sizeof(DeviceConstantMemory));
-
   device_update_symbol(optix_bvh, instance->optix_bvh.traversable);
 
   instance->optix_bvh.initialized = 1;
@@ -268,7 +269,7 @@ void optixrt_init(RaytraceInstance* instance) {
 
 void optixrt_update_params(RaytraceInstance* instance) {
   // Since this is device -> device, the cost of this is negligble.
-  device_gather_device_table(instance->optix_bvh.params, cudaMemcpyDeviceToDevice);
+  device_gather_device_table(instance->optix_kernel.params, cudaMemcpyDeviceToDevice);
 }
 
 void optixrt_execute(RaytraceInstance* instance) {
@@ -277,6 +278,6 @@ void optixrt_execute(RaytraceInstance* instance) {
 
   optixrt_update_params(instance);
   OPTIX_CHECK(optixLaunch(
-    instance->optix_bvh.pipeline, 0, (CUdeviceptr) instance->optix_bvh.params, sizeof(DeviceConstantMemory), &instance->optix_bvh.shaders,
-    THREADS_PER_BLOCK, BLOCKS_PER_GRID, 1));
+    instance->optix_kernel.pipeline, 0, (CUdeviceptr) instance->optix_kernel.params, sizeof(DeviceConstantMemory),
+    &instance->optix_kernel.shaders, THREADS_PER_BLOCK, BLOCKS_PER_GRID, 1));
 }

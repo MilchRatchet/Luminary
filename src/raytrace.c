@@ -13,6 +13,7 @@
 #include "denoise.h"
 #include "device.h"
 #include "optixrt.h"
+#include "optixrt_particle.h"
 #include "png.h"
 #include "sky_defines.h"
 #include "texture.h"
@@ -310,6 +311,11 @@ void raytrace_execute(RaytraceInstance* instance) {
     sky_hdri_generate_LUT(instance);
   }
 
+  if (!instance->particles_instance.optix.initialized) {
+    device_particle_generate(instance);
+    optixrt_particle_init(instance);
+  }
+
   if (instance->bvh_type == BVH_OPTIX && !instance->optix_bvh.initialized) {
     optixrt_init(instance);
   }
@@ -454,6 +460,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   OPTIX_CHECK(optixInit());
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &instance->optix_ctx));
   OPTIX_CHECK(optixDeviceContextSetLogCallback(instance->optix_ctx, _raytrace_optix_log_callback, (void*) 0, 3));
+
+  optixrt_compile_kernel(instance);
 
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;

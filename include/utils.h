@@ -319,6 +319,12 @@ struct GlobalMaterial {
   int colored_transparency;
 } typedef GlobalMaterial;
 
+struct ParticlesMaterial {
+  RGBAF albedo;
+  float smoothness;
+  float metallic;
+} typedef ParticlesMaterial;
+
 struct Scene {
   Camera camera;
   Triangle* triangles;
@@ -332,6 +338,7 @@ struct Scene {
   Toy toy;
   Fog fog;
   GlobalMaterial material;
+  ParticlesMaterial particles_material;
 } typedef Scene;
 
 struct RayEmitter {
@@ -428,16 +435,33 @@ struct DeviceConstantMemory {
   TraversalTriangle* bvh_triangles;
 } typedef DeviceConstantMemory;
 
+struct OptixKernel {
+  OptixPipeline pipeline;
+  OptixShaderBindingTable shaders;
+  DeviceConstantMemory* params;
+} typedef OptixKernel;
+
 struct OptixBVH {
   int initialized;
   OptixTraversableHandle traversable;
   void* bvh_data;
-  OptixPipeline pipeline;
-  OptixShaderBindingTable shaders;
-  DeviceConstantMemory* params;
   int force_dmm_usage;
   int disable_omm;
 } typedef OptixBVH;
+
+struct ParticlesSettings {
+  uint32_t count;
+} typedef ParticlesSettings;
+
+struct ParticlesInstance {
+  ParticlesSettings settings;
+  OptixBVH optix;
+  uint32_t triangle_count;
+  uint32_t vertex_count;
+  DeviceBuffer* vertex_buffer;
+  uint32_t index_count;
+  DeviceBuffer* index_buffer;
+} typedef ParticlesInstance;
 
 struct DeviceInfo {
   size_t global_mem_size;
@@ -505,9 +529,11 @@ struct RaytraceInstance {
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
   OptixDeviceContext optix_ctx;
+  OptixKernel optix_kernel;
   OptixBVH optix_bvh;
   BVHType bvh_type;
   int luminary_bvh_initialized;
+  ParticlesInstance particles_instance;
   DeviceInfo device_info;
 } typedef RaytraceInstance;
 
