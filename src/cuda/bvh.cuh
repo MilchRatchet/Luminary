@@ -60,7 +60,7 @@ __device__ int bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_
   }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
-  const uint16_t trace_task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const uint16_t trace_task_count = device.trace_count[THREAD_ID];
   uint16_t offset                 = 0;
 
   uint2 traversal_stack[STACK_SIZE];

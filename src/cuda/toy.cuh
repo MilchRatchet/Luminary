@@ -8,8 +8,8 @@
 #include "toy_utils.cuh"
 
 __global__ void toy_generate_g_buffer() {
-  const int task_count  = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 3];
-  const int task_offset = device.ptrs.task_offsets[(threadIdx.x + blockIdx.x * blockDim.x) * 5 + 3];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
 
   for (int i = 0; i < task_count; i++) {
     ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -62,12 +62,10 @@ __global__ void toy_generate_g_buffer() {
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count   = device.ptrs.task_counts[id * 6 + 3];
-  const int task_offset  = device.ptrs.task_offsets[id * 5 + 3];
-  int light_trace_count  = device.ptrs.light_trace_count[id];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[id];
+  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
+  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
+  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
+  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -207,15 +205,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     }
   }
 
-  device.ptrs.light_trace_count[id]  = light_trace_count;
-  device.ptrs.bounce_trace_count[id] = bounce_trace_count;
+  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
+  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count  = device.ptrs.task_counts[id * 6 + 3];
-  const int task_offset = device.ptrs.task_offsets[id * 5 + 3];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
 
   for (int i = 0; i < task_count; i++) {
     const ToyTask task = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));

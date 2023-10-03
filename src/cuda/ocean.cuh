@@ -252,7 +252,7 @@ __device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
 ////////////////////////////////////////////////////////////////////
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset  = get_task_address(i);
@@ -281,12 +281,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count   = device.ptrs.task_counts[id * 6 + 1];
-  const int task_offset  = device.ptrs.task_offsets[id * 5 + 1];
-  int light_trace_count  = device.ptrs.light_trace_count[id];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[id];
+  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
+  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
+  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
+  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -338,15 +336,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     }
   }
 
-  device.ptrs.light_trace_count[id]  = light_trace_count;
-  device.ptrs.bounce_trace_count[id] = bounce_trace_count;
+  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
+  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count  = device.ptrs.task_counts[id * 6 + 1];
-  const int task_offset = device.ptrs.task_offsets[id * 5 + 1];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));

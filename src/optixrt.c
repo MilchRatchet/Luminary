@@ -25,7 +25,7 @@
     }                                                                                                    \
   }
 
-void optixrt_compile_kernel(RaytraceInstance* instance) {
+void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel) {
   bench_tic();
 
   ////////////////////////////////////////////////////////////////////
@@ -36,10 +36,10 @@ void optixrt_compile_kernel(RaytraceInstance* instance) {
   char* ptx;
   uint64_t ptx_info;
 
-  ceb_access("optix_kernels.ptx", (void**) &ptx, &ptx_length, &ptx_info);
+  ceb_access(kernels_name, (void**) &ptx, &ptx_length, &ptx_info);
 
   if (ptx_info || !ptx_length) {
-    crash_message("Failed to load OptiX kernels. Ceb Error Code: %zu", ptx_info);
+    crash_message("Failed to load OptiX kernels %s. Ceb Error Code: %zu", kernels_name, ptx_info);
   }
 
   OptixModuleCompileOptions module_compile_options;
@@ -69,8 +69,7 @@ void optixrt_compile_kernel(RaytraceInstance* instance) {
   OptixModule module;
 
   OPTIX_CHECK_LOGS(
-    optixModuleCreate(instance->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module),
-    log);
+    optixModuleCreate(optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module), log);
 
   ////////////////////////////////////////////////////////////////////
   // Group Creation
@@ -96,8 +95,7 @@ void optixrt_compile_kernel(RaytraceInstance* instance) {
 
   OptixProgramGroup groups[OPTIXRT_NUM_GROUPS];
 
-  OPTIX_CHECK_LOGS(
-    optixProgramGroupCreate(instance->optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, groups), log);
+  OPTIX_CHECK_LOGS(optixProgramGroupCreate(optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, groups), log);
 
   ////////////////////////////////////////////////////////////////////
   // Pipeline Creation
@@ -108,8 +106,7 @@ void optixrt_compile_kernel(RaytraceInstance* instance) {
 
   OPTIX_CHECK_LOGS(
     optixPipelineCreate(
-      instance->optix_ctx, &pipeline_compile_options, &pipeline_link_options, groups, OPTIXRT_NUM_GROUPS, log, &log_size,
-      &instance->optix_kernel.pipeline),
+      optix_ctx, &pipeline_compile_options, &pipeline_link_options, groups, OPTIXRT_NUM_GROUPS, log, &log_size, &kernel->pipeline),
     log);
 
   ////////////////////////////////////////////////////////////////////
@@ -127,21 +124,21 @@ void optixrt_compile_kernel(RaytraceInstance* instance) {
 
   gpuErrchk(cudaMemcpy(records, host_records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE, cudaMemcpyHostToDevice));
 
-  instance->optix_kernel.shaders.raygenRecord       = (CUdeviceptr) (records + 0 * OPTIX_SBT_RECORD_HEADER_SIZE);
-  instance->optix_kernel.shaders.missRecordBase     = (CUdeviceptr) (records + 1 * OPTIX_SBT_RECORD_HEADER_SIZE);
-  instance->optix_kernel.shaders.hitgroupRecordBase = (CUdeviceptr) (records + 2 * OPTIX_SBT_RECORD_HEADER_SIZE);
+  kernel->shaders.raygenRecord       = (CUdeviceptr) (records + 0 * OPTIX_SBT_RECORD_HEADER_SIZE);
+  kernel->shaders.missRecordBase     = (CUdeviceptr) (records + 1 * OPTIX_SBT_RECORD_HEADER_SIZE);
+  kernel->shaders.hitgroupRecordBase = (CUdeviceptr) (records + 2 * OPTIX_SBT_RECORD_HEADER_SIZE);
 
-  instance->optix_kernel.shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
-  instance->optix_kernel.shaders.missRecordCount         = 1;
+  kernel->shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
+  kernel->shaders.missRecordCount         = 1;
 
-  instance->optix_kernel.shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
-  instance->optix_kernel.shaders.hitgroupRecordCount         = 1;
+  kernel->shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
+  kernel->shaders.hitgroupRecordCount         = 1;
 
   ////////////////////////////////////////////////////////////////////
   // Params Creation
   ////////////////////////////////////////////////////////////////////
 
-  device_malloc((void**) &instance->optix_kernel.params, sizeof(DeviceConstantMemory));
+  device_malloc(&(kernel->params), sizeof(DeviceConstantMemory));
 
   bench_toc("BVH Kernel Setup (OptiX)");
 }

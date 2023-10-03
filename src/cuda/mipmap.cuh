@@ -9,7 +9,7 @@
 #include "utils.cuh"
 
 __global__ void mipmap_generate_level_3D_RGBA8(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
 
@@ -40,7 +40,7 @@ __global__ void mipmap_generate_level_3D_RGBA8(cudaTextureObject_t src, cudaSurf
 }
 
 __global__ void mipmap_generate_level_2D_RGBA8(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height;
 
@@ -68,7 +68,7 @@ __global__ void mipmap_generate_level_2D_RGBA8(cudaTextureObject_t src, cudaSurf
 }
 
 __global__ void mipmap_generate_level_3D_RGBA16(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
 
@@ -99,7 +99,7 @@ __global__ void mipmap_generate_level_3D_RGBA16(cudaTextureObject_t src, cudaSur
 }
 
 __global__ void mipmap_generate_level_2D_RGBA16(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height;
 
@@ -127,7 +127,7 @@ __global__ void mipmap_generate_level_2D_RGBA16(cudaTextureObject_t src, cudaSur
 }
 
 __global__ void mipmap_generate_level_3D_RGBAF(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
 
@@ -153,7 +153,7 @@ __global__ void mipmap_generate_level_3D_RGBAF(cudaTextureObject_t src, cudaSurf
 }
 
 __global__ void mipmap_generate_level_2D_RGBAF(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height;
 

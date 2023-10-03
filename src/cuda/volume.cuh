@@ -141,10 +141,8 @@ __device__ float volume_sample_intersection(
 ////////////////////////////////////////////////////////////////////
 
 __global__ void volume_generate_g_buffer() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count  = device.ptrs.task_counts[id * 6 + 4];
-  const int task_offset = device.ptrs.task_offsets[id * 5 + 4];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
 
   for (int i = 0; i < task_count; i++) {
     VolumeTask task = load_volume_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -174,7 +172,7 @@ __global__ void volume_generate_g_buffer() {
 }
 
 __global__ void volume_process_events() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
@@ -217,7 +215,7 @@ __global__ void volume_process_events() {
 }
 
 __global__ void volume_process_events_weight() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
@@ -275,12 +273,10 @@ __global__ void volume_process_events_weight() {
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count   = device.ptrs.task_counts[id * 6 + 4];
-  const int task_offset  = device.ptrs.task_offsets[id * 5 + 4];
-  int light_trace_count  = device.ptrs.light_trace_count[id];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[id];
+  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
+  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     VolumeTask task = load_volume_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -339,8 +335,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
     }
   }
 
-  device.ptrs.light_trace_count[id]  = light_trace_count;
-  device.ptrs.bounce_trace_count[id] = bounce_trace_count;
+  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
+  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
 #endif /* CU_VOLUME_H */

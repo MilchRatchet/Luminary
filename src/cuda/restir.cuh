@@ -254,9 +254,9 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
  * Light samples are only generated for pixels for which the flag G_BUFFER_REQUIRES_SAMPLING is set.
  */
 __global__ void restir_weighted_reservoir_sampling() {
-  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
+  const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT];
 
-  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset     = get_task_address(i);
@@ -274,13 +274,12 @@ __global__ void restir_weighted_reservoir_sampling() {
     }
   }
 
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
+  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 __global__ void restir_candidates_pool_generation() {
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+  int id        = THREAD_ID;
+  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   const int light_sample_bin_count = 1 << device.restir.light_candidate_pool_size_log2;
 
@@ -296,7 +295,7 @@ __global__ void restir_candidates_pool_generation() {
     id += blockDim.x * gridDim.x;
   }
 
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
+  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 #endif /* CU_RESTIR_H */

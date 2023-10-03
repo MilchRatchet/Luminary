@@ -78,11 +78,11 @@ __device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32
 ////////////////////////////////////////////////////////////////////
 
 __device__ uint32_t random_uint32_t(const uint32_t offset) {
-  return random_uint32_t_base(threadIdx.x + blockIdx.x * blockDim.x, offset);
+  return random_uint32_t_base(THREAD_ID, offset);
 }
 
 __device__ uint16_t random_uint16_t(const uint32_t offset) {
-  return random_uint16_t_base(threadIdx.x + blockIdx.x * blockDim.x, offset);
+  return random_uint16_t_base(THREAD_ID, offset);
 }
 
 __device__ float white_noise_precise_offset(const uint32_t offset) {
@@ -99,11 +99,11 @@ __device__ float white_noise_offset_restir(const uint32_t offset) {
 }
 
 __device__ float white_noise_precise() {
-  return white_noise_precise_offset(device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x]++);
+  return white_noise_precise_offset(device.ptrs.randoms[THREAD_ID]++);
 }
 
 __device__ float white_noise() {
-  return white_noise_offset(device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x]++);
+  return white_noise_offset(device.ptrs.randoms[THREAD_ID]++);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -112,7 +112,7 @@ __device__ float white_noise() {
 
 #ifndef RANDOM_NO_KERNELS
 __global__ void initialize_randoms() {
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = 1;
+  device.ptrs.randoms[THREAD_ID] = 1;
 }
 #endif
 

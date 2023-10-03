@@ -12,7 +12,7 @@
 #define BRDF_UNITTEST_ITERATIONS 1000000
 
 __global__ void brdf_unittest_kernel(float* bounce, float* light) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const unsigned int total = BRDF_UNITTEST_TOTAL;
 

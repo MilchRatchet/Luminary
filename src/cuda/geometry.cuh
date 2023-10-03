@@ -54,10 +54,11 @@ __device__ vec3 geometry_compute_normal(
 }
 
 __global__ void geometry_generate_g_buffer() {
-  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(i));
+    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
     vec3 ray;
@@ -173,12 +174,13 @@ __global__ void geometry_generate_g_buffer() {
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks() {
-  const int task_count   = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
-  int light_trace_count  = device.ptrs.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
+  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(i));
+    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
     const GBufferData data = load_g_buffer_data(pixel);
@@ -292,12 +294,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     }
   }
 
-  device.ptrs.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x]  = light_trace_count;
-  device.ptrs.bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x] = bounce_trace_count;
+  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
+  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_tasks() {
-  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
+  const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(i));

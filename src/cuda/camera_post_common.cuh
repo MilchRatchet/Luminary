@@ -65,7 +65,7 @@ __device__ RGBF sample_pixel_border(const RGBF* image, float x, float y, const i
 }
 
 __global__ void image_downsample(const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const float scale_x = 1.0f / (tw - 1);
   const float scale_y = 1.0f / (th - 1);
@@ -106,7 +106,7 @@ __global__ void image_downsample(const RGBF* source, const int sw, const int sh,
 
 __global__ void image_downsample_threshold(
   const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th, const float thresh) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const float scale_x = 1.0f / (tw - 1);
   const float scale_y = 1.0f / (th - 1);
@@ -150,7 +150,7 @@ __global__ void image_downsample_threshold(
 __global__ void image_upsample(
   const RGBF* source, const int sw, const int sh, RGBF* target, const RGBF* base, const int tw, const int th, const float sa,
   const float sb) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const float scale_x = 1.0f / (tw - 1);
   const float scale_y = 1.0f / (th - 1);

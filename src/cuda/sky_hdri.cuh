@@ -26,9 +26,9 @@ __device__ float sky_hdri_tent_filter_importance_sample(const float x) {
 // Sampling Sun => (pos - hdri_pos) and then precompute the sun pos based on hdri values instead.
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lut(float4* dst) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
-  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   const int amount = device.scene.sky.hdri_dim * device.scene.sky.hdri_dim;
 
@@ -114,7 +114,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
     id += blockDim.x * gridDim.x;
   }
 
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
+  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {

@@ -50,7 +50,7 @@ endif()
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
 
-list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu")
+list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu" "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu")
 
 #=============================================================
 # SDL2
@@ -168,7 +168,7 @@ message("")
 
 set(EMBED_FILE_NAME "embed_file")
 include(ceb_embed_files)
-ceb_embed_files(PROJECT Luminary OUTPUT ${EMBED_FILE_NAME} INPUT $<TARGET_OBJECTS:optix_kernels> ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png)
+ceb_embed_files(PROJECT Luminary OUTPUT ${EMBED_FILE_NAME} INPUT $<TARGET_OBJECTS:optix_kernels> $<TARGET_OBJECTS:optix_kernels_particle> ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png)
 
 #=============================================================
 # Executable
@@ -202,6 +202,15 @@ target_include_directories(optix_kernels PRIVATE "${CMAKE_SOURCE_DIR}/include")
 target_include_directories(optix_kernels PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
 target_include_directories(optix_kernels PRIVATE "${OptiX_INCLUDE}")
 target_include_directories(optix_kernels PRIVATE CUDA::toolkit)
+
+add_library(optix_kernels_particle OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu)
+set_target_properties(optix_kernels_particle PROPERTIES CUDA_PTX_COMPILATION ON)
+add_dependencies(Luminary optix_kernels_particle)
+
+target_include_directories(optix_kernels_particle PRIVATE "${CMAKE_SOURCE_DIR}/include")
+target_include_directories(optix_kernels_particle PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
+target_include_directories(optix_kernels_particle PRIVATE "${OptiX_INCLUDE}")
+target_include_directories(optix_kernels_particle PRIVATE CUDA::toolkit)
 
 #=============================================================
 # File copying

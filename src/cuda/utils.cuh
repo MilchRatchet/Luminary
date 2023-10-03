@@ -9,6 +9,8 @@
 
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 1024
+#define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
+#define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
 
 #ifndef eps
 #define eps 0.000001f
@@ -22,12 +24,28 @@ enum HitType : uint32_t {
   HIT_TYPE_VOLUME_OCEAN      = 0xfffffff3u,
   HIT_TYPE_VOLUME_FOG        = 0xfffffff2u,
   HIT_TYPE_REJECT            = 0xfffffff0u,
-  HIT_TYPE_TRIANGLE_ID_LIMIT = 0xefffffffu
+  HIT_TYPE_PARTICLE_MAX      = 0xefffffffu,
+  HIT_TYPE_PARTICLE_MIN      = 0x80000000u,
+  HIT_TYPE_PARTICLE_MASK     = 0x7fffffffu,
+  HIT_TYPE_TRIANGLE_ID_LIMIT = 0x7fffffffu
 } typedef HitType;
 
+enum TaskAddressOffset {
+  TASK_ADDRESS_OFFSET_GEOMETRY   = 0,
+  TASK_ADDRESS_OFFSET_PARTICLE   = 1,
+  TASK_ADDRESS_OFFSET_OCEAN      = 2,
+  TASK_ADDRESS_OFFSET_SKY        = 3,
+  TASK_ADDRESS_OFFSET_TOY        = 4,
+  TASK_ADDRESS_OFFSET_VOLUME     = 5,
+  TASK_ADDRESS_OFFSET_TOTALCOUNT = 6,
+  TASK_ADDRESS_OFFSET_STRIDE     = 6,
+  TASK_ADDRESS_COUNT_STRIDE      = 7
+} typedef TaskAddressOffset;
+
 // VOLUME_FOG_HIT is supposed to always have the volume type bits set to 0.
-#define VOLUME_HIT_CHECK(X) ((X & HIT_TYPE_VOLUME_FOG) == HIT_TYPE_VOLUME_FOG)
+#define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))
 #define VOLUME_HIT_TYPE(X) ((VolumeType) (X & 0x00000001u))
+#define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
 
 //===========================================================================================
 // Device Variables

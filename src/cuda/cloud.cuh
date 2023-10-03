@@ -304,9 +304,9 @@ __device__ float clouds_render(vec3 origin, const vec3 ray, const float limit, R
 ////////////////////////////////////////////////////////////////////
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.trace_count[THREAD_ID];
 
-  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset         = get_task_address(i);
@@ -338,7 +338,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     store_RGBF(device.ptrs.frame_buffer + pixel, color);
   }
 
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
+  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 #endif /* CU_CLOUD_H */

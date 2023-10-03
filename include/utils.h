@@ -51,7 +51,7 @@ enum LightID : uint32_t {
   LIGHT_ID_TOY               = 0xfffffffeu,
   LIGHT_ID_NONE              = 0xfffffff1u,
   LIGHT_ID_ANY               = 0xfffffff0u,
-  LIGHT_ID_TRIANGLE_ID_LIMIT = 0xefffffffu
+  LIGHT_ID_TRIANGLE_ID_LIMIT = 0x7fffffffu
 } typedef LightID;
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
@@ -433,6 +433,7 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh;
   Node8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
+  Quad* particle_quads;
 } typedef DeviceConstantMemory;
 
 struct OptixKernel {
@@ -455,6 +456,7 @@ struct ParticlesSettings {
 
 struct ParticlesInstance {
   ParticlesSettings settings;
+  OptixKernel kernel;
   OptixBVH optix;
   uint32_t triangle_count;
   uint32_t vertex_count;

@@ -137,7 +137,7 @@ __device__ int micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t
 // This kernel computes a level 0 format 4 base micromap array.
 //
 __global__ void omm_level_0_format_4(uint8_t* dst, uint8_t* level_record) {
-  int id                        = threadIdx.x + blockIdx.x * blockDim.x;
+  int id                        = THREAD_ID;
   const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
 
   while (id < triangle_count) {
@@ -157,7 +157,7 @@ __global__ void omm_level_0_format_4(uint8_t* dst, uint8_t* level_record) {
 }
 
 __global__ void omm_refine_format_4(uint8_t* dst, const uint8_t* src, uint8_t* level_record, const uint32_t src_level) {
-  int id                        = threadIdx.x + blockIdx.x * blockDim.x;
+  int id                        = THREAD_ID;
   const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
 
   while (id < triangle_count) {
@@ -208,7 +208,7 @@ __global__ void omm_refine_format_4(uint8_t* dst, const uint8_t* src, uint8_t* l
 
 __global__ void omm_gather_array_format_4(
   uint8_t* dst, const uint8_t* src, const uint32_t level, const uint8_t* level_record, const OptixOpacityMicromapDesc* desc) {
-  int id                        = threadIdx.x + blockIdx.x * blockDim.x;
+  int id                        = THREAD_ID;
   const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
   const uint32_t state_size     = OMM_STATE_SIZE(level, OPTIX_OPACITY_MICROMAP_FORMAT_4_STATE);
 
@@ -501,7 +501,7 @@ __device__ DMMTextureTriangle micromap_get_dmmtexturetriangle(const uint32_t id)
 }
 
 __global__ void dmm_precompute_indices(uint32_t* dst) {
-  int id                        = threadIdx.x + blockIdx.x * blockDim.x;
+  int id                        = THREAD_ID;
   const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
 
   while (id < triangle_count) {
@@ -515,7 +515,7 @@ __global__ void dmm_precompute_indices(uint32_t* dst) {
 }
 
 __global__ void dmm_setup_vertex_directions(half* dst) {
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
+  int id = THREAD_ID;
 
   while (id < device.scene.triangle_data.triangle_count) {
     const float4* ptr = (float4*) (device.scene.triangles + id);
@@ -586,7 +586,7 @@ __device__ void dmm_set_displacement(uint8_t* dst, const uint32_t u_vert_id, con
 }
 
 __global__ void dmm_build_level_3_format_64(uint8_t* dst, const uint32_t* mapping, const uint32_t count) {
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
+  int id = THREAD_ID;
 
   while (id < count) {
     const uint32_t tri_id = mapping[id];

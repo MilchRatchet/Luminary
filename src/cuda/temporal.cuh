@@ -65,7 +65,7 @@ __device__ RGBF sample_pixel_catmull_rom(const RGBF* image, float x, float y, co
 __global__ void temporal_accumulation() {
   const int amount = device.width * device.height;
 
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < amount; offset += blockDim.x * gridDim.x) {
+  for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBF buffer = load_RGBF(device.ptrs.frame_buffer + offset);
     RGBF output;
     RGBF variance;
@@ -128,7 +128,7 @@ __global__ void temporal_accumulation() {
 __global__ void temporal_reprojection() {
   const int amount = device.width * device.height;
 
-  for (int offset = threadIdx.x + blockIdx.x * blockDim.x; offset < amount; offset += blockDim.x * gridDim.x) {
+  for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBF output               = load_RGBF(device.ptrs.frame_buffer + offset);
     const float closest_depth = device.ptrs.trace_result_buffer[offset].depth;
 

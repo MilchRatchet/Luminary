@@ -130,6 +130,13 @@ struct Node8 {
   uint8_t high_z[8];
 } typedef Node8;
 
+struct Quad {
+  vec3 vertex;
+  vec3 edge1;
+  vec3 edge2;
+  vec3 normal;
+} typedef Quad;
+
 /********************************************************
  * Pixelformats
  ********************************************************/
@@ -280,6 +287,13 @@ struct GeometryTask {
   uint32_t hit_id;
   uint32_t padding;
 } typedef GeometryTask;
+
+struct ParticleTask {
+  ushort2 index;
+  vec3 position;
+  vec3 ray;
+  uint32_t hit_id;
+} typedef ParticleTask;
 
 struct SkyTask {
   ushort2 index;
