@@ -9,8 +9,8 @@ extern "C" {
 
 void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel);
 void optixrt_init(RaytraceInstance* instance);
-void optixrt_update_params(RaytraceInstance* instance);
-void optixrt_execute(RaytraceInstance* instance);
+void optixrt_update_params(OptixKernel kernel);
+void optixrt_execute(OptixKernel kernel);
 
 #if __cplusplus
 }

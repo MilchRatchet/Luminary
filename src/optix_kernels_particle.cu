@@ -36,7 +36,9 @@ extern "C" __global__ void __raygen__optix() {
     const TraceTask task = load_trace_task_essentials(device.trace_tasks + offset);
     const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
-    const float3 origin = make_float3(task.origin.x, task.origin.y, task.origin.z);
+    const vec3 reference = sub_vector(task.origin, device.scene.camera.pos);
+
+    const float3 origin = make_float3(reference.x, reference.y, reference.z);
     const float3 ray    = make_float3(task.ray.x, task.ray.y, task.ray.z);
 
     const float tmax = result.x;
@@ -45,80 +47,31 @@ extern "C" __global__ void __raygen__optix() {
     unsigned int hit_id = __float_as_uint(result.y);
     unsigned int cost   = 0;
 
-    optixTrace(device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, 0, 0, 0, depth, hit_id, cost);
+    optixTrace(
+      device.optix_bvh_particles, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, 0, 0, 0, depth, hit_id, cost);
 
-    float2 trace_result;
+    if (__uint_as_float(depth) < tmax) {
+      float2 trace_result = result;
 
-    if (device.shading_mode == SHADING_HEAT) {
-      trace_result = make_float2(cost, __uint_as_float(hit_id));
-    }
-    else {
-      trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
-    }
+      if (device.shading_mode == SHADING_HEAT) {
+        trace_result = make_float2(cost, __uint_as_float(hit_id));
+      }
+      else {
+        // Hit ID contains the triangle ID but we only store the actual particle / quad ID
+        hit_id       = HIT_TYPE_PARTICLE_MIN + (hit_id >> 1);
+        trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
+      }
 
-    __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
-  }
-}
-
-/*
- * Performs alpha test on triangle
- * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
- */
-__device__ int perform_alpha_test() {
-  const unsigned int hit_id = optixGetPrimitiveIndex();
-
-  const uint32_t maps = device.scene.triangles[hit_id].object_maps;
-  const uint16_t tex  = device.scene.texture_assignments[maps].albedo_map;
-
-  if (tex != TEXTURE_NONE) {
-    const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
-
-    const float alpha = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v).w;
-
-    if (alpha <= device.scene.material.alpha_cutoff) {
-      return 2;
-    }
-
-    if (alpha < 1.0f) {
-      return 1;
+      __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
     }
   }
-
-  return 0;
 }
 
 extern "C" __global__ void __anyhit__optix() {
   optixSetPayload_2(optixGetPayload_2() + 1);
-
-  const int alpha_test = perform_alpha_test();
-
-  if (alpha_test == 2) {
-    optixIgnoreIntersection();
-  }
-
-  if (device.iteration_type == TYPE_LIGHT && alpha_test == 0) {
-    if (optixGetPrimitiveIndex() != optixGetPayload_1()) {
-      optixSetPayload_0(__float_as_uint(0.0f));
-      optixSetPayload_1(HIT_TYPE_REJECT);
-
-      optixTerminateRay();
-    }
-    else {
-      optixIgnoreIntersection();
-    }
-  }
 }
 
 extern "C" __global__ void __closesthit__optix() {
-  if (device.iteration_type == TYPE_LIGHT && optixGetPrimitiveIndex() != optixGetPayload_1()) {
-    // If anyhit was never executed, then we must have hit fully opaque geometry.
-    if (!optixGetPayload_2()) {
-      optixSetPayload_0(__float_as_uint(0.0f));
-      optixSetPayload_1(HIT_TYPE_REJECT);
-      return;
-    }
-  }
-
   optixSetPayload_0(__float_as_uint(optixGetRayTmax()));
   optixSetPayload_1(optixGetPrimitiveIndex());
 }

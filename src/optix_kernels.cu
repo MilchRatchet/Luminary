@@ -47,16 +47,18 @@ extern "C" __global__ void __raygen__optix() {
 
     optixTrace(device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, 0, 0, 0, depth, hit_id, cost);
 
-    float2 trace_result;
+    if (__uint_as_float(depth) < tmax) {
+      float2 trace_result;
 
-    if (device.shading_mode == SHADING_HEAT) {
-      trace_result = make_float2(cost, __uint_as_float(hit_id));
-    }
-    else {
-      trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
-    }
+      if (device.shading_mode == SHADING_HEAT) {
+        trace_result = make_float2(cost, __uint_as_float(hit_id));
+      }
+      else {
+        trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
+      }
 
-    __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
+      __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
+    }
   }
 }
 

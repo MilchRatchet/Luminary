@@ -183,6 +183,8 @@ void scene_init(Scene** _scene) {
   scene->fog.height           = 500.0f;
   scene->fog.dist             = 500.0f;
 
+  scene->particles.active = 1;
+
   *_scene = scene;
 }
 

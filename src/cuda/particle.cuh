@@ -5,6 +5,10 @@
 #include "utils.cuh"
 #include "utils.h"
 
+__device__ vec3 particle_transform_relative(vec3 p) {
+  return sub_vector(p, device.scene.camera.pos);
+}
+
 __global__ void particle_generate_g_buffer() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
@@ -13,7 +17,10 @@ __global__ void particle_generate_g_buffer() {
     ParticleTask task = load_particle_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
-    const Quad q = load_quad(device.particle_quads, task.hit_id & HIT_TYPE_PARTICLE_MASK);
+    Quad q   = load_quad(device.particle_quads, task.hit_id & HIT_TYPE_PARTICLE_MASK);
+    q.vertex = particle_transform_relative(q.vertex);
+    q.edge1  = particle_transform_relative(q.edge1);
+    q.edge2  = particle_transform_relative(q.edge2);
 
     const float2 coords = get_coordinates_in_triangle(q.vertex, q.edge1, q.edge2, task.position);
 
@@ -166,9 +173,9 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
   const float scale = 1.0f;
 
   while (id < count) {
-    const float x = white_noise_offset(seed++);
-    const float y = white_noise_offset(seed++);
-    const float z = white_noise_offset(seed++);
+    const float x = (white_noise_offset(seed++) * 20.0f) - 10.0f;
+    const float y = (white_noise_offset(seed++) * 20.0f) - 10.0f;
+    const float z = (white_noise_offset(seed++) * 20.0f) - 10.0f;
 
     const vec3 p = get_vector(x, y, z);
 
@@ -213,8 +220,7 @@ void device_particle_generate(RaytraceInstance* instance) {
 
   const uint32_t count = 4096;
 
-  ParticlesInstance particles;
-  memset(&particles, 0, sizeof(ParticlesInstance));
+  ParticlesInstance particles = instance->particles_instance;
 
   particles.triangle_count = 2 * count;
   particles.vertex_count   = 4 * count;

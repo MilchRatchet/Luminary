@@ -319,11 +319,12 @@ struct GlobalMaterial {
   int colored_transparency;
 } typedef GlobalMaterial;
 
-struct ParticlesMaterial {
+struct Particles {
+  int active;
   RGBAF albedo;
   float smoothness;
   float metallic;
-} typedef ParticlesMaterial;
+} typedef Particles;
 
 struct Scene {
   Camera camera;
@@ -338,7 +339,7 @@ struct Scene {
   Toy toy;
   Fog fog;
   GlobalMaterial material;
-  ParticlesMaterial particles_material;
+  Particles particles;
 } typedef Scene;
 
 struct RayEmitter {
@@ -431,6 +432,7 @@ struct DeviceConstantMemory {
   RayEmitter emitter;
   int accum_mode;
   OptixTraversableHandle optix_bvh;
+  OptixTraversableHandle optix_bvh_particles;
   Node8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
   Quad* particle_quads;

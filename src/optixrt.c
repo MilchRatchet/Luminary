@@ -264,17 +264,13 @@ void optixrt_init(RaytraceInstance* instance) {
   bench_toc("BVH Setup (OptiX)");
 }
 
-void optixrt_update_params(RaytraceInstance* instance) {
+void optixrt_update_params(OptixKernel kernel) {
   // Since this is device -> device, the cost of this is negligble.
-  device_gather_device_table(instance->optix_kernel.params, cudaMemcpyDeviceToDevice);
+  device_gather_device_table(kernel.params, cudaMemcpyDeviceToDevice);
 }
 
-void optixrt_execute(RaytraceInstance* instance) {
-  if (!instance->optix_bvh.initialized)
-    return;
-
-  optixrt_update_params(instance);
+void optixrt_execute(OptixKernel kernel) {
+  optixrt_update_params(kernel);
   OPTIX_CHECK(optixLaunch(
-    instance->optix_kernel.pipeline, 0, (CUdeviceptr) instance->optix_kernel.params, sizeof(DeviceConstantMemory),
-    &instance->optix_kernel.shaders, THREADS_PER_BLOCK, BLOCKS_PER_GRID, 1));
+    kernel.pipeline, 0, (CUdeviceptr) kernel.params, sizeof(DeviceConstantMemory), &kernel.shaders, THREADS_PER_BLOCK, BLOCKS_PER_GRID, 1));
 }
