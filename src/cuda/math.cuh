@@ -1052,7 +1052,7 @@ __device__ float sample_triangle_solid_angle(const TriangleLight triangle, const
   const float num   = fabsf(dot_product(a, cross_product(b, c)));
   const float denom = 1.0f + dot_product(a, b) + dot_product(a, c) + dot_product(b, c);
 
-  return 4.0f * atan2f(num, denom);
+  return 2.0f * atan2f(num, denom);
 }
 
 /*
