@@ -61,11 +61,6 @@ __global__ void geometry_generate_g_buffer() {
     GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
-
     const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
 
     const float4 t1 = __ldg(hit_address);
@@ -97,7 +92,7 @@ __global__ void geometry_generate_g_buffer() {
     const vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
     const vec3 normal = geometry_compute_normal(
-      vertex_normal, edge1_normal, edge2_normal, ray, edge1, edge2, edge1_texture, edge2_texture, maps.w, coords, tex_coords);
+      vertex_normal, edge1_normal, edge2_normal, task.ray, edge1, edge2, edge1_texture, edge2_texture, maps.w, coords, tex_coords);
 
     RGBAF albedo;
 
@@ -152,10 +147,10 @@ __global__ void geometry_generate_g_buffer() {
     }
 
     if (flags & G_BUFFER_TRANSPARENT_PASS) {
-      task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
+      task.position = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
     }
     else {
-      task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
+      task.position = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
     }
 
     GBufferData data;
@@ -164,7 +159,7 @@ __global__ void geometry_generate_g_buffer() {
     data.emission  = emission;
     data.normal    = normal;
     data.position  = task.position;
-    data.V         = scale_vector(ray, -1.0f);
+    data.V         = scale_vector(task.ray, -1.0f);
     data.roughness = roughness;
     data.metallic  = metallic;
     data.flags     = flags;
@@ -184,11 +179,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     const int pixel   = task.index.y * device.width + task.index.x;
 
     const GBufferData data = load_g_buffer_data(pixel);
-
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
     RGBF record = load_RGBF(device.records + pixel);
 
@@ -220,7 +210,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
       TraceTask new_task;
       new_task.origin = data.position;
-      new_task.ray    = ray;
+      new_task.ray    = task.ray;
       new_task.index  = task.index;
 
       switch (device.iteration_type) {
@@ -240,8 +230,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       }
     }
     else if (device.iteration_type != TYPE_LIGHT) {
-      const vec3 V = scale_vector(ray, -1.0f);
-
       if (!material_is_mirror(data.roughness, data.metallic))
         write_albedo_buffer(opaque_color(data.albedo), pixel);
 

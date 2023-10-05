@@ -444,29 +444,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
 
     __stcs(ptr, data0);
 
-    if (hit_id == HIT_TYPE_TOY || hit_id == HIT_TYPE_SKY || PARTICLE_HIT_CHECK(hit_id)) {
-      data1.x = task.ray.x;
-      data1.y = task.ray.y;
-      data1.z = task.ray.z;
-    }
-    else {
-      data1.x = asinf(task.ray.y);
-      data1.y = atan2f(task.ray.z, task.ray.x);
-    }
-
-    if (hit_id == HIT_TYPE_OCEAN || VOLUME_HIT_CHECK(hit_id)) {
-      data1.z = depth;
-    }
-
-    if (VOLUME_HIT_CHECK(hit_id)) {
-      data1.w = __uint_as_float(VOLUME_HIT_TYPE(hit_id));
-    }
-    else if (PARTICLE_HIT_CHECK(hit_id)) {
-      data1.w = __uint_as_float(hit_id);
-    }
-    else if (hit_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-      data1.z = __uint_as_float(hit_id);
-    }
+    data1.x = task.ray.x;
+    data1.y = task.ray.y;
+    data1.z = task.ray.z;
+    data1.w = __uint_as_float(hit_id);
 
     __stcs(ptr + 1, data1);
   }

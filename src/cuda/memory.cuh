@@ -103,9 +103,10 @@ __device__ GeometryTask load_geometry_task(const void* ptr) {
   task.position.y = data0.z;
   task.position.z = data0.w;
 
-  task.ray_y  = data1.x;
-  task.ray_xz = data1.y;
-  task.hit_id = __float_as_uint(data1.z);
+  task.ray.x  = data1.x;
+  task.ray.y  = data1.y;
+  task.ray.z  = data1.z;
+  task.hit_id = __float_as_uint(data1.w);
 
   return task;
 }
@@ -139,9 +140,9 @@ __device__ OceanTask load_ocean_task(const void* ptr) {
   task.position.x = data0.y;
   task.position.y = data0.z;
   task.position.z = data0.w;
-  task.ray_y      = data1.x;
-  task.ray_xz     = data1.y;
-  task.distance   = data1.z;
+  task.ray.x      = data1.x;
+  task.ray.y      = data1.y;
+  task.ray.z      = data1.z;
 
   return task;
 }
@@ -185,15 +186,15 @@ __device__ VolumeTask load_volume_task(const void* ptr) {
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
   VolumeTask task;
-  task.index.x     = __float_as_uint(data0.x) & 0xffff;
-  task.index.y     = (__float_as_uint(data0.x) >> 16);
-  task.position.x  = data0.y;
-  task.position.y  = data0.z;
-  task.position.z  = data0.w;
-  task.ray_y       = data1.x;
-  task.ray_xz      = data1.y;
-  task.distance    = data1.z;
-  task.volume_type = __float_as_uint(data1.w);
+  task.index.x    = __float_as_uint(data0.x) & 0xffff;
+  task.index.y    = (__float_as_uint(data0.x) >> 16);
+  task.position.x = data0.y;
+  task.position.y = data0.z;
+  task.position.z = data0.w;
+  task.ray.x      = data1.x;
+  task.ray.y      = data1.y;
+  task.ray.z      = data1.z;
+  task.hit_id     = __float_as_uint(data1.w);
 
   return task;
 }

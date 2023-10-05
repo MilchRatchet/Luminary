@@ -276,16 +276,14 @@ struct GBufferData {
   uint32_t flags;
 } typedef GBufferData;
 
-// TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: VolumeCount
-
-// ray_xz is horizontal angle
+//
+// Shading task structs. They used to be very different, however, they could all be unified as of October 2023.
+//
 struct GeometryTask {
   ushort2 index;
   vec3 position;
-  float ray_y;
-  float ray_xz;
+  vec3 ray;
   uint32_t hit_id;
-  uint32_t padding;
 } typedef GeometryTask;
 
 struct ParticleTask {
@@ -302,14 +300,11 @@ struct SkyTask {
   uint32_t padding;
 } typedef SkyTask;
 
-// Magnitude of ray gives distance
 struct OceanTask {
   ushort2 index;
   vec3 position;
-  float ray_y;
-  float ray_xz;
-  float distance;
-  uint32_t padding;
+  vec3 ray;
+  float padding;
 } typedef OceanTask;
 
 struct ToyTask {
@@ -322,10 +317,8 @@ struct ToyTask {
 struct VolumeTask {
   ushort2 index;
   vec3 position;
-  float ray_y;
-  float ray_xz;
-  float distance;
-  uint32_t volume_type;
+  vec3 ray;
+  uint32_t hit_id;
 } typedef VolumeTask;
 
 struct TraceTask {

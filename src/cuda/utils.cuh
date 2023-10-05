@@ -42,7 +42,6 @@ enum TaskAddressOffset {
   TASK_ADDRESS_COUNT_STRIDE      = 7
 } typedef TaskAddressOffset;
 
-// VOLUME_FOG_HIT is supposed to always have the volume type bits set to 0.
 #define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))
 #define VOLUME_HIT_TYPE(X) ((VolumeType) (X & 0x00000001u))
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))

@@ -148,21 +148,16 @@ __global__ void volume_generate_g_buffer() {
     VolumeTask task = load_volume_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
-
     uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
     flags |= G_BUFFER_VOLUME_HIT;
 
     GBufferData data;
-    data.hit_id    = task.volume_type;
+    data.hit_id    = task.hit_id;
     data.albedo    = RGBAF_set(0.0f, 0.0f, 0.0f, 0.0f);
     data.emission  = get_color(0.0f, 0.0f, 0.0f);
     data.normal    = get_vector(0.0f, 0.0f, 0.0f);
     data.position  = task.position;
-    data.V         = scale_vector(ray, -1.0f);
+    data.V         = scale_vector(task.ray, -1.0f);
     data.roughness = 1.0f;
     data.metallic  = 0.0f;
     data.flags     = flags;
@@ -282,12 +277,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
     VolumeTask task = load_volume_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    VolumeType volume_type = VOLUME_HIT_TYPE(task.volume_type);
-
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+    VolumeType volume_type = VOLUME_HIT_TYPE(task.hit_id);
 
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
@@ -295,8 +285,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
 
     write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
 
-    const vec3 bounce_ray =
-      (volume.type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_sample(ray, device.scene.fog.droplet_diameter) : ocean_phase_sampling(ray);
+    const vec3 bounce_ray = (volume.type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_sample(task.ray, device.scene.fog.droplet_diameter)
+                                                             : ocean_phase_sampling(task.ray);
 
     TraceTask bounce_task;
     bounce_task.origin = task.position;
@@ -312,7 +302,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-      BRDFInstance brdf = brdf_get_instance_scattering(scale_vector(ray, -1.0f));
+      BRDFInstance brdf = brdf_get_instance_scattering(scale_vector(task.ray, -1.0f));
 
       if (light.weight > 0.0f) {
         BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, volume_type);
