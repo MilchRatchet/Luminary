@@ -109,8 +109,8 @@ __device__ float toy_get_solid_angle(const vec3 position) {
 }
 
 __device__ vec3 toy_plane_sample_ray(const vec3 position, uint32_t& seed) {
-  const float alpha = white_noise_offset_restir(seed++) * 2.0f * PI;
-  const float beta  = sqrtf(white_noise_offset_restir(seed++));
+  const float alpha = white_noise_offset(seed++) * 2.0f * PI;
+  const float beta  = sqrtf(white_noise_offset(seed++));
 
   const vec3 n = rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
 

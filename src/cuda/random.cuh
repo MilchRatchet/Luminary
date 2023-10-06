@@ -23,6 +23,23 @@
 // https://arxiv.org/abs/2004.06278
 
 ////////////////////////////////////////////////////////////////////
+// Unsigned integer to float [0, 1] conversion
+// Based on the uint64 conversion from Sebastiano Vigna and David Blackman (https://prng.di.unimi.it/)
+////////////////////////////////////////////////////////////////////
+
+__device__ float random_uint32_t_to_float(const uint32_t v) {
+  const uint32_t i = 0x3F800000u | (v >> 9);
+
+  return __uint_as_float(i) - 1.0f;
+}
+
+__device__ float random_uint16_t_to_float(const uint16_t v) {
+  const uint32_t i = 0x3F800000u | (((uint32_t) v) << 7);
+
+  return __uint_as_float(i) - 1.0f;
+}
+
+////////////////////////////////////////////////////////////////////
 // Random number generators
 ////////////////////////////////////////////////////////////////////
 
@@ -86,16 +103,11 @@ __device__ uint16_t random_uint16_t(const uint32_t offset) {
 }
 
 __device__ float white_noise_precise_offset(const uint32_t offset) {
-  return ((float) random_uint32_t(offset)) / ((float) UINT32_MAX);
+  return random_uint32_t_to_float(random_uint32_t(offset));
 }
 
 __device__ float white_noise_offset(const uint32_t offset) {
-  return ((float) random_uint16_t(offset)) / ((float) UINT16_MAX);
-}
-
-// ReSTIR and GRIS reuse seeds across threads and hence we use the same key of 0
-__device__ float white_noise_offset_restir(const uint32_t offset) {
-  return ((float) random_uint16_t_base(0, offset)) / ((float) UINT16_MAX);
+  return random_uint16_t_to_float(random_uint16_t(offset));
 }
 
 __device__ float white_noise_precise() {
