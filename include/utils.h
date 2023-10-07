@@ -379,7 +379,7 @@ struct DevicePointers {
   uint32_t* light_sample_history;
   RGBF* frame_buffer;
   RGBF* frame_temporal;
-  RGBF* frame_variance;
+  float* frame_variance;
   RGBF* frame_accumulate;
   RGBF* frame_output;
   RGBF* albedo_buffer;

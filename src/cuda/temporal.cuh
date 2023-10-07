@@ -68,26 +68,27 @@ __global__ void temporal_accumulation() {
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBF buffer = load_RGBF(device.ptrs.frame_buffer + offset);
     RGBF output;
-    RGBF variance;
+    float variance;
 
     if (device.temporal_frames == 0) {
       output   = buffer;
-      variance = get_color(1.0f, 1.0f, 1.0f);
+      variance = 1.0f;
     }
     else {
       output   = load_RGBF(device.ptrs.frame_accumulate + offset);
-      variance = load_RGBF(device.ptrs.frame_variance + offset);
+      variance = __ldcs(device.ptrs.frame_variance + offset);
     }
 
-    RGBF deviation = max_color(variance, get_color(eps, eps, eps));
+    float luminance_buffer = luminance(buffer);
+    float luminance_output = luminance(output);
 
-    deviation.r = sqrtf(deviation.r);
-    deviation.g = sqrtf(deviation.g);
-    deviation.b = sqrtf(deviation.b);
+    const float deviation = fminf(0.1f, sqrtf(fmaxf(variance, eps)));
 
     if (device.temporal_frames) {
-      variance  = scale_color(variance, device.temporal_frames - 1.0f);
-      RGBF diff = sub_color(buffer, output);
+      variance *= device.temporal_frames - 1.0f;
+
+      float diff = luminance_buffer - luminance_output;
+      diff       = diff * diff;
 
       // Hard firefly rejection.
       // Fireflies that appear during the first frame are accepted by our method since there is
@@ -98,24 +99,22 @@ __global__ void temporal_accumulation() {
       // pixel as its own independent entity to preserve fine details.
       // TODO: Improve this method to remove the visible dimming during the second frame.
       if (device.temporal_frames == 1) {
-        RGBF min = min_color(buffer, output);
+        float min_luminance = fminf(luminance_buffer, luminance_output);
 
-        output = min;
-        buffer = min;
+        output = (luminance_output > eps) ? scale_color(output, min_luminance / luminance_output) : get_color(0.0f, 0.0f, 0.0f);
+        buffer = (luminance_buffer > eps) ? scale_color(buffer, min_luminance / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
       }
 
-      diff = mul_color(diff, diff);
-
-      variance = add_color(variance, diff);
-      variance = scale_color(variance, 1.0f / device.temporal_frames);
+      variance += diff;
+      variance *= 1.0f / device.temporal_frames;
     }
 
-    store_RGBF(device.ptrs.frame_variance + offset, variance);
+    __stcs(device.ptrs.frame_variance + offset, variance);
 
-    RGBF firefly_rejection = add_color(get_color(0.1f, 0.1f, 0.1f), add_color(output, scale_color(deviation, 4.0f)));
-    firefly_rejection      = max_color(get_color(0.0f, 0.0f, 0.0f), sub_color(buffer, firefly_rejection));
+    const float firefly_rejection    = 0.1f + luminance_output + deviation * 4.0f;
+    const float new_luminance_buffer = fminf(luminance_buffer, firefly_rejection);
 
-    buffer = sub_color(buffer, firefly_rejection);
+    buffer = (luminance_buffer > eps) ? scale_color(buffer, new_luminance_buffer / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
 
     output = scale_color(output, device.temporal_frames);
     output = add_color(buffer, output);
