@@ -284,20 +284,73 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
   return brdf;
 }
 
-__device__ BRDFInstance brdf_apply_sample_restir(BRDFInstance brdf, LightSample light, vec3 pos, float& solid_angle) {
+/*
+ * Surface sample a triangle and return its area and emission luminance.
+ * @param triangle Triangle.
+ * @param origin Point to sample from.
+ * @param area Solid angle of the triangle.
+ * @param seed Random seed used to sample the triangle.
+ * @param lum Output emission luminance of the triangle at the sampled point.
+ * @result Normalized direction to the point on the triangle.
+ *
+ * Robust triangle sampling.
+ */
+__device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed, float& lum) {
+  float r1 = sqrtf(white_noise_offset(seed++));
+  float r2 = white_noise_offset(seed++);
+
+  // Map random numbers uniformly into [0.025,0.975].
+  r1 = 0.025f + 0.95f * r1;
+  r2 = 0.025f + 0.95f * r2;
+
+  const float u = 1.0f - r1;
+  const float v = r1 * r2;
+
+  const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
+  const vec3 dir = vector_direction_stable(p, origin);
+
+  const float r = get_length(sub_vector(p, origin));
+
+  const vec3 cross         = cross_product(triangle.edge1, triangle.edge2);
+  const float cross_length = get_length(cross);
+
+  // Use that surface * cos_term = 0.5 * |a x b| * |normal(a x b)^Td| = 0.5 * |a x b| * |(a x b)^Td|/|a x b| = 0.5 * |(a x b)^Td|.
+  const float surface_cos_term = 0.5f * fabsf(dot_product(cross, dir));
+
+  area = surface_cos_term / (r * r);
+
+  if (isnan(area) || isinf(area) || area < 1e-7f) {
+    area = 0.0f;
+    lum  = 0.0f;
+    return get_vector(0.0f, 0.0f, 0.0f);
+  }
+
+  const uint16_t illum_tex = device.scene.texture_assignments[triangle.object_maps].illuminance_map;
+
+  const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, make_float2(u, v));
+  const float4 emission = tex2D<float4>(device.ptrs.illuminance_atlas[illum_tex].tex, tex_coords.u, 1.0f - tex_coords.v);
+
+  lum = device.scene.material.default_material.b * luminance(get_color(emission.x, emission.y, emission.z)) * emission.w;
+
+  return dir;
+}
+
+__device__ BRDFInstance brdf_apply_sample_restir(BRDFInstance brdf, LightSample light, vec3 pos, float& solid_angle, float& lum) {
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
       brdf.L       = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
+      lum          = 1.0f;
     } break;
     case LIGHT_ID_TOY:
       brdf.L      = toy_sample_ray(pos, light.seed);
       solid_angle = toy_get_solid_angle(pos);
+      lum         = device.scene.toy.material.b * luminance(device.scene.toy.emission);
       break;
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
-      brdf.L                       = sample_triangle(triangle, pos, solid_angle, light.seed);
+      brdf.L                       = restir_sample_triangle(triangle, pos, solid_angle, light.seed, lum);
     } break;
   }
 
@@ -307,19 +360,19 @@ __device__ BRDFInstance brdf_apply_sample_restir(BRDFInstance brdf, LightSample 
 }
 
 __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos) {
-  float solid_angle;
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
-      brdf.L       = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
+      float solid_angle;
+      brdf.L = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
     } break;
     case LIGHT_ID_TOY:
       brdf.L = toy_sample_ray(pos, light.seed);
       break;
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
-      brdf.L                       = sample_triangle(triangle, pos, solid_angle, light.seed);
+      brdf.L                       = sample_triangle(triangle, pos, light.seed);
     } break;
   }
 

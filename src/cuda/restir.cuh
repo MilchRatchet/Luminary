@@ -73,7 +73,8 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data,
   BRDFInstance result;
 
   float solid_angle;
-  result = brdf_apply_sample_restir(brdf, x, data.position, solid_angle);
+  float lum;
+  result = brdf_apply_sample_restir(brdf, x, data.position, solid_angle, lum);
 
   primitive_pdf = 1.0f / solid_angle;
 
@@ -90,44 +91,7 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data,
     value = 0.0f;
   }
 
-  switch (x.presampled_id) {
-    case LIGHT_ID_SUN:
-      value *= (2e+04f * device.scene.sky.sun_strength);
-      break;
-    case LIGHT_ID_TOY:
-      value *= device.scene.toy.material.b * luminance(device.scene.toy.emission);
-      break;
-    default:
-      const TriangleLight tri_light = load_triangle_light(device.scene.triangle_lights, x.id);
-
-      if (device.scene.texture_assignments[tri_light.object_maps].normal_map == TEXTURE_NONE) {
-        TraversalTriangle tt;
-        tt.vertex = tri_light.vertex;
-        tt.edge1  = tri_light.edge1;
-        tt.edge2  = tri_light.edge2;
-        tt.id     = tri_light.triangle_id;
-
-        float2 coords;
-        const float dist = bvh_triangle_intersection_uv(tt, data.position, result.L, coords);
-
-        if (dist != FLT_MAX) {
-          const uint16_t illum_tex = device.scene.texture_assignments[tri_light.object_maps].illuminance_map;
-
-          const UV tex_coords   = load_triangle_tex_coords(tri_light.triangle_id, coords);
-          const float4 emission = tex2D<float4>(device.ptrs.illuminance_atlas[illum_tex].tex, tex_coords.u, 1.0f - tex_coords.v);
-
-          value *= device.scene.material.default_material.b * luminance(get_color(emission.x, emission.y, emission.z)) * emission.w;
-        }
-        else {
-          value = 0.0f;
-        }
-      }
-      else {
-        value = 0.0f;
-      }
-
-      break;
-  }
+  value *= (x.presampled_id == LIGHT_ID_SUN) ? (2e+04f * device.scene.sky.sun_strength) : lum;
 
   return value;
 }

@@ -1081,12 +1081,12 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
  * Surface sample a triangle.
  * @param triangle Triangle.
  * @param origin Point to sample from.
- * @param area Solid angle of the triangle.
+ * @param seed Random seed used to sample the triangle.
  * @result Normalized direction to the point on the triangle.
  *
  * Robust triangle sampling.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed) {
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, uint32_t& seed) {
   float r1 = sqrtf(white_noise_offset(seed++));
   float r2 = white_noise_offset(seed++);
 
@@ -1094,28 +1094,12 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
   r1 = 0.025f + 0.95f * r1;
   r2 = 0.025f + 0.95f * r2;
 
-  float u = 1.0f - r1;
-  float v = r1 * r2;
+  const float u = 1.0f - r1;
+  const float v = r1 * r2;
 
-  const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
-  const vec3 dir = vector_direction_stable(p, origin);
+  const vec3 p = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
 
-  const float r = get_length(sub_vector(p, origin));
-
-  const vec3 cross         = cross_product(triangle.edge1, triangle.edge2);
-  const float cross_length = get_length(cross);
-
-  // Use that surface * cos_term = 0.5 * |a x b| * |normal(a x b)^Td| = 0.5 * |a x b| * |(a x b)^Td|/|a x b| = 0.5 * |(a x b)^Td|.
-  const float surface_cos_term = 0.5f * fabsf(dot_product(cross, dir));
-
-  area = surface_cos_term / (r * r);
-
-  if (isnan(area) || isinf(area) || area < 1e-7f) {
-    area = 0.0f;
-    return get_vector(0.0f, 0.0f, 0.0f);
-  }
-
-  return dir;
+  return vector_direction_stable(p, origin);
 }
 
 /*
