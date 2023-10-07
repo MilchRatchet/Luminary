@@ -94,7 +94,34 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data)
       value *= device.scene.toy.material.b * luminance(device.scene.toy.emission);
       break;
     default:
-      value *= device.scene.material.default_material.b;
+      const TriangleLight tri_light = load_triangle_light(device.scene.triangle_lights, x.id);
+
+      if (device.scene.texture_assignments[tri_light.object_maps].normal_map == TEXTURE_NONE) {
+        TraversalTriangle tt;
+        tt.vertex = tri_light.vertex;
+        tt.edge1  = tri_light.edge1;
+        tt.edge2  = tri_light.edge2;
+        tt.id     = tri_light.triangle_id;
+
+        float2 coords;
+        const float dist = bvh_triangle_intersection_uv(tt, data.position, result.L, coords);
+
+        if (dist != FLT_MAX) {
+          const uint16_t illum_tex = device.scene.texture_assignments[tri_light.object_maps].illuminance_map;
+
+          const UV tex_coords   = load_triangle_tex_coords(tri_light.triangle_id, coords);
+          const float4 emission = tex2D<float4>(device.ptrs.illuminance_atlas[illum_tex].tex, tex_coords.u, 1.0f - tex_coords.v);
+
+          value *= device.scene.material.default_material.b * luminance(get_color(emission.x, emission.y, emission.z)) * emission.w;
+        }
+        else {
+          value = 0.0f;
+        }
+      }
+      else {
+        value = 0.0f;
+      }
+
       break;
   }
 
@@ -188,10 +215,9 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     LightSample sampled;
     sampled.seed          = random_uint32_t(seed++);
     sampled.presampled_id = random_uint32_t(seed++) & (light_count - 1);
+    sampled.id            = device.ptrs.light_candidates[sampled.presampled_id];
 
-    const uint32_t sampled_light_global_id = device.ptrs.light_candidates[sampled.presampled_id];
-
-    if (sampled_light_global_id == blocked_light_id)
+    if (sampled.id == blocked_light_id)
       continue;
 
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
@@ -201,7 +227,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
 
     selected.weight += weight;
     if (white_noise_offset(seed++) * selected.weight < weight) {
-      selected.id            = sampled_light_global_id;
+      selected.id            = sampled.id;
       selected.presampled_id = sampled.presampled_id;
       selected.seed          = sampled.seed;
       selection_pdf          = sampled_pdf;

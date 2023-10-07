@@ -98,7 +98,7 @@ struct TriangleLight {
   vec3 edge1;
   vec3 edge2;
   uint32_t triangle_id;
-  float padding1;
+  uint32_t object_maps;
   float padding2;
 } typedef TriangleLight;
 

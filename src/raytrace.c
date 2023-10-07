@@ -479,7 +479,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->accum_mode   = TEMPORAL_ACCUMULATION;
   instance->bvh_type     = BVH_OPTIX;
 
-  instance->restir.initial_reservoir_size         = 32;
+  instance->restir.initial_reservoir_size         = 16;
   instance->restir.light_candidate_pool_size_log2 = 14;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
