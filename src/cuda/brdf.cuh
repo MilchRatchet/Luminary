@@ -284,8 +284,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
   return brdf;
 }
 
-__device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos) {
-  float solid_angle;
+__device__ BRDFInstance brdf_apply_sample_restir(BRDFInstance brdf, LightSample light, vec3 pos, float& solid_angle) {
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
@@ -302,7 +301,29 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
     } break;
   }
 
-  brdf.term = scale_color(brdf.term, light.weight * solid_angle);
+  brdf.term = scale_color(brdf.term, light.weight);
+
+  return brdf;
+}
+
+__device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos) {
+  float solid_angle;
+  switch (light.presampled_id) {
+    case LIGHT_ID_NONE:
+    case LIGHT_ID_SUN: {
+      vec3 sky_pos = world_to_sky_transform(pos);
+      brdf.L       = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
+    } break;
+    case LIGHT_ID_TOY:
+      brdf.L = toy_sample_ray(pos, light.seed);
+      break;
+    default: {
+      const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
+      brdf.L                       = sample_triangle(triangle, pos, solid_angle, light.seed);
+    } break;
+  }
+
+  brdf.term = scale_color(brdf.term, light.weight);
 
   return brdf;
 }

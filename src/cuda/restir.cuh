@@ -60,8 +60,9 @@ __device__ LightSample restir_sample_empty() {
  * @param data Data to compute the target pdf from.
  * @result Target PDF of light sample.
  */
-__device__ float restir_sample_target_pdf(LightSample x, const GBufferData data) {
+__device__ float restir_sample_target_pdf(LightSample x, const GBufferData data, float& primitive_pdf) {
   if (x.presampled_id == LIGHT_ID_NONE) {
+    primitive_pdf = 1.0f;
     return 0.0f;
   }
 
@@ -71,7 +72,10 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data)
   BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
   BRDFInstance result;
 
-  result = brdf_apply_sample(brdf, x, data.position);
+  float solid_angle;
+  result = brdf_apply_sample_restir(brdf, x, data.position, solid_angle);
+
+  primitive_pdf = 1.0f / solid_angle;
 
   if (data.flags & G_BUFFER_VOLUME_HIT) {
     result = brdf_apply_sample_weight_scattering(result, VOLUME_HIT_TYPE(data.hit_id));
@@ -128,18 +132,6 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data)
   return value;
 }
 
-/*
- * There are three different MIS weights implemented:
- * Uniform, balance heuristic (power = 1) and power heuristic (power = 2).
- * In general, power heuristic is known to perform the best and uniform the worst.
- * However, since the multiple sampling functions domains form a partition of the total sampling
- * domain, and each sampling function is uniform over its domain, the uniform MIS weights perform the best.
- * The balance heuristic produces identical results but it is also slightly more expensive computationally.
- * However, I want to keep the code simple, the balance heuristic enforces a system of pdf tracking that
- * will make it easier for me if I ever decide to implement other sampling strategies.
- */
-#define RESTIR_MIS_WEIGHT_METHOD 1
-
 /**
  * Samples a light sample using WRS and MIS.
  * @param data Data used for evaluating a lights importance.
@@ -154,8 +146,6 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
 
-  // Sampling pdf used when the selected light was selected, this is used for the MIS balance heuristic
-  float selection_pdf        = 1.0f;
   float selection_target_pdf = 1.0f;
 
   // Importance sample the sun
@@ -164,8 +154,9 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     sampled.seed          = random_uint32_t(seed++);
     sampled.presampled_id = LIGHT_ID_SUN;
 
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
-    const float sampled_pdf        = 1.0f;
+    float primitive_pdf;
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, primitive_pdf);
+    const float sampled_pdf        = primitive_pdf;
 
     const float weight = sampled_target_pdf / sampled_pdf;
 
@@ -174,7 +165,6 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
       selected.id            = LIGHT_ID_SUN;
       selected.presampled_id = LIGHT_ID_SUN;
       selected.seed          = sampled.seed;
-      selection_pdf          = sampled_pdf;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
@@ -185,8 +175,9 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     sampled.seed          = random_uint32_t(seed++);
     sampled.presampled_id = LIGHT_ID_TOY;
 
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
-    const float sampled_pdf        = 1.0f;
+    float primitive_pdf;
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, primitive_pdf);
+    const float sampled_pdf        = primitive_pdf;
 
     const float weight = sampled_target_pdf / sampled_pdf;
 
@@ -195,7 +186,6 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
       selected.id            = LIGHT_ID_TOY;
       selected.presampled_id = LIGHT_ID_TOY;
       selected.seed          = sampled.seed;
-      selection_pdf          = sampled_pdf;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
@@ -220,8 +210,9 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     if (sampled.id == blocked_light_id)
       continue;
 
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
-    const float sampled_pdf        = reservoir_sampling_pdf;
+    float primitive_pdf;
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, primitive_pdf);
+    const float sampled_pdf        = reservoir_sampling_pdf * primitive_pdf;
 
     const float weight = sampled_target_pdf / sampled_pdf;
 
@@ -230,7 +221,6 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
       selected.id            = sampled.id;
       selected.presampled_id = sampled.presampled_id;
       selected.seed          = sampled.seed;
-      selection_pdf          = sampled_pdf;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
@@ -240,33 +230,8 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     selected.weight = 0.0f;
   }
   else {
-#if RESTIR_MIS_WEIGHT_METHOD == 0
-    // Compute the sum of the sampling PDFs of the selected light for MIS uniform
-    float sum_pdf = 0.0f;
-    sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
-    sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf += (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? reservoir_size : 0.0f;
-
-    const float mis_weight = 1.0f / sum_pdf;
-#elif RESTIR_MIS_WEIGHT_METHOD == 1
-    // Compute the sum of the sampling PDFs of the selected light for MIS balance heuristic
-    float sum_pdf = 0.0f;
-    sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
-    sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf += (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? reservoir_size * reservoir_sampling_pdf : 0.0f;
-
-    const float mis_weight = selection_pdf / sum_pdf;
-#else
-    // Compute the sum of the sampling PDFs of the selected light for MIS power heuristic
-    float sum_pdf = 0.0f;
-    sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
-    sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf += (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT)
-                 ? reservoir_size * reservoir_sampling_pdf * reservoir_size * reservoir_sampling_pdf
-                 : 0.0f;
-
-    const float mis_weight = (selection_pdf * selection_pdf) / sum_pdf;
-#endif
+    // We use uniform MIS weights because the images of our distributions are a partition of the set of all lights.
+    const float mis_weight = (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? 1.0f / reservoir_size : 1.0f;
 
     selected.weight = mis_weight * selected.weight / selection_target_pdf;
   }

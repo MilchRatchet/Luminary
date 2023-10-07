@@ -1133,6 +1133,7 @@ __device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, fl
   const float d = get_length(dir);
 
   if (d < r) {
+    area = 4.0f * PI;
     return normalize_vector(sample_ray_sphere(2.0f * r1 - 1.0f, r2));
   }
 
