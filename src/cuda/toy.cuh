@@ -168,7 +168,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
         if (light.weight > 0.0f) {
-          BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, data.position);
+          const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position));
 
           const RGBF light_record = mul_color(record, brdf_sample.term);
 

@@ -71,11 +71,13 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data)
   BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
   BRDFInstance result;
 
+  result = brdf_apply_sample(brdf, x, data.position);
+
   if (data.flags & G_BUFFER_VOLUME_HIT) {
-    result = brdf_apply_sample_scattering(brdf, x, data.position, VOLUME_HIT_TYPE(data.hit_id));
+    result = brdf_apply_sample_weight_scattering(result, VOLUME_HIT_TYPE(data.hit_id));
   }
   else {
-    result = brdf_apply_sample(brdf, x, data.position);
+    result = brdf_apply_sample_weight(result);
   }
 
   float value = luminance(result.term);
