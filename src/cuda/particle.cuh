@@ -216,7 +216,7 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
 }
 
 void device_particle_generate(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic((const char*) "Particles Generation");
 
   const uint32_t count = 4096;
 
@@ -243,5 +243,5 @@ void device_particle_generate(RaytraceInstance* instance) {
 
   instance->particles_instance = particles;
 
-  bench_toc((char*) "Particles Generation");
+  bench_toc();
 }

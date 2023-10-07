@@ -360,7 +360,7 @@ __global__ void generate_weather_map(const int dim, const float seed, uint8_t* t
 #define CLOUD_WEATHER_RES 1024
 
 extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic((const char*) "Cloud Noise Generation");
 
   if (instance->scene.sky.cloud.initialized) {
     texture_free_atlas(instance->cloud_noise, 3);
@@ -396,7 +396,7 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
 
   instance->scene.sky.cloud.initialized = 1;
 
-  bench_toc((char*) "Cloud Noise Generation");
+  bench_toc();
 }
 
 #endif /* CU_CLOUD_NOISE_H */

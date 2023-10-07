@@ -223,7 +223,7 @@ static TraversalTriangle* construct_traversal_triangles(
 }
 
 RaytraceInstance* load_baked(const char* filename) {
-  bench_tic();
+  bench_tic("Loading Luminary Baked File");
   FILE* file = fopen(filename, "rb");
 
   assert(file != 0, "Baked file could not be loaded!", 1);
@@ -286,12 +286,12 @@ RaytraceInstance* load_baked(const char* filename) {
 
   // scene->traversal_triangles = construct_traversal_triangles(scene->triangles, scene->triangles_length, scene->texture_assignments);
 
+  scene->sky.stars = (Star*) 0;
+
   RaytraceInstance* final;
   raytrace_init(&final, instance->settings, tex_atlas, scene);
 
-  final->scene.sky.stars             = (Star*) 0;
   final->scene.sky.cloud.initialized = 0;
-  generate_stars(final);
 
   uint64_t strings_count = head[12];
   char** strings         = load_strings(file, strings_count, head[13]);
@@ -306,7 +306,7 @@ RaytraceInstance* load_baked(const char* filename) {
   free(head);
   fclose(file);
 
-  bench_toc("Loading Luminary Baked File");
+  bench_toc();
 
   return final;
 }
@@ -373,7 +373,7 @@ static uint64_t serialize_strings(RaytraceInstance* instance, void** ptr) {
 }
 
 void serialize_baked(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic("Baked Luminary File");
   FILE* file = fopen("generated.baked", "wb");
 
   if (!file) {
@@ -410,5 +410,5 @@ void serialize_baked(RaytraceInstance* instance) {
   free(head);
   fclose(file);
 
-  bench_toc("Baked Luminary File");
+  bench_toc();
 }

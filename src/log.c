@@ -23,6 +23,8 @@ size_t log_buffer_offset;
 char* print_buffer;
 int print_buffer_size;
 
+int volatile_line = 0;
+
 int write_logs;
 
 #ifdef _WIN32
@@ -152,8 +154,34 @@ void print_info(const char* format, ...) {
   va_end(args);
   write_to_log_buffer(size);
 
+  if (volatile_line)
+    printf("\33[2K\r");
+
   printf("\x1B[1m%s\033[0m\n", print_buffer);
   fflush(stdout);
+
+  volatile_line = 0;
+}
+
+/*
+ * Writes a message without a newline. This message will be overwritten by any following message.
+ * @param format Message which may contain format specifiers.
+ * @param ... Additional arguments to replace the format speciefiers.
+ */
+void print_info_inline(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  int size = format_string(format, args);
+  va_end(args);
+  write_to_log_buffer(size);
+
+  if (volatile_line)
+    printf("\33[2K\r");
+
+  printf("\x1B[1m%s\033[0m", print_buffer);
+  fflush(stdout);
+
+  volatile_line = 1;
 }
 
 /*
@@ -168,8 +196,13 @@ void print_warn(const char* format, ...) {
   va_end(args);
   write_to_log_buffer(size);
 
+  if (volatile_line)
+    puts("");
+
   printf("\x1B[93m\x1B[1m%s\033[0m\n", print_buffer);
   fflush(stdout);
+
+  volatile_line = 0;
 }
 
 /*
@@ -184,8 +217,13 @@ void print_error(const char* format, ...) {
   va_end(args);
   write_to_log_buffer(size);
 
+  if (volatile_line)
+    puts("");
+
   printf("\x1B[91m\x1B[1m%s\033[0m\n", print_buffer);
   fflush(stdout);
+
+  volatile_line = 0;
 }
 
 /*
@@ -200,8 +238,13 @@ void print_crash(const char* format, ...) {
   va_end(args);
   write_to_log_buffer(size);
 
+  if (volatile_line)
+    puts("");
+
   printf("\x1B[95m\x1B[1m%s\033[0m\n", print_buffer);
   fflush(stdout);
+
+  volatile_line = 0;
 
   exit_program();
 }

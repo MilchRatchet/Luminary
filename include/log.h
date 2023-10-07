@@ -14,6 +14,7 @@ extern "C" {
 void init_log(int wl);
 void print_log(const char* format, ...);
 void print_info(const char* format, ...);
+void print_info_inline(const char* format, ...);
 void print_warn(const char* format, ...);
 void print_error(const char* format, ...);
 void print_crash(const char* format, ...);

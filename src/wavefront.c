@@ -449,8 +449,9 @@ static int read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangl
 }
 
 int wavefront_read_file(WavefrontContent* _content, const char* filename) {
+  bench_tic("Reading *.obj File");
   log_message("Reading *.obj file (%s)", filename);
-  bench_tic();
+
   FILE* file = fopen(filename, "r");
 
   if (!file) {
@@ -598,7 +599,7 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
   free(path);
   free(read_buffer);
 
-  bench_toc("Reading *.obj File");
+  bench_toc();
 
   log_message("Mesh: Verts: %d Tris: %d", vertices_count, triangles_count);
 
@@ -622,7 +623,7 @@ TextureAssignment* wavefront_generate_texture_assignments(WavefrontContent* cont
 }
 
 unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data) {
-  bench_tic();
+  bench_tic("Converting Mesh");
 
   static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
@@ -838,7 +839,7 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
   data->index_count    = 3 * index_triplet_count;
   data->triangle_count = index_triplet_count;
 
-  bench_toc("Converting Mesh");
+  bench_toc();
 
   return ptr;
 }

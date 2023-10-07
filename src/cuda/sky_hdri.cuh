@@ -118,7 +118,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
 }
 
 extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic((const char*) "Sky HDRI Computation");
 
   if (instance->scene.sky.hdri_initialized) {
     texture_free_atlas(instance->sky_hdri_luts, 1);
@@ -127,6 +127,12 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   instance->scene.sky.hdri_dim = instance->scene.sky.settings_hdri_dim;
 
   const int dim = instance->scene.sky.hdri_dim;
+
+  if (dim == 0) {
+    error_message("Failed to allocated HDRI because resolution was 0. Turned off HDRI.");
+    instance->scene.sky.hdri_active = 0;
+    return;
+  }
 
   instance->scene.sky.hdri_initialized = 1;
 
@@ -153,7 +159,7 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
 
   raytrace_update_device_pointers(instance);
 
-  bench_toc((char*) "Sky HDRI Computation");
+  bench_toc();
 }
 
 extern "C" void sky_hdri_set_pos_to_cam(RaytraceInstance* instance) {

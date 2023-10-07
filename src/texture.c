@@ -127,6 +127,8 @@ static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
   const unsigned int pitch  = tex->pitch;
   void* data                = tex->data;
 
+  log_message("Allocating device texture of dimension %ux%ux%u.", width, height, depth);
+
   switch (tex->dim) {
     case Tex2D: {
       switch (tex->mipmap) {

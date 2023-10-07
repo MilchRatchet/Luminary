@@ -99,31 +99,29 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 }
 
 void offline_output(RaytraceInstance* instance) {
-  bench_tic();
-  clock_t start_of_rt = clock();
   raytrace_prepare(instance);
+  const clock_t start_of_rt       = clock();
+  clock_t last_frame              = start_of_rt;
+  double moving_average_frametime = 0.0;
+  bench_tic("Raytracing");
   for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; instance->temporal_frames++) {
-    // We reset the clock to account for setup cost during the first frame.
-    if (instance->temporal_frames == 1) {
-      bench_tic();
-      start_of_rt = clock();
-    }
-
     raytrace_execute(instance);
     raytrace_update_ray_emitter(instance);
-    const double progress     = ((double) (instance->temporal_frames + 1)) / instance->offline_samples;
-    const double time_elapsed = ((double) (clock() - start_of_rt)) / CLOCKS_PER_SEC;
-    const double time_left    = (time_elapsed / progress) - time_elapsed;
-    printf(
-      "\r                                                                                                          \rProgress: "
-      "%2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Performance: %.1f Mrays/s",
-      100.0 * progress, time_elapsed, time_left,
-      0.000001 * 2.0 * (1 + instance->max_ray_depth) * instance->width * instance->height * instance->temporal_frames / time_elapsed);
+
+    const clock_t current_frame = clock();
+    const double progress       = ((double) (instance->temporal_frames + 1)) / instance->offline_samples;
+    const double time_elapsed   = ((double) (current_frame - start_of_rt)) / CLOCKS_PER_SEC;
+    const double frametime      = ((double) (current_frame - last_frame)) / CLOCKS_PER_SEC;
+    moving_average_frametime    = (instance->temporal_frames == 0) ? frametime : 0.9 * moving_average_frametime + 0.1 * frametime;
+    const double time_left      = (instance->offline_samples - (instance->temporal_frames + 1)) * moving_average_frametime;
+
+    print_info_inline(
+      "Progress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Frametime: %.1f ms", 100.0 * progress, time_elapsed, time_left,
+      1000.0f * moving_average_frametime);
+    last_frame = current_frame;
   }
 
-  printf("\r                                                                                                              \r");
-
-  bench_toc("Raytracing");
+  bench_toc();
 
   raytrace_free_work_buffers(instance);
 
@@ -299,8 +297,8 @@ void realtime_output(RaytraceInstance* instance) {
     if (instance->accum_mode == TEMPORAL_REPROJECTION)
       instance->temporal_frames = temporal_frames_buffer;
 
-    start_frametime(&frametime_trace);
     raytrace_prepare(instance);
+    start_frametime(&frametime_trace);
     raytrace_execute(instance);
     sample_frametime(&frametime_trace);
 

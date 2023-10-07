@@ -264,8 +264,6 @@ RaytraceInstance* scene_load_lum(const char* filename) {
   wavefront_clear(&content);
   scene_clear(&scene);
 
-  generate_stars(instance);
-
   return instance;
 }
 
@@ -310,8 +308,6 @@ RaytraceInstance* scene_load_obj(char* filename) {
 
   wavefront_clear(&content);
   scene_clear(&scene);
-
-  generate_stars(instance);
 
   return instance;
 }

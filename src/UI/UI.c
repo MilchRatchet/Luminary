@@ -265,7 +265,7 @@ static UITab create_sky_general_celestial_panels(UI* ui, RaytraceInstance* insta
   panels[i++] = create_slider(ui, "Stars Count", &(instance->scene.sky.settings_stars_count), 0, 1.0f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Stars Seed", &(instance->scene.sky.stars_seed), 0, 1.0f, 0.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Stars Intensity", &(instance->scene.sky.stars_intensity), 1, 0.0001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_button(ui, "Generate Stars", instance, (void (*)(void*)) generate_stars, 1);
+  panels[i++] = create_button(ui, "Generate Stars", instance, (void (*)(void*)) stars_generate, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

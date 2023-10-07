@@ -828,7 +828,7 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "SKY HDRIACTI %d\n", instance->scene.sky.hdri_active);
   fputs(line, file);
-  sprintf(line, "SKY HDRIDIM_ %d\n", instance->scene.sky.hdri_dim);
+  sprintf(line, "SKY HDRIDIM_ %d\n", instance->scene.sky.settings_hdri_dim);
   fputs(line, file);
   sprintf(line, "SKY HDRISAMP %d\n", instance->scene.sky.hdri_samples);
   fputs(line, file);

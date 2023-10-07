@@ -212,8 +212,6 @@ int main(int argc, char* argv[]) {
   instance->image_format      = img_format;
   instance->post_process_menu = post_process_menu;
 
-  info_message("Instance set up.");
-
   if (offline) {
     offline_output(instance);
   }

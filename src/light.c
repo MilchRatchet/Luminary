@@ -131,7 +131,7 @@ static int contains_illumination(Triangle triangle, TextureRGBA tex) {
 }
 
 void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
-  bench_tic();
+  bench_tic("Processing Lights");
 
   Scene data = *scene;
 
@@ -162,5 +162,5 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
 
   *scene = data;
 
-  bench_toc("Processing Lights");
+  bench_toc();
 }

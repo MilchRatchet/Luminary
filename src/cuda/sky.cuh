@@ -577,7 +577,7 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
 }
 
 extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic((const char*) "Sky LUT Computation");
 
   if (instance->scene.sky.lut_initialized) {
     texture_free_atlas(instance->sky_tm_luts, 2);
@@ -648,7 +648,7 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
 
   instance->scene.sky.lut_initialized = 1;
 
-  bench_toc((char*) "Sky LUT Computation");
+  bench_toc();
 }
 
 ////////////////////////////////////////////////////////////////////

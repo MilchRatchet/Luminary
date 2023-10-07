@@ -16,6 +16,7 @@
 #include "optixrt_particle.h"
 #include "png.h"
 #include "sky_defines.h"
+#include "stars.h"
 #include "texture.h"
 #include "utils.h"
 
@@ -304,9 +305,7 @@ static void update_special_lights(const Scene scene) {
 // Raytrace main functions
 ////////////////////////////////////////////////////////////////////
 
-void raytrace_execute(RaytraceInstance* instance) {
-  device_update_symbol(temporal_frames, instance->temporal_frames);
-
+void raytrace_build_structures(RaytraceInstance* instance) {
   if (instance->scene.sky.hdri_active && !instance->scene.sky.hdri_initialized) {
     sky_hdri_generate_LUT(instance);
   }
@@ -323,6 +322,10 @@ void raytrace_execute(RaytraceInstance* instance) {
   if (instance->bvh_type == BVH_LUMINARY && !instance->luminary_bvh_initialized) {
     bvh_init(instance);
   }
+}
+
+void raytrace_execute(RaytraceInstance* instance) {
+  device_update_symbol(temporal_frames, instance->temporal_frames);
 
   device_generate_tasks();
 
@@ -555,6 +558,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
+  stars_generate(instance);
 
   raytrace_allocate_buffers(instance);
   device_camera_post_init(instance);
@@ -623,6 +627,7 @@ void raytrace_prepare(RaytraceInstance* instance) {
   raytrace_update_ray_emitter(instance);
   device_update_symbol(accum_mode, instance->accum_mode);
   device_update_symbol(restir, instance->restir);
+  raytrace_build_structures(instance);
 }
 
 /*

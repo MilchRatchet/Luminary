@@ -15,7 +15,7 @@
   }
 
 void optixrt_particle_init(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic("Particles BVH Setup (OptiX)");
 
   OptixAccelBuildOptions build_options;
   memset(&build_options, 0, sizeof(OptixAccelBuildOptions));
@@ -95,5 +95,5 @@ void optixrt_particle_init(RaytraceInstance* instance) {
   instance->particles_instance.optix.traversable = traversable;
   instance->particles_instance.optix.initialized = 1;
 
-  bench_toc("Particle BVH Setup (OptiX)");
+  bench_toc();
 }

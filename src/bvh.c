@@ -1379,7 +1379,7 @@ static void _bvh_clear_work(BVHWork* work) {
 }
 
 void bvh_init(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic("BVH Setup (Luminary)");
 
   BVHWork work;
   memset(&work, 0, sizeof(BVHWork));
@@ -1391,5 +1391,5 @@ void bvh_init(RaytraceInstance* instance) {
   _bvh_finalize(instance, &work);
   _bvh_clear_work(&work);
 
-  bench_toc("BVH Setup (Luminary)");
+  bench_toc();
 }

@@ -1,5 +1,6 @@
 #include "bench.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -18,12 +19,13 @@
 
 static int bench_active = 0;
 static uint64_t t       = 0;
+static const char* str  = (const char*) 0;
 
-void bench_activate() {
+void bench_activate(void) {
   bench_active = 1;
 }
 
-static uint64_t get_time() {
+static uint64_t _bench_get_time(void) {
 #ifdef _WIN32
   LARGE_INTEGER ticks;
   if (!QueryPerformanceCounter(&ticks))
@@ -34,7 +36,7 @@ static uint64_t get_time() {
 #endif
 }
 
-static double get_diff(const uint64_t t0, const uint64_t t1) {
+static double _bench_get_time_diff(const uint64_t t0, const uint64_t t1) {
 #ifdef _WIN32
   LARGE_INTEGER freq;
   if (!QueryPerformanceFrequency(&freq))
@@ -48,16 +50,30 @@ static double get_diff(const uint64_t t0, const uint64_t t1) {
 #endif
 }
 
-void bench_tic() {
+void bench_tic(const char* text) {
   if (!bench_active)
     return;
 
-  t = get_time();
+  if (!text) {
+    error_message("Text was NULL.");
+    return;
+  }
+
+  t   = _bench_get_time();
+  str = text;
+
+  print_info_inline("%-32s [......]", str);
 }
 
-void bench_toc(char* text) {
+void bench_toc(void) {
   if (!bench_active)
     return;
 
-  print_info("%-32s [%.3fs]", text, get_diff(t, get_time()));
+  if (!str) {
+    error_message("Str was NULL.");
+    return;
+  }
+
+  print_info("%-32s [%.3fs]", str, _bench_get_time_diff(t, _bench_get_time()));
+  str = (const char*) 0;
 }

@@ -26,7 +26,7 @@
   }
 
 void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel) {
-  bench_tic();
+  bench_tic("Kernel Setup (OptiX)");
 
   ////////////////////////////////////////////////////////////////////
   // Module Compilation
@@ -140,11 +140,11 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
 
   device_malloc(&(kernel->params), sizeof(DeviceConstantMemory));
 
-  bench_toc("BVH Kernel Setup (OptiX)");
+  bench_toc();
 }
 
 void optixrt_init(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic("BVH Setup (OptiX)");
 
   ////////////////////////////////////////////////////////////////////
   // Displacement Micromaps Building
@@ -261,7 +261,7 @@ void optixrt_init(RaytraceInstance* instance) {
 
   instance->optix_bvh.initialized = 1;
 
-  bench_toc("BVH Setup (OptiX)");
+  bench_toc();
 }
 
 void optixrt_update_params(OptixKernel kernel) {
