@@ -19,7 +19,7 @@
 #define UI_HEIGHT_BUFFER (UI_HEIGHT + PANEL_HEIGHT)
 #define UI_BORDER_SIZE 20
 
-#define UI_PANELS_TAB_COUNT 5
+#define UI_PANELS_TAB_COUNT 4
 
 #if !defined(__AVX2__)
 #warning Using non AVX2 version of Luminary UI.

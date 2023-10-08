@@ -46,7 +46,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "Renderer\nMaterials\nExport");
   panels[i++] = create_slider(ui, "Width", &(instance->settings.width), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Height", &(instance->settings.height), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
@@ -83,7 +83,7 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "Renderer\nMaterials\nExport");
   panels[i++] = create_check(ui, "Lights", &(instance->scene.material.lights_active), 1);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene.material.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
@@ -111,7 +111,7 @@ static UITab create_general_export_panels(UI* ui, RaytraceInstance* instance) {
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "Renderer\nMaterials\nExport");
   panels[i++] = create_dropdown(ui, "Snapshot Resolution", &(instance->snap_resolution), 0, 2, "Window\0Render", 2);
   panels[i++] = create_dropdown(ui, "Output Image Format", &(instance->image_format), 0, 2, "PNG\0QOI", 3);
@@ -153,7 +153,7 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "Properties\nPost Processing");
   panels[i++] = create_slider(ui, "Position X", &(instance->scene.camera.pos.x), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Position Y", &(instance->scene.camera.pos.y), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
@@ -189,7 +189,7 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "Properties\nPost Processing");
   panels[i++] = create_dropdown(
     ui, "Tone Mapping", &(instance->scene.camera.tonemap), 0, 7, "None\0ACES\0Reinhard\0Uncharted 2\0AgX\0AgX Punchy\0AgX Custom", 2);
@@ -250,7 +250,7 @@ static UITab create_sky_general_celestial_panels(UI* ui, RaytraceInstance* insta
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "Celestial\nAtmosphere\nHDRI");
   panels[i++] = create_slider(ui, "Geometry Offset X", &(instance->scene.sky.geometry_offset.x), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
@@ -284,7 +284,7 @@ static UITab create_sky_general_atmo_panels(UI* ui, RaytraceInstance* instance) 
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "Celestial\nAtmosphere\nHDRI");
   panels[i++] = create_slider(ui, "Ray March Steps", &(instance->scene.sky.steps), 1, 0.005f, 0.0f, FLT_MAX, 0, 1);
@@ -322,7 +322,7 @@ static UITab create_sky_general_hdri_panels(UI* ui, RaytraceInstance* instance) 
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "Celestial\nAtmosphere\nHDRI");
   panels[i++] = create_check(ui, "Active", &(instance->scene.sky.hdri_active), 1);
@@ -370,7 +370,7 @@ static UITab create_sky_cloud_general_panels(UI* ui, RaytraceInstance* instance)
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "General\nLow\nMid\nTop");
   panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.active), 1);
@@ -406,7 +406,7 @@ static UITab create_sky_cloud_lowlevel_panels(UI* ui, RaytraceInstance* instance
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "General\nLow\nMid\nTop");
   panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.low.active), 1);
@@ -436,7 +436,7 @@ static UITab create_sky_cloud_midlevel_panels(UI* ui, RaytraceInstance* instance
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "General\nLow\nMid\nTop");
   panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.mid.active), 1);
@@ -466,7 +466,7 @@ static UITab create_sky_cloud_toplevel_panels(UI* ui, RaytraceInstance* instance
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "General\nLow\nMid\nTop");
   panels[i++] = create_check(ui, "Active", &(instance->scene.sky.cloud.top.active), 1);
@@ -515,7 +515,7 @@ static UITab create_sky_fog_panels(UI* ui, RaytraceInstance* instance) {
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_check(ui, "Active", &(instance->scene.fog.active), 1);
   panels[i++] = create_slider(ui, "Density", &(instance->scene.fog.density), 1, 0.001f, 0.001f, FLT_MAX, 0, 0);
@@ -548,7 +548,7 @@ static UITab create_sky_panels(UI* ui, RaytraceInstance* instance) {
   return tab;
 }
 
-static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
+static UITab create_procedurals_ocean_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
   tab.count   = 1;
@@ -558,11 +558,12 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
+  panels[i++] = create_tab(ui, 1, "Ocean\nParticles\nToy");
   panels[i++] = create_check(ui, "Active", &(instance->scene.ocean.active), 1);
   panels[i++] = create_dropdown(
     ui, "Jerlov Water Type", &(instance->scene.ocean.water_type), 1, 10,
-    "Open (I)\0Open (IA)\0Open (IB)\0Open (II)\0Open (III)\0Coastal (1C)\0Coastal (3C)\0Coastal (5C)\0Coastal (7C)\0Coastal (9C)", 2);
+    "Open (I)\0Open (IA)\0Open (IB)\0Open (II)\0Open (III)\0Coastal (1C)\0Coastal (3C)\0Coastal (5C)\0Coastal (7C)\0Coastal (9C)", 3);
   panels[i++] = create_slider(ui, "Height", &(instance->scene.ocean.height), 1, 0.005f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Amplitude", &(instance->scene.ocean.amplitude), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Choppyness", &(instance->scene.ocean.choppyness), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
@@ -576,7 +577,7 @@ static UITab create_ocean_panels(UI* ui, RaytraceInstance* instance) {
   return tab;
 }
 
-static UITab create_toy_panels(UI* ui, RaytraceInstance* instance) {
+static UITab create_procedurals_particles_panels(UI* ui, RaytraceInstance* instance) {
   UITab tab;
 
   tab.count   = 1;
@@ -586,9 +587,31 @@ static UITab create_toy_panels(UI* ui, RaytraceInstance* instance) {
 
   int i = 0;
 
-  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nOcean\nToy");
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
+  panels[i++] = create_tab(ui, 1, "Ocean\nParticles\nToy");
+  panels[i++] = create_check(ui, "Active", &(instance->scene.particles.active), 1);
+
+  tab.panels      = panels;
+  tab.panel_count = i;
+  tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
+
+  return tab;
+}
+
+static UITab create_procedurals_toy_panels(UI* ui, RaytraceInstance* instance) {
+  UITab tab;
+
+  tab.count   = 1;
+  tab.subtabs = (UITab*) 0;
+
+  UIPanel* panels = (UIPanel*) malloc(sizeof(UIPanel) * TAB_PANEL_DEFAULT_ALLOCATION);
+
+  int i = 0;
+
+  panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
+  panels[i++] = create_tab(ui, 1, "Ocean\nParticles\nToy");
   panels[i++] = create_check(ui, "Active", &(instance->scene.toy.active), 1);
-  panels[i++] = create_dropdown(ui, "Shape", &(instance->scene.toy.shape), 1, 2, "Sphere\0Plane", 2);
+  panels[i++] = create_dropdown(ui, "Shape", &(instance->scene.toy.shape), 1, 2, "Sphere\0Plane", 3);
   panels[i++] = create_button(ui, "Center at Camera", instance, (void (*)(void*)) raytrace_center_toy_at_camera, 1);
   panels[i++] = create_check(ui, "Flashlight Mode", &(instance->scene.toy.flashlight_mode), 1);
   panels[i++] = create_slider(ui, "Position X", &(instance->scene.toy.position.x), 1, 0.005f, -FLT_MAX, FLT_MAX, 1, 0);
@@ -616,6 +639,24 @@ static UITab create_toy_panels(UI* ui, RaytraceInstance* instance) {
   tab.panels      = panels;
   tab.panel_count = i;
   tab.panels      = safe_realloc(tab.panels, sizeof(UIPanel) * tab.panel_count);
+
+  return tab;
+}
+
+static UITab create_procedurals_panels(UI* ui, RaytraceInstance* instance) {
+  UITab tab;
+
+  tab.count       = 3;
+  tab.panel_count = 0;
+  tab.panels      = (UIPanel*) 0;
+
+  UITab* tabs = (UITab*) malloc(sizeof(UITab) * tab.count);
+
+  tabs[0] = create_procedurals_ocean_panels(ui, instance);
+  tabs[1] = create_procedurals_particles_panels(ui, instance);
+  tabs[2] = create_procedurals_toy_panels(ui, instance);
+
+  tab.subtabs = tabs;
 
   return tab;
 }
@@ -654,8 +695,7 @@ UI init_UI(RaytraceInstance* instance, WindowInstance* window) {
   ui.tabs[0] = create_general_panels(&ui, instance);
   ui.tabs[1] = create_camera_panels(&ui, instance);
   ui.tabs[2] = create_sky_panels(&ui, instance);
-  ui.tabs[3] = create_ocean_panels(&ui, instance);
-  ui.tabs[4] = create_toy_panels(&ui, instance);
+  ui.tabs[3] = create_procedurals_panels(&ui, instance);
 
   SDL_SetRelativeMouseMode(!ui.active);
 
