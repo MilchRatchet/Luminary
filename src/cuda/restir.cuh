@@ -76,7 +76,7 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data,
   float lum;
   result = brdf_apply_sample_restir(brdf, x, data.position, solid_angle, lum);
 
-  primitive_pdf = 1.0f / solid_angle;
+  primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 0.0f;
 
   if (data.flags & G_BUFFER_VOLUME_HIT) {
     result = brdf_apply_sample_weight_scattering(result, VOLUME_HIT_TYPE(data.hit_id));
@@ -122,7 +122,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, primitive_pdf);
     const float sampled_pdf        = primitive_pdf;
 
-    const float weight = sampled_target_pdf / sampled_pdf;
+    const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
     if (white_noise_offset(seed++) * selected.weight < weight) {
@@ -143,7 +143,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, primitive_pdf);
     const float sampled_pdf        = primitive_pdf;
 
-    const float weight = sampled_target_pdf / sampled_pdf;
+    const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
     if (white_noise_offset(seed++) * selected.weight < weight) {
@@ -178,7 +178,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, primitive_pdf);
     const float sampled_pdf        = reservoir_sampling_pdf * primitive_pdf;
 
-    const float weight = sampled_target_pdf / sampled_pdf;
+    const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
     if (white_noise_offset(seed++) * selected.weight < weight) {
