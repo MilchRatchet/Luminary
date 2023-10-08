@@ -193,6 +193,9 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int typ
   }
 
   process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+    particle_process_debug_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
   if (instance->scene.ocean.active) {
     process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }

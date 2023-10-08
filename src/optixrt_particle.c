@@ -2,6 +2,7 @@
 
 #include "bench.h"
 #include "buffer.h"
+#include "device.h"
 #include "utils.h"
 
 #define OPTIX_CHECK_LOGS(call, log)                                                                      \
@@ -93,6 +94,9 @@ void optixrt_particle_init(RaytraceInstance* instance) {
 
   instance->particles_instance.optix.bvh_data    = output_buffer;
   instance->particles_instance.optix.traversable = traversable;
+
+  device_update_symbol(optix_bvh_particles, instance->particles_instance.optix.traversable);
+
   instance->particles_instance.optix.initialized = 1;
 
   bench_toc();

@@ -27,6 +27,7 @@
 
 void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel) {
   bench_tic("Kernel Setup (OptiX)");
+  log_message("Compiling kernels: %s.", kernels_name);
 
   ////////////////////////////////////////////////////////////////////
   // Module Compilation

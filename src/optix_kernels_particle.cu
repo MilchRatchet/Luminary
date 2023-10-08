@@ -53,12 +53,13 @@ extern "C" __global__ void __raygen__optix() {
     if (__uint_as_float(depth) < tmax) {
       float2 trace_result = result;
 
+      // Hit ID contains the triangle ID but we only store the actual particle / quad ID
+      hit_id = HIT_TYPE_PARTICLE_MIN + (hit_id >> 1);
+
       if (device.shading_mode == SHADING_HEAT) {
         trace_result = make_float2(cost, __uint_as_float(hit_id));
       }
       else {
-        // Hit ID contains the triangle ID but we only store the actual particle / quad ID
-        hit_id       = HIT_TYPE_PARTICLE_MIN + (hit_id >> 1);
         trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
       }
 
