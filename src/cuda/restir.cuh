@@ -3,6 +3,7 @@
 
 #include "memory.cuh"
 #include "utils.cuh"
+#include "volume.cuh"
 
 //
 // This file implements light sampling based on ReSTIR. However, I ultimately decided to only use
@@ -54,6 +55,21 @@ __device__ LightSample restir_sample_empty() {
   return s;
 }
 
+__device__ float restir_sample_volume_extinction(const GBufferData data, const vec3 ray, const float max_dist) {
+  float extinction = 1.0f;
+
+  if (device.scene.fog.active) {
+    const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
+    const float2 path             = volume_compute_path(volume, data.position, ray, max_dist);
+
+    if (path.x >= 0.0f) {
+      extinction *= expf(-path.y * volume.avg_scattering);
+    }
+  }
+
+  return extinction;
+}
+
 /**
  * Compute the target PDF of a light sample. Currently, this is basically BRDF weight multiplied by general light intensity.
  * @param x Light sample
@@ -72,9 +88,8 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data,
   BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
   BRDFInstance result;
 
-  float solid_angle;
-  float lum;
-  result = brdf_apply_sample_restir(brdf, x, data.position, solid_angle, lum);
+  float solid_angle, lum, sample_dist;
+  result = brdf_apply_sample_restir(brdf, x, data.position, solid_angle, lum, sample_dist);
 
   primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 0.0f;
 
@@ -89,6 +104,10 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data,
 
   if (isinf(value) || isnan(value)) {
     value = 0.0f;
+  }
+
+  if (value > 0.0f) {
+    value *= restir_sample_volume_extinction(data, result.L, sample_dist);
   }
 
   value *= (x.presampled_id == LIGHT_ID_SUN) ? (2e+04f * device.scene.sky.sun_strength) : lum;

@@ -295,7 +295,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
  *
  * Robust triangle sampling.
  */
-__device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed, float& lum) {
+__device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed, float& lum, float& r) {
   float r1 = sqrtf(white_noise_offset(seed++));
   float r2 = white_noise_offset(seed++);
 
@@ -309,7 +309,7 @@ __device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 
   const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
   const vec3 dir = vector_direction_stable(p, origin);
 
-  const float r = get_length(sub_vector(p, origin));
+  r = get_length(sub_vector(p, origin));
 
   const vec3 cross         = cross_product(triangle.edge1, triangle.edge2);
   const float cross_length = get_length(cross);
@@ -335,22 +335,26 @@ __device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 
   return dir;
 }
 
-__device__ BRDFInstance brdf_apply_sample_restir(BRDFInstance brdf, LightSample light, vec3 pos, float& solid_angle, float& lum) {
+__device__ BRDFInstance
+  brdf_apply_sample_restir(BRDFInstance brdf, LightSample light, vec3 pos, float& solid_angle, float& lum, float& sample_dist) {
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
       brdf.L       = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
       lum          = 1.0f;
+      sample_dist  = FLT_MAX;
     } break;
     case LIGHT_ID_TOY:
       brdf.L      = toy_sample_ray(pos, light.seed);
       solid_angle = toy_get_solid_angle(pos);
       lum         = device.scene.toy.material.b * luminance(device.scene.toy.emission);
+      // Approximation, it is not super important what the actual distance is
+      sample_dist = get_length(sub_vector(pos, device.scene.toy.position));
       break;
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
-      brdf.L                       = restir_sample_triangle(triangle, pos, solid_angle, light.seed, lum);
+      brdf.L                       = restir_sample_triangle(triangle, pos, solid_angle, light.seed, lum, sample_dist);
     } break;
   }
 
