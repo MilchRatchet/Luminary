@@ -590,6 +590,7 @@ static UITab create_procedurals_particles_panels(UI* ui, RaytraceInstance* insta
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "Ocean\nParticles\nToy");
   panels[i++] = create_check(ui, "Active", &(instance->scene.particles.active), 1);
+  panels[i++] = create_slider(ui, "Seed", &(instance->scene.particles.seed), 0, 0.005f, 0.0f, FLT_MAX, 0, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

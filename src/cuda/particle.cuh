@@ -224,14 +224,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
 
 __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_buffer, uint32_t* index_buffer, Quad* quads) {
   uint32_t id   = THREAD_ID;
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
+  uint32_t seed = device.scene.particles.seed;
 
   const float scale = 0.01f;
 
   while (id < count) {
-    const float x = (white_noise_offset(seed++) * 20.0f) - 10.0f;
-    const float y = (white_noise_offset(seed++) * 20.0f) - 10.0f;
-    const float z = (white_noise_offset(seed++) * 20.0f) - 10.0f;
+    const float x = (white_noise_offset(seed + id * 3 + 0) * 20.0f) - 10.0f;
+    const float y = (white_noise_offset(seed + id * 3 + 1) * 20.0f) - 10.0f;
+    const float z = (white_noise_offset(seed + id * 3 + 2) * 20.0f) - 10.0f;
 
     const vec3 p = get_vector(x, y, z);
 
@@ -267,8 +267,6 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
 
     id += blockDim.x * gridDim.x;
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 void device_particle_generate(RaytraceInstance* instance) {
