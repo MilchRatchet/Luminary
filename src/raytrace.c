@@ -526,6 +526,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->sky_moon_albedo_tex);
   device_buffer_init(&instance->sky_moon_normal_tex);
   device_buffer_init(&instance->mis_buffer);
+  device_buffer_init(&instance->light_transparency_weight_buffer);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
@@ -653,6 +654,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->mis_buffer, sizeof(float), amount);
+  device_buffer_malloc(instance->light_transparency_weight_buffer, sizeof(float), amount);
 
   if (instance->denoiser) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);
@@ -690,42 +692,43 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
 void raytrace_update_device_pointers(RaytraceInstance* instance) {
   DevicePointers ptrs;
 
-  ptrs.light_trace          = (TraceTask*) device_buffer_get_pointer(instance->light_trace);
-  ptrs.bounce_trace         = (TraceTask*) device_buffer_get_pointer(instance->bounce_trace);
-  ptrs.light_trace_count    = (uint16_t*) device_buffer_get_pointer(instance->light_trace_count);
-  ptrs.bounce_trace_count   = (uint16_t*) device_buffer_get_pointer(instance->bounce_trace_count);
-  ptrs.trace_results        = (TraceResult*) device_buffer_get_pointer(instance->trace_results);
-  ptrs.task_counts          = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
-  ptrs.task_offsets         = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
-  ptrs.light_sample_history = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
-  ptrs.frame_buffer         = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
-  ptrs.frame_temporal       = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
-  ptrs.frame_variance       = (float*) device_buffer_get_pointer(instance->frame_variance);
-  ptrs.frame_accumulate     = (RGBF*) device_buffer_get_pointer(instance->frame_accumulate);
-  ptrs.frame_output         = (RGBF*) device_buffer_get_pointer(instance->frame_output);
-  ptrs.albedo_buffer        = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
-  ptrs.normal_buffer        = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
-  ptrs.light_records        = (RGBF*) device_buffer_get_pointer(instance->light_records);
-  ptrs.bounce_records       = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
-  ptrs.buffer_8bit          = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
-  ptrs.albedo_atlas         = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
-  ptrs.illuminance_atlas    = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.illuminance);
-  ptrs.material_atlas       = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.material);
-  ptrs.normal_atlas         = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.normal);
-  ptrs.cloud_noise          = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);
-  ptrs.randoms              = (uint32_t*) device_buffer_get_pointer(instance->randoms);
-  ptrs.raydir_buffer        = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
-  ptrs.trace_result_buffer  = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
-  ptrs.state_buffer         = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
-  ptrs.light_samples        = (LightSample*) device_buffer_get_pointer(instance->light_samples);
-  ptrs.g_buffer             = (GBufferData*) device_buffer_get_pointer(instance->g_buffer);
-  ptrs.light_candidates     = (uint32_t*) device_buffer_get_pointer(instance->light_candidates);
-  ptrs.sky_tm_luts          = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
-  ptrs.sky_ms_luts          = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
-  ptrs.sky_hdri_luts        = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
-  ptrs.sky_moon_albedo_tex  = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_albedo_tex);
-  ptrs.sky_moon_normal_tex  = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_normal_tex);
-  ptrs.mis_buffer           = (float*) device_buffer_get_pointer(instance->mis_buffer);
+  ptrs.light_trace                      = (TraceTask*) device_buffer_get_pointer(instance->light_trace);
+  ptrs.bounce_trace                     = (TraceTask*) device_buffer_get_pointer(instance->bounce_trace);
+  ptrs.light_trace_count                = (uint16_t*) device_buffer_get_pointer(instance->light_trace_count);
+  ptrs.bounce_trace_count               = (uint16_t*) device_buffer_get_pointer(instance->bounce_trace_count);
+  ptrs.trace_results                    = (TraceResult*) device_buffer_get_pointer(instance->trace_results);
+  ptrs.task_counts                      = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
+  ptrs.task_offsets                     = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
+  ptrs.light_sample_history             = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
+  ptrs.frame_buffer                     = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
+  ptrs.frame_temporal                   = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
+  ptrs.frame_variance                   = (float*) device_buffer_get_pointer(instance->frame_variance);
+  ptrs.frame_accumulate                 = (RGBF*) device_buffer_get_pointer(instance->frame_accumulate);
+  ptrs.frame_output                     = (RGBF*) device_buffer_get_pointer(instance->frame_output);
+  ptrs.albedo_buffer                    = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
+  ptrs.normal_buffer                    = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
+  ptrs.light_records                    = (RGBF*) device_buffer_get_pointer(instance->light_records);
+  ptrs.bounce_records                   = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
+  ptrs.buffer_8bit                      = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
+  ptrs.albedo_atlas                     = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
+  ptrs.illuminance_atlas                = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.illuminance);
+  ptrs.material_atlas                   = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.material);
+  ptrs.normal_atlas                     = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.normal);
+  ptrs.cloud_noise                      = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);
+  ptrs.randoms                          = (uint32_t*) device_buffer_get_pointer(instance->randoms);
+  ptrs.raydir_buffer                    = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
+  ptrs.trace_result_buffer              = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
+  ptrs.state_buffer                     = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
+  ptrs.light_samples                    = (LightSample*) device_buffer_get_pointer(instance->light_samples);
+  ptrs.g_buffer                         = (GBufferData*) device_buffer_get_pointer(instance->g_buffer);
+  ptrs.light_candidates                 = (uint32_t*) device_buffer_get_pointer(instance->light_candidates);
+  ptrs.sky_tm_luts                      = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
+  ptrs.sky_ms_luts                      = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
+  ptrs.sky_hdri_luts                    = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
+  ptrs.sky_moon_albedo_tex              = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_albedo_tex);
+  ptrs.sky_moon_normal_tex              = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_normal_tex);
+  ptrs.mis_buffer                       = (float*) device_buffer_get_pointer(instance->mis_buffer);
+  ptrs.light_transparency_weight_buffer = (float*) device_buffer_get_pointer(instance->light_transparency_weight_buffer);
 
   device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");
@@ -755,6 +758,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->light_samples);
   device_buffer_free(instance->g_buffer);
   device_buffer_free(instance->mis_buffer);
+  device_buffer_free(instance->light_transparency_weight_buffer);
 
   gpuErrchk(cudaDeviceSynchronize());
 }

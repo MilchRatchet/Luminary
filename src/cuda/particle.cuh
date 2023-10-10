@@ -100,9 +100,10 @@ __global__ void particle_process_tasks() {
           store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
+          device.ptrs.light_transparency_weight_buffer[pixel] *= 2.0f;
           if (white_noise() > 0.5f) {
             if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-              store_RGBF(device.ptrs.light_records + pixel, scale_color(record, 2.0f));
+              store_RGBF(device.ptrs.light_records + pixel, record);
               store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
             }
           }

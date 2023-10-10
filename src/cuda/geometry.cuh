@@ -191,6 +191,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         const float mis_weight = device.ptrs.mis_buffer[pixel];
         emission               = scale_color(emission, mis_weight);
       }
+      else if (device.iteration_type == TYPE_LIGHT) {
+        emission = scale_color(emission, get_light_transparency_weight(pixel));
+      }
 
       const uint32_t light = device.ptrs.light_sample_history[pixel];
 
@@ -220,9 +223,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
           store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
+          device.ptrs.light_transparency_weight_buffer[pixel] *= 2.0f;
           if (white_noise() > 0.5f) {
             if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-              store_RGBF(device.ptrs.light_records + pixel, scale_color(record, 2.0f));
+              store_RGBF(device.ptrs.light_records + pixel, record);
               store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
             }
           }

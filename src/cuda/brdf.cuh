@@ -358,8 +358,6 @@ __device__ BRDFInstance
     } break;
   }
 
-  brdf.term = scale_color(brdf.term, light.weight);
-
   return brdf;
 }
 

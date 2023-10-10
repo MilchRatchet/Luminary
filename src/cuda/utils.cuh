@@ -81,6 +81,12 @@ __device__ static int is_first_ray() {
   return (device.iteration_type == TYPE_CAMERA);
 }
 
+__device__ static float get_light_transparency_weight(const uint32_t pixel) {
+  const float light_transparency_weight               = device.ptrs.light_transparency_weight_buffer[pixel];
+  device.ptrs.light_transparency_weight_buffer[pixel] = 1.0f;
+  return light_transparency_weight;
+}
+
 __device__ static bool proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
   return (
     (device.iteration_type == TYPE_CAMERA) || (device.iteration_type == TYPE_BOUNCE)
