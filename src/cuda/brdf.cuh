@@ -295,7 +295,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
  *
  * Robust triangle sampling.
  */
-__device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed, float& lum, float& r) {
+__device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed, RGBF& lum, float& r) {
   float r1 = sqrtf(white_noise_offset(seed++));
   float r2 = white_noise_offset(seed++);
 
@@ -321,7 +321,7 @@ __device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 
 
   if (isnan(area) || isinf(area) || area < 1e-7f) {
     area = 0.0f;
-    lum  = 0.0f;
+    lum  = get_color(0.0f, 0.0f, 0.0f);
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
@@ -330,25 +330,25 @@ __device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 
   const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, make_float2(u, v));
   const float4 emission = tex2D<float4>(device.ptrs.illuminance_atlas[illum_tex].tex, tex_coords.u, 1.0f - tex_coords.v);
 
-  lum = device.scene.material.default_material.b * luminance(get_color(emission.x, emission.y, emission.z)) * emission.w;
+  lum = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
 
   return dir;
 }
 
 __device__ BRDFInstance
-  brdf_apply_sample_restir(BRDFInstance brdf, LightSample light, vec3 pos, float& solid_angle, float& lum, float& sample_dist) {
+  brdf_apply_sample_restir(BRDFInstance brdf, LightSample light, vec3 pos, float& solid_angle, RGBF& lum, float& sample_dist) {
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
       brdf.L       = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
-      lum          = 1.0f;
+      lum          = scale_color(get_color(1.0f, 1.0f, 1.0f), 2e+04f * device.scene.sky.sun_strength);
       sample_dist  = FLT_MAX;
     } break;
     case LIGHT_ID_TOY:
       brdf.L      = toy_sample_ray(pos, light.seed);
       solid_angle = toy_get_solid_angle(pos);
-      lum         = device.scene.toy.material.b * luminance(device.scene.toy.emission);
+      lum         = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
       // Approximation, it is not super important what the actual distance is
       sample_dist = get_length(sub_vector(pos, device.scene.toy.position));
       break;
