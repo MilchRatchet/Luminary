@@ -5,6 +5,7 @@
 #include "math.cuh"
 #include "memory.cuh"
 #include "state.cuh"
+#include "texture_utils.cuh"
 
 __device__ vec3 geometry_compute_normal(
   vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 e1, vec3 e2, UV e1_tex, UV e2_tex, unsigned short normal_map, float2 coords,

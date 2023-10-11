@@ -7,6 +7,7 @@
 #include "memory.cuh"
 #include "random.cuh"
 #include "sky_utils.cuh"
+#include "texture_utils.cuh"
 #include "toy_utils.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -328,7 +329,7 @@ __device__ vec3 restir_sample_triangle(const TriangleLight triangle, const vec3 
   const uint16_t illum_tex = device.scene.texture_assignments[triangle.object_maps].illuminance_map;
 
   const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, make_float2(u, v));
-  const float4 emission = tex2D<float4>(device.ptrs.illuminance_atlas[illum_tex].tex, tex_coords.u, 1.0f - tex_coords.v);
+  const float4 emission = texture_load(device.ptrs.illuminance_atlas[illum_tex], tex_coords);
 
   lum = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
 
