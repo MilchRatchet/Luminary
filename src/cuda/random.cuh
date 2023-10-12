@@ -60,21 +60,22 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 // Random number generators
 ////////////////////////////////////////////////////////////////////
 
-#define R1_PHI 0.61803398875f
-#define R2_PHI1 0.7548776662f
-#define R2_PHI2 0.56984029f
+// Integer fractions of the actual numbers
+#define R1_PHI 2654435768u  /*0.61803398875f*/
+#define R2_PHI1 3242174888u /*0.7548776662f*/
+#define R2_PHI2 2447445413u /*0.56984029f*/
 
 __device__ float random_r1(const uint32_t offset) {
-  const float v = offset * R1_PHI;
+  const uint32_t v = offset * R1_PHI;
 
-  return v - truncf(v);
+  return random_uint32_t_to_float(v);
 }
 
 __device__ float2 random_r2(const uint32_t offset) {
-  const float v1 = offset * R2_PHI1;
-  const float v2 = offset * R2_PHI2;
+  const uint32_t v1 = offset * R2_PHI1;
+  const uint32_t v2 = offset * R2_PHI2;
 
-  return make_float2(v1 - truncf(v1), v2 - truncf(v2));
+  return make_float2(random_uint32_t_to_float(v1), random_uint32_t_to_float(v2));
 }
 
 // This is the base generator for random 32 bits.
