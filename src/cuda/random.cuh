@@ -14,6 +14,19 @@
 // producing only 16 bits is used wherever we don't need a huge range of possible random numbers.
 //
 
+enum QuasiRandomTarget : uint32_t {
+  QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE           = 0,   /* 1 */
+  QUASI_RANDOM_TARGET_BOUNCE_DIR                  = 1,   /* 2 */
+  QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY         = 3,   /* 1 */
+  QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY          = 4,   /* 1 */
+  QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY_ROULETTE = 5,   /* 1 */
+  QUASI_RANDOM_TARGET_RESTIR_CHOICE               = 6,   /* 2 + 128 */
+  QUASI_RANDOM_TARGET_RESTIR_GENERATION           = 136, /* 128 */
+  QUASI_RANDOM_TARGET_LENS                        = 264, /* 2 */
+  QUASI_RANDOM_TARGET_VOLUME_DIST                 = 266, /* 1 */
+  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE            = 267  /* 1 */
+} typedef QuasiRandomTarget;
+
 ////////////////////////////////////////////////////////////////////
 // Literature
 ////////////////////////////////////////////////////////////////////
@@ -21,6 +34,10 @@
 // [Wid20]
 // Bernard Widynski, "Squares: A Fast Counter-Based RNG", 2020
 // https://arxiv.org/abs/2004.06278
+
+// [Rob18]
+// Martin Roberts, "The Unreasonable Effectiveness of Quasirandom Sequences", 2018
+// https://extremelearning.com.au/unreasonable-effectiveness-of-quasirandom-sequences/
 
 ////////////////////////////////////////////////////////////////////
 // Unsigned integer to float [0, 1] conversion
@@ -42,6 +59,23 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 ////////////////////////////////////////////////////////////////////
 // Random number generators
 ////////////////////////////////////////////////////////////////////
+
+#define R1_PHI 0.61803398875f
+#define R2_PHI1 0.7548776662f
+#define R2_PHI2 0.56984029f
+
+__device__ float random_r1(const uint32_t offset) {
+  const float v = offset * R1_PHI;
+
+  return v - truncf(v);
+}
+
+__device__ float2 random_r2(const uint32_t offset) {
+  const float v1 = offset * R2_PHI1;
+  const float v2 = offset * R2_PHI2;
+
+  return make_float2(v1 - truncf(v1), v2 - truncf(v2));
+}
 
 // This is the base generator for random 32 bits.
 __device__ uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32_t offset) {
@@ -116,6 +150,32 @@ __device__ float white_noise_precise() {
 
 __device__ float white_noise() {
   return white_noise_offset(device.ptrs.randoms[THREAD_ID]++);
+}
+
+__device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t pixel) {
+  const float offset = random_uint16_t_to_float(random_uint16_t_base(pixel + (device.depth << 24), target));
+
+  float quasi = random_r1(device.temporal_frames);
+
+  quasi += offset;
+  quasi -= truncf(quasi);
+
+  return quasi;
+}
+
+__device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t pixel) {
+  const float offset1 = random_uint16_t_to_float(random_uint16_t_base(pixel + (device.depth << 24), target));
+  const float offset2 = random_uint16_t_to_float(random_uint16_t_base(pixel + (device.depth << 24), target + 1));
+
+  float2 quasi = random_r2(device.temporal_frames);
+
+  quasi.x += offset1;
+  quasi.x -= truncf(quasi.x);
+
+  quasi.y += offset2;
+  quasi.y -= truncf(quasi.y);
+
+  return quasi;
 }
 
 ////////////////////////////////////////////////////////////////////

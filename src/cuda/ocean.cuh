@@ -303,7 +303,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     write_normal_buffer(normal, pixel);
 
-    if (white_noise() > 0.5f) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > 0.5f) {
       task.ray      = refract_ray(task.ray, normal, refraction_index_ratio);
       task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps * (1.0f + get_length(task.position))));
     }

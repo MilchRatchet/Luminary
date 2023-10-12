@@ -404,23 +404,22 @@ __device__ BRDFInstance brdf_apply_sample_weight_scattering(BRDFInstance brdf, V
  * Samples a ray based on the BRDFs and multiplies record with sampling weight.
  * Writes L and term of the BRDFInstance.
  */
-__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, bool& use_specular) {
+__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const uint32_t pixel, bool& use_specular) {
   const float specular_prob = brdf_spec_probability(brdf.metallic);
-  use_specular              = white_noise() < specular_prob;
+  use_specular              = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel) < specular_prob;
 
-  const float alpha = white_noise();
-  const float beta  = white_noise();
+  float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(brdf.V, rotation_to_z);
 
   if (use_specular) {
-    brdf = brdf_sample_ray_microfacet(brdf, V_local, alpha, beta);
+    brdf = brdf_sample_ray_microfacet(brdf, V_local, random.x, random.y);
 
     brdf.L = normalize_vector(rotate_vector_by_quaternion(brdf.L, inverse_quaternion(rotation_to_z)));
   }
   else {
-    const vec3 L_local = brdf_sample_ray_diffuse(alpha, beta);
+    const vec3 L_local = brdf_sample_ray_diffuse(random.x, random.y);
     brdf.L             = normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
     brdf               = brdf_evaluate(brdf);
   }
@@ -436,7 +435,8 @@ __device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, bool& use_specular) {
  * This is most likely completely non physical but since refraction plays such a small role at the moment,
  * it probably doesnt matter too much.
  */
-__device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const float r1, const float r2) {
+__device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const uint32_t pixel) {
+  const float2 random    = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
   const float roughness2 = brdf.roughness * brdf.roughness;
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
@@ -445,7 +445,7 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
   vec3 H_local = get_vector(0.0f, 0.0f, 1.0f);
 
   if (roughness2 > 0.0f) {
-    H_local = brdf_sample_microfacet(V_local, roughness2, r1, r2);
+    H_local = brdf_sample_microfacet(V_local, roughness2, random.x, random.y);
   }
 
   vec3 L_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);

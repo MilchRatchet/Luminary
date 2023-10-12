@@ -963,20 +963,19 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
  *
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
-__device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float ms_factor = 1.0f) {
-  const float r = white_noise();
-
+__device__ vec3
+  jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice, const float ms_factor = 1.0f) {
   JendersieEonParams params = jendersie_eon_phase_parameters(diameter, ms_factor);
 
   float u;
-  if (white_noise() < params.w_d) {
-    u = draine_phase_sample(params.g_d, params.alpha, r);
+  if (r_choice < params.w_d) {
+    u = draine_phase_sample(params.g_d, params.alpha, r_dir.x);
   }
   else {
-    u = henyey_greenstein_phase_sample(params.g_hg, r);
+    u = henyey_greenstein_phase_sample(params.g_hg, r_dir.x);
   }
 
-  return phase_sample_basis(u, white_noise(), ray);
+  return phase_sample_basis(u, r_dir.y, ray);
 }
 
 __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {

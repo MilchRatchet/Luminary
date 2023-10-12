@@ -126,9 +126,9 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
  * @result Distance of intersection point and origin in world space.
  */
 __device__ float volume_sample_intersection(
-  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist) {
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist, const float random) {
   // [FonWKH17] Equation 15
-  const float t = (-logf(1.0f - white_noise())) / volume.avg_scattering;
+  const float t = (-logf(random)) / volume.avg_scattering;
 
   if (t > max_dist)
     return FLT_MAX;
@@ -173,16 +173,19 @@ __global__ void volume_process_events() {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device.trace_tasks + offset);
     const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
+    const int pixel     = task.index.y * device.width + task.index.x;
 
     float depth     = result.x;
     uint32_t hit_id = __float_as_uint(result.y);
+
+    const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, pixel);
 
     if (device.scene.fog.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
-        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y);
+        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
         if (volume_dist < depth) {
           depth  = volume_dist;
@@ -196,7 +199,7 @@ __global__ void volume_process_events() {
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
-        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y);
+        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
         if (volume_dist < depth) {
           depth  = volume_dist;
@@ -285,8 +288,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
 
     write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
 
-    const vec3 bounce_ray = (volume.type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_sample(task.ray, device.scene.fog.droplet_diameter)
-                                                             : ocean_phase_sampling(task.ray);
+    const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
+    const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
+
+    const vec3 bounce_ray = (volume.type == VOLUME_TYPE_FOG)
+                              ? jendersie_eon_phase_sample(task.ray, device.scene.fog.droplet_diameter, random_dir, random_choice)
+                              : ocean_phase_sampling(task.ray, random_dir, random_choice);
 
     TraceTask bounce_task;
     bounce_task.origin = task.position;
