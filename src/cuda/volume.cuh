@@ -312,7 +312,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
       BRDFInstance brdf = brdf_get_instance_scattering(scale_vector(task.ray, -1.0f));
 
       if (light.weight > 0.0f) {
-        const BRDFInstance brdf_sample = brdf_apply_sample_weight_scattering(brdf_apply_sample(brdf, light, task.position), volume_type);
+        const BRDFInstance brdf_sample =
+          brdf_apply_sample_weight_scattering(brdf_apply_sample(brdf, light, task.position, pixel), volume_type);
 
         const RGBF light_record = mul_color(record, brdf_sample.term);
 

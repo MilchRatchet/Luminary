@@ -1074,9 +1074,9 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
  *
  * Robust triangle sampling.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, uint32_t& seed) {
-  float r1 = sqrtf(white_noise_offset(seed++));
-  float r2 = white_noise_offset(seed++);
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random) {
+  float r1 = sqrtf(random.x);
+  float r2 = random.y;
 
   // Map random numbers uniformly into [0.025,0.975].
   r1 = 0.025f + 0.95f * r1;
@@ -1097,9 +1097,9 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the sphere.
  */
-__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, float& area, uint32_t& seed) {
-  float r1 = white_noise_offset(seed++);
-  float r2 = white_noise_offset(seed++);
+__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, const float2 random, float& area) {
+  float r1 = random.x;
+  float r2 = random.y;
 
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);

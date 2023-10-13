@@ -21,10 +21,11 @@ enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY          = 4,   /* 1 */
   QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY_ROULETTE = 5,   /* 1 */
   QUASI_RANDOM_TARGET_RESTIR_CHOICE               = 6,   /* 2 + 128 */
-  QUASI_RANDOM_TARGET_RESTIR_GENERATION           = 136, /* 128 */
-  QUASI_RANDOM_TARGET_LENS                        = 264, /* 2 */
-  QUASI_RANDOM_TARGET_VOLUME_DIST                 = 266, /* 1 */
-  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE            = 267  /* 1 */
+  QUASI_RANDOM_TARGET_RESTIR_DIR                  = 136, /* 2 + 128 */
+  QUASI_RANDOM_TARGET_RESTIR_GENERATION           = 266, /* 128 */
+  QUASI_RANDOM_TARGET_LENS                        = 394, /* 2 */
+  QUASI_RANDOM_TARGET_VOLUME_DIST                 = 396, /* 1 */
+  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE            = 397  /* 1 */
 } typedef QuasiRandomTarget;
 
 ////////////////////////////////////////////////////////////////////
@@ -65,17 +66,17 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 #define R2_PHI1 3242174888u /*0.7548776662f*/
 #define R2_PHI2 2447445413u /*0.56984029f*/
 
-__device__ float random_r1(const uint32_t offset) {
+__device__ uint32_t random_r1(const uint32_t offset) {
   const uint32_t v = offset * R1_PHI;
 
-  return random_uint32_t_to_float(v);
+  return v;
 }
 
-__device__ float2 random_r2(const uint32_t offset) {
+__device__ uint2 random_r2(const uint32_t offset) {
   const uint32_t v1 = offset * R2_PHI1;
   const uint32_t v2 = offset * R2_PHI2;
 
-  return make_float2(random_uint32_t_to_float(v1), random_uint32_t_to_float(v2));
+  return make_uint2(v1, v2);
 }
 
 // This is the base generator for random 32 bits.
@@ -154,29 +155,39 @@ __device__ float white_noise() {
 }
 
 __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t pixel) {
-  const float offset = random_uint16_t_to_float(random_uint16_t_base(pixel + (device.depth << 24), target));
+  const uint32_t offset = random_uint32_t_base(pixel + (device.depth << 24), target);
 
-  float quasi = random_r1(device.temporal_frames);
+  uint32_t quasi = random_r1(device.temporal_frames);
 
   quasi += offset;
-  quasi -= truncf(quasi);
 
-  return quasi;
+  return random_uint32_t_to_float(quasi);
+}
+
+// This is a special version of the quasirandom sequence that is not low discrepency temporally but instead
+// allows for a custom sequence id. This is useful for things like ReSTIR where the light selection
+// does not need to vary between frames as the list we are indexing changes every frame. Instead, we
+// want to make sure that we sample unique lights.
+__device__ float quasirandom_sequence_1D_intraframe(const uint32_t target, const uint32_t pixel, const uint32_t sequence_id) {
+  const uint32_t offset = random_uint32_t_base(pixel + (device.depth << 24), target);
+
+  uint32_t quasi = random_r1(sequence_id);
+
+  quasi += offset;
+
+  return random_uint32_t_to_float(quasi);
 }
 
 __device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t pixel) {
-  const float offset1 = random_uint16_t_to_float(random_uint16_t_base(pixel + (device.depth << 24), target));
-  const float offset2 = random_uint16_t_to_float(random_uint16_t_base(pixel + (device.depth << 24), target + 1));
+  const uint32_t offset1 = random_uint32_t_base(pixel + (device.depth << 24), target);
+  const uint32_t offset2 = random_uint32_t_base(pixel + (device.depth << 24), target + 1);
 
-  float2 quasi = random_r2(device.temporal_frames);
+  uint2 quasi = random_r2(device.temporal_frames);
 
   quasi.x += offset1;
-  quasi.x -= truncf(quasi.x);
-
   quasi.y += offset2;
-  quasi.y -= truncf(quasi.y);
 
-  return quasi;
+  return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
 }
 
 ////////////////////////////////////////////////////////////////////

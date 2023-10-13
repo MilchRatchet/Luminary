@@ -129,7 +129,7 @@ __global__ void particle_process_tasks() {
         LightSample light                   = load_light_sample(device.ptrs.light_samples, pixel);
 
         if (light.weight > 0.0f) {
-          const BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, data.position);
+          const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, pixel));
 
           const RGBF light_record = mul_color(record, brdf_sample.term);
 
