@@ -25,7 +25,8 @@ enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_RESTIR_GENERATION           = 266, /* 128 */
   QUASI_RANDOM_TARGET_LENS                        = 394, /* 2 */
   QUASI_RANDOM_TARGET_VOLUME_DIST                 = 396, /* 1 */
-  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE            = 397  /* 1 */
+  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE            = 397, /* 1 */
+  QUASI_RANDOM_TARGET_MAX                         = 398
 } typedef QuasiRandomTarget;
 
 ////////////////////////////////////////////////////////////////////
@@ -154,12 +155,55 @@ __device__ float white_noise() {
   return white_noise_offset(device.ptrs.randoms[THREAD_ID]++);
 }
 
+#define HILBERT_LEVEL 16u
+#define HILBERT_WIDTH (1u << HILBERT_LEVEL)
+
+// https://www.shadertoy.com/view/ttVBWz
+__device__ uint32_t random_hilbert_order(const uint32_t x, const uint32_t y) {
+  uint32_t px    = x;
+  uint32_t py    = y;
+  uint32_t index = 0;
+
+  for (uint32_t cur_level = HILBERT_WIDTH / 2u; cur_level > 0u; cur_level /= 2u) {
+    const uint32_t rx = ((px & cur_level) > 0) ? 1 : 0;
+    const uint32_t ry = ((py & cur_level) > 0) ? 1 : 0;
+
+    index += cur_level * cur_level * ((3u * rx) ^ ry);
+
+    if (ry == 0u) {
+      if (rx == 1u) {
+        px = HILBERT_WIDTH - 1u - px;
+        py = HILBERT_WIDTH - 1u - py;
+      }
+
+      uint32_t cx = px;
+      uint32_t cy = py;
+
+      px = cy;
+      py = cx;
+    }
+  }
+
+  return index;
+}
+
+__device__ uint32_t random_blue_noise_mask(const uint32_t pixel) {
+  const uint32_t y = pixel / device.width;
+  const uint32_t x = pixel - y * device.width;
+
+  const uint32_t index = (random_hilbert_order(x, y) & 0xFFFF);
+
+  return index;
+}
+
+__device__ uint32_t random_target_offset(const uint32_t target) {
+  return random_uint32_t_base(0, device.depth * QUASI_RANDOM_TARGET_MAX + target);
+}
+
 __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t pixel) {
-  const uint32_t offset = random_uint32_t_base(pixel + (device.depth << 24), target);
+  uint32_t quasi = random_r1((device.temporal_frames & 0xFFFF) | (random_blue_noise_mask(pixel) << 16));
 
-  uint32_t quasi = random_r1(device.temporal_frames);
-
-  quasi += offset;
+  quasi += random_target_offset(target);
 
   return random_uint32_t_to_float(quasi);
 }
@@ -169,23 +213,18 @@ __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t p
 // does not need to vary between frames as the list we are indexing changes every frame. Instead, we
 // want to make sure that we sample unique lights.
 __device__ float quasirandom_sequence_1D_intraframe(const uint32_t target, const uint32_t pixel, const uint32_t sequence_id) {
-  const uint32_t offset = random_uint32_t_base(pixel + (device.depth << 24), target);
+  uint32_t quasi = random_r1((sequence_id & 0xFFFF) | (random_blue_noise_mask(pixel) << 16));
 
-  uint32_t quasi = random_r1(sequence_id);
-
-  quasi += offset;
+  quasi += random_target_offset(target);
 
   return random_uint32_t_to_float(quasi);
 }
 
 __device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t pixel) {
-  const uint32_t offset1 = random_uint32_t_base(pixel + (device.depth << 24), target);
-  const uint32_t offset2 = random_uint32_t_base(pixel + (device.depth << 24), target + 1);
+  uint2 quasi = random_r2((device.temporal_frames & 0xFFFF) | (random_blue_noise_mask(pixel) << 16));
 
-  uint2 quasi = random_r2(device.temporal_frames);
-
-  quasi.x += offset1;
-  quasi.y += offset2;
+  quasi.x += random_target_offset(target);
+  quasi.y += random_target_offset(target + 1);
 
   return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
 }
