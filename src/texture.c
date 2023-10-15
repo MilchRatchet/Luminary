@@ -241,8 +241,8 @@ void texture_create_atlas(DeviceBuffer** buffer, TextureRGBA* textures, const in
 
   for (int i = 0; i < textures_length; i++) {
     texture_allocate(&textures_cpu[i].tex, textures + i);
-    textures_cpu[i].inv_width  = 1.0f / (textures[i].width - 1);
-    textures_cpu[i].inv_height = 1.0f / (textures[i].height - 1);
+    textures_cpu[i].inv_width  = 1.0f / textures[i].width;
+    textures_cpu[i].inv_height = 1.0f / textures[i].height;
     textures_cpu[i].gamma      = textures[i].gamma;
   }
 

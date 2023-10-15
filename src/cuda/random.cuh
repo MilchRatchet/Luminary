@@ -63,9 +63,9 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 ////////////////////////////////////////////////////////////////////
 
 // Integer fractions of the actual numbers
-#define R1_PHI 2654435768u  /*0.61803398875f*/
-#define R2_PHI1 3242174888u /*0.7548776662f*/
-#define R2_PHI2 2447445413u /*0.56984029f*/
+#define R1_PHI 2654435768u  /* 0.61803398875f */
+#define R2_PHI1 3242174888u /* 0.7548776662f  */
+#define R2_PHI2 2447445413u /* 0.56984029f    */
 
 __device__ uint32_t random_r1(const uint32_t offset) {
   const uint32_t v = offset * R1_PHI;
@@ -155,45 +155,24 @@ __device__ float white_noise() {
   return white_noise_offset(device.ptrs.randoms[THREAD_ID]++);
 }
 
-#define HILBERT_LEVEL 16u
-#define HILBERT_WIDTH (1u << HILBERT_LEVEL)
-
-// https://www.shadertoy.com/view/ttVBWz
-__device__ uint32_t random_hilbert_order(const uint32_t x, const uint32_t y) {
-  uint32_t px    = x;
-  uint32_t py    = y;
-  uint32_t index = 0;
-
-  for (uint32_t cur_level = HILBERT_WIDTH / 2u; cur_level > 0u; cur_level /= 2u) {
-    const uint32_t rx = ((px & cur_level) > 0) ? 1 : 0;
-    const uint32_t ry = ((py & cur_level) > 0) ? 1 : 0;
-
-    index += cur_level * cur_level * ((3u * rx) ^ ry);
-
-    if (ry == 0u) {
-      if (rx == 1u) {
-        px = HILBERT_WIDTH - 1u - px;
-        py = HILBERT_WIDTH - 1u - py;
-      }
-
-      uint32_t cx = px;
-      uint32_t cy = py;
-
-      px = cy;
-      py = cx;
-    }
-  }
-
-  return index;
-}
-
-__device__ uint32_t random_blue_noise_mask(const uint32_t pixel) {
+__device__ uint32_t random_blue_noise_mask_1D(const uint32_t pixel) {
   const uint32_t y = pixel / device.width;
   const uint32_t x = pixel - y * device.width;
 
-  const uint32_t index = (random_hilbert_order(x, y) & 0xFFFF);
+  DeviceTexture tex      = *device.ptrs.bluenoise_1D_tex;
+  const float blue_noise = tex2D<float>(tex.tex, x * tex.inv_width, y * tex.inv_height);
 
-  return index;
+  return ((uint32_t) (0xFFFFu * blue_noise)) << 16;
+}
+
+__device__ uint2 random_blue_noise_mask_2D(const uint32_t pixel) {
+  const uint32_t y = pixel / device.width;
+  const uint32_t x = pixel - y * device.width;
+
+  DeviceTexture tex       = *device.ptrs.bluenoise_2D_tex;
+  const float2 blue_noise = tex2D<float2>(tex.tex, x * tex.inv_width, y * tex.inv_height);
+
+  return make_uint2(((uint32_t) (0xFFFFu * blue_noise.x)) << 16, ((uint32_t) (0xFFFFu * blue_noise.y)) << 16);
 }
 
 __device__ uint32_t random_target_offset(const uint32_t target) {
@@ -201,9 +180,10 @@ __device__ uint32_t random_target_offset(const uint32_t target) {
 }
 
 __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t pixel) {
-  uint32_t quasi = random_r1((device.temporal_frames & 0xFFFF) | (random_blue_noise_mask(pixel) << 16));
+  uint32_t quasi = random_r1(device.temporal_frames);
 
   quasi += random_target_offset(target);
+  quasi += random_blue_noise_mask_1D(pixel);
 
   return random_uint32_t_to_float(quasi);
 }
@@ -213,18 +193,24 @@ __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t p
 // does not need to vary between frames as the list we are indexing changes every frame. Instead, we
 // want to make sure that we sample unique lights.
 __device__ float quasirandom_sequence_1D_intraframe(const uint32_t target, const uint32_t pixel, const uint32_t sequence_id) {
-  uint32_t quasi = random_r1((sequence_id & 0xFFFF) | (random_blue_noise_mask(pixel) << 16));
+  uint32_t quasi = random_r1(sequence_id);
 
   quasi += random_target_offset(target);
+  quasi += random_blue_noise_mask_1D(pixel);
 
   return random_uint32_t_to_float(quasi);
 }
 
 __device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t pixel) {
-  uint2 quasi = random_r2((device.temporal_frames & 0xFFFF) | (random_blue_noise_mask(pixel) << 16));
+  uint2 quasi = random_r2(device.temporal_frames);
+
+  uint2 blue_noise_mask = random_blue_noise_mask_2D(pixel);
 
   quasi.x += random_target_offset(target);
   quasi.y += random_target_offset(target + 1);
+
+  quasi.x += blue_noise_mask.x;
+  quasi.y += blue_noise_mask.y;
 
   return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
 }

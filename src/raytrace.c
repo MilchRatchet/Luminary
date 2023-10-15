@@ -157,6 +157,41 @@ static void raytrace_load_moon_textures(RaytraceInstance* instance) {
   texture_create_atlas(&instance->sky_moon_normal_tex, &moon_normal_tex, 1);
 }
 
+static void raytrace_load_bluenoise_texture(RaytraceInstance* instance) {
+  uint64_t info = 0;
+
+  void* bluenoise_1D_data;
+  int64_t bluenoise_1D_data_length;
+  ceb_access("bluenoise_1D.png", &bluenoise_1D_data, &bluenoise_1D_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load bluenoise_1D texture.");
+  }
+
+  void* bluenoise_2D_data;
+  int64_t bluenoise_2D_data_length;
+  ceb_access("bluenoise_2D.png", &bluenoise_2D_data, &bluenoise_2D_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load bluenoise_2D texture.");
+  }
+
+  TextureRGBA bluenoise_1D_tex = png_load(bluenoise_1D_data, bluenoise_1D_data_length, "bluenoise_1D.png");
+  bluenoise_1D_tex.filter      = TexFilterPoint;
+  bluenoise_1D_tex.wrap_mode_R = TexModeWrap;
+  bluenoise_1D_tex.wrap_mode_S = TexModeWrap;
+  bluenoise_1D_tex.wrap_mode_T = TexModeWrap;
+
+  TextureRGBA bluenoise_2D_tex = png_load(bluenoise_2D_data, bluenoise_2D_data_length, "bluenoise_2D.png");
+  bluenoise_2D_tex.filter      = TexFilterPoint;
+  bluenoise_2D_tex.wrap_mode_R = TexModeWrap;
+  bluenoise_2D_tex.wrap_mode_S = TexModeWrap;
+  bluenoise_2D_tex.wrap_mode_T = TexModeWrap;
+
+  texture_create_atlas(&instance->bluenoise_1D_tex, &bluenoise_1D_tex, 1);
+  texture_create_atlas(&instance->bluenoise_2D_tex, &bluenoise_2D_tex, 1);
+}
+
 /*
  * We importance sample for a tent filter of radius 1.
  * The tent filter is defined by 1-abs(x) for all x in [-1,1] and 0 else.
@@ -556,6 +591,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_update_symbol(texture_assignments, instance->scene.texture_assignments);
 
   raytrace_load_moon_textures(instance);
+  raytrace_load_bluenoise_texture(instance);
 
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
@@ -727,6 +763,8 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.sky_hdri_luts                    = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
   ptrs.sky_moon_albedo_tex              = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_albedo_tex);
   ptrs.sky_moon_normal_tex              = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_normal_tex);
+  ptrs.bluenoise_1D_tex                 = (DeviceTexture*) device_buffer_get_pointer(instance->bluenoise_1D_tex);
+  ptrs.bluenoise_2D_tex                 = (DeviceTexture*) device_buffer_get_pointer(instance->bluenoise_2D_tex);
   ptrs.mis_buffer                       = (float*) device_buffer_get_pointer(instance->mis_buffer);
   ptrs.light_transparency_weight_buffer = (float*) device_buffer_get_pointer(instance->light_transparency_weight_buffer);
 

@@ -560,11 +560,11 @@ __global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int
         break;
     }
 
-    const float dither = (device.scene.camera.dithering) ? get_dithering(x, y) : 0.0f;
+    const float dither = (device.scene.camera.dithering) ? dither_mask(x, y) : 0.0f;
 
-    pixel.r = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.r));
-    pixel.g = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.g));
-    pixel.b = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.b));
+    pixel.r = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.r));
+    pixel.g = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.g));
+    pixel.b = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.b));
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;
