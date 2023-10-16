@@ -181,12 +181,14 @@ static void raytrace_load_bluenoise_texture(RaytraceInstance* instance) {
   bluenoise_1D_tex.wrap_mode_R = TexModeWrap;
   bluenoise_1D_tex.wrap_mode_S = TexModeWrap;
   bluenoise_1D_tex.wrap_mode_T = TexModeWrap;
+  bluenoise_1D_tex.read_mode   = TexReadModeElement;
 
   TextureRGBA bluenoise_2D_tex = png_load(bluenoise_2D_data, bluenoise_2D_data_length, "bluenoise_2D.png");
   bluenoise_2D_tex.filter      = TexFilterPoint;
   bluenoise_2D_tex.wrap_mode_R = TexModeWrap;
   bluenoise_2D_tex.wrap_mode_S = TexModeWrap;
   bluenoise_2D_tex.wrap_mode_T = TexModeWrap;
+  bluenoise_2D_tex.read_mode   = TexReadModeElement;
 
   texture_create_atlas(&instance->bluenoise_1D_tex, &bluenoise_1D_tex, 1);
   texture_create_atlas(&instance->bluenoise_2D_tex, &bluenoise_2D_tex, 1);

@@ -695,11 +695,6 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
   return result;
 }
 
-__device__ float dither_mask(const int x, const int y) {
-  DeviceTexture tex = *device.ptrs.bluenoise_1D_tex;
-  return tex2D<float>(tex.tex, x * tex.inv_width, y * tex.inv_height);
-}
-
 //
 // Linear RGB / sRGB conversion taken from https://www.shadertoy.com/view/lsd3zN
 // which is based os D3DX implementations
@@ -753,7 +748,7 @@ __device__ RGBF filter_sepia(RGBF color) {
 __device__ RGBF filter_gameboy(RGBF color, int x, int y) {
   const float value = 2550.0f * luminance(color);
 
-  const float dither = dither_mask(x, y);
+  const float dither = random_dither_mask(x, y);
 
   const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
 
@@ -773,7 +768,7 @@ __device__ RGBF filter_gameboy(RGBF color, int x, int y) {
 __device__ RGBF filter_2bitgray(RGBF color, int x, int y) {
   const float value = 2550.0f * luminance(color);
 
-  const float dither = dither_mask(x, y);
+  const float dither = random_dither_mask(x, y);
 
   const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
 
@@ -816,7 +811,7 @@ __device__ RGBF filter_crt(RGBF color, int x, int y) {
 __device__ RGBF filter_blackwhite(RGBF color, int x, int y) {
   const float value = 2550.0f * luminance(color);
 
-  const float dither = dither_mask(x, y);
+  const float dither = random_dither_mask(x, y);
 
   const int tone = (int) ((64.0f + value - dither * 128.0f) / 128.0f);
 

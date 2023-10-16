@@ -159,20 +159,20 @@ __device__ uint32_t random_blue_noise_mask_1D(const uint32_t pixel) {
   const uint32_t y = pixel / device.width;
   const uint32_t x = pixel - y * device.width;
 
-  DeviceTexture tex      = *device.ptrs.bluenoise_1D_tex;
-  const float blue_noise = tex2D<float>(tex.tex, x * tex.inv_width, y * tex.inv_height);
+  DeviceTexture tex         = *device.ptrs.bluenoise_1D_tex;
+  const uint32_t blue_noise = tex2D<uint32_t>(tex.tex, x * tex.inv_width, y * tex.inv_height);
 
-  return ((uint32_t) (0xFFFFu * blue_noise)) << 16;
+  return blue_noise << 16;
 }
 
 __device__ uint2 random_blue_noise_mask_2D(const uint32_t pixel) {
   const uint32_t y = pixel / device.width;
   const uint32_t x = pixel - y * device.width;
 
-  DeviceTexture tex       = *device.ptrs.bluenoise_2D_tex;
-  const float2 blue_noise = tex2D<float2>(tex.tex, x * tex.inv_width, y * tex.inv_height);
+  DeviceTexture tex      = *device.ptrs.bluenoise_2D_tex;
+  const uint2 blue_noise = tex2D<uint2>(tex.tex, x * tex.inv_width, y * tex.inv_height);
 
-  return make_uint2(((uint32_t) (0xFFFFu * blue_noise.x)) << 16, ((uint32_t) (0xFFFFu * blue_noise.y)) << 16);
+  return make_uint2(blue_noise.x << 16, blue_noise.y << 16);
 }
 
 __device__ uint32_t random_target_offset(const uint32_t target) {
@@ -213,6 +213,13 @@ __device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t 
   quasi.y += blue_noise_mask.y;
 
   return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
+}
+
+__device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
+  DeviceTexture tex         = *device.ptrs.bluenoise_1D_tex;
+  const uint16_t blue_noise = tex2D<uint16_t>(tex.tex, x * tex.inv_width, y * tex.inv_height);
+
+  return random_uint16_t_to_float(blue_noise);
 }
 
 ////////////////////////////////////////////////////////////////////

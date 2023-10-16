@@ -42,7 +42,15 @@ enum cudaTextureReadMode texture_get_read_mode(TextureRGBA* tex) {
       return cudaReadModeElementType;
     case TexDataUINT8:
     case TexDataUINT16:
-      return cudaReadModeNormalizedFloat;
+      switch (tex->read_mode) {
+        case TexReadModeNormalized:
+          return cudaReadModeNormalizedFloat;
+        case TexReadModeElement:
+          return cudaReadModeElementType;
+        default:
+          error_message("Invalid texture read mode %d\n", tex->read_mode);
+          return cudaReadModeNormalizedFloat;
+      }
     default:
       error_message("Invalid texture data type %d\n", tex->type);
       return cudaReadModeElementType;
@@ -282,6 +290,7 @@ void texture_create(
     .wrap_mode_T      = TexModeWrap,
     .wrap_mode_R      = TexModeWrap,
     .filter           = TexFilterLinear,
+    .read_mode        = TexReadModeNormalized,
     .mipmap           = TexMipmapNone,
     .mipmap_max_level = 0,
     .gamma            = 1.0f};
