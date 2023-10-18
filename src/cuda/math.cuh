@@ -733,24 +733,23 @@ __device__ RGBAF saturate_albedo(RGBAF color, float change) {
   return color;
 }
 
-__device__ RGBF filter_gray(RGBF color) {
+__device__ RGBF filter_gray(const RGBF color) {
   const float value = luminance(color);
 
   return get_color(value, value, value);
 }
 
-__device__ RGBF filter_sepia(RGBF color) {
+__device__ RGBF filter_sepia(const RGBF color) {
   return get_color(
     color.r * 0.393f + color.g * 0.769f + color.b * 0.189f, color.r * 0.349f + color.g * 0.686f + color.b * 0.168f,
     color.r * 0.272f + color.g * 0.534f + color.b * 0.131f);
 }
 
-__device__ RGBF filter_gameboy(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
-
+__device__ RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 4.0f * luminance(color);
   const float dither = random_dither_mask(x, y);
 
-  const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
@@ -765,20 +764,19 @@ __device__ RGBF filter_gameboy(RGBF color, int x, int y) {
   }
 }
 
-__device__ RGBF filter_2bitgray(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
-
+__device__ RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 4.0f * luminance(color);
   const float dither = random_dither_mask(x, y);
 
-  const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
       return get_color(0.0f, 0.0f, 0.0f);
     case 1:
-      return get_color(85.0f / 255.0f, 85.0f / 255.0f, 85.0f / 255.0f);
+      return get_color(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f);
     case 2:
-      return get_color(170.0f / 255.0f, 170.0f / 255.0f, 170.0f / 255.0f);
+      return get_color(2.0f / 3.0f, 2.0f / 3.0f, 2.0f / 3.0f);
     case 3:
     default:
       return get_color(1.0f, 1.0f, 1.0f);
@@ -808,12 +806,11 @@ __device__ RGBF filter_crt(RGBF color, int x, int y) {
   return color;
 }
 
-__device__ RGBF filter_blackwhite(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
-
+__device__ RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 2.0f * luminance(color);
   const float dither = random_dither_mask(x, y);
 
-  const int tone = (int) ((64.0f + value - dither * 128.0f) / 128.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
