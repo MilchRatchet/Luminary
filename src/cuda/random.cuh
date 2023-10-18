@@ -26,7 +26,8 @@ enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_LENS                        = 394, /* 2 */
   QUASI_RANDOM_TARGET_VOLUME_DIST                 = 396, /* 1 */
   QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE            = 397, /* 1 */
-  QUASI_RANDOM_TARGET_MAX                         = 398
+  QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET           = 398, /* 3 */
+  QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT            = 401  /* 3 */
 } typedef QuasiRandomTarget;
 
 ////////////////////////////////////////////////////////////////////
@@ -175,15 +176,28 @@ __device__ uint2 random_blue_noise_mask_2D(const uint32_t pixel) {
   return make_uint2(blue_noise.x << 16, blue_noise.y << 16);
 }
 
-__device__ uint32_t random_target_offset(const uint32_t target) {
-  return random_uint32_t_base(0, device.depth * QUASI_RANDOM_TARGET_MAX + target);
+__device__ uint32_t random_target_offset_1D(const uint32_t target) {
+  const uint32_t depth_offset  = random_uint32_t_base(0xc8e4fd15, device.depth);
+  const uint32_t target_offset = random_uint32_t_base(0x4ce32f6d, target);
+
+  return depth_offset + target_offset;
+}
+
+__device__ uint2 random_target_offset_2D(const uint32_t target) {
+  const uint32_t depth_offset1  = random_uint32_t_base(0xfcbd6e15, 2 * device.depth);
+  const uint32_t target_offset1 = random_uint32_t_base(0x4bf53ed9, target);
+
+  const uint32_t depth_offset2  = random_uint32_t_base(0xfcbd6e15, 2 * device.depth + 1);
+  const uint32_t target_offset2 = random_uint32_t_base(0x4bf53ed9, target + 1);
+
+  return make_uint2(depth_offset1 + target_offset1, depth_offset2 + target_offset2);
 }
 
 __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t pixel) {
   uint32_t quasi = random_r1(device.temporal_frames);
 
-  quasi += random_target_offset(target);
   quasi += random_blue_noise_mask_1D(pixel);
+  quasi += random_target_offset_1D(target);
 
   return random_uint32_t_to_float(quasi);
 }
@@ -195,8 +209,8 @@ __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t p
 __device__ float quasirandom_sequence_1D_intraframe(const uint32_t target, const uint32_t pixel, const uint32_t sequence_id) {
   uint32_t quasi = random_r1(sequence_id);
 
-  quasi += random_target_offset(target);
   quasi += random_blue_noise_mask_1D(pixel);
+  quasi += random_target_offset_1D(target);
 
   return random_uint32_t_to_float(quasi);
 }
@@ -204,10 +218,11 @@ __device__ float quasirandom_sequence_1D_intraframe(const uint32_t target, const
 __device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t pixel) {
   uint2 quasi = random_r2(device.temporal_frames);
 
-  uint2 blue_noise_mask = random_blue_noise_mask_2D(pixel);
+  const uint2 blue_noise_mask     = random_blue_noise_mask_2D(pixel);
+  const uint2 depth_target_offset = random_target_offset_2D(target);
 
-  quasi.x += random_target_offset(target);
-  quasi.y += random_target_offset(target + 1);
+  quasi.x += depth_target_offset.x;
+  quasi.y += depth_target_offset.y;
 
   quasi.x += blue_noise_mask.x;
   quasi.y += blue_noise_mask.y;

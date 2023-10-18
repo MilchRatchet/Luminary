@@ -80,7 +80,8 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray, const Cloud
 /*
  * Returns an RGBAF where the RGB is the radiance and the A is the greyscale transmittance.
  */
-__device__ CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float start, float dist, const CloudLayerType layer, uint32_t& seed) {
+__device__ CloudRenderResult
+  clouds_compute(vec3 origin, vec3 ray, float start, float dist, const CloudLayerType layer, const uint32_t pixel, uint32_t& seed) {
   if (dist < 0.0f || start == FLT_MAX) {
     CloudRenderResult result;
 
@@ -92,22 +93,21 @@ __device__ CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float start, 
   }
 
   int step_count;
-
   switch (layer) {
     case CLOUD_LAYER_LOW: {
       const float span = device.scene.sky.cloud.low.height_max - device.scene.sky.cloud.low.height_min;
       dist             = fminf(6.0f * span, dist);
-      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / (6.0f * span)) + white_noise_offset(seed++) - 0.5f;
+      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / (6.0f * span));
     } break;
     case CLOUD_LAYER_MID: {
       const float span = device.scene.sky.cloud.mid.height_max - device.scene.sky.cloud.mid.height_min;
       dist             = fminf(6.0f * span, dist);
-      step_count       = (device.scene.sky.cloud.steps / 4) * __saturatef(dist / (6.0f * span)) + white_noise_offset(seed++) - 0.5f;
+      step_count       = (device.scene.sky.cloud.steps / 4) * __saturatef(dist / (6.0f * span));
     } break;
     case CLOUD_LAYER_TOP: {
       const float span = device.scene.sky.cloud.top.height_max - device.scene.sky.cloud.top.height_min;
       dist             = fminf(6.0f * span, dist);
-      step_count       = (device.scene.sky.cloud.steps / 8) * __saturatef(dist / (6.0f * span)) + white_noise_offset(seed++) - 0.5f;
+      step_count       = (device.scene.sky.cloud.steps / 8) * __saturatef(dist / (6.0f * span));
     } break;
     default: {
       CloudRenderResult result;
@@ -120,10 +120,13 @@ __device__ CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float start, 
     }
   }
 
+  step_count += quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT + layer, pixel);
+
   start = fmaxf(0.0f, start);
 
-  const float step_size = dist / step_count;
-  float reach           = start + (0.1f + white_noise_offset(seed++) * 0.9f) * step_size;
+  const float step_size     = dist / step_count;
+  const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, pixel);
+  float reach               = start + (0.1f + random_offset * 0.9f) * step_size;
 
   const float sun_solid_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
@@ -236,18 +239,19 @@ __device__ CloudRenderResult clouds_compute(vec3 origin, vec3 ray, float start, 
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ float clouds_render(vec3 origin, const vec3 ray, const float limit, RGBF& color, RGBF& transmittance, uint32_t& seed) {
+__device__ float clouds_render(
+  vec3 origin, const vec3 ray, const float limit, const uint32_t pixel, RGBF& color, RGBF& transmittance, uint32_t& seed) {
   float2 intersections[3];
   CloudRenderResult results[3];
 
   intersections[0] = cloud_get_lowlayer_intersection(origin, ray, limit);
-  results[0]       = clouds_compute(origin, ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW, seed);
+  results[0]       = clouds_compute(origin, ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW, pixel, seed);
 
   intersections[1] = cloud_get_midlayer_intersection(origin, ray, limit);
-  results[1]       = clouds_compute(origin, ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID, seed);
+  results[1]       = clouds_compute(origin, ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID, pixel, seed);
 
   intersections[2] = cloud_get_toplayer_intersection(origin, ray, limit);
-  results[2]       = clouds_compute(origin, ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP, seed);
+  results[2]       = clouds_compute(origin, ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP, pixel, seed);
 
   const bool less01 = intersections[0].x <= intersections[1].x;
   const bool less02 = intersections[0].x <= intersections[2].x;
@@ -319,7 +323,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     RGBF record = load_RGBF(device.records + pixel);
     RGBF color  = load_RGBF(device.ptrs.frame_buffer + pixel);
 
-    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, color, record, seed);
+    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, pixel, color, record, seed);
 
     if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
       if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
