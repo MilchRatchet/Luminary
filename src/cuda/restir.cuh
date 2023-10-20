@@ -63,7 +63,7 @@ __device__ float restir_sample_volume_extinction(const GBufferData data, const v
     const float2 path             = volume_compute_path(volume, data.position, ray, max_dist);
 
     if (path.x >= 0.0f) {
-      extinction *= expf(-path.y * volume.avg_scattering);
+      extinction *= expf(-path.y * volume.max_scattering);
     }
   }
 

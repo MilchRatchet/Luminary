@@ -1,6 +1,7 @@
 #ifndef CU_VOLUME_H
 #define CU_VOLUME_H
 
+#include "directives.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
 #include "state.cuh"
@@ -128,7 +129,7 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
 __device__ float volume_sample_intersection(
   const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist, const float random) {
   // [FonWKH17] Equation 15
-  const float t = (-logf(random)) / volume.avg_scattering;
+  const float t = (-logf(random)) / volume.max_scattering;
 
   if (t > max_dist)
     return FLT_MAX;
@@ -232,7 +233,7 @@ __global__ void volume_process_events_weight() {
         const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
         if (path.x >= 0.0f) {
-          record = scale_color(record, expf(-path.y * volume.avg_scattering));
+          record = scale_color(record, expf(-path.y * volume.max_scattering));
         }
       }
     }
@@ -251,12 +252,12 @@ __global__ void volume_process_events_weight() {
         }
         else {
           if (hit_id == HIT_TYPE_VOLUME_OCEAN) {
-            record.r *=
-              (volume.scattering.r * expf(-path.y * volume.scattering.r)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
-            record.g *=
-              (volume.scattering.g * expf(-path.y * volume.scattering.g)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
-            record.b *=
-              (volume.scattering.b * expf(-path.y * volume.scattering.b)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
+            const float sampling_pdf = volume.max_scattering * expf(-path.y * volume.max_scattering);
+            const RGBF target_pdf    = get_color(
+              volume.scattering.r * expf(-path.y * volume.scattering.r), volume.scattering.g * expf(-path.y * volume.scattering.g),
+              volume.scattering.b * expf(-path.y * volume.scattering.b));
+
+            record = mul_color(record, scale_color(target_pdf, 1.0f / sampling_pdf));
           }
 
           record.r *= expf(-path.y * volume.absorption.r);
@@ -295,14 +296,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
                               ? jendersie_eon_phase_sample(task.ray, device.scene.fog.droplet_diameter, random_dir, random_choice)
                               : ocean_phase_sampling(task.ray, random_dir, random_choice);
 
+    RGBF bounce_record = record;
+
     TraceTask bounce_task;
     bounce_task.origin = task.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 
     device.ptrs.mis_buffer[pixel] = 0.0f;
-    store_RGBF(device.ptrs.bounce_records + pixel, record);
-    store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+    if (validate_trace_task(bounce_task, pixel, bounce_record)) {
+      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
+      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+    }
 
     if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
       LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
