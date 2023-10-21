@@ -18,23 +18,25 @@
 #include "utils.cuh"
 #include "volume.cuh"
 
-__device__ TraceTask get_starting_ray(TraceTask task) {
-  vec3 default_ray;
+__device__ TraceTask get_starting_ray(TraceTask task, const uint32_t pixel) {
+  vec3 lens_ray;
 
-  default_ray.x =
+  lens_ray.x =
     device.scene.camera.focal_length * (-device.scene.camera.fov + device.emitter.step * (task.index.x + device.emitter.jitter.x));
-  default_ray.y = device.scene.camera.focal_length * (device.emitter.vfov - device.emitter.step * (task.index.y + device.emitter.jitter.y));
-  default_ray.z = -device.scene.camera.focal_length;
+  lens_ray.y = device.scene.camera.focal_length * (device.emitter.vfov - device.emitter.step * (task.index.y + device.emitter.jitter.y));
+  lens_ray.z = -device.scene.camera.focal_length;
 
-  const float alpha = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : white_noise() * 2.0f * PI;
-  const float beta  = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : sqrtf(white_noise()) * device.scene.camera.aperture_size;
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LENS, pixel);
+
+  const float alpha = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : random.x * 2.0f * PI;
+  const float beta  = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : sqrtf(random.y) * device.scene.camera.aperture_size;
 
   vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 
-  default_ray       = sub_vector(default_ray, point_on_aperture);
+  lens_ray          = sub_vector(lens_ray, point_on_aperture);
   point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device.emitter.camera_rotation);
 
-  task.ray    = normalize_vector(rotate_vector_by_quaternion(default_ray, device.emitter.camera_rotation));
+  task.ray    = normalize_vector(rotate_vector_by_quaternion(lens_ray, device.emitter.camera_rotation));
   task.origin = add_vector(device.scene.camera.pos, point_on_aperture);
 
   return task;
@@ -50,7 +52,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     task.index.x = (uint16_t) (pixel % device.width);
     task.index.y = (uint16_t) (pixel / device.width);
 
-    task = get_starting_ray(task);
+    task = get_starting_ray(task, pixel);
 
     device.ptrs.light_records[pixel]                    = get_color(1.0f, 1.0f, 1.0f);
     device.ptrs.bounce_records[pixel]                   = get_color(1.0f, 1.0f, 1.0f);
@@ -558,11 +560,11 @@ __global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int
         break;
     }
 
-    const float dither = (device.scene.camera.dithering) ? get_dithering(x, y) : 0.0f;
+    const float dither = (device.scene.camera.dithering) ? random_dither_mask(x, y) : 0.0f;
 
-    pixel.r = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.r));
-    pixel.g = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.g));
-    pixel.b = fminf(255.9f, 0.5f - dither + 255.9f * linearRGB_to_SRGB(pixel.b));
+    pixel.r = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.r));
+    pixel.g = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.g));
+    pixel.b = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.b));
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;

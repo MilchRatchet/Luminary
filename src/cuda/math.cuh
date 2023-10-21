@@ -695,12 +695,6 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
   return result;
 }
 
-__device__ float get_dithering(const int x, const int y) {
-  const float dither = 2.0f * white_noise() - 1.0f;
-
-  return copysignf(1.0f - sqrtf(1.0f - fabsf(dither)), dither);
-}
-
 //
 // Linear RGB / sRGB conversion taken from https://www.shadertoy.com/view/lsd3zN
 // which is based os D3DX implementations
@@ -739,24 +733,23 @@ __device__ RGBAF saturate_albedo(RGBAF color, float change) {
   return color;
 }
 
-__device__ RGBF filter_gray(RGBF color) {
+__device__ RGBF filter_gray(const RGBF color) {
   const float value = luminance(color);
 
   return get_color(value, value, value);
 }
 
-__device__ RGBF filter_sepia(RGBF color) {
+__device__ RGBF filter_sepia(const RGBF color) {
   return get_color(
     color.r * 0.393f + color.g * 0.769f + color.b * 0.189f, color.r * 0.349f + color.g * 0.686f + color.b * 0.168f,
     color.r * 0.272f + color.g * 0.534f + color.b * 0.131f);
 }
 
-__device__ RGBF filter_gameboy(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
+__device__ RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 4.0f * luminance(color);
+  const float dither = random_dither_mask(x, y);
 
-  const float dither = get_dithering(x, y);
-
-  const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
@@ -771,20 +764,19 @@ __device__ RGBF filter_gameboy(RGBF color, int x, int y) {
   }
 }
 
-__device__ RGBF filter_2bitgray(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
+__device__ RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 4.0f * luminance(color);
+  const float dither = random_dither_mask(x, y);
 
-  const float dither = get_dithering(x, y);
-
-  const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
       return get_color(0.0f, 0.0f, 0.0f);
     case 1:
-      return get_color(85.0f / 255.0f, 85.0f / 255.0f, 85.0f / 255.0f);
+      return get_color(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f);
     case 2:
-      return get_color(170.0f / 255.0f, 170.0f / 255.0f, 170.0f / 255.0f);
+      return get_color(2.0f / 3.0f, 2.0f / 3.0f, 2.0f / 3.0f);
     case 3:
     default:
       return get_color(1.0f, 1.0f, 1.0f);
@@ -814,12 +806,11 @@ __device__ RGBF filter_crt(RGBF color, int x, int y) {
   return color;
 }
 
-__device__ RGBF filter_blackwhite(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
+__device__ RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 2.0f * luminance(color);
+  const float dither = random_dither_mask(x, y);
 
-  const float dither = get_dithering(x, y);
-
-  const int tone = (int) ((64.0f + value - dither * 128.0f) / 128.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
@@ -963,20 +954,19 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
  *
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
-__device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float ms_factor = 1.0f) {
-  const float r = white_noise();
-
+__device__ vec3
+  jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice, const float ms_factor = 1.0f) {
   JendersieEonParams params = jendersie_eon_phase_parameters(diameter, ms_factor);
 
   float u;
-  if (white_noise() < params.w_d) {
-    u = draine_phase_sample(params.g_d, params.alpha, r);
+  if (r_choice < params.w_d) {
+    u = draine_phase_sample(params.g_d, params.alpha, r_dir.x);
   }
   else {
-    u = henyey_greenstein_phase_sample(params.g_hg, r);
+    u = henyey_greenstein_phase_sample(params.g_hg, r_dir.x);
   }
 
-  return phase_sample_basis(u, white_noise(), ray);
+  return phase_sample_basis(u, r_dir.y, ray);
 }
 
 __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
@@ -1075,9 +1065,9 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
  *
  * Robust triangle sampling.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, uint32_t& seed) {
-  float r1 = sqrtf(white_noise_offset(seed++));
-  float r2 = white_noise_offset(seed++);
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random) {
+  float r1 = sqrtf(random.x);
+  float r2 = random.y;
 
   // Map random numbers uniformly into [0.025,0.975].
   r1 = 0.025f + 0.95f * r1;
@@ -1098,9 +1088,9 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the sphere.
  */
-__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, float& area, uint32_t& seed) {
-  float r1 = white_noise_offset(seed++);
-  float r2 = white_noise_offset(seed++);
+__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, const float2 random, float& area) {
+  float r1 = random.x;
+  float r2 = random.y;
 
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);

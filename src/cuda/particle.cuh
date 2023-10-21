@@ -37,7 +37,10 @@ __global__ void particle_generate_g_buffer() {
 
     uint32_t flags = 0;
 
-    if (albedo.a < 1.0f && white_noise() > albedo.a) {
+    const QuasiRandomTarget random_target =
+      (device.iteration_type == TYPE_LIGHT) ? QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY : QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY;
+
+    if (albedo.a < 1.0f && quasirandom_sequence_1D(random_target, pixel) > albedo.a) {
       flags |= G_BUFFER_TRANSPARENT_PASS;
     }
 
@@ -101,7 +104,7 @@ __global__ void particle_process_tasks() {
           break;
         case TYPE_LIGHT:
           device.ptrs.light_transparency_weight_buffer[pixel] *= 2.0f;
-          if (white_noise() > 0.5f) {
+          if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY_ROULETTE, pixel) > 0.5f) {
             if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
               store_RGBF(device.ptrs.light_records + pixel, record);
               store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
@@ -117,7 +120,7 @@ __global__ void particle_process_tasks() {
       BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
 
       bool bounce_is_specular;
-      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, bounce_is_specular);
+      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, pixel, bounce_is_specular);
 
       float bounce_mis_weight = 1.0f;
 
@@ -126,7 +129,7 @@ __global__ void particle_process_tasks() {
         LightSample light                   = load_light_sample(device.ptrs.light_samples, pixel);
 
         if (light.weight > 0.0f) {
-          const BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, data.position);
+          const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, pixel));
 
           const RGBF light_record = mul_color(record, brdf_sample.term);
 
@@ -155,7 +158,7 @@ __global__ void particle_process_tasks() {
       bounce_task.ray    = bounce_brdf.L;
       bounce_task.index  = task.index;
 
-      if (validate_trace_task(bounce_task, bounce_record)) {
+      if (validate_trace_task(bounce_task, pixel, bounce_record)) {
         device.ptrs.mis_buffer[pixel] = bounce_mis_weight;
         store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
         store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);

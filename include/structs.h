@@ -226,6 +226,7 @@ enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
 enum TextureStorageLocation { TexStorageCPU = 0, TexStorageGPU = 1 } typedef TextureStorageLocation;
 enum TextureFilterMode { TexFilterPoint = 0, TexFilterLinear = 1 } typedef TextureFilterMode;
 enum TextureMipmapMode { TexMipmapNone = 0, TexMipmapGenerate = 1 } typedef TextureMipmapMode;
+enum TextureReadMode { TexReadModeNormalized = 0, TexReadModeElement = 1 } typedef TextureReadMode;
 
 struct TextureRGBA {
   unsigned int width;
@@ -240,6 +241,7 @@ struct TextureRGBA {
   TextureStorageLocation storage;
   TextureFilterMode filter;
   TextureMipmapMode mipmap;
+  TextureReadMode read_mode;
   int mipmap_max_level;
   void* data;
   float gamma;

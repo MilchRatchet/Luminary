@@ -63,7 +63,7 @@ __device__ float restir_sample_volume_extinction(const GBufferData data, const v
     const float2 path             = volume_compute_path(volume, data.position, ray, max_dist);
 
     if (path.x >= 0.0f) {
-      extinction *= expf(-path.y * volume.avg_scattering);
+      extinction *= expf(-path.y * volume.max_scattering);
     }
   }
 
@@ -76,7 +76,8 @@ __device__ float restir_sample_volume_extinction(const GBufferData data, const v
  * @param data Data to compute the target pdf from.
  * @result Target PDF of light sample.
  */
-__device__ float restir_sample_target_pdf(LightSample x, const GBufferData data, const RGBF record, float& primitive_pdf) {
+__device__ float restir_sample_target_pdf(
+  LightSample x, const GBufferData data, const RGBF record, const uint32_t pixel, float& primitive_pdf) {
   if (x.presampled_id == LIGHT_ID_NONE) {
     primitive_pdf = 1.0f;
     return 0.0f;
@@ -90,7 +91,7 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data,
 
   float solid_angle, sample_dist;
   RGBF emission;
-  result = brdf_apply_sample_restir(brdf, x, data.position, solid_angle, emission, sample_dist);
+  result = brdf_apply_sample_restir(brdf, x, data.position, pixel, solid_angle, emission, sample_dist);
 
   primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 0.0f;
 
@@ -121,7 +122,7 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data,
  * @param seed Seed used for random number generation, the seed is overwritten on use.
  * @result Sampled light sample.
  */
-__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, uint32_t& seed) {
+__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const uint32_t pixel) {
   LightSample selected = restir_sample_empty();
 
   const vec3 sky_pos = world_to_sky_transform(data.position);
@@ -134,17 +135,17 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   // Importance sample the sun
   if (sun_visible) {
     LightSample sampled;
-    sampled.seed          = random_uint32_t(seed++);
+    sampled.seed          = QUASI_RANDOM_TARGET_RESTIR_DIR;
     sampled.presampled_id = LIGHT_ID_SUN;
 
     float primitive_pdf;
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, primitive_pdf);
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, pixel, primitive_pdf);
     const float sampled_pdf        = primitive_pdf;
 
     const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
-    if (white_noise_offset(seed++) * selected.weight < weight) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RESTIR_CHOICE, pixel) * selected.weight < weight) {
       selected.id            = LIGHT_ID_SUN;
       selected.presampled_id = LIGHT_ID_SUN;
       selected.seed          = sampled.seed;
@@ -155,17 +156,17 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   // Importance sample the toy (but only if we are not originating from the toy)
   if (toy_visible && data.hit_id != HIT_TYPE_TOY) {
     LightSample sampled;
-    sampled.seed          = random_uint32_t(seed++);
+    sampled.seed          = QUASI_RANDOM_TARGET_RESTIR_DIR + 1;
     sampled.presampled_id = LIGHT_ID_TOY;
 
     float primitive_pdf;
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, primitive_pdf);
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, pixel, primitive_pdf);
     const float sampled_pdf        = primitive_pdf;
 
     const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
-    if (white_noise_offset(seed++) * selected.weight < weight) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RESTIR_CHOICE + 1, pixel) * selected.weight < weight) {
       selected.id            = LIGHT_ID_TOY;
       selected.presampled_id = LIGHT_ID_TOY;
       selected.seed          = sampled.seed;
@@ -186,21 +187,21 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
 
   for (int i = 0; i < reservoir_size; i++) {
     LightSample sampled;
-    sampled.seed          = random_uint32_t(seed++);
-    sampled.presampled_id = random_uint32_t(seed++) & (light_count - 1);
+    sampled.seed          = QUASI_RANDOM_TARGET_RESTIR_DIR + 2 + i;
+    sampled.presampled_id = quasirandom_sequence_1D_intraframe(QUASI_RANDOM_TARGET_RESTIR_GENERATION, pixel, i) * light_count;
     sampled.id            = device.ptrs.light_candidates[sampled.presampled_id];
 
     if (sampled.id == blocked_light_id)
       continue;
 
     float primitive_pdf;
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, primitive_pdf);
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, pixel, primitive_pdf);
     const float sampled_pdf        = reservoir_sampling_pdf * primitive_pdf;
 
     const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
-    if (white_noise_offset(seed++) * selected.weight < weight) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RESTIR_CHOICE + 2 + i, pixel) * selected.weight < weight) {
       selected.id            = sampled.id;
       selected.presampled_id = sampled.presampled_id;
       selected.seed          = sampled.seed;
@@ -232,8 +233,6 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
 __global__ void restir_weighted_reservoir_sampling() {
   const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT];
 
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
-
   for (int i = 0; i < task_count; i++) {
     const int offset     = get_task_address(i);
     const ushort2 index  = __ldg((ushort2*) (device.trace_tasks + offset));
@@ -242,7 +241,8 @@ __global__ void restir_weighted_reservoir_sampling() {
     const GBufferData data = load_g_buffer_data(pixel);
     const RGBF record      = load_RGBF(device.records + pixel);
 
-    LightSample sample = (data.flags & G_BUFFER_REQUIRES_SAMPLING) ? restir_sample_reservoir(data, record, seed) : restir_sample_empty();
+    const LightSample sample =
+      (data.flags & G_BUFFER_REQUIRES_SAMPLING) ? restir_sample_reservoir(data, record, pixel) : restir_sample_empty();
 
     store_light_sample(device.ptrs.light_samples, sample, pixel);
 
@@ -250,8 +250,6 @@ __global__ void restir_weighted_reservoir_sampling() {
       device.ptrs.g_buffer[pixel].flags = data.flags & (~G_BUFFER_REQUIRES_SAMPLING);
     }
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 __global__ void restir_candidates_pool_generation() {
