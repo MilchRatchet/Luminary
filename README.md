@@ -221,3 +221,4 @@ This is a list of papers I have used for this project so far. Note that some tec
 - J. Dupuy, A. Benyoub, _Sampling Visible GGX Normals with Spherical Caps_, 2023. arXiv:2306.05044
 - J. Jendersie and E. d'Eon, _An Approximate Mie Scattering Function for Fog and Cloud Rendering_, SIGGRAPH 2023 Talks, 2023.
 - M. Droske, J. Hanika, J. Vorba, A. Weidlich, M. Sabbadin, _Path Tracing in Production: The Path of Water_, ACM SIGGRAPH 2023 Courses, 2023.
+- L. Belcour and E. Heitz, _Lessons Learned and Improvements when Building Screen-Space Samplers with Blue-Noise Error Distribution_, ACM SIGGRAPH 2021 Talks, pp. 1-2, 2021.
