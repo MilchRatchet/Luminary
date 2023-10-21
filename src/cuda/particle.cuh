@@ -27,12 +27,12 @@ __global__ void particle_generate_g_buffer() {
     const vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
 
     RGBAF albedo;
-    albedo.r = 0.0f;
+    albedo.r = 1.0f;
     albedo.g = 1.0f;
-    albedo.b = 0.0f;
+    albedo.b = 1.0f;
     albedo.a = 1.0f;
 
-    float roughness = 1.0f;
+    float roughness = 0.7f;
     float metallic  = 0.0f;
 
     uint32_t flags = 0;
@@ -231,18 +231,25 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
   uint32_t seed = device.scene.particles.seed;
 
   const float scale = 0.01f;
+  const float range = 100.0f;
 
   while (id < count) {
-    const float x = (white_noise_offset(seed + id * 3 + 0) * 20.0f) - 10.0f;
-    const float y = (white_noise_offset(seed + id * 3 + 1) * 20.0f) - 10.0f;
-    const float z = (white_noise_offset(seed + id * 3 + 2) * 20.0f) - 10.0f;
+    const float x = (white_noise_offset(seed + id * 5 + 0) * range) - 0.5f * range;
+    const float y = (white_noise_offset(seed + id * 5 + 1) * range) - 0.5f * range;
+    const float z = (white_noise_offset(seed + id * 5 + 2) * range) - 0.5f * range;
 
     const vec3 p = get_vector(x, y, z);
 
-    const vec3 a00 = add_vector(p, get_vector(scale, scale, 0.0f));
-    const vec3 a01 = add_vector(p, get_vector(scale, -scale, 0.0f));
-    const vec3 a10 = add_vector(p, get_vector(-scale, scale, 0.0f));
-    const vec3 a11 = add_vector(p, get_vector(-scale, -scale, 0.0f));
+    const float r1 = 2.0f * white_noise_offset(seed + id * 5 + 3) - 1.0f;
+    const float r2 = white_noise_offset(seed + id * 5 + 4);
+
+    const vec3 normal      = sample_ray_sphere(r1, r2);
+    const Mat3x3 transform = create_basis(normal);
+
+    const vec3 a00 = add_vector(p, transform_vec3(transform, get_vector(scale, scale, 0.0f)));
+    const vec3 a01 = add_vector(p, transform_vec3(transform, get_vector(scale, -scale, 0.0f)));
+    const vec3 a10 = add_vector(p, transform_vec3(transform, get_vector(-scale, scale, 0.0f)));
+    const vec3 a11 = add_vector(p, transform_vec3(transform, get_vector(-scale, -scale, 0.0f)));
 
     const float4 f00 = make_float4(a00.x, a00.y, a00.z, 1.0f);
     const float4 f01 = make_float4(a01.x, a01.y, a01.z, 1.0f);
@@ -276,7 +283,7 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
 void device_particle_generate(RaytraceInstance* instance) {
   bench_tic((const char*) "Particles Generation");
 
-  const uint32_t count = 4096;
+  const uint32_t count = 4096 * 1024;
 
   ParticlesInstance particles = instance->particles_instance;
 
