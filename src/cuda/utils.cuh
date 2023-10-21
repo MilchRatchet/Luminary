@@ -43,7 +43,7 @@ enum TaskAddressOffset {
 } typedef TaskAddressOffset;
 
 #define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))
-#define VOLUME_HIT_TYPE(X) ((VolumeType) (X & 0x00000001u))
+#define VOLUME_HIT_TYPE(X) ((X <= HIT_TYPE_PARTICLE_MAX) ? VOLUME_TYPE_PARTICLE : ((VolumeType) (X & 0x00000001u)))
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
 
 //===========================================================================================

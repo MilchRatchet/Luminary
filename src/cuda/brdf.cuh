@@ -397,8 +397,15 @@ __device__ BRDFInstance brdf_apply_sample_weight(BRDFInstance brdf) {
 
 __device__ BRDFInstance brdf_apply_sample_weight_scattering(BRDFInstance brdf, VolumeType volume_hit_type) {
   const float cos_angle = dot_product(scale_vector(brdf.V, -1.0f), brdf.L);
-  const float phase     = (volume_hit_type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_function(cos_angle, device.scene.fog.droplet_diameter)
-                                                               : ocean_phase(cos_angle);
+
+  float phase;
+  if (volume_hit_type == VOLUME_TYPE_OCEAN) {
+    phase = ocean_phase(cos_angle);
+  }
+  else {
+    const float diameter = (volume_hit_type == VOLUME_TYPE_FOG) ? device.scene.fog.droplet_diameter : device.scene.particles.phase_diameter;
+    phase                = jendersie_eon_phase_function(cos_angle, diameter);
+  }
 
   brdf.term = scale_color(brdf.term, phase);
 
