@@ -14,7 +14,7 @@
 #define MAX_MEMORY_USAGE 100000000ul
 
 #define OMM_STATE_SIZE(__level__, __format__) \
-  (((1 << (__level__ * 2)) * ((__format__ == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) ? 1 : 2) + 7) / 8)
+  (((1u << (__level__ * 2u)) * ((__format__ == OPTIX_OPACITY_MICROMAP_FORMAT_2_STATE) ? 1u : 2u) + 7u) / 8u)
 
 struct OMMTextureTriangle {
   UV vertex;
@@ -242,8 +242,8 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   const uint32_t total_tri_count          = instance->scene.triangle_data.triangle_count;
 
   // Highest allowed level is 12 according to OptiX Docs
-  const uint32_t max_num_levels = 6;
-  uint32_t num_levels           = 0;
+  const uint8_t max_num_levels = 6;
+  uint8_t num_levels           = 0;
 
   ////////////////////////////////////////////////////////////////////
   // OMM construction
