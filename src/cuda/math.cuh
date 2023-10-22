@@ -907,7 +907,8 @@ __device__ vec3 phase_sample_basis(const float alpha, const float beta, const ve
   const vec3 u1    = get_vector(1.0f + sign * basis.x * basis.x * a, sign * b, -sign * basis.x);
   const vec3 u2    = get_vector(b, sign + basis.y * basis.y * a, -basis.y);
 
-  const vec3 s = sample_ray_sphere(alpha, beta);
+  // There is an orientation change when the sign flips, hence we need to remap accordingly
+  const vec3 s = sample_ray_sphere(alpha, sign * beta);
 
   vec3 result;
   result.x = s.x * u1.x + s.y * u2.x + s.z * basis.x;
@@ -954,9 +955,8 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
  *
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
-__device__ vec3
-  jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice, const float ms_factor = 1.0f) {
-  JendersieEonParams params = jendersie_eon_phase_parameters(diameter, ms_factor);
+__device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice) {
+  JendersieEonParams params = jendersie_eon_phase_parameters(diameter, 1.0f);
 
   float u;
   if (r_choice < params.w_d) {
