@@ -591,6 +591,14 @@ static UITab create_procedurals_particles_panels(UI* ui, RaytraceInstance* insta
   panels[i++] = create_tab(ui, 1, "Ocean\nParticles\nToy");
   panels[i++] = create_check(ui, "Active", &(instance->scene.particles.active), 1);
   panels[i++] = create_slider(ui, "Seed", &(instance->scene.particles.seed), 0, 0.005f, 0.0f, FLT_MAX, 0, 1);
+  panels[i++] = create_color(ui, "Albedo", (float*) &(instance->scene.particles.albedo));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene.particles.albedo.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene.particles.albedo.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene.particles.albedo.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Direction Azimuth", &(instance->scene.particles.direction_azimuth), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] =
+    create_slider(ui, "Direction Altitude", &(instance->scene.particles.direction_altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
+  panels[i++] = create_slider(ui, "Direction Speed", &(instance->scene.particles.speed), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Phase Diameter", &(instance->scene.particles.phase_diameter), 1, 0.001f, 0.01f, 50.0f, 0, 0);
 
   tab.panels      = panels;

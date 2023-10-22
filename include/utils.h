@@ -322,9 +322,10 @@ struct GlobalMaterial {
 struct Particles {
   int active;
   uint32_t seed;
-  RGBAF albedo;
-  float smoothness;
-  float metallic;
+  RGBF albedo;
+  float speed;
+  float direction_altitude;
+  float direction_azimuth;
   float phase_diameter;
 } typedef Particles;
 

@@ -19,11 +19,13 @@
 #include "volume.cuh"
 
 __device__ TraceTask get_starting_ray(TraceTask task, const uint32_t pixel) {
+  const float2 jitter = (device.accum_mode != TEMPORAL_REPROJECTION) ? quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER)
+                                                                     : make_float2(device.emitter.jitter.x, device.emitter.jitter.y);
+
   vec3 lens_ray;
 
-  lens_ray.x =
-    device.scene.camera.focal_length * (-device.scene.camera.fov + device.emitter.step * (task.index.x + device.emitter.jitter.x));
-  lens_ray.y = device.scene.camera.focal_length * (device.emitter.vfov - device.emitter.step * (task.index.y + device.emitter.jitter.y));
+  lens_ray.x = device.scene.camera.focal_length * (-device.scene.camera.fov + device.emitter.step * (task.index.x + jitter.x));
+  lens_ray.y = device.scene.camera.focal_length * (device.emitter.vfov - device.emitter.step * (task.index.y + jitter.y));
   lens_ray.z = -device.scene.camera.focal_length;
 
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LENS, pixel);

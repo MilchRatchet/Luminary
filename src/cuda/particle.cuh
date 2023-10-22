@@ -27,13 +27,10 @@ __global__ void particle_generate_g_buffer() {
     vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
 
     RGBAF albedo;
-    albedo.r = 1.0f;
-    albedo.g = 1.0f;
-    albedo.b = 1.0f;
-    albedo.a = 0.5f;
-
-    float roughness = 1.0f;
-    float metallic  = 0.0f;
+    albedo.r = device.scene.particles.albedo.r;
+    albedo.g = device.scene.particles.albedo.g;
+    albedo.b = device.scene.particles.albedo.b;
+    albedo.a = 1.0f;
 
     // Particles BSDF is emulated using volume BSDFs
     uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
@@ -46,8 +43,8 @@ __global__ void particle_generate_g_buffer() {
     data.normal    = normal;
     data.position  = task.position;
     data.V         = scale_vector(task.ray, -1.0f);
-    data.roughness = roughness;
-    data.metallic  = metallic;
+    data.roughness = 0.0f;
+    data.metallic  = 0.0f;
     data.flags     = flags;
 
     store_g_buffer_data(data, pixel);

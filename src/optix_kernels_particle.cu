@@ -40,12 +40,16 @@ extern "C" __global__ void __raygen__optix() {
       break;
   }
 
+  const float time         = quasirandom_sequence_1D_global(QUASI_RANDOM_TARGET_CAMERA_TIME);
+  const vec3 motion        = angles_to_direction(device.scene.particles.direction_altitude, device.scene.particles.direction_azimuth);
+  const vec3 motion_offset = scale_vector(motion, time * device.scene.particles.speed);
+
   for (int i = 0; i < trace_task_count; i++) {
     const int offset     = get_task_address2(idx.x, idx.y, i);
     const TraceTask task = load_trace_task_essentials(device.trace_tasks + offset);
     const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
-    const vec3 reference = sub_vector(task.origin, device.scene.camera.pos);
+    const vec3 reference = add_vector(sub_vector(task.origin, device.scene.camera.pos), motion_offset);
 
     const float3 origin = make_float3(reference.x, reference.y, reference.z);
     const float3 ray    = make_float3(task.ray.x, task.ray.y, task.ray.z);

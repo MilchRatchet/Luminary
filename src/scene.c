@@ -183,9 +183,15 @@ void scene_init(Scene** _scene) {
   scene->fog.height           = 500.0f;
   scene->fog.dist             = 500.0f;
 
-  scene->particles.active         = 0;
-  scene->particles.seed           = 0;
-  scene->particles.phase_diameter = 50.0f;
+  scene->particles.active             = 0;
+  scene->particles.seed               = 0;
+  scene->particles.phase_diameter     = 50.0f;
+  scene->particles.albedo.r           = 1.0f;
+  scene->particles.albedo.g           = 1.0f;
+  scene->particles.albedo.b           = 1.0f;
+  scene->particles.speed              = 0.0f;
+  scene->particles.direction_altitude = 1.234f;
+  scene->particles.direction_azimuth  = 0.0f;
 
   *_scene = scene;
 }
