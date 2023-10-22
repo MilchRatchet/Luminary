@@ -208,7 +208,7 @@ static General get_default_settings() {
 void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
   wavefront_convert_content(content, &scene->triangles, &scene->triangle_data);
 
-  scene->materials_count     = content->materials_length;
+  scene->materials_count     = content->materials_count;
   scene->texture_assignments = wavefront_generate_texture_assignments(content);
 }
 
