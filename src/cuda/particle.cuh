@@ -226,9 +226,9 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
     index_buffer[id * 6 + 0] = id * 4 + 0;
     index_buffer[id * 6 + 1] = id * 4 + 1;
     index_buffer[id * 6 + 2] = id * 4 + 2;
-    index_buffer[id * 6 + 3] = id * 4 + 1;
-    index_buffer[id * 6 + 4] = id * 4 + 3;
-    index_buffer[id * 6 + 5] = id * 4 + 2;
+    index_buffer[id * 6 + 3] = id * 4 + 3;
+    index_buffer[id * 6 + 4] = id * 4 + 2;
+    index_buffer[id * 6 + 5] = id * 4 + 1;
 
     id += blockDim.x * gridDim.x;
   }

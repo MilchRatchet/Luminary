@@ -9,6 +9,15 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "memory.cuh"
 #include "utils.cuh"
 
+__device__ bool particle_opacity_cutout(const float2 coord) {
+  const float dx = fabsf(coord.x - 0.5f);
+  const float dy = fabsf(coord.y - 0.5f);
+
+  const float r = dx * dx + dy * dy;
+
+  return (r > 0.25f);
+}
+
 // Kernels must be named __[SEMANTIC]__..., for example, __raygen__...
 // This can be found under function name prefix in the programming guide
 
@@ -70,6 +79,10 @@ extern "C" __global__ void __raygen__optix() {
 
 extern "C" __global__ void __anyhit__optix() {
   optixSetPayload_2(optixGetPayload_2() + 1);
+
+  if (particle_opacity_cutout(optixGetTriangleBarycentrics())) {
+    optixIgnoreIntersection();
+  }
 }
 
 extern "C" __global__ void __closesthit__optix() {
