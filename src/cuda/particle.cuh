@@ -22,8 +22,6 @@ __global__ void particle_generate_g_buffer() {
     q.edge1  = particle_transform_relative(q.edge1);
     q.edge2  = particle_transform_relative(q.edge2);
 
-    const float2 coords = get_coordinates_in_triangle(q.vertex, q.edge1, q.edge2, task.position);
-
     vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
 
     RGBAF albedo;
@@ -181,13 +179,13 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
   uint32_t id   = THREAD_ID;
   uint32_t seed = device.scene.particles.seed;
 
-  const float scale = 0.01f;
-  const float range = 100.0f;
+  const float scale = 0.001f;
+  const float range = 1.0f;
 
   while (id < count) {
-    const float x = (white_noise_offset(seed + id * 5 + 0) * range) - 0.5f * range;
-    const float y = (white_noise_offset(seed + id * 5 + 1) * range) - 0.5f * range;
-    const float z = (white_noise_offset(seed + id * 5 + 2) * range) - 0.5f * range;
+    const float x = white_noise_offset(seed + id * 5 + 0) * range;
+    const float y = white_noise_offset(seed + id * 5 + 1) * range;
+    const float z = white_noise_offset(seed + id * 5 + 2) * range;
 
     const vec3 p = get_vector(x, y, z);
 
@@ -234,7 +232,7 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
 void device_particle_generate(RaytraceInstance* instance) {
   bench_tic((const char*) "Particles Generation");
 
-  const uint32_t count = 4096 * 1024;
+  const uint32_t count = 8192;
 
   ParticlesInstance particles = instance->particles_instance;
 

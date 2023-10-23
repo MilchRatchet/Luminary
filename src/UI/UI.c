@@ -600,6 +600,7 @@ static UITab create_procedurals_particles_panels(UI* ui, RaytraceInstance* insta
     create_slider(ui, "Direction Altitude", &(instance->scene.particles.direction_altitude), 1, 0.0001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Direction Speed", &(instance->scene.particles.speed), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Phase Diameter", &(instance->scene.particles.phase_diameter), 1, 0.001f, 0.01f, 50.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Scale", &(instance->scene.particles.scale), 1, 0.001f, 1.0f, 10000.0f, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;
