@@ -253,8 +253,9 @@ void optixrt_init(RaytraceInstance* instance) {
     buffer_sizes.outputSizeInBytes = compact_size;
   }
 
-  instance->optix_bvh.bvh_data    = output_buffer;
-  instance->optix_bvh.traversable = traversable;
+  instance->optix_bvh.bvh_data     = output_buffer;
+  instance->optix_bvh.bvh_mem_size = buffer_sizes.outputSizeInBytes;
+  instance->optix_bvh.traversable  = traversable;
 
   micromap_opacity_free(omm);
 

@@ -14,6 +14,7 @@
 #include "UI_text.h"
 #include "baked.h"
 #include "device.h"
+#include "optixrt_particle.h"
 #include "output.h"
 #include "raytrace.h"
 #include "scene.h"
@@ -601,6 +602,7 @@ static UITab create_procedurals_particles_panels(UI* ui, RaytraceInstance* insta
   panels[i++] = create_slider(ui, "Direction Speed", &(instance->scene.particles.speed), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Phase Diameter", &(instance->scene.particles.phase_diameter), 1, 0.001f, 0.01f, 50.0f, 0, 0);
   panels[i++] = create_slider(ui, "Scale", &(instance->scene.particles.scale), 1, 0.001f, 1.0f, 10000.0f, 0, 0);
+  panels[i++] = create_button(ui, "Generate Particles", instance, (void (*)(void*)) optixrt_particle_clear, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

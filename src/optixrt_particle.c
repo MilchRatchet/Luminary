@@ -92,12 +92,18 @@ void optixrt_particle_init(RaytraceInstance* instance) {
     buffer_sizes.outputSizeInBytes = compact_size;
   }
 
-  instance->particles_instance.optix.bvh_data    = output_buffer;
-  instance->particles_instance.optix.traversable = traversable;
+  instance->particles_instance.optix.bvh_data     = output_buffer;
+  instance->particles_instance.optix.bvh_mem_size = buffer_sizes.outputSizeInBytes;
+  instance->particles_instance.optix.traversable  = traversable;
 
   device_update_symbol(optix_bvh_particles, instance->particles_instance.optix.traversable);
 
   instance->particles_instance.optix.initialized = 1;
 
   bench_toc();
+}
+
+void optixrt_particle_clear(RaytraceInstance* instance) {
+  device_free(instance->particles_instance.optix.bvh_data, instance->particles_instance.optix.bvh_mem_size);
+  memset(&instance->particles_instance.optix, 0, sizeof(OptixBVH));
 }

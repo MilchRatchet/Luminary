@@ -453,6 +453,7 @@ struct OptixKernel {
 
 struct OptixBVH {
   int initialized;
+  size_t bvh_mem_size;
   OptixTraversableHandle traversable;
   void* bvh_data;
   int force_dmm_usage;
