@@ -104,6 +104,7 @@ void optixrt_particle_init(RaytraceInstance* instance) {
 }
 
 void optixrt_particle_clear(RaytraceInstance* instance) {
+  // This frees the BVH. The BVH is automatically rebuilt at the beginning of the next frame using the current settings.
   device_free(instance->particles_instance.optix.bvh_data, instance->particles_instance.optix.bvh_mem_size);
   memset(&instance->particles_instance.optix, 0, sizeof(OptixBVH));
 }

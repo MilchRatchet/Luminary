@@ -322,6 +322,7 @@ struct GlobalMaterial {
 struct Particles {
   int active;
   uint32_t seed;
+  uint32_t count;
   RGBF albedo;
   float speed;
   float direction_altitude;
@@ -460,12 +461,7 @@ struct OptixBVH {
   int disable_omm;
 } typedef OptixBVH;
 
-struct ParticlesSettings {
-  uint32_t count;
-} typedef ParticlesSettings;
-
 struct ParticlesInstance {
-  ParticlesSettings settings;
   OptixKernel kernel;
   OptixBVH optix;
   uint32_t triangle_count;
@@ -473,6 +469,7 @@ struct ParticlesInstance {
   DeviceBuffer* vertex_buffer;
   uint32_t index_count;
   DeviceBuffer* index_buffer;
+  DeviceBuffer* quad_buffer;
 } typedef ParticlesInstance;
 
 struct DeviceInfo {

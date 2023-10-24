@@ -232,27 +232,34 @@ __global__ void particle_kernel_generate(const uint32_t count, float4* vertex_bu
 void device_particle_generate(RaytraceInstance* instance) {
   bench_tic((const char*) "Particles Generation");
 
-  const uint32_t count = 8192;
-
   ParticlesInstance particles = instance->particles_instance;
 
+  if (particles.vertex_buffer)
+    device_buffer_destroy(&particles.vertex_buffer);
+  if (particles.index_buffer)
+    device_buffer_destroy(&particles.index_buffer);
+  if (particles.quad_buffer)
+    device_buffer_destroy(&particles.quad_buffer);
+
+  const uint32_t count     = instance->scene.particles.count;
   particles.triangle_count = 2 * count;
   particles.vertex_count   = 4 * count;
   particles.index_count    = 6 * count;
 
   device_buffer_init(&particles.vertex_buffer);
   device_buffer_init(&particles.index_buffer);
+  device_buffer_init(&particles.quad_buffer);
 
   device_buffer_malloc(particles.vertex_buffer, 4 * sizeof(float4), count);
   device_buffer_malloc(particles.index_buffer, 6 * sizeof(uint32_t), count);
+  device_buffer_malloc(particles.quad_buffer, sizeof(Quad), count);
 
-  Quad* quads;
-  device_malloc(&quads, sizeof(Quad) * count);
+  void* quads = device_buffer_get_pointer(particles.quad_buffer);
   device_update_symbol(particle_quads, quads);
 
   particle_kernel_generate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
     count, (float4*) device_buffer_get_pointer(particles.vertex_buffer), (uint32_t*) device_buffer_get_pointer(particles.index_buffer),
-    quads);
+    (Quad*) device_buffer_get_pointer(particles.quad_buffer));
   gpuErrchk(cudaDeviceSynchronize());
 
   instance->particles_instance = particles;

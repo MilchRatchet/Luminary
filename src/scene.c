@@ -193,6 +193,7 @@ void scene_init(Scene** _scene) {
   scene->particles.direction_altitude = 1.234f;
   scene->particles.direction_azimuth  = 0.0f;
   scene->particles.scale              = 10.0f;
+  scene->particles.count              = 8192;
 
   *_scene = scene;
 }
