@@ -509,6 +509,57 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
   }
 }
 
+static void parse_particle_settings(Particles* particle, char* line) {
+  const uint64_t key = *((uint64_t*) line);
+  char* value        = line + 9;
+
+  switch (key) {
+    /* ACTIVE__ */
+    case 6872287793290429249u:
+      sscanf(value, "%d\n", &particle->active);
+      break;
+    /* SCALE___ */
+    case 6872316307627393875u:
+      sscanf(value, "%f\n", &particle->scale);
+      break;
+    /* ALBEDO__ */
+    case 6872298711029009473:
+      sscanf(value, "%f %f %f\n", &particle->albedo.r, &particle->albedo.g, &particle->albedo.b);
+      break;
+    /* DIRECTIO */
+    case 5713190250198747460:
+      sscanf(value, "%f %f\n", &particle->direction_altitude, &particle->direction_azimuth);
+      break;
+    /* SPEED___ */
+    case 6872316303215251539:
+      sscanf(value, "%f\n", &particle->speed);
+      break;
+    /* PHASEDIA */
+    case 4704366350305413200:
+      sscanf(value, "%f\n", &particle->phase_diameter);
+      break;
+    /* SEED____ */
+    case 6872316419162588499:
+      sscanf(value, "%d\n", &particle->seed);
+      break;
+    /* COUNT___ */
+    case 6872316372086771523:
+      sscanf(value, "%d\n", &particle->count);
+      break;
+    /* SIZE____ */
+    case 6872316419180742995:
+      sscanf(value, "%f\n", &particle->size);
+      break;
+    /* SIZEVARI */
+    case 5283357151645550931:
+      sscanf(value, "%f\n", &particle->size_variation);
+      break;
+    default:
+      warn_message("%8.8s (%zu) is not a valid PARTICLE setting.", line, key);
+      break;
+  }
+}
+
 static void parse_toy_settings(Toy* toy, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
@@ -653,6 +704,9 @@ void lum_parse_file(FILE* file, Scene* scene, General* general, WavefrontContent
     }
     else if (line[0] == 'O') {
       parse_ocean_settings(&scene->ocean, line + 5 + 1);
+    }
+    else if (line[0] == 'P') {
+      parse_particle_settings(&scene->particles, line + 8 + 1);
     }
     else if (line[0] == 'T') {
       parse_toy_settings(&scene->toy, line + 3 + 1);
@@ -927,6 +981,32 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "OCEAN REFRACT_ %f\n", instance->scene.ocean.refractive_index);
   fputs(line, file);
   sprintf(line, "OCEAN WATERTYP %d\n", instance->scene.ocean.water_type);
+  fputs(line, file);
+
+  sprintf(line, "\n#===============================\n# Particle Settings\n#===============================\n\n");
+  fputs(line, file);
+
+  sprintf(line, "PARTICLE ACTIVE__ %d\n", instance->scene.particles.active);
+  fputs(line, file);
+  sprintf(line, "PARTICLE SCALE___ %f\n", instance->scene.particles.scale);
+  fputs(line, file);
+  sprintf(
+    line, "PARTICLE ALBEDO__ %f %f %f\n", instance->scene.particles.albedo.r, instance->scene.particles.albedo.g,
+    instance->scene.particles.albedo.b);
+  fputs(line, file);
+  sprintf(line, "PARTICLE DIRECTIO %f %f\n", instance->scene.particles.direction_altitude, instance->scene.particles.direction_azimuth);
+  fputs(line, file);
+  sprintf(line, "PARTICLE SPEED___ %f\n", instance->scene.particles.speed);
+  fputs(line, file);
+  sprintf(line, "PARTICLE PHASEDIA %f\n", instance->scene.particles.phase_diameter);
+  fputs(line, file);
+  sprintf(line, "PARTICLE SEED____ %d\n", instance->scene.particles.seed);
+  fputs(line, file);
+  sprintf(line, "PARTICLE COUNT___ %d\n", instance->scene.particles.count);
+  fputs(line, file);
+  sprintf(line, "PARTICLE SIZE____ %f\n", instance->scene.particles.size);
+  fputs(line, file);
+  sprintf(line, "PARTICLE SIZEVARI %f\n", instance->scene.particles.size_variation);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Toy Settings\n#===============================\n\n");
