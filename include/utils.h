@@ -329,6 +329,8 @@ struct Particles {
   float direction_azimuth;
   float phase_diameter;
   float scale;
+  float size;
+  float size_variation;
 } typedef Particles;
 
 struct Scene {

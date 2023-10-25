@@ -194,6 +194,8 @@ void scene_init(Scene** _scene) {
   scene->particles.direction_azimuth  = 0.0f;
   scene->particles.scale              = 10.0f;
   scene->particles.count              = 8192;
+  scene->particles.size               = 1.0f;
+  scene->particles.size_variation     = 0.1f;
 
   *_scene = scene;
 }

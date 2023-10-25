@@ -175,30 +175,33 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
   }
 }
 
-__global__ void particle_kernel_generate(const uint32_t count, float4* vertex_buffer, uint32_t* index_buffer, Quad* quads) {
+__global__ void particle_kernel_generate(
+  const uint32_t count, float size, const float size_variation, float4* vertex_buffer, uint32_t* index_buffer, Quad* quads) {
   uint32_t id   = THREAD_ID;
   uint32_t seed = device.scene.particles.seed;
 
-  const float scale = 0.001f;
-  const float range = 1.0f;
+  size *= 0.001f;
 
   while (id < count) {
-    const float x = white_noise_offset(seed + id * 5 + 0) * range;
-    const float y = white_noise_offset(seed + id * 5 + 1) * range;
-    const float z = white_noise_offset(seed + id * 5 + 2) * range;
+    const float x = white_noise_offset(seed + id * 6 + 0);
+    const float y = white_noise_offset(seed + id * 6 + 1);
+    const float z = white_noise_offset(seed + id * 6 + 2);
 
     const vec3 p = get_vector(x, y, z);
 
-    const float r1 = 2.0f * white_noise_offset(seed + id * 5 + 3) - 1.0f;
-    const float r2 = white_noise_offset(seed + id * 5 + 4);
+    const float r1 = 2.0f * white_noise_offset(seed + id * 6 + 3) - 1.0f;
+    const float r2 = white_noise_offset(seed + id * 6 + 4);
 
     const vec3 normal      = sample_ray_sphere(r1, r2);
     const Mat3x3 transform = create_basis(normal);
 
-    const vec3 a00 = add_vector(p, transform_vec3(transform, get_vector(scale, scale, 0.0f)));
-    const vec3 a01 = add_vector(p, transform_vec3(transform, get_vector(scale, -scale, 0.0f)));
-    const vec3 a10 = add_vector(p, transform_vec3(transform, get_vector(-scale, scale, 0.0f)));
-    const vec3 a11 = add_vector(p, transform_vec3(transform, get_vector(-scale, -scale, 0.0f)));
+    const float random_size = 2.0f * white_noise_offset(seed + id * 6 + 5) - 1.0f;
+    const float s           = size * (1.0f + random_size * size_variation);
+
+    const vec3 a00 = add_vector(p, transform_vec3(transform, get_vector(s, s, 0.0f)));
+    const vec3 a01 = add_vector(p, transform_vec3(transform, get_vector(s, -s, 0.0f)));
+    const vec3 a10 = add_vector(p, transform_vec3(transform, get_vector(-s, s, 0.0f)));
+    const vec3 a11 = add_vector(p, transform_vec3(transform, get_vector(-s, -s, 0.0f)));
 
     const float4 f00 = make_float4(a00.x, a00.y, a00.z, 1.0f);
     const float4 f01 = make_float4(a01.x, a01.y, a01.z, 1.0f);
@@ -258,7 +261,8 @@ void device_particle_generate(RaytraceInstance* instance) {
   device_update_symbol(particle_quads, quads);
 
   particle_kernel_generate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    count, (float4*) device_buffer_get_pointer(particles.vertex_buffer), (uint32_t*) device_buffer_get_pointer(particles.index_buffer),
+    count, instance->scene.particles.size, instance->scene.particles.size_variation,
+    (float4*) device_buffer_get_pointer(particles.vertex_buffer), (uint32_t*) device_buffer_get_pointer(particles.index_buffer),
     (Quad*) device_buffer_get_pointer(particles.quad_buffer));
   gpuErrchk(cudaDeviceSynchronize());
 
