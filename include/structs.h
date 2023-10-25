@@ -98,7 +98,7 @@ struct TriangleLight {
   vec3 edge1;
   vec3 edge2;
   uint32_t triangle_id;
-  float padding1;
+  uint32_t object_maps;
   float padding2;
 } typedef TriangleLight;
 
@@ -129,6 +129,13 @@ struct Node8 {
   uint8_t high_y[8];
   uint8_t high_z[8];
 } typedef Node8;
+
+struct Quad {
+  vec3 vertex;
+  vec3 edge1;
+  vec3 edge2;
+  vec3 normal;
+} typedef Quad;
 
 /********************************************************
  * Pixelformats
@@ -219,6 +226,7 @@ enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
 enum TextureStorageLocation { TexStorageCPU = 0, TexStorageGPU = 1 } typedef TextureStorageLocation;
 enum TextureFilterMode { TexFilterPoint = 0, TexFilterLinear = 1 } typedef TextureFilterMode;
 enum TextureMipmapMode { TexMipmapNone = 0, TexMipmapGenerate = 1 } typedef TextureMipmapMode;
+enum TextureReadMode { TexReadModeNormalized = 0, TexReadModeElement = 1 } typedef TextureReadMode;
 
 struct TextureRGBA {
   unsigned int width;
@@ -233,6 +241,7 @@ struct TextureRGBA {
   TextureStorageLocation storage;
   TextureFilterMode filter;
   TextureMipmapMode mipmap;
+  TextureReadMode read_mode;
   int mipmap_max_level;
   void* data;
   float gamma;
@@ -269,17 +278,22 @@ struct GBufferData {
   uint32_t flags;
 } typedef GBufferData;
 
-// TaskCounts: 0: GeoCount 1: OceanCount 2: SkyCount 3: ToyCount 4: VolumeCount
-
-// ray_xz is horizontal angle
+//
+// Shading task structs. They used to be very different, however, they could all be unified as of October 2023.
+//
 struct GeometryTask {
   ushort2 index;
   vec3 position;
-  float ray_y;
-  float ray_xz;
+  vec3 ray;
   uint32_t hit_id;
-  uint32_t padding;
 } typedef GeometryTask;
+
+struct ParticleTask {
+  ushort2 index;
+  vec3 position;
+  vec3 ray;
+  uint32_t hit_id;
+} typedef ParticleTask;
 
 struct SkyTask {
   ushort2 index;
@@ -288,14 +302,11 @@ struct SkyTask {
   uint32_t padding;
 } typedef SkyTask;
 
-// Magnitude of ray gives distance
 struct OceanTask {
   ushort2 index;
   vec3 position;
-  float ray_y;
-  float ray_xz;
-  float distance;
-  uint32_t padding;
+  vec3 ray;
+  float padding;
 } typedef OceanTask;
 
 struct ToyTask {
@@ -308,10 +319,8 @@ struct ToyTask {
 struct VolumeTask {
   ushort2 index;
   vec3 position;
-  float ray_y;
-  float ray_xz;
-  float distance;
-  uint32_t volume_type;
+  vec3 ray;
+  uint32_t hit_id;
 } typedef VolumeTask;
 
 struct TraceTask {

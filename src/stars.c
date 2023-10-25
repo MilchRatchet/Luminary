@@ -20,8 +20,8 @@ static float random_float() {
  * The grid is [0,2PI] x [-PI/2,PI/2] in blocks of [0,0.1] x [0,0.1]
  * which means we use 64 x 32 blocks.
  */
-void generate_stars(RaytraceInstance* instance) {
-  bench_tic();
+void stars_generate(RaytraceInstance* instance) {
+  bench_tic("Generated Stars");
 
   const int grid_x = STARS_GRID_LD;
   const int grid_y = 32;
@@ -98,5 +98,5 @@ void generate_stars(RaytraceInstance* instance) {
   free(grid);
   free(offsets);
 
-  bench_toc("Generated Stars");
+  bench_toc();
 }

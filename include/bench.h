@@ -5,9 +5,9 @@
 extern "C" {
 #endif
 
-void bench_activate();
-void bench_tic();
-void bench_toc(char* text);
+void bench_activate(void);
+void bench_tic(const char* text);
+void bench_toc(void);
 
 #if __cplusplus
 }

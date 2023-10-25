@@ -5,6 +5,6 @@
 
 #define STARS_GRID_LD 64
 
-void generate_stars(RaytraceInstance* instance);
+void stars_generate(RaytraceInstance* instance);
 
 #endif /* STARS_H */

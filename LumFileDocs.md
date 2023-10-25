@@ -329,6 +329,38 @@ Jerlov water type used for the underwater volume rendering. Higher numbered type
  - 8 = Coastal Type (7C)
  - 9 = Coastal Type (9C)
 
+## Particle Settings
+
+`PARTICLE ACTIVE__ [INT32]`<br/>
+Set 1 to activate particles, 0 else.
+
+`PARTICLE SCALE___ [FP32]`<br/>
+Scale of the particle field's repeated voxel.
+
+`PARTICLE ALBEDO__ [FP32] [FP32] [FP32]`<br/>
+Albedo color of the toy. Numbers must be in the range [0,1].
+
+`PARTICLE DIRECTIO [FP32] [FP32]`<br/>
+Direction of the particle motion given by altitude and azimuth.
+
+`PARTICLE SPEED___ [FP32]`<br/>
+Magnitude of the particle motion.
+
+`PARTICLE PHASEDIA [FP32]`<br/>
+Particle diameter for use in the phase function.
+
+`PARTICLE SEED____ [INT32]`<br/>
+Seed used for the generation of the particles.
+
+`PARTICLE COUNT___ [INT32]`<br/>
+Number of particles generated within each voxel. The particle field repeats the same generated voxel.
+
+`PARTICLE SIZE____ [FP32]`<br/>
+Size of each particle.
+
+`PARTICLE SIZEVARI [FP32]`<br/>
+Magnitude of the variation applied to the size of each particle.
+
 ## Toy Settings
 
 `TOY ACTIVE__ [INT32]`<br/>

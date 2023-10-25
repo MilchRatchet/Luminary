@@ -42,7 +42,15 @@ enum cudaTextureReadMode texture_get_read_mode(TextureRGBA* tex) {
       return cudaReadModeElementType;
     case TexDataUINT8:
     case TexDataUINT16:
-      return cudaReadModeNormalizedFloat;
+      switch (tex->read_mode) {
+        case TexReadModeNormalized:
+          return cudaReadModeNormalizedFloat;
+        case TexReadModeElement:
+          return cudaReadModeElementType;
+        default:
+          error_message("Invalid texture read mode %d\n", tex->read_mode);
+          return cudaReadModeNormalizedFloat;
+      }
     default:
       error_message("Invalid texture data type %d\n", tex->type);
       return cudaReadModeElementType;
@@ -126,6 +134,8 @@ static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
   const unsigned int depth  = tex->depth;
   const unsigned int pitch  = tex->pitch;
   void* data                = tex->data;
+
+  log_message("Allocating device texture of dimension %ux%ux%u.", width, height, depth);
 
   switch (tex->dim) {
     case Tex2D: {
@@ -239,8 +249,8 @@ void texture_create_atlas(DeviceBuffer** buffer, TextureRGBA* textures, const in
 
   for (int i = 0; i < textures_length; i++) {
     texture_allocate(&textures_cpu[i].tex, textures + i);
-    textures_cpu[i].inv_width  = 1.0f / (textures[i].width - 1);
-    textures_cpu[i].inv_height = 1.0f / (textures[i].height - 1);
+    textures_cpu[i].inv_width  = 1.0f / textures[i].width;
+    textures_cpu[i].inv_height = 1.0f / textures[i].height;
     textures_cpu[i].gamma      = textures[i].gamma;
   }
 
@@ -280,6 +290,7 @@ void texture_create(
     .wrap_mode_T      = TexModeWrap,
     .wrap_mode_R      = TexModeWrap,
     .filter           = TexFilterLinear,
+    .read_mode        = TexReadModeNormalized,
     .mipmap           = TexMipmapNone,
     .mipmap_max_level = 0,
     .gamma            = 1.0f};

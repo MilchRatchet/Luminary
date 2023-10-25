@@ -3,6 +3,7 @@
 
 #include "memory.cuh"
 #include "utils.cuh"
+#include "volume.cuh"
 
 //
 // This file implements light sampling based on ReSTIR. However, I ultimately decided to only use
@@ -54,14 +55,31 @@ __device__ LightSample restir_sample_empty() {
   return s;
 }
 
+__device__ float restir_sample_volume_extinction(const GBufferData data, const vec3 ray, const float max_dist) {
+  float extinction = 1.0f;
+
+  if (device.scene.fog.active) {
+    const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
+    const float2 path             = volume_compute_path(volume, data.position, ray, max_dist);
+
+    if (path.x >= 0.0f) {
+      extinction *= expf(-path.y * volume.max_scattering);
+    }
+  }
+
+  return extinction;
+}
+
 /**
  * Compute the target PDF of a light sample. Currently, this is basically BRDF weight multiplied by general light intensity.
  * @param x Light sample
  * @param data Data to compute the target pdf from.
  * @result Target PDF of light sample.
  */
-__device__ float restir_sample_target_pdf(LightSample x, const GBufferData data) {
+__device__ float restir_sample_target_pdf(
+  LightSample x, const GBufferData data, const RGBF record, const uint32_t pixel, float& primitive_pdf) {
   if (x.presampled_id == LIGHT_ID_NONE) {
+    primitive_pdf = 1.0f;
     return 0.0f;
   }
 
@@ -71,45 +89,32 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data)
   BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
   BRDFInstance result;
 
+  float solid_angle, sample_dist;
+  RGBF emission;
+  result = brdf_apply_sample_restir(brdf, x, data.position, pixel, solid_angle, emission, sample_dist);
+
+  primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 0.0f;
+
   if (data.flags & G_BUFFER_VOLUME_HIT) {
-    result = brdf_apply_sample_scattering(brdf, x, data.position, VOLUME_HIT_TYPE(data.hit_id));
+    result = brdf_apply_sample_weight_scattering(result, VOLUME_HIT_TYPE(data.hit_id));
   }
   else {
-    result = brdf_apply_sample(brdf, x, data.position);
+    result = brdf_apply_sample_weight(result);
   }
 
-  float value = luminance(result.term);
+  const RGBF color_value = mul_color(mul_color(emission, result.term), record);
+  float value            = luminance(color_value);
 
   if (isinf(value) || isnan(value)) {
     value = 0.0f;
   }
 
-  switch (x.presampled_id) {
-    case LIGHT_ID_SUN:
-      value *= (2e+04f * device.scene.sky.sun_strength);
-      break;
-    case LIGHT_ID_TOY:
-      value *= device.scene.toy.material.b * luminance(device.scene.toy.emission);
-      break;
-    default:
-      value *= device.scene.material.default_material.b;
-      break;
+  if (value > 0.0f) {
+    value *= restir_sample_volume_extinction(data, result.L, sample_dist);
   }
 
   return value;
 }
-
-/*
- * There are three different MIS weights implemented:
- * Uniform, balance heuristic (power = 1) and power heuristic (power = 2).
- * In general, power heuristic is known to perform the best and uniform the worst.
- * However, since the multiple sampling functions domains form a partition of the total sampling
- * domain, and each sampling function is uniform over its domain, the uniform MIS weights perform the best.
- * The balance heuristic produces identical results but it is also slightly more expensive computationally.
- * However, I want to keep the code simple, the balance heuristic enforces a system of pdf tracking that
- * will make it easier for me if I ever decide to implement other sampling strategies.
- */
-#define RESTIR_MIS_WEIGHT_METHOD 1
 
 /**
  * Samples a light sample using WRS and MIS.
@@ -117,7 +122,7 @@ __device__ float restir_sample_target_pdf(LightSample x, const GBufferData data)
  * @param seed Seed used for random number generation, the seed is overwritten on use.
  * @result Sampled light sample.
  */
-__device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed) {
+__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const uint32_t pixel) {
   LightSample selected = restir_sample_empty();
 
   const vec3 sky_pos = world_to_sky_transform(data.position);
@@ -125,48 +130,46 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
 
-  // Sampling pdf used when the selected light was selected, this is used for the MIS balance heuristic
-  float selection_pdf        = 1.0f;
   float selection_target_pdf = 1.0f;
 
   // Importance sample the sun
   if (sun_visible) {
     LightSample sampled;
-    sampled.seed          = random_uint32_t(seed++);
+    sampled.seed          = QUASI_RANDOM_TARGET_RESTIR_DIR;
     sampled.presampled_id = LIGHT_ID_SUN;
 
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
-    const float sampled_pdf        = 1.0f;
+    float primitive_pdf;
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, pixel, primitive_pdf);
+    const float sampled_pdf        = primitive_pdf;
 
-    const float weight = sampled_target_pdf / sampled_pdf;
+    const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
-    if (white_noise_offset(seed++) * selected.weight < weight) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RESTIR_CHOICE, pixel) * selected.weight < weight) {
       selected.id            = LIGHT_ID_SUN;
       selected.presampled_id = LIGHT_ID_SUN;
       selected.seed          = sampled.seed;
-      selection_pdf          = sampled_pdf;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
 
   // Importance sample the toy (but only if we are not originating from the toy)
-  if (toy_visible && data.hit_id != TOY_HIT) {
+  if (toy_visible && data.hit_id != HIT_TYPE_TOY) {
     LightSample sampled;
-    sampled.seed          = random_uint32_t(seed++);
+    sampled.seed          = QUASI_RANDOM_TARGET_RESTIR_DIR + 1;
     sampled.presampled_id = LIGHT_ID_TOY;
 
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
-    const float sampled_pdf        = 1.0f;
+    float primitive_pdf;
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, pixel, primitive_pdf);
+    const float sampled_pdf        = primitive_pdf;
 
-    const float weight = sampled_target_pdf / sampled_pdf;
+    const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
-    if (white_noise_offset(seed++) * selected.weight < weight) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RESTIR_CHOICE + 1, pixel) * selected.weight < weight) {
       selected.id            = LIGHT_ID_TOY;
       selected.presampled_id = LIGHT_ID_TOY;
       selected.seed          = sampled.seed;
-      selection_pdf          = sampled_pdf;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
@@ -177,32 +180,31 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
   const float reservoir_sampling_pdf = (1.0f / device.scene.triangle_lights_count);
 
   // Don't allow triangles to sample themselves.
-  uint32_t blocked_light_id = TRIANGLE_ID_LIMIT + 1;
-  if (data.hit_id <= TRIANGLE_ID_LIMIT) {
+  uint32_t blocked_light_id = LIGHT_ID_TRIANGLE_ID_LIMIT + 1;
+  if (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) {
     blocked_light_id = __ldg(&(device.scene.triangles[data.hit_id].light_id));
   }
 
   for (int i = 0; i < reservoir_size; i++) {
     LightSample sampled;
-    sampled.seed          = random_uint32_t(seed++);
-    sampled.presampled_id = random_uint32_t(seed++) & (light_count - 1);
+    sampled.seed          = QUASI_RANDOM_TARGET_RESTIR_DIR + 2 + i;
+    sampled.presampled_id = quasirandom_sequence_1D_intraframe(QUASI_RANDOM_TARGET_RESTIR_GENERATION, pixel, i) * light_count;
+    sampled.id            = device.ptrs.light_candidates[sampled.presampled_id];
 
-    const uint32_t sampled_light_global_id = device.ptrs.light_candidates[sampled.presampled_id];
-
-    if (sampled_light_global_id == blocked_light_id)
+    if (sampled.id == blocked_light_id)
       continue;
 
-    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data);
-    const float sampled_pdf        = reservoir_sampling_pdf;
+    float primitive_pdf;
+    const float sampled_target_pdf = restir_sample_target_pdf(sampled, data, record, pixel, primitive_pdf);
+    const float sampled_pdf        = reservoir_sampling_pdf * primitive_pdf;
 
-    const float weight = sampled_target_pdf / sampled_pdf;
+    const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
     selected.weight += weight;
-    if (white_noise_offset(seed++) * selected.weight < weight) {
-      selected.id            = sampled_light_global_id;
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RESTIR_CHOICE + 2 + i, pixel) * selected.weight < weight) {
+      selected.id            = sampled.id;
       selected.presampled_id = sampled.presampled_id;
       selected.seed          = sampled.seed;
-      selection_pdf          = sampled_pdf;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
@@ -212,32 +214,8 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
     selected.weight = 0.0f;
   }
   else {
-#if RESTIR_MIS_WEIGHT_METHOD == 0
-    // Compute the sum of the sampling PDFs of the selected light for MIS uniform
-    float sum_pdf = 0.0f;
-    sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
-    sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf += (selected.id <= TRIANGLE_ID_LIMIT) ? reservoir_size : 0.0f;
-
-    const float mis_weight = 1.0f / sum_pdf;
-#elif RESTIR_MIS_WEIGHT_METHOD == 1
-    // Compute the sum of the sampling PDFs of the selected light for MIS balance heuristic
-    float sum_pdf = 0.0f;
-    sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
-    sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf += (selected.id <= TRIANGLE_ID_LIMIT) ? reservoir_size * reservoir_sampling_pdf : 0.0f;
-
-    const float mis_weight = selection_pdf / sum_pdf;
-#else
-    // Compute the sum of the sampling PDFs of the selected light for MIS power heuristic
-    float sum_pdf = 0.0f;
-    sum_pdf += (sun_visible && selected.id == LIGHT_ID_SUN) ? 1.0f : 0.0f;
-    sum_pdf += (toy_visible && selected.id == LIGHT_ID_TOY) ? 1.0f : 0.0f;
-    sum_pdf +=
-      (selected.id <= TRIANGLE_ID_LIMIT) ? reservoir_size * reservoir_sampling_pdf * reservoir_size * reservoir_sampling_pdf : 0.0f;
-
-    const float mis_weight = (selection_pdf * selection_pdf) / sum_pdf;
-#endif
+    // We use uniform MIS weights because the images of our distributions are a partition of the set of all lights.
+    const float mis_weight = (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? 1.0f / reservoir_size : 1.0f;
 
     selected.weight = mis_weight * selected.weight / selection_target_pdf;
   }
@@ -253,9 +231,7 @@ __device__ LightSample restir_sample_reservoir(GBufferData data, uint32_t& seed)
  * Light samples are only generated for pixels for which the flag G_BUFFER_REQUIRES_SAMPLING is set.
  */
 __global__ void restir_weighted_reservoir_sampling() {
-  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6 + 5];
-
-  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT];
 
   for (int i = 0; i < task_count; i++) {
     const int offset     = get_task_address(i);
@@ -263,8 +239,10 @@ __global__ void restir_weighted_reservoir_sampling() {
     const uint32_t pixel = get_pixel_id(index.x, index.y);
 
     const GBufferData data = load_g_buffer_data(pixel);
+    const RGBF record      = load_RGBF(device.records + pixel);
 
-    LightSample sample = (data.flags & G_BUFFER_REQUIRES_SAMPLING) ? restir_sample_reservoir(data, seed) : restir_sample_empty();
+    const LightSample sample =
+      (data.flags & G_BUFFER_REQUIRES_SAMPLING) ? restir_sample_reservoir(data, record, pixel) : restir_sample_empty();
 
     store_light_sample(device.ptrs.light_samples, sample, pixel);
 
@@ -272,14 +250,11 @@ __global__ void restir_weighted_reservoir_sampling() {
       device.ptrs.g_buffer[pixel].flags = data.flags & (~G_BUFFER_REQUIRES_SAMPLING);
     }
   }
-
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
 }
 
 __global__ void restir_candidates_pool_generation() {
-  int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+  int id        = THREAD_ID;
+  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   const int light_sample_bin_count = 1 << device.restir.light_candidate_pool_size_log2;
 
@@ -295,7 +270,7 @@ __global__ void restir_candidates_pool_generation() {
     id += blockDim.x * gridDim.x;
   }
 
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
+  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 #endif /* CU_RESTIR_H */

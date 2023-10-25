@@ -183,6 +183,20 @@ void scene_init(Scene** _scene) {
   scene->fog.height           = 500.0f;
   scene->fog.dist             = 500.0f;
 
+  scene->particles.active             = 0;
+  scene->particles.scale              = 10.0f;
+  scene->particles.albedo.r           = 1.0f;
+  scene->particles.albedo.g           = 1.0f;
+  scene->particles.albedo.b           = 1.0f;
+  scene->particles.direction_altitude = 1.234f;
+  scene->particles.direction_azimuth  = 0.0f;
+  scene->particles.speed              = 0.0f;
+  scene->particles.phase_diameter     = 50.0f;
+  scene->particles.seed               = 0;
+  scene->particles.count              = 8192;
+  scene->particles.size               = 1.0f;
+  scene->particles.size_variation     = 0.1f;
+
   *_scene = scene;
 }
 
@@ -204,7 +218,7 @@ static General get_default_settings() {
 void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
   wavefront_convert_content(content, &scene->triangles, &scene->triangle_data);
 
-  scene->materials_count     = content->materials_length;
+  scene->materials_count     = content->materials_count;
   scene->texture_assignments = wavefront_generate_texture_assignments(content);
 }
 
@@ -262,8 +276,6 @@ RaytraceInstance* scene_load_lum(const char* filename) {
   wavefront_clear(&content);
   scene_clear(&scene);
 
-  generate_stars(instance);
-
   return instance;
 }
 
@@ -308,8 +320,6 @@ RaytraceInstance* scene_load_obj(char* filename) {
 
   wavefront_clear(&content);
   scene_clear(&scene);
-
-  generate_stars(instance);
 
   return instance;
 }

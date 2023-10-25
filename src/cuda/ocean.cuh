@@ -252,7 +252,7 @@ __device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
 ////////////////////////////////////////////////////////////////////
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset  = get_task_address(i);
@@ -272,7 +272,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
         if (ocean_depth < depth) {
           float2 result;
           result.x = ocean_depth;
-          result.y = __uint_as_float(OCEAN_HIT);
+          result.y = __uint_as_float(HIT_TYPE_OCEAN);
           __stcs((float2*) (device.ptrs.trace_results + offset), result);
         }
       }
@@ -281,26 +281,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count   = device.ptrs.task_counts[id * 6 + 1];
-  const int task_offset  = device.ptrs.task_offsets[id * 5 + 1];
-  int light_trace_count  = device.ptrs.light_trace_count[id];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[id];
+  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
+  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
+  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
+  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
-
     vec3 normal = ocean_get_normal(task.position);
 
     float refraction_index_ratio;
-    if (dot_product(ray, normal) > 0.0f) {
+    if (dot_product(task.ray, normal) > 0.0f) {
       normal                 = scale_vector(normal, -1.0f);
       refraction_index_ratio = device.scene.ocean.refractive_index;
     }
@@ -310,22 +303,22 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     write_normal_buffer(normal, pixel);
 
-    if (white_noise() > 0.5f) {
-      ray           = refract_ray(ray, normal, refraction_index_ratio);
-      task.position = add_vector(task.position, scale_vector(ray, 2.0f * eps * (1.0f + get_length(task.position))));
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > 0.5f) {
+      task.ray      = refract_ray(task.ray, normal, refraction_index_ratio);
+      task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps * (1.0f + get_length(task.position))));
     }
     else {
-      task.position = add_vector(task.position, scale_vector(ray, -2.0f * eps * (1.0f + get_length(task.position))));
-      ray           = reflect_vector(ray, normal);
+      task.position = add_vector(task.position, scale_vector(task.ray, -2.0f * eps * (1.0f + get_length(task.position))));
+      task.ray      = reflect_vector(task.ray, normal);
     }
 
     RGBF record = load_RGBF(device.records + pixel);
-    record      = mul_color(record, ocean_brdf(ray, normal));
+    record      = mul_color(record, ocean_brdf(task.ray, normal));
     record      = scale_color(record, 2.0f);  // 1.0 / probability of refraction/reflection
 
     TraceTask new_task;
     new_task.origin = task.position;
-    new_task.ray    = ray;
+    new_task.ray    = task.ray;
     new_task.index  = task.index;
 
     device.ptrs.mis_buffer[pixel] = 1.0f;
@@ -338,15 +331,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     }
   }
 
-  device.ptrs.light_trace_count[id]  = light_trace_count;
-  device.ptrs.bounce_trace_count[id] = bounce_trace_count;
+  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
+  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count  = device.ptrs.task_counts[id * 6 + 1];
-  const int task_offset = device.ptrs.task_offsets[id * 5 + 1];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
 
   for (int i = 0; i < task_count; i++) {
     OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -356,7 +347,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
       device.ptrs.frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
-      const float value               = __saturatef((1.0f / task.distance) * 2.0f);
+      const float dist                = get_length(sub_vector(device.scene.camera.pos, task.position));
+      const float value               = __saturatef((1.0f / dist) * 2.0f);
       device.ptrs.frame_buffer[pixel] = get_color(value, value, value);
     }
     else if (device.shading_mode == SHADING_NORMAL) {

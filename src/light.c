@@ -131,7 +131,7 @@ static int contains_illumination(Triangle triangle, TextureRGBA tex) {
 }
 
 void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
-  bench_tic();
+  bench_tic("Processing Lights");
 
   Scene data = *scene;
 
@@ -145,7 +145,8 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
     const uint16_t tex_index = data.texture_assignments[triangle.object_maps].illuminance_map;
 
     if (tex_index != TEXTURE_NONE && contains_illumination(triangle, textures[tex_index])) {
-      const TriangleLight l      = {.vertex = triangle.vertex, .edge1 = triangle.edge1, .edge2 = triangle.edge2, .triangle_id = i};
+      const TriangleLight l = {
+        .vertex = triangle.vertex, .edge1 = triangle.edge1, .edge2 = triangle.edge2, .triangle_id = i, .object_maps = triangle.object_maps};
       data.triangles[i].light_id = light_count;
       lights[light_count++]      = l;
       if (light_count == lights_length) {
@@ -162,5 +163,5 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
 
   *scene = data;
 
-  bench_toc("Processing Lights");
+  bench_toc();
 }

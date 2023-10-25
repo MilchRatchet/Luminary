@@ -14,6 +14,7 @@
 #include "cuda/micromap.cuh"
 #include "cuda/mipmap.cuh"
 #include "cuda/ocean.cuh"
+#include "cuda/particle.cuh"
 #include "cuda/random.cuh"
 #include "cuda/restir.cuh"
 #include "cuda/sky.cuh"
@@ -91,11 +92,15 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
+  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+    optixrt_execute(instance->particles_instance.kernel);
+  }
+
   if (instance->bvh_type == BVH_LUMINARY) {
     process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   else {
-    optixrt_execute(instance);
+    optixrt_execute(instance->optix_kernel);
   }
 
   if (instance->scene.ocean.active && type != TYPE_LIGHT) {
@@ -118,6 +123,10 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   geometry_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
+  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+    particle_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+
   if (instance->scene.toy.active) {
     toy_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -132,6 +141,10 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
   }
 
   process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+    particle_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
 
   if (instance->scene.ocean.active) {
     process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -153,18 +166,36 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int typ
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
+  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+    optixrt_execute(instance->particles_instance.kernel);
+  }
+
   if (instance->bvh_type == BVH_LUMINARY) {
     process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   else {
-    optixrt_execute(instance);
+    optixrt_execute(instance->optix_kernel);
   }
 
   if (instance->scene.ocean.active && type != TYPE_LIGHT) {
     ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+  geometry_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+    particle_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+
+  if (instance->scene.toy.active) {
+    toy_generate_g_buffer<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
+
   process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+    particle_process_debug_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  }
   if (instance->scene.ocean.active) {
     process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }

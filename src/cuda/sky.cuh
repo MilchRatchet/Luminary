@@ -399,7 +399,7 @@ __device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const
 
 // [Bru17]
 __global__ void sky_compute_transmittance_lut(float4* transmittance_tex_lower, float4* transmittance_tex_higher) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT;
 
@@ -577,7 +577,7 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
 }
 
 extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic((const char*) "Sky LUT Computation");
 
   if (instance->scene.sky.lut_initialized) {
     texture_free_atlas(instance->sky_tm_luts, 2);
@@ -648,7 +648,7 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
 
   instance->scene.sky.lut_initialized = 1;
 
-  bench_toc((char*) "Sky LUT Computation");
+  bench_toc();
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -866,12 +866,10 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 ////////////////////////////////////////////////////////////////////
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
-  const int task_count  = device.ptrs.task_counts[id * 6 + 2];
-  const int task_offset = device.ptrs.task_offsets[id * 5 + 2];
-
-  uint32_t seed = device.ptrs.randoms[id];
+  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -906,21 +904,23 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
       sky = mul_color(sky_color, record);
     }
 
+    if (device.iteration_type == TYPE_LIGHT) {
+      sky = scale_color(sky, get_light_transparency_weight(pixel));
+    }
+
     store_RGBF(device.ptrs.frame_buffer + pixel, add_color(load_RGBF(device.ptrs.frame_buffer + pixel), sky));
     write_albedo_buffer(sky, pixel);
     write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }
 
-  device.ptrs.randoms[id] = seed;
+  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
-  const int task_count  = device.ptrs.task_counts[id * 6 + 2];
-  const int task_offset = device.ptrs.task_offsets[id * 5 + 2];
-
-  uint32_t seed = device.ptrs.randoms[id];
+  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -945,7 +945,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks(
     }
   }
 
-  device.ptrs.randoms[id] = seed;
+  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 #endif /* CU_SKY_H */

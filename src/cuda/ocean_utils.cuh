@@ -112,20 +112,18 @@ __device__ float ocean_particle_phase_sampling_cosine(const vec3 ray, const floa
   return (1.0f + g * g - s * s) / (2.0f * g);
 }
 
-__device__ vec3 ocean_phase_sampling(const vec3 ray) {
+__device__ vec3 ocean_phase_sampling(const vec3 ray, const float2 r_dir, const float r_choice) {
   const float molecular_weight = ocean_molecular_weight(device.scene.ocean.water_type);
 
-  const float r = white_noise();
-
   float cos_angle;
-  if (white_noise() < molecular_weight) {
-    cos_angle = ocean_molecular_phase_sampling_cosine(ray, r);
+  if (r_choice < molecular_weight) {
+    cos_angle = ocean_molecular_phase_sampling_cosine(ray, r_dir.x);
   }
   else {
-    cos_angle = ocean_particle_phase_sampling_cosine(ray, r);
+    cos_angle = ocean_particle_phase_sampling_cosine(ray, r_dir.x);
   }
 
-  return phase_sample_basis(cos_angle, white_noise(), ray);
+  return phase_sample_basis(cos_angle, r_dir.y, ray);
 }
 
 __device__ float ocean_molecular_phase(const float cos_angle) {

@@ -5,6 +5,7 @@
 #include "math.cuh"
 #include "memory.cuh"
 #include "state.cuh"
+#include "texture_utils.cuh"
 
 __device__ vec3 geometry_compute_normal(
   vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 e1, vec3 e2, UV e1_tex, UV e2_tex, unsigned short normal_map, float2 coords,
@@ -54,16 +55,12 @@ __device__ vec3 geometry_compute_normal(
 }
 
 __global__ void geometry_generate_g_buffer() {
-  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(i));
+    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
-
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
     const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
 
@@ -96,7 +93,7 @@ __global__ void geometry_generate_g_buffer() {
     const vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
     const vec3 normal = geometry_compute_normal(
-      vertex_normal, edge1_normal, edge2_normal, ray, edge1, edge2, edge1_texture, edge2_texture, maps.w, coords, tex_coords);
+      vertex_normal, edge1_normal, edge2_normal, task.ray, edge1, edge2, edge1_texture, edge2_texture, maps.w, coords, tex_coords);
 
     RGBAF albedo;
 
@@ -142,7 +139,10 @@ __global__ void geometry_generate_g_buffer() {
 
     uint32_t flags = 0;
 
-    if (albedo.a < 1.0f && white_noise() > albedo.a) {
+    const QuasiRandomTarget random_target =
+      (device.iteration_type == TYPE_LIGHT) ? QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY : QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY;
+
+    if (albedo.a < 1.0f && quasirandom_sequence_1D(random_target, pixel) > albedo.a) {
       flags |= G_BUFFER_TRANSPARENT_PASS;
     }
 
@@ -151,10 +151,10 @@ __global__ void geometry_generate_g_buffer() {
     }
 
     if (flags & G_BUFFER_TRANSPARENT_PASS) {
-      task.position = add_vector(task.position, scale_vector(ray, eps * get_length(task.position)));
+      task.position = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
     }
     else {
-      task.position = add_vector(task.position, scale_vector(ray, -eps * get_length(task.position)));
+      task.position = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
     }
 
     GBufferData data;
@@ -163,7 +163,7 @@ __global__ void geometry_generate_g_buffer() {
     data.emission  = emission;
     data.normal    = normal;
     data.position  = task.position;
-    data.V         = scale_vector(ray, -1.0f);
+    data.V         = scale_vector(task.ray, -1.0f);
     data.roughness = roughness;
     data.metallic  = metallic;
     data.flags     = flags;
@@ -173,20 +173,16 @@ __global__ void geometry_generate_g_buffer() {
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks() {
-  const int task_count   = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
-  int light_trace_count  = device.ptrs.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
+  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(i));
+    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
     const GBufferData data = load_g_buffer_data(pixel);
-
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
 
     RGBF record = load_RGBF(device.records + pixel);
 
@@ -198,6 +194,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       if (device.iteration_type == TYPE_BOUNCE) {
         const float mis_weight = device.ptrs.mis_buffer[pixel];
         emission               = scale_color(emission, mis_weight);
+      }
+      else if (device.iteration_type == TYPE_LIGHT) {
+        emission = scale_color(emission, get_light_transparency_weight(pixel));
       }
 
       const uint32_t light = device.ptrs.light_sample_history[pixel];
@@ -218,7 +217,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
       TraceTask new_task;
       new_task.origin = data.position;
-      new_task.ray    = ray;
+      new_task.ray    = task.ray;
       new_task.index  = task.index;
 
       switch (device.iteration_type) {
@@ -228,9 +227,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
           store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           break;
         case TYPE_LIGHT:
-          if (white_noise() > 0.5f) {
+          device.ptrs.light_transparency_weight_buffer[pixel] *= 2.0f;
+          if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY_ROULETTE, pixel) > 0.5f) {
             if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-              store_RGBF(device.ptrs.light_records + pixel, scale_color(record, 2.0f));
+              store_RGBF(device.ptrs.light_records + pixel, record);
               store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
             }
           }
@@ -238,15 +238,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       }
     }
     else if (device.iteration_type != TYPE_LIGHT) {
-      const vec3 V = scale_vector(ray, -1.0f);
-
       if (!material_is_mirror(data.roughness, data.metallic))
         write_albedo_buffer(opaque_color(data.albedo), pixel);
 
       BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
 
       bool bounce_is_specular;
-      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, bounce_is_specular);
+      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, pixel, bounce_is_specular);
 
       float bounce_mis_weight = 1.0f;
 
@@ -255,7 +253,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         LightSample light                   = load_light_sample(device.ptrs.light_samples, pixel);
 
         if (light.weight > 0.0f) {
-          const BRDFInstance brdf_sample = brdf_apply_sample(brdf, light, data.position);
+          const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, pixel));
 
           const RGBF light_record = mul_color(record, brdf_sample.term);
 
@@ -284,7 +282,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       bounce_task.ray    = bounce_brdf.L;
       bounce_task.index  = task.index;
 
-      if (validate_trace_task(bounce_task, bounce_record)) {
+      if (validate_trace_task(bounce_task, pixel, bounce_record)) {
         device.ptrs.mis_buffer[pixel] = bounce_mis_weight;
         store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
         store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
@@ -292,12 +290,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     }
   }
 
-  device.ptrs.light_trace_count[threadIdx.x + blockIdx.x * blockDim.x]  = light_trace_count;
-  device.ptrs.bounce_trace_count[threadIdx.x + blockIdx.x * blockDim.x] = bounce_trace_count;
+  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
+  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_tasks() {
-  const int task_count = device.ptrs.task_counts[(threadIdx.x + blockIdx.x * blockDim.x) * 6];
+  const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
     GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(i));

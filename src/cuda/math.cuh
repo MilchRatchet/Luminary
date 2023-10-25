@@ -695,12 +695,6 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
   return result;
 }
 
-__device__ float get_dithering(const int x, const int y) {
-  const float dither = 2.0f * white_noise() - 1.0f;
-
-  return copysignf(1.0f - sqrtf(1.0f - fabsf(dither)), dither);
-}
-
 //
 // Linear RGB / sRGB conversion taken from https://www.shadertoy.com/view/lsd3zN
 // which is based os D3DX implementations
@@ -739,24 +733,23 @@ __device__ RGBAF saturate_albedo(RGBAF color, float change) {
   return color;
 }
 
-__device__ RGBF filter_gray(RGBF color) {
+__device__ RGBF filter_gray(const RGBF color) {
   const float value = luminance(color);
 
   return get_color(value, value, value);
 }
 
-__device__ RGBF filter_sepia(RGBF color) {
+__device__ RGBF filter_sepia(const RGBF color) {
   return get_color(
     color.r * 0.393f + color.g * 0.769f + color.b * 0.189f, color.r * 0.349f + color.g * 0.686f + color.b * 0.168f,
     color.r * 0.272f + color.g * 0.534f + color.b * 0.131f);
 }
 
-__device__ RGBF filter_gameboy(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
+__device__ RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 4.0f * luminance(color);
+  const float dither = random_dither_mask(x, y);
 
-  const float dither = get_dithering(x, y);
-
-  const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
@@ -771,20 +764,19 @@ __device__ RGBF filter_gameboy(RGBF color, int x, int y) {
   }
 }
 
-__device__ RGBF filter_2bitgray(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
+__device__ RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 4.0f * luminance(color);
+  const float dither = random_dither_mask(x, y);
 
-  const float dither = get_dithering(x, y);
-
-  const int tone = (int) ((32.0f + value - dither * 64.0f) / 64.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
       return get_color(0.0f, 0.0f, 0.0f);
     case 1:
-      return get_color(85.0f / 255.0f, 85.0f / 255.0f, 85.0f / 255.0f);
+      return get_color(1.0f / 3.0f, 1.0f / 3.0f, 1.0f / 3.0f);
     case 2:
-      return get_color(170.0f / 255.0f, 170.0f / 255.0f, 170.0f / 255.0f);
+      return get_color(2.0f / 3.0f, 2.0f / 3.0f, 2.0f / 3.0f);
     case 3:
     default:
       return get_color(1.0f, 1.0f, 1.0f);
@@ -814,12 +806,11 @@ __device__ RGBF filter_crt(RGBF color, int x, int y) {
   return color;
 }
 
-__device__ RGBF filter_blackwhite(RGBF color, int x, int y) {
-  const float value = 2550.0f * luminance(color);
+__device__ RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint32_t y) {
+  const float value  = 2.0f * luminance(color);
+  const float dither = random_dither_mask(x, y);
 
-  const float dither = get_dithering(x, y);
-
-  const int tone = (int) ((64.0f + value - dither * 128.0f) / 128.0f);
+  const int tone = (int) (value + dither);
 
   switch (tone) {
     case 0:
@@ -916,7 +907,8 @@ __device__ vec3 phase_sample_basis(const float alpha, const float beta, const ve
   const vec3 u1    = get_vector(1.0f + sign * basis.x * basis.x * a, sign * b, -sign * basis.x);
   const vec3 u2    = get_vector(b, sign + basis.y * basis.y * a, -basis.y);
 
-  const vec3 s = sample_ray_sphere(alpha, beta);
+  // There is an orientation change when the sign flips, hence we need to remap accordingly
+  const vec3 s = sample_ray_sphere(alpha, sign * beta);
 
   vec3 result;
   result.x = s.x * u1.x + s.y * u2.x + s.z * basis.x;
@@ -955,17 +947,6 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
   return 0.5f * g + ((1.0f / (2.0f * g)) - (1.0f / (8.0f * g)) * (h * h));
 }
 
-__device__ float4 texture_load(const DeviceTexture tex, const UV uv) {
-  float4 v = tex2D<float4>(tex.tex, uv.u, 1.0f - uv.v);
-
-  v.x = powf(v.x, tex.gamma);
-  v.y = powf(v.y, tex.gamma);
-  v.z = powf(v.z, tex.gamma);
-  // Gamma is never applied to the alpha of a texture according to PNG standard.
-
-  return v;
-}
-
 /*
  * This function perfectly importance samples the phase function from [JenE23]. The details of this are presented in the
  * supplement of the paper.
@@ -974,20 +955,18 @@ __device__ float4 texture_load(const DeviceTexture tex, const UV uv) {
  *
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
-__device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float ms_factor = 1.0f) {
-  const float r = white_noise();
-
-  JendersieEonParams params = jendersie_eon_phase_parameters(diameter, ms_factor);
+__device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice) {
+  JendersieEonParams params = jendersie_eon_phase_parameters(diameter, 1.0f);
 
   float u;
-  if (white_noise() < params.w_d) {
-    u = draine_phase_sample(params.g_d, params.alpha, r);
+  if (r_choice < params.w_d) {
+    u = draine_phase_sample(params.g_d, params.alpha, r_dir.x);
   }
   else {
-    u = henyey_greenstein_phase_sample(params.g_hg, r);
+    u = henyey_greenstein_phase_sample(params.g_hg, r_dir.x);
   }
 
-  return phase_sample_basis(u, white_noise(), ray);
+  return phase_sample_basis(u, r_dir.y, ray);
 }
 
 __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
@@ -1081,41 +1060,25 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
  * Surface sample a triangle.
  * @param triangle Triangle.
  * @param origin Point to sample from.
- * @param area Solid angle of the triangle.
+ * @param seed Random seed used to sample the triangle.
  * @result Normalized direction to the point on the triangle.
  *
  * Robust triangle sampling.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, float& area, uint32_t& seed) {
-  float r1 = sqrtf(white_noise_offset_restir(seed++));
-  float r2 = white_noise_offset_restir(seed++);
+__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random) {
+  float r1 = sqrtf(random.x);
+  float r2 = random.y;
 
   // Map random numbers uniformly into [0.025,0.975].
   r1 = 0.025f + 0.95f * r1;
   r2 = 0.025f + 0.95f * r2;
 
-  float u = 1.0f - r1;
-  float v = r1 * r2;
+  const float u = 1.0f - r1;
+  const float v = r1 * r2;
 
-  const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
-  const vec3 dir = vector_direction_stable(p, origin);
+  const vec3 p = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
 
-  const float r = get_length(sub_vector(p, origin));
-
-  const vec3 cross         = cross_product(triangle.edge1, triangle.edge2);
-  const float cross_length = get_length(cross);
-
-  // Use that surface * cos_term = 0.5 * |a x b| * |normal(a x b)^Td| = 0.5 * |a x b| * |(a x b)^Td|/|a x b| = 0.5 * |(a x b)^Td|.
-  const float surface_cos_term = 0.5f * fabsf(dot_product(cross, dir));
-
-  area = surface_cos_term / (r * r);
-
-  if (isnan(area) || isinf(area) || area < 1e-7f) {
-    area = 0.0f;
-    return get_vector(0.0f, 0.0f, 0.0f);
-  }
-
-  return dir;
+  return vector_direction_stable(p, origin);
 }
 
 /*
@@ -1125,14 +1088,15 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the sphere.
  */
-__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, float& area, uint32_t& seed) {
-  float r1 = white_noise_offset_restir(seed++);
-  float r2 = white_noise_offset_restir(seed++);
+__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, const float2 random, float& area) {
+  float r1 = random.x;
+  float r2 = random.y;
 
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);
 
   if (d < r) {
+    area = 4.0f * PI;
     return normalize_vector(sample_ray_sphere(2.0f * r1 - 1.0f, r2));
   }
 

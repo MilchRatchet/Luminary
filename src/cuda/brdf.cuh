@@ -7,6 +7,7 @@
 #include "memory.cuh"
 #include "random.cuh"
 #include "sky_utils.cuh"
+#include "texture_utils.cuh"
 #include "toy_utils.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -284,84 +285,153 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
   return brdf;
 }
 
-__device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos) {
-  BRDFInstance result = brdf;
+/*
+ * Surface sample a triangle and return its area and emission luminance.
+ * @param triangle Triangle.
+ * @param origin Point to sample from.
+ * @param area Solid angle of the triangle.
+ * @param seed Random seed used to sample the triangle.
+ * @param lum Output emission luminance of the triangle at the sampled point.
+ * @result Normalized direction to the point on the triangle.
+ *
+ * Robust triangle sampling.
+ */
+__device__ vec3
+  restir_sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random, float& area, RGBF& lum, float& r) {
+  float r1 = sqrtf(random.x);
+  float r2 = random.y;
 
-  float solid_angle;
-  switch (light.presampled_id) {
-    case LIGHT_ID_NONE:
-    case LIGHT_ID_SUN: {
-      vec3 sky_pos = world_to_sky_transform(pos);
-      result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
-    } break;
-    case LIGHT_ID_TOY:
-      result.L    = toy_sample_ray(pos, light.seed);
-      solid_angle = toy_get_solid_angle(pos);
-      break;
-    default: {
-      const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
-      result.L                     = sample_triangle(triangle, pos, solid_angle, light.seed);
-    } break;
+  // Map random numbers uniformly into [0.025,0.975].
+  r1 = 0.025f + 0.95f * r1;
+  r2 = 0.025f + 0.95f * r2;
+
+  const float u = 1.0f - r1;
+  const float v = r1 * r2;
+
+  const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
+  const vec3 dir = vector_direction_stable(p, origin);
+
+  r = get_length(sub_vector(p, origin));
+
+  const vec3 cross         = cross_product(triangle.edge1, triangle.edge2);
+  const float cross_length = get_length(cross);
+
+  // Use that surface * cos_term = 0.5 * |a x b| * |normal(a x b)^Td| = 0.5 * |a x b| * |(a x b)^Td|/|a x b| = 0.5 * |(a x b)^Td|.
+  const float surface_cos_term = 0.5f * fabsf(dot_product(cross, dir));
+
+  area = surface_cos_term / (r * r);
+
+  if (isnan(area) || isinf(area) || area < 1e-7f) {
+    area = 0.0f;
+    lum  = get_color(0.0f, 0.0f, 0.0f);
+    return get_vector(0.0f, 0.0f, 0.0f);
   }
 
-  result.term = scale_color(result.term, light.weight * 0.5f * ONE_OVER_PI * solid_angle);
+  const uint16_t illum_tex = device.scene.texture_assignments[triangle.object_maps].illuminance_map;
 
-  return brdf_evaluate(result);
+  const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, make_float2(u, v));
+  const float4 emission = texture_load(device.ptrs.illuminance_atlas[illum_tex], tex_coords);
+
+  lum = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
+
+  return dir;
 }
 
-__device__ BRDFInstance brdf_apply_sample_scattering(BRDFInstance brdf, LightSample light, vec3 pos, VolumeType volume_hit_type) {
-  BRDFInstance result = brdf_get_instance_scattering(brdf.V);
+__device__ BRDFInstance brdf_apply_sample_restir(
+  BRDFInstance brdf, LightSample light, vec3 pos, const uint32_t pixel, float& solid_angle, RGBF& lum, float& sample_dist) {
+  const float2 random = quasirandom_sequence_2D(light.seed, pixel);
 
-  float solid_angle;
   switch (light.presampled_id) {
     case LIGHT_ID_NONE:
     case LIGHT_ID_SUN: {
       vec3 sky_pos = world_to_sky_transform(pos);
-      result.L     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, solid_angle, light.seed);
+      brdf.L       = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+      lum          = scale_color(get_color(1.0f, 1.0f, 1.0f), 2e+04f * device.scene.sky.sun_strength);
+      sample_dist  = FLT_MAX;
     } break;
     case LIGHT_ID_TOY:
-      result.L    = toy_sample_ray(pos, light.seed);
+      brdf.L      = toy_sample_ray(pos, random);
       solid_angle = toy_get_solid_angle(pos);
+      lum         = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+      // Approximation, it is not super important what the actual distance is
+      sample_dist = get_length(sub_vector(pos, device.scene.toy.position));
       break;
     default: {
       const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
-      result.L                     = sample_triangle(triangle, pos, solid_angle, light.seed);
-      solid_angle                  = isnan(solid_angle) ? 0.0f : solid_angle;
+      brdf.L                       = restir_sample_triangle(triangle, pos, random, solid_angle, lum, sample_dist);
     } break;
   }
 
-  result.term = scale_color(result.term, light.weight * solid_angle);
+  return brdf;
+}
 
-  const float cos_angle = dot_product(scale_vector(brdf.V, -1.0f), result.L);
-  const float phase     = (volume_hit_type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_function(cos_angle, device.scene.fog.droplet_diameter)
-                                                               : ocean_phase(cos_angle);
+__device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos, const uint32_t pixel) {
+  const float2 random = quasirandom_sequence_2D(light.seed, pixel);
 
-  result.term = scale_color(result.term, phase);
+  switch (light.presampled_id) {
+    case LIGHT_ID_NONE:
+    case LIGHT_ID_SUN: {
+      vec3 sky_pos = world_to_sky_transform(pos);
+      float solid_angle;
+      brdf.L = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+    } break;
+    case LIGHT_ID_TOY:
+      brdf.L = toy_sample_ray(pos, random);
+      break;
+    default: {
+      const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
+      brdf.L                       = sample_triangle(triangle, pos, random);
+    } break;
+  }
 
-  return result;
+  brdf.term = scale_color(brdf.term, light.weight);
+
+  return brdf;
+}
+
+__device__ BRDFInstance brdf_apply_sample_weight(BRDFInstance brdf) {
+  brdf.term = scale_color(brdf.term, 0.5f * ONE_OVER_PI);
+
+  return brdf_evaluate(brdf);
+}
+
+__device__ BRDFInstance brdf_apply_sample_weight_scattering(BRDFInstance brdf, VolumeType volume_hit_type) {
+  const float cos_angle = dot_product(scale_vector(brdf.V, -1.0f), brdf.L);
+
+  float phase;
+  if (volume_hit_type == VOLUME_TYPE_OCEAN) {
+    phase = ocean_phase(cos_angle);
+  }
+  else {
+    const float diameter = (volume_hit_type == VOLUME_TYPE_FOG) ? device.scene.fog.droplet_diameter : device.scene.particles.phase_diameter;
+    phase                = jendersie_eon_phase_function(cos_angle, diameter);
+  }
+
+  brdf.term = scale_color(brdf.term, phase);
+
+  return brdf;
 }
 
 /*
  * Samples a ray based on the BRDFs and multiplies record with sampling weight.
  * Writes L and term of the BRDFInstance.
  */
-__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, bool& use_specular) {
+__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const uint32_t pixel, bool& use_specular) {
   const float specular_prob = brdf_spec_probability(brdf.metallic);
-  use_specular              = white_noise() < specular_prob;
+  use_specular              = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel) < specular_prob;
 
-  const float alpha = white_noise();
-  const float beta  = white_noise();
+  float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(brdf.V, rotation_to_z);
 
   if (use_specular) {
-    brdf = brdf_sample_ray_microfacet(brdf, V_local, alpha, beta);
+    brdf = brdf_sample_ray_microfacet(brdf, V_local, random.x, random.y);
 
     brdf.L = normalize_vector(rotate_vector_by_quaternion(brdf.L, inverse_quaternion(rotation_to_z)));
   }
   else {
-    const vec3 L_local = brdf_sample_ray_diffuse(alpha, beta);
+    const vec3 L_local = brdf_sample_ray_diffuse(random.x, random.y);
     brdf.L             = normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
     brdf               = brdf_evaluate(brdf);
   }
@@ -377,7 +447,8 @@ __device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, bool& use_specular) {
  * This is most likely completely non physical but since refraction plays such a small role at the moment,
  * it probably doesnt matter too much.
  */
-__device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const float r1, const float r2) {
+__device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const uint32_t pixel) {
+  const float2 random    = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
   const float roughness2 = brdf.roughness * brdf.roughness;
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(brdf.normal);
@@ -386,7 +457,7 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
   vec3 H_local = get_vector(0.0f, 0.0f, 1.0f);
 
   if (roughness2 > 0.0f) {
-    H_local = brdf_sample_microfacet(V_local, roughness2, r1, r2);
+    H_local = brdf_sample_microfacet(V_local, roughness2, random.x, random.y);
   }
 
   vec3 L_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);

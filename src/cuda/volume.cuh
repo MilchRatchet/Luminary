@@ -1,6 +1,7 @@
 #ifndef CU_VOLUME_H
 #define CU_VOLUME_H
 
+#include "directives.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
 #include "state.cuh"
@@ -126,9 +127,9 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
  * @result Distance of intersection point and origin in world space.
  */
 __device__ float volume_sample_intersection(
-  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist) {
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist, const float random) {
   // [FonWKH17] Equation 15
-  const float t = (-logf(1.0f - white_noise())) / volume.avg_scattering;
+  const float t = (-logf(random)) / volume.max_scattering;
 
   if (t > max_dist)
     return FLT_MAX;
@@ -141,30 +142,23 @@ __device__ float volume_sample_intersection(
 ////////////////////////////////////////////////////////////////////
 
 __global__ void volume_generate_g_buffer() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count  = device.ptrs.task_counts[id * 6 + 4];
-  const int task_offset = device.ptrs.task_offsets[id * 5 + 4];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
 
   for (int i = 0; i < task_count; i++) {
     VolumeTask task = load_volume_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
-
     uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
     flags |= G_BUFFER_VOLUME_HIT;
 
     GBufferData data;
-    data.hit_id    = task.volume_type;
+    data.hit_id    = task.hit_id;
     data.albedo    = RGBAF_set(0.0f, 0.0f, 0.0f, 0.0f);
     data.emission  = get_color(0.0f, 0.0f, 0.0f);
     data.normal    = get_vector(0.0f, 0.0f, 0.0f);
     data.position  = task.position;
-    data.V         = scale_vector(ray, -1.0f);
+    data.V         = scale_vector(task.ray, -1.0f);
     data.roughness = 1.0f;
     data.metallic  = 0.0f;
     data.flags     = flags;
@@ -174,26 +168,29 @@ __global__ void volume_generate_g_buffer() {
 }
 
 __global__ void volume_process_events() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device.trace_tasks + offset);
     const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
+    const int pixel     = task.index.y * device.width + task.index.x;
 
     float depth     = result.x;
     uint32_t hit_id = __float_as_uint(result.y);
+
+    const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, pixel);
 
     if (device.scene.fog.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
-        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y);
+        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
         if (volume_dist < depth) {
           depth  = volume_dist;
-          hit_id = VOLUME_FOG_HIT;
+          hit_id = HIT_TYPE_VOLUME_FOG;
         }
       }
     }
@@ -203,11 +200,11 @@ __global__ void volume_process_events() {
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
-        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y);
+        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
         if (volume_dist < depth) {
           depth  = volume_dist;
-          hit_id = VOLUME_OCEAN_HIT;
+          hit_id = HIT_TYPE_VOLUME_OCEAN;
         }
       }
     }
@@ -217,7 +214,7 @@ __global__ void volume_process_events() {
 }
 
 __global__ void volume_process_events_weight() {
-  const int task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
@@ -236,7 +233,7 @@ __global__ void volume_process_events_weight() {
         const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
         if (path.x >= 0.0f) {
-          record = scale_color(record, expf(-path.y * volume.avg_scattering));
+          record = scale_color(record, expf(-path.y * volume.max_scattering));
         }
       }
     }
@@ -254,13 +251,13 @@ __global__ void volume_process_events_weight() {
           record.b *= expf(-path.y * volume_transmittance.b);
         }
         else {
-          if (hit_id == VOLUME_OCEAN_HIT) {
-            record.r *=
-              (volume.scattering.r * expf(-path.y * volume.scattering.r)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
-            record.g *=
-              (volume.scattering.g * expf(-path.y * volume.scattering.g)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
-            record.b *=
-              (volume.scattering.b * expf(-path.y * volume.scattering.b)) / (volume.avg_scattering * expf(-path.y * volume.avg_scattering));
+          if (hit_id == HIT_TYPE_VOLUME_OCEAN) {
+            const float sampling_pdf = volume.max_scattering * expf(-path.y * volume.max_scattering);
+            const RGBF target_pdf    = get_color(
+              volume.scattering.r * expf(-path.y * volume.scattering.r), volume.scattering.g * expf(-path.y * volume.scattering.g),
+              volume.scattering.b * expf(-path.y * volume.scattering.b));
+
+            record = mul_color(record, scale_color(target_pdf, 1.0f / sampling_pdf));
           }
 
           record.r *= expf(-path.y * volume.absorption.r);
@@ -275,23 +272,16 @@ __global__ void volume_process_events_weight() {
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
-  const int id = threadIdx.x + blockIdx.x * blockDim.x;
-
-  const int task_count   = device.ptrs.task_counts[id * 6 + 4];
-  const int task_offset  = device.ptrs.task_offsets[id * 5 + 4];
-  int light_trace_count  = device.ptrs.light_trace_count[id];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[id];
+  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
+  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     VolumeTask task = load_volume_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    VolumeType volume_type = VOLUME_HIT_TYPE(task.volume_type);
-
-    vec3 ray;
-    ray.x = cosf(task.ray_xz) * cosf(task.ray_y);
-    ray.y = sinf(task.ray_y);
-    ray.z = sinf(task.ray_xz) * cosf(task.ray_y);
+    VolumeType volume_type = VOLUME_HIT_TYPE(task.hit_id);
 
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
@@ -299,8 +289,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
 
     write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
 
-    const vec3 bounce_ray =
-      (volume.type == VOLUME_TYPE_FOG) ? jendersie_eon_phase_sample(ray, device.scene.fog.droplet_diameter) : ocean_phase_sampling(ray);
+    const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
+    const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
+
+    const vec3 bounce_ray = (volume.type == VOLUME_TYPE_FOG)
+                              ? jendersie_eon_phase_sample(task.ray, device.scene.fog.droplet_diameter, random_dir, random_choice)
+                              : ocean_phase_sampling(task.ray, random_dir, random_choice);
+
+    RGBF bounce_record = record;
 
     TraceTask bounce_task;
     bounce_task.origin = task.position;
@@ -308,18 +304,21 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
     bounce_task.index  = task.index;
 
     device.ptrs.mis_buffer[pixel] = 0.0f;
-    store_RGBF(device.ptrs.bounce_records + pixel, record);
-    store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+    if (validate_trace_task(bounce_task, pixel, bounce_record)) {
+      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
+      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+    }
 
     if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
       LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-      BRDFInstance brdf = brdf_get_instance_scattering(scale_vector(ray, -1.0f));
+      BRDFInstance brdf = brdf_get_instance_scattering(scale_vector(task.ray, -1.0f));
 
       if (light.weight > 0.0f) {
-        BRDFInstance brdf_sample = brdf_apply_sample_scattering(brdf, light, task.position, volume_type);
+        const BRDFInstance brdf_sample =
+          brdf_apply_sample_weight_scattering(brdf_apply_sample(brdf, light, task.position, pixel), volume_type);
 
         const RGBF light_record = mul_color(record, brdf_sample.term);
 
@@ -339,8 +338,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
     }
   }
 
-  device.ptrs.light_trace_count[id]  = light_trace_count;
-  device.ptrs.bounce_trace_count[id] = bounce_trace_count;
+  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
+  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
 #endif /* CU_VOLUME_H */

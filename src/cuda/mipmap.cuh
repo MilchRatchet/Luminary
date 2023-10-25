@@ -9,7 +9,7 @@
 #include "utils.cuh"
 
 __global__ void mipmap_generate_level_3D_RGBA8(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
 
@@ -40,7 +40,7 @@ __global__ void mipmap_generate_level_3D_RGBA8(cudaTextureObject_t src, cudaSurf
 }
 
 __global__ void mipmap_generate_level_2D_RGBA8(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height;
 
@@ -68,7 +68,7 @@ __global__ void mipmap_generate_level_2D_RGBA8(cudaTextureObject_t src, cudaSurf
 }
 
 __global__ void mipmap_generate_level_3D_RGBA16(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
 
@@ -99,7 +99,7 @@ __global__ void mipmap_generate_level_3D_RGBA16(cudaTextureObject_t src, cudaSur
 }
 
 __global__ void mipmap_generate_level_2D_RGBA16(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height;
 
@@ -127,7 +127,7 @@ __global__ void mipmap_generate_level_2D_RGBA16(cudaTextureObject_t src, cudaSur
 }
 
 __global__ void mipmap_generate_level_3D_RGBAF(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
 
@@ -153,7 +153,7 @@ __global__ void mipmap_generate_level_3D_RGBAF(cudaTextureObject_t src, cudaSurf
 }
 
 __global__ void mipmap_generate_level_2D_RGBAF(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const int amount = width * height;
 
@@ -176,12 +176,12 @@ __global__ void mipmap_generate_level_2D_RGBAF(cudaTextureObject_t src, cudaSurf
 }
 
 extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, TextureRGBA* tex) {
-  const int num_levels = device_mipmap_compute_max_level(tex);
+  const unsigned int num_levels = device_mipmap_compute_max_level(tex);
 
   cudaTextureFilterMode filter_mode = texture_get_filter_mode(tex);
   cudaTextureReadMode read_mode     = texture_get_read_mode(tex);
 
-  for (int level = 0; level < num_levels; level++) {
+  for (unsigned int level = 0; level < num_levels; level++) {
     cudaArray_t level_src;
     gpuErrchk(cudaGetMipmappedArrayLevel(&level_src, mipmap_array, level));
     cudaArray_t level_dst;
@@ -270,7 +270,7 @@ extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Textur
 }
 
 extern "C" unsigned int device_mipmap_compute_max_level(TextureRGBA* tex) {
-  int max_dim;
+  unsigned int max_dim;
 
   switch (tex->dim) {
     case Tex2D:
@@ -287,7 +287,7 @@ extern "C" unsigned int device_mipmap_compute_max_level(TextureRGBA* tex) {
   if (max_dim == 0)
     return 0;
 
-  int i = 0;
+  unsigned int i = 0;
 
   while (max_dim != 1) {
     i++;

@@ -60,7 +60,7 @@ __device__ int bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_
   }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
-  const uint16_t trace_task_count = device.trace_count[threadIdx.x + blockIdx.x * blockDim.x];
+  const uint16_t trace_task_count = device.trace_count[THREAD_ID];
   uint16_t offset                 = 0;
 
   uint2 traversal_stack[STACK_SIZE];
@@ -368,7 +368,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           if (device.iteration_type == TYPE_LIGHT && alpha_result == 0) {
             if (triangle.id != hit_id) {
               depth           = -1.0f;
-              hit_id          = REJECT_HIT;
+              hit_id          = HIT_TYPE_REJECT;
               triangle_task.y = 0;
               node_task.y     = 0;
               stack_ptr       = 0;
@@ -395,7 +395,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_trace_tasks() {
           }
         }
         else {
-          if (device.shading_mode == SHADING_HEAT && hit_id > TRIANGLE_ID_LIMIT) {
+          if (device.shading_mode == SHADING_HEAT && hit_id > HIT_TYPE_TRIANGLE_ID_LIMIT) {
             hit_id = 0;
           }
 

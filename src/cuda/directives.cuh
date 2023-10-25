@@ -22,7 +22,7 @@
 #define CUTOFF ((4.0f) / (BRIGHTEST_EMISSION))
 #define PROBABILISTIC_CUTOFF (16.0f * CUTOFF)
 
-__device__ int validate_trace_task(TraceTask task, RGBF& record) {
+__device__ int validate_trace_task(TraceTask task, const uint32_t pixel, RGBF& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
@@ -32,7 +32,7 @@ __device__ int validate_trace_task(TraceTask task, RGBF& record) {
   }
   else if (max < PROBABILISTIC_CUTOFF) {
     const float p = (max - CUTOFF) / (PROBABILISTIC_CUTOFF - CUTOFF);
-    if (white_noise() > p) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE, pixel) > p) {
       valid = 0;
     }
     else {

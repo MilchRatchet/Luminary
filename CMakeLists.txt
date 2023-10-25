@@ -50,7 +50,7 @@ endif()
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
 
-list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu")
+list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu" "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu")
 
 #=============================================================
 # SDL2
@@ -61,7 +61,7 @@ find_package(SDL2_ttf REQUIRED CONFIG)
 #=============================================================
 # Set CUDA flags
 #=============================================================
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --source-in-ptx --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --use_fast_math")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --source-in-ptx --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math")
 if(WIN32)
     set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O2 -fp:fast -arch:AVX2")
     set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Od -fp:fast -arch:AVX2 -g")
@@ -101,16 +101,16 @@ endif()
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
     if (CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4 -Wno-static-in-inline -Wno-deprecated-non-prototype")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native /W4 -Wno-static-in-inline -Wno-deprecated-non-prototype -Wextra")
         set(CMAKE_C_FLAGS_RELEASE "/O2")
         set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG")
     elseif(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wall -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-strict-aliasing -Wno-deprecated-non-prototype")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-strict-aliasing -Wno-deprecated-non-prototype")
         set(CMAKE_C_FLAGS_RELEASE "-O3")
         set(CMAKE_C_FLAGS_DEBUG "-Og -g")
     endif()
 elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wall -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-strict-aliasing -Wno-deprecated-non-prototype")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-strict-aliasing -Wno-deprecated-non-prototype")
     set(CMAKE_C_FLAGS_RELEASE "-O3")
     set(CMAKE_C_FLAGS_DEBUG "-Og -g")
 else()
@@ -168,7 +168,18 @@ message("")
 
 set(EMBED_FILE_NAME "embed_file")
 include(ceb_embed_files)
-ceb_embed_files(PROJECT Luminary OUTPUT ${EMBED_FILE_NAME} INPUT $<TARGET_OBJECTS:optix_kernels> ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png)
+ceb_embed_files(
+  PROJECT Luminary
+  OUTPUT ${EMBED_FILE_NAME}
+  INPUT
+  $<TARGET_OBJECTS:optix_kernels>
+  $<TARGET_OBJECTS:optix_kernels_particle>
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_1D.png
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_2D.png
+)
 
 #=============================================================
 # Executable
@@ -202,6 +213,15 @@ target_include_directories(optix_kernels PRIVATE "${CMAKE_SOURCE_DIR}/include")
 target_include_directories(optix_kernels PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
 target_include_directories(optix_kernels PRIVATE "${OptiX_INCLUDE}")
 target_include_directories(optix_kernels PRIVATE CUDA::toolkit)
+
+add_library(optix_kernels_particle OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu)
+set_target_properties(optix_kernels_particle PROPERTIES CUDA_PTX_COMPILATION ON)
+add_dependencies(Luminary optix_kernels_particle)
+
+target_include_directories(optix_kernels_particle PRIVATE "${CMAKE_SOURCE_DIR}/include")
+target_include_directories(optix_kernels_particle PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
+target_include_directories(optix_kernels_particle PRIVATE "${OptiX_INCLUDE}")
+target_include_directories(optix_kernels_particle PRIVATE CUDA::toolkit)
 
 #=============================================================
 # File copying

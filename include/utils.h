@@ -40,15 +40,19 @@
 #define ONE_OVER_PI 0.31830988618f
 #endif
 
-#define LIGHT_ID_SUN 0xffffffffu
-#define LIGHT_ID_TOY 0xfffffffeu
-#define LIGHT_ID_NONE 0xfffffff1u
-
 #define OPTIXRT_NUM_GROUPS 3
 
 #define RESTIR_CANDIDATE_POOL_MAX (1 << 20)
 
 enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
+
+enum LightID : uint32_t {
+  LIGHT_ID_SUN               = 0xffffffffu,
+  LIGHT_ID_TOY               = 0xfffffffeu,
+  LIGHT_ID_NONE              = 0xfffffff1u,
+  LIGHT_ID_ANY               = 0xfffffff0u,
+  LIGHT_ID_TRIANGLE_ID_LIMIT = 0x7fffffffu
+} typedef LightID;
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
@@ -96,7 +100,7 @@ enum MaterialFresnel { SCHLICK = 0, FDEZ_AGUERA = 1 } typedef MaterialFresnel;
 
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
-enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1 } typedef VolumeType;
+enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE } typedef VolumeType;
 
 // Set of architectures supported by Luminary
 enum DeviceArch {
@@ -315,6 +319,20 @@ struct GlobalMaterial {
   int colored_transparency;
 } typedef GlobalMaterial;
 
+struct Particles {
+  int active;
+  uint32_t seed;
+  uint32_t count;
+  RGBF albedo;
+  float speed;
+  float direction_altitude;
+  float direction_azimuth;
+  float phase_diameter;
+  float scale;
+  float size;
+  float size_variation;
+} typedef Particles;
+
 struct Scene {
   Camera camera;
   Triangle* triangles;
@@ -328,6 +346,7 @@ struct Scene {
   Toy toy;
   Fog fog;
   GlobalMaterial material;
+  Particles particles;
 } typedef Scene;
 
 struct RayEmitter {
@@ -367,7 +386,7 @@ struct DevicePointers {
   uint32_t* light_sample_history;
   RGBF* frame_buffer;
   RGBF* frame_temporal;
-  RGBF* frame_variance;
+  float* frame_variance;
   RGBF* frame_accumulate;
   RGBF* frame_output;
   RGBF* albedo_buffer;
@@ -377,6 +396,7 @@ struct DevicePointers {
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
   float* mis_buffer;
+  float* light_transparency_weight_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
   uint32_t* randoms;
@@ -390,6 +410,8 @@ struct DevicePointers {
   DeviceTexture* sky_hdri_luts;
   DeviceTexture* sky_moon_albedo_tex;
   DeviceTexture* sky_moon_normal_tex;
+  DeviceTexture* bluenoise_1D_tex;
+  DeviceTexture* bluenoise_2D_tex;
   LightSample* light_samples;
   GBufferData* g_buffer;
   uint32_t* light_candidates;
@@ -420,20 +442,37 @@ struct DeviceConstantMemory {
   RayEmitter emitter;
   int accum_mode;
   OptixTraversableHandle optix_bvh;
+  OptixTraversableHandle optix_bvh_particles;
   Node8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
+  Quad* particle_quads;
 } typedef DeviceConstantMemory;
 
-struct OptixBVH {
-  int initialized;
-  OptixTraversableHandle traversable;
-  void* bvh_data;
+struct OptixKernel {
   OptixPipeline pipeline;
   OptixShaderBindingTable shaders;
   DeviceConstantMemory* params;
+} typedef OptixKernel;
+
+struct OptixBVH {
+  int initialized;
+  size_t bvh_mem_size;
+  OptixTraversableHandle traversable;
+  void* bvh_data;
   int force_dmm_usage;
   int disable_omm;
 } typedef OptixBVH;
+
+struct ParticlesInstance {
+  OptixKernel kernel;
+  OptixBVH optix;
+  uint32_t triangle_count;
+  uint32_t vertex_count;
+  DeviceBuffer* vertex_buffer;
+  uint32_t index_count;
+  DeviceBuffer* index_buffer;
+  DeviceBuffer* quad_buffer;
+} typedef ParticlesInstance;
 
 struct DeviceInfo {
   size_t global_mem_size;
@@ -474,7 +513,10 @@ struct RaytraceInstance {
   DeviceBuffer* sky_hdri_luts;
   DeviceBuffer* sky_moon_albedo_tex;
   DeviceBuffer* sky_moon_normal_tex;
+  DeviceBuffer* bluenoise_1D_tex;
+  DeviceBuffer* bluenoise_2D_tex;
   DeviceBuffer* mis_buffer;
+  DeviceBuffer* light_transparency_weight_buffer;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
@@ -501,9 +543,11 @@ struct RaytraceInstance {
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
   OptixDeviceContext optix_ctx;
+  OptixKernel optix_kernel;
   OptixBVH optix_bvh;
   BVHType bvh_type;
   int luminary_bvh_initialized;
+  ParticlesInstance particles_instance;
   DeviceInfo device_info;
 } typedef RaytraceInstance;
 

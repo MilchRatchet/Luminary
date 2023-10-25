@@ -12,7 +12,7 @@
 #define BRDF_UNITTEST_ITERATIONS 1000000
 
 __global__ void brdf_unittest_kernel(float* bounce, float* light) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   const unsigned int total = BRDF_UNITTEST_TOTAL;
 
@@ -37,7 +37,7 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
         brdf_get_instance(get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f), V, get_vector(0.0f, 1.0f, 0.0f), 1.0f - smoothness, metallic);
 
       bool dummy;
-      brdf = brdf_sample_ray(brdf, dummy);
+      brdf = brdf_sample_ray(brdf, 0, dummy);
 
       float weight = luminance(brdf.term);
 

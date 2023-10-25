@@ -26,9 +26,9 @@ __device__ float sky_hdri_tent_filter_importance_sample(const float x) {
 // Sampling Sun => (pos - hdri_pos) and then precompute the sun pos based on hdri values instead.
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lut(float4* dst) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
-  uint32_t seed = device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x];
+  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   const int amount = device.scene.sky.hdri_dim * device.scene.sky.hdri_dim;
 
@@ -37,6 +37,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
   while (id < amount) {
     const int x = id % device.scene.sky.hdri_dim;
     const int y = id / device.scene.sky.hdri_dim;
+
+    const uint32_t pixel = x + y * device.scene.sky.hdri_dim;
 
     RGBF result   = get_color(0.0f, 0.0f, 0.0f);
     RGBF variance = get_color(1.0f, 1.0f, 1.0f);
@@ -61,7 +63,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
       RGBF cloud_transmittance = get_color(1.0f, 1.0f, 1.0f);
 
       if (device.scene.sky.cloud.active) {
-        const float offset = clouds_render(sky_origin, ray, FLT_MAX, color, cloud_transmittance, seed);
+        const float offset = clouds_render(sky_origin, ray, FLT_MAX, pixel, color, cloud_transmittance, seed);
 
         iter_origin = add_vector(iter_origin, scale_vector(ray, offset));
       }
@@ -109,16 +111,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
 
     result = scale_color(result, 1.0f / device.scene.sky.hdri_samples);
 
-    dst[x + y * device.scene.sky.hdri_dim] = make_float4(result.r, result.g, result.b, 0.0f);
+    dst[pixel] = make_float4(result.r, result.g, result.b, 0.0f);
 
     id += blockDim.x * gridDim.x;
   }
 
-  device.ptrs.randoms[threadIdx.x + blockIdx.x * blockDim.x] = seed;
+  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic((const char*) "Sky HDRI Computation");
 
   if (instance->scene.sky.hdri_initialized) {
     texture_free_atlas(instance->sky_hdri_luts, 1);
@@ -127,6 +129,12 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   instance->scene.sky.hdri_dim = instance->scene.sky.settings_hdri_dim;
 
   const int dim = instance->scene.sky.hdri_dim;
+
+  if (dim == 0) {
+    error_message("Failed to allocated HDRI because resolution was 0. Turned off HDRI.");
+    instance->scene.sky.hdri_active = 0;
+    return;
+  }
 
   instance->scene.sky.hdri_initialized = 1;
 
@@ -153,7 +161,7 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
 
   raytrace_update_device_pointers(instance);
 
-  bench_toc((char*) "Sky HDRI Computation");
+  bench_toc();
 }
 
 extern "C" void sky_hdri_set_pos_to_cam(RaytraceInstance* instance) {

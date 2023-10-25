@@ -108,9 +108,9 @@ __device__ float toy_get_solid_angle(const vec3 position) {
   return 0.0f;
 }
 
-__device__ vec3 toy_plane_sample_ray(const vec3 position, uint32_t& seed) {
-  const float alpha = white_noise_offset_restir(seed++) * 2.0f * PI;
-  const float beta  = sqrtf(white_noise_offset_restir(seed++));
+__device__ vec3 toy_plane_sample_ray(const vec3 position, const float2 random) {
+  const float alpha = random.x * 2.0f * PI;
+  const float beta  = sqrtf(random.y);
 
   const vec3 n = rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
 
@@ -120,13 +120,13 @@ __device__ vec3 toy_plane_sample_ray(const vec3 position, uint32_t& seed) {
   return normalize_vector(sub_vector(p, position));
 }
 
-__device__ vec3 toy_sample_ray(const vec3 position, uint32_t& seed) {
+__device__ vec3 toy_sample_ray(const vec3 position, const float2 random) {
   switch (device.scene.toy.shape) {
     case TOY_SPHERE:
       float dummy;
-      return sample_sphere(device.scene.toy.position, device.scene.toy.scale, position, dummy, seed);
+      return sample_sphere(device.scene.toy.position, device.scene.toy.scale, position, random, dummy);
     case TOY_PLANE:
-      return toy_plane_sample_ray(position, seed);
+      return toy_plane_sample_ray(position, random);
   }
 
   return normalize_vector(sub_vector(device.scene.toy.position, position));

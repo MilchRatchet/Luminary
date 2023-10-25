@@ -216,7 +216,7 @@ __device__ float dilate_perlin_worley(const float p, const float w, float x) {
 }
 
 __global__ void generate_shape_noise(const int dim, uint8_t* tex) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;
 
@@ -261,7 +261,7 @@ __global__ void generate_shape_noise(const int dim, uint8_t* tex) {
 }
 
 __global__ void generate_detail_noise(const int dim, uint8_t* tex) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;
 
@@ -297,7 +297,7 @@ __global__ void generate_detail_noise(const int dim, uint8_t* tex) {
 }
 
 __global__ void generate_weather_map(const int dim, const float seed, uint8_t* tex) {
-  unsigned int id = threadIdx.x + blockIdx.x * blockDim.x;
+  unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;
 
@@ -360,7 +360,7 @@ __global__ void generate_weather_map(const int dim, const float seed, uint8_t* t
 #define CLOUD_WEATHER_RES 1024
 
 extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
-  bench_tic();
+  bench_tic((const char*) "Cloud Noise Generation");
 
   if (instance->scene.sky.cloud.initialized) {
     texture_free_atlas(instance->cloud_noise, 3);
@@ -396,7 +396,7 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
 
   instance->scene.sky.cloud.initialized = 1;
 
-  bench_toc((char*) "Cloud Noise Generation");
+  bench_toc();
 }
 
 #endif /* CU_CLOUD_NOISE_H */

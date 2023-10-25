@@ -11,7 +11,7 @@ struct VolumeDescriptor {
   VolumeType type;
   RGBF absorption;
   RGBF scattering;
-  float avg_scattering;
+  float max_scattering;
   float dist;
   float max_height;
   float min_height;
@@ -27,7 +27,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
   volume.type           = VOLUME_TYPE_FOG;
   volume.absorption     = get_color(0.0f, 0.0f, 0.0f);
   volume.scattering     = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
-  volume.avg_scattering = FOG_DENSITY;
+  volume.max_scattering = FOG_DENSITY;
   volume.dist           = device.scene.fog.dist;
   volume.max_height     = device.scene.fog.height;
   volume.min_height     = (device.scene.ocean.active) ? OCEAN_MAX_HEIGHT : 0.0f;
@@ -45,7 +45,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.max_height = OCEAN_MIN_HEIGHT * (1.0f - eps);
   volume.min_height = 0.0f;
 
-  volume.avg_scattering = RGBF_avg(volume.scattering);
+  volume.max_scattering = fmaxf(fmaxf(volume.scattering.r, volume.scattering.g), volume.scattering.b);
 
   return volume;
 }
