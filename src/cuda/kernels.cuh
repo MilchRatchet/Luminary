@@ -22,24 +22,27 @@ __device__ TraceTask get_starting_ray(TraceTask task, const uint32_t pixel) {
   const float2 jitter = (device.accum_mode != TEMPORAL_REPROJECTION) ? quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER)
                                                                      : make_float2(device.emitter.jitter.x, device.emitter.jitter.y);
 
-  vec3 lens_ray;
+  vec3 film_point;
+  film_point.x = device.scene.camera.fov - device.emitter.step * (task.index.x + jitter.x);
+  film_point.y = -device.emitter.vfov + device.emitter.step * (task.index.y + jitter.y);
+  film_point.z = 1.0f;
 
-  lens_ray.x = device.scene.camera.focal_length * (-device.scene.camera.fov + device.emitter.step * (task.index.x + jitter.x));
-  lens_ray.y = device.scene.camera.focal_length * (device.emitter.vfov - device.emitter.step * (task.index.y + jitter.y));
-  lens_ray.z = -device.scene.camera.focal_length;
+  vec3 film_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), film_point));
+
+  // The minus is because we are always looking in -Z direction
+  vec3 focal_point = scale_vector(film_to_focal_ray, -device.scene.camera.focal_length / film_to_focal_ray.z);
 
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LENS, pixel);
+  const float alpha   = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : random.x * 2.0f * PI;
+  const float beta    = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : sqrtf(random.y) * device.scene.camera.aperture_size;
 
-  const float alpha = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : random.x * 2.0f * PI;
-  const float beta  = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : sqrtf(random.y) * device.scene.camera.aperture_size;
+  vec3 aperture_point = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
 
-  vec3 point_on_aperture = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
+  focal_point    = rotate_vector_by_quaternion(focal_point, device.emitter.camera_rotation);
+  aperture_point = rotate_vector_by_quaternion(aperture_point, device.emitter.camera_rotation);
 
-  lens_ray          = sub_vector(lens_ray, point_on_aperture);
-  point_on_aperture = rotate_vector_by_quaternion(point_on_aperture, device.emitter.camera_rotation);
-
-  task.ray    = normalize_vector(rotate_vector_by_quaternion(lens_ray, device.emitter.camera_rotation));
-  task.origin = add_vector(device.scene.camera.pos, point_on_aperture);
+  task.ray    = normalize_vector(sub_vector(focal_point, aperture_point));
+  task.origin = add_vector(device.scene.camera.pos, aperture_point);
 
   return task;
 }
