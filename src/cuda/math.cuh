@@ -1202,10 +1202,6 @@ __device__ float tent_filter_importance_sample(const float x) {
   }
 }
 
-__device__ float2 camera_jitter(const float2 rand) {
-  return make_float2(0.5f + tent_filter_importance_sample(rand.x), 0.5f + tent_filter_importance_sample(rand.y));
-}
-
 /////////////////
 // RGBAhalf functions
 /////////////////

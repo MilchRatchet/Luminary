@@ -102,6 +102,8 @@ enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 
 
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE } typedef VolumeType;
 
+enum CameraApertureShape { CAMERA_APERTURE_ROUND = 0, CAMERA_APERTURE_BLADED = 1 } typedef CameraApertureShape;
+
 // Set of architectures supported by Luminary
 enum DeviceArch {
   DEVICE_ARCH_UNKNOWN = 0,
@@ -137,6 +139,8 @@ struct Camera {
   float fov;
   float focal_length;
   float aperture_size;
+  CameraApertureShape aperture_shape;
+  int aperture_blade_count;
   float exposure;
   float max_exposure;
   float min_exposure;

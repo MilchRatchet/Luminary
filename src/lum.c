@@ -122,6 +122,14 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 4995148757353189441u:
       sscanf(value, "%f\n", &camera->aperture_size);
       break;
+    /* APESHAPE */
+    case 4994563765644382273u:
+      sscanf(value, "%d\n", &camera->aperture_shape);
+      break;
+    /* APEBLACO */
+    case 5711480548221079617u:
+      sscanf(value, "%d\n", &camera->aperture_blade_count);
+      break;
     /* AUTOEXP_ */
     case 6868086486446921025u:
       sscanf(value, "%d\n", &camera->auto_exposure);
@@ -523,35 +531,35 @@ static void parse_particle_settings(Particles* particle, char* line) {
       sscanf(value, "%f\n", &particle->scale);
       break;
     /* ALBEDO__ */
-    case 6872298711029009473:
+    case 6872298711029009473u:
       sscanf(value, "%f %f %f\n", &particle->albedo.r, &particle->albedo.g, &particle->albedo.b);
       break;
     /* DIRECTIO */
-    case 5713190250198747460:
+    case 5713190250198747460u:
       sscanf(value, "%f %f\n", &particle->direction_altitude, &particle->direction_azimuth);
       break;
     /* SPEED___ */
-    case 6872316303215251539:
+    case 6872316303215251539u:
       sscanf(value, "%f\n", &particle->speed);
       break;
     /* PHASEDIA */
-    case 4704366350305413200:
+    case 4704366350305413200u:
       sscanf(value, "%f\n", &particle->phase_diameter);
       break;
     /* SEED____ */
-    case 6872316419162588499:
+    case 6872316419162588499u:
       sscanf(value, "%d\n", &particle->seed);
       break;
     /* COUNT___ */
-    case 6872316372086771523:
+    case 6872316372086771523u:
       sscanf(value, "%d\n", &particle->count);
       break;
     /* SIZE____ */
-    case 6872316419180742995:
+    case 6872316419180742995u:
       sscanf(value, "%f\n", &particle->size);
       break;
     /* SIZEVARI */
-    case 5283357151645550931:
+    case 5283357151645550931u:
       sscanf(value, "%f\n", &particle->size_variation);
       break;
     default:
@@ -775,6 +783,10 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "CAMERA FOCALLEN %f\n", instance->scene.camera.focal_length);
   fputs(line, file);
   sprintf(line, "CAMERA APERTURE %f\n", instance->scene.camera.aperture_size);
+  fputs(line, file);
+  sprintf(line, "CAMERA APESHAPE %d\n", instance->scene.camera.aperture_shape);
+  fputs(line, file);
+  sprintf(line, "CAMERA APEBLACO %d\n", instance->scene.camera.aperture_blade_count);
   fputs(line, file);
   sprintf(line, "CAMERA EXPOSURE %f\n", instance->scene.camera.exposure);
   fputs(line, file);

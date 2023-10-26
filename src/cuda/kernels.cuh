@@ -4,6 +4,7 @@
 #include <cuda_runtime_api.h>
 
 #include "bvh.cuh"
+#include "camera.cuh"
 #include "cloud.cuh"
 #include "geometry.cuh"
 #include "ocean.cuh"
@@ -18,36 +19,6 @@
 #include "utils.cuh"
 #include "volume.cuh"
 
-__device__ TraceTask get_starting_ray(TraceTask task, const uint32_t pixel) {
-  const float2 jitter = (device.accum_mode != TEMPORAL_REPROJECTION)
-                          ? camera_jitter(quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER))
-                          : make_float2(device.emitter.jitter.x, device.emitter.jitter.y);
-
-  vec3 film_point;
-  film_point.x = device.scene.camera.fov - device.emitter.step * (task.index.x + jitter.x);
-  film_point.y = -device.emitter.vfov + device.emitter.step * (task.index.y + jitter.y);
-  film_point.z = 1.0f;
-
-  vec3 film_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), film_point));
-
-  // The minus is because we are always looking in -Z direction
-  vec3 focal_point = scale_vector(film_to_focal_ray, -device.scene.camera.focal_length / film_to_focal_ray.z);
-
-  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LENS, pixel);
-  const float alpha   = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : random.x * 2.0f * PI;
-  const float beta    = (device.scene.camera.aperture_size == 0.0f) ? 0.0f : sqrtf(random.y) * device.scene.camera.aperture_size;
-
-  vec3 aperture_point = get_vector(cosf(alpha) * beta, sinf(alpha) * beta, 0.0f);
-
-  focal_point    = rotate_vector_by_quaternion(focal_point, device.emitter.camera_rotation);
-  aperture_point = rotate_vector_by_quaternion(aperture_point, device.emitter.camera_rotation);
-
-  task.ray    = normalize_vector(sub_vector(focal_point, aperture_point));
-  task.origin = add_vector(device.scene.camera.pos, aperture_point);
-
-  return task;
-}
-
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() {
   int offset       = 0;
   const int amount = device.width * device.height;
@@ -58,7 +29,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     task.index.x = (uint16_t) (pixel % device.width);
     task.index.y = (uint16_t) (pixel / device.width);
 
-    task = get_starting_ray(task, pixel);
+    task = camera_get_ray(task, pixel);
 
     device.ptrs.light_records[pixel]                    = get_color(1.0f, 1.0f, 1.0f);
     device.ptrs.bounce_records[pixel]                   = get_color(1.0f, 1.0f, 1.0f);

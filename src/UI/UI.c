@@ -164,6 +164,8 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Rotation Z", &(instance->scene.camera.rotation.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Field of View", &(instance->scene.camera.fov), 1, 0.001f, 0.0001f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Aperture Size", &(instance->scene.camera.aperture_size), 1, 0.0005f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_dropdown(ui, "Aperture Shape", &(instance->scene.camera.aperture_shape), 1, 2, "Round\0Bladed", 10);
+  panels[i++] = create_slider(ui, "Aperture Blade Count", &(instance->scene.camera.aperture_blade_count), 1, 0.0005f, 3.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Focal Length", &(instance->scene.camera.focal_length), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Far Clip Distance", &(instance->scene.camera.far_clip_distance), 1, 0.05f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Camera Speed", &(instance->scene.camera.wasd_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);

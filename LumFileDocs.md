@@ -72,6 +72,14 @@ Focal length of the camera. Number must be non-negative.
 `CAMERA APERTURE [FP32]`<br/>
 Aperture size of the camera. Number must be non-negative.
 
+`CAMERA APESHAPE [INT32]`<br/>
+Aperture shape of the camera:
+ - 0 = Round
+ - 1 = Bladed
+
+`CAMERA APEBLACO [INT32]`<br/>
+Number of blades used in an aperture with bladed shape. Number must at least 3.
+
 `CAMERA EXPOSURE [FP32]`<br/>
 Exposure of the camera. Number must be non-negative.
 

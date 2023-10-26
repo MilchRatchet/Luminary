@@ -118,12 +118,13 @@ enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_RESTIR_DIR                  = 136, /* 2 + 128 */
   QUASI_RANDOM_TARGET_RESTIR_GENERATION           = 266, /* 128 */
   QUASI_RANDOM_TARGET_LENS                        = 394, /* 2 */
-  QUASI_RANDOM_TARGET_VOLUME_DIST                 = 396, /* 1 */
-  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE            = 397, /* 1 */
-  QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET           = 398, /* 3 */
-  QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT            = 401, /* 3 */
-  QUASI_RANDOM_TARGET_CAMERA_JITTER               = 404, /* 2 */
-  QUASI_RANDOM_TARGET_CAMERA_TIME                 = 406  /* 1 */
+  QUASI_RANDOM_TARGET_LENS_BLADE                  = 396, /* 1 */
+  QUASI_RANDOM_TARGET_VOLUME_DIST                 = 397, /* 1 */
+  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE            = 398, /* 1 */
+  QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET           = 399, /* 3 */
+  QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT            = 402, /* 3 */
+  QUASI_RANDOM_TARGET_CAMERA_JITTER               = 405, /* 2 */
+  QUASI_RANDOM_TARGET_CAMERA_TIME                 = 407  /* 1 */
 } typedef QuasiRandomTarget;
 
 ////////////////////////////////////////////////////////////////////

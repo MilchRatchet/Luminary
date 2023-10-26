@@ -37,7 +37,9 @@ void scene_init(Scene** _scene) {
   scene->camera.rotation.z            = 0.0f;
   scene->camera.fov                   = 1.0f;
   scene->camera.focal_length          = 1.0f;
-  scene->camera.aperture_size         = 0.00f;
+  scene->camera.aperture_size         = 0.0f;
+  scene->camera.aperture_shape        = CAMERA_APERTURE_ROUND;
+  scene->camera.aperture_blade_count  = 7;
   scene->camera.exposure              = 1.0f;
   scene->camera.min_exposure          = 40.0f;
   scene->camera.max_exposure          = 300.0f;
