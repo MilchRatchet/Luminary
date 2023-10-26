@@ -221,7 +221,7 @@ void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
   wavefront_convert_content(content, &scene->triangles, &scene->triangle_data);
 
   scene->materials_count     = content->materials_count;
-  scene->texture_assignments = wavefront_generate_texture_assignments(content);
+  scene->materials = wavefront_generate_texture_assignments(content);
 }
 
 RaytraceInstance* scene_load_lum(const char* filename) {
@@ -362,7 +362,7 @@ void scene_clear(Scene** scene) {
 
   free((*scene)->triangles);
   free((*scene)->triangle_lights);
-  free((*scene)->texture_assignments);
+  free((*scene)->materials);
 
   free(*scene);
 }

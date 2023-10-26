@@ -38,6 +38,7 @@ struct WavefrontTriangle {
 
 struct WavefrontMaterial {
   size_t hash;
+  float refraction_index;
   uint16_t texture[4];
 } typedef WavefrontMaterial;
 
@@ -81,7 +82,7 @@ struct WavefrontContent {
 void wavefront_init(WavefrontContent** content);
 void wavefront_clear(WavefrontContent** content);
 int wavefront_read_file(WavefrontContent* _content, const char* filename);
-TextureAssignment* wavefront_generate_texture_assignments(WavefrontContent* content);
+Material* wavefront_generate_texture_assignments(WavefrontContent* content);
 unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data);
 
 #endif /* WAVEFRONT_H */

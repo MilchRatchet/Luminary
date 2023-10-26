@@ -266,23 +266,25 @@ __device__ GBufferData load_g_buffer_data(const int offset) {
   const float4 data2 = __ldcs(ptr + 2);
   const float4 data3 = __ldcs(ptr + 3);
   const float4 data4 = __ldcs(ptr + 4);
+  const float4 data5 = __ldcs(ptr + 5);
 
   GBufferData result;
-  result.hit_id    = __float_as_uint(data0.x);
-  result.albedo    = RGBAF_set(data0.y, data0.z, data0.w, data1.x);
-  result.emission  = get_color(data1.y, data1.z, data1.w);
-  result.position  = get_vector(data2.x, data2.y, data2.z);
-  result.V         = get_vector(data2.w, data3.x, data3.y);
-  result.normal    = get_vector(data3.z, data3.w, data4.x);
-  result.roughness = data4.y;
-  result.metallic  = data4.z;
-  result.flags     = __float_as_uint(data4.w);
+  result.hit_id           = __float_as_uint(data0.x);
+  result.albedo           = RGBAF_set(data0.y, data0.z, data0.w, data1.x);
+  result.emission         = get_color(data1.y, data1.z, data1.w);
+  result.position         = get_vector(data2.x, data2.y, data2.z);
+  result.V                = get_vector(data2.w, data3.x, data3.y);
+  result.normal           = get_vector(data3.z, data3.w, data4.x);
+  result.roughness        = data4.y;
+  result.metallic         = data4.z;
+  result.flags            = __float_as_uint(data4.w);
+  result.refraction_index = data5.x;
 
   return result;
 }
 
 __device__ void store_g_buffer_data(const GBufferData data, const int offset) {
-  float4 data0, data1, data2, data3, data4;
+  float4 data0, data1, data2, data3, data4, data5;
 
   data0.x = __uint_as_float(data.hit_id);
   data0.y = data.albedo.r;
@@ -304,6 +306,7 @@ __device__ void store_g_buffer_data(const GBufferData data, const int offset) {
   data4.y = data.roughness;
   data4.z = data.metallic;
   data4.w = __uint_as_float(data.flags);
+  data5.x = data.refraction_index;
 
   float4* ptr = (float4*) (device.ptrs.g_buffer + offset);
   __stcs(ptr + 0, data0);
@@ -311,6 +314,7 @@ __device__ void store_g_buffer_data(const GBufferData data, const int offset) {
   __stcs(ptr + 2, data2);
   __stcs(ptr + 3, data3);
   __stcs(ptr + 4, data4);
+  __stcs(ptr + 5, data5);
 }
 
 __device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {
@@ -374,7 +378,7 @@ __device__ TriangleLight load_triangle_light(const TriangleLight* data, const in
   triangle.edge1       = get_vector(v1.w, v2.x, v2.y);
   triangle.edge2       = get_vector(v2.z, v2.w, v3.x);
   triangle.triangle_id = __float_as_uint(v3.y);
-  triangle.object_maps = __float_as_uint(v3.z);
+  triangle.material_id = __float_as_uint(v3.z);
 
   return triangle;
 }
@@ -392,6 +396,20 @@ __device__ Quad load_quad(const Quad* data, const int offset) {
   quad.normal = get_vector(v3.y, v3.z, v3.w);
 
   return quad;
+}
+
+__device__ Material load_material(const Material* data, const int offset) {
+  const float4* ptr = (float4*) (data + offset);
+  const float4 v    = __ldg(ptr);
+
+  Material mat;
+  mat.refraction_index = v.x;
+  mat.albedo_map       = __float_as_uint(v.z) & 0xFFFF;
+  mat.illuminance_map  = __float_as_uint(v.z) >> 16;
+  mat.material_map     = __float_as_uint(v.w) & 0xFFFF;
+  mat.normal_map       = __float_as_uint(v.w) >> 16;
+
+  return mat;
 }
 
 #endif /* CU_MEMORY_H */

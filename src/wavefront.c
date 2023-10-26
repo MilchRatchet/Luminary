@@ -38,6 +38,7 @@ void wavefront_init(WavefrontContent** content) {
   (*content)->materials_count  = 1;
 
   (*content)->materials[0].hash                    = 0;
+  (*content)->materials[1].refraction_index        = 1.0f;
   (*content)->materials[0].texture[WF_ALBEDO]      = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_ILLUMINANCE] = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
@@ -95,6 +96,28 @@ void wavefront_clear(WavefrontContent** content) {
   free((*content)->texture_list);
 
   free(*content);
+}
+
+/*
+ * Reads a line str of n floating point numbers and writes them into dst.
+ * @param str String containing the floating point numbers.
+ * @param n Number of floating point numbers.
+ * @param dst Array the floating point numbers are written to.
+ * @result Returns the number of floating point numbers written.
+ */
+static int read_float_line(const char* str, const int n, float* dst) {
+  const char* rstr = str;
+  for (int i = 0; i < n; i++) {
+    char* new_rstr;
+    dst[i] = strtof(rstr, &new_rstr);
+
+    if (!new_rstr)
+      return i + 1;
+
+    rstr = (const char*) new_rstr;
+  }
+
+  return n;
 }
 
 static size_t hash_djb2(unsigned char* str) {
@@ -256,11 +279,23 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
       ensure_capacity(content->materials, content->materials_count, content->materials_length, sizeof(WavefrontMaterial));
 
       content->materials[content->materials_count].hash                    = hash;
+      content->materials[content->materials_count].refraction_index        = 1.0f;
       content->materials[content->materials_count].texture[WF_ALBEDO]      = TEXTURE_NONE;
       content->materials[content->materials_count].texture[WF_ILLUMINANCE] = TEXTURE_NONE;
       content->materials[content->materials_count].texture[WF_MATERIAL]    = TEXTURE_NONE;
       content->materials[content->materials_count].texture[WF_NORMAL]      = TEXTURE_NONE;
       content->materials_count++;
+    }
+    else if (line[0] == 'N' && line[1] == 'i') {
+      char* value = line + 3;
+
+      float refraction_index;
+      if (read_float_line(value, 1, &refraction_index)) {
+        content->materials[content->materials_count - 1].refraction_index = refraction_index;
+      }
+      else {
+        warn_message("Expected refraction index in *.mtl file but didn't find a number. Line: %s.", line);
+      }
     }
     else {
       _wavefront_parse_map(content, line, line_len);
@@ -273,28 +308,6 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
   log_message(
     "Material counts: %d (%d %d %d %d)", content->materials_count, content->maps_count[WF_ALBEDO], content->maps_count[WF_ILLUMINANCE],
     content->maps_count[WF_MATERIAL], content->maps_count[WF_NORMAL]);
-}
-
-/*
- * Reads a line str of n floating point numbers and writes them into dst.
- * @param str String containing the floating point numbers.
- * @param n Number of floating point numbers.
- * @param dst Array the floating point numbers are written to.
- * @result Returns the number of floating point numbers written.
- */
-static int read_float_line(const char* str, const int n, float* dst) {
-  const char* rstr = str;
-  for (int i = 0; i < n; i++) {
-    char* new_rstr;
-    dst[i] = strtof(rstr, &new_rstr);
-
-    if (!new_rstr)
-      return i + 1;
-
-    rstr = (const char*) new_rstr;
-  }
-
-  return n;
 }
 
 /*
@@ -606,20 +619,21 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
   return 0;
 }
 
-TextureAssignment* wavefront_generate_texture_assignments(WavefrontContent* content) {
-  TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * content->materials_count);
+Material* wavefront_generate_texture_assignments(WavefrontContent* content) {
+  Material* materials = malloc(sizeof(Material) * content->materials_count);
 
   for (unsigned int i = 0; i < content->materials_count; i++) {
-    TextureAssignment assignment;
-    assignment.albedo_map      = content->materials[i].texture[WF_ALBEDO];
-    assignment.illuminance_map = content->materials[i].texture[WF_ILLUMINANCE];
-    assignment.material_map    = content->materials[i].texture[WF_MATERIAL];
-    assignment.normal_map      = content->materials[i].texture[WF_NORMAL];
+    Material mat;
+    mat.refraction_index = content->materials[i].refraction_index;
+    mat.albedo_map       = content->materials[i].texture[WF_ALBEDO];
+    mat.illuminance_map  = content->materials[i].texture[WF_ILLUMINANCE];
+    mat.material_map     = content->materials[i].texture[WF_MATERIAL];
+    mat.normal_map       = content->materials[i].texture[WF_NORMAL];
 
-    texture_assignments[i] = assignment;
+    materials[i] = mat;
   }
 
-  return texture_assignments;
+  return materials;
 }
 
 unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data) {
@@ -826,7 +840,7 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
     triangle.edge2_normal.y = n.y - triangle.vertex_normal.y;
     triangle.edge2_normal.z = n.z - triangle.vertex_normal.z;
 
-    triangle.object_maps = t.object;
+    triangle.material_id = t.object;
     triangle.light_id    = LIGHT_ID_NONE;
 
     (*triangles)[ptr++] = triangle;

@@ -27,9 +27,9 @@ struct OMMTextureTriangle {
 __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id) {
   const Triangle* t_ptr = (Triangle*) (device.scene.triangles + id);
 
-  uint32_t object_map = __ldg(&(t_ptr->object_maps));
+  uint32_t object_map = __ldg(&(t_ptr->material_id));
 
-  uint16_t tex = device.scene.texture_assignments[object_map].albedo_map;
+  uint16_t tex = device.scene.materials[object_map].albedo_map;
 
   OMMTextureTriangle tri;
   tri.tex_id = tex;
@@ -479,7 +479,7 @@ __device__ DMMTextureTriangle micromap_get_dmmtexturetriangle(const uint32_t id)
   const float* t_ptr = (float*) (device.scene.triangles + id);
 
   uint32_t object_map = __ldg((uint32_t*) (t_ptr + 24));
-  uint16_t tex        = device.scene.texture_assignments[object_map].normal_map;
+  uint16_t tex        = device.scene.materials[object_map].normal_map;
 
   DMMTextureTriangle tri;
   tri.tex_id = tex;
@@ -505,8 +505,8 @@ __global__ void dmm_precompute_indices(uint32_t* dst) {
   const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
 
   while (id < triangle_count) {
-    const uint32_t object_map = device.scene.triangles[id].object_maps;
-    const uint16_t tex        = device.scene.texture_assignments[object_map].normal_map;
+    const uint32_t object_map = device.scene.triangles[id].material_id;
+    const uint16_t tex        = device.scene.materials[object_map].normal_map;
 
     dst[id] = (tex == TEXTURE_NONE) ? 0 : 1;
 

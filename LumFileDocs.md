@@ -439,19 +439,21 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
 
 >📝 Textures must contain gamma information if they are not encoded linearly. Note that GIMP does not correctly export the correct gamma value. Hence, it is important to uncheck "Save gamma" during png export ([See Thread](https://gitlab.gnome.org/GNOME/gimp/-/issues/5363)). If textures are not displayed correctly, make sure that the gamma value used in the png file correctly approximates the color profile otherwise defined in the file.
 
-Textures are to be referenced in the `*.mtl` as follows:
+Material properties are to be referenced in the `*.mtl` as follows:
 
 - map_Kd   = Albedo Textures
 - map_Ke   = Illuminance Textures
 - map_Ns   = Material Textures
 - map_Bump = Normal Textures
+- Ni       = Index of refraction
 
-In `Blender` these map types correspond to:
+In `Blender` these types correspond to the following nodes in the standard material:
 
 - map_Kd   = Albedo
 - map_Ke   = Emission
 - map_Ns   = Rougness
 - map_Bump = Normal
+- Ni       = IOR
 
 >📝 There was a [bug](https://developer.blender.org/D14519) in Blender before 02.04.22 where map_Ke were not exported. If you encounter any issues of Luminary detecting no emissive triangles, use a newer Blender version for the export.
 

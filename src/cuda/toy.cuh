@@ -146,8 +146,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       switch (device.iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          store_RGBF(device.ptrs.bounce_records + pixel, record);
-          store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+          if (validate_trace_task(new_task, pixel, record)) {
+            device.ptrs.mis_buffer[pixel] = 1.0f;
+            store_RGBF(device.ptrs.bounce_records + pixel, record);
+            store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+          }
           break;
         case TYPE_LIGHT:
           device.ptrs.light_transparency_weight_buffer[pixel] *= 2.0f;

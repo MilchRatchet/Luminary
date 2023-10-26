@@ -1324,8 +1324,8 @@ static void _bvh_postprocess_sort(BVHWork* work) {
 
 static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
   // TODO: The traversal triangle construction could be performed on the GPU.
-  TextureAssignment* texture_assignments = malloc(sizeof(TextureAssignment) * instance->scene.materials_count);
-  device_download(texture_assignments, instance->scene.texture_assignments, sizeof(TextureAssignment) * instance->scene.materials_count);
+  Material* materials = malloc(sizeof(Material) * instance->scene.materials_count);
+  device_download(materials, instance->scene.materials, sizeof(Material) * instance->scene.materials_count);
 
   TraversalTriangle* traversal_triangles = malloc(sizeof(TraversalTriangle) * work->fragments_count);
 
@@ -1334,7 +1334,7 @@ static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
 
     const Triangle triangle = work->triangles[frag.id];
 
-    const uint32_t albedo_tex = texture_assignments[triangle.object_maps].albedo_map;
+    const uint32_t albedo_tex = materials[triangle.material_id].albedo_map;
 
     TraversalTriangle tt = {
       .vertex     = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
@@ -1344,7 +1344,7 @@ static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
       .id         = frag.id};
     traversal_triangles[i] = tt;
   }
-  free(texture_assignments);
+  free(materials);
 
   void* bvh_triangles;
   device_malloc(&bvh_triangles, sizeof(TraversalTriangle) * work->fragments_count);

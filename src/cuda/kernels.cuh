@@ -142,33 +142,33 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       if (is_first_ray() || (device.iteration_type == TYPE_LIGHT && light_id <= LIGHT_ID_TRIANGLE_ID_LIMIT)) {
         uint32_t t_id;
         TraversalTriangle tt;
-        uint32_t object_maps;
+        uint32_t material_id;
         if (device.iteration_type == TYPE_LIGHT) {
           const TriangleLight tri_light = load_triangle_light(device.scene.triangle_lights, light_id);
           t_id                          = tri_light.triangle_id;
-          object_maps                   = tri_light.object_maps;
+          material_id                   = tri_light.material_id;
           tt.vertex                     = tri_light.vertex;
           tt.edge1                      = tri_light.edge1;
           tt.edge2                      = tri_light.edge2;
-          tt.albedo_tex                 = device.scene.texture_assignments[object_maps].albedo_map;
+          tt.albedo_tex                 = device.scene.materials[material_id].albedo_map;
           tt.id                         = t_id;
         }
         else {
           t_id = device.ptrs.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
           if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
             Triangle t    = device.scene.triangles[t_id];
-            object_maps   = t.object_maps;
+            material_id   = t.material_id;
             tt.vertex     = t.vertex;
             tt.edge1      = t.edge1;
             tt.edge2      = t.edge2;
-            tt.albedo_tex = device.scene.texture_assignments[object_maps].albedo_map;
+            tt.albedo_tex = device.scene.materials[material_id].albedo_map;
             tt.id         = t_id;
           }
         }
 
         if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
           // This feature does not work for displacement triangles
-          if (device.scene.texture_assignments[object_maps].normal_map == TEXTURE_NONE) {
+          if (device.scene.materials[material_id].normal_map == TEXTURE_NONE) {
             float2 coords;
             const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
 

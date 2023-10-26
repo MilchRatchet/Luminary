@@ -78,7 +78,7 @@ struct Triangle {
   UV vertex_texture;
   UV edge1_texture;
   UV edge2_texture;
-  uint32_t object_maps;
+  uint32_t material_id;
   uint32_t light_id;
   float padding2;
   float padding3;
@@ -98,7 +98,7 @@ struct TriangleLight {
   vec3 edge1;
   vec3 edge2;
   uint32_t triangle_id;
-  uint32_t object_maps;
+  uint32_t material_id;
   float padding2;
 } typedef TriangleLight;
 
@@ -207,12 +207,14 @@ struct RGBAF {
  * Textures
  ********************************************************/
 
-struct TextureAssignment {
+struct Material {
+  float refraction_index;
+  float padding;
   uint16_t albedo_map;
   uint16_t illuminance_map;
   uint16_t material_map;
   uint16_t normal_map;
-} typedef TextureAssignment;
+} typedef Material;
 
 struct TextureG {
   unsigned int width;
@@ -264,7 +266,12 @@ struct LightSample {
   float weight;
 } typedef LightSample;
 
-enum GBufferFlags { G_BUFFER_REQUIRES_SAMPLING = 0b1, G_BUFFER_VOLUME_HIT = 0b10, G_BUFFER_TRANSPARENT_PASS = 0b100 } typedef GBufferFlags;
+enum GBufferFlags {
+  G_BUFFER_REQUIRES_SAMPLING    = 0b1,
+  G_BUFFER_VOLUME_HIT           = 0b10,
+  G_BUFFER_TRANSPARENT_PASS     = 0b100,
+  G_BUFFER_REFRACTION_IS_INSIDE = 0b1000
+} typedef GBufferFlags;
 
 struct GBufferData {
   uint32_t hit_id;
@@ -276,6 +283,10 @@ struct GBufferData {
   float roughness;
   float metallic;
   uint32_t flags;
+  float refraction_index;
+  float padding0;
+  float padding1;
+  float padding2;
 } typedef GBufferData;
 
 //

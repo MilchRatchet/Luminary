@@ -344,7 +344,7 @@ struct Scene {
   TriangleGeomData triangle_data;
   unsigned int triangle_lights_count;
   uint16_t materials_count;
-  TextureAssignment* texture_assignments;
+  Material* materials;
   Ocean ocean;
   Sky sky;
   Toy toy;
@@ -438,7 +438,7 @@ struct DeviceConstantMemory {
   int height;
   int output_width;
   int output_height;
-  TextureAssignment* texture_assignments;
+  Material* materials;
   vec3 sun_pos;
   vec3 moon_pos;
   int shading_mode;

@@ -69,8 +69,8 @@ extern "C" __global__ void __raygen__optix() {
 __device__ int perform_alpha_test() {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
-  const uint32_t maps = device.scene.triangles[hit_id].object_maps;
-  const uint16_t tex  = device.scene.texture_assignments[maps].albedo_map;
+  const uint32_t maps = device.scene.triangles[hit_id].material_id;
+  const uint16_t tex  = device.scene.materials[maps].albedo_map;
 
   if (tex != TEXTURE_NONE) {
     const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
