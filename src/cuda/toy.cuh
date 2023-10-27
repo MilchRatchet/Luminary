@@ -125,15 +125,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     BRDFInstance brdf = brdf_get_instance(albedo, data.V, normal, roughness, metallic);
 
     if (data.flags & G_BUFFER_TRANSPARENT_PASS) {
-      brdf.term = mul_color(brdf.term, opaque_color(albedo));
+      if (device.iteration_type != TYPE_LIGHT) {
+        const float ambient_index_of_refraction = toy_get_ambient_index_of_refraction(data.position);
 
-      if (device.scene.toy.refractive_index != 1.0f && device.iteration_type != TYPE_LIGHT) {
-        const float refraction_index = (is_inside) ? device.scene.toy.refractive_index : 1.0f / device.scene.toy.refractive_index;
+        const float refraction_index = (is_inside) ? device.scene.toy.refractive_index / ambient_index_of_refraction
+                                                   : ambient_index_of_refraction / device.scene.toy.refractive_index;
 
         brdf = brdf_sample_ray_refraction(brdf, refraction_index, pixel);
       }
       else {
-        brdf.L = task.ray;
+        brdf.term = mul_color(brdf.term, opaque_color(albedo));
+        brdf.L    = task.ray;
       }
 
       record = mul_color(record, brdf.term);

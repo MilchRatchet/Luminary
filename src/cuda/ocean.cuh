@@ -292,13 +292,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     vec3 normal = ocean_get_normal(task.position);
 
+    const float ambient_index_of_refraction = ocean_get_ambient_index_of_refraction(task.position);
+
     float refraction_index_ratio;
     if (dot_product(task.ray, normal) > 0.0f) {
       normal                 = scale_vector(normal, -1.0f);
-      refraction_index_ratio = device.scene.ocean.refractive_index;
+      refraction_index_ratio = device.scene.ocean.refractive_index / ambient_index_of_refraction;
     }
     else {
-      refraction_index_ratio = 1.0f / device.scene.ocean.refractive_index;
+      refraction_index_ratio = ambient_index_of_refraction / device.scene.ocean.refractive_index;
     }
 
     write_normal_buffer(normal, pixel);

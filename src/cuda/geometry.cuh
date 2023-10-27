@@ -55,6 +55,16 @@ __device__ vec3 geometry_compute_normal(
   return normal;
 }
 
+__device__ float geometry_get_ambient_index_of_refraction(const vec3 position) {
+  if (device.scene.toy.active && toy_is_inside(position))
+    return device.scene.toy.refractive_index;
+
+  if (device.scene.ocean.active && position.y < device.scene.ocean.height)
+    return device.scene.ocean.refractive_index;
+
+  return 1.0f;
+}
+
 __global__ void geometry_generate_g_buffer() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
@@ -228,8 +238,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     if (data.flags & G_BUFFER_TRANSPARENT_PASS) {
       if (device.iteration_type != TYPE_LIGHT) {
-        const float refraction_index =
-          (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index / 1.0f : 1.0f / data.refraction_index;
+        const float ambient_index_of_refraction = geometry_get_ambient_index_of_refraction(data.position);
+
+        const float refraction_index = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index / ambient_index_of_refraction
+                                                                                    : ambient_index_of_refraction / data.refraction_index;
 
         brdf = brdf_sample_ray_refraction(brdf, refraction_index, pixel);
       }

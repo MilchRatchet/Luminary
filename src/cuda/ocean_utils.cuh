@@ -6,6 +6,13 @@
 #define OCEAN_MAX_HEIGHT (device.scene.ocean.height + 2.66f * device.scene.ocean.amplitude)
 #define OCEAN_MIN_HEIGHT (device.scene.ocean.height)
 
+__device__ float ocean_get_ambient_index_of_refraction(const vec3 position) {
+  if (device.scene.toy.active && toy_is_inside(position))
+    return device.scene.toy.refractive_index;
+
+  return 1.0f;
+}
+
 // Coefficients taken from
 // M. Droske, J. Hanika, J. Vorba, A. Weidlich, M. Sabbadin, _Path Tracing in Production: The Path of Water_, ACM SIGGRAPH 2023 Courses,
 // 2023.

@@ -4,6 +4,13 @@
 #include "math.cuh"
 #include "utils.cuh"
 
+__device__ float toy_get_ambient_index_of_refraction(const vec3 position) {
+  if (device.scene.ocean.active && position.y < device.scene.ocean.height)
+    return device.scene.ocean.refractive_index;
+
+  return 1.0f;
+}
+
 /*
  * Requirement:
  *      - Position should be the middle of the shape
