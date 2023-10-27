@@ -491,10 +491,11 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
     L_local = reflect_vector(ray_local, scale_vector(H_local, -1.0f));
   }
   else {
-    L_local = normalize_vector(add_vector(scale_vector(ray_local, index), scale_vector(H_local, index * HdotV - sqrtf(b))));
+    L_local = add_vector(scale_vector(ray_local, index), scale_vector(H_local, index * HdotV - sqrtf(b)));
   }
 
-  brdf.L = normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
+  L_local = normalize_vector(L_local);
+  brdf.L  = normalize_vector(rotate_vector_by_quaternion(L_local, inverse_quaternion(rotation_to_z)));
 
   return brdf;
 }

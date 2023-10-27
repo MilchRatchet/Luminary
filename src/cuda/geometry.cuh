@@ -190,7 +190,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
-    const GBufferData data = load_g_buffer_data(pixel);
+    GBufferData data = load_g_buffer_data(pixel);
 
     RGBF record = load_RGBF(device.records + pixel);
 
@@ -218,21 +218,24 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
     write_normal_buffer(data.normal, pixel);
 
+    if (data.flags & G_BUFFER_TRANSPARENT_PASS && !device.scene.material.colored_transparency) {
+      data.albedo.r = 1.0f;
+      data.albedo.g = 1.0f;
+      data.albedo.b = 1.0f;
+    }
+
     BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
 
     if (data.flags & G_BUFFER_TRANSPARENT_PASS) {
-      if (device.scene.material.colored_transparency) {
-        brdf.term = mul_color(brdf.term, opaque_color(data.albedo));
-      }
-
-      if (data.refraction_index != 1.0f && device.iteration_type != TYPE_LIGHT) {
+      if (device.iteration_type != TYPE_LIGHT) {
         const float refraction_index =
           (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index / 1.0f : 1.0f / data.refraction_index;
 
         brdf = brdf_sample_ray_refraction(brdf, refraction_index, pixel);
       }
       else {
-        brdf.L = task.ray;
+        brdf.term = mul_color(brdf.term, opaque_color(data.albedo));
+        brdf.L    = task.ray;
       }
 
       record = mul_color(record, brdf.term);
