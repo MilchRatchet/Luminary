@@ -1324,8 +1324,8 @@ static void _bvh_postprocess_sort(BVHWork* work) {
 
 static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
   // TODO: The traversal triangle construction could be performed on the GPU.
-  Material* materials = malloc(sizeof(Material) * instance->scene.materials_count);
-  device_download(materials, instance->scene.materials, sizeof(Material) * instance->scene.materials_count);
+  PackedMaterial* materials = malloc(sizeof(PackedMaterial) * instance->scene.materials_count);
+  device_download(materials, instance->scene.materials, sizeof(PackedMaterial) * instance->scene.materials_count);
 
   TraversalTriangle* traversal_triangles = malloc(sizeof(TraversalTriangle) * work->fragments_count);
 

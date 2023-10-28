@@ -108,8 +108,7 @@ __global__ void geometry_generate_g_buffer() {
       vertex_normal, edge1_normal, edge2_normal, task.ray, edge1, edge2, edge1_texture, edge2_texture, mat.normal_map, coords, tex_coords,
       is_inside);
 
-    RGBAF albedo;
-
+    RGBAF albedo = mat.albedo;
     if (mat.albedo_map != TEXTURE_NONE) {
       const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[mat.albedo_map], tex_coords);
       albedo.r              = albedo_f.x;
@@ -117,37 +116,34 @@ __global__ void geometry_generate_g_buffer() {
       albedo.b              = albedo_f.z;
       albedo.a              = albedo_f.w;
     }
-    else {
-      albedo.r = 0.9f;
-      albedo.g = 0.9f;
-      albedo.b = 0.9f;
-      albedo.a = 1.0f;
-    }
 
     if (albedo.a < device.scene.material.alpha_cutoff)
       albedo.a = 0.0f;
 
-    RGBF emission = get_color(0.0f, 0.0f, 0.0f);
-
+    RGBF emission = (device.scene.material.lights_active) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
     if (mat.illuminance_map != TEXTURE_NONE && device.scene.material.lights_active) {
       const float4 illuminance_f = texture_load(device.ptrs.illuminance_atlas[mat.illuminance_map], tex_coords);
 
       emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
-      emission = scale_color(emission, device.scene.material.default_material.b * illuminance_f.w * albedo.a);
+      emission = scale_color(emission, illuminance_f.w * albedo.a);
     }
+    emission = scale_color(emission, device.scene.material.default_material.b);
 
-    float roughness;
-    float metallic;
-
+    float roughness = mat.roughness;
+    float metallic  = mat.metallic;
     if (mat.material_map != TEXTURE_NONE) {
       const float4 material_f = texture_load(device.ptrs.material_atlas[mat.material_map], tex_coords);
 
-      roughness = (1.0f - material_f.x);
+      roughness = material_f.x;
       metallic  = material_f.y;
     }
-    else {
-      roughness = (1.0f - device.scene.material.default_material.r);
+    else if (device.scene.material.override_materials) {
+      roughness = 1.0f - device.scene.material.default_material.r;
       metallic  = device.scene.material.default_material.g;
+    }
+
+    if (!device.scene.material.override_materials && device.scene.material.invert_roughness) {
+      roughness = 1.0f - roughness;
     }
 
     uint32_t flags = 0;

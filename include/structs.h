@@ -207,9 +207,30 @@ struct RGBAF {
  * Textures
  ********************************************************/
 
+struct PackedMaterial {
+  float refraction_index;
+  uint16_t albedo_r;
+  uint16_t albedo_g;
+  uint16_t albedo_b;
+  uint16_t albedo_a;
+  uint16_t emission_r;
+  uint16_t emission_g;
+  uint16_t emission_b;
+  uint16_t emission_scale;
+  uint16_t metallic;
+  uint16_t roughness;
+  uint16_t albedo_map;
+  uint16_t illuminance_map;
+  uint16_t material_map;
+  uint16_t normal_map;
+} typedef PackedMaterial;
+
 struct Material {
   float refraction_index;
-  float padding;
+  RGBAF albedo;
+  RGBF emission;
+  float metallic;
+  float roughness;
   uint16_t albedo_map;
   uint16_t illuminance_map;
   uint16_t material_map;

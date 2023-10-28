@@ -398,16 +398,29 @@ __device__ Quad load_quad(const Quad* data, const int offset) {
   return quad;
 }
 
-__device__ Material load_material(const Material* data, const int offset) {
+__device__ Material load_material(const PackedMaterial* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
-  const float4 v    = __ldg(ptr);
+  const float4 v0   = __ldg(ptr + 0);
+  const float4 v1   = __ldg(ptr + 1);
 
   Material mat;
-  mat.refraction_index = v.x;
-  mat.albedo_map       = __float_as_uint(v.z) & 0xFFFF;
-  mat.illuminance_map  = __float_as_uint(v.z) >> 16;
-  mat.material_map     = __float_as_uint(v.w) & 0xFFFF;
-  mat.normal_map       = __float_as_uint(v.w) >> 16;
+  mat.refraction_index = v0.x;
+  mat.albedo.r         = random_uint16_t_to_float(__float_as_uint(v0.y) & 0xFFFF);
+  mat.albedo.g         = random_uint16_t_to_float(__float_as_uint(v0.y) >> 16);
+  mat.albedo.b         = random_uint16_t_to_float(__float_as_uint(v0.z) & 0xFFFF);
+  mat.albedo.a         = random_uint16_t_to_float(__float_as_uint(v0.z) >> 16);
+  mat.emission.r       = random_uint16_t_to_float(__float_as_uint(v0.w) & 0xFFFF);
+  mat.emission.g       = random_uint16_t_to_float(__float_as_uint(v0.w) >> 16);
+  mat.emission.b       = random_uint16_t_to_float(__float_as_uint(v1.x) & 0xFFFF);
+  float emission_scale = (float) (__float_as_uint(v1.x) >> 16);
+  mat.metallic         = random_uint16_t_to_float(__float_as_uint(v1.y) & 0xFFFF);
+  mat.roughness        = random_uint16_t_to_float(__float_as_uint(v1.y) >> 16);
+  mat.albedo_map       = __float_as_uint(v1.z) & 0xFFFF;
+  mat.illuminance_map  = __float_as_uint(v1.z) >> 16;
+  mat.material_map     = __float_as_uint(v1.w) & 0xFFFF;
+  mat.normal_map       = __float_as_uint(v1.w) >> 16;
+
+  mat.emission = scale_color(mat.emission, emission_scale);
 
   return mat;
 }

@@ -35,6 +35,9 @@ Path to an `*.obj` mesh file. Option may be specified multiple times to load mul
 `MATERIAL LIGHTSON [INT32]`<br/>
 Set 1 to enable light sources from geometry, 0 else.
 
+`MATERIAL OVERRIDE [INT32]`<br/>
+Set 1 to override metallic and roughness for geometry, 0 else. This does not apply to textured materials.
+
 `MATERIAL SMOOTHNE [FP32]`<br/>
 Default smoothness value that is used when no material texture is present. Number must be in the range [0,1].
 
@@ -54,6 +57,9 @@ Every alpha value smaller than this value is automatically treated as 0, i.e., f
 
 `MATERIAL COLORTRA [INT32]`<br/>
 Set 1 to enable colored transparency for geometry, 0 else. Enabling this will use the albedo color to change the color of rays passing through the geometry. Note that this can cause artifacts with some albedo textures.
+
+`MATERIAL INVERTRO [INT32]`<br/>
+Set 1 to invert roughness for geometry, 0 else. Enabling this gives you legacy behaviour where the roughness from the input geometry was always inverted.
 
 ## Camera Settings
 
@@ -427,7 +433,7 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
    - Blue: Emission Blue Color
    - Alpha: Emission Intensity [0,1]
  - Material Textures
-   - Red: Smoothness
+   - Red: Roughness
    - Green: Metallic
    - Blue: Unused
    - Alpha: Unused

@@ -563,7 +563,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
-  device_malloc((void**) &(instance->scene.materials), sizeof(Material) * instance->scene.materials_count);
+  device_malloc((void**) &(instance->scene.materials), sizeof(PackedMaterial) * instance->scene.materials_count);
   device_malloc((void**) &(instance->scene.triangles), sizeof(Triangle) * instance->scene.triangle_data.triangle_count);
   device_malloc((void**) &(instance->scene.triangle_lights), sizeof(TriangleLight) * instance->scene.triangle_lights_count);
   device_malloc((void**) &(instance->scene.triangle_data.vertex_buffer), instance->scene.triangle_data.vertex_count * 4 * sizeof(float));
@@ -572,7 +572,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_malloc((void**) &(instance->restir.presampled_triangle_lights), sizeof(TriangleLight) * RESTIR_CANDIDATE_POOL_MAX);
 
   gpuErrchk(cudaMemcpy(
-    instance->scene.materials, scene->materials, sizeof(Material) * instance->scene.materials_count,
+    instance->scene.materials, scene->materials, sizeof(PackedMaterial) * instance->scene.materials_count,
     cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
     instance->scene.triangles, scene->triangles, sizeof(Triangle) * instance->scene.triangle_data.triangle_count, cudaMemcpyHostToDevice));

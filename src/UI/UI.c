@@ -88,12 +88,13 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_tab(ui, 1, "Renderer\nMaterials\nExport");
   panels[i++] = create_check(ui, "Lights", &(instance->scene.material.lights_active), 1);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene.material.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_check(ui, "Override Materials", &(instance->scene.material.override_materials), 1);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->scene.material.default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->scene.material.default_material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] =
-    create_slider(ui, "Default Light Intensity", &(instance->scene.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 7);
+  panels[i++] = create_slider(ui, "Light Intensity", &(instance->scene.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 8);
   panels[i++] = create_check(ui, "Colored Transparency", &(instance->scene.material.colored_transparency), 1);
+  panels[i++] = create_check(ui, "Invert roughness", &(instance->scene.material.invert_roughness), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

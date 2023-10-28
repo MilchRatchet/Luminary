@@ -321,6 +321,8 @@ struct GlobalMaterial {
   int lights_active;
   float alpha_cutoff;
   int colored_transparency;
+  int invert_roughness;
+  int override_materials;
 } typedef GlobalMaterial;
 
 struct Particles {
@@ -344,7 +346,7 @@ struct Scene {
   TriangleGeomData triangle_data;
   unsigned int triangle_lights_count;
   uint16_t materials_count;
-  Material* materials;
+  PackedMaterial* materials;
   Ocean ocean;
   Sky sky;
   Toy toy;
@@ -438,7 +440,7 @@ struct DeviceConstantMemory {
   int height;
   int output_width;
   int output_height;
-  Material* materials;
+  PackedMaterial* materials;
   vec3 sun_pos;
   vec3 moon_pos;
   int shading_mode;

@@ -67,6 +67,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 5642820479573510476u:
       sscanf(value, "%d\n", &material->lights_active);
       break;
+    /* OVERRIDE */
+    case 4991194904949773903u:
+      sscanf(value, "%d\n", &material->override_materials);
+      break;
     /* SMOOTHNE */
     case 4994008563745508691u:
       sscanf(value, "%f\n", &material->default_material.r);
@@ -90,6 +94,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     /* COLORTRA */
     case 4706917273050042179u:
       sscanf(value, "%d\n", &material->colored_transparency);
+      break;
+    /* INTERTRO */
+    case 5715723589413916233u:
+      sscanf(value, "%d\n", &material->invert_roughness);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
@@ -828,6 +836,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
 
   sprintf(line, "MATERIAL LIGHTSON %d\n", instance->scene.material.lights_active);
   fputs(line, file);
+  sprintf(line, "MATERIAL OVERRIDE %d\n", instance->scene.material.override_materials);
+  fputs(line, file);
   sprintf(line, "MATERIAL SMOOTHNE %f\n", instance->scene.material.default_material.r);
   fputs(line, file);
   sprintf(line, "MATERIAL METALLIC %f\n", instance->scene.material.default_material.g);
@@ -839,6 +849,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene.material.alpha_cutoff);
   fputs(line, file);
   sprintf(line, "MATERIAL COLORTRA %d\n", instance->scene.material.colored_transparency);
+  fputs(line, file);
+  sprintf(line, "MATERIAL INVERTRO %d\n", instance->scene.material.invert_roughness);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");

@@ -28,6 +28,8 @@ void scene_init(Scene** _scene) {
   scene->material.fresnel              = FDEZ_AGUERA;
   scene->material.alpha_cutoff         = 0.0f;
   scene->material.colored_transparency = 0;
+  scene->material.override_materials   = 0;
+  scene->material.invert_roughness     = 0;
 
   scene->camera.pos.x                 = 0.0f;
   scene->camera.pos.y                 = 0.0f;
@@ -220,8 +222,8 @@ static General get_default_settings() {
 void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
   wavefront_convert_content(content, &scene->triangles, &scene->triangle_data);
 
-  scene->materials_count     = content->materials_count;
-  scene->materials = wavefront_generate_texture_assignments(content);
+  scene->materials_count = content->materials_count;
+  scene->materials       = wavefront_generate_texture_assignments(content);
 }
 
 RaytraceInstance* scene_load_lum(const char* filename) {

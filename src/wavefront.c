@@ -38,7 +38,18 @@ void wavefront_init(WavefrontContent** content) {
   (*content)->materials_count  = 1;
 
   (*content)->materials[0].hash                    = 0;
-  (*content)->materials[1].refraction_index        = 1.0f;
+  (*content)->materials[0].diffuse_reflectivity.r  = 0.9f;
+  (*content)->materials[0].diffuse_reflectivity.g  = 0.9f;
+  (*content)->materials[0].diffuse_reflectivity.b  = 0.9f;
+  (*content)->materials[0].dissolve                = 1.0f;
+  (*content)->materials[0].specular_reflectivity.r = 0.0f;
+  (*content)->materials[0].specular_reflectivity.g = 0.0f;
+  (*content)->materials[0].specular_reflectivity.b = 0.0f;
+  (*content)->materials[0].specular_exponent       = 300.0f;
+  (*content)->materials[0].emission.r              = 0.0f;
+  (*content)->materials[0].emission.g              = 0.0f;
+  (*content)->materials[0].emission.b              = 0.0f;
+  (*content)->materials[0].refraction_index        = 1.0f;
   (*content)->materials[0].texture[WF_ALBEDO]      = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_ILLUMINANCE] = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
@@ -279,12 +290,84 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
       ensure_capacity(content->materials, content->materials_count, content->materials_length, sizeof(WavefrontMaterial));
 
       content->materials[content->materials_count].hash                    = hash;
+      content->materials[content->materials_count].diffuse_reflectivity.r  = 0.9f;
+      content->materials[content->materials_count].diffuse_reflectivity.g  = 0.9f;
+      content->materials[content->materials_count].diffuse_reflectivity.b  = 0.9f;
+      content->materials[content->materials_count].dissolve                = 1.0f;
+      content->materials[content->materials_count].specular_reflectivity.r = 0.0f;
+      content->materials[content->materials_count].specular_reflectivity.g = 0.0f;
+      content->materials[content->materials_count].specular_reflectivity.b = 0.0f;
+      content->materials[content->materials_count].specular_exponent       = 300.0f;
+      content->materials[content->materials_count].emission.r              = 0.0f;
+      content->materials[content->materials_count].emission.g              = 0.0f;
+      content->materials[content->materials_count].emission.b              = 0.0f;
       content->materials[content->materials_count].refraction_index        = 1.0f;
       content->materials[content->materials_count].texture[WF_ALBEDO]      = TEXTURE_NONE;
       content->materials[content->materials_count].texture[WF_ILLUMINANCE] = TEXTURE_NONE;
       content->materials[content->materials_count].texture[WF_MATERIAL]    = TEXTURE_NONE;
       content->materials[content->materials_count].texture[WF_NORMAL]      = TEXTURE_NONE;
       content->materials_count++;
+    }
+    else if (line[0] == 'K' && line[1] == 'd') {
+      char* value = line + 3;
+
+      float diffuse_reflectivity[3];
+      if (read_float_line(value, 3, diffuse_reflectivity) == 3) {
+        content->materials[content->materials_count - 1].diffuse_reflectivity.r = diffuse_reflectivity[0];
+        content->materials[content->materials_count - 1].diffuse_reflectivity.g = diffuse_reflectivity[1];
+        content->materials[content->materials_count - 1].diffuse_reflectivity.b = diffuse_reflectivity[2];
+      }
+      else {
+        warn_message("Expected three values in diffuse reflectivity in *.mtl file but didn't find three numbers. Line: %s.", line);
+      }
+    }
+    else if (line[0] == 'd') {
+      char* value = line + 2;
+
+      float dissolve;
+      if (read_float_line(value, 1, &dissolve)) {
+        content->materials[content->materials_count - 1].dissolve = dissolve;
+      }
+      else {
+        warn_message("Expected dissolve in *.mtl file but didn't find a number. Line: %s.", line);
+      }
+    }
+    else if (line[0] == 'K' && line[1] == 's') {
+      char* value = line + 3;
+
+      float specular_reflectivity[3];
+      if (read_float_line(value, 3, specular_reflectivity) == 3) {
+        content->materials[content->materials_count - 1].specular_reflectivity.r = specular_reflectivity[0];
+        content->materials[content->materials_count - 1].specular_reflectivity.g = specular_reflectivity[1];
+        content->materials[content->materials_count - 1].specular_reflectivity.b = specular_reflectivity[2];
+      }
+      else {
+        warn_message("Expected three values in specular reflectivity in *.mtl file but didn't find three numbers. Line: %s.", line);
+      }
+    }
+    else if (line[0] == 'N' && line[1] == 's') {
+      char* value = line + 3;
+
+      float specular_exponent;
+      if (read_float_line(value, 1, &specular_exponent)) {
+        content->materials[content->materials_count - 1].specular_exponent = specular_exponent;
+      }
+      else {
+        warn_message("Expected specular_exponent in *.mtl file but didn't find a number. Line: %s.", line);
+      }
+    }
+    else if (line[0] == 'K' && line[1] == 'e') {
+      char* value = line + 3;
+
+      float emission[3];
+      if (read_float_line(value, 3, emission) == 3) {
+        content->materials[content->materials_count - 1].emission.r = emission[0];
+        content->materials[content->materials_count - 1].emission.g = emission[1];
+        content->materials[content->materials_count - 1].emission.b = emission[2];
+      }
+      else {
+        warn_message("Expected three values in emission in *.mtl file but didn't find three numbers. Line: %s.", line);
+      }
     }
     else if (line[0] == 'N' && line[1] == 'i') {
       char* value = line + 3;
@@ -619,12 +702,34 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
   return 0;
 }
 
-Material* wavefront_generate_texture_assignments(WavefrontContent* content) {
-  Material* materials = malloc(sizeof(Material) * content->materials_count);
+static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
+  const float value = fmaxf(fminf(f, 1.0f), 0.0f) + 1.0f;
+
+  return ((*((uint32_t*) &value)) & 0x007FFF80) >> 7;
+}
+
+PackedMaterial* wavefront_generate_texture_assignments(WavefrontContent* content) {
+  PackedMaterial* materials = malloc(sizeof(PackedMaterial) * content->materials_count);
 
   for (unsigned int i = 0; i < content->materials_count; i++) {
-    Material mat;
+    RGBF emission                 = content->materials[i].emission;
+    const uint16_t emission_scale = (uint16_t) fminf(fmaxf(fmaxf(emission.r, emission.g), emission.b) + 1.0f, (float) 0xFFFF);
+    emission.r /= (float) emission_scale;
+    emission.g /= (float) emission_scale;
+    emission.b /= (float) emission_scale;
+
+    PackedMaterial mat;
     mat.refraction_index = content->materials[i].refraction_index;
+    mat.albedo_r         = _wavefront_convert_float01_to_uint16(content->materials[i].diffuse_reflectivity.r);
+    mat.albedo_g         = _wavefront_convert_float01_to_uint16(content->materials[i].diffuse_reflectivity.g);
+    mat.albedo_b         = _wavefront_convert_float01_to_uint16(content->materials[i].diffuse_reflectivity.b);
+    mat.albedo_a         = _wavefront_convert_float01_to_uint16(content->materials[i].dissolve);
+    mat.emission_r       = _wavefront_convert_float01_to_uint16(emission.r);
+    mat.emission_g       = _wavefront_convert_float01_to_uint16(emission.g);
+    mat.emission_b       = _wavefront_convert_float01_to_uint16(emission.b);
+    mat.emission_scale   = emission_scale;
+    mat.metallic         = _wavefront_convert_float01_to_uint16(content->materials[i].specular_reflectivity.r);
+    mat.roughness        = _wavefront_convert_float01_to_uint16(1.0f - content->materials[i].specular_exponent / 1000.0f);
     mat.albedo_map       = content->materials[i].texture[WF_ALBEDO];
     mat.illuminance_map  = content->materials[i].texture[WF_ILLUMINANCE];
     mat.material_map     = content->materials[i].texture[WF_MATERIAL];
