@@ -228,23 +228,30 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
   return ocean_intersection_solver(origin, ray, start, end);
 }
 
-__device__ RGBF ocean_brdf(const vec3 ray, const vec3 normal) {
-  const float dot = dot_product(ray, normal);
+/*
+ * This uses the actual Fresnel equations to compute the reflection coefficient under the following assumptions:
+ *  - The media are not magnetic.
+ *  - The light is not polarized.
+ *  - The IORs are wavelength independent.
+ */
+__device__ float ocean_reflection_coefficient(
+  const vec3 normal, const vec3 ray, const vec3 refraction, const float index_in, const float index_out) {
+  const float NdotV = -dot_product(ray, normal);
+  const float NdotT = -dot_product(refraction, normal);
 
-  if (dot < 0.0f) {
-    return get_color(1.0f, 1.0f, 1.0f);
-  }
+  const float s_pol_term1 = index_in * NdotV;
+  const float s_pol_term2 = index_out * NdotT;
 
-  RGBF specular_f0 = get_color(0.02f, 0.02f, 0.02f);
-  switch (device.scene.material.fresnel) {
-    case SCHLICK:
-      return brdf_fresnel_schlick(specular_f0, brdf_shadowed_F90(specular_f0), dot);
-      break;
-    case FDEZ_AGUERA:
-    default:
-      return brdf_fresnel_roughness(specular_f0, 0.0f, dot);
-      break;
-  }
+  const float p_pol_term1 = index_in * NdotT;
+  const float p_pol_term2 = index_out * NdotV;
+
+  float reflection_s_pol = (s_pol_term1 - s_pol_term2) / (s_pol_term1 + s_pol_term2);
+  float reflection_p_pol = (p_pol_term1 - p_pol_term2) / (p_pol_term1 + p_pol_term2);
+
+  reflection_s_pol *= reflection_s_pol;
+  reflection_p_pol *= reflection_p_pol;
+
+  return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -294,29 +301,33 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     const float ambient_index_of_refraction = ocean_get_ambient_index_of_refraction(task.position);
 
-    float refraction_index_ratio;
+    float index_in, index_out;
     if (dot_product(task.ray, normal) > 0.0f) {
-      normal                 = scale_vector(normal, -1.0f);
-      refraction_index_ratio = device.scene.ocean.refractive_index / ambient_index_of_refraction;
+      normal    = scale_vector(normal, -1.0f);
+      index_in  = device.scene.ocean.refractive_index;
+      index_out = ambient_index_of_refraction;
     }
     else {
-      refraction_index_ratio = ambient_index_of_refraction / device.scene.ocean.refractive_index;
+      index_in  = ambient_index_of_refraction;
+      index_out = device.scene.ocean.refractive_index;
     }
 
     write_normal_buffer(normal, pixel);
 
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > 0.5f) {
-      task.ray      = refract_ray(task.ray, normal, refraction_index_ratio);
-      task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps * (1.0f + get_length(task.position))));
-    }
-    else {
+    const float refraction_index_ratio = index_in / index_out;
+    const vec3 refraction_dir          = refract_ray(task.ray, normal, refraction_index_ratio);
+
+    const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, index_in, index_out);
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) < reflection_coefficient) {
       task.position = add_vector(task.position, scale_vector(task.ray, -2.0f * eps * (1.0f + get_length(task.position))));
       task.ray      = reflect_vector(task.ray, normal);
     }
+    else {
+      task.ray      = refraction_dir;
+      task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps * (1.0f + get_length(task.position))));
+    }
 
     RGBF record = load_RGBF(device.records + pixel);
-    record      = mul_color(record, ocean_brdf(task.ray, normal));
-    record      = scale_color(record, 2.0f);  // 1.0 / probability of refraction/reflection
 
     TraceTask new_task;
     new_task.origin = task.position;
@@ -326,11 +337,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     device.ptrs.mis_buffer[pixel] = 1.0f;
     store_RGBF(device.ptrs.bounce_records + pixel, record);
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
-
-    if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-      // If no light ray is queued yet, make sure that this bounce ray is allowed to gather energy from any light it hits.
-      device.ptrs.light_sample_history[pixel] = LIGHT_ID_ANY;
-    }
   }
 
   device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
