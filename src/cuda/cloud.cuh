@@ -321,7 +321,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     const int pixel          = task.index.y * device.width + task.index.x;
 
     RGBF record = load_RGBF(device.records + pixel);
-    RGBF color  = load_RGBF(device.ptrs.frame_buffer + pixel);
+    RGBF color  = get_color(0.0f, 0.0f, 0.0f);
 
     const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, pixel, color, record, seed);
 
@@ -339,7 +339,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     }
 
     store_RGBF(device.records + pixel, record);
-    store_RGBF(device.ptrs.frame_buffer + pixel, color);
+    write_beauty_buffer(color, pixel);
   }
 
   device.ptrs.randoms[THREAD_ID] = seed;

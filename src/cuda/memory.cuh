@@ -259,6 +259,14 @@ __device__ void write_normal_buffer(vec3 normal, const int pixel) {
   device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
 }
 
+__device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set = false) {
+  RGBF output = beauty;
+  if (!mode_set) {
+    output = add_color(beauty, load_RGBF(device.ptrs.frame_buffer + pixel));
+  }
+  store_RGBF(device.ptrs.frame_buffer + pixel, output);
+}
+
 __device__ GBufferData load_g_buffer_data(const int offset) {
   const float4* ptr  = (float4*) (device.ptrs.g_buffer + offset);
   const float4 data0 = __ldcs(ptr + 0);

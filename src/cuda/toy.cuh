@@ -116,7 +116,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       const uint32_t light = device.ptrs.light_sample_history[pixel];
 
       if (proper_light_sample(light, LIGHT_ID_TOY)) {
-        store_RGBF(device.ptrs.frame_buffer + pixel, add_color(load_RGBF(device.ptrs.frame_buffer + pixel), emission));
+        write_beauty_buffer(add_color(load_RGBF(device.ptrs.frame_buffer + pixel), emission), pixel);
       }
     }
 
@@ -230,12 +230,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
     const int pixel    = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      store_RGBF(device.ptrs.frame_buffer + pixel, opaque_color(device.scene.toy.albedo));
+      write_beauty_buffer(opaque_color(device.scene.toy.albedo), pixel, true);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
       const float value = __saturatef((1.0f / dist) * 2.0f);
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(value, value, value));
+      write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
     else if (device.shading_mode == SHADING_NORMAL) {
       vec3 normal = get_toy_normal(task.position);
@@ -248,10 +248,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
+      write_beauty_buffer(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel, true);
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(1.0f, 0.63f, 0.0f));
+      write_beauty_buffer(get_color(1.0f, 0.63f, 0.0f), pixel, true);
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
       RGBF color;
@@ -262,7 +262,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks
         color = scale_color(opaque_color(device.scene.toy.albedo), 0.1f);
       }
 
-      store_RGBF(device.ptrs.frame_buffer + pixel, color);
+      write_beauty_buffer(color, pixel, true);
     }
   }
 }

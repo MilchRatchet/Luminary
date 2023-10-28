@@ -908,7 +908,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
       sky = scale_color(sky, get_light_transparency_weight(pixel));
     }
 
-    store_RGBF(device.ptrs.frame_buffer + pixel, add_color(load_RGBF(device.ptrs.frame_buffer + pixel), sky));
+    write_beauty_buffer(sky, pixel);
     write_albedo_buffer(sky, pixel);
     write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }
@@ -934,14 +934,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks(
       else {
         sky = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps, seed);
       }
-      store_RGBF(device.ptrs.frame_buffer + pixel, sky);
+      write_beauty_buffer(sky, pixel, true);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float value = __saturatef((1.0f / device.scene.camera.far_clip_distance) * 2.0f);
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(value, value, value));
+      write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(0.0f, 0.63f, 1.0f));
+      write_beauty_buffer(get_color(0.0f, 0.63f, 1.0f), pixel, true);
     }
   }
 

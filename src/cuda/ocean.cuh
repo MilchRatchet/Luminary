@@ -351,13 +351,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
     OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    if (device.shading_mode == SHADING_ALBEDO) {
-      device.ptrs.frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
-    }
-    else if (device.shading_mode == SHADING_DEPTH) {
-      const float dist                = get_length(sub_vector(device.scene.camera.pos, task.position));
-      const float value               = __saturatef((1.0f / dist) * 2.0f);
-      device.ptrs.frame_buffer[pixel] = get_color(value, value, value);
+    if (device.shading_mode == SHADING_DEPTH) {
+      const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
+      const float value = __saturatef((1.0f / dist) * 2.0f);
+      write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
     else if (device.shading_mode == SHADING_NORMAL) {
       vec3 normal = ocean_get_normal(task.position);
@@ -366,10 +363,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tas
       normal.y = 0.5f * normal.y + 0.5f;
       normal.z = 0.5f * normal.z + 0.5f;
 
-      device.ptrs.frame_buffer[pixel] = get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z));
+      write_beauty_buffer(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel, true);
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(0.0f, 0.0f, 1.0f));
+      write_beauty_buffer(get_color(0.0f, 0.0f, 1.0f), pixel, true);
     }
   }
 }

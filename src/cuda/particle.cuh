@@ -130,19 +130,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
     if (device.shading_mode == SHADING_ALBEDO) {
       const GBufferData data = load_g_buffer_data(pixel);
 
-      store_RGBF(device.ptrs.frame_buffer + pixel, add_color(opaque_color(data.albedo), data.emission));
+      write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
       const float value = __saturatef((1.0f / dist) * 2.0f);
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(value, value, value));
+      write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
     else if (device.shading_mode == SHADING_NORMAL) {
       const GBufferData data = load_g_buffer_data(pixel);
 
       const vec3 normal = data.normal;
 
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)));
+      write_beauty_buffer(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel, true);
     }
     else if (device.shading_mode == SHADING_HEAT) {
       const float cost  = device.ptrs.trace_result_buffer[pixel].depth;
@@ -150,7 +150,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
       const float red   = __saturatef(2.0f * value);
       const float green = __saturatef(2.0f * (value - 0.5f));
       const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
-      store_RGBF(device.ptrs.frame_buffer + pixel, get_color(red, green, blue));
+      write_beauty_buffer(get_color(red, green, blue), pixel, true);
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
       const uint32_t v = random_uint32_t_base(0, task.hit_id);
@@ -165,12 +165,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
 
       const RGBF color = get_color(cr, cg, cb);
 
-      store_RGBF(device.ptrs.frame_buffer + pixel, color);
+      write_beauty_buffer(color, pixel, true);
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
       const GBufferData data = load_g_buffer_data(pixel);
 
-      store_RGBF(device.ptrs.frame_buffer + pixel, add_color(opaque_color(data.albedo), data.emission));
+      write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
     }
   }
 }

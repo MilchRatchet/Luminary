@@ -252,13 +252,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
 
     RGBF record = load_RGBF(device.records + pixel);
 
-    RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, seed);
-
-    RGBF color = load_RGBF(device.ptrs.frame_buffer + pixel);
-    color      = add_color(color, inscattering);
+    const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, seed);
 
     store_RGBF(device.records + pixel, record);
-    store_RGBF(device.ptrs.frame_buffer + pixel, color);
+    write_beauty_buffer(inscattering, pixel);
   }
 
   device.ptrs.randoms[THREAD_ID] = seed;
