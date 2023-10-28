@@ -12,7 +12,7 @@ extern "C" {
 #endif
 
 void raytrace_execute(RaytraceInstance* instance);
-void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene);
+void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene, CommandlineOptions options);
 void raytrace_reset(RaytraceInstance* instance);
 void raytrace_prepare(RaytraceInstance* instance);
 void raytrace_build_structures(RaytraceInstance* instance);
@@ -26,6 +26,7 @@ void raytrace_update_ray_emitter(RaytraceInstance* instance);
 void raytrace_update_toy_rotation(RaytraceInstance* instance);
 void raytrace_update_device_scene(RaytraceInstance* instance);
 void raytrace_center_toy_at_camera(RaytraceInstance* instance);
+DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance);
 
 #if __cplusplus
 }

@@ -8,8 +8,8 @@
 
 void scene_init(Scene** _scene);
 void scene_create_from_wavefront(Scene* scene, WavefrontContent* content);
-RaytraceInstance* scene_load_lum(const char* filename);
-RaytraceInstance* scene_load_obj(char* filename);
+RaytraceInstance* scene_load_lum(const char* filename, CommandlineOptions options);
+RaytraceInstance* scene_load_obj(char* filename, CommandlineOptions options);
 void scene_serialize(RaytraceInstance* instance);
 void free_atlases(RaytraceInstance* instance);
 void free_strings(RaytraceInstance* instance);

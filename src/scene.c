@@ -226,7 +226,7 @@ void scene_create_from_wavefront(Scene* scene, WavefrontContent* content) {
   scene->materials       = wavefront_generate_texture_assignments(content);
 }
 
-RaytraceInstance* scene_load_lum(const char* filename) {
+RaytraceInstance* scene_load_lum(const char* filename, CommandlineOptions options) {
   FILE* file = fopen(filename, "rb");
 
   if (!file) {
@@ -275,7 +275,7 @@ RaytraceInstance* scene_load_lum(const char* filename) {
   texture_create_atlas(&tex_atlas.normal, content->maps[WF_NORMAL], content->maps_count[WF_NORMAL]);
 
   RaytraceInstance* instance;
-  raytrace_init(&instance, general, tex_atlas, scene);
+  raytrace_init(&instance, general, tex_atlas, scene, options);
 
   wavefront_clear(&content);
   scene_clear(&scene);
@@ -283,7 +283,7 @@ RaytraceInstance* scene_load_lum(const char* filename) {
   return instance;
 }
 
-RaytraceInstance* scene_load_obj(char* filename) {
+RaytraceInstance* scene_load_obj(char* filename, CommandlineOptions options) {
   Scene* scene;
   scene_init(&scene);
 
@@ -320,7 +320,7 @@ RaytraceInstance* scene_load_obj(char* filename) {
   texture_create_atlas(&tex_atlas.normal, content->maps[WF_NORMAL], content->maps_count[WF_NORMAL]);
 
   RaytraceInstance* instance;
-  raytrace_init(&instance, general, tex_atlas, scene);
+  raytrace_init(&instance, general, tex_atlas, scene, options);
 
   wavefront_clear(&content);
   scene_clear(&scene);

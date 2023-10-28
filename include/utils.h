@@ -68,6 +68,14 @@ enum ShadingMode {
   SHADING_LIGHTS         = 6
 } typedef ShadingMode;
 
+enum OutputVariable {
+  OUTPUT_VARIABLE_BEAUTY            = 0,
+  OUTPUT_VARIABLE_ALBEDO_GUIDANCE   = 1,
+  OUTPUT_VARIABLE_NORMAL_GUIDANCE   = 2,
+  OUTPUT_VARIABLE_DIRECT_LIGHTING   = 3,
+  OUTPUT_VARIABLE_INDIRECT_LIGHTING = 4
+} typedef OutputVariable;
+
 enum ToyShape { TOY_SPHERE = 0, TOY_PLANE = 1 } typedef ToyShape;
 
 enum ToneMap {
@@ -120,6 +128,12 @@ struct DeviceBuffer {
   size_t size;
   int allocated;
 } typedef DeviceBuffer;
+
+struct CommandlineOptions {
+  int aov_mode;
+  int width;
+  int height;
+} typedef CommandlineOptions;
 
 struct General {
   int width;
@@ -394,6 +408,10 @@ struct DevicePointers {
   RGBF* frame_temporal;
   float* frame_variance;
   RGBF* frame_accumulate;
+  RGBF* frame_direct_buffer;
+  RGBF* frame_direct_accumulate;
+  RGBF* frame_indirect_buffer;
+  RGBF* frame_indirect_accumulate;
   RGBF* frame_output;
   RGBF* albedo_buffer;
   RGBF* normal_buffer;
@@ -444,6 +462,8 @@ struct DeviceConstantMemory {
   vec3 sun_pos;
   vec3 moon_pos;
   int shading_mode;
+  int aov_mode;
+  OutputVariable output_variable;
   RGBF* bloom_scratch;
   RayEmitter emitter;
   int accum_mode;
@@ -505,6 +525,10 @@ struct RaytraceInstance {
   DeviceBuffer* frame_variance;
   DeviceBuffer* frame_accumulate;
   DeviceBuffer* frame_output;
+  DeviceBuffer* frame_direct_buffer;
+  DeviceBuffer* frame_direct_accumulate;
+  DeviceBuffer* frame_indirect_buffer;
+  DeviceBuffer* frame_indirect_accumulate;
   DeviceBuffer* albedo_buffer;
   DeviceBuffer* normal_buffer;
   DeviceBuffer* light_records;
@@ -537,6 +561,8 @@ struct RaytraceInstance {
   int snap_resolution;
   OutputImageFormat image_format;
   int post_process_menu;
+  int aov_mode;
+  OutputVariable output_variable;
   General settings;
   AtmoSettings atmo_settings;
   void* denoise_setup;

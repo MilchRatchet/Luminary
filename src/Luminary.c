@@ -110,6 +110,7 @@ int main(int argc, char* argv[]) {
   int version_output           = 0;
   int force_displacement       = 0;
   int disable_omm              = 0;
+  int aov_mode                 = 0;
 
   for (int i = 1; i < argc; i++) {
     if (custom_samples) {
@@ -135,6 +136,7 @@ int main(int argc, char* argv[]) {
     version_output |= parse_command(argv[i], "-v", "--version");
     force_displacement |= parse_command(argv[i], (char*) 0, "--force-displacement");
     disable_omm |= parse_command(argv[i], (char*) 0, "--no-omm");
+    aov_mode |= parse_command(argv[i], (char*) 0, "--aov-mode");
 
     if (parse_command(argv[i], (char*) 0, "--png")) {
       img_format = IMGFORMAT_PNG;
@@ -161,20 +163,22 @@ int main(int argc, char* argv[]) {
   if (bench)
     bench_activate();
 
+  CommandlineOptions options = {.aov_mode = aov_mode, .width = width, .height = height};
+
   RaytraceInstance* instance;
 
   switch (file_type) {
     case LUM_FILE:
-      instance = scene_load_lum(argv[1]);
+      instance = scene_load_lum(argv[1], options);
       break;
     case OBJ_FILE:
-      instance = scene_load_obj(argv[1]);
+      instance = scene_load_obj(argv[1], options);
       break;
     case BAKED_FILE:
-      instance = load_baked(argv[1]);
+      instance = load_baked(argv[1], options);
       break;
     default:
-      instance = scene_load_lum(argv[1]);
+      instance = scene_load_lum(argv[1], options);
       break;
   }
 
@@ -199,15 +203,6 @@ int main(int argc, char* argv[]) {
 
   if (offline_samples)
     instance->offline_samples = offline_samples;
-
-  int custom_res = width || height;
-
-  if (custom_res) {
-    instance->settings.width  = (width) ? width : instance->width;
-    instance->settings.height = (height) ? height : instance->height;
-  }
-
-  raytrace_reset(instance);
 
   instance->image_format      = img_format;
   instance->post_process_menu = post_process_menu;

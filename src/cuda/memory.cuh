@@ -231,7 +231,7 @@ __device__ void store_RGBF(void* ptr, const RGBF a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if (!device.denoiser || device.iteration_type == TYPE_LIGHT)
+  if ((!device.denoiser && !device.aov_mode) || device.iteration_type == TYPE_LIGHT)
     return;
 
   if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
@@ -247,7 +247,10 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
 }
 
 __device__ void write_normal_buffer(vec3 normal, const int pixel) {
-  if (!device.denoiser || device.iteration_type != TYPE_CAMERA || (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION))
+  if ((!device.denoiser && !device.aov_mode) || device.iteration_type != TYPE_CAMERA)
+    return;
+
+  if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION)
     return;
 
   const float normal_norm = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
@@ -265,6 +268,23 @@ __device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set 
     output = add_color(beauty, load_RGBF(device.ptrs.frame_buffer + pixel));
   }
   store_RGBF(device.ptrs.frame_buffer + pixel, output);
+
+  if (device.aov_mode) {
+    if (device.depth == 0 || (device.depth == 1 && device.iteration_type == TYPE_BOUNCE)) {
+      RGBF output = beauty;
+      if (!mode_set) {
+        output = add_color(beauty, load_RGBF(device.ptrs.frame_direct_buffer + pixel));
+      }
+      store_RGBF(device.ptrs.frame_direct_buffer + pixel, output);
+    }
+    else {
+      RGBF output = beauty;
+      if (!mode_set) {
+        output = add_color(beauty, load_RGBF(device.ptrs.frame_indirect_buffer + pixel));
+      }
+      store_RGBF(device.ptrs.frame_indirect_buffer + pixel, output);
+    }
+  }
 }
 
 __device__ GBufferData load_g_buffer_data(const int offset) {

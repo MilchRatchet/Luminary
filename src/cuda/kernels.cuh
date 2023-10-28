@@ -38,9 +38,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
     device.ptrs.light_transparency_weight_buffer[pixel] = 1.0f;
     device.ptrs.state_buffer[pixel]                     = 0;
 
-    if (device.denoiser && !device.temporal_frames) {
+    if ((device.denoiser || device.aov_mode) && !device.temporal_frames) {
       device.ptrs.albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
       device.ptrs.normal_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+    }
+
+    if (device.aov_mode) {
+      device.ptrs.frame_direct_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
+      device.ptrs.frame_indirect_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
 
     store_trace_task(device.ptrs.bounce_trace + get_task_address(offset++), task);
@@ -455,6 +460,9 @@ __global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int
   const float scale_x = 1.0f / (width - 1);
   const float scale_y = 1.0f / (height - 1);
 
+  const int src_width  = (device.output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_width : device.width;
+  const int src_height = (device.output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_height : device.height;
+
   while (id < amount) {
     const int x = id % width;
     const int y = id / width;
@@ -462,7 +470,7 @@ __global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int
     const float sx = x * scale_x;
     const float sy = y * scale_y;
 
-    RGBF pixel = sample_pixel_clamp(source, sx, sy, device.output_width, device.output_height);
+    RGBF pixel = sample_pixel_clamp(source, sx, sy, src_width, src_height);
 
     if (device.scene.camera.purkinje) {
       pixel = purkinje_shift(pixel);

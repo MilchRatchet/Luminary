@@ -306,16 +306,25 @@ void realtime_output(RaytraceInstance* instance) {
 
     // If window is not minimized
     if (!(SDL_GetWindowFlags(window->window) & SDL_WINDOW_MINIMIZED)) {
-      DeviceBuffer* base_output_image = instance->frame_accumulate;
-      if (instance->denoiser) {
-        base_output_image = denoise_apply(instance, device_buffer_get_pointer(instance->frame_accumulate));
+      DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance);
+
+      printf("buffer: %zu\n", base_output_image);
+
+      if (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) {
+        if (instance->denoiser) {
+          base_output_image = denoise_apply(instance, device_buffer_get_pointer(instance->frame_accumulate));
+        }
+
+        device_buffer_copy(base_output_image, instance->frame_output);
+        device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
+
+        device_copy_framebuffer_to_8bit(
+          device_buffer_get_pointer(instance->frame_output), gpu_scratch, window->buffer, window->width, window->height, window->ld);
       }
-
-      device_buffer_copy(base_output_image, instance->frame_output);
-      device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
-
-      device_copy_framebuffer_to_8bit(
-        device_buffer_get_pointer(instance->frame_output), gpu_scratch, window->buffer, window->width, window->height, window->ld);
+      else {
+        device_copy_framebuffer_to_8bit(
+          device_buffer_get_pointer(base_output_image), gpu_scratch, window->buffer, window->width, window->height, window->ld);
+      }
     }
 
     sample_frametime(&frametime_post);

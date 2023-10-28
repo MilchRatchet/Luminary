@@ -222,7 +222,7 @@ static TraversalTriangle* construct_traversal_triangles(
   return traversal_triangles;
 }
 
-RaytraceInstance* load_baked(const char* filename) {
+RaytraceInstance* load_baked(const char* filename, CommandlineOptions options) {
   bench_tic("Loading Luminary Baked File");
   FILE* file = fopen(filename, "rb");
 
@@ -289,7 +289,7 @@ RaytraceInstance* load_baked(const char* filename) {
   scene->sky.stars = (Star*) 0;
 
   RaytraceInstance* final;
-  raytrace_init(&final, instance->settings, tex_atlas, scene);
+  raytrace_init(&final, instance->settings, tex_atlas, scene, options);
 
   final->scene.sky.cloud.initialized = 0;
 

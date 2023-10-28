@@ -60,6 +60,11 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_dropdown(
     ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Identification\0Lights", 8);
   panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 9);
+  if (instance->aov_mode) {
+    panels[i++] = create_dropdown(
+      ui, "Output Variable", &(instance->output_variable), 0, 5,
+      "Beauty\0Albedo Guidance\0Normal Guidance\0Direct Lighting\0Indirect Lighting", 10);
+  }
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] =
