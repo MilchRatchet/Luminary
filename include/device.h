@@ -29,7 +29,8 @@ void device_execute_main_kernels(RaytraceInstance* instance, int type, int depth
 void device_execute_debug_kernels(RaytraceInstance* instance, int type);
 void device_handle_accumulation(RaytraceInstance* instance);
 void device_copy_framebuffer_to_8bit(
-  RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld);
+  RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld,
+  const OutputVariable output_variable);
 
 ////////////////////////////////////////////////////////////////////
 // camera_post.cuh

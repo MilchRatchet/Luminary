@@ -270,7 +270,7 @@ __device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set 
   store_RGBF(device.ptrs.frame_buffer + pixel, output);
 
   if (device.aov_mode) {
-    if (device.depth == 0 || (device.depth == 1 && device.iteration_type == TYPE_BOUNCE)) {
+    if (device.depth <= 1) {
       RGBF output = beauty;
       if (!mode_set) {
         output = add_color(beauty, load_RGBF(device.ptrs.frame_direct_buffer + pixel));

@@ -367,10 +367,10 @@ void raytrace_execute(RaytraceInstance* instance) {
   }
   else {
     device_execute_main_kernels(instance, TYPE_CAMERA, 0);
-    device_execute_main_kernels(instance, TYPE_LIGHT, 0);
-    for (int i = 0; i < instance->max_ray_depth; i++) {
-      device_execute_main_kernels(instance, TYPE_BOUNCE, 1 + i);
-      device_execute_main_kernels(instance, TYPE_LIGHT, 1 + i);
+    device_execute_main_kernels(instance, TYPE_LIGHT, 1);
+    for (int i = 1; i <= instance->max_ray_depth; i++) {
+      device_execute_main_kernels(instance, TYPE_BOUNCE, i);
+      device_execute_main_kernels(instance, TYPE_LIGHT, i + 1);
     }
   }
 
@@ -544,6 +544,10 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->frame_variance);
   device_buffer_init(&instance->frame_accumulate);
   device_buffer_init(&instance->frame_output);
+  device_buffer_init(&instance->frame_direct_buffer);
+  device_buffer_init(&instance->frame_direct_accumulate);
+  device_buffer_init(&instance->frame_indirect_buffer);
+  device_buffer_init(&instance->frame_indirect_accumulate);
   device_buffer_init(&instance->albedo_buffer);
   device_buffer_init(&instance->normal_buffer);
   device_buffer_init(&instance->light_records);
@@ -574,13 +578,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_malloc(
     (void**) &(instance->scene.triangle_data.index_buffer), instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t));
   device_malloc((void**) &(instance->restir.presampled_triangle_lights), sizeof(TriangleLight) * RESTIR_CANDIDATE_POOL_MAX);
-
-  if (options.aov_mode) {
-    device_buffer_init(&instance->frame_direct_buffer);
-    device_buffer_init(&instance->frame_direct_accumulate);
-    device_buffer_init(&instance->frame_indirect_buffer);
-    device_buffer_init(&instance->frame_indirect_accumulate);
-  }
 
   gpuErrchk(cudaMemcpy(
     instance->scene.materials, scene->materials, sizeof(PackedMaterial) * instance->scene.materials_count, cudaMemcpyHostToDevice));
@@ -856,8 +853,8 @@ void raytrace_update_device_scene(RaytraceInstance* instance) {
   device_update_symbol(scene, instance->scene);
 }
 
-DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance) {
-  switch (instance->output_variable) {
+DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance, OutputVariable output_variable) {
+  switch (output_variable) {
     default:
     case OUTPUT_VARIABLE_BEAUTY:
       return instance->frame_accumulate;
@@ -869,5 +866,21 @@ DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance) {
       return instance->frame_direct_accumulate;
     case OUTPUT_VARIABLE_INDIRECT_LIGHTING:
       return instance->frame_indirect_accumulate;
+  }
+}
+
+const char* raytrace_get_output_variable_name(OutputVariable output_variable) {
+  switch (output_variable) {
+    default:
+    case OUTPUT_VARIABLE_BEAUTY:
+      return "beauty";
+    case OUTPUT_VARIABLE_ALBEDO_GUIDANCE:
+      return "albedo";
+    case OUTPUT_VARIABLE_NORMAL_GUIDANCE:
+      return "normal";
+    case OUTPUT_VARIABLE_DIRECT_LIGHTING:
+      return "direct";
+    case OUTPUT_VARIABLE_INDIRECT_LIGHTING:
+      return "indirect";
   }
 }

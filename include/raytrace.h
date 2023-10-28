@@ -26,7 +26,8 @@ void raytrace_update_ray_emitter(RaytraceInstance* instance);
 void raytrace_update_toy_rotation(RaytraceInstance* instance);
 void raytrace_update_device_scene(RaytraceInstance* instance);
 void raytrace_center_toy_at_camera(RaytraceInstance* instance);
-DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance);
+DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance, OutputVariable output_variable);
+const char* raytrace_get_output_variable_name(OutputVariable output_variable);
 
 #if __cplusplus
 }

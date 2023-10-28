@@ -453,15 +453,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.trace_count[THREAD_ID] = 0;
 }
 
-__global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int width, const int height, const int ld) {
+__global__ void convert_RGBF_to_XRGB8(
+  const RGBF* source, XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
   unsigned int id = THREAD_ID;
 
   const int amount    = width * height;
   const float scale_x = 1.0f / (width - 1);
   const float scale_y = 1.0f / (height - 1);
 
-  const int src_width  = (device.output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_width : device.width;
-  const int src_height = (device.output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_height : device.height;
+  const int src_width  = (output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_width : device.width;
+  const int src_height = (output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_height : device.height;
 
   while (id < amount) {
     const int x = id % width;
@@ -492,9 +493,11 @@ __global__ void convert_RGBF_to_XRGB8(const RGBF* source, XRGB8* dest, const int
       pixel = hsv_to_rgb(hsv);
     }
 
-    pixel.r *= device.scene.camera.exposure;
-    pixel.g *= device.scene.camera.exposure;
-    pixel.b *= device.scene.camera.exposure;
+    if (output_variable != OUTPUT_VARIABLE_ALBEDO_GUIDANCE && output_variable != OUTPUT_VARIABLE_NORMAL_GUIDANCE) {
+      pixel.r *= device.scene.camera.exposure;
+      pixel.g *= device.scene.camera.exposure;
+      pixel.b *= device.scene.camera.exposure;
+    }
 
     switch (device.scene.camera.tonemap) {
       case TONEMAP_NONE:

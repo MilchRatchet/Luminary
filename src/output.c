@@ -51,7 +51,8 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 
     device_buffer_copy(base_output_image, instance->frame_output);
     device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), gpu_output);
-    device_copy_framebuffer_to_8bit(gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld);
+    device_copy_framebuffer_to_8bit(
+      gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld, OUTPUT_VARIABLE_BEAUTY);
 
     SDL_PumpEvents();
 
@@ -145,7 +146,7 @@ void offline_output(RaytraceInstance* instance) {
   if (instance->post_process_menu) {
     device_copy_framebuffer_to_8bit(
       device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
-      instance->output_height, instance->output_width);
+      instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
 
     switch (instance->image_format) {
       case IMGFORMAT_QOI:
@@ -168,9 +169,7 @@ void offline_output(RaytraceInstance* instance) {
 
   device_copy_framebuffer_to_8bit(
     device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
-    instance->output_height, instance->output_width);
-
-  device_buffer_destroy(&scratch_buffer);
+    instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
 
   switch (instance->image_format) {
     case IMGFORMAT_QOI:
@@ -185,6 +184,32 @@ void offline_output(RaytraceInstance* instance) {
       info_message("PNG file created.");
       break;
   }
+
+  if (instance->aov_mode) {
+    for (OutputVariable variable = OUTPUT_VARIABLE_ALBEDO_GUIDANCE; variable < OUTPUT_VARIABLE_COUNT; variable++) {
+      device_copy_framebuffer_to_8bit(
+        device_buffer_get_pointer(raytrace_get_accumulate_buffer(instance, variable)), device_buffer_get_pointer(scratch_buffer), frame,
+        instance->output_width, instance->output_height, instance->output_width, variable);
+
+      const char* var_name = raytrace_get_output_variable_name(variable);
+
+      switch (instance->image_format) {
+        case IMGFORMAT_QOI:
+          sprintf(output_path, "%s_%s.qoi", instance->settings.output_path, var_name);
+          store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
+          info_message("QOI file created. (%s)", var_name);
+          break;
+        case IMGFORMAT_PNG:
+        default:
+          sprintf(output_path, "%s_%s.png", instance->settings.output_path, var_name);
+          png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
+          info_message("PNG file created. (%s)", var_name);
+          break;
+      }
+    }
+  }
+
+  device_buffer_destroy(&scratch_buffer);
 
   free(output_path);
   free(frame);
@@ -231,12 +256,12 @@ static void make_snapshot(RaytraceInstance* instance, WindowInstance* window, RG
       height = window->height;
       break;
     case SNAP_RESOLUTION_RENDER:
-      width  = instance->output_width;
-      height = instance->output_height;
+      width  = (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) ? instance->output_width : instance->width;
+      height = (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) ? instance->output_height : instance->height;
       buffer = malloc(sizeof(XRGB8) * width * height);
       void* gpu_scratch;
       device_malloc(&gpu_scratch, sizeof(XRGB8) * width * height);
-      device_copy_framebuffer_to_8bit(render_output_image, gpu_scratch, buffer, width, height, width);
+      device_copy_framebuffer_to_8bit(render_output_image, gpu_scratch, buffer, width, height, width, instance->output_variable);
       device_free(gpu_scratch, sizeof(XRGB8) * width * height);
       break;
     default:
@@ -305,10 +330,9 @@ void realtime_output(RaytraceInstance* instance) {
     start_frametime(&frametime_post);
 
     // If window is not minimized
+    DeviceBuffer* output_image = (DeviceBuffer*) 0;
     if (!(SDL_GetWindowFlags(window->window) & SDL_WINDOW_MINIMIZED)) {
-      DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance);
-
-      printf("buffer: %zu\n", base_output_image);
+      DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, instance->output_variable);
 
       if (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) {
         if (instance->denoiser) {
@@ -318,13 +342,15 @@ void realtime_output(RaytraceInstance* instance) {
         device_buffer_copy(base_output_image, instance->frame_output);
         device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
 
-        device_copy_framebuffer_to_8bit(
-          device_buffer_get_pointer(instance->frame_output), gpu_scratch, window->buffer, window->width, window->height, window->ld);
+        output_image = instance->frame_output;
       }
       else {
-        device_copy_framebuffer_to_8bit(
-          device_buffer_get_pointer(base_output_image), gpu_scratch, window->buffer, window->width, window->height, window->ld);
+        output_image = base_output_image;
       }
+
+      device_copy_framebuffer_to_8bit(
+        device_buffer_get_pointer(output_image), gpu_scratch, window->buffer, window->width, window->height, window->ld,
+        instance->output_variable);
     }
 
     sample_frametime(&frametime_post);
@@ -416,7 +442,7 @@ void realtime_output(RaytraceInstance* instance) {
 
     if (make_image) {
       log_message("Taking snapshot.");
-      make_snapshot(instance, window, device_buffer_get_pointer(instance->frame_output));
+      make_snapshot(instance, window, device_buffer_get_pointer(output_image));
       make_image = 0;
     }
 
