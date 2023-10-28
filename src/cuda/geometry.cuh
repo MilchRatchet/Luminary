@@ -142,7 +142,7 @@ __global__ void geometry_generate_g_buffer() {
       metallic  = device.scene.material.default_material.g;
     }
 
-    if (!device.scene.material.override_materials && device.scene.material.invert_roughness) {
+    if ((!device.scene.material.override_materials || mat.material_map != TEXTURE_NONE) && device.scene.material.invert_roughness) {
       roughness = 1.0f - roughness;
     }
 
