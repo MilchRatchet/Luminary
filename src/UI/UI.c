@@ -610,7 +610,7 @@ static UITab create_procedurals_particles_panels(UI* ui, RaytraceInstance* insta
   panels[i++] = create_slider(ui, "Direction Speed", &(instance->scene.particles.speed), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Phase Diameter", &(instance->scene.particles.phase_diameter), 1, 0.001f, 0.01f, 50.0f, 0, 0);
   panels[i++] = create_slider(ui, "Seed", &(instance->scene.particles.seed), 0, 0.01f, 0.0f, FLT_MAX, 0, 1);
-  panels[i++] = create_slider(ui, "Count", &(instance->scene.particles.count), 0, 1.0f, 0.0f, FLT_MAX, 0, 1);
+  panels[i++] = create_slider(ui, "Count", &(instance->scene.particles.count), 0, 1.0f, 1.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Size", &(instance->scene.particles.size), 1, 0.001f, 0.0f, 1000.0f, 0, 0);
   panels[i++] = create_slider(ui, "Size Variation", &(instance->scene.particles.size_variation), 1, 0.0001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_button(ui, "Generate Particles", instance, (void (*)(void*)) optixrt_particle_clear, 1);

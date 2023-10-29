@@ -63,7 +63,7 @@ extern "C" __global__ void __raygen__optix() {
 
     const unsigned int vis_mask = OptixVisibilityMask(0xFFFF);
 
-    float t = 0.0f;
+    float t = 64.0f * eps;
 
     float3 inv_ray;
     inv_ray.x = 1.0f / ((fabsf(ray.x) > eps) ? ray.x : copysignf(eps, ray.x));

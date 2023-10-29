@@ -367,7 +367,7 @@ Particle diameter for use in the phase function.
 Seed used for the generation of the particles.
 
 `PARTICLE COUNT___ [INT32]`<br/>
-Number of particles generated within each voxel. The particle field repeats the same generated voxel.
+Number of particles generated within each voxel. The particle field repeats the same generated voxel. Number must be larger than 0.
 
 `PARTICLE SIZE____ [FP32]`<br/>
 Size of each particle.
