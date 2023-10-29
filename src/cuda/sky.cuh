@@ -895,7 +895,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
         sky_color = sky_get_sun_color(origin, task.ray);
       }
       else if (device.iteration_type != TYPE_LIGHT) {
-        sky_color = sky_get_color(origin, task.ray, FLT_MAX, sample_sun, device.scene.sky.steps, seed);
+        sky_color = sky_get_color(origin, task.ray, FLT_MAX, true, device.scene.sky.steps, seed);
+        if (sky_ray_hits_sun(origin, task.ray)) {
+          sky_color = scale_color(sky_color, device.ptrs.mis_buffer[pixel]);
+        }
       }
       else {
         continue;

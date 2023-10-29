@@ -39,6 +39,10 @@ __device__ vec3 sky_to_world_transform(vec3 input) {
   return result;
 }
 
+__device__ bool sky_ray_hits_sun(const vec3 origin_sky, const vec3 ray) {
+  return sphere_ray_intersection(ray, origin_sky, device.sun_pos, SKY_SUN_RADIUS) != FLT_MAX;
+}
+
 __device__ RGBF sky_hdri_sample(const vec3 ray, const float mip_bias) {
   const float theta = atan2f(ray.z, ray.x);
   const float phi   = asinf(ray.y);
