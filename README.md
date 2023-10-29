@@ -81,6 +81,9 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
     --no-omm
         turn off opacity micromap usage
 
+    --aov-mode
+        generate and output additional variables like albedo, normal, direct lighting and indirect lighting
+
     --qoi
         set output image format to QOI
 
