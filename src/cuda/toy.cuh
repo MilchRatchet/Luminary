@@ -23,10 +23,9 @@ __global__ void toy_generate_g_buffer() {
 
     uint32_t flags = 0;
 
-    const QuasiRandomTarget random_target =
-      (device.iteration_type == TYPE_LIGHT) ? QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY : QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY;
-
-    if (device.scene.toy.albedo.a < 1.0f && quasirandom_sequence_1D(random_target, pixel) > device.scene.toy.albedo.a) {
+    if (
+      device.iteration_type == TYPE_LIGHT
+      || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > device.scene.toy.albedo.a) {
       flags |= G_BUFFER_TRANSPARENT_PASS;
     }
 
@@ -35,10 +34,10 @@ __global__ void toy_generate_g_buffer() {
     }
 
     if (flags & G_BUFFER_TRANSPARENT_PASS) {
-      task.position = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
+      task.position = add_vector(task.position, scale_vector(task.ray, 8.0f * eps * get_length(task.position)));
     }
     else {
-      task.position = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
+      task.position = add_vector(task.position, scale_vector(task.ray, -8.0f * eps * get_length(task.position)));
     }
 
     RGBF emission;
@@ -109,9 +108,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         const float mis_weight = device.ptrs.mis_buffer[pixel];
         emission               = scale_color(emission, mis_weight);
       }
-      else if (device.iteration_type == TYPE_LIGHT) {
-        emission = scale_color(emission, get_light_transparency_weight(pixel));
-      }
 
       const uint32_t light = device.ptrs.light_sample_history[pixel];
 
@@ -155,8 +151,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
           }
           break;
         case TYPE_LIGHT:
-          device.ptrs.light_transparency_weight_buffer[pixel] *= 2.0f;
-          if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY_ROULETTE, pixel) > 0.5f) {
+          if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY, pixel) > device.scene.toy.albedo.a) {
             if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
               store_RGBF(device.ptrs.light_records + pixel, record);
               store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);

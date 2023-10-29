@@ -31,12 +31,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
 
     task = camera_get_ray(task, pixel);
 
-    device.ptrs.light_records[pixel]                    = get_color(1.0f, 1.0f, 1.0f);
-    device.ptrs.bounce_records[pixel]                   = get_color(1.0f, 1.0f, 1.0f);
-    device.ptrs.frame_buffer[pixel]                     = get_color(0.0f, 0.0f, 0.0f);
-    device.ptrs.mis_buffer[pixel]                       = 1.0f;
-    device.ptrs.light_transparency_weight_buffer[pixel] = 1.0f;
-    device.ptrs.state_buffer[pixel]                     = 0;
+    device.ptrs.light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
+    device.ptrs.bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
+    device.ptrs.frame_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
+    device.ptrs.mis_buffer[pixel]     = 1.0f;
+    device.ptrs.state_buffer[pixel]   = 0;
 
     if ((device.denoiser || device.aov_mode) && !device.temporal_frames) {
       device.ptrs.albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
