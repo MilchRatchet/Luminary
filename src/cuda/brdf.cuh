@@ -172,6 +172,11 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
 
   const vec3 L_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
 
+  if (L_local.z < 0.0f) {
+    brdf.term = get_color(0.0f, 0.0f, 0.0f);
+    return brdf;
+  }
+
   const float HdotL = fmaxf(0.00001f, fminf(1.0f, dot_product(H_local, L_local)));
   const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
   const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
@@ -461,6 +466,11 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
   }
 
   vec3 L_local = reflect_vector(scale_vector(V_local, -1.0f), H_local);
+
+  if (L_local.z < 0.0f) {
+    brdf.term = get_color(0.0f, 0.0f, 0.0f);
+    return brdf;
+  }
 
   const float HdotL = fmaxf(eps, fminf(1.0f, dot_product(H_local, L_local)));
   const float HdotV = fmaxf(eps, fminf(1.0f, dot_product(H_local, V_local)));
