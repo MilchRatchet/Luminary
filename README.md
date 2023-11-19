@@ -18,11 +18,15 @@
 </p>
 
 <p align="center">
-  <img src="demo_images/Todano.png" alt="Todano Example">
+  <img src="demo_images/Endako.png" alt="Todano Example">
 </p>
 
 <p align="center">
-  <img src="demo_images/Aranos.png" alt="Aranos Example">
+  <img src="demo_images/Notak.png" alt="Aranos Example">
+</p>
+
+<p align="center">
+  <img src="demo_images/Pokitaru.png" alt="Aranos Example">
 </p>
 
 # About
@@ -94,7 +98,7 @@ where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` f
 ## Realtime Mode
 
 <p align="center">
-  <img src="demo_images/KorosUI.png" alt="UI Example">
+  <img src="demo_images/SiberiusUI.png" alt="UI Example">
 </p>
 
 In realtime mode, which is used by default, you can control the camera through `WASD`, `LCTRL`, `SPACE` and the mouse. The sun can be controlled with the arrow keys. A snapshot can be made by pressing `[F12]`. You can open a user interface with `[E]` in which you can change most parameters.
