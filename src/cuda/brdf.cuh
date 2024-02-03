@@ -63,7 +63,11 @@ __device__ RGBF brdf_albedo_as_diffuse(const RGBF albedo, const float metallic) 
  * @result Fresnel approximation.
  */
 __device__ RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float NdotV) {
-  const float t = powf(1.0f - NdotV, 5.0f);
+  const float one_minus_NdotV = 1.0f - NdotV;
+  const float pow2            = one_minus_NdotV * one_minus_NdotV;
+
+  // powf(1.0f - NdotV, 5.0f)
+  const float t = pow2 * pow2 * one_minus_NdotV;
 
   RGBF result = f0;
   RGBF diff   = sub_color(get_color(f90, f90, f90), f0);
@@ -80,7 +84,12 @@ __device__ RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float
  * @result Fresnel approximation.
  */
 __device__ RGBF brdf_fresnel_roughness(const RGBF f0, const float roughness, const float NdotV) {
-  const float t = powf(1.0f - NdotV, 5.0f);
+  const float one_minus_NdotV = 1.0f - NdotV;
+  const float pow2            = one_minus_NdotV * one_minus_NdotV;
+
+  // powf(1.0f - NdotV, 5.0f)
+  const float t = pow2 * pow2 * one_minus_NdotV;
+
   const float s = 1.0f - roughness;
   const RGBF Fr = sub_color(max_color(get_color(s, s, s), f0), f0);
 

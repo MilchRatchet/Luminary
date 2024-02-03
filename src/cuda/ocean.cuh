@@ -67,7 +67,7 @@ __device__ float ocean_octave(float2 p, const float choppyness) {
   wave1.x = lerp(wave1.x, wave2.x, wave1.x);
   wave1.y = lerp(wave1.y, wave2.y, wave1.y);
 
-  return powf(1.0f - powf(wave1.x * wave1.y, 0.65f), choppyness);
+  return powf(1.0f - sqrtf(wave1.x * wave1.y), choppyness);
 }
 
 __device__ float ocean_get_height(const vec3 p, const int steps) {

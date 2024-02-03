@@ -294,8 +294,8 @@ __device__ float cloud_base_density_low(const vec3 pos, const float height, cons
 
   const float density_gradient = cloud_density_height_gradient_low_level(height, weather);
 
-  float density = shape_sum * density_gradient;
-  density       = powf(fabsf(density), __saturatef(height * 6.0f));
+  float density = fabsf(shape_sum * density_gradient);
+  density       = powf(density, __saturatef(height * 6.0f));
   density       = smoothstep(density, 0.25f, 1.1f);
   density       = __saturatef(density - (1.0f - weather.coverage)) * weather.coverage;
 

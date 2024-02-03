@@ -822,7 +822,11 @@ __device__ RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint
 }
 
 __device__ float henyey_greenstein_phase_function(const float cos_angle, const float g) {
-  return (1.0f - g * g) / (4.0f * PI * powf(1.0f + g * g - 2.0f * g * cos_angle, 1.5f));
+  const float g2         = g * g;
+  const float denom_term = 1.0f + g2 - 2.0f * g * cos_angle;
+  const float pow15      = denom_term * sqrtf(denom_term);
+
+  return (1.0f - g * g) / (4.0f * PI * pow15);
 }
 
 __device__ float draine_phase_function(const float cos_angle, const float g, const float alpha) {
@@ -938,7 +942,7 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
   const float t4 = 3.0f * g2 * (1.0f + t3) + alpha * (2.0f + g2 * (1.0f + (1.0f + 2.0f * g2) * t3));
   const float t5 = t0 * (t1 * t2 + t4 * t4) + t1 * t1 * t1;
   const float t6 = t0 * 4.0f * (g4 - g2);
-  const float t7 = powf(t5 + sqrtf(t5 * t5 - t6 * t6 * t6), 1.0f / 3.0f);
+  const float t7 = cbrtf(t5 + sqrtf(t5 * t5 - t6 * t6 * t6));
   const float t8 = 2.0f * ((t1 + (t6 / t7) + t7) / t0);
   const float t9 = sqrtf(6.0f * (1.0f + g2) + t8);
 
