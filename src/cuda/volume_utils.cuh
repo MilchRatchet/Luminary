@@ -61,4 +61,118 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
   }
 }
 
+/*
+ * Computes the start and length of a ray path through a volume.
+ * The output path is only valid if the start is non-negative.
+ *
+ * @param origin Start point of ray in world space.
+ * @param ray Direction of ray.
+ * @param limit Maximum distance a ray may travel in world space.
+ * @result Two floats:
+ *                  - [x] = Start in world space.
+ *                  - [y] = Distance through fog in world space.
+ */
+__device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
+  if (volume.max_height <= volume.min_height)
+    return make_float2(-FLT_MAX, 0.0f);
+
+  // Horizontal intersection
+  const float rn = 1.0f / sqrtf(ray.x * ray.x + ray.z * ray.z);
+  const float rx = ray.x * rn;
+  const float rz = ray.z * rn;
+
+  const float dx = origin.x - device.scene.camera.pos.x;
+  const float dz = origin.z - device.scene.camera.pos.z;
+
+  const float dot = dx * rx + dz * rz;
+  const float r2  = volume.dist * volume.dist;
+  const float c   = (dx * dx + dz * dz) - r2;
+
+  const float kx = dx - rx * dot;
+  const float kz = dz - rz * dot;
+
+  const float d = r2 - (kx * kx + kz * kz);
+
+  if (d < 0.0f)
+    return make_float2(-FLT_MAX, 0.0f);
+
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
+
+  const float t0 = fmaxf(0.0f, c / q);
+  const float t1 = fmaxf(0.0f, q);
+
+  const float start_xz = fminf(t0, t1);
+  const float end_xz   = fmaxf(t0, t1);
+
+  // Vertical intersection
+  float start_y;
+  float end_y;
+  if (volume.type == VOLUME_TYPE_OCEAN) {
+    const bool above_surface = ocean_get_relative_height(origin, OCEAN_ITERATIONS_INTERSECTION) > 0.0f;
+
+    const float surface_intersect = ocean_intersection_distance(origin, ray, limit);
+
+    if (above_surface) {
+      start_y = surface_intersect;
+      end_y   = FLT_MAX;
+    }
+    else {
+      start_y = 0.0f;
+      end_y   = surface_intersect;
+    }
+  }
+  else {
+    if (fabsf(ray.y) < 0.005f) {
+      if (origin.y >= volume.min_height && origin.y <= volume.max_height) {
+        start_y = 0.0f;
+        end_y   = volume.dist;
+      }
+      else {
+        return make_float2(-FLT_MAX, 0.0f);
+      }
+    }
+    else {
+      const float dy1 = volume.min_height - origin.y;
+      const float dy2 = volume.max_height - origin.y;
+
+      const float sy1 = dy1 / ray.y;
+      const float sy2 = dy2 / ray.y;
+
+      start_y = fmaxf(fminf(sy1, sy2), 0.0f);
+      end_y   = fmaxf(sy1, sy2);
+    }
+  }
+
+  const float start = fmaxf(start_xz, start_y);
+  const float dist  = fminf(fminf(end_xz, end_y) - start, limit - start);
+
+  if (dist < 0.0f)
+    return make_float2(-FLT_MAX, 0.0f);
+
+  return make_float2(start, dist);
+}
+
+/*
+ * Computes a random volume intersection point by perfectly importance sampling the transmittance
+ * based pdf.
+ *
+ * @param volume VolumeDescriptor of the corresponding volume.
+ * @param origin Origin of ray in world space.
+ * @param ray Direction of ray.
+ * @param start Start offset of ray.
+ * @param max_dist Maximum dist ray may travel after start.
+ * @result Distance of intersection point and origin in world space.
+ */
+__device__ float volume_sample_intersection(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist, const float random) {
+  // [FonWKH17] Equation 15
+  const float t = (-logf(random)) / volume.max_scattering;
+
+  if (t > max_dist)
+    return FLT_MAX;
+
+  return start + t;
+}
+
 #endif /* CU_VOLUME_UTILS_H */

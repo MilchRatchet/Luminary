@@ -287,64 +287,6 @@ __device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set 
   }
 }
 
-__device__ GBufferData load_g_buffer_data(const int offset) {
-  const float4* ptr  = (float4*) (device.ptrs.g_buffer + offset);
-  const float4 data0 = __ldcs(ptr + 0);
-  const float4 data1 = __ldcs(ptr + 1);
-  const float4 data2 = __ldcs(ptr + 2);
-  const float4 data3 = __ldcs(ptr + 3);
-  const float4 data4 = __ldcs(ptr + 4);
-  const float4 data5 = __ldcs(ptr + 5);
-
-  GBufferData result;
-  result.hit_id           = __float_as_uint(data0.x);
-  result.albedo           = RGBAF_set(data0.y, data0.z, data0.w, data1.x);
-  result.emission         = get_color(data1.y, data1.z, data1.w);
-  result.position         = get_vector(data2.x, data2.y, data2.z);
-  result.V                = get_vector(data2.w, data3.x, data3.y);
-  result.normal           = get_vector(data3.z, data3.w, data4.x);
-  result.roughness        = data4.y;
-  result.metallic         = data4.z;
-  result.flags            = __float_as_uint(data4.w);
-  result.refraction_index = data5.x;
-
-  return result;
-}
-
-__device__ void store_g_buffer_data(const GBufferData data, const int offset) {
-  float4 data0, data1, data2, data3, data4, data5;
-
-  data0.x = __uint_as_float(data.hit_id);
-  data0.y = data.albedo.r;
-  data0.z = data.albedo.g;
-  data0.w = data.albedo.b;
-  data1.x = data.albedo.a;
-  data1.y = data.emission.r;
-  data1.z = data.emission.g;
-  data1.w = data.emission.b;
-  data2.x = data.position.x;
-  data2.y = data.position.y;
-  data2.z = data.position.z;
-  data2.w = data.V.x;
-  data3.x = data.V.y;
-  data3.y = data.V.z;
-  data3.z = data.normal.x;
-  data3.w = data.normal.y;
-  data4.x = data.normal.z;
-  data4.y = data.roughness;
-  data4.z = data.metallic;
-  data4.w = __uint_as_float(data.flags);
-  data5.x = data.refraction_index;
-
-  float4* ptr = (float4*) (device.ptrs.g_buffer + offset);
-  __stcs(ptr + 0, data0);
-  __stcs(ptr + 1, data1);
-  __stcs(ptr + 2, data2);
-  __stcs(ptr + 3, data3);
-  __stcs(ptr + 4, data4);
-  __stcs(ptr + 5, data5);
-}
-
 __device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {
   const float4 packet = __ldcs((float4*) (ptr + offset));
 

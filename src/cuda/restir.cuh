@@ -3,7 +3,7 @@
 
 #include "memory.cuh"
 #include "utils.cuh"
-#include "volume.cuh"
+#include "volume_utils.cuh"
 
 //
 // This file implements light sampling based on ReSTIR. However, I ultimately decided to only use
@@ -125,6 +125,9 @@ __device__ float restir_sample_target_pdf(
 __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const uint32_t pixel) {
   LightSample selected = restir_sample_empty();
 
+  if (!(data.flags & G_BUFFER_REQUIRES_SAMPLING))
+    return selected;
+
   const vec3 sky_pos = world_to_sky_transform(data.position);
 
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
@@ -221,35 +224,6 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   }
 
   return selected;
-}
-
-/**
- * Kernel that determines a light sample to be used in next event estimation
- *
- * Light sample is stored in device.ptrs.light_samples.
- *
- * Light samples are only generated for pixels for which the flag G_BUFFER_REQUIRES_SAMPLING is set.
- */
-__global__ void restir_weighted_reservoir_sampling() {
-  const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT];
-
-  for (int i = 0; i < task_count; i++) {
-    const int offset     = get_task_address(i);
-    const ushort2 index  = __ldg((ushort2*) (device.trace_tasks + offset));
-    const uint32_t pixel = get_pixel_id(index.x, index.y);
-
-    const GBufferData data = load_g_buffer_data(pixel);
-    const RGBF record      = load_RGBF(device.records + pixel);
-
-    const LightSample sample =
-      (data.flags & G_BUFFER_REQUIRES_SAMPLING) ? restir_sample_reservoir(data, record, pixel) : restir_sample_empty();
-
-    store_light_sample(device.ptrs.light_samples, sample, pixel);
-
-    if (device.iteration_type != TYPE_CAMERA) {
-      device.ptrs.g_buffer[pixel].flags = data.flags & (~G_BUFFER_REQUIRES_SAMPLING);
-    }
-  }
 }
 
 __global__ void restir_candidates_pool_generation() {

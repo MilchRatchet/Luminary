@@ -305,9 +305,6 @@ struct GBufferData {
   float metallic;
   uint32_t flags;
   float refraction_index;
-  float padding0;
-  float padding1;
-  float padding2;
 } typedef GBufferData;
 
 //

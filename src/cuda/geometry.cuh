@@ -4,6 +4,7 @@
 #include "brdf.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "restir.cuh"
 #include "state.cuh"
 #include "texture_utils.cuh"
 
@@ -65,122 +66,115 @@ __device__ float geometry_get_ambient_index_of_refraction(const vec3 position) {
   return 1.0f;
 }
 
-__global__ void geometry_generate_g_buffer() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+__device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const int pixel) {
+  const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
 
-  for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel   = task.index.y * device.width + task.index.x;
+  const float4 t1 = __ldg(hit_address);
+  const float4 t2 = __ldg(hit_address + 1);
+  const float4 t3 = __ldg(hit_address + 2);
+  const float4 t4 = __ldg(hit_address + 3);
+  const float4 t5 = __ldg(hit_address + 4);
+  const float4 t6 = __ldg(hit_address + 5);
+  const float t7  = __ldg((float*) (hit_address + 6));
 
-    const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
+  const vec3 vertex = get_vector(t1.x, t1.y, t1.z);
+  const vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
+  const vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
-    const float4 t1 = __ldg(hit_address);
-    const float4 t2 = __ldg(hit_address + 1);
-    const float4 t3 = __ldg(hit_address + 2);
-    const float4 t4 = __ldg(hit_address + 3);
-    const float4 t5 = __ldg(hit_address + 4);
-    const float4 t6 = __ldg(hit_address + 5);
-    const float t7  = __ldg((float*) (hit_address + 6));
+  const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
-    const vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-    const vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
-    const vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
+  const UV vertex_texture = get_UV(t5.z, t5.w);
+  const UV edge1_texture  = get_UV(t6.x, t6.y);
+  const UV edge2_texture  = get_UV(t6.z, t6.w);
 
-    const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+  const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 
-    const UV vertex_texture = get_UV(t5.z, t5.w);
-    const UV edge1_texture  = get_UV(t6.x, t6.y);
-    const UV edge2_texture  = get_UV(t6.z, t6.w);
+  const int material_id = __float_as_int(t7);
 
-    const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+  const Material mat = load_material(device.materials, material_id);
 
-    const int material_id = __float_as_int(t7);
+  const vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
+  const vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
+  const vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
 
-    const Material mat = load_material(device.materials, material_id);
+  bool is_inside;
+  const vec3 normal = geometry_compute_normal(
+    vertex_normal, edge1_normal, edge2_normal, task.ray, edge1, edge2, edge1_texture, edge2_texture, mat.normal_map, coords, tex_coords,
+    is_inside);
 
-    const vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
-    const vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
-    const vec3 edge2_normal  = get_vector(t4.w, t5.x, t5.y);
-
-    bool is_inside;
-    const vec3 normal = geometry_compute_normal(
-      vertex_normal, edge1_normal, edge2_normal, task.ray, edge1, edge2, edge1_texture, edge2_texture, mat.normal_map, coords, tex_coords,
-      is_inside);
-
-    RGBAF albedo = mat.albedo;
-    if (mat.albedo_map != TEXTURE_NONE) {
-      const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[mat.albedo_map], tex_coords);
-      albedo.r              = albedo_f.x;
-      albedo.g              = albedo_f.y;
-      albedo.b              = albedo_f.z;
-      albedo.a              = albedo_f.w;
-    }
-
-    if (albedo.a < device.scene.material.alpha_cutoff)
-      albedo.a = 0.0f;
-
-    RGBF emission = (device.scene.material.lights_active) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
-    if (mat.illuminance_map != TEXTURE_NONE && device.scene.material.lights_active) {
-      const float4 illuminance_f = texture_load(device.ptrs.illuminance_atlas[mat.illuminance_map], tex_coords);
-
-      emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
-      emission = scale_color(emission, illuminance_f.w * albedo.a);
-    }
-    emission = scale_color(emission, device.scene.material.default_material.b);
-
-    float roughness = mat.roughness;
-    float metallic  = mat.metallic;
-    if (mat.material_map != TEXTURE_NONE) {
-      const float4 material_f = texture_load(device.ptrs.material_atlas[mat.material_map], tex_coords);
-
-      roughness = material_f.x;
-      metallic  = material_f.y;
-    }
-    else if (device.scene.material.override_materials) {
-      roughness = 1.0f - device.scene.material.default_material.r;
-      metallic  = device.scene.material.default_material.g;
-    }
-
-    if ((!device.scene.material.override_materials || mat.material_map != TEXTURE_NONE) && device.scene.material.invert_roughness) {
-      roughness = 1.0f - roughness;
-    }
-
-    uint32_t flags = 0;
-
-    if (device.iteration_type == TYPE_LIGHT || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > albedo.a) {
-      flags |= G_BUFFER_TRANSPARENT_PASS;
-    }
-
-    if (!(flags & G_BUFFER_TRANSPARENT_PASS) && !state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-      flags |= G_BUFFER_REQUIRES_SAMPLING;
-    }
-
-    if (flags & G_BUFFER_TRANSPARENT_PASS) {
-      task.position = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
-    }
-    else {
-      task.position = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
-    }
-
-    if (is_inside) {
-      flags |= G_BUFFER_REFRACTION_IS_INSIDE;
-    }
-
-    GBufferData data;
-    data.hit_id           = task.hit_id;
-    data.albedo           = albedo;
-    data.emission         = emission;
-    data.normal           = normal;
-    data.position         = task.position;
-    data.V                = scale_vector(task.ray, -1.0f);
-    data.roughness        = roughness;
-    data.metallic         = metallic;
-    data.flags            = flags;
-    data.refraction_index = mat.refraction_index;
-
-    store_g_buffer_data(data, pixel);
+  RGBAF albedo = mat.albedo;
+  if (mat.albedo_map != TEXTURE_NONE) {
+    const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[mat.albedo_map], tex_coords);
+    albedo.r              = albedo_f.x;
+    albedo.g              = albedo_f.y;
+    albedo.b              = albedo_f.z;
+    albedo.a              = albedo_f.w;
   }
+
+  if (albedo.a < device.scene.material.alpha_cutoff)
+    albedo.a = 0.0f;
+
+  RGBF emission = (device.scene.material.lights_active) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
+  if (mat.illuminance_map != TEXTURE_NONE && device.scene.material.lights_active) {
+    const float4 illuminance_f = texture_load(device.ptrs.illuminance_atlas[mat.illuminance_map], tex_coords);
+
+    emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
+    emission = scale_color(emission, illuminance_f.w * albedo.a);
+  }
+  emission = scale_color(emission, device.scene.material.default_material.b);
+
+  float roughness = mat.roughness;
+  float metallic  = mat.metallic;
+  if (mat.material_map != TEXTURE_NONE) {
+    const float4 material_f = texture_load(device.ptrs.material_atlas[mat.material_map], tex_coords);
+
+    roughness = material_f.x;
+    metallic  = material_f.y;
+  }
+  else if (device.scene.material.override_materials) {
+    roughness = 1.0f - device.scene.material.default_material.r;
+    metallic  = device.scene.material.default_material.g;
+  }
+
+  if ((!device.scene.material.override_materials || mat.material_map != TEXTURE_NONE) && device.scene.material.invert_roughness) {
+    roughness = 1.0f - roughness;
+  }
+
+  uint32_t flags = 0;
+
+  if (device.iteration_type == TYPE_LIGHT || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > albedo.a) {
+    flags |= G_BUFFER_TRANSPARENT_PASS;
+  }
+
+  if (!(flags & G_BUFFER_TRANSPARENT_PASS) && !state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+    flags |= G_BUFFER_REQUIRES_SAMPLING;
+  }
+
+  vec3 pos;
+  if (flags & G_BUFFER_TRANSPARENT_PASS) {
+    pos = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
+  }
+  else {
+    pos = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
+  }
+
+  if (is_inside) {
+    flags |= G_BUFFER_REFRACTION_IS_INSIDE;
+  }
+
+  GBufferData data;
+  data.hit_id           = task.hit_id;
+  data.albedo           = albedo;
+  data.emission         = emission;
+  data.normal           = normal;
+  data.position         = pos;
+  data.V                = scale_vector(task.ray, -1.0f);
+  data.roughness        = roughness;
+  data.metallic         = metallic;
+  data.flags            = flags;
+  data.refraction_index = mat.refraction_index;
+
+  return data;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks() {
@@ -193,7 +187,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
-    GBufferData data = load_g_buffer_data(pixel);
+    GBufferData data = geometry_generate_g_buffer(task, pixel);
 
     RGBF record = load_RGBF(device.records + pixel);
 
@@ -277,7 +271,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
         uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-        LightSample light                   = load_light_sample(device.ptrs.light_samples, pixel);
+        LightSample light                   = restir_sample_reservoir(data, record, pixel);
 
         if (light.weight > 0.0f) {
           const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, pixel));
@@ -329,7 +323,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
     const int pixel   = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      const GBufferData data = load_g_buffer_data(pixel);
+      const GBufferData data = geometry_generate_g_buffer(task, pixel);
 
       write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
     }
@@ -339,7 +333,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
     else if (device.shading_mode == SHADING_NORMAL) {
-      const GBufferData data = load_g_buffer_data(pixel);
+      const GBufferData data = geometry_generate_g_buffer(task, pixel);
 
       const vec3 normal = data.normal;
 

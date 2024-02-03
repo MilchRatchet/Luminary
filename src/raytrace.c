@@ -558,7 +558,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->trace_result_buffer);
   device_buffer_init(&instance->state_buffer);
   device_buffer_init(&instance->light_samples);
-  device_buffer_init(&instance->g_buffer);
   device_buffer_init(&instance->light_candidates);
   device_buffer_init(&instance->cloud_noise);
   device_buffer_init(&instance->sky_ms_luts);
@@ -731,7 +730,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
 
   device_buffer_malloc(instance->light_samples, sizeof(LightSample), amount);
-  device_buffer_malloc(instance->g_buffer, sizeof(GBufferData), amount);
   device_buffer_malloc(instance->light_candidates, sizeof(uint32_t), RESTIR_CANDIDATE_POOL_MAX);
 
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
@@ -772,7 +770,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.trace_result_buffer       = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.state_buffer              = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
   ptrs.light_samples             = (LightSample*) device_buffer_get_pointer(instance->light_samples);
-  ptrs.g_buffer                  = (GBufferData*) device_buffer_get_pointer(instance->g_buffer);
   ptrs.light_candidates          = (uint32_t*) device_buffer_get_pointer(instance->light_candidates);
   ptrs.sky_tm_luts               = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
   ptrs.sky_ms_luts               = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
@@ -811,7 +808,6 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->trace_result_buffer);
   device_buffer_free(instance->state_buffer);
   device_buffer_free(instance->light_samples);
-  device_buffer_free(instance->g_buffer);
   device_buffer_free(instance->mis_buffer);
 
   gpuErrchk(cudaDeviceSynchronize());

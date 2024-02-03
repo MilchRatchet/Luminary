@@ -7,60 +7,53 @@
 #include "state.cuh"
 #include "toy_utils.cuh"
 
-__global__ void toy_generate_g_buffer() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
+__device__ GBufferData toy_generate_g_buffer(const ToyTask task, const int pixel) {
+  vec3 normal = get_toy_normal(task.position);
 
-  for (int i = 0; i < task_count; i++) {
-    ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device.width + task.index.x;
-
-    vec3 normal = get_toy_normal(task.position);
-
-    if (dot_product(normal, task.ray) > 0.0f) {
-      normal = scale_vector(normal, -1.0f);
-    }
-
-    uint32_t flags = 0;
-
-    if (
-      device.iteration_type == TYPE_LIGHT
-      || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > device.scene.toy.albedo.a) {
-      flags |= G_BUFFER_TRANSPARENT_PASS;
-    }
-
-    if (!(flags & G_BUFFER_TRANSPARENT_PASS) && !state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-      flags |= G_BUFFER_REQUIRES_SAMPLING;
-    }
-
-    if (flags & G_BUFFER_TRANSPARENT_PASS) {
-      task.position = add_vector(task.position, scale_vector(task.ray, 8.0f * eps * get_length(task.position)));
-    }
-    else {
-      task.position = add_vector(task.position, scale_vector(task.ray, -8.0f * eps * get_length(task.position)));
-    }
-
-    RGBF emission;
-    if (device.scene.toy.emissive) {
-      emission = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
-    }
-    else {
-      emission = get_color(0.0f, 0.0f, 0.0f);
-    }
-
-    GBufferData data;
-    data.hit_id    = HIT_TYPE_TOY;
-    data.albedo    = device.scene.toy.albedo;
-    data.emission  = emission;
-    data.normal    = normal;
-    data.position  = task.position;
-    data.V         = scale_vector(task.ray, -1.0f);
-    data.roughness = (1.0f - device.scene.toy.material.r);
-    data.metallic  = device.scene.toy.material.g;
-    data.flags     = flags;
-
-    store_g_buffer_data(data, pixel);
+  if (dot_product(normal, task.ray) > 0.0f) {
+    normal = scale_vector(normal, -1.0f);
   }
+
+  uint32_t flags = 0;
+
+  if (
+    device.iteration_type == TYPE_LIGHT
+    || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > device.scene.toy.albedo.a) {
+    flags |= G_BUFFER_TRANSPARENT_PASS;
+  }
+
+  if (!(flags & G_BUFFER_TRANSPARENT_PASS) && !state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
+    flags |= G_BUFFER_REQUIRES_SAMPLING;
+  }
+
+  vec3 pos;
+  if (flags & G_BUFFER_TRANSPARENT_PASS) {
+    pos = add_vector(task.position, scale_vector(task.ray, 8.0f * eps * get_length(task.position)));
+  }
+  else {
+    pos = add_vector(task.position, scale_vector(task.ray, -8.0f * eps * get_length(task.position)));
+  }
+
+  RGBF emission;
+  if (device.scene.toy.emissive) {
+    emission = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+  }
+  else {
+    emission = get_color(0.0f, 0.0f, 0.0f);
+  }
+
+  GBufferData data;
+  data.hit_id    = HIT_TYPE_TOY;
+  data.albedo    = device.scene.toy.albedo;
+  data.emission  = emission;
+  data.normal    = normal;
+  data.position  = pos;
+  data.V         = scale_vector(task.ray, -1.0f);
+  data.roughness = (1.0f - device.scene.toy.material.r);
+  data.metallic  = device.scene.toy.material.g;
+  data.flags     = flags;
+
+  return data;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
@@ -73,7 +66,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
     ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    const GBufferData data = load_g_buffer_data(pixel);
+    const GBufferData data = toy_generate_g_buffer(task, pixel);
 
     const bool is_inside = toy_is_inside(task.position);
     const vec3 normal    = data.normal;
@@ -171,8 +164,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
         uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-
-        LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
+        LightSample light                   = restir_sample_reservoir(data, record, pixel);
 
         if (light.weight > 0.0f) {
           const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, pixel));

@@ -9,44 +9,36 @@ __device__ vec3 particle_transform_relative(vec3 p) {
   return sub_vector(p, device.scene.camera.pos);
 }
 
-__global__ void particle_generate_g_buffer() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
+__device__ GBufferData particle_generate_g_buffer(const ParticleTask task, const int pixel) {
+  Quad q   = load_quad(device.particle_quads, task.hit_id & HIT_TYPE_PARTICLE_MASK);
+  q.vertex = particle_transform_relative(q.vertex);
+  q.edge1  = particle_transform_relative(q.edge1);
+  q.edge2  = particle_transform_relative(q.edge2);
 
-  for (int i = 0; i < task_count; i++) {
-    ParticleTask task = load_particle_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel   = task.index.y * device.width + task.index.x;
+  vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
 
-    Quad q   = load_quad(device.particle_quads, task.hit_id & HIT_TYPE_PARTICLE_MASK);
-    q.vertex = particle_transform_relative(q.vertex);
-    q.edge1  = particle_transform_relative(q.edge1);
-    q.edge2  = particle_transform_relative(q.edge2);
+  RGBAF albedo;
+  albedo.r = device.scene.particles.albedo.r;
+  albedo.g = device.scene.particles.albedo.g;
+  albedo.b = device.scene.particles.albedo.b;
+  albedo.a = 1.0f;
 
-    vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
+  // Particles BSDF is emulated using volume BSDFs
+  uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
+  flags |= G_BUFFER_VOLUME_HIT;
 
-    RGBAF albedo;
-    albedo.r = device.scene.particles.albedo.r;
-    albedo.g = device.scene.particles.albedo.g;
-    albedo.b = device.scene.particles.albedo.b;
-    albedo.a = 1.0f;
+  GBufferData data;
+  data.hit_id    = task.hit_id;
+  data.albedo    = albedo;
+  data.emission  = get_color(0.0f, 0.0f, 0.0f);
+  data.normal    = normal;
+  data.position  = task.position;
+  data.V         = scale_vector(task.ray, -1.0f);
+  data.roughness = 0.0f;
+  data.metallic  = 0.0f;
+  data.flags     = flags;
 
-    // Particles BSDF is emulated using volume BSDFs
-    uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
-    flags |= G_BUFFER_VOLUME_HIT;
-
-    GBufferData data;
-    data.hit_id    = task.hit_id;
-    data.albedo    = albedo;
-    data.emission  = get_color(0.0f, 0.0f, 0.0f);
-    data.normal    = normal;
-    data.position  = task.position;
-    data.V         = scale_vector(task.ray, -1.0f);
-    data.roughness = 0.0f;
-    data.metallic  = 0.0f;
-    data.flags     = flags;
-
-    store_g_buffer_data(data, pixel);
-  }
+  return data;
 }
 
 __global__ void particle_process_tasks() {
@@ -59,7 +51,7 @@ __global__ void particle_process_tasks() {
     ParticleTask task = load_particle_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
-    const GBufferData data = load_g_buffer_data(pixel);
+    const GBufferData data = particle_generate_g_buffer(task, pixel);
 
     RGBF record = load_RGBF(device.records + pixel);
 
@@ -88,7 +80,7 @@ __global__ void particle_process_tasks() {
     }
 
     if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-      LightSample light = load_light_sample(device.ptrs.light_samples, pixel);
+      LightSample light = restir_sample_reservoir(data, record, pixel);
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
@@ -128,7 +120,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
     const int pixel   = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      const GBufferData data = load_g_buffer_data(pixel);
+      const GBufferData data = particle_generate_g_buffer(task, pixel);
 
       write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
     }
@@ -138,7 +130,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
       write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
     else if (device.shading_mode == SHADING_NORMAL) {
-      const GBufferData data = load_g_buffer_data(pixel);
+      const GBufferData data = particle_generate_g_buffer(task, pixel);
 
       const vec3 normal = data.normal;
 
@@ -168,7 +160,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
       write_beauty_buffer(color, pixel, true);
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
-      const GBufferData data = load_g_buffer_data(pixel);
+      const GBufferData data = particle_generate_g_buffer(task, pixel);
 
       write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
     }
