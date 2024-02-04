@@ -105,13 +105,19 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
   const float start_xz = fminf(t0, t1);
   const float end_xz   = fmaxf(t0, t1);
 
+  if (end_xz < start_xz || limit < start_xz)
+    return make_float2(-FLT_MAX, 0.0f);
+
   // Vertical intersection
   float start_y;
   float end_y;
   if (volume.type == VOLUME_TYPE_OCEAN) {
     const bool above_surface = ocean_get_relative_height(origin, OCEAN_ITERATIONS_INTERSECTION) > 0.0f;
 
-    const float surface_intersect = ocean_intersection_distance(origin, ray, limit);
+    // Without loss of generality, we can simply assume that the end of the volume is at our closest intersection
+    // as long as we are below the surface.
+    const float surface_intersect =
+      (above_surface || device.iteration_type == TYPE_LIGHT) ? ocean_intersection_distance(origin, ray, limit) : limit;
 
     if (above_surface) {
       start_y = surface_intersect;
