@@ -160,13 +160,17 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
         else {
           t_id = device.ptrs.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
           if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-            Triangle t    = device.scene.triangles[t_id];
-            material_id   = t.material_id;
-            tt.vertex     = t.vertex;
-            tt.edge1      = t.edge1;
-            tt.edge2      = t.edge2;
-            tt.albedo_tex = device.scene.materials[material_id].albedo_map;
+            material_id = load_triangle_material_id(t_id);
+
+            const float4 data0 = __ldg((float4*) triangle_get_entry_address(0, 0, t_id));
+            const float4 data1 = __ldg((float4*) triangle_get_entry_address(1, 0, t_id));
+            const float data2  = __ldg((float*) triangle_get_entry_address(2, 0, t_id));
+
+            tt.vertex     = get_vector(data0.x, data0.y, data0.z);
+            tt.edge1      = get_vector(data0.w, data1.x, data1.y);
+            tt.edge2      = get_vector(data1.z, data1.w, data2);
             tt.id         = t_id;
+            tt.albedo_tex = device.scene.materials[material_id].albedo_map;
           }
         }
 

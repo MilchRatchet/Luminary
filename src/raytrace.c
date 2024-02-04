@@ -17,6 +17,7 @@
 #include "png.h"
 #include "sky_defines.h"
 #include "stars.h"
+#include "struct_interleaving.h"
 #include "texture.h"
 #include "utils.h"
 
@@ -577,10 +578,14 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
     (void**) &(instance->scene.triangle_data.index_buffer), instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t));
   device_malloc((void**) &(instance->restir.presampled_triangle_lights), sizeof(TriangleLight) * RESTIR_CANDIDATE_POOL_MAX);
 
+  Triangle* triangles_interleaved = (Triangle*) malloc(sizeof(Triangle) * instance->scene.triangle_data.triangle_count);
+  struct_triangles_interleave(triangles_interleaved, scene->triangles, instance->scene.triangle_data.triangle_count);
+
   gpuErrchk(cudaMemcpy(
     instance->scene.materials, scene->materials, sizeof(PackedMaterial) * instance->scene.materials_count, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene.triangles, scene->triangles, sizeof(Triangle) * instance->scene.triangle_data.triangle_count, cudaMemcpyHostToDevice));
+    instance->scene.triangles, triangles_interleaved, sizeof(Triangle) * instance->scene.triangle_data.triangle_count,
+    cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
     instance->scene.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * instance->scene.triangle_lights_count,
     cudaMemcpyHostToDevice));
@@ -590,6 +595,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   gpuErrchk(cudaMemcpy(
     instance->scene.triangle_data.index_buffer, scene->triangle_data.index_buffer,
     instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t), cudaMemcpyHostToDevice));
+
+  free(triangles_interleaved);
 
   device_update_symbol(materials, instance->scene.materials);
   device_update_symbol(aov_mode, instance->aov_mode);

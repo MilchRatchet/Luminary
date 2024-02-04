@@ -325,16 +325,29 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   return triangle;
 }
 
+__device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t id) {
+  return (void*) (((float*) device.scene.triangles) + (device.scene.triangle_data.triangle_count * chunk + id) * 4 + offset);
+}
+
 __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
-  const float4* ptr      = (float4*) (device.scene.triangles + offset);
-  const float2 bytes0x48 = __ldg(((float2*) (ptr + 4)) + 1);
-  const float4 bytes0x50 = __ldg(ptr + 5);
+  const float2 bytes0x48 = __ldg((float2*) triangle_get_entry_address(4, 2, offset));
+  const float4 bytes0x50 = __ldg((float4*) triangle_get_entry_address(5, 0, offset));
 
   const UV vertex_texture = get_UV(bytes0x48.x, bytes0x48.y);
   const UV edge1_texture  = get_UV(bytes0x50.x, bytes0x50.y);
   const UV edge2_texture  = get_UV(bytes0x50.z, bytes0x50.w);
 
   return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+}
+
+__device__ uint32_t load_triangle_material_id(const uint32_t id) {
+  const uint32_t* triangles_material_ids = ((uint32_t*) device.scene.triangles) + device.scene.triangle_data.triangle_count * 6 * 4;
+  return __ldg(triangles_material_ids + id);
+}
+
+__device__ uint32_t load_triangle_light_id(const uint32_t id) {
+  const uint32_t* triangles_light_ids = ((uint32_t*) device.scene.triangles) + device.scene.triangle_data.triangle_count * (6 * 4 + 1);
+  return __ldg(triangles_light_ids + id);
 }
 
 __device__ TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {

@@ -67,15 +67,14 @@ __device__ float geometry_get_ambient_index_of_refraction(const vec3 position) {
 }
 
 __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const int pixel) {
-  const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
+  const float4 t1 = __ldg((float4*) triangle_get_entry_address(0, 0, task.hit_id));
+  const float4 t2 = __ldg((float4*) triangle_get_entry_address(1, 0, task.hit_id));
+  const float4 t3 = __ldg((float4*) triangle_get_entry_address(2, 0, task.hit_id));
+  const float4 t4 = __ldg((float4*) triangle_get_entry_address(3, 0, task.hit_id));
+  const float4 t5 = __ldg((float4*) triangle_get_entry_address(4, 0, task.hit_id));
+  const float4 t6 = __ldg((float4*) triangle_get_entry_address(5, 0, task.hit_id));
 
-  const float4 t1 = __ldg(hit_address);
-  const float4 t2 = __ldg(hit_address + 1);
-  const float4 t3 = __ldg(hit_address + 2);
-  const float4 t4 = __ldg(hit_address + 3);
-  const float4 t5 = __ldg(hit_address + 4);
-  const float4 t6 = __ldg(hit_address + 5);
-  const float t7  = __ldg((float*) (hit_address + 6));
+  const uint32_t material_id = load_triangle_material_id(task.hit_id);
 
   const vec3 vertex = get_vector(t1.x, t1.y, t1.z);
   const vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
@@ -88,8 +87,6 @@ __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const
   const UV edge2_texture  = get_UV(t6.z, t6.w);
 
   const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
-
-  const int material_id = __float_as_int(t7);
 
   const Material mat = load_material(device.materials, material_id);
 
@@ -201,9 +198,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         emission               = scale_color(emission, mis_weight);
       }
 
-      const uint32_t light = device.ptrs.light_sample_history[pixel];
-
-      const uint32_t triangle_light_id = __ldg(&(device.scene.triangles[task.hit_id].light_id));
+      const uint32_t light             = device.ptrs.light_sample_history[pixel];
+      const uint32_t triangle_light_id = load_triangle_light_id(data.hit_id);
 
       if (proper_light_sample(light, triangle_light_id)) {
         write_beauty_buffer(emission, pixel);
@@ -363,48 +359,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_t
       write_beauty_buffer(color, pixel, true);
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
-      const float4* hit_address = (float4*) (device.scene.triangles + task.hit_id);
+      const GBufferData data = geometry_generate_g_buffer(task, pixel);
 
-      const float4 t1 = __ldg(hit_address);
-      const float4 t2 = __ldg(hit_address + 1);
-      const float4 t3 = __ldg(hit_address + 2);
-      const float4 t5 = __ldg(hit_address + 4);
-      const float4 t6 = __ldg(hit_address + 5);
-      const float2 t7 = __ldg((float2*) (hit_address + 6));
-
-      vec3 vertex = get_vector(t1.x, t1.y, t1.z);
-      vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
-      vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
-
-      const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
-
-      UV vertex_texture = get_UV(t5.z, t5.w);
-      UV edge1_texture  = get_UV(t6.x, t6.y);
-      UV edge2_texture  = get_UV(t6.z, t6.w);
-
-      const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
-
-      const int material_id = __float_as_int(t7.x);
-      const int light_id    = __float_as_int(t7.y);
-
-      RGBF color;
-
-      if (light_id != LIGHT_ID_NONE) {
-        color = get_color(100.0f, 100.0f, 100.0f);
-      }
-      else {
-        const Material mat = load_material(device.materials, material_id);
-
-        if (mat.albedo_map != TEXTURE_NONE) {
-          const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[mat.albedo_map], tex_coords);
-          color                 = get_color(albedo_f.x, albedo_f.y, albedo_f.z);
-        }
-        else {
-          color = get_color(0.9f, 0.9f, 0.9f);
-        }
-
-        color = scale_color(color, 0.1f);
-      }
+      RGBF color = add_color(scale_color(opaque_color(data.albedo), 0.5f), scale_color(data.emission, 100.0f));
 
       write_beauty_buffer(color, pixel, true);
     }

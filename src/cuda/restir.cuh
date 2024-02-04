@@ -185,7 +185,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   // Don't allow triangles to sample themselves.
   uint32_t blocked_light_id = LIGHT_ID_TRIANGLE_ID_LIMIT + 1;
   if (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) {
-    blocked_light_id = __ldg(&(device.scene.triangles[data.hit_id].light_id));
+    blocked_light_id = load_triangle_light_id(data.hit_id);
   }
 
   for (int i = 0; i < reservoir_size; i++) {

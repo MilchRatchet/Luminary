@@ -4,6 +4,9 @@
 #include <cuda_runtime_api.h>
 #include <stdint.h>
 
+// This struct is stored as a struct of arrays, members are grouped into 16 bytes where possible. Padding is not required.
+#define INTERLEAVED_STORAGE
+
 /********************************************************
  * Vectors and matrices
  ********************************************************/
@@ -68,7 +71,7 @@ struct UV {
  * Mesh
  ********************************************************/
 
-struct Triangle {
+INTERLEAVED_STORAGE struct Triangle {
   vec3 vertex;
   vec3 edge1;
   vec3 edge2;
@@ -80,8 +83,6 @@ struct Triangle {
   UV edge2_texture;
   uint32_t material_id;
   uint32_t light_id;
-  float padding2;
-  float padding3;
 } typedef Triangle;
 
 struct TraversalTriangle {
@@ -277,9 +278,6 @@ struct DeviceTexture {
   float gamma;
 } typedef DeviceTexture;
 
-////////////////////////////////////////////////////////////////////
-// Kernel passing structs
-////////////////////////////////////////////////////////////////////
 struct LightSample {
   uint32_t seed;
   uint32_t presampled_id;
@@ -306,6 +304,10 @@ struct GBufferData {
   uint32_t flags;
   float refraction_index;
 } typedef GBufferData;
+
+////////////////////////////////////////////////////////////////////
+// Kernel passing structs
+////////////////////////////////////////////////////////////////////
 
 //
 // Shading task structs. They used to be very different, however, they could all be unified as of October 2023.

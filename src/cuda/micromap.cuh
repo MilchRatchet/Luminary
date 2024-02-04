@@ -25,11 +25,8 @@ struct OMMTextureTriangle {
 } typedef OMMTextureTriangle;
 
 __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id) {
-  const Triangle* t_ptr = (Triangle*) (device.scene.triangles + id);
-
-  uint32_t object_map = __ldg(&(t_ptr->material_id));
-
-  uint16_t tex = device.scene.materials[object_map].albedo_map;
+  const uint32_t material_id = load_triangle_material_id(id);
+  const uint16_t tex         = device.scene.materials[material_id].albedo_map;
 
   OMMTextureTriangle tri;
   tri.tex_id = tex;
@@ -38,8 +35,8 @@ __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id)
     return tri;
   }
 
-  float2 data0 = __ldg((float2*) &(t_ptr->vertex_texture));
-  float4 data1 = __ldg((float4*) &(t_ptr->edge1_texture));
+  const float2 data0 = __ldg((float2*) triangle_get_entry_address(4, 2, id));
+  const float4 data1 = __ldg((float4*) triangle_get_entry_address(5, 0, id));
 
   tri.tex = device.ptrs.albedo_atlas[tex];
 
@@ -476,10 +473,8 @@ struct DMMTextureTriangle {
 } typedef DMMTextureTriangle;
 
 __device__ DMMTextureTriangle micromap_get_dmmtexturetriangle(const uint32_t id) {
-  const float* t_ptr = (float*) (device.scene.triangles + id);
-
-  uint32_t object_map = __ldg((uint32_t*) (t_ptr + 24));
-  uint16_t tex        = device.scene.materials[object_map].normal_map;
+  const uint32_t material_id = load_triangle_material_id(id);
+  const uint16_t tex         = device.scene.materials[material_id].normal_map;
 
   DMMTextureTriangle tri;
   tri.tex_id = tex;
@@ -488,8 +483,8 @@ __device__ DMMTextureTriangle micromap_get_dmmtexturetriangle(const uint32_t id)
     return tri;
   }
 
-  float2 data0 = __ldg((float2*) (t_ptr + 18));
-  float4 data1 = __ldg((float4*) (t_ptr + 20));
+  const float2 data0 = __ldg((float2*) triangle_get_entry_address(4, 2, id));
+  const float4 data1 = __ldg((float4*) triangle_get_entry_address(5, 0, id));
 
   tri.tex = device.ptrs.normal_atlas[tex];
 
@@ -505,8 +500,8 @@ __global__ void dmm_precompute_indices(uint32_t* dst) {
   const uint32_t triangle_count = device.scene.triangle_data.triangle_count;
 
   while (id < triangle_count) {
-    const uint32_t object_map = device.scene.triangles[id].material_id;
-    const uint16_t tex        = device.scene.materials[object_map].normal_map;
+    const uint32_t material_id = load_triangle_material_id(id);
+    const uint16_t tex         = __ldg(&(device.scene.materials[material_id].normal_map));
 
     dst[id] = (tex == TEXTURE_NONE) ? 0 : 1;
 
@@ -518,11 +513,9 @@ __global__ void dmm_setup_vertex_directions(half* dst) {
   int id = THREAD_ID;
 
   while (id < device.scene.triangle_data.triangle_count) {
-    const float4* ptr = (float4*) (device.scene.triangles + id);
-
-    const float4 data0 = __ldg(ptr + 2);
-    const float4 data1 = __ldg(ptr + 3);
-    const float4 data2 = __ldg(ptr + 4);
+    const float4 data0 = __ldg((float4*) triangle_get_entry_address(2, 0, id));
+    const float4 data1 = __ldg((float4*) triangle_get_entry_address(3, 0, id));
+    const float2 data2 = __ldg((float2*) triangle_get_entry_address(4, 0, id));
 
     const vec3 vertex_normal = get_vector(data0.y, data0.z, data0.w);
     const vec3 edge1_normal  = get_vector(data1.x, data1.y, data1.z);

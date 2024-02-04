@@ -124,7 +124,7 @@ void scene_init(Scene** _scene) {
   scene->sky.multiscattering_factor      = 1.0f;
   scene->sky.steps                       = 40;
   scene->sky.ozone_absorption            = 1;
-  scene->sky.aerial_perspective          = 1;
+  scene->sky.aerial_perspective          = 0;
   scene->sky.lut_initialized             = 0;
   scene->sky.hdri_initialized            = 0;
   scene->sky.hdri_active                 = 0;
