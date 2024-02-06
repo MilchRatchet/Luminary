@@ -69,35 +69,6 @@ __device__ float ocean_reflection_coefficient(
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void ocean_depth_trace_tasks() {
-  const int task_count = device.trace_count[THREAD_ID];
-
-  for (int i = 0; i < task_count; i++) {
-    const int offset  = get_task_address(i);
-    TraceTask task    = load_trace_task(device.trace_tasks + offset);
-    const float depth = __ldcs(&((device.ptrs.trace_results + offset)->depth));
-
-    if (device.iteration_type != TYPE_LIGHT) {
-      bool intersection_possible = true;
-      if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
-        const float short_distance = ocean_short_distance(task.origin, task.ray);
-        intersection_possible      = (short_distance != FLT_MAX) && (short_distance <= depth);
-      }
-
-      if (intersection_possible) {
-        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
-
-        if (ocean_depth < depth) {
-          float2 result;
-          result.x = ocean_depth;
-          result.y = __uint_as_float(HIT_TYPE_OCEAN);
-          __stcs((float2*) (device.ptrs.trace_results + offset), result);
-        }
-      }
-    }
-  }
-}
-
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
   const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
   const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];

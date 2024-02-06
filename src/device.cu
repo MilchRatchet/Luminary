@@ -120,10 +120,6 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     optixrt_execute(instance->optix_kernel);
   }
 
-  if (instance->scene.ocean.active && type != TYPE_LIGHT) {
-    ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
-
   if (instance->scene.fog.active || instance->scene.ocean.active) {
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -179,9 +175,10 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int typ
     optixrt_execute(instance->optix_kernel);
   }
 
-  if (instance->scene.ocean.active && type != TYPE_LIGHT) {
-    ocean_depth_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  if (instance->scene.fog.active || instance->scene.ocean.active) {
+    volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
+
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

@@ -101,6 +101,21 @@ __global__ void volume_process_events() {
       }
 
       if (device.scene.ocean.active) {
+        bool ocean_intersection_possible = true;
+        if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
+          const float short_distance  = ocean_short_distance(task.origin, task.ray);
+          ocean_intersection_possible = (short_distance != FLT_MAX) && (short_distance <= depth);
+        }
+
+        if (ocean_intersection_possible) {
+          const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
+
+          if (ocean_depth < depth) {
+            depth  = ocean_depth;
+            hit_id = HIT_TYPE_OCEAN;
+          }
+        }
+
         const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
         const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
