@@ -160,59 +160,62 @@ __device__ CloudRenderResult
     if (density > 0.0f) {
       hit = true;
 
-      const float ambient_r1 = 2.0f * white_noise_offset(seed++) - 1.0f;
-      const float ambient_r2 = white_noise_offset(seed++);
+      if (device.iteration_type != TYPE_LIGHT) {
+        const float ambient_r1 = 2.0f * white_noise_offset(seed++) - 1.0f;
+        const float ambient_r2 = white_noise_offset(seed++);
 
-      const vec3 ambient_ray = sample_ray_sphere(ambient_r1, ambient_r2);
-      RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2, seed);
+        const vec3 ambient_ray = sample_ray_sphere(ambient_r1, ambient_r2);
+        RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2, seed);
 
-      float ambient_extinction      = cloud_extinction(pos, ambient_ray, layer);
-      const float ambient_cos_angle = dot_product(ray, ambient_ray);
+        float ambient_extinction      = cloud_extinction(pos, ambient_ray, layer);
+        const float ambient_cos_angle = dot_product(ray, ambient_ray);
 
-      RGBF sun_color;
-      float sun_extinction;
-      float sun_cos_angle;
+        RGBF sun_color;
+        float sun_extinction;
+        float sun_cos_angle;
 
-      const vec3 sun_ray = normalize_vector(sub_vector(device.sun_pos, pos));
+        const vec3 sun_ray = normalize_vector(sub_vector(device.sun_pos, pos));
 
-      const int sun_visible = !sph_ray_hit_p0(sun_ray, pos, SKY_EARTH_RADIUS);
-      if (sun_visible) {
-        sun_color = sky_get_sun_color(pos, sun_ray);
+        const int sun_visible = !sph_ray_hit_p0(sun_ray, pos, SKY_EARTH_RADIUS);
+        if (sun_visible) {
+          sun_color = sky_get_sun_color(pos, sun_ray);
 
-        sun_cos_angle = dot_product(ray, sun_ray);
+          sun_cos_angle = dot_product(ray, sun_ray);
 
-        sun_extinction = cloud_extinction(pos, sun_ray, layer);
-      }
-      else {
-        sun_color      = get_color(0.0f, 0.0f, 0.0f);
-        sun_extinction = 1.0f;
-        sun_cos_angle  = 0.0f;
-      }
+          sun_extinction = cloud_extinction(pos, sun_ray, layer);
+        }
+        else {
+          sun_color      = get_color(0.0f, 0.0f, 0.0f);
+          sun_extinction = 1.0f;
+          sun_cos_angle  = 0.0f;
+        }
 
-      float scattering   = density * CLOUD_SCATTERING_DENSITY;
-      float extinction   = fmaxf(density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
-      float phase_factor = 1.0f;
-      for (int i = 0; i < device.scene.sky.cloud.octaves; i++) {
-        scattering *= CLOUD_OCTAVE_SCATTERING_FACTOR;
-        extinction *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
+        float scattering   = density * CLOUD_SCATTERING_DENSITY;
+        float extinction   = fmaxf(density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
+        float phase_factor = 1.0f;
+        for (int i = 0; i < device.scene.sky.cloud.octaves; i++) {
+          scattering *= CLOUD_OCTAVE_SCATTERING_FACTOR;
+          extinction *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
 
-        const float sun_phase     = jendersie_eon_phase_function(sun_cos_angle, device.scene.sky.cloud.droplet_diameter, phase_factor);
-        const float ambient_phase = jendersie_eon_phase_function(ambient_cos_angle, device.scene.sky.cloud.droplet_diameter, phase_factor);
-        phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
+          const float sun_phase = jendersie_eon_phase_function(sun_cos_angle, device.scene.sky.cloud.droplet_diameter, phase_factor);
+          const float ambient_phase =
+            jendersie_eon_phase_function(ambient_cos_angle, device.scene.sky.cloud.droplet_diameter, phase_factor);
+          phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
 
-        const RGBF sun_color_i     = scale_color(sun_color, sun_extinction * sun_phase * sun_solid_angle);
-        const RGBF ambient_color_i = scale_color(ambient_color, ambient_extinction * ambient_phase * 4.0f * PI);
+          const RGBF sun_color_i     = scale_color(sun_color, sun_extinction * sun_phase * sun_solid_angle);
+          const RGBF ambient_color_i = scale_color(ambient_color, ambient_extinction * ambient_phase * 4.0f * PI);
 
-        sun_extinction     = sqrtf(sun_extinction);
-        ambient_extinction = sqrtf(ambient_extinction);
+          sun_extinction     = sqrtf(sun_extinction);
+          ambient_extinction = sqrtf(ambient_extinction);
 
-        RGBF S = add_color(sun_color_i, ambient_color_i);
-        S      = scale_color(S, scattering * 0.5f);  // 0.5f is the MIS uniform weight
+          RGBF S = add_color(sun_color_i, ambient_color_i);
+          S      = scale_color(S, scattering * 0.5f);  // 0.5f is the MIS uniform weight
 
-        const float step_trans = expf(-extinction * step_size);
+          const float step_trans = expf(-extinction * step_size);
 
-        S               = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
-        scattered_light = add_color(scattered_light, scale_color(S, transmittance));
+          S               = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
+          scattered_light = add_color(scattered_light, scale_color(S, transmittance));
+        }
       }
 
       transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);
