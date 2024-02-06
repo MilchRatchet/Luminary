@@ -902,17 +902,28 @@ __device__ float jendersie_eon_phase_function(const float cos_angle, const float
 
 /*
  * Uses a orthonormal basis which is built as described in
- * T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_
+ * J. Frisvad, _Building an Orthonormal Basis from a 3D Unit Vector Without Normalization_, 2012
+ * with an improved threshold given in
+ * N. Max, _Improved accuracy when building an orthonormal basis_, 2017.
+ * The common branchless version has a discontinuity at z=0 which makes it unsuitable for
+ * sampling with low discrepancy random numbers.
  */
 __device__ vec3 phase_sample_basis(const float alpha, const float beta, const vec3 basis) {
-  const float sign = copysignf(1.0f, basis.z);
-  const float a    = -1.0f / (sign + basis.z);
-  const float b    = basis.x * basis.y * a;
-  const vec3 u1    = get_vector(1.0f + sign * basis.x * basis.x * a, sign * b, -sign * basis.x);
-  const vec3 u2    = get_vector(b, sign + basis.y * basis.y * a, -basis.y);
+  vec3 u1, u2;
 
-  // There is an orientation change when the sign flips, hence we need to remap accordingly
-  const vec3 s = sample_ray_sphere(alpha, sign * beta);
+  if (basis.z < -0.9999805689f) {
+    u1 = get_vector(0.0f, -1.0f, 0.0f);
+    u2 = get_vector(-1.0f, 0.0f, 0.0f);
+  }
+  else {
+    const float a = 1.0f / (1.0f + basis.z);
+    const float b = -basis.x * basis.y * a;
+
+    u1 = get_vector(1.0f - basis.x * basis.x * a, b, -basis.x);
+    u2 = get_vector(b, 1.0f - basis.y * basis.y * a, -basis.y);
+  }
+
+  const vec3 s = sample_ray_sphere(alpha, beta);
 
   vec3 result;
   result.x = s.x * u1.x + s.y * u2.x + s.z * basis.x;
