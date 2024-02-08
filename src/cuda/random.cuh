@@ -298,10 +298,9 @@ __device__ uint2 random_target_offset_2D(const uint32_t depth, const uint32_t ta
 }
 
 __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t pixel) {
-  uint32_t quasi = random_r1(device.temporal_frames);
+  uint32_t quasi = random_r1(device.temporal_frames + (target << 16) + (device.depth << 24));
 
   quasi += random_blue_noise_mask_1D(pixel);
-  quasi += random_target_offset_1D(device.depth, target);
 
   return random_uint32_t_to_float(quasi);
 }
@@ -311,31 +310,24 @@ __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t p
 // does not need to vary between frames as the list we are indexing changes every frame. Instead, we
 // want to make sure that we sample unique lights.
 __device__ float quasirandom_sequence_1D_intraframe(const uint32_t target, const uint32_t pixel, const uint32_t sequence_id) {
-  uint32_t quasi = random_r1(sequence_id);
+  uint32_t quasi = random_r1(sequence_id + (target << 16) + (device.depth << 24));
 
   quasi += random_blue_noise_mask_1D(pixel);
-  quasi += random_target_offset_1D(device.depth, target);
 
   return random_uint32_t_to_float(quasi);
 }
 
 // This is a global version that is constant within a given frame.
 __device__ float quasirandom_sequence_1D_global(const uint32_t target) {
-  uint32_t quasi = random_r1(device.temporal_frames);
-
-  quasi += random_target_offset_1D(0, target);
+  uint32_t quasi = random_r1(device.temporal_frames + (target << 16));
 
   return random_uint32_t_to_float(quasi);
 }
 
 __device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t pixel) {
-  uint2 quasi = random_r2(device.temporal_frames);
+  uint2 quasi = random_r2(device.temporal_frames + (target << 16) + (device.depth << 24));
 
-  const uint2 blue_noise_mask     = random_blue_noise_mask_2D(pixel);
-  const uint2 depth_target_offset = random_target_offset_2D(device.depth, target);
-
-  quasi.x += depth_target_offset.x;
-  quasi.y += depth_target_offset.y;
+  const uint2 blue_noise_mask = random_blue_noise_mask_2D(pixel);
 
   quasi.x += blue_noise_mask.x;
   quasi.y += blue_noise_mask.y;
@@ -345,12 +337,7 @@ __device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t 
 
 // This is a global version that is constant within a given frame.
 __device__ float2 quasirandom_sequence_2D_global(const uint32_t target) {
-  uint2 quasi = random_r2(device.temporal_frames);
-
-  const uint2 depth_target_offset = random_target_offset_2D(0, target);
-
-  quasi.x += depth_target_offset.x;
-  quasi.y += depth_target_offset.y;
+  uint2 quasi = random_r2(device.temporal_frames + (target << 16));
 
   return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
 }
