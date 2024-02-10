@@ -183,6 +183,9 @@ int main(int argc, char* argv[]) {
   }
 
   if (unittest) {
+    if (device_random_unittest())
+      error_message("UNITTEST - RANDOM failed.");
+
     if (device_brdf_unittest(0.95f))
       error_message("UNITTEST - BRDF failed.");
 

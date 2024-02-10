@@ -16,6 +16,7 @@
 #include "cuda/ocean.cuh"
 #include "cuda/particle.cuh"
 #include "cuda/random.cuh"
+#include "cuda/random_unittest.cuh"
 #include "cuda/restir.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/sky_hdri.cuh"
