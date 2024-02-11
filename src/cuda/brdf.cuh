@@ -39,19 +39,19 @@ struct BRDFInstance {
  * There are two fresnel approximations. One is the standard Schlick approximation. The other is some
  * approximation found in the paper by Fdez-Aguera.
  */
-__device__ float brdf_shadowed_F90(const RGBF specular_f0) {
+LUM_DEVICE_FUNC float brdf_shadowed_F90(const RGBF specular_f0) {
   const float t = 1.0f / 0.04f;
   return fminf(1.0f, t * luminance(specular_f0));
 }
 
-__device__ RGBF brdf_albedo_as_specular_f0(const RGBF albedo, const float metallic) {
+LUM_DEVICE_FUNC RGBF brdf_albedo_as_specular_f0(const RGBF albedo, const float metallic) {
   const RGBF specular_f0 = get_color(0.04f, 0.04f, 0.04f);
   const RGBF diff        = sub_color(albedo, specular_f0);
 
   return fma_color(diff, metallic, specular_f0);
 }
 
-__device__ RGBF brdf_albedo_as_diffuse(const RGBF albedo, const float metallic) {
+LUM_DEVICE_FUNC RGBF brdf_albedo_as_diffuse(const RGBF albedo, const float metallic) {
   return scale_color(albedo, 1.0f - metallic);
 }
 
@@ -62,7 +62,7 @@ __device__ RGBF brdf_albedo_as_diffuse(const RGBF albedo, const float metallic) 
  * @param NdotV Cosine Angle.
  * @result Fresnel approximation.
  */
-__device__ RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float NdotV) {
+LUM_DEVICE_FUNC RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float NdotV) {
   const float one_minus_NdotV = 1.0f - NdotV;
   const float pow2            = one_minus_NdotV * one_minus_NdotV;
 
@@ -83,7 +83,7 @@ __device__ RGBF brdf_fresnel_schlick(const RGBF f0, const float f90, const float
  * @param NdotV Cosine Angle.
  * @result Fresnel approximation.
  */
-__device__ RGBF brdf_fresnel_roughness(const RGBF f0, const float roughness, const float NdotV) {
+LUM_DEVICE_FUNC RGBF brdf_fresnel_roughness(const RGBF f0, const float roughness, const float NdotV) {
   const float one_minus_NdotV = 1.0f - NdotV;
   const float pow2            = one_minus_NdotV * one_minus_NdotV;
 
@@ -96,17 +96,17 @@ __device__ RGBF brdf_fresnel_roughness(const RGBF f0, const float roughness, con
   return fma_color(Fr, t, f0);
 }
 
-__device__ float brdf_smith_G1_GGX(const float roughness4, const float NdotS2) {
+LUM_DEVICE_FUNC float brdf_smith_G1_GGX(const float roughness4, const float NdotS2) {
   return 2.0f / (sqrtf(((roughness4 * (1.0f - NdotS2)) + NdotS2) / NdotS2) + 1.0f);
 }
 
-__device__ float brdf_smith_G2_over_G1_height_correlated(const float roughness4, const float NdotL, const float NdotV) {
+LUM_DEVICE_FUNC float brdf_smith_G2_over_G1_height_correlated(const float roughness4, const float NdotL, const float NdotV) {
   const float G1V = brdf_smith_G1_GGX(roughness4, NdotV * NdotV);
   const float G1L = brdf_smith_G1_GGX(roughness4, NdotL * NdotL);
   return G1L / (G1V + G1L - G1V * G1L);
 }
 
-__device__ float brdf_smith_G2_height_correlated_GGX(const float roughness4, const float NdotL, const float NdotV) {
+LUM_DEVICE_FUNC float brdf_smith_G2_height_correlated_GGX(const float roughness4, const float NdotL, const float NdotV) {
   const float a = NdotV * sqrtf(roughness4 + NdotL * (NdotL - roughness4 * NdotL));
   const float b = NdotL * sqrtf(roughness4 + NdotV * (NdotV - roughness4 * NdotV));
   return 0.5f / (a + b);
@@ -117,7 +117,7 @@ __device__ float brdf_smith_G2_height_correlated_GGX(const float roughness4, con
  *
  * [DupB23] J. Dupuy and A. Benyoub, "Sampling Visible GGX Normals with Spherical Caps", 2023. arXiv:2306.05044
  */
-__device__ vec3 brdf_sample_microfacet_GGX_hemisphere(const vec3 v, const float r1, const float r2) {
+LUM_DEVICE_FUNC vec3 brdf_sample_microfacet_GGX_hemisphere(const vec3 v, const float r1, const float r2) {
   const float phi       = 2.0f * PI * r1;
   const float z         = (1.0f - r2) * (1.0f + v.z) - v.z;
   const float sin_theta = sqrtf(__saturatef(1.0f - z * z));
@@ -136,7 +136,7 @@ __device__ vec3 brdf_sample_microfacet_GGX_hemisphere(const vec3 v, const float 
  * @param r2 Uniform random number in [0,1).
  * @result Vector randomly sampled according to GGX distribution.
  */
-__device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, const float r1, const float r2) {
+LUM_DEVICE_FUNC vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, const float r1, const float r2) {
   vec3 v_hemi = normalize_vector(get_vector(alpha * v.x, alpha * v.y, v.z));
 
   vec3 sampled = brdf_sample_microfacet_GGX_hemisphere(v_hemi, r1, r2);
@@ -144,14 +144,14 @@ __device__ vec3 brdf_sample_microfacet_GGX(const vec3 v, const float alpha, cons
   return normalize_vector(get_vector(sampled.x * alpha, sampled.y * alpha, sampled.z));
 }
 
-__device__ vec3 brdf_sample_microfacet(const vec3 V_local, const float roughness2, const float alpha, const float beta) {
+LUM_DEVICE_FUNC vec3 brdf_sample_microfacet(const vec3 V_local, const float roughness2, const float alpha, const float beta) {
   return brdf_sample_microfacet_GGX(V_local, roughness2, alpha, beta);
 }
 
 /*
  * Multiscattering microfacet model by Fdez-Aguera.
  */
-__device__ RGBF brdf_microfacet_multiscattering(
+LUM_DEVICE_FUNC RGBF brdf_microfacet_multiscattering(
   const float NdotV, const RGBF fresnel, const RGBF specular_f0, const RGBF diffuse, const float brdf_term) {
   const RGBF FssEss = scale_color(fresnel, brdf_term);
 
@@ -171,7 +171,7 @@ __device__ RGBF brdf_microfacet_multiscattering(
   return add_color(Kd, SSMS);
 }
 
-__device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3 V_local, float alpha, float beta) {
+LUM_DEVICE_FUNC BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3 V_local, float alpha, float beta) {
   const float roughness2 = brdf.roughness * brdf.roughness;
   vec3 H_local           = get_vector(0.0f, 0.0f, 1.0f);
 
@@ -211,20 +211,20 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
   return brdf;
 }
 
-__device__ vec3 brdf_sample_ray_diffuse(const float alpha, const float beta) {
+LUM_DEVICE_FUNC vec3 brdf_sample_ray_diffuse(const float alpha, const float beta) {
   return sample_ray_sphere(alpha, beta);
 }
 
-__device__ float brdf_spec_probability(const float metallic) {
+LUM_DEVICE_FUNC float brdf_spec_probability(const float metallic) {
   return lerp(0.5f, 1.0f, metallic);
 }
 
-__device__ float brdf_evaluate_microfacet_GGX(const float roughness4, const float NdotH) {
+LUM_DEVICE_FUNC float brdf_evaluate_microfacet_GGX(const float roughness4, const float NdotH) {
   const float a = ((roughness4 - 1.0f) * NdotH * NdotH + 1.0f);
   return roughness4 / (PI * a * a);
 }
 
-__device__ RGBF brdf_evaluate_microfacet(BRDFInstance brdf, const float NdotH, const float NdotL, const float NdotV) {
+LUM_DEVICE_FUNC RGBF brdf_evaluate_microfacet(BRDFInstance brdf, const float NdotH, const float NdotL, const float NdotV) {
   const float roughness4 = brdf.roughness * brdf.roughness * brdf.roughness * brdf.roughness;
   const float D          = brdf_evaluate_microfacet_GGX(roughness4, NdotH);
   const float G2         = brdf_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
@@ -232,7 +232,7 @@ __device__ RGBF brdf_evaluate_microfacet(BRDFInstance brdf, const float NdotH, c
   return brdf_microfacet_multiscattering(NdotV, brdf.fresnel, brdf.specular_f0, brdf.diffuse, D * G2 * NdotL);
 }
 
-__device__ BRDFInstance brdf_get_instance(RGBAF albedo, const vec3 V, const vec3 normal, const float roughness, const float metallic) {
+LUM_DEVICE_FUNC BRDFInstance brdf_get_instance(RGBAF albedo, const vec3 V, const vec3 normal, const float roughness, const float metallic) {
   BRDFInstance brdf;
 
   // An albedo of all 1 produces incorrect results
@@ -249,7 +249,7 @@ __device__ BRDFInstance brdf_get_instance(RGBAF albedo, const vec3 V, const vec3
   return brdf;
 }
 
-__device__ BRDFInstance brdf_get_instance_scattering(const vec3 V) {
+LUM_DEVICE_FUNC BRDFInstance brdf_get_instance_scattering(const vec3 V) {
   BRDFInstance brdf;
   brdf.albedo       = get_color(0.0f, 0.0f, 0.0f);
   brdf.transparency = 1.0f;
@@ -268,7 +268,7 @@ __device__ BRDFInstance brdf_get_instance_scattering(const vec3 V) {
  * This computes the BRDF weight of a light sample.
  * Writes term of the BRDFInstance.
  */
-__device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
+LUM_DEVICE_FUNC BRDFInstance brdf_evaluate(BRDFInstance brdf) {
   float NdotL = dot_product(brdf.normal, brdf.L);
   float NdotV = dot_product(brdf.normal, brdf.V);
 
@@ -310,7 +310,7 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
  *
  * Robust triangle sampling.
  */
-__device__ vec3
+LUM_DEVICE_FUNC vec3
   restir_sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random, float& area, RGBF& lum, float& r) {
   float r1 = sqrtf(random.x);
   float r2 = random.y;
@@ -351,7 +351,7 @@ __device__ vec3
   return dir;
 }
 
-__device__ BRDFInstance brdf_apply_sample_restir(
+LUM_DEVICE_FUNC BRDFInstance brdf_apply_sample_restir(
   BRDFInstance brdf, LightSample light, vec3 pos, const uint32_t pixel, float& solid_angle, RGBF& lum, float& sample_dist) {
   const float2 random = quasirandom_sequence_2D(light.seed, pixel);
 
@@ -379,7 +379,7 @@ __device__ BRDFInstance brdf_apply_sample_restir(
   return brdf;
 }
 
-__device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos, const uint32_t pixel) {
+LUM_DEVICE_FUNC BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos, const uint32_t pixel) {
   const float2 random = quasirandom_sequence_2D(light.seed, pixel);
 
   switch (light.presampled_id) {
@@ -403,13 +403,13 @@ __device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, 
   return brdf;
 }
 
-__device__ BRDFInstance brdf_apply_sample_weight(BRDFInstance brdf) {
+LUM_DEVICE_FUNC BRDFInstance brdf_apply_sample_weight(BRDFInstance brdf) {
   brdf.term = scale_color(brdf.term, 0.5f * ONE_OVER_PI);
 
   return brdf_evaluate(brdf);
 }
 
-__device__ BRDFInstance brdf_apply_sample_weight_scattering(BRDFInstance brdf, VolumeType volume_hit_type) {
+LUM_DEVICE_FUNC BRDFInstance brdf_apply_sample_weight_scattering(BRDFInstance brdf, VolumeType volume_hit_type) {
   const float cos_angle = dot_product(scale_vector(brdf.V, -1.0f), brdf.L);
 
   float phase;
@@ -430,7 +430,7 @@ __device__ BRDFInstance brdf_apply_sample_weight_scattering(BRDFInstance brdf, V
  * Samples a ray based on the BRDFs and multiplies record with sampling weight.
  * Writes L and term of the BRDFInstance.
  */
-__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const uint32_t pixel, bool& use_specular) {
+LUM_DEVICE_FUNC BRDFInstance brdf_sample_ray(BRDFInstance brdf, const uint32_t pixel, bool& use_specular) {
   const float specular_prob = brdf_spec_probability(brdf.metallic);
   use_specular              = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel) < specular_prob;
 
@@ -461,7 +461,7 @@ __device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const uint32_t pixel,
  * This is most likely completely non physical but since refraction plays such a small role at the moment,
  * it probably doesnt matter too much.
  */
-__device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const uint32_t pixel) {
+LUM_DEVICE_FUNC BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const uint32_t pixel) {
   const float2 random    = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
   const float roughness2 = brdf.roughness * brdf.roughness;
 

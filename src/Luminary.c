@@ -10,6 +10,7 @@
 #include "output.h"
 #include "raytrace.h"
 #include "scene.h"
+#include "unittest.h"
 #include "utils.h"
 
 static int parse_command(const char* arg, char* opt1, char* opt2) {
@@ -183,10 +184,10 @@ int main(int argc, char* argv[]) {
   }
 
   if (unittest) {
-    if (device_random_unittest())
+    if (unittest_random())
       error_message("UNITTEST - RANDOM failed.");
 
-    if (device_brdf_unittest(0.95f))
+    if (unittest_brdf(0.95f))
       error_message("UNITTEST - BRDF failed.");
 
     return 0;

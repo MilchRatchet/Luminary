@@ -17,11 +17,11 @@ struct VolumeDescriptor {
   float min_height;
 } typedef VolumeDescriptor;
 
-__device__ RGBF volume_get_transmittance(const VolumeDescriptor volume) {
+LUM_DEVICE_FUNC RGBF volume_get_transmittance(const VolumeDescriptor volume) {
   return add_color(volume.absorption, volume.scattering);
 }
 
-__device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
+LUM_DEVICE_FUNC VolumeDescriptor volume_get_descriptor_preset_fog() {
   VolumeDescriptor volume;
 
   volume.type           = VOLUME_TYPE_FOG;
@@ -35,7 +35,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
   return volume;
 }
 
-__device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
+LUM_DEVICE_FUNC VolumeDescriptor volume_get_descriptor_preset_ocean() {
   VolumeDescriptor volume;
 
   volume.type       = VOLUME_TYPE_OCEAN;
@@ -50,7 +50,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   return volume;
 }
 
-__device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) {
+LUM_DEVICE_FUNC VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) {
   switch (type) {
     case VOLUME_TYPE_FOG:
       return volume_get_descriptor_preset_fog();
@@ -72,7 +72,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
  *                  - [x] = Start in world space.
  *                  - [y] = Distance through fog in world space.
  */
-__device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
+LUM_DEVICE_FUNC float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
   if (volume.max_height <= volume.min_height)
     return make_float2(-FLT_MAX, 0.0f);
 
@@ -170,7 +170,7 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
  * @param max_dist Maximum dist ray may travel after start.
  * @result Distance of intersection point and origin in world space.
  */
-__device__ float volume_sample_intersection(
+LUM_DEVICE_FUNC float volume_sample_intersection(
   const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float max_dist, const float random) {
   // [FonWKH17] Equation 15
   const float t = (-logf(random)) / volume.max_scattering;

@@ -16,7 +16,7 @@
 #include "math.cuh"
 #include "structs.h"
 
-__device__ RGBF purkinje_shift(RGBF pixel) {
+LUM_DEVICE_FUNC RGBF purkinje_shift(RGBF pixel) {
   // sRGB => LMSR
   float long_cone   = 0.096869562190332f * pixel.r + 0.318940374720484f * pixel.g - 0.188428411786113f * pixel.b;
   float medium_cone = 0.020208210904239f * pixel.r + 0.291385283197581f * pixel.g - 0.090918262127325f * pixel.b;

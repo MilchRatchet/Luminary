@@ -3,12 +3,14 @@
 
 #include <cuda_runtime_api.h>
 
+#include "bench.h"
 #include "cloud_shadow.cuh"
 #include "math.cuh"
 #include "raytrace.h"
 #include "sky_utils.cuh"
 #include "stars.h"
 #include "texture.h"
+#include "texture_utils.cuh"
 #include "utils.cuh"
 
 //
@@ -51,7 +53,7 @@ struct Spectrum {
 } typedef Spectrum;
 
 // This is the spectrum that transforms to the identity color (1,1,1)
-__device__ Spectrum spectrum_get_ident() {
+LUM_DEVICE_FUNC Spectrum spectrum_get_ident() {
   Spectrum result;
 
   result.v[0] = 8.4205e-03f;
@@ -66,7 +68,7 @@ __device__ Spectrum spectrum_get_ident() {
   return result;
 }
 
-__device__ Spectrum spectrum_set1(const float v) {
+LUM_DEVICE_FUNC Spectrum spectrum_set1(const float v) {
   Spectrum result;
 
 #pragma unroll
@@ -77,7 +79,7 @@ __device__ Spectrum spectrum_set1(const float v) {
   return result;
 }
 
-__device__ Spectrum spectrum_set(
+LUM_DEVICE_FUNC Spectrum spectrum_set(
   const float v0, const float v1, const float v2, const float v3, const float v4, const float v5, const float v6, const float v7) {
   Spectrum result;
 
@@ -93,7 +95,7 @@ __device__ Spectrum spectrum_set(
   return result;
 }
 
-__device__ Spectrum spectrum_add(const Spectrum a, const Spectrum b) {
+LUM_DEVICE_FUNC Spectrum spectrum_add(const Spectrum a, const Spectrum b) {
   Spectrum result;
 
 #pragma unroll
@@ -104,7 +106,7 @@ __device__ Spectrum spectrum_add(const Spectrum a, const Spectrum b) {
   return result;
 }
 
-__device__ Spectrum spectrum_sub(const Spectrum a, const Spectrum b) {
+LUM_DEVICE_FUNC Spectrum spectrum_sub(const Spectrum a, const Spectrum b) {
   Spectrum result;
 
 #pragma unroll
@@ -115,7 +117,7 @@ __device__ Spectrum spectrum_sub(const Spectrum a, const Spectrum b) {
   return result;
 }
 
-__device__ Spectrum spectrum_scale(const Spectrum a, const float b) {
+LUM_DEVICE_FUNC Spectrum spectrum_scale(const Spectrum a, const float b) {
   Spectrum result;
 
 #pragma unroll
@@ -126,7 +128,7 @@ __device__ Spectrum spectrum_scale(const Spectrum a, const float b) {
   return result;
 }
 
-__device__ Spectrum spectrum_mul(const Spectrum a, const Spectrum b) {
+LUM_DEVICE_FUNC Spectrum spectrum_mul(const Spectrum a, const Spectrum b) {
   Spectrum result;
 
 #pragma unroll
@@ -137,7 +139,7 @@ __device__ Spectrum spectrum_mul(const Spectrum a, const Spectrum b) {
   return result;
 }
 
-__device__ Spectrum spectrum_inv(const Spectrum a) {
+LUM_DEVICE_FUNC Spectrum spectrum_inv(const Spectrum a) {
   Spectrum result;
 
 #pragma unroll
@@ -148,7 +150,7 @@ __device__ Spectrum spectrum_inv(const Spectrum a) {
   return result;
 }
 
-__device__ Spectrum spectrum_exp(const Spectrum a) {
+LUM_DEVICE_FUNC Spectrum spectrum_exp(const Spectrum a) {
   Spectrum result;
 
 #pragma unroll
@@ -159,7 +161,7 @@ __device__ Spectrum spectrum_exp(const Spectrum a) {
   return result;
 }
 
-__device__ Spectrum spectrum_merge(const float4 low, const float4 high) {
+LUM_DEVICE_FUNC Spectrum spectrum_merge(const float4 low, const float4 high) {
   Spectrum result;
 
   result.v[0] = low.x;
@@ -174,7 +176,7 @@ __device__ Spectrum spectrum_merge(const float4 low, const float4 high) {
   return result;
 }
 
-__device__ float4 spectrum_split_low(const Spectrum a) {
+LUM_DEVICE_FUNC float4 spectrum_split_low(const Spectrum a) {
   float4 result;
 
   result.x = a.v[0];
@@ -185,7 +187,7 @@ __device__ float4 spectrum_split_low(const Spectrum a) {
   return result;
 }
 
-__device__ float4 spectrum_split_high(const Spectrum a) {
+LUM_DEVICE_FUNC float4 spectrum_split_high(const Spectrum a) {
   float4 result;
 
   result.x = a.v[4];
@@ -234,29 +236,29 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 ////////////////////////////////////////////////////////////////////
 
 // [Hil20]
-__device__ float sky_unit_to_sub_uv(const float u, const float resolution) {
+LUM_DEVICE_FUNC float sky_unit_to_sub_uv(const float u, const float resolution) {
   return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f));
 }
 
 // [Hil20]
-__device__ float sky_sub_to_unit_uv(const float u, const float resolution) {
+LUM_DEVICE_FUNC float sky_sub_to_unit_uv(const float u, const float resolution) {
   return (u - 0.5f / resolution) * (resolution / (resolution - 1.0f));
 }
 
-__device__ float sky_rayleigh_phase(const float cos_angle) {
+LUM_DEVICE_FUNC float sky_rayleigh_phase(const float cos_angle) {
   return 3.0f * (1.0f + cos_angle * cos_angle) / (16.0f * 3.1415926535f);
 }
 
-__device__ float sky_rayleigh_density(const float height) {
+LUM_DEVICE_FUNC float sky_rayleigh_density(const float height) {
   return 2.5f * device.scene.sky.base_density * expf(-height * (1.0f / device.scene.sky.rayleigh_falloff));
 }
 
-__device__ float sky_mie_phase(const float cos_angle) {
+LUM_DEVICE_FUNC float sky_mie_phase(const float cos_angle) {
   return jendersie_eon_phase_function(cos_angle, device.scene.sky.mie_diameter);
 }
 
 // [Wil21]
-__device__ float sky_mie_density(const float height) {
+LUM_DEVICE_FUNC float sky_mie_density(const float height) {
   // INSO (insoluble = dust-like particles)
   const float INSO = expf(-height * (1.0f / device.scene.sky.mie_falloff));
 
@@ -273,7 +275,7 @@ __device__ float sky_mie_density(const float height) {
   return device.scene.sky.base_density * (INSO + WASO);
 }
 
-__device__ float sky_ozone_density(const float height) {
+LUM_DEVICE_FUNC float sky_ozone_density(const float height) {
   if (!device.scene.sky.ozone_absorption)
     return 0.0f;
 
@@ -287,7 +289,7 @@ __device__ float sky_ozone_density(const float height) {
  * @param ray Direction of ray
  * @result 2 floats, first value is the start, second value is the length of the path.
  */
-__device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const float min_height, const float max_height) {
+LUM_DEVICE_FUNC float2 sky_compute_path(const vec3 origin, const vec3 ray, const float min_height, const float max_height) {
   const float height = get_length(origin);
 
   if (height <= min_height)
@@ -313,7 +315,7 @@ __device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const floa
 }
 
 // [Wil21]
-__device__ RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
+LUM_DEVICE_FUNC RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
   // Radiance to XYZ
   //  {{0.0076500,0.2345212,0.3027571,0.0357158,0.0698887,0.4671353,0.9607998,0.9384000},
   //   {0.0002170,0.0085286,0.0548572,0.2024885,0.7218860,0.9971143,0.8316430,0.4412000},
@@ -346,7 +348,7 @@ __device__ RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
 ////////////////////////////////////////////////////////////////////
 
 // [Hil20]
-__device__ UV sky_transmittance_lut_uv(float height, float zenith_cos_angle) {
+LUM_DEVICE_FUNC UV sky_transmittance_lut_uv(float height, float zenith_cos_angle) {
   height += SKY_EARTH_RADIUS;
 
   const float H   = sqrtf(fmaxf(0.0f, SKY_ATMO_RADIUS * SKY_ATMO_RADIUS - SKY_EARTH_RADIUS * SKY_EARTH_RADIUS));
@@ -364,7 +366,7 @@ __device__ UV sky_transmittance_lut_uv(float height, float zenith_cos_angle) {
 }
 
 // [Bru17]
-__device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const float mu) {
+LUM_DEVICE_FUNC Spectrum sky_compute_transmittance_optical_depth(const float r, const float mu) {
   const int steps = 2500;
 
   // Distance to top of atmosphere
@@ -397,50 +399,13 @@ __device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const
   return depth;
 }
 
-// [Bru17]
-__global__ void sky_compute_transmittance_lut(float4* transmittance_tex_lower, float4* transmittance_tex_higher) {
-  unsigned int id = THREAD_ID;
-
-  const int amount = SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT;
-
-  while (id < amount) {
-    const int x = id % SKY_TM_TEX_WIDTH;
-    const int y = id / SKY_TM_TEX_WIDTH;
-
-    float fx = ((float) x + 0.5f) / SKY_TM_TEX_WIDTH;
-    float fy = ((float) y + 0.5f) / SKY_TM_TEX_HEIGHT;
-
-    fx = sky_sub_to_unit_uv(fx, SKY_TM_TEX_WIDTH);
-    fy = sky_sub_to_unit_uv(fy, SKY_TM_TEX_HEIGHT);
-
-    const float H   = sqrtf(SKY_ATMO_RADIUS * SKY_ATMO_RADIUS - SKY_EARTH_RADIUS * SKY_EARTH_RADIUS);
-    const float rho = H * fy;
-    const float r   = sqrtf(rho * rho + SKY_EARTH_RADIUS * SKY_EARTH_RADIUS);
-
-    const float d_min = SKY_ATMO_RADIUS - r;
-    const float d_max = rho + H;
-    const float d     = d_min + fx * (d_max - d_min);
-
-    float mu = (d == 0.0f) ? 1.0f : (H * H - rho * rho - d * d) / (2.0f * r * d);
-    mu       = fminf(1.0f, fmaxf(-1.0f, mu));
-
-    const Spectrum optical_depth = sky_compute_transmittance_optical_depth(r, mu);
-    const Spectrum transmittance = spectrum_exp(spectrum_scale(optical_depth, -1.0f));
-
-    transmittance_tex_lower[x + y * SKY_TM_TEX_WIDTH]  = spectrum_split_low(transmittance);
-    transmittance_tex_higher[x + y * SKY_TM_TEX_WIDTH] = spectrum_split_high(transmittance);
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
 struct msScatteringResult {
   Spectrum L;
   Spectrum multiScatterAs1;
 } typedef msScatteringResult;
 
 // [Hil20]
-__device__ msScatteringResult sky_compute_multiscattering_integration(const vec3 origin, const vec3 ray, const vec3 sun_pos) {
+LUM_DEVICE_FUNC msScatteringResult sky_compute_multiscattering_integration(const vec3 origin, const vec3 ray, const vec3 sun_pos) {
   msScatteringResult result;
 
   result.L               = spectrum_set1(0.0f);
@@ -520,142 +485,11 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
   return result;
 }
 
-// [Hil20]
-__global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lower, float4* multiscattering_tex_higher) {
-  const int x = blockIdx.x;
-  const int y = blockIdx.y;
-
-  float fx = ((float) x + 0.5f) / SKY_MS_TEX_SIZE;
-  float fy = ((float) y + 0.5f) / SKY_MS_TEX_SIZE;
-
-  fx = sky_sub_to_unit_uv(fx, SKY_MS_TEX_SIZE);
-  fy = sky_sub_to_unit_uv(fy, SKY_MS_TEX_SIZE);
-
-  __shared__ Spectrum luminance_shared[SKY_MS_ITER];
-  __shared__ Spectrum multiscattering_shared[SKY_MS_ITER];
-
-  const float cos_angle = fx * 2.0f - 1.0f;
-  const vec3 sun_dir    = get_vector(0.0f, cos_angle, sqrtf(__saturatef(1.0f - cos_angle * cos_angle)));
-  const float height    = SKY_EARTH_RADIUS + __saturatef(fy + SKY_HEIGHT_OFFSET) * (SKY_ATMO_HEIGHT - SKY_HEIGHT_OFFSET);
-
-  const vec3 pos     = get_vector(0.0f, height, 0.0f);
-  const vec3 sun_pos = scale_vector(sun_dir, SKY_SUN_DISTANCE);
-
-  const float sqrt_sample = (float) SKY_MS_BASE;
-
-  const float a     = threadIdx.x / SKY_MS_BASE;
-  const float b     = (threadIdx.x - ((threadIdx.x / SKY_MS_BASE) * SKY_MS_BASE));
-  const float randA = a / sqrt_sample;
-  const float randB = b / sqrt_sample;
-  const vec3 ray    = sample_ray_sphere(2.0f * randA - 1.0f, randB);
-
-  msScatteringResult result = sky_compute_multiscattering_integration(pos, ray, sun_pos);
-
-  luminance_shared[threadIdx.x]       = result.L;
-  multiscattering_shared[threadIdx.x] = result.multiScatterAs1;
-
-  for (int i = SKY_MS_ITER >> 1; i > 0; i = i >> 1) {
-    __syncthreads();
-    if (threadIdx.x < i) {
-      luminance_shared[threadIdx.x]       = spectrum_add(luminance_shared[threadIdx.x], luminance_shared[threadIdx.x + i]);
-      multiscattering_shared[threadIdx.x] = spectrum_add(multiscattering_shared[threadIdx.x], multiscattering_shared[threadIdx.x + i]);
-    }
-  }
-
-  if (threadIdx.x > 0)
-    return;
-
-  Spectrum luminance       = spectrum_scale(luminance_shared[0], 1.0f / (sqrt_sample * sqrt_sample));
-  Spectrum multiscattering = spectrum_scale(multiscattering_shared[0], 1.0f / (sqrt_sample * sqrt_sample));
-
-  const Spectrum multiScatteringContribution = spectrum_inv(spectrum_sub(spectrum_set1(1.0f), multiscattering));
-
-  const Spectrum L = spectrum_scale(spectrum_mul(luminance, multiScatteringContribution), device.scene.sky.multiscattering_factor);
-
-  multiscattering_tex_lower[x + y * SKY_MS_TEX_SIZE]  = spectrum_split_low(L);
-  multiscattering_tex_higher[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
-}
-
-extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
-  bench_tic((const char*) "Sky LUT Computation");
-
-  if (instance->scene.sky.lut_initialized) {
-    texture_free_atlas(instance->sky_tm_luts, 2);
-    texture_free_atlas(instance->sky_ms_luts, 2);
-  }
-
-  instance->scene.sky.base_density           = instance->atmo_settings.base_density;
-  instance->scene.sky.ground_visibility      = instance->atmo_settings.ground_visibility;
-  instance->scene.sky.mie_density            = instance->atmo_settings.mie_density;
-  instance->scene.sky.mie_falloff            = instance->atmo_settings.mie_falloff;
-  instance->scene.sky.mie_diameter           = instance->atmo_settings.mie_diameter;
-  instance->scene.sky.ozone_absorption       = instance->atmo_settings.ozone_absorption;
-  instance->scene.sky.ozone_density          = instance->atmo_settings.ozone_density;
-  instance->scene.sky.ozone_layer_thickness  = instance->atmo_settings.ozone_layer_thickness;
-  instance->scene.sky.rayleigh_density       = instance->atmo_settings.rayleigh_density;
-  instance->scene.sky.rayleigh_falloff       = instance->atmo_settings.rayleigh_falloff;
-  instance->scene.sky.multiscattering_factor = instance->atmo_settings.multiscattering_factor;
-
-  raytrace_update_device_scene(instance);
-
-  TextureRGBA luts_tm_tex[2];
-  texture_create(luts_tm_tex + 0, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
-  texture_create(luts_tm_tex + 1, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
-  luts_tm_tex[0].wrap_mode_S = TexModeClamp;
-  luts_tm_tex[0].wrap_mode_T = TexModeClamp;
-  luts_tm_tex[1].wrap_mode_S = TexModeClamp;
-  luts_tm_tex[1].wrap_mode_T = TexModeClamp;
-
-  device_malloc((void**) &luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
-  device_malloc((void**) &luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
-
-  sky_compute_transmittance_lut<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((float4*) luts_tm_tex[0].data, (float4*) luts_tm_tex[1].data);
-
-  gpuErrchk(cudaDeviceSynchronize());
-
-  texture_create_atlas(&instance->sky_tm_luts, luts_tm_tex, 2);
-
-  device_free(luts_tm_tex[0].data, luts_tm_tex[0].height * luts_tm_tex[0].pitch * 4 * sizeof(float));
-  device_free(luts_tm_tex[1].data, luts_tm_tex[1].height * luts_tm_tex[1].pitch * 4 * sizeof(float));
-
-  raytrace_update_device_pointers(instance);
-
-  TextureRGBA luts_ms_tex[2];
-  texture_create(luts_ms_tex + 0, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
-  texture_create(luts_ms_tex + 1, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
-  luts_ms_tex[0].wrap_mode_S = TexModeClamp;
-  luts_ms_tex[0].wrap_mode_T = TexModeClamp;
-  luts_ms_tex[1].wrap_mode_S = TexModeClamp;
-  luts_ms_tex[1].wrap_mode_T = TexModeClamp;
-
-  device_malloc((void**) &luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
-  device_malloc((void**) &luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));
-
-  // We use the z component to signify its special intention
-  dim3 threads_ms(SKY_MS_ITER, 1, 1);
-  dim3 blocks_ms(SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1);
-
-  sky_compute_multiscattering_lut<<<blocks_ms, threads_ms>>>((float4*) luts_ms_tex[0].data, (float4*) luts_ms_tex[1].data);
-
-  gpuErrchk(cudaDeviceSynchronize());
-
-  texture_create_atlas(&instance->sky_ms_luts, luts_ms_tex, 2);
-
-  device_free(luts_ms_tex[0].data, luts_ms_tex[0].height * luts_ms_tex[0].pitch * 4 * sizeof(float));
-  device_free(luts_ms_tex[1].data, luts_ms_tex[1].height * luts_ms_tex[1].pitch * 4 * sizeof(float));
-
-  raytrace_update_device_pointers(instance);
-
-  instance->scene.sky.lut_initialized = 1;
-
-  bench_toc();
-}
-
 ////////////////////////////////////////////////////////////////////
 // Atmosphere Integration
 ////////////////////////////////////////////////////////////////////
 
-__device__ Spectrum sky_compute_atmosphere(
+LUM_DEVICE_FUNC Spectrum sky_compute_atmosphere(
   Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials, const bool cloud_shadows,
   const int steps, uint32_t& seed) {
   Spectrum result = spectrum_set1(0.0f);
@@ -818,7 +652,7 @@ __device__ Spectrum sky_compute_atmosphere(
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ RGBF
+LUM_DEVICE_FUNC RGBF
   sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps, uint32_t& seed) {
   Spectrum unused = spectrum_set1(0.0f);
 
@@ -830,7 +664,7 @@ __device__ RGBF
 // This is a quick way of obtaining the color of the sun disk times transmittance
 // Note that it is not checked whether the sun is actually hit by ray, it is simply assumed
 // Inscattering is not included
-__device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
+LUM_DEVICE_FUNC RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
   const float height           = sky_height(origin);
   const float zenith_cos_angle = dot_product(normalize_vector(origin), ray);
 
@@ -845,7 +679,7 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
   return sky_compute_color_from_spectrum(radiance);
 }
 
-__device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, uint32_t& seed) {
+LUM_DEVICE_FUNC RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, uint32_t& seed) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
   const float base_range = (is_first_ray()) ? 40.0f : 80.0f;
@@ -859,92 +693,6 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
   record = mul_color(record, sky_compute_color_from_spectrum(transmittance));
 
   return inscattering;
-}
-
-////////////////////////////////////////////////////////////////////
-// Kernel
-////////////////////////////////////////////////////////////////////
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
-
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
-
-  for (int i = 0; i < task_count; i++) {
-    const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel    = task.index.y * device.width + task.index.x;
-
-    const RGBF record    = load_RGBF(device.records + pixel);
-    const uint32_t light = device.ptrs.light_sample_history[pixel];
-
-    RGBF sky;
-
-    if (device.scene.sky.hdri_active) {
-      const float mip_bias = (device.iteration_type == TYPE_CAMERA) ? 0.0f : 1.0f;
-
-      sky = mul_color(sky_hdri_sample(task.ray, mip_bias), record);
-    }
-    else {
-      const vec3 origin = world_to_sky_transform(task.origin);
-
-      const bool sample_sun = proper_light_sample(light, LIGHT_ID_SUN);
-
-      RGBF sky_color;
-      if (device.iteration_type == TYPE_LIGHT && sample_sun) {
-        sky_color = sky_get_sun_color(origin, task.ray);
-      }
-      else if (device.iteration_type != TYPE_LIGHT) {
-        sky_color = sky_get_color(origin, task.ray, FLT_MAX, true, device.scene.sky.steps, seed);
-        if (sky_ray_hits_sun(origin, task.ray)) {
-          sky_color = scale_color(sky_color, device.ptrs.mis_buffer[pixel]);
-        }
-      }
-      else {
-        continue;
-      }
-
-      sky = mul_color(sky_color, record);
-    }
-
-    write_beauty_buffer(sky, pixel);
-    write_albedo_buffer(sky, pixel);
-    write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
-  }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
-}
-
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
-
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
-
-  for (int i = 0; i < task_count; i++) {
-    const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel    = task.index.y * device.width + task.index.x;
-
-    if (device.shading_mode == SHADING_ALBEDO) {
-      RGBF sky;
-      if (device.scene.sky.hdri_active) {
-        sky = sky_hdri_sample(task.ray, device.scene.sky.hdri_mip_bias);
-      }
-      else {
-        sky = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps, seed);
-      }
-      write_beauty_buffer(sky, pixel, true);
-    }
-    else if (device.shading_mode == SHADING_DEPTH) {
-      const float value = __saturatef((1.0f / device.scene.camera.far_clip_distance) * 2.0f);
-      write_beauty_buffer(get_color(value, value, value), pixel, true);
-    }
-    else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      write_beauty_buffer(get_color(0.0f, 0.63f, 1.0f), pixel, true);
-    }
-  }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 #endif /* CU_SKY_H */

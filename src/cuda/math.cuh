@@ -8,7 +8,7 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-__device__ vec3 cross_product(const vec3 a, const vec3 b) {
+LUM_DEVICE_FUNC vec3 cross_product(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = a.y * b.z - a.z * b.y;
@@ -18,15 +18,15 @@ __device__ vec3 cross_product(const vec3 a, const vec3 b) {
   return result;
 }
 
-__device__ float fractf(const float x) {
+LUM_DEVICE_FUNC float fractf(const float x) {
   return x - floorf(x);
 }
 
-__device__ float dot_product(const vec3 a, const vec3 b) {
+LUM_DEVICE_FUNC float dot_product(const vec3 a, const vec3 b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-__device__ __host__ float lerp(const float a, const float b, const float t) {
+LUM_DEVICE_FUNC __host__ float lerp(const float a, const float b, const float t) {
   return a + t * (b - a);
 }
 
@@ -39,19 +39,19 @@ __device__ __host__ float lerp(const float a, const float b, const float t) {
  * @param dst_high High of destination range.
  * @result Remapped value.
  */
-__device__ float remap(const float value, const float src_low, const float src_high, const float dst_low, const float dst_high) {
+LUM_DEVICE_FUNC float remap(const float value, const float src_low, const float src_high, const float dst_low, const float dst_high) {
   return (value - src_low) / (src_high - src_low) * (dst_high - dst_low) + dst_low;
 }
 
-__device__ float remap01(const float value, const float src_low, const float src_high) {
+LUM_DEVICE_FUNC float remap01(const float value, const float src_low, const float src_high) {
   return __saturatef(remap(value, src_low, src_high, 0.0f, 1.0f));
 }
 
-__device__ float step(const float edge, const float x) {
+LUM_DEVICE_FUNC float step(const float edge, const float x) {
   return (x < edge) ? 0.0f : 1.0f;
 }
 
-__device__ float smoothstep(const float x, const float edge0, const float edge1) {
+LUM_DEVICE_FUNC float smoothstep(const float x, const float edge0, const float edge1) {
   float t = remap01(x, edge0, edge1);
   // Surprisingly, this is almost equivalent on [0,1]
   // https://twitter.com/lisyarus/status/1600173486802014209
@@ -59,7 +59,7 @@ __device__ float smoothstep(const float x, const float edge0, const float edge1)
   return t * t * (3.0f - 2.0f * t);
 }
 
-__device__ vec3 get_vector(const float x, const float y, const float z) {
+LUM_DEVICE_FUNC vec3 get_vector(const float x, const float y, const float z) {
   vec3 result;
 
   result.x = x;
@@ -69,7 +69,7 @@ __device__ vec3 get_vector(const float x, const float y, const float z) {
   return result;
 }
 
-__device__ __host__ vec3 add_vector(const vec3 a, const vec3 b) {
+LUM_DEVICE_FUNC __host__ vec3 add_vector(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = a.x + b.x;
@@ -79,7 +79,7 @@ __device__ __host__ vec3 add_vector(const vec3 a, const vec3 b) {
   return result;
 }
 
-__device__ vec3 sub_vector(const vec3 a, const vec3 b) {
+LUM_DEVICE_FUNC vec3 sub_vector(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = a.x - b.x;
@@ -89,7 +89,7 @@ __device__ vec3 sub_vector(const vec3 a, const vec3 b) {
   return result;
 }
 
-__device__ vec3 mul_vector(const vec3 a, const vec3 b) {
+LUM_DEVICE_FUNC vec3 mul_vector(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = a.x * b.x;
@@ -99,7 +99,7 @@ __device__ vec3 mul_vector(const vec3 a, const vec3 b) {
   return result;
 }
 
-__device__ vec3 min_vector(const vec3 a, const vec3 b) {
+LUM_DEVICE_FUNC vec3 min_vector(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = fminf(a.x, b.x);
@@ -109,7 +109,7 @@ __device__ vec3 min_vector(const vec3 a, const vec3 b) {
   return result;
 }
 
-__device__ vec3 max_vector(const vec3 a, const vec3 b) {
+LUM_DEVICE_FUNC vec3 max_vector(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = fmaxf(a.x, b.x);
@@ -119,7 +119,7 @@ __device__ vec3 max_vector(const vec3 a, const vec3 b) {
   return result;
 }
 
-__device__ vec3 inv_vector(const vec3 a) {
+LUM_DEVICE_FUNC vec3 inv_vector(const vec3 a) {
   vec3 result;
 
   result.x = 1.0f / a.x;
@@ -129,19 +129,19 @@ __device__ vec3 inv_vector(const vec3 a) {
   return result;
 }
 
-__device__ vec3 add_vector_const(const vec3 x, const float y) {
+LUM_DEVICE_FUNC vec3 add_vector_const(const vec3 x, const float y) {
   return add_vector(x, get_vector(y, y, y));
 }
 
-__device__ vec3 fract_vector(const vec3 x) {
+LUM_DEVICE_FUNC vec3 fract_vector(const vec3 x) {
   return get_vector(fractf(x.x), fractf(x.y), fractf(x.z));
 }
 
-__device__ vec3 floor_vector(const vec3 x) {
+LUM_DEVICE_FUNC vec3 floor_vector(const vec3 x) {
   return get_vector(floorf(x.x), floorf(x.y), floorf(x.z));
 }
 
-__device__ vec3 normalize_vector(vec3 vector) {
+LUM_DEVICE_FUNC vec3 normalize_vector(vec3 vector) {
   const float scale = rnorm3df(vector.x, vector.y, vector.z);
 
   vector.x *= scale;
@@ -151,7 +151,7 @@ __device__ vec3 normalize_vector(vec3 vector) {
   return vector;
 }
 
-__device__ vec3 scale_vector(vec3 vector, const float scale) {
+LUM_DEVICE_FUNC vec3 scale_vector(vec3 vector, const float scale) {
   vector.x *= scale;
   vector.y *= scale;
   vector.z *= scale;
@@ -159,18 +159,18 @@ __device__ vec3 scale_vector(vec3 vector, const float scale) {
   return vector;
 }
 
-__device__ vec3 reflect_vector(const vec3 ray, const vec3 normal) {
+LUM_DEVICE_FUNC vec3 reflect_vector(const vec3 ray, const vec3 normal) {
   const float dot   = dot_product(ray, normal);
   const vec3 result = sub_vector(ray, scale_vector(normal, 2.0f * dot));
 
   return normalize_vector(result);
 }
 
-__device__ float get_length(const vec3 vector) {
+LUM_DEVICE_FUNC float get_length(const vec3 vector) {
   return sqrtf(vector.x * vector.x + vector.y * vector.y + vector.z * vector.z);
 }
 
-__device__ float2 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
+LUM_DEVICE_FUNC float2 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge1, const vec3 edge2, const vec3 point) {
   const vec3 diff   = sub_vector(point, vertex);
   const float d00   = dot_product(edge1, edge1);
   const float d01   = dot_product(edge1, edge2);
@@ -182,7 +182,7 @@ __device__ float2 get_coordinates_in_triangle(const vec3 vertex, const vec3 edge
   return make_float2((d11 * d20 - d01 * d21) * denom, (d00 * d21 - d01 * d20) * denom);
 }
 
-__device__ vec3
+LUM_DEVICE_FUNC vec3
   lerp_normals(const vec3 vertex_normal, const vec3 edge1_normal, const vec3 edge2_normal, const float2 coords, const vec3 face_normal) {
   vec3 result;
 
@@ -195,7 +195,7 @@ __device__ vec3
   return (length < eps) ? face_normal : scale_vector(result, 1.0f / length);
 }
 
-__device__ UV get_UV(const float u, const float v) {
+LUM_DEVICE_FUNC UV get_UV(const float u, const float v) {
   UV result;
 
   result.u = u;
@@ -204,7 +204,7 @@ __device__ UV get_UV(const float u, const float v) {
   return result;
 }
 
-__device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV edge2_texture, const float2 coords) {
+LUM_DEVICE_FUNC UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV edge2_texture, const float2 coords) {
   UV result;
 
   result.u = vertex_texture.u + coords.x * edge1_texture.u + coords.y * edge2_texture.u;
@@ -217,7 +217,7 @@ __device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV 
  * Uses a orthonormal basis which is built as described in
  * T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_
  */
-__device__ vec3 sample_hemisphere_basis(const float altitude, const float azimuth, const vec3 basis) {
+LUM_DEVICE_FUNC vec3 sample_hemisphere_basis(const float altitude, const float azimuth, const vec3 basis) {
   vec3 u1, u2;
   // Orthonormal basis building
   {
@@ -241,7 +241,7 @@ __device__ vec3 sample_hemisphere_basis(const float altitude, const float azimut
   return normalize_vector(result);
 }
 
-__device__ Mat3x3 create_basis(const vec3 basis) {
+LUM_DEVICE_FUNC Mat3x3 create_basis(const vec3 basis) {
   const float sign = copysignf(1.0f, basis.z);
   const float a    = -1.0f / (sign + basis.z);
   const float b    = basis.x * basis.y * a;
@@ -270,7 +270,7 @@ __device__ Mat3x3 create_basis(const vec3 basis) {
  * @param beta Number between [0,1].
  * @result Unit vector on the sphere given by the two parameters.
  */
-__device__ vec3 sample_ray_sphere(const float alpha, const float beta) {
+LUM_DEVICE_FUNC vec3 sample_ray_sphere(const float alpha, const float beta) {
   if (fabsf(alpha) > 1.0f - eps) {
     return get_vector(0.0f, 0.0f, copysignf(1.0f, alpha));
   }
@@ -289,11 +289,11 @@ __device__ vec3 sample_ray_sphere(const float alpha, const float beta) {
   return get_vector(a * cosf(b), a * sinf(b), alpha);
 }
 
-__device__ int trailing_zeros(const unsigned int n) {
+LUM_DEVICE_FUNC int trailing_zeros(const unsigned int n) {
   return __clz(__brev(n));
 }
 
-__device__ Quaternion inverse_quaternion(const Quaternion q) {
+LUM_DEVICE_FUNC Quaternion inverse_quaternion(const Quaternion q) {
   Quaternion result;
   result.x = -q.x;
   result.y = -q.y;
@@ -302,7 +302,7 @@ __device__ Quaternion inverse_quaternion(const Quaternion q) {
   return result;
 }
 
-__device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
+LUM_DEVICE_FUNC Quaternion get_rotation_to_z_canonical(const vec3 v) {
   Quaternion res;
   if (v.z < -1.0f + eps) {
     res.x = 1.0f;
@@ -325,7 +325,7 @@ __device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
   return res;
 }
 
-__device__ __host__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
+LUM_DEVICE_FUNC __host__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   vec3 result;
 
   vec3 u;
@@ -351,7 +351,7 @@ __device__ __host__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quatern
   return result;
 }
 
-__device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
+LUM_DEVICE_FUNC vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
   vec4 res;
 
   res.x = m.f11 * p.x + m.f12 * p.y + m.f13 * p.z + m.f14 * p.w;
@@ -362,7 +362,7 @@ __device__ vec4 transform_vec4(const Mat4x4 m, const vec4 p) {
   return res;
 }
 
-__device__ vec3 transform_vec4_3(const Mat4x4 m, const vec3 p) {
+LUM_DEVICE_FUNC vec3 transform_vec4_3(const Mat4x4 m, const vec3 p) {
   vec3 res;
 
   res.x = m.f11 * p.x + m.f12 * p.y + m.f13 * p.z;
@@ -372,7 +372,7 @@ __device__ vec3 transform_vec4_3(const Mat4x4 m, const vec3 p) {
   return res;
 }
 
-__device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
+LUM_DEVICE_FUNC vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
   vec3 res;
 
   res.x = m.f11 * p.x + m.f12 * p.y + m.f13 * p.z;
@@ -392,7 +392,7 @@ __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
  * @param r Radius of the sphere.
  * @result Value t such that origin + t * ray is a point on the sphere.
  */
-__device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
+LUM_DEVICE_FUNC float sphere_ray_intersection(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
@@ -422,7 +422,7 @@ __device__ float sphere_ray_intersection(const vec3 ray, const vec3 origin, cons
  * @param r Radius of the sphere.
  * @result Value t such that origin + t * ray is a point on the sphere.
  */
-__device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r) {
+LUM_DEVICE_FUNC float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
@@ -451,7 +451,7 @@ __device__ float sph_ray_int_p0(const vec3 ray, const vec3 origin, const float r
  * @param r Radius of the sphere.
  * @result 1 if the ray hits the sphere, 0 else.
  */
-__device__ bool sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
+LUM_DEVICE_FUNC bool sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
@@ -477,7 +477,7 @@ __device__ bool sphere_ray_hit(const vec3 ray, const vec3 origin, const vec3 p, 
  * @param r Radius of the sphere.
  * @result 1 if the ray hits the sphere, 0 else.
  */
-__device__ bool sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) {
+LUM_DEVICE_FUNC bool sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
@@ -502,7 +502,7 @@ __device__ bool sph_ray_hit_p0(const vec3 ray, const vec3 origin, const float r)
  * @param r Radius of the sphere.
  * @result Value t such that origin + t * ray is a point on the sphere.
  */
-__device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
+LUM_DEVICE_FUNC float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, const vec3 p, const float r) {
   const vec3 diff = sub_vector(origin, p);
   const float dot = dot_product(diff, ray);
   const float r2  = r * r;
@@ -532,7 +532,7 @@ __device__ float sphere_ray_intersect_back(const vec3 ray, const vec3 origin, co
  * @param r Radius of the sphere.
  * @result Value t such that origin + t * ray is a point on the sphere.
  */
-__device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const float r) {
+LUM_DEVICE_FUNC float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const float r) {
   const float dot = dot_product(origin, ray);
   const float r2  = r * r;
   const vec3 k    = sub_vector(origin, scale_vector(ray, dot));
@@ -553,7 +553,7 @@ __device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const fl
   return (t0 >= 0.0f) ? t0 : FLT_MAX;
 }
 
-__device__ __host__ vec3 angles_to_direction(const float altitude, const float azimuth) {
+LUM_DEVICE_FUNC __host__ vec3 angles_to_direction(const float altitude, const float azimuth) {
   vec3 dir;
   dir.x = cosf(azimuth) * cosf(altitude);
   dir.y = sinf(altitude);
@@ -563,7 +563,7 @@ __device__ __host__ vec3 angles_to_direction(const float altitude, const float a
 }
 
 // PBRT v3 Chapter "Specular Reflection and Transmission", Refract() function
-__device__ vec3 refract_ray(const vec3 ray, const vec3 normal, const float index_ratio) {
+LUM_DEVICE_FUNC vec3 refract_ray(const vec3 ray, const vec3 normal, const float index_ratio) {
   const float dot = -dot_product(normal, ray);
 
   const float b = 1.0f - index_ratio * index_ratio * (1.0f - dot * dot);
@@ -577,7 +577,7 @@ __device__ vec3 refract_ray(const vec3 ray, const vec3 normal, const float index
   }
 }
 
-__device__ RGBF get_color(const float r, const float g, const float b) {
+LUM_DEVICE_FUNC RGBF get_color(const float r, const float g, const float b) {
   RGBF result;
 
   result.r = r;
@@ -587,7 +587,7 @@ __device__ RGBF get_color(const float r, const float g, const float b) {
   return result;
 }
 
-__device__ RGBAF get_RGBAF(const float r, const float g, const float b, const float a) {
+LUM_DEVICE_FUNC RGBAF get_RGBAF(const float r, const float g, const float b, const float a) {
   RGBAF result;
 
   result.r = r;
@@ -598,7 +598,7 @@ __device__ RGBAF get_RGBAF(const float r, const float g, const float b, const fl
   return result;
 }
 
-__device__ RGBF add_color(const RGBF a, const RGBF b) {
+LUM_DEVICE_FUNC RGBF add_color(const RGBF a, const RGBF b) {
   RGBF result;
 
   result.r = a.r + b.r;
@@ -608,7 +608,7 @@ __device__ RGBF add_color(const RGBF a, const RGBF b) {
   return result;
 }
 
-__device__ RGBF sub_color(const RGBF a, const RGBF b) {
+LUM_DEVICE_FUNC RGBF sub_color(const RGBF a, const RGBF b) {
   RGBF result;
 
   result.r = a.r - b.r;
@@ -618,7 +618,7 @@ __device__ RGBF sub_color(const RGBF a, const RGBF b) {
   return result;
 }
 
-__device__ RGBF mul_color(const RGBF a, const RGBF b) {
+LUM_DEVICE_FUNC RGBF mul_color(const RGBF a, const RGBF b) {
   RGBF result;
 
   result.r = a.r * b.r;
@@ -628,7 +628,7 @@ __device__ RGBF mul_color(const RGBF a, const RGBF b) {
   return result;
 }
 
-__device__ RGBF scale_color(const RGBF a, const float b) {
+LUM_DEVICE_FUNC RGBF scale_color(const RGBF a, const float b) {
   RGBF result;
 
   result.r = a.r * b;
@@ -638,11 +638,11 @@ __device__ RGBF scale_color(const RGBF a, const float b) {
   return result;
 }
 
-__device__ RGBF fma_color(const RGBF a, const float b, const RGBF c) {
+LUM_DEVICE_FUNC RGBF fma_color(const RGBF a, const float b, const RGBF c) {
   return add_color(c, scale_color(a, b));
 }
 
-__device__ RGBF min_color(const RGBF a, const RGBF b) {
+LUM_DEVICE_FUNC RGBF min_color(const RGBF a, const RGBF b) {
   RGBF result;
 
   result.r = fminf(a.r, b.r);
@@ -652,7 +652,7 @@ __device__ RGBF min_color(const RGBF a, const RGBF b) {
   return result;
 }
 
-__device__ RGBF max_color(const RGBF a, const RGBF b) {
+LUM_DEVICE_FUNC RGBF max_color(const RGBF a, const RGBF b) {
   RGBF result;
 
   result.r = fmaxf(a.r, b.r);
@@ -662,7 +662,7 @@ __device__ RGBF max_color(const RGBF a, const RGBF b) {
   return result;
 }
 
-__device__ RGBF inv_color(const RGBF a) {
+LUM_DEVICE_FUNC RGBF inv_color(const RGBF a) {
   RGBF result;
 
   result.r = 1.0f / a.r;
@@ -672,19 +672,19 @@ __device__ RGBF inv_color(const RGBF a) {
   return result;
 }
 
-__device__ int color_any(const RGBF a) {
+LUM_DEVICE_FUNC int color_any(const RGBF a) {
   return (a.r > 0.0f || a.g > 0.0f || a.b > 0.0f);
 }
 
-__device__ float RGBF_avg(const RGBF a) {
+LUM_DEVICE_FUNC float RGBF_avg(const RGBF a) {
   return (a.r + a.g + a.b) * (1.0f / 3.0f);
 }
 
-__device__ RGBF opaque_color(const RGBAF a) {
+LUM_DEVICE_FUNC RGBF opaque_color(const RGBAF a) {
   return get_color(a.r, a.g, a.b);
 }
 
-__device__ RGBAF RGBAF_set(const float r, const float g, const float b, const float a) {
+LUM_DEVICE_FUNC RGBAF RGBAF_set(const float r, const float g, const float b, const float a) {
   RGBAF result;
 
   result.r = r;
@@ -700,7 +700,7 @@ __device__ RGBAF RGBAF_set(const float r, const float g, const float b, const fl
 // which is based os D3DX implementations
 //
 
-__device__ float linearRGB_to_SRGB(const float value) {
+LUM_DEVICE_FUNC float linearRGB_to_SRGB(const float value) {
   if (value <= 0.0031308f) {
     return 12.92f * value;
   }
@@ -709,7 +709,7 @@ __device__ float linearRGB_to_SRGB(const float value) {
   }
 }
 
-__device__ float SRGB_to_linearRGB(const float value) {
+LUM_DEVICE_FUNC float SRGB_to_linearRGB(const float value) {
   if (value <= 0.04045f) {
     return value / 12.92f;
   }
@@ -718,11 +718,11 @@ __device__ float SRGB_to_linearRGB(const float value) {
   }
 }
 
-__device__ float luminance(const RGBF v) {
+LUM_DEVICE_FUNC float luminance(const RGBF v) {
   return 0.2126f * v.r + 0.7152f * v.g + 0.0722f * v.b;
 }
 
-__device__ RGBAF saturate_albedo(RGBAF color, float change) {
+LUM_DEVICE_FUNC RGBAF saturate_albedo(RGBAF color, float change) {
   const float max_value = fmaxf(color.r, fmaxf(color.g, color.b));
   const float min_value = fminf(color.r, fminf(color.g, color.b));
   const float diff      = 0.01f + max_value - min_value;
@@ -733,19 +733,19 @@ __device__ RGBAF saturate_albedo(RGBAF color, float change) {
   return color;
 }
 
-__device__ RGBF filter_gray(const RGBF color) {
+LUM_DEVICE_FUNC RGBF filter_gray(const RGBF color) {
   const float value = luminance(color);
 
   return get_color(value, value, value);
 }
 
-__device__ RGBF filter_sepia(const RGBF color) {
+LUM_DEVICE_FUNC RGBF filter_sepia(const RGBF color) {
   return get_color(
     color.r * 0.393f + color.g * 0.769f + color.b * 0.189f, color.r * 0.349f + color.g * 0.686f + color.b * 0.168f,
     color.r * 0.272f + color.g * 0.534f + color.b * 0.131f);
 }
 
-__device__ RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_t y) {
+LUM_DEVICE_FUNC RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_t y) {
   const float value  = 4.0f * luminance(color);
   const float dither = random_dither_mask(x, y);
 
@@ -764,7 +764,7 @@ __device__ RGBF filter_gameboy(const RGBF color, const uint32_t x, const uint32_
   }
 }
 
-__device__ RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32_t y) {
+LUM_DEVICE_FUNC RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32_t y) {
   const float value  = 4.0f * luminance(color);
   const float dither = random_dither_mask(x, y);
 
@@ -783,7 +783,7 @@ __device__ RGBF filter_2bitgray(const RGBF color, const uint32_t x, const uint32
   }
 }
 
-__device__ RGBF filter_crt(RGBF color, int x, int y) {
+LUM_DEVICE_FUNC RGBF filter_crt(RGBF color, int x, int y) {
   color = scale_color(color, 1.5f);
 
   const int row = y % 3;
@@ -806,7 +806,7 @@ __device__ RGBF filter_crt(RGBF color, int x, int y) {
   return color;
 }
 
-__device__ RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint32_t y) {
+LUM_DEVICE_FUNC RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint32_t y) {
   const float value  = 2.0f * luminance(color);
   const float dither = random_dither_mask(x, y);
 
@@ -821,7 +821,7 @@ __device__ RGBF filter_blackwhite(const RGBF color, const uint32_t x, const uint
   }
 }
 
-__device__ float henyey_greenstein_phase_function(const float cos_angle, const float g) {
+LUM_DEVICE_FUNC float henyey_greenstein_phase_function(const float cos_angle, const float g) {
   const float g2         = g * g;
   const float denom_term = 1.0f + g2 - 2.0f * g * cos_angle;
   const float pow15      = denom_term * sqrtf(denom_term);
@@ -829,7 +829,7 @@ __device__ float henyey_greenstein_phase_function(const float cos_angle, const f
   return (1.0f - g * g) / (4.0f * PI * pow15);
 }
 
-__device__ float draine_phase_function(const float cos_angle, const float g, const float alpha) {
+LUM_DEVICE_FUNC float draine_phase_function(const float cos_angle, const float g, const float alpha) {
   return henyey_greenstein_phase_function(cos_angle, g)
          * ((1.0f + alpha * cos_angle * cos_angle) / (1.0f + (alpha / 3.0f) * (1.0f + 2.0f * g * g)));
 }
@@ -841,7 +841,7 @@ struct JendersieEonParams {
   float w_d;
 } typedef JendersieEonParams;
 
-__device__ JendersieEonParams jendersie_eon_phase_parameters(const float diameter, const float ms_factor) {
+LUM_DEVICE_FUNC JendersieEonParams jendersie_eon_phase_parameters(const float diameter, const float ms_factor) {
   JendersieEonParams params;
 
   // Renaming to a shorter name.
@@ -891,7 +891,7 @@ __device__ JendersieEonParams jendersie_eon_phase_parameters(const float diamete
  *
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
-__device__ float jendersie_eon_phase_function(const float cos_angle, const float diameter, const float ms_factor = 1.0f) {
+LUM_DEVICE_FUNC float jendersie_eon_phase_function(const float cos_angle, const float diameter, const float ms_factor = 1.0f) {
   JendersieEonParams params = jendersie_eon_phase_parameters(diameter, ms_factor);
 
   const float phase_hg = henyey_greenstein_phase_function(cos_angle, params.g_hg);
@@ -908,7 +908,7 @@ __device__ float jendersie_eon_phase_function(const float cos_angle, const float
  * The common branchless version has a discontinuity at z=0 which makes it unsuitable for
  * sampling with low discrepancy random numbers.
  */
-__device__ vec3 phase_sample_basis(const float alpha, const float beta, const vec3 basis) {
+LUM_DEVICE_FUNC vec3 phase_sample_basis(const float alpha, const float beta, const vec3 basis) {
   vec3 u1, u2;
 
   if (basis.z < -0.9999805689f) {
@@ -933,7 +933,7 @@ __device__ vec3 phase_sample_basis(const float alpha, const float beta, const ve
   return normalize_vector(result);
 }
 
-__device__ float henyey_greenstein_phase_sample(const float g, const float r) {
+LUM_DEVICE_FUNC float henyey_greenstein_phase_sample(const float g, const float r) {
   const float g2 = g * g;
 
   const float t = (1.0f - g2) / (1.0f - g + 2.0f * g * r);
@@ -942,7 +942,7 @@ __device__ float henyey_greenstein_phase_sample(const float g, const float r) {
   return (1.0f + g2 - t * t) / (2.0f * g);
 }
 
-__device__ float draine_phase_sample(const float g, const float alpha, const float r) {
+LUM_DEVICE_FUNC float draine_phase_sample(const float g, const float alpha, const float r) {
   const float g2 = g * g;
   const float g4 = g2 * g2;
 
@@ -970,7 +970,7 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
  *
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
-__device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice) {
+LUM_DEVICE_FUNC vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice) {
   JendersieEonParams params = jendersie_eon_phase_parameters(diameter, 1.0f);
 
   float u;
@@ -984,7 +984,7 @@ __device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter,
   return phase_sample_basis(u, r_dir.y, ray);
 }
 
-__device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
+LUM_DEVICE_FUNC float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
   const vec3 h  = cross_product(ray, triangle.edge2);
   const float a = dot_product(triangle.edge1, h);
 
@@ -1003,7 +1003,7 @@ __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, con
   return __fslctf(t, FLT_MAX, t);
 }
 
-__device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, const vec3 origin, const vec3 ray, float2& coords) {
+LUM_DEVICE_FUNC float bvh_triangle_intersection_uv(const TraversalTriangle triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);
   const float a = dot_product(triangle.edge1, h);
 
@@ -1025,7 +1025,7 @@ __device__ float bvh_triangle_intersection_uv(const TraversalTriangle triangle, 
   return __fslctf(t, FLT_MAX, t);
 }
 
-__device__ float clampf(const float x, const float a, const float b) {
+LUM_DEVICE_FUNC float clampf(const float x, const float a, const float b) {
   return fminf(b, fmaxf(a, x));
 }
 
@@ -1037,7 +1037,7 @@ __device__ float clampf(const float x, const float a, const float b) {
  * @param normal Normalized normal of surface from which you sample.
  * @result Solid angle of triangle.
  */
-__device__ float sample_triangle_solid_angle(const TriangleLight triangle, const vec3 origin) {
+LUM_DEVICE_FUNC float sample_triangle_solid_angle(const TriangleLight triangle, const vec3 origin) {
   vec3 a       = sub_vector(triangle.vertex, origin);
   const vec3 b = normalize_vector(add_vector(triangle.edge1, a));
   const vec3 c = normalize_vector(add_vector(triangle.edge2, a));
@@ -1053,7 +1053,7 @@ __device__ float sample_triangle_solid_angle(const TriangleLight triangle, const
  * A more numerically stable version of normalize(b-a).
  * Whether this is actually is any better, I don't know, I just pretend.
  */
-__device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
+LUM_DEVICE_FUNC vec3 vector_direction_stable(vec3 a, vec3 b) {
   const float len_a = get_length(a);
   const float len_b = get_length(b);
 
@@ -1080,7 +1080,7 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
  *
  * Robust triangle sampling.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random) {
+LUM_DEVICE_FUNC vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random) {
   float r1 = sqrtf(random.x);
   float r2 = random.y;
 
@@ -1103,7 +1103,7 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
  * @param origin Point to sample from.
  * @result Normalized direction to the point on the sphere.
  */
-__device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, const float2 random, float& area) {
+LUM_DEVICE_FUNC vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, const float2 random, float& area) {
   float r1 = random.x;
   float r2 = random.y;
 
@@ -1139,7 +1139,7 @@ __device__ vec3 sample_sphere(const vec3 p, const float r, const vec3 origin, co
  * @param normal Normalized normal of surface from which you sample.
  * @result Solid angle of sphere.
  */
-__device__ float sample_sphere_solid_angle(const vec3 p, const float r, const vec3 origin) {
+LUM_DEVICE_FUNC float sample_sphere_solid_angle(const vec3 p, const float r, const vec3 origin) {
   vec3 dir      = sub_vector(p, origin);
   const float d = get_length(dir);
 
@@ -1151,13 +1151,13 @@ __device__ float sample_sphere_solid_angle(const vec3 p, const float r, const ve
   return 2.0f * PI * a * a;
 }
 
-__device__ int material_is_mirror(const float roughness, const float metallic) {
+LUM_DEVICE_FUNC int material_is_mirror(const float roughness, const float metallic) {
   return (roughness < 0.9f && metallic > 0.9f);
 }
 
 // Computes tangent space for use with normal mapping without precomputation
 // http://www.thetenthplanet.de/archives/1180
-__device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
+LUM_DEVICE_FUNC Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
   e1 = normalize_vector(e1);
   e2 = normalize_vector(e2);
 
@@ -1208,7 +1208,7 @@ __device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
  * Then we can take a uniformly distributed random variable Y in [0,1] for which then holds
  *    F^{-1}(Y) is distributed as F.
  */
-__device__ float tent_filter_importance_sample(const float x) {
+LUM_DEVICE_FUNC float tent_filter_importance_sample(const float x) {
   if (x > 0.5f) {
     return 1.0f - sqrtf(2.0f) * sqrtf(1.0f - x);
   }
@@ -1221,7 +1221,7 @@ __device__ float tent_filter_importance_sample(const float x) {
 // RGBAhalf functions
 /////////////////
 
-__device__ RGBAhalf RGBF_to_RGBAhalf(const RGBF a) {
+LUM_DEVICE_FUNC RGBAhalf RGBF_to_RGBAhalf(const RGBF a) {
   RGBAhalf result;
 
   result.rg   = __floats2half2_rn(a.r, a.g);
@@ -1231,7 +1231,7 @@ __device__ RGBAhalf RGBF_to_RGBAhalf(const RGBF a) {
   return result;
 }
 
-__device__ RGBF RGBAhalf_to_RGBF(const RGBAhalf a) {
+LUM_DEVICE_FUNC RGBF RGBAhalf_to_RGBF(const RGBAhalf a) {
   RGBF result;
 
   const float2 rg = __half22float2(a.rg);
@@ -1243,7 +1243,7 @@ __device__ RGBF RGBAhalf_to_RGBF(const RGBAhalf a) {
   return result;
 }
 
-__device__ RGBAhalf RGBAF_to_RGBAhalf(const RGBAF a) {
+LUM_DEVICE_FUNC RGBAhalf RGBAF_to_RGBAhalf(const RGBAF a) {
   RGBAhalf result;
 
   result.rg = __floats2half2_rn(a.r, a.g);
@@ -1252,7 +1252,7 @@ __device__ RGBAhalf RGBAF_to_RGBAhalf(const RGBAF a) {
   return result;
 }
 
-__device__ RGBAF RGBAhalf_to_RGBAF(const RGBAhalf a) {
+LUM_DEVICE_FUNC RGBAF RGBAhalf_to_RGBAF(const RGBAhalf a) {
   RGBAF result;
 
   const float2 rg = __half22float2(a.rg);
@@ -1266,7 +1266,7 @@ __device__ RGBAF RGBAhalf_to_RGBAF(const RGBAhalf a) {
   return result;
 }
 
-__device__ RGBAhalf scale_RGBAhalf(const RGBAhalf a, const __half b) {
+LUM_DEVICE_FUNC RGBAhalf scale_RGBAhalf(const RGBAhalf a, const __half b) {
   RGBAhalf result;
 
   __half2 s = make_half2(b, b);
@@ -1277,7 +1277,7 @@ __device__ RGBAhalf scale_RGBAhalf(const RGBAhalf a, const __half b) {
   return result;
 }
 
-__device__ RGBAhalf add_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+LUM_DEVICE_FUNC RGBAhalf add_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   RGBAhalf result;
 
   result.rg = __hadd2(a.rg, b.rg);
@@ -1286,7 +1286,7 @@ __device__ RGBAhalf add_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   return result;
 }
 
-__device__ RGBAhalf sub_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+LUM_DEVICE_FUNC RGBAhalf sub_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   RGBAhalf result;
 
   result.rg = __hsub2(a.rg, b.rg);
@@ -1295,7 +1295,7 @@ __device__ RGBAhalf sub_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   return result;
 }
 
-__device__ RGBAhalf mul_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+LUM_DEVICE_FUNC RGBAhalf mul_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   RGBAhalf result;
 
   result.rg = __hmul2(a.rg, b.rg);
@@ -1304,7 +1304,7 @@ __device__ RGBAhalf mul_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   return result;
 }
 
-__device__ RGBAhalf max_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+LUM_DEVICE_FUNC RGBAhalf max_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   RGBAhalf result;
 
   result.rg = __hmax2(a.rg, b.rg);
@@ -1313,7 +1313,7 @@ __device__ RGBAhalf max_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   return result;
 }
 
-__device__ RGBAhalf min_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
+LUM_DEVICE_FUNC RGBAhalf min_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   RGBAhalf result;
 
   result.rg = __hmin2(a.rg, b.rg);
@@ -1322,13 +1322,13 @@ __device__ RGBAhalf min_RGBAhalf(const RGBAhalf a, const RGBAhalf b) {
   return result;
 }
 
-__device__ float hmax_RGBAhalf(const RGBAhalf a) {
+LUM_DEVICE_FUNC float hmax_RGBAhalf(const RGBAhalf a) {
   const __half2 max = __hmax2(a.rg, a.ba);
 
   return fmaxf(__high2float(max), __low2float(max));
 }
 
-__device__ RGBAhalf fma_RGBAhalf(const RGBAhalf a, const __half b, const RGBAhalf c) {
+LUM_DEVICE_FUNC RGBAhalf fma_RGBAhalf(const RGBAhalf a, const __half b, const RGBAhalf c) {
   RGBAhalf result;
 
   __half2 s = make_half2(b, b);
@@ -1339,7 +1339,7 @@ __device__ RGBAhalf fma_RGBAhalf(const RGBAhalf a, const __half b, const RGBAhal
   return result;
 }
 
-__device__ RGBAhalf sqrt_RGBAhalf(const RGBAhalf a) {
+LUM_DEVICE_FUNC RGBAhalf sqrt_RGBAhalf(const RGBAhalf a) {
   RGBAhalf result;
 
   result.rg = h2sqrt(a.rg);
@@ -1348,7 +1348,7 @@ __device__ RGBAhalf sqrt_RGBAhalf(const RGBAhalf a) {
   return result;
 }
 
-__device__ bool any_RGBAhalf(const RGBAhalf a) {
+LUM_DEVICE_FUNC bool any_RGBAhalf(const RGBAhalf a) {
   __half2 zero = make_half2(0.0f, 0.0f);
 
   return !(__hbeq2(a.rg, zero) && __hbeq2(a.ba, zero));
@@ -1358,7 +1358,7 @@ __device__ bool any_RGBAhalf(const RGBAhalf a) {
  * This bounds the RGBAhalf to values of magnitude less than 6500.0f
  * This is slow!
  */
-__device__ RGBAhalf bound_RGBAhalf(const RGBAhalf a) {
+LUM_DEVICE_FUNC RGBAhalf bound_RGBAhalf(const RGBAhalf a) {
   RGBAhalf result;
 
   int inf_r = __hisinf(a.rg.x) | __hisnan(a.rg.x);
@@ -1374,7 +1374,7 @@ __device__ RGBAhalf bound_RGBAhalf(const RGBAhalf a) {
   return result;
 }
 
-__device__ int infnan_RGBAhalf(const RGBAhalf a) {
+LUM_DEVICE_FUNC int infnan_RGBAhalf(const RGBAhalf a) {
   int inf_r = __hisinf(a.rg.x) || __hisnan(a.rg.x);
   int inf_g = __hisinf(a.rg.y) || __hisnan(a.rg.y);
   int inf_b = __hisinf(a.ba.x) || __hisnan(a.ba.x);
@@ -1383,7 +1383,7 @@ __device__ int infnan_RGBAhalf(const RGBAhalf a) {
   return inf_r || inf_g || inf_b || inf_a;
 }
 
-__device__ RGBAhalf get_RGBAhalf(const float r, const float g, const float b, const float a) {
+LUM_DEVICE_FUNC RGBAhalf get_RGBAhalf(const float r, const float g, const float b, const float a) {
   RGBAhalf result;
 
   result.rg = make_half2((__half) r, (__half) g);
@@ -1392,7 +1392,7 @@ __device__ RGBAhalf get_RGBAhalf(const float r, const float g, const float b, co
   return result;
 }
 
-__device__ RGBF rgb_to_hsv(const RGBF rgb) {
+LUM_DEVICE_FUNC RGBF rgb_to_hsv(const RGBF rgb) {
   const float max_value = fmaxf(rgb.r, fmaxf(rgb.g, rgb.b));
   const float min_value = fminf(rgb.r, fminf(rgb.g, rgb.b));
 
@@ -1425,7 +1425,7 @@ __device__ RGBF rgb_to_hsv(const RGBF rgb) {
 //
 // Taken from the shader toy https://www.shadertoy.com/view/lsS3Wc by Inigo Quilez
 //
-__device__ RGBF hsv_to_rgb(RGBF hsv) {
+LUM_DEVICE_FUNC RGBF hsv_to_rgb(RGBF hsv) {
   const float s = hsv.g;
   const float v = hsv.b;
 

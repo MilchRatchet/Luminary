@@ -22,7 +22,7 @@
 #define CUTOFF ((4.0f) / (BRIGHTEST_EMISSION))
 #define PROBABILISTIC_CUTOFF (16.0f * CUTOFF)
 
-__device__ int validate_trace_task(TraceTask task, const uint32_t pixel, RGBF& record) {
+LUM_DEVICE_FUNC int validate_trace_task(TraceTask task, const uint32_t pixel, RGBF& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT

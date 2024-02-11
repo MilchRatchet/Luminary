@@ -12,6 +12,8 @@
 #define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
 #define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
 
+#define LUM_DEVICE_FUNC static __device__
+
 #ifndef eps
 #define eps 0.000001f
 #endif /* eps */
@@ -51,7 +53,7 @@ enum TaskAddressOffset {
 //===========================================================================================
 
 #ifndef UTILS_NO_DEVICE_TABLE
-__constant__ DeviceConstantMemory device;
+extern __constant__ DeviceConstantMemory device;
 #endif
 
 //===========================================================================================
@@ -59,29 +61,29 @@ __constant__ DeviceConstantMemory device;
 //===========================================================================================
 
 #ifndef UTILS_NO_DEVICE_FUNCTIONS
-__device__ static uint32_t get_pixel_id(const int x, const int y) {
+LUM_DEVICE_FUNC uint32_t get_pixel_id(const int x, const int y) {
   return x + device.width * y;
 }
 
-__device__ static int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
+LUM_DEVICE_FUNC int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
   const int warp_id       = (((thread_id & 0x60) >> 5) + block_id * (THREADS_PER_BLOCK / 32));
   const int thread_offset = (thread_id & 0x1f);
   return 32 * device.pixels_per_thread * warp_id + 32 * number + thread_offset;
 }
 
-__device__ static int get_task_address(const int number) {
+LUM_DEVICE_FUNC int get_task_address(const int number) {
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
 }
 
-__device__ static int get_task_address2(const unsigned int x, const unsigned int y, const int number) {
+LUM_DEVICE_FUNC int get_task_address2(const unsigned int x, const unsigned int y, const int number) {
   return get_task_address_of_thread(x, y, number);
 }
 
-__device__ static int is_first_ray() {
+LUM_DEVICE_FUNC int is_first_ray() {
   return (device.iteration_type == TYPE_CAMERA);
 }
 
-__device__ static bool proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
+LUM_DEVICE_FUNC bool proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
   return (
     (device.iteration_type == TYPE_CAMERA) || (device.iteration_type == TYPE_BOUNCE)
     || ((device.iteration_type == TYPE_LIGHT) && (target_light == source_light)) || target_light == LIGHT_ID_ANY);

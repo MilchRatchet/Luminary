@@ -16,7 +16,7 @@ enum StateFlag { STATE_FLAG_ALBEDO = 0b00000001u, STATE_FLAG_LIGHT_OCCUPIED = 0b
 //                            again for itself if it requires another iteration due to transparency.
 //
 
-__device__ bool state_consume(const int pixel, const StateFlag flag) {
+LUM_DEVICE_FUNC bool state_consume(const int pixel, const StateFlag flag) {
   if (device.ptrs.state_buffer[pixel] & flag) {
     return false;
   }
@@ -26,11 +26,11 @@ __device__ bool state_consume(const int pixel, const StateFlag flag) {
   }
 }
 
-__device__ bool state_peek(const int pixel, const StateFlag flag) {
+LUM_DEVICE_FUNC bool state_peek(const int pixel, const StateFlag flag) {
   return (device.ptrs.state_buffer[pixel] & flag) ? true : false;
 }
 
-__device__ void state_release(const int pixel, const StateFlag flag) {
+LUM_DEVICE_FUNC void state_release(const int pixel, const StateFlag flag) {
   device.ptrs.state_buffer[pixel] &= ~flag;
 }
 

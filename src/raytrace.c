@@ -15,6 +15,7 @@
 #include "optixrt.h"
 #include "optixrt_particle.h"
 #include "png.h"
+#include "sky_bake.h"
 #include "sky_defines.h"
 #include "stars.h"
 #include "struct_interleaving.h"
@@ -341,7 +342,7 @@ static void update_special_lights(const Scene scene) {
 
 void raytrace_build_structures(RaytraceInstance* instance) {
   if (instance->scene.sky.hdri_active && !instance->scene.sky.hdri_initialized) {
-    sky_hdri_generate_LUT(instance);
+    sky_bake_hdri_generate_LUT(instance);
   }
 
   if (!instance->particles_instance.optix.initialized) {
@@ -603,7 +604,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   raytrace_load_moon_textures(instance);
   raytrace_load_bluenoise_texture(instance);
 
-  device_sky_generate_LUTs(instance);
+  sky_bake_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
   stars_generate(instance);
 

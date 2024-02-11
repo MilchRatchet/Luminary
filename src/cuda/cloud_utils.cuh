@@ -1,6 +1,8 @@
 #ifndef CLOUD_UTILS_CUH
 #define CLOUD_UTILS_CUH
 
+#include "sky_utils.cuh"
+
 ////////////////////////////////////////////////////////////////////
 // Defines
 ////////////////////////////////////////////////////////////////////
@@ -51,11 +53,11 @@ struct CloudRenderResult {
 // Utility functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ float cloud_gradient(float4 gradient, float height) {
+LUM_DEVICE_FUNC float cloud_gradient(float4 gradient, float height) {
   return smoothstep(height, gradient.x, gradient.y) - smoothstep(height, gradient.z, gradient.w);
 }
 
-__device__ float cloud_height(const vec3 pos, const CloudLayerType layer) {
+LUM_DEVICE_FUNC float cloud_height(const vec3 pos, const CloudLayerType layer) {
   switch (layer) {
     case CLOUD_LAYER_LOW:
       return (sky_height(pos) - device.scene.sky.cloud.low.height_min)
@@ -71,7 +73,7 @@ __device__ float cloud_height(const vec3 pos, const CloudLayerType layer) {
   }
 }
 
-__device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerType layer) {
+LUM_DEVICE_FUNC CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerType layer) {
   pos.x += device.scene.sky.cloud.offset_x;
   pos.z += device.scene.sky.cloud.offset_z;
 
@@ -132,7 +134,7 @@ __device__ CloudWeather cloud_weather(vec3 pos, const float height, CloudLayerTy
 // Low level cloud functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ vec3 cloud_weather_type_low_level(const CloudWeather weather) {
+LUM_DEVICE_FUNC vec3 cloud_weather_type_low_level(const CloudWeather weather) {
   const float stratus       = 1.0f - __saturatef(weather.type * 2.0f);
   const float stratocumulus = 1.0f - fabsf(2.0f * weather.type - 1.0f);
   const float cumulus       = __saturatef(2.0f * weather.type - 1.0f);
@@ -140,7 +142,7 @@ __device__ vec3 cloud_weather_type_low_level(const CloudWeather weather) {
   return get_vector(stratus, stratocumulus, cumulus);
 }
 
-__device__ float4 cloud_density_height_gradient_type_low_level(const CloudWeather weather) {
+LUM_DEVICE_FUNC float4 cloud_density_height_gradient_type_low_level(const CloudWeather weather) {
   const vec3 weather_type = cloud_weather_type_low_level(weather);
 
   const float4 stratus       = CLOUD_GRADIENT_STRATUS;
@@ -154,7 +156,7 @@ __device__ float4 cloud_density_height_gradient_type_low_level(const CloudWeathe
     weather_type.x * stratus.w + weather_type.y * stratocumulus.w + weather_type.z * cumulus.w);
 }
 
-__device__ float cloud_density_height_gradient_low_level(const float height, const CloudWeather weather) {
+LUM_DEVICE_FUNC float cloud_density_height_gradient_low_level(const float height, const CloudWeather weather) {
   const float4 gradient = cloud_density_height_gradient_type_low_level(weather);
 
   return cloud_gradient(gradient, height);
@@ -164,14 +166,14 @@ __device__ float cloud_density_height_gradient_low_level(const float height, con
 // Mid level cloud functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ vec3 cloud_weather_type_mid_level(const CloudWeather weather) {
+LUM_DEVICE_FUNC vec3 cloud_weather_type_mid_level(const CloudWeather weather) {
   const float altostratus = 1.0f - __saturatef(weather.type);
   const float altocumulus = __saturatef(weather.type);
 
   return get_vector(altostratus, altocumulus, 0.0f);
 }
 
-__device__ float4 cloud_density_height_gradient_type_mid_level(const CloudWeather weather) {
+LUM_DEVICE_FUNC float4 cloud_density_height_gradient_type_mid_level(const CloudWeather weather) {
   const vec3 weather_type = cloud_weather_type_mid_level(weather);
 
   const float4 altostratus = CLOUD_GRADIENT_ALTOSTRATUS;
@@ -182,7 +184,7 @@ __device__ float4 cloud_density_height_gradient_type_mid_level(const CloudWeathe
     weather_type.x * altostratus.z + weather_type.y * altocumulus.z, weather_type.x * altostratus.w + weather_type.y * altocumulus.w);
 }
 
-__device__ float cloud_density_height_gradient_mid_level(const float height, const CloudWeather weather) {
+LUM_DEVICE_FUNC float cloud_density_height_gradient_mid_level(const float height, const CloudWeather weather) {
   const float4 gradient = cloud_density_height_gradient_type_mid_level(weather);
 
   return cloud_gradient(gradient, height);
@@ -192,11 +194,11 @@ __device__ float cloud_density_height_gradient_mid_level(const float height, con
 // Top level cloud functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ float4 cloud_density_height_gradient_type_top_level() {
+LUM_DEVICE_FUNC float4 cloud_density_height_gradient_type_top_level() {
   return CLOUD_GRADIENT_TOPLAYER;
 }
 
-__device__ float cloud_density_height_gradient_top_level(const float height, const CloudWeather weather) {
+LUM_DEVICE_FUNC float cloud_density_height_gradient_top_level(const float height, const CloudWeather weather) {
   const float4 gradient = cloud_density_height_gradient_type_top_level();
 
   return cloud_gradient(gradient, height);
@@ -206,7 +208,7 @@ __device__ float cloud_density_height_gradient_top_level(const float height, con
 // Cloud layer intersection functions
 ////////////////////////////////////////////////////////////////////
 
-__device__ float2 cloud_get_layer_intersection(const vec3 origin, const vec3 ray, const float limit, const float hmin, const float hmax) {
+LUM_DEVICE_FUNC float2 cloud_get_layer_intersection(const vec3 origin, const vec3 ray, const float limit, const float hmin, const float hmax) {
   const float height = get_length(origin);
 
   const float dist_hmax = sph_ray_int_p0(ray, origin, hmax);
@@ -238,7 +240,7 @@ __device__ float2 cloud_get_layer_intersection(const vec3 origin, const vec3 ray
   return make_float2(start, distance);
 }
 
-__device__ float2 cloud_get_lowlayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
+LUM_DEVICE_FUNC float2 cloud_get_lowlayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
   if (!device.scene.sky.cloud.low.active) {
     return make_float2(FLT_MAX, 0.0f);
   }
@@ -249,7 +251,7 @@ __device__ float2 cloud_get_lowlayer_intersection(const vec3 origin, const vec3 
   return cloud_get_layer_intersection(origin, ray, limit, hmin, hmax);
 }
 
-__device__ float2 cloud_get_midlayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
+LUM_DEVICE_FUNC float2 cloud_get_midlayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
   if (!device.scene.sky.cloud.mid.active) {
     return make_float2(FLT_MAX, 0.0f);
   }
@@ -260,7 +262,7 @@ __device__ float2 cloud_get_midlayer_intersection(const vec3 origin, const vec3 
   return cloud_get_layer_intersection(origin, ray, limit, hmin, hmax);
 }
 
-__device__ float2 cloud_get_toplayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
+LUM_DEVICE_FUNC float2 cloud_get_toplayer_intersection(const vec3 origin, const vec3 ray, const float limit) {
   if (!device.scene.sky.cloud.top.active) {
     return make_float2(FLT_MAX, 0.0f);
   }
@@ -275,7 +277,7 @@ __device__ float2 cloud_get_toplayer_intersection(const vec3 origin, const vec3 
 // Density function
 ////////////////////////////////////////////////////////////////////
 
-__device__ float cloud_base_density_low(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
+LUM_DEVICE_FUNC float cloud_base_density_low(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
   mip_bias += device.scene.sky.cloud.mipmap_bias;
   mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
 
@@ -302,7 +304,7 @@ __device__ float cloud_base_density_low(const vec3 pos, const float height, cons
   return density;
 }
 
-__device__ float cloud_base_density_mid(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
+LUM_DEVICE_FUNC float cloud_base_density_mid(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
   mip_bias += device.scene.sky.cloud.mipmap_bias;
   mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
 
@@ -321,7 +323,7 @@ __device__ float cloud_base_density_mid(const vec3 pos, const float height, cons
   return remap01(density_gradient * (d0 * (1.0f - interp) + d1 * interp), 0.05f, 1.0f);
 }
 
-__device__ float cloud_base_density_top(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
+LUM_DEVICE_FUNC float cloud_base_density_top(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
   mip_bias += device.scene.sky.cloud.mipmap_bias;
   mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
 
@@ -349,7 +351,7 @@ __device__ float cloud_base_density_top(const vec3 pos, const float height, cons
   return remap01(density_gradient * (d1 + d2) * 0.25f, 0.05f, 1.0f);
 }
 
-__device__ float cloud_erode_density(const vec3 pos, float density, const float height, const CloudWeather weather, float mip_bias) {
+LUM_DEVICE_FUNC float cloud_erode_density(const vec3 pos, float density, const float height, const CloudWeather weather, float mip_bias) {
   if (density > 0.0f) {
     mip_bias += device.scene.sky.cloud.mipmap_bias;
     mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
@@ -369,7 +371,7 @@ __device__ float cloud_erode_density(const vec3 pos, float density, const float 
   return density;
 }
 
-__device__ float cloud_density(vec3 pos, const float height, const CloudWeather weather, const float mip_bias, const CloudLayerType layer) {
+LUM_DEVICE_FUNC float cloud_density(vec3 pos, const float height, const CloudWeather weather, const float mip_bias, const CloudLayerType layer) {
   pos.x += device.scene.sky.cloud.offset_x;
   pos.z += device.scene.sky.cloud.offset_z;
 
@@ -399,7 +401,7 @@ __device__ float cloud_density(vec3 pos, const float height, const CloudWeather 
 // Cutoff function
 ////////////////////////////////////////////////////////////////////
 
-__device__ bool cloud_significant_point(const float height, const CloudWeather weather, const CloudLayerType layer) {
+LUM_DEVICE_FUNC bool cloud_significant_point(const float height, const CloudWeather weather, const CloudLayerType layer) {
   switch (layer) {
     case CLOUD_LAYER_LOW: {
       const float4 type = cloud_density_height_gradient_type_low_level(weather);

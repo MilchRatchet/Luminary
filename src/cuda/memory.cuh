@@ -1,6 +1,7 @@
 #ifndef CU_MEMORY_H
 #define CU_MEMORY_H
 
+#include "math.cuh"
 #include "state.cuh"
 #include "utils.cuh"
 
@@ -8,11 +9,11 @@
 // Memory Prefetch Functions
 //===========================================================================================
 
-__device__ void __prefetch_global_l1(const void* const ptr) {
+LUM_DEVICE_FUNC void __prefetch_global_l1(const void* const ptr) {
   asm("prefetch.global.L1 [%0];" : : "l"(ptr));
 }
 
-__device__ void __prefetch_global_l2(const void* const ptr) {
+LUM_DEVICE_FUNC void __prefetch_global_l2(const void* const ptr) {
   asm("prefetch.global.L2 [%0];" : : "l"(ptr));
 }
 
@@ -20,15 +21,15 @@ __device__ void __prefetch_global_l2(const void* const ptr) {
 // Minimal Cache Pollution Loads/Stores
 //===========================================================================================
 
-__device__ void stream_float2(const float2* source, float2* target) {
+LUM_DEVICE_FUNC void stream_float2(const float2* source, float2* target) {
   __stcs(target, __ldcs(source));
 }
 
-__device__ void stream_float4(const float4* source, float4* target) {
+LUM_DEVICE_FUNC void stream_float4(const float4* source, float4* target) {
   __stcs(target, __ldcs(source));
 }
 
-__device__ void swap_trace_data(const int index0, const int index1) {
+LUM_DEVICE_FUNC void swap_trace_data(const int index0, const int index1) {
   const int offset0  = get_task_address(index0);
   const float2 temp  = __ldca((float2*) (device.ptrs.trace_results + offset0));
   const float4 data0 = __ldcs((float4*) (device.trace_tasks + offset0));
@@ -43,7 +44,7 @@ __device__ void swap_trace_data(const int index0, const int index1) {
   __stcs((float4*) (device.trace_tasks + offset1) + 1, data1);
 }
 
-__device__ TraceTask load_trace_task(const void* ptr) {
+LUM_DEVICE_FUNC TraceTask load_trace_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
@@ -61,7 +62,7 @@ __device__ TraceTask load_trace_task(const void* ptr) {
   return task;
 }
 
-__device__ void store_trace_task(const void* ptr, const TraceTask task) {
+LUM_DEVICE_FUNC void store_trace_task(const void* ptr, const TraceTask task) {
   float4 data0;
   data0.x = task.origin.x;
   data0.y = task.origin.y;
@@ -76,7 +77,7 @@ __device__ void store_trace_task(const void* ptr, const TraceTask task) {
   __stcs(((float4*) ptr) + 1, data1);
 }
 
-__device__ TraceTask load_trace_task_essentials(const void* ptr) {
+LUM_DEVICE_FUNC TraceTask load_trace_task_essentials(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float2 data1 = __ldcs(((float2*) ptr) + 2);
 
@@ -92,7 +93,7 @@ __device__ TraceTask load_trace_task_essentials(const void* ptr) {
   return task;
 }
 
-__device__ GeometryTask load_geometry_task(const void* ptr) {
+LUM_DEVICE_FUNC GeometryTask load_geometry_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
@@ -111,7 +112,7 @@ __device__ GeometryTask load_geometry_task(const void* ptr) {
   return task;
 }
 
-__device__ ParticleTask load_particle_task(const void* ptr) {
+LUM_DEVICE_FUNC ParticleTask load_particle_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
@@ -130,7 +131,7 @@ __device__ ParticleTask load_particle_task(const void* ptr) {
   return task;
 }
 
-__device__ OceanTask load_ocean_task(const void* ptr) {
+LUM_DEVICE_FUNC OceanTask load_ocean_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
@@ -147,7 +148,7 @@ __device__ OceanTask load_ocean_task(const void* ptr) {
   return task;
 }
 
-__device__ SkyTask load_sky_task(const void* ptr) {
+LUM_DEVICE_FUNC SkyTask load_sky_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
@@ -164,7 +165,7 @@ __device__ SkyTask load_sky_task(const void* ptr) {
   return task;
 }
 
-__device__ ToyTask load_toy_task(const void* ptr) {
+LUM_DEVICE_FUNC ToyTask load_toy_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
@@ -181,7 +182,7 @@ __device__ ToyTask load_toy_task(const void* ptr) {
   return task;
 }
 
-__device__ VolumeTask load_volume_task(const void* ptr) {
+LUM_DEVICE_FUNC VolumeTask load_volume_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
@@ -199,7 +200,7 @@ __device__ VolumeTask load_volume_task(const void* ptr) {
   return task;
 }
 
-__device__ RGBAhalf load_RGBAhalf(const void* ptr) {
+LUM_DEVICE_FUNC RGBAhalf load_RGBAhalf(const void* ptr) {
   const ushort4 data0 = __ldcs((ushort4*) ptr);
 
   RGBAhalf result;
@@ -211,17 +212,17 @@ __device__ RGBAhalf load_RGBAhalf(const void* ptr) {
   return result;
 }
 
-__device__ void store_RGBAhalf(void* ptr, const RGBAhalf a) {
+LUM_DEVICE_FUNC void store_RGBAhalf(void* ptr, const RGBAhalf a) {
   ushort4 data0 = make_ushort4(__half_as_ushort(a.rg.x), __half_as_ushort(a.rg.y), __half_as_ushort(a.ba.x), __half_as_ushort(a.ba.y));
 
   __stcs((ushort4*) ptr, data0);
 }
 
-__device__ RGBF load_RGBF(const void* ptr) {
+LUM_DEVICE_FUNC RGBF load_RGBF(const void* ptr) {
   return *((RGBF*) ptr);
 }
 
-__device__ void store_RGBF(void* ptr, const RGBF a) {
+LUM_DEVICE_FUNC void store_RGBF(void* ptr, const RGBF a) {
   *((RGBF*) ptr) = a;
 }
 
@@ -230,7 +231,7 @@ __device__ void store_RGBF(void* ptr, const RGBF a) {
  * @param albedo Albedo color to be added to the albedo buffer.
  * @param pixel Index of pixel.
  */
-__device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
+LUM_DEVICE_FUNC void write_albedo_buffer(RGBF albedo, const int pixel) {
   if ((!device.denoiser && !device.aov_mode) || device.iteration_type == TYPE_LIGHT)
     return;
 
@@ -246,7 +247,7 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
   }
 }
 
-__device__ void write_normal_buffer(vec3 normal, const int pixel) {
+LUM_DEVICE_FUNC void write_normal_buffer(vec3 normal, const int pixel) {
   if ((!device.denoiser && !device.aov_mode) || device.iteration_type != TYPE_CAMERA)
     return;
 
@@ -262,7 +263,7 @@ __device__ void write_normal_buffer(vec3 normal, const int pixel) {
   device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
 }
 
-__device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set = false) {
+LUM_DEVICE_FUNC void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set = false) {
   RGBF output = beauty;
   if (!mode_set) {
     output = add_color(beauty, load_RGBF(device.ptrs.frame_buffer + pixel));
@@ -287,7 +288,7 @@ __device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set 
   }
 }
 
-__device__ LightSample load_light_sample(const LightSample* ptr, const int offset) {
+LUM_DEVICE_FUNC LightSample load_light_sample(const LightSample* ptr, const int offset) {
   const float4 packet = __ldcs((float4*) (ptr + offset));
 
   LightSample sample;
@@ -299,7 +300,7 @@ __device__ LightSample load_light_sample(const LightSample* ptr, const int offse
   return sample;
 }
 
-__device__ void store_light_sample(LightSample* ptr, const LightSample sample, const int offset) {
+LUM_DEVICE_FUNC void store_light_sample(LightSample* ptr, const LightSample sample, const int offset) {
   float4 packet;
   packet.x = __uint_as_float(sample.seed);
   packet.y = __uint_as_float(sample.presampled_id);
@@ -309,7 +310,7 @@ __device__ void store_light_sample(LightSample* ptr, const LightSample sample, c
   __stcs((float4*) (ptr + offset), packet);
 }
 
-__device__ TraversalTriangle load_traversal_triangle(const int offset) {
+LUM_DEVICE_FUNC TraversalTriangle load_traversal_triangle(const int offset) {
   const float4* ptr = (float4*) (device.bvh_triangles + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
@@ -325,11 +326,11 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   return triangle;
 }
 
-__device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t id) {
+LUM_DEVICE_FUNC void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t id) {
   return (void*) (((float*) device.scene.triangles) + (device.scene.triangle_data.triangle_count * chunk + id) * 4 + offset);
 }
 
-__device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
+LUM_DEVICE_FUNC UV load_triangle_tex_coords(const int offset, const float2 coords) {
   const float2 bytes0x48 = __ldg((float2*) triangle_get_entry_address(4, 2, offset));
   const float4 bytes0x50 = __ldg((float4*) triangle_get_entry_address(5, 0, offset));
 
@@ -340,17 +341,17 @@ __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
   return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 }
 
-__device__ uint32_t load_triangle_material_id(const uint32_t id) {
+LUM_DEVICE_FUNC uint32_t load_triangle_material_id(const uint32_t id) {
   const uint32_t* triangles_material_ids = ((uint32_t*) device.scene.triangles) + device.scene.triangle_data.triangle_count * 6 * 4;
   return __ldg(triangles_material_ids + id);
 }
 
-__device__ uint32_t load_triangle_light_id(const uint32_t id) {
+LUM_DEVICE_FUNC uint32_t load_triangle_light_id(const uint32_t id) {
   const uint32_t* triangles_light_ids = ((uint32_t*) device.scene.triangles) + device.scene.triangle_data.triangle_count * (6 * 4 + 1);
   return __ldg(triangles_light_ids + id);
 }
 
-__device__ TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {
+LUM_DEVICE_FUNC TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
@@ -366,7 +367,7 @@ __device__ TriangleLight load_triangle_light(const TriangleLight* data, const in
   return triangle;
 }
 
-__device__ Quad load_quad(const Quad* data, const int offset) {
+LUM_DEVICE_FUNC Quad load_quad(const Quad* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v1   = __ldg(ptr);
   const float4 v2   = __ldg(ptr + 1);
@@ -381,7 +382,7 @@ __device__ Quad load_quad(const Quad* data, const int offset) {
   return quad;
 }
 
-__device__ Material load_material(const PackedMaterial* data, const int offset) {
+LUM_DEVICE_FUNC Material load_material(const PackedMaterial* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v0   = __ldg(ptr + 0);
   const float4 v1   = __ldg(ptr + 1);

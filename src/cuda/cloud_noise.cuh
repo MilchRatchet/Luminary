@@ -22,11 +22,11 @@
 /*
  * Cubic interpolation with second derivative equal to 0 on boundaries
  */
-__device__ float interp_cubic_d2(const float x) {
+LUM_DEVICE_FUNC float interp_cubic_d2(const float x) {
   return x * x * x * (x * (x * 6.0f - 15.0f) + 10.0f);
 }
 
-__device__ void perlin_hash(
+LUM_DEVICE_FUNC void perlin_hash(
   vec3 grid, float scale, bool tile, float4& low0, float4& low1, float4& low2, float4& high0, float4& high1, float4& high2) {
   const float2 offset = make_float2(50.0f, 161.0f);
   const float domain  = 69.0f;
@@ -66,7 +66,7 @@ __device__ void perlin_hash(
   high2 = make_float4(fractf(p.x * high.z), fractf(p.y * high.z), fractf(p.z * high.z), fractf(p.w * high.z));
 }
 
-__device__ float perlin(vec3 p, const float scale, const bool tile) {
+LUM_DEVICE_FUNC float perlin(vec3 p, const float scale, const bool tile) {
   p = scale_vector(p, scale);
 
   vec3 p1 = get_vector(floorf(p.x), floorf(p.y), floorf(p.z));
@@ -119,7 +119,7 @@ __device__ float perlin(vec3 p, const float scale, const bool tile) {
   return ((final * 1.5f) + 1.0f) * 0.5f;
 }
 
-__device__ float perlin_octaves(const vec3 p, const float scale, const int octaves, const bool tile) {
+LUM_DEVICE_FUNC float perlin_octaves(const vec3 p, const float scale, const int octaves, const bool tile) {
   float frequency   = 1.0f;
   float persistence = 1.0f;
 
@@ -135,7 +135,7 @@ __device__ float perlin_octaves(const vec3 p, const float scale, const int octav
   return value;
 }
 
-__device__ vec3 voronoi_hash(vec3 x, float scale) {
+LUM_DEVICE_FUNC vec3 voronoi_hash(vec3 x, float scale) {
   x.x = fmodf(x.x, scale);
   x.y = fmodf(x.y, scale);
   x.z = fmodf(x.z, scale);
@@ -149,7 +149,7 @@ __device__ vec3 voronoi_hash(vec3 x, float scale) {
   return get_vector(fractf(sinf(x.x) * h), fractf(sinf(x.y) * h), fractf(sinf(x.z) * h));
 }
 
-__device__ vec3 voronoi(vec3 x, float scale, float seed, bool inverted) {
+LUM_DEVICE_FUNC vec3 voronoi(vec3 x, float scale, float seed, bool inverted) {
   x = scale_vector(x, scale);
   x = add_vector_const(x, 0.5f);
 
@@ -186,7 +186,7 @@ __device__ vec3 voronoi(vec3 x, float scale, float seed, bool inverted) {
   }
 }
 
-__device__ float worley_octaves(const vec3 p, float scale, const int octaves, const float seed, const float persistence) {
+LUM_DEVICE_FUNC float worley_octaves(const vec3 p, float scale, const int octaves, const float seed, const float persistence) {
   float value = __saturatef(voronoi(p, scale, seed, true).x);
 
   float frequency = 2.0f;
@@ -200,7 +200,7 @@ __device__ float worley_octaves(const vec3 p, float scale, const int octaves, co
   return value;
 }
 
-__device__ float dilate_perlin_worley(const float p, const float w, float x) {
+LUM_DEVICE_FUNC float dilate_perlin_worley(const float p, const float w, float x) {
   float curve = 0.75f;
 
   if (x < 0.5f) {
@@ -213,190 +213,6 @@ __device__ float dilate_perlin_worley(const float p, const float w, float x) {
     float n = w + p * (1.0f - x);
     return n * lerp(0.5f, 1.0f, powf(x, 1.0f / curve));
   }
-}
-
-__global__ void generate_shape_noise(const int dim, uint8_t* tex) {
-  unsigned int id = THREAD_ID;
-
-  uchar4* dst = (uchar4*) tex;
-
-  const int amount    = dim * dim * dim;
-  const float scale_x = 1.0f / dim;
-  const float scale_y = 1.0f / dim;
-  const float scale_z = 1.0f / dim;
-
-  while (id < amount) {
-    const int x = id % dim;
-    const int y = (id % (dim * dim)) / dim;
-    const int z = id / (dim * dim);
-
-    const float sx = x * scale_x;
-    const float sy = y * scale_y;
-    const float sz = z * scale_z;
-
-    const float size_scale = 1.0f;
-
-    float perlin_dilate = perlin_octaves(get_vector(sx, sy, sz), 4.0f * size_scale, 7, true);
-    float worley_dilate = worley_octaves(get_vector(sx, sy, sz), 6.0f * size_scale, 3, 0.0f, 0.3f);
-
-    float worley_large  = worley_octaves(get_vector(sx, sy, sz), 6.0f * size_scale, 3, 0.0f, 0.3f);
-    float worley_medium = worley_octaves(get_vector(sx, sy, sz), 12.0f * size_scale, 3, 0.0f, 0.3f);
-    float worley_small  = worley_octaves(get_vector(sx, sy, sz), 24.0f * size_scale, 3, 0.0f, 0.3f);
-
-    perlin_dilate = remap01(perlin_dilate, 0.3f, 1.4f);
-    worley_dilate = remap01(worley_dilate, -0.3f, 1.3f);
-
-    worley_large  = remap01(worley_large, -0.4f, 1.0f);
-    worley_medium = remap01(worley_medium, -0.4f, 1.0f);
-    worley_small  = remap01(worley_small, -0.4f, 1.0f);
-
-    float perlin_worley = dilate_perlin_worley(perlin_dilate, worley_dilate, 0.3f);
-
-    dst[x + y * dim + z * dim * dim] = make_uchar4(
-      __saturatef(perlin_worley) * 255.0f, __saturatef(worley_large) * 255.0f, __saturatef(worley_medium) * 255.0f,
-      __saturatef(worley_small) * 255.0f);
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
-__global__ void generate_detail_noise(const int dim, uint8_t* tex) {
-  unsigned int id = THREAD_ID;
-
-  uchar4* dst = (uchar4*) tex;
-
-  const int amount    = dim * dim * dim;
-  const float scale_x = 1.0f / dim;
-  const float scale_y = 1.0f / dim;
-  const float scale_z = 1.0f / dim;
-
-  while (id < amount) {
-    const int x = id % dim;
-    const int y = (id % (dim * dim)) / dim;
-    const int z = id / (dim * dim);
-
-    const float sx = x * scale_x;
-    const float sy = y * scale_y;
-    const float sz = z * scale_z;
-
-    const float size_scale = 0.5f;
-
-    float worley_large  = worley_octaves(get_vector(sx, sy, sz), 10.0f * size_scale, 3, 0.0f, 0.3f);
-    float worley_medium = worley_octaves(get_vector(sx, sy, sz), 15.0f * size_scale, 3, 0.0f, 0.3f);
-    float worley_small  = worley_octaves(get_vector(sx, sy, sz), 20.0f * size_scale, 3, 0.0f, 0.3f);
-
-    worley_large  = remap01(worley_large, -1.0f, 1.0f);
-    worley_medium = remap01(worley_medium, -1.0f, 1.0f);
-    worley_small  = remap01(worley_small, -1.0f, 1.0f);
-
-    dst[x + y * dim + z * dim * dim] =
-      make_uchar4(__saturatef(worley_large) * 255.0f, __saturatef(worley_medium) * 255.0f, __saturatef(worley_small) * 255.0f, 255);
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
-__global__ void generate_weather_map(const int dim, const float seed, uint8_t* tex) {
-  unsigned int id = THREAD_ID;
-
-  uchar4* dst = (uchar4*) tex;
-
-  const int amount    = dim * dim;
-  const float scale_x = 1.0f / dim;
-  const float scale_y = 1.0f / dim;
-
-  while (id < amount) {
-    const int x = id % dim;
-    const int y = id / dim;
-
-    const float sx = x * scale_x;
-    const float sy = y * scale_y;
-
-    const float size_scale                  = 3.0f;
-    const float coverage_perlin_worley_diff = 0.4f;
-
-    const float remap_low  = 0.5f;
-    const float remap_high = 1.3f;
-
-    float perlin1 = perlin_octaves(get_vector(sx, sy, 0.0f), 2.0f * size_scale, 7, true);
-    float worley1 = worley_octaves(get_vector(sx, sy, 0.0f), 3.0f * size_scale, 2, seed, 0.25f);
-    float perlin2 = perlin_octaves(get_vector(sx, sy, 500.0f), 4.0f * size_scale, 7, true);
-    float perlin3 = perlin_octaves(get_vector(sx, sy, 100.0f), 2.0f * size_scale, 7, true);
-    float perlin4 = perlin_octaves(get_vector(sx, sy, 200.0f), 3.0f * size_scale, 7, true);
-
-    perlin1 = remap01(perlin1, remap_low, remap_high);
-    worley1 = remap01(worley1, remap_low, remap_high);
-    perlin2 = remap01(perlin2, remap_low, remap_high);
-    perlin3 = remap01(perlin3, remap_low, remap_high);
-    perlin4 = remap01(perlin4, remap_low, remap_high);
-
-    perlin1 = powf(perlin1, 1.0f);
-    worley1 = powf(worley1, 0.75f);
-    perlin2 = powf(perlin2, 2.0f);
-    perlin3 = powf(perlin3, 3.0f);
-    perlin4 = powf(perlin4, 1.0f);
-
-    perlin1 = __saturatef(perlin1 * 1.2f) * 0.4f + 0.1f;
-    worley1 = __saturatef(1.0f - worley1 * 2.0f);
-    perlin2 = __saturatef(perlin2) * 0.5f;
-    perlin3 = __saturatef(1.0f - perlin3 * 3.0f);
-    perlin4 = __saturatef(1.0f - perlin4 * 1.5f);
-    perlin4 = dilate_perlin_worley(worley1, perlin4, coverage_perlin_worley_diff);
-
-    perlin1 -= perlin4;
-    perlin2 -= perlin4 * perlin4;
-
-    perlin1 = remap01(2.0f * perlin1, 0.05, 1.0);
-
-    dst[x + y * dim] = make_uchar4(
-      __saturatef(perlin1) * 255.0f, __saturatef(perlin2) * 255.0f, __saturatef(perlin3) * 255.0f, __saturatef(perlin4) * 255.0f);
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
-#define CLOUD_SHAPE_RES 128
-#define CLOUD_DETAIL_RES 32
-#define CLOUD_WEATHER_RES 1024
-
-extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
-  bench_tic((const char*) "Cloud Noise Generation");
-
-  if (instance->scene.sky.cloud.initialized) {
-    texture_free_atlas(instance->cloud_noise, 3);
-  }
-
-  TextureRGBA noise_tex[3];
-  texture_create(noise_tex + 0, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
-  texture_create(
-    noise_tex + 1, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
-  texture_create(noise_tex + 2, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, CLOUD_WEATHER_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
-
-  noise_tex[0].mipmap = TexMipmapGenerate;
-  noise_tex[1].mipmap = TexMipmapGenerate;
-  noise_tex[2].mipmap = TexMipmapNone;
-
-  device_malloc((void**) &noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
-  generate_shape_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[0].width, (uint8_t*) noise_tex[0].data);
-
-  device_malloc((void**) &noise_tex[1].data, noise_tex[1].depth * noise_tex[1].height * noise_tex[1].pitch * 4 * sizeof(uint8_t));
-  generate_detail_noise<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(noise_tex[1].width, (uint8_t*) noise_tex[1].data);
-
-  device_malloc((void**) &noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
-  generate_weather_map<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    noise_tex[2].width, (float) instance->scene.sky.cloud.seed, (uint8_t*) noise_tex[2].data);
-
-  texture_create_atlas(&instance->cloud_noise, noise_tex, 3);
-
-  device_free(noise_tex[0].data, noise_tex[0].depth * noise_tex[0].height * noise_tex[0].pitch * 4 * sizeof(uint8_t));
-  device_free(noise_tex[1].data, noise_tex[1].depth * noise_tex[1].height * noise_tex[1].pitch * 4 * sizeof(uint8_t));
-  device_free(noise_tex[2].data, noise_tex[2].height * noise_tex[2].pitch * 4 * sizeof(uint8_t));
-
-  raytrace_update_device_pointers(instance);
-
-  instance->scene.sky.cloud.initialized = 1;
-
-  bench_toc();
 }
 
 #endif /* CU_CLOUD_NOISE_H */

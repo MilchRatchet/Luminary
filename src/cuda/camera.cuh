@@ -4,7 +4,7 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-__device__ vec3 camera_sample_aperture(const uint32_t pixel) {
+LUM_DEVICE_FUNC vec3 camera_sample_aperture(const uint32_t pixel) {
   if (device.scene.camera.aperture_size == 0.0f)
     return get_vector(0.0f, 0.0f, 0.0f);
 
@@ -43,11 +43,11 @@ __device__ vec3 camera_sample_aperture(const uint32_t pixel) {
   return get_vector(sample.x, sample.y, 0.0f);
 }
 
-__device__ float2 camera_jitter(const float2 rand) {
+LUM_DEVICE_FUNC float2 camera_jitter(const float2 rand) {
   return make_float2(0.5f + tent_filter_importance_sample(rand.x), 0.5f + tent_filter_importance_sample(rand.y));
 }
 
-__device__ TraceTask camera_get_ray(TraceTask task, const uint32_t pixel) {
+LUM_DEVICE_FUNC TraceTask camera_get_ray(TraceTask task, const uint32_t pixel) {
   const float2 jitter = (device.accum_mode != TEMPORAL_REPROJECTION)
                           ? camera_jitter(quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER))
                           : make_float2(device.emitter.jitter.x, device.emitter.jitter.y);

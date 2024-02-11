@@ -3,7 +3,7 @@
 
 #include "utils.cuh"
 
-__device__ float4 texture_load(const DeviceTexture tex, const UV uv) {
+LUM_DEVICE_FUNC float4 texture_load(const DeviceTexture tex, const UV uv) {
   float4 v = tex2D<float4>(tex.tex, uv.u, 1.0f - uv.v);
 
   v.x = powf(v.x, tex.gamma);

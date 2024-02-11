@@ -9,7 +9,7 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "memory.cuh"
 #include "utils.cuh"
 
-__device__ bool particle_opacity_cutout(const float2 coord) {
+LUM_DEVICE_FUNC bool particle_opacity_cutout(const float2 coord) {
   const float dx = fabsf(coord.x - 0.5f);
   const float dy = fabsf(coord.y - 0.5f);
 

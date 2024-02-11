@@ -4,7 +4,7 @@ IF(WIN32)
   set(CMAKE_TRY_COMPILE_TARGET_TYPE "STATIC_LIBRARY")
 ENDIF()
 
-project ("Luminary" LANGUAGES C CUDA)
+project(Luminary LANGUAGES C CUDA)
 
 set(CMAKE_C_STANDARD 23)
 
@@ -14,7 +14,7 @@ option(SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)
 
 set(CMAKE_BUILD_TYPE "Release")
 
-if (DEBUG)
+if(DEBUG)
     set(CMAKE_BUILD_TYPE "Debug")
 endif()
 
@@ -48,7 +48,7 @@ endif()
 # Set files to compile
 #=============================================================
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
-file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
+file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu" "${CMAKE_SOURCE_DIR}/src/cuda/kernels/*.cu")
 
 list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu" "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu")
 
@@ -200,6 +200,8 @@ target_include_directories(Luminary PRIVATE SDL2::Headers)
 target_include_directories(Luminary PRIVATE SDL2_ttf::SDL2_ttf)
 target_include_directories(Luminary PRIVATE "${OptiX_INCLUDE}")
 target_include_directories(Luminary PRIVATE CUDA::toolkit)
+
+set_property(TARGET Luminary PROPERTY CUDA_SEPARABLE_COMPILATION ON)
 
 #=============================================================
 # Create PTX files

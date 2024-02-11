@@ -18,6 +18,7 @@
 #include "output.h"
 #include "raytrace.h"
 #include "scene.h"
+#include "sky_bake.h"
 #include "stars.h"
 
 #define MOUSE_LEFT_BLOCKED 0b1
@@ -312,7 +313,7 @@ static UITab create_sky_general_atmo_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Water Droplet Diameter", &(instance->atmo_settings.mie_diameter), 1, 0.001f, 0.01f, 50.0f, 0, 0);
   panels[i++] =
     create_slider(ui, "Multiscattering Factor", &(instance->atmo_settings.multiscattering_factor), 0, 0.001f, 0.01f, FLT_MAX, 0, 0);
-  panels[i++] = create_button(ui, "Apply Settings", instance, (void (*)(void*)) device_sky_generate_LUTs, 1);
+  panels[i++] = create_button(ui, "Apply Settings", instance, (void (*)(void*)) sky_bake_generate_LUTs, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -341,8 +342,8 @@ static UITab create_sky_general_hdri_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Origin X", &(instance->scene.sky.hdri_origin.x), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Origin Y", &(instance->scene.sky.hdri_origin.y), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_slider(ui, "Origin Z", &(instance->scene.sky.hdri_origin.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
-  panels[i++] = create_button(ui, "Origin To Camera", instance, (void (*)(void*)) sky_hdri_set_pos_to_cam, 0);
-  panels[i++] = create_button(ui, "Generate", instance, (void (*)(void*)) sky_hdri_generate_LUT, 1);
+  panels[i++] = create_button(ui, "Origin To Camera", instance, (void (*)(void*)) sky_bake_hdri_set_pos_to_cam, 0);
+  panels[i++] = create_button(ui, "Generate", instance, (void (*)(void*)) sky_bake_hdri_generate_LUT, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

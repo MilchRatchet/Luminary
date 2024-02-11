@@ -66,7 +66,7 @@ extern "C" __global__ void __raygen__optix() {
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ int perform_alpha_test() {
+LUM_DEVICE_FUNC int perform_alpha_test() {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
   const uint32_t material_id = load_triangle_material_id(hit_id);

@@ -153,13 +153,13 @@ enum QuasiRandomTarget : uint32_t {
 // Based on the uint64 conversion from Sebastiano Vigna and David Blackman (https://prng.di.unimi.it/)
 ////////////////////////////////////////////////////////////////////
 
-__device__ float random_uint32_t_to_float(const uint32_t v) {
+LUM_DEVICE_FUNC float random_uint32_t_to_float(const uint32_t v) {
   const uint32_t i = 0x3F800000u | (v >> 9);
 
   return __uint_as_float(i) - 1.0f;
 }
 
-__device__ float random_uint16_t_to_float(const uint16_t v) {
+LUM_DEVICE_FUNC float random_uint16_t_to_float(const uint16_t v) {
   const uint32_t i = 0x3F800000u | (((uint32_t) v) << 7);
 
   return __uint_as_float(i) - 1.0f;
@@ -174,13 +174,13 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 #define R2_PHI1 3242174888u /* 0.7548776662f  */
 #define R2_PHI2 2447445413u /* 0.56984029f    */
 
-__device__ uint32_t random_r1(const uint32_t offset) {
+LUM_DEVICE_FUNC uint32_t random_r1(const uint32_t offset) {
   const uint32_t v = offset * R1_PHI;
 
   return v;
 }
 
-__device__ uint2 random_r2(const uint32_t offset) {
+LUM_DEVICE_FUNC uint2 random_r2(const uint32_t offset) {
   const uint32_t v1 = offset * R2_PHI1;
   const uint32_t v2 = offset * R2_PHI2;
 
@@ -188,7 +188,7 @@ __device__ uint2 random_r2(const uint32_t offset) {
 }
 
 // This is the base generator for random 32 bits.
-__device__ uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32_t offset) {
+LUM_DEVICE_FUNC uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32_t offset) {
   const uint32_t key     = key_offset;
   const uint32_t counter = offset;
 
@@ -213,7 +213,7 @@ __device__ uint32_t random_uint32_t_base(const uint32_t key_offset, const uint32
 }
 
 // This is the base generator for random 16 bits.
-__device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32_t offset) {
+LUM_DEVICE_FUNC uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32_t offset) {
   const uint32_t key     = key_offset;
   const uint32_t counter = offset;
 
@@ -234,31 +234,31 @@ __device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ uint32_t random_uint32_t(const uint32_t offset) {
+LUM_DEVICE_FUNC uint32_t random_uint32_t(const uint32_t offset) {
   return random_uint32_t_base(0xfcbd6e15 + THREAD_ID, offset);
 }
 
-__device__ uint16_t random_uint16_t(const uint32_t offset) {
+LUM_DEVICE_FUNC uint16_t random_uint16_t(const uint32_t offset) {
   return random_uint16_t_base(0xfcbd6e15 + THREAD_ID, offset);
 }
 
-__device__ float white_noise_precise_offset(const uint32_t offset) {
+LUM_DEVICE_FUNC float white_noise_precise_offset(const uint32_t offset) {
   return random_uint32_t_to_float(random_uint32_t(offset));
 }
 
-__device__ float white_noise_offset(const uint32_t offset) {
+LUM_DEVICE_FUNC float white_noise_offset(const uint32_t offset) {
   return random_uint16_t_to_float(random_uint16_t(offset));
 }
 
-__device__ float white_noise_precise() {
+LUM_DEVICE_FUNC float white_noise_precise() {
   return white_noise_precise_offset(device.ptrs.randoms[THREAD_ID]++);
 }
 
-__device__ float white_noise() {
+LUM_DEVICE_FUNC float white_noise() {
   return white_noise_offset(device.ptrs.randoms[THREAD_ID]++);
 }
 
-__device__ uint32_t random_blue_noise_mask_1D(const uint32_t pixel) {
+LUM_DEVICE_FUNC uint32_t random_blue_noise_mask_1D(const uint32_t pixel) {
   const uint32_t y = pixel / device.width;
   const uint32_t x = pixel - y * device.width;
 
@@ -268,7 +268,7 @@ __device__ uint32_t random_blue_noise_mask_1D(const uint32_t pixel) {
   return blue_noise << 16;
 }
 
-__device__ uint2 random_blue_noise_mask_2D(const uint32_t pixel) {
+LUM_DEVICE_FUNC uint2 random_blue_noise_mask_2D(const uint32_t pixel) {
   const uint32_t y = pixel / device.width;
   const uint32_t x = pixel - y * device.width;
 
@@ -278,14 +278,14 @@ __device__ uint2 random_blue_noise_mask_2D(const uint32_t pixel) {
   return make_uint2(blue_noise.x << 16, blue_noise.y << 16);
 }
 
-__device__ uint32_t random_target_offset_1D(const uint32_t depth, const uint32_t target) {
+LUM_DEVICE_FUNC uint32_t random_target_offset_1D(const uint32_t depth, const uint32_t target) {
   const uint32_t depth_offset  = random_uint32_t_base(0xc8e4fd15, depth);
   const uint32_t target_offset = random_uint32_t_base(0x4ce32f6d, target);
 
   return depth_offset + target_offset;
 }
 
-__device__ uint2 random_target_offset_2D(const uint32_t depth, const uint32_t target) {
+LUM_DEVICE_FUNC uint2 random_target_offset_2D(const uint32_t depth, const uint32_t target) {
   const uint32_t depth_offset1  = random_uint32_t_base(0xfcbd6e15, depth);
   const uint32_t target_offset1 = random_uint32_t_base(0x4bf53ed9, target);
 
@@ -295,7 +295,7 @@ __device__ uint2 random_target_offset_2D(const uint32_t depth, const uint32_t ta
   return make_uint2(depth_offset1 + target_offset1, depth_offset2 + target_offset2);
 }
 
-__device__ float quasirandom_sequence_1D_base(
+LUM_DEVICE_FUNC float quasirandom_sequence_1D_base(
   const uint32_t target, const uint32_t pixel, const uint32_t sequence_id, const uint32_t depth) {
 #ifndef RANDOM_DEBUG_REFERENCE_WHITE_NOISE
   uint32_t quasi = random_r1(sequence_id + (target << 16) + (device.depth << 24));
@@ -313,7 +313,7 @@ __device__ float quasirandom_sequence_1D_base(
 #endif
 }
 
-__device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t pixel) {
+LUM_DEVICE_FUNC float quasirandom_sequence_1D(const uint32_t target, const uint32_t pixel) {
 #ifndef RANDOM_DEBUG_REFERENCE_WHITE_NOISE
   uint32_t quasi = random_r1(device.temporal_frames + (target << 16) + (device.depth << 24));
 
@@ -329,7 +329,7 @@ __device__ float quasirandom_sequence_1D(const uint32_t target, const uint32_t p
 // allows for a custom sequence id. This is useful for things like ReSTIR where the light selection
 // does not need to vary between frames as the list we are indexing changes every frame. Instead, we
 // want to make sure that we sample unique lights.
-__device__ float quasirandom_sequence_1D_intraframe(const uint32_t target, const uint32_t pixel, const uint32_t sequence_id) {
+LUM_DEVICE_FUNC float quasirandom_sequence_1D_intraframe(const uint32_t target, const uint32_t pixel, const uint32_t sequence_id) {
 #ifndef RANDOM_DEBUG_REFERENCE_WHITE_NOISE
   uint32_t quasi = random_r1(sequence_id + (target << 16) + (device.depth << 24));
 
@@ -342,7 +342,7 @@ __device__ float quasirandom_sequence_1D_intraframe(const uint32_t target, const
 }
 
 // This is a global version that is constant within a given frame.
-__device__ float quasirandom_sequence_1D_global(const uint32_t target) {
+LUM_DEVICE_FUNC float quasirandom_sequence_1D_global(const uint32_t target) {
 #ifndef RANDOM_DEBUG_REFERENCE_WHITE_NOISE
   uint32_t quasi = random_r1(device.temporal_frames + (target << 16));
 
@@ -352,7 +352,7 @@ __device__ float quasirandom_sequence_1D_global(const uint32_t target) {
 #endif
 }
 
-__device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t pixel) {
+LUM_DEVICE_FUNC float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t pixel) {
 #ifndef RANDOM_DEBUG_REFERENCE_WHITE_NOISE
   uint2 quasi = random_r2(device.temporal_frames + (target << 16) + (device.depth << 24));
 
@@ -370,7 +370,7 @@ __device__ float2 quasirandom_sequence_2D(const uint32_t target, const uint32_t 
 }
 
 // This is a global version that is constant within a given frame.
-__device__ float2 quasirandom_sequence_2D_global(const uint32_t target) {
+LUM_DEVICE_FUNC float2 quasirandom_sequence_2D_global(const uint32_t target) {
 #ifndef RANDOM_DEBUG_REFERENCE_WHITE_NOISE
   uint2 quasi = random_r2(device.temporal_frames + (target << 16));
 
@@ -382,21 +382,11 @@ __device__ float2 quasirandom_sequence_2D_global(const uint32_t target) {
 #endif
 }
 
-__device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
+LUM_DEVICE_FUNC float random_dither_mask(const uint32_t x, const uint32_t y) {
   DeviceTexture tex         = *device.ptrs.bluenoise_1D_tex;
   const uint16_t blue_noise = tex2D<uint16_t>(tex.tex, x * tex.inv_width, y * tex.inv_height);
 
   return random_uint16_t_to_float(blue_noise);
 }
-
-////////////////////////////////////////////////////////////////////
-// Kernels
-////////////////////////////////////////////////////////////////////
-
-#ifndef RANDOM_NO_KERNELS
-__global__ void initialize_randoms() {
-  device.ptrs.randoms[THREAD_ID] = 1;
-}
-#endif
 
 #endif /* CU_RANDOM_H */

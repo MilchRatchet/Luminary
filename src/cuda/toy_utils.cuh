@@ -4,7 +4,7 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-__device__ float toy_get_ambient_index_of_refraction(const vec3 position) {
+LUM_DEVICE_FUNC float toy_get_ambient_index_of_refraction(const vec3 position) {
   if (device.scene.ocean.active && position.y < device.scene.ocean.height)
     return device.scene.ocean.refractive_index;
 
@@ -17,7 +17,7 @@ __device__ float toy_get_ambient_index_of_refraction(const vec3 position) {
  *      - Scale should be the radius of the shape
  */
 
-__device__ float toy_plane_distance(const vec3 origin, const vec3 ray) {
+LUM_DEVICE_FUNC float toy_plane_distance(const vec3 origin, const vec3 ray) {
   const vec3 n = rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
 
   const float denom = dot_product(n, ray);
@@ -40,7 +40,7 @@ __device__ float toy_plane_distance(const vec3 origin, const vec3 ray) {
   return FLT_MAX;
 }
 
-__device__ float get_toy_distance(const vec3 origin, const vec3 ray) {
+LUM_DEVICE_FUNC float get_toy_distance(const vec3 origin, const vec3 ray) {
   switch (device.scene.toy.shape) {
     case TOY_SPHERE:
       return sphere_ray_intersection(ray, origin, device.scene.toy.position, device.scene.toy.scale);
@@ -51,16 +51,16 @@ __device__ float get_toy_distance(const vec3 origin, const vec3 ray) {
   return FLT_MAX;
 }
 
-__device__ vec3 toy_sphere_normal(const vec3 position) {
+LUM_DEVICE_FUNC vec3 toy_sphere_normal(const vec3 position) {
   const vec3 diff = sub_vector(position, device.scene.toy.position);
   return normalize_vector(diff);
 }
 
-__device__ vec3 toy_plane_normal(const vec3 position) {
+LUM_DEVICE_FUNC vec3 toy_plane_normal(const vec3 position) {
   return rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
 }
 
-__device__ vec3 get_toy_normal(const vec3 position) {
+LUM_DEVICE_FUNC vec3 get_toy_normal(const vec3 position) {
   switch (device.scene.toy.shape) {
     case TOY_SPHERE:
       return toy_sphere_normal(position);
@@ -71,12 +71,12 @@ __device__ vec3 get_toy_normal(const vec3 position) {
   return get_vector(0.0f, 1.0f, 0.0f);
 }
 
-__device__ bool toy_sphere_is_inside(const vec3 position) {
+LUM_DEVICE_FUNC bool toy_sphere_is_inside(const vec3 position) {
   const vec3 diff = sub_vector(position, device.scene.toy.position);
   return (dot_product(diff, diff) < device.scene.toy.scale * device.scene.toy.scale);
 }
 
-__device__ bool toy_plane_is_inside(const vec3 position) {
+LUM_DEVICE_FUNC bool toy_plane_is_inside(const vec3 position) {
   const vec3 n = toy_plane_normal(position);
 
   const float dot = dot_product(n, sub_vector(position, device.scene.toy.position));
@@ -84,7 +84,7 @@ __device__ bool toy_plane_is_inside(const vec3 position) {
   return (dot < 0.0f);
 }
 
-__device__ bool toy_is_inside(const vec3 position) {
+LUM_DEVICE_FUNC bool toy_is_inside(const vec3 position) {
   switch (device.scene.toy.shape) {
     case TOY_SPHERE:
       return toy_sphere_is_inside(position);
@@ -95,7 +95,7 @@ __device__ bool toy_is_inside(const vec3 position) {
   return false;
 }
 
-__device__ float toy_plane_solid_angle(const vec3 position) {
+LUM_DEVICE_FUNC float toy_plane_solid_angle(const vec3 position) {
   // this is not correct, fix this in the future if this is important
   const float sphere = sample_sphere_solid_angle(device.scene.toy.position, device.scene.toy.scale, position);
 
@@ -104,7 +104,7 @@ __device__ float toy_plane_solid_angle(const vec3 position) {
   return sphere * fabsf(dot_product(n, normalize_vector(sub_vector(device.scene.toy.position, position))));
 }
 
-__device__ float toy_get_solid_angle(const vec3 position) {
+LUM_DEVICE_FUNC float toy_get_solid_angle(const vec3 position) {
   switch (device.scene.toy.shape) {
     case TOY_SPHERE:
       return sample_sphere_solid_angle(device.scene.toy.position, device.scene.toy.scale, position);
@@ -115,7 +115,7 @@ __device__ float toy_get_solid_angle(const vec3 position) {
   return 0.0f;
 }
 
-__device__ vec3 toy_plane_sample_ray(const vec3 position, const float2 random) {
+LUM_DEVICE_FUNC vec3 toy_plane_sample_ray(const vec3 position, const float2 random) {
   const float alpha = random.x * 2.0f * PI;
   const float beta  = sqrtf(random.y);
 
@@ -127,7 +127,7 @@ __device__ vec3 toy_plane_sample_ray(const vec3 position, const float2 random) {
   return normalize_vector(sub_vector(p, position));
 }
 
-__device__ vec3 toy_sample_ray(const vec3 position, const float2 random) {
+LUM_DEVICE_FUNC vec3 toy_sample_ray(const vec3 position, const float2 random) {
   switch (device.scene.toy.shape) {
     case TOY_SPHERE:
       float dummy;
