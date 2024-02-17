@@ -108,6 +108,9 @@
 // RNG paper [Wid20].
 //
 
+#define BLUENOISE_TEX_DIM 128
+#define BLUENOISE_TEX_DIM_MASK 0x7F
+
 enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE   = 0,   /* 1 */
   QUASI_RANDOM_TARGET_BOUNCE_DIR          = 1,   /* 1 */
@@ -261,18 +264,11 @@ __device__ float white_noise() {
   return white_noise_offset(device.ptrs.randoms[THREAD_ID]++);
 }
 
-__device__ uint2 random_blue_noise_mask_2D_xy(const uint32_t x, const uint32_t y) {
-  const DeviceTexture tex = *device.ptrs.bluenoise_2D_tex;
-  const uint2 blue_noise  = tex2D<uint2>(tex.tex, x * tex.inv_width, y * tex.inv_height);
+__device__ uint2 random_blue_noise_mask_2D(const uint32_t x, const uint32_t y) {
+  const uint32_t pixel      = (x & BLUENOISE_TEX_DIM_MASK) + (y & BLUENOISE_TEX_DIM_MASK) * BLUENOISE_TEX_DIM;
+  const uint32_t blue_noise = __ldg(device.ptrs.bluenoise_2D + pixel);
 
-  return make_uint2(blue_noise.x << 16, blue_noise.y << 16);
-}
-
-__device__ uint2 random_blue_noise_mask_2D(const uint32_t pixel) {
-  const uint32_t y = pixel / device.width;
-  const uint32_t x = pixel - y * device.width;
-
-  return random_blue_noise_mask_2D_xy(x, y);
+  return make_uint2(blue_noise & 0xFFFF0000, blue_noise << 16);
 }
 
 __device__ float2
@@ -288,7 +284,7 @@ __device__ float2
   const uint32_t y         = pixel / device.width;
   const uint32_t x         = pixel - y * device.width;
   const uint2 pixel_offset = random_r2(intraframe_input);
-  const uint2 blue_noise   = random_blue_noise_mask_2D_xy((x + (pixel_offset.x >> 25)) & 127, (y + (pixel_offset.y >> 25)) & 127);
+  const uint2 blue_noise   = random_blue_noise_mask_2D(x + (pixel_offset.x >> 25), y + (pixel_offset.y >> 25));
 
   quasi.x += blue_noise.x;
   quasi.y += blue_noise.y;
@@ -320,8 +316,8 @@ __device__ float2 quasirandom_sequence_2D_global(const uint32_t target) {
 }
 
 __device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
-  DeviceTexture tex         = *device.ptrs.bluenoise_1D_tex;
-  const uint16_t blue_noise = tex2D<uint16_t>(tex.tex, x * tex.inv_width, y * tex.inv_height);
+  const uint32_t pixel      = (x & BLUENOISE_TEX_DIM_MASK) + (y & BLUENOISE_TEX_DIM_MASK) * BLUENOISE_TEX_DIM;
+  const uint16_t blue_noise = __ldg(device.ptrs.bluenoise_1D + pixel);
 
   return random_uint16_t_to_float(blue_noise);
 }
