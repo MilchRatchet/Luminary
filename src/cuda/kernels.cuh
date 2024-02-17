@@ -26,8 +26,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
   for (int pixel = THREAD_ID; pixel < amount; pixel += blockDim.x * gridDim.x) {
     TraceTask task;
 
-    task.index.x = (uint16_t) (pixel % device.width);
     task.index.y = (uint16_t) (pixel / device.width);
+    task.index.x = (uint16_t) (pixel - task.index.y * device.width);
 
     task = camera_get_ray(task, pixel);
 
@@ -468,8 +468,8 @@ __global__ void convert_RGBF_to_XRGB8(
   const int src_height = (output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_height : device.height;
 
   while (id < amount) {
-    const int x = id % width;
     const int y = id / width;
+    const int x = id - y * width;
 
     const float sx = x * scale_x;
     const float sy = y * scale_y;

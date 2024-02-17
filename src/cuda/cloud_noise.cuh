@@ -226,9 +226,9 @@ __global__ void generate_shape_noise(const int dim, uint8_t* tex) {
   const float scale_z = 1.0f / dim;
 
   while (id < amount) {
-    const int x = id % dim;
-    const int y = (id % (dim * dim)) / dim;
     const int z = id / (dim * dim);
+    const int y = (id - z * (dim * dim)) / dim;
+    const int x = id - y * dim - z * dim * dim;
 
     const float sx = x * scale_x;
     const float sy = y * scale_y;
@@ -271,9 +271,9 @@ __global__ void generate_detail_noise(const int dim, uint8_t* tex) {
   const float scale_z = 1.0f / dim;
 
   while (id < amount) {
-    const int x = id % dim;
-    const int y = (id % (dim * dim)) / dim;
     const int z = id / (dim * dim);
+    const int y = (id - z * (dim * dim)) / dim;
+    const int x = id - y * dim - z * dim * dim;
 
     const float sx = x * scale_x;
     const float sy = y * scale_y;
@@ -306,8 +306,8 @@ __global__ void generate_weather_map(const int dim, const float seed, uint8_t* t
   const float scale_y = 1.0f / dim;
 
   while (id < amount) {
-    const int x = id % dim;
     const int y = id / dim;
+    const int x = id - y * dim;
 
     const float sx = x * scale_x;
     const float sy = y * scale_y;

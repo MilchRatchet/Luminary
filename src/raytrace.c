@@ -208,6 +208,8 @@ void raytrace_update_ray_emitter(RaytraceInstance* instance) {
 
   emitter.camera_rotation = get_rotation_quaternion(instance->scene.camera.rotation);
 
+  // The following is legacy code that is only used for temporal reprojection.
+
   memset(&emitter.view_space, 0, sizeof(Mat4x4));
 
   emitter.view_space.f11 = 1.0f - (q.y * q.y * 2.0f + q.z * q.z * 2.0f);

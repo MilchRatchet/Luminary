@@ -404,8 +404,8 @@ __global__ void sky_compute_transmittance_lut(float4* transmittance_tex_lower, f
   const int amount = SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT;
 
   while (id < amount) {
-    const int x = id % SKY_TM_TEX_WIDTH;
     const int y = id / SKY_TM_TEX_WIDTH;
+    const int x = id - y * SKY_TM_TEX_WIDTH;
 
     float fx = ((float) x + 0.5f) / SKY_TM_TEX_WIDTH;
     float fy = ((float) y + 0.5f) / SKY_TM_TEX_HEIGHT;

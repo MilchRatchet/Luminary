@@ -35,8 +35,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
   const float step_size = 1.0f / (device.scene.sky.hdri_dim - 1);
 
   while (id < amount) {
-    const int x = id % device.scene.sky.hdri_dim;
     const int y = id / device.scene.sky.hdri_dim;
+    const int x = id - y * device.scene.sky.hdri_dim;
 
     const uint32_t pixel = x + y * device.scene.sky.hdri_dim;
 

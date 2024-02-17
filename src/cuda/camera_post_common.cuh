@@ -73,8 +73,8 @@ __global__ void image_downsample(const RGBF* source, const int sw, const int sh,
   const float step_y  = 1.0f / (sh - 1);
 
   while (id < tw * th) {
-    const int x = id % tw;
     const int y = id / tw;
+    const int x = id - y * tw;
 
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
@@ -114,8 +114,8 @@ __global__ void image_downsample_threshold(
   const float step_y  = 1.0f / (sh - 1);
 
   while (id < tw * th) {
-    const int x = id % tw;
     const int y = id / tw;
+    const int x = id - y * tw;
 
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
@@ -158,8 +158,8 @@ __global__ void image_upsample(
   const float step_y  = 1.0f / (sh - 1);
 
   while (id < tw * th) {
-    const int x = id % tw;
     const int y = id / tw;
+    const int x = id - y * tw;
 
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
