@@ -35,8 +35,8 @@ __global__ void _lens_flare_ghosts(const RGBF* source, const int sw, const int s
   const float scale_y = 1.0f / (th - 1);
 
   while (id < tw * th) {
-    const int x = id % tw;
     const int y = id / tw;
+    const int x = id - y * tw;
 
     const float sx = scale_x * x + 0.5f * scale_x;
     const float sy = scale_y * y + 0.5f * scale_y;
@@ -92,8 +92,8 @@ __global__ void _lens_flare_halo(const RGBF* src, const int sw, const int sh, RG
   const float scale_y = 1.0f / (th - 1);
 
   while (id < tw * th) {
-    const int x = id % tw;
     const int y = id / tw;
+    const int x = id - y * tw;
 
     const float width        = 0.45f;
     const float chroma_shift = 0.005f;

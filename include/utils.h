@@ -423,7 +423,6 @@ struct DevicePointers {
   float* mis_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
-  uint32_t* randoms;
   DeviceTexture* albedo_atlas;
   DeviceTexture* illuminance_atlas;
   DeviceTexture* material_atlas;
@@ -434,8 +433,8 @@ struct DevicePointers {
   DeviceTexture* sky_hdri_luts;
   DeviceTexture* sky_moon_albedo_tex;
   DeviceTexture* sky_moon_normal_tex;
-  DeviceTexture* bluenoise_1D_tex;
-  DeviceTexture* bluenoise_2D_tex;
+  uint16_t* bluenoise_1D;
+  uint32_t* bluenoise_2D;
   uint32_t* light_candidates;
 } typedef DevicePointers;
 
@@ -539,8 +538,8 @@ struct RaytraceInstance {
   DeviceBuffer* sky_hdri_luts;
   DeviceBuffer* sky_moon_albedo_tex;
   DeviceBuffer* sky_moon_normal_tex;
-  DeviceBuffer* bluenoise_1D_tex;
-  DeviceBuffer* bluenoise_2D_tex;
+  DeviceBuffer* bluenoise_1D;
+  DeviceBuffer* bluenoise_2D;
   DeviceBuffer* mis_buffer;
   int max_ray_depth;
   int reservoir_size;
@@ -548,7 +547,6 @@ struct RaytraceInstance {
   Scene scene;
   DenoisingMode denoiser;
   int temporal_frames;
-  DeviceBuffer* randoms;
   int shading_mode;
   RGBF** bloom_mips_gpu;
   int bloom_mips_count;

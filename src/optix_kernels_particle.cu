@@ -1,5 +1,4 @@
 #define UTILS_NO_DEVICE_TABLE
-#define RANDOM_NO_KERNELS
 
 #include "utils.h"
 

@@ -404,8 +404,8 @@ __global__ void sky_compute_transmittance_lut(float4* transmittance_tex_lower, f
   const int amount = SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT;
 
   while (id < amount) {
-    const int x = id % SKY_TM_TEX_WIDTH;
     const int y = id / SKY_TM_TEX_WIDTH;
+    const int x = id - y * SKY_TM_TEX_WIDTH;
 
     float fx = ((float) x + 0.5f) / SKY_TM_TEX_WIDTH;
     float fy = ((float) y + 0.5f) / SKY_TM_TEX_HEIGHT;
@@ -657,7 +657,7 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
 
 __device__ Spectrum sky_compute_atmosphere(
   Spectrum& transmittance_out, const vec3 origin, const vec3 ray, const float limit, const bool celestials, const bool cloud_shadows,
-  const int steps, uint32_t& seed) {
+  const int steps, ushort2 pixel) {
   Spectrum result = spectrum_set1(0.0f);
 
   const float2 path = sky_compute_path(origin, ray, SKY_EARTH_RADIUS, SKY_ATMO_RADIUS);
@@ -671,10 +671,11 @@ __device__ Spectrum sky_compute_atmosphere(
     float reach = start;
     float step_size;
 
-    const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, origin);
+    const float light_angle   = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, origin);
+    const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_STEP_OFFSET, pixel);
 
     for (int i = 0; i < steps; i++) {
-      const float new_reach = start + distance * (i + white_noise_offset(seed++)) / steps;
+      const float new_reach = start + distance * (i + random_offset) / steps;
       step_size             = new_reach - reach;
       reach                 = new_reach;
 
@@ -818,11 +819,10 @@ __device__ Spectrum sky_compute_atmosphere(
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ RGBF
-  sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps, uint32_t& seed) {
+__device__ RGBF sky_get_color(const vec3 origin, const vec3 ray, const float limit, const bool celestials, const int steps, ushort2 pixel) {
   Spectrum unused = spectrum_set1(0.0f);
 
-  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, false, steps, seed);
+  const Spectrum radiance = sky_compute_atmosphere(unused, origin, ray, limit, celestials, false, steps, pixel);
 
   return sky_compute_color_from_spectrum(radiance);
 }
@@ -845,14 +845,15 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
   return sky_compute_color_from_spectrum(radiance);
 }
 
-__device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, uint32_t& seed) {
+__device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, ushort2 pixel) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
   const float base_range = (is_first_ray()) ? 40.0f : 80.0f;
 
-  const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.scene.sky.steps / 6) + white_noise_offset(seed++) - 0.5f;
+  const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.scene.sky.steps / 6)
+                    + quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP, pixel) - 0.5f;
 
-  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, seed);
+  const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, pixel);
 
   const RGBF inscattering = mul_color(sky_compute_color_from_spectrum(radiance), record);
 
@@ -868,8 +869,6 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
-
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -895,7 +894,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
         sky_color = sky_get_sun_color(origin, task.ray);
       }
       else if (device.iteration_type != TYPE_LIGHT) {
-        sky_color = sky_get_color(origin, task.ray, FLT_MAX, true, device.scene.sky.steps, seed);
+        sky_color = sky_get_color(origin, task.ray, FLT_MAX, true, device.scene.sky.steps, task.index);
         if (sky_ray_hits_sun(origin, task.ray)) {
           sky_color = scale_color(sky_color, device.ptrs.mis_buffer[pixel]);
         }
@@ -911,15 +910,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
     write_albedo_buffer(sky, pixel);
     write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
-
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
@@ -931,7 +926,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks(
         sky = sky_hdri_sample(task.ray, device.scene.sky.hdri_mip_bias);
       }
       else {
-        sky = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps, seed);
+        sky = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps, task.index);
       }
       write_beauty_buffer(sky, pixel, true);
     }
@@ -943,8 +938,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks(
       write_beauty_buffer(get_color(0.0f, 0.63f, 1.0f), pixel, true);
     }
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 #endif /* CU_SKY_H */

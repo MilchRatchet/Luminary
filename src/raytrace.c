@@ -163,7 +163,7 @@ static void raytrace_load_bluenoise_texture(RaytraceInstance* instance) {
 
   void* bluenoise_1D_data;
   int64_t bluenoise_1D_data_length;
-  ceb_access("bluenoise_1D.png", &bluenoise_1D_data, &bluenoise_1D_data_length, &info);
+  ceb_access("bluenoise_1D.bin", &bluenoise_1D_data, &bluenoise_1D_data_length, &info);
 
   if (info) {
     crash_message("Failed to load bluenoise_1D texture.");
@@ -171,28 +171,17 @@ static void raytrace_load_bluenoise_texture(RaytraceInstance* instance) {
 
   void* bluenoise_2D_data;
   int64_t bluenoise_2D_data_length;
-  ceb_access("bluenoise_2D.png", &bluenoise_2D_data, &bluenoise_2D_data_length, &info);
+  ceb_access("bluenoise_2D.bin", &bluenoise_2D_data, &bluenoise_2D_data_length, &info);
 
   if (info) {
     crash_message("Failed to load bluenoise_2D texture.");
   }
 
-  TextureRGBA bluenoise_1D_tex = png_load(bluenoise_1D_data, bluenoise_1D_data_length, "bluenoise_1D.png");
-  bluenoise_1D_tex.filter      = TexFilterPoint;
-  bluenoise_1D_tex.wrap_mode_R = TexModeWrap;
-  bluenoise_1D_tex.wrap_mode_S = TexModeWrap;
-  bluenoise_1D_tex.wrap_mode_T = TexModeWrap;
-  bluenoise_1D_tex.read_mode   = TexReadModeElement;
+  device_buffer_malloc(instance->bluenoise_1D, 1, bluenoise_1D_data_length);
+  device_buffer_upload(instance->bluenoise_1D, bluenoise_1D_data);
 
-  TextureRGBA bluenoise_2D_tex = png_load(bluenoise_2D_data, bluenoise_2D_data_length, "bluenoise_2D.png");
-  bluenoise_2D_tex.filter      = TexFilterPoint;
-  bluenoise_2D_tex.wrap_mode_R = TexModeWrap;
-  bluenoise_2D_tex.wrap_mode_S = TexModeWrap;
-  bluenoise_2D_tex.wrap_mode_T = TexModeWrap;
-  bluenoise_2D_tex.read_mode   = TexReadModeElement;
-
-  texture_create_atlas(&instance->bluenoise_1D_tex, &bluenoise_1D_tex, 1);
-  texture_create_atlas(&instance->bluenoise_2D_tex, &bluenoise_2D_tex, 1);
+  device_buffer_malloc(instance->bluenoise_2D, 1, bluenoise_2D_data_length);
+  device_buffer_upload(instance->bluenoise_2D, bluenoise_2D_data);
 }
 
 /*
@@ -218,6 +207,8 @@ void raytrace_update_ray_emitter(RaytraceInstance* instance) {
   const vec3 offset  = instance->scene.camera.pos;
 
   emitter.camera_rotation = get_rotation_quaternion(instance->scene.camera.rotation);
+
+  // The following is legacy code that is only used for temporal reprojection.
 
   memset(&emitter.view_space, 0, sizeof(Mat4x4));
 
@@ -554,7 +545,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->light_records);
   device_buffer_init(&instance->bounce_records);
   device_buffer_init(&instance->buffer_8bit);
-  device_buffer_init(&instance->randoms);
   device_buffer_init(&instance->raydir_buffer);
   device_buffer_init(&instance->trace_result_buffer);
   device_buffer_init(&instance->state_buffer);
@@ -565,6 +555,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->sky_hdri_luts);
   device_buffer_init(&instance->sky_moon_albedo_tex);
   device_buffer_init(&instance->sky_moon_normal_tex);
+  device_buffer_init(&instance->bluenoise_1D);
+  device_buffer_init(&instance->bluenoise_2D);
   device_buffer_init(&instance->mis_buffer);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
@@ -610,7 +602,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   raytrace_allocate_buffers(instance);
   device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
-  device_initialize_random_generators();
   raytrace_prepare(instance);
 
   instance->snap_resolution = SNAP_RESOLUTION_RENDER;
@@ -650,7 +641,6 @@ void raytrace_reset(RaytraceInstance* instance) {
   raytrace_allocate_buffers(instance);
   device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
-  device_initialize_random_generators();
   raytrace_prepare(instance);
 
   if (allocate_denoise) {
@@ -728,7 +718,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_results, sizeof(TraceResult), max_task_count);
   device_buffer_malloc(instance->task_counts, sizeof(uint16_t), 7 * thread_count);
   device_buffer_malloc(instance->task_offsets, sizeof(uint16_t), 6 * thread_count);
-  device_buffer_malloc(instance->randoms, sizeof(uint32_t), thread_count);
 
   device_buffer_malloc(instance->light_sample_history, sizeof(uint32_t), amount);
   device_buffer_malloc(instance->raydir_buffer, sizeof(vec3), amount);
@@ -770,7 +759,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.material_atlas            = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.material);
   ptrs.normal_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.normal);
   ptrs.cloud_noise               = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);
-  ptrs.randoms                   = (uint32_t*) device_buffer_get_pointer(instance->randoms);
   ptrs.raydir_buffer             = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
   ptrs.trace_result_buffer       = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.state_buffer              = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
@@ -780,8 +768,8 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.sky_hdri_luts             = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
   ptrs.sky_moon_albedo_tex       = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_albedo_tex);
   ptrs.sky_moon_normal_tex       = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_normal_tex);
-  ptrs.bluenoise_1D_tex          = (DeviceTexture*) device_buffer_get_pointer(instance->bluenoise_1D_tex);
-  ptrs.bluenoise_2D_tex          = (DeviceTexture*) device_buffer_get_pointer(instance->bluenoise_2D_tex);
+  ptrs.bluenoise_1D              = (uint16_t*) device_buffer_get_pointer(instance->bluenoise_1D);
+  ptrs.bluenoise_2D              = (uint32_t*) device_buffer_get_pointer(instance->bluenoise_2D);
   ptrs.mis_buffer                = (float*) device_buffer_get_pointer(instance->mis_buffer);
 
   device_update_symbol(ptrs, ptrs);

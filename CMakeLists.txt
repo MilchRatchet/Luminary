@@ -177,8 +177,8 @@ ceb_embed_files(
   ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png
-  ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_1D.png
-  ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_2D.png
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_1D.bin
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_2D.bin
 )
 
 #=============================================================

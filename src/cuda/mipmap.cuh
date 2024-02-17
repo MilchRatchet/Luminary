@@ -18,9 +18,9 @@ __global__ void mipmap_generate_level_3D_RGBA8(cudaTextureObject_t src, cudaSurf
   const float scale_z = 1.0f / (depth - 1);
 
   while (id < amount) {
-    const int x = id % width;
-    const int y = (id % (width * height)) / width;
     const int z = id / (width * height);
+    const int y = (id - z * (width * height)) / width;
+    const int x = id - y * width - z * width * height;
 
     const float sx = scale_x * x + scale_x * 0.5f;
     const float sy = scale_y * y + scale_y * 0.5f;
@@ -48,8 +48,8 @@ __global__ void mipmap_generate_level_2D_RGBA8(cudaTextureObject_t src, cudaSurf
   const float scale_y = 1.0f / (height - 1);
 
   while (id < amount) {
-    const int x = id % width;
     const int y = id / width;
+    const int x = id - y * width;
 
     const float sx = scale_x * x + scale_x * 0.5f;
     const float sy = scale_y * y + scale_y * 0.5f;
@@ -77,9 +77,9 @@ __global__ void mipmap_generate_level_3D_RGBA16(cudaTextureObject_t src, cudaSur
   const float scale_z = 1.0f / (depth - 1);
 
   while (id < amount) {
-    const int x = id % width;
-    const int y = (id % (width * height)) / width;
     const int z = id / (width * height);
+    const int y = (id - z * (width * height)) / width;
+    const int x = id - y * width - z * width * height;
 
     const float sx = scale_x * x + scale_x * 0.5f;
     const float sy = scale_y * y + scale_y * 0.5f;
@@ -107,8 +107,8 @@ __global__ void mipmap_generate_level_2D_RGBA16(cudaTextureObject_t src, cudaSur
   const float scale_y = 1.0f / (height - 1);
 
   while (id < amount) {
-    const int x = id % width;
     const int y = id / width;
+    const int x = id - y * width;
 
     const float sx = scale_x * x + scale_x * 0.5f;
     const float sy = scale_y * y + scale_y * 0.5f;
@@ -136,9 +136,9 @@ __global__ void mipmap_generate_level_3D_RGBAF(cudaTextureObject_t src, cudaSurf
   const float scale_z = 1.0f / (depth - 1);
 
   while (id < amount) {
-    const int x = id % width;
-    const int y = (id % (width * height)) / width;
     const int z = id / (width * height);
+    const int y = (id - z * (width * height)) / width;
+    const int x = id - y * width - z * width * height;
 
     const float sx = scale_x * x + scale_x * 0.5f;
     const float sy = scale_y * y + scale_y * 0.5f;
@@ -161,8 +161,8 @@ __global__ void mipmap_generate_level_2D_RGBAF(cudaTextureObject_t src, cudaSurf
   const float scale_y = 1.0f / (height - 1);
 
   while (id < amount) {
-    const int x = id % width;
     const int y = id / width;
+    const int x = id - y * width;
 
     const float sx = scale_x * x + scale_x * 0.5f;
     const float sy = scale_y * y + scale_y * 0.5f;

@@ -77,7 +77,7 @@ __device__ float restir_sample_volume_extinction(const GBufferData data, const v
  * @result Target PDF of light sample.
  */
 __device__ float restir_sample_target_pdf(
-  LightSample x, const GBufferData data, const RGBF record, const uint32_t pixel, float& primitive_pdf) {
+  LightSample x, const GBufferData data, const RGBF record, const ushort2 pixel, float& primitive_pdf) {
   if (x.presampled_id == LIGHT_ID_NONE) {
     primitive_pdf = 1.0f;
     return 0.0f;
@@ -122,7 +122,7 @@ __device__ float restir_sample_target_pdf(
  * @param seed Seed used for random number generation, the seed is overwritten on use.
  * @result Sampled light sample.
  */
-__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const uint32_t pixel) {
+__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const ushort2 pixel) {
   LightSample selected = restir_sample_empty();
 
   if (!(data.flags & G_BUFFER_REQUIRES_SAMPLING))
@@ -191,7 +191,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   for (int i = 0; i < reservoir_size; i++) {
     LightSample sampled;
     sampled.seed          = QUASI_RANDOM_TARGET_RESTIR_DIR + 2 + i;
-    sampled.presampled_id = quasirandom_sequence_1D_intraframe(QUASI_RANDOM_TARGET_RESTIR_GENERATION, pixel, i) * light_count;
+    sampled.presampled_id = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RESTIR_GENERATION + i, pixel) * light_count;
     sampled.id            = device.ptrs.light_candidates[sampled.presampled_id];
 
     if (sampled.id == blocked_light_id)
@@ -227,24 +227,22 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
 }
 
 __global__ void restir_candidates_pool_generation() {
-  int id        = THREAD_ID;
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
-
-  const int light_sample_bin_count = 1 << device.restir.light_candidate_pool_size_log2;
-
   if (device.scene.triangle_lights_count == 0)
     return;
 
+  int id = THREAD_ID;
+
+  const int light_sample_bin_count = 1 << device.restir.light_candidate_pool_size_log2;
   while (id < light_sample_bin_count) {
-    const uint32_t sampled_id = random_uint32_t(seed++) % device.scene.triangle_lights_count;
+    // TODO: Expose more white noise keys, maybe
+    const uint32_t sampled_id =
+      random_uint32_t_base(0xfcbd6e15, id + light_sample_bin_count * device.temporal_frames) % device.scene.triangle_lights_count;
 
     device.ptrs.light_candidates[id]             = sampled_id;
     device.restir.presampled_triangle_lights[id] = device.scene.triangle_lights[sampled_id];
 
     id += blockDim.x * gridDim.x;
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 #endif /* CU_RESTIR_H */

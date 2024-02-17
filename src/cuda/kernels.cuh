@@ -26,8 +26,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
   for (int pixel = THREAD_ID; pixel < amount; pixel += blockDim.x * gridDim.x) {
     TraceTask task;
 
-    task.index.x = (uint16_t) (pixel % device.width);
     task.index.y = (uint16_t) (pixel / device.width);
+    task.index.x = (uint16_t) (pixel - task.index.y * device.width);
 
     task = camera_get_ray(task, pixel);
 
@@ -238,8 +238,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering_tasks() {
   const int task_count = device.trace_count[THREAD_ID];
 
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
-
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device.trace_tasks + offset);
@@ -260,13 +258,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
 
     RGBF record = load_RGBF(device.records + pixel);
 
-    const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, seed);
+    const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.index);
 
     store_RGBF(device.records + pixel, record);
     write_beauty_buffer(inscattering, pixel);
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {
@@ -468,8 +464,8 @@ __global__ void convert_RGBF_to_XRGB8(
   const int src_height = (output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_height : device.height;
 
   while (id < amount) {
-    const int x = id % width;
     const int y = id / width;
+    const int x = id - y * width;
 
     const float sx = x * scale_x;
     const float sy = y * scale_y;
