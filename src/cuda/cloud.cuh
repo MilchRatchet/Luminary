@@ -120,7 +120,7 @@ __device__ CloudRenderResult
     }
   }
 
-  step_count += quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT + layer, pixel);
+  step_count += 8.0f * quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT + layer, pixel);
 
   start = fmaxf(0.0f, start);
 
@@ -161,10 +161,10 @@ __device__ CloudRenderResult
       hit = true;
 
       if (device.iteration_type != TYPE_LIGHT) {
-        const float ambient_r1 = 2.0f * white_noise_offset(seed++) - 1.0f;
-        const float ambient_r2 = white_noise_offset(seed++);
+        float2 ambient_r = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CLOUD_DIR + i, pixel);
+        ambient_r.x      = 2.0f * ambient_r.x - 1.0f;
 
-        const vec3 ambient_ray = sample_ray_sphere(ambient_r1, ambient_r2);
+        const vec3 ambient_ray = sample_ray_sphere(ambient_r.x, ambient_r.y);
         RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2, seed);
 
         float ambient_extinction      = cloud_extinction(pos, ambient_ray, layer);

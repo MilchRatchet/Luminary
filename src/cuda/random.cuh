@@ -11,8 +11,8 @@
 // A classic approach to accelerating Monte Carlo methods is using low-discrepancy random numbers.
 // This results in the so called quasi-Monte Carlo method. We can summarize the idea of that as follows:
 // Uncorrelated random numbers can clump, that is, multiple random numbers in a row could end up being
-// very close to each other. If we now think about integrating a function and another classical approach
-// of evaluating the function at equidistant points then we see that the equidistant points manage to cover
+// very close to each other. If we now think about integrating a function then another classical approach is
+// evaluating the function at equidistant points. For that we see that the equidistant points manage to cover
 // a large range of the functions domain and will only fail if the function has very different outputs
 // inbetween those points. Our clumped up random points however will fail to give a good representation of our
 // function even if the function is well behaved since we are not effectively covering the functions domain.
@@ -21,7 +21,7 @@
 // of points that each split the existing sampling gaps in half, i.e., 1/2, 1/4, 3/4, 1/8, 5/8 and so on.
 // This sequence is called the "van der Corput" sequence. While the points are low-discrepency, they
 // have a visible pattern and hence more "randomly" distributed points are to be preferred.
-// A multitude of random number sequences have been proposed one of the most notable is the Halton and
+// A multitude of random number sequences have been proposed, one of the most notable is the Halton and
 // the Sobol sequence. Especially the latter in combination with Owen scrambling is known to produce
 // high quality low-discrepency numbers without any visible pattern. Another very simple sequence
 // is the sequence in which the i-th number is given by i * \alpha (mod 1). Here \alpha can be
@@ -34,32 +34,33 @@
 // in the D-dimensional metric space. The number D of random numbers that we need to render a single sample
 // per pixel is a) often way too large to compute such a D-dimensional low-discrepancy random number and
 // b) it is often not known a-priori how many random numbers we even need. Hence the idea is to generate
-// a D-dimensional random number by computing one random number and shifting it using a different sequence
+// a D-dimensional random number by computing one random number and modifying it using a different sequence
 // of random numbers. All entries inside this D-dimensional random number must be uncorrelated or else we would
 // obtain a biased result. You can think of this as we want the decision to use a diffuse importance sampled
 // direction to not be correlated with the actual sampled direction obtained from that method, i.e., we don't
-// want all diffuse samples to go up. Hence we shift them using a uncorrelated sequence of random numbers.
-// We perform this shift as r + s_j (mod 1) where s_j is our shift number and r is our low-discrepancy random number.
-// This is also called a Cranley-Patterson rotation. In order for the generated D-dimensional random numbers to stay
-// low-discrepancy, we have to apply the same shift s to each low-discrepancy random number.
+// want all diffuse samples to go up. Hence we modify them using a uncorrelated sequence of random numbers.
+// For this we take a direction vector s of dimension D and obtain our low-discrepancy D-dimensional random numbers
+// each by multiplying s with the low-discrepancy number and then applying modulo 1 to wrap the entries back into
+// the [0,1) range.
 //
 // Now that we can generate low-discrepancy D-dimensional random numbers to perform quasi-Monte Carlo integration for
 // each pixel, we need to think about the sequences for all our pixels. If we were to use the same random number
 // sequence for each pixel, we would obtain almost identical errors in each pixel. On the surface this does not sound
 // too bad but visually this means that the error is much more prominent and the image after a few samples per pixel
-// will not look anything like the final converged image. To fix this we can apply the same approach as above by
-// applying another shift to the D-dimensional low-discrepancy random numbers that is different for each pixel.
+// will not look anything like the final converged image. To fix this we can apply a shift of the form a + b (mod 1)
+// to the D-dimensional low-discrepancy random numbers that is different for each pixel. This is also called a Cranley-Patterson rotation.
 // This will distribute the error across pixels which gives a much more visually pleasing result. In fact, this
 // is the point where our images start to become noisy, without this they would look almost noise free but heavily biased
 // instead. It is also much clearer to understand if an image is (pretty much) converged based on the noise levels
-// as it is impossible to visually identify the error if no reference image exists. For the choice of the shift number
+// as otherwise it is impossible to visually identify the error if no reference image exists. For the choice of the shift number
 // we could use standard uncorrelated random numbers but if we do that we would run into clumping again which means
 // that the error would not be evenly distributed over the image. Hence we again use low-discrepancy numbers to perform
 // this shift. A common approach for this are so called blue noise masks which are specifically crafted images that shift
-// each sequence of D-dimensional random numbers such that the error is very evenly distributed across pixels. Alternatively,
-// other approach likes using Hilbert or Morton indexing together with scrambling have been shown to be a good alternative that
-// don't need any precomputed texture. They work by having a very large base sequence of low-discrepancy numbers and
-// computing a different index in this sequence for each pixel.
+// each sequence of D-dimensional random numbers such that the error is very evenly distributed across pixels. Since these
+// images are only of low dimensionality, we use low-discrepancy numbers to shift our pixel coordinates such that we effectively
+// obtain D many images. Alternatively, other approach likes using Hilbert or Morton indexing together with scrambling have been
+// shown to be a good alternative that don't need any precomputed texture. They work by having a very large base sequence of
+// low-discrepancy numbers and computing a different index in this sequence for each pixel.
 //
 // Now we come to the actual implementation here. First it is important to note that this whole area of low-discrepancy
 // random numbers for Monte Carlo rendering is a very ongoing research topic currently and it is not always clear what
@@ -75,25 +76,12 @@
 // provided by Cristoph Peters (http://momentsingraphics.de/BlueNoise.html) and a golden ratio based Rank-1 lattice
 // sequence. This approach was also demonstrated to provide very good results in [Wol22]
 // and was called a "blue noise animated golden ratio" sequence.
-// For the uncorrelated shifts we use the Squares random number generator which is a very fast
+// To obtain a direction vector, we use the Squares random number generator which is a very fast
 // minimal state high quality random number generated. This random number generator was used in Luminary
 // already before so it was the obvious choice. It also provides very nice statistical properties (Though
 // we have no idea about what that exactly means). Since a lot of the use cases in Luminary are 2D random
-// points, we also included a generalization of the golden ratio based Rank-1 lattice that uses
-// the inverse of the plastic number and its square. This is also the only point where we are unsure whether
-// we introduce some correlation issues because we use both the 1D and the 2D sequence at the same time, albeit
-// for different decision. It is unclear to us whether these two sequence may cause any issues when used like that,
-// however, we couldn't observe any issues and comparisons to renders with the previous white noise random
-// number generator demonstrated that we converge to the same result. Ultimately, each random number is given by
-//
-//                    r(t) + b(x,y) + w_1(d) + w_2(u) (mod 1)
-//
-// where r is our low-discrepancy sequence, b is the blue noise mask and w_1 and w_2 are differently seeded
-// white noise generators. Further, t is the sampled ID (also called the temporal frame in Luminary),
-// x and y are the pixel coordinates, d is the current depth of the path and u is the use case of this random number.
-// Each usage of these numbers is mapped out using an enum, this makes sure that no two decisions use the same
-// random number and it is nice to work with. Important to note is that this random number generator is not
-// counter based, we do not have to keep track of the number of random numbers generated.
+// points, we work always with pairs of randoms numbers using a generalization of the golden ratio based Rank-1 lattice that uses
+// the inverse of the plastic number and its square.
 //
 // Now some small implementation details. For one, we perform all our operations using uint32_ts because
 // we are working only with numbers in [0,1) due to the (mod 1) and integer addition and multiplication map
@@ -103,9 +91,7 @@
 // 64 bit numbers from 64 bit inputs but since we only need 32 bit outputs and only have 32 bit inputs, we
 // modified the method to work with 32 bits. Similarly, was done for the 64 bit -> 32 bit version which we
 // modified into a 32 bit -> 16 bit generator. The seed of this generator in general use cases is
-// a key of alternating 0s and 1s in binary plus the thread ID. For our low-discrepancy random number
-// we used a seed that instead of adding the thread ID, adds a key as provided by the original Squares
-// RNG paper [Wid20].
+// a key of alternating 0s and 1s in binary plus the thread ID.
 //
 
 #define BLUENOISE_TEX_DIM 128
@@ -127,7 +113,8 @@ enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_RESTIR_GENERATION   = 270, /* 128 */
   QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET   = 398, /* 3 */
   QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT    = 401, /* 3 */
-  QUASI_RANDOM_TARGET_COUNT               = 404
+  QUASI_RANDOM_TARGET_CLOUD_DIR           = 404, /* 128 */
+  QUASI_RANDOM_TARGET_COUNT               = 532
 } typedef QuasiRandomTarget;
 
 ////////////////////////////////////////////////////////////////////
@@ -172,20 +159,10 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 ////////////////////////////////////////////////////////////////////
 
 // Integer fractions of the actual numbers
-#define R1_PHI 2654435768u  // 2654435768u /* 0.61803398875f */ /* 2654435789 */
 #define R2_PHI1 3242174888u /* 0.7548776662f  */
 #define R2_PHI2 2447445413u /* 0.56984029f    */
 
-__device__ uint32_t random_r1(const uint32_t offset) {
-  uint32_t result;
-  asm("mul.lo.u32 %0, %1, %2;" : "=r"(result) : "r"(offset), "r"(R1_PHI));
-  return result;
-
-  // const uint32_t v = offset * R1_PHI;
-
-  // return v;
-}
-
+// [Rob18]
 __device__ uint2 random_r2(const uint32_t offset) {
   const uint32_t v1 = offset * R2_PHI1;
   const uint32_t v2 = offset * R2_PHI2;
