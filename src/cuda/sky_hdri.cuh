@@ -28,8 +28,6 @@ __device__ float sky_hdri_tent_filter_importance_sample(const float x) {
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lut(float4* dst) {
   unsigned int id = THREAD_ID;
 
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
-
   const int amount = device.scene.sky.hdri_dim * device.scene.sky.hdri_dim;
 
   const float step_size = 1.0f / (device.scene.sky.hdri_dim - 1);
@@ -38,7 +36,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
     const int y = id / device.scene.sky.hdri_dim;
     const int x = id - y * device.scene.sky.hdri_dim;
 
-    const uint32_t pixel = x + y * device.scene.sky.hdri_dim;
+    const ushort2 pixel_coords = make_ushort2(x, y);
+    const uint32_t pixel       = x + y * device.scene.sky.hdri_dim;
 
     RGBF result   = get_color(0.0f, 0.0f, 0.0f);
     RGBF variance = get_color(1.0f, 1.0f, 1.0f);
@@ -46,8 +45,10 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
     const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
 
     for (int i = 0; i < device.scene.sky.hdri_samples; i++) {
-      const float jitter_u = 0.5f + sky_hdri_tent_filter_importance_sample(white_noise());
-      const float jitter_v = 0.5f + sky_hdri_tent_filter_importance_sample(white_noise());
+      float2 random_jitter = quasirandom_sequence_2D_base(QUASI_RANDOM_TARGET_CAMERA_JITTER, pixel_coords, i, 0);
+
+      const float jitter_u = 0.5f + sky_hdri_tent_filter_importance_sample(random_jitter.x);
+      const float jitter_v = 0.5f + sky_hdri_tent_filter_importance_sample(random_jitter.y);
 
       const float u = (((float) x) + jitter_u) * step_size;
       const float v = 1.0f - (((float) y) + jitter_v) * step_size;
@@ -63,12 +64,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
       RGBF cloud_transmittance = get_color(1.0f, 1.0f, 1.0f);
 
       if (device.scene.sky.cloud.active) {
-        const float offset = clouds_render(sky_origin, ray, FLT_MAX, pixel, color, cloud_transmittance, seed);
+        const float offset = clouds_render(sky_origin, ray, FLT_MAX, pixel_coords, color, cloud_transmittance);
 
         iter_origin = add_vector(iter_origin, scale_vector(ray, offset));
       }
 
-      const RGBF sky = sky_get_color(iter_origin, ray, FLT_MAX, true, device.scene.sky.steps, seed);
+      const RGBF sky = sky_get_color(iter_origin, ray, FLT_MAX, true, device.scene.sky.steps, pixel_coords);
 
       color = add_color(color, mul_color(sky, cloud_transmittance));
 
@@ -115,8 +116,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void sky_hdri_compute_hdri_lu
 
     id += blockDim.x * gridDim.x;
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {

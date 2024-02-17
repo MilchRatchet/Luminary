@@ -57,8 +57,8 @@ __global__ void particle_process_tasks() {
 
     write_normal_buffer(data.normal, pixel);
 
-    const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
-    const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
+    const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, task.index);
+    const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, task.index);
 
     const vec3 bounce_ray = jendersie_eon_phase_sample(task.ray, device.scene.particles.phase_diameter, random_dir, random_choice);
 
@@ -74,20 +74,20 @@ __global__ void particle_process_tasks() {
     bounce_task.index  = task.index;
 
     device.ptrs.mis_buffer[pixel] = 0.0f;
-    if (validate_trace_task(bounce_task, pixel, bounce_record)) {
+    if (validate_trace_task(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
 
     if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-      LightSample light = restir_sample_reservoir(data, record, pixel);
+      LightSample light = restir_sample_reservoir(data, record, task.index);
 
       uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
       if (light.weight > 0.0f) {
         BRDFInstance brdf = brdf_get_instance_scattering(scale_vector(task.ray, -1.0f));
         const BRDFInstance brdf_sample =
-          brdf_apply_sample_weight_scattering(brdf_apply_sample(brdf, light, task.position, pixel), volume_type);
+          brdf_apply_sample_weight_scattering(brdf_apply_sample(brdf, light, task.position, task.index), volume_type);
 
         const RGBF light_record = mul_color(record, brdf_sample.term);
 

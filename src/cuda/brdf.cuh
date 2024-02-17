@@ -352,7 +352,7 @@ __device__ vec3
 }
 
 __device__ BRDFInstance brdf_apply_sample_restir(
-  BRDFInstance brdf, LightSample light, vec3 pos, const uint32_t pixel, float& solid_angle, RGBF& lum, float& sample_dist) {
+  BRDFInstance brdf, LightSample light, vec3 pos, const ushort2 pixel, float& solid_angle, RGBF& lum, float& sample_dist) {
   const float2 random = quasirandom_sequence_2D(light.seed, pixel);
 
   switch (light.presampled_id) {
@@ -379,7 +379,7 @@ __device__ BRDFInstance brdf_apply_sample_restir(
   return brdf;
 }
 
-__device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos, const uint32_t pixel) {
+__device__ BRDFInstance brdf_apply_sample(BRDFInstance brdf, LightSample light, vec3 pos, const ushort2 pixel) {
   const float2 random = quasirandom_sequence_2D(light.seed, pixel);
 
   switch (light.presampled_id) {
@@ -430,7 +430,7 @@ __device__ BRDFInstance brdf_apply_sample_weight_scattering(BRDFInstance brdf, V
  * Samples a ray based on the BRDFs and multiplies record with sampling weight.
  * Writes L and term of the BRDFInstance.
  */
-__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const uint32_t pixel, bool& use_specular) {
+__device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const ushort2 pixel, bool& use_specular) {
   const float specular_prob = brdf_spec_probability(brdf.metallic);
   use_specular              = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel) < specular_prob;
 
@@ -461,7 +461,7 @@ __device__ BRDFInstance brdf_sample_ray(BRDFInstance brdf, const uint32_t pixel,
  * This is most likely completely non physical but since refraction plays such a small role at the moment,
  * it probably doesnt matter too much.
  */
-__device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const uint32_t pixel) {
+__device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const float index, const ushort2 pixel) {
   const float2 random    = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
   const float roughness2 = brdf.roughness * brdf.roughness;
 

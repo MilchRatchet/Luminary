@@ -4,11 +4,11 @@
 #include "math.cuh"
 #include "utils.cuh"
 
-__device__ vec3 camera_sample_aperture(const uint32_t pixel) {
+__device__ vec3 camera_sample_aperture(const ushort2 pixel_coords) {
   if (device.scene.camera.aperture_size == 0.0f)
     return get_vector(0.0f, 0.0f, 0.0f);
 
-  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LENS, pixel);
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LENS, pixel_coords);
   float2 sample;
 
   switch (device.scene.camera.aperture_shape) {
@@ -20,7 +20,7 @@ __device__ vec3 camera_sample_aperture(const uint32_t pixel) {
       sample = make_float2(cosf(alpha) * beta, sinf(alpha) * beta);
     } break;
     case CAMERA_APERTURE_BLADED: {
-      const int blade   = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LENS_BLADE, pixel) * device.scene.camera.aperture_blade_count;
+      const int blade   = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LENS_BLADE, pixel_coords) * device.scene.camera.aperture_blade_count;
       const float alpha = sqrtf(random.x);
       const float beta  = random.y;
 
@@ -62,7 +62,7 @@ __device__ TraceTask camera_get_ray(TraceTask task, const uint32_t pixel) {
   // The minus is because we are always looking in -Z direction
   vec3 focal_point = scale_vector(film_to_focal_ray, -device.scene.camera.focal_length / film_to_focal_ray.z);
 
-  vec3 aperture_point = camera_sample_aperture(pixel);
+  vec3 aperture_point = camera_sample_aperture(task.index);
 
   focal_point    = rotate_vector_by_quaternion(focal_point, device.emitter.camera_rotation);
   aperture_point = rotate_vector_by_quaternion(aperture_point, device.emitter.camera_rotation);

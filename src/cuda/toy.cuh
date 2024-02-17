@@ -18,7 +18,7 @@ __device__ GBufferData toy_generate_g_buffer(const ToyTask task, const int pixel
 
   if (
     device.iteration_type == TYPE_LIGHT
-    || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, pixel) > device.scene.toy.albedo.a) {
+    || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) > device.scene.toy.albedo.a) {
     flags |= G_BUFFER_TRANSPARENT_PASS;
   }
 
@@ -120,7 +120,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         const float refraction_index = (is_inside) ? device.scene.toy.refractive_index / ambient_index_of_refraction
                                                    : ambient_index_of_refraction / device.scene.toy.refractive_index;
 
-        brdf = brdf_sample_ray_refraction(brdf, refraction_index, pixel);
+        brdf = brdf_sample_ray_refraction(brdf, refraction_index, task.index);
       }
       else {
         brdf.term = mul_color(brdf.term, opaque_color(albedo));
@@ -137,14 +137,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       switch (device.iteration_type) {
         case TYPE_CAMERA:
         case TYPE_BOUNCE:
-          if (validate_trace_task(new_task, pixel, record)) {
+          if (validate_trace_task(new_task, record)) {
             device.ptrs.mis_buffer[pixel] = 1.0f;
             store_RGBF(device.ptrs.bounce_records + pixel, record);
             store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
           }
           break;
         case TYPE_LIGHT:
-          if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY, pixel) > device.scene.toy.albedo.a) {
+          if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY, task.index) > device.scene.toy.albedo.a) {
             if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
               store_RGBF(device.ptrs.light_records + pixel, record);
               store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
@@ -158,16 +158,16 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         write_albedo_buffer(get_color(albedo.r, albedo.g, albedo.b), pixel);
 
       bool bounce_is_specular;
-      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, pixel, bounce_is_specular);
+      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, task.index, bounce_is_specular);
 
       float bounce_mis_weight = 1.0f;
 
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
         uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-        LightSample light                   = restir_sample_reservoir(data, record, pixel);
+        LightSample light                   = restir_sample_reservoir(data, record, task.index);
 
         if (light.weight > 0.0f) {
-          const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, pixel));
+          const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, task.index));
 
           const RGBF light_record = mul_color(record, brdf_sample.term);
 
@@ -196,7 +196,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
       bounce_task.ray    = bounce_brdf.L;
       bounce_task.index  = task.index;
 
-      if (validate_trace_task(bounce_task, pixel, bounce_record)) {
+      if (validate_trace_task(bounce_task, bounce_record)) {
         device.ptrs.mis_buffer[pixel] = bounce_mis_weight;
         store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
         store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);

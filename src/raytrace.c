@@ -545,7 +545,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->light_records);
   device_buffer_init(&instance->bounce_records);
   device_buffer_init(&instance->buffer_8bit);
-  device_buffer_init(&instance->randoms);
   device_buffer_init(&instance->raydir_buffer);
   device_buffer_init(&instance->trace_result_buffer);
   device_buffer_init(&instance->state_buffer);
@@ -603,7 +602,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   raytrace_allocate_buffers(instance);
   device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
-  device_initialize_random_generators();
   raytrace_prepare(instance);
 
   instance->snap_resolution = SNAP_RESOLUTION_RENDER;
@@ -643,7 +641,6 @@ void raytrace_reset(RaytraceInstance* instance) {
   raytrace_allocate_buffers(instance);
   device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
-  device_initialize_random_generators();
   raytrace_prepare(instance);
 
   if (allocate_denoise) {
@@ -721,7 +718,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_results, sizeof(TraceResult), max_task_count);
   device_buffer_malloc(instance->task_counts, sizeof(uint16_t), 7 * thread_count);
   device_buffer_malloc(instance->task_offsets, sizeof(uint16_t), 6 * thread_count);
-  device_buffer_malloc(instance->randoms, sizeof(uint32_t), thread_count);
 
   device_buffer_malloc(instance->light_sample_history, sizeof(uint32_t), amount);
   device_buffer_malloc(instance->raydir_buffer, sizeof(vec3), amount);
@@ -763,7 +759,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.material_atlas            = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.material);
   ptrs.normal_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.normal);
   ptrs.cloud_noise               = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);
-  ptrs.randoms                   = (uint32_t*) device_buffer_get_pointer(instance->randoms);
   ptrs.raydir_buffer             = (vec3*) device_buffer_get_pointer(instance->raydir_buffer);
   ptrs.trace_result_buffer       = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.state_buffer              = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);

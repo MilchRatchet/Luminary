@@ -423,7 +423,6 @@ struct DevicePointers {
   float* mis_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
-  uint32_t* randoms;
   DeviceTexture* albedo_atlas;
   DeviceTexture* illuminance_atlas;
   DeviceTexture* material_atlas;
@@ -548,7 +547,6 @@ struct RaytraceInstance {
   Scene scene;
   DenoisingMode denoiser;
   int temporal_frames;
-  DeviceBuffer* randoms;
   int shading_mode;
   RGBF** bloom_mips_gpu;
   int bloom_mips_count;

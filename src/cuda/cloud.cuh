@@ -81,7 +81,7 @@ __device__ float cloud_extinction(const vec3 origin, const vec3 ray, const Cloud
  * Returns an RGBAF where the RGB is the radiance and the A is the greyscale transmittance.
  */
 __device__ CloudRenderResult
-  clouds_compute(vec3 origin, vec3 ray, float start, float dist, const CloudLayerType layer, const uint32_t pixel, uint32_t& seed) {
+  clouds_compute(vec3 origin, vec3 ray, float start, float dist, const CloudLayerType layer, const ushort2 pixel) {
   if (dist < 0.0f || start == FLT_MAX) {
     CloudRenderResult result;
 
@@ -165,7 +165,7 @@ __device__ CloudRenderResult
         ambient_r.x      = 2.0f * ambient_r.x - 1.0f;
 
         const vec3 ambient_ray = sample_ray_sphere(ambient_r.x, ambient_r.y);
-        RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2, seed);
+        RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2, pixel);
 
         float ambient_extinction      = cloud_extinction(pos, ambient_ray, layer);
         const float ambient_cos_angle = dot_product(ray, ambient_ray);
@@ -242,19 +242,18 @@ __device__ CloudRenderResult
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ float clouds_render(
-  vec3 origin, const vec3 ray, const float limit, const uint32_t pixel, RGBF& color, RGBF& transmittance, uint32_t& seed) {
+__device__ float clouds_render(vec3 origin, const vec3 ray, const float limit, const ushort2 pixel, RGBF& color, RGBF& transmittance) {
   float2 intersections[3];
   CloudRenderResult results[3];
 
   intersections[0] = cloud_get_lowlayer_intersection(origin, ray, limit);
-  results[0]       = clouds_compute(origin, ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW, pixel, seed);
+  results[0]       = clouds_compute(origin, ray, intersections[0].x, intersections[0].y, CLOUD_LAYER_LOW, pixel);
 
   intersections[1] = cloud_get_midlayer_intersection(origin, ray, limit);
-  results[1]       = clouds_compute(origin, ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID, pixel, seed);
+  results[1]       = clouds_compute(origin, ray, intersections[1].x, intersections[1].y, CLOUD_LAYER_MID, pixel);
 
   intersections[2] = cloud_get_toplayer_intersection(origin, ray, limit);
-  results[2]       = clouds_compute(origin, ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP, pixel, seed);
+  results[2]       = clouds_compute(origin, ray, intersections[2].x, intersections[2].y, CLOUD_LAYER_TOP, pixel);
 
   const bool less01 = intersections[0].x <= intersections[1].x;
   const bool less02 = intersections[0].x <= intersections[2].x;
@@ -293,7 +292,7 @@ __device__ float clouds_render(
       break;
 
     if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
-      color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance, seed));
+      color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance, pixel));
       origin = add_vector(origin, scale_vector(ray, result.hit_dist - prev_start));
     }
 
@@ -313,8 +312,6 @@ __device__ float clouds_render(
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
   const int task_count = device.trace_count[THREAD_ID];
 
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
-
   for (int i = 0; i < task_count; i++) {
     const int offset         = get_task_address(i);
     TraceTask task           = load_trace_task(device.trace_tasks + offset);
@@ -326,7 +323,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     RGBF record = load_RGBF(device.records + pixel);
     RGBF color  = get_color(0.0f, 0.0f, 0.0f);
 
-    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, pixel, color, record, seed);
+    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, task.index, color, record);
 
     if (device.iteration_type != TYPE_LIGHT && device.scene.sky.cloud.atmosphere_scattering) {
       if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
@@ -344,8 +341,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
     store_RGBF(device.records + pixel, record);
     write_beauty_buffer(color, pixel);
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 #endif /* CU_CLOUD_H */

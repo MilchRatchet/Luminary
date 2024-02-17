@@ -238,8 +238,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering_tasks() {
   const int task_count = device.trace_count[THREAD_ID];
 
-  uint32_t seed = device.ptrs.randoms[THREAD_ID];
-
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
     TraceTask task      = load_trace_task(device.trace_tasks + offset);
@@ -260,13 +258,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
 
     RGBF record = load_RGBF(device.records + pixel);
 
-    const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, seed);
+    const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.index);
 
     store_RGBF(device.records + pixel, record);
     write_beauty_buffer(inscattering, pixel);
   }
-
-  device.ptrs.randoms[THREAD_ID] = seed;
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {

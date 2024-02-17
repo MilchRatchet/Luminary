@@ -21,7 +21,6 @@ extern "C" {
 void _device_update_symbol(const size_t offset, const void* src, const size_t size);
 void _device_gather_symbol(void* dst, const size_t offset, const size_t size);
 void device_gather_device_table(void* dst, enum cudaMemcpyKind kind);
-void device_initialize_random_generators();
 unsigned int device_get_thread_count();
 void device_init();
 void device_generate_tasks();
