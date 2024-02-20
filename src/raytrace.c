@@ -755,7 +755,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.bounce_records            = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
   ptrs.buffer_8bit               = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
   ptrs.albedo_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
-  ptrs.illuminance_atlas         = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.illuminance);
+  ptrs.luminance_atlas           = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.luminance);
   ptrs.material_atlas            = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.material);
   ptrs.normal_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.normal);
   ptrs.cloud_noise               = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);

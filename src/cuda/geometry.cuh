@@ -112,11 +112,11 @@ __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const
     albedo.a = 0.0f;
 
   RGBF emission = (device.scene.material.lights_active) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
-  if (mat.illuminance_map != TEXTURE_NONE && device.scene.material.lights_active) {
-    const float4 illuminance_f = texture_load(device.ptrs.illuminance_atlas[mat.illuminance_map], tex_coords);
+  if (mat.luminance_map != TEXTURE_NONE && device.scene.material.lights_active) {
+    const float4 luminance_f = texture_load(device.ptrs.luminance_atlas[mat.luminance_map], tex_coords);
 
-    emission = get_color(illuminance_f.x, illuminance_f.y, illuminance_f.z);
-    emission = scale_color(emission, illuminance_f.w * albedo.a);
+    emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
+    emission = scale_color(emission, luminance_f.w * albedo.a);
   }
   emission = scale_color(emission, device.scene.material.default_material.b);
 

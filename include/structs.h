@@ -221,7 +221,7 @@ struct PackedMaterial {
   uint16_t metallic;
   uint16_t roughness;
   uint16_t albedo_map;
-  uint16_t illuminance_map;
+  uint16_t luminance_map;
   uint16_t material_map;
   uint16_t normal_map;
 } typedef PackedMaterial;
@@ -233,7 +233,7 @@ struct Material {
   float metallic;
   float roughness;
   uint16_t albedo_map;
-  uint16_t illuminance_map;
+  uint16_t luminance_map;
   uint16_t material_map;
   uint16_t normal_map;
 } typedef Material;

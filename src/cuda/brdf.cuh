@@ -341,10 +341,10 @@ __device__ vec3
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
-  const uint16_t illum_tex = device.scene.materials[triangle.material_id].illuminance_map;
+  const uint16_t illum_tex = device.scene.materials[triangle.material_id].luminance_map;
 
   const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, make_float2(u, v));
-  const float4 emission = texture_load(device.ptrs.illuminance_atlas[illum_tex], tex_coords);
+  const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
 
   lum = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
 

@@ -257,20 +257,20 @@ RaytraceInstance* scene_load_lum(const char* filename, CommandlineOptions option
 
   scene_create_from_wavefront(scene, content);
 
-  lights_build_set_from_triangles(scene, content->maps[WF_ILLUMINANCE]);
+  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE]);
 
   TextureAtlas tex_atlas = {
-    .albedo             = (DeviceBuffer*) 0,
-    .albedo_length      = content->maps_count[WF_ALBEDO],
-    .illuminance        = (DeviceBuffer*) 0,
-    .illuminance_length = content->maps_count[WF_ILLUMINANCE],
-    .material           = (DeviceBuffer*) 0,
-    .material_length    = content->maps_count[WF_MATERIAL],
-    .normal             = (DeviceBuffer*) 0,
-    .normal_length      = content->maps_count[WF_NORMAL]};
+    .albedo           = (DeviceBuffer*) 0,
+    .albedo_length    = content->maps_count[WF_ALBEDO],
+    .luminance        = (DeviceBuffer*) 0,
+    .luminance_length = content->maps_count[WF_LUMINANCE],
+    .material         = (DeviceBuffer*) 0,
+    .material_length  = content->maps_count[WF_MATERIAL],
+    .normal           = (DeviceBuffer*) 0,
+    .normal_length    = content->maps_count[WF_NORMAL]};
 
   texture_create_atlas(&tex_atlas.albedo, content->maps[WF_ALBEDO], content->maps_count[WF_ALBEDO]);
-  texture_create_atlas(&tex_atlas.illuminance, content->maps[WF_ILLUMINANCE], content->maps_count[WF_ILLUMINANCE]);
+  texture_create_atlas(&tex_atlas.luminance, content->maps[WF_LUMINANCE], content->maps_count[WF_LUMINANCE]);
   texture_create_atlas(&tex_atlas.material, content->maps[WF_MATERIAL], content->maps_count[WF_MATERIAL]);
   texture_create_atlas(&tex_atlas.normal, content->maps[WF_NORMAL], content->maps_count[WF_NORMAL]);
 
@@ -302,20 +302,20 @@ RaytraceInstance* scene_load_obj(char* filename, CommandlineOptions options) {
 
   scene_create_from_wavefront(scene, content);
 
-  lights_build_set_from_triangles(scene, content->maps[WF_ILLUMINANCE]);
+  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE]);
 
   TextureAtlas tex_atlas = {
-    .albedo             = (DeviceBuffer*) 0,
-    .albedo_length      = content->maps_count[WF_ALBEDO],
-    .illuminance        = (DeviceBuffer*) 0,
-    .illuminance_length = content->maps_count[WF_ILLUMINANCE],
-    .material           = (DeviceBuffer*) 0,
-    .material_length    = content->maps_count[WF_MATERIAL],
-    .normal             = (DeviceBuffer*) 0,
-    .normal_length      = content->maps_count[WF_NORMAL]};
+    .albedo           = (DeviceBuffer*) 0,
+    .albedo_length    = content->maps_count[WF_ALBEDO],
+    .luminance        = (DeviceBuffer*) 0,
+    .luminance_length = content->maps_count[WF_LUMINANCE],
+    .material         = (DeviceBuffer*) 0,
+    .material_length  = content->maps_count[WF_MATERIAL],
+    .normal           = (DeviceBuffer*) 0,
+    .normal_length    = content->maps_count[WF_NORMAL]};
 
   texture_create_atlas(&tex_atlas.albedo, content->maps[WF_ALBEDO], content->maps_count[WF_ALBEDO]);
-  texture_create_atlas(&tex_atlas.illuminance, content->maps[WF_ILLUMINANCE], content->maps_count[WF_ILLUMINANCE]);
+  texture_create_atlas(&tex_atlas.luminance, content->maps[WF_LUMINANCE], content->maps_count[WF_LUMINANCE]);
   texture_create_atlas(&tex_atlas.material, content->maps[WF_MATERIAL], content->maps_count[WF_MATERIAL]);
   texture_create_atlas(&tex_atlas.normal, content->maps[WF_NORMAL], content->maps_count[WF_NORMAL]);
 
@@ -343,7 +343,7 @@ void scene_serialize(RaytraceInstance* instance) {
 
 void free_atlases(RaytraceInstance* instance) {
   texture_free_atlas(instance->tex_atlas.albedo, instance->tex_atlas.albedo_length);
-  texture_free_atlas(instance->tex_atlas.illuminance, instance->tex_atlas.illuminance_length);
+  texture_free_atlas(instance->tex_atlas.luminance, instance->tex_atlas.luminance_length);
   texture_free_atlas(instance->tex_atlas.material, instance->tex_atlas.material_length);
   texture_free_atlas(instance->tex_atlas.normal, instance->tex_atlas.normal_length);
 }

@@ -51,22 +51,22 @@ void wavefront_init(WavefrontContent** content) {
   (*content)->materials[0].emission.b              = 0.0f;
   (*content)->materials[0].refraction_index        = 1.0f;
   (*content)->materials[0].texture[WF_ALBEDO]      = TEXTURE_NONE;
-  (*content)->materials[0].texture[WF_ILLUMINANCE] = TEXTURE_NONE;
+  (*content)->materials[0].texture[WF_LUMINANCE]   = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_NORMAL]      = TEXTURE_NONE;
 
-  (*content)->maps[WF_ALBEDO]             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  (*content)->maps_count[WF_ALBEDO]       = 0;
-  (*content)->maps_length[WF_ALBEDO]      = 1;
-  (*content)->maps[WF_ILLUMINANCE]        = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  (*content)->maps_count[WF_ILLUMINANCE]  = 0;
-  (*content)->maps_length[WF_ILLUMINANCE] = 1;
-  (*content)->maps[WF_MATERIAL]           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  (*content)->maps_count[WF_MATERIAL]     = 0;
-  (*content)->maps_length[WF_MATERIAL]    = 1;
-  (*content)->maps[WF_NORMAL]             = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
-  (*content)->maps_count[WF_NORMAL]       = 0;
-  (*content)->maps_length[WF_NORMAL]      = 1;
+  (*content)->maps[WF_ALBEDO]           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps_count[WF_ALBEDO]     = 0;
+  (*content)->maps_length[WF_ALBEDO]    = 1;
+  (*content)->maps[WF_LUMINANCE]        = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps_count[WF_LUMINANCE]  = 0;
+  (*content)->maps_length[WF_LUMINANCE] = 1;
+  (*content)->maps[WF_MATERIAL]         = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps_count[WF_MATERIAL]   = 0;
+  (*content)->maps_length[WF_MATERIAL]  = 1;
+  (*content)->maps[WF_NORMAL]           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps_count[WF_NORMAL]     = 0;
+  (*content)->maps_length[WF_NORMAL]    = 1;
 
   (*content)->texture_list           = malloc(sizeof(WavefrontTextureList));
   (*content)->texture_list->textures = malloc(sizeof(WavefrontTextureInstance) * 16);
@@ -89,8 +89,8 @@ void wavefront_clear(WavefrontContent** content) {
   for (unsigned int i = 0; i < (*content)->maps_count[WF_ALBEDO]; i++) {
     free((*content)->maps[WF_ALBEDO][i].data);
   }
-  for (unsigned int i = 0; i < (*content)->maps_count[WF_ILLUMINANCE]; i++) {
-    free((*content)->maps[WF_ILLUMINANCE][i].data);
+  for (unsigned int i = 0; i < (*content)->maps_count[WF_LUMINANCE]; i++) {
+    free((*content)->maps[WF_LUMINANCE][i].data);
   }
   for (unsigned int i = 0; i < (*content)->maps_count[WF_MATERIAL]; i++) {
     free((*content)->maps[WF_MATERIAL][i].data);
@@ -100,7 +100,7 @@ void wavefront_clear(WavefrontContent** content) {
   }
 
   free((*content)->maps[WF_ALBEDO]);
-  free((*content)->maps[WF_ILLUMINANCE]);
+  free((*content)->maps[WF_LUMINANCE]);
   free((*content)->maps[WF_MATERIAL]);
   free((*content)->maps[WF_NORMAL]);
   free((*content)->texture_list->textures);
@@ -184,7 +184,7 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
     type = WF_ALBEDO;
   }
   else if (!strncmp(line + 4, "Ke", 2)) {
-    type = WF_ILLUMINANCE;
+    type = WF_LUMINANCE;
   }
   else if (!strncmp(line + 4, "Ns", 2)) {
     type = WF_MATERIAL;
@@ -303,7 +303,7 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
       content->materials[content->materials_count].emission.b              = 0.0f;
       content->materials[content->materials_count].refraction_index        = 1.0f;
       content->materials[content->materials_count].texture[WF_ALBEDO]      = TEXTURE_NONE;
-      content->materials[content->materials_count].texture[WF_ILLUMINANCE] = TEXTURE_NONE;
+      content->materials[content->materials_count].texture[WF_LUMINANCE]   = TEXTURE_NONE;
       content->materials[content->materials_count].texture[WF_MATERIAL]    = TEXTURE_NONE;
       content->materials[content->materials_count].texture[WF_NORMAL]      = TEXTURE_NONE;
       content->materials_count++;
@@ -389,7 +389,7 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
   fclose(file);
 
   log_message(
-    "Material counts: %d (%d %d %d %d)", content->materials_count, content->maps_count[WF_ALBEDO], content->maps_count[WF_ILLUMINANCE],
+    "Material counts: %d (%d %d %d %d)", content->materials_count, content->maps_count[WF_ALBEDO], content->maps_count[WF_LUMINANCE],
     content->maps_count[WF_MATERIAL], content->maps_count[WF_NORMAL]);
 }
 
@@ -731,7 +731,7 @@ PackedMaterial* wavefront_generate_texture_assignments(WavefrontContent* content
     mat.metallic         = _wavefront_convert_float01_to_uint16(content->materials[i].specular_reflectivity.r);
     mat.roughness        = _wavefront_convert_float01_to_uint16(1.0f - content->materials[i].specular_exponent / 1000.0f);
     mat.albedo_map       = content->materials[i].texture[WF_ALBEDO];
-    mat.illuminance_map  = content->materials[i].texture[WF_ILLUMINANCE];
+    mat.luminance_map    = content->materials[i].texture[WF_LUMINANCE];
     mat.material_map     = content->materials[i].texture[WF_MATERIAL];
     mat.normal_map       = content->materials[i].texture[WF_NORMAL];
 

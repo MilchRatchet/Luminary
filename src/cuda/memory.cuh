@@ -399,7 +399,7 @@ __device__ Material load_material(const PackedMaterial* data, const int offset) 
   mat.metallic         = random_uint16_t_to_float(__float_as_uint(v1.y) & 0xFFFF);
   mat.roughness        = random_uint16_t_to_float(__float_as_uint(v1.y) >> 16);
   mat.albedo_map       = __float_as_uint(v1.z) & 0xFFFF;
-  mat.illuminance_map  = __float_as_uint(v1.z) >> 16;
+  mat.luminance_map    = __float_as_uint(v1.z) >> 16;
   mat.material_map     = __float_as_uint(v1.w) & 0xFFFF;
   mat.normal_map       = __float_as_uint(v1.w) >> 16;
 

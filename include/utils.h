@@ -382,8 +382,8 @@ struct RayEmitter {
 struct TextureAtlas {
   DeviceBuffer* albedo;
   int albedo_length;
-  DeviceBuffer* illuminance;
-  int illuminance_length;
+  DeviceBuffer* luminance;
+  int luminance_length;
   DeviceBuffer* material;
   int material_length;
   DeviceBuffer* normal;
@@ -424,7 +424,7 @@ struct DevicePointers {
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
   DeviceTexture* albedo_atlas;
-  DeviceTexture* illuminance_atlas;
+  DeviceTexture* luminance_atlas;
   DeviceTexture* material_atlas;
   DeviceTexture* normal_atlas;
   DeviceTexture* cloud_noise;

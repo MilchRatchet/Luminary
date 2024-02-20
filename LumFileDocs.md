@@ -427,7 +427,7 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
    - Green: Green Color
    - Blue: Blue Color
    - Alpha: Transparency
- - Illuminance Textures
+ - Luminance Textures
    - Red: Emission Red Color
    - Green: Emission Green Color
    - Blue: Emission Blue Color
@@ -448,7 +448,7 @@ Textures must be in the Portable Network Graphics (`*.png`) file format. They ne
 Material properties are to be referenced in the `*.mtl` as follows:
 
 - map_Kd   = Albedo Textures
-- map_Ke   = Illuminance Textures
+- map_Ke   = Luminance Textures
 - map_Ns   = Material Textures
 - map_Bump = Normal Textures
 - Ni       = Index of refraction

@@ -47,12 +47,7 @@ struct WavefrontMaterial {
   uint16_t texture[4];
 } typedef WavefrontMaterial;
 
-enum WavefrontTextureInstanceType {
-  WF_ALBEDO      = 0,
-  WF_ILLUMINANCE = 1,
-  WF_MATERIAL    = 2,
-  WF_NORMAL      = 3
-} typedef WavefrontTextureInstanceType;
+enum WavefrontTextureInstanceType { WF_ALBEDO = 0, WF_LUMINANCE = 1, WF_MATERIAL = 2, WF_NORMAL = 3 } typedef WavefrontTextureInstanceType;
 
 struct WavefrontTextureInstance {
   size_t hash;

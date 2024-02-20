@@ -142,7 +142,7 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
   for (uint32_t i = 0; i < data.triangle_data.triangle_count; i++) {
     const Triangle triangle = data.triangles[i];
 
-    const uint16_t tex_index = data.materials[triangle.material_id].illuminance_map;
+    const uint16_t tex_index = data.materials[triangle.material_id].luminance_map;
 
     if (tex_index != TEXTURE_NONE && contains_illumination(triangle, textures[tex_index])) {
       const TriangleLight l = {
