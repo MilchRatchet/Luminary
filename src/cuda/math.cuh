@@ -264,7 +264,7 @@ __device__ Mat3x3 create_basis(const vec3 basis) {
 }
 
 /*
- * This function samples a ray on the unit sphere.
+ * This function samples a ray on the unit sphere. Up is Z+.
  *
  * @param alpha Number between [-1,1]. To sample only the upper hemisphere use [0,1] and vice versa.
  * @param beta Number between [0,1].
@@ -325,6 +325,7 @@ __device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
   return res;
 }
 
+// TODO: Replace math with functions
 __device__ __host__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   vec3 result;
 
