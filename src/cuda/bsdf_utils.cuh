@@ -4,6 +4,17 @@
 #include "math.cuh"
 #include "utils.cuh"
 
+struct BSDFRayContext {
+  RGBF f0;
+  RGBF fresnel;
+  RGBF diffuse;
+  RGBF refraction;
+  float NdotH;
+  float NdotL;
+  float NdotV;
+  bool is_refraction;
+};
+
 __device__ RGBF bsdf_diffuse_color(const GBufferData data) {
   return scale_color(opaque_color(data.albedo), 1.0f - data.metallic);
 }
@@ -186,20 +197,18 @@ __device__ float bsdf_diffuse_pdf(const vec3 normal, const vec3 L) {
 // Multiscattering
 ///////////////////////////////////////////////////
 
-__device__ RGBF bsdf_multiscattering_evaluate(
-  const GBufferData data, const RGBF Fss, const RGBF f0, const RGBF Kd, const RGBF Fr, const float NdotH, const float NdotL,
-  const float NdotV, const bool is_refraction) {
+__device__ RGBF bsdf_multiscattering_evaluate(const GBufferData data, const BSDFRayContext ctx) {
   // Single scattering energy
-  const float Ess = bsdf_microfacet_evaluate(data, NdotH, NdotL, NdotV);
+  const float Ess = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
 
   // Single scattering term
-  const RGBF FssEss = scale_color(Fss, Ess);
+  const RGBF FssEss = scale_color(ctx.fresnel, Ess);
 
   // Multi scattering energy
   const float Ems = (1.0f - Ess);
 
   // Average Fresnel term
-  const RGBF F_avg = add_color(f0, scale_color(get_color(1.0f - f0.r, 1.0f - f0.g, 1.0f - f0.b), 1.0f / 21.0f));
+  const RGBF F_avg = add_color(ctx.f0, scale_color(get_color(1.0f - ctx.f0.r, 1.0f - ctx.f0.g, 1.0f - ctx.f0.b), 1.0f / 21.0f));
 
   // Multi scattering Fresnel term
   const RGBF Fms = mul_color(FssEss, mul_color(F_avg, inv_color(scale_color(F_avg, 1.0f - Ess))));
@@ -211,12 +220,12 @@ __device__ RGBF bsdf_multiscattering_evaluate(
   const RGBF Ed = sub_color(get_color(1.0f, 1.0f, 1.0f), add_color(FssEss, FmsEms));
 
   // Diffuse term
-  const RGBF KdEd = scale_color(mul_color(Kd, Ed), data.albedo.a);
+  const RGBF KdEd = scale_color(mul_color(ctx.diffuse, Ed), data.albedo.a);
 
   // Refraction term
-  const RGBF FrEd = scale_color(mul_color(Fr, Ed), 1.0f - data.albedo.a);
+  const RGBF FrEd = scale_color(mul_color(ctx.refraction, Ed), 1.0f - data.albedo.a);
 
-  return (is_refraction) ? FrEd : add_color(FssEss, scale_color(add_color(FmsEms, KdEd), NdotL));
+  return (ctx.is_refraction) ? FrEd : add_color(FssEss, scale_color(add_color(FmsEms, KdEd), ctx.NdotL));
 }
 
 #endif /* CU_BSDF_UTILS_H */

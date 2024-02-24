@@ -5,13 +5,15 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-__device__ RGBF bsdf_evaluate(const GBufferData data, const vec3 L) {
-  float NdotL       = dot_product(data.normal, L);
-  const float NdotV = dot_product(data.normal, data.V);
+__device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const vec3 L) {
+  BSDFRayContext context;
+
+  context.NdotL = dot_product(data.normal, L);
+  context.NdotV = dot_product(data.normal, data.V);
 
   // Refraction rays can leave the surface and reflections could enter the surface, we hack here and simply swap their meaning around based
   // on if they enter or leave, otherwise it is not clear which of the two a ray should be.
-  const bool is_refraction = (NdotL < 0.0f);
+  context.is_refraction = (context.NdotL < 0.0f);
 
   const float ambient_ior = bsdf_refraction_index_ambient(data);
   const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
@@ -20,13 +22,13 @@ __device__ RGBF bsdf_evaluate(const GBufferData data, const vec3 L) {
   vec3 reflection_vector, refraction_vector, H;
 
   // For every refraction exists a corresponding reflection vector, we always compute the BSDF based on the reflection.
-  if (is_refraction) {
-    NdotL = fabsf(NdotL);
-
+  if (context.is_refraction) {
     H = bsdf_refraction_normal_from_pair(L, data.V, ior_out, ior_in);
 
     reflection_vector = reflect_vector(scale_vector(data.V, -1.0f), H);
     refraction_vector = L;
+
+    context.NdotL = dot_product(data.normal, reflection_vector);
   }
   else {
     H = normalize_vector(add_vector(data.V, L));
@@ -35,14 +37,25 @@ __device__ RGBF bsdf_evaluate(const GBufferData data, const vec3 L) {
     refraction_vector = refract_ray(scale_vector(data.V, -1.0f), H, ior_in / ior_out);
   }
 
-  const float NdotH = dot_product(data.normal, H);
+  context.NdotH     = dot_product(data.normal, H);
   const float HdotV = __saturatef(dot_product(H, data.V));
 
-  const RGBF f0      = bsdf_fresnel_normal_incidence(data);
-  const RGBF fresnel = bsdf_fresnel_composite(data, reflection_vector, refraction_vector, ior_in, ior_out, f0, HdotV);
-  const RGBF diffuse = bsdf_diffuse_color(data);
+  context.f0         = bsdf_fresnel_normal_incidence(data);
+  context.fresnel    = bsdf_fresnel_composite(data, reflection_vector, refraction_vector, ior_in, ior_out, context.f0, HdotV);
+  context.diffuse    = bsdf_diffuse_color(data);
+  context.refraction = opaque_color(data.albedo);
 
-  return bsdf_multiscattering_evaluate(data, fresnel, f0, diffuse, opaque_color(data.albedo), NdotH, NdotL, NdotV, is_refraction);
+  return context;
+}
+
+__device__ RGBF bsdf_evaluate_core(const GBufferData data, const BSDFRayContext context) {
+  return bsdf_multiscattering_evaluate(data, context);
+}
+
+__device__ RGBF bsdf_evaluate(const GBufferData data, const vec3 L) {
+  const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
+
+  return bsdf_evaluate_core(data, context);
 }
 
 __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& weight) {
