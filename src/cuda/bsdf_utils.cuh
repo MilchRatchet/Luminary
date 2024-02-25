@@ -112,7 +112,12 @@ __device__ float bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(const f
   return 0.5f / (a + b);
 }
 
-__device__ float bsdf_microfacet_evaluate_GGX(const float NdotH, const float roughness4) {
+__device__ float bsdf_microfacet_evaluate_smith_G1_GGX(const float roughness4, const float NdotL) {
+  const float NdotL2 = NdotL * NdotL;
+  return 2.0f / (sqrtf(((roughness4 * (1.0f - NdotL2)) + NdotL2) / NdotL2) + 1.0f);
+}
+
+__device__ float bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float roughness4) {
   const float a = ((roughness4 - 1.0f) * NdotH * NdotH + 1.0f);
   return roughness4 / (PI * a * a);
 }
@@ -120,7 +125,7 @@ __device__ float bsdf_microfacet_evaluate_GGX(const float NdotH, const float rou
 __device__ float bsdf_microfacet_evaluate(const GBufferData data, const float NdotH, const float NdotL, const float NdotV) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_GGX(roughness4, NdotH);
+  const float D          = bsdf_microfacet_evaluate_D_GGX(roughness4, NdotH);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   return D * G2 * NdotL;
@@ -150,6 +155,16 @@ __device__ vec3 bsdf_microfacet_sample_normal(const GBufferData data, const vec3
   vec3 sampled = bsdf_microfacet_sample_normal_GGX(v_hemi, random);
 
   return normalize_vector(get_vector(sampled.x * roughness2, sampled.y * roughness2, sampled.z));
+}
+
+__device__ float bsdf_microfacet_pdf(const GBufferData data, const vec3 H) {
+  const float roughness2 = data.roughness * data.roughness;
+  const float roughness4 = roughness2 * roughness2;
+
+  const float NdotH = dot_product(data.normal, H);
+  const float NdotV = dot_product(data.normal, data.V);
+
+  return bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4) * bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV) / (4.0f * NdotV);
 }
 
 ///////////////////////////////////////////////////

@@ -78,10 +78,12 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
 
   // Specular Reflection Vector (+Z-Up)
   const vec3 spec_reflection_local = reflect_vector(scale_vector(V_local, -1.0f), microfacet_normal_local);
+  const float spec_reflection_pdf  = bsdf_microfacet_pdf(data_local, microfacet_normal_local);
 
   // Refraction Vector (+Z-Up)
   const float refraction_index = bsdf_refraction_index(data_local);
   const vec3 refraction_local  = refract_ray(scale_vector(V_local, -1.0f), microfacet_normal_local, refraction_index);
+  const float refraction_pdf   = spec_reflection_pdf;
 
   // Diffuse Vector (+Z-Up)
   const float2 diffuse_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_DIFFUSE, pixel);
