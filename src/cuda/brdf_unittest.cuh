@@ -1,7 +1,7 @@
 #ifndef CU_BRDF_UNITTEST_H
 #define CU_BRDF_UNITTEST_H
 
-#include "brdf.cuh"
+#include "bsdf.cuh"
 #include "buffer.h"
 #include "utils.cuh"
 #include "utils.h"
@@ -26,6 +26,14 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
     float sum_bounce = 0.0f;
     float sum_light  = 0.0f;
 
+    GBufferData data;
+    data.albedo           = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
+    data.position         = get_vector(FLT_MAX, 1000000.0f, 0.0f);
+    data.refraction_index = 1.0f;
+    data.roughness        = 1.0f - smoothness;
+    data.metallic         = metallic;
+    data.normal           = get_vector(0.0f, 1.0f, 0.0f);
+
     for (int i = 0; i < BRDF_UNITTEST_ITERATIONS; i++) {
       float2 ran0 = quasirandom_sequence_2D_base(0, make_ushort2(0, 0), i, 0);
       float2 ran1 = quasirandom_sequence_2D_base(1, make_ushort2(0, 0), i, 0);
@@ -35,26 +43,16 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
       ran1.x = 0.5f * PI * (1.0f - ran1.x);
       ran1.y = 0.5f * PI * ran1.y;
 
-      const vec3 V = angles_to_direction(ran0.x, ran0.y);
+      data.V = angles_to_direction(ran0.x, ran0.y);
 
-      BRDFInstance brdf =
-        brdf_get_instance(get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f), V, get_vector(0.0f, 1.0f, 0.0f), 1.0f - smoothness, metallic);
+      RGBF weight;
+      bsdf_sample(data, make_ushort2(0, 0), weight);
 
-      bool dummy;
-      brdf = brdf_sample_ray(brdf, make_ushort2(0, 0), dummy);
+      sum_bounce += luminance(weight);
 
-      float weight = luminance(brdf.term);
+      vec3 L = angles_to_direction(ran1.x, ran1.y);
 
-      sum_bounce += weight;
-
-      brdf.L    = angles_to_direction(ran1.x, ran1.y);
-      brdf.term = get_color(1.0f, 1.0f, 1.0f);
-
-      brdf = brdf_evaluate(brdf);
-
-      weight = luminance(brdf.term);
-
-      sum_light += weight;
+      sum_light += luminance(bsdf_evaluate(data, L, BSDF_SAMPLING_GENERAL)) / (2.0f * PI);
     }
 
     bounce[id] = sum_bounce / BRDF_UNITTEST_ITERATIONS;

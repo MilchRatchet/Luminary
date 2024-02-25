@@ -2,9 +2,11 @@
 #define CU_BSDF_UTILS_H
 
 #include "math.cuh"
+#include "toy_utils.cuh"
 #include "utils.cuh"
 
 struct BSDFRayContext {
+  vec3 H;
   RGBF f0;
   RGBF fresnel;
   RGBF diffuse;
@@ -14,6 +16,8 @@ struct BSDFRayContext {
   float NdotV;
   bool is_refraction;
 };
+
+enum BSDFSamplingHint { BSDF_SAMPLING_GENERAL = 0, BSDF_SAMPLING_MICROFACET = 1, BSDF_SAMPLING_DIFFUSE = 2 };
 
 __device__ RGBF bsdf_diffuse_color(const GBufferData data) {
   return scale_color(opaque_color(data.albedo), 1.0f - data.metallic);
@@ -106,15 +110,22 @@ __device__ RGBF bsdf_fresnel_composite(
 // Microfacet
 ///////////////////////////////////////////////////
 
+__device__ float bsdf_microfacet_evaluate_smith_G1_GGX(const float roughness4, const float NdotL) {
+  const float NdotL2 = __saturatef(fmaxf(0.001f, NdotL * NdotL));
+  return 2.0f / (sqrtf(((roughness4 * (1.0f - NdotL2)) + NdotL2) / NdotL2) + 1.0f);
+}
+
 __device__ float bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(const float roughness4, const float NdotL, const float NdotV) {
   const float a = NdotV * sqrtf(roughness4 + NdotL * (NdotL - roughness4 * NdotL));
   const float b = NdotL * sqrtf(roughness4 + NdotV * (NdotV - roughness4 * NdotV));
   return 0.5f / (a + b);
 }
 
-__device__ float bsdf_microfacet_evaluate_smith_G1_GGX(const float roughness4, const float NdotL) {
-  const float NdotL2 = NdotL * NdotL;
-  return 2.0f / (sqrtf(((roughness4 * (1.0f - NdotL2)) + NdotL2) / NdotL2) + 1.0f);
+__device__ float bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(
+  const float roughness4, const float NdotL, const float NdotV) {
+  const float G1V = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV * NdotV);
+  const float G1L = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotL * NdotL);
+  return G1L / (G1V + G1L - G1V * G1L);
 }
 
 __device__ float bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float roughness4) {
@@ -129,6 +140,14 @@ __device__ float bsdf_microfacet_evaluate(const GBufferData data, const float Nd
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   return D * G2 * NdotL;
+}
+
+__device__ float bsdf_microfacet_evaluate_sampled(const GBufferData data, const float NdotH, const float NdotL, const float NdotV) {
+  const float roughness2 = data.roughness * data.roughness;
+  const float roughness4 = roughness2 * roughness2;
+  const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
+
+  return G2_over_G1;
 }
 
 /*
@@ -159,10 +178,10 @@ __device__ vec3 bsdf_microfacet_sample_normal(const GBufferData data, const vec3
 
 __device__ float bsdf_microfacet_pdf(const GBufferData data, const vec3 H) {
   const float roughness2 = data.roughness * data.roughness;
-  const float roughness4 = roughness2 * roughness2;
+  const float roughness4 = __saturatef(fmaxf(0.001f, roughness2 * roughness2));
 
-  const float NdotH = dot_product(data.normal, H);
-  const float NdotV = dot_product(data.normal, data.V);
+  const float NdotH = __saturatef(fmaxf(0.001f, dot_product(data.normal, H)));
+  const float NdotV = __saturatef(fmaxf(0.001f, dot_product(data.normal, data.V)));
 
   return bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4) * bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV) / (4.0f * NdotV);
 }
@@ -203,6 +222,10 @@ __device__ vec3 bsdf_diffuse_sample(const float2 random) {
   return sample_ray_sphere(random.x, random.y);
 }
 
+__device__ float bsdf_diffuse_pdf_recip(const float NdotL) {
+  return PI / fmaxf(0.0001f, NdotL);
+}
+
 __device__ float bsdf_diffuse_pdf(const vec3 normal, const vec3 L) {
   const float NdotL = dot_product(normal, L);
   return NdotL / PI;
@@ -212,12 +235,27 @@ __device__ float bsdf_diffuse_pdf(const vec3 normal, const vec3 L) {
 // Multiscattering
 ///////////////////////////////////////////////////
 
-__device__ RGBF bsdf_multiscattering_evaluate(const GBufferData data, const BSDFRayContext ctx) {
+__device__ RGBF bsdf_multiscattering_evaluate(const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint) {
   // Single scattering energy
-  const float Ess = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
+  float Ess, Ess_over_pdf, one_over_pdf;
+  Ess = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
+  switch (sampling_hint) {
+    case BSDF_SAMPLING_GENERAL:
+      one_over_pdf = 1.0f;
+      Ess_over_pdf = Ess;
+      break;
+    case BSDF_SAMPLING_MICROFACET:
+      one_over_pdf = bsdf_microfacet_pdf(data, ctx.H);
+      Ess_over_pdf = bsdf_microfacet_evaluate_sampled(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
+      break;
+    case BSDF_SAMPLING_DIFFUSE:
+      one_over_pdf = bsdf_diffuse_pdf_recip(ctx.NdotL);
+      Ess_over_pdf = Ess * one_over_pdf;
+      break;
+  };
 
-  // Single scattering term
-  const RGBF FssEss = scale_color(ctx.fresnel, Ess);
+  // Single scattering term (including pdf)
+  const RGBF FssEss = scale_color(ctx.fresnel, Ess_over_pdf);
 
   // Multi scattering energy
   const float Ems = (1.0f - Ess);
@@ -225,14 +263,14 @@ __device__ RGBF bsdf_multiscattering_evaluate(const GBufferData data, const BSDF
   // Average Fresnel term
   const RGBF F_avg = add_color(ctx.f0, scale_color(get_color(1.0f - ctx.f0.r, 1.0f - ctx.f0.g, 1.0f - ctx.f0.b), 1.0f / 21.0f));
 
-  // Multi scattering Fresnel term
+  // Multi scattering Fresnel term (including pdf)
   const RGBF Fms = mul_color(FssEss, mul_color(F_avg, inv_color(scale_color(F_avg, 1.0f - Ess))));
 
-  // Multi scattering term
+  // Multi scattering term (including pdf)
   const RGBF FmsEms = scale_color(Fms, Ems);
 
-  // Diffuse energy
-  const RGBF Ed = sub_color(get_color(1.0f, 1.0f, 1.0f), add_color(FssEss, FmsEms));
+  // Diffuse energy (including pdf)
+  const RGBF Ed = sub_color(get_color(one_over_pdf, one_over_pdf, one_over_pdf), add_color(FssEss, FmsEms));
 
   // Diffuse term
   const RGBF KdEd = scale_color(mul_color(ctx.diffuse, Ed), data.albedo.a);

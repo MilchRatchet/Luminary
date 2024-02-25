@@ -2,6 +2,7 @@
 #define CU_TOY_H
 
 #include "brdf.cuh"
+#include "bsdf.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "state.cuh"
@@ -16,23 +17,23 @@ __device__ GBufferData toy_generate_g_buffer(const ToyTask task, const int pixel
 
   uint32_t flags = 0;
 
-  if (
+  /*if (
     device.iteration_type == TYPE_LIGHT
     || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) > device.scene.toy.albedo.a) {
     flags |= G_BUFFER_TRANSPARENT_PASS;
-  }
+  }*/
 
   if (!(flags & G_BUFFER_TRANSPARENT_PASS) && !state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
     flags |= G_BUFFER_REQUIRES_SAMPLING;
   }
 
-  vec3 pos;
+  /*vec3 pos;
   if (flags & G_BUFFER_TRANSPARENT_PASS) {
     pos = add_vector(task.position, scale_vector(task.ray, 8.0f * eps * get_length(task.position)));
   }
   else {
     pos = add_vector(task.position, scale_vector(task.ray, -8.0f * eps * get_length(task.position)));
-  }
+  }*/
 
   RGBF emission;
   if (device.scene.toy.emissive) {
@@ -42,12 +43,16 @@ __device__ GBufferData toy_generate_g_buffer(const ToyTask task, const int pixel
     emission = get_color(0.0f, 0.0f, 0.0f);
   }
 
+  if (toy_is_inside(task.position)) {
+    flags |= G_BUFFER_REFRACTION_IS_INSIDE;
+  }
+
   GBufferData data;
   data.hit_id    = HIT_TYPE_TOY;
   data.albedo    = device.scene.toy.albedo;
   data.emission  = emission;
   data.normal    = normal;
-  data.position  = pos;
+  data.position  = task.position;
   data.V         = scale_vector(task.ray, -1.0f);
   data.roughness = (1.0f - device.scene.toy.material.r);
   data.metallic  = device.scene.toy.material.g;
@@ -68,7 +73,32 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
     const GBufferData data = toy_generate_g_buffer(task, pixel);
 
-    const bool is_inside = toy_is_inside(task.position);
+    if (device.iteration_type == TYPE_LIGHT) {
+      // Unlucko, we just block all the light
+    }
+    else {
+      RGBF weight;
+      const vec3 bounce_direction = bsdf_sample(data, task.index, weight);
+
+      RGBF record = load_RGBF(device.records + pixel);
+
+      record = mul_color(record, weight);
+
+      const float NdotL = dot_product(bounce_direction, data.normal);
+
+      TraceTask bounce_task;
+      bounce_task.origin = add_vector(data.position, scale_vector(data.normal, copysignf(16.0f * eps, NdotL)));
+      bounce_task.ray    = bounce_direction;
+      bounce_task.index  = task.index;
+
+      if (validate_trace_task(bounce_task, record)) {
+        device.ptrs.mis_buffer[pixel] = 1.0f;
+        store_RGBF(device.ptrs.bounce_records + pixel, record);
+        store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      }
+    }
+
+    /*const bool is_inside = toy_is_inside(task.position);
     const vec3 normal    = data.normal;
 
     RGBAF albedo          = device.scene.toy.albedo;
@@ -201,7 +231,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
         store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
       }
-    }
+    }*/
   }
 
   device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;

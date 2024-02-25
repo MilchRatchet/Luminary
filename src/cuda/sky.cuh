@@ -9,6 +9,7 @@
 #include "sky_utils.cuh"
 #include "stars.h"
 #include "texture.h"
+#include "texture_utils.cuh"
 #include "utils.cuh"
 
 //
