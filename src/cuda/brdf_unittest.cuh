@@ -52,7 +52,7 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
 
       vec3 L = angles_to_direction(ran1.x, ran1.y);
 
-      sum_light += luminance(bsdf_evaluate(data, L, BSDF_SAMPLING_GENERAL)) / (2.0f * PI);
+      sum_light += luminance(bsdf_evaluate(data, L, BSDF_SAMPLING_GENERAL, 2.0f * PI));
     }
 
     bounce[id] = sum_bounce / BRDF_UNITTEST_ITERATIONS;

@@ -48,14 +48,16 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   return context;
 }
 
-__device__ RGBF bsdf_evaluate_core(const GBufferData data, const BSDFRayContext context, const BSDFSamplingHint sampling_hint) {
-  return bsdf_multiscattering_evaluate(data, context, sampling_hint);
+__device__ RGBF bsdf_evaluate_core(
+  const GBufferData data, const BSDFRayContext context, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  return bsdf_multiscattering_evaluate(data, context, sampling_hint, one_over_sampling_pdf);
 }
 
-__device__ RGBF bsdf_evaluate(const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint) {
+__device__ RGBF
+  bsdf_evaluate(const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf = 1.0f) {
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
 
-  return bsdf_evaluate_core(data, context, sampling_hint);
+  return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf);
 }
 
 __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& weight) {
