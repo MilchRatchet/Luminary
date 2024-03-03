@@ -40,8 +40,8 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.NdotH     = dot_product(data.normal, context.H);
   const float HdotV = __saturatef(dot_product(context.H, data.V));
 
-  context.f0         = bsdf_fresnel_normal_incidence(data);
-  context.fresnel    = bsdf_fresnel_composite(data, reflection_vector, refraction_vector, ior_in, ior_out, context.f0, HdotV);
+  context.f0         = bsdf_fresnel_normal_incidence(data, ior_in, ior_out);
+  context.fresnel    = bsdf_fresnel_composite(data, refraction_vector, ior_in, ior_out, context.f0, HdotV);
   context.diffuse    = bsdf_diffuse_color(data);
   context.refraction = opaque_color(data.albedo);
 
@@ -49,7 +49,7 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
 }
 
 __device__ RGBF bsdf_evaluate_core(
-  const GBufferData data, const BSDFRayContext context, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  const GBufferData data, const BSDFRayContext context, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf = 1.0f) {
   return bsdf_multiscattering_evaluate(data, context, sampling_hint, one_over_sampling_pdf);
 }
 
@@ -58,6 +58,44 @@ __device__ RGBF
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
 
   return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf);
+}
+
+__device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3 H, const vec3 L) {
+  BSDFRayContext context;
+
+  context.NdotL = dot_product(data.normal, L);
+  context.NdotV = dot_product(data.normal, data.V);
+
+  // Refraction rays can leave the surface and reflections could enter the surface, we hack here and simply swap their meaning around based
+  // on if they enter or leave, otherwise it is not clear which of the two a ray should be.
+  context.is_refraction = (context.NdotL < 0.0f);
+
+  const float ambient_ior = bsdf_refraction_index_ambient(data);
+  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
+  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
+
+  context.H = H;
+
+  vec3 refraction_vector;
+  if (context.is_refraction) {
+    const vec3 reflection_vector = reflect_vector(scale_vector(data.V, -1.0f), context.H);
+    refraction_vector            = L;
+
+    context.NdotL = dot_product(data.normal, reflection_vector);
+  }
+  else {
+    refraction_vector = refract_ray(scale_vector(data.V, -1.0f), context.H, ior_in / ior_out);
+  }
+
+  context.NdotH     = dot_product(data.normal, context.H);
+  const float HdotV = __saturatef(dot_product(context.H, data.V));
+
+  context.f0         = bsdf_fresnel_normal_incidence(data, ior_in, ior_out);
+  context.fresnel    = bsdf_fresnel_composite(data, refraction_vector, ior_in, ior_out, context.f0, HdotV);
+  context.diffuse    = bsdf_diffuse_color(data);
+  context.refraction = opaque_color(data.albedo);
+
+  return context;
 }
 
 __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& weight) {
@@ -79,24 +117,27 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
   }
 
   // Specular Reflection Vector (+Z-Up)
-  const vec3 spec_reflection_local = reflect_vector(scale_vector(V_local, -1.0f), microfacet_normal_local);
-  const float spec_reflection_pdf  = bsdf_microfacet_pdf(data_local, microfacet_normal_local);
+  const vec3 spec_reflection_local             = reflect_vector(scale_vector(V_local, -1.0f), microfacet_normal_local);
+  const float spec_reflection_pdf              = bsdf_microfacet_pdf(data_local, microfacet_normal_local);
+  const BSDFRayContext spec_reflection_context = bsdf_sample_context(data_local, microfacet_normal_local, spec_reflection_local);
 
   // Refraction Vector (+Z-Up)
-  const float refraction_index = bsdf_refraction_index(data_local);
-  const vec3 refraction_local  = refract_ray(scale_vector(V_local, -1.0f), microfacet_normal_local, refraction_index);
-  const float refraction_pdf   = spec_reflection_pdf;
+  const float refraction_index            = bsdf_refraction_index(data_local);
+  const vec3 refraction_local             = refract_ray(scale_vector(V_local, -1.0f), microfacet_normal_local, refraction_index);
+  const float refraction_pdf              = spec_reflection_pdf;
+  const BSDFRayContext refraction_context = bsdf_sample_context(data_local, microfacet_normal_local, refraction_local);
 
   // Diffuse Vector (+Z-Up)
   const float2 diffuse_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_DIFFUSE, pixel);
   const vec3 diffuse_local    = bsdf_diffuse_sample(diffuse_random);
-  const float diffuse_pdf     = bsdf_diffuse_pdf(data_local.normal, diffuse_local);
+  const float diffuse_pdf     = bsdf_diffuse_pdf(data_local, diffuse_local);
 
   // Evaluate BSDF for each sample
-  const RGBF spec_reflection_bsdf = bsdf_evaluate(data_local, spec_reflection_local, BSDF_SAMPLING_MICROFACET);
-  const RGBF refraction_bsdf      = get_color(0.0f, 0.0f, 0.0f);  // bsdf_evaluate(data_local, refraction_local, BSDF_SAMPLING_MICROFACET);
-                                                                  // TODO: This is currently broken, fix everything else first.
-  const RGBF diffuse_bsdf = bsdf_evaluate(data_local, diffuse_local, BSDF_SAMPLING_DIFFUSE);
+  // I probably also need a new sampling hint for refraction because it is not correct using microfacet because it will
+  // give me the probability of a microfacet that would give this reflection, should be doable tho
+  const RGBF spec_reflection_bsdf = bsdf_evaluate_core(data_local, spec_reflection_context, BSDF_SAMPLING_MICROFACET);
+  const RGBF refraction_bsdf      = bsdf_evaluate_core(data_local, refraction_context, BSDF_SAMPLING_MICROFACET);
+  const RGBF diffuse_bsdf         = bsdf_evaluate(data_local, diffuse_local, BSDF_SAMPLING_DIFFUSE);
 
   // Compute weight for each sample
   const float spec_reflection_weight = luminance(spec_reflection_bsdf);
@@ -116,26 +157,36 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
   float choice_pdf;
   RGBF choice_bsdf;
   float choice_probability;
+  float MIS_weight;
 
   if (choice_random < spec_reflection_probability) {
     choice_local       = spec_reflection_local;
     choice_bsdf        = spec_reflection_bsdf;
     choice_probability = spec_reflection_probability;
+    MIS_weight =
+      1.0f
+      / (1.0f + ((bsdf_microfacet_pdf_refraction(data_local, spec_reflection_local) > 0.0f) ? 1.0f : 0.0f) + ((bsdf_diffuse_pdf(data_local, spec_reflection_local) > 0.0f) ? 1.0f : 0.0f));
   }
   else if (choice_random < spec_reflection_probability + refraction_probability) {
     choice_local       = refraction_local;
     choice_bsdf        = refraction_bsdf;
     choice_probability = refraction_probability;
+    MIS_weight =
+      1.0f
+      / (1.0f + ((bsdf_microfacet_pdf_reflection(data_local, spec_reflection_local) > 0.0f) ? 1.0f : 0.0f) + ((bsdf_diffuse_pdf(data_local, spec_reflection_local) > 0.0f) ? 1.0f : 0.0f));
   }
   else {
     choice_local       = diffuse_local;
     choice_bsdf        = diffuse_bsdf;
     choice_probability = diffuse_probability;
+    MIS_weight =
+      1.0f
+      / (1.0f + ((bsdf_microfacet_pdf_reflection(data_local, diffuse_local) > 0.0f) ? 1.0f : 0.0f) + ((bsdf_microfacet_pdf_refraction(data_local, diffuse_local) > 0.0f) ? 1.0f : 0.0f));
   }
 
   vec3 choice = normalize_vector(rotate_vector_by_quaternion(choice_local, inverse_quaternion(rotation_to_z)));
 
-  weight = scale_color(choice_bsdf, 1.0f / choice_probability);
+  weight = scale_color(choice_bsdf, MIS_weight / choice_probability);
 
   return choice;
 }
