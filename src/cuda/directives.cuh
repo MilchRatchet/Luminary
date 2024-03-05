@@ -19,19 +19,18 @@
  */
 #define WEIGHT_BASED_EXIT
 #define BRIGHTEST_EMISSION (device.scene.camera.exposure * device.scene.camera.russian_roulette_bias)
-#define CUTOFF ((4.0f) / (BRIGHTEST_EMISSION))
-#define PROBABILISTIC_CUTOFF (16.0f * CUTOFF)
+#define PROBABILISTIC_CUTOFF ((64.0f) / (BRIGHTEST_EMISSION))
 
 __device__ int validate_trace_task(TraceTask task, RGBF& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
   const float max = luminance(record);
-  if (isnan(max) || isinf(max) || max < CUTOFF) {
+  if (isnan(max) || isinf(max)) {
     valid = 0;
   }
   else if (max < PROBABILISTIC_CUTOFF) {
-    const float p = (max - CUTOFF) / (PROBABILISTIC_CUTOFF - CUTOFF);
+    const float p = max / PROBABILISTIC_CUTOFF;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE, task.index) > p) {
       valid = 0;
     }
