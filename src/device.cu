@@ -42,7 +42,7 @@ extern "C" void device_init() {
   print_info("[%s] %s", LUMINARY_BRANCH_NAME, LUMINARY_VERSION_DATE);
   print_info("Compiled using %s on %s", LUMINARY_COMPILER, LUMINARY_OS);
   print_info("CUDA Version %s OptiX Version %s", LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
-  print_info("Copyright (c) 2023 MilchRatchet");
+  print_info("Copyright (c) 2024 MilchRatchet");
 }
 
 void device_handle_accumulation(RaytraceInstance* instance) {
