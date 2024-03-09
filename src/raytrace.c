@@ -555,6 +555,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->sky_hdri_luts);
   device_buffer_init(&instance->sky_moon_albedo_tex);
   device_buffer_init(&instance->sky_moon_normal_tex);
+  device_buffer_init(&instance->bsdf_energy_lut);
   device_buffer_init(&instance->bluenoise_1D);
   device_buffer_init(&instance->bluenoise_2D);
   device_buffer_init(&instance->mis_buffer);
@@ -597,6 +598,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
+  bsdf_compute_energy_lut(instance);
   stars_generate(instance);
 
   raytrace_allocate_buffers(instance);
@@ -768,6 +770,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.sky_hdri_luts             = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
   ptrs.sky_moon_albedo_tex       = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_albedo_tex);
   ptrs.sky_moon_normal_tex       = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_normal_tex);
+  ptrs.bsdf_energy_lut           = (DeviceTexture*) device_buffer_get_pointer(instance->bsdf_energy_lut);
   ptrs.bluenoise_1D              = (uint16_t*) device_buffer_get_pointer(instance->bluenoise_1D);
   ptrs.bluenoise_2D              = (uint32_t*) device_buffer_get_pointer(instance->bluenoise_2D);
   ptrs.mis_buffer                = (float*) device_buffer_get_pointer(instance->mis_buffer);

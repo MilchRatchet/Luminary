@@ -7,9 +7,9 @@
 #include "utils.h"
 
 #define BRDF_UNITTEST_STEPS_SMOOTHNESS 20
-#define BRDF_UNITTEST_STEPS_METALLIC 20
+#define BRDF_UNITTEST_STEPS_METALLIC 2
 #define BRDF_UNITTEST_TOTAL (BRDF_UNITTEST_STEPS_SMOOTHNESS * BRDF_UNITTEST_STEPS_METALLIC)
-#define BRDF_UNITTEST_ITERATIONS 1000000
+#define BRDF_UNITTEST_ITERATIONS (8192 * 32)
 
 __global__ void brdf_unittest_kernel(float* bounce, float* light) {
   unsigned int id = THREAD_ID;

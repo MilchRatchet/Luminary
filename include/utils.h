@@ -433,6 +433,7 @@ struct DevicePointers {
   DeviceTexture* sky_hdri_luts;
   DeviceTexture* sky_moon_albedo_tex;
   DeviceTexture* sky_moon_normal_tex;
+  DeviceTexture* bsdf_energy_lut;
   uint16_t* bluenoise_1D;
   uint32_t* bluenoise_2D;
   uint32_t* light_candidates;
@@ -538,6 +539,7 @@ struct RaytraceInstance {
   DeviceBuffer* sky_hdri_luts;
   DeviceBuffer* sky_moon_albedo_tex;
   DeviceBuffer* sky_moon_normal_tex;
+  DeviceBuffer* bsdf_energy_lut;
   DeviceBuffer* bluenoise_1D;
   DeviceBuffer* bluenoise_2D;
   DeviceBuffer* mis_buffer;
