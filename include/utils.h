@@ -179,7 +179,7 @@ struct Camera {
   int smooth_movement;
   float smoothing_factor;
   float temporal_blend_factor;
-  float russian_roulette_bias;
+  float russian_roulette_threshold;
   int use_color_correction;
   RGBF color_correction;
 } typedef Camera;

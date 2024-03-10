@@ -204,7 +204,7 @@ static void parse_camera_settings(Camera* camera, char* line) {
       break;
     /* RUSSIANR */
     case 5930749542479910226u:
-      sscanf(value, "%f\n", &camera->russian_roulette_bias);
+      sscanf(value, "%f\n", &camera->russian_roulette_threshold);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
@@ -828,7 +828,7 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CAMERA PURKINJE %d\n", instance->scene.camera.purkinje);
   fputs(line, file);
-  sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene.camera.russian_roulette_bias);
+  sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene.camera.russian_roulette_threshold);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");

@@ -179,7 +179,7 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene.camera.smooth_movement), 0);
   panels[i++] = create_slider(ui, "Smoothing Factor", &(instance->scene.camera.smoothing_factor), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
   panels[i++] =
-    create_slider(ui, "Russian Roulette Bias", &(instance->scene.camera.russian_roulette_bias), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
+    create_slider(ui, "Russian Roulette Bias", &(instance->scene.camera.russian_roulette_threshold), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

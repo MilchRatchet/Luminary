@@ -18,27 +18,24 @@
  * are perceptively unaffected.
  */
 #define WEIGHT_BASED_EXIT
-#define BRIGHTEST_EMISSION (device.scene.camera.exposure * device.scene.camera.russian_roulette_bias)
-#define PROBABILISTIC_CUTOFF ((64.0f) / (BRIGHTEST_EMISSION))
+#define RUSSIAN_ROULETTE_CLAMP (1.0f / 8.0f)
 
 __device__ int validate_trace_task(TraceTask task, RGBF& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
-  const float max = luminance(record);
-  if (isnan(max) || isinf(max)) {
+  const float value = luminance(record);
+  if (isnan(value) || isinf(value)) {
     valid = 0;
   }
-  else if (max < PROBABILISTIC_CUTOFF) {
-    const float p = max / PROBABILISTIC_CUTOFF;
+  else if (value < device.scene.camera.russian_roulette_threshold) {
+    // Clamp probability to avoid fireflies.
+    const float p = fmaxf(value / device.scene.camera.russian_roulette_threshold, RUSSIAN_ROULETTE_CLAMP);
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE, task.index) > p) {
       valid = 0;
     }
     else {
-      // Hack: If the probability was too low then we will get huge fireflies.
-      // We add a little bias here and in return all fireflies are within a threshold
-      // that we can average out most of the time.
-      record = scale_color(record, fminf(128.0f, 1.0f / p));
+      record = scale_color(record, 1.0f / p);
     }
   }
 #endif
