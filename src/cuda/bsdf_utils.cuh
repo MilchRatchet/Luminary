@@ -7,10 +7,12 @@
 
 struct BSDFRayContext {
   vec3 H;
-  RGBF f0;
-  RGBF fresnel;
-  RGBF diffuse;
-  RGBF refraction;
+  RGBF f0_conductor;
+  RGBF f0_glossy;
+  RGBF f0_dielectric;
+  RGBF fresnel_conductor;
+  RGBF fresnel_glossy;
+  RGBF fresnel_dielectric;
   float NdotH;
   float NdotL;
   float NdotV;
@@ -322,10 +324,11 @@ __device__ RGBF bsdf_conductor(
       break;
   };
 
-  const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, data.roughness);
+  const float directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, data.roughness);
 
-  const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel, ss_term);
-  const RGBF ms_term_with_fresnel = mul_color(ctx.f0, scale_color(ctx.fresnel, ((1.0f / conductor_directional_albedo) - 1.0f) * ss_term));
+  const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel_conductor, ss_term);
+  const RGBF ms_term_with_fresnel =
+    mul_color(ctx.f0_conductor, scale_color(ctx.fresnel_conductor, ((1.0f / directional_albedo) - 1.0f) * ss_term));
 
   return add_color(ss_term_with_fresnel, ms_term_with_fresnel);
 }
@@ -363,10 +366,10 @@ __device__ RGBF
   };
 
   const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, data.roughness);
-  const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, data.roughness, luminance(ctx.f0));
+  const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, data.roughness, luminance(ctx.f0_glossy));
 
-  const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel, ss_term / conductor_directional_albedo);
-  const RGBF diff_term_with_color = scale_color(ctx.diffuse, diff_term * (1.0f - glossy_directional_albedo));
+  const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel_glossy, ss_term / conductor_directional_albedo);
+  const RGBF diff_term_with_color = scale_color(opaque_color(data.albedo), diff_term * (1.0f - glossy_directional_albedo));
 
   return add_color(ss_term_with_fresnel, diff_term_with_color);
 }

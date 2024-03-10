@@ -40,10 +40,13 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.NdotH     = dot_product(data.normal, context.H);
   const float HdotV = __saturatef(dot_product(context.H, data.V));
 
-  context.f0         = bsdf_fresnel_normal_incidence(data, ior_in, ior_out);
-  context.fresnel    = bsdf_fresnel_composite(data, refraction_vector, ior_in, ior_out, context.f0, HdotV);
-  context.diffuse    = bsdf_diffuse_color(data);
-  context.refraction = (device.scene.material.colored_transparency) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
+  context.f0_conductor      = opaque_color(data.albedo);
+  context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), HdotV);
+
+  context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
+  context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), HdotV);
+
+  // TODO: Dielectric
 
   return context;
 }
@@ -86,10 +89,13 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   context.NdotH     = dot_product(data.normal, context.H);
   const float HdotV = __saturatef(dot_product(context.H, data.V));
 
-  context.f0      = bsdf_fresnel_normal_incidence(data, ior_in, ior_out);
-  context.fresnel = bsdf_fresnel_composite(data, L, ior_in, ior_out, context.f0, HdotV);
-  context.diffuse = bsdf_diffuse_color(data);
-  // context.refraction = opaque_color(data.albedo);
+  context.f0_conductor      = opaque_color(data.albedo);
+  context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), HdotV);
+
+  context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
+  context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), HdotV);
+
+  // TODO: Dielectric
 
   return context;
 }
@@ -106,7 +112,16 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
   data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
 
   vec3 ray_local;
-  if (data.metallic == 0.0f) {
+  // Interpolate between conductor and glossy using the metallic, otherwise textures dont blend well from one pixel to the next
+  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1, pixel) < data.metallic) {
+    vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
+    ray_local               = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
+
+    const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
+
+    weight = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
+  }
+  else {
     vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
     BSDFSamplingHint hint;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE, pixel) < 0.5f) {
@@ -120,15 +135,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
 
     const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
 
-    weight = bsdf_glossy(data_local, context, hint, 1.0f);
-  }
-  else {
-    vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
-    ray_local               = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
-
-    const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
-
-    weight = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
+    weight = scale_color(bsdf_glossy(data_local, context, hint, 1.0f), 2.0f);
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));

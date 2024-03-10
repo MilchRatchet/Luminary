@@ -121,8 +121,9 @@ enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_BSDF_REFRACTION = 545,
   QUASI_RANDOM_TARGET_BSDF_DIFFUSE    = 555,
   QUASI_RANDOM_TARGET_BSDF_CHOICE     = 565,
+  QUASI_RANDOM_TARGET_BSDF_TBD1       = 575,
 
-  QUASI_RANDOM_TARGET_COUNT = 575
+  QUASI_RANDOM_TARGET_COUNT = 585
 } typedef QuasiRandomTarget;
 
 ////////////////////////////////////////////////////////////////////
