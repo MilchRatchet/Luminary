@@ -112,7 +112,6 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
   data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
 
   vec3 ray_local;
-  // Interpolate between conductor and glossy using the metallic, otherwise textures dont blend well from one pixel to the next
   if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1, pixel) < data.metallic) {
     vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
     ray_local               = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);

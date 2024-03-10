@@ -35,7 +35,10 @@ __device__ int validate_trace_task(TraceTask task, RGBF& record) {
       valid = 0;
     }
     else {
-      record = scale_color(record, 1.0f / p);
+      // Hack: If the probability was too low then we will get huge fireflies.
+      // We add a little bias here and in return all fireflies are within a threshold
+      // that we can average out most of the time.
+      record = scale_color(record, fminf(128.0f, 1.0f / p));
     }
   }
 #endif
