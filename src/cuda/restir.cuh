@@ -1,6 +1,7 @@
 #ifndef CU_RESTIR_H
 #define CU_RESTIR_H
 
+#include "bsdf.cuh"
 #include "memory.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -70,6 +71,112 @@ __device__ float restir_sample_volume_extinction(const GBufferData data, const v
   return extinction;
 }
 
+/*
+ * Surface sample a triangle and return its area and emission luminance.
+ * @param triangle Triangle.
+ * @param origin Point to sample from.
+ * @param area Solid angle of the triangle.
+ * @param seed Random seed used to sample the triangle.
+ * @param lum Output emission luminance of the triangle at the sampled point.
+ * @result Normalized direction to the point on the triangle.
+ *
+ * Robust triangle sampling.
+ */
+__device__ vec3
+  restir_sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random, float& solid_angle, RGBF& lum, float& r) {
+  float r1 = sqrtf(random.x);
+  float r2 = random.y;
+
+  // Map random numbers uniformly into [0.025,0.975].
+  r1 = 0.025f + 0.95f * r1;
+  r2 = 0.025f + 0.95f * r2;
+
+  const float u = 1.0f - r1;
+  const float v = r1 * r2;
+
+  const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
+  const vec3 dir = vector_direction_stable(p, origin);
+
+  r = get_length(sub_vector(p, origin));
+
+  const vec3 cross         = cross_product(triangle.edge1, triangle.edge2);
+  const float cross_length = get_length(cross);
+
+  // Use that surface * cos_term = 0.5 * |a x b| * |normal(a x b)^Td| = 0.5 * |a x b| * |(a x b)^Td|/|a x b| = 0.5 * |(a x b)^Td|.
+  const float surface_cos_term = 0.5f * fabsf(dot_product(cross, dir));
+
+  solid_angle = surface_cos_term / (r * r);
+
+  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
+    solid_angle = 0.0f;
+    lum         = get_color(0.0f, 0.0f, 0.0f);
+    return get_vector(0.0f, 0.0f, 0.0f);
+  }
+
+  const uint16_t illum_tex = device.scene.materials[triangle.material_id].luminance_map;
+
+  const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, make_float2(u, v));
+  const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
+
+  lum = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
+
+  return dir;
+}
+
+__device__ vec3 restir_apply_sample(LightSample light, vec3 pos, const ushort2 pixel, float& solid_angle, RGBF& lum, float& sample_dist) {
+  const float2 random = quasirandom_sequence_2D(light.seed, pixel);
+
+  vec3 ray;
+  switch (light.presampled_id) {
+    case LIGHT_ID_NONE:
+    case LIGHT_ID_SUN: {
+      vec3 sky_pos = world_to_sky_transform(pos);
+      ray          = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+      lum          = scale_color(get_color(1.0f, 1.0f, 1.0f), 2e+04f * device.scene.sky.sun_strength);
+      sample_dist  = FLT_MAX;
+    } break;
+    case LIGHT_ID_TOY:
+      ray         = toy_sample_ray(pos, random);
+      solid_angle = toy_get_solid_angle(pos);
+      lum         = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+      // Approximation, it is not super important what the actual distance is
+      sample_dist = get_length(sub_vector(pos, device.scene.toy.position));
+      break;
+    default: {
+      const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
+      ray                          = restir_sample_triangle(triangle, pos, random, solid_angle, lum, sample_dist);
+    } break;
+  }
+
+  return ray;
+}
+
+__device__ vec3 restir_apply_sample_shading(const GBufferData data, LightSample light, const ushort2 pixel, RGBF& weight) {
+  const float2 random = quasirandom_sequence_2D(light.seed, pixel);
+
+  vec3 ray;
+  switch (light.presampled_id) {
+    case LIGHT_ID_NONE:
+    case LIGHT_ID_SUN: {
+      float solid_angle;
+      vec3 sky_pos = world_to_sky_transform(data.position);
+      ray          = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+    } break;
+    case LIGHT_ID_TOY:
+      ray = toy_sample_ray(data.position, random);
+      break;
+    default: {
+      const TriangleLight triangle = load_triangle_light(device.restir.presampled_triangle_lights, light.presampled_id);
+      ray                          = sample_triangle(triangle, data.position, random);
+    } break;
+  }
+
+  // TODO: Document why 2PI is the correct 1/PDF.
+  weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, 2.0f * PI), light.weight);
+
+  return ray;
+}
+
 /**
  * Compute the target PDF of a light sample. Currently, this is basically BRDF weight multiplied by general light intensity.
  * @param x Light sample
@@ -86,23 +193,23 @@ __device__ float restir_sample_target_pdf(
   // We overwrite the local scope copy of the light sample
   x.weight = 1.0f;
 
-  BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
-  BRDFInstance result;
-
   float solid_angle, sample_dist;
   RGBF emission;
-  result = brdf_apply_sample_restir(brdf, x, data.position, pixel, solid_angle, emission, sample_dist);
+  const vec3 ray = restir_apply_sample(x, data.position, pixel, solid_angle, emission, sample_dist);
 
   primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 0.0f;
 
+  RGBF bsdf_weight;
   if (data.flags & G_BUFFER_VOLUME_HIT) {
-    result = brdf_apply_sample_weight_scattering(result, VOLUME_HIT_TYPE(data.hit_id));
+    // TODO: Reimplement volume scattering
+    bsdf_weight = get_color(0.0f, 0.0f, 0.0f);
+    // result = brdf_apply_sample_weight_scattering(result, VOLUME_HIT_TYPE(data.hit_id));
   }
   else {
-    result = brdf_apply_sample_weight(result);
+    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, solid_angle);
   }
 
-  const RGBF color_value = mul_color(mul_color(emission, result.term), record);
+  const RGBF color_value = mul_color(mul_color(emission, bsdf_weight), record);
   float value            = luminance(color_value);
 
   if (isinf(value) || isnan(value)) {
@@ -110,7 +217,7 @@ __device__ float restir_sample_target_pdf(
   }
 
   if (value > 0.0f) {
-    value *= restir_sample_volume_extinction(data, result.L, sample_dist);
+    value *= restir_sample_volume_extinction(data, ray, sample_dist);
   }
 
   return value;

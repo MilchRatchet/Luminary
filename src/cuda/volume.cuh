@@ -199,14 +199,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
       BRDFInstance brdf = brdf_get_instance_scattering(scale_vector(task.ray, -1.0f));
 
       if (light.weight > 0.0f) {
-        const BRDFInstance brdf_sample =
-          brdf_apply_sample_weight_scattering(brdf_apply_sample(brdf, light, task.position, task.index), volume_type);
+        RGBF light_weight;
+        const vec3 light_ray = restir_apply_sample_shading(data, light, task.index, light_weight);
 
-        const RGBF light_record = mul_color(record, brdf_sample.term);
+        const RGBF light_record = mul_color(record, light_weight);
 
         TraceTask light_task;
         light_task.origin = task.position;
-        light_task.ray    = brdf_sample.L;
+        light_task.ray    = light_ray;
         light_task.index  = task.index;
 
         if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {

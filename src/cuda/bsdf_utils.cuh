@@ -333,7 +333,7 @@ __device__ RGBF bsdf_conductor(
   return add_color(ss_term_with_fresnel, ms_term_with_fresnel);
 }
 
-__device__ float bsdf_glossy_directional_albedo(const float NdotV, const float roughness, const float f0) {
+__device__ float bsdf_glossy_directional_albedo(const float NdotV, const float roughness) {
   return tex2D<float4>(device.ptrs.bsdf_energy_lut[BSDF_LUT_SPECULAR].tex, NdotV, roughness).x;
 }
 
@@ -366,7 +366,7 @@ __device__ RGBF
   };
 
   const float conductor_directional_albedo = bsdf_conductor_directional_albedo(ctx.NdotV, data.roughness);
-  const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, data.roughness, luminance(ctx.f0_glossy));
+  const float glossy_directional_albedo    = bsdf_glossy_directional_albedo(ctx.NdotV, data.roughness);
 
   const RGBF ss_term_with_fresnel = scale_color(ctx.fresnel_glossy, ss_term / conductor_directional_albedo);
   const RGBF diff_term_with_color = scale_color(opaque_color(data.albedo), diff_term * (1.0f - glossy_directional_albedo));
@@ -383,10 +383,10 @@ __device__ RGBF bsdf_multiscattering_evaluate(
   if (ctx.is_refraction)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  if (data.metallic == 0.0f)
-    return bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf);
+  RGBF conductor = scale_color(bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf), data.metallic);
+  RGBF glossy    = scale_color(bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.metallic);
 
-  return bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf);
+  return add_color(conductor, glossy);
 }
 
 #endif /* CU_BSDF_UTILS_H */

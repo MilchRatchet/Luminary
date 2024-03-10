@@ -1,7 +1,7 @@
 #ifndef CU_GEOMETRY_H
 #define CU_GEOMETRY_H
 
-#include "brdf.cuh"
+#include "bsdf.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "restir.cuh"
@@ -214,8 +214,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       data.albedo.b = 1.0f;
     }
 
-    BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
-
     if (data.flags & G_BUFFER_TRANSPARENT_PASS) {
       if (device.iteration_type != TYPE_LIGHT) {
         const float ambient_index_of_refraction = geometry_get_ambient_index_of_refraction(data.position);
@@ -223,18 +221,19 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         const float refraction_index = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index / ambient_index_of_refraction
                                                                                     : ambient_index_of_refraction / data.refraction_index;
 
-        brdf = brdf_sample_ray_refraction(brdf, refraction_index, task.index);
+        // TODO: Refraction
+        // brdf = brdf_sample_ray_refraction(brdf, refraction_index, task.index);
       }
       else {
-        brdf.term = mul_color(brdf.term, opaque_color(data.albedo));
-        brdf.L    = task.ray;
+        // brdf.term = mul_color(brdf.term, opaque_color(data.albedo));
+        // brdf.L    = task.ray;
       }
 
-      record = mul_color(record, brdf.term);
+      // record = mul_color(record, brdf.term);
 
       TraceTask new_task;
       new_task.origin = data.position;
-      new_task.ray    = brdf.L;
+      new_task.ray    = task.ray;
       new_task.index  = task.index;
 
       switch (device.iteration_type) {
@@ -260,9 +259,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
       if (!material_is_mirror(data.roughness, data.metallic))
         write_albedo_buffer(opaque_color(data.albedo), pixel);
 
-      bool bounce_is_specular;
-      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, task.index, bounce_is_specular);
-
       float bounce_mis_weight = 1.0f;
 
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
@@ -270,17 +266,18 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         LightSample light                   = restir_sample_reservoir(data, record, task.index);
 
         if (light.weight > 0.0f) {
-          const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, task.index));
+          RGBF light_weight;
+          const vec3 light_ray = restir_apply_sample_shading(data, light, task.index, light_weight);
 
-          const RGBF light_record = mul_color(record, brdf_sample.term);
+          const RGBF light_record = mul_color(record, light_weight);
 
           TraceTask light_task;
           light_task.origin = data.position;
-          light_task.ray    = brdf_sample.L;
+          light_task.ray    = light_ray;
           light_task.index  = task.index;
 
           if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-            const float light_mis_weight = (bounce_is_specular) ? data.roughness * data.roughness : 1.0f;
+            const float light_mis_weight = data.roughness * data.roughness;
             bounce_mis_weight            = 1.0f - light_mis_weight;
 
             store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
@@ -292,11 +289,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
       }
 
-      RGBF bounce_record = mul_color(record, bounce_brdf.term);
+      RGBF bounce_weight;
+      vec3 bounce_ray = bsdf_sample(data, task.index, bounce_weight);
+
+      RGBF bounce_record = mul_color(record, bounce_weight);
 
       TraceTask bounce_task;
       bounce_task.origin = data.position;
-      bounce_task.ray    = bounce_brdf.L;
+      bounce_task.ray    = bounce_ray;
       bounce_task.index  = task.index;
 
       if (validate_trace_task(bounce_task, bounce_record)) {
