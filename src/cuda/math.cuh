@@ -720,7 +720,7 @@ __device__ float SRGB_to_linearRGB(const float value) {
 }
 
 __device__ float luminance(const RGBF v) {
-  return 0.2126f * v.r + 0.7152f * v.g + 0.0722f * v.b;
+  return 0.212655f * v.r + 0.715158f * v.g + 0.072187f * v.b;
 }
 
 __device__ RGBAF saturate_albedo(RGBAF color, float change) {
