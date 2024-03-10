@@ -108,31 +108,27 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
   vec3 ray_local;
   if (data.metallic == 0.0f) {
     vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
-    float sampling_weight   = 1.0f;
     BSDFSamplingHint hint;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE, pixel) < 0.5f) {
-      ray_local = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet, sampling_weight);
-
-      hint = BSDF_SAMPLING_MICROFACET;
+      ray_local = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
+      hint      = BSDF_SAMPLING_MICROFACET;
     }
     else {
       ray_local = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION, pixel));
-
-      hint = BSDF_SAMPLING_DIFFUSE;
+      hint      = BSDF_SAMPLING_DIFFUSE;
     }
 
     const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
 
-    weight = scale_color(bsdf_glossy(data_local, context, hint, 1.0f), sampling_weight);
+    weight = bsdf_glossy(data_local, context, hint, 1.0f);
   }
   else {
-    float sampling_weight   = 0.0f;
     vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
-    ray_local               = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet, sampling_weight);
+    ray_local               = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
 
     const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
 
-    weight = scale_color(bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f), sampling_weight);
+    weight = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));

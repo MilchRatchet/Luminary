@@ -45,19 +45,18 @@ __global__ void bsdf_lut_ss_generate(uint16_t* dst) {
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
     vec3 H;
-    float weight;
-    const vec3 reflection = bsdf_microfacet_sample(data, make_ushort2(0, 0), H, weight);
+    const vec3 reflection = bsdf_microfacet_sample(data, make_ushort2(0, 0), H, i, 0);
 
     const float NdotL = reflection.z;
 
     if (NdotL > 0.0f)
-      sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV) * weight;
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV);
   }
 
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst[4 * (x + y * BSDF_LUT_SIZE) + 0] = (uint16_t) (ceilf(__saturatef(sum) * 0xFFFF));
+  dst[4 * (x + y * BSDF_LUT_SIZE) + 0] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
   dst[4 * (x + y * BSDF_LUT_SIZE) + 1] = 0;
   dst[4 * (x + y * BSDF_LUT_SIZE) + 2] = 0;
   dst[4 * (x + y * BSDF_LUT_SIZE) + 3] = 0;
@@ -89,15 +88,14 @@ __global__ void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* src_en
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
     vec3 H;
-    float weight;
-    const vec3 reflection = bsdf_microfacet_sample(data, make_ushort2(0, 0), H, weight);
+    const vec3 reflection = bsdf_microfacet_sample(data, make_ushort2(0, 0), H, i, 0);
 
     const float NdotL = reflection.z;
 
     if (NdotL > 0.0f) {
       const float HdotV  = dot_product(H, data.V);
       const RGBF fresnel = bsdf_fresnel_schlick(f0, bsdf_shadowed_F90(f0), HdotV);
-      sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV) * weight * luminance(fresnel);
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV) * luminance(fresnel);
     }
   }
 
@@ -108,7 +106,7 @@ __global__ void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* src_en
   sum /= single_scattering_term;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst[4 * (x + y * BSDF_LUT_SIZE) + 0] = (uint16_t) (ceilf(__saturatef(sum) * 0xFFFF));
+  dst[4 * (x + y * BSDF_LUT_SIZE) + 0] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
   dst[4 * (x + y * BSDF_LUT_SIZE) + 1] = 0;
   dst[4 * (x + y * BSDF_LUT_SIZE) + 2] = 0;
   dst[4 * (x + y * BSDF_LUT_SIZE) + 3] = 0;

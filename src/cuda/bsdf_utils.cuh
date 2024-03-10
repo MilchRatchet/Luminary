@@ -241,38 +241,6 @@ __device__ vec3 bsdf_microfacet_sample_normal(const GBufferData data, const floa
   return normalize_vector(get_vector(sampled.x * roughness2, sampled.y * roughness2, sampled.z));
 }
 
-__device__ vec3 bsdf_microfacet_sample(
-  const GBufferData data, const ushort2 pixel, vec3& H, float& sampling_weight, const uint32_t sequence_id = device.temporal_frames,
-  const uint32_t depth = device.depth) {
-  float weight                 = 0.0f;
-  const uint32_t total_samples = 10;
-  H                            = get_vector(0.0f, 0.0f, 1.0f);
-  vec3 chosen_ray;
-
-  for (uint32_t i = 0; i < total_samples; i++) {
-    vec3 microfacet = get_vector(0.0f, 0.0f, 1.0f);
-    if (data.roughness > 0.0f) {
-      const float2 random = quasirandom_sequence_2D_base(QUASI_RANDOM_TARGET_BSDF_REFLECTION + i, pixel, sequence_id, depth);
-      microfacet          = bsdf_microfacet_sample_normal(data, random);
-    }
-
-    vec3 sampled_ray = reflect_vector(scale_vector(data.V, -1.0f), microfacet);
-
-    if (sampled_ray.z > 0.0f) {
-      weight += 1.0f;
-
-      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE + i, pixel) * weight < 1.0f) {
-        chosen_ray = sampled_ray;
-        H          = microfacet;
-      }
-    }
-  }
-
-  sampling_weight = weight / total_samples;
-
-  return chosen_ray;
-}
-
 __device__ float bsdf_microfacet_pdf(const GBufferData data, const vec3 H) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
@@ -281,6 +249,18 @@ __device__ float bsdf_microfacet_pdf(const GBufferData data, const vec3 H) {
   const float NdotV = __saturatef(dot_product(data.normal, data.V));
 
   return bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4) * bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV) / (4.0f * NdotV);
+}
+
+__device__ vec3 bsdf_microfacet_sample(
+  const GBufferData data, const ushort2 pixel, vec3& H, const uint32_t sequence_id = device.temporal_frames,
+  const uint32_t depth = device.depth) {
+  H = get_vector(0.0f, 0.0f, 1.0f);
+  if (data.roughness > 0.0f) {
+    const float2 random = quasirandom_sequence_2D_base(QUASI_RANDOM_TARGET_BSDF_REFLECTION, pixel, sequence_id, depth);
+    H                   = bsdf_microfacet_sample_normal(data, random);
+  }
+
+  return reflect_vector(scale_vector(data.V, -1.0f), H);
 }
 
 __device__ float bsdf_microfacet_pdf_reflection(const GBufferData data, const vec3 L) {
@@ -326,6 +306,9 @@ __device__ float bsdf_conductor_directional_albedo(const float NdotV, const floa
 
 __device__ RGBF bsdf_conductor(
   const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  if (ctx.NdotL <= 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   float ss_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
