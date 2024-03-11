@@ -261,6 +261,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
 
       float bounce_mis_weight = 1.0f;
 
+      BSDFSampleInfo bounce_info;
+      vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
+
       if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
         uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
         LightSample light                   = restir_sample_reservoir(data, record, task.index);
@@ -277,7 +280,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
           light_task.index  = task.index;
 
           if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-            const float light_mis_weight = data.roughness * data.roughness;
+            const float light_mis_weight = (bounce_info.is_microfacet_based) ? data.roughness * data.roughness : 1.0f;
             bounce_mis_weight            = 1.0f - light_mis_weight;
 
             store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
@@ -289,10 +292,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
       }
 
-      RGBF bounce_weight;
-      vec3 bounce_ray = bsdf_sample(data, task.index, bounce_weight);
-
-      RGBF bounce_record = mul_color(record, bounce_weight);
+      RGBF bounce_record = mul_color(record, bounce_info.weight);
 
       TraceTask bounce_task;
       bounce_task.origin = data.position;

@@ -100,7 +100,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   return context;
 }
 
-__device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& weight) {
+__device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
@@ -111,6 +111,9 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
   data_local.V      = V_local;
   data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
 
+  info.is_transparent_pass = false;
+  info.is_microfacet_based = false;
+
   vec3 ray_local;
   if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1, pixel) < data.metallic) {
     vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
@@ -118,23 +121,26 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, RGBF& w
 
     const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
 
-    weight = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
+    info.weight              = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
+    info.is_microfacet_based = true;
   }
   else {
     vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
     BSDFSamplingHint hint;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE, pixel) < 0.5f) {
-      ray_local = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
-      hint      = BSDF_SAMPLING_MICROFACET;
+      ray_local                = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
+      hint                     = BSDF_SAMPLING_MICROFACET;
+      info.is_microfacet_based = true;
     }
     else {
-      ray_local = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION, pixel));
-      hint      = BSDF_SAMPLING_DIFFUSE;
+      ray_local                = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION, pixel));
+      hint                     = BSDF_SAMPLING_DIFFUSE;
+      info.is_microfacet_based = false;
     }
 
     const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
 
-    weight = scale_color(bsdf_glossy(data_local, context, hint, 1.0f), 2.0f);
+    info.weight = scale_color(bsdf_glossy(data_local, context, hint, 1.0f), 2.0f);
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));

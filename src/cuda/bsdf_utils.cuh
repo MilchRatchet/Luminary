@@ -26,6 +26,12 @@ struct BSDFDirectionalAlbedos {
   RGBF dielectric_inv;
 } typedef BSDFDirectionalAlbedos;
 
+struct BSDFSampleInfo {
+  RGBF weight;
+  bool is_transparent_pass;
+  bool is_microfacet_based;
+} typedef BSDFSampleInfo;
+
 enum BSDFLUT { BSDF_LUT_SS = 0, BSDF_LUT_SPECULAR = 1, BSDF_LUT_DIELEC = 2, BSDF_LUT_DIELEC_INV = 3 } typedef BSDFLUT;
 
 enum BSDFSamplingHint { BSDF_SAMPLING_GENERAL = 0, BSDF_SAMPLING_MICROFACET = 1, BSDF_SAMPLING_DIFFUSE = 2 };

@@ -45,10 +45,10 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
 
       data.V = angles_to_direction(ran0.x, ran0.y);
 
-      RGBF weight;
-      bsdf_sample(data, make_ushort2(0, 0), weight);
+      BSDFSampleInfo info;
+      bsdf_sample(data, make_ushort2(0, 0), info);
 
-      sum_bounce += luminance(weight);
+      sum_bounce += luminance(info.weight);
 
       vec3 L = angles_to_direction(ran1.x, ran1.y);
 
