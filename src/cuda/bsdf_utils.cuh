@@ -314,7 +314,7 @@ __device__ float bsdf_conductor_directional_albedo(const float NdotV, const floa
 
 __device__ RGBF bsdf_conductor(
   const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
-  if (ctx.NdotL <= 0.0f)
+  if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
   float ss_term;
@@ -345,6 +345,9 @@ __device__ float bsdf_glossy_directional_albedo(const float NdotV, const float r
 
 __device__ RGBF
   bsdf_glossy(const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
+  if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   float ss_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
