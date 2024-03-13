@@ -125,22 +125,42 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     info.is_microfacet_based = true;
   }
   else {
-    vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
-    BSDFSamplingHint hint;
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE, pixel) < 0.5f) {
-      ray_local                = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
-      hint                     = BSDF_SAMPLING_MICROFACET;
+    vec3 sampled_microfacet             = get_vector(0.0f, 0.0f, 1.0f);
+    const vec3 microfacet_ray           = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
+    const float microfacet_pdf          = bsdf_microfacet_pdf_reflection(data_local, microfacet_ray);
+    const float microfacet_pdf_diffuse  = bsdf_diffuse_pdf(data_local, microfacet_ray);
+    const float microfacet_mis_weight   = (data_local.roughness < 0.1f) ? 0.5f : microfacet_pdf / (microfacet_pdf + microfacet_pdf_diffuse);
+    const BSDFRayContext microfacet_ctx = bsdf_sample_context(data_local, sampled_microfacet, microfacet_ray);
+    const RGBF microfacet_eval          = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+
+    const vec3 diffuse_ray             = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION + 1, pixel));
+    const float diffuse_pdf            = bsdf_diffuse_pdf(data_local, diffuse_ray);
+    const float diffuse_pdf_microfacet = bsdf_microfacet_pdf(data_local, diffuse_ray);
+    const float diffuse_mis_weight     = (data_local.roughness < 0.1f) ? 0.5f : diffuse_pdf / (diffuse_pdf + diffuse_pdf_microfacet);
+    const BSDFRayContext diffuse_ctx   = bsdf_sample_context(data_local, get_vector(0.0f, 0.0f, 1.0f), diffuse_ray);
+    const RGBF diffuse_eval            = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
+
+    const float microfacet_weight = microfacet_mis_weight * luminance(microfacet_eval);
+    const float diffuse_weight    = diffuse_mis_weight * luminance(diffuse_eval);
+
+    const float sum_weights = microfacet_weight + diffuse_weight;
+
+    const float microfacet_probability = microfacet_weight / sum_weights;
+    const float diffuse_probability    = diffuse_weight / sum_weights;
+
+    RGBF final_weight;
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE, pixel) < microfacet_probability) {
+      ray_local                = microfacet_ray;
+      final_weight             = scale_color(microfacet_eval, 1.0f / microfacet_probability);
       info.is_microfacet_based = true;
     }
     else {
-      ray_local                = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION, pixel));
-      hint                     = BSDF_SAMPLING_DIFFUSE;
+      ray_local                = diffuse_ray;
+      final_weight             = scale_color(diffuse_eval, 1.0f / diffuse_probability);
       info.is_microfacet_based = false;
     }
 
-    const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
-
-    info.weight = scale_color(bsdf_glossy(data_local, context, hint, 1.0f), 2.0f);
+    info.weight = final_weight;
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
