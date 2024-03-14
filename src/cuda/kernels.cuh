@@ -449,7 +449,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME]     = volume_task_count;
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT] = num_tasks;
 
-  device.trace_count[THREAD_ID] = 0;
+  // Reset trace counts for all types that we can queue.
+  if (device.iteration_type == TYPE_LIGHT) {
+    device.ptrs.light_trace_count[THREAD_ID] = 0;
+  }
+  else {
+    device.ptrs.bounce_trace_count[THREAD_ID] = 0;
+    device.ptrs.light_trace_count[THREAD_ID]  = 0;
+  }
 }
 
 __global__ void convert_RGBF_to_XRGB8(
