@@ -39,31 +39,49 @@ extern "C" __global__ void __raygen__optix() {
 
   for (int i = 0; i < trace_task_count; i++) {
     const int offset     = get_task_address2(idx.x, idx.y, i);
-    const TraceTask task = load_trace_task_essentials(device.trace_tasks + offset);
+    const TraceTask task = load_trace_task(device.trace_tasks + offset);
     const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
+    const int pixel      = task.index.y * device.width + task.index.x;
 
     const float3 origin = make_float3(task.origin.x, task.origin.y, task.origin.z);
     const float3 ray    = make_float3(task.ray.x, task.ray.y, task.ray.z);
 
     const float tmax = result.x;
 
-    unsigned int depth  = __float_as_uint(result.x);
-    unsigned int hit_id = __float_as_uint(result.y);
-    unsigned int cost   = 0;
+    if (device.iteration_type == TYPE_LIGHT) {
+      unsigned int depth             = __float_as_uint(result.x);
+      unsigned int hit_id            = __float_as_uint(result.y);
+      unsigned int accumulated_alpha = __float_as_uint(1.0f);
 
-    optixTrace(device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, 0, 0, 0, depth, hit_id, cost);
+      optixTrace(
+        device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, 0, 0, 0, depth, hit_id, accumulated_alpha);
 
-    if (__uint_as_float(depth) < tmax) {
-      float2 trace_result;
+      RGBF record = load_RGBF(device.ptrs.light_records + pixel);
+      record      = scale_color(record, __uint_as_float(accumulated_alpha));
+      store_RGBF(device.ptrs.light_records + pixel, record);
 
-      if (device.shading_mode == SHADING_HEAT) {
-        trace_result = make_float2(cost, __uint_as_float(hit_id));
-      }
-      else {
-        trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
-      }
-
+      float2 trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
       __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
+    }
+    else {
+      unsigned int depth  = __float_as_uint(result.x);
+      unsigned int hit_id = __float_as_uint(result.y);
+      unsigned int cost   = 0;
+
+      optixTrace(device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), ray_flags, 0, 0, 0, depth, hit_id, cost);
+
+      if (__uint_as_float(depth) < tmax) {
+        float2 trace_result;
+
+        if (device.shading_mode == SHADING_HEAT) {
+          trace_result = make_float2(cost, __uint_as_float(hit_id));
+        }
+        else {
+          trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
+        }
+
+        __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
+      }
     }
   }
 }
@@ -72,16 +90,18 @@ extern "C" __global__ void __raygen__optix() {
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ OptixAlphaResult optix_alpha_test() {
+__device__ OptixAlphaResult optix_alpha_test(float& alpha) {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
   const uint32_t material_id = load_triangle_material_id(hit_id);
   const uint16_t tex         = __ldg(&(device.scene.materials[material_id].albedo_map));
 
+  alpha = 1.0f;
+
   if (tex != TEXTURE_NONE) {
     const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
 
-    const float alpha = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v).w;
+    alpha = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v).w;
 
     if (alpha <= device.scene.material.alpha_cutoff) {
       return OPTIX_ALPHA_RESULT_TRANSPARENT;
@@ -96,24 +116,34 @@ __device__ OptixAlphaResult optix_alpha_test() {
 }
 
 extern "C" __global__ void __anyhit__optix() {
-  optixSetPayload_2(optixGetPayload_2() + 1);
+  if (device.iteration_type == TYPE_CAMERA) {
+    optixSetPayload_2(optixGetPayload_2() + 1);
+  }
 
-  const OptixAlphaResult alpha_result = optix_alpha_test();
+  float alpha;
+  const OptixAlphaResult alpha_result = optix_alpha_test(alpha);
 
   if (alpha_result == OPTIX_ALPHA_RESULT_TRANSPARENT) {
     optixIgnoreIntersection();
   }
 
-  if (device.iteration_type == TYPE_LIGHT && alpha_result == OPTIX_ALPHA_RESULT_OPAQUE) {
-    if (optixGetPrimitiveIndex() != optixGetPayload_1()) {
+  if (device.iteration_type == TYPE_LIGHT) {
+    if (optixGetPrimitiveIndex() == optixGetPayload_1()) {
+      optixIgnoreIntersection();
+    }
+
+    if (alpha_result == OPTIX_ALPHA_RESULT_OPAQUE) {
       optixSetPayload_0(__float_as_uint(0.0f));
       optixSetPayload_1(HIT_TYPE_REJECT);
 
       optixTerminateRay();
     }
-    else {
-      optixIgnoreIntersection();
-    }
+
+    unsigned int accumulated_alpha = optixGetPayload_2();
+    accumulated_alpha              = __float_as_uint((1.0f - alpha) * __uint_as_float(accumulated_alpha));
+    optixSetPayload_2(accumulated_alpha);
+
+    optixIgnoreIntersection();
   }
 }
 

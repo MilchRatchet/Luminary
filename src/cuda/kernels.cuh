@@ -390,15 +390,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     }
   }
 
-  if (device.iteration_type == TYPE_LIGHT) {
-    for (int i = 0; i < task_count; i++) {
-      const int offset     = get_task_address(i);
-      TraceTask task       = load_trace_task(device.trace_tasks + offset);
-      const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
-      state_release(pixel, STATE_FLAG_LIGHT_OCCUPIED);
-    }
-  }
-
   // process data
   for (int i = 0; i < num_tasks; i++) {
     const int offset    = get_task_address(i);
@@ -449,11 +440,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME]     = volume_task_count;
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT] = num_tasks;
 
-  // Reset trace counts for all types that we can queue.
-  if (device.iteration_type == TYPE_LIGHT) {
-    device.ptrs.light_trace_count[THREAD_ID] = 0;
-  }
-  else {
+  // Light tasks can't queue so we don't need to reset for those.
+  if (device.iteration_type != TYPE_LIGHT) {
     device.ptrs.bounce_trace_count[THREAD_ID] = 0;
     device.ptrs.light_trace_count[THREAD_ID]  = 0;
   }

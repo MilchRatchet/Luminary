@@ -201,7 +201,7 @@ void optixrt_init(RaytraceInstance* instance) {
   build_inputs.triangleArray.numIndexTriplets   = instance->scene.triangle_data.triangle_count;
   build_inputs.triangleArray.indexBuffer        = (CUdeviceptr) instance->scene.triangle_data.index_buffer;
 
-  unsigned int inputFlags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING};
+  unsigned int inputFlags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING | OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL};
 
   build_inputs.triangleArray.flags                = inputFlags;
   build_inputs.triangleArray.opacityMicromap      = omm;
