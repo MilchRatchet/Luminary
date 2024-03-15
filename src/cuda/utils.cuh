@@ -64,9 +64,12 @@ __device__ static uint32_t get_pixel_id(const int x, const int y) {
 }
 
 __device__ static int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
-  const int warp_id       = (((thread_id & 0x60) >> 5) + block_id * (THREADS_PER_BLOCK / 32));
-  const int thread_offset = (thread_id & 0x1f);
-  return 32 * device.pixels_per_thread * warp_id + 32 * number + thread_offset;
+  static_assert(THREADS_PER_BLOCK == 128, "I wrote this using that we have 4 warps per block, this is also used in the 0x3!");
+
+  const uint32_t threads_per_warp  = 32;
+  const uint32_t warp_id           = ((thread_id >> 5) & 0x3) + block_id * 4;
+  const uint32_t thread_id_in_warp = (thread_id & 0x1f);
+  return threads_per_warp * device.pixels_per_thread * warp_id + threads_per_warp * number + thread_id_in_warp;
 }
 
 __device__ static int get_task_address(const int number) {
