@@ -8,6 +8,12 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "memory.cuh"
 #include "utils.cuh"
 
+enum OptixAlphaResult {
+  OPTIX_ALPHA_RESULT_OPAQUE      = 0,
+  OPTIX_ALPHA_RESULT_SEMI        = 1,
+  OPTIX_ALPHA_RESULT_TRANSPARENT = 2
+} typedef OptixAlphaResult;
+
 // Kernels must be named __[SEMANTIC]__..., for example, __raygen__...
 // This can be found under function name prefix in the programming guide
 
@@ -26,7 +32,8 @@ extern "C" __global__ void __raygen__optix() {
       ray_flags = OPTIX_RAY_FLAG_NONE;
       break;
     case TYPE_LIGHT:
-      ray_flags = OPTIX_RAY_FLAG_NONE;
+      // Disable OMM opaque hits because we want to know if we hit something that is fully opaque so we can reject.
+      ray_flags = OPTIX_RAY_FLAG_ENFORCE_ANYHIT;
       break;
   }
 
@@ -65,7 +72,7 @@ extern "C" __global__ void __raygen__optix() {
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ int perform_alpha_test() {
+__device__ OptixAlphaResult optix_alpha_test() {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
   const uint32_t material_id = load_triangle_material_id(hit_id);
@@ -77,27 +84,27 @@ __device__ int perform_alpha_test() {
     const float alpha = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v).w;
 
     if (alpha <= device.scene.material.alpha_cutoff) {
-      return 2;
+      return OPTIX_ALPHA_RESULT_TRANSPARENT;
     }
 
     if (alpha < 1.0f) {
-      return 1;
+      return OPTIX_ALPHA_RESULT_SEMI;
     }
   }
 
-  return 0;
+  return OPTIX_ALPHA_RESULT_OPAQUE;
 }
 
 extern "C" __global__ void __anyhit__optix() {
   optixSetPayload_2(optixGetPayload_2() + 1);
 
-  const int alpha_test = perform_alpha_test();
+  const OptixAlphaResult alpha_result = optix_alpha_test();
 
-  if (alpha_test == 2) {
+  if (alpha_result == OPTIX_ALPHA_RESULT_TRANSPARENT) {
     optixIgnoreIntersection();
   }
 
-  if (device.iteration_type == TYPE_LIGHT && alpha_test == 0) {
+  if (device.iteration_type == TYPE_LIGHT && alpha_result == OPTIX_ALPHA_RESULT_OPAQUE) {
     if (optixGetPrimitiveIndex() != optixGetPayload_1()) {
       optixSetPayload_0(__float_as_uint(0.0f));
       optixSetPayload_1(HIT_TYPE_REJECT);
@@ -111,15 +118,6 @@ extern "C" __global__ void __anyhit__optix() {
 }
 
 extern "C" __global__ void __closesthit__optix() {
-  if (device.iteration_type == TYPE_LIGHT && optixGetPrimitiveIndex() != optixGetPayload_1()) {
-    // If anyhit was never executed, then we must have hit fully opaque geometry.
-    if (!optixGetPayload_2()) {
-      optixSetPayload_0(__float_as_uint(0.0f));
-      optixSetPayload_1(HIT_TYPE_REJECT);
-      return;
-    }
-  }
-
   optixSetPayload_0(__float_as_uint(optixGetRayTmax()));
   optixSetPayload_1(optixGetPrimitiveIndex());
 }
