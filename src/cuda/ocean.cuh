@@ -97,7 +97,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     write_normal_buffer(normal, pixel);
 
     const float refraction_index_ratio = index_in / index_out;
-    const vec3 refraction_dir          = refract_ray(task.ray, normal, refraction_index_ratio);
+    const vec3 refraction_dir          = refract_vector(task.ray, normal, refraction_index_ratio);
 
     const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, index_in, index_out);
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) < reflection_coefficient) {

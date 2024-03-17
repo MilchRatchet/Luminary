@@ -279,13 +279,20 @@ __device__ float bsdf_microfacet_pdf(const GBufferData data, const float NdotH, 
 }
 
 __device__ vec3 bsdf_microfacet_sample(
-  const GBufferData data, const ushort2 pixel, vec3& H, const uint32_t sequence_id = device.temporal_frames,
-  const uint32_t depth = device.depth) {
-  H = get_vector(0.0f, 0.0f, 1.0f);
+  const GBufferData data, const ushort2 pixel, const uint32_t sequence_id = device.temporal_frames, const uint32_t depth = device.depth) {
+  vec3 H = get_vector(0.0f, 0.0f, 1.0f);
   if (data.roughness > 0.0f) {
     const float2 random = quasirandom_sequence_2D_base(QUASI_RANDOM_TARGET_BSDF_REFLECTION, pixel, sequence_id, depth);
     H                   = bsdf_microfacet_sample_normal(data, random);
   }
+
+  return H;
+}
+
+__device__ vec3 bsdf_microfacet_sample_reflection(
+  const GBufferData data, const ushort2 pixel, vec3& H, const uint32_t sequence_id = device.temporal_frames,
+  const uint32_t depth = device.depth) {
+  H = bsdf_microfacet_sample(data, pixel, sequence_id, depth);
 
   return reflect_vector(scale_vector(data.V, -1.0f), H);
 }
@@ -293,17 +300,13 @@ __device__ vec3 bsdf_microfacet_sample(
 __device__ vec3 bsdf_microfacet_sample_refraction(
   const GBufferData data, const ushort2 pixel, vec3& H, const uint32_t sequence_id = device.temporal_frames,
   const uint32_t depth = device.depth) {
-  H = get_vector(0.0f, 0.0f, 1.0f);
-  if (data.roughness > 0.0f) {
-    const float2 random = quasirandom_sequence_2D_base(QUASI_RANDOM_TARGET_BSDF_REFLECTION, pixel, sequence_id, depth);
-    H                   = bsdf_microfacet_sample_normal(data, random);
-  }
+  H = bsdf_microfacet_sample(data, pixel, sequence_id, depth);
 
   const float ambient_ior = bsdf_refraction_index_ambient(data);
   const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
   const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
 
-  return refract_ray(scale_vector(data.V, -1.0f), H, ior_in / ior_out);
+  return refract_vector(scale_vector(data.V, -1.0f), H, ior_in / ior_out);
 }
 
 ///////////////////////////////////////////////////

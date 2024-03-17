@@ -44,8 +44,8 @@ __global__ void bsdf_lut_ss_generate(uint16_t* dst) {
   float sum = 0.0f;
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
-    vec3 H;
-    const vec3 reflection = bsdf_microfacet_sample(data, make_ushort2(0, 0), H, i, 0);
+    const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
+    const vec3 reflection = reflect_vector(scale_vector(data.V, -1.0f), H);
 
     const float NdotL = reflection.z;
 
@@ -87,8 +87,8 @@ __global__ void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* src_en
   float sum = 0.0f;
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
-    vec3 H;
-    const vec3 reflection = bsdf_microfacet_sample(data, make_ushort2(0, 0), H, i, 0);
+    const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
+    const vec3 reflection = reflect_vector(scale_vector(data.V, -1.0f), H);
 
     const float NdotL = reflection.z;
 
