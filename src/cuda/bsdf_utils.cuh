@@ -300,8 +300,8 @@ __device__ vec3 bsdf_microfacet_sample_refraction(
   }
 
   const float ambient_ior = bsdf_refraction_index_ambient(data);
-  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
-  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
+  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
+  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
 
   return refract_ray(scale_vector(data.V, -1.0f), H, ior_in / ior_out);
 }

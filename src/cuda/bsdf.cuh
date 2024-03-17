@@ -16,8 +16,8 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.is_refraction = (context.NdotL < 0.0f);
 
   const float ambient_ior = bsdf_refraction_index_ambient(data);
-  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
-  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
+  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
+  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
 
   context.refraction_index = ior_in / ior_out;
 
@@ -75,8 +75,8 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
     context.NdotL *= -1.0f;
 
   const float ambient_ior = bsdf_refraction_index_ambient(data);
-  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
-  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
+  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
+  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
 
   context.refraction_index = ior_in / ior_out;
 
@@ -172,8 +172,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
 
     const float ambient_ior = bsdf_refraction_index_ambient(data_local);
-    const float ior_in      = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data_local.refraction_index;
-    const float ior_out     = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data_local.refraction_index : ambient_ior;
+    const float ior_in      = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data_local.refraction_index : ambient_ior;
+    const float ior_out     = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data_local.refraction_index;
 
     const vec3 reflection_vector        = reflect_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet);
     const BSDFRayContext reflection_ctx = bsdf_sample_context(data_local, sampled_microfacet, reflection_vector, false);
@@ -194,11 +194,11 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     RGBF final_weight;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 2, pixel) < reflection_probability) {
       ray_local    = reflection_vector;
-      final_weight = scale_color(reflection_eval, 1.0f / reflection_probability);
+      final_weight = scale_color(reflection_eval, 0.5f * 1.0f / reflection_probability);
     }
     else {
       ray_local                = refraction_vector;
-      final_weight             = scale_color(refraction_eval, 1.0f / refraction_probability);
+      final_weight             = scale_color(refraction_eval, 0.5f * 1.0f / refraction_probability);
       info.is_transparent_pass = true;
     }
 
