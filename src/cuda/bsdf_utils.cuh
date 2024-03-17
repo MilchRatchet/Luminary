@@ -403,7 +403,7 @@ __device__ RGBF
 
 __device__ RGBF bsdf_dielectric(
   const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
-  if (ctx.NdotV <= 0.0f)
+  if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
   float term;

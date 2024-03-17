@@ -60,15 +60,16 @@ __device__ RGBF
   return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf);
 }
 
-__device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3 H, const vec3 L) {
+__device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3 H, const vec3 L, const bool is_refraction) {
   BSDFRayContext context;
 
   context.NdotL = dot_product(data.normal, L);
   context.NdotV = fabsf(dot_product(data.normal, data.V));
 
-  context.is_refraction = (context.NdotL < 0.0f);
+  context.is_refraction = is_refraction;
 
-  context.NdotL = fabsf(context.NdotL);
+  if (is_refraction)
+    context.NdotL *= -1.0f;
 
   const float ambient_ior = bsdf_refraction_index_ambient(data);
   const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
@@ -118,7 +119,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
       ray_local               = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
 
-      const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
+      const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local, false);
 
       info.weight              = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
       info.is_microfacet_based = true;
@@ -126,14 +127,15 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     else {
       vec3 sampled_microfacet             = get_vector(0.0f, 0.0f, 1.0f);
       const vec3 microfacet_ray           = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
-      const BSDFRayContext microfacet_ctx = bsdf_sample_context(data_local, sampled_microfacet, microfacet_ray);
+      const BSDFRayContext microfacet_ctx = bsdf_sample_context(data_local, sampled_microfacet, microfacet_ray, false);
       const float microfacet_pdf          = bsdf_microfacet_pdf(data_local, microfacet_ctx.NdotH, microfacet_ctx.NdotV);
       const float microfacet_pdf_diffuse  = bsdf_diffuse_pdf(data_local, microfacet_ctx.NdotL);
       const float microfacet_mis_weight = (data_local.roughness < 0.1f) ? 0.5f : microfacet_pdf / (microfacet_pdf + microfacet_pdf_diffuse);
       const RGBF microfacet_eval        = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
       const vec3 diffuse_ray             = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION + 1, pixel));
-      const BSDFRayContext diffuse_ctx   = bsdf_sample_context(data_local, get_vector(0.0f, 0.0f, 1.0f), diffuse_ray);
+      const vec3 diffuse_microfacet      = normalize_vector(add_vector(data.V, diffuse_ray));
+      const BSDFRayContext diffuse_ctx   = bsdf_sample_context(data_local, diffuse_microfacet, diffuse_ray, false);
       const float diffuse_pdf            = bsdf_diffuse_pdf(data_local, diffuse_ctx.NdotL);
       const float diffuse_pdf_microfacet = bsdf_microfacet_pdf(data_local, diffuse_ctx.NdotH, diffuse_ctx.NdotV);
       const float diffuse_mis_weight     = (data_local.roughness < 0.1f) ? 0.5f : diffuse_pdf / (diffuse_pdf + diffuse_pdf_microfacet);
@@ -164,16 +166,21 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   }
   else {
     vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
+    bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
 
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 2, pixel) < 0.5f) {
-      ray_local = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
+      ray_local = reflect_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet);
     }
     else {
-      ray_local                = bsdf_microfacet_sample_refraction(data_local, pixel, sampled_microfacet);
+      const float ambient_ior = bsdf_refraction_index_ambient(data_local);
+      const float ior_in      = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data_local.refraction_index;
+      const float ior_out     = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data_local.refraction_index : ambient_ior;
+
+      ray_local                = refract_ray(scale_vector(data_local.V, -1.0f), sampled_microfacet, ior_in / ior_out);
       info.is_transparent_pass = true;
     }
 
-    const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
+    const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local, info.is_transparent_pass);
 
     info.weight              = scale_color(bsdf_dielectric(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f), 2.0f);
     info.is_microfacet_based = true;
