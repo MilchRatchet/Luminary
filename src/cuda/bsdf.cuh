@@ -19,34 +19,31 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
   const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
 
-  vec3 reflection_vector, refraction_vector;
+  context.refraction_index = ior_in / ior_out;
 
-  // For every refraction exists a corresponding reflection vector, we always compute the BSDF based on the reflection.
+  vec3 refraction_vector;
   if (context.is_refraction) {
-    context.H = bsdf_refraction_normal_from_pair(L, data.V, ior_out, ior_in);
-
-    reflection_vector = reflect_vector(scale_vector(data.V, -1.0f), context.H);
+    context.H         = bsdf_refraction_normal_from_pair(L, data.V, ior_out, ior_in);
     refraction_vector = L;
-
-    context.NdotL = dot_product(data.normal, reflection_vector);
   }
   else {
     context.H = normalize_vector(add_vector(data.V, L));
 
-    reflection_vector = L;
-    refraction_vector = refract_ray(scale_vector(data.V, -1.0f), context.H, ior_in / ior_out);
+    refraction_vector = refract_ray(scale_vector(data.V, -1.0f), context.H, context.refraction_index);
   }
 
-  context.NdotH     = dot_product(data.normal, context.H);
-  const float HdotV = __saturatef(dot_product(context.H, data.V));
+  context.NdotH = dot_product(data.normal, context.H);
+  context.HdotV = dot_product(context.H, data.V);
+  context.HdotL = dot_product(context.H, L);
 
   context.f0_conductor      = opaque_color(data.albedo);
-  context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), HdotV);
+  context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), context.HdotV);
 
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
-  context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), HdotV);
+  context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  // TODO: Dielectric
+  context.f0_dielectric      = bsdf_fresnel_normal_incidence(ior_in, ior_out);
+  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
 
   return context;
 }
@@ -67,35 +64,35 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   BSDFRayContext context;
 
   context.NdotL = dot_product(data.normal, L);
-  context.NdotV = dot_product(data.normal, data.V);
+  context.NdotV = fabsf(dot_product(data.normal, data.V));
+
+  context.is_refraction = (context.NdotL < 0.0f);
+
+  context.NdotL = fabsf(context.NdotL);
 
   const float ambient_ior = bsdf_refraction_index_ambient(data);
   const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
   const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
 
+  context.refraction_index = ior_in / ior_out;
+
   context.H = H;
 
-  // vec3 refraction_vector;
-  // if (context.is_refraction) {
-  //   const vec3 reflection_vector = reflect_vector(scale_vector(data.V, -1.0f), context.H);
-  //   refraction_vector            = L;
-  //
-  //  context.NdotL = dot_product(data.normal, reflection_vector);
-  //}
-  // else {
-  //  refraction_vector = refract_ray(scale_vector(data.V, -1.0f), context.H, ior_in / ior_out);
-  //}
+  const vec3 refraction_vector =
+    (context.is_refraction) ? L : refract_ray(scale_vector(data.V, -1.0f), context.H, context.refraction_index);
 
-  context.NdotH     = dot_product(data.normal, context.H);
-  const float HdotV = __saturatef(dot_product(context.H, data.V));
+  context.NdotH = fabsf(dot_product(data.normal, context.H));
+  context.HdotV = fabsf(dot_product(context.H, data.V));
+  context.HdotL = fabsf(dot_product(context.H, L));
 
   context.f0_conductor      = opaque_color(data.albedo);
-  context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), HdotV);
+  context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), context.HdotV);
 
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
-  context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), HdotV);
+  context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  // TODO: Dielectric
+  context.f0_dielectric      = bsdf_fresnel_normal_incidence(ior_in, ior_out);
+  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
 
   return context;
 }
@@ -115,52 +112,71 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   info.is_microfacet_based = false;
 
   vec3 ray_local;
-  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1, pixel) < data.metallic) {
-    vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
-    ray_local               = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
 
-    const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
+  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 1, pixel) < data.albedo.a) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1, pixel) < data.metallic) {
+      vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
+      ray_local               = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
 
-    info.weight              = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
-    info.is_microfacet_based = true;
-  }
-  else {
-    vec3 sampled_microfacet             = get_vector(0.0f, 0.0f, 1.0f);
-    const vec3 microfacet_ray           = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
-    const float microfacet_pdf          = bsdf_microfacet_pdf_reflection(data_local, microfacet_ray);
-    const float microfacet_pdf_diffuse  = bsdf_diffuse_pdf(data_local, microfacet_ray);
-    const float microfacet_mis_weight   = (data_local.roughness < 0.1f) ? 0.5f : microfacet_pdf / (microfacet_pdf + microfacet_pdf_diffuse);
-    const BSDFRayContext microfacet_ctx = bsdf_sample_context(data_local, sampled_microfacet, microfacet_ray);
-    const RGBF microfacet_eval          = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+      const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
 
-    const vec3 diffuse_ray             = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION + 1, pixel));
-    const float diffuse_pdf            = bsdf_diffuse_pdf(data_local, diffuse_ray);
-    const float diffuse_pdf_microfacet = bsdf_microfacet_pdf(data_local, diffuse_ray);
-    const float diffuse_mis_weight     = (data_local.roughness < 0.1f) ? 0.5f : diffuse_pdf / (diffuse_pdf + diffuse_pdf_microfacet);
-    const BSDFRayContext diffuse_ctx   = bsdf_sample_context(data_local, get_vector(0.0f, 0.0f, 1.0f), diffuse_ray);
-    const RGBF diffuse_eval            = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
-
-    const float microfacet_weight = microfacet_mis_weight * luminance(microfacet_eval);
-    const float diffuse_weight    = diffuse_mis_weight * luminance(diffuse_eval);
-
-    const float sum_weights = microfacet_weight + diffuse_weight;
-
-    const float microfacet_probability = microfacet_weight / sum_weights;
-    const float diffuse_probability    = diffuse_weight / sum_weights;
-
-    RGBF final_weight;
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE, pixel) < microfacet_probability) {
-      ray_local                = microfacet_ray;
-      final_weight             = scale_color(microfacet_eval, 1.0f / microfacet_probability);
+      info.weight              = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
       info.is_microfacet_based = true;
     }
     else {
-      ray_local                = diffuse_ray;
-      final_weight             = scale_color(diffuse_eval, 1.0f / diffuse_probability);
-      info.is_microfacet_based = false;
+      vec3 sampled_microfacet             = get_vector(0.0f, 0.0f, 1.0f);
+      const vec3 microfacet_ray           = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
+      const BSDFRayContext microfacet_ctx = bsdf_sample_context(data_local, sampled_microfacet, microfacet_ray);
+      const float microfacet_pdf          = bsdf_microfacet_pdf(data_local, microfacet_ctx.NdotH, microfacet_ctx.NdotV);
+      const float microfacet_pdf_diffuse  = bsdf_diffuse_pdf(data_local, microfacet_ctx.NdotL);
+      const float microfacet_mis_weight = (data_local.roughness < 0.1f) ? 0.5f : microfacet_pdf / (microfacet_pdf + microfacet_pdf_diffuse);
+      const RGBF microfacet_eval        = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+
+      const vec3 diffuse_ray             = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION + 1, pixel));
+      const BSDFRayContext diffuse_ctx   = bsdf_sample_context(data_local, get_vector(0.0f, 0.0f, 1.0f), diffuse_ray);
+      const float diffuse_pdf            = bsdf_diffuse_pdf(data_local, diffuse_ctx.NdotL);
+      const float diffuse_pdf_microfacet = bsdf_microfacet_pdf(data_local, diffuse_ctx.NdotH, diffuse_ctx.NdotV);
+      const float diffuse_mis_weight     = (data_local.roughness < 0.1f) ? 0.5f : diffuse_pdf / (diffuse_pdf + diffuse_pdf_microfacet);
+      const RGBF diffuse_eval            = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
+
+      const float microfacet_weight = microfacet_mis_weight * luminance(microfacet_eval);
+      const float diffuse_weight    = diffuse_mis_weight * luminance(diffuse_eval);
+
+      const float sum_weights = microfacet_weight + diffuse_weight;
+
+      const float microfacet_probability = microfacet_weight / sum_weights;
+      const float diffuse_probability    = diffuse_weight / sum_weights;
+
+      RGBF final_weight;
+      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE, pixel) < microfacet_probability) {
+        ray_local                = microfacet_ray;
+        final_weight             = scale_color(microfacet_eval, 1.0f / microfacet_probability);
+        info.is_microfacet_based = true;
+      }
+      else {
+        ray_local                = diffuse_ray;
+        final_weight             = scale_color(diffuse_eval, 1.0f / diffuse_probability);
+        info.is_microfacet_based = false;
+      }
+
+      info.weight = final_weight;
+    }
+  }
+  else {
+    vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
+
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 2, pixel) < 0.5f) {
+      ray_local = bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
+    }
+    else {
+      ray_local                = bsdf_microfacet_sample_refraction(data_local, pixel, sampled_microfacet);
+      info.is_transparent_pass = true;
     }
 
-    info.weight = final_weight;
+    const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local);
+
+    info.weight              = scale_color(bsdf_dielectric(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f), 2.0f);
+    info.is_microfacet_based = true;
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
