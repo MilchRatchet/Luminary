@@ -151,7 +151,8 @@ __device__ vec3 restir_apply_sample(LightSample light, vec3 pos, const ushort2 p
   return ray;
 }
 
-__device__ vec3 restir_apply_sample_shading(const GBufferData data, LightSample light, const ushort2 pixel, RGBF& weight) {
+__device__ vec3
+  restir_apply_sample_shading(const GBufferData data, LightSample light, const ushort2 pixel, RGBF& weight, bool& is_transparent_pass) {
   const float2 random = quasirandom_sequence_2D(light.seed, pixel);
 
   vec3 ray;
@@ -172,7 +173,7 @@ __device__ vec3 restir_apply_sample_shading(const GBufferData data, LightSample 
   }
 
   // TODO: Document why 2PI is the correct 1/PDF.
-  weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, 2.0f * PI), light.weight);
+  weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, 2.0f * PI), light.weight);
 
   return ray;
 }
@@ -206,7 +207,8 @@ __device__ float restir_sample_target_pdf(
     // result = brdf_apply_sample_weight_scattering(result, VOLUME_HIT_TYPE(data.hit_id));
   }
   else {
-    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, solid_angle);
+    bool is_transparent_pass;
+    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, solid_angle);
   }
 
   const RGBF color_value = mul_color(mul_color(emission, bsdf_weight), record);

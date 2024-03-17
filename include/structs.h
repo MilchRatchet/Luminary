@@ -288,8 +288,7 @@ struct LightSample {
 enum GBufferFlags {
   G_BUFFER_REQUIRES_SAMPLING    = 0b1,
   G_BUFFER_VOLUME_HIT           = 0b10,
-  G_BUFFER_TRANSPARENT_PASS     = 0b100,
-  G_BUFFER_REFRACTION_IS_INSIDE = 0b1000
+  G_BUFFER_REFRACTION_IS_INSIDE = 0b100
 } typedef GBufferFlags;
 
 struct GBufferData {

@@ -53,9 +53,12 @@ __device__ RGBF bsdf_evaluate_core(
   return bsdf_multiscattering_evaluate(data, context, sampling_hint, one_over_sampling_pdf);
 }
 
-__device__ RGBF
-  bsdf_evaluate(const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf = 1.0f) {
+__device__ RGBF bsdf_evaluate(
+  const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_transparent_pass,
+  const float one_over_sampling_pdf = 1.0f) {
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
+
+  is_transparent_pass = context.is_refraction;
 
   return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf);
 }
