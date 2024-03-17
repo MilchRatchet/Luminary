@@ -450,10 +450,10 @@ __device__ RGBF bsdf_dielectric(
 __device__ RGBF bsdf_multiscattering_evaluate(
   const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
   if (ctx.is_refraction)
-    return get_color(0.0f, 0.0f, 0.0f);
+    return scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.albedo.a);
 
-  RGBF conductor = scale_color(bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf), data.metallic);
-  RGBF glossy    = scale_color(bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.metallic);
+  RGBF conductor = scale_color(bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * data.metallic);
+  RGBF glossy    = scale_color(bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * (1.0f - data.metallic));
 
   return add_color(conductor, glossy);
 }

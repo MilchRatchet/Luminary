@@ -171,21 +171,38 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     vec3 sampled_microfacet = get_vector(0.0f, 0.0f, 1.0f);
     bsdf_microfacet_sample(data_local, pixel, sampled_microfacet);
 
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 2, pixel) < 0.5f) {
-      ray_local = reflect_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet);
+    const float ambient_ior = bsdf_refraction_index_ambient(data_local);
+    const float ior_in      = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data_local.refraction_index;
+    const float ior_out     = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data_local.refraction_index : ambient_ior;
+
+    const vec3 reflection_vector        = reflect_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet);
+    const BSDFRayContext reflection_ctx = bsdf_sample_context(data_local, sampled_microfacet, reflection_vector, false);
+    const RGBF reflection_eval          = bsdf_dielectric(data_local, reflection_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+
+    const vec3 refraction_vector        = refract_ray(scale_vector(data_local.V, -1.0f), sampled_microfacet, ior_in / ior_out);
+    const BSDFRayContext refraction_ctx = bsdf_sample_context(data_local, sampled_microfacet, refraction_vector, true);
+    const RGBF refraction_eval          = bsdf_dielectric(data_local, refraction_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+
+    const float reflection_weight = luminance(reflection_eval);
+    const float refraction_weight = luminance(refraction_eval);
+
+    const float sum_weights = reflection_weight + refraction_weight;
+
+    const float reflection_probability = reflection_weight / sum_weights;
+    const float refraction_probability = refraction_weight / sum_weights;
+
+    RGBF final_weight;
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 2, pixel) < reflection_probability) {
+      ray_local    = reflection_vector;
+      final_weight = scale_color(reflection_eval, 1.0f / reflection_probability);
     }
     else {
-      const float ambient_ior = bsdf_refraction_index_ambient(data_local);
-      const float ior_in      = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data_local.refraction_index;
-      const float ior_out     = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data_local.refraction_index : ambient_ior;
-
-      ray_local                = refract_ray(scale_vector(data_local.V, -1.0f), sampled_microfacet, ior_in / ior_out);
+      ray_local                = refraction_vector;
+      final_weight             = scale_color(refraction_eval, 1.0f / refraction_probability);
       info.is_transparent_pass = true;
     }
 
-    const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local, info.is_transparent_pass);
-
-    info.weight              = scale_color(bsdf_dielectric(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f), 2.0f);
+    info.weight              = final_weight;
     info.is_microfacet_based = true;
   }
 
