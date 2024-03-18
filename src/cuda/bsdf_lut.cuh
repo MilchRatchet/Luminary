@@ -93,7 +93,7 @@ __global__ void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* src_en
     const float NdotL = reflection.z;
 
     if (NdotL > 0.0f) {
-      const float HdotV  = dot_product(H, data.V);
+      const float HdotV  = fabsf(dot_product(H, data.V));
       const RGBF fresnel = bsdf_fresnel_schlick(f0, bsdf_shadowed_F90(f0), HdotV);
       sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV) * luminance(fresnel);
     }
@@ -110,6 +110,96 @@ __global__ void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* src_en
   dst[4 * (x + y * BSDF_LUT_SIZE) + 1] = 0;
   dst[4 * (x + y * BSDF_LUT_SIZE) + 2] = 0;
   dst[4 * (x + y * BSDF_LUT_SIZE) + 3] = 0;
+}
+
+__global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
+  const uint32_t id = THREAD_ID;
+
+  if (id > BSDF_LUT_SIZE * BSDF_LUT_SIZE * BSDF_LUT_SIZE)
+    return;
+
+  const uint32_t z = id / (BSDF_LUT_SIZE * BSDF_LUT_SIZE);
+  const uint32_t y = (id - z * (BSDF_LUT_SIZE * BSDF_LUT_SIZE)) / BSDF_LUT_SIZE;
+  const uint32_t x = id - y * BSDF_LUT_SIZE - z * BSDF_LUT_SIZE * BSDF_LUT_SIZE;
+
+  const float NdotV     = fmaxf(32.0f * eps, x * (1.0f / (BSDF_LUT_SIZE - 1)));
+  const float roughness = y * (1.0f / (BSDF_LUT_SIZE - 1));
+  const float ior       = 1.0f + z * (1.0f / (BSDF_LUT_SIZE - 1)) * 2.0f;
+
+  GBufferData data;
+  data.normal           = get_vector(0.0f, 0.0f, 1.0f);
+  data.metallic         = 1.0f;
+  data.roughness        = roughness;
+  data.V                = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
+  data.refraction_index = ior;
+
+  const vec3 ray = scale_vector(data.V, -1.0f);
+
+  float sum = 0.0f;
+
+  for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
+    const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
+    const vec3 reflection = reflect_vector(scale_vector(data.V, -1.0f), H);
+    const vec3 refraction = refract_vector(scale_vector(data.V, -1.0f), H, 1.0f / data.refraction_index);
+    const float fresnel   = bsdf_fresnel(H, data.V, refraction, 1.0f, data.refraction_index);
+    const float HdotV     = fabsf(dot_product(H, data.V));
+
+    const float NdotL = reflection.z;
+
+    if (NdotL > 0.0f) {
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV) * fresnel;
+    }
+
+    const float NdotR = -refraction.z;
+
+    if (NdotR > 0.0f) {
+      const float HdotR = fabsf(dot_product(H, refraction));
+      const float NdotH = fabsf(H.z);
+      sum += bsdf_microfacet_refraction_evaluate_sampled_microfacet(data, HdotR, HdotV, NdotH, NdotR, NdotV, 1.0f / data.refraction_index)
+             * (1.0f - fresnel);
+    }
+  }
+
+  sum /= BSDF_ENERGY_LUT_ITERATIONS;
+
+  // Ceil because underestimating energy causes excessive energy.
+  dst[4 * (x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE) + 0] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  dst[4 * (x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE) + 1] = 0;
+  dst[4 * (x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE) + 2] = 0;
+  dst[4 * (x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE) + 3] = 0;
+
+  sum = 0.0f;
+
+  for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
+    const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
+    const vec3 reflection = reflect_vector(scale_vector(data.V, -1.0f), H);
+    const vec3 refraction = refract_vector(scale_vector(data.V, -1.0f), H, data.refraction_index);
+    const float fresnel   = bsdf_fresnel(H, data.V, refraction, data.refraction_index, 1.0f);
+    const float HdotV     = fabsf(dot_product(H, data.V));
+
+    const float NdotL = reflection.z;
+
+    if (NdotL > 0.0f) {
+      sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV) * fresnel;
+    }
+
+    const float NdotR = -refraction.z;
+
+    if (NdotR > 0.0f) {
+      const float HdotR = fabsf(dot_product(H, refraction));
+      const float NdotH = fabsf(H.z);
+      sum += bsdf_microfacet_refraction_evaluate_sampled_microfacet(data, HdotR, HdotV, NdotH, NdotR, NdotV, data.refraction_index)
+             * (1.0f - fresnel);
+    }
+  }
+
+  sum /= BSDF_ENERGY_LUT_ITERATIONS;
+
+  // Ceil because underestimating energy causes excessive energy.
+  dst_inv[4 * (x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE) + 0] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  dst_inv[4 * (x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE) + 1] = 0;
+  dst_inv[4 * (x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE) + 2] = 0;
+  dst_inv[4 * (x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE) + 3] = 0;
 }
 
 extern "C" void bsdf_compute_energy_lut(RaytraceInstance* instance) {
@@ -152,6 +242,8 @@ extern "C" void bsdf_compute_energy_lut(RaytraceInstance* instance) {
   bsdf_lut_ss_generate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((uint16_t*) luts[BSDF_LUT_SS].data);
   bsdf_lut_specular_generate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
     (uint16_t*) luts[BSDF_LUT_SPECULAR].data, (uint16_t*) luts[BSDF_LUT_SS].data);
+  bsdf_lut_dielectric_generate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+    (uint16_t*) luts[BSDF_LUT_DIELEC].data, (uint16_t*) luts[BSDF_LUT_DIELEC_INV].data);
 
   texture_create_atlas(&instance->bsdf_energy_lut, luts, 4);
 

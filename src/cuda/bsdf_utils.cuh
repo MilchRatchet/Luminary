@@ -9,7 +9,6 @@ struct BSDFRayContext {
   vec3 H;
   RGBF f0_conductor;
   RGBF f0_glossy;
-  float f0_dielectric;
   RGBF fresnel_conductor;
   RGBF fresnel_glossy;
   float fresnel_dielectric;
@@ -64,10 +63,6 @@ __device__ float bsdf_fresnel(const vec3 normal, const vec3 V, const vec3 refrac
   reflection_p_pol *= reflection_p_pol;
 
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
-}
-
-__device__ float bsdf_fresnel_normal_incidence(const float ior_in, const float ior_out) {
-  return bsdf_fresnel(get_vector(0.0f, 0.0f, 1.0f), get_vector(0.0f, 0.0f, 1.0f), get_vector(0.0f, 0.0f, -1.0f), ior_in, ior_out);
 }
 
 /*
@@ -406,6 +401,16 @@ __device__ RGBF
   return add_color(ss_term_with_fresnel, diff_term_with_color);
 }
 
+__device__ float bsdf_dielectric_directional_albedo(const float NdotV, const float roughness, const float ior) {
+  const bool use_inv = (ior > 1.0f);
+
+  const float ior_tex_coord = use_inv ? (ior - 1.0f) * 0.5f : (1.0f / ior - 1.0f) * 0.5f;
+
+  const uint32_t lut_index = use_inv ? BSDF_LUT_DIELEC_INV : BSDF_LUT_DIELEC;
+
+  return tex3D<float4>(device.ptrs.bsdf_energy_lut[lut_index].tex, NdotV, roughness, ior_tex_coord).x;
+}
+
 __device__ RGBF bsdf_dielectric(
   const GBufferData data, const BSDFRayContext ctx, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf) {
   if (ctx.NdotL <= 0.0f || ctx.NdotV <= 0.0f)
@@ -444,6 +449,9 @@ __device__ RGBF bsdf_dielectric(
 
     term *= ctx.fresnel_dielectric;
   }
+
+  const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, data.roughness, ctx.refraction_index);
+  term /= dielectric_directional_albedo;
 
   return get_color(term, term, term);
 }

@@ -41,7 +41,6 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  context.f0_dielectric      = bsdf_fresnel_normal_incidence(ior_in, ior_out);
   context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
 
   return context;
@@ -94,7 +93,6 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  context.f0_dielectric      = bsdf_fresnel_normal_incidence(ior_in, ior_out);
   context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
 
   return context;
