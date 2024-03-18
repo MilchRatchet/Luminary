@@ -190,11 +190,11 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     RGBF final_weight;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 2, pixel) < reflection_probability) {
       ray_local    = reflection_vector;
-      final_weight = scale_color(reflection_eval, 0.5f * 1.0f / reflection_probability);
+      final_weight = scale_color(reflection_eval, 1.0f / reflection_probability);
     }
     else {
       ray_local                = refraction_vector;
-      final_weight             = scale_color(refraction_eval, 0.5f * 1.0f / refraction_probability);
+      final_weight             = scale_color(refraction_eval, 1.0f / refraction_probability);
       info.is_transparent_pass = true;
     }
 

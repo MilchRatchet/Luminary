@@ -228,7 +228,8 @@ __device__ float bsdf_microfacet_refraction_evaluate(
   float denominator = refraction_index * HdotL + HdotV;
   denominator       = denominator * denominator;
 
-  return ((HdotV * HdotL) / (NdotV * NdotL)) * D * G2 / denominator;
+  // ... * NdotL
+  return ((HdotV * HdotL) / NdotV) * D * G2 / denominator;
 }
 
 __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
@@ -242,7 +243,8 @@ __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
   float denominator = refraction_index * HdotL + HdotV;
   denominator       = denominator * denominator;
 
-  return 4.0f * ((HdotV * HdotL) / NdotL) * G2_over_G1 / denominator;
+  // ... * NdotL
+  return 4.0f * HdotV * HdotL * G2_over_G1 / denominator;
 }
 
 /*
