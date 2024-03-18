@@ -172,8 +172,14 @@ __device__ vec3
     } break;
   }
 
-  // TODO: Document why 2PI is the correct 1/PDF.
-  weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, 2.0f * PI), light.weight);
+  if (data.flags & G_BUFFER_VOLUME_HIT) {
+    is_transparent_pass = true;
+    weight              = scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), ray), light.weight);
+  }
+  else {
+    // TODO: Document why 2PI is the correct 1/PDF.
+    weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, 2.0f * PI), light.weight);
+  }
 
   return ray;
 }
@@ -202,9 +208,7 @@ __device__ float restir_sample_target_pdf(
 
   RGBF bsdf_weight;
   if (data.flags & G_BUFFER_VOLUME_HIT) {
-    // TODO: Reimplement volume scattering
-    bsdf_weight = get_color(0.0f, 0.0f, 0.0f);
-    // result = brdf_apply_sample_weight_scattering(result, VOLUME_HIT_TYPE(data.hit_id));
+    bsdf_weight = volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), ray);
   }
   else {
     bool is_transparent_pass;

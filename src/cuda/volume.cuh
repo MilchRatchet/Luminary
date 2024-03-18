@@ -28,20 +28,21 @@
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-__device__ GBufferData volume_generate_g_buffer(const VolumeTask task, const int pixel) {
-  uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
-  flags |= G_BUFFER_VOLUME_HIT;
+__device__ GBufferData volume_generate_g_buffer(const VolumeTask task, const int pixel, const VolumeDescriptor volume) {
+  const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
 
   GBufferData data;
-  data.hit_id    = task.hit_id;
-  data.albedo    = RGBAF_set(0.0f, 0.0f, 0.0f, 0.0f);
+  data.hit_id = task.hit_id;
+  data.albedo = RGBAF_set(
+    volume.scattering.r * scattering_normalization, volume.scattering.g * scattering_normalization,
+    volume.scattering.b * scattering_normalization, 0.0f);
   data.emission  = get_color(0.0f, 0.0f, 0.0f);
   data.normal    = get_vector(0.0f, 0.0f, 0.0f);
   data.position  = task.position;
   data.V         = scale_vector(task.ray, -1.0f);
   data.roughness = 1.0f;
   data.metallic  = 0.0f;
-  data.flags     = flags;
+  data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
 
   return data;
 }
@@ -162,7 +163,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
     VolumeTask task = load_volume_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    VolumeType volume_type = VOLUME_HIT_TYPE(task.hit_id);
+    const VolumeType volume_type = VOLUME_HIT_TYPE(task.hit_id);
 
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
@@ -190,34 +191,29 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
 
-    if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-      const GBufferData data = volume_generate_g_buffer(task, pixel);
-      LightSample light      = restir_sample_reservoir(data, record, task.index);
+    const GBufferData data = volume_generate_g_buffer(task, pixel, volume);
+    LightSample light      = restir_sample_reservoir(data, record, task.index);
 
-      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
+    uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-      BRDFInstance brdf = brdf_get_instance_scattering(scale_vector(task.ray, -1.0f));
+    if (light.weight > 0.0f) {
+      RGBF light_weight;
+      bool is_transparent_pass;
+      const vec3 light_ray = restir_apply_sample_shading(data, light, task.index, light_weight, is_transparent_pass);
 
-      if (light.weight > 0.0f) {
-        RGBF light_weight;
-        const vec3 light_ray = restir_apply_sample_shading(data, light, task.index, light_weight);
+      const RGBF light_record = mul_color(record, light_weight);
 
-        const RGBF light_record = mul_color(record, light_weight);
+      TraceTask light_task;
+      light_task.origin = task.position;
+      light_task.ray    = light_ray;
+      light_task.index  = task.index;
 
-        TraceTask light_task;
-        light_task.origin = task.position;
-        light_task.ray    = light_ray;
-        light_task.index  = task.index;
-
-        if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-          store_RGBF(device.ptrs.light_records + pixel, light_record);
-          light_history_buffer_entry = light.id;
-          store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
-        }
-      }
-
-      device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
+      store_RGBF(device.ptrs.light_records + pixel, light_record);
+      light_history_buffer_entry = light.id;
+      store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
     }
+
+    device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
   }
 
   device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;

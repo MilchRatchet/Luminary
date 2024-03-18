@@ -24,9 +24,6 @@ __device__ GBufferData particle_generate_g_buffer(const ParticleTask task, const
   albedo.a = 1.0f;
 
   // Particles BSDF is emulated using volume BSDFs
-  uint32_t flags = (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) ? G_BUFFER_REQUIRES_SAMPLING : 0;
-  flags |= G_BUFFER_VOLUME_HIT;
-
   GBufferData data;
   data.hit_id    = task.hit_id;
   data.albedo    = albedo;
@@ -36,7 +33,7 @@ __device__ GBufferData particle_generate_g_buffer(const ParticleTask task, const
   data.V         = scale_vector(task.ray, -1.0f);
   data.roughness = 0.0f;
   data.metallic  = 0.0f;
-  data.flags     = flags;
+  data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
 
   return data;
 }
@@ -79,31 +76,28 @@ __global__ void particle_process_tasks() {
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
 
-    if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-      LightSample light = restir_sample_reservoir(data, record, task.index);
+    const LightSample light = restir_sample_reservoir(data, record, task.index);
 
-      uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
+    uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
-      if (light.weight > 0.0f) {
-        RGBF light_weight;
-        const vec3 light_ray = restir_apply_sample_shading(data, light, task.index, light_weight);
+    if (light.weight > 0.0f) {
+      RGBF light_weight;
+      bool is_transparent_pass;
+      const vec3 light_ray = restir_apply_sample_shading(data, light, task.index, light_weight, is_transparent_pass);
 
-        const RGBF light_record = mul_color(record, light_weight);
+      const RGBF light_record = mul_color(record, light_weight);
 
-        TraceTask light_task;
-        light_task.origin = task.position;
-        light_task.ray    = light_ray;
-        light_task.index  = task.index;
+      TraceTask light_task;
+      light_task.origin = task.position;
+      light_task.ray    = light_ray;
+      light_task.index  = task.index;
 
-        if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-          store_RGBF(device.ptrs.light_records + pixel, light_record);
-          light_history_buffer_entry = light.id;
-          store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
-        }
-      }
-
-      device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
+      store_RGBF(device.ptrs.light_records + pixel, light_record);
+      light_history_buffer_entry = light.id;
+      store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
     }
+
+    device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
   }
 
   device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;

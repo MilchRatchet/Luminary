@@ -181,4 +181,19 @@ __device__ float volume_sample_intersection(
   return start + t;
 }
 
+__device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType volume_hit_type, const vec3 ray) {
+  const float cos_angle = dot_product(scale_vector(data.V, -1.0f), ray);
+
+  float phase;
+  if (volume_hit_type == VOLUME_TYPE_OCEAN) {
+    phase = ocean_phase(cos_angle);
+  }
+  else {
+    const float diameter = (volume_hit_type == VOLUME_TYPE_FOG) ? device.scene.fog.droplet_diameter : device.scene.particles.phase_diameter;
+    phase                = jendersie_eon_phase_function(cos_angle, diameter);
+  }
+
+  return scale_color(opaque_color(data.albedo), phase);
+}
+
 #endif /* CU_VOLUME_UTILS_H */

@@ -72,7 +72,6 @@ __device__ float ocean_reflection_coefficient(
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
   const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
   const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
-  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
   int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -121,7 +120,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
   }
 
-  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
   device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
