@@ -163,7 +163,8 @@ int main(int argc, char* argv[]) {
   if (bench)
     bench_activate();
 
-  CommandlineOptions options = {.aov_mode = aov_mode, .width = width, .height = height};
+  CommandlineOptions options = {
+    .aov_mode = aov_mode, .width = width, .height = height, .dmm_active = force_displacement, .omm_active = !disable_omm};
 
   RaytraceInstance* instance;
 

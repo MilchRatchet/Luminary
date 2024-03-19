@@ -134,6 +134,8 @@ struct CommandlineOptions {
   int aov_mode;
   int width;
   int height;
+  int dmm_active;
+  int omm_active;
 } typedef CommandlineOptions;
 
 struct General {

@@ -130,7 +130,7 @@ static int contains_illumination(Triangle triangle, TextureRGBA tex) {
   return 0;
 }
 
-void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
+void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures, int dmm_active) {
   bench_tic("Processing Lights");
 
   Scene data = *scene;
@@ -143,6 +143,10 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures) {
     const Triangle triangle = data.triangles[i];
 
     const uint16_t tex_index = data.materials[triangle.material_id].luminance_map;
+
+    // Triangles with displacement can't be light sources.
+    if (dmm_active && data.materials[triangle.material_id].normal_map)
+      continue;
 
     if (tex_index != TEXTURE_NONE && contains_illumination(triangle, textures[tex_index])) {
       const TriangleLight l = {

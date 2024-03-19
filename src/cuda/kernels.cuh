@@ -179,29 +179,22 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
         }
 
         if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-          // This feature does not work for displacement triangles
-          if (device.scene.materials[material_id].normal_map == TEXTURE_NONE) {
-            float2 coords;
-            const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
+          float2 coords;
+          const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
 
-            if (dist < depth) {
-              const int alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
+          if (dist < depth) {
+            const int alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
 
-              if (alpha_result != 2) {
-                depth  = dist;
-                hit_id = t_id;
-              }
-              else if (device.iteration_type == TYPE_LIGHT) {
-                depth  = -1.0f;
-                hit_id = HIT_TYPE_REJECT;
-              }
+            if (alpha_result != 2) {
+              depth  = dist;
+              hit_id = t_id;
             }
-            else if (device.iteration_type == TYPE_LIGHT && dist == FLT_MAX) {
+            else if (device.iteration_type == TYPE_LIGHT) {
               depth  = -1.0f;
               hit_id = HIT_TYPE_REJECT;
             }
           }
-          else if (device.iteration_type == TYPE_LIGHT) {
+          else if (device.iteration_type == TYPE_LIGHT && dist == FLT_MAX) {
             depth  = -1.0f;
             hit_id = HIT_TYPE_REJECT;
           }
