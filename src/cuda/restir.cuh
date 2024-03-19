@@ -177,8 +177,7 @@ __device__ vec3
     weight              = scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), ray), light.weight);
   }
   else {
-    // TODO: Document why 2PI is the correct 1/PDF.
-    weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, 2.0f * PI), light.weight);
+    weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, 1.0f), light.weight);
   }
 
   return ray;
