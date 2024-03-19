@@ -302,7 +302,8 @@ struct GBufferData {
   float roughness;
   float metallic;
   uint32_t flags;
-  float refraction_index;
+  float ior_in;
+  float ior_out;
 } typedef GBufferData;
 
 ////////////////////////////////////////////////////////////////////

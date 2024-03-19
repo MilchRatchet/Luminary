@@ -27,12 +27,13 @@ __global__ void brdf_unittest_kernel(float* bounce, float* light) {
     float sum_light  = 0.0f;
 
     GBufferData data;
-    data.albedo           = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
-    data.position         = get_vector(FLT_MAX, 1000000.0f, 0.0f);
-    data.refraction_index = 1.0f;
-    data.roughness        = 1.0f - smoothness;
-    data.metallic         = metallic;
-    data.normal           = get_vector(0.0f, 1.0f, 0.0f);
+    data.albedo    = get_RGBAF(1.0f, 1.0f, 1.0f, 1.0f);
+    data.position  = get_vector(FLT_MAX, 1000000.0f, 0.0f);
+    data.ior_in    = 1.0f;
+    data.ior_out   = 1.0f;
+    data.roughness = 1.0f - smoothness;
+    data.metallic  = metallic;
+    data.normal    = get_vector(0.0f, 1.0f, 0.0f);
 
     for (int i = 0; i < BRDF_UNITTEST_ITERATIONS; i++) {
       float2 ran0 = quasirandom_sequence_2D_base(0, make_ushort2(0, 0), i, 0);

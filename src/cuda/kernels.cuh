@@ -7,6 +7,7 @@
 #include "camera.cuh"
 #include "cloud.cuh"
 #include "geometry.cuh"
+#include "ior_stack.cuh"
 #include "ocean.cuh"
 #include "purkinje.cuh"
 #include "restir.cuh"
@@ -46,6 +47,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
       device.ptrs.frame_direct_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
       device.ptrs.frame_indirect_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
+
+    const float ambient_ior = geometry_get_ambient_index_of_refraction(task.origin);
+    ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
 
     store_trace_task(device.ptrs.bounce_trace + get_task_address(offset++), task);
   }

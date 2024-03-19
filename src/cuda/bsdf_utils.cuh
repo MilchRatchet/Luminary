@@ -136,15 +136,6 @@ __device__ float bsdf_refraction_index_ambient(const GBufferData data) {
   return 1.0f;
 }
 
-__device__ float bsdf_refraction_index(const GBufferData data) {
-  const float ambient_index_of_refraction = bsdf_refraction_index_ambient(data);
-
-  const float refraction_index = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index / ambient_index_of_refraction
-                                                                              : ambient_index_of_refraction / data.refraction_index;
-
-  return refraction_index;
-}
-
 // Get normal vector based on incoming ray and refracted ray: https://physics.stackexchange.com/a/762982
 __device__ vec3 bsdf_refraction_normal_from_pair(const vec3 L, const vec3 V, const float ior_L, const float ior_V) {
   return normalize_vector(add_vector(scale_vector(V, ior_V), scale_vector(L, ior_L)));
@@ -299,11 +290,7 @@ __device__ vec3 bsdf_microfacet_sample_refraction(
   const uint32_t depth = device.depth) {
   H = bsdf_microfacet_sample(data, pixel, sequence_id, depth);
 
-  const float ambient_ior = bsdf_refraction_index_ambient(data);
-  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
-  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
-
-  return refract_vector(scale_vector(data.V, -1.0f), H, ior_in / ior_out);
+  return refract_vector(scale_vector(data.V, -1.0f), H, data.ior_in / data.ior_out);
 }
 
 ///////////////////////////////////////////////////

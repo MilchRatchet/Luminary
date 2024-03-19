@@ -121,11 +121,12 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
   const float ior       = 1.0f + z * (1.0f / (BSDF_LUT_SIZE - 1)) * 2.0f;
 
   GBufferData data;
-  data.normal           = get_vector(0.0f, 0.0f, 1.0f);
-  data.metallic         = 1.0f;
-  data.roughness        = roughness;
-  data.V                = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
-  data.refraction_index = ior;
+  data.normal    = get_vector(0.0f, 0.0f, 1.0f);
+  data.metallic  = 1.0f;
+  data.roughness = roughness;
+  data.V         = normalize_vector(get_vector(0.0f, sqrtf(1.0f - NdotV * NdotV), NdotV));
+  data.ior_in    = 1.0f;
+  data.ior_out   = ior;
 
   const vec3 ray = scale_vector(data.V, -1.0f);
 
@@ -134,8 +135,8 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
     const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
     const vec3 reflection = reflect_vector(scale_vector(data.V, -1.0f), H);
-    const vec3 refraction = refract_vector(scale_vector(data.V, -1.0f), H, 1.0f / data.refraction_index);
-    const float fresnel   = bsdf_fresnel(H, data.V, refraction, 1.0f, data.refraction_index);
+    const vec3 refraction = refract_vector(scale_vector(data.V, -1.0f), H, data.ior_in / data.ior_out);
+    const float fresnel   = bsdf_fresnel(H, data.V, refraction, data.ior_in, data.ior_out);
     const float HdotV     = fabsf(dot_product(H, data.V));
 
     const float NdotL = reflection.z;
@@ -149,7 +150,7 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
     if (NdotR > 0.0f) {
       const float HdotR = fabsf(dot_product(H, refraction));
       const float NdotH = fabsf(H.z);
-      sum += bsdf_microfacet_refraction_evaluate_sampled_microfacet(data, HdotR, HdotV, NdotH, NdotR, NdotV, 1.0f / data.refraction_index)
+      sum += bsdf_microfacet_refraction_evaluate_sampled_microfacet(data, HdotR, HdotV, NdotH, NdotR, NdotV, data.ior_in / data.ior_out)
              * (1.0f - fresnel);
     }
   }
@@ -159,13 +160,16 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
   // Ceil because underestimating energy causes excessive energy.
   dst[x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 
+  data.ior_in  = ior;
+  data.ior_out = 1.0f;
+
   sum = 0.0f;
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
     const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
     const vec3 reflection = reflect_vector(scale_vector(data.V, -1.0f), H);
-    const vec3 refraction = refract_vector(scale_vector(data.V, -1.0f), H, data.refraction_index);
-    const float fresnel   = bsdf_fresnel(H, data.V, refraction, data.refraction_index, 1.0f);
+    const vec3 refraction = refract_vector(scale_vector(data.V, -1.0f), H, data.ior_in / data.ior_out);
+    const float fresnel   = bsdf_fresnel(H, data.V, refraction, data.ior_in, data.ior_out);
     const float HdotV     = fabsf(dot_product(H, data.V));
 
     const float NdotL = reflection.z;
@@ -179,7 +183,7 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
     if (NdotR > 0.0f) {
       const float HdotR = fabsf(dot_product(H, refraction));
       const float NdotH = fabsf(H.z);
-      sum += bsdf_microfacet_refraction_evaluate_sampled_microfacet(data, HdotR, HdotV, NdotH, NdotR, NdotV, data.refraction_index)
+      sum += bsdf_microfacet_refraction_evaluate_sampled_microfacet(data, HdotR, HdotV, NdotH, NdotR, NdotV, data.ior_in / data.ior_out)
              * (1.0f - fresnel);
     }
   }

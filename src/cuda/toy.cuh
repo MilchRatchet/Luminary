@@ -3,6 +3,7 @@
 
 #include "brdf.cuh"
 #include "bsdf.cuh"
+#include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "state.cuh"
@@ -29,17 +30,22 @@ __device__ GBufferData toy_generate_g_buffer(const ToyTask task, const int pixel
     flags |= G_BUFFER_REFRACTION_IS_INSIDE;
   }
 
+  const IORStackMethod ior_stack_method =
+    (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+  const float ray_ior = ior_stack_interact(device.scene.toy.refractive_index, pixel, ior_stack_method);
+
   GBufferData data;
-  data.hit_id           = HIT_TYPE_TOY;
-  data.albedo           = device.scene.toy.albedo;
-  data.emission         = emission;
-  data.normal           = normal;
-  data.position         = task.position;
-  data.V                = scale_vector(task.ray, -1.0f);
-  data.roughness        = (1.0f - device.scene.toy.material.r);
-  data.metallic         = device.scene.toy.material.g;
-  data.flags            = flags;
-  data.refraction_index = device.scene.toy.refractive_index;
+  data.hit_id    = HIT_TYPE_TOY;
+  data.albedo    = device.scene.toy.albedo;
+  data.emission  = emission;
+  data.normal    = normal;
+  data.position  = task.position;
+  data.V         = scale_vector(task.ray, -1.0f);
+  data.roughness = (1.0f - device.scene.toy.material.r);
+  data.metallic  = device.scene.toy.material.g;
+  data.flags     = flags;
+  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.toy.refractive_index : ray_ior;
+  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.scene.toy.refractive_index;
 
   return data;
 }
@@ -120,6 +126,11 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
     const float shift           = (bounce_info.is_transparent_pass) ? -eps : eps;
     const vec3 shifted_position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+    if (bounce_info.is_transparent_pass) {
+      const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(data.ior_in, pixel, ior_stack_method);
+    }
 
     TraceTask bounce_task;
     bounce_task.origin = shifted_position;

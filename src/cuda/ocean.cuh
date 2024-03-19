@@ -2,6 +2,7 @@
 #define CU_OCEAN_H
 
 #include "brdf.cuh"
+#include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "ocean_utils.cuh"
@@ -80,25 +81,27 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     vec3 normal = ocean_get_normal(task.position);
 
-    const float ambient_index_of_refraction = ocean_get_ambient_index_of_refraction(task.position);
+    const bool inside_water = dot_product(task.ray, normal) > 0.0f;
 
-    float index_in, index_out;
-    if (dot_product(task.ray, normal) > 0.0f) {
-      normal    = scale_vector(normal, -1.0f);
-      index_in  = device.scene.ocean.refractive_index;
-      index_out = ambient_index_of_refraction;
+    const IORStackMethod ior_stack_method = (inside_water) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+    const float ray_ior                   = ior_stack_interact(device.scene.ocean.refractive_index, pixel, ior_stack_method);
+
+    float ior_in, ior_out;
+    if (inside_water) {
+      normal  = scale_vector(normal, -1.0f);
+      ior_in  = device.scene.ocean.refractive_index;
+      ior_out = ray_ior;
     }
     else {
-      index_in  = ambient_index_of_refraction;
-      index_out = device.scene.ocean.refractive_index;
+      ior_in  = ray_ior;
+      ior_out = device.scene.ocean.refractive_index;
     }
 
     write_normal_buffer(normal, pixel);
 
-    const float refraction_index_ratio = index_in / index_out;
-    const vec3 refraction_dir          = refract_vector(task.ray, normal, refraction_index_ratio);
+    const vec3 refraction_dir = refract_vector(task.ray, normal, ior_in / ior_out);
 
-    const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, index_in, index_out);
+    const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, ior_in, ior_out);
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) < reflection_coefficient) {
       task.position = add_vector(task.position, scale_vector(task.ray, -2.0f * eps * (1.0f + get_length(task.position))));
       task.ray      = reflect_vector(task.ray, normal);
@@ -106,6 +109,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     else {
       task.ray      = refraction_dir;
       task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps * (1.0f + get_length(task.position))));
+
+      const IORStackMethod ior_stack_method = (inside_water) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(ior_in, pixel, ior_stack_method);
     }
 
     RGBF record = load_RGBF(device.records + pixel);

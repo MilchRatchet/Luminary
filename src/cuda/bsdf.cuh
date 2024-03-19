@@ -15,15 +15,11 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   // on if they enter or leave, otherwise it is not clear which of the two a ray should be.
   context.is_refraction = (context.NdotL < 0.0f);
 
-  const float ambient_ior = bsdf_refraction_index_ambient(data);
-  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
-  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
-
-  context.refraction_index = ior_in / ior_out;
+  context.refraction_index = data.ior_in / data.ior_out;
 
   vec3 refraction_vector;
   if (context.is_refraction) {
-    context.H         = bsdf_refraction_normal_from_pair(L, data.V, ior_out, ior_in);
+    context.H         = bsdf_refraction_normal_from_pair(L, data.V, data.ior_out, data.ior_out);
     refraction_vector = L;
   }
   else {
@@ -41,7 +37,7 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
+  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, data.ior_in, data.ior_out);
 
   return context;
 }
@@ -72,11 +68,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   if (is_refraction)
     context.NdotL *= -1.0f;
 
-  const float ambient_ior = bsdf_refraction_index_ambient(data);
-  const float ior_in      = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index : ambient_ior;
-  const float ior_out     = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data.refraction_index;
-
-  context.refraction_index = ior_in / ior_out;
+  context.refraction_index = data.ior_in / data.ior_out;
 
   context.H = H;
 
@@ -93,7 +85,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
+  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, data.ior_in, data.ior_out);
 
   return context;
 }
@@ -165,15 +157,11 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     }
   }
   else {
-    const float ambient_ior = bsdf_refraction_index_ambient(data_local);
-    const float ior_in      = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data_local.refraction_index : ambient_ior;
-    const float ior_out     = (data_local.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ambient_ior : data_local.refraction_index;
-
     const vec3 reflection_vector        = reflect_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet);
     const BSDFRayContext reflection_ctx = bsdf_sample_context(data_local, sampled_microfacet, reflection_vector, false);
     const RGBF reflection_eval          = bsdf_dielectric(data_local, reflection_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
-    const vec3 refraction_vector        = refract_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet, ior_in / ior_out);
+    const vec3 refraction_vector        = refract_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet, data.ior_in / data.ior_out);
     const BSDFRayContext refraction_ctx = bsdf_sample_context(data_local, sampled_microfacet, refraction_vector, true);
     const RGBF refraction_eval          = bsdf_dielectric(data_local, refraction_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 

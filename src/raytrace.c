@@ -531,6 +531,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->task_counts);
   device_buffer_init(&instance->task_offsets);
   device_buffer_init(&instance->light_sample_history);
+  device_buffer_init(&instance->ior_stack);
   device_buffer_init(&instance->frame_buffer);
   device_buffer_init(&instance->frame_temporal);
   device_buffer_init(&instance->frame_variance);
@@ -721,6 +722,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->task_counts, sizeof(uint16_t), 7 * thread_count);
   device_buffer_malloc(instance->task_offsets, sizeof(uint16_t), 6 * thread_count);
 
+  device_buffer_malloc(instance->ior_stack, sizeof(uint32_t), amount);
   device_buffer_malloc(instance->light_sample_history, sizeof(uint32_t), amount);
   device_buffer_malloc(instance->raydir_buffer, sizeof(vec3), amount);
   device_buffer_malloc(instance->trace_result_buffer, sizeof(TraceResult), amount);
@@ -742,6 +744,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.task_counts               = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets              = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
   ptrs.light_sample_history      = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
+  ptrs.ior_stack                 = (uint32_t*) device_buffer_get_pointer(instance->ior_stack);
   ptrs.frame_buffer              = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
   ptrs.frame_temporal            = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
   ptrs.frame_variance            = (float*) device_buffer_get_pointer(instance->frame_variance);
@@ -784,6 +787,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene.triangles));
   gpuErrchk(cudaFree(instance->scene.triangle_lights));
   gpuErrchk(cudaFree(instance->restir.presampled_triangle_lights));
+  device_buffer_free(instance->ior_stack);
   device_buffer_free(instance->light_trace);
   device_buffer_free(instance->bounce_trace);
   device_buffer_free(instance->light_trace_count);

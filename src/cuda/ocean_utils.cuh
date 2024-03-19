@@ -194,13 +194,6 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
   return ocean_intersection_solver(origin, ray, start, end);
 }
 
-__device__ float ocean_get_ambient_index_of_refraction(const vec3 position) {
-  if (device.scene.toy.active && toy_is_inside(position))
-    return device.scene.toy.refractive_index;
-
-  return 1.0f;
-}
-
 // Coefficients taken from
 // M. Droske, J. Hanika, J. Vorba, A. Weidlich, M. Sabbadin, _Path Tracing in Production: The Path of Water_, ACM SIGGRAPH 2023 Courses,
 // 2023.
