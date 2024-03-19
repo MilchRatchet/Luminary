@@ -190,15 +190,15 @@ __device__ BRDFInstance brdf_sample_ray_microfacet(BRDFInstance brdf, const vec3
   const float NdotL = fmaxf(0.00001f, fminf(1.0f, L_local.z));
   const float NdotV = fmaxf(0.00001f, fminf(1.0f, V_local.z));
 
-  switch (device.scene.material.fresnel) {
-    case SCHLICK:
-      brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotL);
-      break;
-    case FDEZ_AGUERA:
-    default:
-      brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotL);
-      break;
-  }
+  // switch (device.scene.material.fresnel) {
+  //   case SCHLICK:
+  //     brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotL);
+  //     break;
+  //   case FDEZ_AGUERA:
+  //   default:
+  //     brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotL);
+  //     break;
+  // }
 
   const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
 
@@ -282,15 +282,15 @@ __device__ BRDFInstance brdf_evaluate(BRDFInstance brdf) {
   const float NdotH = __saturatef(dot_product(brdf.normal, H));
   const float HdotV = __saturatef(dot_product(H, brdf.V));
 
-  switch (device.scene.material.fresnel) {
-    case SCHLICK:
-      brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotV);
-      break;
-    case FDEZ_AGUERA:
-    default:
-      brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotV);
-      break;
-  }
+  // switch (device.scene.material.fresnel) {
+  //   case SCHLICK:
+  //     brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotV);
+  //     break;
+  //   case FDEZ_AGUERA:
+  //   default:
+  //     brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotV);
+  //     break;
+  // }
 
   RGBF specular = brdf_evaluate_microfacet(brdf, NdotH, NdotL, NdotV);
 
@@ -436,15 +436,15 @@ __device__ BRDFInstance brdf_sample_ray_refraction(BRDFInstance brdf, const floa
   const float NdotL = fmaxf(eps, fminf(1.0f, L_local.z));
   const float NdotV = fmaxf(eps, fminf(1.0f, V_local.z));
 
-  switch (device.scene.material.fresnel) {
-    case SCHLICK:
-      brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotL);
-      break;
-    case FDEZ_AGUERA:
-    default:
-      brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotL);
-      break;
-  }
+  // switch (device.scene.material.fresnel) {
+  //   case SCHLICK:
+  //     brdf.fresnel = brdf_fresnel_schlick(brdf.specular_f0, brdf_shadowed_F90(brdf.specular_f0), HdotL);
+  //     break;
+  //   case FDEZ_AGUERA:
+  //   default:
+  //     brdf.fresnel = brdf_fresnel_roughness(brdf.specular_f0, brdf.roughness, HdotL);
+  //     break;
+  // }
 
   const float brdf_term = brdf_smith_G2_over_G1_height_correlated(roughness2 * roughness2, NdotL, NdotV);
 
