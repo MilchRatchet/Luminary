@@ -252,9 +252,12 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
     bounce_task.index  = task.index;
 
     if (validate_trace_task(bounce_task, bounce_record)) {
-      device.ptrs.mis_buffer[pixel] = bounce_mis_weight;
       store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+
+      // MIS weight must be propagated if the ray just passes through.
+      if (get_length(sub_vector(task.ray, bounce_ray)) > eps)
+        device.ptrs.mis_buffer[pixel] = bounce_mis_weight;
     }
   }
 

@@ -102,13 +102,15 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
     const vec3 refraction_dir = refract_vector(task.ray, normal, ior_in / ior_out);
 
     const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, ior_in, ior_out);
+
+    vec3 bounce_ray;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) < reflection_coefficient) {
       task.position = add_vector(task.position, scale_vector(task.ray, -2.0f * eps * (1.0f + get_length(task.position))));
-      task.ray      = reflect_vector(task.ray, normal);
+      bounce_ray    = reflect_vector(task.ray, normal);
     }
     else {
-      task.ray      = refraction_dir;
-      task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps * (1.0f + get_length(task.position))));
+      bounce_ray    = refraction_dir;
+      task.position = add_vector(task.position, scale_vector(bounce_ray, 2.0f * eps * (1.0f + get_length(task.position))));
 
       const IORStackMethod ior_stack_method = (inside_water) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(ior_in, pixel, ior_stack_method);
@@ -118,10 +120,13 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     TraceTask new_task;
     new_task.origin = task.position;
-    new_task.ray    = task.ray;
+    new_task.ray    = bounce_ray;
     new_task.index  = task.index;
 
-    device.ptrs.mis_buffer[pixel] = 1.0f;
+    // MIS weight must be propagated if the ray just passes through.
+    if (get_length(sub_vector(task.ray, bounce_ray)) > eps)
+      device.ptrs.mis_buffer[pixel] = 1.0f;
+
     store_RGBF(device.ptrs.bounce_records + pixel, record);
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
   }
