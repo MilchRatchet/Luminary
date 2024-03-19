@@ -269,6 +269,7 @@ struct TextureRGBA {
   int mipmap_max_level;
   void* data;
   float gamma;
+  unsigned int num_components;
 } typedef TextureRGBA;
 
 struct DeviceTexture {

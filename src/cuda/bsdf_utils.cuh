@@ -327,7 +327,7 @@ __device__ float bsdf_diffuse_pdf(const GBufferData data, const float NdotL) {
 ///////////////////////////////////////////////////
 
 __device__ float bsdf_conductor_directional_albedo(const float NdotV, const float roughness) {
-  return tex2D<float4>(device.ptrs.bsdf_energy_lut[BSDF_LUT_SS].tex, NdotV, roughness).x;
+  return tex2D<float>(device.ptrs.bsdf_energy_lut[BSDF_LUT_SS].tex, NdotV, roughness);
 }
 
 __device__ RGBF bsdf_conductor(
@@ -358,7 +358,7 @@ __device__ RGBF bsdf_conductor(
 }
 
 __device__ float bsdf_glossy_directional_albedo(const float NdotV, const float roughness) {
-  return tex2D<float4>(device.ptrs.bsdf_energy_lut[BSDF_LUT_SPECULAR].tex, NdotV, roughness).x;
+  return tex2D<float>(device.ptrs.bsdf_energy_lut[BSDF_LUT_SPECULAR].tex, NdotV, roughness);
 }
 
 __device__ RGBF
@@ -408,7 +408,7 @@ __device__ float bsdf_dielectric_directional_albedo(const float NdotV, const flo
 
   const uint32_t lut_index = use_inv ? BSDF_LUT_DIELEC_INV : BSDF_LUT_DIELEC;
 
-  return tex3D<float4>(device.ptrs.bsdf_energy_lut[lut_index].tex, NdotV, roughness, ior_tex_coord).x;
+  return tex3D<float>(device.ptrs.bsdf_energy_lut[lut_index].tex, NdotV, roughness, ior_tex_coord);
 }
 
 __device__ RGBF bsdf_dielectric(

@@ -367,10 +367,11 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   }
 
   TextureRGBA noise_tex[3];
-  texture_create(noise_tex + 0, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
   texture_create(
-    noise_tex + 1, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
-  texture_create(noise_tex + 2, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, CLOUD_WEATHER_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
+    noise_tex + 0, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, 4, TexStorageGPU);
+  texture_create(
+    noise_tex + 1, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TexDataUINT8, 4, TexStorageGPU);
+  texture_create(noise_tex + 2, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, CLOUD_WEATHER_RES, (void*) 0, TexDataUINT8, 4, TexStorageGPU);
 
   noise_tex[0].mipmap = TexMipmapGenerate;
   noise_tex[1].mipmap = TexMipmapGenerate;

@@ -90,7 +90,7 @@ static void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
     gpuErrchk(cudaMemcpy(cpu_ptr + offset, source, pitch * height, cudaMemcpyDeviceToHost));
 
     TextureRGBA tex;
-    texture_create(&tex, width, height, 1, pitch / sizeof(RGBA8), (void*) (cpu_ptr + offset), TexDataUINT8, TexStorageCPU);
+    texture_create(&tex, width, height, 1, pitch / sizeof(RGBA8), (void*) (cpu_ptr + offset), TexDataUINT8, 4, TexStorageCPU);
 
     uint32_t encoded_size;
 
@@ -140,7 +140,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
     memcpy(&width, head + header_element_size * i + 0x04, sizeof(uint32_t));
     memcpy(&height, head + header_element_size * i + 0x08, sizeof(uint32_t));
 
-    texture_create(textures + i, width, height, 1, width, (void*) ((uint64_t) (data_size)), TexDataUINT8, TexStorageCPU);
+    texture_create(textures + i, width, height, 1, width, (void*) ((uint64_t) (data_size)), TexDataUINT8, 4, TexStorageCPU);
 
     textures[i].data = (void*) ((uint64_t) (data_size));
     total_length += data_size;

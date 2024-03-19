@@ -82,30 +82,35 @@ enum cudaMemcpyKind texture_get_copy_to_device_type(TextureRGBA* tex) {
 }
 
 struct cudaChannelFormatDesc texture_get_channel_format_desc(TextureRGBA* tex) {
+  const int x_bits = (tex->num_components >= 1) ? 1 : 0;
+  const int y_bits = (tex->num_components >= 2) ? 1 : 0;
+  const int z_bits = (tex->num_components >= 3) ? 1 : 0;
+  const int w_bits = (tex->num_components >= 4) ? 1 : 0;
+
   switch (tex->type) {
     case TexDataFP32:
-      return cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
+      return cudaCreateChannelDesc(32 * x_bits, 32 * y_bits, 32 * z_bits, 32 * w_bits, cudaChannelFormatKindFloat);
     case TexDataUINT8:
-      return cudaCreateChannelDesc(8, 8, 8, 8, cudaChannelFormatKindUnsigned);
+      return cudaCreateChannelDesc(8 * x_bits, 8 * y_bits, 8 * z_bits, 8 * w_bits, cudaChannelFormatKindUnsigned);
     case TexDataUINT16:
-      return cudaCreateChannelDesc(16, 16, 16, 16, cudaChannelFormatKindUnsigned);
+      return cudaCreateChannelDesc(16 * x_bits, 16 * y_bits, 16 * z_bits, 16 * w_bits, cudaChannelFormatKindUnsigned);
     default:
       crash_message("Invalid texture data type %d\n", tex->type);
-      return cudaCreateChannelDesc(32, 32, 32, 32, cudaChannelFormatKindFloat);
+      return cudaCreateChannelDesc(32 * x_bits, 32 * y_bits, 32 * z_bits, 32 * w_bits, cudaChannelFormatKindFloat);
   }
 }
 
 size_t texture_get_pixel_size(TextureRGBA* tex) {
   switch (tex->type) {
     case TexDataFP32:
-      return sizeof(RGBAF);
+      return tex->num_components * sizeof(float);
     case TexDataUINT8:
-      return sizeof(RGBA8);
+      return tex->num_components * sizeof(uint8_t);
     case TexDataUINT16:
-      return sizeof(RGBA16);
+      return tex->num_components * sizeof(uint16_t);
     default:
       crash_message("Invalid texture data type %d\n", tex->type);
-      return sizeof(RGBA8);
+      return tex->num_components * sizeof(uint8_t);
   }
 }
 
@@ -156,6 +161,9 @@ static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
           res_desc.res.pitch2D.pitchInBytes = pitch_gpu;
         } break;
         case TexMipmapGenerate: {
+          if (tex->num_components != 4)
+            crash_message("Textures with less than 4 components do not support mipmap generation.");
+
           const unsigned int levels    = device_mipmap_compute_max_level(tex);
           tex->mipmap_max_level        = levels;
           tex_desc.maxMipmapLevelClamp = levels;
@@ -202,6 +210,9 @@ static void texture_allocate(cudaTextureObject_t* cudaTex, TextureRGBA* tex) {
           res_desc.res.array.array = array_gpu;
         } break;
         case TexMipmapGenerate: {
+          if (tex->num_components != 4)
+            crash_message("Textures with less than 4 components do not support mipmap generation.");
+
           const unsigned int levels    = device_mipmap_compute_max_level(tex);
           tex->mipmap_max_level        = levels;
           tex_desc.maxMipmapLevelClamp = levels;
@@ -273,7 +284,7 @@ void texture_free_atlas(DeviceBuffer* texture_atlas, const int textures_length) 
 
 void texture_create(
   TextureRGBA* tex, unsigned int width, unsigned int height, unsigned int depth, unsigned int pitch, void* data, TextureDataType type,
-  TextureStorageLocation storage) {
+  unsigned int num_components, TextureStorageLocation storage) {
   if (tex == (TextureRGBA*) 0)
     return;
 
@@ -293,7 +304,8 @@ void texture_create(
     .read_mode        = TexReadModeNormalized,
     .mipmap           = TexMipmapNone,
     .mipmap_max_level = 0,
-    .gamma            = 1.0f};
+    .gamma            = 1.0f,
+    .num_components   = num_components};
 
   *tex = _tex;
 }
