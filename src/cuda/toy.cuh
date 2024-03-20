@@ -74,10 +74,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         emission               = scale_color(emission, mis_weight);
       }
 
-      const uint32_t light             = device.ptrs.light_sample_history[pixel];
-      const uint32_t triangle_light_id = load_triangle_light_id(data.hit_id);
+      const uint32_t light = device.ptrs.light_sample_history[pixel];
 
-      if (proper_light_sample(light, triangle_light_id)) {
+      if (proper_light_sample(light, LIGHT_ID_TOY)) {
         write_beauty_buffer(emission, pixel);
       }
     }

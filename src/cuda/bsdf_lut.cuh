@@ -24,7 +24,7 @@ extern "C" void bsdf_compute_energy_lut(RaytraceInstance* instance) {
 __global__ void bsdf_lut_ss_generate(uint16_t* dst) {
   const uint32_t id = THREAD_ID;
 
-  if (id > BSDF_LUT_SIZE * BSDF_LUT_SIZE)
+  if (id >= BSDF_LUT_SIZE * BSDF_LUT_SIZE)
     return;
 
   const uint32_t y = id / BSDF_LUT_SIZE;
@@ -56,13 +56,13 @@ __global__ void bsdf_lut_ss_generate(uint16_t* dst) {
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst[x + y * BSDF_LUT_SIZE] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 }
 
 __global__ void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* src_energy_ss) {
   const uint32_t id = THREAD_ID;
 
-  if (id > BSDF_LUT_SIZE * BSDF_LUT_SIZE)
+  if (id >= BSDF_LUT_SIZE * BSDF_LUT_SIZE)
     return;
 
   const uint32_t y = id / BSDF_LUT_SIZE;
@@ -98,18 +98,18 @@ __global__ void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* src_en
 
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
-  const float single_scattering_term = src_energy_ss[x + y * BSDF_LUT_SIZE] * (1.0f / 0xFFFF);
+  const float single_scattering_term = src_energy_ss[id] * (1.0f / 0xFFFF);
 
   sum /= single_scattering_term;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst[x + y * BSDF_LUT_SIZE] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 }
 
 __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
   const uint32_t id = THREAD_ID;
 
-  if (id > BSDF_LUT_SIZE * BSDF_LUT_SIZE * BSDF_LUT_SIZE)
+  if (id >= BSDF_LUT_SIZE * BSDF_LUT_SIZE * BSDF_LUT_SIZE)
     return;
 
   const uint32_t z = id / (BSDF_LUT_SIZE * BSDF_LUT_SIZE);
@@ -158,7 +158,7 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst[x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 
   data.ior_in  = ior;
   data.ior_out = 1.0f;
@@ -191,7 +191,7 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst_inv[x + y * BSDF_LUT_SIZE + z * BSDF_LUT_SIZE * BSDF_LUT_SIZE] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  dst_inv[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 }
 
 extern "C" void bsdf_compute_energy_lut(RaytraceInstance* instance) {
