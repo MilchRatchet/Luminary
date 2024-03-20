@@ -134,8 +134,8 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
     const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
-    const vec3 reflection = reflect_vector(scale_vector(data.V, -1.0f), H);
-    const vec3 refraction = refract_vector(scale_vector(data.V, -1.0f), H, data.ior_in / data.ior_out);
+    const vec3 reflection = reflect_vector(ray, H);
+    const vec3 refraction = refract_vector(ray, H, data.ior_in / data.ior_out);
     const float fresnel   = bsdf_fresnel(H, data.V, refraction, data.ior_in, data.ior_out);
     const float HdotV     = fabsf(dot_product(H, data.V));
 
@@ -167,8 +167,8 @@ __global__ void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
     const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
-    const vec3 reflection = reflect_vector(scale_vector(data.V, -1.0f), H);
-    const vec3 refraction = refract_vector(scale_vector(data.V, -1.0f), H, data.ior_in / data.ior_out);
+    const vec3 reflection = reflect_vector(ray, H);
+    const vec3 refraction = refract_vector(ray, H, data.ior_in / data.ior_out);
     const float fresnel   = bsdf_fresnel(H, data.V, refraction, data.ior_in, data.ior_out);
     const float HdotV     = fabsf(dot_product(H, data.V));
 

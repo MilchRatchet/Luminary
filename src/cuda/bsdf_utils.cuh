@@ -440,6 +440,11 @@ __device__ RGBF bsdf_dielectric(
   const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, data.roughness, ctx.refraction_index);
   term /= dielectric_directional_albedo;
 
+  if (ctx.refraction_index == 1.0f) {
+    // TODO: Energy conservation does not work correctly for dielectric, investigate.
+    term = (ctx.is_refraction) ? 1.0f : 0.0f;
+  }
+
   return (data.colored_dielectric) ? scale_color(opaque_color(data.albedo), term) : get_color(term, term, term);
 }
 

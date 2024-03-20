@@ -15,11 +15,14 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   // on if they enter or leave, otherwise it is not clear which of the two a ray should be.
   context.is_refraction = (context.NdotL < 0.0f);
 
-  context.refraction_index = data.ior_in / data.ior_out;
+  const float ior_in  = fminf(3.0f, fmaxf(1.0f, data.ior_in));
+  const float ior_out = fminf(3.0f, fmaxf(1.0f, data.ior_out));
+
+  context.refraction_index = ior_in / ior_out;
 
   vec3 refraction_vector;
   if (context.is_refraction) {
-    context.H         = bsdf_refraction_normal_from_pair(L, data.V, data.ior_out, data.ior_out);
+    context.H         = bsdf_refraction_normal_from_pair(L, data.V, ior_in, ior_out);
     refraction_vector = L;
   }
   else {
@@ -37,7 +40,7 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, data.ior_in, data.ior_out);
+  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
 
   return context;
 }
@@ -68,7 +71,10 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   if (is_refraction)
     context.NdotL *= -1.0f;
 
-  context.refraction_index = data.ior_in / data.ior_out;
+  const float ior_in  = fminf(3.0f, fmaxf(1.0f, data.ior_in));
+  const float ior_out = fminf(3.0f, fmaxf(1.0f, data.ior_out));
+
+  context.refraction_index = ior_in / ior_out;
 
   context.H = H;
 
@@ -85,7 +91,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, data.ior_in, data.ior_out);
+  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
 
   return context;
 }
