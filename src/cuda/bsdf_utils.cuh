@@ -440,7 +440,7 @@ __device__ RGBF bsdf_dielectric(
   const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, data.roughness, ctx.refraction_index);
   term /= dielectric_directional_albedo;
 
-  return get_color(term, term, term);
+  return (data.colored_dielectric) ? scale_color(opaque_color(data.albedo), term) : get_color(term, term, term);
 }
 
 ///////////////////////////////////////////////////

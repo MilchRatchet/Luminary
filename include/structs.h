@@ -304,6 +304,7 @@ struct GBufferData {
   uint32_t flags;
   float ior_in;
   float ior_out;
+  uint32_t colored_dielectric;
 } typedef GBufferData;
 
 ////////////////////////////////////////////////////////////////////

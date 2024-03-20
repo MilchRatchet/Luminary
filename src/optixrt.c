@@ -55,7 +55,7 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
 
   pipeline_compile_options.usesMotionBlur                   = 0;
   pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
-  pipeline_compile_options.numPayloadValues                 = 3;
+  pipeline_compile_options.numPayloadValues                 = 4;
   pipeline_compile_options.numAttributeValues               = 2;
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";

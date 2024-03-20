@@ -217,7 +217,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
             // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
             RGBF record = load_RGBF(device.ptrs.light_records + pixel);
 
-            record = scale_color(record, 1.0f - device.scene.toy.albedo.a);
+            RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
+
+            record = mul_color(record, toy_transparency);
 
             vec3 hit_origin = add_vector(task.origin, scale_vector(task.ray, toy_dist));
             hit_origin      = add_vector(hit_origin, scale_vector(task.ray, get_length(hit_origin) * eps * 16.0f));
@@ -225,7 +227,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
             const float toy_dist2 = get_toy_distance(hit_origin, task.ray);
 
             if (toy_dist2 + toy_dist < depth) {
-              record = scale_color(record, 1.0f - device.scene.toy.albedo.a);
+              record = mul_color(record, toy_transparency);
             }
 
             if (luminance(record) == 0.0f) {
