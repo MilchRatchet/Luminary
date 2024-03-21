@@ -10,6 +10,7 @@
 #include "bench.h"
 #include "buffer.h"
 #include "device.h"
+#include "struct_interleaving.h"
 #include "structs.h"
 #include "utils.h"
 
@@ -75,8 +76,13 @@ struct BVHWork {
 static void _bvh_create_fragments(RaytraceInstance* instance, BVHWork* work) {
   const uint32_t triangle_count = instance->scene.triangle_data.triangle_count;
 
+  Triangle* triangles_interleaved = malloc(sizeof(Triangle) * triangle_count);
+  device_download(triangles_interleaved, instance->scene.triangles, sizeof(Triangle) * triangle_count);
+
   Triangle* triangles = malloc(sizeof(Triangle) * triangle_count);
-  device_download(triangles, instance->scene.triangles, sizeof(Triangle) * triangle_count);
+  struct_triangles_deinterleave(triangles, triangles_interleaved, triangle_count);
+
+  free(triangles_interleaved);
 
   work->triangles       = triangles;
   work->triangles_count = triangle_count;
