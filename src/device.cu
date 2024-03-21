@@ -137,28 +137,37 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (type != TYPE_LIGHT) {
+  if (type == TYPE_LIGHT) {
+    process_geometry_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+    process_sky_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+    if (instance->scene.toy.active) {
+      process_toy_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
+  }
+  else {
     restir_candidates_pool_generation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
 
-  process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene.particles.active && type != TYPE_LIGHT) {
-    particle_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
+    if (instance->scene.particles.active) {
+      particle_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
 
-  if (instance->scene.ocean.active) {
-    process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
+    if (instance->scene.ocean.active) {
+      process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
 
-  process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene.toy.active) {
-    process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
+    if (instance->scene.toy.active) {
+      process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
 
-  if (type != TYPE_LIGHT && (instance->scene.fog.active || instance->scene.ocean.active)) {
-    volume_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    if (instance->scene.fog.active || instance->scene.ocean.active) {
+      volume_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
   }
 }
 

@@ -74,15 +74,8 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
         emission               = scale_color(emission, mis_weight);
       }
 
-      const uint32_t light = device.ptrs.light_sample_history[pixel];
-
-      if (proper_light_sample(light, LIGHT_ID_TOY)) {
-        write_beauty_buffer(emission, pixel);
-      }
+      write_beauty_buffer(emission, pixel);
     }
-
-    if (device.iteration_type == TYPE_LIGHT)
-      continue;
 
     write_normal_buffer(data.normal, pixel);
 
@@ -148,6 +141,28 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
 
   device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
   device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
+}
+
+__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_toy_light_tasks() {
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
+
+  for (int i = 0; i < task_count; i++) {
+    ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
+
+    GBufferData data = toy_generate_g_buffer(task, pixel);
+
+    RGBF record = load_RGBF(device.records + pixel);
+
+    if (color_any(data.emission)) {
+      const uint32_t light = device.ptrs.light_sample_history[pixel];
+
+      if (proper_light_sample(light, LIGHT_ID_TOY)) {
+        write_beauty_buffer(mul_color(data.emission, record), pixel);
+      }
+    }
+  }
 }
 
 __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
