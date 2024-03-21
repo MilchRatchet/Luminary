@@ -59,8 +59,6 @@ __global__ void particle_process_tasks() {
 
     const vec3 bounce_ray = jendersie_eon_phase_sample(task.ray, device.scene.particles.phase_diameter, random_dir, random_choice);
 
-    VolumeType volume_type = VOLUME_TYPE_PARTICLE;
-
     record = mul_color(record, opaque_color(data.albedo));
 
     RGBF bounce_record = record;

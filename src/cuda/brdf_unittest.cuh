@@ -11,6 +11,11 @@
 #define BRDF_UNITTEST_TOTAL (BRDF_UNITTEST_STEPS_SMOOTHNESS * BRDF_UNITTEST_STEPS_METALLIC)
 #define BRDF_UNITTEST_ITERATIONS (8192 * 32)
 
+// TODO:
+// This is broken because the random number generator isn't used correctly in this context.
+// The solution would be a macro based system that is setup before any of the includes.
+// However, for that the unittests would need to be in a separate translation unit.
+
 __global__ void brdf_unittest_kernel(float* bounce, float* light) {
   unsigned int id = THREAD_ID;
 

@@ -1,7 +1,6 @@
 #ifndef CU_OCEAN_H
 #define CU_OCEAN_H
 
-#include "brdf.cuh"
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"

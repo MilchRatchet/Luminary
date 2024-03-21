@@ -21,6 +21,7 @@ struct BSDFRayContext {
   bool is_refraction;
 };
 
+// TODO: Prefetch these for light sampling.
 struct BSDFDirectionalAlbedos {
   float conductor;
   float glossy;
@@ -37,10 +38,6 @@ struct BSDFSampleInfo {
 enum BSDFLUT { BSDF_LUT_SS = 0, BSDF_LUT_SPECULAR = 1, BSDF_LUT_DIELEC = 2, BSDF_LUT_DIELEC_INV = 3 } typedef BSDFLUT;
 
 enum BSDFSamplingHint { BSDF_SAMPLING_GENERAL = 0, BSDF_SAMPLING_MICROFACET = 1, BSDF_SAMPLING_DIFFUSE = 2 };
-
-__device__ RGBF bsdf_diffuse_color(const GBufferData data) {
-  return scale_color(opaque_color(data.albedo), 1.0f - data.metallic);
-}
 
 ///////////////////////////////////////////////////
 // Fresnel
@@ -86,51 +83,20 @@ __device__ RGBF bsdf_fresnel_schlick(const RGBF f0, const float f90, const float
   return result;
 }
 
-/*
- * Fresnel approximation as found in the paper by Fdez-Aguera
- * @param f0 Specular F0.
- * @param roughness Material roughness.
- * @param NdotV Cosine Angle.
- * @result Fresnel approximation.
- */
-__device__ RGBF bsdf_fresnel_roughness(const RGBF f0, const float roughness, const float HdotV) {
-  const float one_minus_HdotV = 1.0f - HdotV;
-  const float pow2            = one_minus_HdotV * one_minus_HdotV;
-
-  // powf(1.0f - NdotV, 5.0f)
-  const float t = pow2 * pow2 * one_minus_HdotV;
-
-  const float s = 1.0f - roughness;
-  const RGBF Fr = sub_color(max_color(get_color(s, s, s), f0), f0);
-
-  return fma_color(Fr, t, f0);
-}
-
 __device__ float bsdf_shadowed_F90(const RGBF specular_f0) {
   const float t = 1.0f / 0.04f;
   return fminf(1.0f, t * luminance(specular_f0));
-}
-
-__device__ RGBF bsdf_fresnel_composite(
-  const GBufferData data, const vec3 refraction, const float ior_in, const float ior_out, const RGBF f0, const float HdotV) {
-  float fresnel_ior = bsdf_fresnel(data.normal, data.V, refraction, ior_in, ior_out);
-
-  RGBF fresnel_approx = bsdf_fresnel_schlick(f0, bsdf_shadowed_F90(f0), HdotV);  // bsdf_fresnel_roughness(f0, data.roughness, HdotV);
-  fresnel_approx      = scale_color(fresnel_approx, data.albedo.a);
-  fresnel_approx      = add_color(fresnel_approx, scale_color(get_color(fresnel_ior, fresnel_ior, fresnel_ior), 1.0f - data.albedo.a));
-
-  return fresnel_approx;
 }
 
 ///////////////////////////////////////////////////
 // Refraction
 ///////////////////////////////////////////////////
 
-__device__ float bsdf_refraction_index_ambient(const GBufferData data) {
-  if (device.scene.toy.active && toy_is_inside(data.position))
+__device__ float bsdf_refraction_index_ambient(const vec3 position) {
+  if (device.scene.toy.active && toy_is_inside(position))
     return device.scene.toy.refractive_index;
 
-  if (device.scene.ocean.active && data.position.y < device.scene.ocean.height)
+  if (device.scene.ocean.active && position.y < device.scene.ocean.height)
     return device.scene.ocean.refractive_index;
 
   return 1.0f;
@@ -275,22 +241,6 @@ __device__ vec3 bsdf_microfacet_sample(
   }
 
   return H;
-}
-
-__device__ vec3 bsdf_microfacet_sample_reflection(
-  const GBufferData data, const ushort2 pixel, vec3& H, const uint32_t sequence_id = device.temporal_frames,
-  const uint32_t depth = device.depth) {
-  H = bsdf_microfacet_sample(data, pixel, sequence_id, depth);
-
-  return reflect_vector(scale_vector(data.V, -1.0f), H);
-}
-
-__device__ vec3 bsdf_microfacet_sample_refraction(
-  const GBufferData data, const ushort2 pixel, vec3& H, const uint32_t sequence_id = device.temporal_frames,
-  const uint32_t depth = device.depth) {
-  H = bsdf_microfacet_sample(data, pixel, sequence_id, depth);
-
-  return refract_vector(scale_vector(data.V, -1.0f), H, data.ior_in / data.ior_out);
 }
 
 ///////////////////////////////////////////////////

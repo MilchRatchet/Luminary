@@ -3,6 +3,7 @@
 
 #include "bsdf.cuh"
 #include "memory.cuh"
+#include "texture_utils.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
 

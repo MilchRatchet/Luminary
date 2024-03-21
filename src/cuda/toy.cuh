@@ -1,7 +1,6 @@
 #ifndef CU_TOY_H
 #define CU_TOY_H
 
-#include "brdf.cuh"
 #include "bsdf.cuh"
 #include "ior_stack.cuh"
 #include "math.cuh"

@@ -10,6 +10,7 @@
 #include "cuda/camera_post.cuh"
 #include "cuda/cloud_noise.cuh"
 #include "cuda/directives.cuh"
+#include "cuda/geometry.cuh"
 #include "cuda/kernels.cuh"
 #include "cuda/math.cuh"
 #include "cuda/micromap.cuh"

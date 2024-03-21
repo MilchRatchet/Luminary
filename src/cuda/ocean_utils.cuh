@@ -1,6 +1,7 @@
 #ifndef CU_OCEAN_UTILS_H
 #define CU_OCEAN_UTILS_H
 
+#include "sky_utils.cuh"
 #include "utils.cuh"
 
 #define OCEAN_MAX_HEIGHT (device.scene.ocean.height + 2.66f * device.scene.ocean.amplitude)
