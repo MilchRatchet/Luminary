@@ -126,21 +126,15 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     else {
       const vec3 microfacet_ray           = reflect_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet);
       const BSDFRayContext microfacet_ctx = bsdf_sample_context(data_local, sampled_microfacet, microfacet_ray, false);
-      const float microfacet_pdf          = bsdf_microfacet_pdf(data_local, microfacet_ctx.NdotH, microfacet_ctx.NdotV);
-      const float microfacet_pdf_diffuse  = bsdf_diffuse_pdf(data_local, microfacet_ctx.NdotL);
-      const float microfacet_mis_weight = (data_local.roughness < 0.1f) ? 0.5f : microfacet_pdf / (microfacet_pdf + microfacet_pdf_diffuse);
-      const RGBF microfacet_eval        = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+      const RGBF microfacet_eval          = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
-      const vec3 diffuse_ray             = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION + 1, pixel));
-      const vec3 diffuse_microfacet      = normalize_vector(add_vector(data.V, diffuse_ray));
-      const BSDFRayContext diffuse_ctx   = bsdf_sample_context(data_local, diffuse_microfacet, diffuse_ray, false);
-      const float diffuse_pdf            = bsdf_diffuse_pdf(data_local, diffuse_ctx.NdotL);
-      const float diffuse_pdf_microfacet = bsdf_microfacet_pdf(data_local, diffuse_ctx.NdotH, diffuse_ctx.NdotV);
-      const float diffuse_mis_weight     = (data_local.roughness < 0.1f) ? 0.5f : diffuse_pdf / (diffuse_pdf + diffuse_pdf_microfacet);
-      const RGBF diffuse_eval            = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
+      const vec3 diffuse_ray           = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION + 1, pixel));
+      const vec3 diffuse_microfacet    = normalize_vector(add_vector(data.V, diffuse_ray));
+      const BSDFRayContext diffuse_ctx = bsdf_sample_context(data_local, diffuse_microfacet, diffuse_ray, false);
+      const RGBF diffuse_eval          = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
 
-      const float microfacet_weight = microfacet_mis_weight * luminance(microfacet_eval);
-      const float diffuse_weight    = diffuse_mis_weight * luminance(diffuse_eval);
+      const float microfacet_weight = luminance(microfacet_eval);
+      const float diffuse_weight    = luminance(diffuse_eval);
 
       const float sum_weights = microfacet_weight + diffuse_weight;
 
