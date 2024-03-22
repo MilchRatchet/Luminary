@@ -50,7 +50,7 @@ __device__ GBufferData toy_generate_g_buffer(const ToyTask task, const int pixel
   return data;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
+LUMINARY_KERNEL void process_toy_tasks() {
   const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
   const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
   int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
@@ -143,7 +143,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_toy_tasks() {
   device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_toy_light_tasks() {
+LUMINARY_KERNEL void process_toy_light_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
 
@@ -165,7 +165,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_toy_light_tasks
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_debug_toy_tasks() {
+LUMINARY_KERNEL void process_debug_toy_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
 

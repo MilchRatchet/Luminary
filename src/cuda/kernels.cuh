@@ -20,7 +20,7 @@
 #include "utils.cuh"
 #include "volume.cuh"
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() {
+LUMINARY_KERNEL void generate_trace_tasks() {
   int offset       = 0;
   const int amount = device.width * device.height;
 
@@ -58,7 +58,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
   device.ptrs.bounce_trace_count[THREAD_ID] = offset;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
+LUMINARY_KERNEL void balance_trace_tasks() {
   const int warp = THREAD_ID;
 
   if (warp >= (THREADS_PER_BLOCK * BLOCKS_PER_GRID) >> 5)
@@ -128,7 +128,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks() {
+LUMINARY_KERNEL void preprocess_trace_tasks() {
   const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -270,7 +270,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering_tasks() {
+LUMINARY_KERNEL void process_sky_inscattering_tasks() {
   const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -300,7 +300,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {
+LUMINARY_KERNEL void postprocess_trace_tasks() {
   const int task_count         = device.trace_count[THREAD_ID];
   uint16_t geometry_task_count = 0;
   uint16_t particle_task_count = 0;
@@ -482,7 +482,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   }
 }
 
-__global__ void convert_RGBF_to_XRGB8(
+LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
   const RGBF* source, XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
   unsigned int id = THREAD_ID;
 

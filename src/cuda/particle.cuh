@@ -38,7 +38,7 @@ __device__ GBufferData particle_generate_g_buffer(const ParticleTask task, const
   return data;
 }
 
-__global__ void particle_process_tasks() {
+LUMINARY_KERNEL void particle_process_tasks() {
   const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
   const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
   int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
@@ -102,7 +102,7 @@ __global__ void particle_process_tasks() {
   device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_tasks() {
+LUMINARY_KERNEL void particle_process_debug_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
 
@@ -158,7 +158,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void particle_process_debug_t
   }
 }
 
-__global__ void particle_kernel_generate(
+LUMINARY_KERNEL void particle_kernel_generate(
   const uint32_t count, float size, const float size_variation, float4* vertex_buffer, uint32_t* index_buffer, Quad* quads) {
   uint32_t id   = THREAD_ID;
   uint32_t seed = device.scene.particles.seed;

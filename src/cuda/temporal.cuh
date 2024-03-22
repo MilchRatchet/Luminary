@@ -62,7 +62,7 @@ __device__ RGBF sample_pixel_catmull_rom(const RGBF* image, float x, float y, co
   return result;
 }
 
-__global__ void temporal_accumulation() {
+LUMINARY_KERNEL void temporal_accumulation() {
   const int amount = device.width * device.height;
 
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
@@ -124,7 +124,7 @@ __global__ void temporal_accumulation() {
   }
 }
 
-__global__ void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) {
+LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) {
   const int amount = device.width * device.height;
 
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
@@ -139,7 +139,7 @@ __global__ void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) 
   }
 }
 
-__global__ void temporal_reprojection() {
+LUMINARY_KERNEL void temporal_reprojection() {
   const int amount = device.width * device.height;
 
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {

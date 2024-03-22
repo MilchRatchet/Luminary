@@ -215,7 +215,7 @@ __device__ float dilate_perlin_worley(const float p, const float w, float x) {
   }
 }
 
-__global__ void generate_shape_noise(const int dim, uint8_t* tex) {
+LUMINARY_KERNEL void generate_shape_noise(const int dim, uint8_t* tex) {
   unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;
@@ -260,7 +260,7 @@ __global__ void generate_shape_noise(const int dim, uint8_t* tex) {
   }
 }
 
-__global__ void generate_detail_noise(const int dim, uint8_t* tex) {
+LUMINARY_KERNEL void generate_detail_noise(const int dim, uint8_t* tex) {
   unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;
@@ -296,7 +296,7 @@ __global__ void generate_detail_noise(const int dim, uint8_t* tex) {
   }
 }
 
-__global__ void generate_weather_map(const int dim, const float seed, uint8_t* tex) {
+LUMINARY_KERNEL void generate_weather_map(const int dim, const float seed, uint8_t* tex) {
   unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;

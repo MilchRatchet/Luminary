@@ -339,7 +339,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   return selected;
 }
 
-__global__ void restir_candidates_pool_generation() {
+LUMINARY_KERNEL void restir_candidates_pool_generation() {
   if (device.scene.triangle_lights_count == 0)
     return;
 

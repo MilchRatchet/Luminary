@@ -399,7 +399,7 @@ __device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const
 }
 
 // [Bru17]
-__global__ void sky_compute_transmittance_lut(float4* transmittance_tex_lower, float4* transmittance_tex_higher) {
+LUMINARY_KERNEL void sky_compute_transmittance_lut(float4* transmittance_tex_lower, float4* transmittance_tex_higher) {
   unsigned int id = THREAD_ID;
 
   const int amount = SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT;
@@ -522,6 +522,7 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
 }
 
 // [Hil20]
+// This kernel does not use default Luminary launch bounds, hence it may not be marked as LUMINARY_KERNEL
 __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lower, float4* multiscattering_tex_higher) {
   const int x = blockIdx.x;
   const int y = blockIdx.y;
@@ -867,7 +868,7 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
+LUMINARY_KERNEL void process_sky_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
@@ -900,7 +901,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_sky_light_tasks() {
+LUMINARY_KERNEL void process_sky_light_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
@@ -931,7 +932,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void process_sky_light_tasks
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks() {
+LUMINARY_KERNEL void process_debug_sky_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 

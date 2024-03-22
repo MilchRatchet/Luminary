@@ -47,7 +47,7 @@ __device__ GBufferData volume_generate_g_buffer(const VolumeTask task, const int
   return data;
 }
 
-__global__ void volume_process_events() {
+LUMINARY_KERNEL void volume_process_events() {
   const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -153,7 +153,7 @@ __global__ void volume_process_events() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void volume_process_tasks() {
+LUMINARY_KERNEL void volume_process_tasks() {
   const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
   const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
   int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];

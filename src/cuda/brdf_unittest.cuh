@@ -16,7 +16,7 @@
 // The solution would be a macro based system that is setup before any of the includes.
 // However, for that the unittests would need to be in a separate translation unit.
 
-__global__ void brdf_unittest_kernel(float* bounce, float* light) {
+LUMINARY_KERNEL void brdf_unittest_kernel(float* bounce, float* light) {
   unsigned int id = THREAD_ID;
 
   const unsigned int total = BRDF_UNITTEST_TOTAL;

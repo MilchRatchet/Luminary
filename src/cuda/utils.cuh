@@ -12,6 +12,8 @@
 #define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
 #define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
 
+#define LUMINARY_KERNEL __global__ __launch_bounds__(THREADS_PER_BLOCK)
+
 #ifndef eps
 #define eps 0.000001f
 #endif /* eps */
