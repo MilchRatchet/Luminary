@@ -114,8 +114,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   const vec3 sampled_microfacet = bsdf_microfacet_sample(data_local, pixel);
 
-  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 1, pixel) < data.albedo.a) {
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1, pixel) < data.metallic) {
+  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_ALPHA, pixel) < data.albedo.a) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_METALLIC, pixel) < data.metallic) {
       ray_local = reflect_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet);
 
       const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local, false);
@@ -128,7 +128,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       const BSDFRayContext microfacet_ctx = bsdf_sample_context(data_local, sampled_microfacet, microfacet_ray, false);
       const RGBF microfacet_eval          = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
-      const vec3 diffuse_ray           = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_REFLECTION + 1, pixel));
+      const vec3 diffuse_ray           = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_DIFFUSE, pixel));
       const vec3 diffuse_microfacet    = normalize_vector(add_vector(data.V, diffuse_ray));
       const BSDFRayContext diffuse_ctx = bsdf_sample_context(data_local, diffuse_microfacet, diffuse_ray, false);
       const RGBF diffuse_eval          = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
@@ -142,7 +142,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       const float diffuse_probability    = diffuse_weight / sum_weights;
 
       RGBF final_weight;
-      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_CHOICE, pixel) < microfacet_probability) {
+      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_GLOSSY, pixel) < microfacet_probability) {
         ray_local                = microfacet_ray;
         final_weight             = scale_color(microfacet_eval, 1.0f / microfacet_probability);
         info.is_microfacet_based = true;
@@ -176,7 +176,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     const float refraction_probability = refraction_weight / sum_weights;
 
     RGBF final_weight;
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_TBD1 + 2, pixel) < reflection_probability) {
+    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_DIELECTRIC, pixel) < reflection_probability) {
       ray_local    = reflection_vector;
       final_weight = scale_color(reflection_eval, 1.0f / reflection_probability);
     }
