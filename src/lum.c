@@ -202,6 +202,10 @@ static void parse_camera_settings(Camera* camera, char* line) {
     case 5930749542479910226u:
       sscanf(value, "%f\n", &camera->russian_roulette_threshold);
       break;
+      /* FIREFLYC */
+    case 4852993938162862406u:
+      sscanf(value, "%d\n", &camera->do_firefly_clamping);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
       break;
@@ -825,6 +829,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "CAMERA PURKINJE %d\n", instance->scene.camera.purkinje);
   fputs(line, file);
   sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene.camera.russian_roulette_threshold);
+  fputs(line, file);
+  sprintf(line, "CAMERA FIREFLYC %d\n", instance->scene.camera.do_firefly_clamping);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");

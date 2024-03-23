@@ -182,6 +182,7 @@ struct Camera {
   float russian_roulette_threshold;
   int use_color_correction;
   RGBF color_correction;
+  int do_firefly_clamping;
 } typedef Camera;
 
 struct Toy {
