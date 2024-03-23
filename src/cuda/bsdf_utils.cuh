@@ -141,7 +141,7 @@ __device__ float bsdf_microfacet_evaluate_D_GGX(const float NdotH, const float r
 __device__ float bsdf_microfacet_evaluate(const GBufferData data, const float NdotH, const float NdotL, const float NdotV) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(roughness4, NdotH);
+  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   // D * G2 * NdotL / (4.0f * NdotL * NdotV)
@@ -161,7 +161,7 @@ __device__ float bsdf_microfacet_evaluate_sampled_microfacet(const GBufferData d
 __device__ float bsdf_microfacet_evaluate_sampled_diffuse(const GBufferData data, const float NdotH, const float NdotL, const float NdotV) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(roughness4, NdotH);
+  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   // D * G2 * NdotL * PI / (4.0f * NdotL * NdotV * NdotL)
@@ -174,7 +174,7 @@ __device__ float bsdf_microfacet_refraction_evaluate(
   const float refraction_index) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(roughness4, NdotH);
+  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   float denominator = refraction_index * HdotL + HdotV;
@@ -189,7 +189,7 @@ __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
   const float refraction_index) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(roughness4, NdotH);
+  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   float denominator = refraction_index * HdotL + HdotV;
