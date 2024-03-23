@@ -220,7 +220,6 @@ This is a list of papers I have used for this project so far. Note that some tec
 - E. Bruneton, _Precomputed Atmospheric Scattering_, 2017. URL: https://github.com/ebruneton/precomputed_atmospheric_scattering
 - A. Schneider, _The Real-time Volumetric Cloudscapes of Horizon: Zero Dawn_, SIGGRAPH 2015.
 - A. Schneider, _Nubis, Evolved: Real-Time Volumetric Clouds for Skies, Environments, and VFX_, SIGGRAPH 2022.
-- C. Fdez-Agüera, _A Multiple-Scattering Microfacet Model for Real-Time Image Based Lighting_, Journal of Computer Graphics Techniques (JCGT), 8(1), pp. 45-55, 2019.
 - B. Bitterli, C. Wyman, M. Pharr, P. Shirley, A. Lefohn, W. Jarosz, _Spatiotemporal reservoir resampling for real-time ray tracing with dynamic direct lighting_, ACM Transactions on Graphics (Proceedings of SIGGRAPH), 39(4), 2020.
 - C. Wyman, A. Panteleev, "Rearchitecting Spatiotemporal Resampling for Production", High-Performance Graphics - Symposium Papers, pp. 23-41, 2021.
 - T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_, Journal of Computer Graphics Techniques, 6(1), pp. 1-8, 2017.
@@ -229,3 +228,5 @@ This is a list of papers I have used for this project so far. Note that some tec
 - J. Jendersie and E. d'Eon, _An Approximate Mie Scattering Function for Fog and Cloud Rendering_, SIGGRAPH 2023 Talks, 2023.
 - M. Droske, J. Hanika, J. Vorba, A. Weidlich, M. Sabbadin, _Path Tracing in Production: The Path of Water_, ACM SIGGRAPH 2023 Courses, 2023.
 - L. Belcour and E. Heitz, _Lessons Learned and Improvements when Building Screen-Space Samplers with Blue-Noise Error Distribution_, ACM SIGGRAPH 2021 Talks, pp. 1-2, 2021.
+- K. Eto, Y. Tokuyoshi, _Bounded VNDF Sampling for Smith–GGX Reflections_, ACM SIGGRAPH Asia 2023 Technical Communications, pp. 1-4, 2023.
+- D. Sforza, F. Pellacini, _Enforcing Energy Preservation in Microfacet Models_, Smart Tools and Applications in Graphics - Eurographics Italian Chapter Conference, 2022.

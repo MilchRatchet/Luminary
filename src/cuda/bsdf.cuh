@@ -161,9 +161,11 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     const BSDFRayContext reflection_ctx = bsdf_sample_context(data_local, sampled_microfacet, reflection_vector, false);
     const RGBF reflection_eval          = bsdf_dielectric(data_local, reflection_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
-    const vec3 refraction_vector        = refract_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet, data.ior_in / data.ior_out);
-    const BSDFRayContext refraction_ctx = bsdf_sample_context(data_local, sampled_microfacet, refraction_vector, true);
-    const RGBF refraction_eval          = bsdf_dielectric(data_local, refraction_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+    const vec3 sampled_microfacet_refraction = bsdf_microfacet_refraction_sample(data_local, pixel);
+    const vec3 refraction_vector =
+      refract_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet_refraction, data.ior_in / data.ior_out);
+    const BSDFRayContext refraction_ctx = bsdf_sample_context(data_local, sampled_microfacet_refraction, refraction_vector, true);
+    const RGBF refraction_eval          = bsdf_dielectric(data_local, refraction_ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, 1.0f);
 
     const float reflection_weight = luminance(reflection_eval);
     const float refraction_weight = luminance(refraction_eval);
