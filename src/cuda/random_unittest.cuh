@@ -10,7 +10,7 @@
 #define RANDOM_UNITTEST_DEPTH 64
 #define RANDOM_UNITTEST_TOTAL 500
 
-__global__ void random_unittest_kernel(float* results) {
+LUMINARY_KERNEL void random_unittest_kernel(float* results) {
   unsigned int id = THREAD_ID;
 
   const unsigned int total = RANDOM_UNITTEST_TOTAL;

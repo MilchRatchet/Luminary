@@ -22,7 +22,7 @@ extern "C" void device_lens_flare_init(RaytraceInstance* instance) {
   device_malloc((void**) &(instance->lens_flare_buffers_gpu[3]), sizeof(RGBF) * (width >> 2) * (height >> 2));
 }
 
-__global__ void _lens_flare_ghosts(const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
+LUMINARY_KERNEL void _lens_flare_ghosts(const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
   unsigned int id = THREAD_ID;
 
   const int ghost_count      = 8;
@@ -85,7 +85,7 @@ __device__ UV _lens_flare_fisheye(UV uv, const float compression, const float zo
   return result;
 }
 
-__global__ void _lens_flare_halo(const RGBF* src, const int sw, const int sh, RGBF* target, const int tw, const int th) {
+LUMINARY_KERNEL void _lens_flare_halo(const RGBF* src, const int sw, const int sh, RGBF* target, const int tw, const int th) {
   unsigned int id = THREAD_ID;
 
   const float scale_x = 1.0f / (tw - 1);

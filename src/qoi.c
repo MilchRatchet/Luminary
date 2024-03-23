@@ -86,7 +86,7 @@ TextureRGBA* qoi_decode_RGBA8(const void* data, const int size) {
   void* decoded_data = qoi_decode(data, size, &desc, 4);
 
   TextureRGBA* tex = malloc(sizeof(TextureRGBA));
-  texture_create(tex, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, TexStorageCPU);
+  texture_create(tex, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, 4, TexStorageCPU);
 
   return tex;
 }

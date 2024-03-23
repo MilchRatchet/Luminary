@@ -25,51 +25,51 @@ void scene_init(Scene** _scene) {
   scene->material.default_material.r   = 0.3f;
   scene->material.default_material.g   = 0.0f;
   scene->material.default_material.b   = 1.0f;
-  scene->material.fresnel              = FDEZ_AGUERA;
   scene->material.alpha_cutoff         = 0.0f;
   scene->material.colored_transparency = 0;
   scene->material.override_materials   = 0;
   scene->material.invert_roughness     = 0;
 
-  scene->camera.pos.x                 = 0.0f;
-  scene->camera.pos.y                 = 0.0f;
-  scene->camera.pos.z                 = 0.0f;
-  scene->camera.rotation.x            = 0.0f;
-  scene->camera.rotation.y            = 0.0f;
-  scene->camera.rotation.z            = 0.0f;
-  scene->camera.fov                   = 1.0f;
-  scene->camera.focal_length          = 1.0f;
-  scene->camera.aperture_size         = 0.0f;
-  scene->camera.aperture_shape        = CAMERA_APERTURE_ROUND;
-  scene->camera.aperture_blade_count  = 7;
-  scene->camera.exposure              = 1.0f;
-  scene->camera.min_exposure          = 40.0f;
-  scene->camera.max_exposure          = 300.0f;
-  scene->camera.auto_exposure         = 1;
-  scene->camera.bloom                 = 1;
-  scene->camera.bloom_blend           = 0.01f;
-  scene->camera.lens_flare            = 0;
-  scene->camera.lens_flare_threshold  = 1.0f;
-  scene->camera.dithering             = 1;
-  scene->camera.far_clip_distance     = 50000.0f;
-  scene->camera.tonemap               = TONEMAP_ACES;
-  scene->camera.agx_custom_slope      = 1.0f;
-  scene->camera.agx_custom_power      = 1.0f;
-  scene->camera.agx_custom_saturation = 1.0f;
-  scene->camera.filter                = FILTER_NONE;
-  scene->camera.wasd_speed            = 1.0f;
-  scene->camera.mouse_speed           = 1.0f;
-  scene->camera.smooth_movement       = 0;
-  scene->camera.smoothing_factor      = 0.1f;
-  scene->camera.temporal_blend_factor = 0.15f;
-  scene->camera.purkinje              = 1;
-  scene->camera.purkinje_kappa1       = 0.2f;
-  scene->camera.purkinje_kappa2       = 0.29f;
-  scene->camera.russian_roulette_bias = 100.0f;
-  scene->camera.use_color_correction  = 0;
-  scene->camera.color_correction.r    = 0.0f;
-  scene->camera.color_correction.g    = 0.0f;
-  scene->camera.color_correction.b    = 0.0f;
+  scene->camera.pos.x                      = 0.0f;
+  scene->camera.pos.y                      = 0.0f;
+  scene->camera.pos.z                      = 0.0f;
+  scene->camera.rotation.x                 = 0.0f;
+  scene->camera.rotation.y                 = 0.0f;
+  scene->camera.rotation.z                 = 0.0f;
+  scene->camera.fov                        = 1.0f;
+  scene->camera.focal_length               = 1.0f;
+  scene->camera.aperture_size              = 0.0f;
+  scene->camera.aperture_shape             = CAMERA_APERTURE_ROUND;
+  scene->camera.aperture_blade_count       = 7;
+  scene->camera.exposure                   = 1.0f;
+  scene->camera.min_exposure               = 40.0f;
+  scene->camera.max_exposure               = 300.0f;
+  scene->camera.auto_exposure              = 1;
+  scene->camera.bloom                      = 1;
+  scene->camera.bloom_blend                = 0.01f;
+  scene->camera.lens_flare                 = 0;
+  scene->camera.lens_flare_threshold       = 1.0f;
+  scene->camera.dithering                  = 1;
+  scene->camera.far_clip_distance          = 50000.0f;
+  scene->camera.tonemap                    = TONEMAP_ACES;
+  scene->camera.agx_custom_slope           = 1.0f;
+  scene->camera.agx_custom_power           = 1.0f;
+  scene->camera.agx_custom_saturation      = 1.0f;
+  scene->camera.filter                     = FILTER_NONE;
+  scene->camera.wasd_speed                 = 1.0f;
+  scene->camera.mouse_speed                = 1.0f;
+  scene->camera.smooth_movement            = 0;
+  scene->camera.smoothing_factor           = 0.1f;
+  scene->camera.temporal_blend_factor      = 0.15f;
+  scene->camera.purkinje                   = 1;
+  scene->camera.purkinje_kappa1            = 0.2f;
+  scene->camera.purkinje_kappa2            = 0.29f;
+  scene->camera.russian_roulette_threshold = 0.1f;
+  scene->camera.use_color_correction       = 0;
+  scene->camera.color_correction.r         = 0.0f;
+  scene->camera.color_correction.g         = 0.0f;
+  scene->camera.color_correction.b         = 0.0f;
+  scene->camera.do_firefly_clamping        = 1;
 
   scene->ocean.active           = 0;
   scene->ocean.height           = 0.0f;
@@ -257,7 +257,7 @@ RaytraceInstance* scene_load_lum(const char* filename, CommandlineOptions option
 
   scene_create_from_wavefront(scene, content);
 
-  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE]);
+  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE], options.dmm_active);
 
   TextureAtlas tex_atlas = {
     .albedo           = (DeviceBuffer*) 0,
@@ -302,7 +302,7 @@ RaytraceInstance* scene_load_obj(char* filename, CommandlineOptions options) {
 
   scene_create_from_wavefront(scene, content);
 
-  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE]);
+  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE], options.dmm_active);
 
   TextureAtlas tex_atlas = {
     .albedo           = (DeviceBuffer*) 0,

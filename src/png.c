@@ -312,7 +312,7 @@ static inline TextureRGBA _png_default_texture() {
   data[3]             = default_pixel;
   TextureRGBA fallback;
 
-  texture_create(&fallback, 2, 2, 1, 2, data, TexDataUINT8, TexStorageCPU);
+  texture_create(&fallback, 2, 2, 1, 2, data, TexDataUINT8, 4, TexStorageCPU);
 
   return fallback;
 }
@@ -514,7 +514,7 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
 
   TextureRGBA result;
   const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
-  texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, TexStorageCPU);
+  texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, 4, TexStorageCPU);
 
   uint8_t* filtered_data     = (uint8_t*) malloc(width * height * byte_per_pixel + height);
   uint8_t* compressed_buffer = (uint8_t*) malloc(2 * (width * height * byte_per_pixel + height));

@@ -5,10 +5,12 @@
 #include "buffer.h"
 #include "config.h"
 #include "cuda/brdf_unittest.cuh"
+#include "cuda/bsdf_lut.cuh"
 #include "cuda/bvh.cuh"
 #include "cuda/camera_post.cuh"
 #include "cuda/cloud_noise.cuh"
 #include "cuda/directives.cuh"
+#include "cuda/geometry.cuh"
 #include "cuda/kernels.cuh"
 #include "cuda/math.cuh"
 #include "cuda/micromap.cuh"
@@ -41,7 +43,7 @@ extern "C" void device_init() {
   print_info("[%s] %s", LUMINARY_BRANCH_NAME, LUMINARY_VERSION_DATE);
   print_info("Compiled using %s on %s", LUMINARY_COMPILER, LUMINARY_OS);
   print_info("CUDA Version %s OptiX Version %s", LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
-  print_info("Copyright (c) 2023 MilchRatchet");
+  print_info("Copyright (c) 2024 MilchRatchet");
 }
 
 void device_handle_accumulation(RaytraceInstance* instance) {
@@ -135,28 +137,37 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
 
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (type != TYPE_LIGHT) {
+  if (type == TYPE_LIGHT) {
+    process_geometry_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+    process_sky_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+
+    if (instance->scene.toy.active) {
+      process_toy_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
+  }
+  else {
     restir_candidates_pool_generation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
 
-  process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene.particles.active && type != TYPE_LIGHT) {
-    particle_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
+    if (instance->scene.particles.active) {
+      particle_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
 
-  if (instance->scene.ocean.active) {
-    process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
+    if (instance->scene.ocean.active) {
+      process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
 
-  process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene.toy.active) {
-    process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
+    if (instance->scene.toy.active) {
+      process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
 
-  if (type != TYPE_LIGHT && (instance->scene.fog.active || instance->scene.ocean.active)) {
-    volume_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    if (instance->scene.fog.active || instance->scene.ocean.active) {
+      volume_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    }
   }
 }
 

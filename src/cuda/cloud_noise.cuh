@@ -215,7 +215,7 @@ __device__ float dilate_perlin_worley(const float p, const float w, float x) {
   }
 }
 
-__global__ void generate_shape_noise(const int dim, uint8_t* tex) {
+LUMINARY_KERNEL void generate_shape_noise(const int dim, uint8_t* tex) {
   unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;
@@ -260,7 +260,7 @@ __global__ void generate_shape_noise(const int dim, uint8_t* tex) {
   }
 }
 
-__global__ void generate_detail_noise(const int dim, uint8_t* tex) {
+LUMINARY_KERNEL void generate_detail_noise(const int dim, uint8_t* tex) {
   unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;
@@ -296,7 +296,7 @@ __global__ void generate_detail_noise(const int dim, uint8_t* tex) {
   }
 }
 
-__global__ void generate_weather_map(const int dim, const float seed, uint8_t* tex) {
+LUMINARY_KERNEL void generate_weather_map(const int dim, const float seed, uint8_t* tex) {
   unsigned int id = THREAD_ID;
 
   uchar4* dst = (uchar4*) tex;
@@ -367,10 +367,11 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   }
 
   TextureRGBA noise_tex[3];
-  texture_create(noise_tex + 0, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
   texture_create(
-    noise_tex + 1, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
-  texture_create(noise_tex + 2, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, CLOUD_WEATHER_RES, (void*) 0, TexDataUINT8, TexStorageGPU);
+    noise_tex + 0, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, 4, TexStorageGPU);
+  texture_create(
+    noise_tex + 1, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, CLOUD_DETAIL_RES, (void*) 0, TexDataUINT8, 4, TexStorageGPU);
+  texture_create(noise_tex + 2, CLOUD_WEATHER_RES, CLOUD_WEATHER_RES, 1, CLOUD_WEATHER_RES, (void*) 0, TexDataUINT8, 4, TexStorageGPU);
 
   noise_tex[0].mipmap = TexMipmapGenerate;
   noise_tex[1].mipmap = TexMipmapGenerate;

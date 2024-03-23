@@ -1,7 +1,8 @@
 #ifndef CU_GEOMETRY_H
 #define CU_GEOMETRY_H
 
-#include "brdf.cuh"
+#include "bsdf.cuh"
+#include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "restir.cuh"
@@ -54,16 +55,6 @@ __device__ vec3 geometry_compute_normal(
   }
 
   return normal;
-}
-
-__device__ float geometry_get_ambient_index_of_refraction(const vec3 position) {
-  if (device.scene.toy.active && toy_is_inside(position))
-    return device.scene.toy.refractive_index;
-
-  if (device.scene.ocean.active && position.y < device.scene.ocean.height)
-    return device.scene.ocean.refractive_index;
-
-  return 1.0f;
 }
 
 __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const int pixel) {
@@ -137,44 +128,34 @@ __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const
     roughness = 1.0f - roughness;
   }
 
-  uint32_t flags = 0;
-
-  if (device.iteration_type == TYPE_LIGHT || quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) > albedo.a) {
-    flags |= G_BUFFER_TRANSPARENT_PASS;
-  }
-
-  if (!(flags & G_BUFFER_TRANSPARENT_PASS) && !state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-    flags |= G_BUFFER_REQUIRES_SAMPLING;
-  }
-
-  vec3 pos;
-  if (flags & G_BUFFER_TRANSPARENT_PASS) {
-    pos = add_vector(task.position, scale_vector(task.ray, eps * get_length(task.position)));
-  }
-  else {
-    pos = add_vector(task.position, scale_vector(task.ray, -eps * get_length(task.position)));
-  }
+  uint32_t flags = G_BUFFER_REQUIRES_SAMPLING;
 
   if (is_inside) {
     flags |= G_BUFFER_REFRACTION_IS_INSIDE;
   }
 
+  const IORStackMethod ior_stack_method =
+    (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+  const float ray_ior = ior_stack_interact(mat.refraction_index, pixel, ior_stack_method);
+
   GBufferData data;
-  data.hit_id           = task.hit_id;
-  data.albedo           = albedo;
-  data.emission         = emission;
-  data.normal           = normal;
-  data.position         = pos;
-  data.V                = scale_vector(task.ray, -1.0f);
-  data.roughness        = roughness;
-  data.metallic         = metallic;
-  data.flags            = flags;
-  data.refraction_index = mat.refraction_index;
+  data.hit_id             = task.hit_id;
+  data.albedo             = albedo;
+  data.emission           = emission;
+  data.normal             = normal;
+  data.position           = task.position;
+  data.V                  = scale_vector(task.ray, -1.0f);
+  data.roughness          = roughness;
+  data.metallic           = metallic;
+  data.flags              = flags;
+  data.ior_in             = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
+  data.ior_out            = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
+  data.colored_dielectric = device.scene.material.colored_transparency;
 
   return data;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks() {
+LUMINARY_KERNEL void process_geometry_tasks() {
   const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
   const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
   int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
@@ -198,112 +179,68 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
         emission               = scale_color(emission, mis_weight);
       }
 
-      const uint32_t light             = device.ptrs.light_sample_history[pixel];
-      const uint32_t triangle_light_id = load_triangle_light_id(data.hit_id);
-
-      if (proper_light_sample(light, triangle_light_id)) {
-        write_beauty_buffer(emission, pixel);
-      }
+      write_beauty_buffer(emission, pixel);
     }
 
     write_normal_buffer(data.normal, pixel);
 
-    if (data.flags & G_BUFFER_TRANSPARENT_PASS && !device.scene.material.colored_transparency) {
-      data.albedo.r = 1.0f;
-      data.albedo.g = 1.0f;
-      data.albedo.b = 1.0f;
+    if (!material_is_mirror(data.roughness, data.metallic))
+      write_albedo_buffer(opaque_color(data.albedo), pixel);
+
+    float bounce_mis_weight = 1.0f;
+
+    BSDFSampleInfo bounce_info;
+    vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
+
+    uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
+    LightSample light                   = restir_sample_reservoir(data, record, task.index);
+
+    if (light.weight > 0.0f) {
+      RGBF light_weight;
+      bool is_transparent_pass;
+      const vec3 light_ray = restir_apply_sample_shading(data, light, task.index, light_weight, is_transparent_pass);
+
+      const RGBF light_record = mul_color(record, light_weight);
+
+      const float shift           = (is_transparent_pass) ? -eps : eps;
+      const vec3 shifted_position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+      TraceTask light_task;
+      light_task.origin = shifted_position;
+      light_task.ray    = light_ray;
+      light_task.index  = task.index;
+
+      const float light_mis_weight = (bounce_info.is_microfacet_based) ? data.roughness * data.roughness : 1.0f;
+      bounce_mis_weight            = 1.0f - light_mis_weight;
+      store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
+      light_history_buffer_entry = light.id;
+      store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
     }
 
-    BRDFInstance brdf = brdf_get_instance(data.albedo, data.V, data.normal, data.roughness, data.metallic);
+    device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
 
-    if (data.flags & G_BUFFER_TRANSPARENT_PASS) {
-      if (device.iteration_type != TYPE_LIGHT) {
-        const float ambient_index_of_refraction = geometry_get_ambient_index_of_refraction(data.position);
+    RGBF bounce_record = mul_color(record, bounce_info.weight);
 
-        const float refraction_index = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? data.refraction_index / ambient_index_of_refraction
-                                                                                    : ambient_index_of_refraction / data.refraction_index;
+    const float shift           = (bounce_info.is_transparent_pass) ? -eps : eps;
+    const vec3 shifted_position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
-        brdf = brdf_sample_ray_refraction(brdf, refraction_index, task.index);
-      }
-      else {
-        brdf.term = mul_color(brdf.term, opaque_color(data.albedo));
-        brdf.L    = task.ray;
-      }
-
-      record = mul_color(record, brdf.term);
-
-      TraceTask new_task;
-      new_task.origin = data.position;
-      new_task.ray    = brdf.L;
-      new_task.index  = task.index;
-
-      switch (device.iteration_type) {
-        case TYPE_CAMERA:
-        case TYPE_BOUNCE:
-          if (validate_trace_task(new_task, record)) {
-            device.ptrs.mis_buffer[pixel] = 1.0f;
-            store_RGBF(device.ptrs.bounce_records + pixel, record);
-            store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
-          }
-          break;
-        case TYPE_LIGHT:
-          if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY, task.index) > data.albedo.a) {
-            if (state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-              store_RGBF(device.ptrs.light_records + pixel, record);
-              store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), new_task);
-            }
-          }
-          break;
-      }
+    if (bounce_info.is_transparent_pass) {
+      const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(data.ior_in, pixel, ior_stack_method);
     }
-    else if (device.iteration_type != TYPE_LIGHT) {
-      if (!material_is_mirror(data.roughness, data.metallic))
-        write_albedo_buffer(opaque_color(data.albedo), pixel);
 
-      bool bounce_is_specular;
-      BRDFInstance bounce_brdf = brdf_sample_ray(brdf, task.index, bounce_is_specular);
+    TraceTask bounce_task;
+    bounce_task.origin = shifted_position;
+    bounce_task.ray    = bounce_ray;
+    bounce_task.index  = task.index;
 
-      float bounce_mis_weight = 1.0f;
+    if (validate_trace_task(bounce_task, bounce_record)) {
+      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
+      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
 
-      if (!state_peek(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-        uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-        LightSample light                   = restir_sample_reservoir(data, record, task.index);
-
-        if (light.weight > 0.0f) {
-          const BRDFInstance brdf_sample = brdf_apply_sample_weight(brdf_apply_sample(brdf, light, data.position, task.index));
-
-          const RGBF light_record = mul_color(record, brdf_sample.term);
-
-          TraceTask light_task;
-          light_task.origin = data.position;
-          light_task.ray    = brdf_sample.L;
-          light_task.index  = task.index;
-
-          if (luminance(light_record) > 0.0f && state_consume(pixel, STATE_FLAG_LIGHT_OCCUPIED)) {
-            const float light_mis_weight = (bounce_is_specular) ? data.roughness * data.roughness : 1.0f;
-            bounce_mis_weight            = 1.0f - light_mis_weight;
-
-            store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
-            light_history_buffer_entry = light.id;
-            store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
-          }
-        }
-
-        device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
-      }
-
-      RGBF bounce_record = mul_color(record, bounce_brdf.term);
-
-      TraceTask bounce_task;
-      bounce_task.origin = data.position;
-      bounce_task.ray    = bounce_brdf.L;
-      bounce_task.index  = task.index;
-
-      if (validate_trace_task(bounce_task, bounce_record)) {
+      // MIS weight must be propagated if the ray just passes through.
+      if (get_length(sub_vector(task.ray, bounce_ray)) > eps)
         device.ptrs.mis_buffer[pixel] = bounce_mis_weight;
-        store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
-        store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
-      }
     }
   }
 
@@ -311,7 +248,30 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_geometry_tasks()
   device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 9) void process_debug_geometry_tasks() {
+LUMINARY_KERNEL void process_geometry_light_tasks() {
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+
+  for (int i = 0; i < task_count; i++) {
+    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel   = task.index.y * device.width + task.index.x;
+
+    GBufferData data = geometry_generate_g_buffer(task, pixel);
+
+    RGBF record = load_RGBF(device.records + pixel);
+
+    if (color_any(data.emission)) {
+      const uint32_t light             = device.ptrs.light_sample_history[pixel];
+      const uint32_t triangle_light_id = load_triangle_light_id(data.hit_id);
+
+      if (proper_light_sample(light, triangle_light_id)) {
+        write_beauty_buffer(mul_color(data.emission, record), pixel);
+      }
+    }
+  }
+}
+
+LUMINARY_KERNEL void process_debug_geometry_tasks() {
   const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {

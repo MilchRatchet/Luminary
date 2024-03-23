@@ -105,8 +105,6 @@ enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } t
 
 enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJECTION = 2 } typedef AccumMode;
 
-enum MaterialFresnel { SCHLICK = 0, FDEZ_AGUERA = 1 } typedef MaterialFresnel;
-
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE } typedef VolumeType;
@@ -134,6 +132,8 @@ struct CommandlineOptions {
   int aov_mode;
   int width;
   int height;
+  int dmm_active;
+  int omm_active;
 } typedef CommandlineOptions;
 
 struct General {
@@ -179,9 +179,10 @@ struct Camera {
   int smooth_movement;
   float smoothing_factor;
   float temporal_blend_factor;
-  float russian_roulette_bias;
+  float russian_roulette_threshold;
   int use_color_correction;
   RGBF color_correction;
+  int do_firefly_clamping;
 } typedef Camera;
 
 struct Toy {
@@ -332,7 +333,6 @@ struct Jitter {
 
 struct GlobalMaterial {
   RGBF default_material;
-  MaterialFresnel fresnel;
   int lights_active;
   float alpha_cutoff;
   int colored_transparency;
@@ -405,6 +405,7 @@ struct DevicePointers {
   uint16_t* task_counts;
   uint16_t* task_offsets;
   uint32_t* light_sample_history;
+  uint32_t* ior_stack;
   RGBF* frame_buffer;
   RGBF* frame_temporal;
   float* frame_variance;
@@ -433,6 +434,7 @@ struct DevicePointers {
   DeviceTexture* sky_hdri_luts;
   DeviceTexture* sky_moon_albedo_tex;
   DeviceTexture* sky_moon_normal_tex;
+  DeviceTexture* bsdf_energy_lut;
   uint16_t* bluenoise_1D;
   uint32_t* bluenoise_2D;
   uint32_t* light_candidates;
@@ -509,6 +511,7 @@ struct RaytraceInstance {
   unsigned int output_width;
   unsigned int output_height;
   int realtime;
+  DeviceBuffer* ior_stack;
   DeviceBuffer* light_trace;
   DeviceBuffer* bounce_trace;
   DeviceBuffer* light_trace_count;
@@ -538,6 +541,7 @@ struct RaytraceInstance {
   DeviceBuffer* sky_hdri_luts;
   DeviceBuffer* sky_moon_albedo_tex;
   DeviceBuffer* sky_moon_normal_tex;
+  DeviceBuffer* bsdf_energy_lut;
   DeviceBuffer* bluenoise_1D;
   DeviceBuffer* bluenoise_2D;
   DeviceBuffer* mis_buffer;

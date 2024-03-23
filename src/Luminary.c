@@ -91,7 +91,7 @@ static int magic(char* path) {
 static void luminary_version_output() {
   printf("Luminary %s (Branch: %s)\n", LUMINARY_VERSION_DATE, LUMINARY_BRANCH_NAME);
   printf("(%s, %s, CUDA %s, OptiX %s)\n", LUMINARY_COMPILER, LUMINARY_OS, LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
-  printf("Copyright (c) 2023 MilchRatchet\n");
+  printf("Copyright (c) 2024 MilchRatchet\n");
 }
 
 int main(int argc, char* argv[]) {
@@ -163,7 +163,8 @@ int main(int argc, char* argv[]) {
   if (bench)
     bench_activate();
 
-  CommandlineOptions options = {.aov_mode = aov_mode, .width = width, .height = height};
+  CommandlineOptions options = {
+    .aov_mode = aov_mode, .width = width, .height = height, .dmm_active = force_displacement, .omm_active = !disable_omm};
 
   RaytraceInstance* instance;
 

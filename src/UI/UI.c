@@ -97,7 +97,6 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->scene.material.default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->scene.material.default_material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Light Intensity", &(instance->scene.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
-  panels[i++] = create_dropdown(ui, "Fresnel Approximation", &(instance->scene.material.fresnel), 1, 2, "Schlick\0Fdez-Aguera", 8);
   panels[i++] = create_check(ui, "Colored Transparency", &(instance->scene.material.colored_transparency), 1);
   panels[i++] = create_check(ui, "Invert roughness", &(instance->scene.material.invert_roughness), 1);
 
@@ -179,7 +178,8 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene.camera.smooth_movement), 0);
   panels[i++] = create_slider(ui, "Smoothing Factor", &(instance->scene.camera.smoothing_factor), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
   panels[i++] =
-    create_slider(ui, "Russian Roulette Bias", &(instance->scene.camera.russian_roulette_bias), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
+    create_slider(ui, "Russian Roulette Bias", &(instance->scene.camera.russian_roulette_threshold), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Firefly Clamping", &(instance->scene.camera.do_firefly_clamping), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -652,7 +652,7 @@ static UITab create_procedurals_toy_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "  Alpha", &(instance->scene.toy.albedo.a), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Smoothness", &(instance->scene.toy.material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Metallic", &(instance->scene.toy.material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene.toy.refractive_index), 1, 0.001f, 1.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene.toy.refractive_index), 1, 0.0001f, 1.0f, 3.0f, 0, 0);
   panels[i++] = create_check(ui, "Emissive", &(instance->scene.toy.emissive), 1);
   panels[i++] = create_color(ui, "Emission", (float*) &(instance->scene.toy.emission));
   panels[i++] = create_slider(ui, "  Red", &(instance->scene.toy.emission.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);

@@ -47,11 +47,6 @@ Default metallic value that is used when no material texture is present. Number 
 `MATERIAL EMISSION [FP32]`<br/>
 Default emission intensity value that is used when no material texture is present. Number must be strictly greater than 0.
 
-`MATERIAL FRESNEL_ [INT32]`<br/>
-Defines which of the available fresnel approximations is used:
-  - 0 = Schlick
-  - 1 = Fdez-Aguera
-
 `MATERIAL ALPHACUT [FP32]`<br/>
 Every alpha value smaller than this value is automatically treated as 0, i.e., fully transparent. Number must be in the range [0,1].
 

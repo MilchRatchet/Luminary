@@ -83,10 +83,6 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 5642809480346946885u:
       sscanf(value, "%f\n", &material->default_material.b);
       break;
-    /* FRESNEL_ */
-    case 6866939734539981382u:
-      sscanf(value, "%d\n", &material->fresnel);
-      break;
     /* ALPHACUT */
     case 6076837219871509569u:
       sscanf(value, "%f\n", &material->alpha_cutoff);
@@ -204,7 +200,11 @@ static void parse_camera_settings(Camera* camera, char* line) {
       break;
     /* RUSSIANR */
     case 5930749542479910226u:
-      sscanf(value, "%f\n", &camera->russian_roulette_bias);
+      sscanf(value, "%f\n", &camera->russian_roulette_threshold);
+      break;
+      /* FIREFLYC */
+    case 4852993938162862406u:
+      sscanf(value, "%d\n", &camera->do_firefly_clamping);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid CAMERA setting.", line, key);
@@ -828,7 +828,9 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "CAMERA PURKINJE %d\n", instance->scene.camera.purkinje);
   fputs(line, file);
-  sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene.camera.russian_roulette_bias);
+  sprintf(line, "CAMERA RUSSIANR %f\n", instance->scene.camera.russian_roulette_threshold);
+  fputs(line, file);
+  sprintf(line, "CAMERA FIREFLYC %d\n", instance->scene.camera.do_firefly_clamping);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# MATERIAL Settings\n#===============================\n\n");
@@ -843,8 +845,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL METALLIC %f\n", instance->scene.material.default_material.g);
   fputs(line, file);
   sprintf(line, "MATERIAL EMISSION %f\n", instance->scene.material.default_material.b);
-  fputs(line, file);
-  sprintf(line, "MATERIAL FRESNEL_ %d\n", instance->scene.material.fresnel);
   fputs(line, file);
   sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene.material.alpha_cutoff);
   fputs(line, file);

@@ -264,7 +264,7 @@ __device__ Mat3x3 create_basis(const vec3 basis) {
 }
 
 /*
- * This function samples a ray on the unit sphere.
+ * This function samples a ray on the unit sphere. Up is Z+.
  *
  * @param alpha Number between [-1,1]. To sample only the upper hemisphere use [0,1] and vice versa.
  * @param beta Number between [0,1].
@@ -325,6 +325,7 @@ __device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
   return res;
 }
 
+// TODO: Replace math with functions
 __device__ __host__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   vec3 result;
 
@@ -563,7 +564,7 @@ __device__ __host__ vec3 angles_to_direction(const float altitude, const float a
 }
 
 // PBRT v3 Chapter "Specular Reflection and Transmission", Refract() function
-__device__ vec3 refract_ray(const vec3 ray, const vec3 normal, const float index_ratio) {
+__device__ vec3 refract_vector(const vec3 ray, const vec3 normal, const float index_ratio) {
   const float dot = -dot_product(normal, ray);
 
   const float b = 1.0f - index_ratio * index_ratio * (1.0f - dot * dot);
@@ -719,7 +720,7 @@ __device__ float SRGB_to_linearRGB(const float value) {
 }
 
 __device__ float luminance(const RGBF v) {
-  return 0.2126f * v.r + 0.7152f * v.g + 0.0722f * v.b;
+  return 0.212655f * v.r + 0.715158f * v.g + 0.072187f * v.b;
 }
 
 __device__ RGBAF saturate_albedo(RGBAF color, float change) {

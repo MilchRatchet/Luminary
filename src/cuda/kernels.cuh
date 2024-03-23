@@ -3,10 +3,11 @@
 
 #include <cuda_runtime_api.h>
 
+#include "bsdf_utils.cuh"
 #include "bvh.cuh"
 #include "camera.cuh"
 #include "cloud.cuh"
-#include "geometry.cuh"
+#include "ior_stack.cuh"
 #include "ocean.cuh"
 #include "purkinje.cuh"
 #include "restir.cuh"
@@ -19,7 +20,7 @@
 #include "utils.cuh"
 #include "volume.cuh"
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() {
+LUMINARY_KERNEL void generate_trace_tasks() {
   int offset       = 0;
   const int amount = device.width * device.height;
 
@@ -47,6 +48,9 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
       device.ptrs.frame_indirect_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
 
+    const float ambient_ior = bsdf_refraction_index_ambient(task.origin);
+    ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
+
     store_trace_task(device.ptrs.bounce_trace + get_task_address(offset++), task);
   }
 
@@ -54,7 +58,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void generate_trace_tasks() 
   device.ptrs.bounce_trace_count[THREAD_ID] = offset;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
+LUMINARY_KERNEL void balance_trace_tasks() {
   const int warp = THREAD_ID;
 
   if (warp >= (THREADS_PER_BLOCK * BLOCKS_PER_GRID) >> 5)
@@ -124,7 +128,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void balance_trace_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks() {
+LUMINARY_KERNEL void preprocess_trace_tasks() {
   const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -175,29 +179,23 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
         }
 
         if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-          // This feature does not work for displacement triangles
-          if (device.scene.materials[material_id].normal_map == TEXTURE_NONE) {
-            float2 coords;
-            const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
+          float2 coords;
+          const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
 
-            if (dist < depth) {
-              const int alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
+          if (dist < depth) {
+            RGBAF albedo;
+            const BVHAlphaResult alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords, albedo);
 
-              if (alpha_result != 2) {
-                depth  = dist;
-                hit_id = t_id;
-              }
-              else if (device.iteration_type == TYPE_LIGHT) {
-                depth  = -1.0f;
-                hit_id = HIT_TYPE_REJECT;
-              }
+            if (alpha_result != BVH_ALPHA_RESULT_TRANSPARENT) {
+              depth  = dist;
+              hit_id = t_id;
             }
-            else if (device.iteration_type == TYPE_LIGHT && dist == FLT_MAX) {
+            else if (device.iteration_type == TYPE_LIGHT) {
               depth  = -1.0f;
               hit_id = HIT_TYPE_REJECT;
             }
           }
-          else if (device.iteration_type == TYPE_LIGHT) {
+          else if (device.iteration_type == TYPE_LIGHT && dist == FLT_MAX) {
             depth  = -1.0f;
             hit_id = HIT_TYPE_REJECT;
           }
@@ -205,14 +203,51 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
       }
     }
 
-    if (
-      device.scene.toy.active && (!device.scene.toy.flashlight_mode || (device.iteration_type == TYPE_LIGHT && light_id == LIGHT_ID_TOY))) {
-      const float toy_dist = get_toy_distance(task.origin, task.ray);
+    if (device.scene.toy.active) {
+      if (device.iteration_type == TYPE_LIGHT) {
+        const float toy_dist = get_toy_distance(task.origin, task.ray);
 
-      if (toy_dist < depth) {
-        depth  = toy_dist;
-        hit_id = (device.iteration_type == TYPE_LIGHT && light_id != LIGHT_ID_TOY && device.scene.toy.albedo.a == 1.0f) ? HIT_TYPE_REJECT
-                                                                                                                        : HIT_TYPE_TOY;
+        if (toy_dist < depth) {
+          if (light_id == LIGHT_ID_TOY) {
+            if (toy_dist < depth) {
+              depth  = toy_dist;
+              hit_id = HIT_TYPE_TOY;
+            }
+          }
+          else {
+            // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
+            RGBF record = load_RGBF(device.ptrs.light_records + pixel);
+
+            RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
+
+            record = mul_color(record, toy_transparency);
+
+            vec3 hit_origin = add_vector(task.origin, scale_vector(task.ray, toy_dist));
+            hit_origin      = add_vector(hit_origin, scale_vector(task.ray, get_length(hit_origin) * eps * 16.0f));
+
+            const float toy_dist2 = get_toy_distance(hit_origin, task.ray);
+
+            if (toy_dist2 + toy_dist < depth) {
+              record = mul_color(record, toy_transparency);
+            }
+
+            if (luminance(record) == 0.0f) {
+              // If the toy causes full shadows, terminate the light task.
+              depth  = -1.0f;
+              hit_id = HIT_TYPE_REJECT;
+            }
+
+            store_RGBF(device.ptrs.light_records + pixel, record);
+          }
+        }
+      }
+      else {
+        const float toy_dist = get_toy_distance(task.origin, task.ray);
+
+        if (toy_dist < depth) {
+          depth  = toy_dist;
+          hit_id = HIT_TYPE_TOY;
+        }
       }
     }
 
@@ -235,7 +270,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void preprocess_trace_tasks(
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering_tasks() {
+LUMINARY_KERNEL void process_sky_inscattering_tasks() {
   const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -265,7 +300,7 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 6) void process_sky_inscattering
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks() {
+LUMINARY_KERNEL void postprocess_trace_tasks() {
   const int task_count         = device.trace_count[THREAD_ID];
   uint16_t geometry_task_count = 0;
   uint16_t particle_task_count = 0;
@@ -390,15 +425,6 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
     }
   }
 
-  if (device.iteration_type == TYPE_LIGHT) {
-    for (int i = 0; i < task_count; i++) {
-      const int offset     = get_task_address(i);
-      TraceTask task       = load_trace_task(device.trace_tasks + offset);
-      const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
-      state_release(pixel, STATE_FLAG_LIGHT_OCCUPIED);
-    }
-  }
-
   // process data
   for (int i = 0; i < num_tasks; i++) {
     const int offset    = get_task_address(i);
@@ -449,10 +475,14 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 12) void postprocess_trace_tasks
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME]     = volume_task_count;
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT] = num_tasks;
 
-  device.trace_count[THREAD_ID] = 0;
+  // Light tasks can't queue so we don't need to reset for those.
+  if (device.iteration_type != TYPE_LIGHT) {
+    device.ptrs.bounce_trace_count[THREAD_ID] = 0;
+    device.ptrs.light_trace_count[THREAD_ID]  = 0;
+  }
 }
 
-__global__ void convert_RGBF_to_XRGB8(
+LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
   const RGBF* source, XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
   unsigned int id = THREAD_ID;
 

@@ -1,6 +1,7 @@
 #ifndef CU_OCEAN_UTILS_H
 #define CU_OCEAN_UTILS_H
 
+#include "sky_utils.cuh"
 #include "utils.cuh"
 
 #define OCEAN_MAX_HEIGHT (device.scene.ocean.height + 2.66f * device.scene.ocean.amplitude)
@@ -192,13 +193,6 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
   const float end = fminf(limit, ocean_far_distance(origin, ray));
 
   return ocean_intersection_solver(origin, ray, start, end);
-}
-
-__device__ float ocean_get_ambient_index_of_refraction(const vec3 position) {
-  if (device.scene.toy.active && toy_is_inside(position))
-    return device.scene.toy.refractive_index;
-
-  return 1.0f;
 }
 
 // Coefficients taken from

@@ -309,7 +309,7 @@ __device__ float clouds_render(vec3 origin, const vec3 ray, const float limit, c
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 5) void clouds_render_tasks() {
+LUMINARY_KERNEL void clouds_render_tasks() {
   const int task_count = device.trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {

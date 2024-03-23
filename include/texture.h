@@ -20,7 +20,7 @@ void texture_create_atlas(DeviceBuffer** buffer, TextureRGBA* textures, const in
 void texture_free_atlas(DeviceBuffer* texture_atlas, const int textures_length);
 void texture_create(
   TextureRGBA* tex, unsigned int width, unsigned int height, unsigned int depth, unsigned int pitch, void* data, TextureDataType type,
-  TextureStorageLocation storage);
+  unsigned int num_components, TextureStorageLocation storage);
 
 #if __cplusplus
 }

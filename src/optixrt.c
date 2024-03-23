@@ -55,7 +55,7 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
 
   pipeline_compile_options.usesMotionBlur                   = 0;
   pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
-  pipeline_compile_options.numPayloadValues                 = 3;
+  pipeline_compile_options.numPayloadValues                 = 4;
   pipeline_compile_options.numAttributeValues               = 2;
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
@@ -201,7 +201,7 @@ void optixrt_init(RaytraceInstance* instance) {
   build_inputs.triangleArray.numIndexTriplets   = instance->scene.triangle_data.triangle_count;
   build_inputs.triangleArray.indexBuffer        = (CUdeviceptr) instance->scene.triangle_data.index_buffer;
 
-  unsigned int inputFlags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING};
+  unsigned int inputFlags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING | OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL};
 
   build_inputs.triangleArray.flags                = inputFlags;
   build_inputs.triangleArray.opacityMicromap      = omm;

@@ -1,7 +1,7 @@
 #ifndef CU_OCEAN_H
 #define CU_OCEAN_H
 
-#include "brdf.cuh"
+#include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "ocean_utils.cuh"
@@ -69,10 +69,9 @@ __device__ float ocean_reflection_coefficient(
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
+LUMINARY_KERNEL void process_ocean_tasks() {
   const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
   const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
-  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
   int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -81,51 +80,60 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_ocean_tasks() {
 
     vec3 normal = ocean_get_normal(task.position);
 
-    const float ambient_index_of_refraction = ocean_get_ambient_index_of_refraction(task.position);
+    const bool inside_water = dot_product(task.ray, normal) > 0.0f;
 
-    float index_in, index_out;
-    if (dot_product(task.ray, normal) > 0.0f) {
-      normal    = scale_vector(normal, -1.0f);
-      index_in  = device.scene.ocean.refractive_index;
-      index_out = ambient_index_of_refraction;
+    const IORStackMethod ior_stack_method = (inside_water) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+    const float ray_ior                   = ior_stack_interact(device.scene.ocean.refractive_index, pixel, ior_stack_method);
+
+    float ior_in, ior_out;
+    if (inside_water) {
+      normal  = scale_vector(normal, -1.0f);
+      ior_in  = device.scene.ocean.refractive_index;
+      ior_out = ray_ior;
     }
     else {
-      index_in  = ambient_index_of_refraction;
-      index_out = device.scene.ocean.refractive_index;
+      ior_in  = ray_ior;
+      ior_out = device.scene.ocean.refractive_index;
     }
 
     write_normal_buffer(normal, pixel);
 
-    const float refraction_index_ratio = index_in / index_out;
-    const vec3 refraction_dir          = refract_ray(task.ray, normal, refraction_index_ratio);
+    const vec3 refraction_dir = refract_vector(task.ray, normal, ior_in / ior_out);
 
-    const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, index_in, index_out);
+    const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, ior_in, ior_out);
+
+    vec3 bounce_ray;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) < reflection_coefficient) {
       task.position = add_vector(task.position, scale_vector(task.ray, -2.0f * eps * (1.0f + get_length(task.position))));
-      task.ray      = reflect_vector(task.ray, normal);
+      bounce_ray    = reflect_vector(task.ray, normal);
     }
     else {
-      task.ray      = refraction_dir;
-      task.position = add_vector(task.position, scale_vector(task.ray, 2.0f * eps * (1.0f + get_length(task.position))));
+      bounce_ray    = refraction_dir;
+      task.position = add_vector(task.position, scale_vector(bounce_ray, 2.0f * eps * (1.0f + get_length(task.position))));
+
+      const IORStackMethod ior_stack_method = (inside_water) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(ior_in, pixel, ior_stack_method);
     }
 
     RGBF record = load_RGBF(device.records + pixel);
 
     TraceTask new_task;
     new_task.origin = task.position;
-    new_task.ray    = task.ray;
+    new_task.ray    = bounce_ray;
     new_task.index  = task.index;
 
-    device.ptrs.mis_buffer[pixel] = 1.0f;
+    // MIS weight must be propagated if the ray just passes through.
+    if (get_length(sub_vector(task.ray, bounce_ray)) > eps)
+      device.ptrs.mis_buffer[pixel] = 1.0f;
+
     store_RGBF(device.ptrs.bounce_records + pixel, record);
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
   }
 
-  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
   device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 10) void process_debug_ocean_tasks() {
+LUMINARY_KERNEL void process_debug_ocean_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
 

@@ -116,7 +116,15 @@ enum QuasiRandomTarget : uint32_t {
   QUASI_RANDOM_TARGET_CLOUD_DIR             = 404, /* 128 */
   QUASI_RANDOM_TARGET_SKY_STEP_OFFSET       = 532, /* 1 */
   QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP = 534, /* 1 */
-  QUASI_RANDOM_TARGET_COUNT                 = 535
+  QUASI_RANDOM_TARGET_BSDF_MICROFACET       = 535, /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_DIFFUSE          = 536, /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_REFRACTION       = 537, /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_GLOSSY           = 538, /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_DIELECTRIC       = 539, /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_METALLIC         = 540, /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_ALPHA            = 541, /* 1 */
+
+  QUASI_RANDOM_TARGET_COUNT = 542
 } typedef QuasiRandomTarget;
 
 ////////////////////////////////////////////////////////////////////

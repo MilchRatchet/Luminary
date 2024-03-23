@@ -9,6 +9,7 @@
 #include "sky_utils.cuh"
 #include "stars.h"
 #include "texture.h"
+#include "texture_utils.cuh"
 #include "utils.cuh"
 
 //
@@ -398,7 +399,7 @@ __device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const
 }
 
 // [Bru17]
-__global__ void sky_compute_transmittance_lut(float4* transmittance_tex_lower, float4* transmittance_tex_higher) {
+LUMINARY_KERNEL void sky_compute_transmittance_lut(float4* transmittance_tex_lower, float4* transmittance_tex_higher) {
   unsigned int id = THREAD_ID;
 
   const int amount = SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT;
@@ -521,6 +522,7 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
 }
 
 // [Hil20]
+// This kernel does not use default Luminary launch bounds, hence it may not be marked as LUMINARY_KERNEL
 __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lower, float4* multiscattering_tex_higher) {
   const int x = blockIdx.x;
   const int y = blockIdx.y;
@@ -599,8 +601,8 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   raytrace_update_device_scene(instance);
 
   TextureRGBA luts_tm_tex[2];
-  texture_create(luts_tm_tex + 0, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
-  texture_create(luts_tm_tex + 1, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, TexStorageGPU);
+  texture_create(luts_tm_tex + 0, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, 4, TexStorageGPU);
+  texture_create(luts_tm_tex + 1, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH, (void*) 0, TexDataFP32, 4, TexStorageGPU);
   luts_tm_tex[0].wrap_mode_S = TexModeClamp;
   luts_tm_tex[0].wrap_mode_T = TexModeClamp;
   luts_tm_tex[1].wrap_mode_S = TexModeClamp;
@@ -621,8 +623,8 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   raytrace_update_device_pointers(instance);
 
   TextureRGBA luts_ms_tex[2];
-  texture_create(luts_ms_tex + 0, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
-  texture_create(luts_ms_tex + 1, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, TexStorageGPU);
+  texture_create(luts_ms_tex + 0, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, 4, TexStorageGPU);
+  texture_create(luts_ms_tex + 1, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE, (void*) 0, TexDataFP32, 4, TexStorageGPU);
   luts_ms_tex[0].wrap_mode_S = TexModeClamp;
   luts_ms_tex[0].wrap_mode_T = TexModeClamp;
   luts_ms_tex[1].wrap_mode_S = TexModeClamp;
@@ -866,7 +868,7 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
+LUMINARY_KERNEL void process_sky_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
@@ -874,37 +876,24 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
     const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel    = task.index.y * device.width + task.index.x;
 
-    const RGBF record    = load_RGBF(device.records + pixel);
-    const uint32_t light = device.ptrs.light_sample_history[pixel];
+    const RGBF record = load_RGBF(device.records + pixel);
 
     RGBF sky;
-
     if (device.scene.sky.hdri_active) {
       const float mip_bias = (device.iteration_type == TYPE_CAMERA) ? 0.0f : 1.0f;
 
-      sky = mul_color(sky_hdri_sample(task.ray, mip_bias), record);
+      sky = sky_hdri_sample(task.ray, mip_bias);
     }
     else {
-      const vec3 origin = world_to_sky_transform(task.origin);
+      const vec3 sky_origin = world_to_sky_transform(task.origin);
 
-      const bool sample_sun = proper_light_sample(light, LIGHT_ID_SUN);
-
-      RGBF sky_color;
-      if (device.iteration_type == TYPE_LIGHT && sample_sun) {
-        sky_color = sky_get_sun_color(origin, task.ray);
+      sky = sky_get_color(sky_origin, task.ray, FLT_MAX, true, device.scene.sky.steps, task.index);
+      if (device.iteration_type != TYPE_CAMERA && sky_ray_hits_sun(sky_origin, task.ray)) {
+        sky = scale_color(sky, device.ptrs.mis_buffer[pixel]);
       }
-      else if (device.iteration_type != TYPE_LIGHT) {
-        sky_color = sky_get_color(origin, task.ray, FLT_MAX, true, device.scene.sky.steps, task.index);
-        if (sky_ray_hits_sun(origin, task.ray)) {
-          sky_color = scale_color(sky_color, device.ptrs.mis_buffer[pixel]);
-        }
-      }
-      else {
-        continue;
-      }
-
-      sky = mul_color(sky_color, record);
     }
+
+    sky = mul_color(sky, record);
 
     write_beauty_buffer(sky, pixel);
     write_albedo_buffer(sky, pixel);
@@ -912,7 +901,38 @@ __global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_sky_tasks() {
   }
 }
 
-__global__ __launch_bounds__(THREADS_PER_BLOCK, 7) void process_debug_sky_tasks() {
+LUMINARY_KERNEL void process_sky_light_tasks() {
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
+
+  for (int i = 0; i < task_count; i++) {
+    const SkyTask task = load_sky_task(device.trace_tasks + get_task_address(task_offset + i));
+    const int pixel    = task.index.y * device.width + task.index.x;
+
+    const uint32_t light = device.ptrs.light_sample_history[pixel];
+
+    if (!proper_light_sample(light, LIGHT_ID_SUN))
+      continue;
+
+    const RGBF record = load_RGBF(device.records + pixel);
+
+    RGBF sky;
+    if (device.scene.sky.hdri_active) {
+      sky = sky_hdri_sample(task.ray, 0.0f);
+    }
+    else {
+      const vec3 sky_origin = world_to_sky_transform(task.origin);
+
+      sky = sky_get_sun_color(sky_origin, task.ray);
+    }
+
+    sky = mul_color(sky, record);
+
+    write_beauty_buffer(sky, pixel);
+  }
+}
+
+LUMINARY_KERNEL void process_debug_sky_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
