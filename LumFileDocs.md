@@ -56,6 +56,12 @@ Set 1 to enable colored transparency for geometry, 0 else. Enabling this will us
 `MATERIAL INVERTRO [INT32]`<br/>
 Set 1 to invert roughness for geometry, 0 else. Enabling this gives you legacy behaviour where the roughness from the input geometry was always inverted.
 
+`MATERIAL BACKSIDE [INT32]`<br/>
+Determines which sides of lights are emitting light.
+ - 0 = Both sides
+ - 1 = One Side (Clockwise)
+ - 2 = One Side (Counter-Clockwise)
+
 ## Camera Settings
 
 `CAMERA POSITION [FP32] [FP32] [FP32]`<br/>
@@ -144,7 +150,10 @@ Defines which of the available filters is used:
 Set 1 to activate purkinje effect.
 
 `CAMERA RUSSIANR [FP32]`<br/>
-Factor used in russian roulette. A higher number means rays need to correspond to a smaller throughput to be removed early.
+Factor used in russian roulette. A higher number means rays are more likely to be terminated early.
+
+`CAMERA FIREFLYC [INT32]`<br/>
+Set 1 to activate firefly clamping.
 
 ## Sky Settings
 

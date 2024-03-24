@@ -111,6 +111,15 @@ __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const
   }
   emission = scale_color(emission, device.scene.material.default_material.b);
 
+  if (device.scene.material.light_side_mode != LIGHT_SIDE_MODE_BOTH) {
+    const vec3 face_normal = cross_product(edge1, edge2);
+    const float side       = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
+
+    if (dot_product(face_normal, task.ray) * side > 0.0f) {
+      emission = get_color(0.0f, 0.0f, 0.0f);
+    }
+  }
+
   float roughness = mat.roughness;
   float metallic  = mat.metallic;
   if (mat.material_map != TEXTURE_NONE) {

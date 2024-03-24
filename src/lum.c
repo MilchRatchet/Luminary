@@ -95,6 +95,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 5715723589413916233u:
       sscanf(value, "%d\n", &material->invert_roughness);
       break;
+    /* BACKSIDE */
+    case 4991194909127164226u:
+      sscanf(value, "%d\n", &material->light_side_mode);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
       break;
@@ -851,6 +855,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL COLORTRA %d\n", instance->scene.material.colored_transparency);
   fputs(line, file);
   sprintf(line, "MATERIAL INVERTRO %d\n", instance->scene.material.invert_roughness);
+  fputs(line, file);
+  sprintf(line, "MATERIAL BACKSIDE %d\n", instance->scene.material.light_side_mode);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");

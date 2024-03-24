@@ -99,6 +99,8 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Light Intensity", &(instance->scene.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Colored Transparency", &(instance->scene.material.colored_transparency), 1);
   panels[i++] = create_check(ui, "Invert roughness", &(instance->scene.material.invert_roughness), 1);
+  panels[i++] = create_dropdown(
+    ui, "Light Visibility", &(instance->scene.material.light_side_mode), 1, 3, "Both Sides\0One Sided (CW)\0One Sided (CCW)", 10);
 
   tab.panels      = panels;
   tab.panel_count = i;

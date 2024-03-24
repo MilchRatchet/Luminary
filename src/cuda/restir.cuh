@@ -98,6 +98,18 @@ __device__ vec3
   const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
   const vec3 dir = vector_direction_stable(p, origin);
 
+  if (device.scene.material.light_side_mode != LIGHT_SIDE_MODE_BOTH) {
+    const vec3 face_normal = cross_product(triangle.edge1, triangle.edge2);
+    const float side       = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
+
+    if (dot_product(face_normal, dir) * side > 0.0f) {
+      // Reject side with no emission
+      solid_angle = 0.0f;
+      lum         = get_color(0.0f, 0.0f, 0.0f);
+      return get_vector(0.0f, 0.0f, 0.0f);
+    }
+  }
+
   r = get_length(sub_vector(p, origin));
 
   const vec3 cross         = cross_product(triangle.edge1, triangle.edge2);
