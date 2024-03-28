@@ -325,8 +325,17 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   return triangle;
 }
 
-__device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return (void*) (((float*) device.scene.triangles) + (device.scene.triangle_data.triangle_count * chunk + id) * 4 + offset);
+__device__ const void* interleaved_buffer_get_entry_address(
+  const void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
+  return (const void*) (((const float*) ptr) + (count * chunk + id) * 4 + offset);
+}
+
+__device__ const void* pixel_buffer_get_entry_address(const void* ptr, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
+  return interleaved_buffer_get_entry_address(ptr, device.width * device.height, chunk, offset, id);
+}
+
+__device__ const void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t id) {
+  return interleaved_buffer_get_entry_address(device.scene.triangles, device.scene.triangle_data.triangle_count, chunk, offset, id);
 }
 
 __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {

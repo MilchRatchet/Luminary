@@ -307,6 +307,26 @@ struct GBufferData {
   uint32_t colored_dielectric;
 } typedef GBufferData;
 
+// For MIS, doesn't contain data that isn't used by light sampling.
+INTERLEAVED_STORAGE struct GBufferDataPacked {
+  uint32_t hit_id;
+  uint16_t albedo_r;
+  uint16_t albedo_g;
+  uint16_t albedo_b;
+  uint16_t albedo_a;
+  uint16_t roughness;
+  uint16_t metallic;
+  vec3 position;
+  vec3 V;
+  vec3 normal;
+  uint32_t rougness_metallic_packed;
+  uint32_t flags;
+  uint16_t ior_in;
+  uint16_t ior_out;
+  uint32_t padding;
+} typedef GBufferDataPacked;
+static_assert(sizeof(GBufferDataPacked) == 0x40);
+
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////
