@@ -422,6 +422,7 @@ struct DevicePointers {
   RGBF* normal_buffer;
   RGBF* light_records;
   RGBF* bounce_records;
+  RGBF* bounce_records_history;
   PackedGBufferData* packed_gbuffer_history;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
@@ -537,6 +538,7 @@ struct RaytraceInstance {
   DeviceBuffer* normal_buffer;
   DeviceBuffer* light_records;
   DeviceBuffer* bounce_records;
+  DeviceBuffer* bounce_records_history;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;

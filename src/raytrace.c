@@ -545,6 +545,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->normal_buffer);
   device_buffer_init(&instance->light_records);
   device_buffer_init(&instance->bounce_records);
+  device_buffer_init(&instance->bounce_records_history);
   device_buffer_init(&instance->buffer_8bit);
   device_buffer_init(&instance->raydir_buffer);
   device_buffer_init(&instance->trace_result_buffer);
@@ -694,6 +695,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->bounce_records_history, sizeof(RGBF), amount);
   device_buffer_malloc(instance->mis_buffer, sizeof(float), amount);
   device_buffer_malloc(instance->packed_gbuffer_history, sizeof(PackedGBufferData), amount);
 
@@ -760,6 +762,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.normal_buffer             = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
   ptrs.light_records             = (RGBF*) device_buffer_get_pointer(instance->light_records);
   ptrs.bounce_records            = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
+  ptrs.bounce_records_history    = (RGBF*) device_buffer_get_pointer(instance->bounce_records_history);
   ptrs.buffer_8bit               = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
   ptrs.albedo_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
   ptrs.luminance_atlas           = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.luminance);
@@ -805,6 +808,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_variance);
   device_buffer_free(instance->light_records);
   device_buffer_free(instance->bounce_records);
+  device_buffer_free(instance->bounce_records_history);
   device_buffer_free(instance->light_sample_history);
   device_buffer_free(instance->raydir_buffer);
   device_buffer_free(instance->trace_result_buffer);
