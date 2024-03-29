@@ -30,7 +30,7 @@
   }
 
 // Flags variables as unused so that no warning is emitted
-#define LUM_UNUSED(x) (void) (x);
+#define LUM_UNUSED(x) ((void) (x))
 
 #ifndef PI
 #define PI 3.141592653589f
