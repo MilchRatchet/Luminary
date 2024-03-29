@@ -422,6 +422,7 @@ struct DevicePointers {
   RGBF* normal_buffer;
   RGBF* light_records;
   RGBF* bounce_records;
+  PackedGBufferData* packed_gbuffer_history;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
   float* mis_buffer;
@@ -548,6 +549,7 @@ struct RaytraceInstance {
   DeviceBuffer* bluenoise_1D;
   DeviceBuffer* bluenoise_2D;
   DeviceBuffer* mis_buffer;
+  DeviceBuffer* packed_gbuffer_history;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;

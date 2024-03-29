@@ -560,6 +560,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->bluenoise_1D);
   device_buffer_init(&instance->bluenoise_2D);
   device_buffer_init(&instance->mis_buffer);
+  device_buffer_init(&instance->packed_gbuffer_history);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
@@ -694,6 +695,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->mis_buffer, sizeof(float), amount);
+  device_buffer_malloc(instance->packed_gbuffer_history, sizeof(PackedGBufferData), amount);
 
   if (instance->denoiser || instance->aov_mode) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);
@@ -777,6 +779,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.bluenoise_1D              = (uint16_t*) device_buffer_get_pointer(instance->bluenoise_1D);
   ptrs.bluenoise_2D              = (uint32_t*) device_buffer_get_pointer(instance->bluenoise_2D);
   ptrs.mis_buffer                = (float*) device_buffer_get_pointer(instance->mis_buffer);
+  ptrs.packed_gbuffer_history    = (PackedGBufferData*) device_buffer_get_pointer(instance->packed_gbuffer_history);
 
   device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");
@@ -807,6 +810,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->trace_result_buffer);
   device_buffer_free(instance->state_buffer);
   device_buffer_free(instance->mis_buffer);
+  device_buffer_free(instance->packed_gbuffer_history);
 
   gpuErrchk(cudaDeviceSynchronize());
 }

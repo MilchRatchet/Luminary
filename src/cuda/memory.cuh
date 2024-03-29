@@ -417,4 +417,74 @@ __device__ Material load_material(const PackedMaterial* data, const int offset) 
   return mat;
 }
 
+__device__ void store_gbuffer_data(const GBufferData data, const int pixel) {
+  PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
+
+  float4 bytes0x00;
+  bytes0x00.x = __uint_as_float(data.hit_id);
+  bytes0x00.y = ((uint32_t) (data.albedo.r * 0xFFFF + 0.5f)) | (((uint32_t) (data.albedo.g * 0xFFFF + 0.5f)) << 16);
+  bytes0x00.z = ((uint32_t) (data.albedo.b * 0xFFFF + 0.5f)) | (((uint32_t) (data.albedo.a * 0xFFFF + 0.5f)) << 16);
+  bytes0x00.w = ((uint32_t) (data.roughness * 0xFFFF + 0.5f)) | (((uint32_t) (data.metallic * 0xFFFF + 0.5f)) << 16);
+
+  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel), bytes0x00);
+
+  float4 bytes0x10;
+  bytes0x10.x = data.position.x;
+  bytes0x10.y = data.position.y;
+  bytes0x10.z = data.position.z;
+  bytes0x10.w = data.V.x;
+
+  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel), bytes0x10);
+
+  float4 bytes0x20;
+  bytes0x20.x = data.V.y;
+  bytes0x20.y = data.V.z;
+  bytes0x20.z = data.normal.x;
+  bytes0x20.w = data.normal.y;
+
+  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel), bytes0x20);
+
+  float2 bytes0x30;
+  bytes0x30.x = data.normal.z;
+  bytes0x30.y = __uint_as_float(data.flags);
+
+  __stcs((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel), bytes0x30);
+
+  float bytes0x38;
+  bytes0x38 = ((uint32_t) (data.ior_in * 0xFFFF + 0.5f)) | (((uint32_t) (data.ior_out * 0xFFFF + 0.5f)) << 16);
+
+  __stcs((float*) pixel_buffer_get_entry_address(ptr, 3, 8, pixel), bytes0x38);
+}
+
+__device__ GBufferData load_gbuffer_data(const int pixel) {
+  const PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
+
+  const float4 bytes0x00 = __ldg((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel));
+  const float4 bytes0x10 = __ldg((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel));
+  const float4 bytes0x20 = __ldg((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel));
+  const float2 bytes0x30 = __ldg((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel));
+  const float bytes0x38  = __ldg((float*) pixel_buffer_get_entry_address(ptr, 3, 8, pixel));
+
+  GBufferData data;
+  data.hit_id    = __float_as_uint(bytes0x00.x);
+  data.albedo.r  = (__float_as_uint(bytes0x00.y) & 0xFFFF) * (1.0f / 0xFFFF);
+  data.albedo.g  = (__float_as_uint(bytes0x00.y) >> 16) * (1.0f / 0xFFFF);
+  data.albedo.b  = (__float_as_uint(bytes0x00.z) & 0xFFFF) * (1.0f / 0xFFFF);
+  data.albedo.a  = (__float_as_uint(bytes0x00.z) >> 16) * (1.0f / 0xFFFF);
+  data.roughness = (__float_as_uint(bytes0x00.w) & 0xFFFF) * (1.0f / 0xFFFF);
+  data.metallic  = (__float_as_uint(bytes0x00.w) >> 16) * (1.0f / 0xFFFF);
+  data.position  = get_vector(bytes0x10.x, bytes0x10.y, bytes0x10.z);
+  data.V         = get_vector(bytes0x10.w, bytes0x20.x, bytes0x20.y);
+  data.normal    = get_vector(bytes0x20.z, bytes0x20.w, bytes0x30.x);
+  data.flags     = __float_as_uint(bytes0x30.y);
+  data.ior_in    = (__float_as_uint(bytes0x38) & 0xFFFF) * (1.0f / 0xFFFF);
+  data.ior_out   = (__float_as_uint(bytes0x38) >> 16) * (1.0f / 0xFFFF);
+
+  data.colored_dielectric = (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? device.scene.material.colored_transparency : 1;
+
+  data.emission = get_color(0.0f, 0.0f, 0.0f);
+
+  return data;
+}
+
 #endif /* CU_MEMORY_H */

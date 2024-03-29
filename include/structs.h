@@ -284,8 +284,10 @@ struct LightSample {
   uint32_t presampled_id;
   uint32_t id;
   float weight;
+  float sample_weight;
 } typedef LightSample;
 
+// TODO: Add colored dielectric as a flag
 enum GBufferFlags {
   G_BUFFER_REQUIRES_SAMPLING    = 0b1,
   G_BUFFER_VOLUME_HIT           = 0b10,
@@ -308,7 +310,7 @@ struct GBufferData {
 } typedef GBufferData;
 
 // For MIS, doesn't contain data that isn't used by light sampling.
-INTERLEAVED_STORAGE struct GBufferDataPacked {
+INTERLEAVED_STORAGE struct PackedGBufferData {
   uint32_t hit_id;
   uint16_t albedo_r;
   uint16_t albedo_g;
@@ -317,15 +319,12 @@ INTERLEAVED_STORAGE struct GBufferDataPacked {
   uint16_t roughness;
   uint16_t metallic;
   vec3 position;
-  vec3 V;
-  vec3 normal;
-  uint32_t rougness_metallic_packed;
+  vec3 V;       // TODO: Compress
+  vec3 normal;  // TODO: Compress
   uint32_t flags;
   uint16_t ior_in;
   uint16_t ior_out;
-  uint32_t padding;
-} typedef GBufferDataPacked;
-static_assert(sizeof(GBufferDataPacked) == 0x40);
+} typedef PackedGBufferData;
 
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs

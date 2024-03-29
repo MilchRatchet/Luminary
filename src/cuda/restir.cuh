@@ -53,6 +53,7 @@ __device__ LightSample restir_sample_empty() {
   s.presampled_id = LIGHT_ID_NONE;
   s.id            = LIGHT_ID_NONE;
   s.weight        = 0.0f;
+  s.sample_weight = 0.0f;
 
   return s;
 }
@@ -277,6 +278,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.id            = LIGHT_ID_SUN;
       selected.presampled_id = LIGHT_ID_SUN;
       selected.seed          = sampled.seed;
+      selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
@@ -298,6 +300,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.id            = LIGHT_ID_TOY;
       selected.presampled_id = LIGHT_ID_TOY;
       selected.seed          = sampled.seed;
+      selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
@@ -333,6 +336,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.id            = sampled.id;
       selected.presampled_id = sampled.presampled_id;
       selected.seed          = sampled.seed;
+      selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
     }
   }
