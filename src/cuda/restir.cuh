@@ -73,6 +73,20 @@ __device__ float restir_sample_volume_extinction(const GBufferData data, const v
   return extinction;
 }
 
+__device__ void restir_triangle_properties(
+  const vec3 p, const vec3 dir, const vec3 face_normal, const vec3 origin, float& solid_angle, float& dist) {
+  dist = get_length(sub_vector(p, origin));
+
+  // Use that surface * cos_term = 0.5 * |a x b| * |normal(a x b)^Td| = 0.5 * |a x b| * |(a x b)^Td|/|a x b| = 0.5 * |(a x b)^Td|.
+  const float surface_cos_term = 0.5f * fabsf(dot_product(face_normal, dir));
+
+  solid_angle = surface_cos_term / (dist * dist);
+
+  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
+    solid_angle = 0.0f;
+  }
+}
+
 /*
  * Surface sample a triangle and return its area and emission luminance.
  * @param triangle Triangle.
@@ -85,7 +99,7 @@ __device__ float restir_sample_volume_extinction(const GBufferData data, const v
  * Robust triangle sampling.
  */
 __device__ vec3
-  restir_sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random, float& solid_angle, RGBF& lum, float& r) {
+  restir_sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random, float& solid_angle, RGBF& lum, float& dist) {
   float r1 = sqrtf(random.x);
   float r2 = random.y;
 
@@ -99,9 +113,10 @@ __device__ vec3
   const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
   const vec3 dir = vector_direction_stable(p, origin);
 
+  const vec3 face_normal = cross_product(triangle.edge1, triangle.edge2);
+
   if (device.scene.material.light_side_mode != LIGHT_SIDE_MODE_BOTH) {
-    const vec3 face_normal = cross_product(triangle.edge1, triangle.edge2);
-    const float side       = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
+    const float side = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
 
     if (dot_product(face_normal, dir) * side > 0.0f) {
       // Reject side with no emission
@@ -111,21 +126,7 @@ __device__ vec3
     }
   }
 
-  r = get_length(sub_vector(p, origin));
-
-  const vec3 cross         = cross_product(triangle.edge1, triangle.edge2);
-  const float cross_length = get_length(cross);
-
-  // Use that surface * cos_term = 0.5 * |a x b| * |normal(a x b)^Td| = 0.5 * |a x b| * |(a x b)^Td|/|a x b| = 0.5 * |(a x b)^Td|.
-  const float surface_cos_term = 0.5f * fabsf(dot_product(cross, dir));
-
-  solid_angle = surface_cos_term / (r * r);
-
-  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
-    solid_angle = 0.0f;
-    lum         = get_color(0.0f, 0.0f, 0.0f);
-    return get_vector(0.0f, 0.0f, 0.0f);
-  }
+  restir_triangle_properties(p, dir, face_normal, origin, solid_angle, dist);
 
   const uint16_t illum_tex = device.scene.materials[triangle.material_id].luminance_map;
 
@@ -197,6 +198,31 @@ __device__ vec3
   return ray;
 }
 
+__device__ float restir_target_pdf(
+  const GBufferData data, const vec3 ray, const RGBF record, const float solid_angle, const float sample_dist, const RGBF emission) {
+  RGBF bsdf_weight;
+  if (data.flags & G_BUFFER_VOLUME_HIT) {
+    bsdf_weight = volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), ray);
+  }
+  else {
+    bool is_transparent_pass;
+    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, solid_angle);
+  }
+
+  const RGBF color_value = mul_color(mul_color(emission, bsdf_weight), record);
+  float value            = luminance(color_value);
+
+  if (isinf(value) || isnan(value)) {
+    value = 0.0f;
+  }
+
+  if (value > 0.0f) {
+    value *= restir_sample_volume_extinction(data, ray, sample_dist);
+  }
+
+  return value;
+}
+
 /**
  * Compute the target PDF of a light sample. Currently, this is basically BRDF weight multiplied by general light intensity.
  * @param x Light sample
@@ -219,27 +245,7 @@ __device__ float restir_sample_target_pdf(
 
   primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 0.0f;
 
-  RGBF bsdf_weight;
-  if (data.flags & G_BUFFER_VOLUME_HIT) {
-    bsdf_weight = volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), ray);
-  }
-  else {
-    bool is_transparent_pass;
-    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, solid_angle);
-  }
-
-  const RGBF color_value = mul_color(mul_color(emission, bsdf_weight), record);
-  float value            = luminance(color_value);
-
-  if (isinf(value) || isnan(value)) {
-    value = 0.0f;
-  }
-
-  if (value > 0.0f) {
-    value *= restir_sample_volume_extinction(data, ray, sample_dist);
-  }
-
-  return value;
+  return restir_target_pdf(data, ray, record, solid_angle, sample_dist, emission);
 }
 
 /**
@@ -353,6 +359,54 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   }
 
   return selected;
+}
+
+/**
+ * Approximates marginal for a sample by evaluating the conditional PDF based on the actual chosen sampling technique.
+ * @param data Data from previous bounce.
+ * @param record Record from previous bounce.
+ * @param hit_data Data from current bounce.
+ * @param sampled_technique Sum of ReSTIR weights minus the weight of the actually chosen light sample.
+ * @result Sampled light sample.
+ */
+__device__ float restir_sampling_marginal(
+  const GBufferData data, const RGBF record, const GBufferData hit_data, const float sampled_technique) {
+  const vec3 ray = scale_vector(hit_data.V, -1.0f);
+
+  RGBF lum;
+  float reservoir_pdf, sample_dist, solid_angle;
+  switch (hit_data.hit_id) {
+    case HIT_TYPE_SKY:
+      // We fake the emission from the sun when sampling, we must do the same here.
+      lum           = scale_color(get_color(1.0f, 1.0f, 1.0f), 2e+04f * device.scene.sky.sun_strength);
+      reservoir_pdf = 1.0f;
+      sample_dist   = FLT_MAX;
+      solid_angle   = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(data.position));
+      break;
+    case HIT_TYPE_TOY:
+      lum           = hit_data.emission;
+      reservoir_pdf = 1.0f;
+
+      sample_dist = get_length(sub_vector(data.position, device.scene.toy.position));
+      solid_angle = toy_get_solid_angle(data.position);
+      break;
+    default:
+      lum           = hit_data.emission;
+      reservoir_pdf = (1.0f / device.scene.triangle_lights_count);
+      sample_dist   = get_length(sub_vector(hit_data.position, device.scene.toy.position));
+      // TODO: Use actual face normal and not the shading normal
+      restir_triangle_properties(hit_data.position, ray, data.normal, data.position, solid_angle, sample_dist);
+      break;
+  }
+
+  float primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 1.0f;
+  float target_pdf    = restir_target_pdf(data, ray, record, solid_angle, sample_dist, lum);
+
+  float sampled_pdf = primitive_pdf * reservoir_pdf;
+  float weight      = (sampled_pdf > 0.0f) ? target_pdf / sampled_pdf : 0.0f;
+
+  // Probability of sampling from reservoir and probability of choosing this sample based on the sampled technique.
+  return sampled_pdf * (weight / (weight + sampled_technique));
 }
 
 LUMINARY_KERNEL void restir_candidates_pool_generation() {
