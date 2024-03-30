@@ -120,7 +120,9 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
       const BSDFRayContext context = bsdf_sample_context(data_local, sampled_microfacet, ray_local, false);
 
+      info.antagonist_weight   = 0.0f;
       info.weight              = bsdf_conductor(data_local, context, BSDF_SAMPLING_MICROFACET, 1.0f);
+      info.sampled_technique   = BSDF_CONDUCTOR;
       info.is_microfacet_based = true;
     }
     else {
@@ -146,14 +148,17 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         ray_local                = microfacet_ray;
         final_weight             = scale_color(microfacet_eval, 1.0f / microfacet_probability);
         info.is_microfacet_based = true;
+        info.antagonist_weight   = diffuse_weight;
       }
       else {
         ray_local                = diffuse_ray;
         final_weight             = scale_color(diffuse_eval, 1.0f / diffuse_probability);
         info.is_microfacet_based = false;
+        info.antagonist_weight   = microfacet_weight;
       }
 
-      info.weight = final_weight;
+      info.sampled_technique = BSDF_GLOSSY;
+      info.weight            = final_weight;
     }
   }
   else {
@@ -177,20 +182,80 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
     RGBF final_weight;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_DIELECTRIC, pixel) < reflection_probability) {
-      ray_local    = reflection_vector;
-      final_weight = scale_color(reflection_eval, 1.0f / reflection_probability);
+      ray_local              = reflection_vector;
+      final_weight           = scale_color(reflection_eval, 1.0f / reflection_probability);
+      info.antagonist_weight = refraction_weight;
     }
     else {
       ray_local                = refraction_vector;
       final_weight             = scale_color(refraction_eval, 1.0f / refraction_probability);
+      info.antagonist_weight   = reflection_weight;
       info.is_transparent_pass = true;
     }
 
     info.weight              = final_weight;
+    info.sampled_technique   = BSDF_DIELECTRIC;
     info.is_microfacet_based = true;
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+}
+
+__device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, const BSDFSampleInfo info) {
+  // Transformation to +Z-Up
+  const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
+  const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
+  const vec3 ray_local           = rotate_vector_by_quaternion(ray, rotation_to_z);
+
+  // G Buffer Data (+Z-Up)
+  GBufferData data_local = data;
+
+  data_local.V      = V_local;
+  data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
+
+  float marginal;
+  vec3 H = get_vector(0.0f, 0.0f, 1.0f);
+  switch (info.sampled_technique) {
+    default:
+    case BSDF_CONDUCTOR:
+      H        = normalize_vector(add_vector(data_local.V, ray_local));
+      marginal = 1.0f;
+      break;
+    case BSDF_GLOSSY: {
+      H                        = normalize_vector(add_vector(data_local.V, ray_local));
+      const BSDFRayContext ctx = bsdf_sample_context(data_local, H, ray_local, false);
+
+      const BSDFSamplingHint hint = (info.is_microfacet_based) ? BSDF_SAMPLING_MICROFACET : BSDF_SAMPLING_DIFFUSE;
+
+      const RGBF eval    = bsdf_glossy(data_local, ctx, hint, 1.0f);
+      const float weight = luminance(eval);
+
+      marginal = weight / (weight + info.antagonist_weight);
+    } break;
+    case BSDF_DIELECTRIC: {
+      H = (info.is_transparent_pass) ? bsdf_refraction_normal_from_pair(ray_local, data_local.V, data_local.ior_in, data_local.ior_out)
+                                     : normalize_vector(add_vector(data_local.V, ray_local));
+
+      const BSDFRayContext ctx = bsdf_sample_context(data_local, H, ray_local, info.is_transparent_pass);
+
+      const BSDFSamplingHint hint = (info.is_transparent_pass) ? BSDF_SAMPLING_MICROFACET_REFRACTION : BSDF_SAMPLING_MICROFACET;
+
+      const RGBF eval    = bsdf_dielectric(data_local, ctx, hint, 1.0f);
+      const float weight = luminance(eval);
+
+      marginal = weight / (weight + info.antagonist_weight);
+    } break;
+  }
+
+  float sample_pdf;
+  if (info.is_microfacet_based) {
+    sample_pdf = bsdf_microfacet_pdf(data, H.z, data_local.V.z);
+  }
+  else {
+    sample_pdf = bsdf_diffuse_pdf(data, ray_local.z);
+  }
+
+  return marginal * sample_pdf;
 }
 
 #endif /* CU_BSDF_H */
