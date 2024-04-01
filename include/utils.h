@@ -426,7 +426,7 @@ struct DevicePointers {
   PackedGBufferData* packed_gbuffer_history;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
-  float* mis_buffer;
+  MISData* mis_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
   DeviceTexture* albedo_atlas;

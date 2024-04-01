@@ -459,11 +459,11 @@ __device__ void store_gbuffer_data(const GBufferData data, const int pixel) {
 __device__ GBufferData load_gbuffer_data(const int pixel) {
   const PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
 
-  const float4 bytes0x00 = __ldg((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel));
-  const float4 bytes0x10 = __ldg((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel));
-  const float4 bytes0x20 = __ldg((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel));
-  const float2 bytes0x30 = __ldg((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel));
-  const float bytes0x38  = __ldg((float*) pixel_buffer_get_entry_address(ptr, 3, 8, pixel));
+  const float4 bytes0x00 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel));
+  const float4 bytes0x10 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel));
+  const float4 bytes0x20 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel));
+  const float2 bytes0x30 = __ldcs((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel));
+  const float bytes0x38  = __ldcs((float*) pixel_buffer_get_entry_address(ptr, 3, 8, pixel));
 
   GBufferData data;
   data.hit_id    = __float_as_uint(bytes0x00.x);
@@ -483,6 +483,26 @@ __device__ GBufferData load_gbuffer_data(const int pixel) {
   data.colored_dielectric = (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? device.scene.material.colored_transparency : 1;
 
   data.emission = get_color(0.0f, 0.0f, 0.0f);
+
+  return data;
+}
+
+__device__ void store_mis_data(const MISData data, const int pixel) {
+  float4 bytes;
+  bytes.x = data.light_sampled_technique;
+  bytes.y = data.bsdf_antagonist_weight;
+  bytes.z = __uint_as_float(data.bsdf_data);
+
+  __stcs((float4*) (device.ptrs.mis_buffer + pixel), bytes);
+}
+
+__device__ MISData load_mis_data(const int pixel) {
+  float4 bytes = __ldcs((float4*) (device.ptrs.mis_buffer + pixel));
+
+  MISData data;
+  data.light_sampled_technique = bytes.x;
+  data.bsdf_antagonist_weight  = bytes.y;
+  data.bsdf_data               = __float_as_uint(bytes.z);
 
   return data;
 }

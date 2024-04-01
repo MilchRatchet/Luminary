@@ -254,7 +254,7 @@ __device__ float restir_sample_target_pdf(
  * @param seed Seed used for random number generation, the seed is overwritten on use.
  * @result Sampled light sample.
  */
-__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const ushort2 pixel) {
+__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const ushort2 pixel, float& marginal) {
   LightSample selected = restir_sample_empty();
 
   if (!(data.flags & G_BUFFER_REQUIRES_SAMPLING))
@@ -265,7 +265,8 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
 
-  float selection_target_pdf = 1.0f;
+  float selection_target_pdf  = 1.0f;
+  float selection_sampled_pdf = 1.0f;
 
   // Importance sample the sun
   if (sun_visible) {
@@ -286,6 +287,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.seed          = sampled.seed;
       selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
+      selection_sampled_pdf  = sampled_pdf;
     }
   }
 
@@ -308,6 +310,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.seed          = sampled.seed;
       selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
+      selection_sampled_pdf  = sampled_pdf;
     }
   }
 
@@ -344,8 +347,11 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.seed          = sampled.seed;
       selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
+      selection_sampled_pdf  = sampled_pdf;
     }
   }
+
+  marginal = selection_sampled_pdf * (selected.sample_weight / selected.weight);
 
   // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
   if (selected.id == LIGHT_ID_NONE) {
@@ -369,7 +375,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
  * @param sampled_technique Sum of ReSTIR weights minus the weight of the actually chosen light sample.
  * @result Sampled light sample.
  */
-__device__ float restir_sampling_marginal(
+__device__ float restir_sample_marginal(
   const GBufferData data, const RGBF record, const GBufferData hit_data, const float sampled_technique) {
   const vec3 ray = scale_vector(hit_data.V, -1.0f);
 

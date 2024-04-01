@@ -5,6 +5,7 @@
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "mis.cuh"
 #include "restir.cuh"
 #include "state.cuh"
 #include "texture_utils.cuh"
@@ -184,7 +185,7 @@ LUMINARY_KERNEL void process_geometry_tasks() {
       RGBF emission = mul_color(data.emission, record);
 
       if (device.iteration_type == TYPE_BOUNCE) {
-        const float mis_weight = device.ptrs.mis_buffer[pixel];
+        const float mis_weight = mis_weight_bsdf_sampled(data, pixel);
         emission               = scale_color(emission, mis_weight);
       }
 
@@ -196,13 +197,12 @@ LUMINARY_KERNEL void process_geometry_tasks() {
     if (!material_is_mirror(data.roughness, data.metallic))
       write_albedo_buffer(opaque_color(data.albedo), pixel);
 
-    float bounce_mis_weight = 1.0f;
-
     BSDFSampleInfo bounce_info;
     vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
     uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-    LightSample light                   = restir_sample_reservoir(data, record, task.index);
+    float light_sample_marginal;
+    LightSample light = restir_sample_reservoir(data, record, task.index, light_sample_marginal);
 
     if (light.weight > 0.0f) {
       RGBF light_weight;
@@ -219,8 +219,7 @@ LUMINARY_KERNEL void process_geometry_tasks() {
       light_task.ray    = light_ray;
       light_task.index  = task.index;
 
-      const float light_mis_weight = (bounce_info.is_microfacet_based) ? data.roughness * data.roughness : 1.0f;
-      bounce_mis_weight            = 1.0f - light_mis_weight;
+      const float light_mis_weight = mis_weight_light_sampled(data, light_ray, bounce_info, light_sample_marginal);
       store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
       light_history_buffer_entry = light.id;
       store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
@@ -247,9 +246,7 @@ LUMINARY_KERNEL void process_geometry_tasks() {
       store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
 
-      // MIS weight must be propagated if the ray just passes through.
-      if (get_length(sub_vector(task.ray, bounce_ray)) > eps)
-        device.ptrs.mis_buffer[pixel] = bounce_mis_weight;
+      mis_store_data(data, record, mis_gather_data(bounce_info, light.weight - light.sample_weight), bounce_ray, pixel);
     }
   }
 

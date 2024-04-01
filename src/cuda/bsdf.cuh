@@ -207,6 +207,9 @@ __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, co
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
   const vec3 ray_local           = rotate_vector_by_quaternion(ray, rotation_to_z);
 
+  if (ray_local.z < 0.0f && !info.is_transparent_pass)
+    return 0.0f;
+
   // G Buffer Data (+Z-Up)
   GBufferData data_local = data;
 
@@ -230,7 +233,7 @@ __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, co
       const RGBF eval    = bsdf_glossy(data_local, ctx, hint, 1.0f);
       const float weight = luminance(eval);
 
-      marginal = weight / (weight + info.antagonist_weight);
+      marginal = ((weight + info.antagonist_weight) > 0.0f) ? weight / (weight + info.antagonist_weight) : 0.0f;
     } break;
     case BSDF_DIELECTRIC: {
       H = (info.is_transparent_pass) ? bsdf_refraction_normal_from_pair(ray_local, data_local.V, data_local.ior_in, data_local.ior_out)
@@ -243,7 +246,7 @@ __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, co
       const RGBF eval    = bsdf_dielectric(data_local, ctx, hint, 1.0f);
       const float weight = luminance(eval);
 
-      marginal = weight / (weight + info.antagonist_weight);
+      marginal = ((weight + info.antagonist_weight) > 0.0f) ? weight / (weight + info.antagonist_weight) : 0.0f;
     } break;
   }
 

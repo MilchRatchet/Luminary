@@ -696,7 +696,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records_history, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->mis_buffer, sizeof(float), amount);
+  device_buffer_malloc(instance->mis_buffer, sizeof(MISData), amount);
   device_buffer_malloc(instance->packed_gbuffer_history, sizeof(PackedGBufferData), amount);
 
   if (instance->denoiser || instance->aov_mode) {
@@ -781,7 +781,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.bsdf_energy_lut           = (DeviceTexture*) device_buffer_get_pointer(instance->bsdf_energy_lut);
   ptrs.bluenoise_1D              = (uint16_t*) device_buffer_get_pointer(instance->bluenoise_1D);
   ptrs.bluenoise_2D              = (uint32_t*) device_buffer_get_pointer(instance->bluenoise_2D);
-  ptrs.mis_buffer                = (float*) device_buffer_get_pointer(instance->mis_buffer);
+  ptrs.mis_buffer                = (MISData*) device_buffer_get_pointer(instance->mis_buffer);
   ptrs.packed_gbuffer_history    = (PackedGBufferData*) device_buffer_get_pointer(instance->packed_gbuffer_history);
 
   device_update_symbol(ptrs, ptrs);

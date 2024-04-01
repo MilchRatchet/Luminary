@@ -185,14 +185,15 @@ LUMINARY_KERNEL void volume_process_tasks() {
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 
-    device.ptrs.mis_buffer[pixel] = 0.0f;
     if (validate_trace_task(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
 
     const GBufferData data = volume_generate_g_buffer(task, pixel, volume);
-    LightSample light      = restir_sample_reservoir(data, record, task.index);
+
+    float light_sample_marginal;
+    LightSample light = restir_sample_reservoir(data, record, task.index, light_sample_marginal);
 
     uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
@@ -208,7 +209,8 @@ LUMINARY_KERNEL void volume_process_tasks() {
       light_task.ray    = light_ray;
       light_task.index  = task.index;
 
-      store_RGBF(device.ptrs.light_records + pixel, light_record);
+      const float light_mis_weight = 1.0f;  // mis_weight_light_sampled(data, light_ray, bounce_info, light_sample_marginal);
+      store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
       light_history_buffer_entry = light.id;
       store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
     }
