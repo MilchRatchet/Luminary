@@ -392,16 +392,15 @@ __device__ float restir_sample_marginal(
     case HIT_TYPE_TOY:
       lum           = hit_data.emission;
       reservoir_pdf = 1.0f;
-
-      sample_dist = get_length(sub_vector(data.position, device.scene.toy.position));
-      solid_angle = toy_get_solid_angle(data.position);
+      sample_dist   = get_length(sub_vector(data.position, device.scene.toy.position));
+      solid_angle   = toy_get_solid_angle(data.position);
       break;
     default:
       lum           = hit_data.emission;
       reservoir_pdf = (1.0f / device.scene.triangle_lights_count);
       sample_dist   = get_length(sub_vector(hit_data.position, device.scene.toy.position));
       // TODO: Use actual face normal and not the shading normal
-      restir_triangle_properties(hit_data.position, ray, data.normal, data.position, solid_angle, sample_dist);
+      restir_triangle_properties(hit_data.position, ray, hit_data.normal, data.position, solid_angle, sample_dist);
       break;
   }
 
@@ -412,7 +411,7 @@ __device__ float restir_sample_marginal(
   float weight      = (sampled_pdf > 0.0f) ? target_pdf / sampled_pdf : 0.0f;
 
   // Probability of sampling from reservoir and probability of choosing this sample based on the sampled technique.
-  return sampled_pdf * (weight / (weight + sampled_technique));
+  return (weight > 0.0f) ? sampled_pdf * (weight / (weight + sampled_technique)) : 0.0f;
 }
 
 LUMINARY_KERNEL void restir_candidates_pool_generation() {
