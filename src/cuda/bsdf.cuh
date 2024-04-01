@@ -96,7 +96,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   return context;
 }
 
-__device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
+__device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info, float& marginal) {
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
@@ -114,6 +114,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   const vec3 sampled_microfacet = bsdf_microfacet_sample(data_local, pixel);
 
+  vec3 sampled_microfacet_refraction;
+  float choice_probability = 1.0f;
   if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_ALPHA, pixel) < data.albedo.a) {
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_METALLIC, pixel) < data.metallic) {
       ray_local = reflect_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet);
@@ -149,12 +151,14 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         final_weight             = scale_color(microfacet_eval, 1.0f / microfacet_probability);
         info.is_microfacet_based = true;
         info.antagonist_weight   = diffuse_weight;
+        choice_probability       = microfacet_probability;
       }
       else {
         ray_local                = diffuse_ray;
         final_weight             = scale_color(diffuse_eval, 1.0f / diffuse_probability);
         info.is_microfacet_based = false;
         info.antagonist_weight   = microfacet_weight;
+        choice_probability       = diffuse_probability;
       }
 
       info.sampled_technique = BSDF_GLOSSY;
@@ -166,7 +170,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     const BSDFRayContext reflection_ctx = bsdf_sample_context(data_local, sampled_microfacet, reflection_vector, false);
     const RGBF reflection_eval          = bsdf_dielectric(data_local, reflection_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
-    const vec3 sampled_microfacet_refraction = bsdf_microfacet_refraction_sample(data_local, pixel);
+    sampled_microfacet_refraction = bsdf_microfacet_refraction_sample(data_local, pixel);
     const vec3 refraction_vector =
       refract_vector(scale_vector(data_local.V, -1.0f), sampled_microfacet_refraction, data.ior_in / data.ior_out);
     const BSDFRayContext refraction_ctx = bsdf_sample_context(data_local, sampled_microfacet_refraction, refraction_vector, true);
@@ -185,18 +189,33 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       ray_local              = reflection_vector;
       final_weight           = scale_color(reflection_eval, 1.0f / reflection_probability);
       info.antagonist_weight = refraction_weight;
+      choice_probability     = reflection_probability;
     }
     else {
       ray_local                = refraction_vector;
       final_weight             = scale_color(refraction_eval, 1.0f / refraction_probability);
       info.antagonist_weight   = reflection_weight;
       info.is_transparent_pass = true;
+      choice_probability       = refraction_probability;
     }
 
     info.weight              = final_weight;
     info.sampled_technique   = BSDF_DIELECTRIC;
     info.is_microfacet_based = true;
   }
+
+  float sample_pdf;
+  if (info.is_transparent_pass) {
+    sample_pdf = bsdf_microfacet_refraction_pdf(data, sampled_microfacet_refraction.z, data_local.V.z);
+  }
+  else if (info.is_microfacet_based) {
+    sample_pdf = bsdf_microfacet_pdf(data, sampled_microfacet.z, data_local.V.z);
+  }
+  else {
+    sample_pdf = bsdf_diffuse_pdf(data, ray_local.z);
+  }
+
+  marginal = sample_pdf * choice_probability;
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
 }

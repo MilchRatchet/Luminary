@@ -83,7 +83,8 @@ LUMINARY_KERNEL void process_toy_tasks() {
       write_albedo_buffer(opaque_color(data.albedo), pixel);
 
     BSDFSampleInfo bounce_info;
-    vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
+    float bsdf_marginal;
+    vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info, bsdf_marginal);
 
     uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
@@ -132,7 +133,11 @@ LUMINARY_KERNEL void process_toy_tasks() {
       store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
 
-      mis_store_data(data, record, mis_gather_data(bounce_info, light.weight - light.sample_weight), bounce_ray, pixel);
+      MISData mis_data;
+      mis_data.light_sampled_technique = light.weight - light.sample_weight;
+      mis_data.bsdf_marginal           = bsdf_marginal;
+
+      mis_store_data(data, record, mis_data, bounce_ray, pixel);
     }
   }
 
