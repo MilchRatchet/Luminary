@@ -199,14 +199,14 @@ __device__ vec3
 }
 
 __device__ float restir_target_pdf(
-  const GBufferData data, const vec3 ray, const RGBF record, const float solid_angle, const float sample_dist, const RGBF emission) {
+  const GBufferData data, const vec3 ray, const RGBF record, const float sample_dist, const RGBF emission) {
   RGBF bsdf_weight;
   if (data.flags & G_BUFFER_VOLUME_HIT) {
     bsdf_weight = volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), ray);
   }
   else {
     bool is_transparent_pass;
-    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, solid_angle);
+    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, 1.0f);
   }
 
   const RGBF color_value = mul_color(mul_color(emission, bsdf_weight), record);
@@ -245,7 +245,7 @@ __device__ float restir_sample_target_pdf(
 
   primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 0.0f;
 
-  return restir_target_pdf(data, ray, record, solid_angle, sample_dist, emission);
+  return restir_target_pdf(data, ray, record, sample_dist, emission);
 }
 
 /**
@@ -407,7 +407,7 @@ __device__ float restir_sample_marginal(
   }
 
   float primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 1.0f;
-  float target_pdf    = restir_target_pdf(data, ray, record, solid_angle, sample_dist, lum);
+  float target_pdf    = restir_target_pdf(data, ray, record, sample_dist, lum);
 
   float sampled_pdf = primitive_pdf * reservoir_pdf;
   float weight      = (sampled_pdf > 0.0f) ? target_pdf / sampled_pdf : 0.0f;
