@@ -353,6 +353,8 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
 
   marginal = selection_sampled_pdf * (selected.sample_weight / selected.weight);
 
+  selected.sample_weight = selected.weight - selected.sample_weight;
+
   // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
   if (selected.id == LIGHT_ID_NONE) {
     selected.weight = 0.0f;

@@ -248,7 +248,7 @@ LUMINARY_KERNEL void process_geometry_tasks() {
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
 
       MISData mis_data;
-      mis_data.light_sampled_technique = light.weight - light.sample_weight;
+      mis_data.light_sampled_technique = light.sample_weight;
       mis_data.bsdf_marginal           = bsdf_marginal;
 
       mis_store_data(data, record, mis_data, bounce_ray, pixel);
