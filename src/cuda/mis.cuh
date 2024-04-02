@@ -7,6 +7,8 @@
 #include "restir.cuh"
 #include "utils.cuh"
 
+#define MIS_USE_POWER_HEURISTIC 1
+
 __device__ void mis_reset_data(const int pixel) {
   MISData invalid;
   invalid.light_sampled_technique = -1.0f;
@@ -35,7 +37,11 @@ __device__ void mis_store_data(const GBufferData data, const RGBF record, const 
 __device__ float mis_weight_light_sampled(const GBufferData data, const vec3 ray, const BSDFSampleInfo info, const float marginal_light) {
   const float marginal_bsdf = bsdf_sample_marginal(data, ray, info);
 
+#if MIS_USE_POWER_HEURISTIC
+  return (marginal_light * marginal_light) / (marginal_light * marginal_light + marginal_bsdf * marginal_bsdf);
+#else
   return marginal_light / (marginal_light + marginal_bsdf);
+#endif
 }
 
 __device__ float mis_weight_bsdf_sampled(const GBufferData data, const int pixel) {
@@ -49,7 +55,12 @@ __device__ float mis_weight_bsdf_sampled(const GBufferData data, const int pixel
 
   const float marginal_light = restir_sample_marginal(history_data, history_records, data, mis_data.light_sampled_technique);
 
+#if MIS_USE_POWER_HEURISTIC
+  return (mis_data.bsdf_marginal * mis_data.bsdf_marginal)
+         / (mis_data.bsdf_marginal * mis_data.bsdf_marginal + marginal_light * marginal_light);
+#else
   return mis_data.bsdf_marginal / (mis_data.bsdf_marginal + marginal_light);
+#endif
 }
 
 #endif /* CU_MIS_H */
