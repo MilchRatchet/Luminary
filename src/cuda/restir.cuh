@@ -49,11 +49,11 @@
 __device__ LightSample restir_sample_empty() {
   LightSample s;
 
-  s.seed          = 0;
-  s.presampled_id = LIGHT_ID_NONE;
-  s.id            = LIGHT_ID_NONE;
-  s.weight        = 0.0f;
-  s.sample_weight = 0.0f;
+  s.seed                     = 0;
+  s.presampled_id            = LIGHT_ID_NONE;
+  s.id                       = LIGHT_ID_NONE;
+  s.weight                   = 0.0f;
+  s.target_pdf_normalization = FLT_MAX;
 
   return s;
 }
@@ -254,7 +254,7 @@ __device__ float restir_sample_target_pdf(
  * @param seed Seed used for random number generation, the seed is overwritten on use.
  * @result Sampled light sample.
  */
-__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const ushort2 pixel, float& marginal) {
+__device__ LightSample restir_sample_reservoir(const GBufferData data, const RGBF record, const ushort2 pixel) {
   LightSample selected = restir_sample_empty();
 
   if (!(data.flags & G_BUFFER_REQUIRES_SAMPLING))
@@ -265,8 +265,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
   const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
 
-  float selection_target_pdf  = 1.0f;
-  float selection_sampled_pdf = 1.0f;
+  float selection_target_pdf = 1.0f;
 
   // Importance sample the sun
   if (sun_visible) {
@@ -285,9 +284,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.id            = LIGHT_ID_SUN;
       selected.presampled_id = LIGHT_ID_SUN;
       selected.seed          = sampled.seed;
-      selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
-      selection_sampled_pdf  = sampled_pdf;
     }
   }
 
@@ -308,9 +305,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.id            = LIGHT_ID_TOY;
       selected.presampled_id = LIGHT_ID_TOY;
       selected.seed          = sampled.seed;
-      selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
-      selection_sampled_pdf  = sampled_pdf;
     }
   }
 
@@ -345,15 +340,9 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
       selected.id            = sampled.id;
       selected.presampled_id = sampled.presampled_id;
       selected.seed          = sampled.seed;
-      selected.sample_weight = weight;
       selection_target_pdf   = sampled_target_pdf;
-      selection_sampled_pdf  = sampled_pdf;
     }
   }
-
-  marginal = selection_sampled_pdf * (selected.sample_weight / selected.weight);
-
-  selected.sample_weight = selected.weight - selected.sample_weight;
 
   // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
   if (selected.id == LIGHT_ID_NONE) {
@@ -363,7 +352,9 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
     // We use uniform MIS weights because the images of our distributions are a partition of the set of all lights.
     const float mis_weight = (selected.id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? 1.0f / reservoir_size : 1.0f;
 
-    selected.weight = mis_weight * selected.weight / selection_target_pdf;
+    selected.target_pdf_normalization = mis_weight * selected.weight;
+
+    selected.weight = selected.target_pdf_normalization / selection_target_pdf;
   }
 
   return selected;
@@ -378,42 +369,28 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
  * @result Sampled light sample.
  */
 __device__ float restir_sample_marginal(
-  const GBufferData data, const RGBF record, const GBufferData hit_data, const float sampled_technique) {
+  const GBufferData data, const RGBF record, const GBufferData hit_data, const float target_pdf_normalization) {
   const vec3 ray = scale_vector(hit_data.V, -1.0f);
 
   RGBF lum;
-  float reservoir_pdf, sample_dist, solid_angle;
+  float sample_dist;
   switch (hit_data.hit_id) {
     case HIT_TYPE_SKY:
       // We fake the emission from the sun when sampling, we must do the same here.
-      lum           = scale_color(get_color(1.0f, 1.0f, 1.0f), 2e+04f * device.scene.sky.sun_strength);
-      reservoir_pdf = 1.0f;
-      sample_dist   = FLT_MAX;
-      solid_angle   = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(data.position));
+      lum         = scale_color(get_color(1.0f, 1.0f, 1.0f), 2e+04f * device.scene.sky.sun_strength);
+      sample_dist = FLT_MAX;
       break;
     case HIT_TYPE_TOY:
-      lum           = hit_data.emission;
-      reservoir_pdf = 1.0f;
-      sample_dist   = get_length(sub_vector(data.position, device.scene.toy.position));
-      solid_angle   = toy_get_solid_angle(data.position);
+      lum         = hit_data.emission;
+      sample_dist = get_length(sub_vector(data.position, device.scene.toy.position));
       break;
     default:
-      lum           = hit_data.emission;
-      reservoir_pdf = (1.0f / device.scene.triangle_lights_count);
-      sample_dist   = get_length(sub_vector(hit_data.position, device.scene.toy.position));
-      // TODO: Use actual face normal and not the shading normal
-      restir_triangle_properties(hit_data.position, ray, hit_data.normal, data.position, solid_angle, sample_dist);
+      lum         = hit_data.emission;
+      sample_dist = get_length(sub_vector(hit_data.position, data.position));
       break;
   }
 
-  float primitive_pdf = (solid_angle > 0.0f) ? 1.0f / solid_angle : 1.0f;
-  float target_pdf    = restir_target_pdf(data, ray, record, sample_dist, lum);
-
-  float sampled_pdf = primitive_pdf * reservoir_pdf;
-  float weight      = (sampled_pdf > 0.0f) ? target_pdf / sampled_pdf : 0.0f;
-
-  // Probability of sampling from reservoir and probability of choosing this sample based on the sampled technique.
-  return (weight > 0.0f) ? sampled_pdf * (weight / (weight + sampled_technique)) : 0.0f;
+  return restir_target_pdf(data, ray, record, sample_dist, lum) / target_pdf_normalization;
 }
 
 LUMINARY_KERNEL void restir_candidates_pool_generation() {

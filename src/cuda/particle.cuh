@@ -73,8 +73,7 @@ LUMINARY_KERNEL void particle_process_tasks() {
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
     }
 
-    float light_sample_marginal;
-    const LightSample light = restir_sample_reservoir(data, record, task.index, light_sample_marginal);
+    const LightSample light = restir_sample_reservoir(data, record, task.index);
 
     uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 

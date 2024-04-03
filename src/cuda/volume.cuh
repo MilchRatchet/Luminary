@@ -192,8 +192,7 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     const GBufferData data = volume_generate_g_buffer(task, pixel, volume);
 
-    float light_sample_marginal;
-    LightSample light = restir_sample_reservoir(data, record, task.index, light_sample_marginal);
+    LightSample light = restir_sample_reservoir(data, record, task.index);
 
     uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 

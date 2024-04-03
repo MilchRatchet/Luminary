@@ -202,8 +202,8 @@ LUMINARY_KERNEL void process_geometry_tasks() {
     vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info, bsdf_marginal);
 
     uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-    float light_sample_marginal;
-    LightSample light = restir_sample_reservoir(data, record, task.index, light_sample_marginal);
+
+    LightSample light = restir_sample_reservoir(data, record, task.index);
 
     if (light.weight > 0.0f) {
       RGBF light_weight;
@@ -220,7 +220,7 @@ LUMINARY_KERNEL void process_geometry_tasks() {
       light_task.ray    = light_ray;
       light_task.index  = task.index;
 
-      const float light_mis_weight = mis_weight_light_sampled(data, light_ray, bounce_info, light_sample_marginal);
+      const float light_mis_weight = mis_weight_light_sampled(data, light_ray, bounce_info, light);
       store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
       light_history_buffer_entry = light.id;
       store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
@@ -248,8 +248,8 @@ LUMINARY_KERNEL void process_geometry_tasks() {
       store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
 
       MISData mis_data;
-      mis_data.light_sampled_technique = light.sample_weight;
-      mis_data.bsdf_marginal           = bsdf_marginal;
+      mis_data.light_target_pdf_normalization = light.target_pdf_normalization;
+      mis_data.bsdf_marginal                  = bsdf_marginal;
 
       mis_store_data(data, record, mis_data, bounce_ray, pixel);
     }

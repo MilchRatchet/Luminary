@@ -284,7 +284,7 @@ struct LightSample {
   uint32_t presampled_id;
   uint32_t id;
   float weight;
-  float sample_weight;
+  float target_pdf_normalization;
 } typedef LightSample;
 
 // TODO: Add colored dielectric as a flag
@@ -327,7 +327,7 @@ INTERLEAVED_STORAGE struct PackedGBufferData {
 } typedef PackedGBufferData;
 
 struct MISData {
-  float light_sampled_technique;
+  float light_target_pdf_normalization;
   float bsdf_marginal;
 } typedef MISData;
 

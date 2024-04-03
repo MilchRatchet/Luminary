@@ -489,7 +489,7 @@ __device__ GBufferData load_gbuffer_data(const int pixel) {
 
 __device__ void store_mis_data(const MISData data, const int pixel) {
   float2 bytes;
-  bytes.x = data.light_sampled_technique;
+  bytes.x = data.light_target_pdf_normalization;
   bytes.y = data.bsdf_marginal;
 
   __stcs((float2*) (device.ptrs.mis_buffer + pixel), bytes);
@@ -499,8 +499,8 @@ __device__ MISData load_mis_data(const int pixel) {
   float2 bytes = __ldcs((float2*) (device.ptrs.mis_buffer + pixel));
 
   MISData data;
-  data.light_sampled_technique = bytes.x;
-  data.bsdf_marginal           = bytes.y;
+  data.light_target_pdf_normalization = bytes.x;
+  data.bsdf_marginal                  = bytes.y;
 
   return data;
 }
