@@ -225,13 +225,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   float sample_pdf;
   if (info.is_transparent_pass) {
-    sample_pdf = bsdf_microfacet_refraction_pdf(data, sampled_microfacet_refraction.z, data_local.V.z);
+    sample_pdf = bsdf_microfacet_refraction_pdf(data_local, sampled_microfacet_refraction.z, data_local.V.z);
   }
   else if (info.is_microfacet_based) {
-    sample_pdf = bsdf_microfacet_pdf(data, sampled_microfacet.z, data_local.V.z);
+    sample_pdf = bsdf_microfacet_pdf(data_local, sampled_microfacet.z, data_local.V.z);
   }
   else {
-    sample_pdf = bsdf_diffuse_pdf(data, ray_local.z);
+    sample_pdf = bsdf_diffuse_pdf(data_local, ray_local.z);
   }
 
   marginal = sample_pdf * choice_probability;

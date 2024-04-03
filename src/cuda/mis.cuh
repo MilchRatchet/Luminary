@@ -22,7 +22,7 @@ __device__ bool mis_data_is_invalid(const MISData data) {
 }
 
 __device__ bool mis_propagate_data(const GBufferData data, const vec3 ray) {
-  return (dot_product(ray, data.V) < -0.99f);
+  return (dot_product(ray, data.V) < -0.999f);
 }
 
 __device__ void mis_store_data(const GBufferData data, const RGBF record, const MISData mis_data, const vec3 ray, const int pixel) {

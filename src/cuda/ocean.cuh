@@ -122,7 +122,7 @@ LUMINARY_KERNEL void process_ocean_tasks() {
     new_task.ray    = bounce_ray;
     new_task.index  = task.index;
 
-    // TODO: Implement fallback for when no MIS
+    mis_reset_data(pixel);
 
     store_RGBF(device.ptrs.bounce_records + pixel, record);
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
