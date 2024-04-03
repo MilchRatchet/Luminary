@@ -370,6 +370,9 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
  */
 __device__ float restir_sample_marginal(
   const GBufferData data, const RGBF record, const GBufferData hit_data, const float target_pdf_normalization) {
+  if (target_pdf_normalization == 0.0f)
+    return 0.0f;
+
   const vec3 ray = scale_vector(hit_data.V, -1.0f);
 
   RGBF lum;

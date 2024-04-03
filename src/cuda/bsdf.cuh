@@ -271,10 +271,10 @@ __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, co
 
   float sample_pdf;
   if (info.is_microfacet_based) {
-    sample_pdf = bsdf_microfacet_pdf(data, H.z, data_local.V.z);
+    sample_pdf = bsdf_microfacet_pdf(data_local, H.z, data_local.V.z);
   }
   else {
-    sample_pdf = bsdf_diffuse_pdf(data, ray_local.z);
+    sample_pdf = bsdf_diffuse_pdf(data_local, ray_local.z);
   }
 
   return marginal * sample_pdf;
