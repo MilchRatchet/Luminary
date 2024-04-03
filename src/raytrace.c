@@ -566,21 +566,23 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
   device_malloc((void**) &(instance->scene.materials), sizeof(PackedMaterial) * instance->scene.materials_count);
-  device_malloc((void**) &(instance->scene.triangles), sizeof(Triangle) * instance->scene.triangle_data.triangle_count);
+  device_malloc(
+    (void**) &(instance->scene.triangles), INTERLEAVED_ALLOCATION_SIZE(sizeof(Triangle)) * instance->scene.triangle_data.triangle_count);
   device_malloc((void**) &(instance->scene.triangle_lights), sizeof(TriangleLight) * instance->scene.triangle_lights_count);
   device_malloc((void**) &(instance->scene.triangle_data.vertex_buffer), instance->scene.triangle_data.vertex_count * 4 * sizeof(float));
   device_malloc(
     (void**) &(instance->scene.triangle_data.index_buffer), instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t));
   device_malloc((void**) &(instance->restir.presampled_triangle_lights), sizeof(TriangleLight) * RESTIR_CANDIDATE_POOL_MAX);
 
-  Triangle* triangles_interleaved = (Triangle*) malloc(sizeof(Triangle) * instance->scene.triangle_data.triangle_count);
+  Triangle* triangles_interleaved =
+    (Triangle*) malloc(INTERLEAVED_ALLOCATION_SIZE(sizeof(Triangle)) * instance->scene.triangle_data.triangle_count);
   struct_triangles_interleave(triangles_interleaved, scene->triangles, instance->scene.triangle_data.triangle_count);
 
   gpuErrchk(cudaMemcpy(
     instance->scene.materials, scene->materials, sizeof(PackedMaterial) * instance->scene.materials_count, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene.triangles, triangles_interleaved, sizeof(Triangle) * instance->scene.triangle_data.triangle_count,
-    cudaMemcpyHostToDevice));
+    instance->scene.triangles, triangles_interleaved,
+    INTERLEAVED_ALLOCATION_SIZE(sizeof(Triangle)) * instance->scene.triangle_data.triangle_count, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
     instance->scene.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * instance->scene.triangle_lights_count,
     cudaMemcpyHostToDevice));
@@ -697,7 +699,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records_history, sizeof(RGBF), amount);
   device_buffer_malloc(instance->mis_buffer, sizeof(MISData), amount);
-  device_buffer_malloc(instance->packed_gbuffer_history, sizeof(PackedGBufferData), amount);
+  device_buffer_malloc(instance->packed_gbuffer_history, INTERLEAVED_ALLOCATION_SIZE(sizeof(PackedGBufferData)), amount);
 
   if (instance->denoiser || instance->aov_mode) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);

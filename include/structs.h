@@ -6,6 +6,8 @@
 
 // This struct is stored as a struct of arrays, members are grouped into 16 bytes where possible. Padding is not required.
 #define INTERLEAVED_STORAGE
+// Round the size of an element in an interleaved buffer to the next multiple of 16 bytes
+#define INTERLEAVED_ALLOCATION_SIZE(X) ((X + 15u) & (~0xFu))
 
 /********************************************************
  * Vectors and matrices

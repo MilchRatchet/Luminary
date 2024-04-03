@@ -330,12 +330,12 @@ __device__ const void* interleaved_buffer_get_entry_address(
   return (const void*) (((const float*) ptr) + (count * chunk + id) * 4 + offset);
 }
 
-__device__ const void* pixel_buffer_get_entry_address(const void* ptr, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return interleaved_buffer_get_entry_address(ptr, device.width * device.height, chunk, offset, id);
+__device__ const void* pixel_buffer_get_entry_address(const void* ptr, const uint32_t chunk, const uint32_t offset, const uint32_t pixel) {
+  return interleaved_buffer_get_entry_address(ptr, device.width * device.height, chunk, offset, pixel);
 }
 
-__device__ const void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return interleaved_buffer_get_entry_address(device.scene.triangles, device.scene.triangle_data.triangle_count, chunk, offset, id);
+__device__ const void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t tri_id) {
+  return interleaved_buffer_get_entry_address(device.scene.triangles, device.scene.triangle_data.triangle_count, chunk, offset, tri_id);
 }
 
 __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
@@ -350,13 +350,11 @@ __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
 }
 
 __device__ uint32_t load_triangle_material_id(const uint32_t id) {
-  const uint32_t* triangles_material_ids = ((uint32_t*) device.scene.triangles) + device.scene.triangle_data.triangle_count * 6 * 4;
-  return __ldg(triangles_material_ids + id);
+  return __ldg((uint32_t*) triangle_get_entry_address(6, 0, id));
 }
 
 __device__ uint32_t load_triangle_light_id(const uint32_t id) {
-  const uint32_t* triangles_light_ids = ((uint32_t*) device.scene.triangles) + device.scene.triangle_data.triangle_count * (6 * 4 + 1);
-  return __ldg(triangles_light_ids + id);
+  return __ldg((uint32_t*) triangle_get_entry_address(6, 1, id));
 }
 
 __device__ TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {
@@ -417,7 +415,7 @@ __device__ Material load_material(const PackedMaterial* data, const int offset) 
   return mat;
 }
 
-__device__ void store_gbuffer_data(const GBufferData data, const int pixel) {
+__device__ void store_gbuffer_data(const GBufferData data, const uint32_t pixel) {
   PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
 
   float4 bytes0x00;
@@ -453,17 +451,17 @@ __device__ void store_gbuffer_data(const GBufferData data, const int pixel) {
   float bytes0x38;
   bytes0x38 = ((uint32_t) (data.ior_in * 0xFFFF + 0.5f)) | (((uint32_t) (data.ior_out * 0xFFFF + 0.5f)) << 16);
 
-  __stcs((float*) pixel_buffer_get_entry_address(ptr, 3, 8, pixel), bytes0x38);
+  __stcs((float*) pixel_buffer_get_entry_address(ptr, 3, 2, pixel), bytes0x38);
 }
 
-__device__ GBufferData load_gbuffer_data(const int pixel) {
+__device__ GBufferData load_gbuffer_data(const uint32_t pixel) {
   const PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
 
   const float4 bytes0x00 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel));
   const float4 bytes0x10 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel));
   const float4 bytes0x20 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel));
   const float2 bytes0x30 = __ldcs((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel));
-  const float bytes0x38  = __ldcs((float*) pixel_buffer_get_entry_address(ptr, 3, 8, pixel));
+  const float bytes0x38  = __ldcs((float*) pixel_buffer_get_entry_address(ptr, 3, 2, pixel));
 
   GBufferData data;
   data.hit_id    = __float_as_uint(bytes0x00.x);

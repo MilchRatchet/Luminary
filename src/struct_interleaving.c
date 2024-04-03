@@ -51,11 +51,8 @@ void struct_triangles_interleave(Triangle* dst, Triangle* src, uint32_t count) {
 
     offset += count * 4;
 
-    dst_uint[offset + i] = triangle.material_id;
-
-    offset += count;
-
-    dst_uint[offset + i] = triangle.light_id;
+    dst_uint[offset + i * 4 + 0] = triangle.material_id;
+    dst_uint[offset + i * 4 + 1] = triangle.light_id;
   }
 }
 
@@ -110,11 +107,8 @@ void struct_triangles_deinterleave(Triangle* dst, Triangle* src, uint32_t count)
 
     offset += count * 4;
 
-    triangle.material_id = src_uint[offset + i];
-
-    offset += count;
-
-    triangle.light_id = src_uint[offset + i];
+    triangle.material_id = src_uint[offset + i * 4 + 0];
+    triangle.light_id    = src_uint[offset + i * 4 + 1];
 
     dst[i] = triangle;
   }
