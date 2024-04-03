@@ -60,7 +60,7 @@ LUMINARY_KERNEL void process_toy_tasks() {
     ToyTask task    = load_toy_task(device.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
-    const GBufferData data = toy_generate_g_buffer(task, pixel);
+    GBufferData data = toy_generate_g_buffer(task, pixel);
 
     RGBF record = load_RGBF(device.records + pixel);
 
@@ -115,8 +115,8 @@ LUMINARY_KERNEL void process_toy_tasks() {
 
     RGBF bounce_record = mul_color(record, bounce_info.weight);
 
-    const float shift           = (bounce_info.is_transparent_pass) ? -eps : eps;
-    const vec3 shifted_position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+    const float shift = (bounce_info.is_transparent_pass) ? -eps : eps;
+    data.position     = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
@@ -124,7 +124,7 @@ LUMINARY_KERNEL void process_toy_tasks() {
     }
 
     TraceTask bounce_task;
-    bounce_task.origin = shifted_position;
+    bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 

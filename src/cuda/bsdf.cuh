@@ -2,6 +2,7 @@
 #define CU_BSDF_H
 
 #include "bsdf_utils.cuh"
+#include "ocean_utils.cuh"
 #include "random.cuh"
 #include "utils.cuh"
 
@@ -97,6 +98,24 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
 }
 
 __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info, float& marginal) {
+  if (data.flags & G_BUFFER_VOLUME_HIT) {
+    const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
+    const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
+
+    const vec3 ray = scale_vector(data.V, -1.0f);
+
+    const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
+                               ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
+                               : ocean_phase_sampling(ray, random_dir, random_choice);
+
+    const float cos_angle = -dot_product(scatter_ray, data.V);
+
+    marginal = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN) ? jendersie_eon_phase_function(cos_angle, data.roughness)
+                                                                   : ocean_phase(cos_angle);
+
+    return scatter_ray;
+  }
+
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
@@ -221,6 +240,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 }
 
 __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, const BSDFSampleInfo info) {
+  if (data.flags & G_BUFFER_VOLUME_HIT) {
+    const float cos_angle = -dot_product(ray, data.V);
+
+    return (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN) ? jendersie_eon_phase_function(cos_angle, data.roughness)
+                                                               : ocean_phase(cos_angle);
+  }
+
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
