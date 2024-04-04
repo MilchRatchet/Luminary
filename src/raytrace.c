@@ -545,6 +545,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->normal_buffer);
   device_buffer_init(&instance->light_records);
   device_buffer_init(&instance->bounce_records);
+  device_buffer_init(&instance->bounce_records_history);
   device_buffer_init(&instance->buffer_8bit);
   device_buffer_init(&instance->raydir_buffer);
   device_buffer_init(&instance->trace_result_buffer);
@@ -560,25 +561,28 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->bluenoise_1D);
   device_buffer_init(&instance->bluenoise_2D);
   device_buffer_init(&instance->mis_buffer);
+  device_buffer_init(&instance->packed_gbuffer_history);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
   device_malloc((void**) &(instance->scene.materials), sizeof(PackedMaterial) * instance->scene.materials_count);
-  device_malloc((void**) &(instance->scene.triangles), sizeof(Triangle) * instance->scene.triangle_data.triangle_count);
+  device_malloc(
+    (void**) &(instance->scene.triangles), INTERLEAVED_ALLOCATION_SIZE(sizeof(Triangle)) * instance->scene.triangle_data.triangle_count);
   device_malloc((void**) &(instance->scene.triangle_lights), sizeof(TriangleLight) * instance->scene.triangle_lights_count);
   device_malloc((void**) &(instance->scene.triangle_data.vertex_buffer), instance->scene.triangle_data.vertex_count * 4 * sizeof(float));
   device_malloc(
     (void**) &(instance->scene.triangle_data.index_buffer), instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t));
   device_malloc((void**) &(instance->restir.presampled_triangle_lights), sizeof(TriangleLight) * RESTIR_CANDIDATE_POOL_MAX);
 
-  Triangle* triangles_interleaved = (Triangle*) malloc(sizeof(Triangle) * instance->scene.triangle_data.triangle_count);
+  Triangle* triangles_interleaved =
+    (Triangle*) malloc(INTERLEAVED_ALLOCATION_SIZE(sizeof(Triangle)) * instance->scene.triangle_data.triangle_count);
   struct_triangles_interleave(triangles_interleaved, scene->triangles, instance->scene.triangle_data.triangle_count);
 
   gpuErrchk(cudaMemcpy(
     instance->scene.materials, scene->materials, sizeof(PackedMaterial) * instance->scene.materials_count, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
-    instance->scene.triangles, triangles_interleaved, sizeof(Triangle) * instance->scene.triangle_data.triangle_count,
-    cudaMemcpyHostToDevice));
+    instance->scene.triangles, triangles_interleaved,
+    INTERLEAVED_ALLOCATION_SIZE(sizeof(Triangle)) * instance->scene.triangle_data.triangle_count, cudaMemcpyHostToDevice));
   gpuErrchk(cudaMemcpy(
     instance->scene.triangle_lights, scene->triangle_lights, sizeof(TriangleLight) * instance->scene.triangle_lights_count,
     cudaMemcpyHostToDevice));
@@ -693,7 +697,9 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->mis_buffer, sizeof(float), amount);
+  device_buffer_malloc(instance->bounce_records_history, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->mis_buffer, sizeof(MISData), amount);
+  device_buffer_malloc(instance->packed_gbuffer_history, INTERLEAVED_ALLOCATION_SIZE(sizeof(PackedGBufferData)), amount);
 
   if (instance->denoiser || instance->aov_mode) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);
@@ -758,6 +764,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.normal_buffer             = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
   ptrs.light_records             = (RGBF*) device_buffer_get_pointer(instance->light_records);
   ptrs.bounce_records            = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
+  ptrs.bounce_records_history    = (RGBF*) device_buffer_get_pointer(instance->bounce_records_history);
   ptrs.buffer_8bit               = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
   ptrs.albedo_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
   ptrs.luminance_atlas           = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.luminance);
@@ -776,7 +783,8 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.bsdf_energy_lut           = (DeviceTexture*) device_buffer_get_pointer(instance->bsdf_energy_lut);
   ptrs.bluenoise_1D              = (uint16_t*) device_buffer_get_pointer(instance->bluenoise_1D);
   ptrs.bluenoise_2D              = (uint32_t*) device_buffer_get_pointer(instance->bluenoise_2D);
-  ptrs.mis_buffer                = (float*) device_buffer_get_pointer(instance->mis_buffer);
+  ptrs.mis_buffer                = (MISData*) device_buffer_get_pointer(instance->mis_buffer);
+  ptrs.packed_gbuffer_history    = (PackedGBufferData*) device_buffer_get_pointer(instance->packed_gbuffer_history);
 
   device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");
@@ -802,11 +810,13 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_variance);
   device_buffer_free(instance->light_records);
   device_buffer_free(instance->bounce_records);
+  device_buffer_free(instance->bounce_records_history);
   device_buffer_free(instance->light_sample_history);
   device_buffer_free(instance->raydir_buffer);
   device_buffer_free(instance->trace_result_buffer);
   device_buffer_free(instance->state_buffer);
   device_buffer_free(instance->mis_buffer);
+  device_buffer_free(instance->packed_gbuffer_history);
 
   gpuErrchk(cudaDeviceSynchronize());
 }

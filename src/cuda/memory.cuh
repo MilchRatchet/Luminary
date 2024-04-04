@@ -325,8 +325,17 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   return triangle;
 }
 
-__device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return (void*) (((float*) device.scene.triangles) + (device.scene.triangle_data.triangle_count * chunk + id) * 4 + offset);
+__device__ const void* interleaved_buffer_get_entry_address(
+  const void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
+  return (const void*) (((const float*) ptr) + (count * chunk + id) * 4 + offset);
+}
+
+__device__ const void* pixel_buffer_get_entry_address(const void* ptr, const uint32_t chunk, const uint32_t offset, const uint32_t pixel) {
+  return interleaved_buffer_get_entry_address(ptr, device.width * device.height, chunk, offset, pixel);
+}
+
+__device__ const void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t tri_id) {
+  return interleaved_buffer_get_entry_address(device.scene.triangles, device.scene.triangle_data.triangle_count, chunk, offset, tri_id);
 }
 
 __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
@@ -341,13 +350,11 @@ __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
 }
 
 __device__ uint32_t load_triangle_material_id(const uint32_t id) {
-  const uint32_t* triangles_material_ids = ((uint32_t*) device.scene.triangles) + device.scene.triangle_data.triangle_count * 6 * 4;
-  return __ldg(triangles_material_ids + id);
+  return __ldg((uint32_t*) triangle_get_entry_address(6, 0, id));
 }
 
 __device__ uint32_t load_triangle_light_id(const uint32_t id) {
-  const uint32_t* triangles_light_ids = ((uint32_t*) device.scene.triangles) + device.scene.triangle_data.triangle_count * (6 * 4 + 1);
-  return __ldg(triangles_light_ids + id);
+  return __ldg((uint32_t*) triangle_get_entry_address(6, 1, id));
 }
 
 __device__ TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {
@@ -406,6 +413,94 @@ __device__ Material load_material(const PackedMaterial* data, const int offset) 
   mat.emission = scale_color(mat.emission, emission_scale);
 
   return mat;
+}
+
+__device__ void store_gbuffer_data(const GBufferData data, const uint32_t pixel) {
+  PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
+
+  float4 bytes0x00;
+  bytes0x00.x = __uint_as_float(data.hit_id);
+  bytes0x00.y = ((uint32_t) (data.albedo.r * 0xFFFF + 0.5f)) | (((uint32_t) (data.albedo.g * 0xFFFF + 0.5f)) << 16);
+  bytes0x00.z = ((uint32_t) (data.albedo.b * 0xFFFF + 0.5f)) | (((uint32_t) (data.albedo.a * 0xFFFF + 0.5f)) << 16);
+  bytes0x00.w = ((uint32_t) (data.roughness * 0xFFFF + 0.5f)) | (((uint32_t) (data.metallic * 0xFFFF + 0.5f)) << 16);
+
+  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel), bytes0x00);
+
+  float4 bytes0x10;
+  bytes0x10.x = data.position.x;
+  bytes0x10.y = data.position.y;
+  bytes0x10.z = data.position.z;
+  bytes0x10.w = data.V.x;
+
+  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel), bytes0x10);
+
+  float4 bytes0x20;
+  bytes0x20.x = data.V.y;
+  bytes0x20.y = data.V.z;
+  bytes0x20.z = data.normal.x;
+  bytes0x20.w = data.normal.y;
+
+  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel), bytes0x20);
+
+  float2 bytes0x30;
+  bytes0x30.x = data.normal.z;
+  bytes0x30.y = __uint_as_float(data.flags);
+
+  __stcs((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel), bytes0x30);
+
+  float bytes0x38;
+  bytes0x38 = ((uint32_t) (data.ior_in * 0xFFFF + 0.5f)) | (((uint32_t) (data.ior_out * 0xFFFF + 0.5f)) << 16);
+
+  __stcs((float*) pixel_buffer_get_entry_address(ptr, 3, 2, pixel), bytes0x38);
+}
+
+__device__ GBufferData load_gbuffer_data(const uint32_t pixel) {
+  const PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
+
+  const float4 bytes0x00 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel));
+  const float4 bytes0x10 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel));
+  const float4 bytes0x20 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel));
+  const float2 bytes0x30 = __ldcs((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel));
+  const float bytes0x38  = __ldcs((float*) pixel_buffer_get_entry_address(ptr, 3, 2, pixel));
+
+  GBufferData data;
+  data.hit_id    = __float_as_uint(bytes0x00.x);
+  data.albedo.r  = (__float_as_uint(bytes0x00.y) & 0xFFFF) * (1.0f / 0xFFFF);
+  data.albedo.g  = (__float_as_uint(bytes0x00.y) >> 16) * (1.0f / 0xFFFF);
+  data.albedo.b  = (__float_as_uint(bytes0x00.z) & 0xFFFF) * (1.0f / 0xFFFF);
+  data.albedo.a  = (__float_as_uint(bytes0x00.z) >> 16) * (1.0f / 0xFFFF);
+  data.roughness = (__float_as_uint(bytes0x00.w) & 0xFFFF) * (1.0f / 0xFFFF);
+  data.metallic  = (__float_as_uint(bytes0x00.w) >> 16) * (1.0f / 0xFFFF);
+  data.position  = get_vector(bytes0x10.x, bytes0x10.y, bytes0x10.z);
+  data.V         = get_vector(bytes0x10.w, bytes0x20.x, bytes0x20.y);
+  data.normal    = get_vector(bytes0x20.z, bytes0x20.w, bytes0x30.x);
+  data.flags     = __float_as_uint(bytes0x30.y);
+  data.ior_in    = (__float_as_uint(bytes0x38) & 0xFFFF) * (1.0f / 0xFFFF);
+  data.ior_out   = (__float_as_uint(bytes0x38) >> 16) * (1.0f / 0xFFFF);
+
+  data.colored_dielectric = (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? device.scene.material.colored_transparency : 1;
+
+  data.emission = get_color(0.0f, 0.0f, 0.0f);
+
+  return data;
+}
+
+__device__ void store_mis_data(const MISData data, const int pixel) {
+  float2 bytes;
+  bytes.x = data.light_target_pdf_normalization;
+  bytes.y = data.bsdf_marginal;
+
+  __stcs((float2*) (device.ptrs.mis_buffer + pixel), bytes);
+}
+
+__device__ MISData load_mis_data(const int pixel) {
+  float2 bytes = __ldcs((float2*) (device.ptrs.mis_buffer + pixel));
+
+  MISData data;
+  data.light_target_pdf_normalization = bytes.x;
+  data.bsdf_marginal                  = bytes.y;
+
+  return data;
 }
 
 #endif /* CU_MEMORY_H */

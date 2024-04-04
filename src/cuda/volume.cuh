@@ -40,7 +40,7 @@ __device__ GBufferData volume_generate_g_buffer(const VolumeTask task, const int
   data.normal    = get_vector(0.0f, 0.0f, 0.0f);
   data.position  = task.position;
   data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = 1.0f;
+  data.roughness = device.scene.fog.droplet_diameter;
   data.metallic  = 0.0f;
   data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
 
@@ -171,28 +171,13 @@ LUMINARY_KERNEL void volume_process_tasks() {
 
     write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
 
-    const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, task.index);
-    const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, task.index);
-
-    const vec3 bounce_ray = (volume.type == VOLUME_TYPE_FOG)
-                              ? jendersie_eon_phase_sample(task.ray, device.scene.fog.droplet_diameter, random_dir, random_choice)
-                              : ocean_phase_sampling(task.ray, random_dir, random_choice);
-
-    RGBF bounce_record = record;
-
-    TraceTask bounce_task;
-    bounce_task.origin = task.position;
-    bounce_task.ray    = bounce_ray;
-    bounce_task.index  = task.index;
-
-    device.ptrs.mis_buffer[pixel] = 0.0f;
-    if (validate_trace_task(bounce_task, bounce_record)) {
-      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
-      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
-    }
-
     const GBufferData data = volume_generate_g_buffer(task, pixel, volume);
-    LightSample light      = restir_sample_reservoir(data, record, task.index);
+
+    BSDFSampleInfo bounce_info;
+    float bsdf_marginal;
+    const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info, bsdf_marginal);
+
+    LightSample light = restir_sample_reservoir(data, record, task.index);
 
     uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
 
@@ -208,12 +193,31 @@ LUMINARY_KERNEL void volume_process_tasks() {
       light_task.ray    = light_ray;
       light_task.index  = task.index;
 
-      store_RGBF(device.ptrs.light_records + pixel, light_record);
+      const float light_mis_weight = mis_weight_light_sampled(data, light_ray, bounce_info, light);
+      store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
       light_history_buffer_entry = light.id;
       store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
     }
 
     device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
+
+    RGBF bounce_record = record;
+
+    TraceTask bounce_task;
+    bounce_task.origin = task.position;
+    bounce_task.ray    = bounce_ray;
+    bounce_task.index  = task.index;
+
+    if (validate_trace_task(bounce_task, bounce_record)) {
+      MISData mis_data;
+      mis_data.light_target_pdf_normalization = light.target_pdf_normalization;
+      mis_data.bsdf_marginal                  = bsdf_marginal;
+
+      mis_store_data(data, record, mis_data, bounce_ray, pixel);
+
+      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
+      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+    }
   }
 
   device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;

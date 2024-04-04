@@ -230,3 +230,4 @@ This is a list of papers I have used for this project so far. Note that some tec
 - L. Belcour and E. Heitz, _Lessons Learned and Improvements when Building Screen-Space Samplers with Blue-Noise Error Distribution_, ACM SIGGRAPH 2021 Talks, pp. 1-2, 2021.
 - K. Eto, Y. Tokuyoshi, _Bounded VNDF Sampling for Smith–GGX Reflections_, ACM SIGGRAPH Asia 2023 Technical Communications, pp. 1-4, 2023.
 - D. Sforza, F. Pellacini, _Enforcing Energy Preservation in Microfacet Models_, Smart Tools and Applications in Graphics - Eurographics Italian Chapter Conference, 2022.
+- R. West, I. Georgiev, T. Hachisuka, _Marginal Multiple Importance Sampling_, SIGGRAPH Asia 2022 Conference Papers, 2022.

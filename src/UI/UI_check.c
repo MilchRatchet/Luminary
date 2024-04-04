@@ -6,8 +6,8 @@
 #include "utils.h"
 
 void handle_mouse_UIPanel_check(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
-  LUM_UNUSED(x)
-  LUM_UNUSED(y)
+  LUM_UNUSED(x);
+  LUM_UNUSED(y);
 
   panel->hover = 1;
 

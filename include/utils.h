@@ -30,7 +30,7 @@
   }
 
 // Flags variables as unused so that no warning is emitted
-#define LUM_UNUSED(x) (void) (x);
+#define LUM_UNUSED(x) ((void) (x))
 
 #ifndef PI
 #define PI 3.141592653589f
@@ -422,9 +422,11 @@ struct DevicePointers {
   RGBF* normal_buffer;
   RGBF* light_records;
   RGBF* bounce_records;
+  RGBF* bounce_records_history;
+  PackedGBufferData* packed_gbuffer_history;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
-  float* mis_buffer;
+  MISData* mis_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
   DeviceTexture* albedo_atlas;
@@ -536,6 +538,7 @@ struct RaytraceInstance {
   DeviceBuffer* normal_buffer;
   DeviceBuffer* light_records;
   DeviceBuffer* bounce_records;
+  DeviceBuffer* bounce_records_history;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;
@@ -548,6 +551,7 @@ struct RaytraceInstance {
   DeviceBuffer* bluenoise_1D;
   DeviceBuffer* bluenoise_2D;
   DeviceBuffer* mis_buffer;
+  DeviceBuffer* packed_gbuffer_history;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;

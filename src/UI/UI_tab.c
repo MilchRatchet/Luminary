@@ -9,7 +9,7 @@
 #include "utils.h"
 
 void handle_mouse_UIPanel_tab(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
-  LUM_UNUSED(y)
+  LUM_UNUSED(y);
 
   panel->hover = 1;
 

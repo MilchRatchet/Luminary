@@ -6,7 +6,7 @@
 #include "utils.h"
 
 void handle_mouse_UIPanel_button(UI* ui, UIPanel* panel, int mouse_state, int x, int y) {
-  LUM_UNUSED(y)
+  LUM_UNUSED(y);
 
   if (x >= UI_WIDTH - 15 - panel->title->w && x <= UI_WIDTH - 5) {
     panel->hover = 1;

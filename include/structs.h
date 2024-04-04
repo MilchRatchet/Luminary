@@ -6,6 +6,8 @@
 
 // This struct is stored as a struct of arrays, members are grouped into 16 bytes where possible. Padding is not required.
 #define INTERLEAVED_STORAGE
+// Round the size of an element in an interleaved buffer to the next multiple of 16 bytes
+#define INTERLEAVED_ALLOCATION_SIZE(X) ((X + 15u) & (~0xFu))
 
 /********************************************************
  * Vectors and matrices
@@ -284,8 +286,10 @@ struct LightSample {
   uint32_t presampled_id;
   uint32_t id;
   float weight;
+  float target_pdf_normalization;
 } typedef LightSample;
 
+// TODO: Add colored dielectric as a flag
 enum GBufferFlags {
   G_BUFFER_REQUIRES_SAMPLING    = 0b1,
   G_BUFFER_VOLUME_HIT           = 0b10,
@@ -306,6 +310,28 @@ struct GBufferData {
   float ior_out;
   uint32_t colored_dielectric;
 } typedef GBufferData;
+
+// For MIS, doesn't contain data that isn't used by light sampling.
+INTERLEAVED_STORAGE struct PackedGBufferData {
+  uint32_t hit_id;
+  uint16_t albedo_r;
+  uint16_t albedo_g;
+  uint16_t albedo_b;
+  uint16_t albedo_a;
+  uint16_t roughness;
+  uint16_t metallic;
+  vec3 position;
+  vec3 V;       // TODO: Compress
+  vec3 normal;  // TODO: Compress
+  uint32_t flags;
+  uint16_t ior_in;
+  uint16_t ior_out;
+} typedef PackedGBufferData;
+
+struct MISData {
+  float light_target_pdf_normalization;
+  float bsdf_marginal;
+} typedef MISData;
 
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs

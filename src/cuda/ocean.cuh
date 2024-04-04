@@ -122,9 +122,7 @@ LUMINARY_KERNEL void process_ocean_tasks() {
     new_task.ray    = bounce_ray;
     new_task.index  = task.index;
 
-    // MIS weight must be propagated if the ray just passes through.
-    if (get_length(sub_vector(task.ray, bounce_ray)) > eps)
-      device.ptrs.mis_buffer[pixel] = 1.0f;
+    mis_reset_data(pixel);
 
     store_RGBF(device.ptrs.bounce_records + pixel, record);
     store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);

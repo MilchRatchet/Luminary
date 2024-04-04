@@ -5,6 +5,7 @@
 
 #include "cloud_shadow.cuh"
 #include "math.cuh"
+#include "mis.cuh"
 #include "raytrace.h"
 #include "sky_utils.cuh"
 #include "stars.h"
@@ -888,8 +889,13 @@ LUMINARY_KERNEL void process_sky_tasks() {
       const vec3 sky_origin = world_to_sky_transform(task.origin);
 
       sky = sky_get_color(sky_origin, task.ray, FLT_MAX, true, device.scene.sky.steps, task.index);
-      if (device.iteration_type != TYPE_CAMERA && sky_ray_hits_sun(sky_origin, task.ray)) {
-        sky = scale_color(sky, device.ptrs.mis_buffer[pixel]);
+      if (device.iteration_type == TYPE_BOUNCE && sky_ray_hits_sun(sky_origin, task.ray)) {
+        GBufferData data;
+        data.hit_id = HIT_TYPE_SKY;
+        data.V      = scale_vector(task.ray, -1.0f);
+
+        const float mis_weight = mis_weight_bsdf_sampled(data, pixel);
+        sky                    = scale_color(sky, mis_weight);
       }
     }
 
