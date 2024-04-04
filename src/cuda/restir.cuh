@@ -370,6 +370,17 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
  */
 __device__ float restir_sample_marginal(
   const GBufferData data, const RGBF record, const GBufferData hit_data, const float target_pdf_normalization) {
+  const vec3 sky_pos    = world_to_sky_transform(data.position);
+  const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+  const int toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
+
+  // If only the sun is visible, we can just compute the PDF.
+  if (sun_visible && !toy_visible && !device.scene.material.lights_active) {
+    const float solid_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, sky_pos);
+
+    return (solid_angle > 0.0f) ? 1.0f / solid_angle : 0.0f;
+  }
+
   if (target_pdf_normalization == 0.0f)
     return 0.0f;
 
