@@ -703,9 +703,7 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
 }
 
 static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
-  const float value = fmaxf(fminf(f, 1.0f), 0.0f) + 1.0f;
-
-  return ((*((uint32_t*) &value)) & 0x007FFF80) >> 7;
+  return (uint16_t) (f * 0xFFFF + 0.5f);
 }
 
 PackedMaterial* wavefront_generate_texture_assignments(WavefrontContent* content) {
