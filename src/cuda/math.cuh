@@ -565,7 +565,7 @@ __device__ __host__ vec3 angles_to_direction(const float altitude, const float a
 
 // PBRT v3 Chapter "Specular Reflection and Transmission", Refract() function
 __device__ vec3 refract_vector(const vec3 ray, const vec3 normal, const float index_ratio) {
-  const float dot = -dot_product(normal, ray);
+  const float dot = fabsf(dot_product(normal, ray));
 
   const float b = 1.0f - index_ratio * index_ratio * (1.0f - dot * dot);
 

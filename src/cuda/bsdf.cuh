@@ -10,11 +10,13 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   BSDFRayContext context;
 
   context.NdotL = dot_product(data.normal, L);
-  context.NdotV = dot_product(data.normal, data.V);
+  context.NdotV = fabsf(dot_product(data.normal, data.V));
 
   // Refraction rays can leave the surface and reflections could enter the surface, we hack here and simply swap their meaning around based
   // on if they enter or leave, otherwise it is not clear which of the two a ray should be.
   context.is_refraction = (context.NdotL < 0.0f);
+
+  context.NdotL = fabsf(context.NdotL);
 
   const float ior_in  = fminf(3.0f, fmaxf(1.0f, data.ior_in));
   const float ior_out = fminf(3.0f, fmaxf(1.0f, data.ior_out));
@@ -23,17 +25,23 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
 
   vec3 refraction_vector;
   if (context.is_refraction) {
-    context.H         = bsdf_refraction_normal_from_pair(L, data.V, ior_in, ior_out);
-    refraction_vector = L;
+    context.H = bsdf_refraction_normal_from_pair(L, data.V, ior_out, ior_in);
   }
   else {
-    context.H         = normalize_vector(add_vector(data.V, L));
-    refraction_vector = refract_vector(scale_vector(data.V, -1.0f), context.H, context.refraction_index);
+    context.H = normalize_vector(add_vector(data.V, L));
   }
 
-  context.NdotH = dot_product(data.normal, context.H);
-  context.HdotV = dot_product(context.H, data.V);
-  context.HdotL = dot_product(context.H, L);
+  refraction_vector = refract_vector(scale_vector(data.V, -1.0f), context.H, context.refraction_index);
+
+  // Invalidate refraction rays that are not possible
+  if (context.is_refraction && dot_product(L, refraction_vector) < 1.0f - 64.0f * eps) {
+    context.NdotL = -1.0f;
+  }
+  }
+
+  context.NdotH = fabsf(dot_product(data.normal, context.H));
+  context.HdotV = fabsf(dot_product(context.H, data.V));
+  context.HdotL = fabsf(dot_product(context.H, L));
 
   context.f0_conductor      = opaque_color(data.albedo);
   context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), context.HdotV);
@@ -69,8 +77,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
 
   context.is_refraction = is_refraction;
 
-  if (is_refraction)
-    context.NdotL *= -1.0f;
+  context.NdotL = fabsf(context.NdotL);
 
   const float ior_in  = fminf(3.0f, fmaxf(1.0f, data.ior_in));
   const float ior_out = fminf(3.0f, fmaxf(1.0f, data.ior_out));
@@ -281,7 +288,7 @@ __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, co
       marginal = ((weight + info.antagonist_weight) > 0.0f) ? weight / (weight + info.antagonist_weight) : 0.0f;
     } break;
     case BSDF_DIELECTRIC: {
-      H = (info.is_transparent_pass) ? bsdf_refraction_normal_from_pair(ray_local, data_local.V, data_local.ior_in, data_local.ior_out)
+      H = (info.is_transparent_pass) ? bsdf_refraction_normal_from_pair(ray_local, data_local.V, data_local.ior_out, data_local.ior_in)
                                      : normalize_vector(add_vector(data_local.V, ray_local));
 
       const BSDFRayContext ctx = bsdf_sample_context(data_local, H, ray_local, info.is_transparent_pass);

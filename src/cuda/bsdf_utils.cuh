@@ -114,7 +114,7 @@ __device__ float bsdf_refraction_index_ambient(const vec3 position) {
 
 // Get normal vector based on incoming ray and refracted ray: https://physics.stackexchange.com/a/762982
 __device__ vec3 bsdf_refraction_normal_from_pair(const vec3 L, const vec3 V, const float ior_L, const float ior_V) {
-  return normalize_vector(add_vector(scale_vector(V, ior_V), scale_vector(L, ior_L)));
+  return normalize_vector(add_vector(scale_vector(V, ior_V), scale_vector(L, -ior_L)));
 }
 
 ///////////////////////////////////////////////////
