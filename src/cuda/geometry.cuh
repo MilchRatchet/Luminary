@@ -100,7 +100,7 @@ __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const
     albedo.a              = albedo_f.w;
   }
 
-  if (albedo.a < device.scene.material.alpha_cutoff)
+  if (albedo.a <= device.scene.material.alpha_cutoff)
     albedo.a = 0.0f;
 
   RGBF emission = (device.scene.material.lights_active) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);

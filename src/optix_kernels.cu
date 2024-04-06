@@ -138,7 +138,7 @@ __device__ OptixAlphaResult optix_alpha_test(RGBAF& albedo) {
     albedo.b = tex_value.z;
     albedo.a = tex_value.w;
 
-    if (albedo.a < device.scene.material.alpha_cutoff) {
+    if (albedo.a <= device.scene.material.alpha_cutoff) {
       return OPTIX_ALPHA_RESULT_TRANSPARENT;
     }
 
