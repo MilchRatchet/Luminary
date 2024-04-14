@@ -316,7 +316,7 @@ __device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
   res.z = 0.0f;
   res.w = 1.0f + v.z;
 
-  const float norm = 1.0f / sqrtf(res.x * res.x + res.y * res.y + res.w * res.w);
+  const float norm = rnorm3df(res.x, res.y, res.w);
 
   res.x *= norm;
   res.y *= norm;
