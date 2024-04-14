@@ -325,29 +325,20 @@ __device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
   return res;
 }
 
-// TODO: Replace math with functions
-__device__ __host__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
+__device__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
   vec3 result;
 
-  vec3 u;
-  u.x = q.x;
-  u.y = q.y;
-  u.z = q.z;
-
+  const vec3 u  = get_vector(q.x, q.y, q.z);
   const float s = q.w;
 
-  const float dot_uv = u.x * v.x + u.y * v.y + u.z * v.z;
-  const float dot_uu = u.x * u.x + u.y * u.y + u.z * u.z;
+  const float dot_uv = dot_product(u, v);
+  const float dot_uu = dot_product(u, u);
 
-  vec3 cross;
+  const vec3 cross = cross_product(u, v);
 
-  cross.x = u.y * v.z - u.z * v.y;
-  cross.y = u.z * v.x - u.x * v.z;
-  cross.z = u.x * v.y - u.y * v.x;
-
-  result.x = 2.0f * dot_uv * u.x + ((s * s) - dot_uu) * v.x + 2.0f * s * cross.x;
-  result.y = 2.0f * dot_uv * u.y + ((s * s) - dot_uu) * v.y + 2.0f * s * cross.y;
-  result.z = 2.0f * dot_uv * u.z + ((s * s) - dot_uu) * v.z + 2.0f * s * cross.z;
+  result = scale_vector(u, 2.0f * dot_uv);
+  result = add_vector(result, scale_vector(v, s * s - dot_uu));
+  result = add_vector(result, scale_vector(cross, 2.0f * s));
 
   return result;
 }

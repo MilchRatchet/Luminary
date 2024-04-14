@@ -37,7 +37,6 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   if (context.is_refraction && dot_product(L, refraction_vector) < 1.0f - 64.0f * eps) {
     context.NdotL = -1.0f;
   }
-  }
 
   context.NdotH = fabsf(dot_product(data.normal, context.H));
   context.HdotV = fabsf(dot_product(context.H, data.V));
