@@ -147,58 +147,36 @@ LUMINARY_KERNEL void preprocess_trace_tasks() {
       light_id = device.ptrs.light_sample_history[pixel];
     }
 
-    if (device.shading_mode != SHADING_HEAT) {
-      if (is_first_ray() || (device.iteration_type == TYPE_LIGHT && light_id <= LIGHT_ID_TRIANGLE_ID_LIMIT)) {
-        uint32_t t_id;
-        TraversalTriangle tt;
-        uint32_t material_id;
-        if (device.iteration_type == TYPE_LIGHT) {
-          const TriangleLight tri_light = load_triangle_light(device.scene.triangle_lights, light_id);
-          t_id                          = tri_light.triangle_id;
-          material_id                   = tri_light.material_id;
-          tt.vertex                     = tri_light.vertex;
-          tt.edge1                      = tri_light.edge1;
-          tt.edge2                      = tri_light.edge2;
-          tt.albedo_tex                 = device.scene.materials[material_id].albedo_map;
-          tt.id                         = t_id;
-        }
-        else {
-          t_id = device.ptrs.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
-          if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-            material_id = load_triangle_material_id(t_id);
+    if (device.shading_mode != SHADING_HEAT && device.primary_ray) {
+      uint32_t t_id;
+      TraversalTriangle tt;
+      uint32_t material_id;
 
-            const float4 data0 = __ldg((float4*) triangle_get_entry_address(0, 0, t_id));
-            const float4 data1 = __ldg((float4*) triangle_get_entry_address(1, 0, t_id));
-            const float data2  = __ldg((float*) triangle_get_entry_address(2, 0, t_id));
+      t_id = device.ptrs.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
+      if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
+        material_id = load_triangle_material_id(t_id);
 
-            tt.vertex     = get_vector(data0.x, data0.y, data0.z);
-            tt.edge1      = get_vector(data0.w, data1.x, data1.y);
-            tt.edge2      = get_vector(data1.z, data1.w, data2);
-            tt.id         = t_id;
-            tt.albedo_tex = device.scene.materials[material_id].albedo_map;
-          }
-        }
+        const float4 data0 = __ldg((float4*) triangle_get_entry_address(0, 0, t_id));
+        const float4 data1 = __ldg((float4*) triangle_get_entry_address(1, 0, t_id));
+        const float data2  = __ldg((float*) triangle_get_entry_address(2, 0, t_id));
 
-        if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-          float2 coords;
-          const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
+        tt.vertex     = get_vector(data0.x, data0.y, data0.z);
+        tt.edge1      = get_vector(data0.w, data1.x, data1.y);
+        tt.edge2      = get_vector(data1.z, data1.w, data2);
+        tt.id         = t_id;
+        tt.albedo_tex = device.scene.materials[material_id].albedo_map;
+      }
 
-          if (dist < depth) {
-            RGBAF albedo;
-            const BVHAlphaResult alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords, albedo);
+      if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
+        float2 coords;
+        const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
 
-            if (alpha_result != BVH_ALPHA_RESULT_TRANSPARENT) {
-              depth  = dist;
-              hit_id = t_id;
-            }
-            else if (device.iteration_type == TYPE_LIGHT) {
-              depth  = -1.0f;
-              hit_id = HIT_TYPE_REJECT;
-            }
-          }
-          else if (device.iteration_type == TYPE_LIGHT && dist == FLT_MAX) {
-            depth  = -1.0f;
-            hit_id = HIT_TYPE_REJECT;
+        if (dist < depth) {
+          const BVHAlphaResult alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
+
+          if (alpha_result != BVH_ALPHA_RESULT_TRANSPARENT) {
+            depth  = dist;
+            hit_id = t_id;
           }
         }
       }

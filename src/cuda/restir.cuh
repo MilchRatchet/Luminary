@@ -315,6 +315,7 @@ __device__ LightSample restir_sample_reservoir(const GBufferData data, const RGB
   const float reservoir_sampling_pdf = (1.0f / device.scene.triangle_lights_count);
 
   // Don't allow triangles to sample themselves.
+  // TODO: This probably adds biasing.
   uint32_t blocked_light_id = LIGHT_ID_TRIANGLE_ID_LIMIT + 1;
   if (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) {
     blocked_light_id = load_triangle_light_id(data.hit_id);

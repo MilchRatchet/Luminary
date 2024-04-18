@@ -231,7 +231,7 @@ __device__ void store_RGBF(void* ptr, const RGBF a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if ((!device.denoiser && !device.aov_mode) || device.iteration_type == TYPE_LIGHT)
+  if ((!device.denoiser && !device.aov_mode))
     return;
 
   if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
@@ -247,7 +247,7 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
 }
 
 __device__ void write_normal_buffer(vec3 normal, const int pixel) {
-  if ((!device.denoiser && !device.aov_mode) || device.iteration_type != TYPE_CAMERA)
+  if ((!device.denoiser && !device.aov_mode) || !device.primary_ray)
     return;
 
   if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION)

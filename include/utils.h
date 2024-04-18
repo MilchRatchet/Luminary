@@ -44,8 +44,6 @@
 
 #define RESTIR_CANDIDATE_POOL_MAX (1 << 20)
 
-enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
-
 enum LightID : uint32_t {
   LIGHT_ID_SUN               = 0xffffffffu,
   LIGHT_ID_TOY               = 0xfffffffeu,
@@ -451,7 +449,8 @@ struct DeviceConstantMemory {
   ReSTIRSettings restir;
   int max_ray_depth;
   int pixels_per_thread;
-  int iteration_type;
+  int primary_ray;
+  int num_light_rays;
   int depth;
   TraceTask* trace_tasks;
   uint16_t* trace_count;
@@ -580,6 +579,7 @@ struct RaytraceInstance {
   TextureAtlas tex_atlas;
   OptixDeviceContext optix_ctx;
   OptixKernel optix_kernel;
+  OptixKernel optix_kernel_geometry;
   OptixBVH optix_bvh;
   BVHType bvh_type;
   int luminary_bvh_initialized;

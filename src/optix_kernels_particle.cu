@@ -26,19 +26,6 @@ extern "C" __global__ void __raygen__optix() {
 
   const uint16_t trace_task_count = device.trace_count[idx.x + idx.y * dimx.x];
 
-  unsigned int ray_flags;
-
-  switch (device.iteration_type) {
-    default:
-    case TYPE_BOUNCE:
-    case TYPE_CAMERA:
-      ray_flags = OPTIX_RAY_FLAG_NONE;
-      break;
-    case TYPE_LIGHT:
-      ray_flags = OPTIX_RAY_FLAG_NONE;
-      break;
-  }
-
   const float time         = quasirandom_sequence_1D_global(QUASI_RANDOM_TARGET_CAMERA_TIME);
   const vec3 motion        = angles_to_direction(device.scene.particles.direction_altitude, device.scene.particles.direction_azimuth);
   const vec3 motion_offset = scale_vector(motion, time * device.scene.particles.speed);
@@ -77,7 +64,7 @@ extern "C" __global__ void __raygen__optix() {
       p.y = p.y - floorf(p.y);
       p.z = p.z - floorf(p.z);
 
-      optixTrace(device.optix_bvh_particles, p, ray, 0.0f, tmax, 0.0f, vis_mask, ray_flags, 0, 0, 0, depth, hit_id, cost);
+      optixTrace(device.optix_bvh_particles, p, ray, 0.0f, tmax, 0.0f, vis_mask, OPTIX_RAY_FLAG_NONE, 0, 0, 0, depth, hit_id, cost);
 
       const float intersection_dist = __uint_as_float(depth);
 

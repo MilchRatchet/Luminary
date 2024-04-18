@@ -851,7 +851,7 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
 __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const float limit, RGBF& record, ushort2 pixel) {
   Spectrum transmittance = spectrum_set1(1.0f);
 
-  const float base_range = (is_first_ray()) ? 40.0f : 80.0f;
+  const float base_range = (device.primary_ray) ? 40.0f : 80.0f;
 
   const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.scene.sky.steps / 6)
                     + quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP, pixel) - 0.5f;
@@ -881,9 +881,7 @@ LUMINARY_KERNEL void process_sky_tasks() {
 
     RGBF sky;
     if (device.scene.sky.hdri_active) {
-      const float mip_bias = (device.iteration_type == TYPE_CAMERA) ? 0.0f : 1.0f;
-
-      sky = sky_hdri_sample(task.ray, mip_bias);
+      sky = sky_hdri_sample(task.ray, 0.0f);
     }
     else {
       const vec3 sky_origin = world_to_sky_transform(task.origin);

@@ -22,25 +22,18 @@ enum BVHAlphaResult { BVH_ALPHA_RESULT_OPAQUE = 0, BVH_ALPHA_RESULT_SEMI = 1, BV
  * @param coords Hit coordinates in triangle.
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_t t_id, float2 coords, RGBAF& albedo) {
-  albedo = get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
-
+__device__ BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_t t_id, float2 coords) {
   if (t.albedo_tex == TEXTURE_NONE)
     return BVH_ALPHA_RESULT_OPAQUE;
 
   const UV tex_coords    = load_triangle_tex_coords(t_id, coords);
   const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[t.albedo_tex].tex, tex_coords.u, 1.0f - tex_coords.v);
 
-  albedo.r = tex_value.x;
-  albedo.g = tex_value.y;
-  albedo.b = tex_value.z;
-  albedo.a = tex_value.w;
-
-  if (albedo.a <= device.scene.material.alpha_cutoff) {
+  if (tex_value.w <= device.scene.material.alpha_cutoff) {
     return BVH_ALPHA_RESULT_TRANSPARENT;
   }
 
-  if (albedo.a < 1.0f) {
+  if (tex_value.w < 1.0f) {
     return BVH_ALPHA_RESULT_SEMI;
   }
 
@@ -87,9 +80,6 @@ LUMINARY_KERNEL void process_trace_tasks() {
   uint2 node_task     = make_uint2(0, 0);
   uint2 triangle_task = make_uint2(0, 0);
 
-  RGBF accumulated_alpha;
-  unsigned int pixel;
-
   unsigned int stack_ptr = 0;
   unsigned int octant;
 
@@ -98,9 +88,7 @@ LUMINARY_KERNEL void process_trace_tasks() {
       if (offset >= trace_task_count)
         break;
 
-      const TraceTask task = (device.iteration_type == TYPE_LIGHT)
-                               ? load_trace_task(device.trace_tasks + get_task_address(offset))
-                               : load_trace_task_essentials(device.trace_tasks + get_task_address(offset));
+      const TraceTask task = load_trace_task_essentials(device.trace_tasks + get_task_address(offset));
       const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + get_task_address(offset)));
 
       node_task     = make_uint2(0, 0x80000000);
@@ -119,11 +107,6 @@ LUMINARY_KERNEL void process_trace_tasks() {
       octant    = ((task.ray.x < 0.0f) ? 0b100 : 0) | ((task.ray.y < 0.0f) ? 0b10 : 0) | ((task.ray.z < 0.0f) ? 0b1 : 0);
       octant    = 0b111 - octant;
       stack_ptr = 0;
-
-      if (device.iteration_type == TYPE_LIGHT) {
-        accumulated_alpha = get_color(1.0f, 1.0f, 1.0f);
-        pixel             = task.index.x + device.width * task.index.y;
-      }
 
       cost = 0.0f;
     }
@@ -382,25 +365,9 @@ LUMINARY_KERNEL void process_trace_tasks() {
         if (d < depth) {
           cost += 1.0f;
 
-          RGBAF albedo;
-          const BVHAlphaResult alpha_result = bvh_triangle_intersection_alpha_test(triangle, triangle.id, coords, albedo);
+          const BVHAlphaResult alpha_result = bvh_triangle_intersection_alpha_test(triangle, triangle.id, coords);
 
-          if (device.iteration_type == TYPE_LIGHT) {
-            if (alpha_result == BVH_ALPHA_RESULT_OPAQUE && triangle.id != hit_id) {
-              depth           = -1.0f;
-              hit_id          = HIT_TYPE_REJECT;
-              triangle_task.y = 0;
-              node_task.y     = 0;
-              stack_ptr       = 0;
-              break;
-            }
-
-            RGBF alpha = (device.scene.material.colored_transparency) ? scale_color(opaque_color(albedo), 1.0f - albedo.a)
-                                                                      : get_color(1.0f - albedo.a, 1.0f - albedo.a, 1.0f - albedo.a);
-
-            accumulated_alpha = mul_color(accumulated_alpha, alpha);
-          }
-          else if (alpha_result != BVH_ALPHA_RESULT_TRANSPARENT) {
+          if (alpha_result != BVH_ALPHA_RESULT_TRANSPARENT) {
             depth  = d;
             hit_id = triangle.id;
           }
@@ -417,33 +384,15 @@ LUMINARY_KERNEL void process_trace_tasks() {
           }
         }
         else {
-          if (device.iteration_type == TYPE_LIGHT) {
-            if (hit_id == HIT_TYPE_REJECT) {
-              float2 result;
-              result.x = -1.0f;
-              result.y = __uint_as_float(HIT_TYPE_REJECT);
-
-              __stcs((float2*) (device.ptrs.trace_results + get_task_address(offset++)), result);
-            }
-            else {
-              RGBF record = load_RGBF(device.ptrs.light_records + pixel);
-              record      = mul_color(record, accumulated_alpha);
-              store_RGBF(device.ptrs.light_records + pixel, record);
-
-              offset++;
-            }
+          if (device.shading_mode == SHADING_HEAT && hit_id > HIT_TYPE_TRIANGLE_ID_LIMIT) {
+            hit_id = 0;
           }
-          else {
-            if (device.shading_mode == SHADING_HEAT && hit_id > HIT_TYPE_TRIANGLE_ID_LIMIT) {
-              hit_id = 0;
-            }
 
-            float2 result;
-            result.x = (device.shading_mode == SHADING_HEAT) ? cost : depth;
-            result.y = __uint_as_float(hit_id);
+          float2 result;
+          result.x = (device.shading_mode == SHADING_HEAT) ? cost : depth;
+          result.y = __uint_as_float(hit_id);
 
-            __stcs((float2*) (device.ptrs.trace_results + get_task_address(offset++)), result);
-          }
+          __stcs((float2*) (device.ptrs.trace_results + get_task_address(offset++)), result);
 
           break;
         }

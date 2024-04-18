@@ -81,16 +81,6 @@ __device__ static int get_task_address(const int number) {
 __device__ static int get_task_address2(const unsigned int x, const unsigned int y, const int number) {
   return get_task_address_of_thread(x, y, number);
 }
-
-__device__ static int is_first_ray() {
-  return (device.iteration_type == TYPE_CAMERA);
-}
-
-__device__ static bool proper_light_sample(const uint32_t target_light, const uint32_t source_light) {
-  return (
-    (device.iteration_type == TYPE_CAMERA) || (device.iteration_type == TYPE_BOUNCE)
-    || ((device.iteration_type == TYPE_LIGHT) && (target_light == source_light)) || target_light == LIGHT_ID_ANY);
-}
 #endif
 
 #endif /* CU_UTILS_H */

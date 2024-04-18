@@ -116,8 +116,11 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
 
     // Without loss of generality, we can simply assume that the end of the volume is at our closest intersection
     // as long as we are below the surface.
-    const float surface_intersect =
-      (above_surface || device.iteration_type == TYPE_LIGHT) ? ocean_intersection_distance(origin, ray, limit) : limit;
+#ifdef SHADING_KERNEL
+    const float surface_intersect = ocean_intersection_distance(origin, ray, limit);
+#else
+    const float surface_intersect = (above_surface) ? ocean_intersection_distance(origin, ray, limit) : limit;
+#endif
 
     if (above_surface) {
       start_y = surface_intersect;
