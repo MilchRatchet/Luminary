@@ -1,6 +1,8 @@
 // More ideas:
 // - Add a ray flag for if MIS is disabled (would be set for bounce rays coming from ocean surface): STATE_FLAG_MIS_DISABLED
 
+// TODO: Add separate definitions for THREAD_ID based utilities for Optix code!
+
 #define UTILS_NO_DEVICE_TABLE
 
 // Functions work differently when executed from this kernel
@@ -65,16 +67,19 @@ extern "C" __global__ void __raygen__optix() {
   //  Sample BRDF ray
   //  Queue bounce ray and store normalization constant
 
-  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
-  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
+  const uint3 idx  = optixGetLaunchIndex();
+  const uint3 dimx = optixGetLaunchDimensions();
+
+  const uint32_t thread_id = idx.x + idx.y * dimx.x;
+
+  const int task_count  = device.ptrs.task_counts[thread_id * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset = device.ptrs.task_offsets[thread_id * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  int trace_count       = device.ptrs.trace_counts[thread_id];
 
   for (int i = 0; i < task_count; i++) {
-    // TODO: Implement generalized shading task
-    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(task_offset + i));
+    GeometryTask task = load_geometry_task(device.ptrs.trace_tasks + get_task_address2(idx.x, idx.y, task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
-    // TODO: Generate G Buffer based on hit_id
     GBufferData data = geometry_generate_g_buffer(task, pixel);
 
     write_normal_buffer(data.normal, pixel);
@@ -82,12 +87,12 @@ extern "C" __global__ void __raygen__optix() {
     if (!material_is_mirror(data.roughness, data.metallic))
       write_albedo_buffer(opaque_color(data.albedo), pixel);
 
-    const RGBF record = load_RGBF(device.ptrs.light_records + pixel);
+    const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     // TODO: If we are eligible for emission collection, initialize this with this hits attenuated emission
-    RGBF accumulated_light = (device.primary_ray) ? mul_color(data.emission, record) : get_color(0.0f, 0.0f, 0.0f);
+    RGBF accumulated_light = (IS_PRIMARY_RAY) ? mul_color(data.emission, record) : get_color(0.0f, 0.0f, 0.0f);
 
-    for (int j = 0; j < device.num_light_rays; j++) {
+    for (int j = 0; j < device.restir.num_light_rays; j++) {
       const uint32_t light_id   = ris_sample_light(data, task.index);
       const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
       float pdf, dist;
@@ -119,11 +124,11 @@ extern "C" __global__ void __raygen__optix() {
 
       RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
 
-      accumulated_light = add_color(accumulated_light, mul_color(light_color, visibility));
+      accumulated_light =
+        add_color(accumulated_light, scale_color(mul_color(light_color, visibility), 1.0f / device.restir.num_light_rays));
     }
 
     accumulated_light = mul_color(accumulated_light, record);
-    accumulated_light = scale_color(accumulated_light, 1.0f / device.num_light_rays);
 
     write_beauty_buffer(accumulated_light, pixel);
 
@@ -147,12 +152,12 @@ extern "C" __global__ void __raygen__optix() {
     bounce_task.index  = task.index;
 
     if (validate_trace_task(bounce_task, bounce_record)) {
-      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
-      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
+      store_RGBF(device.ptrs.records + pixel, bounce_record);
+      store_trace_task(device.ptrs.trace_tasks + get_task_address2(idx.x, idx.y, trace_count++), bounce_task);
     }
   }
 
-  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
+  device.ptrs.trace_counts[thread_id] = trace_count;
 }
 
 /*
@@ -212,4 +217,9 @@ extern "C" __global__ void __anyhit__optix() {
   optixSetPayload_2(alpha_data1);
 
   optixIgnoreIntersection();
+}
+
+extern "C" __global__ void __closesthit__optix() {
+  // Dummy closest hit, this will never get executed anyway due to the anyhit.
+  // I could maybe get rid of this by adding more logic during the optix kernel compilation.
 }

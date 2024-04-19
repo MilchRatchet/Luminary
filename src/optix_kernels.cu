@@ -21,11 +21,11 @@ extern "C" __global__ void __raygen__optix() {
   const uint3 idx  = optixGetLaunchIndex();
   const uint3 dimx = optixGetLaunchDimensions();
 
-  const uint16_t trace_task_count = device.trace_count[idx.x + idx.y * dimx.x];
+  const uint16_t trace_task_count = device.ptrs.trace_counts[idx.x + idx.y * dimx.x];
 
   for (int i = 0; i < trace_task_count; i++) {
     const int offset     = get_task_address2(idx.x, idx.y, i);
-    const TraceTask task = load_trace_task(device.trace_tasks + offset);
+    const TraceTask task = load_trace_task(device.ptrs.trace_tasks + offset);
     const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
     const float3 origin = make_float3(task.origin.x, task.origin.y, task.origin.z);
@@ -83,7 +83,7 @@ __device__ OptixAlphaResult optix_alpha_test() {
 }
 
 extern "C" __global__ void __anyhit__optix() {
-  if (device.primary_ray) {
+  if (IS_PRIMARY_RAY) {
     optixSetPayload_2(optixGetPayload_2() + 1);
   }
 

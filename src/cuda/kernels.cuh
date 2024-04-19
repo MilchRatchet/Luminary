@@ -32,10 +32,9 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
     task = camera_get_ray(task, pixel);
 
-    device.ptrs.light_records[pixel]  = get_color(1.0f, 1.0f, 1.0f);
-    device.ptrs.bounce_records[pixel] = get_color(1.0f, 1.0f, 1.0f);
-    device.ptrs.frame_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
-    device.ptrs.state_buffer[pixel]   = 0;
+    device.ptrs.records[pixel]      = get_color(1.0f, 1.0f, 1.0f);
+    device.ptrs.frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
+    device.ptrs.state_buffer[pixel] = 0;
 
     mis_reset_data(pixel);
 
@@ -52,11 +51,10 @@ LUMINARY_KERNEL void generate_trace_tasks() {
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin);
     ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
 
-    store_trace_task(device.ptrs.bounce_trace + get_task_address(offset++), task);
+    store_trace_task(device.ptrs.trace_tasks + get_task_address(offset++), task);
   }
 
-  device.ptrs.light_trace_count[THREAD_ID]  = 0;
-  device.ptrs.bounce_trace_count[THREAD_ID] = offset;
+  device.ptrs.trace_counts[THREAD_ID] = offset;
 }
 
 LUMINARY_KERNEL void balance_trace_tasks() {
@@ -69,7 +67,7 @@ LUMINARY_KERNEL void balance_trace_tasks() {
   uint32_t sum = 0;
 
   for (int i = 0; i < 32; i += 4) {
-    ushort4 c                  = __ldcs((ushort4*) (device.trace_count + 32 * warp + i));
+    ushort4 c                  = __ldcs((ushort4*) (device.ptrs.trace_counts + 32 * warp + i));
     counts[threadIdx.x][i + 0] = c.x;
     counts[threadIdx.x][i + 1] = c.y;
     counts[threadIdx.x][i + 2] = c.z;
@@ -106,8 +104,9 @@ LUMINARY_KERNEL void balance_trace_tasks() {
       const int block_id       = warp >> 2;
 
       for (int j = 0; j < swaps; j++) {
-        TraceTask* source_ptr = device.trace_tasks + get_task_address_of_thread(thread_id_base + source_index, block_id, source_count - 1);
-        TraceTask* sink_ptr   = device.trace_tasks + get_task_address_of_thread(thread_id_base + i, block_id, count);
+        TraceTask* source_ptr =
+          device.ptrs.trace_tasks + get_task_address_of_thread(thread_id_base + source_index, block_id, source_count - 1);
+        TraceTask* sink_ptr = device.ptrs.trace_tasks + get_task_address_of_thread(thread_id_base + i, block_id, count);
 
         __stwb((float4*) sink_ptr, __ldca((float4*) source_ptr));
         __stwb((float4*) (sink_ptr) + 1, __ldca((float4*) (source_ptr) + 1));
@@ -125,29 +124,23 @@ LUMINARY_KERNEL void balance_trace_tasks() {
 
   for (int i = 0; i < 32; i += 4) {
     ushort4 vals = make_ushort4(counts[threadIdx.x][i], counts[threadIdx.x][i + 1], counts[threadIdx.x][i + 2], counts[threadIdx.x][i + 3]);
-    __stcs((ushort4*) (device.trace_count + 32 * warp + i), vals);
+    __stcs((ushort4*) (device.ptrs.trace_counts + 32 * warp + i), vals);
   }
 }
 
 LUMINARY_KERNEL void preprocess_trace_tasks() {
-  const int task_count = device.trace_count[THREAD_ID];
+  const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset = get_task_address(i);
-    TraceTask task   = load_trace_task(device.trace_tasks + offset);
+    TraceTask task   = load_trace_task(device.ptrs.trace_tasks + offset);
 
     const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
 
     float depth     = device.scene.camera.far_clip_distance;
     uint32_t hit_id = HIT_TYPE_SKY;
 
-    uint32_t light_id;
-
-    if (device.iteration_type == TYPE_LIGHT) {
-      light_id = device.ptrs.light_sample_history[pixel];
-    }
-
-    if (device.shading_mode != SHADING_HEAT && device.primary_ray) {
+    if (device.shading_mode != SHADING_HEAT && IS_PRIMARY_RAY) {
       uint32_t t_id;
       TraversalTriangle tt;
       uint32_t material_id;
@@ -183,54 +176,53 @@ LUMINARY_KERNEL void preprocess_trace_tasks() {
     }
 
     if (device.scene.toy.active) {
-      if (device.iteration_type == TYPE_LIGHT) {
-        const float toy_dist = get_toy_distance(task.origin, task.ray);
+      // if (device.iteration_type == TYPE_LIGHT) {
+      //   const float toy_dist = get_toy_distance(task.origin, task.ray);
+      //
+      //  if (toy_dist < depth) {
+      //    if (light_id == LIGHT_ID_TOY) {
+      //      if (toy_dist < depth) {
+      //        depth  = toy_dist;
+      //        hit_id = HIT_TYPE_TOY;
+      //      }
+      //    }
+      //    else {
+      //      // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
+      //      RGBF record = load_RGBF(device.ptrs.records + pixel);
+      //
+      //      RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
+      //
+      //      record = mul_color(record, toy_transparency);
+      //
+      //      vec3 hit_origin = add_vector(task.origin, scale_vector(task.ray, toy_dist));
+      //      hit_origin      = add_vector(hit_origin, scale_vector(task.ray, get_length(hit_origin) * eps * 16.0f));
+      //
+      //      const float toy_dist2 = get_toy_distance(hit_origin, task.ray);
+      //
+      //      if (toy_dist2 + toy_dist < depth) {
+      //        record = mul_color(record, toy_transparency);
+      //      }
+      //
+      //      if (luminance(record) == 0.0f) {
+      //        // If the toy causes full shadows, terminate the light task.
+      //        depth  = -1.0f;
+      //        hit_id = HIT_TYPE_REJECT;
+      //      }
+      //
+      //      store_RGBF(device.ptrs.records + pixel, record);
+      //    }
+      //  }
+      //}
 
-        if (toy_dist < depth) {
-          if (light_id == LIGHT_ID_TOY) {
-            if (toy_dist < depth) {
-              depth  = toy_dist;
-              hit_id = HIT_TYPE_TOY;
-            }
-          }
-          else {
-            // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
-            RGBF record = load_RGBF(device.ptrs.light_records + pixel);
+      const float toy_dist = get_toy_distance(task.origin, task.ray);
 
-            RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
-
-            record = mul_color(record, toy_transparency);
-
-            vec3 hit_origin = add_vector(task.origin, scale_vector(task.ray, toy_dist));
-            hit_origin      = add_vector(hit_origin, scale_vector(task.ray, get_length(hit_origin) * eps * 16.0f));
-
-            const float toy_dist2 = get_toy_distance(hit_origin, task.ray);
-
-            if (toy_dist2 + toy_dist < depth) {
-              record = mul_color(record, toy_transparency);
-            }
-
-            if (luminance(record) == 0.0f) {
-              // If the toy causes full shadows, terminate the light task.
-              depth  = -1.0f;
-              hit_id = HIT_TYPE_REJECT;
-            }
-
-            store_RGBF(device.ptrs.light_records + pixel, record);
-          }
-        }
-      }
-      else {
-        const float toy_dist = get_toy_distance(task.origin, task.ray);
-
-        if (toy_dist < depth) {
-          depth  = toy_dist;
-          hit_id = HIT_TYPE_TOY;
-        }
+      if (toy_dist < depth) {
+        depth  = toy_dist;
+        hit_id = HIT_TYPE_TOY;
       }
     }
 
-    if (device.scene.ocean.active && device.iteration_type != TYPE_LIGHT) {
+    if (device.scene.ocean.active) {
       if (task.origin.y < OCEAN_MIN_HEIGHT && task.origin.y > OCEAN_MAX_HEIGHT) {
         const float far_distance = ocean_far_distance(task.origin, task.ray);
 
@@ -250,11 +242,11 @@ LUMINARY_KERNEL void preprocess_trace_tasks() {
 }
 
 LUMINARY_KERNEL void process_sky_inscattering_tasks() {
-  const int task_count = device.trace_count[THREAD_ID];
+  const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
     const int offset    = get_task_address(i);
-    TraceTask task      = load_trace_task(device.trace_tasks + offset);
+    TraceTask task      = load_trace_task(device.ptrs.trace_tasks + offset);
     const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
     const float depth     = result.x;
@@ -270,17 +262,17 @@ LUMINARY_KERNEL void process_sky_inscattering_tasks() {
 
     const float inscattering_limit = world_to_sky_scale(depth);
 
-    RGBF record = load_RGBF(device.records + pixel);
+    RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.index);
 
-    store_RGBF(device.records + pixel, record);
+    store_RGBF(device.ptrs.records + pixel, record);
     write_beauty_buffer(inscattering, pixel);
   }
 }
 
 LUMINARY_KERNEL void postprocess_trace_tasks() {
-  const int task_count         = device.trace_count[THREAD_ID];
+  const int task_count         = device.ptrs.trace_counts[THREAD_ID];
   uint16_t geometry_task_count = 0;
   uint16_t particle_task_count = 0;
   uint16_t sky_task_count      = 0;
@@ -407,14 +399,14 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   // process data
   for (int i = 0; i < num_tasks; i++) {
     const int offset    = get_task_address(i);
-    TraceTask task      = load_trace_task(device.trace_tasks + offset);
+    TraceTask task      = load_trace_task(device.ptrs.trace_tasks + offset);
     const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
     const uint32_t pixel  = get_pixel_id(task.index.x, task.index.y);
 
-    if (is_first_ray()) {
+    if (IS_PRIMARY_RAY) {
       device.ptrs.raydir_buffer[pixel] = task.ray;
 
       TraceResult trace_result;
@@ -427,7 +419,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
     if (hit_id != HIT_TYPE_SKY)
       task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    float4* ptr = (float4*) (device.trace_tasks + offset);
+    float4* ptr = (float4*) (device.ptrs.trace_tasks + offset);
     float4 data0;
     float4 data1;
 
@@ -454,11 +446,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME]     = volume_task_count;
   device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOTALCOUNT] = num_tasks;
 
-  // Light tasks can't queue so we don't need to reset for those.
-  if (device.iteration_type != TYPE_LIGHT) {
-    device.ptrs.bounce_trace_count[THREAD_ID] = 0;
-    device.ptrs.light_trace_count[THREAD_ID]  = 0;
-  }
+  device.ptrs.trace_counts[THREAD_ID] = 0;
 }
 
 LUMINARY_KERNEL void convert_RGBF_to_XRGB8(

@@ -170,7 +170,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
   const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device.trace_tasks + get_task_address(i));
+    GeometryTask task = load_geometry_task(device.ptrs.trace_tasks + get_task_address(i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {

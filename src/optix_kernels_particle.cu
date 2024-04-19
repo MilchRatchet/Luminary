@@ -24,7 +24,7 @@ extern "C" __global__ void __raygen__optix() {
   const uint3 idx  = optixGetLaunchIndex();
   const uint3 dimx = optixGetLaunchDimensions();
 
-  const uint16_t trace_task_count = device.trace_count[idx.x + idx.y * dimx.x];
+  const uint16_t trace_task_count = device.ptrs.trace_counts[idx.x + idx.y * dimx.x];
 
   const float time         = quasirandom_sequence_1D_global(QUASI_RANDOM_TARGET_CAMERA_TIME);
   const vec3 motion        = angles_to_direction(device.scene.particles.direction_altitude, device.scene.particles.direction_azimuth);
@@ -32,7 +32,7 @@ extern "C" __global__ void __raygen__optix() {
 
   for (int i = 0; i < trace_task_count; i++) {
     const int offset     = get_task_address2(idx.x, idx.y, i);
-    const TraceTask task = load_trace_task_essentials(device.trace_tasks + offset);
+    const TraceTask task = load_trace_task_essentials(device.ptrs.trace_tasks + offset);
     const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
     const vec3 scaled_ray = scale_vector(task.ray, 1.0f / device.scene.particles.scale);

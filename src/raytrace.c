@@ -355,14 +355,12 @@ void raytrace_execute(RaytraceInstance* instance) {
   device_generate_tasks();
 
   if (instance->shading_mode) {
-    device_execute_debug_kernels(instance, TYPE_CAMERA);
+    device_execute_debug_kernels(instance);
   }
   else {
-    device_execute_main_kernels(instance, TYPE_CAMERA, 0);
-    device_execute_main_kernels(instance, TYPE_LIGHT, 1);
+    device_execute_main_kernels(instance, 0);
     for (int i = 1; i <= instance->max_ray_depth; i++) {
-      device_execute_main_kernels(instance, TYPE_BOUNCE, i);
-      device_execute_main_kernels(instance, TYPE_LIGHT, i + 1);
+      device_execute_main_kernels(instance, i);
     }
   }
 
@@ -511,6 +509,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   instance->restir.initial_reservoir_size         = 16;
   instance->restir.light_candidate_pool_size_log2 = 14;
+  instance->restir.num_light_rays                 = 0;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
@@ -524,10 +523,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->atmo_settings.rayleigh_falloff       = scene->sky.rayleigh_falloff;
   instance->atmo_settings.multiscattering_factor = scene->sky.multiscattering_factor;
 
-  device_buffer_init(&instance->light_trace);
-  device_buffer_init(&instance->bounce_trace);
-  device_buffer_init(&instance->light_trace_count);
-  device_buffer_init(&instance->bounce_trace_count);
+  device_buffer_init(&instance->trace_tasks);
+  device_buffer_init(&instance->trace_counts);
   device_buffer_init(&instance->trace_results);
   device_buffer_init(&instance->task_counts);
   device_buffer_init(&instance->task_offsets);
@@ -544,8 +541,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->frame_indirect_accumulate);
   device_buffer_init(&instance->albedo_buffer);
   device_buffer_init(&instance->normal_buffer);
-  device_buffer_init(&instance->light_records);
-  device_buffer_init(&instance->bounce_records);
+  device_buffer_init(&instance->records);
   device_buffer_init(&instance->bounce_records_history);
   device_buffer_init(&instance->buffer_8bit);
   device_buffer_init(&instance->raydir_buffer);
@@ -696,8 +692,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_variance, sizeof(float), amount);
   device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
-  device_buffer_malloc(instance->light_records, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->bounce_records, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->records, sizeof(RGBF), amount);
   device_buffer_malloc(instance->bounce_records_history, sizeof(RGBF), amount);
   device_buffer_malloc(instance->mis_buffer, sizeof(MISData), amount);
   device_buffer_malloc(instance->packed_gbuffer_history, INTERLEAVED_ALLOCATION_SIZE(sizeof(PackedGBufferData)), amount);
@@ -720,10 +715,8 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
 
   device_update_symbol(pixels_per_thread, pixels_per_thread);
 
-  device_buffer_malloc(instance->light_trace, sizeof(TraceTask), max_task_count);
-  device_buffer_malloc(instance->bounce_trace, sizeof(TraceTask), max_task_count);
-  device_buffer_malloc(instance->light_trace_count, sizeof(uint16_t), thread_count);
-  device_buffer_malloc(instance->bounce_trace_count, sizeof(uint16_t), thread_count);
+  device_buffer_malloc(instance->trace_tasks, sizeof(TraceTask), max_task_count);
+  device_buffer_malloc(instance->trace_counts, sizeof(uint16_t), thread_count);
 
   device_buffer_malloc(instance->trace_results, sizeof(TraceResult), max_task_count);
   device_buffer_malloc(instance->task_counts, sizeof(uint16_t), 7 * thread_count);
@@ -743,10 +736,8 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
 void raytrace_update_device_pointers(RaytraceInstance* instance) {
   DevicePointers ptrs;
 
-  ptrs.light_trace               = (TraceTask*) device_buffer_get_pointer(instance->light_trace);
-  ptrs.bounce_trace              = (TraceTask*) device_buffer_get_pointer(instance->bounce_trace);
-  ptrs.light_trace_count         = (uint16_t*) device_buffer_get_pointer(instance->light_trace_count);
-  ptrs.bounce_trace_count        = (uint16_t*) device_buffer_get_pointer(instance->bounce_trace_count);
+  ptrs.trace_tasks               = (TraceTask*) device_buffer_get_pointer(instance->trace_tasks);
+  ptrs.trace_counts              = (uint16_t*) device_buffer_get_pointer(instance->trace_counts);
   ptrs.trace_results             = (TraceResult*) device_buffer_get_pointer(instance->trace_results);
   ptrs.task_counts               = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets              = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
@@ -763,8 +754,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.frame_output              = (RGBF*) device_buffer_get_pointer(instance->frame_output);
   ptrs.albedo_buffer             = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
   ptrs.normal_buffer             = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
-  ptrs.light_records             = (RGBF*) device_buffer_get_pointer(instance->light_records);
-  ptrs.bounce_records            = (RGBF*) device_buffer_get_pointer(instance->bounce_records);
+  ptrs.records                   = (RGBF*) device_buffer_get_pointer(instance->records);
   ptrs.bounce_records_history    = (RGBF*) device_buffer_get_pointer(instance->bounce_records_history);
   ptrs.buffer_8bit               = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
   ptrs.albedo_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
@@ -797,10 +787,8 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene.triangle_lights));
   gpuErrchk(cudaFree(instance->restir.presampled_triangle_lights));
   device_buffer_free(instance->ior_stack);
-  device_buffer_free(instance->light_trace);
-  device_buffer_free(instance->bounce_trace);
-  device_buffer_free(instance->light_trace_count);
-  device_buffer_free(instance->bounce_trace_count);
+  device_buffer_free(instance->trace_tasks);
+  device_buffer_free(instance->trace_counts);
   device_buffer_free(instance->trace_results);
   device_buffer_free(instance->task_counts);
   device_buffer_free(instance->task_offsets);
@@ -809,8 +797,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_indirect_buffer);
   device_buffer_free(instance->frame_temporal);
   device_buffer_free(instance->frame_variance);
-  device_buffer_free(instance->light_records);
-  device_buffer_free(instance->bounce_records);
+  device_buffer_free(instance->records);
   device_buffer_free(instance->bounce_records_history);
   device_buffer_free(instance->light_sample_history);
   device_buffer_free(instance->raydir_buffer);

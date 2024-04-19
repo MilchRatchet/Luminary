@@ -62,7 +62,7 @@ __device__ BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle
   }
 
 LUMINARY_KERNEL void process_trace_tasks() {
-  const uint16_t trace_task_count = device.trace_count[THREAD_ID];
+  const uint16_t trace_task_count = device.ptrs.trace_counts[THREAD_ID];
   uint16_t offset                 = 0;
 
   uint2 traversal_stack[STACK_SIZE];
@@ -88,7 +88,7 @@ LUMINARY_KERNEL void process_trace_tasks() {
       if (offset >= trace_task_count)
         break;
 
-      const TraceTask task = load_trace_task_essentials(device.trace_tasks + get_task_address(offset));
+      const TraceTask task = load_trace_task_essentials(device.ptrs.trace_tasks + get_task_address(offset));
       const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + get_task_address(offset)));
 
       node_task     = make_uint2(0, 0x80000000);

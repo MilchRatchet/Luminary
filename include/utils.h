@@ -395,13 +395,12 @@ struct ReSTIRSettings {
   int initial_reservoir_size;
   int light_candidate_pool_size_log2;
   TriangleLight* presampled_triangle_lights;
+  int num_light_rays;
 } typedef ReSTIRSettings;
 
 struct DevicePointers {
-  TraceTask* light_trace;
-  TraceTask* bounce_trace;
-  uint16_t* light_trace_count;
-  uint16_t* bounce_trace_count;
+  TraceTask* trace_tasks;
+  uint16_t* trace_counts;
   TraceResult* trace_results;
   uint16_t* task_counts;
   uint16_t* task_offsets;
@@ -418,8 +417,7 @@ struct DevicePointers {
   RGBF* frame_output;
   RGBF* albedo_buffer;
   RGBF* normal_buffer;
-  RGBF* light_records;
-  RGBF* bounce_records;
+  RGBF* records;
   RGBF* bounce_records_history;
   PackedGBufferData* packed_gbuffer_history;
   XRGB8* buffer_8bit;
@@ -449,12 +447,7 @@ struct DeviceConstantMemory {
   ReSTIRSettings restir;
   int max_ray_depth;
   int pixels_per_thread;
-  int primary_ray;
-  int num_light_rays;
   int depth;
-  TraceTask* trace_tasks;
-  uint16_t* trace_count;
-  RGBF* records;
   int temporal_frames;
   int denoiser;
   int width;
@@ -516,10 +509,8 @@ struct RaytraceInstance {
   unsigned int output_height;
   int realtime;
   DeviceBuffer* ior_stack;
-  DeviceBuffer* light_trace;
-  DeviceBuffer* bounce_trace;
-  DeviceBuffer* light_trace_count;
-  DeviceBuffer* bounce_trace_count;
+  DeviceBuffer* trace_tasks;
+  DeviceBuffer* trace_counts;
   DeviceBuffer* trace_results;
   DeviceBuffer* task_counts;
   DeviceBuffer* task_offsets;
@@ -535,8 +526,7 @@ struct RaytraceInstance {
   DeviceBuffer* frame_indirect_accumulate;
   DeviceBuffer* albedo_buffer;
   DeviceBuffer* normal_buffer;
-  DeviceBuffer* light_records;
-  DeviceBuffer* bounce_records;
+  DeviceBuffer* records;
   DeviceBuffer* bounce_records_history;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* light_candidates;

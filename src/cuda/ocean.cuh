@@ -70,12 +70,12 @@ __device__ float ocean_reflection_coefficient(
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_KERNEL void process_ocean_tasks() {
-  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
-  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
+  int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
+    OceanTask task  = load_ocean_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
     vec3 normal = ocean_get_normal(task.position);
@@ -115,7 +115,7 @@ LUMINARY_KERNEL void process_ocean_tasks() {
       ior_stack_interact(ior_in, pixel, ior_stack_method);
     }
 
-    RGBF record = load_RGBF(device.records + pixel);
+    RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     TraceTask new_task;
     new_task.origin = task.position;
@@ -124,11 +124,11 @@ LUMINARY_KERNEL void process_ocean_tasks() {
 
     mis_reset_data(pixel);
 
-    store_RGBF(device.ptrs.bounce_records + pixel, record);
-    store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), new_task);
+    store_RGBF(device.ptrs.records + pixel, record);
+    store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), new_task);
   }
 
-  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
+  device.ptrs.trace_counts[THREAD_ID] = trace_count;
 }
 
 LUMINARY_KERNEL void process_debug_ocean_tasks() {
@@ -136,7 +136,7 @@ LUMINARY_KERNEL void process_debug_ocean_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
 
   for (int i = 0; i < task_count; i++) {
-    OceanTask task  = load_ocean_task(device.trace_tasks + get_task_address(task_offset + i));
+    OceanTask task  = load_ocean_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
     const int pixel = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_DEPTH) {

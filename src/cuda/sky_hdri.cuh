@@ -144,9 +144,7 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
 
   device_malloc((void**) &luts_hdri_tex[0].data, luts_hdri_tex[0].height * luts_hdri_tex[0].pitch * 4 * sizeof(float));
 
-  RayIterationType iter_type = TYPE_CAMERA;
-  device_update_symbol(iteration_type, iter_type);
-  uint32_t depth = 0;
+  int depth = 0;
   device_update_symbol(depth, depth);
 
   for (int i = 0; i < instance->scene.sky.hdri_samples; i++) {
