@@ -886,8 +886,9 @@ LUMINARY_KERNEL void process_sky_tasks() {
     else {
       const vec3 sky_origin = world_to_sky_transform(task.origin);
 
-      // TODO: Add Bounce_DirectLighting ray state flag to check for if we should include celestials
-      sky = sky_get_color(sky_origin, task.ray, FLT_MAX, IS_PRIMARY_RAY, device.scene.sky.steps, task.index);
+      const bool include_sun = state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+
+      sky = sky_get_color(sky_origin, task.ray, FLT_MAX, include_sun, device.scene.sky.steps, task.index);
       // if (device.iteration_type == TYPE_BOUNCE && sky_ray_hits_sun(sky_origin, task.ray)) {
       //   GBufferData data;
       //   data.hit_id = HIT_TYPE_SKY;

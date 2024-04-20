@@ -131,6 +131,8 @@ LUMINARY_KERNEL void process_toy_tasks() {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
 
+      state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+
       // MISData mis_data;
       // mis_data.light_target_pdf_normalization = light.target_pdf_normalization;
       // mis_data.bsdf_marginal                  = bsdf_marginal;

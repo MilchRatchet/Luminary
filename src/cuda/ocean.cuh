@@ -122,7 +122,7 @@ LUMINARY_KERNEL void process_ocean_tasks() {
     new_task.ray    = bounce_ray;
     new_task.index  = task.index;
 
-    mis_reset_data(pixel);
+    state_consume(pixel, STATE_FLAG_BOUNCE_LIGHTING);
 
     store_RGBF(device.ptrs.records + pixel, record);
     store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), new_task);
