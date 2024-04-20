@@ -83,8 +83,8 @@ extern "C" __global__ void __raygen__optix() {
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    // TODO: If we are eligible for emission collection, initialize this with this hits attenuated emission
-    RGBF accumulated_light = (IS_PRIMARY_RAY) ? mul_color(data.emission, record) : get_color(0.0f, 0.0f, 0.0f);
+    RGBF accumulated_light =
+      (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING)) ? mul_color(data.emission, record) : get_color(0.0f, 0.0f, 0.0f);
 
     for (int j = 0; j < device.restir.num_light_rays; j++) {
       const uint32_t light_id   = ris_sample_light(data, task.index);

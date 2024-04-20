@@ -63,18 +63,14 @@ LUMINARY_KERNEL void process_toy_tasks() {
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    // if (data.albedo.a > 0.0f && color_any(data.emission)) {
-    //   write_albedo_buffer(add_color(data.emission, opaque_color(data.albedo)), pixel);
-    //
-    //  RGBF emission = mul_color(data.emission, record);
-    //
-    //  if (device.iteration_type == TYPE_BOUNCE) {
-    //    const float mis_weight = mis_weight_bsdf_sampled(data, pixel);
-    //    emission               = scale_color(emission, mis_weight);
-    //  }
-    //
-    //  write_beauty_buffer(emission, pixel);
-    //}
+    if (data.albedo.a > 0.0f && color_any(data.emission)) {
+      write_albedo_buffer(add_color(data.emission, opaque_color(data.albedo)), pixel);
+
+      if (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING)) {
+        RGBF emission = mul_color(data.emission, record);
+        write_beauty_buffer(emission, pixel);
+      }
+    }
 
     write_normal_buffer(data.normal, pixel);
 
