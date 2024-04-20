@@ -87,16 +87,22 @@ extern "C" __global__ void __raygen__optix() {
       (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING)) ? mul_color(data.emission, record) : get_color(0.0f, 0.0f, 0.0f);
 
     for (int j = 0; j < device.restir.num_light_rays; j++) {
-      const uint32_t light_id   = ris_sample_light(data, task.index);
+      const uint32_t light_id   = ris_sample_light(data, task.index, j);
       const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
       float pdf, dist;
       RGBF light_color;
-      const vec3 dir = light_sample_triangle(light, data, task.index, pdf, dist, light_color);
+      const vec3 dir = light_sample_triangle(light, data, task.index, j, pdf, dist, light_color);
 
-      // TODO: Add support for transparent pass light directions
-      const bool is_transparent_pass = false;
-      const float shift              = (is_transparent_pass) ? -eps : eps;
-      const vec3 shifted_position    = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+      if (pdf == 0.0f)
+        continue;
+
+      bool is_transparent_pass;
+      RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, device.scene.triangle_lights_count / pdf);
+
+      light_color = mul_color(light_color, bsdf_value);
+
+      const float shift           = (is_transparent_pass) ? -eps : eps;
+      const vec3 shifted_position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
       const float3 origin = make_float3(shifted_position.x, shifted_position.y, shifted_position.z);
 
@@ -116,10 +122,12 @@ extern "C" __global__ void __raygen__optix() {
         device.optix_bvh, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
         alpha_data0, alpha_data1);
 
-      RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
+      if (hit_id != HIT_TYPE_REJECT) {
+        RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
 
-      accumulated_light =
-        add_color(accumulated_light, scale_color(mul_color(light_color, visibility), 1.0f / device.restir.num_light_rays));
+        accumulated_light =
+          add_color(accumulated_light, scale_color(mul_color(light_color, visibility), 1.0f / device.restir.num_light_rays));
+      }
     }
 
     accumulated_light = mul_color(accumulated_light, record);

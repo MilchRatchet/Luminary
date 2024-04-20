@@ -16,9 +16,10 @@
  *
  * Robust triangle sampling.
  */
-__device__ vec3
-  light_sample_triangle(const TriangleLight triangle, const GBufferData data, const ushort2 pixel, float& pdf, float& dist, RGBF& color) {
-  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_TBD_1, pixel);
+__device__ vec3 light_sample_triangle(
+  const TriangleLight triangle, const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, float& pdf, float& dist,
+  RGBF& color) {
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_TBD_1 + light_ray_index, pixel);
 
   float r1 = sqrtf(random.x);
   float r2 = random.y;
@@ -53,7 +54,8 @@ __device__ vec3
   float solid_angle = surface_cos_term / (dist * dist);
 
   if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
-    solid_angle = 0.0f;
+    pdf = 0.0f;
+    return get_vector(0.0f, 0.0f, 0.0f);
   }
 
   pdf = 1.0f / solid_angle;
