@@ -87,17 +87,19 @@ extern "C" __global__ void __raygen__optix() {
       (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING)) ? mul_color(data.emission, record) : get_color(0.0f, 0.0f, 0.0f);
 
     for (int j = 0; j < device.restir.num_light_rays; j++) {
-      const uint32_t light_id   = ris_sample_light(data, task.index, j);
-      const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
-      float pdf, dist;
+      float light_id_pdf;
+      const uint32_t light_id = ris_sample_light(data, task.index, j, light_id_pdf);
+      float sample_pdf, dist;
       RGBF light_color;
-      const vec3 dir = light_sample_triangle(light, data, task.index, j, pdf, dist, light_color);
+      const vec3 dir = light_sample(light_id, data, task.index, j, sample_pdf, dist, light_color);
+
+      const float pdf = sample_pdf * light_id_pdf;
 
       if (pdf == 0.0f)
         continue;
 
       bool is_transparent_pass;
-      RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, device.scene.triangle_lights_count / pdf);
+      RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, 1.0f / pdf);
 
       light_color = mul_color(light_color, bsdf_value);
 
@@ -105,10 +107,7 @@ extern "C" __global__ void __raygen__optix() {
       const vec3 shifted_position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
       const float3 origin = make_float3(shifted_position.x, shifted_position.y, shifted_position.z);
-
-      pdf *= 1.0f / device.scene.triangle_lights_count;
-
-      const float3 ray = make_float3(dir.x, dir.y, dir.z);
+      const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
       // TODO: Make sure to set this to an invalid value for non triangle lights
       unsigned int hit_id = light_id;

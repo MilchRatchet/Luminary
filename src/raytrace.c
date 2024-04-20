@@ -509,7 +509,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   instance->restir.initial_reservoir_size         = 16;
   instance->restir.light_candidate_pool_size_log2 = 14;
-  instance->restir.num_light_rays                 = 0;
+  instance->restir.num_light_rays                 = 1;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;

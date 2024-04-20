@@ -8,7 +8,7 @@
 #include "utils.h"
 
 #define THREADS_PER_BLOCK 128
-#define BLOCKS_PER_GRID 1024
+#define BLOCKS_PER_GRID 2048
 #define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
 
 #ifndef OPTIX_KERNEL
