@@ -10,7 +10,12 @@
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 1024
 #define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
+
+#ifndef OPTIX_KERNEL
 #define THREAD_ID (threadIdx.x + blockIdx.x * blockDim.x)
+#else
+#define THREAD_ID (optixGetLaunchIndex().x + optixGetLaunchIndex().y * optixGetLaunchDimensions().x)
+#endif
 
 #define LUMINARY_KERNEL __global__ __launch_bounds__(THREADS_PER_BLOCK)
 
@@ -76,12 +81,14 @@ __device__ static int get_task_address_of_thread(const int thread_id, const int 
 }
 
 __device__ static int get_task_address(const int number) {
+#ifndef OPTIX_KERNEL
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
+#else
+  const uint3 idx = optixGetLaunchIndex();
+  return get_task_address_of_thread(idx.x, idx.y, number);
+#endif
 }
 
-__device__ static int get_task_address2(const unsigned int x, const unsigned int y, const int number) {
-  return get_task_address_of_thread(x, y, number);
-}
 #endif
 
 #endif /* CU_UTILS_H */

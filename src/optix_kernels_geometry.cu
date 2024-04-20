@@ -1,13 +1,12 @@
 // More ideas:
 // - Add a ray flag for if MIS is disabled (would be set for bounce rays coming from ocean surface): STATE_FLAG_MIS_DISABLED
 
-// TODO: Add separate definitions for THREAD_ID based utilities for Optix code!
-
 #define UTILS_NO_DEVICE_TABLE
 
 // Functions work differently when executed from this kernel
 // This emulates the old device.iteration_type == TYPE_LIGHT checks.
 #define SHADING_KERNEL
+#define OPTIX_KERNEL
 
 #include "utils.h"
 
@@ -67,17 +66,12 @@ extern "C" __global__ void __raygen__optix() {
   //  Sample BRDF ray
   //  Queue bounce ray and store normalization constant
 
-  const uint3 idx  = optixGetLaunchIndex();
-  const uint3 dimx = optixGetLaunchDimensions();
-
-  const uint32_t thread_id = idx.x + idx.y * dimx.x;
-
-  const int task_count  = device.ptrs.task_counts[thread_id * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
-  const int task_offset = device.ptrs.task_offsets[thread_id * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
-  int trace_count       = device.ptrs.trace_counts[thread_id];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
+  int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device.ptrs.trace_tasks + get_task_address2(idx.x, idx.y, task_offset + i));
+    GeometryTask task = load_geometry_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
     const int pixel   = task.index.y * device.width + task.index.x;
 
     GBufferData data = geometry_generate_g_buffer(task, pixel);
@@ -153,11 +147,11 @@ extern "C" __global__ void __raygen__optix() {
 
     if (validate_trace_task(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
-      store_trace_task(device.ptrs.trace_tasks + get_task_address2(idx.x, idx.y, trace_count++), bounce_task);
+      store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
     }
   }
 
-  device.ptrs.trace_counts[thread_id] = trace_count;
+  device.ptrs.trace_counts[THREAD_ID] = trace_count;
 }
 
 /*

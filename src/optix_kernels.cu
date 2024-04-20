@@ -1,5 +1,7 @@
 #define UTILS_NO_DEVICE_TABLE
 
+#define OPTIX_KERNEL
+
 #include "utils.h"
 
 extern "C" static __constant__ DeviceConstantMemory device;
@@ -18,13 +20,10 @@ enum OptixAlphaResult {
 // This can be found under function name prefix in the programming guide
 
 extern "C" __global__ void __raygen__optix() {
-  const uint3 idx  = optixGetLaunchIndex();
-  const uint3 dimx = optixGetLaunchDimensions();
-
-  const uint16_t trace_task_count = device.ptrs.trace_counts[idx.x + idx.y * dimx.x];
+  const uint16_t trace_task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < trace_task_count; i++) {
-    const int offset     = get_task_address2(idx.x, idx.y, i);
+    const int offset     = get_task_address(i);
     const TraceTask task = load_trace_task(device.ptrs.trace_tasks + offset);
     const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
