@@ -40,7 +40,7 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
     }
   }
 
-  pdf = 1.0f / sum_weight;
+  pdf = (sampled_id != LIGHT_ID_NONE) ? 1.0f / sum_weight : 0.0f;
 
   // TODO: Implement RIS
   return sampled_id;
