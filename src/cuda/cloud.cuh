@@ -208,7 +208,7 @@ __device__ CloudRenderResult
         ambient_extinction = sqrtf(ambient_extinction);
 
         RGBF S = add_color(sun_color_i, ambient_color_i);
-        S      = scale_color(S, scattering * 0.5f);  // 0.5f is the MIS uniform weight
+        S      = scale_color(S, scattering);
 
         const float step_trans = expf(-extinction * step_size);
 
