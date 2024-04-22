@@ -541,6 +541,7 @@ struct RaytraceInstance {
   DeviceBuffer* bluenoise_2D;
   DeviceBuffer* mis_buffer;
   DeviceBuffer* packed_gbuffer_history;
+  DeviceBuffer* ltc_tex;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;

@@ -12,6 +12,7 @@
 #include "ceb.h"
 #include "denoise.h"
 #include "device.h"
+#include "light.h"
 #include "optixrt.h"
 #include "optixrt_particle.h"
 #include "png.h"
@@ -597,6 +598,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   raytrace_load_moon_textures(instance);
   raytrace_load_bluenoise_texture(instance);
+  light_load_ltc_texture(instance);
 
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);

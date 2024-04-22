@@ -180,6 +180,7 @@ ceb_embed_files(
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_1D.bin
   ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_2D.bin
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/ltc/ltc.dat
 )
 
 #=============================================================

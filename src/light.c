@@ -5,7 +5,9 @@
 #include <stdlib.h>
 
 #include "bench.h"
+#include "ceb.h"
 #include "structs.h"
+#include "texture.h"
 #include "utils.h"
 
 static int min_3_float_to_int(float a, float b, float c) {
@@ -168,4 +170,41 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures, int dm
   *scene = data;
 
   bench_toc();
+}
+
+void light_load_ltc_texture(RaytraceInstance* instance) {
+  log_message("Loading LTC texture...");
+
+  uint64_t info = 0;
+
+  void* ltc_data;
+  int64_t ltc_data_length;
+  ceb_access("ltc.dat", &ltc_data, &ltc_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load LTC data.");
+  }
+
+  uint64_t dim;
+  memcpy(&dim, ltc_data, sizeof(uint64_t));
+
+  float* ltc_tex_data0 = (float*) malloc(dim * dim * sizeof(float) * 4);
+  float* ltc_tex_data1 = (float*) malloc(dim * dim * sizeof(float) * 1);
+
+  const float* pixel_data = (float*) (((uint8_t*) ltc_data) + 5);
+  for (uint32_t i = 0; i < dim * dim; i++) {
+    memcpy(ltc_tex_data0 + i * 4, pixel_data + i * 5, sizeof(float) * 4);
+    memcpy(ltc_tex_data0 + i, pixel_data + i * 5 + 4, sizeof(float));
+  }
+
+  TextureRGBA ltc_tex[2];
+  texture_create(ltc_tex + 0, dim, dim, 1, dim, ltc_tex_data0, TexDataFP32, 4, TexStorageCPU);
+  texture_create(ltc_tex + 1, dim, dim, 1, dim, ltc_tex_data1, TexDataFP32, 1, TexStorageCPU);
+
+  texture_create_atlas(&instance->ltc_tex, ltc_tex, 2);
+
+  free(ltc_tex_data0);
+  free(ltc_tex_data1);
+
+  log_message("Loaded LTC texture.");
 }
