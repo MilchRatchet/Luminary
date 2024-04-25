@@ -436,6 +436,7 @@ struct DevicePointers {
   DeviceTexture* sky_moon_albedo_tex;
   DeviceTexture* sky_moon_normal_tex;
   DeviceTexture* bsdf_energy_lut;
+  DeviceTexture* ltc_tex;
   uint16_t* bluenoise_1D;
   uint32_t* bluenoise_2D;
   uint32_t* light_candidates;

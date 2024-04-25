@@ -188,18 +188,45 @@ void light_load_ltc_texture(RaytraceInstance* instance) {
   uint64_t dim;
   memcpy(&dim, ltc_data, sizeof(uint64_t));
 
-  float* ltc_tex_data0 = (float*) malloc(dim * dim * sizeof(float) * 4);
-  float* ltc_tex_data1 = (float*) malloc(dim * dim * sizeof(float) * 1);
+  uint16_t* ltc_tex_data0 = (uint16_t*) malloc(dim * dim * sizeof(uint16_t) * 4);
+  uint16_t* ltc_tex_data1 = (uint16_t*) malloc(dim * dim * sizeof(uint16_t) * 2);
 
-  const float* pixel_data = (float*) (((uint8_t*) ltc_data) + 5);
+  const float* pixel_data = (float*) (((uint8_t*) ltc_data) + 8);
   for (uint32_t i = 0; i < dim * dim; i++) {
-    memcpy(ltc_tex_data0 + i * 4, pixel_data + i * 5, sizeof(float) * 4);
-    memcpy(ltc_tex_data0 + i, pixel_data + i * 5 + 4, sizeof(float));
+    float data[5];
+    memcpy(data, pixel_data + i * 5, sizeof(float) * 5);
+
+    // We use the negative of the second value.
+    float values_for_tex[6] = {data[2], data[1] * data[2], data[0] - data[1] * data[3], -data[2] * data[3], data[0] * data[2], data[4]};
+
+    float max_value = 0.0f;
+    for (uint32_t j = 0; j < 6; j++) {
+      max_value = fmaxf(max_value, fabsf(values_for_tex[j]));
+    }
+
+    if (max_value > 1.0f) {
+      warn_message("Max Value is %f", max_value);
+    }
+
+    float scale = 1.0f / max_value;
+
+    for (uint32_t j = 0; j < 6; j++) {
+      float value = values_for_tex[j] * scale;
+
+      uint16_t value_16 = (uint16_t) (value * 65535.0f + 0.5f);
+
+      if (j < 4) {
+        ltc_tex_data0[i * 4 + j] = value_16;
+      }
+      else {
+        ltc_tex_data1[i * 2 + j - 4] = value_16;
+      }
+    }
   }
 
   TextureRGBA ltc_tex[2];
-  texture_create(ltc_tex + 0, dim, dim, 1, dim, ltc_tex_data0, TexDataFP32, 4, TexStorageCPU);
-  texture_create(ltc_tex + 1, dim, dim, 1, dim, ltc_tex_data1, TexDataFP32, 1, TexStorageCPU);
+  texture_create(ltc_tex + 0, dim, dim, 1, dim, ltc_tex_data0, TexDataUINT16, 4, TexStorageCPU);
+  texture_create(ltc_tex + 1, dim, dim, 1, dim, ltc_tex_data1, TexDataUINT16, 2, TexStorageCPU);
 
   texture_create_atlas(&instance->ltc_tex, ltc_tex, 2);
 
