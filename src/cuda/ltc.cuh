@@ -166,7 +166,8 @@ __device__ float ltc_integrate(GBufferData data, LTCCoefficients coeffs, Triangl
   // Diffuse
   const uint32_t shading_vertex_count = ltc_clip_triangle(tri_shading_a, tri_shading_b, tri_shading_c, tri_shading_d);
   if (shading_vertex_count) {
-    integral += ltc_integrate_triangle(shading_vertex_count, tri_shading_a, tri_shading_b, tri_shading_c, tri_shading_d);
+    integral += ltc_integrate_triangle(shading_vertex_count, tri_shading_a, tri_shading_b, tri_shading_c, tri_shading_d)
+                * luminance(opaque_color(data.albedo));
   }
 
   vec3 tri_cosine_a = transform_vec4_3_position(coeffs.world_to_shading_transformation, light.vertex);
@@ -181,7 +182,7 @@ __device__ float ltc_integrate(GBufferData data, LTCCoefficients coeffs, Triangl
   // Microfacet
   const uint32_t cosine_vertex_count = ltc_clip_triangle(tri_cosine_a, tri_cosine_b, tri_cosine_c, tri_cosine_d);
   if (cosine_vertex_count) {
-    integral += ltc_integrate_triangle(cosine_vertex_count, tri_cosine_a, tri_cosine_b, tri_cosine_c, tri_cosine_d);
+    integral += ltc_integrate_triangle(cosine_vertex_count, tri_cosine_a, tri_cosine_b, tri_cosine_c, tri_cosine_d) * coeffs.albedo;
   }
 
   return integral;
