@@ -101,6 +101,10 @@ extern "C" __global__ void __raygen__optix() {
       bool is_transparent_pass;
       RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, 1.0f / pdf);
 
+      // TODO: Fix transparent ray directions. (They are currently causing a massive amount of fireflies.)
+      if (is_transparent_pass)
+        continue;
+
       light_color = mul_color(light_color, bsdf_value);
 
       const float shift           = (is_transparent_pass) ? -eps : eps;
