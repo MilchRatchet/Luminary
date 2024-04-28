@@ -56,27 +56,27 @@ __device__ LTCCoefficients ltc_get_coefficients(GBufferData data) {
   coeffs.shading_to_cosine_transformation.f12 = 0.0f;
   coeffs.shading_to_cosine_transformation.f22 = data0.z;
   coeffs.shading_to_cosine_transformation.f32 = 0.0f;
-  coeffs.shading_to_cosine_transformation.f13 = data0.y;
+  coeffs.shading_to_cosine_transformation.f13 = -data0.y;
   coeffs.shading_to_cosine_transformation.f23 = 0.0f;
   coeffs.shading_to_cosine_transformation.f33 = data1.x;
 
   coeffs.albedo = data1.y;
 
-  const float determinant_2x2 = data0.x * data1.x - data0.y * data0.w;
+  const float determinant_2x2 = data0.x * data1.x + data0.y * data0.w;
 
   coeffs.shading_to_cosine_determinant = data0.z * determinant_2x2;
 
   const float inv_determinant_2x2 = 1.0f / determinant_2x2;
 
   coeffs.cosine_to_shading_transformation.f11 = data1.x * inv_determinant_2x2;
-  coeffs.cosine_to_shading_transformation.f11 = 0.0f;
-  coeffs.cosine_to_shading_transformation.f11 = -data0.w * inv_determinant_2x2;
-  coeffs.cosine_to_shading_transformation.f11 = 0.0f;
-  coeffs.cosine_to_shading_transformation.f11 = 1.0f / data0.z;
-  coeffs.cosine_to_shading_transformation.f11 = 0.0f;
-  coeffs.cosine_to_shading_transformation.f11 = -data0.y * inv_determinant_2x2;
-  coeffs.cosine_to_shading_transformation.f11 = 0.0f;
-  coeffs.cosine_to_shading_transformation.f11 = data0.x * inv_determinant_2x2;
+  coeffs.cosine_to_shading_transformation.f21 = 0.0f;
+  coeffs.cosine_to_shading_transformation.f31 = -data0.w * inv_determinant_2x2;
+  coeffs.cosine_to_shading_transformation.f12 = 0.0f;
+  coeffs.cosine_to_shading_transformation.f22 = 1.0f / data0.z;
+  coeffs.cosine_to_shading_transformation.f32 = 0.0f;
+  coeffs.cosine_to_shading_transformation.f13 = data0.y * inv_determinant_2x2;
+  coeffs.cosine_to_shading_transformation.f23 = 0.0f;
+  coeffs.cosine_to_shading_transformation.f33 = data0.x * inv_determinant_2x2;
 
   return coeffs;
 }
