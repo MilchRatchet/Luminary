@@ -37,7 +37,8 @@ extern "C" __global__ void __raygen__optix() {
     unsigned int cost   = 0;
 
     optixTrace(
-      device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_NONE, 0, 0, 0, depth, hit_id, cost);
+      device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_DISABLE_ANYHIT, 0, 0, 0, depth, hit_id,
+      cost);
 
     if (__uint_as_float(depth) < tmax) {
       float2 trace_result;
