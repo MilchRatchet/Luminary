@@ -190,7 +190,7 @@ __device__ RGBAF optix_alpha_test() {
 }
 
 extern "C" __global__ void __anyhit__optix() {
-  if (optixGetPrimitiveIndex() == optixGetPayload_0()) {
+  if (load_triangle_light_id(optixGetPrimitiveIndex()) == optixGetPayload_0()) {
     optixIgnoreIntersection();
   }
 
