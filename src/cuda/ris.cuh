@@ -6,7 +6,7 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-__device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, float& pdf) {
+__device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, float& sampling_weight) {
   const vec3 sky_pos = world_to_sky_transform(data.position);
 
   const int sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
@@ -73,7 +73,7 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
 
   // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
   if (selected_id == LIGHT_ID_NONE) {
-    pdf = 0.0f;
+    sampling_weight = 0.0f;
   }
   else {
     // We use uniform MIS weights because the images of our distributions are a partition of the set of all lights.
@@ -81,7 +81,7 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
 
     const float normalization_term = mis_weight * sum_weight;
 
-    pdf = selected_target_pdf / normalization_term;
+    sampling_weight = normalization_term / selected_target_pdf;
   }
 
   return selected_id;

@@ -87,19 +87,21 @@ extern "C" __global__ void __raygen__optix() {
       (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING)) ? mul_color(data.emission, record) : get_color(0.0f, 0.0f, 0.0f);
 
     for (int j = 0; j < device.restir.num_light_rays; j++) {
-      float light_id_pdf;
-      const uint32_t light_id = ris_sample_light(data, task.index, j, light_id_pdf);
-      float sample_pdf, dist;
+      float light_sampling_weight;
+      const uint32_t light_id = ris_sample_light(data, task.index, j, light_sampling_weight);
+
+      if (light_sampling_weight == 0.0f)
+        continue;
+
+      float solid_angle, dist;
       RGBF light_color;
-      const vec3 dir = light_sample(light_id, data, task.index, j, sample_pdf, dist, light_color);
+      const vec3 dir = light_sample(light_id, data, task.index, j, solid_angle, dist, light_color);
 
-      const float pdf = sample_pdf * light_id_pdf;
-
-      if (pdf == 0.0f)
+      if (solid_angle == 0.0f)
         continue;
 
       bool is_transparent_pass;
-      RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, 1.0f / pdf);
+      RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, solid_angle * light_sampling_weight);
 
       // TODO: Fix transparent ray directions. (They are currently causing a massive amount of fireflies.)
       if (is_transparent_pass)

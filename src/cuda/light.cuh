@@ -42,8 +42,8 @@ __device__ float light_triangle_intersection_uv(const TriangleLight triangle, co
  * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
  *
  */
-__device__ vec3
-  light_sample_triangle(const TriangleLight triangle, const GBufferData data, const float2 random, float& pdf, float& dist, RGBF& color) {
+__device__ vec3 light_sample_triangle(
+  const TriangleLight triangle, const GBufferData data, const float2 random, float& solid_angle, float& dist, RGBF& color) {
   // Projection of triangle onto unit sphere
   const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, data.position));
   const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), data.position));
@@ -53,10 +53,10 @@ __device__ vec3
   const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
   const float G2 = 1.0f + dot_product(v0, v1);
 
-  const float solid_angle = 2.0f * atan2f(G0, G1 + G2);
+  solid_angle = 2.0f * atan2f(G0, G1 + G2);
 
   if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
-    pdf = 0.0f;
+    solid_angle = 0.0f;
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
@@ -80,15 +80,13 @@ __device__ vec3
 
     if (dot_product(face_normal, dir) * side > 0.0f) {
       // Reject side with no emission
-      pdf = 0.0f;
+      solid_angle = 0.0f;
       return get_vector(0.0f, 0.0f, 0.0f);
     }
   }
 
   float2 coords;
   dist = light_triangle_intersection_uv(triangle, data.position, dir, coords);
-
-  pdf = 1.0f / solid_angle;
 
   const uint16_t illum_tex = device.scene.materials[triangle.material_id].luminance_map;
 
@@ -106,27 +104,24 @@ __device__ vec3
 }
 
 __device__ vec3 light_sample(
-  const uint32_t light_id, const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, float& pdf, float& dist,
+  const uint32_t light_id, const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, float& solid_angle, float& dist,
   RGBF& color) {
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_TBD_1 + light_ray_index, pixel);
 
   switch (light_id) {
     case LIGHT_ID_NONE:
-      pdf = 0.0f;
+      solid_angle = 0.0f;
       return get_vector(0.0f, 0.0f, 0.0f);
     case LIGHT_ID_SUN: {
-      float solid_angle;
       vec3 sky_pos = world_to_sky_transform(data.position);
       vec3 ray     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
-      pdf          = 1.0f / solid_angle;
       color        = sky_get_sun_color(sky_pos, ray);
       dist         = FLT_MAX;
       return ray;
     }
     case LIGHT_ID_TOY: {
-      float solid_angle = toy_get_solid_angle(data.position);
-      pdf               = 1.0f / solid_angle;
-      color             = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+      solid_angle = toy_get_solid_angle(data.position);
+      color       = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
       // Approximation, it is not super important what the actual distance is
       dist = get_length(sub_vector(data.position, device.scene.toy.position));
 
@@ -134,7 +129,7 @@ __device__ vec3 light_sample(
     }
     default: {
       const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
-      return light_sample_triangle(light, data, random, pdf, dist, color);
+      return light_sample_triangle(light, data, random, solid_angle, dist, color);
     }
   }
 }
