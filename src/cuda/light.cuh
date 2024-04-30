@@ -6,37 +6,77 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
+__device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
+  const vec3 h  = cross_product(ray, triangle.edge2);
+  const float a = dot_product(triangle.edge1, h);
+
+  const float f = 1.0f / a;
+  const vec3 s  = sub_vector(origin, triangle.vertex);
+  const float u = f * dot_product(s, h);
+
+  const vec3 q  = cross_product(s, triangle.edge1);
+  const float v = f * dot_product(ray, q);
+
+  coords = make_float2(u, v);
+
+  //  The third check is inverted to catch NaNs since NaNs always return false, the not will turn it into a true
+  if (v < 0.0f || u < 0.0f || !(u + v <= 1.0f))
+    return FLT_MAX;
+
+  const float t = f * dot_product(triangle.edge2, q);
+
+  return __fslctf(t, FLT_MAX, t);
+}
+
 /*
- * Surface sample a triangle and return its area and emission luminance.
+ * Solid angle sample a triangle.
  * @param triangle Triangle.
- * @param origin Point to sample from.
- * @param area Solid angle of the triangle.
- * @param seed Random seed used to sample the triangle.
- * @param lum Output emission luminance of the triangle at the sampled point.
+ * @param data Data about shading point.
+ * @param random Random numbers.
+ * @param pdf PDF of sampled direction.
+ * @param dist Distance to sampled point on triangle.
+ * @param color Emission from triangle at sampled point.
  * @result Normalized direction to the point on the triangle.
  *
- * Robust triangle sampling.
+ * Robust solid angle sampling method from
+ * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
+ *
  */
-__device__ vec3 light_sample_triangle(
-  const TriangleLight triangle, const GBufferData data, const float2 random, const uint32_t light_ray_index, float& pdf, float& dist,
-  RGBF& color) {
-  float r1 = sqrtf(random.x);
-  float r2 = random.y;
+__device__ vec3
+  light_sample_triangle(const TriangleLight triangle, const GBufferData data, const float2 random, float& pdf, float& dist, RGBF& color) {
+  // Projection of triangle onto unit sphere
+  const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, data.position));
+  const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), data.position));
+  const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), data.position));
 
-  // Map random numbers uniformly into [0.025,0.975].
-  r1 = 0.025f + 0.95f * r1;
-  r2 = 0.025f + 0.95f * r2;
+  const float G0 = fabsf(dot_product(cross_product(v0, v1), v2));
+  const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
+  const float G2 = 1.0f + dot_product(v0, v1);
 
-  const float u = 1.0f - r1;
-  const float v = r1 * r2;
+  const float solid_angle = 2.0f * atan2f(G0, G1 + G2);
 
-  const vec3 p   = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
-  const vec3 dir = vector_direction_stable(p, data.position);
+  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
+    pdf = 0.0f;
+    return get_vector(0.0f, 0.0f, 0.0f);
+  }
 
-  const vec3 face_normal = cross_product(triangle.edge1, triangle.edge2);
+  const float sampled_solid_angle = random.x * solid_angle;
+
+  const vec3 r = add_vector(
+    scale_vector(v0, G0 * cosf(0.5f * sampled_solid_angle) - G1 * sinf(0.5f * sampled_solid_angle)),
+    scale_vector(v2, G2 * sinf(0.5f * sampled_solid_angle)));
+
+  const vec3 v2_t = sub_vector(scale_vector(r, 2.0f * dot_product(v0, r) / dot_product(r, r)), v0);
+
+  const float s2 = dot_product(v1, v2_t);
+  const float s  = (1.0f - random.y) + random.y * s2;
+  const float t  = sqrtf(fmaxf((1.0f - s * s) / (1.0f - s2 * s2), 0.0f));
+
+  const vec3 dir = add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t));
 
   if (device.scene.material.light_side_mode != LIGHT_SIDE_MODE_BOTH) {
-    const float side = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
+    const vec3 face_normal = cross_product(triangle.edge1, triangle.edge2);
+    const float side       = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
 
     if (dot_product(face_normal, dir) * side > 0.0f) {
       // Reject side with no emission
@@ -45,17 +85,8 @@ __device__ vec3 light_sample_triangle(
     }
   }
 
-  dist = get_length(sub_vector(p, data.position));
-
-  // Use that surface * cos_term = 0.5 * |a x b| * |normal(a x b)^Td| = 0.5 * |a x b| * |(a x b)^Td|/|a x b| = 0.5 * |(a x b)^Td|.
-  const float surface_cos_term = 0.5f * fabsf(dot_product(face_normal, dir));
-
-  float solid_angle = surface_cos_term / (dist * dist);
-
-  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
-    pdf = 0.0f;
-    return get_vector(0.0f, 0.0f, 0.0f);
-  }
+  float2 coords;
+  dist = light_triangle_intersection_uv(triangle, data.position, dir, coords);
 
   pdf = 1.0f / solid_angle;
 
@@ -65,7 +96,7 @@ __device__ vec3 light_sample_triangle(
   color = get_color(0.0f, 0.0f, 0.0f);
 
   if (illum_tex != TEXTURE_NONE) {
-    const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, make_float2(u, v));
+    const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, coords);
     const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
 
     color = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
@@ -103,7 +134,7 @@ __device__ vec3 light_sample(
     }
     default: {
       const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
-      return light_sample_triangle(light, data, random, light_ray_index, pdf, dist, color);
+      return light_sample_triangle(light, data, random, pdf, dist, color);
     }
   }
 }
