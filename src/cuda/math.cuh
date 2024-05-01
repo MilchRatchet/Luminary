@@ -8,12 +8,21 @@
 #include "random.cuh"
 #include "utils.cuh"
 
+__device__ float difference_of_products(const float a, const float b, const float c, const float d) {
+  const float cd = c * d;
+
+  const float err = fmaf(-c, d, cd);
+  const float dop = fmaf(a, b, -cd);
+
+  return dop + err;
+}
+
 __device__ vec3 cross_product(const vec3 a, const vec3 b) {
   vec3 result;
 
-  result.x = a.y * b.z - a.z * b.y;
-  result.y = a.z * b.x - a.x * b.z;
-  result.z = a.x * b.y - a.y * b.x;
+  result.x = difference_of_products(a.y, b.z, a.z, b.y);
+  result.y = difference_of_products(a.z, b.x, a.x, b.z);
+  result.z = difference_of_products(a.x, b.y, a.y, b.x);
 
   return result;
 }
@@ -26,7 +35,7 @@ __device__ float dot_product(const vec3 a, const vec3 b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-__device__ __host__ float lerp(const float a, const float b, const float t) {
+__device__ float lerp(const float a, const float b, const float t) {
   return a + t * (b - a);
 }
 
@@ -69,7 +78,7 @@ __device__ vec3 get_vector(const float x, const float y, const float z) {
   return result;
 }
 
-__device__ __host__ vec3 add_vector(const vec3 a, const vec3 b) {
+__device__ vec3 add_vector(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = a.x + b.x;
@@ -555,7 +564,7 @@ __device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const fl
   return (t0 >= 0.0f) ? t0 : FLT_MAX;
 }
 
-__device__ __host__ vec3 angles_to_direction(const float altitude, const float azimuth) {
+__device__ vec3 angles_to_direction(const float altitude, const float azimuth) {
   vec3 dir;
   dir.x = cosf(azimuth) * cosf(altitude);
   dir.y = sinf(altitude);
