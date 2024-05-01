@@ -99,12 +99,38 @@ __device__ RGBF
   unsigned int alpha_data0, alpha_data1;
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
+  if (light_target != LIGHT_RAY_TARGET_TOY && device.scene.toy.active) {
+    const float toy_dist = get_toy_distance(shifted_position, dir);
+
+    if (toy_dist < dist) {
+      RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
+
+      if (luminance(toy_transparency) == 0.0f)
+        return get_color(0.0f, 0.0f, 0.0f);
+
+      // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
+      vec3 toy_hit_origin = add_vector(shifted_position, scale_vector(dir, toy_dist));
+      toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
+
+      const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
+
+      if (toy_dist2 + toy_dist < dist) {
+        toy_transparency = mul_color(toy_transparency, toy_transparency);
+      }
+
+      light_color = mul_color(light_color, toy_transparency);
+    }
+  }
+
   // Disable OMM opaque hits because we want to know if we hit something that is fully opaque so we can reject.
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1);
 
-  RGBF visibility = (hit_id != HIT_TYPE_REJECT) ? optix_decompress_color(alpha_data0, alpha_data1) : get_color(0.0f, 0.0f, 0.0f);
+  if (hit_id == HIT_TYPE_REJECT)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
 
   return mul_color(light_color, visibility);
 }

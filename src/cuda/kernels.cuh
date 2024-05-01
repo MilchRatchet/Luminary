@@ -180,44 +180,6 @@ LUMINARY_KERNEL void preprocess_trace_tasks() {
     }
 
     if (device.scene.toy.active) {
-      // if (device.iteration_type == TYPE_LIGHT) {
-      //   const float toy_dist = get_toy_distance(task.origin, task.ray);
-      //
-      //  if (toy_dist < depth) {
-      //    if (light_id == LIGHT_ID_TOY) {
-      //      if (toy_dist < depth) {
-      //        depth  = toy_dist;
-      //        hit_id = HIT_TYPE_TOY;
-      //      }
-      //    }
-      //    else {
-      //      // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
-      //      RGBF record = load_RGBF(device.ptrs.records + pixel);
-      //
-      //      RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
-      //
-      //      record = mul_color(record, toy_transparency);
-      //
-      //      vec3 hit_origin = add_vector(task.origin, scale_vector(task.ray, toy_dist));
-      //      hit_origin      = add_vector(hit_origin, scale_vector(task.ray, get_length(hit_origin) * eps * 16.0f));
-      //
-      //      const float toy_dist2 = get_toy_distance(hit_origin, task.ray);
-      //
-      //      if (toy_dist2 + toy_dist < depth) {
-      //        record = mul_color(record, toy_transparency);
-      //      }
-      //
-      //      if (luminance(record) == 0.0f) {
-      //        // If the toy causes full shadows, terminate the light task.
-      //        depth  = -1.0f;
-      //        hit_id = HIT_TYPE_REJECT;
-      //      }
-      //
-      //      store_RGBF(device.ptrs.records + pixel, record);
-      //    }
-      //  }
-      //}
-
       const float toy_dist = get_toy_distance(task.origin, task.ray);
 
       if (toy_dist < depth) {
