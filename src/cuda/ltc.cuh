@@ -1,6 +1,8 @@
 #ifndef CU_LTC_H
 #define CU_LTC_H
 
+#ifndef VOLUME_KERNEL
+
 #include "bsdf_utils.cuh"
 #include "math.cuh"
 #include "utils.cuh"
@@ -187,5 +189,7 @@ __device__ float ltc_integrate(GBufferData data, LTCCoefficients coeffs, Triangl
 
   return integral;
 }
+
+#endif /* VOLUME_KERNEL */
 
 #endif /* CU_LTC_H */

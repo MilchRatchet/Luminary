@@ -15,23 +15,26 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "particle_utils.cuh"
 #include "shading_kernel.cuh"
 #include "utils.cuh"
-#include "volume_utils.cuh"
+#include "volume.cuh"
 
 extern "C" __global__ void __raygen__optix() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    ParticleTask task = load_particle_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel   = task.index.y * device.width + task.index.x;
+    VolumeTask task = load_volume_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
+
+    const VolumeType volume_type = VOLUME_HIT_TYPE(task.hit_id);
+
+    const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
     write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
 
-    const GBufferData data = particle_generate_g_buffer(task, pixel);
+    const GBufferData data = volume_generate_g_buffer(task, pixel, volume);
 
     RGBF accumulated_light   = get_color(0.0f, 0.0f, 0.0f);
     uint32_t light_ray_index = 0;

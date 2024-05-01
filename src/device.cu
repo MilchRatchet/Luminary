@@ -123,7 +123,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
   optixrt_execute(instance->optix_kernel_geometry);
 
   if (instance->scene.particles.active) {
-    particle_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    optixrt_execute(instance->optix_kernel_particle);
   }
 
   if (instance->scene.ocean.active) {
@@ -133,11 +133,11 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   if (instance->scene.toy.active) {
-    process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    optixrt_execute(instance->optix_kernel_toy);
   }
 
   if (instance->scene.fog.active || instance->scene.ocean.active) {
-    volume_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+    optixrt_execute(instance->optix_kernel_volume);
   }
 }
 

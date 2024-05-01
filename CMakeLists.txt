@@ -50,7 +50,14 @@ endif()
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
 
-list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu" "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_geometry.cu" "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu")
+list(REMOVE_ITEM gpu_source_files
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_trace_particle.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_geometry.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_toy.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_volume.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu"
+)
 
 #=============================================================
 # SDL2
@@ -173,7 +180,10 @@ ceb_embed_files(
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
   $<TARGET_OBJECTS:optix_kernels>
+  $<TARGET_OBJECTS:optix_kernels_trace_particle>
   $<TARGET_OBJECTS:optix_kernels_geometry>
+  $<TARGET_OBJECTS:optix_kernels_toy>
+  $<TARGET_OBJECTS:optix_kernels_volume>
   $<TARGET_OBJECTS:optix_kernels_particle>
   ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
@@ -219,7 +229,10 @@ function(compile_ptx kernel_name)
 endfunction()
 
 compile_ptx(optix_kernels)
+compile_ptx(optix_kernels_trace_particle)
 compile_ptx(optix_kernels_geometry)
+compile_ptx(optix_kernels_toy)
+compile_ptx(optix_kernels_volume)
 compile_ptx(optix_kernels_particle)
 
 #=============================================================

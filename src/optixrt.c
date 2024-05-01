@@ -6,13 +6,11 @@
 #include <stdlib.h>
 
 #define UTILS_NO_DEVICE_TABLE
-#define UTILS_NO_DEVICE_FUNCTIONS
 
 #include "bench.h"
 #include "buffer.h"
 #include "ceb.h"
 #include "device.h"
-#include "utils.cuh"
 #include "utils.h"
 
 #define OPTIX_CHECK_LOGS(call, log)                                                                      \

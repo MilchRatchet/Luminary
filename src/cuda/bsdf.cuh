@@ -5,6 +5,7 @@
 #include "ocean_utils.cuh"
 #include "random.cuh"
 #include "utils.cuh"
+#include "volume_utils.cuh"
 
 __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const vec3 L) {
   BSDFRayContext context;
@@ -61,11 +62,15 @@ __device__ RGBF bsdf_evaluate_core(
 __device__ RGBF bsdf_evaluate(
   const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_transparent_pass,
   const float one_over_sampling_pdf = 1.0f) {
+#ifdef VOLUME_KERNEL
+  return scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), L), one_over_sampling_pdf);
+#else
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
 
   is_transparent_pass = context.is_refraction;
 
   return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf);
+#endif
 }
 
 __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3 H, const vec3 L, const bool is_refraction) {
@@ -104,24 +109,25 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
 }
 
 __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info, float& marginal) {
-  if (data.flags & G_BUFFER_VOLUME_HIT) {
-    const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
-    const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
+#ifdef VOLUME_KERNEL
+  const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
+  const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
 
-    const vec3 ray = scale_vector(data.V, -1.0f);
+  const vec3 ray = scale_vector(data.V, -1.0f);
 
-    const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
-                               ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
-                               : ocean_phase_sampling(ray, random_dir, random_choice);
+  const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
+                             ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
+                             : ocean_phase_sampling(ray, random_dir, random_choice);
 
-    const float cos_angle = -dot_product(scatter_ray, data.V);
+  const float cos_angle = -dot_product(scatter_ray, data.V);
 
-    marginal = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN) ? jendersie_eon_phase_function(cos_angle, data.roughness)
-                                                                   : ocean_phase(cos_angle);
+  info.weight = get_color(1.0f, 1.0f, 1.0f);
 
-    return scatter_ray;
-  }
+  marginal =
+    (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN) ? jendersie_eon_phase_function(cos_angle, data.roughness) : ocean_phase(cos_angle);
 
+  return scatter_ray;
+#else
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
@@ -243,6 +249,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   marginal = sample_pdf * choice_probability;
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+#endif
 }
 
 __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, const BSDFSampleInfo info) {

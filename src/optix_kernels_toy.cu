@@ -4,7 +4,6 @@
 // This emulates the old device.iteration_type == TYPE_LIGHT checks.
 #define SHADING_KERNEL
 #define OPTIX_KERNEL
-#define VOLUME_KERNEL
 
 #include "utils.h"
 
@@ -15,23 +14,25 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "particle_utils.cuh"
 #include "shading_kernel.cuh"
+#include "toy.cuh"
 #include "utils.cuh"
-#include "volume_utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_TOY];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_TOY];
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    ParticleTask task = load_particle_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel   = task.index.y * device.width + task.index.x;
+    ToyTask task    = load_toy_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel = task.index.y * device.width + task.index.x;
 
-    write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
+    GBufferData data = toy_generate_g_buffer(task, pixel);
 
-    const GBufferData data = particle_generate_g_buffer(task, pixel);
+    write_normal_buffer(data.normal, pixel);
+
+    if (!material_is_mirror(data.roughness, data.metallic))
+      write_albedo_buffer(opaque_color(data.albedo), pixel);
 
     RGBF accumulated_light   = get_color(0.0f, 0.0f, 0.0f);
     uint32_t light_ray_index = 0;
@@ -49,15 +50,27 @@ extern "C" __global__ void __raygen__optix() {
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_TOY, light_ray_index++));
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
+
+    if (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING))
+      accumulated_light = add_color(accumulated_light, data.emission);
+
     accumulated_light = mul_color(accumulated_light, record);
 
     write_beauty_buffer(accumulated_light, pixel);
 
     BSDFSampleInfo bounce_info;
     float bsdf_marginal;
-    const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info, bsdf_marginal);
+    vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info, bsdf_marginal);
 
-    RGBF bounce_record = record;
+    RGBF bounce_record = mul_color(record, bounce_info.weight);
+
+    const float shift = (bounce_info.is_transparent_pass) ? -eps : eps;
+    data.position     = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+    if (bounce_info.is_transparent_pass) {
+      const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(data.ior_in, pixel, ior_stack_method);
+    }
 
     TraceTask bounce_task;
     bounce_task.origin = data.position;

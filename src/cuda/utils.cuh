@@ -7,8 +7,6 @@
 #include "log.h"
 #include "utils.h"
 
-#define THREADS_PER_BLOCK 128
-#define BLOCKS_PER_GRID 2048
 #define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
 
 #ifndef OPTIX_KERNEL
@@ -66,7 +64,6 @@ __constant__ DeviceConstantMemory device;
 // Functions
 //===========================================================================================
 
-#ifndef UTILS_NO_DEVICE_FUNCTIONS
 __device__ static uint32_t get_pixel_id(const int x, const int y) {
   return x + device.width * y;
 }
@@ -88,7 +85,5 @@ __device__ static int get_task_address(const int number) {
   return get_task_address_of_thread(idx.x, idx.y, number);
 #endif
 }
-
-#endif
 
 #endif /* CU_UTILS_H */

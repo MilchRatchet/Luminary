@@ -24,7 +24,9 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
     blocked_light_id = load_triangle_light_id(data.hit_id);
   }
 
+#ifndef VOLUME_KERNEL
   LTCCoefficients coeffs = ltc_get_coefficients(data);
+#endif
 
   for (int i = 0; i < reservoir_size; i++) {
     uint32_t presampled_id = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_TBD_0 + light_ray_index * reservoir_size + i, pixel) * light_count;
@@ -35,8 +37,12 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
 
     TriangleLight triangle_light = load_triangle_light(device.restir.presampled_triangle_lights, presampled_id);
 
+#ifndef VOLUME_KERNEL
     const float sampled_target_pdf = ltc_integrate(data, coeffs, triangle_light) * device.scene.material.default_material.b;
-    const float sampled_pdf        = reservoir_sampling_pdf;
+#else
+    const float sampled_target_pdf = sample_triangle_solid_angle(triangle_light, data.position) * device.scene.material.default_material.b;
+#endif
+    const float sampled_pdf = reservoir_sampling_pdf;
 
     const float weight = (sampled_pdf > 0.0f) ? sampled_target_pdf / sampled_pdf : 0.0f;
 
