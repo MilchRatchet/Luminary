@@ -1,8 +1,11 @@
 #ifndef CU_BRDF_UNITTEST_H
 #define CU_BRDF_UNITTEST_H
 
+#define SHADING_KERNEL
+
 #include "bsdf.cuh"
 #include "buffer.h"
+#include "math.cuh"
 #include "utils.cuh"
 #include "utils.h"
 

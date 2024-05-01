@@ -78,10 +78,8 @@ __device__ RGBF
 
   vec3 shifted_position = data.position;
 #ifndef VOLUME_KERNEL
-  if (!(data.flags & G_BUFFER_VOLUME_HIT)) {
-    const float shift = (is_transparent_pass) ? -eps : eps;
-    shifted_position  = add_vector(shifted_position, scale_vector(data.V, shift * get_length(shifted_position)));
-  }
+  const float shift = (is_transparent_pass) ? -eps : eps;
+  shifted_position  = add_vector(shifted_position, scale_vector(data.V, shift * get_length(shifted_position)));
 #endif
 
   const float3 origin = make_float3(shifted_position.x, shifted_position.y, shifted_position.z);
@@ -125,6 +123,8 @@ __device__ RGBF
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
+
+  visibility = mul_color(visibility, volume_integrate_transmittance(shifted_position, dir, dist));
 
   return mul_color(light_color, visibility);
 }

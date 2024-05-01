@@ -1,6 +1,8 @@
 #ifndef CU_RIS_H
 #define CU_RIS_H
 
+#if defined(SHADING_KERNEL)
+
 #include "ltc.cuh"
 #include "math.cuh"
 #include "random.cuh"
@@ -66,5 +68,7 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
 
   return selected_id;
 }
+
+#endif /* SHADING_KERNEL */
 
 #endif /* CU_RIS_H */

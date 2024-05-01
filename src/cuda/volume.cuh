@@ -4,7 +4,6 @@
 #include "directives.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
-#include "restir.cuh"
 #include "state.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -27,25 +26,6 @@
 ////////////////////////////////////////////////////////////////////
 // Kernel
 ////////////////////////////////////////////////////////////////////
-
-__device__ GBufferData volume_generate_g_buffer(const VolumeTask task, const int pixel, const VolumeDescriptor volume) {
-  const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
-
-  GBufferData data;
-  data.hit_id = task.hit_id;
-  data.albedo = RGBAF_set(
-    volume.scattering.r * scattering_normalization, volume.scattering.g * scattering_normalization,
-    volume.scattering.b * scattering_normalization, 0.0f);
-  data.emission  = get_color(0.0f, 0.0f, 0.0f);
-  data.normal    = get_vector(0.0f, 0.0f, 0.0f);
-  data.position  = task.position;
-  data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = device.scene.fog.droplet_diameter;
-  data.metallic  = 0.0f;
-  data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
-
-  return data;
-}
 
 LUMINARY_KERNEL void volume_process_events() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];

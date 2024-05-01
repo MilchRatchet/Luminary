@@ -17,7 +17,7 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "memory.cuh"
 #include "shading_kernel.cuh"
 #include "utils.cuh"
-#include "volume.cuh"
+#include "volume_utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];

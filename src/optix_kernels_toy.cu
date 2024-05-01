@@ -15,7 +15,7 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "math.cuh"
 #include "memory.cuh"
 #include "shading_kernel.cuh"
-#include "toy.cuh"
+#include "toy_utils.cuh"
 #include "utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {

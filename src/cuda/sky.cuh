@@ -5,7 +5,6 @@
 
 #include "cloud_shadow.cuh"
 #include "math.cuh"
-#include "mis.cuh"
 #include "raytrace.h"
 #include "sky_utils.cuh"
 #include "stars.h"

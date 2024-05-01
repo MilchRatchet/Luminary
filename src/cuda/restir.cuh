@@ -7,6 +7,8 @@
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
+#ifndef LEGACY_RESTIR_IMPLEMENTATION
+
 //
 // This file implements light sampling based on ReSTIR. However, I ultimately decided to only use
 // weighted reservoir sampling using the BRDF as the target pdf. This is because I want to avoid
@@ -407,6 +409,8 @@ __device__ float restir_sample_marginal(
 
   return restir_target_pdf(data, ray, record, sample_dist, lum) / target_pdf_normalization;
 }
+
+#endif /* LEGACY_RESTIR_IMPLEMENTATION */
 
 LUMINARY_KERNEL void restir_candidates_pool_generation() {
   if (device.scene.triangle_lights_count == 0)

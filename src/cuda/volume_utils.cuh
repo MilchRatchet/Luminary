@@ -199,4 +199,54 @@ __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType v
   return scale_color(opaque_color(data.albedo), phase);
 }
 
+__device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray, const float depth) {
+  float fog_transmittance = 1.0f;
+  if (device.scene.fog.active) {
+    const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
+    const float2 path             = volume_compute_path(volume, origin, ray, depth);
+
+    if (path.x >= 0.0f) {
+      fog_transmittance = expf(-path.y * volume.max_scattering);
+    }
+  }
+
+  RGBF ocean_transmittance = get_color(1.0f, 1.0f, 1.0f);
+  if (device.scene.ocean.active) {
+    const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
+    const float2 path             = volume_compute_path(volume, origin, ray, depth);
+
+    if (path.x >= 0.0f) {
+      RGBF volume_transmittance = volume_get_transmittance(volume);
+
+      ocean_transmittance.r = expf(-path.y * volume_transmittance.r);
+      ocean_transmittance.g = expf(-path.y * volume_transmittance.g);
+      ocean_transmittance.b = expf(-path.y * volume_transmittance.b);
+    }
+  }
+
+  return scale_color(ocean_transmittance, fog_transmittance);
+}
+
+#ifdef VOLUME_KERNEL
+
+__device__ GBufferData volume_generate_g_buffer(const VolumeTask task, const int pixel, const VolumeDescriptor volume) {
+  const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
+
+  GBufferData data;
+  data.hit_id = task.hit_id;
+  data.albedo = RGBAF_set(
+    volume.scattering.r * scattering_normalization, volume.scattering.g * scattering_normalization,
+    volume.scattering.b * scattering_normalization, 0.0f);
+  data.emission  = get_color(0.0f, 0.0f, 0.0f);
+  data.normal    = get_vector(0.0f, 0.0f, 0.0f);
+  data.position  = task.position;
+  data.V         = scale_vector(task.ray, -1.0f);
+  data.roughness = device.scene.fog.droplet_diameter;
+  data.metallic  = 0.0f;
+  data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
+
+  return data;
+}
+#endif /* VOLUME_KERNEL */
+
 #endif /* CU_VOLUME_UTILS_H */

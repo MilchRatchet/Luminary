@@ -4,7 +4,6 @@
 #include "bsdf.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "restir.cuh"
 #include "utils.cuh"
 
 #define MIS_USE_POWER_HEURISTIC 1

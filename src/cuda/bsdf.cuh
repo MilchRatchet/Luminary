@@ -1,6 +1,8 @@
 #ifndef CU_BSDF_H
 #define CU_BSDF_H
 
+#if defined(SHADING_KERNEL)
+
 #include "bsdf_utils.cuh"
 #include "ocean_utils.cuh"
 #include "random.cuh"
@@ -318,5 +320,7 @@ __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, co
 
   return marginal * sample_pdf;
 }
+
+#endif /* SHADING_KERNEL */
 
 #endif /* CU_BSDF_H */
