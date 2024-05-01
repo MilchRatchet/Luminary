@@ -227,7 +227,7 @@ void optixrt_build_bvh(
   bvh->traversable  = traversable;
 }
 
-void optixrt_init(RaytraceInstance* instance) {
+void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   bench_tic("BVH Setup (OptiX)");
 
   ////////////////////////////////////////////////////////////////////
@@ -235,7 +235,7 @@ void optixrt_init(RaytraceInstance* instance) {
   ////////////////////////////////////////////////////////////////////
 
   OptixBuildInputDisplacementMicromap dmm;
-  if ((instance->device_info.rt_core_version >= 1 && instance->optix_bvh.force_dmm_usage) || instance->device_info.rt_core_version >= 3) {
+  if ((instance->device_info.rt_core_version >= 1 && options.dmm_active) || instance->device_info.rt_core_version >= 3) {
     dmm = micromap_displacement_build(instance);
   }
   else {
@@ -250,7 +250,7 @@ void optixrt_init(RaytraceInstance* instance) {
   OptixBuildInputOpacityMicromap omm;
   // OMM and DMM at the same time are only supported on RT core version 3.0 (Ada Lovelace)
   if (
-    (!instance->optix_bvh.disable_omm)
+    options.omm_active
     && (((instance->device_info.rt_core_version >= 1 && !dmm.displacementMicromapArray) || instance->device_info.rt_core_version >= 3))) {
     omm = micromap_opacity_build(instance);
   }

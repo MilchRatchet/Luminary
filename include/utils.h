@@ -483,8 +483,6 @@ struct OptixBVH {
   size_t bvh_mem_size;
   OptixTraversableHandle traversable;
   void* bvh_data;
-  int force_dmm_usage;
-  int disable_omm;
 } typedef OptixBVH;
 
 struct ParticlesInstance {

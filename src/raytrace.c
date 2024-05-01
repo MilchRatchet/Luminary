@@ -341,10 +341,6 @@ void raytrace_build_structures(RaytraceInstance* instance) {
     optixrt_particle_init(instance);
   }
 
-  if (instance->bvh_type == BVH_OPTIX && !instance->optix_bvh.initialized) {
-    optixrt_init(instance);
-  }
-
   if (instance->bvh_type == BVH_LUMINARY && !instance->luminary_bvh_initialized) {
     bvh_init(instance);
   }
@@ -610,6 +606,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_camera_post_init(instance);
   raytrace_update_device_pointers(instance);
   raytrace_prepare(instance);
+
+  optixrt_init(instance, options);
 
   instance->snap_resolution = SNAP_RESOLUTION_RENDER;
 

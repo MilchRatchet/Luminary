@@ -153,23 +153,27 @@ LUMINARY_KERNEL void preprocess_trace_tasks() {
         const float4 data1 = __ldg((float4*) triangle_get_entry_address(1, 0, t_id));
         const float data2  = __ldg((float*) triangle_get_entry_address(2, 0, t_id));
 
-        tt.vertex     = get_vector(data0.x, data0.y, data0.z);
-        tt.edge1      = get_vector(data0.w, data1.x, data1.y);
-        tt.edge2      = get_vector(data1.z, data1.w, data2);
-        tt.id         = t_id;
-        tt.albedo_tex = device.scene.materials[material_id].albedo_map;
-      }
+        tt.vertex = get_vector(data0.x, data0.y, data0.z);
+        tt.edge1  = get_vector(data0.w, data1.x, data1.y);
+        tt.edge2  = get_vector(data1.z, data1.w, data2);
+        tt.id     = t_id;
 
-      if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-        float2 coords;
-        const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
+        const Material mat = load_material(device.scene.materials, material_id);
 
-        if (dist < depth) {
-          const BVHAlphaResult alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
+        tt.albedo_tex = mat.albedo_map;
 
-          if (alpha_result != BVH_ALPHA_RESULT_TRANSPARENT) {
-            depth  = dist;
-            hit_id = t_id;
+        // This optimization does not work with displacement.
+        if (mat.normal_map == TEXTURE_NONE) {
+          float2 coords;
+          const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
+
+          if (dist < depth) {
+            const BVHAlphaResult alpha_result = bvh_triangle_intersection_alpha_test(tt, t_id, coords);
+
+            if (alpha_result != BVH_ALPHA_RESULT_TRANSPARENT) {
+              depth  = dist;
+              hit_id = t_id;
+            }
           }
         }
       }
