@@ -1048,7 +1048,13 @@ __device__ float sample_triangle_solid_angle(const TriangleLight triangle, const
   const float num   = fabsf(dot_product(a, cross_product(b, c)));
   const float denom = 1.0f + dot_product(a, b) + dot_product(a, c) + dot_product(b, c);
 
-  return 2.0f * atan2f(num, denom);
+  float solid_angle = 2.0f * atan2f(num, denom);
+
+  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
+    solid_angle = 0.0f;
+  }
+
+  return solid_angle;
 }
 
 /*

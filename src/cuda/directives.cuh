@@ -20,7 +20,7 @@
 #define WEIGHT_BASED_EXIT
 #define RUSSIAN_ROULETTE_CLAMP (1.0f / 8.0f)
 
-__device__ int validate_trace_task(TraceTask task, RGBF& record) {
+__device__ int validate_trace_task(const TraceTask task, RGBF& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT

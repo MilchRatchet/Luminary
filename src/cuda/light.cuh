@@ -6,6 +6,8 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
+enum LightRayTarget { LIGHT_RAY_TARGET_SUN = 0, LIGHT_RAY_TARGET_TOY = 1, LIGHT_RAY_TARGET_GEOMETRY = 2 } typedef LightRayTarget;
+
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);
   const float a = dot_product(triangle.edge1, h);
@@ -44,7 +46,6 @@ __device__ float light_triangle_intersection_uv(const TriangleLight triangle, co
  */
 __device__ vec3 light_sample_triangle(
   const TriangleLight triangle, const GBufferData data, const float2 random, float& solid_angle, float& dist, RGBF& color) {
-  // Projection of triangle onto unit sphere
   const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, data.position));
   const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), data.position));
   const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), data.position));
@@ -103,23 +104,36 @@ __device__ vec3 light_sample_triangle(
   return dir;
 }
 
+__device__ float light_sample_solid_angle(const LightRayTarget light_target, const uint32_t light_id, const GBufferData data) {
+  switch (light_target) {
+    case LIGHT_RAY_TARGET_SUN: {
+      vec3 sky_pos = world_to_sky_transform(data.position);
+      return sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, sky_pos);
+    }
+    case LIGHT_RAY_TARGET_TOY:
+      return toy_get_solid_angle(data.position);
+    case LIGHT_RAY_TARGET_GEOMETRY:
+    default: {
+      const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
+      return sample_triangle_solid_angle(light, data.position);
+    }
+  }
+}
+
 __device__ vec3 light_sample(
-  const uint32_t light_id, const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, float& solid_angle, float& dist,
-  RGBF& color) {
+  const LightRayTarget light_target, const uint32_t light_id, const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index,
+  float& solid_angle, float& dist, RGBF& color) {
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_TBD_1 + light_ray_index, pixel);
 
-  switch (light_id) {
-    case LIGHT_ID_NONE:
-      solid_angle = 0.0f;
-      return get_vector(0.0f, 0.0f, 0.0f);
-    case LIGHT_ID_SUN: {
+  switch (light_target) {
+    case LIGHT_RAY_TARGET_SUN: {
       vec3 sky_pos = world_to_sky_transform(data.position);
       vec3 ray     = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
       color        = sky_get_sun_color(sky_pos, ray);
       dist         = FLT_MAX;
       return ray;
     }
-    case LIGHT_ID_TOY: {
+    case LIGHT_RAY_TARGET_TOY: {
       solid_angle = toy_get_solid_angle(data.position);
       color       = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
       // Approximation, it is not super important what the actual distance is
@@ -127,6 +141,7 @@ __device__ vec3 light_sample(
 
       return toy_sample_ray(data.position, random);
     }
+    case LIGHT_RAY_TARGET_GEOMETRY:
     default: {
       const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
       return light_sample_triangle(light, data, random, solid_angle, dist, color);

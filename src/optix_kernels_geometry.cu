@@ -46,26 +46,70 @@ __device__ RGBF optix_decompress_color(unsigned int data0, unsigned int data1) {
   return color;
 }
 
-extern "C" __global__ void __raygen__optix() {
-  // For each [Light Queueable Task]
-  //  Get GBufferData
-  //
-  //  Apply bounce MIS to emission and apply
-  //
-  //  Init normalization constant (sum weights = 0, num weights = 0)
-  //  For [number of light rays]
-  //    Sample light source with RIS
-  //    Sample direction towards light with LTC + solid angle
-  //    Compute Visibility
-  //    If (Visibility > 0)
-  //      Compute light weight and accumulate in local color value
-  //
-  //  Apply normalization constant to accumulated local color value
-  //  Apply MIS weight to
-  //
-  //  Sample BRDF ray
-  //  Queue bounce ray and store normalization constant
+__device__ RGBF
+  optix_compute_light_ray(const GBufferData data, const ushort2 index, const LightRayTarget light_target, const uint32_t light_ray_index) {
+  float light_sampling_weight;
+  uint32_t light_id;
+  switch (light_target) {
+    case LIGHT_RAY_TARGET_SUN: {
+      const vec3 sky_pos     = world_to_sky_transform(data.position);
+      const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+      light_id               = (sun_visible) ? LIGHT_ID_SUN : LIGHT_ID_NONE;
+      light_sampling_weight  = (sun_visible) ? 1.0f : 0.0f;
+    } break;
+    case LIGHT_RAY_TARGET_TOY: {
+      const bool toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
+      light_id               = (toy_visible) ? LIGHT_ID_TOY : LIGHT_ID_NONE;
+      light_sampling_weight  = (toy_visible) ? 1.0f : 0.0f;
+    } break;
+    case LIGHT_RAY_TARGET_GEOMETRY:
+    default:
+      light_id = ris_sample_light(data, index, light_ray_index, light_sampling_weight);
+      break;
+  }
 
+  if (light_sampling_weight == 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  float solid_angle, dist;
+  RGBF light_color;
+  const vec3 dir = light_sample(light_target, light_id, data, index, light_ray_index, solid_angle, dist, light_color);
+
+  if (solid_angle == 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  bool is_transparent_pass;
+  RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, solid_angle * light_sampling_weight);
+
+  // TODO: Fix transparent ray directions. (They are currently causing a massive amount of fireflies.)
+  if (is_transparent_pass)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  light_color = mul_color(light_color, bsdf_value);
+
+  const float shift           = (is_transparent_pass) ? -eps : eps;
+  const vec3 shifted_position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+  const float3 origin = make_float3(shifted_position.x, shifted_position.y, shifted_position.z);
+  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
+
+  unsigned int hit_id = light_id;
+
+  // 21 bits for each color component.
+  unsigned int alpha_data0, alpha_data1;
+  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
+
+  // Disable OMM opaque hits because we want to know if we hit something that is fully opaque so we can reject.
+  optixTrace(
+    device.optix_bvh, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
+    alpha_data0, alpha_data1);
+
+  RGBF visibility = (hit_id != HIT_TYPE_REJECT) ? optix_decompress_color(alpha_data0, alpha_data1) : get_color(0.0f, 0.0f, 0.0f);
+
+  return mul_color(light_color, visibility);
+}
+
+extern "C" __global__ void __raygen__optix() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
@@ -81,59 +125,25 @@ extern "C" __global__ void __raygen__optix() {
     if (!material_is_mirror(data.roughness, data.metallic))
       write_albedo_buffer(opaque_color(data.albedo), pixel);
 
+    RGBF accumulated_light   = get_color(0.0f, 0.0f, 0.0f);
+    uint32_t light_ray_index = 0;
+
+    if (device.restir.num_light_rays) {
+      for (int j = 0; j < device.restir.num_light_rays; j++) {
+        accumulated_light =
+          add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_GEOMETRY, light_ray_index++));
+      }
+
+      accumulated_light = scale_color(accumulated_light, 1.0f / device.restir.num_light_rays);
+    }
+
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_SUN, light_ray_index++));
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_TOY, light_ray_index++));
+
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    RGBF accumulated_light =
-      (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING)) ? mul_color(data.emission, record) : get_color(0.0f, 0.0f, 0.0f);
-
-    for (int j = 0; j < device.restir.num_light_rays; j++) {
-      float light_sampling_weight;
-      const uint32_t light_id = ris_sample_light(data, task.index, j, light_sampling_weight);
-
-      if (light_sampling_weight == 0.0f)
-        continue;
-
-      float solid_angle, dist;
-      RGBF light_color;
-      const vec3 dir = light_sample(light_id, data, task.index, j, solid_angle, dist, light_color);
-
-      if (solid_angle == 0.0f)
-        continue;
-
-      bool is_transparent_pass;
-      RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, solid_angle * light_sampling_weight);
-
-      // TODO: Fix transparent ray directions. (They are currently causing a massive amount of fireflies.)
-      if (is_transparent_pass)
-        continue;
-
-      light_color = mul_color(light_color, bsdf_value);
-
-      const float shift           = (is_transparent_pass) ? -eps : eps;
-      const vec3 shifted_position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
-
-      const float3 origin = make_float3(shifted_position.x, shifted_position.y, shifted_position.z);
-      const float3 ray    = make_float3(dir.x, dir.y, dir.z);
-
-      // TODO: Make sure to set this to an invalid value for non triangle lights
-      unsigned int hit_id = light_id;
-
-      // 21 bits for each color component.
-      unsigned int alpha_data0, alpha_data1;
-      optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
-
-      // Disable OMM opaque hits because we want to know if we hit something that is fully opaque so we can reject.
-      optixTrace(
-        device.optix_bvh, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
-        alpha_data0, alpha_data1);
-
-      if (hit_id != HIT_TYPE_REJECT) {
-        RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-
-        accumulated_light =
-          add_color(accumulated_light, scale_color(mul_color(light_color, visibility), 1.0f / device.restir.num_light_rays));
-      }
-    }
+    if (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING))
+      accumulated_light = add_color(accumulated_light, data.emission);
 
     accumulated_light = mul_color(accumulated_light, record);
 
