@@ -8,6 +8,9 @@ extern "C" {
 #endif
 
 void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel);
+void optixrt_build_bvh(
+  RaytraceInstance* instance, OptixBVH* bvh, const OptixBuildInputDisplacementMicromap dmm, const OptixBuildInputOpacityMicromap omm,
+  const int is_for_light_rays);
 void optixrt_init(RaytraceInstance* instance);
 void optixrt_update_params(OptixKernel kernel);
 void optixrt_execute(OptixKernel kernel);

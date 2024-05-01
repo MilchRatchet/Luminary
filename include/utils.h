@@ -465,6 +465,7 @@ struct DeviceConstantMemory {
   RayEmitter emitter;
   int accum_mode;
   OptixTraversableHandle optix_bvh;
+  OptixTraversableHandle optix_bvh_light;
   OptixTraversableHandle optix_bvh_particles;
   Node8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
@@ -573,6 +574,7 @@ struct RaytraceInstance {
   OptixKernel optix_kernel;
   OptixKernel optix_kernel_geometry;
   OptixBVH optix_bvh;
+  OptixBVH optix_bvh_light;
   BVHType bvh_type;
   int luminary_bvh_initialized;
   ParticlesInstance particles_instance;

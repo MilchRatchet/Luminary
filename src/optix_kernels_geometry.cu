@@ -101,8 +101,8 @@ __device__ RGBF
 
   // Disable OMM opaque hits because we want to know if we hit something that is fully opaque so we can reject.
   optixTrace(
-    device.optix_bvh, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
-    alpha_data0, alpha_data1);
+    device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    hit_id, alpha_data0, alpha_data1);
 
   RGBF visibility = (hit_id != HIT_TYPE_REJECT) ? optix_decompress_color(alpha_data0, alpha_data1) : get_color(0.0f, 0.0f, 0.0f);
 
@@ -239,6 +239,7 @@ extern "C" __global__ void __anyhit__optix() {
 }
 
 extern "C" __global__ void __closesthit__optix() {
-  // Dummy closest hit, this will never get executed anyway due to the anyhit.
-  // I could maybe get rid of this by adding more logic during the optix kernel compilation.
+  if (load_triangle_light_id(optixGetPrimitiveIndex()) != optixGetPayload_0()) {
+    optixSetPayload_0(HIT_TYPE_REJECT);
+  }
 }
