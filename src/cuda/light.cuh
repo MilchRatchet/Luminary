@@ -75,7 +75,12 @@ __device__ vec3 light_sample_triangle(
   const float s  = (1.0f - random.y) + random.y * s2;
   const float t  = sqrtf(fmaxf((1.0f - s * s) / (1.0f - s2 * s2), 0.0f));
 
-  const vec3 dir = add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t));
+  const vec3 dir = normalize_vector(add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t)));
+
+  if (isnan(dir.x) || isnan(dir.y) || isnan(dir.z)) {
+    solid_angle = 0.0f;
+    return get_vector(0.0f, 0.0f, 0.0f);
+  }
 
   if (device.scene.material.light_side_mode != LIGHT_SIDE_MODE_BOTH) {
     const vec3 face_normal = cross_product(triangle.edge1, triangle.edge2);

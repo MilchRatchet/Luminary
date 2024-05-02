@@ -21,13 +21,13 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
 
   // Don't allow triangles to sample themselves.
   // TODO: This probably adds biasing.
-  uint32_t blocked_light_id = LIGHT_ID_TRIANGLE_ID_LIMIT + 1;
-  if (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) {
+  uint32_t blocked_light_id = LIGHT_ID_NONE;
+  if (data.hit_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
     blocked_light_id = load_triangle_light_id(data.hit_id);
   }
 
 #ifndef VOLUME_KERNEL
-  LTCCoefficients coeffs = ltc_get_coefficients(data);
+  const LTCCoefficients coeffs = ltc_get_coefficients(data);
 #endif
 
   for (int i = 0; i < reservoir_size; i++) {
