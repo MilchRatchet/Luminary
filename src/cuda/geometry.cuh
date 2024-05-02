@@ -39,7 +39,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
       write_beauty_buffer(get_color(red, green, blue), pixel, true);
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      const uint32_t v = random_uint32_t_base(0, task.hit_id);
+      const uint32_t v = random_uint32_t_base(0x55555555, task.hit_id);
 
       const uint16_t r = v & 0x7ff;
       const uint16_t g = (v >> 10) & 0x7ff;
