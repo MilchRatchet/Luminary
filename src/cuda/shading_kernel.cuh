@@ -3,6 +3,7 @@
 
 #if defined(SHADING_KERNEL) && defined(OPTIX_KERNEL)
 
+#include "bsdf.cuh"
 #include "light.cuh"
 #include "math.cuh"
 #include "memory.cuh"
@@ -62,7 +63,7 @@ __device__ RGBF
   RGBF light_color;
   const vec3 dir = light_sample(light_target, light_id, data, index, light_ray_index, solid_angle, dist, light_color);
 
-  if (solid_angle == 0.0f)
+  if (solid_angle == 0.0f || luminance(light_color) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
   bool is_transparent_pass;

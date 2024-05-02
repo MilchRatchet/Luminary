@@ -37,7 +37,19 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
     if (id == blocked_light_id)
       continue;
 
-    TriangleLight triangle_light = load_triangle_light(device.restir.presampled_triangle_lights, presampled_id);
+    const TriangleLight triangle_light = load_triangle_light(device.restir.presampled_triangle_lights, presampled_id);
+
+    // Reject if the light has no emission towards us.
+    if (device.scene.material.light_side_mode != LIGHT_SIDE_MODE_BOTH) {
+      const vec3 face_normal = cross_product(triangle_light.edge1, triangle_light.edge2);
+      const float direction  = dot_product(face_normal, sub_vector(triangle_light.vertex, data.position));
+
+      const float side = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
+
+      if (direction * side > 0.0f) {
+        continue;
+      }
+    }
 
 #ifndef VOLUME_KERNEL
     const float sampled_target_pdf = ltc_integrate(data, coeffs, triangle_light) * device.scene.material.default_material.b;

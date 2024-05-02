@@ -82,19 +82,14 @@ __device__ vec3 light_sample_triangle(
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
-  if (device.scene.material.light_side_mode != LIGHT_SIDE_MODE_BOTH) {
-    const vec3 face_normal = cross_product(triangle.edge1, triangle.edge2);
-    const float side       = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
-
-    if (dot_product(face_normal, dir) * side > 0.0f) {
-      // Reject side with no emission
-      solid_angle = 0.0f;
-      return get_vector(0.0f, 0.0f, 0.0f);
-    }
-  }
-
   float2 coords;
   dist = light_triangle_intersection_uv(triangle, data.position, dir, coords);
+
+  // Our ray does not actually hit the light, abort.
+  if (dist == FLT_MAX) {
+    solid_angle = 0.0f;
+    return get_vector(0.0f, 0.0f, 0.0f);
+  }
 
   const uint16_t illum_tex = device.scene.materials[triangle.material_id].luminance_map;
 
