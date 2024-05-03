@@ -471,6 +471,9 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->output_width  = general.width;
   instance->output_height = general.height;
 
+  instance->user_selected_x = 0xFFFF;
+  instance->user_selected_y = 0xFFFF;
+
   if (general.denoiser == DENOISING_UPSCALING) {
     if (instance->width * instance->height > 18144000) {
       error_message(
@@ -673,6 +676,8 @@ void raytrace_prepare(RaytraceInstance* instance) {
   raytrace_update_ray_emitter(instance);
   device_update_symbol(accum_mode, instance->accum_mode);
   device_update_symbol(restir, instance->restir);
+  device_update_symbol(user_selected_x, instance->user_selected_x);
+  device_update_symbol(user_selected_y, instance->user_selected_y);
   raytrace_build_structures(instance);
 }
 

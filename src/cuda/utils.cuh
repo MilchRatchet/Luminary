@@ -64,6 +64,10 @@ __constant__ DeviceConstantMemory device;
 // Functions
 //===========================================================================================
 
+__device__ static bool is_selected_pixel(const ushort2 index) {
+  return (index.x == device.user_selected_x && index.y == device.user_selected_y);
+}
+
 __device__ static uint32_t get_pixel_id(const int x, const int y) {
   return x + device.width * y;
 }

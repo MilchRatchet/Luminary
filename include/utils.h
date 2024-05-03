@@ -448,6 +448,8 @@ struct DeviceConstantMemory {
   DevicePointers ptrs;
   Scene scene;
   ReSTIRSettings restir;
+  uint16_t user_selected_x;
+  uint16_t user_selected_y;
   int max_ray_depth;
   int pixels_per_thread;
   int depth;
@@ -509,6 +511,8 @@ struct RaytraceInstance {
   unsigned int height;
   unsigned int output_width;
   unsigned int output_height;
+  uint16_t user_selected_x;
+  uint16_t user_selected_y;
   int realtime;
   DeviceBuffer* ior_stack;
   DeviceBuffer* trace_tasks;

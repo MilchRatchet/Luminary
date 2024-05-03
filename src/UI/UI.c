@@ -840,7 +840,7 @@ static UITab* UI_get_active_tab(UI* ui) {
   return active_tab;
 }
 
-void handle_mouse_UI(UI* ui) {
+void handle_mouse_UI(UI* ui, RaytraceInstance* instance) {
   if (!ui->active)
     return;
 
@@ -855,6 +855,11 @@ void handle_mouse_UI(UI* ui) {
     ui->mouse_flags &= ~MOUSE_DRAGGING_SLIDER;
 
     SDL_SetRelativeMouseMode(SDL_FALSE);
+  }
+
+  if (SDL_BUTTON_RMASK & state) {
+    instance->user_selected_x = (uint16_t) ((((double) x) / ui->max_x) * instance->width);
+    instance->user_selected_y = (uint16_t) ((((double) y) / ui->max_y) * instance->height);
   }
 
   ui->scroll_pos -= MOUSE_SCROLL_SPEED * ui->mouse_wheel;
