@@ -19,7 +19,11 @@ __device__ unsigned int __bfind(unsigned int a) {
  */
 __device__ float __fslctf(const float a, const float b, const float c) {
   float result;
+#ifndef OPTIX_KERNEL
   asm("slct.f32.f32 %0, %1, %2, %3;" : "=f"(result) : "f"(a), "f"(b), "f"(c));
+#else
+  result = (c >= 0.0f) ? a : b;
+#endif
   return result;
 }
 

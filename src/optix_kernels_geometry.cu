@@ -11,7 +11,7 @@ extern "C" static __constant__ DeviceConstantMemory device;
 
 #include "bsdf.cuh"
 #include "directives.cuh"
-#include "geometry.cuh"
+#include "geometry_utils.cuh"
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
