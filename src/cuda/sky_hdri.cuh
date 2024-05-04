@@ -62,7 +62,7 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst) {
       sky_origin = add_vector(sky_origin, scale_vector(ray, offset));
     }
 
-    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, true, device.scene.sky.steps, pixel_coords);
+    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, false, device.scene.sky.steps, pixel_coords);
 
     color = add_color(color, mul_color(sky, cloud_transmittance));
 
