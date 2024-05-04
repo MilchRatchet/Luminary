@@ -168,9 +168,9 @@ __device__ vec3 scale_vector(vec3 vector, const float scale) {
   return vector;
 }
 
-__device__ vec3 reflect_vector(const vec3 ray, const vec3 normal) {
-  const float dot   = dot_product(ray, normal);
-  const vec3 result = sub_vector(ray, scale_vector(normal, 2.0f * dot));
+__device__ vec3 reflect_vector(const vec3 V, const vec3 normal) {
+  const float dot   = dot_product(V, normal);
+  const vec3 result = sub_vector(scale_vector(normal, 2.0f * dot), V);
 
   return normalize_vector(result);
 }
@@ -574,17 +574,17 @@ __device__ vec3 angles_to_direction(const float altitude, const float azimuth) {
 }
 
 // PBRT v3 Chapter "Specular Reflection and Transmission", Refract() function
-__device__ vec3 refract_vector(const vec3 ray, const vec3 normal, const float index_ratio) {
-  const float dot = fabsf(dot_product(normal, ray));
+__device__ vec3 refract_vector(const vec3 V, const vec3 normal, const float index_ratio) {
+  const float dot = fabsf(dot_product(normal, V));
 
   const float b = 1.0f - index_ratio * index_ratio * (1.0f - dot * dot);
 
   if (b < 0.0f) {
     // Total reflection
-    return reflect_vector(ray, normal);
+    return reflect_vector(V, normal);
   }
   else {
-    return normalize_vector(add_vector(scale_vector(ray, index_ratio), scale_vector(normal, index_ratio * dot - sqrtf(b))));
+    return normalize_vector(add_vector(scale_vector(V, -index_ratio), scale_vector(normal, index_ratio * dot - sqrtf(b))));
   }
 }
 

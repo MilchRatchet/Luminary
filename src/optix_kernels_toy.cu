@@ -69,7 +69,7 @@ extern "C" __global__ void __raygen__optix() {
 
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(data.ior_in, pixel, ior_stack_method);
+      ior_stack_interact(data.ior_out, pixel, ior_stack_method);
     }
 
     TraceTask bounce_task;

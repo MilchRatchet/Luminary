@@ -98,21 +98,23 @@ LUMINARY_KERNEL void process_ocean_tasks() {
 
     write_normal_buffer(normal, pixel);
 
-    const vec3 refraction_dir = refract_vector(task.ray, normal, ior_in / ior_out);
+    const vec3 V = scale_vector(task.ray, -1.0f);
+
+    const vec3 refraction_dir = refract_vector(V, normal, ior_in / ior_out);
 
     const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, ior_in, ior_out);
 
     vec3 bounce_ray;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) < reflection_coefficient) {
-      task.position = add_vector(task.position, scale_vector(task.ray, -2.0f * eps * (1.0f + get_length(task.position))));
-      bounce_ray    = reflect_vector(task.ray, normal);
+      task.position = add_vector(task.position, scale_vector(V, 2.0f * eps * (1.0f + get_length(task.position))));
+      bounce_ray    = reflect_vector(V, normal);
     }
     else {
       bounce_ray    = refraction_dir;
       task.position = add_vector(task.position, scale_vector(bounce_ray, 2.0f * eps * (1.0f + get_length(task.position))));
 
       const IORStackMethod ior_stack_method = (inside_water) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(ior_in, pixel, ior_stack_method);
+      ior_stack_interact(ior_out, pixel, ior_stack_method);
     }
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);

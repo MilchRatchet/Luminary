@@ -306,7 +306,9 @@ struct GBufferData {
   float roughness;
   float metallic;
   uint32_t flags;
+  /* IOR of medium in direction of V. */
   float ior_in;
+  /* IOR of medium on the other side. */
   float ior_out;
   uint32_t colored_dielectric;
 } typedef GBufferData;
