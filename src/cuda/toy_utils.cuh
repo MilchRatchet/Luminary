@@ -65,28 +65,14 @@ __device__ vec3 get_toy_normal(const vec3 position) {
   return get_vector(0.0f, 1.0f, 0.0f);
 }
 
-__device__ bool toy_sphere_is_inside(const vec3 position) {
-  const vec3 diff = sub_vector(position, device.scene.toy.position);
-  return (dot_product(diff, diff) < device.scene.toy.scale * device.scene.toy.scale);
-}
+__device__ bool toy_is_inside(const vec3 position, const vec3 ray) {
+  // There is no inside for a plane.
+  if (device.scene.toy.shape == TOY_PLANE)
+    return false;
 
-__device__ bool toy_plane_is_inside(const vec3 position) {
-  const vec3 n = toy_plane_normal(position);
+  const vec3 normal = get_toy_normal(position);
 
-  const float dot = dot_product(n, sub_vector(position, device.scene.toy.position));
-
-  return (dot < 0.0f);
-}
-
-__device__ bool toy_is_inside(const vec3 position) {
-  switch (device.scene.toy.shape) {
-    case TOY_SPHERE:
-      return toy_sphere_is_inside(position);
-    case TOY_PLANE:
-      return toy_plane_is_inside(position);
-  }
-
-  return false;
+  return (dot_product(normal, ray) >= 0.0f);
 }
 
 __device__ float toy_plane_solid_angle(const vec3 position) {
@@ -152,7 +138,7 @@ __device__ GBufferData toy_generate_g_buffer(const ToyTask task, const int pixel
     emission = get_color(0.0f, 0.0f, 0.0f);
   }
 
-  if (toy_is_inside(task.position)) {
+  if (toy_is_inside(task.position, task.ray)) {
     flags |= G_BUFFER_REFRACTION_IS_INSIDE;
   }
 

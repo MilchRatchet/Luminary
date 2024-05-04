@@ -102,8 +102,8 @@ __device__ float bsdf_shadowed_F90(const RGBF specular_f0) {
 // Refraction
 ///////////////////////////////////////////////////
 
-__device__ float bsdf_refraction_index_ambient(const vec3 position) {
-  if (device.scene.toy.active && toy_is_inside(position))
+__device__ float bsdf_refraction_index_ambient(const vec3 position, const vec3 ray) {
+  if (device.scene.toy.active && toy_is_inside(position, ray))
     return device.scene.toy.refractive_index;
 
   if (device.scene.ocean.active && position.y < device.scene.ocean.height)
