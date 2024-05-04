@@ -8,8 +8,6 @@ __device__ vec3 particle_transform_relative(vec3 p) {
   return sub_vector(p, device.scene.camera.pos);
 }
 
-#ifdef SHADING_KERNEL
-
 __device__ GBufferData particle_generate_g_buffer(const ParticleTask task, const int pixel) {
   Quad q   = load_quad(device.particle_quads, task.hit_id & HIT_TYPE_PARTICLE_MASK);
   q.vertex = particle_transform_relative(q.vertex);
@@ -38,7 +36,5 @@ __device__ GBufferData particle_generate_g_buffer(const ParticleTask task, const
 
   return data;
 }
-
-#endif /* SHADING_KERNEL */
 
 #endif /* CU_PARTICLE_UTILS_H */

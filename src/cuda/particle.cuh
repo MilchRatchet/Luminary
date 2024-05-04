@@ -15,9 +15,7 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
     const int pixel   = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      const GBufferData data = particle_generate_g_buffer(task, pixel);
-
-      write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
+      write_beauty_buffer(device.scene.particles.albedo, pixel, true);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
@@ -55,9 +53,7 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
       write_beauty_buffer(color, pixel, true);
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
-      const GBufferData data = particle_generate_g_buffer(task, pixel);
-
-      write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
+      write_beauty_buffer(device.scene.particles.albedo, pixel, true);
     }
   }
 }

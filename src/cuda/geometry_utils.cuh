@@ -54,8 +54,6 @@ __device__ vec3 geometry_compute_normal(
   return normal;
 }
 
-#ifdef SHADING_KERNEL
-
 __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const int pixel) {
   const float4 t1 = __ldg((float4*) triangle_get_entry_address(0, 0, task.hit_id));
   const float4 t2 = __ldg((float4*) triangle_get_entry_address(1, 0, task.hit_id));
@@ -162,7 +160,5 @@ __device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const
 
   return data;
 }
-
-#endif
 
 #endif /* CU_GEOMETRY_UTILS_H */

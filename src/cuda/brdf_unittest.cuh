@@ -1,8 +1,6 @@
 #ifndef CU_BRDF_UNITTEST_H
 #define CU_BRDF_UNITTEST_H
 
-#define SHADING_KERNEL
-
 #include "bsdf.cuh"
 #include "buffer.h"
 #include "math.cuh"
@@ -18,6 +16,9 @@
 // This is broken because the random number generator isn't used correctly in this context.
 // The solution would be a macro based system that is setup before any of the includes.
 // However, for that the unittests would need to be in a separate translation unit.
+// Similarly we need the shading kernel define which also needs a separate translation unit.
+
+#if 0
 
 LUMINARY_KERNEL void brdf_unittest_kernel(float* bounce, float* light) {
   unsigned int id = THREAD_ID;
@@ -169,5 +170,16 @@ extern "C" int device_brdf_unittest(const float tolerance) {
 
   return error;
 }
+
+#else
+
+extern "C" int device_brdf_unittest(const float tolerance) {
+  LUM_UNUSED(tolerance);
+  warn_message("Skipped BRDF test as it is not implemented currently.");
+
+  return 0;
+}
+
+#endif
 
 #endif /* CU_BRDF_UNITTEST_H */

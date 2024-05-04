@@ -7,7 +7,7 @@
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
-#ifndef LEGACY_RESTIR_IMPLEMENTATION
+#ifdef LEGACY_RESTIR_IMPLEMENTATION
 
 //
 // This file implements light sampling based on ReSTIR. However, I ultimately decided to only use
