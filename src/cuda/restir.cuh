@@ -194,7 +194,7 @@ __device__ vec3
     weight              = scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), ray), light.weight);
   }
   else {
-    weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, 1.0f), light.weight);
+    weight = scale_color(bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, 1.0f), light.weight);
   }
 
   return ray;
@@ -207,8 +207,7 @@ __device__ float restir_target_pdf(
     bsdf_weight = volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), ray);
   }
   else {
-    bool is_transparent_pass;
-    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_transparent_pass, 1.0f);
+    bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, 1.0f);
   }
 
   const RGBF color_value = mul_color(mul_color(emission, bsdf_weight), record);

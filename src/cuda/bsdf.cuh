@@ -15,11 +15,12 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.NdotL = dot_product(data.normal, L);
   context.NdotV = fabsf(dot_product(data.normal, data.V));
 
-  // Refraction rays can leave the surface and reflections could enter the surface, we hack here and simply swap their meaning around based
-  // on if they enter or leave, otherwise it is not clear which of the two a ray should be.
-  context.is_refraction = (context.NdotL < 0.0f);
+  context.is_refraction = false;
 
-  context.NdotL = fabsf(context.NdotL);
+  if (data.flags & G_BUFFER_IS_TRANSPARENT_PASS) {
+    context.NdotL *= -1.0f;
+    context.is_refraction = true;
+  }
 
   const float ior_in  = fminf(2.999f, fmaxf(1.0f, data.ior_in));
   const float ior_out = fminf(2.999f, fmaxf(1.0f, data.ior_out));
@@ -35,11 +36,6 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   }
 
   refraction_vector = refract_vector(data.V, context.H, context.refraction_index);
-
-  // Invalidate refraction rays that are not possible
-  if (context.is_refraction && dot_product(L, refraction_vector) < 1.0f - 64.0f * eps) {
-    context.NdotL = -1.0f;
-  }
 
   context.NdotH = fabsf(dot_product(data.normal, context.H));
   context.HdotV = fabsf(dot_product(context.H, data.V));
@@ -61,15 +57,12 @@ __device__ RGBF bsdf_evaluate_core(
   return bsdf_multiscattering_evaluate(data, context, sampling_hint, one_over_sampling_pdf);
 }
 
-__device__ RGBF bsdf_evaluate(
-  const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_transparent_pass,
-  const float one_over_sampling_pdf = 1.0f) {
+__device__ RGBF
+  bsdf_evaluate(const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf = 1.0f) {
 #ifdef VOLUME_KERNEL
   return scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), L), one_over_sampling_pdf);
 #else
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
-
-  is_transparent_pass = context.is_refraction;
 
   return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf);
 #endif
@@ -122,7 +115,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   const float cos_angle = -dot_product(scatter_ray, data.V);
 
-  info.weight = get_color(1.0f, 1.0f, 1.0f);
+  info.weight                = get_color(1.0f, 1.0f, 1.0f);
+  info.transparent_pass_prob = 1.0f;
 
   marginal =
     (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN) ? jendersie_eon_phase_function(cos_angle, data.roughness) : ocean_phase(cos_angle);
@@ -145,6 +139,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   vec3 ray_local;
 
   const vec3 sampled_microfacet = bsdf_microfacet_sample(data_local, pixel);
+
+  info.transparent_pass_prob = 1.0f - data.albedo.a;
 
   vec3 sampled_microfacet_refraction;
   float choice_probability = 1.0f;
@@ -233,6 +229,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     info.weight              = final_weight;
     info.sampled_technique   = BSDF_DIELECTRIC;
     info.is_microfacet_based = true;
+    info.transparent_pass_prob *= refraction_probability;
   }
 
   float sample_pdf;

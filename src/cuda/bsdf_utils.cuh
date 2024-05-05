@@ -38,6 +38,7 @@ struct BSDFSampleInfo {
   // MIS sampled technique data
   BSDFMaterial sampled_technique;
   float antagonist_weight;
+  float transparent_pass_prob;
 } typedef BSDFSampleInfo;
 
 enum BSDFLUT { BSDF_LUT_SS = 0, BSDF_LUT_SPECULAR = 1, BSDF_LUT_DIELEC = 2, BSDF_LUT_DIELEC_INV = 3 } typedef BSDFLUT;

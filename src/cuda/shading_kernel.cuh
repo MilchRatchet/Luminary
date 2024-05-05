@@ -66,24 +66,11 @@ __device__ RGBF
   if (solid_angle == 0.0f || luminance(light_color) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  bool is_transparent_pass;
-  RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_transparent_pass, solid_angle * light_sampling_weight);
-
-#ifndef VOLUME_KERNEL
-  // TODO: Fix transparent ray directions. (They are currently causing a massive amount of fireflies.)
-  if (is_transparent_pass)
-    return get_color(0.0f, 0.0f, 0.0f);
-#endif
+  RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, solid_angle * light_sampling_weight);
 
   light_color = mul_color(light_color, bsdf_value);
 
-  vec3 shifted_position = data.position;
-#ifndef VOLUME_KERNEL
-  const float shift = (is_transparent_pass) ? -eps : eps;
-  shifted_position  = add_vector(shifted_position, scale_vector(data.V, shift * get_length(shifted_position)));
-#endif
-
-  const float3 origin = make_float3(shifted_position.x, shifted_position.y, shifted_position.z);
+  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
   unsigned int hit_id = light_id;
@@ -93,16 +80,19 @@ __device__ RGBF
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
   if (light_target != LIGHT_RAY_TARGET_TOY && device.scene.toy.active) {
-    const float toy_dist = get_toy_distance(shifted_position, dir);
+    const float toy_dist = get_toy_distance(data.position, dir);
 
     if (toy_dist < dist) {
+      if (device.scene.toy.refractive_index != data.ior_in)
+        return get_color(0.0f, 0.0f, 0.0f);
+
       RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
 
       if (luminance(toy_transparency) == 0.0f)
         return get_color(0.0f, 0.0f, 0.0f);
 
       // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
-      vec3 toy_hit_origin = add_vector(shifted_position, scale_vector(dir, toy_dist));
+      vec3 toy_hit_origin = add_vector(data.position, scale_vector(dir, toy_dist));
       toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
 
       const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
@@ -115,17 +105,19 @@ __device__ RGBF
     }
   }
 
+  unsigned int ior_for_traversal = __float_as_uint(data.ior_in);
+
   // Disable OMM opaque hits because we want to know if we hit something that is fully opaque so we can reject.
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
-    hit_id, alpha_data0, alpha_data1);
+    hit_id, alpha_data0, alpha_data1, ior_for_traversal);
 
   if (hit_id == HIT_TYPE_REJECT)
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
 
-  visibility = mul_color(visibility, volume_integrate_transmittance(shifted_position, dir, dist));
+  visibility = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
 
   return mul_color(light_color, visibility);
 }
@@ -137,12 +129,13 @@ __device__ RGBF
 __device__ RGBAF optix_alpha_test() {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
-  const uint32_t material_id = load_triangle_material_id(hit_id);
-  const uint16_t tex         = __ldg(&(device.scene.materials[material_id].albedo_map));
+  const uint32_t material_id   = load_triangle_material_id(hit_id);
+  const float refraction_index = __ldg(&(device.scene.materials[material_id].refraction_index));
+  const uint16_t tex           = __ldg(&(device.scene.materials[material_id].albedo_map));
 
   RGBAF albedo = get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
 
-  if (tex != TEXTURE_NONE) {
+  if (tex != TEXTURE_NONE && refraction_index == __uint_as_float(optixGetPayload_3())) {
     const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
 
     const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v);

@@ -52,7 +52,10 @@ __device__ uint32_t ris_sample_light(const GBufferData data, const ushort2 pixel
     }
 
 #ifndef VOLUME_KERNEL
-    const float sampled_target_pdf = ltc_integrate(data, coeffs, triangle_light) * device.scene.material.default_material.b;
+    const float integrated_triangle = (data.flags & G_BUFFER_IS_TRANSPARENT_PASS)
+                                        ? sample_triangle_solid_angle(triangle_light, data.position)
+                                        : ltc_integrate(data, coeffs, triangle_light);
+    const float sampled_target_pdf  = integrated_triangle * device.scene.material.default_material.b;
 #else
     const float sampled_target_pdf = sample_triangle_solid_angle(triangle_light, data.position) * device.scene.material.default_material.b;
 #endif

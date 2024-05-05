@@ -34,29 +34,7 @@ extern "C" __global__ void __raygen__optix() {
     if (!material_is_mirror(data.roughness, data.metallic))
       write_albedo_buffer(opaque_color(data.albedo), pixel);
 
-    RGBF accumulated_light   = get_color(0.0f, 0.0f, 0.0f);
-    uint32_t light_ray_index = 0;
-
-    if (device.restir.num_light_rays) {
-      for (int j = 0; j < device.restir.num_light_rays; j++) {
-        accumulated_light =
-          add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_GEOMETRY, light_ray_index++));
-      }
-
-      accumulated_light = scale_color(accumulated_light, 1.0f / device.restir.num_light_rays);
-    }
-
-    accumulated_light = add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_SUN, light_ray_index++));
-    accumulated_light = add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_TOY, light_ray_index++));
-
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
-
-    if (state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING))
-      accumulated_light = add_color(accumulated_light, data.emission);
-
-    accumulated_light = mul_color(accumulated_light, record);
-
-    write_beauty_buffer(accumulated_light, pixel);
 
     BSDFSampleInfo bounce_info;
     float bsdf_marginal;
@@ -68,6 +46,7 @@ extern "C" __global__ void __raygen__optix() {
     data.position     = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
     if (bounce_info.is_transparent_pass) {
+      data.flags |= G_BUFFER_IS_TRANSPARENT_PASS;
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(data.ior_out, pixel, ior_stack_method);
     }
@@ -77,12 +56,51 @@ extern "C" __global__ void __raygen__optix() {
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 
+    const bool use_light_rays =
+      !(bounce_info.is_transparent_pass && data.ior_in == data.ior_out) && !(bounce_info.is_microfacet_based && data.roughness < 0.05f);
+    const bool include_emission = state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+
     if (validate_trace_task(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
 
-      state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+      if (use_light_rays) {
+        state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+      }
+      else {
+        state_consume(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+      }
     }
+
+    RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
+
+    if (use_light_rays) {
+      uint32_t light_ray_index = 0;
+
+      if (device.restir.num_light_rays) {
+        for (int j = 0; j < device.restir.num_light_rays; j++) {
+          accumulated_light =
+            add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_GEOMETRY, light_ray_index++));
+        }
+
+        accumulated_light = scale_color(accumulated_light, 1.0f / device.restir.num_light_rays);
+      }
+
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_SUN, light_ray_index++));
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray(data, task.index, LIGHT_RAY_TARGET_TOY, light_ray_index++));
+
+      const float side_prob =
+        (bounce_info.is_transparent_pass) ? bounce_info.transparent_pass_prob : (1.0f - bounce_info.transparent_pass_prob);
+
+      accumulated_light = scale_color(accumulated_light, 1.0f / side_prob);
+    }
+
+    if (include_emission)
+      accumulated_light = add_color(accumulated_light, data.emission);
+
+    accumulated_light = mul_color(accumulated_light, record);
+
+    write_beauty_buffer(accumulated_light, pixel);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = trace_count;
