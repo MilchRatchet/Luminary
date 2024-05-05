@@ -107,7 +107,6 @@ __device__ RGBF
 
   unsigned int compressed_ior = ior_compress(data.ior_in);
 
-  // Disable OMM opaque hits because we want to know if we hit something that is fully opaque so we can reject.
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);

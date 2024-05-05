@@ -246,23 +246,17 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
   }
 }
 
-__device__ void write_normal_buffer(vec3 normal, const int pixel) {
+__device__ void write_normal_buffer(const vec3 normal, const int pixel) {
   if ((!device.denoiser && !device.aov_mode) || !IS_PRIMARY_RAY)
     return;
 
   if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION)
     return;
 
-  const float normal_norm = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
-
-  if (normal_norm > eps) {
-    normal = scale_vector(normal, 1.0f / normal_norm);
-  }
-
   device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
 }
 
-__device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set = false) {
+__device__ void write_beauty_buffer(const RGBF beauty, const int pixel, const bool mode_set = false) {
   RGBF output = beauty;
   if (!mode_set) {
     output = add_color(beauty, load_RGBF(device.ptrs.frame_buffer + pixel));
@@ -271,14 +265,14 @@ __device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set 
 
   if (device.aov_mode) {
     if (device.depth <= 1) {
-      RGBF output = beauty;
+      output = beauty;
       if (!mode_set) {
         output = add_color(beauty, load_RGBF(device.ptrs.frame_direct_buffer + pixel));
       }
       store_RGBF(device.ptrs.frame_direct_buffer + pixel, output);
     }
     else {
-      RGBF output = beauty;
+      output = beauty;
       if (!mode_set) {
         output = add_color(beauty, load_RGBF(device.ptrs.frame_indirect_buffer + pixel));
       }
