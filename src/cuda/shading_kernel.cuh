@@ -83,7 +83,7 @@ __device__ RGBF
     const float toy_dist = get_toy_distance(data.position, dir);
 
     if (toy_dist < dist) {
-      if (device.scene.toy.refractive_index != data.ior_in)
+      if (ior_compress(device.scene.toy.refractive_index) != ior_compress(data.ior_in))
         return get_color(0.0f, 0.0f, 0.0f);
 
       RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
@@ -105,12 +105,12 @@ __device__ RGBF
     }
   }
 
-  unsigned int ior_for_traversal = __float_as_uint(data.ior_in);
+  unsigned int compressed_ior = ior_compress(data.ior_in);
 
   // Disable OMM opaque hits because we want to know if we hit something that is fully opaque so we can reject.
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
-    hit_id, alpha_data0, alpha_data1, ior_for_traversal);
+    hit_id, alpha_data0, alpha_data1, compressed_ior);
 
   if (hit_id == HIT_TYPE_REJECT)
     return get_color(0.0f, 0.0f, 0.0f);
@@ -129,13 +129,13 @@ __device__ RGBF
 __device__ RGBAF optix_alpha_test() {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
-  const uint32_t material_id   = load_triangle_material_id(hit_id);
-  const float refraction_index = __ldg(&(device.scene.materials[material_id].refraction_index));
-  const uint16_t tex           = __ldg(&(device.scene.materials[material_id].albedo_map));
+  const uint32_t material_id    = load_triangle_material_id(hit_id);
+  const uint32_t compressed_ior = ior_compress(__ldg(&(device.scene.materials[material_id].refraction_index)));
+  const uint16_t tex            = __ldg(&(device.scene.materials[material_id].albedo_map));
 
   RGBAF albedo = get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
 
-  if (tex != TEXTURE_NONE && refraction_index == __uint_as_float(optixGetPayload_3())) {
+  if (tex != TEXTURE_NONE && compressed_ior == __uint_as_float(optixGetPayload_3())) {
     const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
 
     const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v);
