@@ -34,6 +34,8 @@ extern "C" __global__ void __raygen__optix() {
     if (!material_is_mirror(data.roughness, data.metallic))
       write_albedo_buffer(opaque_color(data.albedo), pixel);
 
+    const bool include_emission = state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     BSDFSampleInfo bounce_info;
@@ -45,10 +47,17 @@ extern "C" __global__ void __raygen__optix() {
     const float shift = (bounce_info.is_transparent_pass) ? -eps : eps;
     data.position     = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
+    bool use_light_rays = false;
     if (bounce_info.is_transparent_pass) {
       data.flags |= G_BUFFER_IS_TRANSPARENT_PASS;
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(data.ior_out, pixel, ior_stack_method);
+
+      use_light_rays |= data.ior_in != data.ior_out && data.roughness > 0.05f;
+    }
+    else {
+      use_light_rays |= !include_emission;
+      use_light_rays |= !bounce_info.is_microfacet_based || data.roughness > 0.05f;
     }
 
     TraceTask bounce_task;
@@ -56,20 +65,13 @@ extern "C" __global__ void __raygen__optix() {
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 
-    const bool use_light_rays =
-      !(bounce_info.is_transparent_pass && data.ior_in == data.ior_out) && !(bounce_info.is_microfacet_based && data.roughness < 0.05f);
-    const bool include_emission = state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING);
-
     if (validate_trace_task(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
+    }
 
-      if (use_light_rays) {
-        state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
-      }
-      else {
-        state_consume(pixel, STATE_FLAG_BOUNCE_LIGHTING);
-      }
+    if (use_light_rays) {
+      state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
     }
 
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
