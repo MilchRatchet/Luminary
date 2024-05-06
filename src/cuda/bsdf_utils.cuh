@@ -464,9 +464,9 @@ __device__ RGBF bsdf_dielectric(
   const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, data.roughness, ctx.refraction_index);
   term /= dielectric_directional_albedo;
 
-  if (ctx.refraction_index == 1.0f) {
+  if (ctx.refraction_index == 1.0f && ctx.is_refraction) {
     // TODO: Energy conservation does not work correctly for dielectric, investigate.
-    term = (ctx.is_refraction) ? 1.0f : 0.0f;
+    term = 1.0f;
   }
 
   return (data.colored_dielectric) ? scale_color(opaque_color(data.albedo), term) : get_color(term, term, term);
@@ -481,10 +481,11 @@ __device__ RGBF bsdf_multiscattering_evaluate(
   if (ctx.is_refraction)
     return scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.albedo.a);
 
-  RGBF conductor = scale_color(bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * data.metallic);
-  RGBF glossy    = scale_color(bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * (1.0f - data.metallic));
+  RGBF conductor  = scale_color(bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * data.metallic);
+  RGBF glossy     = scale_color(bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * (1.0f - data.metallic));
+  RGBF dielectric = scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.albedo.a);
 
-  return add_color(conductor, glossy);
+  return add_color(add_color(conductor, glossy), dielectric);
 }
 
 #endif /* CU_BSDF_UTILS_H */
