@@ -584,7 +584,7 @@ __device__ vec3 refract_vector(const vec3 V, const vec3 normal, const float inde
     return reflect_vector(V, normal);
   }
   else {
-    return normalize_vector(add_vector(scale_vector(V, -index_ratio), scale_vector(normal, index_ratio * dot - sqrtf(b))));
+    return normalize_vector(sub_vector(scale_vector(normal, index_ratio * dot - sqrtf(b)), scale_vector(V, index_ratio)));
   }
 }
 

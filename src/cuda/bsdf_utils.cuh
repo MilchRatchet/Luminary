@@ -113,9 +113,9 @@ __device__ float bsdf_refraction_index_ambient(const vec3 position, const vec3 r
   return 1.0f;
 }
 
-// Get normal vector based on incoming ray and refracted ray: https://physics.stackexchange.com/a/762982
-__device__ vec3 bsdf_refraction_normal_from_pair(const vec3 L, const vec3 V, const float ior_L, const float ior_V) {
-  return normalize_vector(add_vector(scale_vector(V, ior_V), scale_vector(L, -ior_L)));
+// Get normal vector based on incoming ray and refracted ray: PBRT v3 Chapter 8.4.4
+__device__ vec3 bsdf_refraction_normal_from_pair(const vec3 L, const vec3 V, const float refraction_index) {
+  return normalize_vector(add_vector(L, scale_vector(V, refraction_index)));
 }
 
 ///////////////////////////////////////////////////
@@ -290,11 +290,12 @@ __device__ float bsdf_microfacet_refraction_evaluate(
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  float denominator = refraction_index * HdotL + HdotV;
+  float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
 
   // ... * NdotL
-  return ((HdotV * HdotL) / NdotV) * D * G2 / denominator;
+  // G2 contains (4 * NdotL * NdotV) in the denominator
+  return 4.0f * NdotV * HdotV * HdotL * D * G2 / denominator;
 }
 
 __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
@@ -305,7 +306,7 @@ __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  float denominator = refraction_index * HdotL + HdotV;
+  float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
 
   // ... * NdotL

@@ -29,15 +29,21 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
 
   vec3 refraction_vector;
   if (context.is_refraction) {
-    context.H = bsdf_refraction_normal_from_pair(L, data.V, ior_out, ior_in);
+    context.H         = bsdf_refraction_normal_from_pair(L, data.V, context.refraction_index);
+    refraction_vector = L;
   }
   else {
-    context.H = normalize_vector(add_vector(data.V, L));
+    context.H         = normalize_vector(add_vector(data.V, L));
+    refraction_vector = refract_vector(data.V, context.H, context.refraction_index);
   }
 
-  refraction_vector = refract_vector(data.V, context.H, context.refraction_index);
+  context.NdotH = dot_product(data.normal, context.H);
 
-  context.NdotH = fabsf(dot_product(data.normal, context.H));
+  if (dot_product(context.H, data.normal) < 0.0f) {
+    context.H     = scale_vector(context.H, -1.0f);
+    context.NdotH = -context.NdotH;
+  }
+
   context.HdotV = fabsf(dot_product(context.H, data.V));
   context.HdotL = fabsf(dot_product(context.H, L));
 
@@ -140,6 +146,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   const vec3 sampled_microfacet = bsdf_microfacet_sample(data_local, pixel);
 
+  // TODO: This is biased for semitransparent materials because 1-a is an underestimation whenever we do a glossy or conductor pass.
+  // We would need to evaluate the dielectric pass to get an unbiased estimate of the probability.
   info.transparent_pass_prob = 1.0f - data.albedo.a;
 
   vec3 sampled_microfacet_refraction;
@@ -291,7 +299,7 @@ __device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, co
       marginal = ((weight + info.antagonist_weight) > 0.0f) ? weight / (weight + info.antagonist_weight) : 0.0f;
     } break;
     case BSDF_DIELECTRIC: {
-      H = (info.is_transparent_pass) ? bsdf_refraction_normal_from_pair(ray_local, data_local.V, data_local.ior_out, data_local.ior_in)
+      H = (info.is_transparent_pass) ? bsdf_refraction_normal_from_pair(ray_local, data_local.V, data_local.ior_in / data_local.ior_out)
                                      : normalize_vector(add_vector(data_local.V, ray_local));
 
       const BSDFRayContext ctx = bsdf_sample_context(data_local, H, ray_local, info.is_transparent_pass);

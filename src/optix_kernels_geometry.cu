@@ -53,7 +53,8 @@ extern "C" __global__ void __raygen__optix() {
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(data.ior_out, pixel, ior_stack_method);
 
-      use_light_rays |= data.ior_in != data.ior_out && data.roughness > 0.05f;
+      const float refraction_scale = (data.ior_in > data.ior_out) ? data.ior_in / data.ior_out : data.ior_out / data.ior_in;
+      use_light_rays |= data.roughness * (refraction_scale - 1.0f) > 0.1f;
     }
     else {
       use_light_rays |= !include_emission;
