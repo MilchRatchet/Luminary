@@ -57,7 +57,6 @@ extern "C" __global__ void __raygen__optix() {
       use_light_rays |= data.roughness * (refraction_scale - 1.0f) > 0.1f;
     }
     else {
-      use_light_rays |= !include_emission;
       use_light_rays |= !bounce_info.is_microfacet_based || data.roughness > 0.05f;
     }
 
