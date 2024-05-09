@@ -23,7 +23,7 @@
     }                                                                                                    \
   }
 
-void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel) {
+void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel, CommandlineOptions options) {
   bench_tic("Kernel Setup (OptiX)");
   log_message("Compiling kernels: %s.", kernels_name);
 
@@ -59,8 +59,11 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
 
-  pipeline_compile_options.allowOpacityMicromaps = 1;
-  pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
+  if (options.omm_active)
+    pipeline_compile_options.allowOpacityMicromaps = 1;
+
+  if (options.dmm_active)
+    pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
 
   char log[4096];
   size_t log_size = sizeof(log);

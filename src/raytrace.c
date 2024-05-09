@@ -490,12 +490,12 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &instance->optix_ctx));
   OPTIX_CHECK(optixDeviceContextSetLogCallback(instance->optix_ctx, _raytrace_optix_log_callback, (void*) 0, 3));
 
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.ptx", &(instance->optix_kernel));
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel));
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.ptx", &(instance->optix_kernel_geometry));
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_toy.ptx", &(instance->optix_kernel_toy));
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_volume.ptx", &(instance->optix_kernel_volume));
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_particle.ptx", &(instance->optix_kernel_particle));
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.ptx", &(instance->optix_kernel), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.ptx", &(instance->optix_kernel_geometry), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_toy.ptx", &(instance->optix_kernel_toy), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_volume.ptx", &(instance->optix_kernel_volume), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_particle.ptx", &(instance->optix_kernel_particle), options);
 
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;
