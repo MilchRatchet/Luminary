@@ -53,7 +53,7 @@ extern "C" __global__ void __raygen__optix() {
     bool use_light_rays = false;
     if (bounce_info.is_transparent_pass) {
       const float refraction_scale = (data.ior_in > data.ior_out) ? data.ior_in / data.ior_out : data.ior_out / data.ior_in;
-      use_light_rays |= data.roughness * (refraction_scale - 1.0f) > 0.1f;
+      use_light_rays |= data.roughness * (refraction_scale - 1.0f) > 0.05f;
     }
     else {
       use_light_rays |= !bounce_info.is_microfacet_based || data.roughness > 0.05f;

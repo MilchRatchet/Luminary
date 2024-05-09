@@ -83,6 +83,7 @@ __device__ RGBF
     const float toy_dist = get_toy_distance(data.position, dir);
 
     if (toy_dist < dist) {
+      // TODO: This only works when we enter a surface, what about the exit???
       if (ior_compress(device.scene.toy.refractive_index) != ior_compress(data.ior_in))
         return get_color(0.0f, 0.0f, 0.0f);
 

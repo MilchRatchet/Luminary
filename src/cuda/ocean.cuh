@@ -100,7 +100,8 @@ LUMINARY_KERNEL void process_ocean_tasks() {
 
     const vec3 V = scale_vector(task.ray, -1.0f);
 
-    const vec3 refraction_dir = refract_vector(V, normal, ior_in / ior_out);
+    bool total_reflection;
+    const vec3 refraction_dir = refract_vector(V, normal, ior_in / ior_out, total_reflection);
 
     const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, ior_in, ior_out);
 

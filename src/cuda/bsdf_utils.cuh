@@ -264,11 +264,18 @@ __device__ vec3 bsdf_microfacet_refraction_sample_normal(const GBufferData data,
   return normalize_vector(get_vector(sampled.x * roughness2, sampled.y * roughness2, sampled.z));
 }
 
-__device__ float bsdf_microfacet_refraction_pdf(const GBufferData data, const float NdotH, const float NdotV) {
+__device__ float bsdf_microfacet_refraction_pdf(
+  const GBufferData data, const float NdotH, const float NdotV, const float NdotL, const float HdotV, const float HdotL,
+  const float refraction_index) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
 
-  return bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4) * bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV) / (4.0f * NdotV);
+  float denominator = refraction_index * HdotV + HdotL;
+  denominator       = denominator * denominator;
+
+  // D * G1 * Jacobian
+  // Jacobian = HdotL / denominator
+  return bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4) * bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV) * HdotL / denominator;
 }
 
 __device__ vec3 bsdf_microfacet_refraction_sample(
@@ -294,8 +301,9 @@ __device__ float bsdf_microfacet_refraction_evaluate(
   denominator       = denominator * denominator;
 
   // ... * NdotL
+  // 4 * PI because my results where way too dark, I have no idea why.
   // G2 contains (4 * NdotL * NdotV) in the denominator
-  return 4.0f * NdotV * HdotV * HdotL * D * G2 / denominator;
+  return 4.0f * PI * 4.0f * HdotV * HdotL * NdotL * D * G2 / denominator;
 }
 
 __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
@@ -303,14 +311,10 @@ __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
   const float refraction_index) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  float denominator = refraction_index * HdotV + HdotL;
-  denominator       = denominator * denominator;
-
   // ... * NdotL
-  return 4.0f * HdotV * HdotL * G2_over_G1 / denominator;
+  return G2_over_G1 * HdotV / NdotV;
 }
 
 ///////////////////////////////////////////////////

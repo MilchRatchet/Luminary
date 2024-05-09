@@ -28,13 +28,14 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.refraction_index = ior_in / ior_out;
 
   vec3 refraction_vector;
+  bool total_reflection;
   if (context.is_refraction) {
     context.H         = bsdf_refraction_normal_from_pair(L, data.V, context.refraction_index);
     refraction_vector = L;
   }
   else {
     context.H         = normalize_vector(add_vector(data.V, L));
-    refraction_vector = refract_vector(data.V, context.H, context.refraction_index);
+    refraction_vector = refract_vector(data.V, context.H, context.refraction_index, total_reflection);
   }
 
   context.NdotH = dot_product(data.normal, context.H);
@@ -53,7 +54,7 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
+  context.fresnel_dielectric = (total_reflection) ? 1.0f : bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
 
   return context;
 }
@@ -91,7 +92,9 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
 
   context.H = H;
 
-  const vec3 refraction_vector = (context.is_refraction) ? L : refract_vector(data.V, context.H, context.refraction_index);
+  bool total_reflection = false;
+  const vec3 refraction_vector =
+    (context.is_refraction) ? L : refract_vector(data.V, context.H, context.refraction_index, total_reflection);
 
   context.NdotH = fabsf(dot_product(data.normal, context.H));
   context.HdotV = fabsf(dot_product(context.H, data.V));
@@ -103,7 +106,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
-  context.fresnel_dielectric = bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
+  context.fresnel_dielectric = (total_reflection) ? 1.0f : bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
 
   return context;
 }
@@ -206,13 +209,16 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     const BSDFRayContext reflection_ctx = bsdf_sample_context(data_local, sampled_microfacet, reflection_vector, false);
     const RGBF reflection_eval          = bsdf_dielectric(data_local, reflection_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
-    sampled_microfacet_refraction       = bsdf_microfacet_refraction_sample(data_local, pixel);
-    const vec3 refraction_vector        = refract_vector(data_local.V, sampled_microfacet_refraction, data.ior_in / data.ior_out);
+    bool total_reflection;
+
+    sampled_microfacet_refraction = bsdf_microfacet_refraction_sample(data_local, pixel);
+    const vec3 refraction_vector =
+      refract_vector(data_local.V, sampled_microfacet_refraction, data.ior_in / data.ior_out, total_reflection);
     const BSDFRayContext refraction_ctx = bsdf_sample_context(data_local, sampled_microfacet_refraction, refraction_vector, true);
     const RGBF refraction_eval          = bsdf_dielectric(data_local, refraction_ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, 1.0f);
 
     const float reflection_weight = luminance(reflection_eval);
-    const float refraction_weight = luminance(refraction_eval);
+    const float refraction_weight = (total_reflection) ? 0.0f : luminance(refraction_eval);
 
     const float sum_weights = reflection_weight + refraction_weight;
 
@@ -240,9 +246,10 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     info.transparent_pass_prob *= refraction_probability;
   }
 
+  // TODO: Remove with all the other marginal stuff.
   float sample_pdf;
   if (info.is_transparent_pass) {
-    sample_pdf = bsdf_microfacet_refraction_pdf(data_local, sampled_microfacet_refraction.z, data_local.V.z);
+    sample_pdf = 1.0f;  // bsdf_microfacet_refraction_pdf(data_local, sampled_microfacet_refraction.z, data_local.V.z);
   }
   else if (info.is_microfacet_based) {
     sample_pdf = bsdf_microfacet_pdf(data_local, sampled_microfacet.z, data_local.V.z);
