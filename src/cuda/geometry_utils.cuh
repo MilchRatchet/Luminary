@@ -54,7 +54,7 @@ __device__ vec3 geometry_compute_normal(
   return normal;
 }
 
-__device__ GBufferData geometry_generate_g_buffer(const GeometryTask task, const int pixel) {
+__device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const int pixel) {
   const float4 t1 = __ldg((float4*) triangle_get_entry_address(0, 0, task.hit_id));
   const float4 t2 = __ldg((float4*) triangle_get_entry_address(1, 0, task.hit_id));
   const float4 t3 = __ldg((float4*) triangle_get_entry_address(2, 0, task.hit_id));

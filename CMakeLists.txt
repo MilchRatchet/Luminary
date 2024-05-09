@@ -182,9 +182,7 @@ ceb_embed_files(
   $<TARGET_OBJECTS:optix_kernels>
   $<TARGET_OBJECTS:optix_kernels_trace_particle>
   $<TARGET_OBJECTS:optix_kernels_geometry>
-  $<TARGET_OBJECTS:optix_kernels_toy>
   $<TARGET_OBJECTS:optix_kernels_volume>
-  $<TARGET_OBJECTS:optix_kernels_particle>
   ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png
@@ -231,9 +229,7 @@ endfunction()
 compile_ptx(optix_kernels)
 compile_ptx(optix_kernels_trace_particle)
 compile_ptx(optix_kernels_geometry)
-compile_ptx(optix_kernels_toy)
 compile_ptx(optix_kernels_volume)
-compile_ptx(optix_kernels_particle)
 
 #=============================================================
 # File copying

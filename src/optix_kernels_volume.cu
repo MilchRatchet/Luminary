@@ -15,6 +15,7 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "particle_utils.cuh"
 #include "shading_kernel.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
@@ -25,16 +26,21 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    VolumeTask task = load_volume_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device.width + task.index.x;
+    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel  = task.index.y * device.width + task.index.x;
 
-    const VolumeType volume_type = VOLUME_HIT_TYPE(task.hit_id);
-
+    const VolumeType volume_type  = VOLUME_HIT_TYPE(task.hit_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
-
-    const GBufferData data = volume_generate_g_buffer(task, pixel, volume);
+    GBufferData data;
+    if (volume_type == VOLUME_TYPE_PARTICLE) {
+      data = particle_generate_g_buffer(task, pixel);
+      write_albedo_buffer(opaque_color(data.albedo), pixel);
+    }
+    else {
+      data = volume_generate_g_buffer(task, pixel, volume);
+      write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
+    }
 
     RGBF accumulated_light   = get_color(0.0f, 0.0f, 0.0f);
     uint32_t light_ray_index = 0;

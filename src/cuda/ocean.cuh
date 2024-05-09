@@ -75,8 +75,8 @@ LUMINARY_KERNEL void process_ocean_tasks() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    OceanTask task  = load_ocean_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device.width + task.index.x;
+    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel  = task.index.y * device.width + task.index.x;
 
     vec3 normal = ocean_get_normal(task.position);
 
@@ -118,6 +118,7 @@ LUMINARY_KERNEL void process_ocean_tasks() {
       ior_stack_interact(ior_out, pixel, ior_stack_method);
     }
 
+    // TODO: Remove this, we no longer need to load/store the record here.
     RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     TraceTask new_task;
@@ -137,8 +138,8 @@ LUMINARY_KERNEL void process_debug_ocean_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
 
   for (int i = 0; i < task_count; i++) {
-    OceanTask task  = load_ocean_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel = task.index.y * device.width + task.index.x;
+    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel  = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));

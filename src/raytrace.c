@@ -493,9 +493,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.ptx", &(instance->optix_kernel), options);
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel), options);
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.ptx", &(instance->optix_kernel_geometry), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_toy.ptx", &(instance->optix_kernel_toy), options);
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_volume.ptx", &(instance->optix_kernel_volume), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_particle.ptx", &(instance->optix_kernel_particle), options);
 
   instance->max_ray_depth   = general.max_ray_depth;
   instance->offline_samples = general.samples;

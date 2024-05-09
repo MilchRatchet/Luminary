@@ -1,8 +1,11 @@
 #ifndef STRUCTS_H
 #define STRUCTS_H
 
+#include <assert.h>
 #include <cuda_runtime_api.h>
 #include <stdint.h>
+
+#define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size");
 
 // This struct is stored as a struct of arrays, members are grouped into 16 bytes where possible. Padding is not required.
 #define INTERLEAVED_STORAGE
@@ -340,50 +343,13 @@ struct MISData {
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////
 
-//
-// Shading task structs. They used to be very different, however, they could all be unified as of October 2023.
-//
-struct GeometryTask {
-  ushort2 index;
-  vec3 position;
-  vec3 ray;
+struct ShadingTask {
   uint32_t hit_id;
-} typedef GeometryTask;
-
-struct ParticleTask {
   ushort2 index;
-  vec3 position;
+  vec3 position;  // (Origin if sky)
   vec3 ray;
-  uint32_t hit_id;
-} typedef ParticleTask;
-
-struct SkyTask {
-  ushort2 index;
-  vec3 origin;
-  vec3 ray;
-  uint32_t padding;
-} typedef SkyTask;
-
-struct OceanTask {
-  ushort2 index;
-  vec3 position;
-  vec3 ray;
-  float padding;
-} typedef OceanTask;
-
-struct ToyTask {
-  ushort2 index;
-  vec3 position;
-  vec3 ray;
-  uint32_t padding;
-} typedef ToyTask;
-
-struct VolumeTask {
-  ushort2 index;
-  vec3 position;
-  vec3 ray;
-  uint32_t hit_id;
-} typedef VolumeTask;
+} typedef ShadingTask;
+LUM_STATIC_SIZE_ASSERT(ShadingTask, 32);
 
 struct TraceTask {
   vec3 origin;
@@ -391,10 +357,12 @@ struct TraceTask {
   ushort2 index;
   uint32_t padding;
 } typedef TraceTask;
+LUM_STATIC_SIZE_ASSERT(TraceTask, 32);
 
 struct TraceResult {
   float depth;
   uint32_t hit_id;
 } typedef TraceResult;
+LUM_STATIC_SIZE_ASSERT(TraceResult, 8);
 
 #endif /* STRUCTS_H */

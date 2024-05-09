@@ -92,109 +92,21 @@ __device__ TraceTask load_trace_task_essentials(const void* ptr) {
   return task;
 }
 
-__device__ GeometryTask load_geometry_task(const void* ptr) {
+__device__ ShadingTask load_shading_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
-  GeometryTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
+  ShadingTask task;
+  task.hit_id     = __float_as_uint(data0.x);
+  task.index.x    = __float_as_uint(data0.y) & 0xffff;
+  task.index.y    = (__float_as_uint(data0.y) >> 16);
+  task.position.x = data0.z;
+  task.position.y = data0.w;
 
-  task.ray.x  = data1.x;
-  task.ray.y  = data1.y;
-  task.ray.z  = data1.z;
-  task.hit_id = __float_as_uint(data1.w);
-
-  return task;
-}
-
-__device__ ParticleTask load_particle_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  ParticleTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-
-  task.ray.x  = data1.x;
-  task.ray.y  = data1.y;
-  task.ray.z  = data1.z;
-  task.hit_id = __float_as_uint(data1.w);
-
-  return task;
-}
-
-__device__ OceanTask load_ocean_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  OceanTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-  task.ray.x      = data1.x;
-  task.ray.y      = data1.y;
-  task.ray.z      = data1.z;
-
-  return task;
-}
-
-__device__ SkyTask load_sky_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  SkyTask task;
-  task.index.x  = __float_as_uint(data0.x) & 0xffff;
-  task.index.y  = (__float_as_uint(data0.x) >> 16);
-  task.origin.x = data0.y;
-  task.origin.y = data0.z;
-  task.origin.z = data0.w;
-  task.ray.x    = data1.x;
-  task.ray.y    = data1.y;
-  task.ray.z    = data1.z;
-
-  return task;
-}
-
-__device__ ToyTask load_toy_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  ToyTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-  task.ray.x      = data1.x;
-  task.ray.y      = data1.y;
-  task.ray.z      = data1.z;
-
-  return task;
-}
-
-__device__ VolumeTask load_volume_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  VolumeTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-  task.ray.x      = data1.x;
-  task.ray.y      = data1.y;
-  task.ray.z      = data1.z;
-  task.hit_id     = __float_as_uint(data1.w);
+  task.position.z = data1.x;
+  task.ray.x      = data1.y;
+  task.ray.y      = data1.z;
+  task.ray.z      = data1.w;
 
   return task;
 }

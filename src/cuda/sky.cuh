@@ -599,8 +599,8 @@ LUMINARY_KERNEL void process_sky_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
   for (int i = 0; i < task_count; i++) {
-    const SkyTask task = load_sky_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel    = task.index.y * device.width + task.index.x;
+    const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel        = task.index.y * device.width + task.index.x;
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
@@ -609,19 +609,10 @@ LUMINARY_KERNEL void process_sky_tasks() {
       sky = sky_hdri_sample(task.ray, 0.0f);
     }
     else {
-      const vec3 sky_origin = world_to_sky_transform(task.origin);
-
+      const vec3 sky_origin  = world_to_sky_transform(task.position);
       const bool include_sun = state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING);
 
       sky = sky_get_color(sky_origin, task.ray, FLT_MAX, include_sun, device.scene.sky.steps, task.index);
-      // if (device.iteration_type == TYPE_BOUNCE && sky_ray_hits_sun(sky_origin, task.ray)) {
-      //   GBufferData data;
-      //   data.hit_id = HIT_TYPE_SKY;
-      //   data.V      = scale_vector(task.ray, -1.0f);
-      //
-      //  const float mis_weight = mis_weight_bsdf_sampled(data, pixel);
-      //  sky                    = scale_color(sky, mis_weight);
-      //}
     }
 
     sky = mul_color(sky, record);
@@ -668,8 +659,8 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
   for (int i = 0; i < task_count; i++) {
-    const SkyTask task = load_sky_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel    = task.index.y * device.width + task.index.x;
+    const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel        = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
       RGBF sky;
@@ -677,7 +668,7 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
         sky = sky_hdri_sample(task.ray, device.scene.sky.hdri_mip_bias);
       }
       else {
-        sky = sky_get_color(world_to_sky_transform(task.origin), task.ray, FLT_MAX, true, device.scene.sky.steps, task.index);
+        sky = sky_get_color(world_to_sky_transform(task.position), task.ray, FLT_MAX, true, device.scene.sky.steps, task.index);
       }
       write_beauty_buffer(sky, pixel, true);
     }

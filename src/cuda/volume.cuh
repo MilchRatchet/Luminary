@@ -41,30 +41,6 @@ LUMINARY_KERNEL void volume_process_events() {
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    // if (device.iteration_type == TYPE_LIGHT) {
-    //   if (device.scene.fog.active) {
-    //     const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-    //     const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
-    //
-    //    if (path.x >= 0.0f) {
-    //      record = scale_color(record, expf(-path.y * volume.max_scattering));
-    //    }
-    //  }
-    //
-    //  if (device.scene.ocean.active) {
-    //    const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-    //    const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
-    //
-    //    if (path.x >= 0.0f) {
-    //      RGBF volume_transmittance = volume_get_transmittance(volume);
-    //
-    //      record.r *= expf(-path.y * volume_transmittance.r);
-    //      record.g *= expf(-path.y * volume_transmittance.g);
-    //      record.b *= expf(-path.y * volume_transmittance.b);
-    //    }
-    //  }
-    //}
-
     const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, task.index);
 
     if (device.scene.fog.active) {

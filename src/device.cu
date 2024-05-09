@@ -22,7 +22,6 @@
 #include "cuda/restir.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/sky_hdri.cuh"
-#include "cuda/toy.cuh"
 #include "cuda/utils.cuh"
 #include "cuda/volume.cuh"
 #include "device.h"
@@ -122,8 +121,8 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
 
   optixrt_execute(instance->optix_kernel_geometry);
 
-  if (instance->scene.particles.active) {
-    optixrt_execute(instance->optix_kernel_particle);
+  if (instance->scene.fog.active || instance->scene.ocean.active || instance->scene.particles.active) {
+    optixrt_execute(instance->optix_kernel_volume);
   }
 
   if (instance->scene.ocean.active) {
@@ -131,14 +130,6 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
   }
 
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-
-  if (instance->scene.toy.active) {
-    optixrt_execute(instance->optix_kernel_toy);
-  }
-
-  if (instance->scene.fog.active || instance->scene.ocean.active) {
-    optixrt_execute(instance->optix_kernel_volume);
-  }
 }
 
 extern "C" void device_execute_debug_kernels(RaytraceInstance* instance) {
@@ -172,9 +163,6 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance) {
     process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   process_debug_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  if (instance->scene.toy.active) {
-    process_debug_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
 }
 
 extern "C" void device_generate_tasks() {

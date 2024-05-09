@@ -7,12 +7,15 @@
 #include "utils.h"
 
 LUMINARY_KERNEL void particle_process_debug_tasks() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
 
   for (int i = 0; i < task_count; i++) {
-    ParticleTask task = load_particle_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel   = task.index.y * device.width + task.index.x;
+    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel  = task.index.y * device.width + task.index.x;
+
+    if (VOLUME_HIT_CHECK(task.hit_id))
+      continue;
 
     if (device.shading_mode == SHADING_ALBEDO) {
       write_beauty_buffer(device.scene.particles.albedo, pixel, true);
@@ -38,7 +41,7 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
       write_beauty_buffer(get_color(red, green, blue), pixel, true);
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      const uint32_t v = random_uint32_t_base(0, task.hit_id);
+      const uint32_t v = random_uint32_t_base(0x55555555, task.hit_id);
 
       const uint16_t r = v & 0x7ff;
       const uint16_t g = (v >> 10) & 0x7ff;

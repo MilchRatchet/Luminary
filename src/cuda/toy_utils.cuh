@@ -121,7 +121,7 @@ __device__ vec3 toy_sample_ray(const vec3 position, const float2 random) {
 
 #ifdef SHADING_KERNEL
 
-__device__ GBufferData toy_generate_g_buffer(const ToyTask task, const int pixel) {
+__device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const int pixel) {
   vec3 normal = get_toy_normal(task.position);
 
   if (dot_product(normal, task.ray) > 0.0f) {

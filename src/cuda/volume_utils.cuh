@@ -229,7 +229,7 @@ __device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray
 
 #ifdef VOLUME_KERNEL
 
-__device__ GBufferData volume_generate_g_buffer(const VolumeTask task, const int pixel, const VolumeDescriptor volume) {
+__device__ GBufferData volume_generate_g_buffer(const ShadingTask task, const int pixel, const VolumeDescriptor volume) {
   const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
 
   GBufferData data;

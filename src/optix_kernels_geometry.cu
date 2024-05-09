@@ -16,6 +16,7 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "math.cuh"
 #include "memory.cuh"
 #include "shading_kernel.cuh"
+#include "toy_utils.cuh"
 #include "utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
@@ -24,10 +25,16 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    GeometryTask task = load_geometry_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel   = task.index.y * device.width + task.index.x;
+    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel  = task.index.y * device.width + task.index.x;
 
-    GBufferData data = geometry_generate_g_buffer(task, pixel);
+    GBufferData data;
+    if (task.hit_id == HIT_TYPE_TOY) {
+      data = toy_generate_g_buffer(task, pixel);
+    }
+    else {
+      data = geometry_generate_g_buffer(task, pixel);
+    }
 
     write_normal_buffer(data.normal, pixel);
 
