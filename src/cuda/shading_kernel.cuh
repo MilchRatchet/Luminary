@@ -34,41 +34,126 @@ __device__ RGBF optix_decompress_color(unsigned int data0, unsigned int data1) {
   return color;
 }
 
-__device__ RGBF
-  optix_compute_light_ray(const GBufferData data, const ushort2 index, const LightRayTarget light_target, const uint32_t light_ray_index) {
-  float light_sampling_weight;
-  uint32_t light_id;
-  switch (light_target) {
-    case LIGHT_RAY_TARGET_SUN: {
-      const vec3 sky_pos     = world_to_sky_transform(data.position);
-      const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
-      light_id               = (sun_visible) ? LIGHT_ID_SUN : LIGHT_ID_NONE;
-      light_sampling_weight  = (sun_visible) ? 1.0f : 0.0f;
-    } break;
-    case LIGHT_RAY_TARGET_TOY: {
-      const bool toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
-      light_id               = (toy_visible) ? LIGHT_ID_TOY : LIGHT_ID_NONE;
-      light_sampling_weight  = (toy_visible) ? 1.0f : 0.0f;
-    } break;
-    case LIGHT_RAY_TARGET_GEOMETRY:
-    default:
-      light_id = ris_sample_light(data, index, light_ray_index, light_sampling_weight);
-      break;
+__device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
+  const vec3 sky_pos     = world_to_sky_transform(data.position);
+  const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+
+  if (!sun_visible)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_TBD_3 + light_ray_index, index);
+
+  float solid_angle;
+  const vec3 dir   = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+  RGBF light_color = sky_get_sun_color(sky_pos, dir);
+
+  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, solid_angle);
+  light_color           = mul_color(light_color, bsdf_value);
+
+  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
+  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
+
+  // TODO: Add specialized anyhit shaders for non geometry lights
+  unsigned int hit_id = LIGHT_ID_SUN;
+
+  // 21 bits for each color component.
+  unsigned int alpha_data0, alpha_data1;
+  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
+
+  unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
+
+  if (device.scene.toy.active) {
+    const float toy_dist = get_toy_distance(data.position, dir);
+
+    if (toy_dist < FLT_MAX) {
+      // TODO: This only works when we enter a surface, what about the exit???
+      if (ior_compress(device.scene.toy.refractive_index) != compressed_ior)
+        return get_color(0.0f, 0.0f, 0.0f);
+
+      RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
+
+      if (luminance(toy_transparency) == 0.0f)
+        return get_color(0.0f, 0.0f, 0.0f);
+
+      // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
+      vec3 toy_hit_origin = add_vector(data.position, scale_vector(dir, toy_dist));
+      toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
+
+      const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
+
+      if (toy_dist2 < FLT_MAX)
+        toy_transparency = mul_color(toy_transparency, toy_transparency);
+
+      light_color = mul_color(light_color, toy_transparency);
+    }
   }
 
-  if (light_sampling_weight == 0.0f)
+  optixTrace(
+    device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    hit_id, alpha_data0, alpha_data1, compressed_ior);
+
+  if (hit_id == HIT_TYPE_REJECT)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  float solid_angle, dist;
+  RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
+
+  visibility = mul_color(visibility, volume_integrate_transmittance(data.position, dir, FLT_MAX));
+
+  return mul_color(light_color, visibility);
+}
+
+__device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
+  const bool toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
+
+  if (!toy_visible)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_TBD_3 + light_ray_index, index);
+
+  const vec3 dir   = toy_sample_ray(data.position, random);
+  const float dist = get_toy_distance(data.position, dir);
+
+  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, toy_get_solid_angle(data.position));
+
+  RGBF light_color = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+  light_color      = mul_color(light_color, bsdf_value);
+
+  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
+  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
+
+  unsigned int hit_id = LIGHT_ID_TOY;
+
+  // 21 bits for each color component.
+  unsigned int alpha_data0, alpha_data1;
+  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
+
+  unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
+
+  optixTrace(
+    device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    hit_id, alpha_data0, alpha_data1, compressed_ior);
+
+  if (hit_id == HIT_TYPE_REJECT)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
+
+  visibility = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
+
+  return mul_color(light_color, visibility);
+}
+
+__device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
+  if (!device.scene.material.lights_active)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  vec3 dir;
   RGBF light_color;
-  const vec3 dir = light_sample(light_target, light_id, data, index, light_ray_index, solid_angle, dist, light_color);
+  float dist;
+  const uint32_t light_id = ris_sample_light(data, index, light_ray_index, dir, light_color, dist);
 
-  if (solid_angle == 0.0f || luminance(light_color) == 0.0f)
+  if (luminance(light_color) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
-
-  RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, solid_angle * light_sampling_weight);
-
-  light_color = mul_color(light_color, bsdf_value);
 
   const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
@@ -81,7 +166,7 @@ __device__ RGBF
 
   unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
 
-  if (light_target != LIGHT_RAY_TARGET_TOY && device.scene.toy.active) {
+  if (device.scene.toy.active) {
     const float toy_dist = get_toy_distance(data.position, dir);
 
     if (toy_dist < dist) {
