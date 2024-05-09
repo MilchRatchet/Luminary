@@ -79,12 +79,14 @@ __device__ RGBF
   unsigned int alpha_data0, alpha_data1;
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
+  unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
+
   if (light_target != LIGHT_RAY_TARGET_TOY && device.scene.toy.active) {
     const float toy_dist = get_toy_distance(data.position, dir);
 
     if (toy_dist < dist) {
       // TODO: This only works when we enter a surface, what about the exit???
-      if (ior_compress(device.scene.toy.refractive_index) != ior_compress(data.ior_in))
+      if (ior_compress(device.scene.toy.refractive_index) != compressed_ior)
         return get_color(0.0f, 0.0f, 0.0f);
 
       RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
@@ -105,8 +107,6 @@ __device__ RGBF
       light_color = mul_color(light_color, toy_transparency);
     }
   }
-
-  unsigned int compressed_ior = ior_compress(data.ior_in);
 
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
