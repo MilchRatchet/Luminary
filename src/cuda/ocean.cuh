@@ -103,30 +103,33 @@ LUMINARY_KERNEL void process_ocean_tasks() {
     bool total_reflection;
     const vec3 refraction_dir = refract_vector(V, normal, ior_in / ior_out, total_reflection);
 
-    const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, ior_in, ior_out);
-
     vec3 bounce_ray;
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) < reflection_coefficient) {
-      task.position = add_vector(task.position, scale_vector(V, 2.0f * eps * (1.0f + get_length(task.position))));
-      bounce_ray    = reflect_vector(V, normal);
+    vec3 bias_direction;
+    if (total_reflection) {
+      bias_direction = V;
+      bounce_ray     = reflect_vector(V, normal);
     }
     else {
-      bounce_ray    = refraction_dir;
-      task.position = add_vector(task.position, scale_vector(bounce_ray, 2.0f * eps * (1.0f + get_length(task.position))));
+      const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, ior_in, ior_out);
 
-      const IORStackMethod ior_stack_method = (inside_water) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(ior_out, pixel, ior_stack_method);
+      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) < reflection_coefficient) {
+        bias_direction = V;
+        bounce_ray     = reflect_vector(V, normal);
+      }
+      else {
+        bounce_ray     = refraction_dir;
+        bias_direction = bounce_ray;
+
+        const IORStackMethod ior_stack_method = (inside_water) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+        ior_stack_interact(ior_out, pixel, ior_stack_method);
+      }
     }
 
-    // TODO: Remove this, we no longer need to load/store the record here.
-    RGBF record = load_RGBF(device.ptrs.records + pixel);
-
     TraceTask new_task;
-    new_task.origin = task.position;
+    new_task.origin = add_vector(task.position, scale_vector(bias_direction, 2.0f * eps * (1.0f + get_length(task.position))));
     new_task.ray    = bounce_ray;
     new_task.index  = task.index;
 
-    store_RGBF(device.ptrs.records + pixel, record);
     store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), new_task);
   }
 
