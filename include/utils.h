@@ -406,7 +406,6 @@ struct DevicePointers {
   TraceResult* trace_results;
   uint16_t* task_counts;
   uint16_t* task_offsets;
-  uint32_t* light_sample_history;
   uint32_t* ior_stack;
   RGBF* frame_buffer;
   RGBF* frame_temporal;
@@ -420,11 +419,8 @@ struct DevicePointers {
   RGBF* albedo_buffer;
   RGBF* normal_buffer;
   RGBF* records;
-  RGBF* bounce_records_history;
-  PackedGBufferData* packed_gbuffer_history;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
-  MISData* mis_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
   DeviceTexture* albedo_atlas;
@@ -438,7 +434,6 @@ struct DevicePointers {
   DeviceTexture* sky_moon_albedo_tex;
   DeviceTexture* sky_moon_normal_tex;
   DeviceTexture* bsdf_energy_lut;
-  DeviceTexture* ltc_tex;
   uint16_t* bluenoise_1D;
   uint32_t* bluenoise_2D;
   uint32_t* light_candidates;
@@ -520,7 +515,6 @@ struct RaytraceInstance {
   DeviceBuffer* trace_results;
   DeviceBuffer* task_counts;
   DeviceBuffer* task_offsets;
-  DeviceBuffer* light_sample_history;
   DeviceBuffer* frame_buffer;
   DeviceBuffer* frame_temporal;
   DeviceBuffer* frame_variance;
@@ -533,7 +527,6 @@ struct RaytraceInstance {
   DeviceBuffer* albedo_buffer;
   DeviceBuffer* normal_buffer;
   DeviceBuffer* records;
-  DeviceBuffer* bounce_records_history;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;
@@ -545,9 +538,6 @@ struct RaytraceInstance {
   DeviceBuffer* bsdf_energy_lut;
   DeviceBuffer* bluenoise_1D;
   DeviceBuffer* bluenoise_2D;
-  DeviceBuffer* mis_buffer;
-  DeviceBuffer* packed_gbuffer_history;
-  DeviceBuffer* ltc_tex;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;

@@ -4,7 +4,6 @@
 #if defined(SHADING_KERNEL)
 
 #include "light.cuh"
-#include "ltc.cuh"
 #include "math.cuh"
 #include "random.cuh"
 #include "utils.cuh"

@@ -62,8 +62,7 @@ extern "C" __global__ void __raygen__optix() {
     write_beauty_buffer(accumulated_light, pixel);
 
     BSDFSampleInfo bounce_info;
-    float bsdf_marginal;
-    const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info, bsdf_marginal);
+    const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
     RGBF bounce_record = record;
 

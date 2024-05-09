@@ -334,11 +334,6 @@ INTERLEAVED_STORAGE struct PackedGBufferData {
   uint16_t ior_out;
 } typedef PackedGBufferData;
 
-struct MISData {
-  float light_target_pdf_normalization;
-  float bsdf_marginal;
-} typedef MISData;
-
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////

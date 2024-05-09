@@ -56,8 +56,7 @@ LUMINARY_KERNEL void brdf_unittest_kernel(float* bounce, float* light) {
       data.V = angles_to_direction(ran0.x, ran0.y);
 
       BSDFSampleInfo info;
-      float bsdf_marginal;
-      bsdf_sample(data, make_ushort2(0, 0), info, bsdf_marginal);
+      bsdf_sample(data, make_ushort2(0, 0), info);
 
       sum_bounce += luminance(info.weight);
 

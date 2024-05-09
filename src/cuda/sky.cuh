@@ -623,37 +623,6 @@ LUMINARY_KERNEL void process_sky_tasks() {
   }
 }
 
-// LUMINARY_KERNEL void process_sky_light_tasks() {
-//   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
-//   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
-//
-//   for (int i = 0; i < task_count; i++) {
-//     const SkyTask task = load_sky_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-//     const int pixel    = task.index.y * device.width + task.index.x;
-//
-//     const uint32_t light = device.ptrs.light_sample_history[pixel];
-//
-//     if (!proper_light_sample(light, LIGHT_ID_SUN))
-//       continue;
-//
-//     const RGBF record = load_RGBF(device.ptrs.records + pixel);
-//
-//     RGBF sky;
-//     if (device.scene.sky.hdri_active) {
-//       sky = sky_hdri_sample(task.ray, 0.0f);
-//     }
-//     else {
-//       const vec3 sky_origin = world_to_sky_transform(task.origin);
-//
-//       sky = sky_get_sun_color(sky_origin, task.ray);
-//     }
-//
-//     sky = mul_color(sky, record);
-//
-//     write_beauty_buffer(sky, pixel);
-//   }
-// }
-
 LUMINARY_KERNEL void process_debug_sky_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];

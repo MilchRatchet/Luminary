@@ -529,7 +529,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->trace_results);
   device_buffer_init(&instance->task_counts);
   device_buffer_init(&instance->task_offsets);
-  device_buffer_init(&instance->light_sample_history);
   device_buffer_init(&instance->ior_stack);
   device_buffer_init(&instance->frame_buffer);
   device_buffer_init(&instance->frame_temporal);
@@ -543,7 +542,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->albedo_buffer);
   device_buffer_init(&instance->normal_buffer);
   device_buffer_init(&instance->records);
-  device_buffer_init(&instance->bounce_records_history);
   device_buffer_init(&instance->buffer_8bit);
   device_buffer_init(&instance->raydir_buffer);
   device_buffer_init(&instance->trace_result_buffer);
@@ -556,11 +554,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->sky_moon_albedo_tex);
   device_buffer_init(&instance->sky_moon_normal_tex);
   device_buffer_init(&instance->bsdf_energy_lut);
-  device_buffer_init(&instance->ltc_tex);
   device_buffer_init(&instance->bluenoise_1D);
   device_buffer_init(&instance->bluenoise_2D);
-  device_buffer_init(&instance->mis_buffer);
-  device_buffer_init(&instance->packed_gbuffer_history);
 
   device_buffer_malloc(instance->buffer_8bit, sizeof(XRGB8), instance->width * instance->height);
 
@@ -599,7 +594,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   raytrace_load_moon_textures(instance);
   raytrace_load_bluenoise_texture(instance);
-  light_load_ltc_texture(instance);
 
   device_sky_generate_LUTs(instance);
   device_cloud_noise_generate(instance);
@@ -700,9 +694,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->records, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->bounce_records_history, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->mis_buffer, sizeof(MISData), amount);
-  device_buffer_malloc(instance->packed_gbuffer_history, INTERLEAVED_ALLOCATION_SIZE(sizeof(PackedGBufferData)), amount);
 
   if (instance->denoiser || instance->aov_mode) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);
@@ -730,7 +721,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->task_offsets, sizeof(uint16_t), 6 * thread_count);
 
   device_buffer_malloc(instance->ior_stack, sizeof(uint32_t), amount);
-  device_buffer_malloc(instance->light_sample_history, sizeof(uint32_t), amount);
   device_buffer_malloc(instance->raydir_buffer, sizeof(vec3), amount);
   device_buffer_malloc(instance->trace_result_buffer, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
@@ -748,7 +738,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.trace_results             = (TraceResult*) device_buffer_get_pointer(instance->trace_results);
   ptrs.task_counts               = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets              = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
-  ptrs.light_sample_history      = (uint32_t*) device_buffer_get_pointer(instance->light_sample_history);
   ptrs.ior_stack                 = (uint32_t*) device_buffer_get_pointer(instance->ior_stack);
   ptrs.frame_buffer              = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
   ptrs.frame_temporal            = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
@@ -762,7 +751,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.albedo_buffer             = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
   ptrs.normal_buffer             = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
   ptrs.records                   = (RGBF*) device_buffer_get_pointer(instance->records);
-  ptrs.bounce_records_history    = (RGBF*) device_buffer_get_pointer(instance->bounce_records_history);
   ptrs.buffer_8bit               = (XRGB8*) device_buffer_get_pointer(instance->buffer_8bit);
   ptrs.albedo_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.albedo);
   ptrs.luminance_atlas           = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.luminance);
@@ -779,11 +767,8 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.sky_moon_albedo_tex       = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_albedo_tex);
   ptrs.sky_moon_normal_tex       = (DeviceTexture*) device_buffer_get_pointer(instance->sky_moon_normal_tex);
   ptrs.bsdf_energy_lut           = (DeviceTexture*) device_buffer_get_pointer(instance->bsdf_energy_lut);
-  ptrs.ltc_tex                   = (DeviceTexture*) device_buffer_get_pointer(instance->ltc_tex);
   ptrs.bluenoise_1D              = (uint16_t*) device_buffer_get_pointer(instance->bluenoise_1D);
   ptrs.bluenoise_2D              = (uint32_t*) device_buffer_get_pointer(instance->bluenoise_2D);
-  ptrs.mis_buffer                = (MISData*) device_buffer_get_pointer(instance->mis_buffer);
-  ptrs.packed_gbuffer_history    = (PackedGBufferData*) device_buffer_get_pointer(instance->packed_gbuffer_history);
 
   device_update_symbol(ptrs, ptrs);
   log_message("Updated device pointers.");
@@ -806,13 +791,9 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_temporal);
   device_buffer_free(instance->frame_variance);
   device_buffer_free(instance->records);
-  device_buffer_free(instance->bounce_records_history);
-  device_buffer_free(instance->light_sample_history);
   device_buffer_free(instance->raydir_buffer);
   device_buffer_free(instance->trace_result_buffer);
   device_buffer_free(instance->state_buffer);
-  device_buffer_free(instance->mis_buffer);
-  device_buffer_free(instance->packed_gbuffer_history);
 
   gpuErrchk(cudaDeviceSynchronize());
 }

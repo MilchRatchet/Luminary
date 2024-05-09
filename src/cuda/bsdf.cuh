@@ -111,7 +111,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   return context;
 }
 
-__device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info, float& marginal) {
+__device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
 #ifdef VOLUME_KERNEL
   const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
   const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
@@ -126,9 +126,6 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   info.weight                = get_color(1.0f, 1.0f, 1.0f);
   info.transparent_pass_prob = 1.0f;
-
-  marginal =
-    (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN) ? jendersie_eon_phase_function(cos_angle, data.roughness) : ocean_phase(cos_angle);
 
   return scatter_ray;
 #else
@@ -154,7 +151,6 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   info.transparent_pass_prob = 1.0f - data.albedo.a;
 
   vec3 sampled_microfacet_refraction;
-  float choice_probability = 1.0f;
   if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_ALPHA, pixel) < data.albedo.a) {
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_METALLIC, pixel) < data.metallic) {
       ray_local = reflect_vector(data_local.V, sampled_microfacet);
@@ -190,14 +186,12 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         final_weight             = scale_color(microfacet_eval, 1.0f / microfacet_probability);
         info.is_microfacet_based = true;
         info.antagonist_weight   = diffuse_weight;
-        choice_probability       = microfacet_probability;
       }
       else {
         ray_local                = diffuse_ray;
         final_weight             = scale_color(diffuse_eval, 1.0f / diffuse_probability);
         info.is_microfacet_based = false;
         info.antagonist_weight   = microfacet_weight;
-        choice_probability       = diffuse_probability;
       }
 
       info.sampled_technique = BSDF_GLOSSY;
@@ -230,14 +224,12 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       ray_local              = reflection_vector;
       final_weight           = scale_color(reflection_eval, 1.0f / reflection_probability);
       info.antagonist_weight = refraction_weight;
-      choice_probability     = reflection_probability;
     }
     else {
       ray_local                = refraction_vector;
       final_weight             = scale_color(refraction_eval, 1.0f / refraction_probability);
       info.antagonist_weight   = reflection_weight;
       info.is_transparent_pass = true;
-      choice_probability       = refraction_probability;
     }
 
     info.weight              = final_weight;
@@ -246,89 +238,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     info.transparent_pass_prob *= refraction_probability;
   }
 
-  // TODO: Remove with all the other marginal stuff.
-  float sample_pdf;
-  if (info.is_transparent_pass) {
-    sample_pdf = 1.0f;  // bsdf_microfacet_refraction_pdf(data_local, sampled_microfacet_refraction.z, data_local.V.z);
-  }
-  else if (info.is_microfacet_based) {
-    sample_pdf = bsdf_microfacet_pdf(data_local, sampled_microfacet.z, data_local.V.z);
-  }
-  else {
-    sample_pdf = bsdf_diffuse_pdf(data_local, ray_local.z);
-  }
-
-  marginal = sample_pdf * choice_probability;
-
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
 #endif
-}
-
-__device__ float bsdf_sample_marginal(const GBufferData data, const vec3 ray, const BSDFSampleInfo info) {
-  if (data.flags & G_BUFFER_VOLUME_HIT) {
-    const float cos_angle = -dot_product(ray, data.V);
-
-    return (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN) ? jendersie_eon_phase_function(cos_angle, data.roughness)
-                                                               : ocean_phase(cos_angle);
-  }
-
-  // Transformation to +Z-Up
-  const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
-  const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
-  const vec3 ray_local           = rotate_vector_by_quaternion(ray, rotation_to_z);
-
-  if (ray_local.z < 0.0f && !info.is_transparent_pass)
-    return 0.0f;
-
-  // G Buffer Data (+Z-Up)
-  GBufferData data_local = data;
-
-  data_local.V      = V_local;
-  data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
-
-  float marginal;
-  vec3 H = get_vector(0.0f, 0.0f, 1.0f);
-  switch (info.sampled_technique) {
-    default:
-    case BSDF_CONDUCTOR:
-      H        = normalize_vector(add_vector(data_local.V, ray_local));
-      marginal = 1.0f;
-      break;
-    case BSDF_GLOSSY: {
-      H                        = normalize_vector(add_vector(data_local.V, ray_local));
-      const BSDFRayContext ctx = bsdf_sample_context(data_local, H, ray_local, false);
-
-      const BSDFSamplingHint hint = (info.is_microfacet_based) ? BSDF_SAMPLING_MICROFACET : BSDF_SAMPLING_DIFFUSE;
-
-      const RGBF eval    = bsdf_glossy(data_local, ctx, hint, 1.0f);
-      const float weight = luminance(eval);
-
-      marginal = ((weight + info.antagonist_weight) > 0.0f) ? weight / (weight + info.antagonist_weight) : 0.0f;
-    } break;
-    case BSDF_DIELECTRIC: {
-      H = (info.is_transparent_pass) ? bsdf_refraction_normal_from_pair(ray_local, data_local.V, data_local.ior_in / data_local.ior_out)
-                                     : normalize_vector(add_vector(data_local.V, ray_local));
-
-      const BSDFRayContext ctx = bsdf_sample_context(data_local, H, ray_local, info.is_transparent_pass);
-
-      const BSDFSamplingHint hint = (info.is_transparent_pass) ? BSDF_SAMPLING_MICROFACET_REFRACTION : BSDF_SAMPLING_MICROFACET;
-
-      const RGBF eval    = bsdf_dielectric(data_local, ctx, hint, 1.0f);
-      const float weight = luminance(eval);
-
-      marginal = ((weight + info.antagonist_weight) > 0.0f) ? weight / (weight + info.antagonist_weight) : 0.0f;
-    } break;
-  }
-
-  float sample_pdf;
-  if (info.is_microfacet_based) {
-    sample_pdf = bsdf_microfacet_pdf(data_local, H.z, data_local.V.z);
-  }
-  else {
-    sample_pdf = bsdf_diffuse_pdf(data_local, ray_local.z);
-  }
-
-  return marginal * sample_pdf;
 }
 
 #endif /* SHADING_KERNEL */
