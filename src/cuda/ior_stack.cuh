@@ -16,6 +16,8 @@ enum IORStackMethod {
   IOR_STACK_METHOD_PULL = 4
 } typedef IORStackMethod;
 
+// BSDF transparent fast path relies on this precision.
+// If the precision is improved in the future we will run into INFs with surfaces with refractive index close to 1.
 __device__ uint32_t ior_compress(const float ior) {
   return (__float_as_uint((0.5f * (ior - 1.0f)) + 1.0f) >> 15) & 0xFF;
 }

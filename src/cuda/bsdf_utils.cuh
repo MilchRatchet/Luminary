@@ -35,9 +35,6 @@ struct BSDFSampleInfo {
   RGBF weight;
   bool is_transparent_pass;
   bool is_microfacet_based;
-  // MIS sampled technique data
-  BSDFMaterial sampled_technique;
-  float antagonist_weight;
   float transparent_pass_prob;
 } typedef BSDFSampleInfo;
 
