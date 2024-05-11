@@ -100,13 +100,19 @@ __device__ vec3 light_sample_triangle(
     tex_coords = load_triangle_tex_coords(triangle.triangle_id, coords);
   }
 
-  // TODO: Add support for constant colors
-  color = get_color(0.0f, 0.0f, 0.0f);
-
   if (illum_tex != TEXTURE_NONE) {
     const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
 
     color = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
+  }
+  else {
+    color.r = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_r);
+    color.g = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_g);
+    color.b = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_b);
+
+    const float scale = (float) (device.scene.materials[triangle.material_id].emission_scale);
+
+    color = scale_color(color, device.scene.material.default_material.b * scale);
   }
 
   if (luminance(color) > 0.0f) {
