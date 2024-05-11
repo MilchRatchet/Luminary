@@ -14,13 +14,15 @@ __device__ GBufferData particle_generate_g_buffer(const ShadingTask task, const 
   q.edge1  = particle_transform_relative(q.edge1);
   q.edge2  = particle_transform_relative(q.edge2);
 
-  vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
+  const vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
 
   RGBAF albedo;
   albedo.r = device.scene.particles.albedo.r;
   albedo.g = device.scene.particles.albedo.g;
   albedo.b = device.scene.particles.albedo.b;
   albedo.a = 1.0f;
+
+  const float ray_ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
 
   // Particles BSDF is emulated using volume BSDFs
   GBufferData data;
@@ -33,6 +35,8 @@ __device__ GBufferData particle_generate_g_buffer(const ShadingTask task, const 
   data.roughness = device.scene.particles.phase_diameter;
   data.metallic  = 0.0f;
   data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
+  data.ior_in    = ray_ior;
+  data.ior_out   = ray_ior;
 
   return data;
 }

@@ -50,16 +50,6 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, solid_angle);
   light_color           = mul_color(light_color, bsdf_value);
 
-  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
-  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
-
-  // TODO: Add specialized anyhit shaders for non geometry lights
-  unsigned int hit_id = LIGHT_ID_SUN;
-
-  // 21 bits for each color component.
-  unsigned int alpha_data0, alpha_data1;
-  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
-
   unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
 
   if (device.scene.toy.active) {
@@ -87,6 +77,16 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
       light_color = mul_color(light_color, toy_transparency);
     }
   }
+
+  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
+  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
+
+  // TODO: Add specialized anyhit shaders for non geometry lights
+  unsigned int hit_id = LIGHT_ID_SUN;
+
+  // 21 bits for each color component.
+  unsigned int alpha_data0, alpha_data1;
+  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
@@ -155,15 +155,6 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   if (luminance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
-  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
-
-  unsigned int hit_id = light_id;
-
-  // 21 bits for each color component.
-  unsigned int alpha_data0, alpha_data1;
-  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
-
   unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
 
   if (device.scene.toy.active) {
@@ -185,13 +176,21 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
 
       const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
 
-      if (toy_dist2 + toy_dist < dist) {
+      if (toy_dist2 + toy_dist < dist)
         toy_transparency = mul_color(toy_transparency, toy_transparency);
-      }
 
       light_color = mul_color(light_color, toy_transparency);
     }
   }
+
+  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
+  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
+
+  unsigned int hit_id = light_id;
+
+  // 21 bits for each color component.
+  unsigned int alpha_data0, alpha_data1;
+  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,

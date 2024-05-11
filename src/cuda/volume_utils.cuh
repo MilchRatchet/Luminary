@@ -232,6 +232,8 @@ __device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray
 __device__ GBufferData volume_generate_g_buffer(const ShadingTask task, const int pixel, const VolumeDescriptor volume) {
   const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
 
+  const float ray_ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
+
   GBufferData data;
   data.hit_id = task.hit_id;
   data.albedo = RGBAF_set(
@@ -244,6 +246,8 @@ __device__ GBufferData volume_generate_g_buffer(const ShadingTask task, const in
   data.roughness = device.scene.fog.droplet_diameter;
   data.metallic  = 0.0f;
   data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
+  data.ior_in    = ray_ior;
+  data.ior_out   = ray_ior;
 
   return data;
 }

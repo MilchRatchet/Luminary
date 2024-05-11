@@ -70,9 +70,15 @@ __device__ bool toy_is_inside(const vec3 position, const vec3 ray) {
   if (device.scene.toy.shape == TOY_PLANE)
     return false;
 
-  const vec3 normal = get_toy_normal(position);
+  const float dist = get_length(sub_vector(position, device.scene.toy.position));
 
-  return (dot_product(normal, ray) >= 0.0f);
+  if (fabsf(dist - device.scene.toy.scale) < 32.0f * eps) {
+    const vec3 normal = get_toy_normal(position);
+
+    return (dot_product(normal, ray) >= 0.0f);
+  }
+
+  return (dist < device.scene.toy.scale);
 }
 
 __device__ float toy_plane_solid_angle(const vec3 position) {
