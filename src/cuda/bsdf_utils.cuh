@@ -189,7 +189,7 @@ __device__ float bsdf_microfacet_pdf(const GBufferData data, const float NdotH, 
   const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
   const float s2 = s * s;
   const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
-  return D / (2.0f * (k * data.V.z + t));
+  return D / (2.0f * (k * NdotV + t));
 }
 
 __device__ vec3 bsdf_microfacet_sample(
@@ -219,9 +219,6 @@ __device__ float bsdf_microfacet_evaluate_sampled_microfacet(const GBufferData d
   const float roughness4 = roughness2 * roughness2;
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  // D * G2 * NdotL / (4.0f * NdotL * NdotV)
-  // G2 contains (4 * NdotL * NdotV) in the denominator
-  // Then divide by the pdf given in [EtoT23]
   // NdotV == data.V.z
 
   const float len2 = roughness4 * (data.V.x * data.V.x + data.V.y * data.V.y);
@@ -230,7 +227,9 @@ __device__ float bsdf_microfacet_evaluate_sampled_microfacet(const GBufferData d
   const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
   const float s2 = s * s;
   const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
-  return 2.0f * (k * data.V.z + t) * G2 * NdotL;
+
+  // G2 contains (4 * NdotL * NdotV) in the denominator
+  return 2.0f * (k * NdotV + t) * G2 * NdotL;
 }
 
 __device__ float bsdf_microfacet_evaluate_sampled_diffuse(const GBufferData data, const float NdotH, const float NdotL, const float NdotV) {
@@ -239,9 +238,8 @@ __device__ float bsdf_microfacet_evaluate_sampled_diffuse(const GBufferData data
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  // D * G2 * NdotL * PI / (4.0f * NdotL * NdotV * NdotL)
   // G2 contains (4 * NdotL * NdotV) in the denominator
-  return D * G2 * PI;
+  return D * G2 * PI * NdotL * NdotL;
 }
 
 /*
@@ -269,13 +267,14 @@ __device__ float bsdf_microfacet_refraction_pdf(
   const float refraction_index) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
+  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const float G1         = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
 
   float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
 
-  // D * G1 * Jacobian
-  // Jacobian = HdotL / denominator
-  return bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4) * bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV) * HdotL / denominator;
+  // See Heitz14.
+  return D * G1 * (HdotV / NdotV) * (HdotL / denominator);
 }
 
 __device__ vec3 bsdf_microfacet_refraction_sample(
@@ -300,10 +299,9 @@ __device__ float bsdf_microfacet_refraction_evaluate(
   float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
 
-  // ... * NdotL
-  // 4 * PI because my results where way too dark, I have no idea why.
+  // See Walter07.
   // G2 contains (4 * NdotL * NdotV) in the denominator
-  return 4.0f * PI * 4.0f * HdotV * HdotL * NdotL * D * G2 / denominator;
+  return 4.0f * NdotL * HdotV * HdotL * D * G2 / denominator;
 }
 
 __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
@@ -313,8 +311,8 @@ __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
   const float roughness4 = roughness2 * roughness2;
   const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  // ... * NdotL
-  return G2_over_G1 * HdotV / NdotV;
+  // See Heitz14.
+  return G2_over_G1;
 }
 
 ///////////////////////////////////////////////////
