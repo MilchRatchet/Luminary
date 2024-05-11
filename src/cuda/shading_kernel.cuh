@@ -152,7 +152,7 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   float dist;
   const uint32_t light_id = ris_sample_light(data, index, light_ray_index, dir, light_color, dist);
 
-  if (luminance(light_color) == 0.0f)
+  if (luminance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
     return get_color(0.0f, 0.0f, 0.0f);
 
   const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);

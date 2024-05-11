@@ -20,8 +20,11 @@ __device__ uint32_t ris_sample_light(
   selected_light_color = get_color(0.0f, 0.0f, 0.0f);
 
   const uint32_t light_count = (device.scene.material.lights_active) ? (1 << device.restir.light_candidate_pool_size_log2) : 0;
-  const int reservoir_size   = (device.scene.triangle_lights_count > 0) ? min(device.restir.initial_reservoir_size, light_count) : 0;
 
+  if (light_count == 0)
+    return LIGHT_ID_NONE;
+
+  const int reservoir_size                    = device.restir.initial_reservoir_size;
   const float one_over_reservoir_sampling_pdf = device.scene.triangle_lights_count;
 
   // Don't allow triangles to sample themselves.
