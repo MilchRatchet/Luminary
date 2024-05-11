@@ -341,6 +341,7 @@ struct GlobalMaterial {
   int invert_roughness;
   int override_materials;
   LightSideMode light_side_mode;
+  int enable_ior_shadowing;
 } typedef GlobalMaterial;
 
 struct Particles {

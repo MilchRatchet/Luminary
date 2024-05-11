@@ -67,7 +67,7 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
 
     if (toy_dist < FLT_MAX) {
       // TODO: This only works when we enter a surface, what about the exit???
-      if (ior_compress(device.scene.toy.refractive_index) != compressed_ior)
+      if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
         return get_color(0.0f, 0.0f, 0.0f);
 
       RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
@@ -171,7 +171,7 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
 
     if (toy_dist < dist) {
       // TODO: This only works when we enter a surface, what about the exit???
-      if (ior_compress(device.scene.toy.refractive_index) != compressed_ior)
+      if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
         return get_color(0.0f, 0.0f, 0.0f);
 
       RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
@@ -216,20 +216,33 @@ __device__ RGBAF optix_alpha_test() {
 
   const uint32_t material_id    = load_triangle_material_id(hit_id);
   const uint32_t compressed_ior = ior_compress(__ldg(&(device.scene.materials[material_id].refraction_index)));
-  const uint16_t tex            = __ldg(&(device.scene.materials[material_id].albedo_map));
 
-  RGBAF albedo = get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
+  if (device.scene.material.enable_ior_shadowing && compressed_ior != __uint_as_float(optixGetPayload_3())) {
+    // Terminate ray.
+    return get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
+  }
 
-  if (tex != TEXTURE_NONE && compressed_ior == __uint_as_float(optixGetPayload_3())) {
+  const uint16_t tex = __ldg(&(device.scene.materials[material_id].albedo_map));
+
+  if (tex != TEXTURE_NONE) {
     const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
 
     const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v);
 
+    RGBAF albedo;
     albedo.r = tex_value.x;
     albedo.g = tex_value.y;
     albedo.b = tex_value.z;
     albedo.a = tex_value.w;
+
+    return albedo;
   }
+
+  RGBAF albedo;
+  albedo.r = random_uint16_t_to_float(__ldg(&(device.scene.materials[material_id].albedo_r)));
+  albedo.g = random_uint16_t_to_float(__ldg(&(device.scene.materials[material_id].albedo_g)));
+  albedo.b = random_uint16_t_to_float(__ldg(&(device.scene.materials[material_id].albedo_b)));
+  albedo.a = random_uint16_t_to_float(__ldg(&(device.scene.materials[material_id].albedo_a)));
 
   return albedo;
 }

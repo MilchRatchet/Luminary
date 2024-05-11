@@ -29,6 +29,7 @@ void scene_init(Scene** _scene) {
   scene->material.colored_transparency = 0;
   scene->material.override_materials   = 0;
   scene->material.invert_roughness     = 0;
+  scene->material.enable_ior_shadowing = 1;
   scene->material.light_side_mode      = LIGHT_SIDE_MODE_BOTH;
 
   scene->camera.pos.x                      = 0.0f;

@@ -91,6 +91,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 4706917273050042179u:
       sscanf(value, "%d\n", &material->colored_transparency);
       break;
+    /* IORSHADO */
+    case 5711762006303985481u:
+      sscanf(value, "%d\n", &material->enable_ior_shadowing);
+      break;
     /* INTERTRO */
     case 5715723589413916233u:
       sscanf(value, "%d\n", &material->invert_roughness);
@@ -853,6 +857,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene.material.alpha_cutoff);
   fputs(line, file);
   sprintf(line, "MATERIAL COLORTRA %d\n", instance->scene.material.colored_transparency);
+  fputs(line, file);
+  sprintf(line, "MATERIAL IORSHADO %d\n", instance->scene.material.enable_ior_shadowing);
   fputs(line, file);
   sprintf(line, "MATERIAL INVERTRO %d\n", instance->scene.material.invert_roughness);
   fputs(line, file);
