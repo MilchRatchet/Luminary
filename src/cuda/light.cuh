@@ -91,16 +91,34 @@ __device__ vec3 light_sample_triangle(
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
-  const uint16_t illum_tex = device.scene.materials[triangle.material_id].luminance_map;
+  const uint16_t albedo_tex = device.scene.materials[triangle.material_id].albedo_map;
+  const uint16_t illum_tex  = device.scene.materials[triangle.material_id].luminance_map;
+
+  // Load texture coordinates if we need them.
+  UV tex_coords;
+  if (illum_tex != TEXTURE_NONE || albedo_tex != TEXTURE_NONE) {
+    tex_coords = load_triangle_tex_coords(triangle.triangle_id, coords);
+  }
 
   // TODO: Add support for constant colors
   color = get_color(0.0f, 0.0f, 0.0f);
 
   if (illum_tex != TEXTURE_NONE) {
-    const UV tex_coords   = load_triangle_tex_coords(triangle.triangle_id, coords);
     const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
 
     color = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
+  }
+
+  if (luminance(color) > 0.0f) {
+    float alpha;
+    if (albedo_tex != TEXTURE_NONE) {
+      alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
+    }
+    else {
+      alpha = random_uint16_t_to_float(device.scene.materials[triangle.material_id].albedo_a);
+    }
+
+    color = scale_color(color, alpha);
   }
 
   return dir;

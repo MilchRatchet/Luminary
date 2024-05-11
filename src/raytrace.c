@@ -589,7 +589,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   free(triangles_interleaved);
 
-  device_update_symbol(materials, instance->scene.materials);
   device_update_symbol(aov_mode, instance->aov_mode);
 
   raytrace_load_moon_textures(instance);

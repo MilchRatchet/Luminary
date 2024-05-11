@@ -76,7 +76,7 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
 
   const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 
-  const Material mat = load_material(device.materials, material_id);
+  const Material mat = load_material(device.scene.materials, material_id);
 
   const vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
   const vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);

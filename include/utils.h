@@ -454,7 +454,6 @@ struct DeviceConstantMemory {
   int height;
   int output_width;
   int output_height;
-  PackedMaterial* materials;
   vec3 sun_pos;
   vec3 moon_pos;
   int shading_mode;
