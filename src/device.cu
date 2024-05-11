@@ -19,7 +19,7 @@
 #include "cuda/particle.cuh"
 #include "cuda/random.cuh"
 #include "cuda/random_unittest.cuh"
-#include "cuda/restir.cuh"
+#include "cuda/ris.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/sky_hdri.cuh"
 #include "cuda/utils.cuh"
@@ -117,7 +117,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
 
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  restir_candidates_pool_generation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  ris_presample_lights<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   optixrt_execute(instance->optix_kernel_geometry);
 

@@ -34,14 +34,14 @@ __device__ RGBF optix_decompress_color(unsigned int data0, unsigned int data1) {
   return color;
 }
 
-__device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
+__device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index) {
   const vec3 sky_pos     = world_to_sky_transform(data.position);
   const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
 
   if (!sun_visible)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_TBD_3 + light_ray_index, index);
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_SUN_RAY, index);
 
   float solid_angle;
   const vec3 dir   = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
@@ -102,13 +102,13 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   return mul_color(light_color, visibility);
 }
 
-__device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
+__device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort2 index) {
   const bool toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
 
   if (!toy_visible)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_TBD_3 + light_ray_index, index);
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_TOY_RAY, index);
 
   const vec3 dir   = toy_sample_ray(data.position, random);
   const float dist = get_toy_distance(data.position, dir);

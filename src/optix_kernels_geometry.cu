@@ -83,18 +83,16 @@ extern "C" __global__ void __raygen__optix() {
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
     if (use_light_rays) {
-      uint32_t light_ray_index = 0;
-
-      if (device.restir.num_light_rays) {
-        for (int j = 0; j < device.restir.num_light_rays; j++) {
-          accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geometry(data, task.index, light_ray_index++));
+      if (device.ris_settings.num_light_rays) {
+        for (int j = 0; j < device.ris_settings.num_light_rays; j++) {
+          accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geometry(data, task.index, j));
         }
 
-        accumulated_light = scale_color(accumulated_light, 1.0f / device.restir.num_light_rays);
+        accumulated_light = scale_color(accumulated_light, 1.0f / device.ris_settings.num_light_rays);
       }
 
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index, light_ray_index++));
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index, light_ray_index++));
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
 
       const float side_prob =
         (bounce_info.is_transparent_pass) ? bounce_info.transparent_pass_prob : (1.0f - bounce_info.transparent_pass_prob);

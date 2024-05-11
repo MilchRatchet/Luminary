@@ -7,7 +7,7 @@
 #define FOG_DENSITY (0.001f * device.scene.fog.density)
 
 struct VolumeDescriptor {
-  // TODO: Correctly pass descriptor to G-Buffer and use in ReSTIR.
+  // TODO: Correctly pass descriptor to G-Buffer and use in RIS.
   VolumeType type;
   RGBF absorption;
   RGBF scattering;

@@ -44,7 +44,7 @@
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 2048
 
-#define RESTIR_CANDIDATE_POOL_MAX (1 << 20)
+#define RIS_MAX_CANDIDATE_POOL_SIZE (1 << 20)
 
 enum LightID : uint32_t {
   LIGHT_ID_SUN               = 0xffffffffu,
@@ -394,12 +394,12 @@ struct TextureAtlas {
   int normal_length;
 } typedef TextureAtlas;
 
-struct ReSTIRSettings {
+struct RISSettings {
   int initial_reservoir_size;
   int light_candidate_pool_size_log2;
   TriangleLight* presampled_triangle_lights;
   int num_light_rays;
-} typedef ReSTIRSettings;
+} typedef RISSettings;
 
 struct DevicePointers {
   TraceTask* trace_tasks;
@@ -443,7 +443,7 @@ struct DevicePointers {
 struct DeviceConstantMemory {
   DevicePointers ptrs;
   Scene scene;
-  ReSTIRSettings restir;
+  RISSettings ris_settings;
   uint16_t user_selected_x;
   uint16_t user_selected_y;
   int max_ray_depth;
@@ -559,7 +559,7 @@ struct RaytraceInstance {
   Jitter jitter;
   int accum_mode;
   RayEmitter emitter;
-  ReSTIRSettings restir;
+  RISSettings ris_settings;
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;

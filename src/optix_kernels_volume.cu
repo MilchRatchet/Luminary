@@ -42,34 +42,17 @@ extern "C" __global__ void __raygen__optix() {
       write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
     }
 
-    RGBF accumulated_light   = get_color(0.0f, 0.0f, 0.0f);
-    uint32_t light_ray_index = 0;
-
-    if (device.restir.num_light_rays) {
-      for (int j = 0; j < device.restir.num_light_rays; j++) {
-        accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geometry(data, task.index, light_ray_index++));
-      }
-
-      accumulated_light = scale_color(accumulated_light, 1.0f / device.restir.num_light_rays);
-    }
-
-    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index, light_ray_index++));
-    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index, light_ray_index++));
-
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
-    accumulated_light = mul_color(accumulated_light, record);
-
-    write_beauty_buffer(accumulated_light, pixel);
 
     BSDFSampleInfo bounce_info;
     const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
-
-    RGBF bounce_record = record;
 
     TraceTask bounce_task;
     bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
+
+    RGBF bounce_record = record;
 
     if (validate_trace_task(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
@@ -77,6 +60,23 @@ extern "C" __global__ void __raygen__optix() {
 
       state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
     }
+
+    RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
+
+    if (device.ris_settings.num_light_rays) {
+      for (int j = 0; j < device.ris_settings.num_light_rays; j++) {
+        accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geometry(data, task.index, j));
+      }
+
+      accumulated_light = scale_color(accumulated_light, 1.0f / device.ris_settings.num_light_rays);
+    }
+
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
+
+    accumulated_light = mul_color(accumulated_light, record);
+
+    write_beauty_buffer(accumulated_light, pixel);
   }
 
   device.ptrs.trace_counts[THREAD_ID] = trace_count;
