@@ -239,7 +239,7 @@ __device__ float bsdf_microfacet_evaluate_sampled_diffuse(const GBufferData data
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
   // G2 contains (4 * NdotL * NdotV) in the denominator
-  return D * G2 * PI * NdotL * NdotL;
+  return D * G2 * PI;
 }
 
 /*
@@ -323,12 +323,31 @@ __device__ vec3 bsdf_diffuse_sample(const float2 random) {
   return sample_ray_sphere(random.x, random.y);
 }
 
-__device__ float bsdf_diffuse_evaluate(const GBufferData data, const BSDFRayContext ctx) {
-  return ctx.NdotL * (1.0f / PI);
-}
-
 __device__ float bsdf_diffuse_pdf(const GBufferData data, const float NdotL) {
   return NdotL * (1.0f / PI);
+}
+
+__device__ float bsdf_diffuse_evaluate(const GBufferData data, const float NdotL) {
+  return NdotL * (1.0f / PI);
+}
+
+__device__ float bsdf_diffuse_evaluate_sampled_diffuse() {
+  return 1.0f;
+}
+
+__device__ float bsdf_diffuse_evaluate_sampled_microfacet(const GBufferData data, const float NdotL, const float NdotH, const float NdotV) {
+  const float roughness2 = data.roughness * data.roughness;
+  const float roughness4 = roughness2 * roughness2;
+  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+
+  const float len2 = roughness4 * (data.V.x * data.V.x + data.V.y * data.V.y);
+  const float t    = sqrtf(len2 + data.V.z * data.V.z);
+
+  const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
+  const float s2 = s * s;
+  const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
+
+  return NdotL * (2.0f * (k * NdotV + t)) / (PI * D);
 }
 
 ///////////////////////////////////////////////////
@@ -393,7 +412,7 @@ __device__ RGBF
   float diff_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
-      diff_term = bsdf_diffuse_evaluate(data, ctx) * one_over_sampling_pdf;
+      diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL) * one_over_sampling_pdf;
       break;
     case BSDF_SAMPLING_DIFFUSE:
       diff_term = 1.0f;

@@ -168,7 +168,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       const RGBF microfacet_eval          = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
       const vec3 diffuse_ray           = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_DIFFUSE, pixel));
-      const vec3 diffuse_microfacet    = normalize_vector(add_vector(data.V, diffuse_ray));
+      const vec3 diffuse_microfacet    = normalize_vector(add_vector(data_local.V, diffuse_ray));
       const BSDFRayContext diffuse_ctx = bsdf_sample_context(data_local, diffuse_microfacet, diffuse_ray, false);
       const RGBF diffuse_eval          = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
 
