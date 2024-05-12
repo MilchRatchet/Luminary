@@ -48,10 +48,10 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.HdotV = fabsf(dot_product(context.H, data.V));
   context.HdotL = fabsf(dot_product(context.H, L));
 
-  context.f0_conductor      = opaque_color(data.albedo);
+  context.f0_conductor      = (data.flags & G_BUFFER_DIFFUSE_ONLY) ? get_color(0.0f, 0.0f, 0.0f) : opaque_color(data.albedo);
   context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), context.HdotV);
 
-  context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
+  context.f0_glossy      = (data.flags & G_BUFFER_DIFFUSE_ONLY) ? get_color(0.0f, 0.0f, 0.0f) : get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
   context.fresnel_dielectric = (total_reflection) ? 1.0f : bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);

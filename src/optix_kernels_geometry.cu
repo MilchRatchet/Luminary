@@ -53,7 +53,8 @@ extern "C" __global__ void __raygen__optix() {
     const float shift = (bounce_info.is_transparent_pass) ? -eps : eps;
     data.position     = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
-    bool use_light_rays = false;
+    bool use_light_rays        = false;
+    bool allow_bounce_lighting = false;
     if (bounce_info.is_transparent_pass) {
       data.flags |= G_BUFFER_IS_TRANSPARENT_PASS;
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
@@ -61,9 +62,15 @@ extern "C" __global__ void __raygen__optix() {
 
       const float refraction_scale = (data.ior_in > data.ior_out) ? data.ior_in / data.ior_out : data.ior_out / data.ior_in;
       use_light_rays |= data.roughness * (refraction_scale - 1.0f) > 0.05f;
+      allow_bounce_lighting = !use_light_rays;
     }
     else {
-      use_light_rays |= !bounce_info.is_microfacet_based || data.roughness > 0.05f;
+      use_light_rays |= (data.metallic < 1.0f || data.roughness > 0.05f);
+      allow_bounce_lighting |= bounce_info.is_microfacet_based && data.roughness <= 0.05f;
+
+      if (data.roughness <= 0.05f) {
+        data.flags |= G_BUFFER_DIFFUSE_ONLY;
+      }
     }
 
     TraceTask bounce_task;
@@ -76,7 +83,7 @@ extern "C" __global__ void __raygen__optix() {
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
     }
 
-    if (use_light_rays) {
+    if (!allow_bounce_lighting) {
       state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
     }
 
