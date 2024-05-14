@@ -34,6 +34,32 @@ __device__ RGBF optix_decompress_color(unsigned int data0, unsigned int data1) {
   return color;
 }
 
+__device__ bool optix_evaluate_ior_culling(const uint32_t ior_data, const ushort2 index) {
+  const int8_t ior_stack_pop_max = (int8_t) (ior_data >> 24);
+  if (ior_stack_pop_max > 0) {
+    const uint32_t ior_stack = device.ptrs.ior_stack[get_pixel_id(index.x, index.y)];
+
+    const uint32_t ray_ior = (ior_data & 0xFF);
+
+    if (ior_stack_pop_max >= 3) {
+      if (ray_ior != (ior_stack >> 24))
+        return true;
+    }
+
+    if (ior_stack_pop_max >= 2) {
+      if (ray_ior != (ior_stack >> 16))
+        return true;
+    }
+
+    if (ior_stack_pop_max >= 1) {
+      if (ray_ior != (ior_stack >> 8))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index) {
   const vec3 sky_pos     = world_to_sky_transform(data.position);
   const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
@@ -56,7 +82,6 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
     const float toy_dist = get_toy_distance(data.position, dir);
 
     if (toy_dist < FLT_MAX) {
-      // TODO: This only works when we enter a surface, what about the exit???
       if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
         return get_color(0.0f, 0.0f, 0.0f);
 
@@ -71,8 +96,16 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
 
       const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
 
-      if (toy_dist2 < FLT_MAX)
+      bool two_hits = false;
+      if (toy_dist2 < FLT_MAX) {
         toy_transparency = mul_color(toy_transparency, toy_transparency);
+        two_hits         = true;
+      }
+
+      if (!two_hits) {
+        // Set ray ior pop values to 1,1 or 0,-1 (max,balance)
+        compressed_ior |= (toy_is_inside(data.position, dir)) ? 0x01010000 : 0x00FF0000;
+      }
 
       light_color = mul_color(light_color, toy_transparency);
     }
@@ -93,6 +126,9 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
   if (hit_id == HIT_TYPE_REJECT)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index))
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
@@ -136,6 +172,9 @@ __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort
   if (hit_id == HIT_TYPE_REJECT)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index))
+    return get_color(0.0f, 0.0f, 0.0f);
+
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
 
   visibility = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
@@ -160,8 +199,7 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   if (device.scene.toy.active) {
     const float toy_dist = get_toy_distance(data.position, dir);
 
-    if (toy_dist < dist) {
-      // TODO: This only works when we enter a surface, what about the exit???
+    if (toy_dist < FLT_MAX) {
       if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
         return get_color(0.0f, 0.0f, 0.0f);
 
@@ -176,8 +214,16 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
 
       const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
 
-      if (toy_dist2 + toy_dist < dist)
+      bool two_hits = false;
+      if (toy_dist2 < FLT_MAX) {
         toy_transparency = mul_color(toy_transparency, toy_transparency);
+        two_hits         = true;
+      }
+
+      if (!two_hits) {
+        // Set ray ior pop values to 1,1 or 0,-1 (max,balance)
+        compressed_ior |= (toy_is_inside(data.position, dir)) ? 0x01010000 : 0x00FF0000;
+      }
 
       light_color = mul_color(light_color, toy_transparency);
     }
@@ -199,6 +245,9 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   if (hit_id == HIT_TYPE_REJECT)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index))
+    return get_color(0.0f, 0.0f, 0.0f);
+
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
 
   visibility = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
@@ -210,13 +259,14 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ RGBAF optix_alpha_test() {
+__device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
   const uint32_t material_id    = load_triangle_material_id(hit_id);
   const uint32_t compressed_ior = ior_compress(__ldg(&(device.scene.materials[material_id].refraction_index)));
 
-  if (device.scene.material.enable_ior_shadowing && compressed_ior != __uint_as_float(optixGetPayload_3())) {
+  // This assumes that IOR is compressed into 8 bits.
+  if (device.scene.material.enable_ior_shadowing && compressed_ior != (ray_ior & 0xFF)) {
     // Terminate ray.
     return get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
   }
@@ -251,11 +301,9 @@ extern "C" __global__ void __anyhit__optix() {
     optixIgnoreIntersection();
   }
 
-  RGBAF albedo = optix_alpha_test();
+  unsigned int ray_ior = optixGetPayload_3();
 
-  if (albedo.a == 0.0f) {
-    optixIgnoreIntersection();
-  }
+  const RGBAF albedo = optix_alpha_test(ray_ior);
 
   if (albedo.a == 1.0f) {
     optixSetPayload_0(HIT_TYPE_REJECT);
@@ -263,8 +311,22 @@ extern "C" __global__ void __anyhit__optix() {
     optixTerminateRay();
   }
 
-  RGBF alpha = (device.scene.material.colored_transparency) ? scale_color(opaque_color(albedo), 1.0f - albedo.a)
-                                                            : get_color(1.0f - albedo.a, 1.0f - albedo.a, 1.0f - albedo.a);
+  int8_t ray_ior_pop_balance = (int8_t) ((ray_ior >> 16) & 0xFF);
+  int8_t ray_ior_pop_max     = (int8_t) (ray_ior >> 24);
+
+  ray_ior_pop_balance += (optixIsBackFaceHit()) ? 1 : -1;
+  ray_ior_pop_max = max(ray_ior_pop_max, ray_ior_pop_balance);
+
+  ray_ior = (ray_ior & 0xFFFF) | (uint32_t) (ray_ior_pop_balance << 16) | (uint32_t) (ray_ior_pop_max << 24);
+
+  optixSetPayload_3(ray_ior);
+
+  if (albedo.a == 0.0f) {
+    optixIgnoreIntersection();
+  }
+
+  const RGBF alpha = (device.scene.material.colored_transparency) ? scale_color(opaque_color(albedo), 1.0f - albedo.a)
+                                                                  : get_color(1.0f - albedo.a, 1.0f - albedo.a, 1.0f - albedo.a);
 
   unsigned int alpha_data0 = optixGetPayload_1();
   unsigned int alpha_data1 = optixGetPayload_2();
