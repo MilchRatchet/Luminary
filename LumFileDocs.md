@@ -16,6 +16,9 @@ This number restricts the number of bounces of the path that is traced for each 
 `GENERAL SAMPLES_ [INT32]`<br/>
 The number of samples to compute per pixel in offline mode. Number must be strictly greater than 0.
 
+`GENERAL NUMLIGHT [INT32]`<br/>
+The number of light rays computed at each shading point. Number must be strictly greater than 0.
+
 `GENERAL DENOISER [INT32]`<br/>
 Defines which of the available denoising modes is used:
   - 0 = No denoising
@@ -52,6 +55,9 @@ Every alpha value smaller than this value is automatically treated as 0, i.e., f
 
 `MATERIAL COLORTRA [INT32]`<br/>
 Set 1 to enable colored transparency for geometry, 0 else. Enabling this will use the albedo color to change the color of rays passing through the geometry. Note that this can cause artifacts with some albedo textures.
+
+`MATERIAL IORSHADO [INT32]`<br/>
+Set 1 to cancel light ray when intersecting a boundary of two mediums with different IORs.
 
 `MATERIAL INVERTRO [INT32]`<br/>
 Set 1 to invert roughness for geometry, 0 else. Enabling this gives you legacy behaviour where the roughness from the input geometry was always inverted.

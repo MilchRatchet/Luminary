@@ -141,6 +141,7 @@ struct General {
   int height;
   int samples;
   int max_ray_depth;
+  int num_light_ray;
   DenoisingMode denoiser;
   char** mesh_files;
   int mesh_files_count;

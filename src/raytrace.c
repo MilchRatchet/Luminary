@@ -510,7 +510,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   instance->ris_settings.initial_reservoir_size         = 16;
   instance->ris_settings.light_candidate_pool_size_log2 = 14;
-  instance->ris_settings.num_light_rays                 = 1;
+  instance->ris_settings.num_light_rays                 = general.num_light_ray;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
@@ -625,7 +625,6 @@ void raytrace_reset(RaytraceInstance* instance) {
   instance->height        = instance->settings.height;
   instance->output_width  = instance->settings.width;
   instance->output_height = instance->settings.height;
-  instance->max_ray_depth = instance->settings.max_ray_depth;
   instance->denoiser      = instance->settings.denoiser;
 
   if (instance->denoiser == DENOISING_UPSCALING) {
@@ -669,6 +668,7 @@ void raytrace_prepare(RaytraceInstance* instance) {
   device_update_symbol(ris_settings, instance->ris_settings);
   device_update_symbol(user_selected_x, instance->user_selected_x);
   device_update_symbol(user_selected_y, instance->user_selected_y);
+  device_update_symbol(max_ray_depth, instance->max_ray_depth);
   raytrace_build_structures(instance);
 }
 
@@ -684,7 +684,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_update_symbol(height, instance->height);
   device_update_symbol(output_width, instance->output_width);
   device_update_symbol(output_height, instance->output_height);
-  device_update_symbol(max_ray_depth, instance->max_ray_depth);
   device_update_symbol(denoiser, instance->denoiser);
 
   device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), amount);

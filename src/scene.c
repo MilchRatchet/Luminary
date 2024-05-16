@@ -210,9 +210,10 @@ static General get_default_settings() {
   General general = {
     .width             = 1280,
     .height            = 720,
-    .max_ray_depth     = 3,
-    .samples           = 16,
-    .denoiser          = DENOISING_ON,
+    .max_ray_depth     = 8,
+    .samples           = 64,
+    .num_light_ray     = 1,
+    .denoiser          = DENOISING_OFF,
     .output_path       = malloc(LINE_SIZE),
     .mesh_files        = malloc(sizeof(char*) * 10),
     .mesh_files_count  = 0,

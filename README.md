@@ -31,9 +31,7 @@
 
 # About
 
-Luminary is a renderer using pathtracing. It aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, the input consists of only meshes with albedo, material, illuminance and normal textures. All other effects come parameterized.
-
-This project is for fun and to learn more about `real-time rendering`. Current plans can be found in the `Issues` tab.
+Luminary is a renderer using pathtracing. It aims at rendering high quality images while maintaining usable performance in realtime mode. Usage is supposed to be non-artist friendly, that is, the input consists of only meshes with albedo, material, illuminance and normal textures. All other effects come parameterized. This project is for fun and to learn more about rendering.
 
 The goal is to use as few libraries as feasible. Currently, the following libraries are used: `SDL2`, `zlib`, `qoi`, `OptiX` and `Ceb`.
 
@@ -231,3 +229,4 @@ This is a list of papers I have used for this project so far. Note that some tec
 - K. Eto, Y. Tokuyoshi, _Bounded VNDF Sampling for Smith–GGX Reflections_, ACM SIGGRAPH Asia 2023 Technical Communications, pp. 1-4, 2023.
 - D. Sforza, F. Pellacini, _Enforcing Energy Preservation in Microfacet Models_, Smart Tools and Applications in Graphics - Eurographics Italian Chapter Conference, 2022.
 - R. West, I. Georgiev, T. Hachisuka, _Marginal Multiple Importance Sampling_, SIGGRAPH Asia 2022 Conference Papers, 2022.
+- B. Walter, S. R. Marschner, H. Li, K. E. Torrance, _Microfacet models for refraction through rough surfaces_, Proceedings of the 18th Eurographics Conference on Rendering Techniques, pp. 195-206, 2007.
