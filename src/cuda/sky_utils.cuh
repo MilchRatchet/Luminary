@@ -55,6 +55,16 @@ __device__ RGBF sky_hdri_sample(const vec3 ray, const float mip_bias) {
   return get_color(hdri.x, hdri.y, hdri.z);
 }
 
+__device__ float sky_hdri_sample_alpha(const vec3 ray, const float mip_bias) {
+  const float theta = atan2f(ray.z, ray.x);
+  const float phi   = asinf(ray.y);
+
+  const float u = (theta + PI) / (2.0f * PI);
+  const float v = 1.0f - ((phi + 0.5f * PI) / PI);
+
+  return tex2DLod<float>(device.ptrs.sky_hdri_luts[1].tex, u, v, mip_bias + device.scene.sky.hdri_mip_bias);
+}
+
 // [Hil20]
 __device__ float sky_unit_to_sub_uv(const float u, const float resolution) {
   return (u + 0.5f / resolution) * (resolution / (resolution + 1.0f));
@@ -328,7 +338,14 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
   const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength);
   const Spectrum radiance     = spectrum_mul(extinction_sun, sun_radiance);
 
-  return sky_compute_color_from_spectrum(radiance);
+  RGBF sun_color = sky_compute_color_from_spectrum(radiance);
+
+  if (device.scene.sky.hdri_active) {
+    const float cloud_alpha = sky_hdri_sample_alpha(ray, 0.0f);
+    sun_color               = scale_color(sun_color, cloud_alpha);
+  }
+
+  return sun_color;
 }
 
 #endif /* SKY_UTILS_CUH */

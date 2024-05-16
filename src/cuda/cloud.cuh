@@ -241,7 +241,8 @@ __device__ CloudRenderResult
 // Wrapper
 ////////////////////////////////////////////////////////////////////
 
-__device__ float clouds_render(vec3 origin, const vec3 ray, const float limit, const ushort2 pixel, RGBF& color, RGBF& transmittance) {
+__device__ float clouds_render(
+  vec3 origin, const vec3 ray, const float limit, const ushort2 pixel, RGBF& color, RGBF& transmittance, float& transmittance_cloud_only) {
   float2 intersections[3];
   CloudRenderResult results[3];
 
@@ -299,6 +300,7 @@ __device__ float clouds_render(vec3 origin, const vec3 ray, const float limit, c
 
     color         = add_color(color, mul_color(result.scattered_light, transmittance));
     transmittance = scale_color(transmittance, result.transmittance);
+    transmittance_cloud_only *= result.transmittance;
 
     prev_start = result.hit_dist;
   }
@@ -324,7 +326,8 @@ LUMINARY_KERNEL void clouds_render_tasks() {
     RGBF record = load_RGBF(device.ptrs.records + pixel);
     RGBF color  = get_color(0.0f, 0.0f, 0.0f);
 
-    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, task.index, color, record);
+    float cloud_transmittance;
+    const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, task.index, color, record, cloud_transmittance);
 
     if (device.scene.sky.cloud.atmosphere_scattering) {
       if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
