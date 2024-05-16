@@ -62,7 +62,7 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst) {
       sky_origin = add_vector(sky_origin, scale_vector(ray, offset));
     }
 
-    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, true, device.scene.sky.steps, pixel_coords);
+    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, false, device.scene.sky.steps, pixel_coords);
 
     color = add_color(color, mul_color(sky, cloud_transmittance));
 
@@ -129,6 +129,9 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   if (dim == 0) {
     error_message("Failed to allocated HDRI because resolution was 0. Turned off HDRI.");
     instance->scene.sky.hdri_active = 0;
+
+    // Update GPU constants again because we may have already pushed hdri_active.
+    raytrace_update_device_scene(instance);
     return;
   }
 
@@ -144,9 +147,7 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
 
   device_malloc((void**) &luts_hdri_tex[0].data, luts_hdri_tex[0].height * luts_hdri_tex[0].pitch * 4 * sizeof(float));
 
-  RayIterationType iter_type = TYPE_CAMERA;
-  device_update_symbol(iteration_type, iter_type);
-  uint32_t depth = 0;
+  int depth = 0;
   device_update_symbol(depth, depth);
 
   for (int i = 0; i < instance->scene.sky.hdri_samples; i++) {

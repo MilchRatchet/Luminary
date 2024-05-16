@@ -279,7 +279,7 @@ __device__ float2 cloud_get_toplayer_intersection(const vec3 origin, const vec3 
 
 __device__ float cloud_base_density_low(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
   mip_bias += device.scene.sky.cloud.mipmap_bias;
-  mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
+  mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
 
   vec3 shape_pos = pos;
   shape_pos.x    = shape_pos.x + device.scene.sky.cloud.mid.wind_speed * height * cosf(device.scene.sky.cloud.mid.wind_angle) * 0.33f;
@@ -306,7 +306,7 @@ __device__ float cloud_base_density_low(const vec3 pos, const float height, cons
 
 __device__ float cloud_base_density_mid(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
   mip_bias += device.scene.sky.cloud.mipmap_bias;
-  mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
+  mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
 
   vec3 shape_pos = pos;
   shape_pos      = scale_vector(shape_pos, 0.2f * device.scene.sky.cloud.noise_shape_scale);
@@ -325,7 +325,7 @@ __device__ float cloud_base_density_mid(const vec3 pos, const float height, cons
 
 __device__ float cloud_base_density_top(const vec3 pos, const float height, const CloudWeather weather, float mip_bias) {
   mip_bias += device.scene.sky.cloud.mipmap_bias;
-  mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
+  mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
 
   vec3 shape_pos = pos;
   shape_pos      = scale_vector(shape_pos, 0.2f * device.scene.sky.cloud.noise_shape_scale);
@@ -354,7 +354,7 @@ __device__ float cloud_base_density_top(const vec3 pos, const float height, cons
 __device__ float cloud_erode_density(const vec3 pos, float density, const float height, const CloudWeather weather, float mip_bias) {
   if (density > 0.0f) {
     mip_bias += device.scene.sky.cloud.mipmap_bias;
-    mip_bias += (is_first_ray()) ? 0.0f : 1.0f;
+    mip_bias += (IS_PRIMARY_RAY) ? 0.0f : 1.0f;
 
     vec3 detail_pos = pos;
     detail_pos      = scale_vector(detail_pos, 2.0f * device.scene.sky.cloud.noise_detail_scale);

@@ -7,7 +7,7 @@
 #define FOG_DENSITY (0.001f * device.scene.fog.density)
 
 struct VolumeDescriptor {
-  // TODO: Correctly pass descriptor to G-Buffer and use in ReSTIR.
+  // TODO: Correctly pass descriptor to G-Buffer and use in RIS.
   VolumeType type;
   RGBF absorption;
   RGBF scattering;
@@ -76,38 +76,6 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
   if (volume.max_height <= volume.min_height)
     return make_float2(-FLT_MAX, 0.0f);
 
-  // Horizontal intersection
-  const float rn = 1.0f / sqrtf(ray.x * ray.x + ray.z * ray.z);
-  const float rx = ray.x * rn;
-  const float rz = ray.z * rn;
-
-  const float dx = origin.x - device.scene.camera.pos.x;
-  const float dz = origin.z - device.scene.camera.pos.z;
-
-  const float dot = dx * rx + dz * rz;
-  const float r2  = volume.dist * volume.dist;
-  const float c   = (dx * dx + dz * dz) - r2;
-
-  const float kx = dx - rx * dot;
-  const float kz = dz - rz * dot;
-
-  const float d = r2 - (kx * kx + kz * kz);
-
-  if (d < 0.0f)
-    return make_float2(-FLT_MAX, 0.0f);
-
-  const float sd = sqrtf(d);
-  const float q  = -dot - copysignf(sd, dot);
-
-  const float t0 = fmaxf(0.0f, c / q);
-  const float t1 = fmaxf(0.0f, q);
-
-  const float start_xz = fminf(t0, t1);
-  const float end_xz   = fmaxf(t0, t1);
-
-  if (end_xz < start_xz || limit < start_xz)
-    return make_float2(-FLT_MAX, 0.0f);
-
   // Vertical intersection
   float start_y;
   float end_y;
@@ -116,8 +84,11 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
 
     // Without loss of generality, we can simply assume that the end of the volume is at our closest intersection
     // as long as we are below the surface.
-    const float surface_intersect =
-      (above_surface || device.iteration_type == TYPE_LIGHT) ? ocean_intersection_distance(origin, ray, limit) : limit;
+#ifdef SHADING_KERNEL
+    const float surface_intersect = ocean_intersection_distance(origin, ray, limit);
+#else
+    const float surface_intersect = (above_surface) ? ocean_intersection_distance(origin, ray, limit) : limit;
+#endif
 
     if (above_surface) {
       start_y = surface_intersect;
@@ -149,6 +120,38 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
       end_y   = fmaxf(sy1, sy2);
     }
   }
+
+  // Horizontal intersection
+  const float rn = 1.0f / sqrtf(ray.x * ray.x + ray.z * ray.z);
+  const float rx = ray.x * rn;
+  const float rz = ray.z * rn;
+
+  const float dx = origin.x - device.scene.camera.pos.x;
+  const float dz = origin.z - device.scene.camera.pos.z;
+
+  const float dot = dx * rx + dz * rz;
+  const float r2  = volume.dist * volume.dist;
+  const float c   = (dx * dx + dz * dz) - r2;
+
+  const float kx = dx - rx * dot;
+  const float kz = dz - rz * dot;
+
+  const float d = r2 - (kx * kx + kz * kz);
+
+  if (d < 0.0f)
+    return make_float2(-FLT_MAX, 0.0f);
+
+  const float sd = sqrtf(d);
+  const float q  = -dot - copysignf(sd, dot);
+
+  const float t0 = fmaxf(0.0f, c / q);
+  const float t1 = fmaxf(0.0f, q);
+
+  const float start_xz = fminf(t0, t1);
+  const float end_xz   = fmaxf(t0, t1);
+
+  if (end_xz < start_xz || limit < start_xz)
+    return make_float2(-FLT_MAX, 0.0f);
 
   const float start = fmaxf(start_xz, start_y);
   const float dist  = fminf(fminf(end_xz, end_y) - start, limit - start);
@@ -195,5 +198,59 @@ __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType v
 
   return scale_color(opaque_color(data.albedo), phase);
 }
+
+__device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray, const float depth) {
+  float fog_transmittance = 1.0f;
+  if (device.scene.fog.active) {
+    const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
+    const float2 path             = volume_compute_path(volume, origin, ray, depth);
+
+    if (path.x >= 0.0f) {
+      fog_transmittance = expf(-path.y * volume.max_scattering);
+    }
+  }
+
+  RGBF ocean_transmittance = get_color(1.0f, 1.0f, 1.0f);
+  if (device.scene.ocean.active) {
+    const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
+    const float2 path             = volume_compute_path(volume, origin, ray, depth);
+
+    if (path.x >= 0.0f) {
+      RGBF volume_transmittance = volume_get_transmittance(volume);
+
+      ocean_transmittance.r = expf(-path.y * volume_transmittance.r);
+      ocean_transmittance.g = expf(-path.y * volume_transmittance.g);
+      ocean_transmittance.b = expf(-path.y * volume_transmittance.b);
+    }
+  }
+
+  return scale_color(ocean_transmittance, fog_transmittance);
+}
+
+#ifdef VOLUME_KERNEL
+
+__device__ GBufferData volume_generate_g_buffer(const ShadingTask task, const int pixel, const VolumeDescriptor volume) {
+  const float scattering_normalization = 1.0f / fmaxf(0.0001f, volume.max_scattering);
+
+  const float ray_ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
+
+  GBufferData data;
+  data.hit_id = task.hit_id;
+  data.albedo = RGBAF_set(
+    volume.scattering.r * scattering_normalization, volume.scattering.g * scattering_normalization,
+    volume.scattering.b * scattering_normalization, 0.0f);
+  data.emission  = get_color(0.0f, 0.0f, 0.0f);
+  data.normal    = get_vector(0.0f, 0.0f, 0.0f);
+  data.position  = task.position;
+  data.V         = scale_vector(task.ray, -1.0f);
+  data.roughness = device.scene.fog.droplet_diameter;
+  data.metallic  = 0.0f;
+  data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
+  data.ior_in    = ray_ior;
+  data.ior_out   = ray_ior;
+
+  return data;
+}
+#endif /* VOLUME_KERNEL */
 
 #endif /* CU_VOLUME_UTILS_H */

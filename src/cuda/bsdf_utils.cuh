@@ -35,9 +35,7 @@ struct BSDFSampleInfo {
   RGBF weight;
   bool is_transparent_pass;
   bool is_microfacet_based;
-  // MIS sampled technique data
-  BSDFMaterial sampled_technique;
-  float antagonist_weight;
+  float transparent_pass_prob;
 } typedef BSDFSampleInfo;
 
 enum BSDFLUT { BSDF_LUT_SS = 0, BSDF_LUT_SPECULAR = 1, BSDF_LUT_DIELEC = 2, BSDF_LUT_DIELEC_INV = 3 } typedef BSDFLUT;
@@ -102,8 +100,8 @@ __device__ float bsdf_shadowed_F90(const RGBF specular_f0) {
 // Refraction
 ///////////////////////////////////////////////////
 
-__device__ float bsdf_refraction_index_ambient(const vec3 position) {
-  if (device.scene.toy.active && toy_is_inside(position))
+__device__ float bsdf_refraction_index_ambient(const vec3 position, const vec3 ray) {
+  if (device.scene.toy.active && toy_is_inside(position, ray))
     return device.scene.toy.refractive_index;
 
   if (device.scene.ocean.active && position.y < device.scene.ocean.height)
@@ -112,9 +110,9 @@ __device__ float bsdf_refraction_index_ambient(const vec3 position) {
   return 1.0f;
 }
 
-// Get normal vector based on incoming ray and refracted ray: https://physics.stackexchange.com/a/762982
-__device__ vec3 bsdf_refraction_normal_from_pair(const vec3 L, const vec3 V, const float ior_L, const float ior_V) {
-  return normalize_vector(add_vector(scale_vector(V, ior_V), scale_vector(L, -ior_L)));
+// Get normal vector based on incoming ray and refracted ray: PBRT v3 Chapter 8.4.4
+__device__ vec3 bsdf_refraction_normal_from_pair(const vec3 L, const vec3 V, const float refraction_index) {
+  return normalize_vector(add_vector(L, scale_vector(V, refraction_index)));
 }
 
 ///////////////////////////////////////////////////
@@ -188,7 +186,7 @@ __device__ float bsdf_microfacet_pdf(const GBufferData data, const float NdotH, 
   const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
   const float s2 = s * s;
   const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
-  return D / (2.0f * (k * data.V.z + t));
+  return D / (2.0f * (k * NdotV + t));
 }
 
 __device__ vec3 bsdf_microfacet_sample(
@@ -218,9 +216,6 @@ __device__ float bsdf_microfacet_evaluate_sampled_microfacet(const GBufferData d
   const float roughness4 = roughness2 * roughness2;
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  // D * G2 * NdotL / (4.0f * NdotL * NdotV)
-  // G2 contains (4 * NdotL * NdotV) in the denominator
-  // Then divide by the pdf given in [EtoT23]
   // NdotV == data.V.z
 
   const float len2 = roughness4 * (data.V.x * data.V.x + data.V.y * data.V.y);
@@ -229,7 +224,9 @@ __device__ float bsdf_microfacet_evaluate_sampled_microfacet(const GBufferData d
   const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
   const float s2 = s * s;
   const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
-  return 2.0f * (k * data.V.z + t) * G2 * NdotL;
+
+  // G2 contains (4 * NdotL * NdotV) in the denominator
+  return 2.0f * (k * NdotV + t) * G2 * NdotL;
 }
 
 __device__ float bsdf_microfacet_evaluate_sampled_diffuse(const GBufferData data, const float NdotH, const float NdotL, const float NdotV) {
@@ -238,7 +235,6 @@ __device__ float bsdf_microfacet_evaluate_sampled_diffuse(const GBufferData data
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  // D * G2 * NdotL * PI / (4.0f * NdotL * NdotV * NdotL)
   // G2 contains (4 * NdotL * NdotV) in the denominator
   return D * G2 * PI;
 }
@@ -263,11 +259,19 @@ __device__ vec3 bsdf_microfacet_refraction_sample_normal(const GBufferData data,
   return normalize_vector(get_vector(sampled.x * roughness2, sampled.y * roughness2, sampled.z));
 }
 
-__device__ float bsdf_microfacet_refraction_pdf(const GBufferData data, const float NdotH, const float NdotV) {
+__device__ float bsdf_microfacet_refraction_pdf(
+  const GBufferData data, const float NdotH, const float NdotV, const float NdotL, const float HdotV, const float HdotL,
+  const float refraction_index) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
+  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+  const float G1         = bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV);
 
-  return bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4) * bsdf_microfacet_evaluate_smith_G1_GGX(roughness4, NdotV) / (4.0f * NdotV);
+  float denominator = refraction_index * HdotV + HdotL;
+  denominator       = denominator * denominator;
+
+  // See Heitz14.
+  return D * G1 * (HdotV / NdotV) * (HdotL / denominator);
 }
 
 __device__ vec3 bsdf_microfacet_refraction_sample(
@@ -289,11 +293,12 @@ __device__ float bsdf_microfacet_refraction_evaluate(
   const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2         = bsdf_microfacet_evaluate_smith_G2_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  float denominator = refraction_index * HdotL + HdotV;
+  float denominator = refraction_index * HdotV + HdotL;
   denominator       = denominator * denominator;
 
-  // ... * NdotL
-  return ((HdotV * HdotL) / NdotV) * D * G2 / denominator;
+  // See Walter07.
+  // G2 contains (4 * NdotL * NdotV) in the denominator
+  return 4.0f * NdotL * HdotV * HdotL * D * G2 / denominator;
 }
 
 __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
@@ -301,14 +306,10 @@ __device__ float bsdf_microfacet_refraction_evaluate_sampled_microfacet(
   const float refraction_index) {
   const float roughness2 = data.roughness * data.roughness;
   const float roughness4 = roughness2 * roughness2;
-  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
   const float G2_over_G1 = bsdf_microfacet_evaluate_smith_G2_over_G1_height_correlated_GGX(roughness4, NdotL, NdotV);
 
-  float denominator = refraction_index * HdotL + HdotV;
-  denominator       = denominator * denominator;
-
-  // ... * NdotL
-  return 4.0f * HdotV * HdotL * G2_over_G1 / denominator;
+  // See Heitz14.
+  return G2_over_G1;
 }
 
 ///////////////////////////////////////////////////
@@ -319,12 +320,31 @@ __device__ vec3 bsdf_diffuse_sample(const float2 random) {
   return sample_ray_sphere(random.x, random.y);
 }
 
-__device__ float bsdf_diffuse_evaluate(const GBufferData data, const BSDFRayContext ctx) {
-  return ctx.NdotL * (1.0f / PI);
-}
-
 __device__ float bsdf_diffuse_pdf(const GBufferData data, const float NdotL) {
   return NdotL * (1.0f / PI);
+}
+
+__device__ float bsdf_diffuse_evaluate(const GBufferData data, const float NdotL) {
+  return NdotL * (1.0f / PI);
+}
+
+__device__ float bsdf_diffuse_evaluate_sampled_diffuse() {
+  return 1.0f;
+}
+
+__device__ float bsdf_diffuse_evaluate_sampled_microfacet(const GBufferData data, const float NdotL, const float NdotH, const float NdotV) {
+  const float roughness2 = data.roughness * data.roughness;
+  const float roughness4 = roughness2 * roughness2;
+  const float D          = bsdf_microfacet_evaluate_D_GGX(NdotH, roughness4);
+
+  const float len2 = roughness4 * (data.V.x * data.V.x + data.V.y * data.V.y);
+  const float t    = sqrtf(len2 + data.V.z * data.V.z);
+
+  const float s  = 1.0f + sqrtf(data.V.x * data.V.x + data.V.y * data.V.y);
+  const float s2 = s * s;
+  const float k  = (1.0f - roughness4) * s2 / (s2 + roughness4 * data.V.z * data.V.z);
+
+  return NdotL * (2.0f * (k * NdotV + t)) / (PI * D);
 }
 
 ///////////////////////////////////////////////////
@@ -389,7 +409,7 @@ __device__ RGBF
   float diff_term;
   switch (sampling_hint) {
     case BSDF_SAMPLING_GENERAL:
-      diff_term = bsdf_diffuse_evaluate(data, ctx) * one_over_sampling_pdf;
+      diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL) * one_over_sampling_pdf;
       break;
     case BSDF_SAMPLING_DIFFUSE:
       diff_term = 1.0f;
@@ -463,9 +483,9 @@ __device__ RGBF bsdf_dielectric(
   const float dielectric_directional_albedo = bsdf_dielectric_directional_albedo(ctx.NdotV, data.roughness, ctx.refraction_index);
   term /= dielectric_directional_albedo;
 
-  if (ctx.refraction_index == 1.0f) {
+  if (ctx.refraction_index == 1.0f && ctx.is_refraction) {
     // TODO: Energy conservation does not work correctly for dielectric, investigate.
-    term = (ctx.is_refraction) ? 1.0f : 0.0f;
+    term = 1.0f;
   }
 
   return (data.colored_dielectric) ? scale_color(opaque_color(data.albedo), term) : get_color(term, term, term);
@@ -480,10 +500,11 @@ __device__ RGBF bsdf_multiscattering_evaluate(
   if (ctx.is_refraction)
     return scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.albedo.a);
 
-  RGBF conductor = scale_color(bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * data.metallic);
-  RGBF glossy    = scale_color(bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * (1.0f - data.metallic));
+  RGBF conductor  = scale_color(bsdf_conductor(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * data.metallic);
+  RGBF glossy     = scale_color(bsdf_glossy(data, ctx, sampling_hint, one_over_sampling_pdf), data.albedo.a * (1.0f - data.metallic));
+  RGBF dielectric = scale_color(bsdf_dielectric(data, ctx, sampling_hint, one_over_sampling_pdf), 1.0f - data.albedo.a);
 
-  return add_color(conductor, glossy);
+  return add_color(add_color(conductor, glossy), dielectric);
 }
 
 #endif /* CU_BSDF_UTILS_H */

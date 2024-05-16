@@ -20,15 +20,14 @@
 #define WEIGHT_BASED_EXIT
 #define RUSSIAN_ROULETTE_CLAMP (1.0f / 8.0f)
 
-__device__ int validate_trace_task(TraceTask task, RGBF& record) {
+__device__ int validate_trace_task(const TraceTask task, RGBF& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
   const float value = luminance(record);
-  if (isnan(value) || isinf(value)) {
-    valid = 0;
-  }
-  else if (value < device.scene.camera.russian_roulette_threshold) {
+
+  // Inf and NaN are handled in the temporal accumulation.
+  if (value < device.scene.camera.russian_roulette_threshold) {
     // Clamp probability to avoid fireflies.
     const float p = fmaxf(value / device.scene.camera.russian_roulette_threshold, RUSSIAN_ROULETTE_CLAMP);
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE, task.index) > p) {

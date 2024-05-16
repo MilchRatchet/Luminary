@@ -50,7 +50,14 @@ endif()
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
 
-list(REMOVE_ITEM gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu" "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu")
+list(REMOVE_ITEM gpu_source_files
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_trace_particle.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_geometry.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_toy.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_volume.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu"
+)
 
 #=============================================================
 # SDL2
@@ -105,12 +112,12 @@ if(CMAKE_C_COMPILER_ID STREQUAL "Clang")
         set(CMAKE_C_FLAGS_RELEASE "/O2")
         set(CMAKE_C_FLAGS_DEBUG "/Od /DEBUG")
     elseif(CMAKE_C_COMPILER_FRONTEND_VARIANT STREQUAL "GNU")
-        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-strict-aliasing -Wno-deprecated-non-prototype")
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-deprecated-non-prototype")
         set(CMAKE_C_FLAGS_RELEASE "-O3")
         set(CMAKE_C_FLAGS_DEBUG "-Og -g")
     endif()
 elseif (CMAKE_C_COMPILER_ID STREQUAL "GNU")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-strict-aliasing -Wno-deprecated-non-prototype")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native -Wextra -Wno-unused-result -Wno-format -Wno-uninitialized -Wno-incompatible-pointer-types -Wno-deprecated-non-prototype")
     set(CMAKE_C_FLAGS_RELEASE "-O3")
     set(CMAKE_C_FLAGS_DEBUG "-Og -g")
 else()
@@ -173,7 +180,9 @@ ceb_embed_files(
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
   $<TARGET_OBJECTS:optix_kernels>
-  $<TARGET_OBJECTS:optix_kernels_particle>
+  $<TARGET_OBJECTS:optix_kernels_trace_particle>
+  $<TARGET_OBJECTS:optix_kernels_geometry>
+  $<TARGET_OBJECTS:optix_kernels_volume>
   ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png
@@ -205,23 +214,21 @@ target_include_directories(Luminary PRIVATE CUDA::toolkit)
 # Create PTX files
 #=============================================================
 
-add_library(optix_kernels OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu)
-set_target_properties(optix_kernels PROPERTIES CUDA_PTX_COMPILATION ON)
-add_dependencies(Luminary optix_kernels)
+function(compile_ptx kernel_name)
+  add_library(${kernel_name} OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu)
+  set_target_properties(${kernel_name} PROPERTIES CUDA_PTX_COMPILATION ON)
+  add_dependencies(Luminary ${kernel_name})
 
-target_include_directories(optix_kernels PRIVATE "${CMAKE_SOURCE_DIR}/include")
-target_include_directories(optix_kernels PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
-target_include_directories(optix_kernels PRIVATE "${OptiX_INCLUDE}")
-target_include_directories(optix_kernels PRIVATE CUDA::toolkit)
+  target_include_directories(${kernel_name} PRIVATE "${CMAKE_SOURCE_DIR}/include")
+  target_include_directories(${kernel_name} PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
+  target_include_directories(${kernel_name} PRIVATE "${OptiX_INCLUDE}")
+  target_include_directories(${kernel_name} PRIVATE CUDA::toolkit)
+endfunction()
 
-add_library(optix_kernels_particle OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu)
-set_target_properties(optix_kernels_particle PROPERTIES CUDA_PTX_COMPILATION ON)
-add_dependencies(Luminary optix_kernels_particle)
-
-target_include_directories(optix_kernels_particle PRIVATE "${CMAKE_SOURCE_DIR}/include")
-target_include_directories(optix_kernels_particle PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
-target_include_directories(optix_kernels_particle PRIVATE "${OptiX_INCLUDE}")
-target_include_directories(optix_kernels_particle PRIVATE CUDA::toolkit)
+compile_ptx(optix_kernels)
+compile_ptx(optix_kernels_trace_particle)
+compile_ptx(optix_kernels_geometry)
+compile_ptx(optix_kernels_volume)
 
 #=============================================================
 # File copying

@@ -70,6 +70,20 @@ LUMINARY_KERNEL void temporal_accumulation() {
     RGBF output;
     float variance;
 
+    if (isnan(luminance(buffer)) || isinf(luminance(buffer))) {
+      // Debug code to identify paths that cause NaNs and INFs
+#if 0
+      ushort2 pixel;
+      pixel.y = (uint16_t) (offset / device.width);
+      pixel.x = (uint16_t) (offset - pixel.y * device.width);
+      printf(
+        "Path at (%u, %u) on frame %u ran into a NaN or INF: (%f %f %f)\n", pixel.x, pixel.y, device.temporal_frames, buffer.r, buffer.g,
+        buffer.b);
+#endif
+
+      buffer = get_color(0.0f, 0.0f, 0.0f);
+    }
+
     if (device.temporal_frames == 0) {
       output   = buffer;
       variance = 1.0f;

@@ -8,12 +8,21 @@
 #include "random.cuh"
 #include "utils.cuh"
 
+__device__ float difference_of_products(const float a, const float b, const float c, const float d) {
+  const float cd = c * d;
+
+  const float err = fmaf(-c, d, cd);
+  const float dop = fmaf(a, b, -cd);
+
+  return dop + err;
+}
+
 __device__ vec3 cross_product(const vec3 a, const vec3 b) {
   vec3 result;
 
-  result.x = a.y * b.z - a.z * b.y;
-  result.y = a.z * b.x - a.x * b.z;
-  result.z = a.x * b.y - a.y * b.x;
+  result.x = difference_of_products(a.y, b.z, a.z, b.y);
+  result.y = difference_of_products(a.z, b.x, a.x, b.z);
+  result.z = difference_of_products(a.x, b.y, a.y, b.x);
 
   return result;
 }
@@ -26,7 +35,7 @@ __device__ float dot_product(const vec3 a, const vec3 b) {
   return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
-__device__ __host__ float lerp(const float a, const float b, const float t) {
+__device__ float lerp(const float a, const float b, const float t) {
   return a + t * (b - a);
 }
 
@@ -69,7 +78,7 @@ __device__ vec3 get_vector(const float x, const float y, const float z) {
   return result;
 }
 
-__device__ __host__ vec3 add_vector(const vec3 a, const vec3 b) {
+__device__ vec3 add_vector(const vec3 a, const vec3 b) {
   vec3 result;
 
   result.x = a.x + b.x;
@@ -159,9 +168,9 @@ __device__ vec3 scale_vector(vec3 vector, const float scale) {
   return vector;
 }
 
-__device__ vec3 reflect_vector(const vec3 ray, const vec3 normal) {
-  const float dot   = dot_product(ray, normal);
-  const vec3 result = sub_vector(ray, scale_vector(normal, 2.0f * dot));
+__device__ vec3 reflect_vector(const vec3 V, const vec3 normal) {
+  const float dot   = dot_product(V, normal);
+  const vec3 result = sub_vector(scale_vector(normal, 2.0f * dot), V);
 
   return normalize_vector(result);
 }
@@ -364,6 +373,16 @@ __device__ vec3 transform_vec4_3(const Mat4x4 m, const vec3 p) {
   return res;
 }
 
+__device__ vec3 transform_vec4_3_position(const Mat4x4 m, const vec3 p) {
+  vec3 res;
+
+  res.x = m.f11 * p.x + m.f12 * p.y + m.f13 * p.z + m.f14;
+  res.y = m.f21 * p.x + m.f22 * p.y + m.f23 * p.z + m.f24;
+  res.z = m.f31 * p.x + m.f32 * p.y + m.f33 * p.z + m.f34;
+
+  return res;
+}
+
 __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
   vec3 res;
 
@@ -545,7 +564,7 @@ __device__ float sph_ray_int_back_p0(const vec3 ray, const vec3 origin, const fl
   return (t0 >= 0.0f) ? t0 : FLT_MAX;
 }
 
-__device__ __host__ vec3 angles_to_direction(const float altitude, const float azimuth) {
+__device__ vec3 angles_to_direction(const float altitude, const float azimuth) {
   vec3 dir;
   dir.x = cosf(azimuth) * cosf(altitude);
   dir.y = sinf(altitude);
@@ -555,17 +574,24 @@ __device__ __host__ vec3 angles_to_direction(const float altitude, const float a
 }
 
 // PBRT v3 Chapter "Specular Reflection and Transmission", Refract() function
-__device__ vec3 refract_vector(const vec3 ray, const vec3 normal, const float index_ratio) {
-  const float dot = fabsf(dot_product(normal, ray));
+__device__ vec3 refract_vector(const vec3 V, const vec3 normal, const float index_ratio, bool& total_reflection) {
+  if (index_ratio < eps) {
+    total_reflection = false;
+    return scale_vector(V, -1.0f);
+  }
+
+  const float dot = fabsf(dot_product(normal, V));
 
   const float b = 1.0f - index_ratio * index_ratio * (1.0f - dot * dot);
 
-  if (b < 0.0f) {
+  total_reflection = b < 0.0f;
+
+  if (total_reflection) {
     // Total reflection
-    return reflect_vector(ray, normal);
+    return reflect_vector(V, normal);
   }
   else {
-    return normalize_vector(add_vector(scale_vector(ray, index_ratio), scale_vector(normal, index_ratio * dot - sqrtf(b))));
+    return normalize_vector(sub_vector(scale_vector(normal, index_ratio * dot - sqrtf(b)), scale_vector(V, index_ratio)));
   }
 }
 
@@ -1038,7 +1064,13 @@ __device__ float sample_triangle_solid_angle(const TriangleLight triangle, const
   const float num   = fabsf(dot_product(a, cross_product(b, c)));
   const float denom = 1.0f + dot_product(a, b) + dot_product(a, c) + dot_product(b, c);
 
-  return 2.0f * atan2f(num, denom);
+  float solid_angle = 2.0f * atan2f(num, denom);
+
+  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
+    solid_angle = 0.0f;
+  }
+
+  return solid_angle;
 }
 
 /*

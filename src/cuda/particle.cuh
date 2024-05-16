@@ -1,124 +1,24 @@
 #include "bench.h"
 #include "buffer.h"
 #include "math.cuh"
+#include "particle_utils.cuh"
 #include "random.cuh"
 #include "utils.cuh"
 #include "utils.h"
 
-__device__ vec3 particle_transform_relative(vec3 p) {
-  return sub_vector(p, device.scene.camera.pos);
-}
-
-__device__ GBufferData particle_generate_g_buffer(const ParticleTask task, const int pixel) {
-  Quad q   = load_quad(device.particle_quads, task.hit_id & HIT_TYPE_PARTICLE_MASK);
-  q.vertex = particle_transform_relative(q.vertex);
-  q.edge1  = particle_transform_relative(q.edge1);
-  q.edge2  = particle_transform_relative(q.edge2);
-
-  vec3 normal = (dot_product(task.ray, q.normal) < 0.0f) ? q.normal : scale_vector(q.normal, -1.0f);
-
-  RGBAF albedo;
-  albedo.r = device.scene.particles.albedo.r;
-  albedo.g = device.scene.particles.albedo.g;
-  albedo.b = device.scene.particles.albedo.b;
-  albedo.a = 1.0f;
-
-  // Particles BSDF is emulated using volume BSDFs
-  GBufferData data;
-  data.hit_id    = task.hit_id;
-  data.albedo    = albedo;
-  data.emission  = get_color(0.0f, 0.0f, 0.0f);
-  data.normal    = normal;
-  data.position  = task.position;
-  data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = device.scene.particles.phase_diameter;
-  data.metallic  = 0.0f;
-  data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
-
-  return data;
-}
-
-LUMINARY_KERNEL void particle_process_tasks() {
-  const int task_count   = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
-  const int task_offset  = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
-  int light_trace_count  = device.ptrs.light_trace_count[THREAD_ID];
-  int bounce_trace_count = device.ptrs.bounce_trace_count[THREAD_ID];
-
-  for (int i = 0; i < task_count; i++) {
-    ParticleTask task = load_particle_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel   = task.index.y * device.width + task.index.x;
-
-    RGBF record = load_RGBF(device.records + pixel);
-
-    const GBufferData data = particle_generate_g_buffer(task, pixel);
-
-    write_normal_buffer(data.normal, pixel);
-
-    record = mul_color(record, opaque_color(data.albedo));
-
-    BSDFSampleInfo bounce_info;
-    float bsdf_marginal;
-    const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info, bsdf_marginal);
-
-    const LightSample light = restir_sample_reservoir(data, record, task.index);
-
-    uint32_t light_history_buffer_entry = LIGHT_ID_ANY;
-
-    if (light.weight > 0.0f) {
-      RGBF light_weight;
-      bool is_transparent_pass;
-      const vec3 light_ray = restir_apply_sample_shading(data, light, task.index, light_weight, is_transparent_pass);
-
-      const RGBF light_record = mul_color(record, light_weight);
-
-      TraceTask light_task;
-      light_task.origin = task.position;
-      light_task.ray    = light_ray;
-      light_task.index  = task.index;
-
-      const float light_mis_weight = mis_weight_light_sampled(data, light_ray, bounce_info, light);
-      store_RGBF(device.ptrs.light_records + pixel, scale_color(light_record, light_mis_weight));
-      light_history_buffer_entry = light.id;
-      store_trace_task(device.ptrs.light_trace + get_task_address(light_trace_count++), light_task);
-    }
-
-    device.ptrs.light_sample_history[pixel] = light_history_buffer_entry;
-
-    RGBF bounce_record = record;
-
-    TraceTask bounce_task;
-    bounce_task.origin = task.position;
-    bounce_task.ray    = bounce_ray;
-    bounce_task.index  = task.index;
-
-    if (validate_trace_task(bounce_task, bounce_record)) {
-      MISData mis_data;
-      mis_data.light_target_pdf_normalization = light.target_pdf_normalization;
-      mis_data.bsdf_marginal                  = bsdf_marginal;
-
-      mis_store_data(data, record, mis_data, bounce_ray, pixel);
-
-      store_RGBF(device.ptrs.bounce_records + pixel, bounce_record);
-      store_trace_task(device.ptrs.bounce_trace + get_task_address(bounce_trace_count++), bounce_task);
-    }
-  }
-
-  device.ptrs.light_trace_count[THREAD_ID]  = light_trace_count;
-  device.ptrs.bounce_trace_count[THREAD_ID] = bounce_trace_count;
-}
-
 LUMINARY_KERNEL void particle_process_debug_tasks() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
 
   for (int i = 0; i < task_count; i++) {
-    ParticleTask task = load_particle_task(device.trace_tasks + get_task_address(task_offset + i));
-    const int pixel   = task.index.y * device.width + task.index.x;
+    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel  = task.index.y * device.width + task.index.x;
+
+    if (VOLUME_HIT_CHECK(task.hit_id))
+      continue;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      const GBufferData data = particle_generate_g_buffer(task, pixel);
-
-      write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
+      write_beauty_buffer(device.scene.particles.albedo, pixel, true);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
       const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
@@ -141,7 +41,7 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
       write_beauty_buffer(get_color(red, green, blue), pixel, true);
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
-      const uint32_t v = random_uint32_t_base(0, task.hit_id);
+      const uint32_t v = random_uint32_t_base(0x55555555, task.hit_id);
 
       const uint16_t r = v & 0x7ff;
       const uint16_t g = (v >> 10) & 0x7ff;
@@ -156,9 +56,7 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
       write_beauty_buffer(color, pixel, true);
     }
     else if (device.shading_mode == SHADING_LIGHTS) {
-      const GBufferData data = particle_generate_g_buffer(task, pixel);
-
-      write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
+      write_beauty_buffer(device.scene.particles.albedo, pixel, true);
     }
   }
 }

@@ -19,10 +19,9 @@
 #include "cuda/particle.cuh"
 #include "cuda/random.cuh"
 #include "cuda/random_unittest.cuh"
-#include "cuda/restir.cuh"
+#include "cuda/ris.cuh"
 #include "cuda/sky.cuh"
 #include "cuda/sky_hdri.cuh"
-#include "cuda/toy.cuh"
 #include "cuda/utils.cuh"
 #include "cuda/volume.cuh"
 #include "device.h"
@@ -85,34 +84,15 @@ void device_handle_accumulation(RaytraceInstance* instance) {
   }
 }
 
-static void bind_type(RaytraceInstance* instance, int type, int depth) {
-  device_update_symbol(iteration_type, type);
+extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int depth) {
   device_update_symbol(depth, depth);
 
-  switch (type) {
-    case TYPE_CAMERA:
-    case TYPE_BOUNCE:
-      device_update_symbol(trace_tasks, instance->bounce_trace->device_pointer);
-      device_update_symbol(trace_count, instance->bounce_trace_count->device_pointer);
-      device_update_symbol(records, instance->bounce_records->device_pointer);
-      break;
-    case TYPE_LIGHT:
-      device_update_symbol(trace_tasks, instance->light_trace->device_pointer);
-      device_update_symbol(trace_count, instance->light_trace_count->device_pointer);
-      device_update_symbol(records, instance->light_records->device_pointer);
-      break;
-  }
-}
-
-extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type, int depth) {
-  bind_type(instance, type, depth);
-
-  if (type != TYPE_CAMERA)
+  if (depth > 0)
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+  if (instance->scene.particles.active) {
     optixrt_execute(instance->particles_instance.kernel);
   }
 
@@ -131,52 +111,34 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int type
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (type != TYPE_LIGHT && instance->scene.sky.aerial_perspective) {
+  if (instance->scene.sky.aerial_perspective) {
     process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (type == TYPE_LIGHT) {
-    process_geometry_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  ris_presample_lights<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-    process_sky_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  optixrt_execute(instance->optix_kernel_geometry);
 
-    if (instance->scene.toy.active) {
-      process_toy_light_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
+  if (instance->scene.fog.active || instance->scene.ocean.active || instance->scene.particles.active) {
+    optixrt_execute(instance->optix_kernel_volume);
   }
-  else {
-    restir_candidates_pool_generation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-    process_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-
-    if (instance->scene.particles.active) {
-      particle_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
-
-    if (instance->scene.ocean.active) {
-      process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
-
-    process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-
-    if (instance->scene.toy.active) {
-      process_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
-
-    if (instance->scene.fog.active || instance->scene.ocean.active) {
-      volume_process_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-    }
+  if (instance->scene.ocean.active) {
+    process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
+
+  process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
-extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int type) {
-  bind_type(instance, type, 0);
+extern "C" void device_execute_debug_kernels(RaytraceInstance* instance) {
+  const int depth = 0;
+  device_update_symbol(depth, depth);
 
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
-  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+  if (instance->scene.particles.active) {
     optixrt_execute(instance->particles_instance.kernel);
   }
 
@@ -194,16 +156,13 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance, int typ
   postprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  if (instance->scene.particles.active && type != TYPE_LIGHT) {
+  if (instance->scene.particles.active) {
     particle_process_debug_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   if (instance->scene.ocean.active) {
     process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   process_debug_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  if (instance->scene.toy.active) {
-    process_debug_toy_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
 }
 
 extern "C" void device_generate_tasks() {

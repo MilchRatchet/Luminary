@@ -51,9 +51,9 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_tab(ui, 1, "Renderer\nMaterials\nExport");
   panels[i++] = create_slider(ui, "Width", &(instance->settings.width), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
   panels[i++] = create_slider(ui, "Height", &(instance->settings.height), 0, 0.9f, 16.0f, 16384.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Max Ray Depth", &(instance->settings.max_ray_depth), 0, 0.02f, 0.0f, 1024.0f, 0, 1);
-  panels[i++] = create_dropdown(ui, "Optix Denoiser", &(instance->settings.denoiser), 0, 3, "Off\0On\0Upscaling 4x", 5);
+  panels[i++] = create_dropdown(ui, "Optix Denoiser", &(instance->settings.denoiser), 0, 3, "Off\0On\0Upscaling 4x", 4);
   panels[i++] = create_button(ui, "Reset Renderer", instance, (void (*)(void*)) raytrace_reset, 1);
+  panels[i++] = create_slider(ui, "Max Ray Depth", &(instance->max_ray_depth), 1, 0.02f, 0.0f, 1024.0f, 0, 1);
   panels[i++] =
     create_info(ui, "Triangle Count", &(instance->scene.triangle_data.triangle_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_dropdown(ui, "BVH Type", &(instance->bvh_type), 1, 2, "Luminary\0OptiX", 8);
@@ -67,10 +67,10 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   }
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
+  panels[i++] = create_slider(ui, "RIS Candidates Count", &(instance->ris_settings.initial_reservoir_size), 0, 0.02f, 1.0f, 32.0f, 0, 1);
   panels[i++] =
-    create_slider(ui, "ReSTIR Initial Reservoir Size", &(instance->restir.initial_reservoir_size), 0, 0.02f, 1.0f, 128.0f, 0, 1);
-  panels[i++] =
-    create_slider(ui, "ReSTIR Candidate Pool Size", &(instance->restir.light_candidate_pool_size_log2), 0, 0.01f, 1.0f, 20.0f, 0, 1);
+    create_slider(ui, "RIS Candidates Pool Size", &(instance->ris_settings.light_candidate_pool_size_log2), 0, 0.01f, 1.0f, 20.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Light Ray Count", &(instance->ris_settings.num_light_rays), 1, 0.01f, 1.0f, 32.0f, 0, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -98,9 +98,10 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Default Metallic", &(instance->scene.material.default_material.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "Light Intensity", &(instance->scene.material.default_material.b), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Colored Transparency", &(instance->scene.material.colored_transparency), 1);
+  panels[i++] = create_check(ui, "IOR Shadowing", &(instance->scene.material.enable_ior_shadowing), 1);
   panels[i++] = create_check(ui, "Invert roughness", &(instance->scene.material.invert_roughness), 1);
   panels[i++] = create_dropdown(
-    ui, "Light Visibility", &(instance->scene.material.light_side_mode), 1, 3, "Both Sides\0One Sided (CW)\0One Sided (CCW)", 10);
+    ui, "Light Visibility", &(instance->scene.material.light_side_mode), 1, 3, "Both Sides\0One Sided (CW)\0One Sided (CCW)", 11);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -839,7 +840,7 @@ static UITab* UI_get_active_tab(UI* ui) {
   return active_tab;
 }
 
-void handle_mouse_UI(UI* ui) {
+void handle_mouse_UI(UI* ui, RaytraceInstance* instance) {
   if (!ui->active)
     return;
 
@@ -854,6 +855,11 @@ void handle_mouse_UI(UI* ui) {
     ui->mouse_flags &= ~MOUSE_DRAGGING_SLIDER;
 
     SDL_SetRelativeMouseMode(SDL_FALSE);
+  }
+
+  if (SDL_BUTTON_RMASK & state) {
+    instance->user_selected_x = (uint16_t) ((((double) x) / ui->max_x) * instance->width);
+    instance->user_selected_y = (uint16_t) ((((double) y) / ui->max_y) * instance->height);
   }
 
   ui->scroll_pos -= MOUSE_SCROLL_SPEED * ui->mouse_wheel;

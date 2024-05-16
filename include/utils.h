@@ -41,10 +41,10 @@
 #endif
 
 #define OPTIXRT_NUM_GROUPS 3
+#define THREADS_PER_BLOCK 128
+#define BLOCKS_PER_GRID 2048
 
-#define RESTIR_CANDIDATE_POOL_MAX (1 << 20)
-
-enum RayIterationType { TYPE_CAMERA = 0, TYPE_LIGHT = 1, TYPE_BOUNCE = 2 } typedef RayIterationType;
+#define RIS_MAX_CANDIDATE_POOL_SIZE (1 << 20)
 
 enum LightID : uint32_t {
   LIGHT_ID_SUN               = 0xffffffffu,
@@ -141,6 +141,7 @@ struct General {
   int height;
   int samples;
   int max_ray_depth;
+  int num_light_ray;
   DenoisingMode denoiser;
   char** mesh_files;
   int mesh_files_count;
@@ -341,6 +342,7 @@ struct GlobalMaterial {
   int invert_roughness;
   int override_materials;
   LightSideMode light_side_mode;
+  int enable_ior_shadowing;
 } typedef GlobalMaterial;
 
 struct Particles {
@@ -393,21 +395,19 @@ struct TextureAtlas {
   int normal_length;
 } typedef TextureAtlas;
 
-struct ReSTIRSettings {
+struct RISSettings {
   int initial_reservoir_size;
   int light_candidate_pool_size_log2;
   TriangleLight* presampled_triangle_lights;
-} typedef ReSTIRSettings;
+  int num_light_rays;
+} typedef RISSettings;
 
 struct DevicePointers {
-  TraceTask* light_trace;
-  TraceTask* bounce_trace;
-  uint16_t* light_trace_count;
-  uint16_t* bounce_trace_count;
+  TraceTask* trace_tasks;
+  uint16_t* trace_counts;
   TraceResult* trace_results;
   uint16_t* task_counts;
   uint16_t* task_offsets;
-  uint32_t* light_sample_history;
   uint32_t* ior_stack;
   RGBF* frame_buffer;
   RGBF* frame_temporal;
@@ -420,13 +420,9 @@ struct DevicePointers {
   RGBF* frame_output;
   RGBF* albedo_buffer;
   RGBF* normal_buffer;
-  RGBF* light_records;
-  RGBF* bounce_records;
-  RGBF* bounce_records_history;
-  PackedGBufferData* packed_gbuffer_history;
+  RGBF* records;
   XRGB8* buffer_8bit;
   vec3* raydir_buffer;
-  MISData* mis_buffer;
   TraceResult* trace_result_buffer;
   uint8_t* state_buffer;
   DeviceTexture* albedo_atlas;
@@ -448,21 +444,18 @@ struct DevicePointers {
 struct DeviceConstantMemory {
   DevicePointers ptrs;
   Scene scene;
-  ReSTIRSettings restir;
+  RISSettings ris_settings;
+  uint16_t user_selected_x;
+  uint16_t user_selected_y;
   int max_ray_depth;
   int pixels_per_thread;
-  int iteration_type;
   int depth;
-  TraceTask* trace_tasks;
-  uint16_t* trace_count;
-  RGBF* records;
   int temporal_frames;
   int denoiser;
   int width;
   int height;
   int output_width;
   int output_height;
-  PackedMaterial* materials;
   vec3 sun_pos;
   vec3 moon_pos;
   int shading_mode;
@@ -472,6 +465,7 @@ struct DeviceConstantMemory {
   RayEmitter emitter;
   int accum_mode;
   OptixTraversableHandle optix_bvh;
+  OptixTraversableHandle optix_bvh_light;
   OptixTraversableHandle optix_bvh_particles;
   Node8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
@@ -489,8 +483,6 @@ struct OptixBVH {
   size_t bvh_mem_size;
   OptixTraversableHandle traversable;
   void* bvh_data;
-  int force_dmm_usage;
-  int disable_omm;
 } typedef OptixBVH;
 
 struct ParticlesInstance {
@@ -515,16 +507,15 @@ struct RaytraceInstance {
   unsigned int height;
   unsigned int output_width;
   unsigned int output_height;
+  uint16_t user_selected_x;
+  uint16_t user_selected_y;
   int realtime;
   DeviceBuffer* ior_stack;
-  DeviceBuffer* light_trace;
-  DeviceBuffer* bounce_trace;
-  DeviceBuffer* light_trace_count;
-  DeviceBuffer* bounce_trace_count;
+  DeviceBuffer* trace_tasks;
+  DeviceBuffer* trace_counts;
   DeviceBuffer* trace_results;
   DeviceBuffer* task_counts;
   DeviceBuffer* task_offsets;
-  DeviceBuffer* light_sample_history;
   DeviceBuffer* frame_buffer;
   DeviceBuffer* frame_temporal;
   DeviceBuffer* frame_variance;
@@ -536,9 +527,7 @@ struct RaytraceInstance {
   DeviceBuffer* frame_indirect_accumulate;
   DeviceBuffer* albedo_buffer;
   DeviceBuffer* normal_buffer;
-  DeviceBuffer* light_records;
-  DeviceBuffer* bounce_records;
-  DeviceBuffer* bounce_records_history;
+  DeviceBuffer* records;
   DeviceBuffer* buffer_8bit;
   DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;
@@ -550,8 +539,6 @@ struct RaytraceInstance {
   DeviceBuffer* bsdf_energy_lut;
   DeviceBuffer* bluenoise_1D;
   DeviceBuffer* bluenoise_2D;
-  DeviceBuffer* mis_buffer;
-  DeviceBuffer* packed_gbuffer_history;
   int max_ray_depth;
   int reservoir_size;
   int offline_samples;
@@ -573,14 +560,17 @@ struct RaytraceInstance {
   Jitter jitter;
   int accum_mode;
   RayEmitter emitter;
-  ReSTIRSettings restir;
+  RISSettings ris_settings;
   DeviceBuffer* raydir_buffer;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
   OptixDeviceContext optix_ctx;
   OptixKernel optix_kernel;
+  OptixKernel optix_kernel_geometry;
+  OptixKernel optix_kernel_volume;
   OptixBVH optix_bvh;
+  OptixBVH optix_bvh_light;
   BVHType bvh_type;
   int luminary_bvh_initialized;
   ParticlesInstance particles_instance;

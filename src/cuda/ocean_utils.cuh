@@ -135,6 +135,9 @@ __device__ float ocean_short_distance(const vec3 origin, const vec3 ray) {
 }
 
 __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, const float start, const float limit) {
+  if (start >= limit)
+    return FLT_MAX;
+
   const float target_residual = (1.0f + fabsf(device.scene.ocean.height) + start / 10.0f) * 0.5f * eps;
 
   float t                       = start;

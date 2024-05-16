@@ -31,16 +31,16 @@ __device__ void stream_float4(const float4* source, float4* target) {
 __device__ void swap_trace_data(const int index0, const int index1) {
   const int offset0  = get_task_address(index0);
   const float2 temp  = __ldca((float2*) (device.ptrs.trace_results + offset0));
-  const float4 data0 = __ldcs((float4*) (device.trace_tasks + offset0));
-  const float4 data1 = __ldcs((float4*) (device.trace_tasks + offset0) + 1);
+  const float4 data0 = __ldcs((float4*) (device.ptrs.trace_tasks + offset0));
+  const float4 data1 = __ldcs((float4*) (device.ptrs.trace_tasks + offset0) + 1);
 
   const int offset1 = get_task_address(index1);
   stream_float2((float2*) (device.ptrs.trace_results + offset1), (float2*) (device.ptrs.trace_results + offset0));
-  stream_float4((float4*) (device.trace_tasks + offset1), (float4*) (device.trace_tasks + offset0));
-  stream_float4((float4*) (device.trace_tasks + offset1) + 1, (float4*) (device.trace_tasks + offset0) + 1);
+  stream_float4((float4*) (device.ptrs.trace_tasks + offset1), (float4*) (device.ptrs.trace_tasks + offset0));
+  stream_float4((float4*) (device.ptrs.trace_tasks + offset1) + 1, (float4*) (device.ptrs.trace_tasks + offset0) + 1);
   __stcs((float2*) (device.ptrs.trace_results + offset1), temp);
-  __stcs((float4*) (device.trace_tasks + offset1), data0);
-  __stcs((float4*) (device.trace_tasks + offset1) + 1, data1);
+  __stcs((float4*) (device.ptrs.trace_tasks + offset1), data0);
+  __stcs((float4*) (device.ptrs.trace_tasks + offset1) + 1, data1);
 }
 
 __device__ TraceTask load_trace_task(const void* ptr) {
@@ -92,109 +92,21 @@ __device__ TraceTask load_trace_task_essentials(const void* ptr) {
   return task;
 }
 
-__device__ GeometryTask load_geometry_task(const void* ptr) {
+__device__ ShadingTask load_shading_task(const void* ptr) {
   const float4 data0 = __ldcs((float4*) ptr);
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
-  GeometryTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
+  ShadingTask task;
+  task.hit_id     = __float_as_uint(data0.x);
+  task.index.x    = __float_as_uint(data0.y) & 0xffff;
+  task.index.y    = (__float_as_uint(data0.y) >> 16);
+  task.position.x = data0.z;
+  task.position.y = data0.w;
 
-  task.ray.x  = data1.x;
-  task.ray.y  = data1.y;
-  task.ray.z  = data1.z;
-  task.hit_id = __float_as_uint(data1.w);
-
-  return task;
-}
-
-__device__ ParticleTask load_particle_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  ParticleTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-
-  task.ray.x  = data1.x;
-  task.ray.y  = data1.y;
-  task.ray.z  = data1.z;
-  task.hit_id = __float_as_uint(data1.w);
-
-  return task;
-}
-
-__device__ OceanTask load_ocean_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  OceanTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-  task.ray.x      = data1.x;
-  task.ray.y      = data1.y;
-  task.ray.z      = data1.z;
-
-  return task;
-}
-
-__device__ SkyTask load_sky_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  SkyTask task;
-  task.index.x  = __float_as_uint(data0.x) & 0xffff;
-  task.index.y  = (__float_as_uint(data0.x) >> 16);
-  task.origin.x = data0.y;
-  task.origin.y = data0.z;
-  task.origin.z = data0.w;
-  task.ray.x    = data1.x;
-  task.ray.y    = data1.y;
-  task.ray.z    = data1.z;
-
-  return task;
-}
-
-__device__ ToyTask load_toy_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  ToyTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-  task.ray.x      = data1.x;
-  task.ray.y      = data1.y;
-  task.ray.z      = data1.z;
-
-  return task;
-}
-
-__device__ VolumeTask load_volume_task(const void* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
-
-  VolumeTask task;
-  task.index.x    = __float_as_uint(data0.x) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.x) >> 16);
-  task.position.x = data0.y;
-  task.position.y = data0.z;
-  task.position.z = data0.w;
-  task.ray.x      = data1.x;
-  task.ray.y      = data1.y;
-  task.ray.z      = data1.z;
-  task.hit_id     = __float_as_uint(data1.w);
+  task.position.z = data1.x;
+  task.ray.x      = data1.y;
+  task.ray.y      = data1.z;
+  task.ray.z      = data1.w;
 
   return task;
 }
@@ -231,7 +143,7 @@ __device__ void store_RGBF(void* ptr, const RGBF a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if ((!device.denoiser && !device.aov_mode) || device.iteration_type == TYPE_LIGHT)
+  if ((!device.denoiser && !device.aov_mode))
     return;
 
   if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
@@ -246,23 +158,17 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
   }
 }
 
-__device__ void write_normal_buffer(vec3 normal, const int pixel) {
-  if ((!device.denoiser && !device.aov_mode) || device.iteration_type != TYPE_CAMERA)
+__device__ void write_normal_buffer(const vec3 normal, const int pixel) {
+  if ((!device.denoiser && !device.aov_mode) || !IS_PRIMARY_RAY)
     return;
 
   if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION)
     return;
 
-  const float normal_norm = sqrtf(normal.x * normal.x + normal.y * normal.y + normal.z * normal.z);
-
-  if (normal_norm > eps) {
-    normal = scale_vector(normal, 1.0f / normal_norm);
-  }
-
   device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
 }
 
-__device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set = false) {
+__device__ void write_beauty_buffer(const RGBF beauty, const int pixel, const bool mode_set = false) {
   RGBF output = beauty;
   if (!mode_set) {
     output = add_color(beauty, load_RGBF(device.ptrs.frame_buffer + pixel));
@@ -271,14 +177,14 @@ __device__ void write_beauty_buffer(RGBF beauty, const int pixel, bool mode_set 
 
   if (device.aov_mode) {
     if (device.depth <= 1) {
-      RGBF output = beauty;
+      output = beauty;
       if (!mode_set) {
         output = add_color(beauty, load_RGBF(device.ptrs.frame_direct_buffer + pixel));
       }
       store_RGBF(device.ptrs.frame_direct_buffer + pixel, output);
     }
     else {
-      RGBF output = beauty;
+      output = beauty;
       if (!mode_set) {
         output = add_color(beauty, load_RGBF(device.ptrs.frame_indirect_buffer + pixel));
       }
@@ -413,94 +319,6 @@ __device__ Material load_material(const PackedMaterial* data, const int offset) 
   mat.emission = scale_color(mat.emission, emission_scale);
 
   return mat;
-}
-
-__device__ void store_gbuffer_data(const GBufferData data, const uint32_t pixel) {
-  PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
-
-  float4 bytes0x00;
-  bytes0x00.x = __uint_as_float(data.hit_id);
-  bytes0x00.y = ((uint32_t) (data.albedo.r * 0xFFFF + 0.5f)) | (((uint32_t) (data.albedo.g * 0xFFFF + 0.5f)) << 16);
-  bytes0x00.z = ((uint32_t) (data.albedo.b * 0xFFFF + 0.5f)) | (((uint32_t) (data.albedo.a * 0xFFFF + 0.5f)) << 16);
-  bytes0x00.w = ((uint32_t) (data.roughness * 0xFFFF + 0.5f)) | (((uint32_t) (data.metallic * 0xFFFF + 0.5f)) << 16);
-
-  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel), bytes0x00);
-
-  float4 bytes0x10;
-  bytes0x10.x = data.position.x;
-  bytes0x10.y = data.position.y;
-  bytes0x10.z = data.position.z;
-  bytes0x10.w = data.V.x;
-
-  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel), bytes0x10);
-
-  float4 bytes0x20;
-  bytes0x20.x = data.V.y;
-  bytes0x20.y = data.V.z;
-  bytes0x20.z = data.normal.x;
-  bytes0x20.w = data.normal.y;
-
-  __stcs((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel), bytes0x20);
-
-  float2 bytes0x30;
-  bytes0x30.x = data.normal.z;
-  bytes0x30.y = __uint_as_float(data.flags);
-
-  __stcs((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel), bytes0x30);
-
-  float bytes0x38;
-  bytes0x38 = ((uint32_t) (data.ior_in * 0xFFFF + 0.5f)) | (((uint32_t) (data.ior_out * 0xFFFF + 0.5f)) << 16);
-
-  __stcs((float*) pixel_buffer_get_entry_address(ptr, 3, 2, pixel), bytes0x38);
-}
-
-__device__ GBufferData load_gbuffer_data(const uint32_t pixel) {
-  const PackedGBufferData* ptr = device.ptrs.packed_gbuffer_history;
-
-  const float4 bytes0x00 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 0, 0, pixel));
-  const float4 bytes0x10 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 1, 0, pixel));
-  const float4 bytes0x20 = __ldcs((float4*) pixel_buffer_get_entry_address(ptr, 2, 0, pixel));
-  const float2 bytes0x30 = __ldcs((float2*) pixel_buffer_get_entry_address(ptr, 3, 0, pixel));
-  const float bytes0x38  = __ldcs((float*) pixel_buffer_get_entry_address(ptr, 3, 2, pixel));
-
-  GBufferData data;
-  data.hit_id    = __float_as_uint(bytes0x00.x);
-  data.albedo.r  = (__float_as_uint(bytes0x00.y) & 0xFFFF) * (1.0f / 0xFFFF);
-  data.albedo.g  = (__float_as_uint(bytes0x00.y) >> 16) * (1.0f / 0xFFFF);
-  data.albedo.b  = (__float_as_uint(bytes0x00.z) & 0xFFFF) * (1.0f / 0xFFFF);
-  data.albedo.a  = (__float_as_uint(bytes0x00.z) >> 16) * (1.0f / 0xFFFF);
-  data.roughness = (__float_as_uint(bytes0x00.w) & 0xFFFF) * (1.0f / 0xFFFF);
-  data.metallic  = (__float_as_uint(bytes0x00.w) >> 16) * (1.0f / 0xFFFF);
-  data.position  = get_vector(bytes0x10.x, bytes0x10.y, bytes0x10.z);
-  data.V         = get_vector(bytes0x10.w, bytes0x20.x, bytes0x20.y);
-  data.normal    = get_vector(bytes0x20.z, bytes0x20.w, bytes0x30.x);
-  data.flags     = __float_as_uint(bytes0x30.y);
-  data.ior_in    = (__float_as_uint(bytes0x38) & 0xFFFF) * (1.0f / 0xFFFF);
-  data.ior_out   = (__float_as_uint(bytes0x38) >> 16) * (1.0f / 0xFFFF);
-
-  data.colored_dielectric = (data.hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? device.scene.material.colored_transparency : 1;
-
-  data.emission = get_color(0.0f, 0.0f, 0.0f);
-
-  return data;
-}
-
-__device__ void store_mis_data(const MISData data, const int pixel) {
-  float2 bytes;
-  bytes.x = data.light_target_pdf_normalization;
-  bytes.y = data.bsdf_marginal;
-
-  __stcs((float2*) (device.ptrs.mis_buffer + pixel), bytes);
-}
-
-__device__ MISData load_mis_data(const int pixel) {
-  float2 bytes = __ldcs((float2*) (device.ptrs.mis_buffer + pixel));
-
-  MISData data;
-  data.light_target_pdf_normalization = bytes.x;
-  data.bsdf_marginal                  = bytes.y;
-
-  return data;
 }
 
 #endif /* CU_MEMORY_H */

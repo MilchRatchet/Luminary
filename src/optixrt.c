@@ -6,13 +6,11 @@
 #include <stdlib.h>
 
 #define UTILS_NO_DEVICE_TABLE
-#define UTILS_NO_DEVICE_FUNCTIONS
 
 #include "bench.h"
 #include "buffer.h"
 #include "ceb.h"
 #include "device.h"
-#include "utils.cuh"
 #include "utils.h"
 
 #define OPTIX_CHECK_LOGS(call, log)                                                                      \
@@ -25,7 +23,7 @@
     }                                                                                                    \
   }
 
-void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel) {
+void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel, CommandlineOptions options) {
   bench_tic("Kernel Setup (OptiX)");
   log_message("Compiling kernels: %s.", kernels_name);
 
@@ -61,8 +59,11 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
 
-  pipeline_compile_options.allowOpacityMicromaps = 1;
-  pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
+  if (options.omm_active)
+    pipeline_compile_options.allowOpacityMicromaps = 1;
+
+  if (options.dmm_active)
+    pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
 
   char log[4096];
   size_t log_size = sizeof(log);
@@ -144,42 +145,9 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
   bench_toc();
 }
 
-void optixrt_init(RaytraceInstance* instance) {
-  bench_tic("BVH Setup (OptiX)");
-
-  ////////////////////////////////////////////////////////////////////
-  // Displacement Micromaps Building
-  ////////////////////////////////////////////////////////////////////
-
-  OptixBuildInputDisplacementMicromap dmm;
-  if ((instance->device_info.rt_core_version >= 1 && instance->optix_bvh.force_dmm_usage) || instance->device_info.rt_core_version >= 3) {
-    dmm = micromap_displacement_build(instance);
-  }
-  else {
-    log_message("No DMM is built due to device constraints.");
-    memset(&dmm, 0, sizeof(OptixBuildInputDisplacementMicromap));
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // Opacity Micromaps Building
-  ////////////////////////////////////////////////////////////////////
-
-  OptixBuildInputOpacityMicromap omm;
-  // OMM and DMM at the same time are only supported on RT core version 3.0 (Ada Lovelace)
-  if (
-    (!instance->optix_bvh.disable_omm)
-    && (((instance->device_info.rt_core_version >= 1 && !dmm.displacementMicromapArray) || instance->device_info.rt_core_version >= 3))) {
-    omm = micromap_opacity_build(instance);
-  }
-  else {
-    log_message("No OMM is built due to device constraints or user preference.");
-    memset(&omm, 0, sizeof(OptixBuildInputOpacityMicromap));
-  }
-
-  ////////////////////////////////////////////////////////////////////
-  // BVH Building
-  ////////////////////////////////////////////////////////////////////
-
+void optixrt_build_bvh(
+  RaytraceInstance* instance, OptixBVH* bvh, const OptixBuildInputDisplacementMicromap dmm, const OptixBuildInputOpacityMicromap omm,
+  const int is_for_light_rays) {
   OptixAccelBuildOptions build_options;
   memset(&build_options, 0, sizeof(OptixAccelBuildOptions));
   build_options.operation             = OPTIX_BUILD_OPERATION_BUILD;
@@ -201,9 +169,11 @@ void optixrt_init(RaytraceInstance* instance) {
   build_inputs.triangleArray.numIndexTriplets   = instance->scene.triangle_data.triangle_count;
   build_inputs.triangleArray.indexBuffer        = (CUdeviceptr) instance->scene.triangle_data.index_buffer;
 
-  unsigned int inputFlags[1] = {OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING | OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL};
+  unsigned int inputFlags = 0;
+  inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
+  inputFlags |= (is_for_light_rays) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
 
-  build_inputs.triangleArray.flags                = inputFlags;
+  build_inputs.triangleArray.flags                = &inputFlags;
   build_inputs.triangleArray.opacityMicromap      = omm;
   build_inputs.triangleArray.displacementMicromap = dmm;
   build_inputs.triangleArray.numSbtRecords        = 1;
@@ -253,13 +223,54 @@ void optixrt_init(RaytraceInstance* instance) {
     buffer_sizes.outputSizeInBytes = compact_size;
   }
 
-  instance->optix_bvh.bvh_data     = output_buffer;
-  instance->optix_bvh.bvh_mem_size = buffer_sizes.outputSizeInBytes;
-  instance->optix_bvh.traversable  = traversable;
+  bvh->bvh_data     = output_buffer;
+  bvh->bvh_mem_size = buffer_sizes.outputSizeInBytes;
+  bvh->traversable  = traversable;
+}
+
+void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
+  bench_tic("BVH Setup (OptiX)");
+
+  ////////////////////////////////////////////////////////////////////
+  // Displacement Micromaps Building
+  ////////////////////////////////////////////////////////////////////
+
+  OptixBuildInputDisplacementMicromap dmm;
+  if ((instance->device_info.rt_core_version >= 1 && options.dmm_active) || instance->device_info.rt_core_version >= 3) {
+    dmm = micromap_displacement_build(instance);
+  }
+  else {
+    log_message("No DMM is built due to device constraints.");
+    memset(&dmm, 0, sizeof(OptixBuildInputDisplacementMicromap));
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Opacity Micromaps Building
+  ////////////////////////////////////////////////////////////////////
+
+  OptixBuildInputOpacityMicromap omm;
+  // OMM and DMM at the same time are only supported on RT core version 3.0 (Ada Lovelace)
+  if (
+    options.omm_active
+    && (((instance->device_info.rt_core_version >= 1 && !dmm.displacementMicromapArray) || instance->device_info.rt_core_version >= 3))) {
+    omm = micromap_opacity_build(instance);
+  }
+  else {
+    log_message("No OMM is built due to device constraints or user preference.");
+    memset(&omm, 0, sizeof(OptixBuildInputOpacityMicromap));
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // BVH Building
+  ////////////////////////////////////////////////////////////////////
+
+  optixrt_build_bvh(instance, &instance->optix_bvh, dmm, omm, 0);
+  optixrt_build_bvh(instance, &instance->optix_bvh_light, dmm, omm, 1);
 
   micromap_opacity_free(omm);
 
   device_update_symbol(optix_bvh, instance->optix_bvh.traversable);
+  device_update_symbol(optix_bvh_light, instance->optix_bvh_light.traversable);
 
   instance->optix_bvh.initialized = 1;
 

@@ -193,16 +193,6 @@ int main(int argc, char* argv[]) {
     return 0;
   }
 
-  if (force_displacement) {
-    log_message("DMM Usage was forced on by the user.");
-    instance->optix_bvh.force_dmm_usage = 1;
-  }
-
-  if (disable_omm) {
-    log_message("OMM Usage was forced off by the user.");
-    instance->optix_bvh.disable_omm = 1;
-  }
-
   instance->realtime = !offline;
 
   if (offline_samples)

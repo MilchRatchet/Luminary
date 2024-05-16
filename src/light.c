@@ -5,7 +5,9 @@
 #include <stdlib.h>
 
 #include "bench.h"
+#include "ceb.h"
 #include "structs.h"
+#include "texture.h"
 #include "utils.h"
 
 static int min_3_float_to_int(float a, float b, float c) {
@@ -142,13 +144,19 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures, int dm
   for (uint32_t i = 0; i < data.triangle_data.triangle_count; i++) {
     const Triangle triangle = data.triangles[i];
 
-    const uint16_t tex_index = data.materials[triangle.material_id].luminance_map;
+    const PackedMaterial material = data.materials[triangle.material_id];
+    const uint16_t tex_index      = material.luminance_map;
 
     // Triangles with displacement can't be light sources.
     if (dmm_active && data.materials[triangle.material_id].normal_map)
       continue;
 
-    if (tex_index != TEXTURE_NONE && contains_illumination(triangle, textures[tex_index])) {
+    int is_light = 0;
+
+    is_light |= (tex_index != TEXTURE_NONE && contains_illumination(triangle, textures[tex_index]));
+    is_light |= (tex_index == TEXTURE_NONE && (material.emission_r || material.emission_g || material.emission_b));
+
+    if (is_light) {
       const TriangleLight l = {
         .vertex = triangle.vertex, .edge1 = triangle.edge1, .edge2 = triangle.edge2, .triangle_id = i, .material_id = triangle.material_id};
       data.triangles[i].light_id = light_count;

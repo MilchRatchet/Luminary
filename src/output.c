@@ -74,7 +74,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
     window_instance_update_pointer(window);
 
     set_input_events_UI(&ui, mmotion, mwheel);
-    handle_mouse_UI(&ui);
+    handle_mouse_UI(&ui, instance);
     render_UI(&ui);
 
     blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
@@ -433,7 +433,7 @@ void realtime_output(RaytraceInstance* instance) {
     // If window is not minimized
     if (!(SDL_GetWindowFlags(window->window) & SDL_WINDOW_MINIMIZED)) {
       set_input_events_UI(&ui, mmotion, mwheel);
-      handle_mouse_UI(&ui);
+      handle_mouse_UI(&ui, instance);
       render_UI(&ui);
       blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
     }

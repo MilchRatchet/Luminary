@@ -44,6 +44,10 @@ static void parse_general_settings(General* general, WavefrontContent* content, 
     case 6868910050737209683u:
       sscanf(value, "%d\n", &general->samples);
       break;
+    /* NUMLIGHT */
+    case 6073182477647435086u:
+      sscanf(value, "%d\n", &general->num_light_ray);
+      break;
     /* DENOISER */
     case 5928236058831373636u:
       sscanf(value, "%d\n", &general->denoiser);
@@ -90,6 +94,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     /* COLORTRA */
     case 4706917273050042179u:
       sscanf(value, "%d\n", &material->colored_transparency);
+      break;
+    /* IORSHADO */
+    case 5711762006303985481u:
+      sscanf(value, "%d\n", &material->enable_ior_shadowing);
       break;
     /* INTERTRO */
     case 5715723589413916233u:
@@ -768,9 +776,11 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "GENERAL HEIGHT__ %d\n", instance->settings.height);
   fputs(line, file);
-  sprintf(line, "GENERAL BOUNCES_ %d\n", instance->settings.max_ray_depth);
+  sprintf(line, "GENERAL BOUNCES_ %d\n", instance->max_ray_depth);
   fputs(line, file);
   sprintf(line, "GENERAL SAMPLES_ %d\n", instance->settings.samples);
+  fputs(line, file);
+  sprintf(line, "GENERAL NUMLIGHT %d\n", instance->ris_settings.num_light_rays);
   fputs(line, file);
   sprintf(line, "GENERAL DENOISER %d\n", instance->settings.denoiser);
   fputs(line, file);
@@ -853,6 +863,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL ALPHACUT %f\n", instance->scene.material.alpha_cutoff);
   fputs(line, file);
   sprintf(line, "MATERIAL COLORTRA %d\n", instance->scene.material.colored_transparency);
+  fputs(line, file);
+  sprintf(line, "MATERIAL IORSHADO %d\n", instance->scene.material.enable_ior_shadowing);
   fputs(line, file);
   sprintf(line, "MATERIAL INVERTRO %d\n", instance->scene.material.invert_roughness);
   fputs(line, file);
