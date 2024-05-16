@@ -154,9 +154,9 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   luts_hdri_tex[0].mipmap      = TexMipmapGenerate;
 
   texture_create(luts_hdri_tex + 1, dim, dim, 1, dim, (void*) 0, TexDataFP32, 1, TexStorageGPU);
-  luts_hdri_tex[0].wrap_mode_S = TexModeWrap;
-  luts_hdri_tex[0].wrap_mode_T = TexModeClamp;
-  luts_hdri_tex[0].mipmap      = TexMipmapGenerate;
+  luts_hdri_tex[1].wrap_mode_S = TexModeWrap;
+  luts_hdri_tex[1].wrap_mode_T = TexModeClamp;
+  luts_hdri_tex[1].mipmap      = TexMipmapNone;
 
   device_malloc((void**) &luts_hdri_tex[0].data, luts_hdri_tex[0].height * luts_hdri_tex[0].pitch * 4 * sizeof(float));
   device_malloc((void**) &luts_hdri_tex[1].data, luts_hdri_tex[1].height * luts_hdri_tex[1].pitch * 1 * sizeof(float));
@@ -174,6 +174,7 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   texture_create_atlas(&instance->sky_hdri_luts, luts_hdri_tex, 2);
 
   device_free(luts_hdri_tex[0].data, luts_hdri_tex[0].height * luts_hdri_tex[0].pitch * 4 * sizeof(float));
+  device_free(luts_hdri_tex[1].data, luts_hdri_tex[1].height * luts_hdri_tex[1].pitch * 1 * sizeof(float));
 
   raytrace_update_device_pointers(instance);
 
