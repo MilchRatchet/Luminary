@@ -193,7 +193,8 @@ __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType v
   }
   else {
     const float diameter = (volume_hit_type == VOLUME_TYPE_FOG) ? device.scene.fog.droplet_diameter : device.scene.particles.phase_diameter;
-    phase                = jendersie_eon_phase_function(cos_angle, diameter);
+    const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
+    phase                           = jendersie_eon_phase_function(cos_angle, params);
   }
 
   return scale_color(opaque_color(data.albedo), phase);

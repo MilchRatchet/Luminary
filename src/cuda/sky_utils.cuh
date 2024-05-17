@@ -83,8 +83,8 @@ __device__ float sky_rayleigh_density(const float height) {
   return 2.5f * device.scene.sky.base_density * expf(-height * (1.0f / device.scene.sky.rayleigh_falloff));
 }
 
-__device__ float sky_mie_phase(const float cos_angle) {
-  return jendersie_eon_phase_function(cos_angle, device.scene.sky.mie_diameter);
+__device__ float sky_mie_phase(const float cos_angle, const JendersieEonParams params) {
+  return jendersie_eon_phase_function(cos_angle, params);
 }
 
 ////////////////////////////////////////////////////////////////////

@@ -859,13 +859,11 @@ struct JendersieEonParams {
   float w_d;
 } typedef JendersieEonParams;
 
-__device__ JendersieEonParams jendersie_eon_phase_parameters(const float diameter, const float ms_factor) {
+__device__ JendersieEonParams jendersie_eon_phase_parameters(const float diameter) {
   JendersieEonParams params;
 
   // Renaming to a shorter name.
   const float d = diameter;
-
-  // TODO: Allow precomputation of these so that the actual functions take these parameters as arguments.
 
   if (d >= 5.0f && d <= 50.0f) {
     params.g_hg  = expf(-0.0990567f / (d - 1.67154f));
@@ -896,9 +894,6 @@ __device__ JendersieEonParams jendersie_eon_phase_parameters(const float diamete
     params.w_d   = 0.252977f - 312.983f * powf(d, 4.3f);
   }
 
-  params.g_hg *= ms_factor;
-  params.g_d *= ms_factor;
-
   return params;
 }
 
@@ -909,11 +904,9 @@ __device__ JendersieEonParams jendersie_eon_phase_parameters(const float diamete
  *
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
-__device__ float jendersie_eon_phase_function(const float cos_angle, const float diameter, const float ms_factor = 1.0f) {
-  JendersieEonParams params = jendersie_eon_phase_parameters(diameter, ms_factor);
-
-  const float phase_hg = henyey_greenstein_phase_function(cos_angle, params.g_hg);
-  const float phase_d  = draine_phase_function(cos_angle, params.g_d, params.alpha);
+__device__ float jendersie_eon_phase_function(const float cos_angle, const JendersieEonParams params, const float ms_factor = 1.0f) {
+  const float phase_hg = henyey_greenstein_phase_function(cos_angle, params.g_hg * ms_factor);
+  const float phase_d  = draine_phase_function(cos_angle, params.g_d * ms_factor, params.alpha);
 
   return (1.0f - params.w_d) * phase_hg + params.w_d * phase_d;
 }
@@ -989,7 +982,7 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
  * @param diameter Diameter of water droplets in [5,50] in micrometer.
  */
 __device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice) {
-  JendersieEonParams params = jendersie_eon_phase_parameters(diameter, 1.0f);
+  const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
 
   float u;
   if (r_choice < params.w_d) {

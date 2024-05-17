@@ -130,6 +130,8 @@ __device__ CloudRenderResult
 
   const float sun_solid_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
+  const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.sky.cloud.droplet_diameter);
+
   float transmittance  = 1.0f;
   RGBF scattered_light = get_color(0.0f, 0.0f, 0.0f);
   float hit_dist       = start;
@@ -160,7 +162,6 @@ __device__ CloudRenderResult
     if (density > 0.0f) {
       hit = true;
 
-#ifndef SHADING_KERNEL
       float2 ambient_r = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CLOUD_DIR + i, pixel);
       ambient_r.x      = 2.0f * ambient_r.x - 1.0f;
 
@@ -197,8 +198,8 @@ __device__ CloudRenderResult
         scattering *= CLOUD_OCTAVE_SCATTERING_FACTOR;
         extinction *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
 
-        const float sun_phase     = jendersie_eon_phase_function(sun_cos_angle, device.scene.sky.cloud.droplet_diameter, phase_factor);
-        const float ambient_phase = jendersie_eon_phase_function(ambient_cos_angle, device.scene.sky.cloud.droplet_diameter, phase_factor);
+        const float sun_phase     = jendersie_eon_phase_function(sun_cos_angle, params, phase_factor);
+        const float ambient_phase = jendersie_eon_phase_function(ambient_cos_angle, params, phase_factor);
         phase_factor *= CLOUD_OCTAVE_PHASE_FACTOR;
 
         const RGBF sun_color_i     = scale_color(sun_color, sun_extinction * sun_phase * sun_solid_angle);
@@ -215,7 +216,6 @@ __device__ CloudRenderResult
         S               = scale_color(sub_color(S, scale_color(S, step_trans)), 1.0f / extinction);
         scattered_light = add_color(scattered_light, scale_color(S, transmittance));
       }
-#endif /* SHADING_KERNEL */
 
       transmittance *= expf(-density * CLOUD_EXTINCTION_DENSITY * step_size);
 

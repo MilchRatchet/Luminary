@@ -209,6 +209,8 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
 
     Spectrum transmittance = spectrum_set1(1.0f);
 
+    const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.scene.sky.mie_diameter);
+
     for (int i = 0; i < steps; i++) {
       const float newReach = start + distance * (i + 0.3f) / steps;
       step_size            = newReach - reach;
@@ -220,7 +222,7 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
       const vec3 ray_scatter     = normalize_vector(sub_vector(sun_pos, pos));
       const float cos_angle      = dot_product(ray, ray_scatter);
       const float phase_rayleigh = sky_rayleigh_phase(cos_angle);
-      const float phase_mie      = sky_mie_phase(cos_angle);
+      const float phase_mie      = sky_mie_phase(cos_angle, mie_params);
 
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
 
@@ -420,6 +422,8 @@ __device__ Spectrum sky_compute_atmosphere(
     const float light_angle   = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, origin);
     const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_STEP_OFFSET, pixel);
 
+    const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.scene.sky.mie_diameter);
+
     for (int i = 0; i < steps; i++) {
       const float new_reach = start + distance * (i + random_offset) / steps;
       step_size             = new_reach - reach;
@@ -432,7 +436,7 @@ __device__ Spectrum sky_compute_atmosphere(
       const float cos_angle        = dot_product(ray, ray_scatter);
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
       const float phase_rayleigh   = sky_rayleigh_phase(cos_angle);
-      const float phase_mie        = sky_mie_phase(cos_angle);
+      const float phase_mie        = sky_mie_phase(cos_angle, mie_params);
 
       float shadow;
       if (cloud_shadows) {
