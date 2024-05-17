@@ -340,10 +340,12 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
 
   RGBF sun_color = sky_compute_color_from_spectrum(radiance);
 
+#ifdef SHADING_KERNEL
   if (device.scene.sky.hdri_active) {
     const float cloud_alpha = sky_hdri_sample_alpha(ray);
     sun_color               = scale_color(sun_color, cloud_alpha);
   }
+#endif /* SHADING_KERNEL */
 
   return sun_color;
 }
