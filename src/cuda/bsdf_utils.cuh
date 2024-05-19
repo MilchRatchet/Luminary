@@ -449,7 +449,8 @@ __device__ RGBF bsdf_dielectric(
     switch (sampling_hint) {
       case BSDF_SAMPLING_GENERAL:
         term = bsdf_microfacet_refraction_evaluate(data, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ctx.refraction_index)
-               * one_over_sampling_pdf;
+               * one_over_sampling_pdf * 4.0f
+               * ctx.HdotL;  // Hack: Multiply by the inverse Jacobi for reflections, I don't know why that seems to be correct.
         break;
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_refraction_evaluate_sampled_microfacet(
