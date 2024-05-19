@@ -132,8 +132,7 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-
-  visibility = mul_color(visibility, volume_integrate_transmittance(data.position, dir, FLT_MAX));
+  visibility      = mul_color(visibility, volume_integrate_transmittance(data.position, dir, FLT_MAX));
 
   return mul_color(light_color, visibility);
 }
@@ -176,8 +175,7 @@ __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-
-  visibility = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
+  visibility      = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
 
   return mul_color(light_color, visibility);
 }
@@ -238,9 +236,12 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   unsigned int alpha_data0, alpha_data1;
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
+  // For triangle lights, we cannot rely on fully opaque OMMs because if we first hit the target light and then execute the closest hit for
+  // that, then we will never know if there is an occluder. Similarly, skipping anyhit for fully opaque needs to still terminate the ray so
+  // I enforce anyhit.
   optixTrace(
-    device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
-    hit_id, alpha_data0, alpha_data1, compressed_ior);
+    device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
+    alpha_data0, alpha_data1, compressed_ior);
 
   if (hit_id == HIT_TYPE_REJECT)
     return get_color(0.0f, 0.0f, 0.0f);
@@ -249,8 +250,7 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-
-  visibility = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
+  visibility      = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
 
   return mul_color(light_color, visibility);
 }
@@ -297,7 +297,9 @@ __device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
 }
 
 extern "C" __global__ void __anyhit__optix() {
-  if (load_triangle_light_id(optixGetPrimitiveIndex()) == optixGetPayload_0()) {
+  // First check if the target light is a triangle light so we don't unnecessarily load light IDs when sampling the sun or the toy.
+  unsigned int target_light = optixGetPayload_0();
+  if (target_light < LIGHT_ID_TRIANGLE_ID_LIMIT && target_light == load_triangle_light_id(optixGetPrimitiveIndex())) {
     optixIgnoreIntersection();
   }
 
@@ -342,9 +344,8 @@ extern "C" __global__ void __anyhit__optix() {
 }
 
 extern "C" __global__ void __closesthit__optix() {
-  if (load_triangle_light_id(optixGetPrimitiveIndex()) != optixGetPayload_0()) {
-    optixSetPayload_0(HIT_TYPE_REJECT);
-  }
+  // This is never executed for triangle lights so we don't need to check if the closest hit is the target light.
+  optixSetPayload_0(HIT_TYPE_REJECT);
 }
 
 #endif /* SHADING_KERNEL && OPTIX_KERNEL */
