@@ -65,7 +65,7 @@ extern "C" __global__ void __raygen__optix() {
       allow_bounce_lighting = !use_light_rays;
     }
     else {
-      use_light_rays |= (data.metallic < 1.0f || data.roughness > 0.05f);
+      use_light_rays |= ((data.metallic < 1.0f && data.albedo.a > 0.0f) || data.roughness > 0.05f);
       allow_bounce_lighting |= bounce_info.is_microfacet_based && data.roughness <= 0.05f;
 
       if (data.roughness <= 0.05f) {
