@@ -39,10 +39,8 @@ LUMINARY_KERNEL void generate_trace_tasks() {
       device.ptrs.normal_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
 
-    if (device.aov_mode) {
-      device.ptrs.frame_direct_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
-      device.ptrs.frame_indirect_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
-    }
+    device.ptrs.frame_direct_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
+    device.ptrs.frame_indirect_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
 
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
     ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);

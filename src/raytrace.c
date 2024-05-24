@@ -698,12 +698,10 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
     device_buffer_malloc(instance->normal_buffer, sizeof(RGBF), amount);
   }
 
-  if (instance->aov_mode) {
-    device_buffer_malloc(instance->frame_direct_buffer, sizeof(RGBF), amount);
-    device_buffer_malloc(instance->frame_direct_accumulate, sizeof(RGBF), amount);
-    device_buffer_malloc(instance->frame_indirect_buffer, sizeof(RGBF), amount);
-    device_buffer_malloc(instance->frame_indirect_accumulate, sizeof(RGBF), amount);
-  }
+  device_buffer_malloc(instance->frame_direct_buffer, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_direct_accumulate, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_indirect_buffer, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_indirect_accumulate, sizeof(RGBF), amount);
 
   const int thread_count      = device_get_thread_count();
   const int pixels_per_thread = 1 + ((amount + thread_count - 1) / thread_count);
@@ -804,10 +802,8 @@ void raytrace_free_output_buffers(RaytraceInstance* instance) {
     device_buffer_free(instance->normal_buffer);
   }
 
-  if (instance->aov_mode) {
-    device_buffer_free(instance->frame_direct_accumulate);
-    device_buffer_free(instance->frame_indirect_accumulate);
-  }
+  device_buffer_free(instance->frame_direct_accumulate);
+  device_buffer_free(instance->frame_indirect_accumulate);
 
   device_camera_post_clear(instance);
 

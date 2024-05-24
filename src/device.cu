@@ -61,27 +61,6 @@ void device_handle_accumulation(RaytraceInstance* instance) {
       error_message("Invalid accumulation mode %d specified", instance->accum_mode);
       break;
   }
-
-  if (instance->aov_mode) {
-    switch (instance->accum_mode) {
-      case NO_ACCUMULATION:
-      case TEMPORAL_REPROJECTION:
-        device_buffer_copy(instance->frame_direct_buffer, instance->frame_direct_accumulate);
-        device_buffer_copy(instance->frame_indirect_buffer, instance->frame_indirect_accumulate);
-        break;
-      case TEMPORAL_ACCUMULATION:
-        temporal_accumulation_aov<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-          (const RGBF*) device_buffer_get_pointer(instance->frame_direct_buffer),
-          (RGBF*) device_buffer_get_pointer(instance->frame_direct_accumulate));
-        temporal_accumulation_aov<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-          (const RGBF*) device_buffer_get_pointer(instance->frame_indirect_buffer),
-          (RGBF*) device_buffer_get_pointer(instance->frame_indirect_accumulate));
-        break;
-      default:
-        error_message("Invalid accumulation mode %d specified", instance->accum_mode);
-        break;
-    }
-  }
 }
 
 extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int depth) {
