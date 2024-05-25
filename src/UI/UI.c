@@ -216,6 +216,7 @@ static UITab create_camera_post_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Exposure", &(instance->scene.camera.exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
   panels[i++] = create_check(ui, "Bloom", &(instance->scene.camera.bloom), 0);
   panels[i++] = create_slider(ui, "Bloom Blend", &(instance->scene.camera.bloom_blend), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Film Grain", &(instance->scene.camera.film_grain), 0, 0.001f, 0.0f, 255.0f, 0, 0);
   panels[i++] = create_check(ui, "Lens Flare", &(instance->scene.camera.lens_flare), 0);
   panels[i++] = create_slider(ui, "Lens Flare Threshold", &(instance->scene.camera.lens_flare_threshold), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Color Correction", &(instance->scene.camera.use_color_correction), 0);
@@ -755,6 +756,7 @@ static UITab create_post_process_menu_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_slider(ui, "Exposure", &(instance->scene.camera.exposure), 0, 0.0005f, 0.0f, FLT_MAX, 1, 0);
   panels[i++] = create_check(ui, "Bloom", &(instance->scene.camera.bloom), 0);
   panels[i++] = create_slider(ui, "Bloom Blend", &(instance->scene.camera.bloom_blend), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "Film Grain", &(instance->scene.camera.film_grain), 0, 0.001f, 0.0f, 255.0f, 0, 0);
   panels[i++] = create_check(ui, "Lens Flare", &(instance->scene.camera.lens_flare), 0);
   panels[i++] = create_slider(ui, "Lens Flare Threshold", &(instance->scene.camera.lens_flare_threshold), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Color Correction", &(instance->scene.camera.use_color_correction), 0);

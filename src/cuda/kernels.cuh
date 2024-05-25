@@ -497,11 +497,14 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
       }
     }
 
-    const float dither = (device.scene.camera.dithering) ? random_dither_mask(x, y) : 0.0f;
+    const float dither = (device.scene.camera.dithering) ? random_dither_mask(x, y) : 0.5f;
+    const float grain  = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
 
-    pixel.r = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.r));
-    pixel.g = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.g));
-    pixel.b = fminf(255.9f, dither + 255.9f * linearRGB_to_SRGB(pixel.b));
+    const float color_offset = dither + grain;
+
+    pixel.r = fmaxf(0.0f, fminf(255.9999f, color_offset + 255.0f * linearRGB_to_SRGB(pixel.r)));
+    pixel.g = fmaxf(0.0f, fminf(255.9999f, color_offset + 255.0f * linearRGB_to_SRGB(pixel.g)));
+    pixel.b = fmaxf(0.0f, fminf(255.9999f, color_offset + 255.0f * linearRGB_to_SRGB(pixel.b)));
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;

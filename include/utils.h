@@ -184,6 +184,7 @@ struct Camera {
   int use_color_correction;
   RGBF color_correction;
   int do_firefly_clamping;
+  float film_grain;
 } typedef Camera;
 
 struct Toy {

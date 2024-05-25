@@ -72,6 +72,7 @@ void scene_init(Scene** _scene) {
   scene->camera.color_correction.g         = 0.0f;
   scene->camera.color_correction.b         = 0.0f;
   scene->camera.do_firefly_clamping        = 1;
+  scene->camera.film_grain                 = 10.0f;
 
   scene->ocean.active           = 0;
   scene->ocean.height           = 0.0f;

@@ -230,11 +230,11 @@ __device__ uint16_t random_uint16_t_base(const uint32_t key_offset, const uint32
 ////////////////////////////////////////////////////////////////////
 
 __device__ uint32_t random_uint32_t(const uint32_t offset) {
-  return random_uint32_t_base(0xfcbd6e15 + THREAD_ID, offset);
+  return random_uint32_t_base(0xfcbd6e15, offset);
 }
 
 __device__ uint16_t random_uint16_t(const uint32_t offset) {
-  return random_uint16_t_base(0xfcbd6e15 + THREAD_ID, offset);
+  return random_uint16_t_base(0xfcbd6e15, offset);
 }
 
 __device__ float white_noise_precise_offset(const uint32_t offset) {
@@ -299,6 +299,10 @@ __device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
   const uint16_t blue_noise = __ldg(device.ptrs.bluenoise_1D + pixel);
 
   return random_uint16_t_to_float(blue_noise);
+}
+
+__device__ float random_grain_mask(const uint32_t x, const uint32_t y) {
+  return white_noise_offset(x + y * device.width);
 }
 
 #endif /* CU_RANDOM_H */
