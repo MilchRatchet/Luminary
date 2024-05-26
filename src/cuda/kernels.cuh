@@ -450,6 +450,12 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
       pixel.g *= device.scene.camera.exposure;
       pixel.b *= device.scene.camera.exposure;
 
+      const float grain = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
+
+      pixel.r = fmaxf(0.0f, pixel.r + grain);
+      pixel.g = fmaxf(0.0f, pixel.g + grain);
+      pixel.b = fmaxf(0.0f, pixel.b + grain);
+
       switch (device.scene.camera.tonemap) {
         case TONEMAP_NONE:
           break;
@@ -498,13 +504,10 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
     }
 
     const float dither = (device.scene.camera.dithering) ? random_dither_mask(x, y) : 0.5f;
-    const float grain  = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
 
-    const float color_offset = dither + grain;
-
-    pixel.r = fmaxf(0.0f, fminf(255.9999f, color_offset + 255.0f * linearRGB_to_SRGB(pixel.r)));
-    pixel.g = fmaxf(0.0f, fminf(255.9999f, color_offset + 255.0f * linearRGB_to_SRGB(pixel.g)));
-    pixel.b = fmaxf(0.0f, fminf(255.9999f, color_offset + 255.0f * linearRGB_to_SRGB(pixel.b)));
+    pixel.r = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.r)));
+    pixel.g = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.g)));
+    pixel.b = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.b)));
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;
