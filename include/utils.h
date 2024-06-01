@@ -134,6 +134,7 @@ struct CommandlineOptions {
   int height;
   int dmm_active;
   int omm_active;
+  int optix_validation;
 } typedef CommandlineOptions;
 
 struct General {

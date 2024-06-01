@@ -487,8 +487,16 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   }
 
   OPTIX_CHECK(optixInit());
-  OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, (OptixDeviceContextOptions*) 0, &instance->optix_ctx));
-  OPTIX_CHECK(optixDeviceContextSetLogCallback(instance->optix_ctx, _raytrace_optix_log_callback, (void*) 0, 3));
+
+  OptixDeviceContextOptions optix_device_context_options = {};
+
+  optix_device_context_options.logCallbackData     = (void*) 0;
+  optix_device_context_options.logCallbackFunction = _raytrace_optix_log_callback;
+  optix_device_context_options.logCallbackLevel    = 3;
+  optix_device_context_options.validationMode =
+    (options.optix_validation) ? OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL : OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_OFF;
+
+  OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, &optix_device_context_options, &instance->optix_ctx));
 
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.ptx", &(instance->optix_kernel), options);
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel), options);

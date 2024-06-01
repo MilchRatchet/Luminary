@@ -111,6 +111,7 @@ int main(int argc, char* argv[]) {
   int force_displacement       = 0;
   int disable_omm              = 0;
   int aov_mode                 = 0;
+  int optix_validation         = 0;
 
   for (int i = 1; i < argc; i++) {
     if (custom_samples) {
@@ -137,6 +138,7 @@ int main(int argc, char* argv[]) {
     force_displacement |= parse_command(argv[i], (char*) 0, "--force-displacement");
     disable_omm |= parse_command(argv[i], (char*) 0, "--no-omm");
     aov_mode |= parse_command(argv[i], (char*) 0, "--aov-mode");
+    optix_validation |= parse_command(argv[i], (char*) 0, "--optix-validation");
 
     if (parse_command(argv[i], (char*) 0, "--png")) {
       img_format = IMGFORMAT_PNG;
@@ -164,7 +166,12 @@ int main(int argc, char* argv[]) {
     bench_activate();
 
   CommandlineOptions options = {
-    .aov_mode = aov_mode, .width = width, .height = height, .dmm_active = force_displacement, .omm_active = !disable_omm};
+    .aov_mode         = aov_mode,
+    .width            = width,
+    .height           = height,
+    .dmm_active       = force_displacement,
+    .omm_active       = !disable_omm,
+    .optix_validation = optix_validation};
 
   RaytraceInstance* instance;
 
