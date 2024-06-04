@@ -120,7 +120,7 @@ void _device_buffer_malloc(DeviceBuffer* buffer, size_t element_size, size_t cou
 
   buffer->size      = size;
   buffer->allocated = 1;
-  print_log("[%s:%d] Buffer %s allocated at address %zu with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
+  print_log("[%s:%d] Buffer %s allocated at address %llX with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
 }
 
 void _device_buffer_zero(DeviceBuffer* buffer, char* buf_name, char* func, int line) {
@@ -136,7 +136,7 @@ void _device_buffer_zero(DeviceBuffer* buffer, char* buf_name, char* func, int l
 
   gpuBufferErrchk(cudaMemset(buffer->device_pointer, 0, buffer->size), buf_name, func, line);
 
-  print_log("[%s:%d] Buffer %s zeroed at address %zu with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
+  print_log("[%s:%d] Buffer %s zeroed at address %llX with size %zu.", func, line, buf_name, buffer->device_pointer, buffer->size);
 }
 
 void _device_buffer_upload(DeviceBuffer* buffer, void* data, char* buf_name, char* data_name, char* func, int line) {

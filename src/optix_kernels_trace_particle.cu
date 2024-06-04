@@ -31,7 +31,7 @@ extern "C" __global__ void __raygen__optix() {
 
   for (int i = 0; i < trace_task_count; i++) {
     const int offset     = get_task_address(i);
-    const TraceTask task = load_trace_task_essentials(device.ptrs.trace_tasks + offset);
+    const TraceTask task = load_trace_task(device.ptrs.trace_tasks + offset);
     const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
     const vec3 scaled_ray = scale_vector(task.ray, 1.0f / device.scene.particles.scale);

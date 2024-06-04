@@ -348,10 +348,10 @@ struct ShadingTask {
 LUM_STATIC_SIZE_ASSERT(ShadingTask, 32);
 
 struct TraceTask {
+  uint32_t padding;
+  ushort2 index;
   vec3 origin;
   vec3 ray;
-  ushort2 index;
-  uint32_t padding;
 } typedef TraceTask;
 LUM_STATIC_SIZE_ASSERT(TraceTask, 32);
 

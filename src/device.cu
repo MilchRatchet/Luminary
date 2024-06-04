@@ -156,7 +156,7 @@ extern "C" void _device_gather_symbol(void* dst, const size_t offset, size_t siz
   gpuErrchk(cudaMemcpyFromSymbol(dst, device, size, offset, cudaMemcpyDeviceToHost));
 }
 
-extern "C" void device_gather_device_table(void* dst, enum cudaMemcpyKind kind) {
+extern "C" void device_gather_device_table(void* dst, cudaMemcpyKind kind) {
   gpuErrchk(cudaMemcpyFromSymbol(dst, device, sizeof(DeviceConstantMemory), 0, kind));
 }
 

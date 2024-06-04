@@ -26,8 +26,8 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel  = task.index.y * device.width + task.index.x;
+    const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const int pixel        = task.index.y * device.width + task.index.x;
 
     const VolumeType volume_type  = VOLUME_HIT_TYPE(task.hit_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
@@ -54,13 +54,6 @@ extern "C" __global__ void __raygen__optix() {
 
     RGBF bounce_record = record;
 
-    if (validate_trace_task(bounce_task, bounce_record)) {
-      store_RGBF(device.ptrs.records + pixel, bounce_record);
-      store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
-
-      state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
-    }
-
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
     if (device.ris_settings.num_light_rays) {
@@ -77,6 +70,17 @@ extern "C" __global__ void __raygen__optix() {
     accumulated_light = mul_color(accumulated_light, record);
 
     write_beauty_buffer(accumulated_light, pixel);
+
+    // This must be done after the trace rays due to some optimization in the compiler.
+    // The compiler reloads these values at some point for some reason and if we overwrite
+    // the values we will get garbage. I am not sure if this is a compiler bug or some undefined
+    // behaviour on my side.
+    if (validate_trace_task(bounce_task, bounce_record)) {
+      store_RGBF(device.ptrs.records + pixel, bounce_record);
+      store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
+
+      state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+    }
   }
 
   device.ptrs.trace_counts[THREAD_ID] = trace_count;

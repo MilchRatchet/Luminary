@@ -88,7 +88,7 @@ LUMINARY_KERNEL void process_trace_tasks() {
       if (offset >= trace_task_count)
         break;
 
-      const TraceTask task = load_trace_task_essentials(device.ptrs.trace_tasks + get_task_address(offset));
+      const TraceTask task = load_trace_task(device.ptrs.trace_tasks + get_task_address(offset));
       const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + get_task_address(offset)));
 
       node_task     = make_uint2(0, 0x80000000);
