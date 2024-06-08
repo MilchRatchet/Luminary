@@ -35,7 +35,6 @@ struct BSDFSampleInfo {
   RGBF weight;
   bool is_transparent_pass;
   bool is_microfacet_based;
-  float transparent_pass_prob;
 } typedef BSDFSampleInfo;
 
 enum BSDFLUT { BSDF_LUT_SS = 0, BSDF_LUT_SPECULAR = 1, BSDF_LUT_DIELEC = 2, BSDF_LUT_DIELEC_INV = 3 } typedef BSDFLUT;
@@ -453,8 +452,7 @@ __device__ RGBF bsdf_dielectric(
     switch (sampling_hint) {
       case BSDF_SAMPLING_GENERAL:
         term = bsdf_microfacet_refraction_evaluate(data, ctx.HdotL, ctx.HdotV, ctx.NdotH, ctx.NdotL, ctx.NdotV, ctx.refraction_index)
-               * one_over_sampling_pdf * 4.0f
-               * ctx.HdotL;  // Hack: Multiply by the inverse Jacobi for reflections, I don't know why that seems to be correct.
+               * one_over_sampling_pdf;
         break;
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
         term = bsdf_microfacet_refraction_evaluate_sampled_microfacet(
@@ -490,7 +488,7 @@ __device__ RGBF bsdf_dielectric(
 
   if (ctx.refraction_index == 1.0f && ctx.is_refraction) {
     // TODO: Energy conservation does not work correctly for dielectric, investigate.
-    term = 1.0f;
+    term = (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION) ? 1.0f : 0.0f;
   }
 
   return (data.colored_dielectric) ? scale_color(opaque_color(data.albedo), term) : get_color(term, term, term);

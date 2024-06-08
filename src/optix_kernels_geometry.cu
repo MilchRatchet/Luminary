@@ -50,13 +50,9 @@ extern "C" __global__ void __raygen__optix() {
 
     RGBF bounce_record = mul_color(record, bounce_info.weight);
 
-    const float shift = (bounce_info.is_transparent_pass) ? -eps : eps;
-    data.position     = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
-
     bool use_light_rays        = false;
     bool allow_bounce_lighting = false;
     if (bounce_info.is_transparent_pass) {
-      data.flags |= G_BUFFER_IS_TRANSPARENT_PASS;
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(data.ior_out, pixel, ior_stack_method);
 
@@ -67,16 +63,7 @@ extern "C" __global__ void __raygen__optix() {
     else {
       use_light_rays |= ((data.metallic < 1.0f && data.albedo.a > 0.0f) || data.roughness > 0.05f);
       allow_bounce_lighting |= bounce_info.is_microfacet_based && data.roughness <= 0.05f;
-
-      if (data.roughness <= 0.05f) {
-        data.flags |= G_BUFFER_DIFFUSE_ONLY;
-      }
     }
-
-    TraceTask bounce_task;
-    bounce_task.origin = data.position;
-    bounce_task.ray    = bounce_ray;
-    bounce_task.index  = task.index;
 
     if (include_emission) {
       const RGBF emission = mul_color(data.emission, record);
@@ -101,16 +88,19 @@ extern "C" __global__ void __raygen__optix() {
 
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
-
-      const float side_prob =
-        (bounce_info.is_transparent_pass) ? bounce_info.transparent_pass_prob : (1.0f - bounce_info.transparent_pass_prob);
-
-      accumulated_light = scale_color(accumulated_light, 1.0f / side_prob);
     }
 
     accumulated_light = mul_color(accumulated_light, record);
 
     write_beauty_buffer(accumulated_light, pixel);
+
+    const float shift = (bounce_info.is_transparent_pass) ? -eps : eps;
+    data.position     = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+    TraceTask bounce_task;
+    bounce_task.origin = data.position;
+    bounce_task.ray    = bounce_ray;
+    bounce_task.index  = task.index;
 
     // This must be done after the trace rays due to some optimization in the compiler.
     // The compiler reloads these values at some point for some reason and if we overwrite

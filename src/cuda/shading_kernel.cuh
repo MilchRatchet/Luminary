@@ -73,13 +73,17 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   const vec3 dir   = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
   RGBF light_color = sky_get_sun_color(sky_pos, dir);
 
-  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, solid_angle);
+  bool is_refraction;
+  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, solid_angle);
   light_color           = mul_color(light_color, bsdf_value);
 
-  unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
+  const float shift   = is_refraction ? -eps : eps;
+  const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
   if (device.scene.toy.active) {
-    const float toy_dist = get_toy_distance(data.position, dir);
+    const float toy_dist = get_toy_distance(position, dir);
 
     if (toy_dist < FLT_MAX) {
       if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
@@ -91,7 +95,7 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
         return get_color(0.0f, 0.0f, 0.0f);
 
       // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
-      vec3 toy_hit_origin = add_vector(data.position, scale_vector(dir, toy_dist));
+      vec3 toy_hit_origin = add_vector(position, scale_vector(dir, toy_dist));
       toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
 
       const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
@@ -104,14 +108,14 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
 
       if (!two_hits) {
         // Set ray ior pop values to 1,1 or 0,-1 (max,balance)
-        compressed_ior |= (toy_is_inside(data.position, dir)) ? 0x01010000 : 0x00FF0000;
+        compressed_ior |= (toy_is_inside(position, dir)) ? 0x01010000 : 0x00FF0000;
       }
 
       light_color = mul_color(light_color, toy_transparency);
     }
   }
 
-  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
+  const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
   // TODO: Add specialized anyhit shaders for non geometry lights
@@ -132,7 +136,7 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-  visibility      = mul_color(visibility, volume_integrate_transmittance(data.position, dir, FLT_MAX));
+  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, FLT_MAX));
 
   return mul_color(light_color, visibility);
 }
@@ -145,15 +149,20 @@ __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort
 
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_TOY_RAY, index);
 
-  const vec3 dir   = toy_sample_ray(data.position, random);
-  const float dist = get_toy_distance(data.position, dir);
+  const vec3 dir = toy_sample_ray(data.position, random);
 
-  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, toy_get_solid_angle(data.position));
+  bool is_refraction;
+  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, toy_get_solid_angle(data.position));
+
+  const float shift   = is_refraction ? -eps : eps;
+  const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+  const float dist = get_toy_distance(position, dir);
 
   RGBF light_color = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
   light_color      = mul_color(light_color, bsdf_value);
 
-  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
+  const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
   unsigned int hit_id = LIGHT_ID_TOY;
@@ -162,7 +171,7 @@ __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort
   unsigned int alpha_data0, alpha_data1;
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
-  unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
+  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
@@ -175,7 +184,7 @@ __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-  visibility      = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
+  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
 }
@@ -187,15 +196,19 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   vec3 dir;
   RGBF light_color;
   float dist;
-  const uint32_t light_id = ris_sample_light(data, index, light_ray_index, dir, light_color, dist);
+  bool is_refraction;
+  const uint32_t light_id = ris_sample_light(data, index, light_ray_index, dir, light_color, dist, is_refraction);
 
   if (luminance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  unsigned int compressed_ior = ior_compress((data.flags & G_BUFFER_IS_TRANSPARENT_PASS) ? data.ior_out : data.ior_in);
+  const float shift   = is_refraction ? -eps : eps;
+  const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
   if (device.scene.toy.active) {
-    const float toy_dist = get_toy_distance(data.position, dir);
+    const float toy_dist = get_toy_distance(position, dir);
 
     if (toy_dist < FLT_MAX) {
       if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
@@ -207,7 +220,7 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
         return get_color(0.0f, 0.0f, 0.0f);
 
       // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
-      vec3 toy_hit_origin = add_vector(data.position, scale_vector(dir, toy_dist));
+      vec3 toy_hit_origin = add_vector(position, scale_vector(dir, toy_dist));
       toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
 
       const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
@@ -220,14 +233,14 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
 
       if (!two_hits) {
         // Set ray ior pop values to 1,1 or 0,-1 (max,balance)
-        compressed_ior |= (toy_is_inside(data.position, dir)) ? 0x01010000 : 0x00FF0000;
+        compressed_ior |= (toy_is_inside(position, dir)) ? 0x01010000 : 0x00FF0000;
       }
 
       light_color = mul_color(light_color, toy_transparency);
     }
   }
 
-  const float3 origin = make_float3(data.position.x, data.position.y, data.position.z);
+  const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
   unsigned int hit_id = light_id;
@@ -250,7 +263,7 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-  visibility      = mul_color(visibility, volume_integrate_transmittance(data.position, dir, dist));
+  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
 }

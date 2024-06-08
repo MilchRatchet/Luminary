@@ -24,7 +24,7 @@
 
 __device__ uint32_t ris_sample_light(
   const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, vec3& selected_ray, RGBF& selected_light_color,
-  float& selected_dist) {
+  float& selected_dist, bool& selected_is_refraction) {
   uint32_t selected_id = LIGHT_ID_NONE;
 
   float sum_weight          = 0.0f;
@@ -75,7 +75,8 @@ __device__ uint32_t ris_sample_light(
     RGBF light_color;
     const vec3 ray = light_sample_triangle(triangle_light, data, ray_random, solid_angle, dist, light_color);
 
-    const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, 1.0f);
+    bool is_refraction;
+    const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
     light_color            = mul_color(light_color, bsdf_weight);
     float target_pdf       = luminance(light_color);
 
@@ -88,11 +89,12 @@ __device__ uint32_t ris_sample_light(
 
     sum_weight += weight;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING + light_ray_index * reservoir_size + i, pixel) * sum_weight < weight) {
-      selected_target_pdf  = target_pdf;
-      selected_id          = id;
-      selected_light_color = light_color;
-      selected_ray         = ray;
-      selected_dist        = dist;
+      selected_target_pdf    = target_pdf;
+      selected_id            = id;
+      selected_light_color   = light_color;
+      selected_ray           = ray;
+      selected_dist          = dist;
+      selected_is_refraction = is_refraction;
     }
   }
 

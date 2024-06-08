@@ -17,7 +17,7 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
 
   context.is_refraction = false;
 
-  if (data.flags & G_BUFFER_IS_TRANSPARENT_PASS) {
+  if (context.NdotL < 0.0f) {
     context.NdotL *= -1.0f;
     context.is_refraction = true;
   }
@@ -48,10 +48,10 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   context.HdotV = fabsf(dot_product(context.H, data.V));
   context.HdotL = fabsf(dot_product(context.H, L));
 
-  context.f0_conductor      = (data.flags & G_BUFFER_DIFFUSE_ONLY) ? get_color(0.0f, 0.0f, 0.0f) : opaque_color(data.albedo);
+  context.f0_conductor      = opaque_color(data.albedo);
   context.fresnel_conductor = bsdf_fresnel_schlick(context.f0_conductor, bsdf_shadowed_F90(context.f0_conductor), context.HdotV);
 
-  context.f0_glossy      = (data.flags & G_BUFFER_DIFFUSE_ONLY) ? get_color(0.0f, 0.0f, 0.0f) : get_color(0.04f, 0.04f, 0.04f);
+  context.f0_glossy      = get_color(0.04f, 0.04f, 0.04f);
   context.fresnel_glossy = bsdf_fresnel_schlick(context.f0_glossy, bsdf_shadowed_F90(context.f0_glossy), context.HdotV);
 
   context.fresnel_dielectric = (total_reflection) ? 1.0f : bsdf_fresnel(context.H, data.V, refraction_vector, ior_in, ior_out);
@@ -64,12 +64,15 @@ __device__ RGBF bsdf_evaluate_core(
   return bsdf_multiscattering_evaluate(data, context, sampling_hint, one_over_sampling_pdf);
 }
 
-__device__ RGBF
-  bsdf_evaluate(const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, const float one_over_sampling_pdf = 1.0f) {
+__device__ RGBF bsdf_evaluate(
+  const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction,
+  const float one_over_sampling_pdf = 1.0f) {
 #ifdef VOLUME_KERNEL
   return scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), L), one_over_sampling_pdf);
 #else
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
+
+  is_refraction = context.is_refraction;
 
   return bsdf_evaluate_core(data, context, sampling_hint, one_over_sampling_pdf);
 #endif
@@ -124,8 +127,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   const float cos_angle = -dot_product(scatter_ray, data.V);
 
-  info.weight                = get_color(1.0f, 1.0f, 1.0f);
-  info.transparent_pass_prob = 1.0f;
+  info.weight = get_color(1.0f, 1.0f, 1.0f);
 
   return scatter_ray;
 #else
@@ -145,10 +147,6 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   vec3 ray_local;
 
   const vec3 sampled_microfacet = bsdf_microfacet_sample(data_local, pixel);
-
-  // TODO: This is biased for semitransparent materials because 1-a is an underestimation whenever we do a glossy or conductor pass.
-  // We would need to evaluate the dielectric pass to get an unbiased estimate of the probability.
-  info.transparent_pass_prob = 1.0f - data.albedo.a;
 
   vec3 sampled_microfacet_refraction;
   if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_ALPHA, pixel) < data.albedo.a) {
@@ -249,7 +247,6 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     }
 
     info.is_microfacet_based = true;
-    info.transparent_pass_prob *= refraction_probability;
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
