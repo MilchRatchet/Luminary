@@ -252,7 +252,7 @@ __device__ uint2 random_blue_noise_mask_2D(const uint32_t x, const uint32_t y) {
   return make_uint2(blue_noise & 0xFFFF0000, blue_noise << 16);
 }
 
-__device__ float2
+__device__ uint2
   quasirandom_sequence_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   uint32_t dimension_index = target + depth * QUASI_RANDOM_TARGET_COUNT;
 
@@ -268,30 +268,42 @@ __device__ float2
   quasi.x += blue_noise.x;
   quasi.y += blue_noise.y;
 
+  return quasi;
+}
+
+__device__ float2
+  quasirandom_sequence_2D_base_float(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+  const uint2 quasi = quasirandom_sequence_2D_base(target, pixel, sequence_id, depth);
+
   return make_float2(random_uint32_t_to_float(quasi.x), random_uint32_t_to_float(quasi.y));
 }
 
-__device__ float quasirandom_sequence_1D_base(
-  const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+__device__ uint32_t
+  quasirandom_sequence_1D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   return quasirandom_sequence_2D_base(target, pixel, sequence_id, depth).x;
 }
 
+__device__ float quasirandom_sequence_1D_base_float(
+  const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
+  return random_uint32_t_to_float(quasirandom_sequence_1D_base(target, pixel, sequence_id, depth));
+}
+
 __device__ float quasirandom_sequence_1D(const uint32_t target, const ushort2 pixel) {
-  return quasirandom_sequence_1D_base(target, pixel, device.temporal_frames, device.depth);
+  return quasirandom_sequence_1D_base_float(target, pixel, device.temporal_frames, device.depth);
 }
 
 // This is a global version that is constant within a given frame.
 __device__ float quasirandom_sequence_1D_global(const uint32_t target) {
-  return quasirandom_sequence_1D_base(target, make_ushort2(0, 0), device.temporal_frames, 0);
+  return quasirandom_sequence_1D_base_float(target, make_ushort2(0, 0), device.temporal_frames, 0);
 }
 
 __device__ float2 quasirandom_sequence_2D(const uint32_t target, const ushort2 pixel) {
-  return quasirandom_sequence_2D_base(target, pixel, device.temporal_frames, device.depth);
+  return quasirandom_sequence_2D_base_float(target, pixel, device.temporal_frames, device.depth);
 }
 
 // This is a global version that is constant within a given frame.
 __device__ float2 quasirandom_sequence_2D_global(const uint32_t target) {
-  return quasirandom_sequence_2D_base(target, make_ushort2(0, 0), device.temporal_frames, 0);
+  return quasirandom_sequence_2D_base_float(target, make_ushort2(0, 0), device.temporal_frames, 0);
 }
 
 __device__ float random_dither_mask(const uint32_t x, const uint32_t y) {

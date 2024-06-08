@@ -32,9 +32,7 @@ __device__ uint32_t ris_sample_light(
 
   selected_light_color = get_color(0.0f, 0.0f, 0.0f);
 
-  const uint32_t light_count = (device.scene.material.lights_active) ? (1 << device.ris_settings.light_candidate_pool_size_log2) : 0;
-
-  if (light_count == 0)
+  if (!device.scene.material.lights_active)
     return LIGHT_ID_NONE;
 
   const int reservoir_size                    = device.ris_settings.initial_reservoir_size;
@@ -48,9 +46,10 @@ __device__ uint32_t ris_sample_light(
   }
 
   for (int i = 0; i < reservoir_size; i++) {
-    uint32_t presampled_id =
-      quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID + light_ray_index * reservoir_size + i, pixel) * light_count;
-    uint32_t id = device.ptrs.light_candidates[presampled_id];
+    uint32_t id_rand = quasirandom_sequence_1D_base(
+      QUASI_RANDOM_TARGET_RIS_LIGHT_ID + light_ray_index * reservoir_size + i, pixel, device.temporal_frames, device.depth);
+    uint32_t presampled_id = id_rand >> (31 - device.ris_settings.light_candidate_pool_size_log2);
+    uint32_t id            = device.ptrs.light_candidates[presampled_id];
 
     if (id == blocked_light_id)
       continue;
@@ -123,7 +122,7 @@ LUMINARY_KERNEL void ris_presample_lights() {
   const int light_sample_bin_count = 1 << device.ris_settings.light_candidate_pool_size_log2;
   while (id < light_sample_bin_count) {
     const uint32_t sampled_id =
-      quasirandom_sequence_1D_base(id, make_ushort2(0, 0), device.temporal_frames, 0) * device.scene.triangle_lights_count;
+      quasirandom_sequence_1D_base(id, make_ushort2(0, 0), device.temporal_frames, 0) % device.scene.triangle_lights_count;
 
     device.ptrs.light_candidates[id]                   = sampled_id;
     device.ris_settings.presampled_triangle_lights[id] = device.scene.triangle_lights[sampled_id];
