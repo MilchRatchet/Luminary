@@ -49,6 +49,7 @@ __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id)
 
 // Load triangle only once for the refinement steps
 __device__ int micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t level, const uint32_t mt_id) {
+  // TODO: Handle texture less transparency of materials.
   if (tri.tex_id == TEXTURE_NONE) {
     return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
   }
@@ -121,8 +122,12 @@ __device__ int micromap_get_opacity(const OMMTextureTriangle tri, const uint32_t
       break;
   }
 
+  // Handling IOR means that we cannot just ignore fully transparent geometry.
+  // TODO: Allow fast path for when we are in IOR 1.0 media.
+#if 0
   if (found_transparent && !found_opaque)
     return OPTIX_OPACITY_MICROMAP_STATE_TRANSPARENT;
+#endif
 
   if (found_opaque && !found_transparent)
     return OPTIX_OPACITY_MICROMAP_STATE_OPAQUE;
