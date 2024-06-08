@@ -161,31 +161,51 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       info.is_microfacet_based = true;
     }
     else {
+      // Glossy BSDF model
+      // We sample two directions, one from the microfacet, one from a cosine distribution
+      // We then use RIS with balance heuristic MIS weights to choose a direction.
+
+      // Microfacet evaluation is not numerically stable for very low roughness. We clamp the evaluation here.
+      // Note that the microfacet was sampled with the actual roughness. This means we still get perfect mirrors.
+      data_local.roughness = fmaxf(data_local.roughness, 0.05f);
+
+      // Microfacet based sample
       const vec3 microfacet_ray           = reflect_vector(data_local.V, sampled_microfacet);
       const BSDFRayContext microfacet_ctx = bsdf_sample_context(data_local, sampled_microfacet, microfacet_ray, false);
       const RGBF microfacet_eval          = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+      const float microfacet_pdf          = bsdf_microfacet_pdf(data_local, microfacet_ctx.NdotH, microfacet_ctx.NdotV);
+      const float microfacet_diffuse_pdf  = bsdf_diffuse_pdf(data_local, microfacet_ctx.NdotL);
+      const float microfacet_mis          = microfacet_pdf / (microfacet_pdf + microfacet_diffuse_pdf);
 
-      const vec3 diffuse_ray           = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_DIFFUSE, pixel));
-      const vec3 diffuse_microfacet    = normalize_vector(add_vector(data_local.V, diffuse_ray));
-      const BSDFRayContext diffuse_ctx = bsdf_sample_context(data_local, diffuse_microfacet, diffuse_ray, false);
-      const RGBF diffuse_eval          = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
+      // Diffuse based sample
+      const vec3 diffuse_ray             = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BSDF_DIFFUSE, pixel));
+      const vec3 diffuse_microfacet      = normalize_vector(add_vector(data_local.V, diffuse_ray));
+      const BSDFRayContext diffuse_ctx   = bsdf_sample_context(data_local, diffuse_microfacet, diffuse_ray, false);
+      const RGBF diffuse_eval            = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
+      const float diffuse_pdf            = bsdf_diffuse_pdf(data_local, diffuse_ctx.NdotL);
+      const float diffuse_microfacet_pdf = bsdf_microfacet_pdf(data_local, diffuse_ctx.NdotH, diffuse_ctx.NdotV);
+      const float diffuse_mis            = diffuse_pdf / (diffuse_pdf + diffuse_microfacet_pdf);
 
-      const float microfacet_weight = luminance(microfacet_eval);
-      const float diffuse_weight    = luminance(diffuse_eval);
+      const float microfacet_weight = luminance(microfacet_eval) * microfacet_mis;
+      const float diffuse_weight    = luminance(diffuse_eval) * diffuse_mis;
 
       const float sum_weights = microfacet_weight + diffuse_weight;
 
       const float microfacet_probability = microfacet_weight / sum_weights;
-      const float diffuse_probability    = diffuse_weight / sum_weights;
 
+      // For RIS we need to evaluate f / |f| here. This is unstable for low roughness and microfacet BRDFs.
+      // Hence we use a little trick, f / p can be evaluated in a stable manner when p is the microfacet PDF,
+      // and thus we evaluate f / |f| = (f / p) / |f / p|.
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_GLOSSY, pixel) < microfacet_probability) {
         ray_local                = microfacet_ray;
-        info.weight              = scale_color(microfacet_eval, 1.0f / microfacet_probability);
+        const RGBF color         = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+        info.weight              = scale_color(color, sum_weights / luminance(color));
         info.is_microfacet_based = true;
       }
       else {
         ray_local                = diffuse_ray;
-        info.weight              = scale_color(diffuse_eval, 1.0f / diffuse_probability);
+        const RGBF color         = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
+        info.weight              = scale_color(color, sum_weights / luminance(color));
         info.is_microfacet_based = false;
       }
     }

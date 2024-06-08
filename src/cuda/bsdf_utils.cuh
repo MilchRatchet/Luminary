@@ -401,6 +401,8 @@ __device__ RGBF
       ss_term = bsdf_microfacet_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_DIFFUSE:
+      ss_term = bsdf_microfacet_evaluate_sampled_diffuse(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
+      break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       ss_term = 0.0f;
       break;
@@ -415,6 +417,8 @@ __device__ RGBF
       diff_term = 1.0f;
       break;
     case BSDF_SAMPLING_MICROFACET:
+      diff_term = bsdf_diffuse_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotH, ctx.NdotV);
+      break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
       diff_term = 0.0f;
       break;
