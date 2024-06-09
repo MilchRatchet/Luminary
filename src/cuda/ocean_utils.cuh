@@ -45,13 +45,17 @@ __device__ float ocean_octave(float2 p, const float choppyness) {
   p.x += offset;
   p.y += offset;
 
+  float sin_x, sin_y, cos_x, cos_y;
+  sincosf(p.x, &sin_x, &cos_x);
+  sincosf(p.y, &sin_y, &cos_y);
+
   float2 wave1;
-  wave1.x = 1.0f - fabsf(sinf(p.x));
-  wave1.y = 1.0f - fabsf(sinf(p.y));
+  wave1.x = 1.0f - fabsf(sin_x);
+  wave1.y = 1.0f - fabsf(sin_y);
 
   float2 wave2;
-  wave2.x = fabsf(cosf(p.x));
-  wave2.y = fabsf(cosf(p.y));
+  wave2.x = fabsf(cos_x);
+  wave2.y = fabsf(cos_y);
 
   wave1.x = lerp(wave1.x, wave2.x, wave1.x);
   wave1.y = lerp(wave1.y, wave2.y, wave1.y);
@@ -60,7 +64,7 @@ __device__ float ocean_octave(float2 p, const float choppyness) {
 }
 
 __device__ float ocean_get_height(const vec3 p, const int steps) {
-  float amplitude  = device.scene.ocean.amplitude;
+  float amplitude  = 1.0f;
   float choppyness = device.scene.ocean.choppyness;
   float frequency  = device.scene.ocean.frequency;
 
@@ -82,7 +86,7 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
     choppyness = lerp(choppyness, 1.0f, 0.2f);
   }
 
-  h *= 2.0f;
+  h *= 2.0f * device.scene.ocean.amplitude;
 
   return h;
 }
