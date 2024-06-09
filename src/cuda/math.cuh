@@ -1234,6 +1234,8 @@ __device__ float tent_filter_importance_sample(const float x) {
   }
 }
 
+#ifndef OPTIX_KERNEL
+
 /////////////////
 // RGBAhalf functions
 /////////////////
@@ -1408,6 +1410,8 @@ __device__ RGBAhalf get_RGBAhalf(const float r, const float g, const float b, co
 
   return result;
 }
+
+#endif /* OPTIX_KERNEL */
 
 __device__ RGBF rgb_to_hsv(const RGBF rgb) {
   const float max_value = fmaxf(rgb.r, fmaxf(rgb.g, rgb.b));

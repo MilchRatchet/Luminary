@@ -68,7 +68,7 @@ find_package(SDL2_ttf REQUIRED CONFIG)
 #=============================================================
 # Set CUDA flags
 #=============================================================
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --source-in-ptx --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math --split-compile=0")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math --split-compile=0")
 if(WIN32)
     set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O2 -fp:fast -arch:AVX2")
     set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Od -fp:fast -arch:AVX2 -g")
@@ -170,6 +170,48 @@ message("=======================================================================
 message("")
 
 #=============================================================
+# Executable
+#=============================================================
+
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+add_executable(Luminary)
+
+#=============================================================
+# Create PTX files
+#=============================================================
+
+function(compile_ptx kernel_name)
+  add_custom_command(
+    OUTPUT
+      "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
+    COMMAND
+      ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu"
+      --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      -o "${kernel_name}.ptx"
+      -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_SOURCE_DIR}/src/cuda" -I"${OptiX_INCLUDE}"
+    DEPENDS
+      "${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu"
+    COMMENT
+      "Compiling ${kernel_name}.ptx"
+  )
+
+  add_custom_target(
+    ${kernel_name}
+    DEPENDS
+      "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
+    COMMENT
+      "Target for compiled OptiX kernel."
+  )
+
+  add_dependencies(Luminary ${kernel_name})
+endfunction()
+
+compile_ptx(optix_kernels)
+compile_ptx(optix_kernels_trace_particle)
+compile_ptx(optix_kernels_geometry)
+compile_ptx(optix_kernels_volume)
+
+#=============================================================
 # Embed files
 #=============================================================
 
@@ -179,10 +221,10 @@ ceb_embed_files(
   PROJECT Luminary
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
-  $<TARGET_OBJECTS:optix_kernels>
-  $<TARGET_OBJECTS:optix_kernels_trace_particle>
-  $<TARGET_OBJECTS:optix_kernels_geometry>
-  $<TARGET_OBJECTS:optix_kernels_volume>
+  ${CMAKE_BINARY_DIR}/optix_kernels.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_trace_particle.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_geometry.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_volume.ptx
   ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png
@@ -191,11 +233,10 @@ ceb_embed_files(
 )
 
 #=============================================================
-# Executable
+# Executable sources
 #=============================================================
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
-add_executable(Luminary ${cpu_source_files} ${gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
+target_sources(Luminary PRIVATE ${cpu_source_files} ${gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
 
 target_link_libraries(Luminary PRIVATE SDL2::SDL2)
 target_link_libraries(Luminary PRIVATE SDL2_ttf::SDL2_ttf)
@@ -209,26 +250,6 @@ target_include_directories(Luminary PRIVATE SDL2::Headers)
 target_include_directories(Luminary PRIVATE SDL2_ttf::SDL2_ttf)
 target_include_directories(Luminary PRIVATE "${OptiX_INCLUDE}")
 target_include_directories(Luminary PRIVATE CUDA::toolkit)
-
-#=============================================================
-# Create PTX files
-#=============================================================
-
-function(compile_ptx kernel_name)
-  add_library(${kernel_name} OBJECT ${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu)
-  set_target_properties(${kernel_name} PROPERTIES CUDA_PTX_COMPILATION ON)
-  add_dependencies(Luminary ${kernel_name})
-
-  target_include_directories(${kernel_name} PRIVATE "${CMAKE_SOURCE_DIR}/include")
-  target_include_directories(${kernel_name} PRIVATE "${CMAKE_SOURCE_DIR}/src/cuda")
-  target_include_directories(${kernel_name} PRIVATE "${OptiX_INCLUDE}")
-  target_include_directories(${kernel_name} PRIVATE CUDA::toolkit)
-endfunction()
-
-compile_ptx(optix_kernels)
-compile_ptx(optix_kernels_trace_particle)
-compile_ptx(optix_kernels_geometry)
-compile_ptx(optix_kernels_volume)
 
 #=============================================================
 # File copying
