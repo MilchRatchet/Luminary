@@ -196,14 +196,12 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       // and thus we evaluate f / |f| = (f / p) / |f / p|.
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_GLOSSY, pixel) < microfacet_probability) {
         ray_local                = microfacet_ray;
-        const RGBF color         = bsdf_glossy(data_local, microfacet_ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
-        info.weight              = scale_color(color, sum_weights / luminance(color));
+        info.weight              = scale_color(microfacet_eval, sum_weights / luminance(microfacet_eval));
         info.is_microfacet_based = true;
       }
       else {
         ray_local                = diffuse_ray;
-        const RGBF color         = bsdf_glossy(data_local, diffuse_ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
-        info.weight              = scale_color(color, sum_weights / luminance(color));
+        info.weight              = scale_color(diffuse_eval, sum_weights / luminance(diffuse_eval));
         info.is_microfacet_based = false;
       }
     }
