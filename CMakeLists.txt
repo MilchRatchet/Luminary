@@ -49,6 +49,7 @@ endif()
 #=============================================================
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
+file(GLOB gpu_header_files "${CMAKE_SOURCE_DIR}/src/cuda/*.cuh")
 
 list(REMOVE_ITEM gpu_source_files
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu"
@@ -181,6 +182,7 @@ add_executable(Luminary)
 #=============================================================
 
 function(compile_ptx kernel_name)
+  # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
   add_custom_command(
     OUTPUT
       "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
@@ -191,6 +193,7 @@ function(compile_ptx kernel_name)
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_SOURCE_DIR}/src/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
       "${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu"
+      "${gpu_header_files}"
     COMMENT
       "Compiling ${kernel_name}.ptx"
   )
