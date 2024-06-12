@@ -60,13 +60,45 @@ __device__ bool optix_evaluate_ior_culling(const uint32_t ior_data, const ushort
   return false;
 }
 
-__device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index) {
-  const vec3 sky_pos     = world_to_sky_transform(data.position);
-  const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+__device__ bool optix_toy_shadowing(
+  const vec3 position, const vec3 dir, const float dist, unsigned int& compressed_ior, RGBF& light_color) {
+  if (device.scene.toy.active) {
+    const float toy_dist = get_toy_distance(position, dir);
 
-  if (!sun_visible)
-    return get_color(0.0f, 0.0f, 0.0f);
+    if (toy_dist < dist) {
+      if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
+        return false;
 
+      RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
+
+      if (luminance(toy_transparency) == 0.0f)
+        return false;
+
+      // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
+      vec3 toy_hit_origin = add_vector(position, scale_vector(dir, toy_dist));
+      toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
+
+      const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
+
+      bool two_hits = false;
+      if (toy_dist2 < dist) {
+        toy_transparency = mul_color(toy_transparency, toy_transparency);
+        two_hits         = true;
+      }
+
+      if (!two_hits) {
+        // Set ray ior pop values to 1,1 or 0,-1 (max,balance)
+        compressed_ior |= (toy_is_inside(position, dir)) ? 0x01010000 : 0x00FF0000;
+      }
+
+      light_color = mul_color(light_color, toy_transparency);
+    }
+  }
+
+  return true;
+}
+
+__device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const ushort2 index, const vec3 sky_pos) {
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_SUN_RAY, index);
 
   float solid_angle;
@@ -82,38 +114,8 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
-  if (device.scene.toy.active) {
-    const float toy_dist = get_toy_distance(position, dir);
-
-    if (toy_dist < FLT_MAX) {
-      if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
-        return get_color(0.0f, 0.0f, 0.0f);
-
-      RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
-
-      if (luminance(toy_transparency) == 0.0f)
-        return get_color(0.0f, 0.0f, 0.0f);
-
-      // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
-      vec3 toy_hit_origin = add_vector(position, scale_vector(dir, toy_dist));
-      toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
-
-      const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
-
-      bool two_hits = false;
-      if (toy_dist2 < FLT_MAX) {
-        toy_transparency = mul_color(toy_transparency, toy_transparency);
-        two_hits         = true;
-      }
-
-      if (!two_hits) {
-        // Set ray ior pop values to 1,1 or 0,-1 (max,balance)
-        compressed_ior |= (toy_is_inside(position, dir)) ? 0x01010000 : 0x00FF0000;
-      }
-
-      light_color = mul_color(light_color, toy_transparency);
-    }
-  }
+  if (!optix_toy_shadowing(position, dir, FLT_MAX, compressed_ior, light_color))
+    return get_color(0.0f, 0.0f, 0.0f);
 
   const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
@@ -139,6 +141,41 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, FLT_MAX));
 
   return mul_color(light_color, visibility);
+}
+
+__device__ RGBF optix_compute_light_ray_sun_caustic(const GBufferData data, const ushort2 index, const vec3 sky_pos) {
+  return get_color(0.0f, 0.0f, 0.0f);
+}
+
+__device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index) {
+  const vec3 sky_pos     = world_to_sky_transform(data.position);
+  const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+
+  if (!sun_visible)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  bool sample_direct  = true;
+  bool sample_caustic = false;
+
+  if (device.scene.ocean.active) {
+    // TODO: Change the iterations count if necessary.
+    sample_direct  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) > 0.0f;
+    sample_caustic = device.scene.ocean.caustics_active;
+  }
+
+  RGBF sun_light = get_color(0.0f, 0.0f, 0.0f);
+
+  if (sample_direct) {
+    const RGBF direct_light = optix_compute_light_ray_sun_direct(data, index, sky_pos);
+    sun_light               = add_color(sun_light, direct_light);
+  }
+
+  if (sample_caustic) {
+    const RGBF caustic_light = optix_compute_light_ray_sun_caustic(data, index, sky_pos);
+    sun_light                = add_color(sun_light, caustic_light);
+  }
+
+  return sun_light;
 }
 
 __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort2 index) {
@@ -207,38 +244,8 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
-  if (device.scene.toy.active) {
-    const float toy_dist = get_toy_distance(position, dir);
-
-    if (toy_dist < FLT_MAX) {
-      if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
-        return get_color(0.0f, 0.0f, 0.0f);
-
-      RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
-
-      if (luminance(toy_transparency) == 0.0f)
-        return get_color(0.0f, 0.0f, 0.0f);
-
-      // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
-      vec3 toy_hit_origin = add_vector(position, scale_vector(dir, toy_dist));
-      toy_hit_origin      = add_vector(toy_hit_origin, scale_vector(dir, get_length(toy_hit_origin) * eps * 16.0f));
-
-      const float toy_dist2 = get_toy_distance(toy_hit_origin, dir);
-
-      bool two_hits = false;
-      if (toy_dist2 < FLT_MAX) {
-        toy_transparency = mul_color(toy_transparency, toy_transparency);
-        two_hits         = true;
-      }
-
-      if (!two_hits) {
-        // Set ray ior pop values to 1,1 or 0,-1 (max,balance)
-        compressed_ior |= (toy_is_inside(position, dir)) ? 0x01010000 : 0x00FF0000;
-      }
-
-      light_color = mul_color(light_color, toy_transparency);
-    }
-  }
+  if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color))
+    return get_color(0.0f, 0.0f, 0.0f);
 
   const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);

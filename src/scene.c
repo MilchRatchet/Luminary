@@ -81,6 +81,7 @@ void scene_init(Scene** _scene) {
   scene->ocean.choppyness       = 4.0f;
   scene->ocean.refractive_index = 1.333f;
   scene->ocean.water_type       = JERLOV_WATER_TYPE_IB;
+  scene->ocean.caustics_active  = 0;
 
   scene->toy.active           = 0;
   scene->toy.emissive         = 0;

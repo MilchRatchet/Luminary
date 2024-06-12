@@ -317,6 +317,7 @@ struct Ocean {
   float choppyness;
   float refractive_index;
   JerlovWaterType water_type;
+  int caustics_active;
 } typedef Ocean;
 
 struct Fog {
