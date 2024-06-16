@@ -4,6 +4,7 @@
 #if defined(SHADING_KERNEL) && defined(OPTIX_KERNEL)
 
 #include "bsdf.cuh"
+#include "caustics.cuh"
 #include "light.cuh"
 #include "math.cuh"
 #include "memory.cuh"
@@ -109,6 +110,9 @@ __device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const
   const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, solid_angle);
   light_color           = mul_color(light_color, bsdf_value);
 
+  if (luminance(light_color) < eps)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   const float shift   = is_refraction ? -eps : eps;
   const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
@@ -143,7 +147,77 @@ __device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const
   return mul_color(light_color, visibility);
 }
 
-__device__ RGBF optix_compute_light_ray_sun_caustic(const GBufferData data, const ushort2 index, const vec3 sky_pos) {
+__device__ RGBF
+  optix_compute_light_ray_sun_caustic(const GBufferData data, const ushort2 index, const vec3 sky_pos, const bool is_underwater) {
+  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_SUN_RAY, index);
+
+  float solid_angle;
+  const vec3 sun_dir = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+
+  vec3 connection_point;
+  bool connection_found = false;
+
+  // TODO: This is just for testing because success rate is super low right now.
+  for (uint32_t i = 0; i < 8; i++) {
+    if (caustics_find_connection_point(data, index, sun_dir, is_underwater, i, connection_point)) {
+      connection_found = true;
+      break;
+    }
+  }
+
+  if (connection_found) {
+    vec3 pos_to_ocean = sub_vector(connection_point, data.position);
+
+    const float dist = get_length(pos_to_ocean);
+    const vec3 dir   = normalize_vector(pos_to_ocean);
+
+    RGBF light_color = sky_get_sun_color(world_to_sky_transform(connection_point), sun_dir);
+
+    bool is_refraction;
+    const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, solid_angle);
+    light_color           = mul_color(light_color, bsdf_value);
+
+    if (luminance(light_color) < eps)
+      return get_color(0.0f, 0.0f, 0.0f);
+
+    const float shift   = is_refraction ? -eps : eps;
+    const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+    unsigned int hit_id = LIGHT_ID_SUN;
+
+    float3 origin = make_float3(position.x, position.y, position.z);
+    float3 ray    = make_float3(dir.x, dir.y, dir.z);
+
+    unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
+
+    unsigned int alpha_data0, alpha_data1;
+    optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
+
+    optixTrace(
+      device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
+      alpha_data0, alpha_data1, compressed_ior);
+
+    if (hit_id == HIT_TYPE_REJECT)
+      return get_color(0.0f, 0.0f, 0.0f);
+
+    hit_id = LIGHT_ID_SUN;
+    origin = make_float3(connection_point.x, connection_point.y, connection_point.z);
+    ray    = make_float3(sun_dir.x, sun_dir.y, sun_dir.z);
+
+    optixTrace(
+      device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
+      alpha_data0, alpha_data1, compressed_ior);
+
+    if (hit_id == HIT_TYPE_REJECT)
+      return get_color(0.0f, 0.0f, 0.0f);
+
+    RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
+    visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
+    visibility      = mul_color(visibility, volume_integrate_transmittance(connection_point, sun_dir, FLT_MAX));
+
+    return mul_color(light_color, visibility);
+  }
+
   return get_color(0.0f, 0.0f, 0.0f);
 }
 
@@ -156,10 +230,12 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
 
   bool sample_direct  = true;
   bool sample_caustic = false;
+  bool is_underwater  = false;
 
   if (device.scene.ocean.active) {
     // TODO: Change the iterations count if necessary.
-    sample_direct  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) > 0.0f;
+    is_underwater  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
+    sample_direct  = !is_underwater;
     sample_caustic = device.scene.ocean.caustics_active;
   }
 
@@ -171,7 +247,7 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   }
 
   if (sample_caustic) {
-    const RGBF caustic_light = optix_compute_light_ray_sun_caustic(data, index, sky_pos);
+    const RGBF caustic_light = optix_compute_light_ray_sun_caustic(data, index, sky_pos, is_underwater);
     sun_light                = add_color(sun_light, caustic_light);
   }
 

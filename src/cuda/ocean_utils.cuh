@@ -10,12 +10,17 @@
 
 #define OCEAN_ITERATIONS_INTERSECTION 5
 #define OCEAN_ITERATIONS_NORMAL 8
+#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 1
 
 __device__ float ocean_hash(const float2 p) {
   const float x = p.x * 127.1f + p.y * 311.7f;
   return fractf(sinf(x) * 43758.5453123f);
 }
 
+// TODO: This is just an interpolation of an height map defined at integer coordinates.
+//       We can replace it with a 8 bit texture with bilinear interpolation.
+//       A texture size of 256x256 might already suffice due to the octaves
+//       which would mean this texture would only need 16kB => L1 cache
 __device__ float ocean_noise(const float2 p) {
   float2 integral;
   integral.x = floorf(p.x);
@@ -93,6 +98,28 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
 
 __device__ float ocean_get_relative_height(const vec3 p, const int steps) {
   return (p.y - device.scene.ocean.height) - ocean_get_height(p, steps);
+}
+
+__device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
+  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+
+  // Sobel filter
+  float h[8];
+  h[0] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), iterations);
+  h[1] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
+  h[2] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, d)), iterations);
+  h[3] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
+  h[4] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, 0.0f)), iterations);
+  h[5] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, -d)), iterations);
+  h[6] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), iterations);
+  h[7] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, -d)), iterations);
+
+  vec3 normal;
+  normal.x = -((h[7] + 2.0f * h[4] + h[2]) - (h[5] + 2.0f * h[3] + h[0])) / 8.0f;
+  normal.y = d;
+  normal.z = -((h[0] + 2.0f * h[1] + h[2]) - (h[5] + 2.0f * h[6] + h[7])) / 8.0f;
+
+  return normalize_vector(normal);
 }
 
 // FLT_MAX signals no hit.
