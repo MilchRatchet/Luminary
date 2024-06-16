@@ -10,23 +10,28 @@
 
 // TODO: This must be improved. The set of all point for which we have convergence is extremely small, we must get
 // a good initial guess if we want to achieve anything here.
-__device__ void caustics_get_domain(const GBufferData data, vec3& base_point, vec3& edge1, vec3& edge2) {
-  // Algorithm
-  // If above surface
-  //  Consider line defined by shading point and shading normal
-  //  Intersection of this line with ocean plane forms the center of one of the domain edges
-  //  Project line onto ocean plane, from this we get center of the opposite domain edge
-  //  From this we get all the necessary vectors.
-  //
+__device__ void caustics_get_domain(const GBufferData data, const vec3 L, vec3& base_point, vec3& edge1, vec3& edge2) {
+  // Some things:
+  // We only care about caustics in the direct of the light, the other are super rare and few, we don't care about them.
+  // This is my idea:
+  // First solve for the perfect reflection/refraction vector, this has a closed form solution
+  // Then based on the amplitude, create a domain around the above obtained point
+  // This domain should be stretched along the direction towards the light based on the amplitude
+  // Small amplitude -> small domain
+  // This depends on a few things like distance to the initial point etc
+  // Once we have a domain like that, clip it using the normal of the shading point
+  // This process should be done once and the domain should be reused for all attemps.
 
-  // Preliminary version
-  const float height = device.scene.ocean.height;
+  // Get connection point for flat plane
+  const vec3 dir = get_vector(L.x, -L.y, L.z);
 
-  const vec3 projected_point = get_vector(data.position.x, height, data.position.z);
+  const float dist = ((device.scene.ocean.height - data.position.y) / dir.y);
 
-  base_point = add_vector(projected_point, get_vector(-10.0f, 0.0f, -10.0f));
-  edge1      = get_vector(20.0f, 0.0f, 0.0f);
-  edge2      = get_vector(0.0f, 0.0f, 20.0f);
+  const vec3 connection_point = add_vector(data.position, scale_vector(dir, dist));
+
+  base_point = add_vector(connection_point, get_vector(-2.0f, 0.0f, -2.0f));
+  edge1      = get_vector(4.0f, 0.0f, 0.0f);
+  edge2      = get_vector(0.0f, 0.0f, 4.0f);
 }
 
 __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool is_refraction) {
@@ -91,7 +96,7 @@ __device__ bool caustics_find_connection_point(
   const float2 initial_sample = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_INITIAL + iteration, index);
 
   vec3 domain_base, domain_edge1, domain_edge2;
-  caustics_get_domain(data, domain_base, domain_edge1, domain_edge2);
+  caustics_get_domain(data, light_direction, domain_base, domain_edge1, domain_edge2);
 
   const vec3 initial_sampling_point =
     add_vector(domain_base, add_vector(scale_vector(domain_edge1, initial_sample.x), scale_vector(domain_edge2, initial_sample.y)));

@@ -235,8 +235,8 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   if (device.scene.ocean.active) {
     // TODO: Change the iterations count if necessary.
     is_underwater  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
-    sample_direct  = !is_underwater;
-    sample_caustic = device.scene.ocean.caustics_active;
+    sample_direct  = !device.scene.ocean.caustics_active || !is_underwater;
+    sample_caustic = device.scene.ocean.caustics_active && IS_PRIMARY_RAY;
   }
 
   RGBF sun_light = get_color(0.0f, 0.0f, 0.0f);
