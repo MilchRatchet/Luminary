@@ -13,7 +13,7 @@
 #define OCEAN_ITERATIONS_NORMAL_CAUSTICS 1
 
 __device__ float ocean_hash(const float2 p) {
-  const float x = p.x * 127.1f + p.y * 311.7f;
+  const float x = p.x + p.y * (311.7f / 127.1f);
   return fractf(sinf(x) * 43758.5453123f);
 }
 
@@ -104,20 +104,19 @@ __device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN
   const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
 
   // Sobel filter
-  float h[8];
-  h[0] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), iterations);
-  h[1] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
-  h[2] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, d)), iterations);
-  h[3] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
-  h[4] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, 0.0f)), iterations);
-  h[5] = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, -d)), iterations);
-  h[6] = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), iterations);
-  h[7] = ocean_get_height(add_vector(p, get_vector(d, 0.0f, -d)), iterations);
+  const float h_0 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), iterations);
+  const float h_1 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
+  const float h_2 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, d)), iterations);
+  const float h_3 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
+  const float h_4 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, 0.0f)), iterations);
+  const float h_5 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, -d)), iterations);
+  const float h_6 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), iterations);
+  const float h_7 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, -d)), iterations);
 
   vec3 normal;
-  normal.x = -((h[7] + 2.0f * h[4] + h[2]) - (h[5] + 2.0f * h[3] + h[0])) / 8.0f;
+  normal.x = -((h_7 + 2.0f * h_4 + h_2) - (h_5 + 2.0f * h_3 + h_0)) * (1.0f / 8.0f);
   normal.y = d;
-  normal.z = -((h[0] + 2.0f * h[1] + h[2]) - (h[5] + 2.0f * h[6] + h[7])) / 8.0f;
+  normal.z = -((h_0 + 2.0f * h_1 + h_2) - (h_5 + 2.0f * h_6 + h_7)) * (1.0f / 8.0f);
 
   return normalize_vector(normal);
 }
