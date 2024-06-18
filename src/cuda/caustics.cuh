@@ -6,11 +6,59 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-#define CAUSTICS_DEBUG 0
+struct CausticsSamplingDomain {
+  vec3 base;
+  vec3 edge1;
+  vec3 edge2;
+  float area;
+  float ior_in;
+  float ior_out;
+} typedef CausticsSamplingDomain;
+
+// Assuming a flat plane with a uniform shading normal, find the unique solution.
+__device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, const bool is_underwater, const float dx, const float dz) {
+  // TODO: Come up with a better solution
+  // The issue is that getting the domain bounds by solving for the most extreme normals does not
+  // work because those normals might not be capable of ever being present in a valid connection point
+  // due to things like V.y < 0.0f for reflections. There are two things I came up with so far:
+  // 1) Adjust the most extreme normal so that it is a normal that can produce valid points.
+  //    (This would in theory work but in practice the bounds would still be gigantic)
+  // 2) Assume that most connection points come for flat parts of the surface, i.e. where the normal
+  //    is mostly just looking up. This is what I am doing here through this really small factor here.
+  const float max_height_change = fminf(OCEAN_LIPSCHITZ * 0.06f + eps, 0.12f);
+
+  // Construct normal
+  const float hx = dx * max_height_change;
+  const float hz = dz * max_height_change;
+
+  const vec3 forward = normalize_vector(get_vector(L.x, 0.0f, L.z));
+  const vec3 right   = cross_product(forward, get_vector(0.0f, 1.0f, 0.0f));
+
+  vec3 normal = get_vector(0.0f, 1.0f, 0.0f);
+  normal      = add_vector(normal, scale_vector(right, hx));
+  normal      = add_vector(normal, scale_vector(forward, hz));
+
+  normal = normalize_vector(normal);
+
+  // Get view vector
+  vec3 V;
+  if (is_underwater) {
+    bool total_reflection;
+    V = refract_vector(L, normal, 1.0f / device.scene.ocean.refractive_index, total_reflection);
+  }
+  else {
+    V = reflect_vector(L, normal);
+  }
+
+  // Get intersection distance from position to ocean plane along V
+  const float dist = ((data.position.y - device.scene.ocean.height) / V.y);
+
+  return sub_vector(data.position, scale_vector(V, dist));
+}
 
 // TODO: This must be improved. The set of all point for which we have convergence is extremely small, we must get
 // a good initial guess if we want to achieve anything here.
-__device__ void caustics_get_domain(const GBufferData data, const vec3 L, vec3& base_point, vec3& edge1, vec3& edge2, float& area) {
+__device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, const vec3 L, const bool is_underwater) {
   // Some things:
   // We only care about caustics in the direct of the light, the other are super rare and few, we don't care about them.
   // This is my idea:
@@ -22,20 +70,21 @@ __device__ void caustics_get_domain(const GBufferData data, const vec3 L, vec3& 
   // Once we have a domain like that, clip it using the normal of the shading point
   // This process should be done once and the domain should be reused for all attemps.
 
-  // Get connection point for flat plane
-  const vec3 dir = get_vector(L.x, -L.y, L.z);
+  CausticsSamplingDomain domain;
 
-  const float dist = ((device.scene.ocean.height - data.position.y) / dir.y);
+  domain.base  = caustics_solve_for_normal(data, L, is_underwater, 1.0f, 1.0f);
+  domain.edge1 = caustics_solve_for_normal(data, L, is_underwater, 1.0f, -1.0f);
+  domain.edge2 = caustics_solve_for_normal(data, L, is_underwater, -1.0f, 1.0f);
 
-  const vec3 connection_point = add_vector(data.position, scale_vector(dir, dist));
+  domain.edge1 = sub_vector(domain.edge1, domain.base);
+  domain.edge2 = sub_vector(domain.edge2, domain.base);
 
-  const float domain_size = (device.scene.ocean.amplitude > 0.0f) ? 8.0f : 0.5f;
+  domain.area = get_length(cross_product(domain.edge1, domain.edge2));
 
-  base_point = add_vector(connection_point, scale_vector(get_vector(-0.5f, 0.0f, -0.5f), domain_size));
-  edge1      = scale_vector(get_vector(1.0f, 0.0f, 0.0f), domain_size);
-  edge2      = scale_vector(get_vector(0.0f, 0.0f, 1.0f), domain_size);
+  domain.ior_in  = (is_underwater) ? device.scene.ocean.refractive_index : 1.0f;
+  domain.ior_out = (is_underwater) ? 1.0f : device.scene.ocean.refractive_index;
 
-  area = domain_size * domain_size;
+  return domain;
 }
 
 __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool is_refraction) {
@@ -95,15 +144,11 @@ __device__ void caustics_compute_residual(
 }
 
 __device__ bool caustics_find_connection_point(
-  const GBufferData data, const ushort2 index, const vec3 light_direction, const bool is_refraction, const uint32_t iteration, vec3& point,
-  float& target_weight, float& recip_pdf) {
+  const GBufferData data, const ushort2 index, const CausticsSamplingDomain domain, const bool is_refraction, const uint32_t iteration,
+  vec3& point, float& target_weight, float& recip_pdf) {
   const float2 sample = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_INITIAL + iteration, index);
 
-  vec3 domain_base, domain_edge1, domain_edge2;
-  float domain_area;
-  caustics_get_domain(data, light_direction, domain_base, domain_edge1, domain_edge2, domain_area);
-
-  point   = add_vector(domain_base, add_vector(scale_vector(domain_edge1, sample.x), scale_vector(domain_edge2, sample.y)));
+  point   = add_vector(domain.base, add_vector(scale_vector(domain.edge1, sample.x), scale_vector(domain.edge2, sample.y)));
   point.y = device.scene.ocean.height + ocean_get_height(point, OCEAN_ITERATIONS_INTERSECTION);
 
   vec3 V = sub_vector(data.position, point);
@@ -122,157 +167,20 @@ __device__ bool caustics_find_connection_point(
 
   const vec3 sky_point = world_to_sky_transform(point);
 
-  const bool sun_hit = sphere_ray_hit(L, sky_point, device.sun_pos, SKY_SUN_RADIUS);
+  const bool sun_hit = sphere_ray_hit(L, sky_point, device.sun_pos, SKY_SUN_RADIUS * device.scene.ocean.caustics_regularization);
 
-  recip_pdf = NdotV * domain_area / dist_sq;
-
-  float ior_in, ior_out;
-  if (is_refraction) {
-    ior_in  = device.scene.ocean.refractive_index;
-    ior_out = 1.0f;
-  }
-  else {
-    ior_in  = 1.0f;
-    ior_out = device.scene.ocean.refractive_index;
-  }
-
-  bool total_reflection;
-  const vec3 refraction_dir = refract_vector(V, normal, ior_in / ior_out, total_reflection);
-
-  const float reflection_coefficient = ocean_reflection_coefficient(normal, scale_vector(V, -1.0f), refraction_dir, ior_in, ior_out);
-
-  // TODO: Include Fresnel term.
-  target_weight = (is_refraction) ? 1.0f - reflection_coefficient : reflection_coefficient;
-
-  return sun_hit;
-}
-
-__device__ bool caustics_find_connection_point_2(
-  const GBufferData data, const ushort2 index, const vec3 light_direction, const bool is_refraction, const uint32_t iteration,
-  vec3& connection_point) {
-  const float2 initial_sample = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_INITIAL + iteration, index);
-
-  vec3 domain_base, domain_edge1, domain_edge2;
-  float domain_area;
-  caustics_get_domain(data, light_direction, domain_base, domain_edge1, domain_edge2, domain_area);
-
-  const vec3 initial_sampling_point =
-    add_vector(domain_base, add_vector(scale_vector(domain_edge1, initial_sample.x), scale_vector(domain_edge2, initial_sample.y)));
-
-#if CAUSTICS_DEBUG
-  if (is_selected_pixel(index)) {
-    printf("==== START SEARCH ====\n");
-    printf("Shading Point:          %f %f\n", data.position.x, data.position.z);
-    printf("Initial Sample:         %f %f\n", initial_sampling_point.x, initial_sampling_point.z);
-    printf("Light Dir:              %f %f %f\n", light_direction.x, light_direction.y, light_direction.z);
-  }
-#endif /* CAUSTICS_DEBUG */
-
-  vec3 current_point = initial_sampling_point;
-
-  float beta             = 1.0f;
-  const float step_scale = 1.0f;
-  const float res_tol    = 1e-4f;
-
-  float res_norm = FLT_MAX;
-
-  for (int i = 0; i < 16; i++) {
-#if CAUSTICS_DEBUG
-    if (is_selected_pixel(index)) {
-      printf("==== Iter %d ====\n", i);
-      printf("P:                    %f %f\n", current_point.x, current_point.z);
-    }
-
-#endif /* CAUSTICS_DEBUG */
-
-    const float du = 2.0f * eps * fmaxf(1.0f, fabsf(current_point.x));
-    const float dv = 2.0f * eps * fmaxf(1.0f, fabsf(current_point.z));
-
-    const vec3 current_point_du = add_vector(current_point, get_vector(du, 0.0f, 0.0f));
-    const vec3 current_point_dv = add_vector(current_point, get_vector(0.0f, 0.0f, dv));
-
-    float2 residual, residual_du, residual_dv;
-    caustics_compute_residual(data, index, light_direction, is_refraction, current_point, residual);
-    caustics_compute_residual(data, index, light_direction, is_refraction, current_point_du, residual_du);
-    caustics_compute_residual(data, index, light_direction, is_refraction, current_point_dv, residual_dv);
-
-    const float H_00 = (residual_du.x - residual.x) / du;
-    const float H_10 = (residual_du.y - residual.y) / du;
-    const float H_01 = (residual_dv.x - residual.x) / dv;
-    const float H_11 = (residual_dv.y - residual.y) / dv;
-
-    const float determinant = H_00 * H_11 - H_10 * H_01;
-
-#if CAUSTICS_DEBUG
-    if (is_selected_pixel(index)) {
-      printf("H:                    %f %f\n", H_00, H_01);
-      printf("                      %f %f\n", H_10, H_11);
-      printf("Determinant:          %f\n", determinant);
-
-      const float m = 0.5f * (H_00 + H_11);
-      const float s = sqrtf(fabsf(m * m - determinant));
-
-      const bool is_real = m * m - determinant >= 0.0f;
-
-      if (is_real) {
-        printf("Eigenvalues:          %f %f\n", m + s, m - s);
-      }
-      else {
-        printf("Eigenvalues:          %f+%fi %f-%fi\n", m, s, m, s);
-      }
-    }
-#endif /* CAUSTICS_DEBUG */
-
-    if (fabsf(determinant) < 1e-6f)
-      return false;
-
-    const float recip_determinant = 1.0f / determinant;
-
-    const float step_u = recip_determinant * (residual.x * H_11 - residual.y * H_01);
-    const float step_v = recip_determinant * (residual.y * H_00 - residual.x * H_10);
-
-    const float current_res_norm = sqrtf(residual.x * residual.x + residual.y * residual.y);
-
-    res_norm = current_res_norm;
-
-#if CAUSTICS_DEBUG
-    if (is_selected_pixel(index)) {
-      printf("Residual:             %f %f\n", residual.x, residual.y);
-      printf("Residual Norm:        %f\n", res_norm);
-    }
-#endif /* CAUSTICS_DEBUG */
-
-    if (isnan(res_norm))
-      return false;
-
-    // We are too far away, it is not worth it to keep trying.
-    if (res_norm > 1.0f)
-      return false;
-
-    if (res_norm < res_tol)
-      break;
-
-#if CAUSTICS_DEBUG
-    if (is_selected_pixel(index))
-      printf("Step:                 %f %f\n", step_scale * beta * step_u, step_scale * beta * step_v);
-#endif /* CAUSTICS_DEBUG */
-
-    current_point.x -= step_scale * beta * step_u;
-    current_point.z -= step_scale * beta * step_v;
-  }
-
-  if (!(res_norm < res_tol))
+  if (!sun_hit)
     return false;
 
-  current_point.y = device.scene.ocean.height + ocean_get_height(current_point, OCEAN_ITERATIONS_INTERSECTION);
+  recip_pdf = NdotV * domain.area / dist_sq;
 
-  connection_point = current_point;
+  bool total_reflection;
+  const vec3 refraction_dir = refract_vector(V, normal, domain.ior_in / domain.ior_out, total_reflection);
 
-#if CAUSTICS_DEBUG
-  if (is_selected_pixel(index)) {
-    printf("SUCCESS\nSUCCESS\nSUCCESS\n");
-  }
-#endif /* CAUSTICS_DEBUG */
+  const float reflection_coefficient =
+    ocean_reflection_coefficient(normal, scale_vector(V, -1.0f), refraction_dir, domain.ior_in, domain.ior_out);
+
+  target_weight = (is_refraction) ? 1.0f - reflection_coefficient : reflection_coefficient;
 
   return true;
 }

@@ -149,7 +149,8 @@ __device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const
 
 __device__ RGBF
   optix_compute_light_ray_sun_caustic(const GBufferData data, const ushort2 index, const vec3 sky_pos, const bool is_underwater) {
-  const vec3 sun_dir = normalize_vector(sub_vector(device.sun_pos, sky_pos));
+  const vec3 sun_dir                           = normalize_vector(sub_vector(device.sun_pos, sky_pos));
+  const CausticsSamplingDomain sampling_domain = caustics_get_domain(data, sun_dir, is_underwater);
 
   vec3 connection_point;
   float connection_target_weight;
@@ -161,7 +162,8 @@ __device__ RGBF
   for (uint32_t i = 0; i < num_samples; i++) {
     vec3 sample_point;
     float sample_recip_pdf, sample_target_weight;
-    if (caustics_find_connection_point(data, index, sun_dir, is_underwater, i, sample_point, sample_target_weight, sample_recip_pdf)) {
+    if (caustics_find_connection_point(
+          data, index, sampling_domain, is_underwater, i, sample_point, sample_target_weight, sample_recip_pdf)) {
       const float sample_weight = sample_target_weight * sample_recip_pdf;
       sum_connection_weight += sample_weight;
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index) * sum_connection_weight < sample_weight) {
@@ -185,23 +187,18 @@ __device__ RGBF
     const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, connection_weight);
     light_color           = mul_color(light_color, bsdf_value);
 
-    float ior_in, ior_out;
-    if (is_underwater) {
-      ior_in  = device.scene.ocean.refractive_index;
-      ior_out = 1.0f;
-    }
-    else {
-      ior_in  = 1.0f;
-      ior_out = device.scene.ocean.refractive_index;
-    }
-
     const vec3 normal = scale_vector(ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_underwater) ? -1.0f : 1.0f);
 
     bool total_reflection;
-    const vec3 refraction_dir          = refract_vector(scale_vector(dir, -1.0f), normal, ior_in / ior_out, total_reflection);
-    const float reflection_coefficient = ocean_reflection_coefficient(normal, dir, refraction_dir, ior_in, ior_out);
+    const vec3 refraction_dir =
+      refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior_in / sampling_domain.ior_out, total_reflection);
+    const float reflection_coefficient =
+      ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior_in, sampling_domain.ior_out);
 
     light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
+
+    // Reduce light intensity based on regularization factor, this is not physically correct in any way
+    light_color = scale_color(light_color, 1.0f / device.scene.ocean.caustics_regularization);
 
     if (luminance(light_color) < eps)
       return get_color(0.0f, 0.0f, 0.0f);
@@ -262,7 +259,7 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
     // TODO: Change the iterations count if necessary.
     is_underwater  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
     sample_direct  = !device.scene.ocean.caustics_active || !is_underwater;
-    sample_caustic = device.scene.ocean.caustics_active && IS_PRIMARY_RAY;
+    sample_caustic = device.scene.ocean.caustics_active;
   }
 
   RGBF sun_light = get_color(0.0f, 0.0f, 0.0f);

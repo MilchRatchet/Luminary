@@ -83,6 +83,7 @@ void scene_init(Scene** _scene) {
   scene->ocean.water_type                = JERLOV_WATER_TYPE_IB;
   scene->ocean.caustics_active           = 0;
   scene->ocean.caustics_ris_sample_count = 32;
+  scene->ocean.caustics_regularization   = 1.0f;
 
   scene->toy.active           = 0;
   scene->toy.emissive         = 0;
