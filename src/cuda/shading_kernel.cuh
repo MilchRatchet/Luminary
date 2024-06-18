@@ -149,23 +149,31 @@ __device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const
 
 __device__ RGBF
   optix_compute_light_ray_sun_caustic(const GBufferData data, const ushort2 index, const vec3 sky_pos, const bool is_underwater) {
-  const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_SUN_RAY, index);
-
-  float solid_angle;
-  const vec3 sun_dir = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+  const vec3 sun_dir = normalize_vector(sub_vector(device.sun_pos, sky_pos));
 
   vec3 connection_point;
-  bool connection_found = false;
+  float connection_target_weight;
+  float sum_connection_weight = 0.0f;
+
+  const uint32_t num_samples = device.scene.ocean.caustics_ris_sample_count;
 
   // TODO: This is just for testing because success rate is super low right now.
-  for (uint32_t i = 0; i < 8; i++) {
-    if (caustics_find_connection_point(data, index, sun_dir, is_underwater, i, connection_point)) {
-      connection_found = true;
-      break;
+  for (uint32_t i = 0; i < num_samples; i++) {
+    vec3 sample_point;
+    float sample_recip_pdf, sample_target_weight;
+    if (caustics_find_connection_point(data, index, sun_dir, is_underwater, i, sample_point, sample_target_weight, sample_recip_pdf)) {
+      const float sample_weight = sample_target_weight * sample_recip_pdf;
+      sum_connection_weight += sample_weight;
+      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index) * sum_connection_weight < sample_weight) {
+        connection_target_weight = sample_target_weight;
+        connection_point         = sample_point;
+      }
     }
   }
 
-  if (connection_found) {
+  const float connection_weight = (1.0f / num_samples) * sum_connection_weight / connection_target_weight;
+
+  if (sum_connection_weight > 0.0f) {
     vec3 pos_to_ocean = sub_vector(connection_point, data.position);
 
     const float dist = get_length(pos_to_ocean);
@@ -174,8 +182,26 @@ __device__ RGBF
     RGBF light_color = sky_get_sun_color(world_to_sky_transform(connection_point), sun_dir);
 
     bool is_refraction;
-    const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, solid_angle);
+    const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, connection_weight);
     light_color           = mul_color(light_color, bsdf_value);
+
+    float ior_in, ior_out;
+    if (is_underwater) {
+      ior_in  = device.scene.ocean.refractive_index;
+      ior_out = 1.0f;
+    }
+    else {
+      ior_in  = 1.0f;
+      ior_out = device.scene.ocean.refractive_index;
+    }
+
+    const vec3 normal = scale_vector(ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_underwater) ? -1.0f : 1.0f);
+
+    bool total_reflection;
+    const vec3 refraction_dir          = refract_vector(scale_vector(dir, -1.0f), normal, ior_in / ior_out, total_reflection);
+    const float reflection_coefficient = ocean_reflection_coefficient(normal, dir, refraction_dir, ior_in, ior_out);
+
+    light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
 
     if (luminance(light_color) < eps)
       return get_color(0.0f, 0.0f, 0.0f);

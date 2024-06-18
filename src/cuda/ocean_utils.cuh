@@ -10,7 +10,7 @@
 
 #define OCEAN_ITERATIONS_INTERSECTION 5
 #define OCEAN_ITERATIONS_NORMAL 8
-#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 1
+#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 3
 
 __device__ float ocean_hash(const float2 p) {
   const float x = p.x + p.y * (311.7f / 127.1f);
@@ -363,6 +363,32 @@ __device__ float ocean_phase(const float cos_angle) {
   const float particle_phase  = ocean_particle_phase(cos_angle);
 
   return molecular_phase * molecular_weight + particle_phase * (1.0f - molecular_weight);
+}
+
+/*
+ * This uses the actual Fresnel equations to compute the reflection coefficient under the following assumptions:
+ *  - The media are not magnetic.
+ *  - The light is not polarized.
+ *  - The IORs are wavelength independent.
+ */
+__device__ float ocean_reflection_coefficient(
+  const vec3 normal, const vec3 ray, const vec3 refraction, const float index_in, const float index_out) {
+  const float NdotV = -dot_product(ray, normal);
+  const float NdotT = -dot_product(refraction, normal);
+
+  const float s_pol_term1 = index_in * NdotV;
+  const float s_pol_term2 = index_out * NdotT;
+
+  const float p_pol_term1 = index_in * NdotT;
+  const float p_pol_term2 = index_out * NdotV;
+
+  float reflection_s_pol = (s_pol_term1 - s_pol_term2) / (s_pol_term1 + s_pol_term2);
+  float reflection_p_pol = (p_pol_term1 - p_pol_term2) / (p_pol_term1 + p_pol_term2);
+
+  reflection_s_pol *= reflection_s_pol;
+  reflection_p_pol *= reflection_p_pol;
+
+  return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
 #endif /* CU_OCEAN_UTILS_H */

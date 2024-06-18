@@ -318,6 +318,7 @@ struct Ocean {
   float refractive_index;
   JerlovWaterType water_type;
   int caustics_active;
+  int caustics_ris_sample_count;
 } typedef Ocean;
 
 struct Fog {

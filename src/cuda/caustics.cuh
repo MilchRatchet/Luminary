@@ -10,7 +10,7 @@
 
 // TODO: This must be improved. The set of all point for which we have convergence is extremely small, we must get
 // a good initial guess if we want to achieve anything here.
-__device__ void caustics_get_domain(const GBufferData data, const vec3 L, vec3& base_point, vec3& edge1, vec3& edge2) {
+__device__ void caustics_get_domain(const GBufferData data, const vec3 L, vec3& base_point, vec3& edge1, vec3& edge2, float& area) {
   // Some things:
   // We only care about caustics in the direct of the light, the other are super rare and few, we don't care about them.
   // This is my idea:
@@ -29,9 +29,13 @@ __device__ void caustics_get_domain(const GBufferData data, const vec3 L, vec3& 
 
   const vec3 connection_point = add_vector(data.position, scale_vector(dir, dist));
 
-  base_point = add_vector(connection_point, get_vector(-2.0f, 0.0f, -2.0f));
-  edge1      = get_vector(4.0f, 0.0f, 0.0f);
-  edge2      = get_vector(0.0f, 0.0f, 4.0f);
+  const float domain_size = (device.scene.ocean.amplitude > 0.0f) ? 8.0f : 0.5f;
+
+  base_point = add_vector(connection_point, scale_vector(get_vector(-0.5f, 0.0f, -0.5f), domain_size));
+  edge1      = scale_vector(get_vector(1.0f, 0.0f, 0.0f), domain_size);
+  edge2      = scale_vector(get_vector(0.0f, 0.0f, 1.0f), domain_size);
+
+  area = domain_size * domain_size;
 }
 
 __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool is_refraction) {
@@ -91,12 +95,66 @@ __device__ void caustics_compute_residual(
 }
 
 __device__ bool caustics_find_connection_point(
+  const GBufferData data, const ushort2 index, const vec3 light_direction, const bool is_refraction, const uint32_t iteration, vec3& point,
+  float& target_weight, float& recip_pdf) {
+  const float2 sample = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_INITIAL + iteration, index);
+
+  vec3 domain_base, domain_edge1, domain_edge2;
+  float domain_area;
+  caustics_get_domain(data, light_direction, domain_base, domain_edge1, domain_edge2, domain_area);
+
+  point   = add_vector(domain_base, add_vector(scale_vector(domain_edge1, sample.x), scale_vector(domain_edge2, sample.y)));
+  point.y = device.scene.ocean.height + ocean_get_height(point, OCEAN_ITERATIONS_INTERSECTION);
+
+  vec3 V = sub_vector(data.position, point);
+
+  const float dist_sq = dot_product(V, V);
+  V                   = normalize_vector(V);
+
+  const vec3 normal = scale_vector(ocean_get_normal(point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_refraction) ? -1.0f : 1.0f);
+
+  const float NdotV = dot_product(V, normal);
+
+  if (NdotV < 0.0f)
+    return false;
+
+  const vec3 L = caustics_transform(V, normal, is_refraction);
+
+  const vec3 sky_point = world_to_sky_transform(point);
+
+  const bool sun_hit = sphere_ray_hit(L, sky_point, device.sun_pos, SKY_SUN_RADIUS);
+
+  recip_pdf = NdotV * domain_area / dist_sq;
+
+  float ior_in, ior_out;
+  if (is_refraction) {
+    ior_in  = device.scene.ocean.refractive_index;
+    ior_out = 1.0f;
+  }
+  else {
+    ior_in  = 1.0f;
+    ior_out = device.scene.ocean.refractive_index;
+  }
+
+  bool total_reflection;
+  const vec3 refraction_dir = refract_vector(V, normal, ior_in / ior_out, total_reflection);
+
+  const float reflection_coefficient = ocean_reflection_coefficient(normal, scale_vector(V, -1.0f), refraction_dir, ior_in, ior_out);
+
+  // TODO: Include Fresnel term.
+  target_weight = (is_refraction) ? 1.0f - reflection_coefficient : reflection_coefficient;
+
+  return sun_hit;
+}
+
+__device__ bool caustics_find_connection_point_2(
   const GBufferData data, const ushort2 index, const vec3 light_direction, const bool is_refraction, const uint32_t iteration,
   vec3& connection_point) {
   const float2 initial_sample = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_INITIAL + iteration, index);
 
   vec3 domain_base, domain_edge1, domain_edge2;
-  caustics_get_domain(data, light_direction, domain_base, domain_edge1, domain_edge2);
+  float domain_area;
+  caustics_get_domain(data, light_direction, domain_base, domain_edge1, domain_edge2, domain_area);
 
   const vec3 initial_sampling_point =
     add_vector(domain_base, add_vector(scale_vector(domain_edge1, initial_sample.x), scale_vector(domain_edge2, initial_sample.y)));
