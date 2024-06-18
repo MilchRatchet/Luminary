@@ -114,9 +114,25 @@ __device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN
   const float h_7 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, -d)), iterations);
 
   vec3 normal;
-  normal.x = -((h_7 + 2.0f * h_4 + h_2) - (h_5 + 2.0f * h_3 + h_0)) * (1.0f / 8.0f);
+  normal.x = ((h_5 + 2.0f * h_3 + h_0) - (h_7 + 2.0f * h_4 + h_2)) * (1.0f / 8.0f);
   normal.y = d;
-  normal.z = -((h_0 + 2.0f * h_1 + h_2) - (h_5 + 2.0f * h_6 + h_7)) * (1.0f / 8.0f);
+  normal.z = ((h_5 + 2.0f * h_6 + h_7) - (h_0 + 2.0f * h_1 + h_2)) * (1.0f / 8.0f);
+
+  return normalize_vector(normal);
+}
+
+__device__ vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
+  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+
+  const float h_0 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
+  const float h_1 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
+  const float h_2 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, 0.0f)), iterations);
+  const float h_3 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), iterations);
+
+  vec3 normal;
+  normal.x = (h_1 - h_2) * (1.0f / 4.0f);
+  normal.y = d;
+  normal.z = (h_3 - h_0) * (1.0f / 4.0f);
 
   return normalize_vector(normal);
 }

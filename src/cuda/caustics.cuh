@@ -25,7 +25,7 @@ __device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, 
   //    (This would in theory work but in practice the bounds would still be gigantic)
   // 2) Assume that most connection points come for flat parts of the surface, i.e. where the normal
   //    is mostly just looking up. This is what I am doing here through this really small factor here.
-  const float max_height_change = fminf(OCEAN_LIPSCHITZ * 0.06f + eps, 0.12f);
+  const float max_height_change = fminf(OCEAN_LIPSCHITZ * 0.06f + eps, 0.12f) * (is_underwater) ? 2.0f : 1.0f;
 
   // Construct normal
   const float hx = dx * max_height_change;
@@ -145,7 +145,7 @@ __device__ void caustics_compute_residual(
 
 __device__ bool caustics_find_connection_point(
   const GBufferData data, const ushort2 index, const CausticsSamplingDomain domain, const bool is_refraction, const uint32_t iteration,
-  vec3& point, float& target_weight, float& recip_pdf) {
+  vec3& point, float& sample_weight) {
   const float2 sample = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_INITIAL + iteration, index);
 
   point   = add_vector(domain.base, add_vector(scale_vector(domain.edge1, sample.x), scale_vector(domain.edge2, sample.y)));
@@ -154,9 +154,9 @@ __device__ bool caustics_find_connection_point(
   vec3 V = sub_vector(data.position, point);
 
   const float dist_sq = dot_product(V, V);
-  V                   = normalize_vector(V);
+  V                   = scale_vector(V, 1.0f / sqrtf(dist_sq));
 
-  const vec3 normal = scale_vector(ocean_get_normal(point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_refraction) ? -1.0f : 1.0f);
+  const vec3 normal = scale_vector(ocean_get_normal_fast(point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_refraction) ? -1.0f : 1.0f);
 
   const float NdotV = dot_product(V, normal);
 
@@ -166,21 +166,12 @@ __device__ bool caustics_find_connection_point(
   const vec3 L = caustics_transform(V, normal, is_refraction);
 
   const vec3 sky_point = world_to_sky_transform(point);
-
-  const bool sun_hit = sphere_ray_hit(L, sky_point, device.sun_pos, SKY_SUN_RADIUS * device.scene.ocean.caustics_regularization);
+  const bool sun_hit   = sphere_ray_hit(L, sky_point, device.sun_pos, SKY_SUN_RADIUS * device.scene.ocean.caustics_regularization);
 
   if (!sun_hit)
     return false;
 
-  recip_pdf = NdotV * domain.area / dist_sq;
-
-  bool total_reflection;
-  const vec3 refraction_dir = refract_vector(V, normal, domain.ior_in / domain.ior_out, total_reflection);
-
-  const float reflection_coefficient =
-    ocean_reflection_coefficient(normal, scale_vector(V, -1.0f), refraction_dir, domain.ior_in, domain.ior_out);
-
-  target_weight = (is_refraction) ? 1.0f - reflection_coefficient : reflection_coefficient;
+  sample_weight = NdotV * domain.area / dist_sq;
 
   return true;
 }

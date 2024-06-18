@@ -153,27 +153,23 @@ __device__ RGBF
   const CausticsSamplingDomain sampling_domain = caustics_get_domain(data, sun_dir, is_underwater);
 
   vec3 connection_point;
-  float connection_target_weight;
   float sum_connection_weight = 0.0f;
 
   const uint32_t num_samples = device.scene.ocean.caustics_ris_sample_count;
 
-  // TODO: This is just for testing because success rate is super low right now.
+  // RIS with target weight being the Dirac delta of if the connection point is valid or not.
   for (uint32_t i = 0; i < num_samples; i++) {
     vec3 sample_point;
-    float sample_recip_pdf, sample_target_weight;
-    if (caustics_find_connection_point(
-          data, index, sampling_domain, is_underwater, i, sample_point, sample_target_weight, sample_recip_pdf)) {
-      const float sample_weight = sample_target_weight * sample_recip_pdf;
+    float sample_weight;
+    if (caustics_find_connection_point(data, index, sampling_domain, is_underwater, i, sample_point, sample_weight)) {
       sum_connection_weight += sample_weight;
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index) * sum_connection_weight < sample_weight) {
-        connection_target_weight = sample_target_weight;
-        connection_point         = sample_point;
+        connection_point = sample_point;
       }
     }
   }
 
-  const float connection_weight = (1.0f / num_samples) * sum_connection_weight / connection_target_weight;
+  const float connection_weight = (1.0f / num_samples) * sum_connection_weight;
 
   if (sum_connection_weight > 0.0f) {
     vec3 pos_to_ocean = sub_vector(connection_point, data.position);
