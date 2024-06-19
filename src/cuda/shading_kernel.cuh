@@ -155,7 +155,7 @@ __device__ RGBF
   vec3 connection_point;
   float sum_connection_weight = 0.0f;
 
-  const uint32_t num_samples = device.scene.ocean.caustics_ris_sample_count;
+  const uint32_t num_samples = (device.scene.ocean.amplitude > 0.0f) ? device.scene.ocean.caustics_ris_sample_count : 1;
 
   // RIS with target weight being the Dirac delta of if the connection point is valid or not.
   for (uint32_t i = 0; i < num_samples; i++) {

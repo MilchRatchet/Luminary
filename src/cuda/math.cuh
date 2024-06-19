@@ -573,6 +573,14 @@ __device__ vec3 angles_to_direction(const float altitude, const float azimuth) {
   return dir;
 }
 
+__device__ void direction_to_angles(const vec3 dir, float& azimuth, float& altitude) {
+  altitude = asinf(dir.y);
+  azimuth  = atan2f(dir.z, dir.x);
+
+  if (azimuth < 0.0f)
+    azimuth += 2.0f * PI;
+}
+
 // PBRT v3 Chapter "Specular Reflection and Transmission", Refract() function
 __device__ vec3 refract_vector(const vec3 V, const vec3 normal, const float index_ratio, bool& total_reflection) {
   if (index_ratio < eps) {
