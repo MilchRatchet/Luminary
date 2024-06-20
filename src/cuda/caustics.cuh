@@ -15,6 +15,10 @@ struct CausticsSamplingDomain {
   float ior_out;
 } typedef CausticsSamplingDomain;
 
+__device__ float caustics_get_plane_height(const bool is_underwater) {
+  return (is_underwater) ? OCEAN_MAX_HEIGHT : OCEAN_MIN_HEIGHT;
+}
+
 // Assuming a flat plane with a normal of (0,1,0), find the unique solution.
 __device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, const bool is_underwater, const float dx, const float dz) {
   // Get view vector
@@ -28,7 +32,7 @@ __device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, 
   }
 
   // Get intersection distance from position to ocean plane along V
-  const float dist = fabsf((data.position.y - device.scene.ocean.height) / V.y);
+  const float dist = fabsf((data.position.y - caustics_get_plane_height(is_underwater)) / V.y);
 
   return sub_vector(data.position, scale_vector(V, dist));
 }
@@ -68,15 +72,16 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
   float azimuth, altitude;
   direction_to_angles(center_dir, azimuth, altitude);
 
-  const float angle = __saturatef(0.3f * device.scene.ocean.caustics_domain_scale);
+  const float angle        = 0.3f * device.scene.ocean.caustics_domain_scale;
+  const float plane_height = caustics_get_plane_height(is_underwater);
 
   const vec3 v0_dir = angles_to_direction(altitude - angle, azimuth - angle);
   const vec3 v1_dir = angles_to_direction(altitude - angle, azimuth + angle);
   const vec3 v2_dir = angles_to_direction(altitude + angle, azimuth - angle);
 
-  const float v0_dist = fabsf(data.position.y - device.scene.ocean.height) / fmaxf(0.01f, fabsf(v0_dir.y));
-  const float v1_dist = fabsf(data.position.y - device.scene.ocean.height) / fmaxf(0.01f, fabsf(v1_dir.y));
-  const float v2_dist = fabsf(data.position.y - device.scene.ocean.height) / fmaxf(0.01f, fabsf(v2_dir.y));
+  const float v0_dist = fabsf(data.position.y - plane_height) / fmaxf(0.01f, fabsf(v0_dir.y));
+  const float v1_dist = fabsf(data.position.y - plane_height) / fmaxf(0.01f, fabsf(v1_dir.y));
+  const float v2_dist = fabsf(data.position.y - plane_height) / fmaxf(0.01f, fabsf(v2_dir.y));
 
   const vec3 v0 = add_vector(data.position, scale_vector(v0_dir, v0_dist));
   const vec3 v1 = add_vector(data.position, scale_vector(v1_dir, v1_dist));
@@ -125,9 +130,20 @@ __device__ bool caustics_find_connection_point(
     return false;
 
   // Assume flat plane for the dot product because that is how we sampled it.
-  // TODO: Figure out the correct weight, for some reason I have a severe uniform energy loss that seems to be exactly 2 * 2 * PI,
-  // that makes no sense but I will just take it for now.
-  sample_weight = (device.scene.ocean.amplitude > 0.0f) ? 2.0f * 2.0f * PI * fabsf(V.y) * domain.area / dist_sq : domain.area;
+  sample_weight = (device.scene.ocean.amplitude > 0.0f) ? fabsf(V.y) * domain.area / dist_sq : domain.area;
+
+  // Make no mistake. I do in fact have no idea what I am doing. So I just empirically gathered that these
+  // weights are correct (they are very unlikely to be correct). I will look into fixing this the moment
+  // I start caring.
+  if (device.scene.ocean.amplitude > 0.0f) {
+    // Inspired by the famous factor required for refraction when sampling importance. Note that one of the IOR is 1.0f.
+    sample_weight *= device.scene.ocean.refractive_index * device.scene.ocean.refractive_index;
+
+    if (is_refraction) {
+      // ... and why not apply it again, we are just sampling some extra importance clearly. And a 2.0f for good measure.
+      sample_weight *= device.scene.ocean.refractive_index * device.scene.ocean.refractive_index * 2.0f;
+    }
+  }
 
   return true;
 }

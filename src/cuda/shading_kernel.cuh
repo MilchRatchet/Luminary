@@ -233,8 +233,14 @@ __device__ RGBF
     return get_color(0.0f, 0.0f, 0.0f);
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
-  visibility      = mul_color(visibility, volume_integrate_transmittance(connection_point, sun_dir, FLT_MAX));
+  visibility      = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, FLT_MAX));
+
+  if (is_underwater) {
+    visibility = mul_color(visibility, volume_integrate_transmittance_ocean(position, dir, dist, true));
+  }
+  else {
+    visibility = scale_color(visibility, volume_integrate_transmittance_fog(position, dir, dist));
+  }
 
   return mul_color(light_color, visibility);
 }
