@@ -209,7 +209,7 @@ __device__ RGBF
   float3 origin = make_float3(position.x, position.y, position.z);
   float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
-  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
+  unsigned int compressed_ior = ior_compress(is_underwater ? device.scene.ocean.refractive_index : 1.0f);
 
   unsigned int alpha_data0, alpha_data1;
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
