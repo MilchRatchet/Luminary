@@ -68,7 +68,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
   float azimuth, altitude;
   direction_to_angles(center_dir, azimuth, altitude);
 
-  const float angle = __saturatef(0.2f * device.scene.ocean.caustics_domain_scale);
+  const float angle = __saturatef(0.3f * device.scene.ocean.caustics_domain_scale);
 
   const vec3 v0_dir = angles_to_direction(altitude - angle, azimuth - angle);
   const vec3 v1_dir = angles_to_direction(altitude - angle, azimuth + angle);
@@ -125,7 +125,9 @@ __device__ bool caustics_find_connection_point(
     return false;
 
   // Assume flat plane for the dot product because that is how we sampled it.
-  sample_weight = (device.scene.ocean.amplitude > 0.0f) ? fabsf(V.y) * domain.area / dist_sq : domain.area;
+  // TODO: Figure out the correct weight, for some reason I have a severe uniform energy loss that seems to be exactly 2 * 2 * PI,
+  // that makes no sense but I will just take it for now.
+  sample_weight = (device.scene.ocean.amplitude > 0.0f) ? 2.0f * 2.0f * PI * fabsf(V.y) * domain.area / dist_sq : domain.area;
 
   return true;
 }

@@ -171,73 +171,72 @@ __device__ RGBF
 
   const float connection_weight = (1.0f / num_samples) * sum_connection_weight;
 
-  if (sum_connection_weight > 0.0f) {
-    vec3 pos_to_ocean = sub_vector(connection_point, data.position);
+  if (sum_connection_weight == 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
 
-    const float dist = get_length(pos_to_ocean);
-    const vec3 dir   = normalize_vector(pos_to_ocean);
+  vec3 pos_to_ocean = sub_vector(connection_point, data.position);
 
-    RGBF light_color = sky_get_sun_color(world_to_sky_transform(connection_point), sun_dir);
+  const float dist = get_length(pos_to_ocean);
+  const vec3 dir   = normalize_vector(pos_to_ocean);
 
-    bool is_refraction;
-    const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, connection_weight);
-    light_color           = mul_color(light_color, bsdf_value);
+  RGBF light_color = sky_get_sun_color(world_to_sky_transform(connection_point), sun_dir);
 
-    const vec3 normal = scale_vector(ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_underwater) ? -1.0f : 1.0f);
+  bool is_refraction;
+  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, connection_weight);
+  light_color           = mul_color(light_color, bsdf_value);
 
-    bool total_reflection;
-    const vec3 refraction_dir =
-      refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior_in / sampling_domain.ior_out, total_reflection);
-    const float reflection_coefficient =
-      ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior_in, sampling_domain.ior_out);
+  const vec3 normal = scale_vector(ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_underwater) ? -1.0f : 1.0f);
 
-    light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
+  bool total_reflection;
+  const vec3 refraction_dir =
+    refract_vector(scale_vector(dir, -1.0f), normal, sampling_domain.ior_in / sampling_domain.ior_out, total_reflection);
+  const float reflection_coefficient =
+    ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior_in, sampling_domain.ior_out);
 
-    // Reduce light intensity based on regularization factor, this is not physically correct in any way
-    light_color = scale_color(light_color, 1.0f / device.scene.ocean.caustics_regularization);
+  light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
 
-    if (luminance(light_color) < eps)
-      return get_color(0.0f, 0.0f, 0.0f);
+  // Reduce light intensity based on regularization factor, this is not physically correct in any way
+  light_color = scale_color(light_color, 1.0f / device.scene.ocean.caustics_regularization);
 
-    const float shift   = is_refraction ? -eps : eps;
-    const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+  if (luminance(light_color) < eps)
+    return get_color(0.0f, 0.0f, 0.0f);
 
-    unsigned int hit_id = LIGHT_ID_SUN;
+  const float shift   = is_refraction ? -eps : eps;
+  const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
-    float3 origin = make_float3(position.x, position.y, position.z);
-    float3 ray    = make_float3(dir.x, dir.y, dir.z);
+  unsigned int hit_id = LIGHT_ID_SUN;
 
-    unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
+  float3 origin = make_float3(position.x, position.y, position.z);
+  float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
-    unsigned int alpha_data0, alpha_data1;
-    optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
+  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
-    optixTrace(
-      device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
-      alpha_data0, alpha_data1, compressed_ior);
+  unsigned int alpha_data0, alpha_data1;
+  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
-    if (hit_id == HIT_TYPE_REJECT)
-      return get_color(0.0f, 0.0f, 0.0f);
+  optixTrace(
+    device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    hit_id, alpha_data0, alpha_data1, compressed_ior);
 
-    hit_id = LIGHT_ID_SUN;
-    origin = make_float3(connection_point.x, connection_point.y, connection_point.z);
-    ray    = make_float3(sun_dir.x, sun_dir.y, sun_dir.z);
+  if (hit_id == HIT_TYPE_REJECT)
+    return get_color(0.0f, 0.0f, 0.0f);
 
-    optixTrace(
-      device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
-      alpha_data0, alpha_data1, compressed_ior);
+  hit_id = LIGHT_ID_SUN;
+  origin = make_float3(connection_point.x, connection_point.y, connection_point.z);
+  ray    = make_float3(sun_dir.x, sun_dir.y, sun_dir.z);
 
-    if (hit_id == HIT_TYPE_REJECT)
-      return get_color(0.0f, 0.0f, 0.0f);
+  optixTrace(
+    device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    hit_id, alpha_data0, alpha_data1, compressed_ior);
 
-    RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-    visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
-    visibility      = mul_color(visibility, volume_integrate_transmittance(connection_point, sun_dir, FLT_MAX));
+  if (hit_id == HIT_TYPE_REJECT)
+    return get_color(0.0f, 0.0f, 0.0f);
 
-    return mul_color(light_color, visibility);
-  }
+  RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
+  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
+  visibility      = mul_color(visibility, volume_integrate_transmittance(connection_point, sun_dir, FLT_MAX));
 
-  return get_color(0.0f, 0.0f, 0.0f);
+  return mul_color(light_color, visibility);
 }
 
 __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index) {
