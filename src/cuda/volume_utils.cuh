@@ -200,21 +200,12 @@ __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType v
   return scale_color(opaque_color(data.albedo), phase);
 }
 
-__device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray, const float depth) {
-  float fog_transmittance = 1.0f;
-  if (device.scene.fog.active) {
-    const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-    const float2 path             = volume_compute_path(volume, origin, ray, depth);
-
-    if (path.x >= 0.0f) {
-      fog_transmittance = expf(-path.y * volume.max_scattering);
-    }
-  }
-
+__device__ RGBF volume_integrate_transmittance_ocean(const vec3 origin, const vec3 ray, const float depth, const bool force_path = false) {
   RGBF ocean_transmittance = get_color(1.0f, 1.0f, 1.0f);
+
   if (device.scene.ocean.active) {
     const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-    const float2 path             = volume_compute_path(volume, origin, ray, depth);
+    const float2 path             = (force_path) ? make_float2(0.0f, depth) : volume_compute_path(volume, origin, ray, depth);
 
     if (path.x >= 0.0f) {
       RGBF volume_transmittance = volume_get_transmittance(volume);
@@ -224,6 +215,28 @@ __device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray
       ocean_transmittance.b = expf(-path.y * volume_transmittance.b);
     }
   }
+
+  return ocean_transmittance;
+}
+
+__device__ float volume_integrate_transmittance_fog(const vec3 origin, const vec3 ray, const float depth) {
+  float fog_transmittance = 1.0f;
+
+  if (device.scene.fog.active) {
+    const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
+    const float2 path             = volume_compute_path(volume, origin, ray, depth);
+
+    if (path.x >= 0.0f) {
+      fog_transmittance = expf(-path.y * volume.max_scattering);
+    }
+  }
+
+  return fog_transmittance;
+}
+
+__device__ RGBF volume_integrate_transmittance(const vec3 origin, const vec3 ray, const float depth) {
+  const float fog_transmittance  = volume_integrate_transmittance_fog(origin, ray, depth);
+  const RGBF ocean_transmittance = volume_integrate_transmittance_ocean(origin, ray, depth);
 
   return scale_color(ocean_transmittance, fog_transmittance);
 }

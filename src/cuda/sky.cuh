@@ -621,7 +621,7 @@ LUMINARY_KERNEL void process_sky_tasks() {
 
     sky = mul_color(sky, record);
 
-    write_beauty_buffer(sky, pixel, device.depth <= 1);
+    write_beauty_buffer(sky, pixel);
     write_albedo_buffer(sky, pixel);
     write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }

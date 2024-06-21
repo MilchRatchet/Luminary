@@ -343,7 +343,7 @@ LUMINARY_KERNEL void clouds_render_tasks() {
     }
 
     store_RGBF(device.ptrs.records + pixel, record);
-    write_beauty_buffer(color, pixel, device.depth <= 1);
+    write_beauty_buffer(color, pixel);
   }
 }
 

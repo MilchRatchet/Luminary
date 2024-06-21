@@ -68,11 +68,7 @@ extern "C" __global__ void __raygen__optix() {
     if (include_emission) {
       const RGBF emission = mul_color(data.emission, record);
 
-      write_beauty_buffer(emission, pixel, device.depth <= 1);
-    }
-
-    if (!allow_bounce_lighting) {
-      state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+      write_beauty_buffer(emission, pixel);
     }
 
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
@@ -109,6 +105,11 @@ extern "C" __global__ void __raygen__optix() {
     if (validate_trace_task(bounce_task, bounce_record)) {
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
       store_RGBF(device.ptrs.records + pixel, bounce_record);
+
+      if (!allow_bounce_lighting) {
+        state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+        state_release(pixel, STATE_FLAG_DELTA_PATH);
+      }
     }
   }
 

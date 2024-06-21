@@ -32,7 +32,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
     device.ptrs.records[pixel]      = get_color(1.0f, 1.0f, 1.0f);
     device.ptrs.frame_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
-    device.ptrs.state_buffer[pixel] = STATE_FLAG_BOUNCE_LIGHTING;
+    device.ptrs.state_buffer[pixel] = STATE_FLAG_BOUNCE_LIGHTING | STATE_FLAG_DELTA_PATH;
 
     if ((device.denoiser || device.aov_mode) && !device.temporal_frames) {
       device.ptrs.albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);

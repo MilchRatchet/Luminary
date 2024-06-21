@@ -10,12 +10,17 @@
 
 #define OCEAN_ITERATIONS_INTERSECTION 5
 #define OCEAN_ITERATIONS_NORMAL 8
+#define OCEAN_ITERATIONS_NORMAL_CAUSTICS 3
 
 __device__ float ocean_hash(const float2 p) {
-  const float x = p.x * 127.1f + p.y * 311.7f;
+  const float x = p.x + p.y * (311.7f / 127.1f);
   return fractf(sinf(x) * 43758.5453123f);
 }
 
+// TODO: This is just an interpolation of an height map defined at integer coordinates.
+//       We can replace it with a 8 bit texture with bilinear interpolation.
+//       A texture size of 256x256 might already suffice due to the octaves
+//       which would mean this texture would only need 16kB => L1 cache
 __device__ float ocean_noise(const float2 p) {
   float2 integral;
   integral.x = floorf(p.x);
@@ -93,6 +98,43 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
 
 __device__ float ocean_get_relative_height(const vec3 p, const int steps) {
   return (p.y - device.scene.ocean.height) - ocean_get_height(p, steps);
+}
+
+__device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
+  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+
+  // Sobel filter
+  const float h_0 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, d)), iterations);
+  const float h_1 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
+  const float h_2 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, d)), iterations);
+  const float h_3 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
+  const float h_4 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, 0.0f)), iterations);
+  const float h_5 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, -d)), iterations);
+  const float h_6 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), iterations);
+  const float h_7 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, -d)), iterations);
+
+  vec3 normal;
+  normal.x = ((h_5 + 2.0f * h_3 + h_0) - (h_7 + 2.0f * h_4 + h_2)) * (1.0f / 8.0f);
+  normal.y = d;
+  normal.z = ((h_5 + 2.0f * h_6 + h_7) - (h_0 + 2.0f * h_1 + h_2)) * (1.0f / 8.0f);
+
+  return normalize_vector(normal);
+}
+
+__device__ vec3 ocean_get_normal_fast(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
+  const float d = (OCEAN_LIPSCHITZ + get_length(p)) * eps;
+
+  const float h_0 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, d)), iterations);
+  const float h_1 = ocean_get_height(add_vector(p, get_vector(-d, 0.0f, 0.0f)), iterations);
+  const float h_2 = ocean_get_height(add_vector(p, get_vector(d, 0.0f, 0.0f)), iterations);
+  const float h_3 = ocean_get_height(add_vector(p, get_vector(0.0f, 0.0f, -d)), iterations);
+
+  vec3 normal;
+  normal.x = (h_1 - h_2) * (1.0f / 4.0f);
+  normal.y = d;
+  normal.z = (h_3 - h_0) * (1.0f / 4.0f);
+
+  return normalize_vector(normal);
 }
 
 // FLT_MAX signals no hit.
@@ -337,6 +379,32 @@ __device__ float ocean_phase(const float cos_angle) {
   const float particle_phase  = ocean_particle_phase(cos_angle);
 
   return molecular_phase * molecular_weight + particle_phase * (1.0f - molecular_weight);
+}
+
+/*
+ * This uses the actual Fresnel equations to compute the reflection coefficient under the following assumptions:
+ *  - The media are not magnetic.
+ *  - The light is not polarized.
+ *  - The IORs are wavelength independent.
+ */
+__device__ float ocean_reflection_coefficient(
+  const vec3 normal, const vec3 ray, const vec3 refraction, const float index_in, const float index_out) {
+  const float NdotV = -dot_product(ray, normal);
+  const float NdotT = -dot_product(refraction, normal);
+
+  const float s_pol_term1 = index_in * NdotV;
+  const float s_pol_term2 = index_out * NdotT;
+
+  const float p_pol_term1 = index_in * NdotT;
+  const float p_pol_term2 = index_out * NdotV;
+
+  float reflection_s_pol = (s_pol_term1 - s_pol_term2) / (s_pol_term1 + s_pol_term2);
+  float reflection_p_pol = (p_pol_term1 - p_pol_term2) / (p_pol_term1 + p_pol_term2);
+
+  reflection_s_pol *= reflection_s_pol;
+  reflection_p_pol *= reflection_p_pol;
+
+  return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
 #endif /* CU_OCEAN_UTILS_H */

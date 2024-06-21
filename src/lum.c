@@ -535,6 +535,22 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
     case 5789751508288684375u:
       sscanf(value, "%d\n", &ocean->water_type);
       break;
+    /* CAUSACTI */
+    case 5283922210662465859u:
+      sscanf(value, "%d\n", &ocean->caustics_active);
+      break;
+    /* CAUSRISS */
+    case 6004223346149245251u:
+      sscanf(value, "%d\n", &ocean->caustics_ris_sample_count);
+      break;
+    /* CAUSREGU */
+    case 6144956436458062147u:
+      sscanf(value, "%f\n", &ocean->caustics_regularization);
+      break;
+    /* CAUSSCAL */
+    case 5494747045528158531u:
+      sscanf(value, "%f\n", &ocean->caustics_domain_scale);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
       break;
@@ -1029,6 +1045,14 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "OCEAN REFRACT_ %f\n", instance->scene.ocean.refractive_index);
   fputs(line, file);
   sprintf(line, "OCEAN WATERTYP %d\n", instance->scene.ocean.water_type);
+  fputs(line, file);
+  sprintf(line, "OCEAN CAUSACTI %d\n", instance->scene.ocean.caustics_active);
+  fputs(line, file);
+  sprintf(line, "OCEAN CAUSRISS %d\n", instance->scene.ocean.caustics_ris_sample_count);
+  fputs(line, file);
+  sprintf(line, "OCEAN CAUSREGU %f\n", instance->scene.ocean.caustics_regularization);
+  fputs(line, file);
+  sprintf(line, "OCEAN CAUSSCAL %f\n", instance->scene.ocean.caustics_domain_scale);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Particle Settings\n#===============================\n\n");
