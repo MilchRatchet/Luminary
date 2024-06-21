@@ -214,6 +214,9 @@ __device__ RGBF
   unsigned int alpha_data0, alpha_data1;
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
+  if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color))
+    return get_color(0.0f, 0.0f, 0.0f);
+
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
@@ -224,6 +227,9 @@ __device__ RGBF
   hit_id = LIGHT_ID_SUN;
   origin = make_float3(connection_point.x, connection_point.y, connection_point.z);
   ray    = make_float3(sun_dir.x, sun_dir.y, sun_dir.z);
+
+  if (!optix_toy_shadowing(connection_point, sun_dir, FLT_MAX, compressed_ior, light_color))
+    return get_color(0.0f, 0.0f, 0.0f);
 
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
