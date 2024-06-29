@@ -370,6 +370,7 @@ struct Scene {
   Triangle* triangles;
   TriangleLight* triangle_lights;
   TriangleGeomData triangle_data;
+  TriangleGeomData triangle_lights_data;
   unsigned int triangle_lights_count;
   uint16_t materials_count;
   PackedMaterial* materials;
@@ -471,6 +472,7 @@ struct DeviceConstantMemory {
   RayEmitter emitter;
   int accum_mode;
   OptixTraversableHandle optix_bvh;
+  OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_light;
   OptixTraversableHandle optix_bvh_particles;
   Node8* bvh_nodes;
@@ -576,6 +578,7 @@ struct RaytraceInstance {
   OptixKernel optix_kernel_geometry;
   OptixKernel optix_kernel_volume;
   OptixBVH optix_bvh;
+  OptixBVH optix_bvh_shadow;
   OptixBVH optix_bvh_light;
   BVHType bvh_type;
   int luminary_bvh_initialized;

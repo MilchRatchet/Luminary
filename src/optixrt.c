@@ -146,8 +146,8 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
 }
 
 void optixrt_build_bvh(
-  RaytraceInstance* instance, OptixBVH* bvh, const OptixBuildInputDisplacementMicromap dmm, const OptixBuildInputOpacityMicromap omm,
-  const int is_for_light_rays) {
+  OptixDeviceContext optix_ctx, OptixBVH* bvh, const TriangleGeomData tri_data, const OptixBuildInputDisplacementMicromap dmm,
+  const OptixBuildInputOpacityMicromap omm, const int is_for_light_rays) {
   OptixAccelBuildOptions build_options;
   memset(&build_options, 0, sizeof(OptixAccelBuildOptions));
   build_options.operation             = OPTIX_BUILD_OPERATION_BUILD;
@@ -161,13 +161,13 @@ void optixrt_build_bvh(
 
   build_inputs.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
   build_inputs.triangleArray.vertexStrideInBytes = 16;
-  build_inputs.triangleArray.numVertices         = instance->scene.triangle_data.vertex_count;
-  build_inputs.triangleArray.vertexBuffers       = (CUdeviceptr*) &(instance->scene.triangle_data.vertex_buffer);
+  build_inputs.triangleArray.numVertices         = tri_data.vertex_count;
+  build_inputs.triangleArray.vertexBuffers       = (CUdeviceptr*) &(tri_data.vertex_buffer);
 
   build_inputs.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
   build_inputs.triangleArray.indexStrideInBytes = 16;
-  build_inputs.triangleArray.numIndexTriplets   = instance->scene.triangle_data.triangle_count;
-  build_inputs.triangleArray.indexBuffer        = (CUdeviceptr) instance->scene.triangle_data.index_buffer;
+  build_inputs.triangleArray.numIndexTriplets   = tri_data.triangle_count;
+  build_inputs.triangleArray.indexBuffer        = (CUdeviceptr) tri_data.index_buffer;
 
   unsigned int inputFlags = 0;
   inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
@@ -180,7 +180,7 @@ void optixrt_build_bvh(
 
   OptixAccelBufferSizes buffer_sizes;
 
-  OPTIX_CHECK(optixAccelComputeMemoryUsage(instance->optix_ctx, &build_options, &build_inputs, 1, &buffer_sizes));
+  OPTIX_CHECK(optixAccelComputeMemoryUsage(optix_ctx, &build_options, &build_inputs, 1, &buffer_sizes));
   gpuErrchk(cudaDeviceSynchronize());
 
   void* temp_buffer;
@@ -198,8 +198,8 @@ void optixrt_build_bvh(
   accel_emit.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
 
   OPTIX_CHECK(optixAccelBuild(
-    instance->optix_ctx, 0, &build_options, &build_inputs, 1, (CUdeviceptr) temp_buffer, buffer_sizes.tempSizeInBytes,
-    (CUdeviceptr) output_buffer, buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
+    optix_ctx, 0, &build_options, &build_inputs, 1, (CUdeviceptr) temp_buffer, buffer_sizes.tempSizeInBytes, (CUdeviceptr) output_buffer,
+    buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
   gpuErrchk(cudaDeviceSynchronize());
 
   size_t compact_size;
@@ -214,7 +214,7 @@ void optixrt_build_bvh(
     void* output_buffer_compact;
     device_malloc(&output_buffer_compact, compact_size);
 
-    OPTIX_CHECK(optixAccelCompact(instance->optix_ctx, 0, traversable, (CUdeviceptr) output_buffer_compact, compact_size, &traversable));
+    OPTIX_CHECK(optixAccelCompact(optix_ctx, 0, traversable, (CUdeviceptr) output_buffer_compact, compact_size, &traversable));
     gpuErrchk(cudaDeviceSynchronize());
 
     device_free(output_buffer, buffer_sizes.outputSizeInBytes);
@@ -264,12 +264,20 @@ void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   // BVH Building
   ////////////////////////////////////////////////////////////////////
 
-  optixrt_build_bvh(instance, &instance->optix_bvh, dmm, omm, 0);
-  optixrt_build_bvh(instance, &instance->optix_bvh_light, dmm, omm, 1);
+  // Dummies for the triangle light BVH.
+  OptixBuildInputDisplacementMicromap dmm_dummy;
+  OptixBuildInputOpacityMicromap omm_dummy;
+  memset(&dmm_dummy, 0, sizeof(OptixBuildInputDisplacementMicromap));
+  memset(&omm_dummy, 0, sizeof(OptixBuildInputOpacityMicromap));
+
+  optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh, instance->scene.triangle_data, dmm, omm, 0);
+  optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh_shadow, instance->scene.triangle_data, dmm, omm, 1);
+  optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh_light, instance->scene.triangle_lights_data, dmm_dummy, omm_dummy, 0);
 
   micromap_opacity_free(omm);
 
   device_update_symbol(optix_bvh, instance->optix_bvh.traversable);
+  device_update_symbol(optix_bvh_shadow, instance->optix_bvh_shadow.traversable);
   device_update_symbol(optix_bvh_light, instance->optix_bvh_light.traversable);
 
   instance->optix_bvh.initialized = 1;

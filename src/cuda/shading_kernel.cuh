@@ -11,6 +11,7 @@
 #include "ris.cuh"
 #include "utils.cuh"
 
+#define SKIP_IOR_CHECK (0xFFFFFFFF)
 #define MAX_COMPRESSABLE_COLOR (1.99999988079071044921875f)
 
 __device__ void optix_compress_color(RGBF color, unsigned int& data0, unsigned int& data1) {
@@ -121,6 +122,10 @@ __device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const
   if (!optix_toy_shadowing(position, dir, FLT_MAX, compressed_ior, light_color))
     return get_color(0.0f, 0.0f, 0.0f);
 
+  ////////////////////////////////////////////////////////////////////
+  // Compute visibility term
+  ////////////////////////////////////////////////////////////////////
+
   const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
@@ -132,7 +137,7 @@ __device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
   optixTrace(
-    device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    device.optix_bvh_shadow, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
   if (hit_id == HIT_TYPE_REJECT)
@@ -149,6 +154,10 @@ __device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const
 
 __device__ RGBF
   optix_compute_light_ray_sun_caustic(const GBufferData data, const ushort2 index, const vec3 sky_pos, const bool is_underwater) {
+  ////////////////////////////////////////////////////////////////////
+  // Sample a caustic connection vertex using RIS
+  ////////////////////////////////////////////////////////////////////
+
   const vec3 sun_dir                           = normalize_vector(sub_vector(device.sun_pos, sky_pos));
   const CausticsSamplingDomain sampling_domain = caustics_get_domain(data, sun_dir, is_underwater);
 
@@ -173,6 +182,10 @@ __device__ RGBF
 
   if (sum_connection_weight == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
+
+  ////////////////////////////////////////////////////////////////////
+  // Evaluate sampled connection vertex
+  ////////////////////////////////////////////////////////////////////
 
   vec3 pos_to_ocean = sub_vector(connection_point, data.position);
 
@@ -204,6 +217,10 @@ __device__ RGBF
   const float shift   = is_refraction ? -eps : eps;
   const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
+  ////////////////////////////////////////////////////////////////////
+  // Compute visibility term
+  ////////////////////////////////////////////////////////////////////
+
   unsigned int hit_id = LIGHT_ID_SUN;
 
   float3 origin = make_float3(position.x, position.y, position.z);
@@ -218,7 +235,7 @@ __device__ RGBF
     return get_color(0.0f, 0.0f, 0.0f);
 
   optixTrace(
-    device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
   if (hit_id == HIT_TYPE_REJECT)
@@ -232,7 +249,7 @@ __device__ RGBF
     return get_color(0.0f, 0.0f, 0.0f);
 
   optixTrace(
-    device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    device.optix_bvh_shadow, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
   if (hit_id == HIT_TYPE_REJECT)
@@ -305,6 +322,10 @@ __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort
   RGBF light_color = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
   light_color      = mul_color(light_color, bsdf_value);
 
+  ////////////////////////////////////////////////////////////////////
+  // Compute visibility term
+  ////////////////////////////////////////////////////////////////////
+
   const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
@@ -317,7 +338,7 @@ __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
   optixTrace(
-    device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
   if (hit_id == HIT_TYPE_REJECT)
@@ -336,6 +357,31 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   if (!device.scene.material.lights_active)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  ////////////////////////////////////////////////////////////////////
+  // Sample a direction using BSDF importance sampling
+  ////////////////////////////////////////////////////////////////////
+
+  BSDFSampleInfo sample_info;
+  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, sample_info);
+
+  vec3 position;
+  float3 origin, ray;
+  float shift;
+
+  shift    = sample_info.is_transparent_pass ? -eps : eps;
+  position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+  origin = make_float3(position.x, position.y, position.z);
+  ray    = make_float3(bsdf_dir.x, bsdf_dir.y, bsdf_dir.z);
+
+  unsigned int bsdf_light_id = HIT_TYPE_LIGHT_BSDF_HINT;
+
+  optixTrace(device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0, bsdf_light_id);
+
+  ////////////////////////////////////////////////////////////////////
+  // Resample the BSDF direction with NEE based directions
+  ////////////////////////////////////////////////////////////////////
+
   vec3 dir;
   RGBF light_color;
   float dist;
@@ -345,16 +391,20 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   if (luminance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  const float shift   = is_refraction ? -eps : eps;
-  const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+  ////////////////////////////////////////////////////////////////////
+  // Compute visibility term
+  ////////////////////////////////////////////////////////////////////
+
+  shift    = is_refraction ? -eps : eps;
+  position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+
+  origin = make_float3(position.x, position.y, position.z);
+  ray    = make_float3(dir.x, dir.y, dir.z);
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
   if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color))
     return get_color(0.0f, 0.0f, 0.0f);
-
-  const float3 origin = make_float3(position.x, position.y, position.z);
-  const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
   unsigned int hit_id = light_id;
 
@@ -366,7 +416,7 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   // that, then we will never know if there is an occluder. Similarly, skipping anyhit for fully opaque needs to still terminate the ray so
   // I enforce anyhit.
   optixTrace(
-    device.optix_bvh_light, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
+    device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
     alpha_data0, alpha_data1, compressed_ior);
 
   if (hit_id == HIT_TYPE_REJECT)
@@ -388,13 +438,17 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
 __device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
-  const uint32_t material_id    = load_triangle_material_id(hit_id);
-  const uint32_t compressed_ior = ior_compress(__ldg(&(device.scene.materials[material_id].refraction_index)));
+  const uint32_t material_id = load_triangle_material_id(hit_id);
 
-  // This assumes that IOR is compressed into 8 bits.
-  if (device.scene.material.enable_ior_shadowing && compressed_ior != (ray_ior & 0xFF)) {
-    // Terminate ray.
-    return get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
+  // Don't check for IOR when querying a light from a BSDF sample
+  if (ray_ior != SKIP_IOR_CHECK) {
+    const uint32_t compressed_ior = ior_compress(__ldg(&(device.scene.materials[material_id].refraction_index)));
+
+    // This assumes that IOR is compressed into 8 bits.
+    if (device.scene.material.enable_ior_shadowing && compressed_ior != (ray_ior & 0xFF)) {
+      // Terminate ray.
+      return get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
+    }
   }
 
   const uint16_t tex = __ldg(&(device.scene.materials[material_id].albedo_map));
@@ -423,15 +477,28 @@ __device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
 }
 
 extern "C" __global__ void __anyhit__optix() {
-  // First check if the target light is a triangle light so we don't unnecessarily load light IDs when sampling the sun or the toy.
   unsigned int target_light = optixGetPayload_0();
+
+  // First check if the target light is a triangle light so we don't unnecessarily load light IDs when sampling the sun or the toy.
   if (target_light < LIGHT_ID_TRIANGLE_ID_LIMIT && target_light == load_triangle_light_id(optixGetPrimitiveIndex())) {
     optixIgnoreIntersection();
   }
 
-  unsigned int ray_ior = optixGetPayload_3();
+  const bool bsdf_sampling_query = (target_light == HIT_TYPE_LIGHT_BSDF_HINT);
+
+  unsigned int ray_ior = (bsdf_sampling_query) ? SKIP_IOR_CHECK : optixGetPayload_3();
 
   const RGBAF albedo = optix_alpha_test(ray_ior);
+
+  // For finding the hit light of BSDF rays we only care about ignoring fully transparent hits.
+  // I don't have OMMs for this BVH.
+  if (bsdf_sampling_query) {
+    if (albedo.a == 0.0f) {
+      optixIgnoreIntersection();
+    }
+
+    return;
+  }
 
   if (albedo.a == 1.0f) {
     optixSetPayload_0(HIT_TYPE_REJECT);
@@ -470,6 +537,12 @@ extern "C" __global__ void __anyhit__optix() {
 }
 
 extern "C" __global__ void __closesthit__optix() {
+  unsigned int target_light = optixGetPayload_0();
+  if (target_light == HIT_TYPE_LIGHT_BSDF_HINT) {
+    optixSetPayload_0(optixGetPrimitiveIndex());
+    return;
+  }
+
   // This is never executed for triangle lights so we don't need to check if the closest hit is the target light.
   optixSetPayload_0(HIT_TYPE_REJECT);
 }

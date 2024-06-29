@@ -29,6 +29,7 @@ enum HitType : uint32_t {
   HIT_TYPE_VOLUME_OCEAN      = 0xfffffff3u,
   HIT_TYPE_VOLUME_FOG        = 0xfffffff2u,
   HIT_TYPE_REJECT            = 0xfffffff0u,
+  HIT_TYPE_LIGHT_BSDF_HINT   = 0xffffffefu,
   HIT_TYPE_PARTICLE_MAX      = 0xefffffffu,
   HIT_TYPE_PARTICLE_MIN      = 0x80000000u,
   HIT_TYPE_PARTICLE_MASK     = 0x7fffffffu,

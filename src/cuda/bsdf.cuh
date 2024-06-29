@@ -251,86 +251,117 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 #endif
 }
 
-#ifndef VOLUME_KERNEL
 __device__ vec3 bsdf_sample_microfacet_reflection(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
-  // Transformation to +Z-Up
-  const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
-  const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
-
-  // G Buffer Data (+Z-Up)
-  GBufferData data_local = data;
-
-  data_local.V      = V_local;
-  data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
-
   info.is_transparent_pass = false;
   info.is_microfacet_based = true;
 
-  const vec3 sampled_microfacet = bsdf_microfacet_sample(data_local, pixel);
+  const vec3 sampled_microfacet = bsdf_microfacet_sample(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY);
 
-  const vec3 ray_local = reflect_vector(data_local.V, sampled_microfacet);
+  const vec3 ray = reflect_vector(data.V, sampled_microfacet);
 
-  const BSDFRayContext ctx = bsdf_sample_context(data_local, sampled_microfacet, ray_local, false);
+  const BSDFRayContext ctx = bsdf_sample_context(data, sampled_microfacet, ray, false);
 
-  info.weight = bsdf_evaluate_core(data_local, ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
+  info.weight = bsdf_evaluate_core(data, ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
 
-  return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+  return ray;
 }
 
 __device__ vec3 bsdf_sample_microfacet_refraction(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
-  // Transformation to +Z-Up
-  const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
-  const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
-
-  // G Buffer Data (+Z-Up)
-  GBufferData data_local = data;
-
-  data_local.V      = V_local;
-  data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
-
   info.is_transparent_pass = true;
   info.is_microfacet_based = true;
 
-  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(data_local, pixel);
+  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY);
 
   bool total_reflection;
-  const vec3 ray_local = refract_vector(data_local.V, sampled_microfacet, data.ior_in / data.ior_out, total_reflection);
+  const vec3 ray = refract_vector(data.V, sampled_microfacet, data.ior_in / data.ior_out, total_reflection);
 
-  const BSDFRayContext ctx = bsdf_sample_context(data_local, sampled_microfacet, ray_local, true);
+  const BSDFRayContext ctx = bsdf_sample_context(data, sampled_microfacet, ray, true);
 
-  info.weight = bsdf_evaluate_core(data_local, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, 1.0f);
+  info.weight = bsdf_evaluate_core(data, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, 1.0f);
 
-  return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+  return ray;
+}
+
+__device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
+  info.is_transparent_pass = false;
+  info.is_microfacet_based = false;
+
+  const vec3 ray = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY, pixel));
+
+  const vec3 H = normalize_vector(add_vector(data.V, ray));
+
+  const BSDFRayContext ctx = bsdf_sample_context(data, H, ray, false);
+  info.weight              = bsdf_evaluate_core(data, ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
+
+  return ray;
+}
+
+__device__ void bsdf_sample_for_light_probabilities(
+  const GBufferData data, float& reflection_prob, float& refraction_prob, float& diffuse_prob) {
+  const float microfacet_reflection_weight = 1.0f;
+  const float microfacet_refraction_weight = 1.0f - data.albedo.a;
+  const float diffuse_weight               = (1.0f - data.metallic) * data.albedo.a;
+
+  const float sum_weights = microfacet_reflection_weight + microfacet_refraction_weight + diffuse_weight;
+
+  reflection_prob = microfacet_reflection_weight / sum_weights;
+  refraction_prob = microfacet_refraction_weight / sum_weights;
+  diffuse_prob    = diffuse_weight / sum_weights;
 }
 
 __device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
   // TODO: It is important that pass through rays are not allowed! Otherwise we run into double counting issues.
 
-  const float microfacet_reflection_weight = 1.0f;
-  const float microfacet_refraction_weight = 1.0f - data.albedo.a;
+  const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
+  const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
 
-  const float sum_weights = microfacet_reflection_weight + microfacet_refraction_weight;
+  GBufferData data_local = data;
 
-  const float microfacet_reflection_probability = microfacet_reflection_weight / sum_weights;
-  const float microfacet_refraction_probability = microfacet_refraction_weight / sum_weights;
+  data_local.V      = V_local;
+  data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
+
+  float reflection_probability, refraction_probability, diffuse_probability;
+  bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
 
   // TODO: Fix all the random target uses.
-  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_DIELECTRIC, pixel) < microfacet_reflection_probability) {
-    const vec3 ray = bsdf_sample_microfacet_reflection(data, pixel, info);
+  const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_BSDF_METHOD, pixel);
 
-    info.weight = scale_color(info.weight, 1.0f / microfacet_reflection_probability);
-
-    return ray;
+  vec3 ray_local;
+  if (random < reflection_probability) {
+    ray_local   = bsdf_sample_microfacet_reflection(data_local, pixel, info);
+    info.weight = scale_color(info.weight, 1.0f / reflection_probability);
+  }
+  else if (random < reflection_probability + refraction_probability) {
+    ray_local   = bsdf_sample_microfacet_refraction(data_local, pixel, info);
+    info.weight = scale_color(info.weight, 1.0f / refraction_probability);
   }
   else {
-    const vec3 ray = bsdf_sample_microfacet_refraction(data, pixel, info);
+    ray_local   = bsdf_sample_diffuse(data_local, pixel, info);
+    info.weight = scale_color(info.weight, 1.0f / diffuse_probability);
+  }
 
-    info.weight = scale_color(info.weight, 1.0f / microfacet_reflection_probability);
+  return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+}
 
-    return ray;
+__device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L) {
+  float reflection_probability, refraction_probability, diffuse_probability;
+  bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
+
+  const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
+
+  if (context.is_refraction) {
+    const float microfacet_refraction_pdf = bsdf_microfacet_refraction_pdf(
+      data, context.NdotH, context.NdotV, context.NdotL, context.HdotV, context.HdotL, context.refraction_index);
+
+    return refraction_probability * microfacet_refraction_pdf;
+  }
+  else {
+    const float microfacet_reflection_pdf = bsdf_microfacet_pdf(data, context.NdotH, context.NdotV);
+    const float diffuse_pdf               = bsdf_diffuse_pdf(data, context.NdotL);
+
+    return reflection_probability * microfacet_reflection_pdf + diffuse_probability * diffuse_pdf;
   }
 }
-#endif /* !VOLUME_KERNEL */
 
 #endif /* SHADING_KERNEL */
 
