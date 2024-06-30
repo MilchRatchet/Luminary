@@ -361,14 +361,15 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   // Sample a direction using BSDF importance sampling
   ////////////////////////////////////////////////////////////////////
 
-  BSDFSampleInfo sample_info;
-  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, sample_info);
-
   vec3 position;
   float3 origin, ray;
   float shift;
 
-  shift    = sample_info.is_transparent_pass ? -eps : eps;
+#ifndef VOLUME_KERNEL
+  bool bsdf_sample_is_refraction;
+  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, bsdf_sample_is_refraction);
+
+  shift    = bsdf_sample_is_refraction ? -eps : eps;
   position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
   origin = make_float3(position.x, position.y, position.z);
@@ -377,6 +378,12 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   unsigned int bsdf_light_id = HIT_TYPE_LIGHT_BSDF_HINT;
 
   optixTrace(device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0, bsdf_light_id);
+#else
+  // TODO: Implement BSDF sampling for volumes.
+  const vec3 bsdf_dir                  = get_vector(0.0f, 0.0f, 0.0f);
+  const unsigned int bsdf_light_id     = HIT_TYPE_LIGHT_BSDF_HINT;
+  const bool bsdf_sample_is_refraction = false;
+#endif
 
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions
@@ -386,7 +393,8 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   RGBF light_color;
   float dist;
   bool is_refraction;
-  const uint32_t light_id = ris_sample_light(data, index, light_ray_index, dir, light_color, dist, is_refraction);
+  const uint32_t light_id = ris_sample_light(
+    data, index, light_ray_index, bsdf_light_id, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
 
   if (luminance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
     return get_color(0.0f, 0.0f, 0.0f);

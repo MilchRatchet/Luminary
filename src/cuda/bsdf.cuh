@@ -251,49 +251,21 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 #endif
 }
 
-__device__ vec3 bsdf_sample_microfacet_reflection(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
-  info.is_transparent_pass = false;
-  info.is_microfacet_based = true;
-
+__device__ vec3 bsdf_sample_microfacet_reflection(const GBufferData data, const ushort2 pixel) {
   const vec3 sampled_microfacet = bsdf_microfacet_sample(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY);
 
-  const vec3 ray = reflect_vector(data.V, sampled_microfacet);
-
-  const BSDFRayContext ctx = bsdf_sample_context(data, sampled_microfacet, ray, false);
-
-  info.weight = bsdf_evaluate_core(data, ctx, BSDF_SAMPLING_MICROFACET, 1.0f);
-
-  return ray;
+  return reflect_vector(data.V, sampled_microfacet);
 }
 
-__device__ vec3 bsdf_sample_microfacet_refraction(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
-  info.is_transparent_pass = true;
-  info.is_microfacet_based = true;
-
+__device__ vec3 bsdf_sample_microfacet_refraction(const GBufferData data, const ushort2 pixel) {
   const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY);
 
   bool total_reflection;
-  const vec3 ray = refract_vector(data.V, sampled_microfacet, data.ior_in / data.ior_out, total_reflection);
-
-  const BSDFRayContext ctx = bsdf_sample_context(data, sampled_microfacet, ray, true);
-
-  info.weight = bsdf_evaluate_core(data, ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, 1.0f);
-
-  return ray;
+  return refract_vector(data.V, sampled_microfacet, data.ior_in / data.ior_out, total_reflection);
 }
 
-__device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
-  info.is_transparent_pass = false;
-  info.is_microfacet_based = false;
-
-  const vec3 ray = bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY, pixel));
-
-  const vec3 H = normalize_vector(add_vector(data.V, ray));
-
-  const BSDFRayContext ctx = bsdf_sample_context(data, H, ray, false);
-  info.weight              = bsdf_evaluate_core(data, ctx, BSDF_SAMPLING_DIFFUSE, 1.0f);
-
-  return ray;
+__device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel) {
+  return bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY, pixel));
 }
 
 __device__ void bsdf_sample_for_light_probabilities(
@@ -309,7 +281,7 @@ __device__ void bsdf_sample_for_light_probabilities(
   diffuse_prob    = diffuse_weight / sum_weights;
 }
 
-__device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
+__device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixel, bool& is_refraction) {
   // TODO: It is important that pass through rays are not allowed! Otherwise we run into double counting issues.
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
@@ -328,16 +300,16 @@ __device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixe
 
   vec3 ray_local;
   if (random < reflection_probability) {
-    ray_local   = bsdf_sample_microfacet_reflection(data_local, pixel, info);
-    info.weight = scale_color(info.weight, 1.0f / reflection_probability);
+    ray_local     = bsdf_sample_microfacet_reflection(data_local, pixel);
+    is_refraction = false;
   }
   else if (random < reflection_probability + refraction_probability) {
-    ray_local   = bsdf_sample_microfacet_refraction(data_local, pixel, info);
-    info.weight = scale_color(info.weight, 1.0f / refraction_probability);
+    ray_local     = bsdf_sample_microfacet_refraction(data_local, pixel);
+    is_refraction = true;
   }
   else {
-    ray_local   = bsdf_sample_diffuse(data_local, pixel, info);
-    info.weight = scale_color(info.weight, 1.0f / diffuse_probability);
+    ray_local     = bsdf_sample_diffuse(data_local, pixel);
+    is_refraction = false;
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
