@@ -4,18 +4,8 @@
 #include "utils.cuh"
 
 /*
- * Define WEIGHT_BASED_EXIT for the following to apply
- *
- * Rays with an accumulated weight below CUTOFF are cancelled
- * Higher values provide better performance at the cost of extreme bright lights not being shaded properly
- *
- * Rays with an accumulated weight below PROBABILISTIC_CUTOFF have a chance equal to
- * the inverse linear interpolation of the weight and CUTOFF and PROBABILISTIC_CUTOFF
- * Higher values provide much better performance at the cost of noisy/too dark areas
- * Setting PROBABILISTIC_CUTOFF >= CUTOFF will deactivate this option
- *
- * Tests show a significant performance increase with very minimal visual impact. The visuals
- * are perceptively unaffected.
+ * This is just russian roulette. Before I knew of this, I made this file and experimented with different
+ * ways of culling less important rays. I can clean this up eventually.
  */
 #define WEIGHT_BASED_EXIT
 #define RUSSIAN_ROULETTE_CLAMP (1.0f / 8.0f)
@@ -28,8 +18,8 @@ __device__ int validate_trace_task(const TraceTask task, RGBF& record) {
 
   // Inf and NaN are handled in the temporal accumulation.
   if (value < device.scene.camera.russian_roulette_threshold) {
-    // Clamp probability to avoid fireflies.
-    const float p = fmaxf(value / device.scene.camera.russian_roulette_threshold, RUSSIAN_ROULETTE_CLAMP);
+    // Clamp probability to avoid fireflies. Always remove paths that carry no light at all.
+    const float p = (value > 0.0f) ? fmaxf(value / device.scene.camera.russian_roulette_threshold, RUSSIAN_ROULETTE_CLAMP) : 0.0f;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE, task.index) > p) {
       valid = 0;
     }
