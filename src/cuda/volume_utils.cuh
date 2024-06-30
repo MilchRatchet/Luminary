@@ -185,7 +185,7 @@ __device__ float volume_sample_intersection(
 }
 
 __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType volume_hit_type, const vec3 ray) {
-  const float cos_angle = dot_product(scale_vector(data.V, -1.0f), ray);
+  const float cos_angle = -dot_product(data.V, ray);
 
   float phase;
   if (volume_hit_type == VOLUME_TYPE_OCEAN) {

@@ -125,8 +125,6 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
                              ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
                              : ocean_phase_sampling(ray, random_dir, random_choice);
 
-  const float cos_angle = -dot_product(scatter_ray, data.V);
-
   info.weight = get_color(1.0f, 1.0f, 1.0f);
 
   return scatter_ray;
@@ -282,6 +280,18 @@ __device__ void bsdf_sample_for_light_probabilities(
 }
 
 __device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixel, bool& is_refraction) {
+#ifdef VOLUME_KERNEL
+  const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_BSDF_METHOD, pixel);
+  const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY, pixel);
+
+  const vec3 ray = scale_vector(data.V, -1.0f);
+
+  const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
+                             ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
+                             : ocean_phase_sampling(ray, random_dir, random_choice);
+
+  return scatter_ray;
+#else   // VOLUME_KERNEL
   // TODO: It is important that pass through rays are not allowed! Otherwise we run into double counting issues.
 
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
@@ -313,9 +323,27 @@ __device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixe
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+#endif  // VOLUME_KERNEL
 }
 
 __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L) {
+#ifdef VOLUME_KERNEL
+  const float cos_angle = -dot_product(data.V, L);
+
+  const VolumeType volume_hit_type = VOLUME_HIT_TYPE(data.hit_id);
+
+  float pdf;
+  if (volume_hit_type == VOLUME_TYPE_OCEAN) {
+    pdf = ocean_phase(cos_angle);
+  }
+  else {
+    const float diameter = (volume_hit_type == VOLUME_TYPE_FOG) ? device.scene.fog.droplet_diameter : device.scene.particles.phase_diameter;
+    const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
+    pdf                             = jendersie_eon_phase_function(cos_angle, params);
+  }
+
+  return pdf;
+#else   // VOLUME_KERNEL
   float reflection_probability, refraction_probability, diffuse_probability;
   bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
 
@@ -333,6 +361,7 @@ __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L)
 
     return reflection_probability * microfacet_reflection_pdf + diffuse_probability * diffuse_pdf;
   }
+#endif  // VOLUME_KERNEL
 }
 
 #endif /* SHADING_KERNEL */
