@@ -100,6 +100,10 @@ __device__ bool optix_toy_shadowing(
   return true;
 }
 
+////////////////////////////////////////////////////////////////////
+// Lighting from Sun
+////////////////////////////////////////////////////////////////////
+
 __device__ RGBF optix_compute_light_ray_sun_direct(const GBufferData data, const ushort2 index, const vec3 sky_pos) {
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_SUN_RAY, index);
 
@@ -301,6 +305,10 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   return sun_light;
 }
 
+////////////////////////////////////////////////////////////////////
+// Lighting from Toy
+////////////////////////////////////////////////////////////////////
+
 __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort2 index) {
   const bool toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
 
@@ -353,7 +361,11 @@ __device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort
   return mul_color(light_color, visibility);
 }
 
-__device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
+////////////////////////////////////////////////////////////////////
+// Lighting from Geometry
+////////////////////////////////////////////////////////////////////
+
+__device__ RGBF optix_compute_light_ray_geometry_single(const GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
   if (!device.scene.material.lights_active)
     return get_color(0.0f, 0.0f, 0.0f);
 
@@ -430,6 +442,21 @@ __device__ RGBF optix_compute_light_ray_geometry(const GBufferData data, const u
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
+}
+
+// Shortened from geometry to geo so the function name length would be the same as the other ones.
+__device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort2 index) {
+  RGBF geometry_light = get_color(0.0f, 0.0f, 0.0f);
+
+  if (device.ris_settings.num_light_rays) {
+    for (int j = 0; j < device.ris_settings.num_light_rays; j++) {
+      geometry_light = add_color(geometry_light, optix_compute_light_ray_geometry_single(data, index, j));
+    }
+
+    geometry_light = scale_color(geometry_light, 1.0f / device.ris_settings.num_light_rays);
+  }
+
+  return geometry_light;
 }
 
 /*

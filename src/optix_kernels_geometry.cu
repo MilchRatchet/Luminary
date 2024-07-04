@@ -65,14 +65,7 @@ extern "C" __global__ void __raygen__optix() {
       // Light Ray Sampling
       RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
-      if (device.ris_settings.num_light_rays) {
-        for (int j = 0; j < device.ris_settings.num_light_rays; j++) {
-          accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geometry(data, task.index, j));
-        }
-
-        accumulated_light = scale_color(accumulated_light, 1.0f / device.ris_settings.num_light_rays);
-      }
-
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
 
