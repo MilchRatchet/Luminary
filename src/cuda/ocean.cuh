@@ -30,12 +30,6 @@ LUMINARY_KERNEL void process_ocean_tasks() {
     ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
     const int pixel  = task.index.y * device.width + task.index.x;
 
-    const bool is_delta_path = state_peek(pixel, STATE_FLAG_DELTA_PATH);
-
-    if (is_delta_path) {
-      state_consume(pixel, STATE_FLAG_BOUNCE_LIGHTING);
-    }
-
     vec3 normal = ocean_get_normal(task.position);
 
     const bool inside_water = dot_product(task.ray, normal) > 0.0f;
