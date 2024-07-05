@@ -65,9 +65,9 @@ extern "C" __global__ void __raygen__optix() {
       // Light Ray Sampling
       RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
 
       accumulated_light = mul_color(accumulated_light, record);
 
