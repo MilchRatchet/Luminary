@@ -373,8 +373,8 @@ __device__ RGBF optix_compute_light_ray_geometry_single(const GBufferData data, 
   // Sample a direction using BSDF importance sampling
   ////////////////////////////////////////////////////////////////////
 
-  bool bsdf_sample_is_refraction;
-  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, bsdf_sample_is_refraction);
+  bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
+  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, bsdf_sample_is_refraction, bsdf_sample_is_valid);
 
   vec3 position;
   float3 origin, ray;
@@ -389,6 +389,10 @@ __device__ RGBF optix_compute_light_ray_geometry_single(const GBufferData data, 
   unsigned int bsdf_light_id = HIT_TYPE_LIGHT_BSDF_HINT;
 
   optixTrace(device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0, bsdf_light_id);
+
+  if (!bsdf_sample_is_valid) {
+    bsdf_light_id = HIT_TYPE_LIGHT_BSDF_HINT;
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions

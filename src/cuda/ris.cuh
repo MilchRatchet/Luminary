@@ -27,8 +27,7 @@ __device__ uint32_t ris_sample_light(
   const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist, bool& selected_is_refraction) {
   uint32_t selected_id = LIGHT_ID_NONE;
 
-  float sum_weight          = 0.0f;
-  float selected_target_pdf = FLT_MAX;
+  float sum_weight = 0.0f;
 
   selected_light_color = get_color(0.0f, 0.0f, 0.0f);
 
@@ -57,7 +56,7 @@ __device__ uint32_t ris_sample_light(
     light_sample_triangle_presampled(triangle_light, data, initial_ray, solid_angle, dist, light_color);
 
     bool is_refraction;
-    const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
+    const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction);
     light_color            = mul_color(light_color, bsdf_weight);
 
     float target_pdf = luminance(light_color);
@@ -66,20 +65,19 @@ __device__ uint32_t ris_sample_light(
       target_pdf = 0.0f;
     }
 
-    // TODO: Consider using one of the pair wise MIS if computing MIS turns out to be too expensive.
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, initial_ray);
     const float one_over_nee_sample_pdf = solid_angle * one_over_reservoir_pdf_and_size;
 
     // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
-    const float mis_weight = one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f);
+    const float mis_weight =
+      (reservoir_size > 0) ? one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f) : 1.0f / bsdf_sample_pdf;
 
     const float weight = target_pdf * mis_weight;
 
     sum_weight += weight;
 
-    selected_target_pdf    = target_pdf;
     selected_id            = initial_sample_id;
-    selected_light_color   = light_color;
+    selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
     selected_ray           = initial_ray;
     selected_dist          = dist;
     selected_is_refraction = initial_is_refraction;
@@ -119,7 +117,7 @@ __device__ uint32_t ris_sample_light(
     const vec3 ray = light_sample_triangle(triangle_light, data, ray_random, solid_angle, dist, light_color);
 
     bool is_refraction;
-    const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction, 1.0f);
+    const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
     light_color            = mul_color(light_color, bsdf_weight);
     float target_pdf       = luminance(light_color);
 
@@ -136,9 +134,8 @@ __device__ uint32_t ris_sample_light(
 
     sum_weight += weight;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING + light_ray_index * reservoir_size + i, pixel) * sum_weight < weight) {
-      selected_target_pdf    = target_pdf;
       selected_id            = id;
-      selected_light_color   = light_color;
+      selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
       selected_ray           = ray;
       selected_dist          = dist;
       selected_is_refraction = is_refraction;
@@ -149,7 +146,8 @@ __device__ uint32_t ris_sample_light(
   // Compute the shading weight of the selected light (Probability of selecting the light through WRS)
   ////////////////////////////////////////////////////////////////////
 
-  selected_light_color = scale_color(selected_light_color, sum_weight / selected_target_pdf);
+  // Selected light color already includes 1 / target_pdf.
+  selected_light_color = scale_color(selected_light_color, sum_weight);
 
   return selected_id;
 }

@@ -279,7 +279,7 @@ __device__ void bsdf_sample_for_light_probabilities(
   diffuse_prob    = diffuse_weight / sum_weights;
 }
 
-__device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixel, bool& is_refraction) {
+__device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixel, bool& is_refraction, bool& is_valid) {
 #ifdef VOLUME_KERNEL
   const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_BSDF_METHOD, pixel);
   const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY, pixel);
@@ -289,6 +289,9 @@ __device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixe
   const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
                              ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
                              : ocean_phase_sampling(ray, random_dir, random_choice);
+
+  is_refraction = true;
+  is_valid      = true;
 
   return scatter_ray;
 #else   // VOLUME_KERNEL
@@ -305,7 +308,6 @@ __device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixe
   float reflection_probability, refraction_probability, diffuse_probability;
   bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
 
-  // TODO: Fix all the random target uses.
   const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_BSDF_METHOD, pixel);
 
   vec3 ray_local;
@@ -321,6 +323,8 @@ __device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixe
     ray_local     = bsdf_sample_diffuse(data_local, pixel);
     is_refraction = false;
   }
+
+  is_valid = (is_refraction) ? ray_local.z < 0.0f : ray_local.z > 0.0f;
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
 #endif  // VOLUME_KERNEL
