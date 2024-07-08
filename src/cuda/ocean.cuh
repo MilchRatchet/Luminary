@@ -57,9 +57,11 @@ LUMINARY_KERNEL void process_ocean_tasks() {
 
     vec3 bounce_ray;
     vec3 bias_direction;
+    bool is_reflection = false;
     if (total_reflection) {
       bias_direction = V;
       bounce_ray     = reflect_vector(V, normal);
+      is_reflection  = true;
     }
     else {
       const float reflection_coefficient = ocean_reflection_coefficient(normal, task.ray, refraction_dir, ior_in, ior_out);
@@ -67,6 +69,7 @@ LUMINARY_KERNEL void process_ocean_tasks() {
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY, task.index) < reflection_coefficient) {
         bias_direction = V;
         bounce_ray     = reflect_vector(V, normal);
+        is_reflection  = true;
       }
       else {
         bounce_ray     = refraction_dir;
@@ -76,6 +79,10 @@ LUMINARY_KERNEL void process_ocean_tasks() {
         ior_stack_interact(ior_out, pixel, ior_stack_method);
       }
     }
+
+    // TODO: Remove once I have found a proper solution to avoid the fireflies.
+    if (is_reflection)
+      state_release(pixel, STATE_FLAG_DELTA_PATH);
 
     TraceTask new_task;
     new_task.origin = add_vector(task.position, scale_vector(bias_direction, 2.0f * eps * (1.0f + get_length(task.position))));
