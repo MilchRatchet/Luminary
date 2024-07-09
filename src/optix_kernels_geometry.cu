@@ -50,18 +50,21 @@ extern "C" __global__ void __raygen__optix() {
     vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
     // Update delta path state
-    bool is_delta_distribution = false;
+    bool is_delta_distribution;
+    bool use_light_ray;
     if (bounce_info.is_transparent_pass) {
       const float refraction_scale = (data.ior_in > data.ior_out) ? data.ior_in / data.ior_out : data.ior_out / data.ior_in;
-      is_delta_distribution |= data.roughness * (refraction_scale - 1.0f) < GEOMETRY_DELTA_PATH_CUTOFF;
+      is_delta_distribution        = data.roughness * (refraction_scale - 1.0f) < GEOMETRY_DELTA_PATH_CUTOFF;
+      use_light_ray                = !is_delta_distribution;
     }
     else {
-      is_delta_distribution |= bounce_info.is_microfacet_based && (data.roughness < GEOMETRY_DELTA_PATH_CUTOFF);
+      is_delta_distribution = bounce_info.is_microfacet_based && (data.roughness < GEOMETRY_DELTA_PATH_CUTOFF);
+      use_light_ray         = ((data.metallic < 1.0f && data.albedo.a > 0.0f) || data.roughness >= GEOMETRY_DELTA_PATH_CUTOFF);
     }
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    if (!is_delta_distribution) {
+    if (use_light_ray) {
       // Light Ray Sampling
       RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
