@@ -19,8 +19,6 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "toy_utils.cuh"
 #include "utils.cuh"
 
-#define GEOMETRY_DELTA_PATH_CUTOFF (0.03f)
-
 extern "C" __global__ void __raygen__optix() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
@@ -45,44 +43,55 @@ extern "C" __global__ void __raygen__optix() {
 
     const bool is_delta_path = state_peek(pixel, STATE_FLAG_DELTA_PATH);
 
+    ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
+    ////////////////////////////////////////////////////////////////////
+
     BSDFSampleInfo bounce_info;
     vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
+    ////////////////////////////////////////////////////////////////////
     // Update delta path state
+    ////////////////////////////////////////////////////////////////////
+
     bool is_delta_distribution;
     bool use_light_ray;
     if (bounce_info.is_transparent_pass) {
       const float refraction_scale = (data.ior_in > data.ior_out) ? data.ior_in / data.ior_out : data.ior_out / data.ior_in;
-      is_delta_distribution        = data.roughness * (refraction_scale - 1.0f) < GEOMETRY_DELTA_PATH_CUTOFF;
+      is_delta_distribution        = data.roughness * fminf(refraction_scale - 1.0f, 1.0f) < GEOMETRY_DELTA_PATH_CUTOFF;
       use_light_ray                = !is_delta_distribution;
     }
     else {
-      is_delta_distribution = bounce_info.is_microfacet_based && (data.roughness < GEOMETRY_DELTA_PATH_CUTOFF);
-      use_light_ray         = ((data.metallic < 1.0f && data.albedo.a > 0.0f) || data.roughness >= GEOMETRY_DELTA_PATH_CUTOFF);
+      const bool has_diffuse_component = data.metallic < 1.0f && data.albedo.a > 0.0f;
+      is_delta_distribution            = bounce_info.is_microfacet_based && (data.roughness < GEOMETRY_DELTA_PATH_CUTOFF);
+      use_light_ray                    = has_diffuse_component || data.roughness >= GEOMETRY_DELTA_PATH_CUTOFF;
     }
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    if (use_light_ray) {
-      // Light Ray Sampling
-      RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
+    ////////////////////////////////////////////////////////////////////
+    // Light Ray Sampling
+    ////////////////////////////////////////////////////////////////////
 
+    RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
+
+    if (use_light_ray) {
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
-
-      accumulated_light = mul_color(accumulated_light, record);
-
-      write_beauty_buffer(accumulated_light, pixel);
     }
+
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
+
+    accumulated_light = mul_color(accumulated_light, record);
+
+    write_beauty_buffer(accumulated_light, pixel);
 
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(data.ior_out, pixel, ior_stack_method);
     }
 
-    if (is_delta_path) {
+    if (IS_PRIMARY_RAY) {
       const RGBF emission = mul_color(data.emission, record);
 
       write_beauty_buffer(emission, pixel);
