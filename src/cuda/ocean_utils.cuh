@@ -427,18 +427,17 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const int
   const float ray_ior = ior_stack_interact(device.scene.toy.refractive_index, pixel, ior_stack_method);
 
   GBufferData data;
-  data.hit_id             = HIT_TYPE_OCEAN;
-  data.albedo             = get_RGBAF(1.0f, 1.0f, 1.0f, 0.0f);
-  data.emission           = get_color(0.0f, 0.0f, 0.0f);
-  data.normal             = normal;
-  data.position           = task.position;
-  data.V                  = scale_vector(task.ray, -1.0f);
-  data.roughness          = 0.025f;  // TODO: Find a good value that looks smooth but does not cause fireflies.
-  data.metallic           = 1.0f;
-  data.flags              = flags;
-  data.ior_in             = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.ocean.refractive_index : ray_ior;
-  data.ior_out            = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.scene.ocean.refractive_index;
-  data.colored_dielectric = 1;
+  data.hit_id    = HIT_TYPE_OCEAN;
+  data.albedo    = get_RGBAF(0.0f, 0.0f, 0.0f, 0.0f);  // Albedo doesn't matter because it is not a colored dielectric
+  data.emission  = get_color(0.0f, 0.0f, 0.0f);
+  data.normal    = normal;
+  data.position  = task.position;
+  data.V         = scale_vector(task.ray, -1.0f);
+  data.roughness = 0.025f;  // TODO: Find a good value that looks smooth but does not cause fireflies.
+  data.metallic  = 1.0f;
+  data.flags     = flags;
+  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.ocean.refractive_index : ray_ior;
+  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.scene.ocean.refractive_index;
 
   return data;
 }

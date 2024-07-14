@@ -134,7 +134,7 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const int p
     normal = scale_vector(normal, -1.0f);
   }
 
-  uint32_t flags = 0;
+  uint32_t flags = G_BUFFER_COLORED_DIELECTRIC;
 
   RGBF emission;
   if (device.scene.toy.emissive) {
@@ -153,18 +153,17 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const int p
   const float ray_ior = ior_stack_interact(device.scene.toy.refractive_index, pixel, ior_stack_method);
 
   GBufferData data;
-  data.hit_id             = HIT_TYPE_TOY;
-  data.albedo             = device.scene.toy.albedo;
-  data.emission           = emission;
-  data.normal             = normal;
-  data.position           = task.position;
-  data.V                  = scale_vector(task.ray, -1.0f);
-  data.roughness          = (1.0f - device.scene.toy.material.r);
-  data.metallic           = device.scene.toy.material.g;
-  data.flags              = flags;
-  data.ior_in             = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.toy.refractive_index : ray_ior;
-  data.ior_out            = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.scene.toy.refractive_index;
-  data.colored_dielectric = 1;
+  data.hit_id    = HIT_TYPE_TOY;
+  data.albedo    = device.scene.toy.albedo;
+  data.emission  = emission;
+  data.normal    = normal;
+  data.position  = task.position;
+  data.V         = scale_vector(task.ray, -1.0f);
+  data.roughness = (1.0f - device.scene.toy.material.r);
+  data.metallic  = device.scene.toy.material.g;
+  data.flags     = flags;
+  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.toy.refractive_index : ray_ior;
+  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.scene.toy.refractive_index;
 
   return data;
 }

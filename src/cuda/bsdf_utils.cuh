@@ -493,7 +493,7 @@ __device__ RGBF bsdf_dielectric(
     term = (sampling_hint == BSDF_SAMPLING_MICROFACET_REFRACTION) ? 1.0f : 0.0f;
   }
 
-  return (data.colored_dielectric) ? scale_color(opaque_color(data.albedo), term) : get_color(term, term, term);
+  return (data.flags & G_BUFFER_COLORED_DIELECTRIC) ? scale_color(opaque_color(data.albedo), term) : get_color(term, term, term);
 }
 
 ///////////////////////////////////////////////////

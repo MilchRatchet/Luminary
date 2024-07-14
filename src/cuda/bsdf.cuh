@@ -207,7 +207,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   else if (ior_compress(data_local.ior_in) == ior_compress(data_local.ior_out)) {
     // Fast path for transparent surfaces without refraction/reflection
     ray_local                = scale_vector(data_local.V, -1.0f);
-    info.weight              = (data_local.colored_dielectric) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
+    info.weight              = (data_local.flags & G_BUFFER_COLORED_DIELECTRIC) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
     info.is_transparent_pass = true;
     info.is_microfacet_based = true;
   }

@@ -292,8 +292,11 @@ struct LightSample {
   float target_pdf_normalization;
 } typedef LightSample;
 
-// TODO: Add colored dielectric as a flag
-enum GBufferFlags { G_BUFFER_VOLUME_HIT = 0b1, G_BUFFER_REFRACTION_IS_INSIDE = 0b10 } typedef GBufferFlags;
+enum GBufferFlags {
+  G_BUFFER_VOLUME_HIT           = 0b1,
+  G_BUFFER_REFRACTION_IS_INSIDE = 0b10,
+  G_BUFFER_COLORED_DIELECTRIC   = 0b100
+} typedef GBufferFlags;
 
 struct GBufferData {
   uint32_t hit_id;
@@ -309,7 +312,6 @@ struct GBufferData {
   float ior_in;
   /* IOR of medium on the other side. */
   float ior_out;
-  uint32_t colored_dielectric;
 } typedef GBufferData;
 
 ////////////////////////////////////////////////////////////////////
