@@ -58,16 +58,12 @@ extern "C" __global__ void __raygen__optix() {
     ////////////////////////////////////////////////////////////////////
 
     bool is_delta_distribution;
-    bool use_light_ray;
     if (bounce_info.is_transparent_pass) {
       const float refraction_scale = (data.ior_in > data.ior_out) ? data.ior_in / data.ior_out : data.ior_out / data.ior_in;
-      is_delta_distribution        = data.roughness * fminf(refraction_scale - 1.0f, 1.0f) < GEOMETRY_DELTA_PATH_CUTOFF;
-      use_light_ray                = !is_delta_distribution;
+      is_delta_distribution        = data.roughness * fminf(refraction_scale - 1.0f, 1.0f) <= GEOMETRY_DELTA_PATH_CUTOFF;
     }
     else {
-      const bool has_diffuse_component = data.metallic < 1.0f && data.albedo.a > 0.0f;
-      is_delta_distribution            = bounce_info.is_microfacet_based && (data.roughness < GEOMETRY_DELTA_PATH_CUTOFF);
-      use_light_ray                    = has_diffuse_component || data.roughness >= GEOMETRY_DELTA_PATH_CUTOFF;
+      is_delta_distribution = bounce_info.is_microfacet_based && (data.roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
     }
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
@@ -78,11 +74,8 @@ extern "C" __global__ void __raygen__optix() {
 
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
-    if (use_light_ray) {
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
-    }
-
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
 
     accumulated_light = mul_color(accumulated_light, record);

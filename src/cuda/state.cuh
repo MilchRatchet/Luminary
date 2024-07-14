@@ -12,6 +12,7 @@ enum StateFlag { STATE_FLAG_ALBEDO = 0b00000001u, STATE_FLAG_DELTA_PATH = 0b0000
 //                    The flag gets reset at the start of every frame.
 //
 // STATE_FLAG_DELTA_PATH: This flag is set for paths whose vertices generated bounce rays only from delta (or near-delta) distributions.
+//                        This flag is used for firefly clamping as it only applies to light gathered on path suffixes of non-delta paths.
 //
 
 __device__ bool state_consume(const int pixel, const StateFlag flag) {
