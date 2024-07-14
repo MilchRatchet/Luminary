@@ -21,6 +21,7 @@
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
+#if 0
 LUMINARY_KERNEL void process_ocean_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
@@ -95,6 +96,7 @@ LUMINARY_KERNEL void process_ocean_tasks() {
   device.ptrs.trace_counts[THREAD_ID] = trace_count;
 }
 
+
 LUMINARY_KERNEL void process_debug_ocean_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_OCEAN];
@@ -122,5 +124,6 @@ LUMINARY_KERNEL void process_debug_ocean_tasks() {
     }
   }
 }
+#endif
 
 #endif /* CU_OCEAN_H */

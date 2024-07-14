@@ -34,7 +34,7 @@ __device__ GBufferData particle_generate_g_buffer(const ShadingTask task, const 
   data.V         = scale_vector(task.ray, -1.0f);
   data.roughness = device.scene.particles.phase_diameter;
   data.metallic  = 0.0f;
-  data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
+  data.flags     = G_BUFFER_VOLUME_HIT;
   data.ior_in    = ray_ior;
   data.ior_out   = ray_ior;
 

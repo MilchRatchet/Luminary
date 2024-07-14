@@ -407,4 +407,40 @@ __device__ float ocean_reflection_coefficient(
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
+__device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const int pixel) {
+  vec3 normal = ocean_get_normal(task.position);
+
+  const bool inside_water = dot_product(task.ray, normal) > 0.0f;
+
+  if (inside_water) {
+    normal = scale_vector(normal, -1.0f);
+  }
+
+  uint32_t flags = 0;
+
+  if (inside_water) {
+    flags |= G_BUFFER_REFRACTION_IS_INSIDE;
+  }
+
+  const IORStackMethod ior_stack_method =
+    (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+  const float ray_ior = ior_stack_interact(device.scene.toy.refractive_index, pixel, ior_stack_method);
+
+  GBufferData data;
+  data.hit_id             = HIT_TYPE_OCEAN;
+  data.albedo             = get_RGBAF(1.0f, 1.0f, 1.0f, 0.0f);
+  data.emission           = get_color(0.0f, 0.0f, 0.0f);
+  data.normal             = normal;
+  data.position           = task.position;
+  data.V                  = scale_vector(task.ray, -1.0f);
+  data.roughness          = 0.025f;  // TODO: Find a good value that looks smooth but does not cause fireflies.
+  data.metallic           = 1.0f;
+  data.flags              = flags;
+  data.ior_in             = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.ocean.refractive_index : ray_ior;
+  data.ior_out            = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.scene.ocean.refractive_index;
+  data.colored_dielectric = 1;
+
+  return data;
+}
+
 #endif /* CU_OCEAN_UTILS_H */

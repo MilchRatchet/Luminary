@@ -32,6 +32,9 @@ extern "C" __global__ void __raygen__optix() {
     if (task.hit_id == HIT_TYPE_TOY) {
       data = toy_generate_g_buffer(task, pixel);
     }
+    else if (task.hit_id == HIT_TYPE_OCEAN) {
+      data = ocean_generate_g_buffer(task, pixel);
+    }
     else {
       data = geometry_generate_g_buffer(task, pixel);
     }

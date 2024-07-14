@@ -134,7 +134,7 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
     roughness = 1.0f - roughness;
   }
 
-  uint32_t flags = G_BUFFER_REQUIRES_SAMPLING;
+  uint32_t flags = 0;
 
   if (is_inside) {
     flags |= G_BUFFER_REFRACTION_IS_INSIDE;

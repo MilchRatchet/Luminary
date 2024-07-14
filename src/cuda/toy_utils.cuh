@@ -134,7 +134,7 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const int p
     normal = scale_vector(normal, -1.0f);
   }
 
-  uint32_t flags = G_BUFFER_REQUIRES_SAMPLING;
+  uint32_t flags = 0;
 
   RGBF emission;
   if (device.scene.toy.emissive) {
