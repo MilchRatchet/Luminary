@@ -372,30 +372,90 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
 // Lighting from Toy
 ////////////////////////////////////////////////////////////////////
 
-__device__ RGBF optix_compute_light_ray_toy(const GBufferData data, const ushort2 index) {
+__device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 index) {
   const bool toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
 
   if (!toy_visible)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  // We have to clamp due to numerical precision issues in the microfacet models.
+  data.roughness = fmaxf(data.roughness, 0.025f);
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample a direction using BSDF importance sampling
+  ////////////////////////////////////////////////////////////////////
+
+  bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
+  const vec3 dir_bsdf =
+    bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_TOY_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+  RGBF light_bsdf = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+
+  bool is_refraction_bsdf;
+  const RGBF value_bsdf = bsdf_evaluate(data, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);
+  light_bsdf            = mul_color(light_bsdf, value_bsdf);
+
+  if (get_toy_distance(data.position, dir_bsdf) == FLT_MAX) {
+    light_bsdf = get_color(0.0f, 0.0f, 0.0f);
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample a direction in the sun's solid angle
+  ////////////////////////////////////////////////////////////////////
+
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_TOY_RAY, index);
 
-  const vec3 dir = toy_sample_ray(data.position, random);
+  const vec3 dir_solid_angle = toy_sample_ray(data.position, random);
+  RGBF light_solid_angle     = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
 
+  bool is_refraction_solid_angle;
+  const RGBF value_solid_angle = bsdf_evaluate(data, dir_solid_angle, BSDF_SAMPLING_GENERAL, is_refraction_solid_angle, 1.0f);
+  light_solid_angle            = mul_color(light_solid_angle, value_solid_angle);
+
+  ////////////////////////////////////////////////////////////////////
+  // Resampled Importance Sampling
+  ////////////////////////////////////////////////////////////////////
+
+  const float solid_angle = toy_get_solid_angle(data.position);
+
+  const float target_pdf_bsdf        = luminance(light_bsdf);
+  const float target_pdf_solid_angle = luminance(light_solid_angle);
+
+  // MIS weight multiplied with PDF
+  const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_light_pdf(data, dir_bsdf) * solid_angle + 1.0f);
+  const float mis_weight_solid_angle = solid_angle / (bsdf_sample_for_light_pdf(data, dir_solid_angle) * solid_angle + 1.0f);
+
+  const float weight_bsdf        = target_pdf_bsdf * mis_weight_bsdf;
+  const float weight_solid_angle = target_pdf_solid_angle * mis_weight_solid_angle;
+
+  const float sum_weights = weight_bsdf + weight_solid_angle;
+
+  float target_pdf;
+  vec3 dir;
+  RGBF light_color;
   bool is_refraction;
-  const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, toy_get_solid_angle(data.position));
+  if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_SUN_RIS_RESAMPLING, index) * sum_weights < weight_bsdf) {
+    dir           = dir_bsdf;
+    target_pdf    = target_pdf_bsdf;
+    light_color   = light_bsdf;
+    is_refraction = is_refraction_bsdf;
+  }
+  else {
+    dir           = dir_solid_angle;
+    target_pdf    = target_pdf_solid_angle;
+    light_color   = light_solid_angle;
+    is_refraction = is_refraction_solid_angle;
+  }
+
+  light_color = scale_color(light_color, sum_weights / target_pdf);
+
+  ////////////////////////////////////////////////////////////////////
+  // Compute Visibility
+  ////////////////////////////////////////////////////////////////////
 
   const float shift   = is_refraction ? -eps : eps;
   const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
 
   const float dist = get_toy_distance(position, dir);
-
-  RGBF light_color = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
-  light_color      = mul_color(light_color, bsdf_value);
-
-  ////////////////////////////////////////////////////////////////////
-  // Compute visibility term
-  ////////////////////////////////////////////////////////////////////
 
   const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
