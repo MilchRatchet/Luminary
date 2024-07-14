@@ -249,21 +249,21 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 #endif
 }
 
-__device__ vec3 bsdf_sample_microfacet_reflection(const GBufferData data, const ushort2 pixel) {
-  const vec3 sampled_microfacet = bsdf_microfacet_sample(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY);
+__device__ vec3 bsdf_sample_microfacet_reflection(const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target_ray) {
+  const vec3 sampled_microfacet = bsdf_microfacet_sample(data, pixel, random_target_ray);
 
   return reflect_vector(data.V, sampled_microfacet);
 }
 
-__device__ vec3 bsdf_sample_microfacet_refraction(const GBufferData data, const ushort2 pixel) {
-  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(data, pixel, QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY);
+__device__ vec3 bsdf_sample_microfacet_refraction(const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target_ray) {
+  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(data, pixel, random_target_ray);
 
   bool total_reflection;
   return refract_vector(data.V, sampled_microfacet, data.ior_in / data.ior_out, total_reflection);
 }
 
-__device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel) {
-  return bsdf_diffuse_sample(quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY, pixel));
+__device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target_ray) {
+  return bsdf_diffuse_sample(quasirandom_sequence_2D(random_target_ray, pixel));
 }
 
 __device__ void bsdf_sample_for_light_probabilities(
@@ -279,16 +279,17 @@ __device__ void bsdf_sample_for_light_probabilities(
   diffuse_prob    = diffuse_weight / sum_weights;
 }
 
-__device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixel, bool& is_refraction, bool& is_valid) {
+__device__ vec3 bsdf_sample_for_light(
+  const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target, bool& is_refraction, bool& is_valid) {
 #ifdef VOLUME_KERNEL
-  const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_BSDF_METHOD, pixel);
-  const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_BSDF_RAY, pixel);
+  const float2 random_dir   = quasirandom_sequence_2D(random_target, pixel);
+  const float random_method = quasirandom_sequence_1D(random_target + 1, pixel);
 
   const vec3 ray = scale_vector(data.V, -1.0f);
 
   const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
-                             ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
-                             : ocean_phase_sampling(ray, random_dir, random_choice);
+                             ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_method)
+                             : ocean_phase_sampling(ray, random_dir, random_method);
 
   is_refraction = true;
   is_valid      = true;
@@ -308,19 +309,19 @@ __device__ vec3 bsdf_sample_for_light(const GBufferData data, const ushort2 pixe
   float reflection_probability, refraction_probability, diffuse_probability;
   bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
 
-  const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LIGHT_BSDF_METHOD, pixel);
+  const float random_method = quasirandom_sequence_1D(random_target + 1, pixel);
 
   vec3 ray_local;
-  if (random < reflection_probability) {
-    ray_local     = bsdf_sample_microfacet_reflection(data_local, pixel);
+  if (random_method < reflection_probability) {
+    ray_local     = bsdf_sample_microfacet_reflection(data_local, pixel, random_target);
     is_refraction = false;
   }
-  else if (random < reflection_probability + refraction_probability) {
-    ray_local     = bsdf_sample_microfacet_refraction(data_local, pixel);
+  else if (random_method < reflection_probability + refraction_probability) {
+    ray_local     = bsdf_sample_microfacet_refraction(data_local, pixel, random_target);
     is_refraction = true;
   }
   else {
-    ray_local     = bsdf_sample_diffuse(data_local, pixel);
+    ray_local     = bsdf_sample_diffuse(data_local, pixel, random_target);
     is_refraction = false;
   }
 
