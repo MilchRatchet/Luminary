@@ -66,17 +66,17 @@ extern "C" __global__ void __raygen__optix() {
       is_delta_distribution = bounce_info.is_microfacet_based && (data.roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
     }
 
-    const RGBF record = load_RGBF(device.ptrs.records + pixel);
-
     ////////////////////////////////////////////////////////////////////
     // Light Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
+    RGBF accumulated_light = (IS_PRIMARY_RAY) ? data.emission : get_color(0.0f, 0.0f, 0.0f);
 
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
+
+    const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     accumulated_light = mul_color(accumulated_light, record);
 
@@ -85,12 +85,6 @@ extern "C" __global__ void __raygen__optix() {
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(data.ior_out, pixel, ior_stack_method);
-    }
-
-    if (IS_PRIMARY_RAY) {
-      const RGBF emission = mul_color(data.emission, record);
-
-      write_beauty_buffer(emission, pixel);
     }
 
     const float shift = (bounce_info.is_transparent_pass) ? -eps : eps;

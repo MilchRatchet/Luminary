@@ -23,7 +23,7 @@
 // High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
 
 __device__ uint32_t ris_sample_light(
-  GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const uint32_t initial_sample_id, const vec3 initial_ray,
+  const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const uint32_t initial_sample_id, const vec3 initial_ray,
   const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist, bool& selected_is_refraction) {
   uint32_t selected_id = LIGHT_ID_NONE;
 
@@ -36,9 +36,6 @@ __device__ uint32_t ris_sample_light(
 
   const int reservoir_size                    = device.ris_settings.initial_reservoir_size;
   const float one_over_reservoir_pdf_and_size = device.scene.triangle_lights_count / ((float) reservoir_size);
-
-  // We have to clamp due to numerical precision issues in the microfacet models.
-  data.roughness = fmaxf(data.roughness, GEOMETRY_DELTA_PATH_CUTOFF);
 
   // Don't allow triangles to sample themselves.
   // TODO: This probably adds biasing.
