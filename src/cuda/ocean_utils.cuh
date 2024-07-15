@@ -433,7 +433,7 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const int
   data.normal    = normal;
   data.position  = task.position;
   data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = 0.025f;  // TODO: Find a good value that looks smooth but does not cause fireflies.
+  data.roughness = 0.045f;
   data.metallic  = 1.0f;
   data.flags     = flags;
   data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.ocean.refractive_index : ray_ior;

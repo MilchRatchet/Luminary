@@ -106,7 +106,7 @@ __device__ bool optix_toy_shadowing(
 
 __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushort2 index, const vec3 sky_pos) {
   // We have to clamp due to numerical precision issues in the microfacet models.
-  data.roughness = fmaxf(data.roughness, GEOMETRY_DELTA_PATH_CUTOFF);
+  data.roughness = fmaxf(data.roughness, BSDF_ROUGHNESS_CLAMP);
 
   ////////////////////////////////////////////////////////////////////
   // Sample a direction using BSDF importance sampling
@@ -387,7 +387,7 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
     return get_color(0.0f, 0.0f, 0.0f);
 
   // We have to clamp due to numerical precision issues in the microfacet models.
-  data.roughness = fmaxf(data.roughness, GEOMETRY_DELTA_PATH_CUTOFF);
+  data.roughness = fmaxf(data.roughness, BSDF_ROUGHNESS_CLAMP);
 
   ////////////////////////////////////////////////////////////////////
   // Sample a direction using BSDF importance sampling
@@ -504,7 +504,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
     return get_color(0.0f, 0.0f, 0.0f);
 
   // We have to clamp due to numerical precision issues in the microfacet models.
-  data.roughness = fmaxf(data.roughness, GEOMETRY_DELTA_PATH_CUTOFF);
+  data.roughness = fmaxf(data.roughness, BSDF_ROUGHNESS_CLAMP);
 
   ////////////////////////////////////////////////////////////////////
   // Sample a direction using BSDF importance sampling

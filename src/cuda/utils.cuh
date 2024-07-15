@@ -21,7 +21,8 @@
 #define eps 0.000001f
 #endif /* eps */
 
-#define GEOMETRY_DELTA_PATH_CUTOFF (0.025f)
+#define GEOMETRY_DELTA_PATH_CUTOFF (0.05f)
+#define BSDF_ROUGHNESS_CLAMP (0.025f)
 
 enum HitType : uint32_t {
   HIT_TYPE_SKY               = 0xffffffffu,
