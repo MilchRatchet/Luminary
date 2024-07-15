@@ -172,13 +172,16 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
     is_refraction = is_refraction_solid_angle;
   }
 
+  if (target_pdf == 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   light_color = scale_color(light_color, sum_weights / target_pdf);
 
   ////////////////////////////////////////////////////////////////////
   // Compute Visibility
   ////////////////////////////////////////////////////////////////////
 
-  if (luminance(light_color) < eps)
+  if (luminance(light_color) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
   const float shift   = is_refraction ? -eps : eps;
@@ -378,6 +381,11 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
   if (!toy_visible)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  const RGBF toy_emission = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+
+  if (luminance(toy_emission) == 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   // We have to clamp due to numerical precision issues in the microfacet models.
   data.roughness = fmaxf(data.roughness, GEOMETRY_DELTA_PATH_CUTOFF);
 
@@ -388,7 +396,7 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
   bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
   const vec3 dir_bsdf =
     bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_TOY_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
-  RGBF light_bsdf = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+  RGBF light_bsdf = toy_emission;
 
   bool is_refraction_bsdf;
   const RGBF value_bsdf = bsdf_evaluate(data, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);
@@ -405,7 +413,7 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_TOY_RAY, index);
 
   const vec3 dir_solid_angle = toy_sample_ray(data.position, random);
-  RGBF light_solid_angle     = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+  RGBF light_solid_angle     = toy_emission;
 
   bool is_refraction_solid_angle;
   const RGBF value_solid_angle = bsdf_evaluate(data, dir_solid_angle, BSDF_SAMPLING_GENERAL, is_refraction_solid_angle, 1.0f);
@@ -445,6 +453,9 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
     light_color   = light_solid_angle;
     is_refraction = is_refraction_solid_angle;
   }
+
+  if (target_pdf == 0.0f)
+    return get_color(0.0f, 0.0f, 0.0f);
 
   light_color = scale_color(light_color, sum_weights / target_pdf);
 
@@ -514,11 +525,10 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
 
   unsigned int bsdf_light_id = HIT_TYPE_LIGHT_BSDF_HINT;
 
-  optixTrace(device.optix_bvh_light, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0, bsdf_light_id);
+  float light_search_dist = (bsdf_sample_is_valid) ? FLT_MAX : -1.0f;
 
-  if (!bsdf_sample_is_valid) {
-    bsdf_light_id = HIT_TYPE_LIGHT_BSDF_HINT;
-  }
+  // The compiler has issues with conditional optixTrace, hence we disable them using a negative max dist.
+  optixTrace(device.optix_bvh_light, origin, ray, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0, bsdf_light_id);
 
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions
