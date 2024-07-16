@@ -446,9 +446,11 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
         pixel = hsv_to_rgb(hsv);
       }
 
-      pixel.r *= device.scene.camera.exposure;
-      pixel.g *= device.scene.camera.exposure;
-      pixel.b *= device.scene.camera.exposure;
+      const float exposure = (device.shading_mode == SHADING_DEFAULT) ? device.scene.camera.exposure : 1.0f;
+
+      pixel.r *= exposure;
+      pixel.g *= exposure;
+      pixel.b *= exposure;
 
       const float grain = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
 
