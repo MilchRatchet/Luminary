@@ -347,6 +347,10 @@ void raytrace_build_structures(RaytraceInstance* instance) {
 }
 
 void raytrace_execute(RaytraceInstance* instance) {
+  // In no accumulation mode we always display the 0th frame.
+  if (instance->accum_mode == NO_ACCUMULATION)
+    instance->temporal_frames = 0;
+
   device_update_symbol(temporal_frames, instance->temporal_frames);
 
   device_generate_tasks();
