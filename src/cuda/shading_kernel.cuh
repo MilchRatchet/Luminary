@@ -175,6 +175,10 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   if (target_pdf == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  // Transparent pass through rays are not allowed.
+  if (dot_product(data.V, dir) < -1.0f + eps)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   light_color = scale_color(light_color, sum_weights / target_pdf);
 
   ////////////////////////////////////////////////////////////////////
@@ -281,6 +285,10 @@ __device__ RGBF
   light_color = scale_color(light_color, 1.0f / device.scene.ocean.caustics_regularization);
 
   if (luminance(light_color) < eps)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  // Transparent pass through rays are not allowed.
+  if (dot_product(data.V, dir) < -1.0f + eps)
     return get_color(0.0f, 0.0f, 0.0f);
 
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
@@ -455,6 +463,10 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
   if (target_pdf == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
+  // Transparent pass through rays are not allowed.
+  if (dot_product(data.V, dir) < -1.0f + eps)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   light_color = scale_color(light_color, sum_weights / target_pdf);
 
   ////////////////////////////////////////////////////////////////////
@@ -539,6 +551,10 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
     data, index, light_ray_index, bsdf_light_id, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
 
   if (luminance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  // Transparent pass through rays are not allowed.
+  if (dot_product(data.V, dir) < -1.0f + eps)
     return get_color(0.0f, 0.0f, 0.0f);
 
   ////////////////////////////////////////////////////////////////////

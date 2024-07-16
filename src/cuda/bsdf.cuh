@@ -129,6 +129,9 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   return scatter_ray;
 #else
+  // TODO: Use cheaper version of +Z-up transformation
+  // TODO: Unify the RIS over the 3 models so that three directions are sampled and one is chosen
+
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
@@ -297,8 +300,6 @@ __device__ vec3 bsdf_sample_for_light(
 
   return scatter_ray;
 #else   // VOLUME_KERNEL
-  // TODO: It is important that pass through rays are not allowed! Otherwise we run into double counting issues.
-
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
 
