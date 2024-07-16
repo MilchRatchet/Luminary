@@ -87,8 +87,7 @@ extern "C" __global__ void __raygen__optix() {
       ior_stack_interact(data.ior_out, pixel, ior_stack_method);
     }
 
-    const vec3 shift_vector = (bounce_info.is_transparent_pass) ? bounce_ray : data.V;
-    data.position           = add_vector(data.position, scale_vector(shift_vector, eps * get_length(data.position)));
+    data.position = shift_origin_vector(data.position, data.V, bounce_ray, bounce_info.is_transparent_pass);
 
     TraceTask bounce_task;
     bounce_task.origin = data.position;

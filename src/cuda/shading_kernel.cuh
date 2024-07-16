@@ -184,8 +184,7 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   if (luminance(light_color) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  const float shift   = is_refraction ? -eps : eps;
-  const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+  const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
@@ -284,8 +283,7 @@ __device__ RGBF
   if (luminance(light_color) < eps)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  const float shift   = is_refraction ? -eps : eps;
-  const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+  const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
   ////////////////////////////////////////////////////////////////////
   // Compute visibility term
@@ -463,8 +461,7 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
   // Compute Visibility
   ////////////////////////////////////////////////////////////////////
 
-  const float shift   = is_refraction ? -eps : eps;
-  const vec3 position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+  const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
   const float dist = get_toy_distance(position, dir);
 
@@ -548,8 +545,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   // Compute visibility term
   ////////////////////////////////////////////////////////////////////
 
-  shift    = is_refraction ? -eps : eps;
-  position = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+  position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
   origin = make_float3(position.x, position.y, position.z);
   ray    = make_float3(dir.x, dir.y, dir.z);

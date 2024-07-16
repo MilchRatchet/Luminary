@@ -603,6 +603,12 @@ __device__ vec3 refract_vector(const vec3 V, const vec3 normal, const float inde
   }
 }
 
+// Shift origin vector to avoid self intersection.
+__device__ vec3 shift_origin_vector(const vec3 origin, const vec3 V, const vec3 L, const bool is_refraction) {
+  const vec3 shift_vector = (is_refraction) ? L : V;
+  return add_vector(origin, scale_vector(shift_vector, 2.0f * eps * (1.0f + get_length(origin))));
+}
+
 __device__ RGBF get_color(const float r, const float g, const float b) {
   RGBF result;
 
