@@ -8,7 +8,6 @@
 #include "camera.cuh"
 #include "cloud.cuh"
 #include "ior_stack.cuh"
-#include "ocean.cuh"
 #include "purkinje.cuh"
 #include "sky.cuh"
 #include "sky_utils.cuh"

@@ -15,7 +15,6 @@
 #include "cuda/math.cuh"
 #include "cuda/micromap.cuh"
 #include "cuda/mipmap.cuh"
-#include "cuda/ocean.cuh"
 #include "cuda/particle.cuh"
 #include "cuda/random.cuh"
 #include "cuda/random_unittest.cuh"
