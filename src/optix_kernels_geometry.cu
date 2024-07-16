@@ -70,7 +70,7 @@ extern "C" __global__ void __raygen__optix() {
     // Light Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    RGBF accumulated_light = (IS_PRIMARY_RAY) ? data.emission : get_color(0.0f, 0.0f, 0.0f);
+    RGBF accumulated_light = (state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION)) ? data.emission : get_color(0.0f, 0.0f, 0.0f);
 
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
@@ -104,9 +104,17 @@ extern "C" __global__ void __raygen__optix() {
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
       store_RGBF(device.ptrs.records + pixel, bounce_record);
 
+      uint32_t flags_to_release = 0;
+
       if (is_delta_path && !is_delta_distribution) {
-        state_release(pixel, STATE_FLAG_DELTA_PATH);
+        flags_to_release |= STATE_FLAG_DELTA_PATH;
       }
+
+      if (dot_product(data.V, bounce_ray) > -1.0f + eps) {
+        flags_to_release |= STATE_FLAG_CAMERA_DIRECTION;
+      }
+
+      state_release(pixel, flags_to_release);
     }
   }
 

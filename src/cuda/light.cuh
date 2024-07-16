@@ -8,8 +8,6 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
-enum LightRayTarget { LIGHT_RAY_TARGET_SUN = 0, LIGHT_RAY_TARGET_TOY = 1, LIGHT_RAY_TARGET_GEOMETRY = 2 } typedef LightRayTarget;
-
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);
   const float a = dot_product(triangle.edge1, h);

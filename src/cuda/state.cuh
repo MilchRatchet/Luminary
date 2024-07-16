@@ -3,7 +3,11 @@
 
 #include "utils.cuh"
 
-enum StateFlag { STATE_FLAG_ALBEDO = 0b00000001u, STATE_FLAG_DELTA_PATH = 0b00000010u } typedef StateFlag;
+enum StateFlag {
+  STATE_FLAG_ALBEDO           = 0b00000001u,
+  STATE_FLAG_DELTA_PATH       = 0b00000010u,
+  STATE_FLAG_CAMERA_DIRECTION = 0b00000100u
+} typedef StateFlag;
 
 //
 // Usage documentation:
@@ -13,6 +17,10 @@ enum StateFlag { STATE_FLAG_ALBEDO = 0b00000001u, STATE_FLAG_DELTA_PATH = 0b0000
 //
 // STATE_FLAG_DELTA_PATH: This flag is set for paths whose vertices generated bounce rays only from delta (or near-delta) distributions.
 //                        This flag is used for firefly clamping as it only applies to light gathered on path suffixes of non-delta paths.
+//
+// STATE_FLAG_CAMERA_DIRECTION: This flag is set while the current path is just a line along the original camera direction.
+//                              This flag is used to allow light to be gathered through non-refractive transparencies when coming directly
+//                              from the camera where no DL is executed.
 //
 
 __device__ bool state_consume(const int pixel, const StateFlag flag) {
