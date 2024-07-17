@@ -166,9 +166,6 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
     return 0.0f;
   }
 
-  if (instance->shading_mode != SHADING_DEFAULT)
-    return 1.0f;
-
   const float exposure = instance->scene.camera.exposure;
 
   if (!instance->denoise_setup) {

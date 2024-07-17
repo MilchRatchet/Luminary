@@ -5,6 +5,7 @@
 #include <stdlib.h>
 
 #include "bench.h"
+#include "buffer.h"
 #include "ceb.h"
 #include "structs.h"
 #include "texture.h"
@@ -34,9 +35,17 @@ static int max_3_float_to_int(float a, float b, float c) {
  * Returns 1 if triangle texture is non zero at some point, 0 else.
  * If texture is not RGB8 or not present on CPU this will always return 1.
  */
-static int contains_illumination(Triangle triangle, TextureRGBA tex) {
-  if (tex.type != TexDataUINT8)
+static int light_triangle_texture_has_emission(Triangle triangle, TextureRGBA tex) {
+  // TODO: Implement support for other types of textures.
+  if (tex.type != TexDataUINT8) {
+    warn_message("Texture is not 8 bits. Assume that this triangle is a light.");
     return 1;
+  }
+
+  if (tex.num_components != 4) {
+    warn_message("Texture does not have 4 channels. Assume that this triangle is a light.");
+    return 1;
+  }
 
   if (tex.storage != TexStorageCPU) {
     warn_message("Texture is allocated on the GPU. Assume that this triangle is a light.");
@@ -135,32 +144,36 @@ static int contains_illumination(Triangle triangle, TextureRGBA tex) {
 void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures, int dmm_active) {
   bench_tic("Processing Lights");
 
-  Scene data = *scene;
+  ////////////////////////////////////////////////////////////////////
+  // Iterate over all triangles and find all emissive ones.
+  ////////////////////////////////////////////////////////////////////
 
   uint32_t lights_length = 16;
   TriangleLight* lights  = (TriangleLight*) malloc(sizeof(TriangleLight) * lights_length);
   uint32_t light_count   = 0;
 
-  for (uint32_t i = 0; i < data.triangle_data.triangle_count; i++) {
-    const Triangle triangle = data.triangles[i];
+  for (uint32_t i = 0; i < scene->triangle_data.triangle_count; i++) {
+    const Triangle triangle = scene->triangles[i];
 
-    const PackedMaterial material = data.materials[triangle.material_id];
+    const PackedMaterial material = scene->materials[triangle.material_id];
     const uint16_t tex_index      = material.luminance_map;
 
     // Triangles with displacement can't be light sources.
-    if (dmm_active && data.materials[triangle.material_id].normal_map)
+    if (dmm_active && scene->materials[triangle.material_id].normal_map)
       continue;
 
     int is_light = 0;
 
-    is_light |= (tex_index != TEXTURE_NONE && contains_illumination(triangle, textures[tex_index]));
+    // Triangle is a light if it has a light texture with non-zero value at some point on the triangle's surface or it
+    // has no light texture but a non-zero constant emission.
+    is_light |= (tex_index != TEXTURE_NONE && light_triangle_texture_has_emission(triangle, textures[tex_index]));
     is_light |= (tex_index == TEXTURE_NONE && (material.emission_r || material.emission_g || material.emission_b));
 
     if (is_light) {
       const TriangleLight l = {
         .vertex = triangle.vertex, .edge1 = triangle.edge1, .edge2 = triangle.edge2, .triangle_id = i, .material_id = triangle.material_id};
-      data.triangles[i].light_id = light_count;
-      lights[light_count++]      = l;
+      scene->triangles[i].light_id = light_count;
+      lights[light_count++]        = l;
       if (light_count == lights_length) {
         lights_length *= 2;
         lights = safe_realloc(lights, sizeof(TriangleLight) * lights_length);
@@ -170,10 +183,54 @@ void lights_build_set_from_triangles(Scene* scene, TextureRGBA* textures, int dm
 
   lights = safe_realloc(lights, sizeof(TriangleLight) * light_count);
 
-  data.triangle_lights       = lights;
-  data.triangle_lights_count = light_count;
+  scene->triangle_lights       = lights;
+  scene->triangle_lights_count = light_count;
 
-  *scene = data;
+  ////////////////////////////////////////////////////////////////////
+  // Create vertex and index buffer for BVH creation.
+  ////////////////////////////////////////////////////////////////////
+
+  TriangleGeomData tri_data;
+
+  tri_data.vertex_count   = light_count * 3;
+  tri_data.index_count    = light_count * 3;
+  tri_data.triangle_count = light_count;
+
+  const size_t vertex_buffer_size = sizeof(float) * 4 * 3 * light_count;
+  const size_t index_buffer_size  = sizeof(uint32_t) * 4 * light_count;
+
+  float* vertex_buffer   = (float*) malloc(vertex_buffer_size);
+  uint32_t* index_buffer = (uint32_t*) malloc(index_buffer_size);
+
+  for (uint32_t i = 0; i < light_count; i++) {
+    const TriangleLight l = lights[i];
+
+    vertex_buffer[3 * 4 * i + 4 * 0 + 0] = l.vertex.x;
+    vertex_buffer[3 * 4 * i + 4 * 0 + 1] = l.vertex.y;
+    vertex_buffer[3 * 4 * i + 4 * 0 + 2] = l.vertex.z;
+    vertex_buffer[3 * 4 * i + 4 * 0 + 3] = 1.0f;
+    vertex_buffer[3 * 4 * i + 4 * 1 + 0] = l.vertex.x + l.edge1.x;
+    vertex_buffer[3 * 4 * i + 4 * 1 + 1] = l.vertex.y + l.edge1.y;
+    vertex_buffer[3 * 4 * i + 4 * 1 + 2] = l.vertex.z + l.edge1.z;
+    vertex_buffer[3 * 4 * i + 4 * 1 + 3] = 1.0f;
+    vertex_buffer[3 * 4 * i + 4 * 2 + 0] = l.vertex.x + l.edge2.x;
+    vertex_buffer[3 * 4 * i + 4 * 2 + 1] = l.vertex.y + l.edge2.y;
+    vertex_buffer[3 * 4 * i + 4 * 2 + 2] = l.vertex.z + l.edge2.z;
+    vertex_buffer[3 * 4 * i + 4 * 2 + 3] = 1.0f;
+
+    index_buffer[4 * i + 0] = 3 * i + 0;
+    index_buffer[4 * i + 1] = 3 * i + 1;
+    index_buffer[4 * i + 2] = 3 * i + 2;
+    index_buffer[4 * i + 3] = 0;
+  }
+
+  device_malloc(&tri_data.vertex_buffer, vertex_buffer_size);
+  device_upload(tri_data.vertex_buffer, vertex_buffer, vertex_buffer_size);
+
+  device_malloc(&tri_data.index_buffer, index_buffer_size);
+  device_upload(tri_data.index_buffer, index_buffer, index_buffer_size);
+
+  scene->triangle_lights_data = tri_data;
 
   bench_toc();
 }

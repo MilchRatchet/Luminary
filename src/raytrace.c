@@ -347,6 +347,10 @@ void raytrace_build_structures(RaytraceInstance* instance) {
 }
 
 void raytrace_execute(RaytraceInstance* instance) {
+  // In no accumulation mode we always display the 0th frame.
+  if (instance->accum_mode == NO_ACCUMULATION)
+    instance->temporal_frames = 0;
+
   device_update_symbol(temporal_frames, instance->temporal_frames);
 
   device_generate_tasks();
@@ -364,6 +368,26 @@ void raytrace_execute(RaytraceInstance* instance) {
   device_handle_accumulation(instance);
 
   gpuErrchk(cudaDeviceSynchronize());
+}
+
+static char* _raytrace_arch_enum_to_string(const DeviceArch arch) {
+  switch (arch) {
+    default:
+    case DEVICE_ARCH_UNKNOWN:
+      return "Unknown";
+    case DEVICE_ARCH_PASCAL:
+      return "Pascal";
+    case DEVICE_ARCH_TURING:
+      return "Turing";
+    case DEVICE_ARCH_AMPERE:
+      return "Ampere";
+    case DEVICE_ARCH_ADA:
+      return "Ada";
+    case DEVICE_ARCH_VOLTA:
+      return "Volta";
+    case DEVICE_ARCH_HOPPER:
+      return "Hopper";
+  }
 }
 
 static void _raytrace_gather_device_info(RaytraceInstance* instance) {
@@ -453,7 +477,7 @@ static void _raytrace_gather_device_info(RaytraceInstance* instance) {
 
   log_message("===========DEVICE INFO===========");
   log_message("GLOBAL MEM SIZE:   %zu", instance->device_info.global_mem_size);
-  log_message("ARCH:              %d", instance->device_info.arch);
+  log_message("ARCH:              %s", _raytrace_arch_enum_to_string(instance->device_info.arch));
   log_message("RT CORE VERSION:   %d", instance->device_info.rt_core_version);
   log_message("=================================");
 }

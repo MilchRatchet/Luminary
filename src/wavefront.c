@@ -579,6 +579,7 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
 
   size_t offset = 0;
 
+  // TODO: Read from file only in large chunks and then process until the buffer is empty again
   while (!feof(file)) {
     fread(read_buffer + offset, 1, READ_BUFFER_SIZE - offset, file);
 

@@ -98,35 +98,40 @@
 #define BLUENOISE_TEX_DIM_MASK 0x7F
 
 enum QuasiRandomTarget : uint32_t {
-  QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE     = 0,    /* 1 */
-  QUASI_RANDOM_TARGET_BOUNCE_DIR            = 1,    /* 1 */
-  QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY   = 2,    /* 1 */
-  QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY    = 3,    /* 1 */
-  QUASI_RANDOM_TARGET_LENS                  = 4,    /* 1 */
-  QUASI_RANDOM_TARGET_LENS_BLADE            = 5,    /* 1 */
-  QUASI_RANDOM_TARGET_VOLUME_DIST           = 6,    /* 1 */
-  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE      = 7,    /* 1 */
-  QUASI_RANDOM_TARGET_CAMERA_JITTER         = 8,    /* 1 */
-  QUASI_RANDOM_TARGET_CAMERA_TIME           = 9,    /* 1 */
-  QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET     = 10,   /* 3 */
-  QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT      = 13,   /* 3 */
-  QUASI_RANDOM_TARGET_CLOUD_DIR             = 16,   /* 128 */
-  QUASI_RANDOM_TARGET_SKY_STEP_OFFSET       = 144,  /* 1 */
-  QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP = 145,  /* 1 */
-  QUASI_RANDOM_TARGET_BSDF_MICROFACET       = 146,  /* 1 */
-  QUASI_RANDOM_TARGET_BSDF_DIFFUSE          = 147,  /* 1 */
-  QUASI_RANDOM_TARGET_BSDF_REFRACTION       = 148,  /* 1 */
-  QUASI_RANDOM_TARGET_BSDF_GLOSSY           = 149,  /* 1 */
-  QUASI_RANDOM_TARGET_BSDF_DIELECTRIC       = 150,  /* 1 */
-  QUASI_RANDOM_TARGET_BSDF_METALLIC         = 151,  /* 1 */
-  QUASI_RANDOM_TARGET_BSDF_ALPHA            = 152,  /* 1 */
-  QUASI_RANDOM_TARGET_RIS_LIGHT_ID          = 153,  /* 32x32 */
-  QUASI_RANDOM_TARGET_RIS_RESAMPLING        = 1177, /* 32x32 */
-  QUASI_RANDOM_TARGET_RIS_RAY_DIR           = 2201, /* 32x32 */
-  QUASI_RANDOM_TARGET_CAUSTIC_INITIAL       = 3225, /* 32 */
-  QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE      = 3257, /* 32 */
-  QUASI_RANDOM_TARGET_LIGHT_SUN_RAY         = 3289, /* 1 */
-  QUASI_RANDOM_TARGET_LIGHT_TOY_RAY         = 3290, /* 1 */
+  QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE        = 0,    /* 1 */
+  QUASI_RANDOM_TARGET_BOUNCE_DIR               = 1,    /* 1 */
+  QUASI_RANDOM_TARGET_BOUNCE_TRANSPARENCY      = 2,    /* 1 */
+  QUASI_RANDOM_TARGET_LIGHT_TRANSPARENCY       = 3,    /* 1 */
+  QUASI_RANDOM_TARGET_LENS                     = 4,    /* 1 */
+  QUASI_RANDOM_TARGET_LENS_BLADE               = 5,    /* 1 */
+  QUASI_RANDOM_TARGET_VOLUME_DIST              = 6,    /* 1 */
+  QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE         = 7,    /* 1 */
+  QUASI_RANDOM_TARGET_CAMERA_JITTER            = 8,    /* 1 */
+  QUASI_RANDOM_TARGET_CAMERA_TIME              = 9,    /* 1 */
+  QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET        = 10,   /* 3 */
+  QUASI_RANDOM_TARGET_CLOUD_STEP_COUNT         = 13,   /* 3 */
+  QUASI_RANDOM_TARGET_CLOUD_DIR                = 16,   /* 128 */
+  QUASI_RANDOM_TARGET_SKY_STEP_OFFSET          = 144,  /* 1 */
+  QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP    = 145,  /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_MICROFACET          = 146,  /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_DIFFUSE             = 147,  /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_REFRACTION          = 148,  /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_GLOSSY              = 149,  /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_DIELECTRIC          = 150,  /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_METALLIC            = 151,  /* 1 */
+  QUASI_RANDOM_TARGET_BSDF_ALPHA               = 152,  /* 1 */
+  QUASI_RANDOM_TARGET_RIS_LIGHT_ID             = 153,  /* 32x32 */
+  QUASI_RANDOM_TARGET_RIS_RESAMPLING           = 1177, /* 32x32 */
+  QUASI_RANDOM_TARGET_RIS_RAY_DIR              = 2201, /* 32x32 */
+  QUASI_RANDOM_TARGET_CAUSTIC_INITIAL          = 3225, /* 32 */
+  QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE         = 3257, /* 32 */
+  QUASI_RANDOM_TARGET_LIGHT_SUN_BSDF           = 3289, /* 2 */
+  QUASI_RANDOM_TARGET_LIGHT_TOY_BSDF           = 3291, /* 2 */
+  QUASI_RANDOM_TARGET_LIGHT_BSDF               = 3293, /* 2 */
+  QUASI_RANDOM_TARGET_LIGHT_SUN_RAY            = 3295, /* 1 */
+  QUASI_RANDOM_TARGET_LIGHT_SUN_RIS_RESAMPLING = 3296, /* 1 */
+  QUASI_RANDOM_TARGET_LIGHT_TOY_RAY            = 3297, /* 1 */
+  QUASI_RANDOM_TARGET_LIGHT_TOY_RIS_RESAMPLING = 3298, /* 1 */
 
   QUASI_RANDOM_TARGET_COUNT
 } typedef QuasiRandomTarget;
@@ -173,8 +178,13 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 ////////////////////////////////////////////////////////////////////
 
 // Integer fractions of the actual numbers
+#define R1_PHI1 2654435769u /* 0.61803398875f */
 #define R2_PHI1 3242174888u /* 0.7548776662f  */
 #define R2_PHI2 2447445413u /* 0.56984029f    */
+
+__device__ uint32_t random_r1(const uint32_t offset) {
+  return offset * R1_PHI1;
+}
 
 // [Rob18]
 __device__ uint2 random_r2(const uint32_t offset) {

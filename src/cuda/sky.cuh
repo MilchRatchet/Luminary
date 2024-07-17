@@ -614,7 +614,7 @@ LUMINARY_KERNEL void process_sky_tasks() {
     }
     else {
       const vec3 sky_origin  = world_to_sky_transform(task.position);
-      const bool include_sun = state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+      const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
 
       sky = sky_get_color(sky_origin, task.ray, FLT_MAX, include_sun, device.scene.sky.steps, task.index);
     }

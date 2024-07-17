@@ -21,6 +21,9 @@
 #define eps 0.000001f
 #endif /* eps */
 
+#define GEOMETRY_DELTA_PATH_CUTOFF (0.05f)
+#define BSDF_ROUGHNESS_CLAMP (0.025f)
+
 enum HitType : uint32_t {
   HIT_TYPE_SKY               = 0xffffffffu,
   HIT_TYPE_OCEAN             = 0xfffffffeu,
@@ -29,6 +32,7 @@ enum HitType : uint32_t {
   HIT_TYPE_VOLUME_OCEAN      = 0xfffffff3u,
   HIT_TYPE_VOLUME_FOG        = 0xfffffff2u,
   HIT_TYPE_REJECT            = 0xfffffff0u,
+  HIT_TYPE_LIGHT_BSDF_HINT   = 0xffffffefu,
   HIT_TYPE_PARTICLE_MAX      = 0xefffffffu,
   HIT_TYPE_PARTICLE_MIN      = 0x80000000u,
   HIT_TYPE_PARTICLE_MASK     = 0x7fffffffu,
@@ -38,11 +42,10 @@ enum HitType : uint32_t {
 enum TaskAddressOffset {
   TASK_ADDRESS_OFFSET_GEOMETRY   = 0,
   TASK_ADDRESS_OFFSET_VOLUME     = 1,
-  TASK_ADDRESS_OFFSET_OCEAN      = 2,
-  TASK_ADDRESS_OFFSET_SKY        = 3,
-  TASK_ADDRESS_OFFSET_TOTALCOUNT = 4,
-  TASK_ADDRESS_OFFSET_STRIDE     = 4,
-  TASK_ADDRESS_COUNT_STRIDE      = 5
+  TASK_ADDRESS_OFFSET_SKY        = 2,
+  TASK_ADDRESS_OFFSET_TOTALCOUNT = 3,
+  TASK_ADDRESS_OFFSET_STRIDE     = 3,
+  TASK_ADDRESS_COUNT_STRIDE      = 4
 } typedef TaskAddressOffset;
 
 #define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))

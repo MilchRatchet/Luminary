@@ -185,7 +185,7 @@ __device__ float volume_sample_intersection(
 }
 
 __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType volume_hit_type, const vec3 ray) {
-  const float cos_angle = dot_product(scale_vector(data.V, -1.0f), ray);
+  const float cos_angle = -dot_product(data.V, ray);
 
   float phase;
   if (volume_hit_type == VOLUME_TYPE_OCEAN) {
@@ -259,7 +259,7 @@ __device__ GBufferData volume_generate_g_buffer(const ShadingTask task, const in
   data.V         = scale_vector(task.ray, -1.0f);
   data.roughness = device.scene.fog.droplet_diameter;
   data.metallic  = 0.0f;
-  data.flags     = G_BUFFER_REQUIRES_SAMPLING | G_BUFFER_VOLUME_HIT;
+  data.flags     = G_BUFFER_VOLUME_HIT;
   data.ior_in    = ray_ior;
   data.ior_out   = ray_ior;
 

@@ -42,7 +42,7 @@ LUMINARY_KERNEL void bsdf_lut_ss_generate(uint16_t* dst) {
   float sum = 0.0f;
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
-    const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
+    const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), QUASI_RANDOM_TARGET_BSDF_MICROFACET, i, 0);
     const vec3 reflection = reflect_vector(data.V, H);
 
     const float NdotL = reflection.z;
@@ -80,7 +80,7 @@ LUMINARY_KERNEL void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* s
   float sum = 0.0f;
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
-    const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
+    const vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), QUASI_RANDOM_TARGET_BSDF_MICROFACET, i, 0);
     const vec3 reflection = reflect_vector(data.V, H);
 
     const float NdotL = reflection.z;
@@ -128,7 +128,7 @@ LUMINARY_KERNEL void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_i
   bool total_reflection;
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
-    vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
+    vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), QUASI_RANDOM_TARGET_BSDF_MICROFACET, i, 0);
     vec3 reflection = reflect_vector(data.V, H);
     vec3 refraction = refract_vector(data.V, H, data.ior_in / data.ior_out, total_reflection);
     float fresnel   = (total_reflection) ? 1.0f : bsdf_fresnel(H, data.V, refraction, data.ior_in, data.ior_out);
@@ -140,7 +140,7 @@ LUMINARY_KERNEL void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_i
       sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV) * fresnel;
     }
 
-    H          = bsdf_microfacet_refraction_sample(data, make_ushort2(0, 0), i, 0);
+    H          = bsdf_microfacet_refraction_sample(data, make_ushort2(0, 0), QUASI_RANDOM_TARGET_BSDF_REFRACTION, i, 0);
     reflection = reflect_vector(data.V, H);
     refraction = refract_vector(data.V, H, data.ior_in / data.ior_out, total_reflection);
     fresnel    = (total_reflection) ? 1.0f : bsdf_fresnel(H, data.V, refraction, data.ior_in, data.ior_out);
@@ -167,7 +167,7 @@ LUMINARY_KERNEL void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_i
   sum = 0.0f;
 
   for (uint32_t i = 0; i < BSDF_ENERGY_LUT_ITERATIONS; i++) {
-    vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), i, 0);
+    vec3 H          = bsdf_microfacet_sample(data, make_ushort2(0, 0), QUASI_RANDOM_TARGET_BSDF_MICROFACET, i, 0);
     vec3 reflection = reflect_vector(data.V, H);
     vec3 refraction = refract_vector(data.V, H, data.ior_in / data.ior_out, total_reflection);
     float fresnel   = (total_reflection) ? 1.0f : bsdf_fresnel(H, data.V, refraction, data.ior_in, data.ior_out);
@@ -179,7 +179,7 @@ LUMINARY_KERNEL void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_i
       sum += bsdf_microfacet_evaluate_sampled_microfacet(data, NdotL, NdotV) * fresnel;
     }
 
-    H          = bsdf_microfacet_refraction_sample(data, make_ushort2(0, 0), i, 0);
+    H          = bsdf_microfacet_refraction_sample(data, make_ushort2(0, 0), QUASI_RANDOM_TARGET_BSDF_REFRACTION, i, 0);
     reflection = reflect_vector(data.V, H);
     refraction = refract_vector(data.V, H, data.ior_in / data.ior_out, total_reflection);
     fresnel    = (total_reflection) ? 0.0f : bsdf_fresnel(H, data.V, refraction, data.ior_in, data.ior_out);

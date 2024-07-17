@@ -15,7 +15,6 @@
 #include "cuda/math.cuh"
 #include "cuda/micromap.cuh"
 #include "cuda/mipmap.cuh"
-#include "cuda/ocean.cuh"
 #include "cuda/particle.cuh"
 #include "cuda/random.cuh"
 #include "cuda/random_unittest.cuh"
@@ -48,8 +47,6 @@ extern "C" void device_init() {
 void device_handle_accumulation(RaytraceInstance* instance) {
   switch (instance->accum_mode) {
     case NO_ACCUMULATION:
-      device_buffer_copy(instance->frame_buffer, instance->frame_accumulate);
-      break;
     case TEMPORAL_ACCUMULATION:
       temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
       break;
@@ -66,9 +63,11 @@ void device_handle_accumulation(RaytraceInstance* instance) {
 extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int depth) {
   device_update_symbol(depth, depth);
 
+  // TODO: Only do this for depth == 1
   if (depth > 0)
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
+  // TODO: Merge preprocess with trace kernels
   preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   if (instance->scene.particles.active) {
@@ -82,6 +81,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
     optixrt_execute(instance->optix_kernel);
   }
 
+  // TODO: Merge these 3 kernels
   if (instance->scene.fog.active || instance->scene.ocean.active) {
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -102,10 +102,6 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
 
   if (instance->scene.fog.active || instance->scene.ocean.active || instance->scene.particles.active) {
     optixrt_execute(instance->optix_kernel_volume);
-  }
-
-  if (instance->scene.ocean.active) {
-    process_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -137,9 +133,6 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance) {
   process_debug_geometry_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   if (instance->scene.particles.active) {
     particle_process_debug_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  }
-  if (instance->scene.ocean.active) {
-    process_debug_ocean_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   process_debug_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }

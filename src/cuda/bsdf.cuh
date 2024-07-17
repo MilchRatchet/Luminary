@@ -125,12 +125,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
                              ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
                              : ocean_phase_sampling(ray, random_dir, random_choice);
 
-  const float cos_angle = -dot_product(scatter_ray, data.V);
-
   info.weight = get_color(1.0f, 1.0f, 1.0f);
 
   return scatter_ray;
 #else
+  // TODO: Use cheaper version of +Z-up transformation
+  // TODO: Unify the RIS over the 3 models so that three directions are sampled and one is chosen
+
   // Transformation to +Z-Up
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
@@ -209,7 +210,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   else if (ior_compress(data_local.ior_in) == ior_compress(data_local.ior_out)) {
     // Fast path for transparent surfaces without refraction/reflection
     ray_local                = scale_vector(data_local.V, -1.0f);
-    info.weight              = (data_local.colored_dielectric) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
+    info.weight              = (data_local.flags & G_BUFFER_COLORED_DIELECTRIC) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
     info.is_transparent_pass = true;
     info.is_microfacet_based = true;
   }
@@ -223,11 +224,12 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     sampled_microfacet_refraction = bsdf_microfacet_refraction_sample(data_local, pixel);
     const vec3 refraction_vector =
       refract_vector(data_local.V, sampled_microfacet_refraction, data.ior_in / data.ior_out, total_reflection);
-    const BSDFRayContext refraction_ctx = bsdf_sample_context(data_local, sampled_microfacet_refraction, refraction_vector, true);
-    const RGBF refraction_eval          = bsdf_dielectric(data_local, refraction_ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, 1.0f);
+    const BSDFRayContext refraction_ctx =
+      bsdf_sample_context(data_local, sampled_microfacet_refraction, refraction_vector, !total_reflection);
+    const RGBF refraction_eval = bsdf_dielectric(data_local, refraction_ctx, BSDF_SAMPLING_MICROFACET_REFRACTION, 1.0f);
 
     const float reflection_weight = luminance(reflection_eval);
-    const float refraction_weight = (total_reflection) ? 0.0f : luminance(refraction_eval);
+    const float refraction_weight = luminance(refraction_eval);
 
     const float sum_weights = reflection_weight + refraction_weight;
 
@@ -241,7 +243,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     else {
       ray_local                = refraction_vector;
       info.weight              = scale_color(refraction_eval, 1.0f / refraction_probability);
-      info.is_transparent_pass = true;
+      info.is_transparent_pass = !total_reflection;
     }
 
     info.is_microfacet_based = true;
@@ -249,6 +251,124 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
 #endif
+}
+
+__device__ vec3 bsdf_sample_microfacet_reflection(const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target_ray) {
+  const vec3 sampled_microfacet = bsdf_microfacet_sample(data, pixel, random_target_ray);
+
+  return reflect_vector(data.V, sampled_microfacet);
+}
+
+__device__ vec3 bsdf_sample_microfacet_refraction(const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target_ray) {
+  const vec3 sampled_microfacet = bsdf_microfacet_refraction_sample(data, pixel, random_target_ray);
+
+  bool total_reflection;
+  return refract_vector(data.V, sampled_microfacet, data.ior_in / data.ior_out, total_reflection);
+}
+
+__device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target_ray) {
+  return bsdf_diffuse_sample(quasirandom_sequence_2D(random_target_ray, pixel));
+}
+
+__device__ void bsdf_sample_for_light_probabilities(
+  const GBufferData data, float& reflection_prob, float& refraction_prob, float& diffuse_prob) {
+  const float microfacet_reflection_weight = 1.0f;
+  const float microfacet_refraction_weight = 1.0f - data.albedo.a;
+  const float diffuse_weight               = (1.0f - data.metallic) * data.albedo.a;
+
+  const float sum_weights = microfacet_reflection_weight + microfacet_refraction_weight + diffuse_weight;
+
+  reflection_prob = microfacet_reflection_weight / sum_weights;
+  refraction_prob = microfacet_refraction_weight / sum_weights;
+  diffuse_prob    = diffuse_weight / sum_weights;
+}
+
+__device__ vec3 bsdf_sample_for_light(
+  const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target, bool& is_refraction, bool& is_valid) {
+#ifdef VOLUME_KERNEL
+  const float2 random_dir   = quasirandom_sequence_2D(random_target, pixel);
+  const float random_method = quasirandom_sequence_1D(random_target + 1, pixel);
+
+  const vec3 ray = scale_vector(data.V, -1.0f);
+
+  const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
+                             ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_method)
+                             : ocean_phase_sampling(ray, random_dir, random_method);
+
+  is_refraction = true;
+  is_valid      = true;
+
+  return scatter_ray;
+#else   // VOLUME_KERNEL
+  const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
+  const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
+
+  GBufferData data_local = data;
+
+  data_local.V      = V_local;
+  data_local.normal = get_vector(0.0f, 0.0f, 1.0f);
+
+  float reflection_probability, refraction_probability, diffuse_probability;
+  bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
+
+  const float random_method = quasirandom_sequence_1D(random_target + 1, pixel);
+
+  vec3 ray_local;
+  if (random_method < reflection_probability) {
+    ray_local     = bsdf_sample_microfacet_reflection(data_local, pixel, random_target);
+    is_refraction = false;
+  }
+  else if (random_method < reflection_probability + refraction_probability) {
+    ray_local     = bsdf_sample_microfacet_refraction(data_local, pixel, random_target);
+    is_refraction = true;
+  }
+  else {
+    ray_local     = bsdf_sample_diffuse(data_local, pixel, random_target);
+    is_refraction = false;
+  }
+
+  is_valid = (is_refraction) ? ray_local.z < 0.0f : ray_local.z > 0.0f;
+
+  return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+#endif  // VOLUME_KERNEL
+}
+
+__device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L) {
+#ifdef VOLUME_KERNEL
+  const float cos_angle = -dot_product(data.V, L);
+
+  const VolumeType volume_hit_type = VOLUME_HIT_TYPE(data.hit_id);
+
+  float pdf;
+  if (volume_hit_type == VOLUME_TYPE_OCEAN) {
+    pdf = ocean_phase(cos_angle);
+  }
+  else {
+    const float diameter = (volume_hit_type == VOLUME_TYPE_FOG) ? device.scene.fog.droplet_diameter : device.scene.particles.phase_diameter;
+    const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
+    pdf                             = jendersie_eon_phase_function(cos_angle, params);
+  }
+
+  return pdf;
+#else   // VOLUME_KERNEL
+  float reflection_probability, refraction_probability, diffuse_probability;
+  bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
+
+  const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
+
+  if (context.is_refraction) {
+    const float microfacet_refraction_pdf = bsdf_microfacet_refraction_pdf(
+      data, context.NdotH, context.NdotV, context.NdotL, context.HdotV, context.HdotL, context.refraction_index);
+
+    return refraction_probability * microfacet_refraction_pdf;
+  }
+  else {
+    const float microfacet_reflection_pdf = bsdf_microfacet_pdf(data, context.NdotH, context.NdotV);
+    const float diffuse_pdf               = bsdf_diffuse_pdf(data, context.NdotL);
+
+    return reflection_probability * microfacet_reflection_pdf + diffuse_probability * diffuse_pdf;
+  }
+#endif  // VOLUME_KERNEL
 }
 
 #endif /* SHADING_KERNEL */

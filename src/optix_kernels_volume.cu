@@ -44,6 +44,7 @@ extern "C" __global__ void __raygen__optix() {
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
+    // Bounce Ray Sampling
     BSDFSampleInfo bounce_info;
     const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
@@ -54,16 +55,10 @@ extern "C" __global__ void __raygen__optix() {
 
     RGBF bounce_record = record;
 
+    // Light Ray Sampling
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
-    if (device.ris_settings.num_light_rays) {
-      for (int j = 0; j < device.ris_settings.num_light_rays; j++) {
-        accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geometry(data, task.index, j));
-      }
-
-      accumulated_light = scale_color(accumulated_light, 1.0f / device.ris_settings.num_light_rays);
-    }
-
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
 
@@ -79,8 +74,7 @@ extern "C" __global__ void __raygen__optix() {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
 
-      state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
-      state_release(pixel, STATE_FLAG_DELTA_PATH);
+      state_release(pixel, STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
     }
   }
 

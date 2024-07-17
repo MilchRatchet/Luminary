@@ -292,11 +292,10 @@ struct LightSample {
   float target_pdf_normalization;
 } typedef LightSample;
 
-// TODO: Add colored dielectric as a flag
 enum GBufferFlags {
-  G_BUFFER_REQUIRES_SAMPLING    = 0b1,
-  G_BUFFER_VOLUME_HIT           = 0b10,
-  G_BUFFER_REFRACTION_IS_INSIDE = 0b100
+  G_BUFFER_VOLUME_HIT           = 0b1,
+  G_BUFFER_REFRACTION_IS_INSIDE = 0b10,
+  G_BUFFER_COLORED_DIELECTRIC   = 0b100
 } typedef GBufferFlags;
 
 struct GBufferData {
@@ -313,25 +312,7 @@ struct GBufferData {
   float ior_in;
   /* IOR of medium on the other side. */
   float ior_out;
-  uint32_t colored_dielectric;
 } typedef GBufferData;
-
-// For MIS, doesn't contain data that isn't used by light sampling.
-INTERLEAVED_STORAGE struct PackedGBufferData {
-  uint32_t hit_id;
-  uint16_t albedo_r;
-  uint16_t albedo_g;
-  uint16_t albedo_b;
-  uint16_t albedo_a;
-  uint16_t roughness;
-  uint16_t metallic;
-  vec3 position;
-  vec3 V;       // TODO: Compress
-  vec3 normal;  // TODO: Compress
-  uint32_t flags;
-  uint16_t ior_in;
-  uint16_t ior_out;
-} typedef PackedGBufferData;
 
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs

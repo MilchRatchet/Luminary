@@ -32,6 +32,9 @@ extern "C" __global__ void __raygen__optix() {
     if (task.hit_id == HIT_TYPE_TOY) {
       data = toy_generate_g_buffer(task, pixel);
     }
+    else if (task.hit_id == HIT_TYPE_OCEAN) {
+      data = ocean_generate_g_buffer(task, pixel);
+    }
     else {
       data = geometry_generate_g_buffer(task, pixel);
     }
@@ -41,62 +44,57 @@ extern "C" __global__ void __raygen__optix() {
     if (!material_is_mirror(data.roughness, data.metallic))
       write_albedo_buffer(opaque_color(data.albedo), pixel);
 
-    const bool include_emission = state_peek(pixel, STATE_FLAG_BOUNCE_LIGHTING);
+    const bool is_delta_path = state_peek(pixel, STATE_FLAG_DELTA_PATH);
 
-    const RGBF record = load_RGBF(device.ptrs.records + pixel);
+    ////////////////////////////////////////////////////////////////////
+    // Bounce Ray Sampling
+    ////////////////////////////////////////////////////////////////////
 
     BSDFSampleInfo bounce_info;
     vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
-    RGBF bounce_record = mul_color(record, bounce_info.weight);
+    ////////////////////////////////////////////////////////////////////
+    // Update delta path state
+    ////////////////////////////////////////////////////////////////////
 
-    bool use_light_rays        = false;
-    bool allow_bounce_lighting = false;
+    bool is_delta_distribution;
     if (bounce_info.is_transparent_pass) {
-      const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
-      ior_stack_interact(data.ior_out, pixel, ior_stack_method);
-
       const float refraction_scale = (data.ior_in > data.ior_out) ? data.ior_in / data.ior_out : data.ior_out / data.ior_in;
-      use_light_rays |= data.roughness * (refraction_scale - 1.0f) > 0.05f;
-      allow_bounce_lighting = !use_light_rays;
+      is_delta_distribution        = data.roughness * fminf(refraction_scale - 1.0f, 1.0f) <= GEOMETRY_DELTA_PATH_CUTOFF;
     }
     else {
-      use_light_rays |= ((data.metallic < 1.0f && data.albedo.a > 0.0f) || data.roughness > 0.05f);
-      allow_bounce_lighting |= bounce_info.is_microfacet_based && data.roughness <= 0.05f;
+      is_delta_distribution = bounce_info.is_microfacet_based && (data.roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
     }
 
-    if (include_emission) {
-      const RGBF emission = mul_color(data.emission, record);
+    ////////////////////////////////////////////////////////////////////
+    // Light Ray Sampling
+    ////////////////////////////////////////////////////////////////////
 
-      write_beauty_buffer(emission, pixel);
-    }
+    RGBF accumulated_light = (state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION)) ? data.emission : get_color(0.0f, 0.0f, 0.0f);
 
-    RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
 
-    if (use_light_rays) {
-      if (device.ris_settings.num_light_rays) {
-        for (int j = 0; j < device.ris_settings.num_light_rays; j++) {
-          accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geometry(data, task.index, j));
-        }
-
-        accumulated_light = scale_color(accumulated_light, 1.0f / device.ris_settings.num_light_rays);
-      }
-
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
-    }
+    const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
     accumulated_light = mul_color(accumulated_light, record);
 
     write_beauty_buffer(accumulated_light, pixel);
 
-    const float shift = (bounce_info.is_transparent_pass) ? -eps : eps;
-    data.position     = add_vector(data.position, scale_vector(data.V, shift * get_length(data.position)));
+    if (bounce_info.is_transparent_pass) {
+      const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      ior_stack_interact(data.ior_out, pixel, ior_stack_method);
+    }
+
+    data.position = shift_origin_vector(data.position, data.V, bounce_ray, bounce_info.is_transparent_pass);
 
     TraceTask bounce_task;
     bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
+
+    RGBF bounce_record = mul_color(record, bounce_info.weight);
 
     // This must be done after the trace rays due to some optimization in the compiler.
     // The compiler reloads these values at some point for some reason and if we overwrite
@@ -106,10 +104,17 @@ extern "C" __global__ void __raygen__optix() {
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
       store_RGBF(device.ptrs.records + pixel, bounce_record);
 
-      if (!allow_bounce_lighting) {
-        state_release(pixel, STATE_FLAG_BOUNCE_LIGHTING);
-        state_release(pixel, STATE_FLAG_DELTA_PATH);
+      uint32_t flags_to_release = 0;
+
+      if (is_delta_path && !is_delta_distribution) {
+        flags_to_release |= STATE_FLAG_DELTA_PATH;
       }
+
+      if (dot_product(data.V, bounce_ray) > -1.0f + eps) {
+        flags_to_release |= STATE_FLAG_CAMERA_DIRECTION;
+      }
+
+      state_release(pixel, flags_to_release);
     }
   }
 

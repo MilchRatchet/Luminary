@@ -8,8 +8,6 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
-enum LightRayTarget { LIGHT_RAY_TARGET_SUN = 0, LIGHT_RAY_TARGET_TOY = 1, LIGHT_RAY_TARGET_GEOMETRY = 2 } typedef LightRayTarget;
-
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);
   const float a = dot_product(triangle.edge1, h);
@@ -128,6 +126,56 @@ __device__ vec3 light_sample_triangle(
   }
 
   return dir;
+}
+
+__device__ void light_sample_triangle_presampled(
+  const TriangleLight triangle, const GBufferData data, const vec3 ray, float& solid_angle, float& dist, RGBF& color) {
+  float2 coords;
+  dist = light_triangle_intersection_uv(triangle, data.position, ray, coords);
+
+  // Our ray does not actually hit the light, abort. This should never happen!
+  if (dist == FLT_MAX) {
+    solid_angle = 0.0f;
+    return;
+  }
+
+  solid_angle = sample_triangle_solid_angle(triangle, data.position);
+
+  const uint16_t albedo_tex = device.scene.materials[triangle.material_id].albedo_map;
+  const uint16_t illum_tex  = device.scene.materials[triangle.material_id].luminance_map;
+
+  // Load texture coordinates if we need them.
+  UV tex_coords;
+  if (illum_tex != TEXTURE_NONE || albedo_tex != TEXTURE_NONE) {
+    tex_coords = load_triangle_tex_coords(triangle.triangle_id, coords);
+  }
+
+  if (illum_tex != TEXTURE_NONE) {
+    const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
+
+    color = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
+  }
+  else {
+    color.r = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_r);
+    color.g = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_g);
+    color.b = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_b);
+
+    const float scale = (float) (device.scene.materials[triangle.material_id].emission_scale);
+
+    color = scale_color(color, device.scene.material.default_material.b * scale);
+  }
+
+  if (luminance(color) > 0.0f) {
+    float alpha;
+    if (albedo_tex != TEXTURE_NONE) {
+      alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
+    }
+    else {
+      alpha = random_uint16_t_to_float(device.scene.materials[triangle.material_id].albedo_a);
+    }
+
+    color = scale_color(color, alpha);
+  }
 }
 
 #endif /* SHADING_KERNEL */
