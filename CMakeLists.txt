@@ -32,6 +32,9 @@ if(WIN32)
   if(DEFINED MSVC_LIB_DIR)
     link_directories(${MSVC_LIB_DIR})
   endif()
+
+  # TODO: Add linking on Linux
+  link_libraries(OpenGL32.lib)
 endif()
 
 #=============================================================

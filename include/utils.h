@@ -13,6 +13,7 @@
 #include "log.h"
 #include "structs.h"
 
+// TODO: Rename to CUDA_FAILURE_HANDLE
 #define gpuErrchk(ans)                                                                      \
   {                                                                                         \
     if (ans != cudaSuccess) {                                                               \

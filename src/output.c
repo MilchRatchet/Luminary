@@ -26,6 +26,7 @@ void offline_exit_post_process_menu(RaytraceInstance* instance) {
 }
 
 static void offline_post_process_menu(RaytraceInstance* instance) {
+#if 0
   WindowInstance* window = window_instance_init(instance);
 
   Frametime frametime = init_frametime();
@@ -97,6 +98,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
   free(title);
   window_instance_free(window);
   free_UI(&ui);
+#endif
 }
 
 void offline_output(RaytraceInstance* instance) {
@@ -144,6 +146,7 @@ void offline_output(RaytraceInstance* instance) {
 
   // Post Process Menu stores a backup of the current image, after the user is done the final output image is stored.
   if (instance->post_process_menu) {
+#if 0
     device_copy_framebuffer_to_8bit(
       device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
       instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
@@ -161,15 +164,18 @@ void offline_output(RaytraceInstance* instance) {
     }
 
     offline_post_process_menu(instance);
+#endif
   }
 
   if (instance->denoiser) {
     denoise_free(instance);
   }
 
+#if 0
   device_copy_framebuffer_to_8bit(
     device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
     instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
+
 
   switch (instance->image_format) {
     case IMGFORMAT_QOI:
@@ -213,6 +219,7 @@ void offline_output(RaytraceInstance* instance) {
 
   free(output_path);
   free(frame);
+#endif
 
   info_message("Offline render completed.");
 }
@@ -261,7 +268,9 @@ static void make_snapshot(RaytraceInstance* instance, WindowInstance* window, RG
       buffer = malloc(sizeof(XRGB8) * width * height);
       void* gpu_scratch;
       device_malloc(&gpu_scratch, sizeof(XRGB8) * width * height);
+#if 0
       device_copy_framebuffer_to_8bit(render_output_image, gpu_scratch, buffer, width, height, width, instance->output_variable);
+#endif
       device_free(gpu_scratch, sizeof(XRGB8) * width * height);
       break;
     default:
@@ -301,7 +310,7 @@ void realtime_output(RaytraceInstance* instance) {
   Frametime frametime_UI    = init_frametime();
   Frametime frametime_post  = init_frametime();
   Frametime frametime_total = init_frametime();
-  UI ui                     = init_UI(instance, window);
+  // UI ui                     = init_UI(instance, window);
 
   instance->temporal_frames  = 0;
   int temporal_frames_buffer = 0;
@@ -313,8 +322,6 @@ void realtime_output(RaytraceInstance* instance) {
 
   char* title = (char*) malloc(4096);
   denoise_create(instance);
-
-  void* gpu_scratch = device_buffer_get_pointer(window->gpu_buffer);
 
   while (!exit) {
     SDL_Event event;
@@ -331,7 +338,7 @@ void realtime_output(RaytraceInstance* instance) {
 
     // If window is not minimized
     DeviceBuffer* output_image = (DeviceBuffer*) 0;
-    if (!(SDL_GetWindowFlags(window->window) & SDL_WINDOW_MINIMIZED)) {
+    if (window_instance_is_visible(window)) {
       DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, instance->output_variable);
 
       if (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) {
@@ -349,8 +356,10 @@ void realtime_output(RaytraceInstance* instance) {
       }
 
       device_copy_framebuffer_to_8bit(
-        device_buffer_get_pointer(output_image), gpu_scratch, window->buffer, window->width, window->height, window->ld,
+        device_buffer_get_pointer(output_image), device_buffer_get_pointer(window->buffer), window->width, window->height, window->ld,
         instance->output_variable);
+
+      window_instance_update(window);
     }
 
     sample_frametime(&frametime_post);
@@ -368,7 +377,8 @@ void realtime_output(RaytraceInstance* instance) {
 
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_MOUSEMOTION) {
-        if (ui.active) {
+        // if (ui.active) {
+        if (0) {
           mmotion += event.motion.xrel;
         }
         else {
@@ -387,7 +397,7 @@ void realtime_output(RaytraceInstance* instance) {
           make_image = 1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
-          toggle_UI(&ui);
+          // toggle_UI(&ui);
         }
       }
       else if (event.type == SDL_QUIT) {
@@ -426,16 +436,16 @@ void realtime_output(RaytraceInstance* instance) {
       }
     }
 
-    window_instance_update_pointer(window);
+    window_instance_resize_buffer(window);
 
     start_frametime(&frametime_UI);
 
     // If window is not minimized
-    if (!(SDL_GetWindowFlags(window->window) & SDL_WINDOW_MINIMIZED)) {
-      set_input_events_UI(&ui, mmotion, mwheel);
-      handle_mouse_UI(&ui, instance);
-      render_UI(&ui);
-      blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
+    if (window_instance_is_visible(window)) {
+      // set_input_events_UI(&ui, mmotion, mwheel);
+      // handle_mouse_UI(&ui, instance);
+      // render_UI(&ui);
+      // blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
     }
 
     sample_frametime(&frametime_UI);
@@ -545,5 +555,5 @@ void realtime_output(RaytraceInstance* instance) {
   free(title);
   denoise_free(instance);
   window_instance_free(window);
-  free_UI(&ui);
+  // free_UI(&ui);
 }

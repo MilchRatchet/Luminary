@@ -28,8 +28,7 @@ void device_execute_main_kernels(RaytraceInstance* instance, int depth);
 void device_execute_debug_kernels(RaytraceInstance* instance);
 void device_handle_accumulation(RaytraceInstance* instance);
 void device_copy_framebuffer_to_8bit(
-  RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld,
-  const OutputVariable output_variable);
+  RGBF* src, XRGB8* dst, const int width, const int height, const int ld, const OutputVariable output_variable);
 
 ////////////////////////////////////////////////////////////////////
 // brdf_unittest.cuh

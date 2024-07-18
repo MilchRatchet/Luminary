@@ -147,8 +147,7 @@ extern "C" unsigned int device_get_thread_count() {
 }
 
 extern "C" void device_copy_framebuffer_to_8bit(
-  RGBF* gpu_source, XRGB8* gpu_scratch, XRGB8* cpu_dest, const int width, const int height, const int ld,
-  const OutputVariable output_variable) {
-  convert_RGBF_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(gpu_source, gpu_scratch, width, height, ld, output_variable);
-  gpuErrchk(cudaMemcpy(cpu_dest, gpu_scratch, sizeof(XRGB8) * ld * height, cudaMemcpyDeviceToHost));
+  RGBF* src, XRGB8* dst, const int width, const int height, const int ld, const OutputVariable output_variable) {
+  convert_RGBF_to_XRGB8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src, dst, width, height, ld, output_variable);
+  gpuErrchk(cudaDeviceSynchronize());
 }
