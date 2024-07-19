@@ -153,7 +153,8 @@ void window_instance_update(WindowInstance* window) {
   gpuErrchk(cudaGetMipmappedArrayLevel(&array, mipmapped_array, 0));
 
   gpuErrchk(cudaMemcpy2DToArray(
-    array, 0, 0, device_buffer_get_pointer(window->buffer), window->ld, window->width, window->height, cudaMemcpyDeviceToDevice));
+    array, 0, 0, device_buffer_get_pointer(window->buffer), window->ld * sizeof(XRGB8), window->width * sizeof(XRGB8), window->height,
+    cudaMemcpyDeviceToDevice));
 
   gpuErrchk(cudaDeviceSynchronize());
 

@@ -434,11 +434,11 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
 
     XRGB8 converted_pixel;
     converted_pixel.ignore = 0;
-    converted_pixel.r      = (uint8_t) pixel.r;
+    converted_pixel.r      = (uint8_t) pixel.b;
     converted_pixel.g      = (uint8_t) pixel.g;
-    converted_pixel.b      = (uint8_t) pixel.b;
+    converted_pixel.b      = (uint8_t) pixel.r;
 
-    dest[x + y * ld] = converted_pixel;
+    dest[x + (height - y - 1) * ld] = converted_pixel;
 
     id += blockDim.x * gridDim.x;
   }
