@@ -6,8 +6,10 @@
 
 extern "C" static __constant__ DeviceConstantMemory device;
 
+#include "bvh_utils.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "trace.cuh"
 #include "utils.cuh"
 
 enum OptixAlphaResult {
@@ -23,32 +25,30 @@ extern "C" __global__ void __raygen__optix() {
   const uint16_t trace_task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < trace_task_count; i++) {
-    const int offset     = get_task_address(i);
-    const TraceTask task = load_trace_task(device.ptrs.trace_tasks + offset);
-    const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
+    const int offset         = get_task_address(i);
+    const TraceTask task     = load_trace_task(device.ptrs.trace_tasks + offset);
+    const TraceResult result = trace_preprocess(task);
 
     const float3 origin = make_float3(task.origin.x, task.origin.y, task.origin.z);
     const float3 ray    = make_float3(task.ray.x, task.ray.y, task.ray.z);
 
-    const float tmax = result.x;
+    const float tmax = result.depth;
 
-    unsigned int depth  = __float_as_uint(result.x);
-    unsigned int hit_id = __float_as_uint(result.y);
+    unsigned int depth  = __float_as_uint(result.depth);
+    unsigned int hit_id = result.hit_id;
 
     optixTrace(device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0, depth, hit_id);
 
-    if (__uint_as_float(depth) < tmax) {
-      float2 trace_result;
+    float2 trace_result;
 
-      if (device.shading_mode == SHADING_HEAT) {
-        trace_result = make_float2(0.0f, __uint_as_float(hit_id));
-      }
-      else {
-        trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
-      }
-
-      __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
+    if (device.shading_mode == SHADING_HEAT) {
+      trace_result = make_float2(0.0f, __uint_as_float(hit_id));
     }
+    else {
+      trace_result = make_float2(__uint_as_float(depth), __uint_as_float(hit_id));
+    }
+
+    __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
   }
 }
 

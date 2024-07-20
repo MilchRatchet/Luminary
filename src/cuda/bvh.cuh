@@ -3,42 +3,17 @@
 
 #include <cuda_runtime_api.h>
 
+#include "bvh_utils.cuh"
 #include "intrinsics.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "trace.cuh"
 #include "utils.cuh"
 
 struct traversal_result {
   unsigned int hit_id;
   float depth;
 } typedef traversal_result;
-
-enum BVHAlphaResult { BVH_ALPHA_RESULT_OPAQUE = 0, BVH_ALPHA_RESULT_SEMI = 1, BVH_ALPHA_RESULT_TRANSPARENT = 2 } typedef BVHAlphaResult;
-
-/*
- * Performs alpha test on traversal triangle
- * @param t Triangle to test.
- * @param t_id ID of tested triangle.
- * @param coords Hit coordinates in triangle.
- * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
- */
-__device__ BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle t, uint32_t t_id, float2 coords) {
-  if (t.albedo_tex == TEXTURE_NONE)
-    return BVH_ALPHA_RESULT_OPAQUE;
-
-  const UV tex_coords    = load_triangle_tex_coords(t_id, coords);
-  const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[t.albedo_tex].tex, tex_coords.u, 1.0f - tex_coords.v);
-
-  if (tex_value.w <= device.scene.material.alpha_cutoff) {
-    return BVH_ALPHA_RESULT_TRANSPARENT;
-  }
-
-  if (tex_value.w < 1.0f) {
-    return BVH_ALPHA_RESULT_SEMI;
-  }
-
-  return BVH_ALPHA_RESULT_OPAQUE;
-}
 
 #define STACK_SIZE_SM 10
 #define STACK_SIZE 32
@@ -88,14 +63,14 @@ LUMINARY_KERNEL void process_trace_tasks() {
       if (offset >= trace_task_count)
         break;
 
-      const TraceTask task = load_trace_task(device.ptrs.trace_tasks + get_task_address(offset));
-      const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + get_task_address(offset)));
+      const TraceTask task     = load_trace_task(device.ptrs.trace_tasks + get_task_address(offset));
+      const TraceResult result = trace_preprocess(task);
 
       node_task     = make_uint2(0, 0x80000000);
       triangle_task = make_uint2(0, 0);
 
-      depth  = result.x;
-      hit_id = __float_as_uint(result.y);
+      depth  = result.depth;
+      hit_id = result.hit_id;
 
       origin = task.origin;
       ray    = task.ray;

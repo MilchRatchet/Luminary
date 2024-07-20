@@ -63,16 +63,8 @@ void device_handle_accumulation(RaytraceInstance* instance) {
 extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int depth) {
   device_update_symbol(depth, depth);
 
-  // TODO: Only do this for depth == 1
   if (depth > 0)
     balance_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-
-  // TODO: Merge preprocess with trace kernels
-  preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-
-  if (instance->scene.particles.active) {
-    optixrt_execute(instance->particles_instance.kernel);
-  }
 
   if (instance->bvh_type == BVH_LUMINARY) {
     process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
@@ -81,7 +73,6 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
     optixrt_execute(instance->optix_kernel);
   }
 
-  // TODO: Merge these 3 kernels
   if (instance->scene.fog.active || instance->scene.ocean.active) {
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -110,8 +101,6 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
 extern "C" void device_execute_debug_kernels(RaytraceInstance* instance) {
   const int depth = 0;
   device_update_symbol(depth, depth);
-
-  preprocess_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 
   if (instance->scene.particles.active) {
     optixrt_execute(instance->particles_instance.kernel);

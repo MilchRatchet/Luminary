@@ -1,6 +1,7 @@
 #ifndef CU_MEMORY_H
 #define CU_MEMORY_H
 
+#include "math.cuh"
 #include "state.cuh"
 #include "utils.cuh"
 

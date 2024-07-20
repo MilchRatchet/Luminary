@@ -1,6 +1,7 @@
 #ifndef CU_OCEAN_UTILS_H
 #define CU_OCEAN_UTILS_H
 
+#include "ior_stack.cuh"
 #include "sky_utils.cuh"
 #include "utils.cuh"
 
