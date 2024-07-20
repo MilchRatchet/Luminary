@@ -339,8 +339,6 @@ struct Jitter {
   float prev_y;
 } typedef Jitter;
 
-enum LightSideMode { LIGHT_SIDE_MODE_BOTH = 0, LIGHT_SIDE_MODE_ONE_CW = 1, LIGHT_SIDE_MODE_ONE_CCW = 2 } typedef LightSideMode;
-
 struct GlobalMaterial {
   RGBF default_material;
   int lights_active;
@@ -348,7 +346,6 @@ struct GlobalMaterial {
   int colored_transparency;
   int invert_roughness;
   int override_materials;
-  LightSideMode light_side_mode;
   int enable_ior_shadowing;
 } typedef GlobalMaterial;
 

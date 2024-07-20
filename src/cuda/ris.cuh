@@ -98,18 +98,6 @@ __device__ uint32_t ris_sample_light(
 
     const TriangleLight triangle_light = load_triangle_light(device.ris_settings.presampled_triangle_lights, presampled_id);
 
-    // Reject if the light has no emission towards us.
-    if (device.scene.material.light_side_mode != LIGHT_SIDE_MODE_BOTH) {
-      const vec3 face_normal = cross_product(triangle_light.edge1, triangle_light.edge2);
-      const float direction  = dot_product(face_normal, sub_vector(triangle_light.vertex, data.position));
-
-      const float side = (device.scene.material.light_side_mode == LIGHT_SIDE_MODE_ONE_CW) ? 1.0f : -1.0f;
-
-      if (direction * side > 0.0f) {
-        continue;
-      }
-    }
-
     const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + light_ray_index * reservoir_size + i, pixel);
 
     float solid_angle, dist;

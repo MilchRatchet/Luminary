@@ -62,12 +62,6 @@ Set 1 to cancel light ray when intersecting a boundary of two mediums with diffe
 `MATERIAL INVERTRO [INT32]`<br/>
 Set 1 to invert roughness for geometry, 0 else. Enabling this gives you legacy behaviour where the roughness from the input geometry was always inverted.
 
-`MATERIAL BACKSIDE [INT32]`<br/>
-Determines which sides of lights are emitting light.
- - 0 = Both sides
- - 1 = One Side (Clockwise)
- - 2 = One Side (Counter-Clockwise)
-
 ## Camera Settings
 
 `CAMERA POSITION [FP32] [FP32] [FP32]`<br/>
