@@ -85,6 +85,7 @@ void scene_init(Scene** _scene) {
   scene->ocean.caustics_ris_sample_count = 32;
   scene->ocean.caustics_regularization   = 1.0f;
   scene->ocean.caustics_domain_scale     = 0.5f;
+  scene->ocean.multiscattering           = 0;
 
   scene->toy.active           = 0;
   scene->toy.emissive         = 0;

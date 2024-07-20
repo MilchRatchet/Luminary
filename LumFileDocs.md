@@ -365,6 +365,9 @@ Bias the sun radius to achieve softer and faster converging caustics.
 `OCEAN CAUSSCAL [FP32]`<br/>
 Scale of the sampling domain. A larger domain means more caustic paths can be found at the cost of noise.
 
+`OCEAN MULTISCA [INT32]`<br/>
+Set 1 to activate multiscattering for underwater volumetrics, 0 else.
+
 ## Particle Settings
 
 `PARTICLE ACTIVE__ [INT32]`<br/>

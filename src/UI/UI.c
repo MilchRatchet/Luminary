@@ -58,12 +58,12 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
     create_info(ui, "Triangle Count", &(instance->scene.triangle_data.triangle_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_dropdown(ui, "BVH Type", &(instance->bvh_type), 1, 2, "Luminary\0OptiX", 8);
   panels[i++] = create_dropdown(
-    ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Identification\0Lights", 8);
-  panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 9);
+    ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Identification\0Lights", 9);
+  panels[i++] = create_dropdown(ui, "Accumulation Mode", &(instance->accum_mode), 1, 3, "Off\0Accumulation\0Reprojection", 10);
   if (instance->aov_mode) {
     panels[i++] = create_dropdown(
       ui, "Output Variable", &(instance->output_variable), 0, 5,
-      "Beauty\0Albedo Guidance\0Normal Guidance\0Direct Lighting\0Indirect Lighting", 10);
+      "Beauty\0Albedo Guidance\0Normal Guidance\0Direct Lighting\0Indirect Lighting", 11);
   }
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
@@ -587,6 +587,7 @@ static UITab create_procedurals_ocean_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_slider(ui, "Choppyness", &(instance->scene.ocean.choppyness), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Frequency", &(instance->scene.ocean.frequency), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene.ocean.refractive_index), 1, 0.001f, 1.0f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Multiscattering", &(instance->scene.ocean.multiscattering), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

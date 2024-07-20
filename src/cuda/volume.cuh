@@ -77,28 +77,27 @@ LUMINARY_KERNEL void volume_process_events() {
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
-        const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
-
         float integration_depth = path.y;
 
-        if (volume_dist < depth) {
-          depth  = volume_dist;
-          hit_id = HIT_TYPE_VOLUME_OCEAN;
+        const bool allow_ocean_volume_hit = device.scene.ocean.multiscattering || !state_peek(pixel, STATE_FLAG_OCEAN_SCATTERED);
 
-          integration_depth = depth - path.x;
+        if (allow_ocean_volume_hit) {
+          const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
-          const float sampling_pdf = volume.max_scattering * expf(-integration_depth * volume.max_scattering);
-          const RGBF target_pdf    = get_color(
-            volume.scattering.r * expf(-integration_depth * volume.scattering.r),
-            volume.scattering.g * expf(-integration_depth * volume.scattering.g),
-            volume.scattering.b * expf(-integration_depth * volume.scattering.b));
+          if (volume_dist < depth) {
+            depth  = volume_dist;
+            hit_id = HIT_TYPE_VOLUME_OCEAN;
 
-          record = mul_color(record, scale_color(target_pdf, 1.0f / sampling_pdf));
+            integration_depth = depth - path.x;
+
+            const float sampling_pdf = volume.max_scattering * expf(-integration_depth * volume.max_scattering);
+            record                   = mul_color(record, scale_color(volume.scattering, 1.0f / sampling_pdf));
+          }
         }
 
-        record.r *= expf(-integration_depth * volume.absorption.r);
-        record.g *= expf(-integration_depth * volume.absorption.g);
-        record.b *= expf(-integration_depth * volume.absorption.b);
+        record.r *= expf(-integration_depth * (volume.absorption.r + volume.scattering.r));
+        record.g *= expf(-integration_depth * (volume.absorption.g + volume.scattering.g));
+        record.b *= expf(-integration_depth * (volume.absorption.b + volume.scattering.b));
       }
     }
 

@@ -321,6 +321,7 @@ struct Ocean {
   int caustics_ris_sample_count;
   float caustics_regularization;
   float caustics_domain_scale;
+  int multiscattering;
 } typedef Ocean;
 
 struct Fog {

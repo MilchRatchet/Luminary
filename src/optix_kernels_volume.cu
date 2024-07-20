@@ -74,6 +74,10 @@ extern "C" __global__ void __raygen__optix() {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
 
+      if (volume_type == VOLUME_TYPE_OCEAN) {
+        state_consume(pixel, STATE_FLAG_OCEAN_SCATTERED);
+      }
+
       state_release(pixel, STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
     }
   }
