@@ -353,9 +353,6 @@ Set 1 to activate the ocean caustics, 0 else.
 `OCEAN CAUSRISS [INT32]`<br/>
 Number of RIS samples used to sample caustic paths.
 
-`OCEAN CAUSREGU [FP32]`<br/>
-Bias the sun radius to achieve softer and faster converging caustics.
-
 `OCEAN CAUSSCAL [FP32]`<br/>
 Scale of the sampling domain. A larger domain means more caustic paths can be found at the cost of noise.
 

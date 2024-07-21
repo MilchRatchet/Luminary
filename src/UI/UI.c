@@ -575,7 +575,6 @@ static UITab create_procedurals_ocean_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_check(ui, "Caustics", &(instance->scene.ocean.caustics_active), 1);
   panels[i++] =
     create_slider(ui, "Caustics RIS Samples", &(instance->scene.ocean.caustics_ris_sample_count), 1, 0.01f, 1.0f, 1024.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Caustics Regularization", &(instance->scene.ocean.caustics_regularization), 1, 0.001f, 1.0f, 8.0f, 0, 0);
   panels[i++] = create_slider(ui, "Caustics Domain Scale", &(instance->scene.ocean.caustics_domain_scale), 1, 0.001f, 0.0f, 2.0f, 0, 0);
   panels[i++] = create_dropdown(
     ui, "Jerlov Water Type", &(instance->scene.ocean.water_type), 1, 10,

@@ -539,10 +539,6 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
     case 6004223346149245251u:
       sscanf(value, "%d\n", &ocean->caustics_ris_sample_count);
       break;
-    /* CAUSREGU */
-    case 6144956436458062147u:
-      sscanf(value, "%f\n", &ocean->caustics_regularization);
-      break;
     /* CAUSSCAL */
     case 5494747045528158531u:
       sscanf(value, "%f\n", &ocean->caustics_domain_scale);
@@ -1047,8 +1043,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "OCEAN CAUSACTI %d\n", instance->scene.ocean.caustics_active);
   fputs(line, file);
   sprintf(line, "OCEAN CAUSRISS %d\n", instance->scene.ocean.caustics_ris_sample_count);
-  fputs(line, file);
-  sprintf(line, "OCEAN CAUSREGU %f\n", instance->scene.ocean.caustics_regularization);
   fputs(line, file);
   sprintf(line, "OCEAN CAUSSCAL %f\n", instance->scene.ocean.caustics_domain_scale);
   fputs(line, file);

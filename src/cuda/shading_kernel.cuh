@@ -231,27 +231,53 @@ __device__ RGBF
   // Sample a caustic connection vertex using RIS
   ////////////////////////////////////////////////////////////////////
 
-  const vec3 sun_dir                           = normalize_vector(sub_vector(device.sun_pos, sky_pos));
+  float solid_angle;
+  const float2 sun_dir_random                  = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_SUN_DIR, index);
+  const vec3 sun_dir                           = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
   const CausticsSamplingDomain sampling_domain = caustics_get_domain(data, sun_dir, is_underwater);
 
   vec3 connection_point;
   float sum_connection_weight = 0.0f;
+  float connection_weight;
 
-  const uint32_t num_samples = (device.scene.ocean.amplitude > 0.0f) ? device.scene.ocean.caustics_ris_sample_count : 1;
-
-  // RIS with target weight being the Dirac delta of if the connection point is valid or not.
-  for (uint32_t i = 0; i < num_samples; i++) {
+  if (sampling_domain.fast_path) {
     vec3 sample_point;
     float sample_weight;
-    if (caustics_find_connection_point(data, index, sampling_domain, is_underwater, i, sample_point, sample_weight)) {
-      sum_connection_weight += sample_weight;
-      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index) * sum_connection_weight < sample_weight) {
-        connection_point = sample_point;
+    caustics_find_connection_point(data, index, sampling_domain, is_underwater, 0, sample_point, sample_weight);
+
+    sum_connection_weight = sample_weight;
+    connection_point      = sample_point;
+    connection_weight     = sample_weight;
+  }
+  else {
+    const uint32_t num_samples = device.scene.ocean.caustics_ris_sample_count;
+
+    // RIS with target weight being the Dirac delta of if the connection point is valid or not.
+    for (uint32_t i = 0; i < num_samples; i++) {
+      vec3 sample_point;
+      float sample_weight;
+      if (caustics_find_connection_point(data, index, sampling_domain, is_underwater, i, sample_point, sample_weight)) {
+        sum_connection_weight += sample_weight;
+        if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index) * sum_connection_weight < sample_weight) {
+          connection_point = sample_point;
+        }
       }
     }
-  }
 
-  const float connection_weight = (1.0f / num_samples) * sum_connection_weight;
+    connection_weight = (1.0f / num_samples) * sum_connection_weight;
+
+    // Make no mistake. I do in fact have no idea what I am doing. So I just empirically gathered that these
+    // weights are correct (they are very unlikely to be correct). I will look into fixing this the moment
+    // I start caring.
+
+    // Inspired by the famous factor required for refraction when sampling importance. Note that one of the IOR is 1.0f.
+    connection_weight *= device.scene.ocean.refractive_index * device.scene.ocean.refractive_index;
+
+    if (is_underwater) {
+      // ... and why not apply it again, we are just sampling some extra importance clearly. And a 2.0f for good measure.
+      connection_weight *= device.scene.ocean.refractive_index * device.scene.ocean.refractive_index * 2.0f;
+    }
+  }
 
   if (sum_connection_weight == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
@@ -271,7 +297,9 @@ __device__ RGBF
   const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, connection_weight);
   light_color           = mul_color(light_color, bsdf_value);
 
-  const vec3 normal = scale_vector(ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS), (is_underwater) ? -1.0f : 1.0f);
+  const vec3 ocean_normal =
+    (sampling_domain.fast_path) ? get_vector(0.0f, 1.0f, 0.0f) : ocean_get_normal(connection_point, OCEAN_ITERATIONS_NORMAL_CAUSTICS);
+  const vec3 normal = scale_vector(ocean_normal, (is_underwater) ? -1.0f : 1.0f);
 
   bool total_reflection;
   const vec3 refraction_dir =
@@ -280,9 +308,6 @@ __device__ RGBF
     ocean_reflection_coefficient(normal, dir, refraction_dir, sampling_domain.ior_in, sampling_domain.ior_out);
 
   light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
-
-  // Reduce light intensity based on regularization factor, this is not physically correct in any way
-  light_color = scale_color(light_color, 1.0f / device.scene.ocean.caustics_regularization);
 
   if (luminance(light_color) < eps)
     return get_color(0.0f, 0.0f, 0.0f);
@@ -358,8 +383,8 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   if (device.scene.ocean.active) {
     // TODO: Change the iterations count if necessary.
     is_underwater  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
-    sample_direct  = !device.scene.ocean.caustics_active || !is_underwater;
-    sample_caustic = device.scene.ocean.caustics_active && data.hit_id != HIT_TYPE_OCEAN;
+    sample_direct  = !is_underwater;
+    sample_caustic = (device.scene.ocean.caustics_active || is_underwater) && data.hit_id != HIT_TYPE_OCEAN;
   }
 
   RGBF sun_light = get_color(0.0f, 0.0f, 0.0f);
