@@ -11,6 +11,7 @@
 #include "UI_dropdown.h"
 #include "UI_info.h"
 #include "UI_panel.h"
+#include "UI_render.h"
 #include "UI_text.h"
 #include "baked.h"
 #include "device.h"
@@ -716,6 +717,8 @@ UI init_UI(RaytraceInstance* instance, WindowInstance* window) {
 
   ui.temporal_frames = &(instance->temporal_frames);
 
+  ui.rendering_context_dirty = 1;
+
   size_t scratch_size = compute_scratch_space();
   ui.scratch          = malloc(scratch_size);
   init_text(&ui);
@@ -971,10 +974,14 @@ static void render_tab(UI* ui, UITab* tab) {
   }
 }
 
-void render_UI(UI* ui) {
+void ui_render(UI* ui, void* dst, int width, int height, int ld) {
   if (!ui->active)
     return;
 
+  ui_render_update_context(ui);
+  ui_render_internal(ui, dst, width, height, ld);
+
+#if 0
   memset(ui->pixels, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT_BUFFER * 4);
   memset(ui->pixels_mask, 0, sizeof(uint8_t) * UI_WIDTH * UI_HEIGHT_BUFFER * 4);
 
@@ -986,6 +993,7 @@ void render_UI(UI* ui) {
     const int first_panel = 1 + ui->scroll_pos / PANEL_HEIGHT;
     render_dropdown(ui, ui->dropdown, first_panel - 1);
   }
+#endif
 }
 
 void blit_UI(UI* ui, uint8_t* target, int width, int height, int ld) {

@@ -310,7 +310,7 @@ void realtime_output(RaytraceInstance* instance) {
   Frametime frametime_UI    = init_frametime();
   Frametime frametime_post  = init_frametime();
   Frametime frametime_total = init_frametime();
-  // UI ui                     = init_UI(instance, window);
+  UI ui                     = init_UI(instance, window);
 
   instance->temporal_frames  = 0;
   int temporal_frames_buffer = 0;
@@ -336,34 +336,6 @@ void realtime_output(RaytraceInstance* instance) {
 
     start_frametime(&frametime_post);
 
-    // If window is not minimized
-    DeviceBuffer* output_image = (DeviceBuffer*) 0;
-    if (window_instance_is_visible(window)) {
-      DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, instance->output_variable);
-
-      if (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) {
-        if (instance->denoiser) {
-          base_output_image = denoise_apply(instance, device_buffer_get_pointer(instance->frame_accumulate));
-        }
-
-        device_buffer_copy(base_output_image, instance->frame_output);
-        device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
-
-        output_image = instance->frame_output;
-      }
-      else {
-        output_image = base_output_image;
-      }
-
-      device_copy_framebuffer_to_8bit(
-        device_buffer_get_pointer(output_image), device_buffer_get_pointer(window->buffer), window->width, window->height, window->ld,
-        instance->output_variable);
-
-      window_instance_update(window);
-    }
-
-    sample_frametime(&frametime_post);
-
     instance->temporal_frames++;
     temporal_frames_buffer++;
 
@@ -377,8 +349,7 @@ void realtime_output(RaytraceInstance* instance) {
 
     while (SDL_PollEvent(&event)) {
       if (event.type == SDL_MOUSEMOTION) {
-        // if (ui.active) {
-        if (0) {
+        if (ui.active) {
           mmotion += event.motion.xrel;
         }
         else {
@@ -397,7 +368,7 @@ void realtime_output(RaytraceInstance* instance) {
           make_image = 1;
         }
         else if (event.key.keysym.scancode == SDL_SCANCODE_E) {
-          // toggle_UI(&ui);
+          toggle_UI(&ui);
         }
       }
       else if (event.type == SDL_QUIT) {
@@ -436,19 +407,43 @@ void realtime_output(RaytraceInstance* instance) {
       }
     }
 
-    window_instance_resize_buffer(window);
-
-    start_frametime(&frametime_UI);
-
     // If window is not minimized
+    DeviceBuffer* output_image = (DeviceBuffer*) 0;
     if (window_instance_is_visible(window)) {
-      // set_input_events_UI(&ui, mmotion, mwheel);
-      // handle_mouse_UI(&ui, instance);
-      // render_UI(&ui);
-      // blit_UI(&ui, (uint8_t*) window->buffer, window->width, window->height, window->ld);
+      DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, instance->output_variable);
+
+      if (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) {
+        if (instance->denoiser) {
+          base_output_image = denoise_apply(instance, device_buffer_get_pointer(instance->frame_accumulate));
+        }
+
+        device_buffer_copy(base_output_image, instance->frame_output);
+        device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
+
+        output_image = instance->frame_output;
+      }
+      else {
+        output_image = base_output_image;
+      }
+
+      device_copy_framebuffer_to_8bit(
+        device_buffer_get_pointer(output_image), device_buffer_get_pointer(window->buffer), window->width, window->height, window->ld,
+        instance->output_variable);
+
+      start_frametime(&frametime_UI);
+
+      set_input_events_UI(&ui, mmotion, mwheel);
+      handle_mouse_UI(&ui, instance);
+      ui_render(&ui, device_buffer_get_pointer(window->buffer), window->width, window->height, window->ld);
+
+      sample_frametime(&frametime_UI);
+
+      window_instance_update(window);
     }
 
-    sample_frametime(&frametime_UI);
+    sample_frametime(&frametime_post);
+
+    window_instance_resize_buffer(window);
 
     if (make_image) {
       log_message("Taking snapshot.");
@@ -555,5 +550,5 @@ void realtime_output(RaytraceInstance* instance) {
   free(title);
   denoise_free(instance);
   window_instance_free(window);
-  // free_UI(&ui);
+  free_UI(&ui);
 }

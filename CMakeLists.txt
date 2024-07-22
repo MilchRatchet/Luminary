@@ -51,7 +51,7 @@ endif()
 # Set files to compile
 #=============================================================
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
-file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
+file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu" "${CMAKE_SOURCE_DIR}/src/UI/*.cu")
 file(GLOB gpu_header_files "${CMAKE_SOURCE_DIR}/src/cuda/*.cuh")
 
 list(REMOVE_ITEM gpu_source_files

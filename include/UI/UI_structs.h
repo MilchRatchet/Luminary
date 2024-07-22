@@ -3,8 +3,16 @@
 
 #include "SDL.h"
 #include "SDL_ttf.h"
+#include "buffer.h"
 
 #define UI_MAX_TAB_DEPTH 8
+
+struct UIRenderingContext {
+  int width;
+  int height;
+  int offset_x;
+  int offset_y;
+} typedef UIRenderingContext;
 
 typedef struct UIPanel UIPanel;
 typedef struct UITab UITab;
@@ -57,6 +65,8 @@ struct UI {
   int tab_count;
   int* temporal_frames;
   void* scratch;
+  int rendering_context_dirty;
+  DeviceBuffer* frame;
 } typedef UI;
 
 #endif /* UI_STRUCTS_H */
