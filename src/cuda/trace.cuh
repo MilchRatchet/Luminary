@@ -11,6 +11,8 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
   float depth     = device.scene.camera.far_clip_distance;
   uint32_t hit_id = HIT_TYPE_SKY;
 
+  // Intersect against the triangle we hit in primary visible in the last frame.
+  // This is a heuristic to speed up the BVH traversal.
   if (device.shading_mode != SHADING_HEAT && IS_PRIMARY_RAY) {
     uint32_t t_id;
     TraversalTriangle tt;

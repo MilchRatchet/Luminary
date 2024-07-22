@@ -163,16 +163,14 @@ __device__ void write_normal_buffer(const vec3 normal, const int pixel) {
   device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
 }
 
-__device__ void write_beauty_buffer(const RGBF beauty, const int pixel, bool is_direct = IS_PRIMARY_RAY, const bool mode_set = false) {
+__device__ void write_beauty_buffer(const RGBF beauty, const int pixel, const bool mode_set = false) {
   RGBF output = beauty;
   if (!mode_set) {
     output = add_color(beauty, load_RGBF(device.ptrs.frame_buffer + pixel));
   }
   store_RGBF(device.ptrs.frame_buffer + pixel, output);
 
-  if (!is_direct) {
-    is_direct = state_peek(pixel, STATE_FLAG_DELTA_PATH);
-  }
+  const bool is_direct = state_peek(pixel, STATE_FLAG_DELTA_PATH);
 
   if (is_direct) {
     output = beauty;
