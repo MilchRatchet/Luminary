@@ -70,6 +70,10 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
     optixrt_execute(instance->optix_kernel);
   }
 
+  if (instance->scene.particles.active) {
+    optixrt_execute(instance->particles_instance.kernel);
+  }
+
   if (instance->scene.fog.active || instance->scene.ocean.active) {
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -99,15 +103,15 @@ extern "C" void device_execute_debug_kernels(RaytraceInstance* instance) {
   const int depth = 0;
   device_update_symbol(depth, depth);
 
-  if (instance->scene.particles.active) {
-    optixrt_execute(instance->particles_instance.kernel);
-  }
-
   if (instance->bvh_type == BVH_LUMINARY) {
     process_trace_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
   else {
     optixrt_execute(instance->optix_kernel);
+  }
+
+  if (instance->scene.particles.active) {
+    optixrt_execute(instance->particles_instance.kernel);
   }
 
   if (instance->scene.fog.active || instance->scene.ocean.active) {
