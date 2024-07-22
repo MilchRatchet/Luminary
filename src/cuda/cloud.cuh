@@ -179,7 +179,7 @@ __device__ CloudRenderResult
 
       const int sun_visible = !sph_ray_hit_p0(sun_ray, pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
-        sun_color = sky_get_sun_color(pos, sun_ray);
+        sun_color = sky_get_sun_color(pos, sun_ray, false);
 
         sun_cos_angle = dot_product(ray, sun_ray);
 

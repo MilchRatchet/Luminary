@@ -611,6 +611,17 @@ LUMINARY_KERNEL void process_sky_tasks() {
     RGBF sky;
     if (device.scene.sky.hdri_active) {
       sky = sky_hdri_sample(task.ray, 0.0f);
+
+      if (state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION)) {
+        const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
+
+        // HDRI does not include the sun, compute sun visibility
+        if (sphere_ray_hit(task.ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS)) {
+          const RGBF sun_color = sky_get_sun_color(sky_origin, task.ray);
+
+          sky = add_color(sky, sun_color);
+        }
+      }
     }
     else {
       const vec3 sky_origin  = world_to_sky_transform(task.position);

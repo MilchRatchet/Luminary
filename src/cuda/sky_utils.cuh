@@ -326,7 +326,7 @@ __device__ RGBF sky_compute_color_from_spectrum(const Spectrum radiance) {
 // This is a quick way of obtaining the color of the sun disk times transmittance
 // Note that it is not checked whether the sun is actually hit by ray, it is simply assumed
 // Inscattering is not included
-__device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
+__device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray, const bool include_cloud_hdri = true) {
   const float height           = sky_height(origin);
   const float zenith_cos_angle = dot_product(normalize_vector(origin), ray);
 
@@ -340,12 +340,10 @@ __device__ RGBF sky_get_sun_color(const vec3 origin, const vec3 ray) {
 
   RGBF sun_color = sky_compute_color_from_spectrum(radiance);
 
-#ifdef SHADING_KERNEL
-  if (device.scene.sky.hdri_active) {
+  if (include_cloud_hdri && device.scene.sky.hdri_active) {
     const float cloud_alpha = sky_hdri_sample_alpha(ray);
     sun_color               = scale_color(sun_color, cloud_alpha);
   }
-#endif /* SHADING_KERNEL */
 
   return sun_color;
 }
