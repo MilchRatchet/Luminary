@@ -173,6 +173,8 @@ LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumul
   }
 }
 
+#if 0
+// Legacy temporal reprojection implementation
 LUMINARY_KERNEL void temporal_reprojection() {
   const int amount = device.width * device.height;
 
@@ -219,5 +221,6 @@ LUMINARY_KERNEL void temporal_reprojection() {
     // device.frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));
   }
 }
+#endif
 
 #endif /* CU_TEMPORAL_H */

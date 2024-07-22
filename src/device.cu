@@ -51,9 +51,6 @@ void device_handle_accumulation(RaytraceInstance* instance) {
       temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
       break;
     case TEMPORAL_REPROJECTION:
-      device_buffer_copy(instance->frame_accumulate, instance->frame_temporal);
-      temporal_reprojection<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      break;
     default:
       error_message("Invalid accumulation mode %d specified", instance->accum_mode);
       break;
