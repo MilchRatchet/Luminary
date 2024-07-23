@@ -370,8 +370,11 @@ __device__ RGBF bsdf_conductor(
       ss_term = bsdf_microfacet_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_DIFFUSE:
+      ss_term = bsdf_microfacet_evaluate_sampled_diffuse(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
+      break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      ss_term = 0.0f;
+      ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV)
+                / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
       break;
   };
 
@@ -405,7 +408,8 @@ __device__ RGBF
       ss_term = bsdf_microfacet_evaluate_sampled_diffuse(data, ctx.NdotH, ctx.NdotL, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      ss_term = 0.0f;
+      ss_term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV)
+                / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
       break;
   };
 
@@ -421,7 +425,8 @@ __device__ RGBF
       diff_term = bsdf_diffuse_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotH, ctx.NdotV);
       break;
     case BSDF_SAMPLING_MICROFACET_REFRACTION:
-      diff_term = 0.0f;
+      diff_term = bsdf_diffuse_evaluate(data, ctx.NdotL)
+                  / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
       break;
   };
 
@@ -477,8 +482,10 @@ __device__ RGBF bsdf_dielectric(
         term = bsdf_microfacet_evaluate_sampled_microfacet(data, ctx.NdotL, ctx.NdotV);
         break;
       case BSDF_SAMPLING_DIFFUSE:
+        term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV) / bsdf_diffuse_pdf(data, ctx.NdotL);
       case BSDF_SAMPLING_MICROFACET_REFRACTION:
-        term = 0.0f;
+        term = bsdf_microfacet_evaluate(data, ctx.NdotH, ctx.NdotL, ctx.NdotV)
+               / bsdf_microfacet_refraction_pdf(data, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index);
         break;
     };
 
