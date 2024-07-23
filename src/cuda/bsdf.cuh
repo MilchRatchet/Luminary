@@ -201,7 +201,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       const float weight = luminance(eval) * mis_weight;
 
       sum_weights += weight;
-      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_GLOSSY, pixel) * sum_weights < weight) {
+      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_RIS_DIFFUSE, pixel) * sum_weights < weight) {
         ray_local                = ray;
         selected_eval            = eval;
         info.is_transparent_pass = false;
@@ -233,7 +233,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
       const float weight = luminance(eval) * mis_weight;
 
       sum_weights += weight;
-      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_DIELECTRIC, pixel) * sum_weights < weight) {
+      if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_RIS_REFRACTION, pixel) * sum_weights < weight) {
         ray_local                = ray;
         selected_eval            = eval;
         info.is_transparent_pass = !total_reflection;
