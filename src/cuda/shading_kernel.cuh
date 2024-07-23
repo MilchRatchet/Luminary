@@ -176,7 +176,7 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
     return get_color(0.0f, 0.0f, 0.0f);
 
   // Transparent pass through rays are not allowed.
-  if (dot_product(data.V, dir) < -1.0f + eps)
+  if (bsdf_is_pass_through_ray(data.V, dir))
     return get_color(0.0f, 0.0f, 0.0f);
 
   light_color = scale_color(light_color, sum_weights / target_pdf);
@@ -313,7 +313,7 @@ __device__ RGBF
     return get_color(0.0f, 0.0f, 0.0f);
 
   // Transparent pass through rays are not allowed.
-  if (dot_product(data.V, dir) < -1.0f + eps)
+  if (bsdf_is_pass_through_ray(data.V, dir))
     return get_color(0.0f, 0.0f, 0.0f);
 
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
@@ -488,7 +488,7 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
     return get_color(0.0f, 0.0f, 0.0f);
 
   // Transparent pass through rays are not allowed.
-  if (dot_product(data.V, dir) < -1.0f + eps)
+  if (bsdf_is_pass_through_ray(data.V, dir))
     return get_color(0.0f, 0.0f, 0.0f);
 
   light_color = scale_color(light_color, sum_weights / target_pdf);
@@ -578,7 +578,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
     return get_color(0.0f, 0.0f, 0.0f);
 
   // Transparent pass through rays are not allowed.
-  if (dot_product(data.V, dir) < -1.0f + eps)
+  if (bsdf_is_pass_through_ray(data.V, dir))
     return get_color(0.0f, 0.0f, 0.0f);
 
   ////////////////////////////////////////////////////////////////////

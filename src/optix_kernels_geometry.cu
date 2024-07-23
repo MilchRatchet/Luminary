@@ -110,7 +110,7 @@ extern "C" __global__ void __raygen__optix() {
         flags_to_release |= STATE_FLAG_DELTA_PATH;
       }
 
-      if (dot_product(data.V, bounce_ray) > -1.0f + eps) {
+      if (!bsdf_is_pass_through_ray(data.V, bounce_ray)) {
         flags_to_release |= STATE_FLAG_CAMERA_DIRECTION;
       }
 

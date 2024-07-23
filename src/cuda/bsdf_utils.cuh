@@ -46,6 +46,10 @@ enum BSDFSamplingHint {
   BSDF_SAMPLING_MICROFACET_REFRACTION = 3
 };
 
+__device__ bool bsdf_is_pass_through_ray(const vec3 V, const vec3 L) {
+  return dot_product(V, L) < (-1.0f + 16.0f * eps);
+}
+
 ///////////////////////////////////////////////////
 // Fresnel
 ///////////////////////////////////////////////////
