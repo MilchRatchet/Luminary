@@ -31,8 +31,8 @@ __device__ float __fslctf(const float a, const float b, const float c) {
  * Semantic:
  * ____uswap16p(a) = (a >> 16) | (a << 16);
  */
-__device__ uint32_t __uswap16p(const uint32_t a) {
-  uint32_t result;
+__device__ unsigned int __uswap16p(const unsigned int a) {
+  unsigned int result;
   asm("prmt.b32 %0, %1, %2, 0b0001000000110010;" : "=r"(result) : "r"(a), "r"(a));
   return result;
 }

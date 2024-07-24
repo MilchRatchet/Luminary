@@ -221,9 +221,9 @@ __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
   const float2 bytes0x48 = __ldg((float2*) triangle_get_entry_address(4, 2, offset));
   const float4 bytes0x50 = __ldg((float4*) triangle_get_entry_address(5, 0, offset));
 
-  const UV vertex_texture = get_UV(bytes0x48.x, bytes0x48.y);
-  const UV edge1_texture  = get_UV(bytes0x50.x, bytes0x50.y);
-  const UV edge2_texture  = get_UV(bytes0x50.z, bytes0x50.w);
+  const UV vertex_texture = get_uv(bytes0x48.x, bytes0x48.y);
+  const UV edge1_texture  = get_uv(bytes0x50.x, bytes0x50.y);
+  const UV edge2_texture  = get_uv(bytes0x50.z, bytes0x50.w);
 
   return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 }

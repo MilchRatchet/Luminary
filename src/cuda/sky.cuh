@@ -469,7 +469,7 @@ __device__ Spectrum sky_compute_atmosphere(
 
       const Spectrum ss_radiance = spectrum_scale(spectrum_mul(extinction_sun, phase_times_scattering), shadow * light_angle);
 
-      const UV multiscattering_uv        = get_UV(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
+      const UV multiscattering_uv        = get_uv(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
       const float4 multiscattering_low   = tex2D<float4>(device.ptrs.sky_ms_luts[0].tex, multiscattering_uv.u, multiscattering_uv.v);
       const float4 multiscattering_high  = tex2D<float4>(device.ptrs.sky_ms_luts[1].tex, multiscattering_uv.u, multiscattering_uv.v);
       const Spectrum multiscattering_tex = spectrum_merge(multiscattering_low, multiscattering_high);
@@ -511,7 +511,7 @@ __device__ Spectrum sky_compute_atmosphere(
         const float tex_u = 0.5f + device.scene.sky.moon_tex_offset + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
         const float tex_v = 0.5f + asinf(normal.y) * (1.0f / PI);
 
-        const UV uv = get_UV(tex_u, tex_v);
+        const UV uv = get_uv(tex_u, tex_v);
 
         const Mat3x3 tangent_space = create_basis(normal);
 

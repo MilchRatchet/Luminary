@@ -291,7 +291,7 @@ __device__ UV sky_transmittance_lut_uv(float height, float zenith_cos_angle) {
   const float u     = (d - d_min) / (d_max - d_min);
   const float v     = rho / H;
 
-  return get_UV(u, v);
+  return get_uv(u, v);
 }
 
 // [Wil21]
