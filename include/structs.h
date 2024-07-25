@@ -105,7 +105,7 @@ struct TriangleLight {
   vec3 edge2;
   uint32_t triangle_id;
   uint32_t material_id;
-  float padding2;
+  float power;
 } typedef TriangleLight;
 
 // Traditional description through vertex buffer and index buffer which is required for OptiX RT.
