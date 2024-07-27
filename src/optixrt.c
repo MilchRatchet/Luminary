@@ -24,7 +24,6 @@
   }
 
 void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel, CommandlineOptions options) {
-  bench_tic("Kernel Setup (OptiX)");
   log_message("Compiling kernels: %s.", kernels_name);
 
   ////////////////////////////////////////////////////////////////////
@@ -141,8 +140,6 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
   ////////////////////////////////////////////////////////////////////
 
   device_malloc(&(kernel->params), sizeof(DeviceConstantMemory));
-
-  bench_toc();
 }
 
 void optixrt_build_bvh(
@@ -242,6 +239,15 @@ void optixrt_build_bvh(
 }
 
 void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
+  bench_tic("Kernel Setup (OptiX)");
+
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.ptx", &(instance->optix_kernel), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.ptx", &(instance->optix_kernel_geometry), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_volume.ptx", &(instance->optix_kernel_volume), options);
+
+  bench_toc();
+
   bench_tic("BVH Setup (OptiX)");
 
   ////////////////////////////////////////////////////////////////////

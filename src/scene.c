@@ -264,8 +264,6 @@ RaytraceInstance* scene_load_lum(const char* filename, CommandlineOptions option
 
   scene_create_from_wavefront(scene, content);
 
-  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE], options.dmm_active);
-
   TextureAtlas tex_atlas = {
     .albedo           = (DeviceBuffer*) 0,
     .albedo_length    = content->maps_count[WF_ALBEDO],
@@ -308,8 +306,6 @@ RaytraceInstance* scene_load_obj(char* filename, CommandlineOptions options) {
   general.mesh_files[general.mesh_files_count++] = filename;
 
   scene_create_from_wavefront(scene, content);
-
-  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE], options.dmm_active);
 
   TextureAtlas tex_atlas = {
     .albedo           = (DeviceBuffer*) 0,

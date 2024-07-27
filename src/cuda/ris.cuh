@@ -34,6 +34,7 @@ __device__ uint32_t ris_sample_light(
   if (!device.scene.material.lights_active)
     return LIGHT_ID_NONE;
 
+  // TODO: Once the light tree is implemented. Consider reducing the number of samples for deep bounces.
   const int reservoir_size                    = device.ris_settings.initial_reservoir_size;
   const float one_over_reservoir_pdf_and_size = device.scene.triangle_lights_count / ((float) reservoir_size);
 

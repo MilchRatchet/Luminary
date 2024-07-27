@@ -248,6 +248,7 @@ __device__ TriangleLight load_triangle_light(const TriangleLight* data, const in
   triangle.edge2       = get_vector(v2.z, v2.w, v3.x);
   triangle.triangle_id = __float_as_uint(v3.y);
   triangle.material_id = __float_as_uint(v3.z);
+  triangle.power       = v3.w;
 
   return triangle;
 }
