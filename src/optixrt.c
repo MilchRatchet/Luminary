@@ -146,8 +146,8 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
 }
 
 void optixrt_build_bvh(
-  OptixDeviceContext optix_ctx, OptixBVH* bvh, const TriangleGeomData tri_data, const OptixBuildInputDisplacementMicromap dmm,
-  const OptixBuildInputOpacityMicromap omm, const int is_for_light_rays) {
+  OptixDeviceContext optix_ctx, OptixBVH* bvh, const TriangleGeomData tri_data, const OptixBuildInputDisplacementMicromap* dmm,
+  const OptixBuildInputOpacityMicromap* omm, const OptixRTBVHType type) {
   OptixAccelBuildOptions build_options;
   memset(&build_options, 0, sizeof(OptixAccelBuildOptions));
   build_options.operation             = OPTIX_BUILD_OPERATION_BUILD;
@@ -171,12 +171,16 @@ void optixrt_build_bvh(
 
   unsigned int inputFlags = 0;
   inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
-  inputFlags |= (is_for_light_rays) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
+  inputFlags |= (type == OPTIX_RT_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
 
-  build_inputs.triangleArray.flags                = &inputFlags;
-  build_inputs.triangleArray.opacityMicromap      = omm;
-  build_inputs.triangleArray.displacementMicromap = dmm;
-  build_inputs.triangleArray.numSbtRecords        = 1;
+  build_inputs.triangleArray.flags         = &inputFlags;
+  build_inputs.triangleArray.numSbtRecords = 1;
+
+  if (omm)
+    build_inputs.triangleArray.opacityMicromap = *omm;
+
+  if (dmm)
+    build_inputs.triangleArray.displacementMicromap = *dmm;
 
   OptixAccelBufferSizes buffer_sizes;
 
@@ -264,15 +268,10 @@ void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   // BVH Building
   ////////////////////////////////////////////////////////////////////
 
-  // Dummies for the triangle light BVH.
-  OptixBuildInputDisplacementMicromap dmm_dummy;
-  OptixBuildInputOpacityMicromap omm_dummy;
-  memset(&dmm_dummy, 0, sizeof(OptixBuildInputDisplacementMicromap));
-  memset(&omm_dummy, 0, sizeof(OptixBuildInputOpacityMicromap));
-
-  optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh, instance->scene.triangle_data, dmm, omm, 0);
-  optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh_shadow, instance->scene.triangle_data, dmm, omm, 1);
-  optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh_light, instance->scene.triangle_lights_data, dmm_dummy, omm_dummy, 0);
+  optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh, instance->scene.triangle_data, &dmm, &omm, OPTIX_RT_BVH_TYPE_DEFAULT);
+  optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh_shadow, instance->scene.triangle_data, &dmm, &omm, OPTIX_RT_BVH_TYPE_SHADOW);
+  optixrt_build_bvh(
+    instance->optix_ctx, &instance->optix_bvh_light, instance->scene.triangle_lights_data, (void*) 0, (void*) 0, OPTIX_RT_BVH_TYPE_DEFAULT);
 
   micromap_opacity_free(omm);
 
