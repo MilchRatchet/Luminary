@@ -544,7 +544,8 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   ////////////////////////////////////////////////////////////////////
 
   bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
-  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+  const QuasiRandomTarget bsdf_target = (QuasiRandomTarget) (QUASI_RANDOM_TARGET_LIGHT_BSDF + 2 * light_ray_index);
+  const vec3 bsdf_dir                 = bsdf_sample_for_light(data, index, bsdf_target, bsdf_sample_is_refraction, bsdf_sample_is_valid);
 
   vec3 position;
   float3 origin, ray;
