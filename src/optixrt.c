@@ -169,6 +169,15 @@ void optixrt_build_bvh(
   build_inputs.triangleArray.numIndexTriplets   = tri_data.triangle_count;
   build_inputs.triangleArray.indexBuffer        = (CUdeviceptr) tri_data.index_buffer;
 
+  // OptiX requires pointers to be null if there is no data.
+  if (tri_data.vertex_count == 0) {
+    build_inputs.triangleArray.vertexBuffers = (CUdeviceptr*) 0;
+  }
+
+  if (build_inputs.triangleArray.numIndexTriplets == 0) {
+    build_inputs.triangleArray.indexBuffer = (CUdeviceptr) 0;
+  }
+
   unsigned int inputFlags = 0;
   inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
   inputFlags |= (type == OPTIX_RT_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
