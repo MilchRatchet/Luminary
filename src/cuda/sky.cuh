@@ -616,8 +616,10 @@ LUMINARY_KERNEL void process_sky_tasks() {
         const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
 
         // HDRI does not include the sun, compute sun visibility
-        // TODO: Handle case where the earth is blocking the sky
-        if (sphere_ray_hit(task.ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS)) {
+        const bool ray_hits_sun   = sphere_ray_hit(task.ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS);
+        const bool ray_hits_earth = sph_ray_hit_p0(task.ray, sky_origin, SKY_EARTH_RADIUS);
+
+        if (ray_hits_sun && !ray_hits_earth) {
           const RGBF sun_color = sky_get_sun_color(sky_origin, task.ray);
 
           sky = add_color(sky, sun_color);
