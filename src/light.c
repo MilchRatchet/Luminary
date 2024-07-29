@@ -1,5 +1,7 @@
 #include "light.h"
 
+#include <float.h>
+#include <immintrin.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,134 +14,482 @@
 #include "texture.h"
 #include "utils.h"
 
-static int min_3_float_to_int(float a, float b, float c) {
-  int ai = (int) floorf(a);
-  int bi = (int) floorf(b);
-  int ci = (int) floorf(c);
+enum Axis { AxisX = 0, AxisY = 1, AxisZ = 2 } typedef Axis;
+enum NodeType { NodeTypeNull = 0, NodeTypeInternal = 1, NodeTypeLeaf = 2 } typedef NodeType;
 
-  int minab = (ai < bi) ? ai : bi;
+struct Node2 {
+  vec3 left_low;
+  vec3 left_high;
+  vec3 right_low;
+  vec3 right_high;
+  vec3 self_low;
+  vec3 self_high;
+  uint32_t triangle_count;
+  uint32_t triangles_address;
+  uint32_t child_address;
+  float surface_area;
+  float sah_cost[7];
+  int decision[7];
+  int cost_computed;
+  NodeType type;
+} typedef Node2;
 
-  return (minab < ci) ? minab : ci;
-}
+struct vec3_p {
+  float x;
+  float y;
+  float z;
+  float _p;
+} typedef vec3_p;
 
-static int max_3_float_to_int(float a, float b, float c) {
-  int ai = (int) floorf(a);
-  int bi = (int) floorf(b);
-  int ci = (int) floorf(c);
+struct Fragment {
+  vec3_p high;
+  vec3_p low;
+  vec3_p middle;
+  uint32_t id;
+  float power;
+  uint64_t _p;
+} typedef Fragment;
 
-  int maxab = (ai < bi) ? bi : ai;
+struct LightTreeWork {
+  TriangleLight* triangles;
+  Fragment* fragments;
+  uint32_t triangles_count;
+  Node2* nodes;
+  uint32_t nodes_count;
+} typedef LightTreeWork;
 
-  return (maxab < ci) ? ci : maxab;
-}
+struct Bin {
+  vec3_p high;
+  vec3_p low;
+  int32_t entry;
+  int32_t exit;
+  float energy;
+  uint32_t _p;
+} typedef Bin;
 
 /*
- * Returns 1 if triangle texture is non zero at some point, 0 else.
- * If texture is not RGB8 or not present on CPU this will always return 1.
+ * BIN_COUNTS must be power of 2
  */
-static int light_triangle_texture_has_emission(Triangle triangle, TextureRGBA tex) {
-  // TODO: Implement support for other types of textures.
-  if (tex.type != TexDataUINT8) {
-    warn_message("Texture is not 8 bits. Assume that this triangle is a light.");
-    return 1;
+#define THRESHOLD_TRIANGLES 64
+#define OBJECT_SPLIT_BIN_COUNT 8
+
+// We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
+#define MAX_VALUE 1e10f
+
+#define FRAGMENT_ERROR_COMP (FLT_EPSILON * 4.0f)
+
+static void _lights_tree_create_fragments(Scene* scene, LightTreeWork* work) {
+  const uint32_t triangle_count = scene->triangle_lights_count;
+
+  work->triangles       = scene->triangle_lights;
+  work->triangles_count = triangle_count;
+
+  work->fragments = malloc(sizeof(Fragment) * triangle_count);
+
+  for (uint32_t i = 0; i < triangle_count; i++) {
+    TriangleLight t = scene->triangle_lights[i];
+
+    vec3_p high = {
+      .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
+      .y = max(t.vertex.y, max(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
+      .z = max(t.vertex.z, max(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
+    vec3_p low = {
+      .x = min(t.vertex.x, min(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
+      .y = min(t.vertex.y, min(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
+      .z = min(t.vertex.z, min(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
+
+    vec3_p middle = {.x = (high.x + low.x) * 0.5f, .y = (high.y + low.y) * 0.5f, .z = (high.z + low.z) * 0.5f};
+
+    // Fragments are supposed to be hulls that contain a triangle
+    // They should be as tight as possible but if they are too tight then numerical errors
+    // could result in broken BVHs
+    high.x += fabsf(high.x) * FRAGMENT_ERROR_COMP;
+    high.y += fabsf(high.y) * FRAGMENT_ERROR_COMP;
+    high.z += fabsf(high.z) * FRAGMENT_ERROR_COMP;
+    low.x -= fabsf(low.x) * FRAGMENT_ERROR_COMP;
+    low.y -= fabsf(low.y) * FRAGMENT_ERROR_COMP;
+    low.z -= fabsf(low.z) * FRAGMENT_ERROR_COMP;
+
+    vec3 cross = {
+      .x = t.edge1.y * t.edge2.z - t.edge1.z * t.edge2.y,
+      .y = t.edge1.z * t.edge2.x - t.edge1.x * t.edge2.z,
+      .z = t.edge1.x * t.edge2.y - t.edge1.y * t.edge2.x};
+
+    const float area = 0.5f * sqrtf(cross.x * cross.x + cross.y * cross.y + cross.z * cross.z);
+
+    Fragment frag      = {.high = high, .low = low, .middle = middle, .id = i, .power = t.power * area};
+    work->fragments[i] = frag;
+  }
+}
+
+static float get_entry_by_axis(const vec3_p p, const Axis axis) {
+  switch (axis) {
+    case AxisX:
+      return p.x;
+    case AxisY:
+      return p.y;
+    case AxisZ:
+    default:
+      return p.z;
+  }
+}
+
+#define _get_entry_by_axis(ptr, axis) \
+  _mm_cvtss_f32(_mm_shuffle_ps(_mm_loadu_ps((float*) (ptr)), _mm_loadu_ps((float*) (ptr)), _MM_SHUFFLE(0, 0, 0, axis)))
+
+static void fit_bounds(const Fragment* fragments, const uint32_t fragments_count, vec3_p* high_out, vec3_p* low_out) {
+  __m128 high = _mm_set1_ps(-MAX_VALUE);
+  __m128 low  = _mm_set1_ps(MAX_VALUE);
+
+  for (uint32_t i = 0; i < fragments_count; i++) {
+    __m128 high_frag = _mm_loadu_ps((float*) &(fragments[i].high));
+    __m128 low_frag  = _mm_loadu_ps((float*) &(fragments[i].low));
+
+    high = _mm_max_ps(high, high_frag);
+    low  = _mm_min_ps(low, low_frag);
   }
 
-  if (tex.num_components != 4) {
-    warn_message("Texture does not have 4 channels. Assume that this triangle is a light.");
-    return 1;
+  if (high_out)
+    _mm_storeu_ps((float*) high_out, high);
+  if (low_out)
+    _mm_storeu_ps((float*) low_out, low);
+}
+
+static void fit_bounds_of_bins(const Bin* bins, const int bins_length, vec3_p* high_out, vec3_p* low_out) {
+  __m128 high = _mm_set1_ps(-MAX_VALUE);
+  __m128 low  = _mm_set1_ps(MAX_VALUE);
+
+  for (int i = 0; i < bins_length; i++) {
+    const __m128 high_bin = _mm_loadu_ps((float*) &(bins[i].high));
+    const __m128 low_bin  = _mm_loadu_ps((float*) &(bins[i].low));
+
+    high = _mm_max_ps(high, high_bin);
+    low  = _mm_min_ps(low, low_bin);
   }
 
-  if (tex.storage != TexStorageCPU) {
-    warn_message("Texture is allocated on the GPU. Assume that this triangle is a light.");
-    return 1;
+  if (high_out)
+    _mm_storeu_ps((float*) high_out, high);
+  if (low_out)
+    _mm_storeu_ps((float*) low_out, low);
+}
+
+static void update_bounds_of_bins(const Bin* bins, vec3_p* restrict high_out, vec3_p* restrict low_out) {
+  __m128 high = _mm_loadu_ps((float*) high_out);
+  __m128 low  = _mm_loadu_ps((float*) low_out);
+
+  const float* baseptr = (float*) (bins);
+
+  __m128 high_bin = _mm_loadu_ps(baseptr);
+  __m128 low_bin  = _mm_loadu_ps(baseptr + 4);
+
+  high = _mm_max_ps(high, high_bin);
+  low  = _mm_min_ps(low, low_bin);
+
+  _mm_storeu_ps((float*) high_out, high);
+  _mm_storeu_ps((float*) low_out, low);
+}
+
+#define _construct_bins_kernel(_axis_)                                         \
+  {                                                                            \
+    for (uint32_t i = 0; i < fragments_count; i++) {                           \
+      const double value = _get_entry_by_axis(&(fragments[i].middle), _axis_); \
+      int pos            = ((int) ceil((value - low_axis) / interval)) - 1;    \
+      if (pos < 0)                                                             \
+        pos = 0;                                                               \
+                                                                               \
+      bins[pos].entry++;                                                       \
+      bins[pos].exit++;                                                        \
+      bins[pos].energy += fragments[i].power;                                  \
+                                                                               \
+      __m128 high_bin  = _mm_loadu_ps((float*) &(bins[pos].high));             \
+      __m128 low_bin   = _mm_loadu_ps((float*) &(bins[pos].low));              \
+      __m128 high_frag = _mm_loadu_ps((float*) &(fragments[i].high));          \
+      __m128 low_frag  = _mm_loadu_ps((float*) &(fragments[i].low));           \
+                                                                               \
+      high_bin = _mm_max_ps(high_bin, high_frag);                              \
+      low_bin  = _mm_min_ps(low_bin, low_frag);                                \
+                                                                               \
+      _mm_storeu_ps((float*) &(bins[pos].high), high_bin);                     \
+      _mm_storeu_ps((float*) &(bins[pos].low), low_bin);                       \
+    }                                                                          \
   }
 
-  UV v0 = {.u = triangle.vertex_texture.u, .v = triangle.vertex_texture.v};
-  UV v1 = {.u = triangle.vertex_texture.u + triangle.edge1_texture.u, .v = triangle.vertex_texture.v + triangle.edge1_texture.v};
-  UV v2 = {.u = triangle.vertex_texture.u + triangle.edge2_texture.u, .v = triangle.vertex_texture.v + triangle.edge2_texture.v};
+static double construct_bins(
+  Bin* restrict bins, const Fragment* restrict fragments, const uint32_t fragments_count, const Axis axis, double* offset) {
+  vec3_p high, low;
+  fit_bounds(fragments, fragments_count, &high, &low);
 
-  v0.v = 1.0f - v0.v;
-  v1.v = 1.0f - v1.v;
-  v2.v = 1.0f - v2.v;
+  const double high_axis = get_entry_by_axis(high, axis);
+  const double low_axis  = get_entry_by_axis(low, axis);
 
-  v0.u *= tex.width;
-  v0.v *= tex.height;
-  v1.u *= tex.width;
-  v1.v *= tex.height;
-  v2.u *= tex.width;
-  v2.v *= tex.height;
+  const double span     = high_axis - low_axis;
+  const double interval = span / OBJECT_SPLIT_BIN_COUNT;
 
-  const int min_y = min_3_float_to_int(v0.v, v1.v, v2.v);
-  const int max_y = max_3_float_to_int(v0.v, v1.v, v2.v) + 1;
+  if (interval <= FRAGMENT_ERROR_COMP * fabs(low_axis))
+    return 0.0;
 
-  float m0 = (v0.u - v1.u) / (v0.v - v1.v);
-  float m1 = (v1.u - v2.u) / (v1.v - v2.v);
-  float m2 = (v2.u - v0.u) / (v2.v - v0.v);
+  *offset = low_axis;
 
-  if (isinf(m0) || isnan(m0)) {
-    m0 = tex.width;
+  const Bin b = {
+    .high.x = -MAX_VALUE,
+    .high.y = -MAX_VALUE,
+    .high.z = -MAX_VALUE,
+    .low.x  = MAX_VALUE,
+    .low.y  = MAX_VALUE,
+    .low.z  = MAX_VALUE,
+    .entry  = 0,
+    .exit   = 0,
+    .energy = 0.0f};
+  bins[0] = b;
+
+  for (uint32_t i = 1; i < OBJECT_SPLIT_BIN_COUNT; i = i << 1) {
+    memcpy(bins + i, bins, i * sizeof(Bin));
   }
 
-  if (isinf(m1) || isnan(m1)) {
-    m1 = tex.width;
+  switch (axis) {
+    case AxisX:
+      _construct_bins_kernel(0);
+      break;
+    case AxisY:
+      _construct_bins_kernel(1);
+      break;
+    case AxisZ:
+    default:
+      _construct_bins_kernel(2);
+      break;
   }
 
-  if (isinf(m2) || isnan(m2)) {
-    m2 = tex.width;
+  return interval;
+}
+
+static void divide_middles_along_axis(const double split, const Axis axis, Fragment* fragments, const uint32_t fragments_count) {
+  uint32_t left  = 0;
+  uint32_t right = 0;
+
+  for (uint32_t i = 0; i < fragments_count; i++) {
+    const Fragment frag = fragments[i];
+
+    const double middle = get_entry_by_axis(frag.middle, axis);
+
+    // Note that this increments only after using the value to compute the swap index.
+    const uint32_t swap_index = (middle <= split) ? left++ : (fragments_count - 1 - right++);
+
+    Fragment temp         = fragments[swap_index];
+    fragments[swap_index] = frag;
+    fragments[i]          = temp;
   }
+}
 
-  const float a0 = v0.u - m0 * v0.v;
-  const float a1 = v1.u - m1 * v1.v;
-  const float a2 = v2.u - m2 * v2.v;
+static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
+  Fragment* fragments      = work->fragments;
+  uint32_t fragments_count = work->triangles_count;
 
-  float min_e_0, max_e_0;
+  uint32_t node_count = 1 + fragments_count / THRESHOLD_TRIANGLES;
+  Node2* nodes        = malloc(sizeof(Node2) * node_count);
+  memset(nodes, 0, sizeof(Node2) * node_count);
 
-  {
-    const float e_0_0 = a0 + v0.v * m0;
-    const float e_0_1 = a0 + v1.v * m0;
-    min_e_0           = min(e_0_0, e_0_1);
-    max_e_0           = max(e_0_0, e_0_1);
-  }
+  nodes[0].triangles_address = 0;
+  nodes[0].triangle_count    = fragments_count;
+  nodes[0].type              = NodeTypeLeaf;
 
-  float min_e_1, max_e_1;
+  Bin* bins = (Bin*) malloc(sizeof(Bin) * OBJECT_SPLIT_BIN_COUNT);
 
-  {
-    const float e_1_1 = a1 + v1.v * m1;
-    const float e_1_2 = a1 + v2.v * m1;
-    min_e_1           = min(e_1_1, e_1_2);
-    max_e_1           = max(e_1_1, e_1_2);
-  }
+  uint32_t begin_of_current_nodes = 0;
+  uint32_t end_of_current_nodes   = 1;
+  uint32_t write_ptr              = 1;
 
-  float min_e_2, max_e_2;
+  while (begin_of_current_nodes != end_of_current_nodes) {
+    for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
+      Node2 node         = nodes[node_ptr];
+      node.cost_computed = 0;
 
-  {
-    const float e_2_2 = a2 + v2.v * m2;
-    const float e_2_0 = a2 + v0.v * m2;
-    min_e_2           = min(e_2_2, e_2_0);
-    max_e_2           = max(e_2_2, e_2_0);
-  }
+      const uint32_t fragments_ptr   = node.triangles_address;
+      const uint32_t fragments_count = node.triangle_count;
 
-  const uint32_t* ptr = (uint32_t*) tex.data;
+      // Node has few enough triangles, finalize it as a leaf node.
+      if (fragments_count <= THRESHOLD_TRIANGLES) {
+        nodes[node_ptr].cost_computed = 0;
+        continue;
+      }
 
-  for (int j = min_y; j <= max_y; j++) {
-    const int coordy = j % tex.height;
-    const float v    = (float) j;
-    const float e0   = max(min(a0 + v * m0, max_e_0), min_e_0);
-    const float e1   = max(min(a1 + v * m1, max_e_1), min_e_1);
-    const float e2   = max(min(a2 + v * m2, max_e_2), min_e_2);
-    const int min_x  = min_3_float_to_int(e0, e1, e2);
-    const int max_x  = max_3_float_to_int(e0, e1, e2) + 1;
+      // Compute surface area of current node.
+      double parent_surface_area;
+      float max_axis_interval = 0.0f;
+      {
+        vec3_p high_parent, low_parent;
+        fit_bounds(fragments + fragments_ptr, fragments_count, &high_parent, &low_parent);
+        const vec3 diff = {.x = high_parent.x - low_parent.x, .y = high_parent.y - low_parent.y, .z = high_parent.z - low_parent.z};
 
-    for (int i = min_x; i <= max_x; i++) {
-      const int coordx = i % tex.width;
+        max_axis_interval = fmaxf(diff.x, fmaxf(diff.y, diff.z));
 
-      const uint32_t col = ptr[coordx + coordy * tex.width];
+        parent_surface_area = (double) diff.x * (double) diff.y + (double) diff.x * (double) diff.z + (double) diff.y * (double) diff.z;
+      }
 
-      if (col & 0xffffff00)
-        return 1;
+      vec3_p high, low;
+      double optimal_cost = DBL_MAX;
+      Axis axis;
+      double optimal_splitting_plane;
+      int found_split   = 0;
+      int optimal_split = fragments_count / 2;
+
+      // For each axis, perform a greedy search for an optimal split.
+      for (int a = 0; a < 3; a++) {
+        double low_split;
+        const double interval = construct_bins(bins, fragments + fragments_ptr, fragments_count, (Axis) a, &low_split);
+
+        if (interval == 0.0)
+          continue;
+
+        const double interval_cost = max_axis_interval / interval;
+
+        uint32_t left = 0;
+
+        float left_energy  = 0.0f;
+        float right_energy = 0.0f;
+
+        for (int k = 0; k < OBJECT_SPLIT_BIN_COUNT; k++) {
+          right_energy += bins[k].energy;
+        }
+
+        vec3_p high_left  = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE, ._p = -MAX_VALUE};
+        vec3_p high_right = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE, ._p = -MAX_VALUE};
+        vec3_p low_left   = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE, ._p = MAX_VALUE};
+        vec3_p low_right  = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE, ._p = MAX_VALUE};
+
+        for (int k = 1; k < OBJECT_SPLIT_BIN_COUNT; k++) {
+          update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
+          fit_bounds_of_bins(bins + k, OBJECT_SPLIT_BIN_COUNT - k, &high_right, &low_right);
+
+          left_energy += bins[k - 1].energy;
+          right_energy -= bins[k].energy;
+
+          vec3_p diff_left = {
+            .x = high_left.x - low_left.x, .y = high_left.y - low_left.y, .z = high_left.z - low_left.z, ._p = high_left._p - low_left._p};
+
+          vec3_p diff_right = {
+            .x  = high_right.x - low_right.x,
+            .y  = high_right.y - low_right.y,
+            .z  = high_right.z - low_right.z,
+            ._p = high_right._p - low_right._p};
+
+          const double left_area  = diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
+          const double right_area = diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
+
+          left += bins[k - 1].entry;
+
+          if (left == 0 || left == fragments_count)
+            continue;
+
+          const double total_cost = interval_cost * (left_energy * left_area + right_energy * right_area) / parent_surface_area;
+
+          if (total_cost < optimal_cost) {
+            optimal_cost            = total_cost;
+            optimal_split           = left;
+            optimal_splitting_plane = low_split + k * interval;
+            found_split             = 1;
+            axis                    = a;
+          }
+        }
+      }
+
+      // We were unable to find a split that provided an improvement, finalize this node as a leaf.
+      if (!found_split) {
+        nodes[node_ptr].cost_computed = 0;
+        continue;
+      }
+
+      divide_middles_along_axis(optimal_splitting_plane, axis, fragments + fragments_ptr, fragments_count);
+
+      // At this point we are committed to split, hence we need to make sure that we have enough memory allocated for that.
+      if (write_ptr + 2 >= node_count) {
+        node_count *= 2;
+        nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
+      }
+
+      fit_bounds(fragments + fragments_ptr, optimal_split, &high, &low);
+
+      node.left_high.x   = high.x;
+      node.left_high.y   = high.y;
+      node.left_high.z   = high.z;
+      node.left_low.x    = low.x;
+      node.left_low.y    = low.y;
+      node.left_low.z    = low.z;
+      node.child_address = write_ptr;
+
+      Node2 node_left = {
+        .triangle_count    = optimal_split,
+        .triangles_address = fragments_ptr,
+        .type              = NodeTypeLeaf,
+        .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
+        .self_high.x  = high.x,
+        .self_high.y  = high.y,
+        .self_high.z  = high.z,
+        .self_low.x   = low.x,
+        .self_low.y   = low.y,
+        .self_low.z   = low.z,
+      };
+
+      nodes[write_ptr] = node_left;
+
+      write_ptr++;
+
+      fit_bounds(fragments + fragments_ptr + optimal_split, node.triangle_count - optimal_split, &high, &low);
+
+      node.right_high.x = high.x;
+      node.right_high.y = high.y;
+      node.right_high.z = high.z;
+      node.right_low.x  = low.x;
+      node.right_low.y  = low.y;
+      node.right_low.z  = low.z;
+
+      Node2 node_right = {
+        .triangle_count    = node.triangle_count - optimal_split,
+        .triangles_address = fragments_ptr + optimal_split,
+        .type              = NodeTypeLeaf,
+        .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
+        .self_high.x  = high.x,
+        .self_high.y  = high.y,
+        .self_high.z  = high.z,
+        .self_low.x   = low.x,
+        .self_low.y   = low.y,
+        .self_low.z   = low.z,
+      };
+
+      nodes[write_ptr] = node_right;
+
+      write_ptr++;
+
+      node.triangles_address = 0;
+      node.triangle_count    = 0;
+      node.type              = NodeTypeInternal;
+
+      nodes[node_ptr] = node;
     }
+
+    begin_of_current_nodes = end_of_current_nodes;
+    end_of_current_nodes   = write_ptr;
   }
 
-  return 0;
+  node_count = write_ptr;
+
+  nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
+
+  free(bins);
+
+  work->nodes       = nodes;
+  work->nodes_count = node_count;
+}
+
+void lights_build_light_tree(Scene* scene) {
+  bench_tic("Build Light Tree");
+
+  LightTreeWork work;
+  memset(&work, 0, sizeof(LightTreeWork));
+
+  _lights_tree_create_fragments(scene, &work);
+  _lights_tree_build_binary_bvh(&work);
+
+  bench_toc();
 }
 
 void lights_process(Scene* scene, int dmm_active) {

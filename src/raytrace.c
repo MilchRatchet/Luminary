@@ -629,6 +629,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   ////////////////////////////////////////////////////////////////////
 
   lights_process(scene, options.dmm_active);
+  lights_build_light_tree(scene);
 
   instance->scene.triangle_lights_count = scene->triangle_lights_count;
   instance->scene.triangle_lights_data  = scene->triangle_lights_data;
