@@ -196,7 +196,7 @@ __device__ float lights_integrate_emission(const TriangleLight light, const UV v
 
   const float steps = ceilf(fmaxf(texel_steps_u, texel_steps_v));
 
-  const float step_size = 1.0f / steps;
+  const float step_size = 4.0f / steps;
 
   RGBF accumulator  = get_color(0.0f, 0.0f, 0.0f);
   float texel_count = 0.0f;

@@ -14,10 +14,18 @@
 #include "texture.h"
 #include "utils.h"
 
-enum Axis { AxisX = 0, AxisY = 1, AxisZ = 2 } typedef Axis;
-enum NodeType { NodeTypeNull = 0, NodeTypeInternal = 1, NodeTypeLeaf = 2 } typedef NodeType;
+enum LightTreeSweepAxis {
+  LIGHT_TREE_SWEEP_AXIS_X = 0,
+  LIGHT_TREE_SWEEP_AXIS_Y = 1,
+  LIGHT_TREE_SWEEP_AXIS_Z = 2
+} typedef LightTreeSweepAxis;
+enum LightTreeNodeType {
+  LIGHT_TREE_NODE_TYPE_NULL     = 0,
+  LIGHT_TREE_NODE_TYPE_INTERNAL = 1,
+  LIGHT_TREE_NODE_TYPE_LEAF     = 2
+} typedef LightTreeNodeType;
 
-struct Node2 {
+struct LightTreeBinaryNode {
   vec3 left_low;
   vec3 left_high;
   vec3 right_low;
@@ -28,11 +36,10 @@ struct Node2 {
   uint32_t triangles_address;
   uint32_t child_address;
   float surface_area;
-  float sah_cost[7];
-  int decision[7];
-  int cost_computed;
-  NodeType type;
-} typedef Node2;
+  LightTreeNodeType type;
+  float left_energy;
+  float right_energy;
+} typedef LightTreeBinaryNode;
 
 struct vec3_p {
   float x;
@@ -54,7 +61,8 @@ struct LightTreeWork {
   TriangleLight* triangles;
   Fragment* fragments;
   uint32_t triangles_count;
-  Node2* nodes;
+  LightTreeBinaryNode* binary_nodes;
+  LightTreeNode* nodes;
   uint32_t nodes_count;
 } typedef LightTreeWork;
 
@@ -122,13 +130,13 @@ static void _lights_tree_create_fragments(Scene* scene, LightTreeWork* work) {
   }
 }
 
-static float get_entry_by_axis(const vec3_p p, const Axis axis) {
+static float get_entry_by_axis(const vec3_p p, const LightTreeSweepAxis axis) {
   switch (axis) {
-    case AxisX:
+    case LIGHT_TREE_SWEEP_AXIS_X:
       return p.x;
-    case AxisY:
+    case LIGHT_TREE_SWEEP_AXIS_Y:
       return p.y;
-    case AxisZ:
+    case LIGHT_TREE_SWEEP_AXIS_Z:
     default:
       return p.z;
   }
@@ -215,7 +223,7 @@ static void update_bounds_of_bins(const Bin* bins, vec3_p* restrict high_out, ve
   }
 
 static double construct_bins(
-  Bin* restrict bins, const Fragment* restrict fragments, const uint32_t fragments_count, const Axis axis, double* offset) {
+  Bin* restrict bins, const Fragment* restrict fragments, const uint32_t fragments_count, const LightTreeSweepAxis axis, double* offset) {
   vec3_p high, low;
   fit_bounds(fragments, fragments_count, &high, &low);
 
@@ -247,13 +255,13 @@ static double construct_bins(
   }
 
   switch (axis) {
-    case AxisX:
+    case LIGHT_TREE_SWEEP_AXIS_X:
       _construct_bins_kernel(0);
       break;
-    case AxisY:
+    case LIGHT_TREE_SWEEP_AXIS_Y:
       _construct_bins_kernel(1);
       break;
-    case AxisZ:
+    case LIGHT_TREE_SWEEP_AXIS_Z:
     default:
       _construct_bins_kernel(2);
       break;
@@ -262,7 +270,8 @@ static double construct_bins(
   return interval;
 }
 
-static void divide_middles_along_axis(const double split, const Axis axis, Fragment* fragments, const uint32_t fragments_count) {
+static void divide_middles_along_axis(
+  const double split, const LightTreeSweepAxis axis, Fragment* fragments, const uint32_t fragments_count) {
   uint32_t left  = 0;
   uint32_t right = 0;
 
@@ -284,13 +293,13 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
   Fragment* fragments      = work->fragments;
   uint32_t fragments_count = work->triangles_count;
 
-  uint32_t node_count = 1 + fragments_count / THRESHOLD_TRIANGLES;
-  Node2* nodes        = malloc(sizeof(Node2) * node_count);
-  memset(nodes, 0, sizeof(Node2) * node_count);
+  uint32_t node_count        = 1 + fragments_count / THRESHOLD_TRIANGLES;
+  LightTreeBinaryNode* nodes = malloc(sizeof(LightTreeBinaryNode) * node_count);
+  memset(nodes, 0, sizeof(LightTreeBinaryNode) * node_count);
 
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = fragments_count;
-  nodes[0].type              = NodeTypeLeaf;
+  nodes[0].type              = LIGHT_TREE_NODE_TYPE_LEAF;
 
   Bin* bins = (Bin*) malloc(sizeof(Bin) * OBJECT_SPLIT_BIN_COUNT);
 
@@ -300,15 +309,13 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
 
   while (begin_of_current_nodes != end_of_current_nodes) {
     for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
-      Node2 node         = nodes[node_ptr];
-      node.cost_computed = 0;
+      LightTreeBinaryNode node = nodes[node_ptr];
 
       const uint32_t fragments_ptr   = node.triangles_address;
       const uint32_t fragments_count = node.triangle_count;
 
       // Node has few enough triangles, finalize it as a leaf node.
       if (fragments_count <= THRESHOLD_TRIANGLES) {
-        nodes[node_ptr].cost_computed = 0;
         continue;
       }
 
@@ -327,15 +334,16 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
 
       vec3_p high, low;
       double optimal_cost = DBL_MAX;
-      Axis axis;
+      LightTreeSweepAxis axis;
       double optimal_splitting_plane;
       int found_split   = 0;
       int optimal_split = fragments_count / 2;
+      float optimal_left_energy, optimal_right_energy;
 
       // For each axis, perform a greedy search for an optimal split.
       for (int a = 0; a < 3; a++) {
         double low_split;
-        const double interval = construct_bins(bins, fragments + fragments_ptr, fragments_count, (Axis) a, &low_split);
+        const double interval = construct_bins(bins, fragments + fragments_ptr, fragments_count, (LightTreeSweepAxis) a, &low_split);
 
         if (interval == 0.0)
           continue;
@@ -388,13 +396,14 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
             optimal_splitting_plane = low_split + k * interval;
             found_split             = 1;
             axis                    = a;
+            optimal_left_energy     = left_energy;
+            optimal_right_energy    = right_energy;
           }
         }
       }
 
       // We were unable to find a split that provided an improvement, finalize this node as a leaf.
       if (!found_split) {
-        nodes[node_ptr].cost_computed = 0;
         continue;
       }
 
@@ -403,8 +412,11 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
       // At this point we are committed to split, hence we need to make sure that we have enough memory allocated for that.
       if (write_ptr + 2 >= node_count) {
         node_count *= 2;
-        nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
+        nodes = safe_realloc(nodes, sizeof(LightTreeBinaryNode) * node_count);
       }
+
+      node.left_energy  = optimal_left_energy;
+      node.right_energy = optimal_right_energy;
 
       fit_bounds(fragments + fragments_ptr, optimal_split, &high, &low);
 
@@ -416,10 +428,10 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
       node.left_low.z    = low.z;
       node.child_address = write_ptr;
 
-      Node2 node_left = {
+      LightTreeBinaryNode node_left = {
         .triangle_count    = optimal_split,
         .triangles_address = fragments_ptr,
-        .type              = NodeTypeLeaf,
+        .type              = LIGHT_TREE_NODE_TYPE_LEAF,
         .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
         .self_high.x  = high.x,
         .self_high.y  = high.y,
@@ -442,10 +454,10 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
       node.right_low.y  = low.y;
       node.right_low.z  = low.z;
 
-      Node2 node_right = {
+      LightTreeBinaryNode node_right = {
         .triangle_count    = node.triangle_count - optimal_split,
         .triangles_address = fragments_ptr + optimal_split,
-        .type              = NodeTypeLeaf,
+        .type              = LIGHT_TREE_NODE_TYPE_LEAF,
         .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
         .self_high.x  = high.x,
         .self_high.y  = high.y,
@@ -459,9 +471,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
 
       write_ptr++;
 
-      node.triangles_address = 0;
-      node.triangle_count    = 0;
-      node.type              = NodeTypeInternal;
+      node.type = LIGHT_TREE_NODE_TYPE_INTERNAL;
 
       nodes[node_ptr] = node;
     }
@@ -472,12 +482,81 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
 
   node_count = write_ptr;
 
-  nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
+  nodes = safe_realloc(nodes, sizeof(LightTreeBinaryNode) * node_count);
 
   free(bins);
 
-  work->nodes       = nodes;
-  work->nodes_count = node_count;
+  work->binary_nodes = nodes;
+  work->nodes_count  = node_count;
+}
+
+static void _lights_get_ref_points_and_confidence(LightTreeWork* work, LightTreeBinaryNode node, vec3* ref_point, float* confidence) {
+  const float total_energy         = node.left_energy + node.right_energy;
+  const float inverse_total_energy = 1.0f / total_energy;
+
+  vec3 p = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
+  for (uint32_t i = node.triangles_address; i < node.triangle_count; i++) {
+    Fragment frag = work->fragments[i];
+
+    const float weight = frag.power * inverse_total_energy;
+
+    p.x += weight * frag.middle.x;
+    p.y += weight * frag.middle.y;
+    p.z += weight * frag.middle.z;
+  }
+
+  float minimum_distance = FLT_MAX;
+  for (uint32_t i = node.triangles_address; i < node.triangle_count; i++) {
+    Fragment frag = work->fragments[i];
+
+    const vec3 diff = {.x = p.x - frag.middle.x, .y = p.y - frag.middle.y, .z = p.z - frag.middle.z};
+
+    const float distance = sqrtf(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+
+    minimum_distance = fminf(minimum_distance, distance);
+  }
+
+  *ref_point  = p;
+  *confidence = minimum_distance;
+}
+
+// Set the reference point in each node to be the energy weighted mean of the centers of the lights.
+// Then, based on that reference point, compute the smallest distance to any light center.
+// This is our spatial confidence that we use to clamp the distance with when evaluating the importance during traversal.
+static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
+  LightTreeNode* nodes = malloc(sizeof(LightTreeNode) * work->nodes_count);
+
+  for (uint32_t i = 0; i < work->nodes_count; i++) {
+    LightTreeBinaryNode binary_node = work->binary_nodes[i];
+
+    LightTreeNode node;
+
+    node.left_energy  = binary_node.left_energy;
+    node.right_energy = binary_node.right_energy;
+
+    switch (binary_node.type) {
+      case LIGHT_TREE_NODE_TYPE_INTERNAL:
+        node.light_count = 0;
+        node.ptr         = binary_node.child_address;
+
+        _lights_get_ref_points_and_confidence(
+          work, work->binary_nodes[binary_node.child_address + 0], &node.left_ref_point, &node.left_confidence);
+        _lights_get_ref_points_and_confidence(
+          work, work->binary_nodes[binary_node.child_address + 1], &node.right_ref_point, &node.right_confidence);
+        break;
+      case LIGHT_TREE_NODE_TYPE_LEAF:
+        node.light_count = binary_node.triangle_count;
+        node.ptr         = binary_node.triangles_address;
+        break;
+      default:
+        crash_message("Encountered illegal node type!");
+        break;
+    }
+
+    nodes[i] = node;
+  }
+
+  work->nodes = nodes;
 }
 
 void lights_build_light_tree(Scene* scene) {
@@ -488,6 +567,7 @@ void lights_build_light_tree(Scene* scene) {
 
   _lights_tree_create_fragments(scene, &work);
   _lights_tree_build_binary_bvh(&work);
+  _lights_tree_build_traversal_structure(&work);
 
   bench_toc();
 }
