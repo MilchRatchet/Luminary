@@ -8,6 +8,91 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
+__device__ uint32_t light_tree_traverse(const vec3 origin, float random, uint32_t& subset_length, float& pdf) {
+  LightTreeNode node = load_light_tree_node(device.light_tree_nodes, 0);
+
+  pdf = 1.0f;
+
+  while (node.light_count == 0) {
+    const vec3 left_diff  = sub_vector(origin, node.left_ref_point);
+    const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
+
+    const float left_importance = node.left_energy / (left_dist * left_dist);
+
+    const vec3 right_diff  = sub_vector(origin, node.right_ref_point);
+    const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
+
+    const float right_importance = node.right_energy / (right_dist * right_dist);
+
+    const float sum_importance = left_importance + right_importance;
+
+    const float left_prob  = left_importance / sum_importance;
+    const float right_prob = right_importance / sum_importance;
+
+    uint32_t next_node_address = node.ptr;
+
+    if (random < left_prob) {
+      pdf *= left_prob;
+
+      random = random / left_prob;
+    }
+    else {
+      pdf *= right_prob;
+      next_node_address++;
+
+      random = (1.0f - random) / right_prob;
+    }
+
+    node = load_light_tree_node(device.light_tree_nodes, next_node_address);
+  }
+
+  subset_length = node.light_count;
+
+  return node.ptr;
+}
+
+__device__ float light_tree_traverse_pdf(const vec3 origin, uint32_t light_id) {
+  uint32_t light_path = __ldg(device.light_tree_paths + light_id);
+  LightTreeNode node  = load_light_tree_node(device.light_tree_nodes, 0);
+
+  float pdf = 1.0f;
+
+  while (light_path) {
+    const vec3 left_diff  = sub_vector(origin, node.left_ref_point);
+    const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
+
+    const float left_importance = node.left_energy / (left_dist * left_dist);
+
+    const vec3 right_diff  = sub_vector(origin, node.right_ref_point);
+    const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
+
+    const float right_importance = node.right_energy / (right_dist * right_dist);
+
+    const float sum_importance = left_importance + right_importance;
+
+    const float left_prob  = left_importance / sum_importance;
+    const float right_prob = right_importance / sum_importance;
+
+    uint32_t next_node_address = node.ptr;
+
+    if (light_path & 0b1) {
+      pdf *= left_prob;
+    }
+    else {
+      pdf *= right_prob;
+      next_node_address++;
+    }
+
+    light_path = light_path >> 1;
+
+    node = load_light_tree_node(device.light_tree_nodes, next_node_address);
+  }
+
+  pdf *= 1.0f / node.light_count;
+
+  return pdf;
+}
+
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);
   const float a = dot_product(triangle.edge1, h);

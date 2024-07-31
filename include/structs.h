@@ -107,6 +107,7 @@ struct TriangleLight {
   uint32_t material_id;
   float power;
 } typedef TriangleLight;
+static_assert(sizeof(TriangleLight) == 0x30, "Incorrect packing size.");
 
 // Traditional description through vertex buffer and index buffer which is required for OptiX RT.
 // Both vertex buffer and index buffer have a stride of 16 bytes for each triplet

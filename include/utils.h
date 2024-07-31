@@ -474,6 +474,8 @@ struct DeviceConstantMemory {
   Node8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
   Quad* particle_quads;
+  LightTreeNode* light_tree_nodes;
+  uint32_t* light_tree_paths;
 } typedef DeviceConstantMemory;
 
 struct OptixKernel {
