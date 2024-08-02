@@ -39,6 +39,7 @@ struct LightTreeBinaryNode {
   LightTreeNodeType type;
   float left_energy;
   float right_energy;
+  uint32_t path;
 } typedef LightTreeBinaryNode;
 
 struct vec3_p {
@@ -60,6 +61,7 @@ struct Fragment {
 struct LightTreeWork {
   TriangleLight* triangles;
   Fragment* fragments;
+  uint32_t* paths;
   uint32_t triangles_count;
   LightTreeBinaryNode* binary_nodes;
   LightTreeNode* nodes;
@@ -300,6 +302,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = fragments_count;
   nodes[0].type              = LIGHT_TREE_NODE_TYPE_LEAF;
+  nodes[0].path              = 0;
 
   Bin* bins = (Bin*) malloc(sizeof(Bin) * OBJECT_SPLIT_BIN_COUNT);
 
@@ -439,6 +442,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         .self_low.x   = low.x,
         .self_low.y   = low.y,
         .self_low.z   = low.z,
+        .path         = (node.path << 1) | 1,
       };
 
       nodes[write_ptr] = node_left;
@@ -465,6 +469,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         .self_low.x   = low.x,
         .self_low.y   = low.y,
         .self_low.z   = low.z,
+        .path         = (node.path << 1) | 0,
       };
 
       nodes[write_ptr] = node_right;
@@ -524,6 +529,7 @@ static void _lights_get_ref_points_and_confidence(LightTreeWork* work, LightTree
 // Then, based on that reference point, compute the smallest distance to any light center.
 // This is our spatial confidence that we use to clamp the distance with when evaluating the importance during traversal.
 static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
+  uint32_t* paths      = malloc(sizeof(uint32_t) * work->triangles_count);
   LightTreeNode* nodes = malloc(sizeof(LightTreeNode) * work->nodes_count);
 
   for (uint32_t i = 0; i < work->nodes_count; i++) {
@@ -547,6 +553,10 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
       case LIGHT_TREE_NODE_TYPE_LEAF:
         node.light_count = binary_node.triangle_count;
         node.ptr         = binary_node.triangles_address;
+
+        for (uint32_t light_offset = 0; light_offset < node.light_count; light_offset++) {
+          paths[node.ptr + light_offset] = binary_node.path;
+        }
         break;
       default:
         crash_message("Encountered illegal node type!");
@@ -556,7 +566,29 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
     nodes[i] = node;
   }
 
+  work->paths = paths;
   work->nodes = nodes;
+}
+
+static void _lights_tree_finalize(LightTreeWork* work) {
+  // TODO: Clean up this mess, this is the same as in bvh.c but I would like this to be cleaned, we need this anyway for instance support.
+  void* paths;
+  device_malloc(&paths, sizeof(uint32_t) * work->triangles_count);
+  device_upload(paths, work->paths, sizeof(uint32_t) * work->triangles_count);
+
+  void* light_tree_nodes;
+  device_malloc(&light_tree_nodes, sizeof(LightTreeNode) * work->nodes_count);
+  device_upload(light_tree_nodes, work->nodes, sizeof(LightTreeNode) * work->nodes_count);
+
+  device_update_symbol(light_tree_nodes, light_tree_nodes);
+  device_update_symbol(light_tree_paths, paths);
+}
+
+static void _lights_tree_clear_work(LightTreeWork* work) {
+  free(work->fragments);
+  free(work->paths);
+  free(work->binary_nodes);
+  free(work->nodes);
 }
 
 void lights_build_light_tree(Scene* scene) {
@@ -568,6 +600,8 @@ void lights_build_light_tree(Scene* scene) {
   _lights_tree_create_fragments(scene, &work);
   _lights_tree_build_binary_bvh(&work);
   _lights_tree_build_traversal_structure(&work);
+  _lights_tree_finalize(&work);
+  _lights_tree_clear_work(&work);
 
   bench_toc();
 }
