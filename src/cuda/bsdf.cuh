@@ -270,6 +270,7 @@ __device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel,
 
 __device__ void bsdf_sample_for_light_probabilities(
   const GBufferData data, float& reflection_prob, float& refraction_prob, float& diffuse_prob) {
+  // TODO: Consider creating a context and sampling also proportional to albedo etc.
   const float microfacet_reflection_weight = 1.0f;
   const float microfacet_refraction_weight = 1.0f - data.albedo.a;
   const float diffuse_weight               = (1.0f - data.metallic) * data.albedo.a;

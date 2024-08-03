@@ -495,13 +495,13 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
   work->nodes_count  = node_count;
 }
 
-static void _lights_get_ref_points_and_confidence(LightTreeWork* work, LightTreeBinaryNode node, vec3* ref_point, float* confidence) {
-  const float total_energy         = node.left_energy + node.right_energy;
-  const float inverse_total_energy = 1.0f / total_energy;
+static void _lights_get_ref_points_and_confidence(
+  LightTreeWork* work, LightTreeBinaryNode node, float energy, vec3* ref_point, float* confidence) {
+  const float inverse_total_energy = 1.0f / energy;
 
   vec3 p = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
-  for (uint32_t i = node.triangles_address; i < node.triangle_count; i++) {
-    Fragment frag = work->fragments[i];
+  for (uint32_t i = 0; i < node.triangle_count; i++) {
+    Fragment frag = work->fragments[node.triangles_address + i];
 
     const float weight = frag.power * inverse_total_energy;
 
@@ -511,8 +511,8 @@ static void _lights_get_ref_points_and_confidence(LightTreeWork* work, LightTree
   }
 
   float minimum_distance = FLT_MAX;
-  for (uint32_t i = node.triangles_address; i < node.triangle_count; i++) {
-    Fragment frag = work->fragments[i];
+  for (uint32_t i = 0; i < node.triangle_count; i++) {
+    Fragment frag = work->fragments[node.triangles_address + i];
 
     const vec3 diff = {.x = p.x - frag.middle.x, .y = p.y - frag.middle.y, .z = p.z - frag.middle.z};
 
@@ -546,9 +546,9 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
         node.ptr         = binary_node.child_address;
 
         _lights_get_ref_points_and_confidence(
-          work, work->binary_nodes[binary_node.child_address + 0], &node.left_ref_point, &node.left_confidence);
+          work, work->binary_nodes[binary_node.child_address + 0], node.left_energy, &node.left_ref_point, &node.left_confidence);
         _lights_get_ref_points_and_confidence(
-          work, work->binary_nodes[binary_node.child_address + 1], &node.right_ref_point, &node.right_confidence);
+          work, work->binary_nodes[binary_node.child_address + 1], node.right_energy, &node.right_ref_point, &node.right_confidence);
         break;
       case LIGHT_TREE_NODE_TYPE_LEAF:
         node.light_count = binary_node.triangle_count;
@@ -571,6 +571,17 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
 }
 
 static void _lights_tree_finalize(LightTreeWork* work) {
+  TriangleLight* reordered_lights = (TriangleLight*) malloc(sizeof(TriangleLight) * work->triangles_count);
+
+  for (uint32_t i = 0; i < work->triangles_count; i++) {
+    Fragment frag       = work->fragments[i];
+    reordered_lights[i] = work->triangles[frag.id];
+  }
+
+  memcpy(work->triangles, reordered_lights, sizeof(TriangleLight) * work->triangles_count);
+
+  free(reordered_lights);
+
   // TODO: Clean up this mess, this is the same as in bvh.c but I would like this to be cleaned, we need this anyway for instance support.
   void* paths;
   device_malloc(&paths, sizeof(uint32_t) * work->triangles_count);

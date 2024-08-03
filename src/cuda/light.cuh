@@ -8,18 +8,18 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
-__device__ uint32_t light_tree_traverse(const vec3 origin, float random, uint32_t& subset_length, float& pdf) {
+__device__ uint32_t light_tree_traverse(const vec3 pos, float random, uint32_t& subset_length, float& pdf) {
   LightTreeNode node = load_light_tree_node(device.light_tree_nodes, 0);
 
   pdf = 1.0f;
 
   while (node.light_count == 0) {
-    const vec3 left_diff  = sub_vector(origin, node.left_ref_point);
+    const vec3 left_diff  = sub_vector(pos, node.left_ref_point);
     const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
 
     const float left_importance = node.left_energy / (left_dist * left_dist);
 
-    const vec3 right_diff  = sub_vector(origin, node.right_ref_point);
+    const vec3 right_diff  = sub_vector(pos, node.right_ref_point);
     const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
 
     const float right_importance = node.right_energy / (right_dist * right_dist);
@@ -51,19 +51,19 @@ __device__ uint32_t light_tree_traverse(const vec3 origin, float random, uint32_
   return node.ptr;
 }
 
-__device__ float light_tree_traverse_pdf(const vec3 origin, uint32_t light_id) {
+__device__ float light_tree_traverse_pdf(const vec3 pos, uint32_t light_id) {
   uint32_t light_path = __ldg(device.light_tree_paths + light_id);
   LightTreeNode node  = load_light_tree_node(device.light_tree_nodes, 0);
 
   float pdf = 1.0f;
 
-  while (light_path) {
-    const vec3 left_diff  = sub_vector(origin, node.left_ref_point);
+  while (node.light_count == 0) {
+    const vec3 left_diff  = sub_vector(pos, node.left_ref_point);
     const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
 
     const float left_importance = node.left_energy / (left_dist * left_dist);
 
-    const vec3 right_diff  = sub_vector(origin, node.right_ref_point);
+    const vec3 right_diff  = sub_vector(pos, node.right_ref_point);
     const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
 
     const float right_importance = node.right_energy / (right_dist * right_dist);
