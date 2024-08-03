@@ -99,7 +99,7 @@ __device__ uint32_t ris_sample_light(
   for (int i = 0; i < reservoir_size; i++) {
     uint32_t id_rand = quasirandom_sequence_1D_base(
       QUASI_RANDOM_TARGET_RIS_LIGHT_ID + light_ray_index * reservoir_size + i, pixel, device.temporal_frames, device.depth);
-    uint32_t id = (id_rand % light_list_length) + light_list_ptr;
+    uint32_t id = ((id_rand >> 16) % light_list_length) + light_list_ptr;
 
     if (id == blocked_light_id)
       continue;

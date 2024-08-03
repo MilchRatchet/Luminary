@@ -302,7 +302,7 @@ __device__ float lights_integrate_emission(const TriangleLight light, const UV v
 
   accumulator = scale_color(accumulator, 1.0f / texel_count);
 
-  return luminance(accumulator);
+  return fmaxf(accumulator.r, fmaxf(accumulator.g, accumulator.b));
 }
 
 LUMINARY_KERNEL void lights_compute_power(const TriangleLight* tris, const uint32_t lights_count, float* power_dst) {

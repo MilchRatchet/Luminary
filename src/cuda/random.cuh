@@ -264,6 +264,10 @@ __device__ uint2 random_blue_noise_mask_2D(const uint32_t x, const uint32_t y) {
   return make_uint2(blue_noise & 0xFFFF0000, blue_noise << 16);
 }
 
+////////////////////////////////////////////////////////////////////
+// Warning: The lowest bit is always 0 for these random numbers.
+////////////////////////////////////////////////////////////////////
+
 __device__ uint2
   quasirandom_sequence_2D_base(const uint32_t target, const ushort2 pixel, const uint32_t sequence_id, const uint32_t depth) {
   uint32_t dimension_index = target + depth * QUASI_RANDOM_TARGET_COUNT;

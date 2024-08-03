@@ -372,7 +372,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
           fit_bounds_of_bins(bins + k, OBJECT_SPLIT_BIN_COUNT - k, &high_right, &low_right);
 
           left_energy += bins[k - 1].energy;
-          right_energy -= bins[k].energy;
+          right_energy -= bins[k - 1].energy;
 
           vec3_p diff_left = {
             .x = high_left.x - low_left.x, .y = high_left.y - low_left.y, .z = high_left.z - low_left.z, ._p = high_left._p - low_left._p};
@@ -602,7 +602,7 @@ static void _lights_tree_clear_work(LightTreeWork* work) {
   free(work->nodes);
 }
 
-void lights_build_light_tree(Scene* scene) {
+static void _lights_build_light_tree(Scene* scene) {
   bench_tic("Build Light Tree");
 
   LightTreeWork work;
@@ -667,9 +667,7 @@ void lights_process(Scene* scene, int dmm_active) {
         }
       }
       else {
-        const float luminance = 0.212655f * material.emission_r + 0.715158f * material.emission_g + 0.072187f * material.emission_b;
-
-        light.power = luminance;
+        light.power = fmaxf(material.emission_r, fmaxf(material.emission_g, material.emission_b));
 
         scene->triangles[i].light_id = lights_count;
 
@@ -739,6 +737,12 @@ void lights_process(Scene* scene, int dmm_active) {
 
   scene->triangle_lights       = lights;
   scene->triangle_lights_count = lights_count;
+
+  ////////////////////////////////////////////////////////////////////
+  // Create light tree.
+  ////////////////////////////////////////////////////////////////////
+
+  _lights_build_light_tree(scene);
 
   ////////////////////////////////////////////////////////////////////
   // Create vertex and index buffer for BVH creation.
