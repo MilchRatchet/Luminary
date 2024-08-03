@@ -22,6 +22,7 @@ void scene_init(Scene** _scene) {
   Scene* scene = calloc(1, sizeof(Scene));
 
   scene->material.lights_active        = 0;
+  scene->material.light_tree_active    = 1;
   scene->material.default_material.r   = 0.3f;
   scene->material.default_material.g   = 0.0f;
   scene->material.default_material.b   = 1.0f;

@@ -80,8 +80,8 @@ struct Bin {
 /*
  * BIN_COUNTS must be power of 2
  */
-#define THRESHOLD_TRIANGLES 64
-#define OBJECT_SPLIT_BIN_COUNT 8
+#define THRESHOLD_TRIANGLES 32
+#define OBJECT_SPLIT_BIN_COUNT 64
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
 #define MAX_VALUE 1e10f
@@ -503,14 +503,14 @@ static void _lights_get_ref_points_and_confidence(
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     Fragment frag = work->fragments[node.triangles_address + i];
 
-    const float weight = frag.power * inverse_total_energy;
+    const float weight = 1.0f / node.triangle_count;
 
     p.x += weight * frag.middle.x;
     p.y += weight * frag.middle.y;
     p.z += weight * frag.middle.z;
   }
 
-  float minimum_distance = FLT_MAX;
+  float max_distance = 0.0f;
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     Fragment frag = work->fragments[node.triangles_address + i];
 
@@ -518,11 +518,11 @@ static void _lights_get_ref_points_and_confidence(
 
     const float distance = sqrtf(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
 
-    minimum_distance = fminf(minimum_distance, distance);
+    max_distance = fmaxf(max_distance, distance);
   }
 
   *ref_point  = p;
-  *confidence = minimum_distance;
+  *confidence = max_distance;
 }
 
 // Set the reference point in each node to be the energy weighted mean of the centers of the lights.
@@ -603,8 +603,6 @@ static void _lights_tree_clear_work(LightTreeWork* work) {
 }
 
 static void _lights_build_light_tree(Scene* scene) {
-  bench_tic("Build Light Tree");
-
   LightTreeWork work;
   memset(&work, 0, sizeof(LightTreeWork));
 
@@ -613,8 +611,6 @@ static void _lights_build_light_tree(Scene* scene) {
   _lights_tree_build_traversal_structure(&work);
   _lights_tree_finalize(&work);
   _lights_tree_clear_work(&work);
-
-  bench_toc();
 }
 
 void lights_process(Scene* scene, int dmm_active) {

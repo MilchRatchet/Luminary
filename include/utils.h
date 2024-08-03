@@ -341,6 +341,7 @@ struct Jitter {
 struct GlobalMaterial {
   RGBF default_material;
   int lights_active;
+  int light_tree_active;
   float alpha_cutoff;
   int colored_transparency;
   int invert_roughness;

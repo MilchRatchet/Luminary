@@ -8,18 +8,24 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
-__device__ uint32_t light_tree_traverse(const vec3 pos, float random, uint32_t& subset_length, float& pdf) {
+__device__ uint32_t light_tree_traverse(const GBufferData data, float random, uint32_t& subset_length, float& pdf) {
+  if (!device.scene.material.light_tree_active) {
+    subset_length = device.scene.triangle_lights_count;
+    pdf           = 1.0f;
+    return 0;
+  }
+
   LightTreeNode node = load_light_tree_node(device.light_tree_nodes, 0);
 
   pdf = 1.0f;
 
   while (node.light_count == 0) {
-    const vec3 left_diff  = sub_vector(pos, node.left_ref_point);
+    const vec3 left_diff  = sub_vector(node.left_ref_point, data.position);
     const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
 
     const float left_importance = node.left_energy / (left_dist * left_dist);
 
-    const vec3 right_diff  = sub_vector(pos, node.right_ref_point);
+    const vec3 right_diff  = sub_vector(node.right_ref_point, data.position);
     const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
 
     const float right_importance = node.right_energy / (right_dist * right_dist);
@@ -40,7 +46,7 @@ __device__ uint32_t light_tree_traverse(const vec3 pos, float random, uint32_t& 
       pdf *= right_prob;
       next_node_address++;
 
-      random = (1.0f - random) / right_prob;
+      random = (random - left_prob) / right_prob;
     }
 
     node = load_light_tree_node(device.light_tree_nodes, next_node_address);
@@ -51,19 +57,23 @@ __device__ uint32_t light_tree_traverse(const vec3 pos, float random, uint32_t& 
   return node.ptr;
 }
 
-__device__ float light_tree_traverse_pdf(const vec3 pos, uint32_t light_id) {
+__device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_id) {
+  if (!device.scene.material.light_tree_active) {
+    return 1.0f / device.scene.triangle_lights_count;
+  }
+
   uint32_t light_path = __ldg(device.light_tree_paths + light_id);
   LightTreeNode node  = load_light_tree_node(device.light_tree_nodes, 0);
 
   float pdf = 1.0f;
 
   while (node.light_count == 0) {
-    const vec3 left_diff  = sub_vector(pos, node.left_ref_point);
+    const vec3 left_diff  = sub_vector(node.left_ref_point, data.position);
     const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
 
     const float left_importance = node.left_energy / (left_dist * left_dist);
 
-    const vec3 right_diff  = sub_vector(pos, node.right_ref_point);
+    const vec3 right_diff  = sub_vector(node.right_ref_point, data.position);
     const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
 
     const float right_importance = node.right_energy / (right_dist * right_dist);

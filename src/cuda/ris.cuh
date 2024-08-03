@@ -37,8 +37,8 @@ __device__ uint32_t ris_sample_light(
   uint32_t light_list_length;
   float light_list_pdf;
 
-  const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE, pixel);
-  const uint32_t light_list_ptr = light_tree_traverse(data.position, light_tree_random, light_list_length, light_list_pdf);
+  const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + light_ray_index, pixel);
+  const uint32_t light_list_ptr = light_tree_traverse(data, light_tree_random, light_list_length, light_list_pdf);
 
   // TODO: Once the light tree is implemented. Consider reducing the number of samples for deep bounces.
   const int reservoir_size                     = device.ris_settings.initial_reservoir_size;
@@ -66,7 +66,7 @@ __device__ uint32_t ris_sample_light(
     const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction);
     light_color            = mul_color(light_color, bsdf_weight);
 
-    float target_pdf = luminance(light_color);
+    float target_pdf = fmaxf(light_color.r, fmaxf(light_color.g, light_color.b));
 
     if (isinf(target_pdf) || isnan(target_pdf)) {
       target_pdf = 0.0f;
@@ -74,7 +74,7 @@ __device__ uint32_t ris_sample_light(
 
     const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, initial_ray);
 
-    const float nee_light_tree_pdf      = light_tree_traverse_pdf(data.position, initial_sample_id);
+    const float nee_light_tree_pdf      = light_tree_traverse_pdf(data, initial_sample_id);
     const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
 
     // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
@@ -97,9 +97,8 @@ __device__ uint32_t ris_sample_light(
   ////////////////////////////////////////////////////////////////////
 
   for (int i = 0; i < reservoir_size; i++) {
-    uint32_t id_rand = quasirandom_sequence_1D_base(
-      QUASI_RANDOM_TARGET_RIS_LIGHT_ID + light_ray_index * reservoir_size + i, pixel, device.temporal_frames, device.depth);
-    uint32_t id = ((id_rand >> 16) % light_list_length) + light_list_ptr;
+    const float id_rand = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID + light_ray_index * reservoir_size + i, pixel);
+    const uint32_t id   = uint32_t(__fmul_rd(id_rand, light_list_length)) + light_list_ptr;
 
     if (id == blocked_light_id)
       continue;
@@ -115,7 +114,7 @@ __device__ uint32_t ris_sample_light(
     bool is_refraction;
     const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
     light_color            = mul_color(light_color, bsdf_weight);
-    float target_pdf       = luminance(light_color);
+    float target_pdf       = fmaxf(light_color.r, fmaxf(light_color.g, light_color.b));
 
     if (isinf(target_pdf) || isnan(target_pdf)) {
       target_pdf = 0.0f;

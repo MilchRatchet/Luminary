@@ -92,6 +92,7 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "Renderer\nMaterials\nExport");
   panels[i++] = create_check(ui, "Lights", &(instance->scene.material.lights_active), 1);
+  panels[i++] = create_check(ui, "Light Tree", &(instance->scene.material.light_tree_active), 1);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene.material.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_check(ui, "Override Materials", &(instance->scene.material.override_materials), 1);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->scene.material.default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
