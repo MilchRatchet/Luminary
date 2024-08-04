@@ -21,12 +21,12 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
 
   while (node.light_count == 0) {
     const vec3 left_diff  = sub_vector(node.left_ref_point, data.position);
-    const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
+    const float left_dist = get_length(left_diff);
 
     const float left_importance = node.left_energy / (left_dist * left_dist);
 
     const vec3 right_diff  = sub_vector(node.right_ref_point, data.position);
-    const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
+    const float right_dist = get_length(right_diff);
 
     const float right_importance = node.right_energy / (right_dist * right_dist);
 
@@ -69,12 +69,12 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
 
   while (node.light_count == 0) {
     const vec3 left_diff  = sub_vector(node.left_ref_point, data.position);
-    const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
+    const float left_dist = get_length(left_diff);
 
     const float left_importance = node.left_energy / (left_dist * left_dist);
 
     const vec3 right_diff  = sub_vector(node.right_ref_point, data.position);
-    const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
+    const float right_dist = get_length(right_diff);
 
     const float right_importance = node.right_energy / (right_dist * right_dist);
 

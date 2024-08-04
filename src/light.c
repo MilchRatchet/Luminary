@@ -498,34 +498,21 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
   work->nodes_count  = node_count;
 }
 
-static void _lights_get_ref_points_and_confidence(
-  LightTreeWork* work, LightTreeBinaryNode node, float energy, vec3* ref_point, float* confidence) {
+static void _lights_get_ref_point(LightTreeWork* work, LightTreeBinaryNode node, float energy, vec3* ref_point) {
   const float inverse_total_energy = 1.0f / energy;
 
   vec3 p = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
   for (uint32_t i = 0; i < node.triangle_count; i++) {
     Fragment frag = work->fragments[node.triangles_address + i];
 
-    const float weight = 1.0f / node.triangle_count;
+    const float weight = frag.power * inverse_total_energy;
 
     p.x += weight * frag.middle.x;
     p.y += weight * frag.middle.y;
     p.z += weight * frag.middle.z;
   }
 
-  float max_distance = 0.0f;
-  for (uint32_t i = 0; i < node.triangle_count; i++) {
-    Fragment frag = work->fragments[node.triangles_address + i];
-
-    const vec3 diff = {.x = p.x - frag.middle.x, .y = p.y - frag.middle.y, .z = p.z - frag.middle.z};
-
-    const float distance = sqrtf(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
-
-    max_distance = fmaxf(max_distance, distance);
-  }
-
-  *ref_point  = p;
-  *confidence = max_distance;
+  *ref_point = p;
 }
 
 // Set the reference point in each node to be the energy weighted mean of the centers of the lights.
@@ -548,10 +535,8 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
         node.light_count = 0;
         node.ptr         = binary_node.child_address;
 
-        _lights_get_ref_points_and_confidence(
-          work, work->binary_nodes[binary_node.child_address + 0], node.left_energy, &node.left_ref_point, &node.left_confidence);
-        _lights_get_ref_points_and_confidence(
-          work, work->binary_nodes[binary_node.child_address + 1], node.right_energy, &node.right_ref_point, &node.right_confidence);
+        _lights_get_ref_point(work, work->binary_nodes[binary_node.child_address + 0], node.left_energy, &node.left_ref_point);
+        _lights_get_ref_point(work, work->binary_nodes[binary_node.child_address + 1], node.right_energy, &node.right_ref_point);
         break;
       case LIGHT_TREE_NODE_TYPE_LEAF:
         node.light_count = binary_node.triangle_count;
