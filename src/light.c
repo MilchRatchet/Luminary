@@ -280,17 +280,23 @@ static void divide_middles_along_axis(
   uint32_t left  = 0;
   uint32_t right = 0;
 
-  for (uint32_t i = 0; i < fragments_count; i++) {
-    const Fragment frag = fragments[i];
+  while (left + right < fragments_count) {
+    const Fragment frag = fragments[left];
 
     const double middle = get_entry_by_axis(frag.middle, axis);
 
-    // Note that this increments only after using the value to compute the swap index.
-    const uint32_t swap_index = (middle <= split) ? left++ : (fragments_count - 1 - right++);
+    if (middle > split) {
+      const uint32_t swap_index = fragments_count - 1 - right;
 
-    Fragment temp         = fragments[swap_index];
-    fragments[swap_index] = frag;
-    fragments[i]          = temp;
+      Fragment temp         = fragments[swap_index];
+      fragments[swap_index] = frag;
+      fragments[left]       = temp;
+
+      right++;
+    }
+    else {
+      left++;
+    }
   }
 }
 
