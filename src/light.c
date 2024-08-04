@@ -14,11 +14,14 @@
 #include "texture.h"
 #include "utils.h"
 
+// #define LIGHT_TREE_DEBUG_OUTPUT
+
 enum LightTreeSweepAxis {
   LIGHT_TREE_SWEEP_AXIS_X = 0,
   LIGHT_TREE_SWEEP_AXIS_Y = 1,
   LIGHT_TREE_SWEEP_AXIS_Z = 2
 } typedef LightTreeSweepAxis;
+
 enum LightTreeNodeType {
   LIGHT_TREE_NODE_TYPE_NULL     = 0,
   LIGHT_TREE_NODE_TYPE_INTERNAL = 1,
@@ -602,6 +605,113 @@ static void _lights_tree_clear_work(LightTreeWork* work) {
   free(work->nodes);
 }
 
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+static void _lights_tree_debug_output_export_binary_node(
+  FILE* obj_file, FILE* mtl_file, LightTreeWork* work, uint32_t id, uint32_t* vertex_offset) {
+  LightTreeBinaryNode node = work->binary_nodes[id];
+
+  char buffer[4096];
+  int buffer_offset = 0;
+
+  uint32_t v_offset = *vertex_offset;
+
+  buffer_offset += sprintf(buffer + buffer_offset, "o Node%u\n", id);
+
+  buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", node.self_low.x, node.self_low.y, node.self_low.z);
+  buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", node.self_low.x, node.self_low.y, node.self_high.z);
+  buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", node.self_low.x, node.self_high.y, node.self_low.z);
+  buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", node.self_low.x, node.self_high.y, node.self_high.z);
+  buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", node.self_high.x, node.self_low.y, node.self_low.z);
+  buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", node.self_high.x, node.self_low.y, node.self_high.z);
+  buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", node.self_high.x, node.self_high.y, node.self_low.z);
+  buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", node.self_high.x, node.self_high.y, node.self_high.z);
+
+  buffer_offset += sprintf(buffer + buffer_offset, "usemtl NodeMTL%u\n", id);
+
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 1, v_offset + 2);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 3, v_offset + 1, v_offset + 2);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 4, v_offset + 1);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 5, v_offset + 4, v_offset + 1);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 4, v_offset + 2);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 6, v_offset + 4, v_offset + 2);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 1, v_offset + 5, v_offset + 3);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 5, v_offset + 3);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 2, v_offset + 6, v_offset + 3);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 6, v_offset + 3);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 4, v_offset + 5, v_offset + 6);
+  buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 7, v_offset + 5, v_offset + 6);
+
+  fwrite(buffer, buffer_offset, 1, obj_file);
+
+  v_offset += 8;
+  buffer_offset = 0;
+
+  buffer_offset += sprintf(buffer + buffer_offset, "newmtl NodeMTL%u\n", id);
+  buffer_offset +=
+    sprintf(buffer + buffer_offset, "Kd %f %f %f\n", (id & 0b100) ? 1.0f : 0.0f, (id & 0b10) ? 1.0f : 0.0f, (id & 0b1) ? 1.0f : 0.0f);
+  buffer_offset += sprintf(buffer + buffer_offset, "d %f\n", 0.1f);
+
+  fwrite(buffer, buffer_offset, 1, mtl_file);
+
+  buffer_offset = 0;
+
+  if (node.type == LIGHT_TREE_NODE_TYPE_LEAF) {
+    for (uint32_t i = 0; i < node.triangle_count; i++) {
+      const uint32_t light_id = node.triangles_address + i;
+
+      TriangleLight light = work->triangles[light_id];
+
+      buffer_offset += sprintf(buffer + buffer_offset, "o Node%u - Tri%u\n", id, light_id);
+
+      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", light.vertex.x, light.vertex.y, light.vertex.z);
+      buffer_offset += sprintf(
+        buffer + buffer_offset, "v %f %f %f\n", light.vertex.x + light.edge1.x, light.vertex.y + light.edge1.y,
+        light.vertex.z + light.edge1.z);
+      buffer_offset += sprintf(
+        buffer + buffer_offset, "v %f %f %f\n", light.vertex.x + light.edge2.x, light.vertex.y + light.edge2.y,
+        light.vertex.z + light.edge2.z);
+
+      buffer_offset += sprintf(buffer + buffer_offset, "usemtl TriMTL%u\n", light_id);
+
+      buffer_offset += sprintf(buffer + buffer_offset, "f %u %u %u\n", v_offset + 0, v_offset + 1, v_offset + 2);
+
+      fwrite(buffer, buffer_offset, 1, obj_file);
+
+      v_offset += 3;
+      buffer_offset = 0;
+
+      buffer_offset += sprintf(buffer + buffer_offset, "newmtl TriMTL%u\n", light_id);
+      buffer_offset += sprintf(
+        buffer + buffer_offset, "Kd %f %f %f\n", (light_id & 0b100) ? 1.0f : 0.0f, (light_id & 0b10) ? 1.0f : 0.0f,
+        (light_id & 0b1) ? 1.0f : 0.0f);
+      buffer_offset += sprintf(buffer + buffer_offset, "d %f\n", 1.0f);
+
+      fwrite(buffer, buffer_offset, 1, mtl_file);
+
+      buffer_offset = 0;
+    }
+  }
+
+  *vertex_offset = v_offset;
+}
+
+static void _lights_tree_debug_output(LightTreeWork* work) {
+  FILE* obj_file = fopen("LuminaryLightTree.obj", "wb");
+  FILE* mtl_file = fopen("LuminaryLightTree.mtl", "wb");
+
+  fwrite("LuminaryLightTree.mtl\n", 22, 1, mtl_file);
+
+  uint32_t vertex_offset = 1;
+
+  for (uint32_t i = 1; i < work->nodes_count; i++) {
+    _lights_tree_debug_output_export_binary_node(obj_file, mtl_file, work, i, &vertex_offset);
+  }
+
+  fclose(obj_file);
+  fclose(mtl_file);
+}
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
+
 static void _lights_build_light_tree(Scene* scene) {
   LightTreeWork work;
   memset(&work, 0, sizeof(LightTreeWork));
@@ -610,6 +720,9 @@ static void _lights_build_light_tree(Scene* scene) {
   _lights_tree_build_binary_bvh(&work);
   _lights_tree_build_traversal_structure(&work);
   _lights_tree_finalize(&work);
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+  _lights_tree_debug_output(&work);
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
   _lights_tree_clear_work(&work);
 }
 
