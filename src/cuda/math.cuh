@@ -763,6 +763,10 @@ __device__ float luminance(const RGBF v) {
   return 0.212655f * v.r + 0.715158f * v.g + 0.072187f * v.b;
 }
 
+__device__ float color_importance(const RGBF color) {
+  return __fmax_fmax(color.r, color.g, color.b);
+}
+
 __device__ RGBAF saturate_albedo(RGBAF color, float change) {
   const float max_value = fmaxf(color.r, fmaxf(color.g, color.b));
   const float min_value = fminf(color.r, fminf(color.g, color.b));

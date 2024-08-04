@@ -73,7 +73,7 @@ __device__ bool optix_toy_shadowing(
 
       RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
 
-      if (luminance(toy_transparency) == 0.0f)
+      if (color_importance(toy_transparency) == 0.0f)
         return false;
 
       // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
@@ -143,8 +143,8 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   // Resampled Importance Sampling
   ////////////////////////////////////////////////////////////////////
 
-  const float target_pdf_bsdf        = luminance(light_bsdf);
-  const float target_pdf_solid_angle = luminance(light_solid_angle);
+  const float target_pdf_bsdf        = color_importance(light_bsdf);
+  const float target_pdf_solid_angle = color_importance(light_solid_angle);
 
   // MIS weight multiplied with PDF
   const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_light_pdf(data, dir_bsdf) * solid_angle + 1.0f);
@@ -185,7 +185,7 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   // Compute Visibility
   ////////////////////////////////////////////////////////////////////
 
-  if (luminance(light_color) == 0.0f)
+  if (color_importance(light_color) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
@@ -309,7 +309,7 @@ __device__ RGBF
 
   light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
 
-  if (luminance(light_color) < eps)
+  if (color_importance(light_color) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
   // Transparent pass through rays are not allowed.
@@ -413,7 +413,7 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
 
   const RGBF toy_emission = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
 
-  if (luminance(toy_emission) == 0.0f)
+  if (color_importance(toy_emission) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
   // We have to clamp due to numerical precision issues in the microfacet models.
@@ -455,8 +455,8 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
 
   const float solid_angle = toy_get_solid_angle(data.position);
 
-  const float target_pdf_bsdf        = luminance(light_bsdf);
-  const float target_pdf_solid_angle = luminance(light_solid_angle);
+  const float target_pdf_bsdf        = color_importance(light_bsdf);
+  const float target_pdf_solid_angle = color_importance(light_solid_angle);
 
   // MIS weight multiplied with PDF
   const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_light_pdf(data, dir_bsdf) * solid_angle + 1.0f);
@@ -575,7 +575,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   const uint32_t light_id = ris_sample_light(
     data, index, light_ray_index, bsdf_light_id, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
 
-  if (luminance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
+  if (color_importance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
     return get_color(0.0f, 0.0f, 0.0f);
 
   // Transparent pass through rays are not allowed.

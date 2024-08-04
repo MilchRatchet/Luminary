@@ -209,7 +209,7 @@ __device__ vec3 light_sample_triangle(
     color = scale_color(color, device.scene.material.default_material.b * scale);
   }
 
-  if (luminance(color) > 0.0f) {
+  if (color_importance(color) > 0.0f) {
     float alpha;
     if (albedo_tex != TEXTURE_NONE) {
       alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
@@ -261,7 +261,7 @@ __device__ void light_sample_triangle_presampled(
     color = scale_color(color, device.scene.material.default_material.b * scale);
   }
 
-  if (luminance(color) > 0.0f) {
+  if (color_importance(color) > 0.0f) {
     float alpha;
     if (albedo_tex != TEXTURE_NONE) {
       alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
@@ -311,9 +311,7 @@ __device__ float lights_integrate_emission(const TriangleLight light, const UV v
     }
   }
 
-  accumulator = scale_color(accumulator, 1.0f / texel_count);
-
-  return fmaxf(accumulator.r, fmaxf(accumulator.g, accumulator.b));
+  return color_importance(accumulator) / texel_count;
 }
 
 LUMINARY_KERNEL void lights_compute_power(const TriangleLight* tris, const uint32_t lights_count, float* power_dst) {

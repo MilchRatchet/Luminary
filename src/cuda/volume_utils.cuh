@@ -45,7 +45,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.max_height = OCEAN_MIN_HEIGHT * (1.0f - eps);
   volume.min_height = 0.0f;
 
-  volume.max_scattering = fmaxf(fmaxf(volume.scattering.r, volume.scattering.g), volume.scattering.b);
+  volume.max_scattering = color_importance(volume.scattering);
 
   return volume;
 }

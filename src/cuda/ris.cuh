@@ -67,7 +67,7 @@ __device__ uint32_t ris_sample_light(
       const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction);
       light_color            = mul_color(light_color, bsdf_weight);
 
-      float target_pdf = fmaxf(light_color.r, fmaxf(light_color.g, light_color.b));
+      const float target_pdf = color_importance(light_color);
 
       const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, initial_ray);
 
@@ -115,7 +115,7 @@ __device__ uint32_t ris_sample_light(
     bool is_refraction;
     const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
     light_color            = mul_color(light_color, bsdf_weight);
-    float target_pdf       = fmaxf(light_color.r, fmaxf(light_color.g, light_color.b));
+    const float target_pdf = color_importance(light_color);
 
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
     const float one_over_nee_sample_pdf = solid_angle * one_over_light_tree_pdf_and_size;

@@ -105,8 +105,8 @@ LUMINARY_KERNEL void temporal_accumulation() {
     float variance = (device.temporal_frames == 0) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
     if (device.scene.camera.do_firefly_clamping) {
-      float luminance_buffer = luminance(indirect_buffer);
-      float luminance_output = luminance(indirect_output);
+      float luminance_buffer = color_importance(indirect_buffer);
+      float luminance_output = color_importance(indirect_output);
 
       const float deviation = fminf(0.1f, sqrtf(fmaxf(variance, eps)));
 

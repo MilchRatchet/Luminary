@@ -14,7 +14,7 @@ __device__ int validate_trace_task(const TraceTask task, RGBF& record) {
   int valid = 1;
 
 #ifdef WEIGHT_BASED_EXIT
-  const float value = luminance(record);
+  const float value = color_importance(record);
 
   // Inf and NaN are handled in the temporal accumulation.
   if (value < device.scene.camera.russian_roulette_threshold) {

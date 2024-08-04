@@ -83,7 +83,7 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
       RGBF diff = sub_color(color, result);
       diff      = mul_color(diff, diff);
 
-      variance = variance + luminance(diff);
+      variance = variance + color_importance(diff);
       variance = variance * (1.0f / device.temporal_frames);
 
       // Same as in temporal accumulation
