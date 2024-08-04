@@ -613,6 +613,12 @@ static void _lights_build_light_tree(Scene* scene) {
   _lights_tree_clear_work(&work);
 }
 
+static float _uint16_t_to_float(const uint16_t v) {
+  const uint32_t i = 0x3F800000u | (((uint32_t) v) << 7);
+
+  return *(float*) (&i) - 1.0f;
+}
+
 void lights_process(Scene* scene, int dmm_active) {
   bench_tic("Processing Lights");
 
@@ -640,9 +646,19 @@ void lights_process(Scene* scene, int dmm_active) {
 
     const int is_textured_light = (tex_index != TEXTURE_NONE);
 
+    RGBF constant_emission;
+
+    constant_emission.r = _uint16_t_to_float(material.emission_r);
+    constant_emission.g = _uint16_t_to_float(material.emission_g);
+    constant_emission.b = _uint16_t_to_float(material.emission_b);
+
+    constant_emission.r *= material.emission_scale;
+    constant_emission.g *= material.emission_scale;
+    constant_emission.b *= material.emission_scale;
+
     // Triangle is a light if it has a light texture with non-zero value at some point on the triangle's surface or it
     // has no light texture but a non-zero constant emission.
-    const int is_light = (is_textured_light) || material.emission_r || material.emission_g || material.emission_b;
+    const int is_light = (is_textured_light) || constant_emission.r || constant_emission.g || constant_emission.b;
 
     if (is_light) {
       TriangleLight light;
@@ -663,7 +679,7 @@ void lights_process(Scene* scene, int dmm_active) {
         }
       }
       else {
-        light.power = fmaxf(material.emission_r, fmaxf(material.emission_g, material.emission_b));
+        light.power = fmaxf(constant_emission.r, fmaxf(constant_emission.g, constant_emission.b));
 
         scene->triangles[i].light_id = lights_count;
 
