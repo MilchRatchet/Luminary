@@ -762,7 +762,7 @@ void lights_process(Scene* scene, int dmm_active) {
 
     // Triangle is a light if it has a light texture with non-zero value at some point on the triangle's surface or it
     // has no light texture but a non-zero constant emission.
-    const int is_light = (is_textured_light) || constant_emission.r || constant_emission.g || constant_emission.b;
+    const int is_light = is_textured_light || constant_emission.r || constant_emission.g || constant_emission.b;
 
     if (is_light) {
       TriangleLight light;
@@ -833,8 +833,6 @@ void lights_process(Scene* scene, int dmm_active) {
 
       light.power = candidate_light_power;
 
-      scene->triangles[light.triangle_id].light_id = lights_count;
-
       lights[lights_count++] = light;
       if (lights_count == lights_length) {
         lights_length *= 2;
@@ -859,6 +857,15 @@ void lights_process(Scene* scene, int dmm_active) {
   ////////////////////////////////////////////////////////////////////
 
   _lights_build_light_tree(scene);
+
+  ////////////////////////////////////////////////////////////////////
+  // Setup light ptrs in geometry.
+  ////////////////////////////////////////////////////////////////////
+
+  for (uint32_t light_id = 0; light_id < scene->triangle_lights_count; light_id++) {
+    TriangleLight light                          = scene->triangle_lights[light_id];
+    scene->triangles[light.triangle_id].light_id = light_id;
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Create vertex and index buffer for BVH creation.
