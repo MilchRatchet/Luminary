@@ -62,34 +62,32 @@ __device__ uint32_t ris_sample_light(
     RGBF light_color;
     light_sample_triangle_presampled(triangle_light, data, initial_ray, solid_angle, dist, light_color);
 
-    bool is_refraction;
-    const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction);
-    light_color            = mul_color(light_color, bsdf_weight);
+    if (dist < FLT_MAX && solid_angle > 0.0f) {
+      bool is_refraction;
+      const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction);
+      light_color            = mul_color(light_color, bsdf_weight);
 
-    float target_pdf = fmaxf(light_color.r, fmaxf(light_color.g, light_color.b));
+      float target_pdf = fmaxf(light_color.r, fmaxf(light_color.g, light_color.b));
 
-    if (isinf(target_pdf) || isnan(target_pdf)) {
-      target_pdf = 0.0f;
+      const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, initial_ray);
+
+      const float nee_light_tree_pdf      = light_tree_traverse_pdf(data, initial_sample_id);
+      const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
+
+      // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
+      const float mis_weight =
+        (reservoir_size > 0) ? one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f) : 1.0f / bsdf_sample_pdf;
+
+      const float weight = target_pdf * mis_weight;
+
+      sum_weight += weight;
+
+      selected_id            = initial_sample_id;
+      selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
+      selected_ray           = initial_ray;
+      selected_dist          = dist;
+      selected_is_refraction = initial_is_refraction;
     }
-
-    const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, initial_ray);
-
-    const float nee_light_tree_pdf      = light_tree_traverse_pdf(data, initial_sample_id);
-    const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
-
-    // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
-    const float mis_weight =
-      (reservoir_size > 0) ? one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f) : 1.0f / bsdf_sample_pdf;
-
-    const float weight = target_pdf * mis_weight;
-
-    sum_weight += weight;
-
-    selected_id            = initial_sample_id;
-    selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
-    selected_ray           = initial_ray;
-    selected_dist          = dist;
-    selected_is_refraction = initial_is_refraction;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -111,14 +109,13 @@ __device__ uint32_t ris_sample_light(
     RGBF light_color;
     const vec3 ray = light_sample_triangle(triangle_light, data, ray_random, solid_angle, dist, light_color);
 
+    if (dist == FLT_MAX || solid_angle == 0.0f)
+      continue;
+
     bool is_refraction;
     const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
     light_color            = mul_color(light_color, bsdf_weight);
     float target_pdf       = fmaxf(light_color.r, fmaxf(light_color.g, light_color.b));
-
-    if (isinf(target_pdf) || isnan(target_pdf)) {
-      target_pdf = 0.0f;
-    }
 
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
     const float one_over_nee_sample_pdf = solid_angle * one_over_light_tree_pdf_and_size;

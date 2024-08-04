@@ -3,6 +3,7 @@
 
 #if defined(SHADING_KERNEL)
 
+#include "intrinsics.cuh"
 #include "memory.cuh"
 #include "sky_utils.cuh"
 #include "texture_utils.cuh"
