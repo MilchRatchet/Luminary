@@ -80,10 +80,8 @@ struct Bin {
   uint32_t _p;
 } typedef Bin;
 
-/*
- * BIN_COUNTS must be power of 2
- */
-#define THRESHOLD_TRIANGLES 32
+// Note: This is determined by the number of bits that we allocate for each node.
+#define THRESHOLD_TRIANGLES 4
 #define OBJECT_SPLIT_BIN_COUNT 64
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
@@ -304,9 +302,9 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
   Fragment* fragments      = work->fragments;
   uint32_t fragments_count = work->triangles_count;
 
-  uint32_t node_count        = 1 + fragments_count / THRESHOLD_TRIANGLES;
-  LightTreeBinaryNode* nodes = malloc(sizeof(LightTreeBinaryNode) * node_count);
-  memset(nodes, 0, sizeof(LightTreeBinaryNode) * node_count);
+  uint32_t nodes_length      = 1 + fragments_count;
+  LightTreeBinaryNode* nodes = malloc(sizeof(LightTreeBinaryNode) * nodes_length);
+  memset(nodes, 0, sizeof(LightTreeBinaryNode) * nodes_length);
 
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = fragments_count;
@@ -327,7 +325,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
       const uint32_t fragments_count = node.triangle_count;
 
       // Node has few enough triangles, finalize it as a leaf node.
-      if (fragments_count <= THRESHOLD_TRIANGLES) {
+      if (fragments_count <= 1) {
         continue;
       }
 
@@ -348,8 +346,8 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
       double optimal_cost = DBL_MAX;
       LightTreeSweepAxis axis;
       double optimal_splitting_plane;
-      int found_split   = 0;
-      int optimal_split = fragments_count / 2;
+      int found_split = 0;
+      uint32_t optimal_split;
       float optimal_left_energy, optimal_right_energy;
 
       // For each axis, perform a greedy search for an optimal split.
@@ -414,17 +412,37 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         }
       }
 
-      // We were unable to find a split that provided an improvement, finalize this node as a leaf.
-      if (!found_split) {
+      if (found_split) {
+        divide_middles_along_axis(optimal_splitting_plane, axis, fragments + fragments_ptr, fragments_count);
+      }
+      else if (fragments_count > THRESHOLD_TRIANGLES) {
+        // We didn't find a split but we have too many triangles so we need to do a simply list split.
+        optimal_split = fragments_count / 2;
+
+        optimal_left_energy  = 0.0f;
+        optimal_right_energy = 0.0f;
+
+        uint32_t frag_id = 0;
+
+        for (; frag_id < optimal_split; frag_id++) {
+          optimal_left_energy += fragments[fragments_ptr + frag_id].power;
+        }
+
+        for (; frag_id < fragments_count; frag_id++) {
+          optimal_right_energy += fragments[fragments_ptr + frag_id].power;
+        }
+
+        warn_message("List Split with %u triangles. This warning is here until I have verified that this works!", fragments_count);
+      }
+      else {
+        // We didn't find a split but there are few enough triangles so we will leave this as a leaf node.
         continue;
       }
 
-      divide_middles_along_axis(optimal_splitting_plane, axis, fragments + fragments_ptr, fragments_count);
-
       // At this point we are committed to split, hence we need to make sure that we have enough memory allocated for that.
-      if (write_ptr + 2 >= node_count) {
-        node_count *= 2;
-        nodes = safe_realloc(nodes, sizeof(LightTreeBinaryNode) * node_count);
+      if (write_ptr + 2 >= nodes_length) {
+        nodes_length *= 2;
+        nodes = safe_realloc(nodes, sizeof(LightTreeBinaryNode) * nodes_length);
       }
 
       node.left_energy  = optimal_left_energy;
@@ -494,14 +512,14 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
     end_of_current_nodes   = write_ptr;
   }
 
-  node_count = write_ptr;
+  nodes_length = write_ptr;
 
-  nodes = safe_realloc(nodes, sizeof(LightTreeBinaryNode) * node_count);
+  nodes = safe_realloc(nodes, sizeof(LightTreeBinaryNode) * nodes_length);
 
   free(bins);
 
   work->binary_nodes = nodes;
-  work->nodes_count  = node_count;
+  work->nodes_count  = nodes_length;
 }
 
 static void _lights_get_ref_point(LightTreeWork* work, LightTreeBinaryNode node, float energy, vec3* ref_point) {
