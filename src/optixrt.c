@@ -241,10 +241,11 @@ void optixrt_build_bvh(
 void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   bench_tic("Kernel Setup (OptiX)");
 
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.ptx", &(instance->optix_kernel), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.ptx", &(instance->optix_kernel_geometry), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_volume.ptx", &(instance->optix_kernel_volume), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.optixir", &(instance->optix_kernel), options);
+  optixrt_compile_kernel(
+    instance->optix_ctx, (char*) "optix_kernels_trace_particle.optixir", &(instance->particles_instance.kernel), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.optixir", &(instance->optix_kernel_geometry), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_volume.optixir", &(instance->optix_kernel_volume), options);
 
   bench_toc();
 
