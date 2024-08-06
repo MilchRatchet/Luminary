@@ -22,16 +22,22 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
 
   while (node.light_count == 0) {
     const vec3 left_diff  = sub_vector(node.left_ref_point, data.position);
-    const float left_dist = get_length(left_diff);
+    const float left_dist = fmaxf(get_length(left_diff), 32.0f * eps);
 
     const float left_importance = node.left_energy / (left_dist * left_dist);
 
     const vec3 right_diff  = sub_vector(node.right_ref_point, data.position);
-    const float right_dist = get_length(right_diff);
+    const float right_dist = fmaxf(get_length(right_diff), 32.0f * eps);
 
     const float right_importance = node.right_energy / (right_dist * right_dist);
 
     const float sum_importance = left_importance + right_importance;
+
+    if (sum_importance == 0.0f) {
+      subset_length = 0;
+      pdf           = 1.0f;
+      return 0;
+    }
 
     const float left_prob  = left_importance / sum_importance;
     const float right_prob = right_importance / sum_importance;

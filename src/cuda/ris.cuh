@@ -94,6 +94,8 @@ __device__ uint32_t ris_sample_light(
   // Resample NEE samples
   ////////////////////////////////////////////////////////////////////
 
+  float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING + light_ray_index, pixel);
+
   for (int i = 0; i < reservoir_size; i++) {
     const float id_rand = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID + light_ray_index * reservoir_size + i, pixel);
     const uint32_t id   = uint32_t(__fmul_rd(id_rand, light_list_length)) + light_list_ptr;
@@ -117,6 +119,9 @@ __device__ uint32_t ris_sample_light(
     light_color            = mul_color(light_color, bsdf_weight);
     const float target_pdf = color_importance(light_color);
 
+    if (target_pdf == 0.0f)
+      continue;
+
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
     const float one_over_nee_sample_pdf = solid_angle * one_over_light_tree_pdf_and_size;
 
@@ -125,12 +130,20 @@ __device__ uint32_t ris_sample_light(
     const float weight = target_pdf * mis_weight;
 
     sum_weight += weight;
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING + light_ray_index * reservoir_size + i, pixel) * sum_weight < weight) {
+
+    const float resampling_probability = weight / sum_weight;
+
+    if (resampling_random < resampling_probability) {
       selected_id            = id;
       selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
       selected_ray           = ray;
       selected_dist          = dist;
       selected_is_refraction = is_refraction;
+
+      resampling_random = resampling_random / resampling_probability;
+    }
+    else {
+      resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
     }
   }
 
