@@ -37,15 +37,10 @@ __device__ uint32_t ris_sample_light(
   uint32_t light_list_length;
   float light_list_pdf;
 
-  const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + light_ray_index, pixel);
-  const uint32_t light_list_ptr = light_tree_traverse(data, light_tree_random, light_list_length, light_list_pdf);
-
   // TODO: Once the light tree is implemented. Consider reducing the number of samples for deep bounces.
-  const int reservoir_size                     = device.ris_settings.initial_reservoir_size;
-  const float one_over_light_tree_pdf_and_size = light_list_length / ((float) reservoir_size * light_list_pdf);
+  const int reservoir_size = device.ris_settings.initial_reservoir_size;
 
   // Don't allow triangles to sample themselves.
-  // TODO: This probably adds biasing.
   uint32_t blocked_light_id = LIGHT_ID_NONE;
   if (data.hit_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
     blocked_light_id = load_triangle_light_id(data.hit_id);
@@ -97,7 +92,12 @@ __device__ uint32_t ris_sample_light(
   float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING + light_ray_index, pixel);
 
   for (int i = 0; i < reservoir_size; i++) {
-    const float id_rand = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID + light_ray_index * reservoir_size + i, pixel);
+    const uint32_t random_offset = light_ray_index * reservoir_size + i;
+
+    const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + random_offset, pixel);
+    const uint32_t light_list_ptr = light_tree_traverse(data, light_tree_random, light_list_length, light_list_pdf);
+
+    const float id_rand = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID + random_offset, pixel);
     const uint32_t id   = uint32_t(__fmul_rd(id_rand, light_list_length)) + light_list_ptr;
 
     if (id == blocked_light_id)
@@ -123,7 +123,7 @@ __device__ uint32_t ris_sample_light(
       continue;
 
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
-    const float one_over_nee_sample_pdf = solid_angle * one_over_light_tree_pdf_and_size;
+    const float one_over_nee_sample_pdf = solid_angle * light_list_length / ((float) reservoir_size * light_list_pdf);
 
     const float mis_weight = one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f);
 
