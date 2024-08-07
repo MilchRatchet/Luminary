@@ -43,6 +43,7 @@ struct LightTreeBinaryNode {
   float left_energy;
   float right_energy;
   uint32_t path;
+  uint32_t depth;
 } typedef LightTreeBinaryNode;
 
 struct vec3_p {
@@ -310,6 +311,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
   nodes[0].triangle_count    = fragments_count;
   nodes[0].type              = LIGHT_TREE_NODE_TYPE_LEAF;
   nodes[0].path              = 0;
+  nodes[0].depth             = 0;
 
   Bin* bins = (Bin*) malloc(sizeof(Bin) * OBJECT_SPLIT_BIN_COUNT);
 
@@ -469,7 +471,8 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         .self_low.x   = low.x,
         .self_low.y   = low.y,
         .self_low.z   = low.z,
-        .path         = (node.path << 1) | 1,
+        .path         = node.path | (1 << node.depth),
+        .depth        = node.depth + 1,
       };
 
       nodes[write_ptr] = node_left;
@@ -496,7 +499,8 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         .self_low.x   = low.x,
         .self_low.y   = low.y,
         .self_low.z   = low.z,
-        .path         = (node.path << 1) | 0,
+        .path         = node.path,
+        .depth        = node.depth + 1,
       };
 
       nodes[write_ptr] = node_right;
