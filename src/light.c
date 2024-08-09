@@ -526,7 +526,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
   work->nodes_count  = nodes_length;
 }
 
-static void _lights_get_ref_point(LightTreeWork* work, LightTreeBinaryNode node, float energy, vec3* ref_point) {
+static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryNode node, float energy, vec3* ref_point, float* ref_dist) {
   const float inverse_total_energy = 1.0f / energy;
 
   vec3 p = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
@@ -540,7 +540,21 @@ static void _lights_get_ref_point(LightTreeWork* work, LightTreeBinaryNode node,
     p.z += weight * frag.middle.z;
   }
 
+  float weighted_dist = 0.0f;
+  for (uint32_t i = 0; i < node.triangle_count; i++) {
+    Fragment frag = work->fragments[node.triangles_address + i];
+
+    const vec3 diff = {.x = frag.middle.x - p.x, .y = frag.middle.y - p.y, .z = frag.middle.z - p.z};
+
+    const float dist = sqrtf(diff.x * diff.x + diff.y * diff.y + diff.z * diff.z);
+
+    const float weight = frag.power * inverse_total_energy;
+
+    weighted_dist += weight * dist;
+  }
+
   *ref_point = p;
+  *ref_dist  = weighted_dist;
 }
 
 // Set the reference point in each node to be the energy weighted mean of the centers of the lights.
@@ -563,8 +577,10 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
         node.light_count = 0;
         node.ptr         = binary_node.child_address;
 
-        _lights_get_ref_point(work, work->binary_nodes[binary_node.child_address + 0], node.left_energy, &node.left_ref_point);
-        _lights_get_ref_point(work, work->binary_nodes[binary_node.child_address + 1], node.right_energy, &node.right_ref_point);
+        _lights_get_ref_point_and_dist(
+          work, work->binary_nodes[binary_node.child_address + 0], node.left_energy, &node.left_ref_point, &node.left_confidence);
+        _lights_get_ref_point_and_dist(
+          work, work->binary_nodes[binary_node.child_address + 1], node.right_energy, &node.right_ref_point, &node.right_confidence);
         break;
       case LIGHT_TREE_NODE_TYPE_LEAF:
         node.light_count = binary_node.triangle_count;
