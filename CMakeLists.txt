@@ -183,25 +183,26 @@ add_executable(Luminary)
 
 function(compile_ptx kernel_name)
   # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
+  # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
   add_custom_command(
     OUTPUT
-      "${CMAKE_BINARY_DIR}/${kernel_name}.optixir"
+      "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
     COMMAND
       ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu"
-      --optix-ir --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
-      -o "${kernel_name}.optixir"
+      --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      -o "${kernel_name}.ptx"
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_SOURCE_DIR}/src/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
       "${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu"
       "${gpu_header_files}"
     COMMENT
-      "Compiling ${kernel_name}.optixir"
+      "Compiling ${kernel_name}.ptx"
   )
 
   add_custom_target(
     ${kernel_name}
     DEPENDS
-      "${CMAKE_BINARY_DIR}/${kernel_name}.optixir"
+      "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
     COMMENT
       "Target for compiled OptiX kernel."
   )
@@ -224,10 +225,10 @@ ceb_embed_files(
   PROJECT Luminary
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
-  ${CMAKE_BINARY_DIR}/optix_kernels.optixir
-  ${CMAKE_BINARY_DIR}/optix_kernels_trace_particle.optixir
-  ${CMAKE_BINARY_DIR}/optix_kernels_geometry.optixir
-  ${CMAKE_BINARY_DIR}/optix_kernels_volume.optixir
+  ${CMAKE_BINARY_DIR}/optix_kernels.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_trace_particle.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_geometry.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_volume.ptx
   ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png
