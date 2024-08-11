@@ -149,6 +149,31 @@ struct LightTreeNode {
 } typedef LightTreeNode;
 static_assert(sizeof(LightTreeNode) == 0x30, "Incorrect packing size.");
 
+struct LightTreeNode8Packed {
+  vec3 base_point;
+  uint8_t exp_x;
+  uint8_t exp_y;
+  uint8_t exp_z;
+  uint8_t child_count;
+  uint32_t child_ptr;
+  uint32_t light_ptr;
+  float max_energy;
+  float max_confidence;
+  uint32_t rel_point_x_0;
+  uint32_t rel_point_x_1;
+  uint32_t rel_point_y_0;
+  uint32_t rel_point_y_1;
+  uint32_t rel_point_z_0;
+  uint32_t rel_point_z_1;
+  uint32_t rel_energy_0;
+  uint32_t rel_energy_1;
+  uint32_t rel_confidence_0;
+  uint32_t rel_confidence_1;
+  uint32_t light_index_0;
+  uint32_t light_index_1;
+} typedef LightTreeNode8Packed;
+static_assert(sizeof(LightTreeNode8Packed) == 0x50, "Incorrect packing size.");
+
 struct Quad {
   vec3 vertex;
   vec3 edge1;

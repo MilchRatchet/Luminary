@@ -62,6 +62,13 @@ struct Fragment {
   uint64_t _p;
 } typedef Fragment;
 
+struct LightTreeChildNode {
+  vec3 point;
+  float energy;
+  float confidence;
+  ushort2 light_index;
+} typedef LightTreeChildNode;
+
 struct LightTreeWork {
   TriangleLight* triangles;
   Fragment* fragments;
@@ -69,6 +76,7 @@ struct LightTreeWork {
   uint32_t triangles_count;
   LightTreeBinaryNode* binary_nodes;
   LightTreeNode* nodes;
+  LightTreeNode8Packed* nodes8_packed;
   uint32_t nodes_count;
 } typedef LightTreeWork;
 
@@ -82,7 +90,7 @@ struct Bin {
 } typedef Bin;
 
 // Note: This is determined by the number of bits that we allocate for each node.
-#define THRESHOLD_TRIANGLES 4
+#define THRESHOLD_TRIANGLES 3
 #define OBJECT_SPLIT_BIN_COUNT 64
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
@@ -602,6 +610,298 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
   work->nodes = nodes;
 }
 
+static void _lights_tree_collapse(LightTreeWork* work) {
+  const uint32_t fragments_count = work->triangles_count;
+
+  LightTreeNode* binary_nodes       = work->nodes;
+  const uint32_t binary_nodes_count = work->nodes_count;
+
+  uint32_t node_count = binary_nodes_count;
+
+  LightTreeNode8Packed* nodes = (LightTreeNode8Packed*) malloc(sizeof(LightTreeNode8Packed) * node_count);
+  memset(nodes, 0, sizeof(LightTreeNode8Packed) * node_count);
+
+  uint32_t* new_fragments = malloc(sizeof(uint32_t) * fragments_count);
+
+  for (uint32_t i = 0; i < fragments_count; i++) {
+    new_fragments[i] = 0xFFFFFFFF;
+  }
+
+  nodes[0].child_ptr = 0;
+  nodes[0].light_ptr = 0;
+
+  uint32_t begin_of_current_nodes = 0;
+  uint32_t end_of_current_nodes   = 1;
+  uint32_t write_ptr              = 1;
+  uint32_t triangles_ptr          = 0;
+
+  while (begin_of_current_nodes != end_of_current_nodes) {
+    for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
+      LightTreeNode8Packed node = nodes[node_ptr];
+
+      const uint32_t binary_index = node.child_ptr;
+
+      if (binary_index == 0xFFFFFFFF)
+        continue;
+
+      node.child_ptr = write_ptr;
+      node.light_ptr = triangles_ptr;
+
+      LightTreeChildNode children[8];
+      uint32_t child_binary_index[8];
+
+      for (int i = 0; i < 8; i++) {
+        child_binary_index[i] = 0xFFFFFFFF;
+      }
+
+      uint32_t child_count      = 0;
+      uint32_t child_leaf_count = 0;
+      uint32_t child_light_ptr  = 0;
+
+      if (binary_nodes[binary_index].light_count == 0) {
+        const LightTreeNode binary_node = binary_nodes[binary_index];
+
+        LightTreeChildNode left_child;
+        memset(&left_child, 0, sizeof(LightTreeChildNode));
+
+        left_child.point                = binary_node.left_ref_point;
+        left_child.energy               = binary_node.left_energy;
+        left_child.confidence           = binary_node.left_confidence;
+        child_binary_index[child_count] = binary_node.ptr;
+
+        children[child_count++] = left_child;
+
+        LightTreeChildNode right_child;
+        memset(&right_child, 0, sizeof(LightTreeChildNode));
+
+        right_child.point      = binary_node.right_ref_point;
+        right_child.energy     = binary_node.right_energy;
+        right_child.confidence = binary_node.right_confidence;
+
+        child_binary_index[child_count] = binary_node.ptr + 1;
+
+        children[child_count++] = right_child;
+      }
+      else {
+        // This case implies that the whole tree was just a leaf.
+        // Hence we fill in some basic information and that is it.
+        LightTreeChildNode child;
+        memset(&child, 0, sizeof(LightTreeChildNode));
+
+        child.light_index.y = (uint16_t) binary_nodes[binary_index].light_count;
+        child.energy        = 1.0f;
+
+        for (uint32_t i = 0; i < binary_nodes[binary_index].light_count; i++) {
+          new_fragments[triangles_ptr + i] = binary_nodes[binary_index].ptr + i;
+        }
+
+        child_light_ptr += binary_nodes[binary_index].light_count;
+
+        children[child_count++] = child;
+
+        child_leaf_count++;
+      }
+
+      while (child_count < 8 && child_count > child_leaf_count) {
+        uint32_t loop_end = child_count;
+
+        for (uint32_t child_ptr = 0; child_ptr < loop_end; child_ptr++) {
+          const uint32_t binary_index_of_child = child_binary_index[child_ptr];
+
+          // If this child does not point to another binary node, then skip.
+          if (binary_index_of_child == 0xFFFFFFFF)
+            continue;
+
+          const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
+
+          if (binary_node.light_count == 0) {
+            LightTreeChildNode left_child;
+            memset(&left_child, 0, sizeof(LightTreeChildNode));
+
+            left_child.point      = binary_node.left_ref_point;
+            left_child.energy     = binary_node.left_energy;
+            left_child.confidence = binary_node.left_confidence;
+
+            child_binary_index[child_ptr] = binary_node.ptr;
+
+            children[child_ptr] = left_child;
+
+            LightTreeChildNode right_child;
+            memset(&right_child, 0, sizeof(LightTreeChildNode));
+
+            right_child.point      = binary_node.right_ref_point;
+            right_child.energy     = binary_node.right_energy;
+            right_child.confidence = binary_node.right_confidence;
+
+            child_binary_index[child_count] = binary_node.ptr + 1;
+
+            children[child_count++] = right_child;
+          }
+          else {
+            for (uint32_t i = 0; i < binary_node.light_count; i++) {
+              new_fragments[triangles_ptr + child_light_ptr + i] = binary_node.ptr + i;
+            }
+
+            children[child_ptr].light_index.x = child_light_ptr;
+            children[child_ptr].light_index.y = binary_node.light_count;
+            child_binary_index[child_ptr]     = 0xFFFFFFFF;
+            child_leaf_count++;
+
+            child_light_ptr += binary_node.light_count;
+          }
+        }
+      }
+
+      // The above logic has a flaw in that that leaf nodes that were inserted during the last
+      // loop would not be identified as such. Hence I loop again through the children to mark
+      // all children correctly as leafs.
+      for (uint32_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
+        const uint32_t binary_index_of_child = child_binary_index[child_ptr];
+
+        // If this child does not point to another binary node, then skip.
+        if (binary_index_of_child == 0xFFFFFFFF)
+          continue;
+
+        const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
+
+        if (binary_node.light_count > 0) {
+          for (uint32_t i = 0; i < binary_node.light_count; i++) {
+            new_fragments[triangles_ptr + child_light_ptr + i] = binary_node.ptr + i;
+          }
+
+          children[child_ptr].light_index.x = child_light_ptr;
+          children[child_ptr].light_index.y = binary_node.light_count;
+          child_binary_index[child_ptr]     = 0xFFFFFFFF;
+          child_leaf_count++;
+
+          child_light_ptr += binary_node.light_count;
+        }
+      }
+
+      float max_energy     = 0.0f;
+      float max_confidence = 0.0f;
+
+      for (uint32_t i = 0; i < child_count; i++) {
+        max_energy     = max(max_energy, children[i].energy);
+        max_confidence = max(max_confidence, children[i].confidence);
+      }
+
+      node.max_energy     = max_energy;
+      node.max_confidence = max_confidence;
+
+      vec3 min_point = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
+      vec3 max_point = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
+
+      for (uint32_t i = 0; i < child_count; i++) {
+        const vec3 point = children[i].point;
+
+        min_point.x = min(min_point.x, point.x);
+        min_point.y = min(min_point.y, point.y);
+        min_point.z = min(min_point.z, point.z);
+
+        max_point.x = max(max_point.x, point.x);
+        max_point.y = max(max_point.y, point.y);
+        max_point.z = max(max_point.z, point.z);
+      }
+
+      node.base_point = min_point;
+
+      node.exp_x = (int8_t) ceilf(log2f((max_point.x - min_point.x) * 1.0 / 255.0));
+      node.exp_y = (int8_t) ceilf(log2f((max_point.y - min_point.y) * 1.0 / 255.0));
+      node.exp_z = (int8_t) ceilf(log2f((max_point.z - min_point.z) * 1.0 / 255.0));
+
+      const float compression_x = 1.0f / exp2f(node.exp_x);
+      const float compression_y = 1.0f / exp2f(node.exp_y);
+      const float compression_z = 1.0f / exp2f(node.exp_z);
+
+      node.child_count = child_count;
+
+      uint64_t rel_point_x    = 0;
+      uint64_t rel_point_y    = 0;
+      uint64_t rel_point_z    = 0;
+      uint64_t rel_energy     = 0;
+      uint64_t rel_confidence = 0;
+      uint64_t light_index    = 0;
+
+      for (uint32_t i = 0; i < child_count; i++) {
+        const LightTreeChildNode child_node = children[i];
+
+        uint64_t child_rel_point_x    = (uint64_t) floorf((child_node.point.x - node.base_point.x) * compression_x);
+        uint64_t child_rel_point_y    = (uint64_t) floorf((child_node.point.y - node.base_point.y) * compression_y);
+        uint64_t child_rel_point_z    = (uint64_t) floorf((child_node.point.z - node.base_point.z) * compression_z);
+        uint64_t child_rel_energy     = (uint64_t) floorf(255.0f * child_node.energy / node.max_energy);
+        uint64_t child_rel_confidence = (uint64_t) floorf(255.0f * child_node.confidence / node.max_confidence);
+        uint64_t child_light_index    = (((uint64_t) child_node.light_index.x) << 2) | ((uint64_t) child_node.light_index.y);
+
+        if (child_rel_point_x > 255 || child_rel_point_y > 255 || child_rel_point_z > 255)
+          crash_message(
+            "ChildRelPoint is too large: %u %u %u %f %d %f %f %f", child_rel_point_x, child_rel_point_y, child_rel_point_z, compression_y,
+            node.exp_y, child_node.point.y, node.base_point.y, child_node.point.y - node.base_point.y);
+
+        rel_point_x |= child_rel_point_x << i * 8;
+        rel_point_y |= child_rel_point_y << i * 8;
+        rel_point_z |= child_rel_point_z << i * 8;
+        rel_energy |= child_rel_energy << i * 8;
+        rel_confidence |= child_rel_confidence << i * 8;
+        light_index |= child_light_index << i * 8;
+      }
+
+      node.rel_point_x_0    = (uint32_t) (rel_point_x & 0xFFFF);
+      node.rel_point_x_1    = (uint32_t) ((rel_point_x >> 32) & 0xFFFF);
+      node.rel_point_y_0    = (uint32_t) (rel_point_y & 0xFFFF);
+      node.rel_point_y_1    = (uint32_t) ((rel_point_y >> 32) & 0xFFFF);
+      node.rel_point_z_0    = (uint32_t) (rel_point_z & 0xFFFF);
+      node.rel_point_z_1    = (uint32_t) ((rel_point_z >> 32) & 0xFFFF);
+      node.rel_energy_0     = (uint32_t) (rel_energy & 0xFFFF);
+      node.rel_energy_1     = (uint32_t) ((rel_energy >> 32) & 0xFFFF);
+      node.rel_confidence_0 = (uint32_t) (rel_confidence & 0xFFFF);
+      node.rel_confidence_1 = (uint32_t) ((rel_confidence >> 32) & 0xFFFF);
+      node.light_index_0    = (uint32_t) (light_index & 0xFFFF);
+      node.light_index_1    = (uint32_t) ((light_index >> 32) & 0xFFFF);
+
+      if (write_ptr + child_count >= node_count) {
+        node_count += binary_nodes_count;
+        nodes = safe_realloc(nodes, sizeof(LightTreeNode8Packed) * node_count);
+      }
+
+      // Prepare the next nodes to be constructed from the respective binary nodes.
+      for (uint32_t i = 0; i < node_count; i++) {
+        nodes[write_ptr++].child_ptr = child_binary_index[i];
+      }
+
+      triangles_ptr += child_light_ptr;
+
+      nodes[node_ptr] = node;
+    }
+
+    begin_of_current_nodes = end_of_current_nodes;
+    end_of_current_nodes   = write_ptr;
+  }
+
+  // Check
+  for (uint32_t i = 0; i < fragments_count; i++) {
+    if (new_fragments[i] == 0xFFFFFFFF)
+      crash_message("That didn't work!");
+  }
+
+  Fragment* fragments_swap = malloc(sizeof(Fragment) * fragments_count);
+  memcpy(fragments_swap, work->fragments, sizeof(Fragment) * fragments_count);
+
+  for (uint32_t i = 0; i < fragments_count; i++) {
+    work->fragments[i] = fragments_swap[new_fragments[i]];
+  }
+
+  free(fragments_swap);
+  free(new_fragments);
+
+  node_count = write_ptr;
+
+  nodes = safe_realloc(nodes, sizeof(LightTreeNode8Packed) * node_count);
+
+  work->nodes8_packed = nodes;
+  // work->nodes_count   = node_count;
+}
+
 static void _lights_tree_finalize(LightTreeWork* work) {
   TriangleLight* reordered_lights = (TriangleLight*) malloc(sizeof(TriangleLight) * work->triangles_count);
 
@@ -748,6 +1048,7 @@ static void _lights_build_light_tree(Scene* scene) {
   _lights_tree_create_fragments(scene, &work);
   _lights_tree_build_binary_bvh(&work);
   _lights_tree_build_traversal_structure(&work);
+  //_lights_tree_collapse(&work);
   _lights_tree_finalize(&work);
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
   _lights_tree_debug_output(&work);
