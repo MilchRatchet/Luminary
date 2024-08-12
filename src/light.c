@@ -749,6 +749,10 @@ static void _lights_tree_collapse(LightTreeWork* work) {
 
             child_light_ptr += binary_node.light_count;
           }
+
+          // Child list may have run full, terminate early.
+          if (child_count == 8)
+            break;
         }
       }
 
@@ -865,7 +869,7 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       }
 
       // Prepare the next nodes to be constructed from the respective binary nodes.
-      for (uint32_t i = 0; i < node_count; i++) {
+      for (uint32_t i = 0; i < child_count; i++) {
         nodes[write_ptr++].child_ptr = child_binary_index[i];
       }
 
@@ -1048,7 +1052,7 @@ static void _lights_build_light_tree(Scene* scene) {
   _lights_tree_create_fragments(scene, &work);
   _lights_tree_build_binary_bvh(&work);
   _lights_tree_build_traversal_structure(&work);
-  //_lights_tree_collapse(&work);
+  _lights_tree_collapse(&work);
   _lights_tree_finalize(&work);
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
   _lights_tree_debug_output(&work);
