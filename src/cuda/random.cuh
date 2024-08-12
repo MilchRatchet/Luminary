@@ -218,7 +218,7 @@ __device__ float random_uint16_t_to_float(const uint16_t v) {
 
 // Integer fractions of the actual numbers
 #define R1_PHI1 2654435769u /* 0.61803398875f */
-#define R2_PHI1 3242174888u /* 0.7548776662f  */
+#define R2_PHI1 3242174889u /* 0.7548776662f  */
 #define R2_PHI2 2447445413u /* 0.56984029f    */
 
 __device__ uint32_t random_r1(const uint32_t offset) {
