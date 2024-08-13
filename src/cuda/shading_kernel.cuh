@@ -252,14 +252,23 @@ __device__ RGBF
   else {
     const uint32_t num_samples = device.scene.ocean.caustics_ris_sample_count;
 
+    float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index);
+
     // RIS with target weight being the Dirac delta of if the connection point is valid or not.
     for (uint32_t i = 0; i < num_samples; i++) {
       vec3 sample_point;
       float sample_weight;
       if (caustics_find_connection_point(data, index, sampling_domain, is_underwater, i, sample_point, sample_weight)) {
         sum_connection_weight += sample_weight;
-        if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index) * sum_connection_weight < sample_weight) {
+
+        const float resampling_probability = sample_weight / sum_connection_weight;
+        if (resampling_random < resampling_probability) {
           connection_point = sample_point;
+
+          resampling_random = resampling_random / resampling_probability;
+        }
+        else {
+          resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
         }
       }
     }
