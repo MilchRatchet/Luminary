@@ -476,6 +476,7 @@ struct DeviceConstantMemory {
   TraversalTriangle* bvh_triangles;
   Quad* particle_quads;
   LightTreeNode* light_tree_nodes;
+  LightTreeNode8Packed* light_tree_nodes_8;
   uint32_t* light_tree_paths;
 } typedef DeviceConstantMemory;
 

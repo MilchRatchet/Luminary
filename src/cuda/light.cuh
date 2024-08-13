@@ -9,6 +9,22 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
+__device__ float light_tree_child_importance(
+  const GBufferData data, const LightTreeNode8Packed node, const vec3 exp, const uint32_t i, const uint32_t shift) {
+  vec3 point;
+  point = get_vector((node.rel_point_x[i] >> shift) & 0xFF, (node.rel_point_y[i] >> shift) & 0xFF, (node.rel_point_z[i] >> shift) & 0xFF);
+  point = mul_vector(point, exp);
+  point = add_vector(point, node.base_point);
+
+  const float energy     = ((node.rel_energy[i] >> shift) & 0xFF) * (node.max_energy / 255.0f);
+  const float confidence = ((node.rel_confidence[i] >> shift) & 0xFF) * (node.max_confidence / 255.0f);
+
+  const vec3 diff  = sub_vector(point, data.position);
+  const float dist = fmaxf(get_length(diff), confidence);
+
+  return energy / (dist * dist);
+}
+
 __device__ uint32_t light_tree_traverse(const GBufferData data, float random, uint32_t& subset_length, float& pdf) {
   if (!device.scene.material.light_tree_active) {
     subset_length = device.scene.triangle_lights_count;
@@ -16,9 +32,10 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
     return 0;
   }
 
-  LightTreeNode node = load_light_tree_node(device.light_tree_nodes, 0);
-
   pdf = 1.0f;
+
+#if 0
+  LightTreeNode node = load_light_tree_node(device.light_tree_nodes, 0);
 
   while (node.light_count == 0) {
     const vec3 left_diff  = sub_vector(node.left_ref_point, data.position);
@@ -62,6 +79,73 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
   subset_length = node.light_count;
 
   return node.ptr;
+#else
+  // Note: I have not implemented the upload of the nodes to the GPU!!!
+  LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
+
+  uint32_t subset_ptr = 0xFFFFFFFF;
+  subset_length       = 0;
+
+  while (subset_ptr == 0xFFFFFFFF) {
+    const vec3 exp = get_vector(expf(node.exp_x), expf(node.exp_y), expf(node.exp_z));
+
+    float importance[8];
+
+    importance[0] = (node.child_count > 0) ? light_tree_child_importance(data, node, exp, 0, 0) : 0.0f;
+    importance[1] = (node.child_count > 1) ? light_tree_child_importance(data, node, exp, 0, 8) : 0.0f;
+    importance[2] = (node.child_count > 2) ? light_tree_child_importance(data, node, exp, 0, 16) : 0.0f;
+    importance[3] = (node.child_count > 3) ? light_tree_child_importance(data, node, exp, 0, 24) : 0.0f;
+    importance[4] = (node.child_count > 4) ? light_tree_child_importance(data, node, exp, 1, 0) : 0.0f;
+    importance[5] = (node.child_count > 5) ? light_tree_child_importance(data, node, exp, 1, 8) : 0.0f;
+    importance[6] = (node.child_count > 6) ? light_tree_child_importance(data, node, exp, 1, 16) : 0.0f;
+    importance[7] = (node.child_count > 7) ? light_tree_child_importance(data, node, exp, 1, 24) : 0.0f;
+
+    float sum_importance = 0.0f;
+    for (uint32_t i = 0; i < 8; i++) {
+      sum_importance += importance[i];
+    }
+
+    float accumulated_importance     = 0.0f;
+    const float threshold_importance = random * sum_importance;
+
+    uint32_t selected_child = 0;
+    float child_pdf         = 0.0f;
+
+    for (uint32_t i = 0; i < 8; i++) {
+      const float child_importance = importance[i];
+      accumulated_importance += child_importance;
+
+      if (accumulated_importance > threshold_importance) {
+        selected_child = i;
+        child_pdf      = child_importance / sum_importance;
+        // No control flow, we always loop over all children.
+        accumulated_importance = -FLT_MAX;
+      }
+    }
+
+    pdf *= child_pdf;
+
+    uint32_t selected_light_index;
+    selected_light_index = (selected_child > 3) ? node.light_index[1] : node.light_index[0];
+
+    const uint32_t normalized_child = (selected_child > 3) ? selected_child - 4 : selected_child;
+
+    selected_light_index = (selected_light_index >> (normalized_child * 8)) & 0xFF;
+
+    const uint32_t light_count = selected_light_index & 0x3;
+    const uint32_t light_ptr   = selected_light_index >> 2;
+
+    if (light_count > 0) {
+      subset_length = light_count;
+      subset_ptr    = node.light_ptr + light_ptr;
+      break;
+    }
+
+    node = load_light_tree_node_8(device.light_tree_nodes_8, node.child_ptr + selected_child);
+  }
+
+  return subset_ptr;
+#endif
 }
 
 __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_id) {

@@ -850,18 +850,18 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         light_index |= child_light_index << i * 8;
       }
 
-      node.rel_point_x_0    = (uint32_t) (rel_point_x & 0xFFFF);
-      node.rel_point_x_1    = (uint32_t) ((rel_point_x >> 32) & 0xFFFF);
-      node.rel_point_y_0    = (uint32_t) (rel_point_y & 0xFFFF);
-      node.rel_point_y_1    = (uint32_t) ((rel_point_y >> 32) & 0xFFFF);
-      node.rel_point_z_0    = (uint32_t) (rel_point_z & 0xFFFF);
-      node.rel_point_z_1    = (uint32_t) ((rel_point_z >> 32) & 0xFFFF);
-      node.rel_energy_0     = (uint32_t) (rel_energy & 0xFFFF);
-      node.rel_energy_1     = (uint32_t) ((rel_energy >> 32) & 0xFFFF);
-      node.rel_confidence_0 = (uint32_t) (rel_confidence & 0xFFFF);
-      node.rel_confidence_1 = (uint32_t) ((rel_confidence >> 32) & 0xFFFF);
-      node.light_index_0    = (uint32_t) (light_index & 0xFFFF);
-      node.light_index_1    = (uint32_t) ((light_index >> 32) & 0xFFFF);
+      node.rel_point_x[0]    = (uint32_t) (rel_point_x & 0xFFFF);
+      node.rel_point_x[1]    = (uint32_t) ((rel_point_x >> 32) & 0xFFFF);
+      node.rel_point_y[0]    = (uint32_t) (rel_point_y & 0xFFFF);
+      node.rel_point_y[1]    = (uint32_t) ((rel_point_y >> 32) & 0xFFFF);
+      node.rel_point_z[0]    = (uint32_t) (rel_point_z & 0xFFFF);
+      node.rel_point_z[1]    = (uint32_t) ((rel_point_z >> 32) & 0xFFFF);
+      node.rel_energy[0]     = (uint32_t) (rel_energy & 0xFFFF);
+      node.rel_energy[1]     = (uint32_t) ((rel_energy >> 32) & 0xFFFF);
+      node.rel_confidence[0] = (uint32_t) (rel_confidence & 0xFFFF);
+      node.rel_confidence[1] = (uint32_t) ((rel_confidence >> 32) & 0xFFFF);
+      node.light_index[0]    = (uint32_t) (light_index & 0xFFFF);
+      node.light_index[1]    = (uint32_t) ((light_index >> 32) & 0xFFFF);
 
       if (write_ptr + child_count >= node_count) {
         node_count += binary_nodes_count;
@@ -936,6 +936,7 @@ static void _lights_tree_clear_work(LightTreeWork* work) {
   free(work->paths);
   free(work->binary_nodes);
   free(work->nodes);
+  free(work->nodes8_packed);
 }
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT

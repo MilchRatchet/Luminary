@@ -159,18 +159,12 @@ struct LightTreeNode8Packed {
   uint32_t light_ptr;
   float max_energy;
   float max_confidence;
-  uint32_t rel_point_x_0;
-  uint32_t rel_point_x_1;
-  uint32_t rel_point_y_0;
-  uint32_t rel_point_y_1;
-  uint32_t rel_point_z_0;
-  uint32_t rel_point_z_1;
-  uint32_t rel_energy_0;
-  uint32_t rel_energy_1;
-  uint32_t rel_confidence_0;
-  uint32_t rel_confidence_1;
-  uint32_t light_index_0;
-  uint32_t light_index_1;
+  uint32_t rel_point_x[2];
+  uint32_t rel_point_y[2];
+  uint32_t rel_point_z[2];
+  uint32_t rel_energy[2];
+  uint32_t rel_confidence[2];
+  uint32_t light_index[2];
 } typedef LightTreeNode8Packed;
 static_assert(sizeof(LightTreeNode8Packed) == 0x50, "Incorrect packing size.");
 
