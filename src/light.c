@@ -78,6 +78,7 @@ struct LightTreeWork {
   LightTreeNode* nodes;
   LightTreeNode8Packed* nodes8_packed;
   uint32_t nodes_count;
+  uint32_t nodes_8_count;
 } typedef LightTreeWork;
 
 struct Bin {
@@ -561,6 +562,8 @@ static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryN
     weighted_dist += weight * dist;
   }
 
+  weighted_dist = fmaxf(weighted_dist, 0.0001f);
+
   *ref_point = p;
   *ref_dist  = weighted_dist;
 }
@@ -842,26 +845,26 @@ static void _lights_tree_collapse(LightTreeWork* work) {
             "ChildRelPoint is too large: %u %u %u %f %d %f %f %f", child_rel_point_x, child_rel_point_y, child_rel_point_z, compression_y,
             node.exp_y, child_node.point.y, node.base_point.y, child_node.point.y - node.base_point.y);
 
-        rel_point_x |= child_rel_point_x << i * 8;
-        rel_point_y |= child_rel_point_y << i * 8;
-        rel_point_z |= child_rel_point_z << i * 8;
-        rel_energy |= child_rel_energy << i * 8;
-        rel_confidence |= child_rel_confidence << i * 8;
-        light_index |= child_light_index << i * 8;
+        rel_point_x |= child_rel_point_x << (i * 8);
+        rel_point_y |= child_rel_point_y << (i * 8);
+        rel_point_z |= child_rel_point_z << (i * 8);
+        rel_energy |= child_rel_energy << (i * 8);
+        rel_confidence |= child_rel_confidence << (i * 8);
+        light_index |= child_light_index << (i * 8);
       }
 
-      node.rel_point_x[0]    = (uint32_t) (rel_point_x & 0xFFFF);
-      node.rel_point_x[1]    = (uint32_t) ((rel_point_x >> 32) & 0xFFFF);
-      node.rel_point_y[0]    = (uint32_t) (rel_point_y & 0xFFFF);
-      node.rel_point_y[1]    = (uint32_t) ((rel_point_y >> 32) & 0xFFFF);
-      node.rel_point_z[0]    = (uint32_t) (rel_point_z & 0xFFFF);
-      node.rel_point_z[1]    = (uint32_t) ((rel_point_z >> 32) & 0xFFFF);
-      node.rel_energy[0]     = (uint32_t) (rel_energy & 0xFFFF);
-      node.rel_energy[1]     = (uint32_t) ((rel_energy >> 32) & 0xFFFF);
-      node.rel_confidence[0] = (uint32_t) (rel_confidence & 0xFFFF);
-      node.rel_confidence[1] = (uint32_t) ((rel_confidence >> 32) & 0xFFFF);
-      node.light_index[0]    = (uint32_t) (light_index & 0xFFFF);
-      node.light_index[1]    = (uint32_t) ((light_index >> 32) & 0xFFFF);
+      node.rel_point_x[0]    = (uint32_t) (rel_point_x & 0xFFFFFFFF);
+      node.rel_point_x[1]    = (uint32_t) ((rel_point_x >> 32) & 0xFFFFFFFF);
+      node.rel_point_y[0]    = (uint32_t) (rel_point_y & 0xFFFFFFFF);
+      node.rel_point_y[1]    = (uint32_t) ((rel_point_y >> 32) & 0xFFFFFFFF);
+      node.rel_point_z[0]    = (uint32_t) (rel_point_z & 0xFFFFFFFF);
+      node.rel_point_z[1]    = (uint32_t) ((rel_point_z >> 32) & 0xFFFFFFFF);
+      node.rel_energy[0]     = (uint32_t) (rel_energy & 0xFFFFFFFF);
+      node.rel_energy[1]     = (uint32_t) ((rel_energy >> 32) & 0xFFFFFFFF);
+      node.rel_confidence[0] = (uint32_t) (rel_confidence & 0xFFFFFFFF);
+      node.rel_confidence[1] = (uint32_t) ((rel_confidence >> 32) & 0xFFFFFFFF);
+      node.light_index[0]    = (uint32_t) (light_index & 0xFFFFFFFF);
+      node.light_index[1]    = (uint32_t) ((light_index >> 32) & 0xFFFFFFFF);
 
       if (write_ptr + child_count >= node_count) {
         node_count += binary_nodes_count;
@@ -903,7 +906,7 @@ static void _lights_tree_collapse(LightTreeWork* work) {
   nodes = safe_realloc(nodes, sizeof(LightTreeNode8Packed) * node_count);
 
   work->nodes8_packed = nodes;
-  // work->nodes_count   = node_count;
+  work->nodes_8_count = node_count;
 }
 
 static void _lights_tree_finalize(LightTreeWork* work) {
@@ -927,7 +930,12 @@ static void _lights_tree_finalize(LightTreeWork* work) {
   device_malloc(&light_tree_nodes, sizeof(LightTreeNode) * work->nodes_count);
   device_upload(light_tree_nodes, work->nodes, sizeof(LightTreeNode) * work->nodes_count);
 
+  void* light_tree_nodes_8;
+  device_malloc(&light_tree_nodes_8, sizeof(LightTreeNode8Packed) * work->nodes_8_count);
+  device_upload(light_tree_nodes_8, work->nodes8_packed, sizeof(LightTreeNode8Packed) * work->nodes_8_count);
+
   device_update_symbol(light_tree_nodes, light_tree_nodes);
+  device_update_symbol(light_tree_nodes_8, light_tree_nodes_8);
   device_update_symbol(light_tree_paths, paths);
 }
 

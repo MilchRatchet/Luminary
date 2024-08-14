@@ -80,7 +80,6 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
 
   return node.ptr;
 #else
-  // Note: I have not implemented the upload of the nodes to the GPU!!!
   LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
 
   uint32_t subset_ptr = 0xFFFFFFFF;

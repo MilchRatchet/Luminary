@@ -151,9 +151,9 @@ static_assert(sizeof(LightTreeNode) == 0x30, "Incorrect packing size.");
 
 struct LightTreeNode8Packed {
   vec3 base_point;
-  uint8_t exp_x;
-  uint8_t exp_y;
-  uint8_t exp_z;
+  int8_t exp_x;
+  int8_t exp_y;
+  int8_t exp_z;
   uint8_t child_count;
   uint32_t child_ptr;
   uint32_t light_ptr;
