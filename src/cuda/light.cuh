@@ -85,6 +85,8 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
   uint32_t subset_ptr = 0xFFFFFFFF;
   subset_length       = 0;
 
+  random = random_saturate(random);
+
   while (subset_ptr == 0xFFFFFFFF) {
     const vec3 exp = get_vector(expf(node.exp_x), expf(node.exp_y), expf(node.exp_z));
 
@@ -104,25 +106,38 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
       sum_importance += importance[i];
     }
 
-    float accumulated_importance     = 0.0f;
-    const float threshold_importance = random * sum_importance;
+    float accumulated_importance = 0.0f;
+    const float one_over_sum     = 1.0f / sum_importance;
 
-    uint32_t selected_child = 0;
+    uint32_t selected_child = 0xFFFFFFFF;
     float child_pdf         = 0.0f;
+    float random_shift      = 0.0f;
 
     for (uint32_t i = 0; i < 8; i++) {
-      const float child_importance = importance[i];
+      const float child_importance = importance[i] * one_over_sum;
       accumulated_importance += child_importance;
 
-      if (accumulated_importance > threshold_importance) {
+      if (accumulated_importance > random) {
         selected_child = i;
-        child_pdf      = child_importance / sum_importance;
+        child_pdf      = child_importance;
+
+        random_shift = accumulated_importance - child_importance;
+
         // No control flow, we always loop over all children.
         accumulated_importance = -FLT_MAX;
       }
     }
 
+    if (selected_child == 0xFFFFFFFF) {
+      subset_length = 0;
+      subset_ptr    = 0;
+      break;
+    }
+
     pdf *= child_pdf;
+
+    // Rescale random number
+    random = random_saturate((random - random_shift) / child_pdf);
 
     uint32_t selected_light_index;
     selected_light_index = (selected_child > 3) ? node.light_index[1] : node.light_index[0];
