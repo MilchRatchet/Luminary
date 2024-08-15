@@ -624,14 +624,20 @@ static void _lights_tree_collapse(LightTreeWork* work) {
   LightTreeNode8Packed* nodes = (LightTreeNode8Packed*) malloc(sizeof(LightTreeNode8Packed) * node_count);
   memset(nodes, 0, sizeof(LightTreeNode8Packed) * node_count);
 
-  uint32_t* new_fragments = malloc(sizeof(uint32_t) * fragments_count);
+  uint32_t* node_paths  = (uint32_t*) malloc(sizeof(uint32_t) * node_count);
+  uint32_t* node_depths = (uint32_t*) malloc(sizeof(uint32_t) * node_count);
 
-  for (uint32_t i = 0; i < fragments_count; i++) {
-    new_fragments[i] = 0xFFFFFFFF;
-  }
+  uint32_t* new_fragments  = malloc(sizeof(uint32_t) * fragments_count);
+  uint32_t* fragment_paths = malloc(sizeof(uint32_t) * fragments_count);
+
+  memset(new_fragments, 0xFF, sizeof(uint32_t) * fragments_count);
+  memset(fragment_paths, 0xFF, sizeof(uint32_t) * fragments_count);
 
   nodes[0].child_ptr = 0;
   nodes[0].light_ptr = 0;
+
+  node_paths[0]  = 0;
+  node_depths[0] = 0;
 
   uint32_t begin_of_current_nodes = 0;
   uint32_t end_of_current_nodes   = 1;
@@ -646,6 +652,9 @@ static void _lights_tree_collapse(LightTreeWork* work) {
 
       if (binary_index == 0xFFFFFFFF)
         continue;
+
+      const uint32_t current_node_path  = node_paths[node_ptr];
+      const uint32_t current_node_depth = node_depths[node_ptr];
 
       node.child_ptr = write_ptr;
       node.light_ptr = triangles_ptr;
@@ -695,7 +704,8 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         child.energy        = 1.0f;
 
         for (uint32_t i = 0; i < binary_nodes[binary_index].light_count; i++) {
-          new_fragments[triangles_ptr + i] = binary_nodes[binary_index].ptr + i;
+          new_fragments[triangles_ptr + i]  = binary_nodes[binary_index].ptr + i;
+          fragment_paths[triangles_ptr + i] = 0;
         }
 
         child_light_ptr += binary_nodes[binary_index].light_count;
@@ -742,7 +752,8 @@ static void _lights_tree_collapse(LightTreeWork* work) {
           }
           else {
             for (uint32_t i = 0; i < binary_node.light_count; i++) {
-              new_fragments[triangles_ptr + child_light_ptr + i] = binary_node.ptr + i;
+              new_fragments[triangles_ptr + child_light_ptr + i]  = binary_node.ptr + i;
+              fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
             }
 
             children[child_ptr].light_index.x = child_light_ptr;
@@ -773,7 +784,8 @@ static void _lights_tree_collapse(LightTreeWork* work) {
 
         if (binary_node.light_count > 0) {
           for (uint32_t i = 0; i < binary_node.light_count; i++) {
-            new_fragments[triangles_ptr + child_light_ptr + i] = binary_node.ptr + i;
+            new_fragments[triangles_ptr + child_light_ptr + i]  = binary_node.ptr + i;
+            fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
           }
 
           children[child_ptr].light_index.x = child_light_ptr;
@@ -845,6 +857,8 @@ static void _lights_tree_collapse(LightTreeWork* work) {
             "ChildRelPoint is too large: %u %u %u %f %d %f %f %f", child_rel_point_x, child_rel_point_y, child_rel_point_z, compression_y,
             node.exp_y, child_node.point.y, node.base_point.y, child_node.point.y - node.base_point.y);
 
+        child_rel_energy     = max(1, child_rel_energy);
+        child_rel_confidence = max(1, child_rel_confidence);
         rel_point_x |= child_rel_point_x << (i * 8);
         rel_point_y |= child_rel_point_y << (i * 8);
         rel_point_z |= child_rel_point_z << (i * 8);
@@ -873,6 +887,8 @@ static void _lights_tree_collapse(LightTreeWork* work) {
 
       // Prepare the next nodes to be constructed from the respective binary nodes.
       for (uint32_t i = 0; i < child_count; i++) {
+        node_paths[write_ptr]        = current_node_path | (i << (3 * current_node_depth));
+        node_depths[write_ptr]       = current_node_depth + 1;
         nodes[write_ptr++].child_ptr = child_binary_index[i];
       }
 
@@ -898,8 +914,13 @@ static void _lights_tree_collapse(LightTreeWork* work) {
     work->fragments[i] = fragments_swap[new_fragments[i]];
   }
 
+  memcpy(work->paths, fragment_paths, sizeof(uint32_t) * fragments_count);
+
+  free(node_paths);
+  free(node_depths);
   free(fragments_swap);
   free(new_fragments);
+  free(fragment_paths);
 
   node_count = write_ptr;
 

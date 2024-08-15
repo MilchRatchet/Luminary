@@ -34,52 +34,6 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
 
   pdf = 1.0f;
 
-#if 0
-  LightTreeNode node = load_light_tree_node(device.light_tree_nodes, 0);
-
-  while (node.light_count == 0) {
-    const vec3 left_diff  = sub_vector(node.left_ref_point, data.position);
-    const float left_dist = fmaxf(get_length(left_diff), node.left_confidence);
-
-    const float left_importance = node.left_energy / (left_dist * left_dist);
-
-    const vec3 right_diff  = sub_vector(node.right_ref_point, data.position);
-    const float right_dist = fmaxf(get_length(right_diff), node.right_confidence);
-
-    const float right_importance = node.right_energy / (right_dist * right_dist);
-
-    const float sum_importance = left_importance + right_importance;
-
-    if (sum_importance == 0.0f) {
-      subset_length = 0;
-      pdf           = 1.0f;
-      return 0;
-    }
-
-    const float left_prob  = left_importance / sum_importance;
-    const float right_prob = right_importance / sum_importance;
-
-    uint32_t next_node_address = node.ptr;
-
-    if (random < left_prob) {
-      pdf *= left_prob;
-
-      random = random / left_prob;
-    }
-    else {
-      pdf *= right_prob;
-      next_node_address++;
-
-      random = (random - left_prob) / right_prob;
-    }
-
-    node = load_light_tree_node(device.light_tree_nodes, next_node_address);
-  }
-
-  subset_length = node.light_count;
-
-  return node.ptr;
-#else
   LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
 
   uint32_t subset_ptr = 0xFFFFFFFF;
@@ -87,7 +41,7 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
 
   random = random_saturate(random);
 
-  while (subset_ptr == 0xFFFFFFFF) {
+  while (subset_length == 0) {
     const vec3 exp = get_vector(expf(node.exp_x), expf(node.exp_y), expf(node.exp_z));
 
     float importance[8];
@@ -159,7 +113,6 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
   }
 
   return subset_ptr;
-#endif
 }
 
 __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_id) {
@@ -167,43 +120,74 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
     return 1.0f / device.scene.triangle_lights_count;
   }
 
-  uint32_t light_path = __ldg(device.light_tree_paths + light_id);
-  LightTreeNode node  = load_light_tree_node(device.light_tree_nodes, 0);
-
   float pdf = 1.0f;
 
-  while (node.light_count == 0) {
-    const vec3 left_diff  = sub_vector(node.left_ref_point, data.position);
-    const float left_dist = get_length(left_diff);
+  uint32_t light_path = __ldg(device.light_tree_paths + light_id);
 
-    const float left_importance = node.left_energy / (left_dist * left_dist);
+  LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
 
-    const vec3 right_diff  = sub_vector(node.right_ref_point, data.position);
-    const float right_dist = get_length(right_diff);
+  uint32_t subset_length = 0;
 
-    const float right_importance = node.right_energy / (right_dist * right_dist);
+  while (subset_length == 0) {
+    const vec3 exp = get_vector(expf(node.exp_x), expf(node.exp_y), expf(node.exp_z));
 
-    const float sum_importance = left_importance + right_importance;
+    float importance[8];
 
-    const float left_prob  = left_importance / sum_importance;
-    const float right_prob = right_importance / sum_importance;
+    importance[0] = (node.child_count > 0) ? light_tree_child_importance(data, node, exp, 0, 0) : 0.0f;
+    importance[1] = (node.child_count > 1) ? light_tree_child_importance(data, node, exp, 0, 8) : 0.0f;
+    importance[2] = (node.child_count > 2) ? light_tree_child_importance(data, node, exp, 0, 16) : 0.0f;
+    importance[3] = (node.child_count > 3) ? light_tree_child_importance(data, node, exp, 0, 24) : 0.0f;
+    importance[4] = (node.child_count > 4) ? light_tree_child_importance(data, node, exp, 1, 0) : 0.0f;
+    importance[5] = (node.child_count > 5) ? light_tree_child_importance(data, node, exp, 1, 8) : 0.0f;
+    importance[6] = (node.child_count > 6) ? light_tree_child_importance(data, node, exp, 1, 16) : 0.0f;
+    importance[7] = (node.child_count > 7) ? light_tree_child_importance(data, node, exp, 1, 24) : 0.0f;
 
-    uint32_t next_node_address = node.ptr;
-
-    if (light_path & 0b1) {
-      pdf *= left_prob;
+    float sum_importance = 0.0f;
+    for (uint32_t i = 0; i < 8; i++) {
+      sum_importance += importance[i];
     }
-    else {
-      pdf *= right_prob;
-      next_node_address++;
+
+    const float one_over_sum = 1.0f / sum_importance;
+
+    uint32_t selected_child = 0xFFFFFFFF;
+    float child_pdf         = 0.0f;
+
+    for (uint32_t i = 0; i < 8; i++) {
+      const float child_importance = importance[i];
+
+      if ((light_path & 0x7) == i) {
+        selected_child = i;
+        child_pdf      = child_importance * one_over_sum;
+      }
     }
 
-    light_path = light_path >> 1;
+    if (selected_child == 0xFFFFFFFF) {
+      subset_length = 0;
+      break;
+    }
 
-    node = load_light_tree_node(device.light_tree_nodes, next_node_address);
+    pdf *= child_pdf;
+
+    uint32_t selected_light_index;
+    selected_light_index = (selected_child > 3) ? node.light_index[1] : node.light_index[0];
+
+    const uint32_t normalized_child = (selected_child > 3) ? selected_child - 4 : selected_child;
+
+    selected_light_index = (selected_light_index >> (normalized_child * 8)) & 0xFF;
+
+    const uint32_t light_count = selected_light_index & 0x3;
+
+    if (light_count > 0) {
+      subset_length = light_count;
+      break;
+    }
+
+    light_path = light_path >> 3;
+
+    node = load_light_tree_node_8(device.light_tree_nodes_8, node.child_ptr + selected_child);
   }
 
-  pdf *= 1.0f / node.light_count;
+  pdf *= 1.0f / subset_length;
 
   return pdf;
 }
