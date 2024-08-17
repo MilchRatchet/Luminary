@@ -676,9 +676,10 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         LightTreeChildNode left_child;
         memset(&left_child, 0, sizeof(LightTreeChildNode));
 
-        left_child.point                = binary_node.left_ref_point;
-        left_child.energy               = binary_node.left_energy;
-        left_child.confidence           = binary_node.left_confidence;
+        left_child.point      = binary_node.left_ref_point;
+        left_child.energy     = binary_node.left_energy;
+        left_child.confidence = binary_node.left_confidence;
+
         child_binary_index[child_count] = binary_node.ptr;
 
         children[child_count++] = left_child;
@@ -801,8 +802,8 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       float max_confidence = 0.0f;
 
       for (uint32_t i = 0; i < child_count; i++) {
-        max_energy     = max(max_energy, children[i].energy);
-        max_confidence = max(max_confidence, children[i].confidence);
+        max_energy     = fmaxf(max_energy, children[i].energy);
+        max_confidence = fmaxf(max_confidence, children[i].confidence);
       }
 
       node.max_energy     = max_energy;
@@ -825,9 +826,9 @@ static void _lights_tree_collapse(LightTreeWork* work) {
 
       node.base_point = min_point;
 
-      node.exp_x = (int8_t) ceilf(log2f((max_point.x - min_point.x) * 1.0 / 255.0));
-      node.exp_y = (int8_t) ceilf(log2f((max_point.y - min_point.y) * 1.0 / 255.0));
-      node.exp_z = (int8_t) ceilf(log2f((max_point.z - min_point.z) * 1.0 / 255.0));
+      node.exp_x = (int8_t) (max_point.x != min_point.x) ? ceilf(log2f((max_point.x - min_point.x) * 1.0 / 255.0)) : 0;
+      node.exp_y = (int8_t) (max_point.y != min_point.y) ? ceilf(log2f((max_point.y - min_point.y) * 1.0 / 255.0)) : 0;
+      node.exp_z = (int8_t) (max_point.z != min_point.z) ? ceilf(log2f((max_point.z - min_point.z) * 1.0 / 255.0)) : 0;
 
       const float compression_x = 1.0f / exp2f(node.exp_x);
       const float compression_y = 1.0f / exp2f(node.exp_y);

@@ -332,10 +332,10 @@ __device__ LightTreeNode8Packed load_light_tree_node_8(const LightTreeNode8Packe
   node.base_point.x = v0.x;
   node.base_point.y = v0.y;
   node.base_point.z = v0.z;
-  node.exp_x        = __float_as_uint(v0.w) >> 0 & 0xFF;
-  node.exp_y        = __float_as_uint(v0.w) >> 8 & 0xFF;
-  node.exp_z        = __float_as_uint(v0.w) >> 16 & 0xFF;
-  node.child_count  = __float_as_uint(v0.w) >> 24 & 0xFF;
+  node.exp_x        = *((int8_t*) &v0.w + 0);
+  node.exp_y        = *((int8_t*) &v0.w + 1);
+  node.exp_z        = *((int8_t*) &v0.w + 2);
+  node.child_count  = *((uint8_t*) &v0.w + 3);
 
   node.child_ptr      = __float_as_uint(v1.x);
   node.light_ptr      = __float_as_uint(v1.y);

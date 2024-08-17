@@ -42,7 +42,7 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
   random = random_saturate(random);
 
   while (subset_length == 0) {
-    const vec3 exp = get_vector(expf(node.exp_x), expf(node.exp_y), expf(node.exp_z));
+    const vec3 exp = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
 
     float importance[8];
 
@@ -129,7 +129,7 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
   uint32_t subset_length = 0;
 
   while (subset_length == 0) {
-    const vec3 exp = get_vector(expf(node.exp_x), expf(node.exp_y), expf(node.exp_z));
+    const vec3 exp = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
 
     float importance[8];
 
