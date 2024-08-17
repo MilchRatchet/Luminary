@@ -16,13 +16,12 @@ __device__ float light_tree_child_importance(
   point = mul_vector(point, exp);
   point = add_vector(point, node.base_point);
 
-  const float energy     = ((node.rel_energy[i] >> shift) & 0xFF) * (node.max_energy / 255.0f);
+  const float energy     = (float) ((node.rel_energy[i] >> shift) & 0xFF);
   const float confidence = ((node.rel_confidence[i] >> shift) & 0xFF) * (node.max_confidence / 255.0f);
 
-  const vec3 diff  = sub_vector(point, data.position);
-  const float dist = fmaxf(get_length(diff), confidence);
+  const vec3 diff = sub_vector(point, data.position);
 
-  return energy / (dist * dist);
+  return energy / fmaxf(dot_product(diff, diff), confidence * confidence);
 }
 
 __device__ uint32_t light_tree_traverse(const GBufferData data, float random, uint32_t& subset_length, float& pdf) {
