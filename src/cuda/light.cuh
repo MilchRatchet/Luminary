@@ -122,7 +122,9 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
 
   float pdf = 1.0f;
 
-  uint32_t light_path = __ldg(device.light_tree_paths + light_id);
+  uint2 light_paths           = __ldg(device.light_tree_paths + light_id);
+  uint32_t current_light_path = light_paths.x;
+  uint32_t current_depth      = 0;
 
   LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
 
@@ -155,7 +157,7 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
     for (uint32_t i = 0; i < 8; i++) {
       const float child_importance = importance[i];
 
-      if ((light_path & 0x7) == i) {
+      if ((current_light_path & 0x7) == i) {
         selected_child = i;
         child_pdf      = child_importance * one_over_sum;
       }
@@ -182,7 +184,12 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
       break;
     }
 
-    light_path = light_path >> 3;
+    current_light_path = current_light_path >> 3;
+    current_depth++;
+
+    if (current_depth == 10) {
+      current_light_path = light_paths.y;
+    }
 
     node = load_light_tree_node_8(device.light_tree_nodes_8, node.child_ptr + selected_child);
   }

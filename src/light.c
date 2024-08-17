@@ -72,7 +72,7 @@ struct LightTreeChildNode {
 struct LightTreeWork {
   TriangleLight* triangles;
   Fragment* fragments;
-  uint32_t* paths;
+  uint2* paths;
   uint32_t triangles_count;
   LightTreeBinaryNode* binary_nodes;
   LightTreeNode* nodes;
@@ -572,7 +572,6 @@ static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryN
 // Then, based on that reference point, compute the smallest distance to any light center.
 // This is our spatial confidence that we use to clamp the distance with when evaluating the importance during traversal.
 static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
-  uint32_t* paths      = malloc(sizeof(uint32_t) * work->triangles_count);
   LightTreeNode* nodes = malloc(sizeof(LightTreeNode) * work->nodes_count);
 
   for (uint32_t i = 0; i < work->nodes_count; i++) {
@@ -596,10 +595,6 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
       case LIGHT_TREE_NODE_TYPE_LEAF:
         node.light_count = binary_node.triangle_count;
         node.ptr         = binary_node.triangles_address;
-
-        for (uint32_t light_offset = 0; light_offset < node.light_count; light_offset++) {
-          paths[node.ptr + light_offset] = binary_node.path;
-        }
         break;
       default:
         crash_message("Encountered illegal node type!");
@@ -609,7 +604,6 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
     nodes[i] = node;
   }
 
-  work->paths = paths;
   work->nodes = nodes;
 }
 
@@ -624,14 +618,14 @@ static void _lights_tree_collapse(LightTreeWork* work) {
   LightTreeNode8Packed* nodes = (LightTreeNode8Packed*) malloc(sizeof(LightTreeNode8Packed) * node_count);
   memset(nodes, 0, sizeof(LightTreeNode8Packed) * node_count);
 
-  uint32_t* node_paths  = (uint32_t*) malloc(sizeof(uint32_t) * node_count);
+  uint64_t* node_paths  = (uint64_t*) malloc(sizeof(uint64_t) * node_count);
   uint32_t* node_depths = (uint32_t*) malloc(sizeof(uint32_t) * node_count);
 
-  uint32_t* new_fragments  = malloc(sizeof(uint32_t) * fragments_count);
-  uint32_t* fragment_paths = malloc(sizeof(uint32_t) * fragments_count);
+  uint32_t* new_fragments  = (uint32_t*) malloc(sizeof(uint32_t) * fragments_count);
+  uint64_t* fragment_paths = (uint64_t*) malloc(sizeof(uint64_t) * fragments_count);
 
   memset(new_fragments, 0xFF, sizeof(uint32_t) * fragments_count);
-  memset(fragment_paths, 0xFF, sizeof(uint32_t) * fragments_count);
+  memset(fragment_paths, 0xFF, sizeof(uint64_t) * fragments_count);
 
   nodes[0].child_ptr = 0;
   nodes[0].light_ptr = 0;
@@ -653,7 +647,7 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       if (binary_index == 0xFFFFFFFF)
         continue;
 
-      const uint32_t current_node_path  = node_paths[node_ptr];
+      const uint64_t current_node_path  = node_paths[node_ptr];
       const uint32_t current_node_depth = node_depths[node_ptr];
 
       node.child_ptr = write_ptr;
@@ -719,7 +713,7 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       while (child_count < 8 && child_count > child_leaf_count) {
         uint32_t loop_end = child_count;
 
-        for (uint32_t child_ptr = 0; child_ptr < loop_end; child_ptr++) {
+        for (uint64_t child_ptr = 0; child_ptr < loop_end; child_ptr++) {
           const uint32_t binary_index_of_child = child_binary_index[child_ptr];
 
           // If this child does not point to another binary node, then skip.
@@ -774,7 +768,7 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       // The above logic has a flaw in that that leaf nodes that were inserted during the last
       // loop would not be identified as such. Hence I loop again through the children to mark
       // all children correctly as leafs.
-      for (uint32_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
+      for (uint64_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
         const uint32_t binary_index_of_child = child_binary_index[child_ptr];
 
         // If this child does not point to another binary node, then skip.
@@ -887,7 +881,7 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       }
 
       // Prepare the next nodes to be constructed from the respective binary nodes.
-      for (uint32_t i = 0; i < child_count; i++) {
+      for (uint64_t i = 0; i < child_count; i++) {
         node_paths[write_ptr]        = current_node_path | (i << (3 * current_node_depth));
         node_depths[write_ptr]       = current_node_depth + 1;
         nodes[write_ptr++].child_ptr = child_binary_index[i];
@@ -911,11 +905,20 @@ static void _lights_tree_collapse(LightTreeWork* work) {
   Fragment* fragments_swap = malloc(sizeof(Fragment) * fragments_count);
   memcpy(fragments_swap, work->fragments, sizeof(Fragment) * fragments_count);
 
+  work->paths = (uint2*) malloc(sizeof(uint2) * fragments_count);
+
   for (uint32_t i = 0; i < fragments_count; i++) {
     work->fragments[i] = fragments_swap[new_fragments[i]];
-  }
 
-  memcpy(work->paths, fragment_paths, sizeof(uint32_t) * fragments_count);
+    uint64_t fragment_path = fragment_paths[i];
+
+    uint2 light_path;
+
+    light_path.x = (uint32_t) ((fragment_path >> 0) & 0x3FFFFFFF);
+    light_path.y = (uint32_t) ((fragment_path >> 30) & 0x3FFFFFFF);
+
+    work->paths[i] = light_path;
+  }
 
   free(node_paths);
   free(node_depths);
@@ -945,8 +948,8 @@ static void _lights_tree_finalize(LightTreeWork* work) {
 
   // TODO: Clean up this mess, this is the same as in bvh.c but I would like this to be cleaned, we need this anyway for instance support.
   void* paths;
-  device_malloc(&paths, sizeof(uint32_t) * work->triangles_count);
-  device_upload(paths, work->paths, sizeof(uint32_t) * work->triangles_count);
+  device_malloc(&paths, sizeof(uint2) * work->triangles_count);
+  device_upload(paths, work->paths, sizeof(uint2) * work->triangles_count);
 
   void* light_tree_nodes;
   device_malloc(&light_tree_nodes, sizeof(LightTreeNode) * work->nodes_count);
