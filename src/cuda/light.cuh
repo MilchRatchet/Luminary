@@ -10,19 +10,30 @@
 #include "utils.cuh"
 
 __device__ float light_tree_child_importance(
-  const GBufferData data, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i, const uint32_t shift) {
+  const GBufferData data, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i) {
+  const bool lower_data = (i < 4);
+  const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
+
+  const uint32_t rel_energy = lower_data ? node.rel_energy[0] : node.rel_energy[1];
+
   vec3 point;
-  const float energy = (float) ((node.rel_energy[i] >> shift) & 0xFF);
+  const float energy = (float) ((rel_energy >> shift) & 0xFF);
 
   if (energy == 0.0f)
     return 0.0f;
 
-  point = get_vector((node.rel_point_x[i] >> shift) & 0xFF, (node.rel_point_y[i] >> shift) & 0xFF, (node.rel_point_z[i] >> shift) & 0xFF);
+  const uint32_t rel_point_x = lower_data ? node.rel_point_x[0] : node.rel_point_x[1];
+  const uint32_t rel_point_y = lower_data ? node.rel_point_y[0] : node.rel_point_y[1];
+  const uint32_t rel_point_z = lower_data ? node.rel_point_z[0] : node.rel_point_z[1];
+
+  point = get_vector((rel_point_x >> shift) & 0xFF, (rel_point_y >> shift) & 0xFF, (rel_point_z >> shift) & 0xFF);
   point = mul_vector(point, exp);
   point = add_vector(point, node.base_point);
 
+  const uint32_t confidence_light = lower_data ? node.confidence_light[0] : node.confidence_light[1];
+
   float confidence;
-  confidence = (node.confidence_light[i] >> (shift + 2)) & 0x3F;
+  confidence = (confidence_light >> (shift + 2)) & 0x3F;
   confidence = confidence * exp_c;
 
   const vec3 diff = sub_vector(point, data.position);
@@ -52,14 +63,14 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
 
     float importance[8];
 
-    importance[0] = light_tree_child_importance(data, node, exp, exp_c, 0, 0);
-    importance[1] = light_tree_child_importance(data, node, exp, exp_c, 0, 8);
-    importance[2] = light_tree_child_importance(data, node, exp, exp_c, 0, 16);
-    importance[3] = light_tree_child_importance(data, node, exp, exp_c, 0, 24);
-    importance[4] = light_tree_child_importance(data, node, exp, exp_c, 1, 0);
-    importance[5] = light_tree_child_importance(data, node, exp, exp_c, 1, 8);
-    importance[6] = light_tree_child_importance(data, node, exp, exp_c, 1, 16);
-    importance[7] = light_tree_child_importance(data, node, exp, exp_c, 1, 24);
+    importance[0] = light_tree_child_importance(data, node, exp, exp_c, 0);
+    importance[1] = light_tree_child_importance(data, node, exp, exp_c, 1);
+    importance[2] = light_tree_child_importance(data, node, exp, exp_c, 2);
+    importance[3] = light_tree_child_importance(data, node, exp, exp_c, 3);
+    importance[4] = light_tree_child_importance(data, node, exp, exp_c, 4);
+    importance[5] = light_tree_child_importance(data, node, exp, exp_c, 5);
+    importance[6] = light_tree_child_importance(data, node, exp, exp_c, 6);
+    importance[7] = light_tree_child_importance(data, node, exp, exp_c, 7);
 
     float sum_importance = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
@@ -140,14 +151,14 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
 
     float importance[8];
 
-    importance[0] = light_tree_child_importance(data, node, exp, exp_c, 0, 0);
-    importance[1] = light_tree_child_importance(data, node, exp, exp_c, 0, 8);
-    importance[2] = light_tree_child_importance(data, node, exp, exp_c, 0, 16);
-    importance[3] = light_tree_child_importance(data, node, exp, exp_c, 0, 24);
-    importance[4] = light_tree_child_importance(data, node, exp, exp_c, 1, 0);
-    importance[5] = light_tree_child_importance(data, node, exp, exp_c, 1, 8);
-    importance[6] = light_tree_child_importance(data, node, exp, exp_c, 1, 16);
-    importance[7] = light_tree_child_importance(data, node, exp, exp_c, 1, 24);
+    importance[0] = light_tree_child_importance(data, node, exp, exp_c, 0);
+    importance[1] = light_tree_child_importance(data, node, exp, exp_c, 1);
+    importance[2] = light_tree_child_importance(data, node, exp, exp_c, 2);
+    importance[3] = light_tree_child_importance(data, node, exp, exp_c, 3);
+    importance[4] = light_tree_child_importance(data, node, exp, exp_c, 4);
+    importance[5] = light_tree_child_importance(data, node, exp, exp_c, 5);
+    importance[6] = light_tree_child_importance(data, node, exp, exp_c, 6);
+    importance[7] = light_tree_child_importance(data, node, exp, exp_c, 7);
 
     float sum_importance = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
