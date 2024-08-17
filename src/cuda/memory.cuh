@@ -295,30 +295,6 @@ __device__ Material load_material(const PackedMaterial* data, const int offset) 
   return mat;
 }
 
-__device__ LightTreeNode load_light_tree_node(const LightTreeNode* data, const int offset) {
-  const float4* ptr = (float4*) (data + offset);
-  const float4 v0   = __ldg(ptr + 0);
-  const float4 v1   = __ldg(ptr + 1);
-  const float4 v2   = __ldg(ptr + 2);
-
-  LightTreeNode node;
-
-  node.left_ref_point.x  = v0.x;
-  node.left_ref_point.y  = v0.y;
-  node.left_ref_point.z  = v0.z;
-  node.right_ref_point.x = v0.w;
-  node.right_ref_point.y = v1.x;
-  node.right_ref_point.z = v1.y;
-  node.left_confidence   = v1.z;
-  node.right_confidence  = v1.w;
-  node.left_energy       = v2.x;
-  node.right_energy      = v2.y;
-  node.ptr               = __float_as_uint(v2.z);
-  node.light_count       = __float_as_uint(v2.w);
-
-  return node;
-}
-
 __device__ LightTreeNode8Packed load_light_tree_node_8(const LightTreeNode8Packed* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v0   = __ldg(ptr + 0);

@@ -46,6 +46,18 @@ struct LightTreeBinaryNode {
   uint32_t depth;
 } typedef LightTreeBinaryNode;
 
+struct LightTreeNode {
+  vec3 left_ref_point;
+  vec3 right_ref_point;
+  float left_confidence;
+  float right_confidence;
+  float left_energy;
+  float right_energy;
+  uint32_t ptr;
+  uint32_t light_count;
+} typedef LightTreeNode;
+static_assert(sizeof(LightTreeNode) == 0x30, "Incorrect packing size.");
+
 struct vec3_p {
   float x;
   float y;
@@ -945,15 +957,10 @@ static void _lights_tree_finalize(LightTreeWork* work) {
   device_malloc(&paths, sizeof(uint2) * work->triangles_count);
   device_upload(paths, work->paths, sizeof(uint2) * work->triangles_count);
 
-  void* light_tree_nodes;
-  device_malloc(&light_tree_nodes, sizeof(LightTreeNode) * work->nodes_count);
-  device_upload(light_tree_nodes, work->nodes, sizeof(LightTreeNode) * work->nodes_count);
-
   void* light_tree_nodes_8;
   device_malloc(&light_tree_nodes_8, sizeof(LightTreeNode8Packed) * work->nodes_8_count);
   device_upload(light_tree_nodes_8, work->nodes8_packed, sizeof(LightTreeNode8Packed) * work->nodes_8_count);
 
-  device_update_symbol(light_tree_nodes, light_tree_nodes);
   device_update_symbol(light_tree_nodes_8, light_tree_nodes_8);
   device_update_symbol(light_tree_paths, paths);
 }
