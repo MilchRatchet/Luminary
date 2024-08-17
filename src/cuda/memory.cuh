@@ -325,37 +325,31 @@ __device__ LightTreeNode8Packed load_light_tree_node_8(const LightTreeNode8Packe
   const float4 v1   = __ldg(ptr + 1);
   const float4 v2   = __ldg(ptr + 2);
   const float4 v3   = __ldg(ptr + 3);
-  const float4 v4   = __ldg(ptr + 4);
 
   LightTreeNode8Packed node;
 
-  node.base_point.x = v0.x;
-  node.base_point.y = v0.y;
-  node.base_point.z = v0.z;
-  node.exp_x        = *((int8_t*) &v0.w + 0);
-  node.exp_y        = *((int8_t*) &v0.w + 1);
-  node.exp_z        = *((int8_t*) &v0.w + 2);
-  node.child_count  = *((uint8_t*) &v0.w + 3);
+  node.base_point.x   = v0.x;
+  node.base_point.y   = v0.y;
+  node.base_point.z   = v0.z;
+  node.exp_x          = *((int8_t*) &v0.w + 0);
+  node.exp_y          = *((int8_t*) &v0.w + 1);
+  node.exp_z          = *((int8_t*) &v0.w + 2);
+  node.exp_confidence = *((uint8_t*) &v0.w + 3);
 
   node.child_ptr      = __float_as_uint(v1.x);
   node.light_ptr      = __float_as_uint(v1.y);
-  node.max_energy     = v1.z;
-  node.max_confidence = v1.w;
+  node.rel_point_x[0] = __float_as_uint(v1.z);
+  node.rel_point_x[1] = __float_as_uint(v1.w);
 
-  node.rel_point_x[0] = __float_as_uint(v2.x);
-  node.rel_point_x[1] = __float_as_uint(v2.y);
-  node.rel_point_y[0] = __float_as_uint(v2.z);
-  node.rel_point_y[1] = __float_as_uint(v2.w);
+  node.rel_point_y[0] = __float_as_uint(v2.x);
+  node.rel_point_y[1] = __float_as_uint(v2.y);
+  node.rel_point_z[0] = __float_as_uint(v2.z);
+  node.rel_point_z[1] = __float_as_uint(v2.w);
 
-  node.rel_point_z[0] = __float_as_uint(v3.x);
-  node.rel_point_z[1] = __float_as_uint(v3.y);
-  node.rel_energy[0]  = __float_as_uint(v3.z);
-  node.rel_energy[1]  = __float_as_uint(v3.w);
-
-  node.rel_confidence[0] = __float_as_uint(v4.x);
-  node.rel_confidence[1] = __float_as_uint(v4.y);
-  node.light_index[0]    = __float_as_uint(v4.z);
-  node.light_index[1]    = __float_as_uint(v4.w);
+  node.rel_energy[0]       = __float_as_uint(v3.x);
+  node.rel_energy[1]       = __float_as_uint(v3.y);
+  node.confidence_light[0] = __float_as_uint(v3.z);
+  node.confidence_light[1] = __float_as_uint(v3.w);
 
   return node;
 }

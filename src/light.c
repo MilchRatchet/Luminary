@@ -66,7 +66,7 @@ struct LightTreeChildNode {
   vec3 point;
   float energy;
   float confidence;
-  uint32_t light_index;
+  uint32_t light_count;
 } typedef LightTreeChildNode;
 
 struct LightTreeWork {
@@ -792,24 +792,15 @@ static void _lights_tree_collapse(LightTreeWork* work) {
           fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
         }
 
-        children[child_ptr].light_index = light_count;
+        children[child_ptr].light_count = light_count;
 
         child_light_ptr += light_count;
       }
 
+      vec3 min_point       = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
+      vec3 max_point       = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
       float max_energy     = 0.0f;
       float max_confidence = 0.0f;
-
-      for (uint32_t i = 0; i < child_count; i++) {
-        max_energy     = fmaxf(max_energy, children[i].energy);
-        max_confidence = fmaxf(max_confidence, children[i].confidence);
-      }
-
-      node.max_energy     = max_energy;
-      node.max_confidence = max_confidence;
-
-      vec3 min_point = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
-      vec3 max_point = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
 
       for (uint32_t i = 0; i < child_count; i++) {
         const vec3 point = children[i].point;
@@ -821,6 +812,9 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         max_point.x = max(max_point.x, point.x);
         max_point.y = max(max_point.y, point.y);
         max_point.z = max(max_point.z, point.z);
+
+        max_energy     = fmaxf(max_energy, children[i].energy);
+        max_confidence = fmaxf(max_confidence, children[i].confidence);
       }
 
       node.base_point = min_point;
@@ -829,56 +823,51 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       node.exp_y = (int8_t) (max_point.y != min_point.y) ? ceilf(log2f((max_point.y - min_point.y) * 1.0 / 255.0)) : 0;
       node.exp_z = (int8_t) (max_point.z != min_point.z) ? ceilf(log2f((max_point.z - min_point.z) * 1.0 / 255.0)) : 0;
 
+      node.exp_confidence = ((int8_t) ceilf(log2f(max_confidence * 1.0 / 63.0)));
+
       const float compression_x = 1.0f / exp2f(node.exp_x);
       const float compression_y = 1.0f / exp2f(node.exp_y);
       const float compression_z = 1.0f / exp2f(node.exp_z);
+      const float compression_c = 1.0f / exp2f(node.exp_confidence);
 
-      node.child_count = child_count;
-
-      uint64_t rel_point_x    = 0;
-      uint64_t rel_point_y    = 0;
-      uint64_t rel_point_z    = 0;
-      uint64_t rel_energy     = 0;
-      uint64_t rel_confidence = 0;
-      uint64_t light_index    = 0;
+      uint64_t rel_point_x      = 0;
+      uint64_t rel_point_y      = 0;
+      uint64_t rel_point_z      = 0;
+      uint64_t rel_energy       = 0;
+      uint64_t confidence_light = 0;
 
       for (uint32_t i = 0; i < child_count; i++) {
         const LightTreeChildNode child_node = children[i];
 
-        uint64_t child_rel_point_x    = (uint64_t) floorf((child_node.point.x - node.base_point.x) * compression_x);
-        uint64_t child_rel_point_y    = (uint64_t) floorf((child_node.point.y - node.base_point.y) * compression_y);
-        uint64_t child_rel_point_z    = (uint64_t) floorf((child_node.point.z - node.base_point.z) * compression_z);
-        uint64_t child_rel_energy     = (uint64_t) floorf(255.0f * child_node.energy / node.max_energy);
-        uint64_t child_rel_confidence = (uint64_t) floorf(255.0f * child_node.confidence / node.max_confidence);
-        uint64_t child_light_index    = (uint64_t) child_node.light_index;
+        uint64_t child_rel_point_x      = (uint64_t) floorf((child_node.point.x - node.base_point.x) * compression_x);
+        uint64_t child_rel_point_y      = (uint64_t) floorf((child_node.point.y - node.base_point.y) * compression_y);
+        uint64_t child_rel_point_z      = (uint64_t) floorf((child_node.point.z - node.base_point.z) * compression_z);
+        uint64_t child_rel_energy       = (uint64_t) floorf(255.0f * child_node.energy / max_energy);
+        uint64_t child_confidence_light = (((uint64_t) (child_node.confidence * compression_c)) << 2) | ((uint64_t) child_node.light_count);
 
-        if (child_rel_point_x > 255 || child_rel_point_y > 255 || child_rel_point_z > 255)
+        if (child_rel_point_x > 255 || child_rel_point_y > 255 || child_rel_point_z > 255 || (child_confidence_light >> 2) > 63)
           crash_message(
             "ChildRelPoint is too large: %u %u %u %f %d %f %f %f", child_rel_point_x, child_rel_point_y, child_rel_point_z, compression_y,
             node.exp_y, child_node.point.y, node.base_point.y, child_node.point.y - node.base_point.y);
 
-        child_rel_energy     = max(1, child_rel_energy);
-        child_rel_confidence = max(1, child_rel_confidence);
+        child_rel_energy = max(1, child_rel_energy);
         rel_point_x |= child_rel_point_x << (i * 8);
         rel_point_y |= child_rel_point_y << (i * 8);
         rel_point_z |= child_rel_point_z << (i * 8);
         rel_energy |= child_rel_energy << (i * 8);
-        rel_confidence |= child_rel_confidence << (i * 8);
-        light_index |= child_light_index << (i * 8);
+        confidence_light |= child_confidence_light << (i * 8);
       }
 
-      node.rel_point_x[0]    = (uint32_t) (rel_point_x & 0xFFFFFFFF);
-      node.rel_point_x[1]    = (uint32_t) ((rel_point_x >> 32) & 0xFFFFFFFF);
-      node.rel_point_y[0]    = (uint32_t) (rel_point_y & 0xFFFFFFFF);
-      node.rel_point_y[1]    = (uint32_t) ((rel_point_y >> 32) & 0xFFFFFFFF);
-      node.rel_point_z[0]    = (uint32_t) (rel_point_z & 0xFFFFFFFF);
-      node.rel_point_z[1]    = (uint32_t) ((rel_point_z >> 32) & 0xFFFFFFFF);
-      node.rel_energy[0]     = (uint32_t) (rel_energy & 0xFFFFFFFF);
-      node.rel_energy[1]     = (uint32_t) ((rel_energy >> 32) & 0xFFFFFFFF);
-      node.rel_confidence[0] = (uint32_t) (rel_confidence & 0xFFFFFFFF);
-      node.rel_confidence[1] = (uint32_t) ((rel_confidence >> 32) & 0xFFFFFFFF);
-      node.light_index[0]    = (uint32_t) (light_index & 0xFFFFFFFF);
-      node.light_index[1]    = (uint32_t) ((light_index >> 32) & 0xFFFFFFFF);
+      node.rel_point_x[0]      = (uint32_t) (rel_point_x & 0xFFFFFFFF);
+      node.rel_point_x[1]      = (uint32_t) ((rel_point_x >> 32) & 0xFFFFFFFF);
+      node.rel_point_y[0]      = (uint32_t) (rel_point_y & 0xFFFFFFFF);
+      node.rel_point_y[1]      = (uint32_t) ((rel_point_y >> 32) & 0xFFFFFFFF);
+      node.rel_point_z[0]      = (uint32_t) (rel_point_z & 0xFFFFFFFF);
+      node.rel_point_z[1]      = (uint32_t) ((rel_point_z >> 32) & 0xFFFFFFFF);
+      node.rel_energy[0]       = (uint32_t) (rel_energy & 0xFFFFFFFF);
+      node.rel_energy[1]       = (uint32_t) ((rel_energy >> 32) & 0xFFFFFFFF);
+      node.confidence_light[0] = (uint32_t) (confidence_light & 0xFFFFFFFF);
+      node.confidence_light[1] = (uint32_t) ((confidence_light >> 32) & 0xFFFFFFFF);
 
       if (write_ptr + child_count >= node_count) {
         node_count += binary_nodes_count;
