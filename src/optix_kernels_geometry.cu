@@ -66,6 +66,8 @@ extern "C" __global__ void __raygen__optix() {
       is_delta_distribution = bounce_info.is_microfacet_based && (data.roughness <= GEOMETRY_DELTA_PATH_CUTOFF);
     }
 
+    const bool is_pass_through = bsdf_is_pass_through_ray(bounce_info.is_transparent_pass, data.ior_in, data.ior_out);
+
     ////////////////////////////////////////////////////////////////////
     // Light Ray Sampling
     ////////////////////////////////////////////////////////////////////
@@ -114,7 +116,7 @@ extern "C" __global__ void __raygen__optix() {
         flags_to_release |= STATE_FLAG_DELTA_PATH;
       }
 
-      if (!bsdf_is_pass_through_ray(data.V, bounce_ray)) {
+      if (!is_pass_through) {
         flags_to_release |= STATE_FLAG_CAMERA_DIRECTION;
       }
 

@@ -46,8 +46,8 @@ enum BSDFSamplingHint {
   BSDF_SAMPLING_MICROFACET_REFRACTION = 3
 };
 
-__device__ bool bsdf_is_pass_through_ray(const vec3 V, const vec3 L) {
-  return dot_product(V, L) < (-1.0f + 16.0f * eps);
+__device__ bool bsdf_is_pass_through_ray(const bool is_transparent_pass, const float ior_in, const float ior_out) {
+  return is_transparent_pass && (ior_in == ior_out);
 }
 
 ///////////////////////////////////////////////////
