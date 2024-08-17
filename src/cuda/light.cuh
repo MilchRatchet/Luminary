@@ -78,27 +78,32 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
     }
 
     float accumulated_importance = 0.0f;
-    const float one_over_sum     = 1.0f / sum_importance;
 
     uint32_t selected_child             = 0xFFFFFFFF;
     uint32_t selected_child_light_ptr   = 0;
     uint32_t selected_child_light_count = 0;
     uint32_t sum_lights                 = 0;
-    float child_pdf                     = 0.0f;
+    float selected_importance           = 0.0f;
     float random_shift                  = 0.0f;
 
+    random *= sum_importance;
+
     for (uint32_t i = 0; i < 8; i++) {
-      const float child_importance = importance[i] * one_over_sum;
+      const float child_importance = importance[i];
       accumulated_importance += child_importance;
 
-      uint32_t child_light_count = ((i < 4) ? (node.confidence_light[0] >> (i * 8)) : (node.confidence_light[1] >> ((i - 4) * 8))) & 0x3;
+      const bool lower_data                 = (i < 4);
+      const uint32_t child_light_count_data = lower_data ? node.confidence_light[0] : node.confidence_light[1];
+      const uint32_t shift                  = (lower_data ? i : (i - 4)) << 3;
+
+      uint32_t child_light_count = (child_light_count_data >> shift) & 0x3;
       sum_lights += child_light_count;
 
       if (accumulated_importance > random) {
         selected_child             = i;
         selected_child_light_count = child_light_count;
         selected_child_light_ptr   = sum_lights - child_light_count;
-        child_pdf                  = child_importance;
+        selected_importance        = child_importance;
 
         random_shift = accumulated_importance - child_importance;
 
@@ -113,10 +118,10 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
       break;
     }
 
-    pdf *= child_pdf;
+    pdf *= selected_importance / sum_importance;
 
     // Rescale random number
-    random = random_saturate((random - random_shift) / child_pdf);
+    random = random_saturate((random - random_shift) / selected_importance);
 
     if (selected_child_light_count > 0) {
       subset_length = selected_child_light_count;
