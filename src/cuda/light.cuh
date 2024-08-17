@@ -63,17 +63,25 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
     float accumulated_importance = 0.0f;
     const float one_over_sum     = 1.0f / sum_importance;
 
-    uint32_t selected_child = 0xFFFFFFFF;
-    float child_pdf         = 0.0f;
-    float random_shift      = 0.0f;
+    uint32_t selected_child             = 0xFFFFFFFF;
+    uint32_t selected_child_light_ptr   = 0;
+    uint32_t selected_child_light_count = 0;
+    uint32_t sum_lights                 = 0;
+    float child_pdf                     = 0.0f;
+    float random_shift                  = 0.0f;
 
     for (uint32_t i = 0; i < 8; i++) {
       const float child_importance = importance[i] * one_over_sum;
       accumulated_importance += child_importance;
 
+      const uint32_t child_light_count = ((i < 4) ? (node.light_index[0] >> (i * 8)) : (node.light_index[1] >> ((i - 4) * 8))) & 0xFF;
+      sum_lights += child_light_count;
+
       if (accumulated_importance > random) {
-        selected_child = i;
-        child_pdf      = child_importance;
+        selected_child             = i;
+        selected_child_light_count = child_light_count;
+        selected_child_light_ptr   = sum_lights - child_light_count;
+        child_pdf                  = child_importance;
 
         random_shift = accumulated_importance - child_importance;
 
@@ -93,19 +101,9 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
     // Rescale random number
     random = random_saturate((random - random_shift) / child_pdf);
 
-    uint32_t selected_light_index;
-    selected_light_index = (selected_child > 3) ? node.light_index[1] : node.light_index[0];
-
-    const uint32_t normalized_child = (selected_child > 3) ? selected_child - 4 : selected_child;
-
-    selected_light_index = (selected_light_index >> (normalized_child * 8)) & 0xFF;
-
-    const uint32_t light_count = selected_light_index & 0x3;
-    const uint32_t light_ptr   = selected_light_index >> 2;
-
-    if (light_count > 0) {
-      subset_length = light_count;
-      subset_ptr    = node.light_ptr + light_ptr;
+    if (selected_child_light_count > 0) {
+      subset_length = selected_child_light_count;
+      subset_ptr    = node.light_ptr + selected_child_light_ptr;
       break;
     }
 
@@ -151,15 +149,17 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
 
     const float one_over_sum = 1.0f / sum_importance;
 
-    uint32_t selected_child = 0xFFFFFFFF;
-    float child_pdf         = 0.0f;
+    uint32_t selected_child             = 0xFFFFFFFF;
+    uint32_t selected_child_light_count = 0;
+    float child_pdf                     = 0.0f;
 
     for (uint32_t i = 0; i < 8; i++) {
       const float child_importance = importance[i];
 
       if ((current_light_path & 0x7) == i) {
-        selected_child = i;
-        child_pdf      = child_importance * one_over_sum;
+        selected_child             = i;
+        selected_child_light_count = ((i < 4) ? (node.light_index[0] >> (i * 8)) : (node.light_index[1] >> ((i - 4) * 8))) & 0xFF;
+        child_pdf                  = child_importance * one_over_sum;
       }
     }
 
@@ -170,17 +170,8 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
 
     pdf *= child_pdf;
 
-    uint32_t selected_light_index;
-    selected_light_index = (selected_child > 3) ? node.light_index[1] : node.light_index[0];
-
-    const uint32_t normalized_child = (selected_child > 3) ? selected_child - 4 : selected_child;
-
-    selected_light_index = (selected_light_index >> (normalized_child * 8)) & 0xFF;
-
-    const uint32_t light_count = selected_light_index & 0x3;
-
-    if (light_count > 0) {
-      subset_length = light_count;
+    if (selected_child_light_count > 0) {
+      subset_length = selected_child_light_count;
       break;
     }
 

@@ -66,7 +66,7 @@ struct LightTreeChildNode {
   vec3 point;
   float energy;
   float confidence;
-  ushort2 light_index;
+  uint32_t light_index;
 } typedef LightTreeChildNode;
 
 struct LightTreeWork {
@@ -655,14 +655,17 @@ static void _lights_tree_collapse(LightTreeWork* work) {
 
       LightTreeChildNode children[8];
       uint32_t child_binary_index[8];
+      uint32_t child_leaf_light_ptr[8];
+      uint32_t child_leaf_light_count[8];
 
       for (int i = 0; i < 8; i++) {
-        child_binary_index[i] = 0xFFFFFFFF;
+        child_binary_index[i]     = 0xFFFFFFFF;
+        child_leaf_light_ptr[i]   = 0xFFFFFFFF;
+        child_leaf_light_count[i] = 0;
       }
 
       uint32_t child_count      = 0;
       uint32_t child_leaf_count = 0;
-      uint32_t child_light_ptr  = 0;
 
       if (binary_nodes[binary_index].light_count == 0) {
         const LightTreeNode binary_node = binary_nodes[binary_index];
@@ -695,15 +698,10 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         LightTreeChildNode child;
         memset(&child, 0, sizeof(LightTreeChildNode));
 
-        child.light_index.y = (uint16_t) binary_nodes[binary_index].light_count;
-        child.energy        = 1.0f;
+        child.energy = 1.0f;
 
-        for (uint32_t i = 0; i < binary_nodes[binary_index].light_count; i++) {
-          new_fragments[triangles_ptr + i]  = binary_nodes[binary_index].ptr + i;
-          fragment_paths[triangles_ptr + i] = 0;
-        }
-
-        child_light_ptr += binary_nodes[binary_index].light_count;
+        child_leaf_light_ptr[child_count]   = binary_nodes[binary_index].ptr;
+        child_leaf_light_count[child_count] = binary_nodes[binary_index].light_count;
 
         children[child_count++] = child;
 
@@ -746,17 +744,10 @@ static void _lights_tree_collapse(LightTreeWork* work) {
             children[child_count++] = right_child;
           }
           else {
-            for (uint32_t i = 0; i < binary_node.light_count; i++) {
-              new_fragments[triangles_ptr + child_light_ptr + i]  = binary_node.ptr + i;
-              fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
-            }
-
-            children[child_ptr].light_index.x = child_light_ptr;
-            children[child_ptr].light_index.y = binary_node.light_count;
+            child_leaf_light_ptr[child_ptr]   = binary_node.ptr;
+            child_leaf_light_count[child_ptr] = binary_node.light_count;
             child_binary_index[child_ptr]     = 0xFFFFFFFF;
             child_leaf_count++;
-
-            child_light_ptr += binary_node.light_count;
           }
 
           // Child list may have run full, terminate early.
@@ -778,18 +769,32 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         const LightTreeNode binary_node = binary_nodes[binary_index_of_child];
 
         if (binary_node.light_count > 0) {
-          for (uint32_t i = 0; i < binary_node.light_count; i++) {
-            new_fragments[triangles_ptr + child_light_ptr + i]  = binary_node.ptr + i;
-            fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
-          }
-
-          children[child_ptr].light_index.x = child_light_ptr;
-          children[child_ptr].light_index.y = binary_node.light_count;
+          child_leaf_light_ptr[child_ptr]   = binary_node.ptr;
+          child_leaf_light_count[child_ptr] = binary_node.light_count;
           child_binary_index[child_ptr]     = 0xFFFFFFFF;
           child_leaf_count++;
-
-          child_light_ptr += binary_node.light_count;
         }
+      }
+
+      uint32_t child_light_ptr = 0;
+
+      // Now we copy the triangles for all of our leaf child nodes.
+      for (uint64_t child_ptr = 0; child_ptr < child_count; child_ptr++) {
+        const uint32_t light_ptr   = child_leaf_light_ptr[child_ptr];
+        const uint32_t light_count = child_leaf_light_count[child_ptr];
+
+        // If this child is not a leaf, then skip.
+        if (light_count == 0)
+          continue;
+
+        for (uint32_t i = 0; i < light_count; i++) {
+          new_fragments[triangles_ptr + child_light_ptr + i]  = light_ptr + i;
+          fragment_paths[triangles_ptr + child_light_ptr + i] = current_node_path | (child_ptr << (3 * current_node_depth));
+        }
+
+        children[child_ptr].light_index = light_count;
+
+        child_light_ptr += light_count;
       }
 
       float max_energy     = 0.0f;
@@ -845,7 +850,7 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         uint64_t child_rel_point_z    = (uint64_t) floorf((child_node.point.z - node.base_point.z) * compression_z);
         uint64_t child_rel_energy     = (uint64_t) floorf(255.0f * child_node.energy / node.max_energy);
         uint64_t child_rel_confidence = (uint64_t) floorf(255.0f * child_node.confidence / node.max_confidence);
-        uint64_t child_light_index    = (((uint64_t) child_node.light_index.x) << 2) | ((uint64_t) child_node.light_index.y);
+        uint64_t child_light_index    = (uint64_t) child_node.light_index;
 
         if (child_rel_point_x > 255 || child_rel_point_y > 255 || child_rel_point_z > 255)
           crash_message(
