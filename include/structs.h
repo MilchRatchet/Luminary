@@ -301,14 +301,6 @@ struct DeviceTexture {
   float gamma;
 } typedef DeviceTexture;
 
-struct LightSample {
-  uint32_t seed;
-  uint32_t presampled_id;
-  uint32_t id;
-  float weight;
-  float target_pdf_normalization;
-} typedef LightSample;
-
 enum GBufferFlags {
   G_BUFFER_VOLUME_HIT           = 0b1,
   G_BUFFER_REFRACTION_IS_INSIDE = 0b10,

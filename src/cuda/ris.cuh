@@ -156,26 +156,6 @@ __device__ uint32_t ris_sample_light(
 
   return selected_id;
 }
-
-#else /* SHADING_KERNEL */
-
-LUMINARY_KERNEL void ris_presample_lights() {
-  if (device.scene.triangle_lights_count == 0)
-    return;
-
-  int id = THREAD_ID;
-
-  const int light_sample_bin_count = 1 << device.ris_settings.light_candidate_pool_size_log2;
-  while (id < light_sample_bin_count) {
-    const uint32_t sampled_id = random_r1(light_sample_bin_count * device.temporal_frames + id) % device.scene.triangle_lights_count;
-
-    device.ptrs.light_candidates[id]                   = sampled_id;
-    device.ris_settings.presampled_triangle_lights[id] = device.scene.triangle_lights[sampled_id];
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
 #endif /* !SHADING_KERNEL */
 
 #endif /* CU_RIS_H */

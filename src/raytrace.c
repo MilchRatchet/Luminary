@@ -535,9 +535,8 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->accum_mode   = TEMPORAL_ACCUMULATION;
   instance->bvh_type     = BVH_OPTIX;
 
-  instance->ris_settings.initial_reservoir_size         = 16;
-  instance->ris_settings.light_candidate_pool_size_log2 = 14;
-  instance->ris_settings.num_light_rays                 = general.num_light_ray;
+  instance->ris_settings.initial_reservoir_size = 16;
+  instance->ris_settings.num_light_rays         = general.num_light_ray;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
@@ -572,7 +571,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->buffer_8bit);
   device_buffer_init(&instance->trace_result_buffer);
   device_buffer_init(&instance->state_buffer);
-  device_buffer_init(&instance->light_candidates);
   device_buffer_init(&instance->cloud_noise);
   device_buffer_init(&instance->sky_ms_luts);
   device_buffer_init(&instance->sky_tm_luts);
@@ -591,7 +589,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_malloc((void**) &(instance->scene.triangle_data.vertex_buffer), instance->scene.triangle_data.vertex_count * 4 * sizeof(float));
   device_malloc(
     (void**) &(instance->scene.triangle_data.index_buffer), instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t));
-  device_malloc((void**) &(instance->ris_settings.presampled_triangle_lights), sizeof(TriangleLight) * RIS_MAX_CANDIDATE_POOL_SIZE);
 
   Triangle* triangles_interleaved =
     (Triangle*) malloc(INTERLEAVED_ALLOCATION_SIZE(sizeof(Triangle)) * instance->scene.triangle_data.triangle_count);
@@ -770,8 +767,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->trace_result_buffer, sizeof(TraceResult), amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
 
-  device_buffer_malloc(instance->light_candidates, sizeof(uint32_t), RIS_MAX_CANDIDATE_POOL_SIZE);
-
   cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
 }
 
@@ -804,7 +799,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.cloud_noise               = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);
   ptrs.trace_result_buffer       = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
   ptrs.state_buffer              = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
-  ptrs.light_candidates          = (uint32_t*) device_buffer_get_pointer(instance->light_candidates);
   ptrs.sky_tm_luts               = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
   ptrs.sky_ms_luts               = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
   ptrs.sky_hdri_luts             = (DeviceTexture*) device_buffer_get_pointer(instance->sky_hdri_luts);
@@ -822,7 +816,6 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   gpuErrchk(cudaFree(instance->scene.materials));
   gpuErrchk(cudaFree(instance->scene.triangles));
   gpuErrchk(cudaFree(instance->scene.triangle_lights));
-  gpuErrchk(cudaFree(instance->ris_settings.presampled_triangle_lights));
   device_buffer_free(instance->ior_stack);
   device_buffer_free(instance->trace_tasks);
   device_buffer_free(instance->trace_counts);

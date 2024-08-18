@@ -68,8 +68,6 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_slider(ui, "RIS Candidates Count", &(instance->ris_settings.initial_reservoir_size), 1, 0.02f, 0.0f, 32.0f, 0, 1);
-  panels[i++] =
-    create_slider(ui, "RIS Candidates Pool Size", &(instance->ris_settings.light_candidate_pool_size_log2), 1, 0.01f, 1.0f, 20.0f, 0, 1);
   panels[i++] = create_slider(ui, "Light Ray Count", &(instance->ris_settings.num_light_rays), 1, 0.01f, 1.0f, 32.0f, 0, 1);
 
   tab.panels      = panels;
