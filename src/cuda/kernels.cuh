@@ -17,6 +17,7 @@
 #include "utils.cuh"
 #include "volume.cuh"
 
+// TODO: Turns this into a function and call this in the trace kernel if primary ray.
 LUMINARY_KERNEL void generate_trace_tasks() {
   int offset       = 0;
   const int amount = device.width * device.height;
@@ -344,7 +345,9 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
 
     RGBF pixel = sample_pixel_clamp(source, sx, sy, src_width, src_height);
 
-    if (output_variable != OUTPUT_VARIABLE_ALBEDO_GUIDANCE && output_variable != OUTPUT_VARIABLE_NORMAL_GUIDANCE) {
+    if (
+      device.shading_mode == SHADING_DEFAULT && output_variable != OUTPUT_VARIABLE_ALBEDO_GUIDANCE
+      && output_variable != OUTPUT_VARIABLE_NORMAL_GUIDANCE) {
       if (device.scene.camera.purkinje) {
         pixel = purkinje_shift(pixel);
       }
@@ -365,11 +368,9 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
         pixel = hsv_to_rgb(hsv);
       }
 
-      const float exposure = (device.shading_mode == SHADING_DEFAULT) ? device.scene.camera.exposure : 1.0f;
-
-      pixel.r *= exposure;
-      pixel.g *= exposure;
-      pixel.b *= exposure;
+      pixel.r *= device.scene.camera.exposure;
+      pixel.g *= device.scene.camera.exposure;
+      pixel.b *= device.scene.camera.exposure;
 
       const float grain = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
 

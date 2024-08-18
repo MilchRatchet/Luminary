@@ -44,8 +44,6 @@
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 2048
 
-#define RIS_MAX_CANDIDATE_POOL_SIZE (1 << 20)
-
 enum LightID : uint32_t {
   LIGHT_ID_SUN               = 0xffffffffu,
   LIGHT_ID_TOY               = 0xfffffffeu,
@@ -341,6 +339,7 @@ struct Jitter {
 struct GlobalMaterial {
   RGBF default_material;
   int lights_active;
+  int light_tree_active;
   float alpha_cutoff;
   int colored_transparency;
   int invert_roughness;
@@ -401,8 +400,6 @@ struct TextureAtlas {
 
 struct RISSettings {
   int initial_reservoir_size;
-  int light_candidate_pool_size_log2;
-  TriangleLight* presampled_triangle_lights;
   int num_light_rays;
 } typedef RISSettings;
 
@@ -441,7 +438,6 @@ struct DevicePointers {
   const DeviceTexture* bsdf_energy_lut;
   const uint16_t* bluenoise_1D;
   const uint32_t* bluenoise_2D;
-  uint32_t* light_candidates;
 } typedef DevicePointers;
 
 struct DeviceConstantMemory {
@@ -474,6 +470,8 @@ struct DeviceConstantMemory {
   Node8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
   Quad* particle_quads;
+  LightTreeNode8Packed* light_tree_nodes_8;
+  uint2* light_tree_paths;
 } typedef DeviceConstantMemory;
 
 struct OptixKernel {
@@ -533,7 +531,6 @@ struct RaytraceInstance {
   DeviceBuffer* normal_buffer;
   DeviceBuffer* records;
   DeviceBuffer* buffer_8bit;
-  DeviceBuffer* light_candidates;
   DeviceBuffer* cloud_noise;
   DeviceBuffer* sky_ms_luts;
   DeviceBuffer* sky_tm_luts;

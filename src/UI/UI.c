@@ -68,8 +68,6 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_slider(ui, "RIS Candidates Count", &(instance->ris_settings.initial_reservoir_size), 1, 0.02f, 0.0f, 32.0f, 0, 1);
-  panels[i++] =
-    create_slider(ui, "RIS Candidates Pool Size", &(instance->ris_settings.light_candidate_pool_size_log2), 1, 0.01f, 1.0f, 20.0f, 0, 1);
   panels[i++] = create_slider(ui, "Light Ray Count", &(instance->ris_settings.num_light_rays), 1, 0.01f, 1.0f, 32.0f, 0, 1);
 
   tab.panels      = panels;
@@ -92,6 +90,7 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "Renderer\nMaterials\nExport");
   panels[i++] = create_check(ui, "Lights", &(instance->scene.material.lights_active), 1);
+  panels[i++] = create_check(ui, "Light Tree", &(instance->scene.material.light_tree_active), 1);
   panels[i++] = create_slider(ui, "Alpha Cutoff", &(instance->scene.material.alpha_cutoff), 1, 0.0005f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_check(ui, "Override Materials", &(instance->scene.material.override_materials), 1);
   panels[i++] = create_slider(ui, "Default Smoothness", &(instance->scene.material.default_material.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);

@@ -34,11 +34,13 @@ __device__ uint32_t ris_sample_light(
   if (!device.scene.material.lights_active)
     return LIGHT_ID_NONE;
 
-  const int reservoir_size                    = device.ris_settings.initial_reservoir_size;
-  const float one_over_reservoir_pdf_and_size = device.scene.triangle_lights_count / ((float) reservoir_size);
+  uint32_t light_list_length;
+  float light_list_pdf;
+
+  // TODO: Once the light tree is implemented. Consider reducing the number of samples for deep bounces.
+  const int reservoir_size = device.ris_settings.initial_reservoir_size;
 
   // Don't allow triangles to sample themselves.
-  // TODO: This probably adds biasing.
   uint32_t blocked_light_id = LIGHT_ID_NONE;
   if (data.hit_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
     blocked_light_id = load_triangle_light_id(data.hit_id);
@@ -55,48 +57,55 @@ __device__ uint32_t ris_sample_light(
     RGBF light_color;
     light_sample_triangle_presampled(triangle_light, data, initial_ray, solid_angle, dist, light_color);
 
-    bool is_refraction;
-    const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction);
-    light_color            = mul_color(light_color, bsdf_weight);
+    if (dist < FLT_MAX && solid_angle > 0.0f) {
+      bool is_refraction;
+      const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction);
+      light_color            = mul_color(light_color, bsdf_weight);
 
-    float target_pdf = luminance(light_color);
+      const float target_pdf = color_importance(light_color);
 
-    if (isinf(target_pdf) || isnan(target_pdf)) {
-      target_pdf = 0.0f;
+      const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, initial_ray);
+
+      const float nee_light_tree_pdf      = light_tree_traverse_pdf(data, initial_sample_id);
+      const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
+
+      // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
+      const float mis_weight = (reservoir_size > 0)
+                                 ? bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf
+                                     / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f)
+                                 : 1.0f / bsdf_sample_pdf;
+
+      const float weight = target_pdf * mis_weight;
+
+      sum_weight += weight;
+
+      selected_id            = initial_sample_id;
+      selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
+      selected_ray           = initial_ray;
+      selected_dist          = dist;
+      selected_is_refraction = initial_is_refraction;
     }
-
-    const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, initial_ray);
-    const float one_over_nee_sample_pdf = solid_angle * one_over_reservoir_pdf_and_size;
-
-    // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
-    const float mis_weight =
-      (reservoir_size > 0) ? one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f) : 1.0f / bsdf_sample_pdf;
-
-    const float weight = target_pdf * mis_weight;
-
-    sum_weight += weight;
-
-    selected_id            = initial_sample_id;
-    selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
-    selected_ray           = initial_ray;
-    selected_dist          = dist;
-    selected_is_refraction = initial_is_refraction;
   }
 
   ////////////////////////////////////////////////////////////////////
   // Resample NEE samples
   ////////////////////////////////////////////////////////////////////
 
+  float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING + light_ray_index, pixel);
+
   for (int i = 0; i < reservoir_size; i++) {
-    uint32_t id_rand = quasirandom_sequence_1D_base(
-      QUASI_RANDOM_TARGET_RIS_LIGHT_ID + light_ray_index * reservoir_size + i, pixel, device.temporal_frames, device.depth);
-    uint32_t presampled_id = id_rand >> (32 - device.ris_settings.light_candidate_pool_size_log2);
-    uint32_t id            = device.ptrs.light_candidates[presampled_id];
+    const uint32_t random_offset = light_ray_index * reservoir_size + i;
+
+    const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + random_offset, pixel);
+    const uint32_t light_list_ptr = light_tree_traverse(data, light_tree_random, light_list_length, light_list_pdf);
+
+    const float id_rand = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID + random_offset, pixel);
+    const uint32_t id   = uint32_t(__fmul_rd(id_rand, light_list_length)) + light_list_ptr;
 
     if (id == blocked_light_id)
       continue;
 
-    const TriangleLight triangle_light = load_triangle_light(device.ris_settings.presampled_triangle_lights, presampled_id);
+    const TriangleLight triangle_light = load_triangle_light(device.scene.triangle_lights, id);
 
     const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + light_ray_index * reservoir_size + i, pixel);
 
@@ -104,29 +113,40 @@ __device__ uint32_t ris_sample_light(
     RGBF light_color;
     const vec3 ray = light_sample_triangle(triangle_light, data, ray_random, solid_angle, dist, light_color);
 
+    if (dist == FLT_MAX || solid_angle == 0.0f)
+      continue;
+
     bool is_refraction;
     const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
     light_color            = mul_color(light_color, bsdf_weight);
-    float target_pdf       = luminance(light_color);
+    const float target_pdf = color_importance(light_color);
 
-    if (isinf(target_pdf) || isnan(target_pdf)) {
-      target_pdf = 0.0f;
-    }
+    if (target_pdf == 0.0f)
+      continue;
 
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
-    const float one_over_nee_sample_pdf = solid_angle * one_over_reservoir_pdf_and_size;
+    const float one_over_nee_sample_pdf = solid_angle * light_list_length / ((float) reservoir_size * light_list_pdf);
 
-    const float mis_weight = one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f);
+    const float mis_weight =
+      one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
 
     const float weight = target_pdf * mis_weight;
 
     sum_weight += weight;
-    if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_RESAMPLING + light_ray_index * reservoir_size + i, pixel) * sum_weight < weight) {
+
+    const float resampling_probability = weight / sum_weight;
+
+    if (resampling_random < resampling_probability) {
       selected_id            = id;
       selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
       selected_ray           = ray;
       selected_dist          = dist;
       selected_is_refraction = is_refraction;
+
+      resampling_random = resampling_random / resampling_probability;
+    }
+    else {
+      resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
     }
   }
 
@@ -139,26 +159,6 @@ __device__ uint32_t ris_sample_light(
 
   return selected_id;
 }
-
-#else /* SHADING_KERNEL */
-
-LUMINARY_KERNEL void ris_presample_lights() {
-  if (device.scene.triangle_lights_count == 0)
-    return;
-
-  int id = THREAD_ID;
-
-  const int light_sample_bin_count = 1 << device.ris_settings.light_candidate_pool_size_log2;
-  while (id < light_sample_bin_count) {
-    const uint32_t sampled_id = random_r1(light_sample_bin_count * device.temporal_frames + id) % device.scene.triangle_lights_count;
-
-    device.ptrs.light_candidates[id]                   = sampled_id;
-    device.ris_settings.presampled_triangle_lights[id] = device.scene.triangle_lights[sampled_id];
-
-    id += blockDim.x * gridDim.x;
-  }
-}
-
 #endif /* !SHADING_KERNEL */
 
 #endif /* CU_RIS_H */

@@ -469,7 +469,7 @@ __device__ Spectrum sky_compute_atmosphere(
 
       const Spectrum ss_radiance = spectrum_scale(spectrum_mul(extinction_sun, phase_times_scattering), shadow * light_angle);
 
-      const UV multiscattering_uv        = get_UV(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
+      const UV multiscattering_uv        = get_uv(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
       const float4 multiscattering_low   = tex2D<float4>(device.ptrs.sky_ms_luts[0].tex, multiscattering_uv.u, multiscattering_uv.v);
       const float4 multiscattering_high  = tex2D<float4>(device.ptrs.sky_ms_luts[1].tex, multiscattering_uv.u, multiscattering_uv.v);
       const Spectrum multiscattering_tex = spectrum_merge(multiscattering_low, multiscattering_high);
@@ -511,7 +511,7 @@ __device__ Spectrum sky_compute_atmosphere(
         const float tex_u = 0.5f + device.scene.sky.moon_tex_offset + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
         const float tex_v = 0.5f + asinf(normal.y) * (1.0f / PI);
 
-        const UV uv = get_UV(tex_u, tex_v);
+        const UV uv = get_uv(tex_u, tex_v);
 
         const Mat3x3 tangent_space = create_basis(normal);
 
@@ -608,15 +608,20 @@ LUMINARY_KERNEL void process_sky_tasks() {
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
+    const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
+
     RGBF sky;
     if (device.scene.sky.hdri_active) {
       sky = sky_hdri_sample(task.ray, 0.0f);
 
-      if (state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION)) {
+      if (include_sun) {
         const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
 
         // HDRI does not include the sun, compute sun visibility
-        if (sphere_ray_hit(task.ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS)) {
+        const bool ray_hits_sun   = sphere_ray_hit(task.ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS);
+        const bool ray_hits_earth = sph_ray_hit_p0(task.ray, sky_origin, SKY_EARTH_RADIUS);
+
+        if (ray_hits_sun && !ray_hits_earth) {
           const RGBF sun_color = sky_get_sun_color(sky_origin, task.ray);
 
           sky = add_color(sky, sun_color);
@@ -624,8 +629,7 @@ LUMINARY_KERNEL void process_sky_tasks() {
       }
     }
     else {
-      const vec3 sky_origin  = world_to_sky_transform(task.position);
-      const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
+      const vec3 sky_origin = world_to_sky_transform(task.position);
 
       sky = sky_get_color(sky_origin, task.ray, FLT_MAX, include_sun, device.scene.sky.steps, task.index);
     }

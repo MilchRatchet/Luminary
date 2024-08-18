@@ -105,8 +105,9 @@ struct TriangleLight {
   vec3 edge2;
   uint32_t triangle_id;
   uint32_t material_id;
-  float padding2;
+  float power;
 } typedef TriangleLight;
+static_assert(sizeof(TriangleLight) == 0x30, "Incorrect packing size.");
 
 // Traditional description through vertex buffer and index buffer which is required for OptiX RT.
 // Both vertex buffer and index buffer have a stride of 16 bytes for each triplet
@@ -135,6 +136,22 @@ struct Node8 {
   uint8_t high_y[8];
   uint8_t high_z[8];
 } typedef Node8;
+
+struct LightTreeNode8Packed {
+  vec3 base_point;
+  int8_t exp_x;
+  int8_t exp_y;
+  int8_t exp_z;
+  int8_t exp_confidence;
+  uint32_t child_ptr;
+  uint32_t light_ptr;
+  uint32_t rel_point_x[2];
+  uint32_t rel_point_y[2];
+  uint32_t rel_point_z[2];
+  uint32_t rel_energy[2];
+  uint32_t confidence_light[2];
+} typedef LightTreeNode8Packed;
+static_assert(sizeof(LightTreeNode8Packed) == 0x40, "Incorrect packing size.");
 
 struct Quad {
   vec3 vertex;
@@ -283,14 +300,6 @@ struct DeviceTexture {
   float inv_height;
   float gamma;
 } typedef DeviceTexture;
-
-struct LightSample {
-  uint32_t seed;
-  uint32_t presampled_id;
-  uint32_t id;
-  float weight;
-  float target_pdf_normalization;
-} typedef LightSample;
 
 enum GBufferFlags {
   G_BUFFER_VOLUME_HIT           = 0b1,

@@ -175,7 +175,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
           : 0.0f;
       const float mis_weight = pdf / (pdf + diffuse_pdf + refraction_pdf);
 
-      const float weight = luminance(eval) * mis_weight;
+      const float weight = color_importance(eval) * mis_weight;
 
       ray_local                = ray;
       sum_weights              = weight;
@@ -198,7 +198,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
           : 0.0f;
       const float mis_weight = pdf / (pdf + microfacet_pdf + refraction_pdf);
 
-      const float weight = luminance(eval) * mis_weight;
+      const float weight = color_importance(eval) * mis_weight;
 
       sum_weights += weight;
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_RIS_DIFFUSE, pixel) * sum_weights < weight) {
@@ -230,7 +230,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         mis_weight = pdf / (pdf + reflection_pdf + diffuse_pdf);
       }
 
-      const float weight = luminance(eval) * mis_weight;
+      const float weight = color_importance(eval) * mis_weight;
 
       sum_weights += weight;
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_RIS_REFRACTION, pixel) * sum_weights < weight) {
@@ -244,7 +244,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     // For RIS we need to evaluate f / |f| here. This is unstable for low roughness and microfacet BRDFs.
     // Hence we use a little trick, f / p can be evaluated in a stable manner when p is the microfacet PDF,
     // and thus we evaluate f / |f| = (f / p) / |f / p|.
-    info.weight = scale_color(selected_eval, sum_weights / luminance(selected_eval));
+    info.weight = scale_color(selected_eval, sum_weights / color_importance(selected_eval));
   }
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
@@ -270,6 +270,7 @@ __device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel,
 
 __device__ void bsdf_sample_for_light_probabilities(
   const GBufferData data, float& reflection_prob, float& refraction_prob, float& diffuse_prob) {
+  // TODO: Consider creating a context and sampling also proportional to albedo etc.
   const float microfacet_reflection_weight = 1.0f;
   const float microfacet_refraction_weight = 1.0f - data.albedo.a;
   const float diffuse_weight               = (1.0f - data.metallic) * data.albedo.a;

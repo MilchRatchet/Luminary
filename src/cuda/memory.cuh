@@ -221,9 +221,9 @@ __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
   const float2 bytes0x48 = __ldg((float2*) triangle_get_entry_address(4, 2, offset));
   const float4 bytes0x50 = __ldg((float4*) triangle_get_entry_address(5, 0, offset));
 
-  const UV vertex_texture = get_UV(bytes0x48.x, bytes0x48.y);
-  const UV edge1_texture  = get_UV(bytes0x50.x, bytes0x50.y);
-  const UV edge2_texture  = get_UV(bytes0x50.z, bytes0x50.w);
+  const UV vertex_texture = get_uv(bytes0x48.x, bytes0x48.y);
+  const UV edge1_texture  = get_uv(bytes0x50.x, bytes0x50.y);
+  const UV edge2_texture  = get_uv(bytes0x50.z, bytes0x50.w);
 
   return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 }
@@ -248,6 +248,7 @@ __device__ TriangleLight load_triangle_light(const TriangleLight* data, const in
   triangle.edge2       = get_vector(v2.z, v2.w, v3.x);
   triangle.triangle_id = __float_as_uint(v3.y);
   triangle.material_id = __float_as_uint(v3.z);
+  triangle.power       = v3.w;
 
   return triangle;
 }
@@ -292,6 +293,41 @@ __device__ Material load_material(const PackedMaterial* data, const int offset) 
   mat.emission = scale_color(mat.emission, emission_scale);
 
   return mat;
+}
+
+__device__ LightTreeNode8Packed load_light_tree_node_8(const LightTreeNode8Packed* data, const int offset) {
+  const float4* ptr = (float4*) (data + offset);
+  const float4 v0   = __ldg(ptr + 0);
+  const float4 v1   = __ldg(ptr + 1);
+  const float4 v2   = __ldg(ptr + 2);
+  const float4 v3   = __ldg(ptr + 3);
+
+  LightTreeNode8Packed node;
+
+  node.base_point.x   = v0.x;
+  node.base_point.y   = v0.y;
+  node.base_point.z   = v0.z;
+  node.exp_x          = *((int8_t*) &v0.w + 0);
+  node.exp_y          = *((int8_t*) &v0.w + 1);
+  node.exp_z          = *((int8_t*) &v0.w + 2);
+  node.exp_confidence = *((uint8_t*) &v0.w + 3);
+
+  node.child_ptr      = __float_as_uint(v1.x);
+  node.light_ptr      = __float_as_uint(v1.y);
+  node.rel_point_x[0] = __float_as_uint(v1.z);
+  node.rel_point_x[1] = __float_as_uint(v1.w);
+
+  node.rel_point_y[0] = __float_as_uint(v2.x);
+  node.rel_point_y[1] = __float_as_uint(v2.y);
+  node.rel_point_z[0] = __float_as_uint(v2.z);
+  node.rel_point_z[1] = __float_as_uint(v2.w);
+
+  node.rel_energy[0]       = __float_as_uint(v3.x);
+  node.rel_energy[1]       = __float_as_uint(v3.y);
+  node.confidence_light[0] = __float_as_uint(v3.z);
+  node.confidence_light[1] = __float_as_uint(v3.w);
+
+  return node;
 }
 
 #endif /* CU_MEMORY_H */

@@ -45,7 +45,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.max_height = OCEAN_MIN_HEIGHT * (1.0f - eps);
   volume.min_height = 0.0f;
 
-  volume.max_scattering = fmaxf(fmaxf(volume.scattering.r, volume.scattering.g), volume.scattering.b);
+  volume.max_scattering = color_importance(volume.scattering);
 
   return volume;
 }
@@ -73,6 +73,9 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
  *                  - [y] = Distance through fog in world space.
  */
 __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit) {
+  if (limit <= 0.0f)
+    return make_float2(-FLT_MAX, 0.0f);
+
   if (volume.max_height <= volume.min_height)
     return make_float2(-FLT_MAX, 0.0f);
 

@@ -40,9 +40,9 @@ __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id)
 
   tri.tex = device.ptrs.albedo_atlas[tex];
 
-  tri.vertex = get_UV(data0.x, data0.y);
-  tri.edge1  = get_UV(data1.x, data1.y);
-  tri.edge2  = get_UV(data1.z, data1.w);
+  tri.vertex = get_uv(data0.x, data0.y);
+  tri.edge1  = get_uv(data1.x, data1.y);
+  tri.edge2  = get_uv(data1.z, data1.w);
 
   return tri;
 }
@@ -493,9 +493,9 @@ __device__ DMMTextureTriangle micromap_get_dmmtexturetriangle(const uint32_t id)
 
   tri.tex = device.ptrs.normal_atlas[tex];
 
-  tri.vertex = get_UV(data0.x, data0.y);
-  tri.edge1  = get_UV(data1.x, data1.y);
-  tri.edge2  = get_UV(data1.z, data1.w);
+  tri.vertex = get_uv(data0.x, data0.y);
+  tri.edge1  = get_uv(data1.x, data1.y);
+  tri.edge2  = get_uv(data1.z, data1.w);
 
   return tri;
 }

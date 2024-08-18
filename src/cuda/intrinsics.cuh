@@ -1,6 +1,8 @@
 #ifndef CU_INTRINSICS_H
 #define CU_INTRINSICS_H
 
+#ifndef OPTIX_KERNEL
+// Used in bvh.cuh only
 __device__ unsigned int sign_extend_s8x4(unsigned int a) {
   unsigned int result;
   asm("prmt.b32 %0, %1, 0x0, 0x0000BA98;" : "=r"(result) : "r"(a));
@@ -12,6 +14,7 @@ __device__ unsigned int __bfind(unsigned int a) {
   asm("bfind.u32 %0, %1; " : "=r"(result) : "r"(a));
   return result;
 }
+#endif
 
 /*
  * Semantic:
@@ -31,9 +34,13 @@ __device__ float __fslctf(const float a, const float b, const float c) {
  * Semantic:
  * ____uswap16p(a) = (a >> 16) | (a << 16);
  */
-__device__ uint32_t __uswap16p(const uint32_t a) {
-  uint32_t result;
+__device__ unsigned int __uswap16p(const unsigned int a) {
+  unsigned int result;
+#ifndef OPTIX_KERNEL
   asm("prmt.b32 %0, %1, %2, 0b0001000000110010;" : "=r"(result) : "r"(a), "r"(a));
+#else
+  result = (a >> 16) | (a << 16);
+#endif
   return result;
 }
 
@@ -43,31 +50,51 @@ __device__ uint32_t __uswap16p(const uint32_t a) {
  */
 __device__ unsigned int __uslctf(const unsigned int a, const unsigned int b, const float c) {
   unsigned int result;
+#ifndef OPTIX_KERNEL
   asm("slct.u32.f32 %0, %1, %2, %3;" : "=r"(result) : "r"(a), "r"(b), "f"(c));
+#else
+  result = (c >= 0) ? a : b;
+#endif
   return result;
 }
 
 __device__ int __min_min(const int a, const int b, const int c) {
   int v;
+#ifndef OPTIX_KERNEL
   asm("vmin.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c));
+#else
+  v = min(a, min(b, c));
+#endif
   return v;
 }
 
 __device__ int __min_max(const int a, const int b, const int c) {
   int v;
+#ifndef OPTIX_KERNEL
   asm("vmin.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c));
+#else
+  v = min(a, max(b, c));
+#endif
   return v;
 }
 
 __device__ int __max_min(const int a, const int b, const int c) {
   int v;
+#ifndef OPTIX_KERNEL
   asm("vmax.s32.s32.s32.min %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c));
+#else
+  v = max(a, min(b, c));
+#endif
   return v;
 }
 
 __device__ int __max_max(const int a, const int b, const int c) {
   int v;
+#ifndef OPTIX_KERNEL
   asm("vmax.s32.s32.s32.max %0, %1, %2, %3;" : "=r"(v) : "r"(a), "r"(b), "r"(c));
+#else
+  v = max(a, max(b, c));
+#endif
   return v;
 }
 

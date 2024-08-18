@@ -183,6 +183,7 @@ add_executable(Luminary)
 
 function(compile_ptx kernel_name)
   # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
+  # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
   add_custom_command(
     OUTPUT
       "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"

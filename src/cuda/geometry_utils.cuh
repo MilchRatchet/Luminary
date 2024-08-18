@@ -70,9 +70,9 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
 
   const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
 
-  const UV vertex_texture = get_UV(t5.z, t5.w);
-  const UV edge1_texture  = get_UV(t6.x, t6.y);
-  const UV edge2_texture  = get_UV(t6.z, t6.w);
+  const UV vertex_texture = get_uv(t5.z, t5.w);
+  const UV edge1_texture  = get_uv(t6.x, t6.y);
+  const UV edge2_texture  = get_uv(t6.z, t6.w);
 
   const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 

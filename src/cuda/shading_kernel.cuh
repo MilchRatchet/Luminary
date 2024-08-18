@@ -73,7 +73,7 @@ __device__ bool optix_toy_shadowing(
 
       RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
 
-      if (luminance(toy_transparency) == 0.0f)
+      if (color_importance(toy_transparency) == 0.0f)
         return false;
 
       // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
@@ -143,8 +143,8 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   // Resampled Importance Sampling
   ////////////////////////////////////////////////////////////////////
 
-  const float target_pdf_bsdf        = luminance(light_bsdf);
-  const float target_pdf_solid_angle = luminance(light_solid_angle);
+  const float target_pdf_bsdf        = color_importance(light_bsdf);
+  const float target_pdf_solid_angle = color_importance(light_solid_angle);
 
   // MIS weight multiplied with PDF
   const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_light_pdf(data, dir_bsdf) * solid_angle + 1.0f);
@@ -172,28 +172,37 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
     is_refraction = is_refraction_solid_angle;
   }
 
-  if (target_pdf == 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
+  light_color = scale_color(light_color, sum_weights / target_pdf);
+
+  float dist = FLT_MAX;
+
+  if (target_pdf == 0.0f) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   // Transparent pass through rays are not allowed.
-  if (bsdf_is_pass_through_ray(data.V, dir))
-    return get_color(0.0f, 0.0f, 0.0f);
-
-  light_color = scale_color(light_color, sum_weights / target_pdf);
+  if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Compute Visibility
   ////////////////////////////////////////////////////////////////////
 
-  if (luminance(light_color) == 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
-
+  if (color_importance(light_color) == 0.0f) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
-  if (!optix_toy_shadowing(position, dir, FLT_MAX, compressed_ior, light_color))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (!optix_toy_shadowing(position, dir, FLT_MAX, compressed_ior, light_color)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Compute visibility term
@@ -210,17 +219,21 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
   optixTrace(
-    device.optix_bvh_shadow, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
-  if (hit_id == HIT_TYPE_REJECT)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (hit_id == HIT_TYPE_REJECT) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
-  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, FLT_MAX));
+  visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
 }
@@ -252,14 +265,23 @@ __device__ RGBF
   else {
     const uint32_t num_samples = device.scene.ocean.caustics_ris_sample_count;
 
+    float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index);
+
     // RIS with target weight being the Dirac delta of if the connection point is valid or not.
     for (uint32_t i = 0; i < num_samples; i++) {
       vec3 sample_point;
       float sample_weight;
       if (caustics_find_connection_point(data, index, sampling_domain, is_underwater, i, sample_point, sample_weight)) {
         sum_connection_weight += sample_weight;
-        if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index) * sum_connection_weight < sample_weight) {
+
+        const float resampling_probability = sample_weight / sum_connection_weight;
+        if (resampling_random < resampling_probability) {
           connection_point = sample_point;
+
+          resampling_random = resampling_random / resampling_probability;
+        }
+        else {
+          resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
         }
       }
     }
@@ -279,19 +301,23 @@ __device__ RGBF
     }
   }
 
-  if (sum_connection_weight == 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
-
   ////////////////////////////////////////////////////////////////////
   // Evaluate sampled connection vertex
   ////////////////////////////////////////////////////////////////////
 
   vec3 pos_to_ocean = sub_vector(connection_point, data.position);
 
-  const float dist = get_length(pos_to_ocean);
-  const vec3 dir   = normalize_vector(pos_to_ocean);
+  float dist     = get_length(pos_to_ocean);
+  float sun_dist = FLT_MAX;
+  const vec3 dir = normalize_vector(pos_to_ocean);
 
   RGBF light_color = sky_get_sun_color(world_to_sky_transform(connection_point), sun_dir);
+
+  if (sum_connection_weight == 0.0f) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+    sun_dist    = 0.0f;
+  }
 
   bool is_refraction;
   const RGBF bsdf_value = bsdf_evaluate(data, dir, BSDF_SAMPLING_GENERAL, is_refraction, connection_weight);
@@ -309,12 +335,18 @@ __device__ RGBF
 
   light_color = scale_color(light_color, (is_underwater) ? 1.0f - reflection_coefficient : reflection_coefficient);
 
-  if (luminance(light_color) < eps)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (color_importance(light_color) == 0.0f) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+    sun_dist    = 0.0f;
+  }
 
   // Transparent pass through rays are not allowed.
-  if (bsdf_is_pass_through_ray(data.V, dir))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+    sun_dist    = 0.0f;
+  }
 
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
@@ -332,32 +364,44 @@ __device__ RGBF
   unsigned int alpha_data0, alpha_data1;
   optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
 
-  if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+    sun_dist    = 0.0f;
+  }
 
   optixTrace(
     device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
-  if (hit_id == HIT_TYPE_REJECT)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (hit_id == HIT_TYPE_REJECT) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+    sun_dist    = 0.0f;
+  }
 
   hit_id = LIGHT_ID_SUN;
   origin = make_float3(connection_point.x, connection_point.y, connection_point.z);
   ray    = make_float3(sun_dir.x, sun_dir.y, sun_dir.z);
 
-  if (!optix_toy_shadowing(connection_point, sun_dir, FLT_MAX, compressed_ior, light_color))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (!optix_toy_shadowing(connection_point, sun_dir, FLT_MAX, compressed_ior, light_color)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+    sun_dist    = 0.0f;
+  }
 
   optixTrace(
-    device.optix_bvh_shadow, origin, ray, 0.0f, FLT_MAX, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
+    device.optix_bvh_shadow, origin, ray, 0.0f, sun_dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
-  if (hit_id == HIT_TYPE_REJECT)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (hit_id == HIT_TYPE_REJECT) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+    sun_dist    = 0.0f;
+  }
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
-  visibility      = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, FLT_MAX));
+  visibility      = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, sun_dist));
 
   if (is_underwater) {
     visibility = mul_color(visibility, volume_integrate_transmittance_ocean(position, dir, dist, true));
@@ -373,6 +417,8 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   const vec3 sky_pos     = world_to_sky_transform(data.position);
   const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
 
+  // This sucks. I want to avoid conditionally executing optixTrace but removing this conditional would hurt performance
+  // in night scenes. And in large scenes we may have divergence here during twilight.
   if (!sun_visible)
     return get_color(0.0f, 0.0f, 0.0f);
 
@@ -413,7 +459,7 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
 
   const RGBF toy_emission = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
 
-  if (luminance(toy_emission) == 0.0f)
+  if (color_importance(toy_emission) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
 
   // We have to clamp due to numerical precision issues in the microfacet models.
@@ -455,8 +501,8 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
 
   const float solid_angle = toy_get_solid_angle(data.position);
 
-  const float target_pdf_bsdf        = luminance(light_bsdf);
-  const float target_pdf_solid_angle = luminance(light_solid_angle);
+  const float target_pdf_bsdf        = color_importance(light_bsdf);
+  const float target_pdf_solid_angle = color_importance(light_solid_angle);
 
   // MIS weight multiplied with PDF
   const float mis_weight_bsdf        = solid_angle / (bsdf_sample_for_light_pdf(data, dir_bsdf) * solid_angle + 1.0f);
@@ -484,13 +530,6 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
     is_refraction = is_refraction_solid_angle;
   }
 
-  if (target_pdf == 0.0f)
-    return get_color(0.0f, 0.0f, 0.0f);
-
-  // Transparent pass through rays are not allowed.
-  if (bsdf_is_pass_through_ray(data.V, dir))
-    return get_color(0.0f, 0.0f, 0.0f);
-
   light_color = scale_color(light_color, sum_weights / target_pdf);
 
   ////////////////////////////////////////////////////////////////////
@@ -499,7 +538,18 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
 
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
-  const float dist = get_toy_distance(position, dir);
+  float dist = get_toy_distance(position, dir);
+
+  if (target_pdf == 0.0f) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
+
+  // Transparent pass through rays are not allowed.
+  if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
@@ -516,11 +566,15 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
     device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT, 0, 0, 0,
     hit_id, alpha_data0, alpha_data1, compressed_ior);
 
-  if (hit_id == HIT_TYPE_REJECT)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (hit_id == HIT_TYPE_REJECT) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
-  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
@@ -544,7 +598,8 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   ////////////////////////////////////////////////////////////////////
 
   bool bsdf_sample_is_refraction, bsdf_sample_is_valid;
-  const vec3 bsdf_dir = bsdf_sample_for_light(data, index, QUASI_RANDOM_TARGET_LIGHT_BSDF, bsdf_sample_is_refraction, bsdf_sample_is_valid);
+  const QuasiRandomTarget bsdf_target = (QuasiRandomTarget) (QUASI_RANDOM_TARGET_LIGHT_BSDF + 2 * light_ray_index);
+  const vec3 bsdf_dir                 = bsdf_sample_for_light(data, index, bsdf_target, bsdf_sample_is_refraction, bsdf_sample_is_valid);
 
   vec3 position;
   float3 origin, ray;
@@ -574,12 +629,16 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   const uint32_t light_id = ris_sample_light(
     data, index, light_ray_index, bsdf_light_id, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
 
-  if (luminance(light_color) == 0.0f || light_id == LIGHT_ID_NONE)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (color_importance(light_color) == 0.0f || light_id == LIGHT_ID_NONE) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   // Transparent pass through rays are not allowed.
-  if (bsdf_is_pass_through_ray(data.V, dir))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (bsdf_is_pass_through_ray(is_refraction, data.ior_in, data.ior_out)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Compute visibility term
@@ -592,8 +651,10 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
-  if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   unsigned int hit_id = light_id;
 
@@ -608,11 +669,15 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
     device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), OPTIX_RAY_FLAG_ENFORCE_ANYHIT, 0, 0, 0, hit_id,
     alpha_data0, alpha_data1, compressed_ior);
 
-  if (hit_id == HIT_TYPE_REJECT)
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (hit_id == HIT_TYPE_REJECT) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
-  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index))
-    return get_color(0.0f, 0.0f, 0.0f);
+  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index)) {
+    light_color = get_color(0.0f, 0.0f, 0.0f);
+    dist        = 0.0f;
+  }
 
   RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));

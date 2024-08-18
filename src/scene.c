@@ -22,6 +22,7 @@ void scene_init(Scene** _scene) {
   Scene* scene = calloc(1, sizeof(Scene));
 
   scene->material.lights_active        = 0;
+  scene->material.light_tree_active    = 1;
   scene->material.default_material.r   = 0.3f;
   scene->material.default_material.g   = 0.0f;
   scene->material.default_material.b   = 1.0f;
@@ -264,8 +265,6 @@ RaytraceInstance* scene_load_lum(const char* filename, CommandlineOptions option
 
   scene_create_from_wavefront(scene, content);
 
-  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE], options.dmm_active);
-
   TextureAtlas tex_atlas = {
     .albedo           = (DeviceBuffer*) 0,
     .albedo_length    = content->maps_count[WF_ALBEDO],
@@ -308,8 +307,6 @@ RaytraceInstance* scene_load_obj(char* filename, CommandlineOptions options) {
   general.mesh_files[general.mesh_files_count++] = filename;
 
   scene_create_from_wavefront(scene, content);
-
-  lights_build_set_from_triangles(scene, content->maps[WF_LUMINANCE], options.dmm_active);
 
   TextureAtlas tex_atlas = {
     .albedo           = (DeviceBuffer*) 0,

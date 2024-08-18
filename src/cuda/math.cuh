@@ -204,13 +204,22 @@ __device__ vec3
   return (length < eps) ? face_normal : scale_vector(result, 1.0f / length);
 }
 
-__device__ UV get_UV(const float u, const float v) {
+__device__ UV get_uv(const float u, const float v) {
   UV result;
 
   result.u = u;
   result.v = v;
 
   return result;
+}
+
+__device__ UV add_uv(const UV a, const UV b) {
+  UV uv;
+
+  uv.u = a.u + b.u;
+  uv.v = a.v + b.v;
+
+  return uv;
 }
 
 __device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV edge2_texture, const float2 coords) {
@@ -752,6 +761,10 @@ __device__ float SRGB_to_linearRGB(const float value) {
 
 __device__ float luminance(const RGBF v) {
   return 0.212655f * v.r + 0.715158f * v.g + 0.072187f * v.b;
+}
+
+__device__ float color_importance(const RGBF color) {
+  return __fmax_fmax(color.r, color.g, color.b);
 }
 
 __device__ RGBAF saturate_albedo(RGBAF color, float change) {
