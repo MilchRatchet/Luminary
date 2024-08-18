@@ -454,8 +454,6 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         for (; frag_id < fragments_count; frag_id++) {
           optimal_right_energy += fragments[fragments_ptr + frag_id].power;
         }
-
-        warn_message("List Split with %u triangles. This warning is here until I have verified that this works!", fragments_count);
       }
       else {
         // We didn't find a split but there are few enough triangles so we will leave this as a leaf node.
@@ -842,6 +840,15 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       const float compression_z = 1.0f / exp2f(node.exp_z);
       const float compression_c = 1.0f / exp2f(node.exp_confidence);
 
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+      info_message("==== %u ====", node_ptr);
+      info_message("Meta:  %u (%u) %u", node.child_ptr, child_count, node.light_ptr);
+      info_message("Point: (%f, %f, %f)", node.base_point.x, node.base_point.y, node.base_point.z);
+      info_message(
+        "Exponents: %d %d %d => %f %f %f | %d => %f", node.exp_x, node.exp_y, node.exp_z, 1.0f / compression_x, 1.0f / compression_y,
+        1.0f / compression_z, node.exp_confidence, 1.0f / compression_c);
+#endif
+
       uint64_t rel_point_x      = 0;
       uint64_t rel_point_y      = 0;
       uint64_t rel_point_z      = 0;
@@ -857,12 +864,51 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         uint64_t child_rel_energy       = (uint64_t) floorf(255.0f * child_node.energy / max_energy);
         uint64_t child_confidence_light = (((uint64_t) (child_node.confidence * compression_c)) << 2) | ((uint64_t) child_node.light_count);
 
-        if (child_rel_point_x > 255 || child_rel_point_y > 255 || child_rel_point_z > 255 || (child_confidence_light >> 2) > 63)
-          crash_message(
-            "ChildRelPoint is too large: %u %u %u %f %d %f %f %f", child_rel_point_x, child_rel_point_y, child_rel_point_z, compression_y,
-            node.exp_y, child_node.point.y, node.base_point.y, child_node.point.y - node.base_point.y);
+        if (child_rel_point_x > 255 || child_rel_point_y > 255 || child_rel_point_z > 255 || (child_confidence_light >> 2) > 63) {
+          crash_message("Fatal error during light tree compression. Value exceeded bit limit.");
+        }
 
         child_rel_energy = max(1, child_rel_energy);
+
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+        info_message(
+          "[%u] %llX %llX %llX %llX %llX", i, child_rel_point_x, child_rel_point_y, child_rel_point_z, child_rel_energy,
+          child_confidence_light);
+
+        {
+          // Check error of compressed point
+
+          const float decompression_x = exp2f(node.exp_x);
+          const float decompression_y = exp2f(node.exp_y);
+          const float decompression_z = exp2f(node.exp_z);
+
+          const float decompressed_point_x = child_rel_point_x * decompression_x + node.base_point.x;
+          const float decompressed_point_y = child_rel_point_y * decompression_y + node.base_point.y;
+          const float decompressed_point_z = child_rel_point_z * decompression_z + node.base_point.z;
+
+          const float diff_x = decompressed_point_x - child_node.point.x;
+          const float diff_y = decompressed_point_y - child_node.point.y;
+          const float diff_z = decompressed_point_z - child_node.point.z;
+
+          const float error = sqrtf(diff_x * diff_x + diff_y * diff_y + diff_z * diff_z);
+
+          info_message(
+            "    (%f, %f, %f) => (%f, %f, %f) [Err: %f]", child_node.point.x, child_node.point.y, child_node.point.z, decompressed_point_x,
+            decompressed_point_y, decompressed_point_z, error);
+        }
+
+        {
+          // Check error of confidence
+
+          const float decompression_c = exp2f(node.exp_confidence);
+
+          const float decompressed_confidence = (child_confidence_light >> 2) * decompression_c;
+
+          info_message(
+            "    %f => %f [Err: %f]", child_node.confidence, decompressed_confidence, child_node.confidence - decompressed_confidence);
+        }
+#endif
+
         rel_point_x |= child_rel_point_x << (i * 8);
         rel_point_y |= child_rel_point_y << (i * 8);
         rel_point_z |= child_rel_point_z << (i * 8);
@@ -904,8 +950,9 @@ static void _lights_tree_collapse(LightTreeWork* work) {
 
   // Check
   for (uint32_t i = 0; i < fragments_count; i++) {
-    if (new_fragments[i] == 0xFFFFFFFF)
-      crash_message("That didn't work!");
+    if (new_fragments[i] == 0xFFFFFFFF || fragment_paths[i] == 0xFFFFFFFFFFFFFFFF) {
+      crash_message("Fatal error during light tree compression. Light was lost.");
+    }
   }
 
   Fragment* fragments_swap = malloc(sizeof(Fragment) * fragments_count);
