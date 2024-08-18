@@ -70,8 +70,10 @@ __device__ uint32_t ris_sample_light(
       const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
 
       // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
-      const float mis_weight =
-        (reservoir_size > 0) ? one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f) : 1.0f / bsdf_sample_pdf;
+      const float mis_weight = (reservoir_size > 0)
+                                 ? bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf
+                                     / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f)
+                                 : 1.0f / bsdf_sample_pdf;
 
       const float weight = target_pdf * mis_weight;
 
@@ -125,7 +127,8 @@ __device__ uint32_t ris_sample_light(
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
     const float one_over_nee_sample_pdf = solid_angle * light_list_length / ((float) reservoir_size * light_list_pdf);
 
-    const float mis_weight = one_over_nee_sample_pdf / (bsdf_sample_pdf * one_over_nee_sample_pdf + 1.0f);
+    const float mis_weight =
+      one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
 
     const float weight = target_pdf * mis_weight;
 
