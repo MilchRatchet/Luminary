@@ -233,3 +233,5 @@ This is a list of papers I have used for this project so far. Note that some tec
 - D. Sforza, F. Pellacini, _Enforcing Energy Preservation in Microfacet Models_, Smart Tools and Applications in Graphics - Eurographics Italian Chapter Conference, 2022.
 - R. West, I. Georgiev, T. Hachisuka, _Marginal Multiple Importance Sampling_, SIGGRAPH Asia 2022 Conference Papers, 2022.
 - B. Walter, S. R. Marschner, H. Li, K. E. Torrance, _Microfacet models for refraction through rough surfaces_, Proceedings of the 18th Eurographics Conference on Rendering Techniques, pp. 195-206, 2007.
+- A. C. Estevez, C. Kulla, _Importance Sampling of Many Lights with Adaptive Tree Splitting_, Proceedings of the ACM on Computer Graphics and Interactive Techniques, 1(2), pp. 1-17, 2018.
+- A. C. Estevez, P. Lecocq, C. Hellmuth, _A Resampled Tree for Many Lights Rendering_, ACM SIGGRAPH 2024 Talks, 2024.
