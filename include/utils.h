@@ -569,6 +569,7 @@ struct RaytraceInstance {
   OptixKernel optix_kernel;
   OptixKernel optix_kernel_geometry;
   OptixKernel optix_kernel_volume;
+  OptixKernel optix_kernel_volume_dl;
   OptixBVH optix_bvh;
   OptixBVH optix_bvh_shadow;
   OptixBVH optix_bvh_light;

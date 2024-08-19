@@ -55,9 +55,8 @@ list(REMOVE_ITEM gpu_source_files
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_trace_particle.cu"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_geometry.cu"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_toy.cu"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_volume.cu"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_volume_dl.cu"
 )
 
 #=============================================================
@@ -214,6 +213,7 @@ compile_ptx(optix_kernels)
 compile_ptx(optix_kernels_trace_particle)
 compile_ptx(optix_kernels_geometry)
 compile_ptx(optix_kernels_volume)
+compile_ptx(optix_kernels_volume_dl)
 
 #=============================================================
 # Embed files
@@ -229,6 +229,7 @@ ceb_embed_files(
   ${CMAKE_BINARY_DIR}/optix_kernels_trace_particle.ptx
   ${CMAKE_BINARY_DIR}/optix_kernels_geometry.ptx
   ${CMAKE_BINARY_DIR}/optix_kernels_volume.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_volume_dl.ptx
   ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png

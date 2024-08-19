@@ -1116,15 +1116,12 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
 }
 
 /*
- * Surface sample a triangle.
+ * Surface sample a triangle light.
  * @param triangle Triangle.
- * @param origin Point to sample from.
- * @param seed Random seed used to sample the triangle.
- * @result Normalized direction to the point on the triangle.
- *
- * Robust triangle sampling.
+ * @param seed Random number used to sample the triangle.
+ * @result Point on the triangle.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random) {
+__device__ vec3 sample_triangle(const TriangleLight triangle, const float2 random, float2& uv) {
   float r1 = sqrtf(random.x);
   float r2 = random.y;
 
@@ -1132,12 +1129,10 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
   r1 = 0.025f + 0.95f * r1;
   r2 = 0.025f + 0.95f * r2;
 
-  const float u = 1.0f - r1;
-  const float v = r1 * r2;
+  uv.x = 1.0f - r1;
+  uv.y = r1 * r2;
 
-  const vec3 p = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
-
-  return vector_direction_stable(p, origin);
+  return add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
 }
 
 /*
