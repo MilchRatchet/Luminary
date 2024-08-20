@@ -9,10 +9,9 @@
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
-#ifdef VOLUME_DL_KERNEL
+#ifdef VOLUME_KERNEL
 __device__ float light_tree_child_importance(
-  const vec3 origin, const vec3 ray, const float limit, const LightTreeNode8Packed node, const vec3 exp, const float exp_c,
-  const uint32_t i) {
+  const vec3 origin, const vec3 ray, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
 
@@ -38,8 +37,9 @@ __device__ float light_tree_child_importance(
   confidence = (confidence_light >> (shift + 2)) & 0x3F;
   confidence = confidence * exp_c;
 
+  // TODO: Importance should decrease based on transmittance.
   // Compute the point along our ray that is closest to the child point.
-  const float t            = fminf(fmaxf(dot_product(sub_vector(origin, point), ray), 0.0f), limit);
+  const float t            = fmaxf(dot_product(sub_vector(origin, point), ray), 0.0f);
   const vec3 closest_point = add_vector(origin, scale_vector(ray, t));
 
   const vec3 diff = sub_vector(point, closest_point);
@@ -48,8 +48,7 @@ __device__ float light_tree_child_importance(
   return energy / fmaxf(get_length(diff), confidence);
 }
 
-__device__ uint32_t
-  light_tree_traverse(const vec3 origin, const vec3 ray, const float limit, float random, uint32_t& subset_length, float& pdf) {
+__device__ uint32_t light_tree_traverse(const vec3 origin, const vec3 ray, float random, uint32_t& subset_length, float& pdf) {
   if (!device.scene.material.light_tree_active) {
     subset_length = device.scene.triangle_lights_count;
     pdf           = 1.0f;
@@ -71,14 +70,14 @@ __device__ uint32_t
 
     float importance[8];
 
-    importance[0] = light_tree_child_importance(origin, ray, limit, node, exp, exp_c, 0);
-    importance[1] = light_tree_child_importance(origin, ray, limit, node, exp, exp_c, 1);
-    importance[2] = light_tree_child_importance(origin, ray, limit, node, exp, exp_c, 2);
-    importance[3] = light_tree_child_importance(origin, ray, limit, node, exp, exp_c, 3);
-    importance[4] = light_tree_child_importance(origin, ray, limit, node, exp, exp_c, 4);
-    importance[5] = light_tree_child_importance(origin, ray, limit, node, exp, exp_c, 5);
-    importance[6] = light_tree_child_importance(origin, ray, limit, node, exp, exp_c, 6);
-    importance[7] = light_tree_child_importance(origin, ray, limit, node, exp, exp_c, 7);
+    importance[0] = light_tree_child_importance(origin, ray, node, exp, exp_c, 0);
+    importance[1] = light_tree_child_importance(origin, ray, node, exp, exp_c, 1);
+    importance[2] = light_tree_child_importance(origin, ray, node, exp, exp_c, 2);
+    importance[3] = light_tree_child_importance(origin, ray, node, exp, exp_c, 3);
+    importance[4] = light_tree_child_importance(origin, ray, node, exp, exp_c, 4);
+    importance[5] = light_tree_child_importance(origin, ray, node, exp, exp_c, 5);
+    importance[6] = light_tree_child_importance(origin, ray, node, exp, exp_c, 6);
+    importance[7] = light_tree_child_importance(origin, ray, node, exp, exp_c, 7);
 
     float sum_importance = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
@@ -143,7 +142,7 @@ __device__ uint32_t
   return subset_ptr;
 }
 
-#else  /* VOLUME_DL_KERNEL */
+#else  /* VOLUME_KERNEL */
 __device__ float light_tree_child_importance(
   const GBufferData data, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i) {
   const bool lower_data = (i < 4);
@@ -347,7 +346,7 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
 
   return pdf;
 }
-#endif /* !VOLUME_DL_KERNEL */
+#endif /* !VOLUME_KERNEL */
 
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);

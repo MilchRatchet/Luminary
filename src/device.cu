@@ -77,7 +77,8 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
   if (instance->scene.particles.active) {
     optixrt_execute(instance->particles_instance.kernel);
   }
-
+  // TODO: Think about fixing the sky light issue for volumes by disallowing volume
+  // events as the last scattering event.
   if (instance->scene.fog.active || instance->scene.ocean.active) {
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
@@ -94,8 +95,12 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
 
   optixrt_execute(instance->optix_kernel_geometry);
 
-  if (instance->scene.fog.active || instance->scene.ocean.active || instance->scene.particles.active) {
+  if (instance->scene.fog.active || instance->scene.ocean.active) {
     optixrt_execute(instance->optix_kernel_volume);
+  }
+
+  if (instance->scene.particles.active) {
+    optixrt_execute(instance->optix_kernel_particle);
   }
 
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();

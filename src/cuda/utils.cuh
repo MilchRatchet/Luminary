@@ -39,13 +39,15 @@ enum HitType : uint32_t {
   HIT_TYPE_TRIANGLE_ID_LIMIT = 0x7fffffffu
 } typedef HitType;
 
+// TODO: Task addresses should be interleaved. This will reduce time to load task list meta data.
 enum TaskAddressOffset {
   TASK_ADDRESS_OFFSET_GEOMETRY   = 0,
   TASK_ADDRESS_OFFSET_VOLUME     = 1,
-  TASK_ADDRESS_OFFSET_SKY        = 2,
-  TASK_ADDRESS_OFFSET_TOTALCOUNT = 3,
-  TASK_ADDRESS_OFFSET_STRIDE     = 3,
-  TASK_ADDRESS_COUNT_STRIDE      = 4
+  TASK_ADDRESS_OFFSET_PARTICLE   = 2,
+  TASK_ADDRESS_OFFSET_SKY        = 3,
+  TASK_ADDRESS_OFFSET_TOTALCOUNT = 4,
+  TASK_ADDRESS_OFFSET_STRIDE     = 4,
+  TASK_ADDRESS_COUNT_STRIDE      = 5
 } typedef TaskAddressOffset;
 
 #define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))

@@ -586,6 +586,8 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
 // Lighting from Geometry
 ////////////////////////////////////////////////////////////////////
 
+#ifndef VOLUME_KERNEL
+
 __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
   if (!device.scene.material.lights_active)
     return get_color(0.0f, 0.0f, 0.0f);
@@ -699,6 +701,16 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 
   return geometry_light;
 }
+
+#else /* !VOLUME_KERNEL */
+
+__device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort2 index) {
+  // TODO: Call bridges
+
+  return get_color(0.0f, 0.0f, 0.0f);
+}
+
+#endif /* VOLUME_KERNEL */
 
 /*
  * Performs alpha test on triangle

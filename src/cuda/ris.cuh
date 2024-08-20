@@ -7,7 +7,7 @@
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
-#if defined(SHADING_KERNEL)
+#if defined(SHADING_KERNEL) && !defined(VOLUME_KERNEL)
 
 ////////////////////////////////////////////////////////////////////
 // Literature
@@ -159,6 +159,6 @@ __device__ uint32_t ris_sample_light(
 
   return selected_id;
 }
-#endif /* !SHADING_KERNEL */
+#endif /* SHADING_KERNEL && !VOLUME_KERNEL */
 
 #endif /* CU_RIS_H */

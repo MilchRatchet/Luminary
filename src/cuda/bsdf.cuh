@@ -67,7 +67,7 @@ __device__ RGBF bsdf_evaluate_core(
 __device__ RGBF bsdf_evaluate(
   const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction,
   const float one_over_sampling_pdf = 1.0f) {
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   return scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), L), one_over_sampling_pdf);
 #else
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
@@ -115,7 +115,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
 }
 
 __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
   const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
 
@@ -284,7 +284,7 @@ __device__ void bsdf_sample_for_light_probabilities(
 
 __device__ vec3 bsdf_sample_for_light(
   const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target, bool& is_refraction, bool& is_valid) {
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   const float2 random_dir   = quasirandom_sequence_2D(random_target, pixel);
   const float random_method = quasirandom_sequence_1D(random_target + 1, pixel);
 
@@ -298,7 +298,7 @@ __device__ vec3 bsdf_sample_for_light(
   is_valid      = true;
 
   return scatter_ray;
-#else   // VOLUME_KERNEL
+#else   // PHASE_KERNEL
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
 
@@ -329,11 +329,11 @@ __device__ vec3 bsdf_sample_for_light(
   is_valid = (is_refraction) ? ray_local.z < 0.0f : ray_local.z > 0.0f;
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
-#endif  // VOLUME_KERNEL
+#endif  // !PHASE_KERNEL
 }
 
 __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L) {
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   const float cos_angle = -dot_product(data.V, L);
 
   const VolumeType volume_hit_type = VOLUME_HIT_TYPE(data.hit_id);
@@ -349,7 +349,7 @@ __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L)
   }
 
   return pdf;
-#else   // VOLUME_KERNEL
+#else   // PHASE_KERNEL
   float reflection_probability, refraction_probability, diffuse_probability;
   bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
 
@@ -367,7 +367,7 @@ __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L)
 
     return reflection_probability * microfacet_reflection_pdf + diffuse_probability * diffuse_pdf;
   }
-#endif  // VOLUME_KERNEL
+#endif  // !PHASE_KERNEL
 }
 
 #endif /* SHADING_KERNEL */
