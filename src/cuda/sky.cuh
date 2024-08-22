@@ -611,7 +611,10 @@ LUMINARY_KERNEL void process_sky_tasks() {
     const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
 
     RGBF sky;
-    if (device.scene.sky.hdri_active) {
+    if (device.scene.sky.constant_color_mode) {
+      sky = device.scene.sky.constant_color;
+    }
+    else if (device.scene.sky.hdri_active) {
       sky = sky_hdri_sample(task.ray, 0.0f);
 
       if (include_sun) {
@@ -652,7 +655,10 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
 
     if (device.shading_mode == SHADING_ALBEDO) {
       RGBF sky;
-      if (device.scene.sky.hdri_active) {
+      if (device.scene.sky.constant_color_mode) {
+        sky = device.scene.sky.constant_color;
+      }
+      else if (device.scene.sky.hdri_active) {
         sky = sky_hdri_sample(task.ray, device.scene.sky.hdri_mip_bias);
       }
       else {

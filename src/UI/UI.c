@@ -344,6 +344,11 @@ static UITab create_sky_general_hdri_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Origin Z", &(instance->scene.sky.hdri_origin.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_button(ui, "Origin To Camera", instance, (void (*)(void*)) sky_hdri_set_pos_to_cam, 0);
   panels[i++] = create_button(ui, "Generate", instance, (void (*)(void*)) sky_hdri_generate_LUT, 1);
+  panels[i++] = create_check(ui, "Constant color", &(instance->scene.sky.constant_color_mode), 1);
+  panels[i++] = create_color(ui, "Color", (float*) &(instance->scene.sky.constant_color));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene.sky.constant_color.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene.sky.constant_color.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene.sky.constant_color.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

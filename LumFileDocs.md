@@ -241,6 +241,12 @@ Mipmap bias applied to the HDRI sky.
 `SKY HDRIORIG [FP32] [FP32] [FP32]`<br/>
 Position from which the HDRI sky is computed.
 
+`SKY COLORMOD [INT32]`<br/>
+Enables constant color mode.
+
+`SKY COLORCON [FP32] [FP32] [FP32]`<br/>
+Color used in constant color mode.
+
 ## Cloud Settings
 
 `CLOUD ACTIVE__ [INT32]`<br/>

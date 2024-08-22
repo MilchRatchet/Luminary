@@ -330,17 +330,25 @@ static void parse_sky_settings(Sky* sky, char* line) {
       sscanf(value, "%d\n", &sky->settings_hdri_dim);
       sscanf(value, "%d\n", &sky->hdri_dim);
       break;
-      /* HDRISAMP */
+    /* HDRISAMP */
     case 5786352922209174600u:
       sscanf(value, "%d\n", &sky->hdri_samples);
       break;
-      /* HDRIMIPB */
+    /* HDRIMIPB */
     case 4778399800931533896u:
       sscanf(value, "%f\n", &sky->hdri_mip_bias);
       break;
-      /* HDRIORIG */
+    /* HDRIORIG */
     case 5136727350478783560u:
       sscanf(value, "%f %f %f\n", &sky->hdri_origin.x, &sky->hdri_origin.y, &sky->hdri_origin.z);
+      break;
+    /* COLORMOD */
+    case 4922237933652299587u:
+      sscanf(value, "%d\n", &sky->constant_color_mode);
+      break;
+    /* COLORCON */
+    case 5642802878915301187u:
+      sscanf(value, "%f %f %f\n", &sky->constant_color.r, &sky->constant_color.g, &sky->constant_color.b);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
@@ -949,6 +957,12 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(
     line, "SKY HDRIORIG %f %f %f\n", instance->scene.sky.hdri_origin.x, instance->scene.sky.hdri_origin.y,
     instance->scene.sky.hdri_origin.z);
+  fputs(line, file);
+  sprintf(line, "SKY COLORMOD %d\n", instance->scene.sky.constant_color_mode);
+  fputs(line, file);
+  sprintf(
+    line, "SKY COLORCON %f %f %f\n", instance->scene.sky.constant_color.r, instance->scene.sky.constant_color.g,
+    instance->scene.sky.constant_color.b);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Cloud Settings\n#===============================\n\n");

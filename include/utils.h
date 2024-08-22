@@ -292,6 +292,8 @@ struct Sky {
   vec3 hdri_origin;
   float hdri_mip_bias;
   int aerial_perspective;
+  int constant_color_mode;
+  RGBF constant_color;
 } typedef Sky;
 
 enum JerlovWaterType {

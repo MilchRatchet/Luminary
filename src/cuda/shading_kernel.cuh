@@ -414,6 +414,9 @@ __device__ RGBF
 }
 
 __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index) {
+  if (device.scene.sky.constant_color_mode)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   const vec3 sky_pos     = world_to_sky_transform(data.position);
   const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
 

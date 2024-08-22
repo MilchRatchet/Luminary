@@ -145,6 +145,10 @@ void scene_init(Scene** _scene) {
   scene->sky.stars_seed                  = 0;
   scene->sky.stars_intensity             = 1.0f;
   scene->sky.settings_stars_count        = 10000;
+  scene->sky.constant_color_mode         = 0;
+  scene->sky.constant_color.r            = 1.0f;
+  scene->sky.constant_color.g            = 1.0f;
+  scene->sky.constant_color.b            = 1.0f;
   scene->sky.cloud.active                = 0;
   scene->sky.cloud.initialized           = 0;
   scene->sky.cloud.steps                 = 96;

@@ -87,7 +87,7 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (instance->scene.sky.aerial_perspective) {
+  if (instance->scene.sky.aerial_perspective && !instance->scene.sky.constant_color_mode) {
     process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
