@@ -241,6 +241,10 @@ struct Cloud {
   int octaves;
 } typedef Cloud;
 
+struct BridgeSettings {
+  int max_num_vertices;
+} typedef BridgeSettings;
+
 // Settings that affect the sky LUTs
 struct AtmoSettings {
   float rayleigh_density;
@@ -446,6 +450,7 @@ struct DeviceConstantMemory {
   DevicePointers ptrs;
   Scene scene;
   RISSettings ris_settings;
+  BridgeSettings bridge_settings;
   uint16_t user_selected_x;
   uint16_t user_selected_y;
   int max_ray_depth;
