@@ -21,25 +21,32 @@ WindowInstance* window_instance_init(RaytraceInstance* instance) {
   window->max_width  = screen_size.w + 32;
   window->max_height = screen_size.h;
 
-  rect.y += screen_size.h - rect.h;
-  rect.h -= screen_size.h - rect.h;
+  const int taskbar_margin = screen_size.h - rect.h;
+
+  rect.h -= 4 * taskbar_margin;
+
+  rect.w = min(rect.w, (int) instance->output_width);
+  rect.h = min(rect.h, (int) instance->output_height);
+
+  const float aspect_ratio = ((float) instance->output_width) / instance->output_height;
 
   // It seems SDL window dimensions must be a multiple of 4
   rect.h = rect.h & 0xfffffffc;
 
-  rect.w = rect.h * ((float) instance->width) / instance->height;
+  rect.w = rect.h * aspect_ratio;
 
   rect.w = rect.w & 0xfffffffc;
 
   if (rect.w > screen_size.w) {
     rect.w = screen_size.w;
-    rect.h = rect.w * ((float) instance->height) / instance->width;
+    rect.h = rect.w / aspect_ratio;
   }
 
   window->width  = (unsigned int) rect.w;
   window->height = (unsigned int) rect.h;
 
-  window->window = SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, rect.y, rect.w, rect.h, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
+  window->window =
+    SDL_CreateWindow("Luminary", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, rect.w, rect.h, SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE);
 
   window_instance_update_pointer(window);
 
