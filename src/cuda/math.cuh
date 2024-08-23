@@ -311,6 +311,19 @@ __device__ int trailing_zeros(const unsigned int n) {
   return __clz(__brev(n));
 }
 
+__device__ Quaternion normalize_quaternion(const Quaternion q) {
+  const float length = sqrtf(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+
+  Quaternion res;
+
+  res.x = q.x / length;
+  res.y = q.y / length;
+  res.z = q.z / length;
+  res.w = q.w / length;
+
+  return res;
+}
+
 __device__ Quaternion inverse_quaternion(const Quaternion q) {
   Quaternion result;
   result.x = -q.x;

@@ -243,6 +243,7 @@ struct Cloud {
 
 struct BridgeSettings {
   int max_num_vertices;
+  int num_ris_samples;
 } typedef BridgeSettings;
 
 // Settings that affect the sky LUTs
