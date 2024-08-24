@@ -46,9 +46,15 @@ enum BSDFSamplingHint {
   BSDF_SAMPLING_MICROFACET_REFRACTION = 3
 };
 
+#ifndef VOLUME_KERNEL
 __device__ bool bsdf_is_pass_through_ray(const bool is_transparent_pass, const float ior_in, const float ior_out) {
   return is_transparent_pass && (ior_in == ior_out);
 }
+#else  /* !VOLUME_KERNEL */
+__device__ bool bsdf_is_pass_through_ray(const bool is_transparent_pass, const float ior_in, const float ior_out) {
+  return false;
+}
+#endif /* VOLUME_KERNEL */
 
 ///////////////////////////////////////////////////
 // Fresnel

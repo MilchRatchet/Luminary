@@ -50,7 +50,7 @@ __device__ Quaternion bridges_compute_rotation(const GBufferData data, const vec
 
 __device__ float bridges_log_factorial(const uint32_t vertex_count) {
   if (vertex_count == 1)
-    return 1.0f;
+    return 0.0f;
 
   const float n = (float) (vertex_count - 1);
 
@@ -90,10 +90,14 @@ __device__ RGBF bridges_sample_bridge(
   vec3 current_point     = data.position;
   vec3 current_direction = normalize_vector(sub_vector(light_point, data.position));
 
+  float sum_dist = 0.0f;
+
   {
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel);
     const float dist        = -logf(random_dist);
     current_point           = add_vector(current_point, scale_vector(current_direction, dist));
+
+    sum_dist += dist;
   }
 
   for (int i = 1; i < vertex_count; i++) {
@@ -105,34 +109,29 @@ __device__ RGBF bridges_sample_bridge(
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
     const float dist        = -logf(random_dist);
     current_point           = add_vector(current_point, scale_vector(current_direction, dist));
+
+    sum_dist += dist;
   }
 
   const float target_scale = get_length(sub_vector(light_point, data.position));
   const float actual_scale = get_length(sub_vector(current_point, data.position));
   scale                    = target_scale / actual_scale;
 
+  sum_dist *= scale;
+
   end_vertex = current_point;
 
-  RGBF path_weight = get_color(1.0f, 1.0f, 1.0f);
-  float sum_dist   = 0.0f;
-
-  for (int i = 0; i < vertex_count; i++) {
-    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
-
-    const float dist = -logf(random_dist) * scale;
-
-    sum_dist += dist;
-
-    // TODO: I can probably simplify this. I can gather the unscaled sum_dist and scale it.
-    //       Also I can do the same for the extinction and then raise it to the power of the scale.
-    const float extinction = expf(-dist * FOG_DENSITY);
-
-    path_weight = scale_color(path_weight, extinction);
-  }
+  RGBF path_weight = get_color(
+    expf((vertex_count - 1) * logf(FOG_DENSITY) - sum_dist * FOG_DENSITY),
+    expf((vertex_count - 1) * logf(FOG_DENSITY) - sum_dist * FOG_DENSITY),
+    expf((vertex_count - 1) * logf(FOG_DENSITY) - sum_dist * FOG_DENSITY));
 
   const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
 
-  path_pdf = vertex_count_pdf * expf(log_path_pdf) * target_scale * target_scale * target_scale;
+  path_pdf = vertex_count_pdf;
+  if (vertex_count > 1) {
+    path_pdf *= expf(log_path_pdf) * target_scale * target_scale * target_scale;
+  }
 
   return path_weight;
 }
@@ -164,6 +163,11 @@ __device__ RGBF bridges_evaluate_bridge(
   float dist;
   RGBF visibility = get_color(1.0f, 1.0f, 1.0f);
 
+  // Apply phase function of first direction.
+  const float cos_angle           = -dot_product(current_direction, data.V);
+  const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
+  visibility                      = scale_color(visibility, jendersie_eon_phase_function(cos_angle, params));
+
   {
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel);
 
@@ -193,6 +197,8 @@ __device__ RGBF bridges_evaluate_bridge(
 
     visibility = mul_color(visibility, volume_integrate_transmittance(current_point, current_direction, dist));
   }
+
+  visibility = scale_color(visibility, expf((vertex_count - 1) * logf(FOG_DENSITY)));
 
   return mul_color(light_color, visibility);
 }

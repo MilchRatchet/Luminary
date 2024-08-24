@@ -709,6 +709,9 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 #else /* !VOLUME_KERNEL */
 
 __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort2 index) {
+  if (!device.scene.material.lights_active)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   return bridges_sample(data, index);
 }
 
