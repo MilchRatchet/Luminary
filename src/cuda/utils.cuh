@@ -54,6 +54,7 @@ enum TaskAddressOffset {
 #define VOLUME_HIT_TYPE(X) ((X <= HIT_TYPE_PARTICLE_MAX) ? VOLUME_TYPE_PARTICLE : ((VolumeType) (X & 0x00000001u)))
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
 #define IS_PRIMARY_RAY (device.depth == 0)
+#define TRIANGLE_LIGHTS_ON (device.scene.material.lights_active && device.scene.triangle_lights_count > 0)
 
 //===========================================================================================
 // Device Variables

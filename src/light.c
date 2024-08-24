@@ -1281,7 +1281,9 @@ void lights_process(Scene* scene, int dmm_active) {
   // Create light tree.
   ////////////////////////////////////////////////////////////////////
 
-  _lights_build_light_tree(scene);
+  if (scene->triangle_lights_count > 0) {
+    _lights_build_light_tree(scene);
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Setup light ptrs in geometry.
