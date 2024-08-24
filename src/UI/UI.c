@@ -69,8 +69,8 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_slider(ui, "RIS Samples", &(instance->ris_settings.initial_reservoir_size), 1, 0.02f, 0.0f, 32.0f, 0, 1);
   panels[i++] = create_slider(ui, "Light Ray Count", &(instance->ris_settings.num_light_rays), 1, 0.01f, 1.0f, 32.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Volume RIS Samples", &(instance->bridge_settings.num_ris_samples), 1, 0.02f, 0.0f, 32.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Volume DL Max Depth", &(instance->bridge_settings.max_num_vertices), 1, 0.02f, 0.0f, 32.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Volume RIS Samples", &(instance->bridge_settings.num_ris_samples), 1, 0.02f, 1.0f, 32.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Volume DL Max Depth", &(instance->bridge_settings.max_num_vertices), 1, 0.02f, 1.0f, 32.0f, 0, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

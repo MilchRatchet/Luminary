@@ -49,6 +49,9 @@ __device__ Quaternion bridges_compute_rotation(const GBufferData data, const vec
 }
 
 __device__ float bridges_log_factorial(const uint32_t vertex_count) {
+  if (vertex_count == 1)
+    return 1.0f;
+
   const float n = (float) (vertex_count - 1);
 
   // Ramanjuan approximation
@@ -57,6 +60,15 @@ __device__ float bridges_log_factorial(const uint32_t vertex_count) {
   const float t2 = 0.5f * logf(PI);
 
   return t0 + t1 + t2 - n;
+}
+
+// TODO: Proper importance sampling
+__device__ uint32_t bridges_sample_vertex_count(const uint32_t seed, const ushort2 pixel, float& pdf) {
+  const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_COUNT + seed, pixel);
+
+  pdf = 1.0f / device.bridge_settings.max_num_vertices;
+
+  return 1 + random * (device.bridge_settings.max_num_vertices - 1) + 0.5f;
 }
 
 // TODO: I wrote this for fog but obviously it needs to work for all volumes.
@@ -69,16 +81,14 @@ __device__ float bridges_log_factorial(const uint32_t vertex_count) {
 __device__ RGBF bridges_sample_bridge(
   const GBufferData data, const vec3 light_point, const uint32_t seed, const ushort2 pixel, float& path_pdf, vec3& end_vertex,
   float& scale) {
-  const vec3 initial_direction = sub_vector(light_point, data.position);
-
   ////////////////////////////////////////////////////////////////////
   // Sample vertex count
   ////////////////////////////////////////////////////////////////////
-  // TODO: Actually sample
-  const uint32_t vertex_count = device.bridge_settings.max_num_vertices;
+  float vertex_count_pdf;
+  const uint32_t vertex_count = bridges_sample_vertex_count(seed, pixel, vertex_count_pdf);
 
   vec3 current_point     = data.position;
-  vec3 current_direction = normalize_vector(initial_direction);
+  vec3 current_direction = normalize_vector(sub_vector(light_point, data.position));
 
   {
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel);
@@ -97,7 +107,7 @@ __device__ RGBF bridges_sample_bridge(
     current_point           = add_vector(current_point, scale_vector(current_direction, dist));
   }
 
-  const float target_scale = get_length(initial_direction);
+  const float target_scale = get_length(sub_vector(light_point, data.position));
   const float actual_scale = get_length(sub_vector(current_point, data.position));
   scale                    = target_scale / actual_scale;
 
@@ -122,8 +132,7 @@ __device__ RGBF bridges_sample_bridge(
 
   const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
 
-  // TODO: Include probability of sampling vertex_count.
-  path_pdf = expf(log_path_pdf) * target_scale * target_scale * target_scale;
+  path_pdf = vertex_count_pdf * expf(log_path_pdf) * target_scale * target_scale * target_scale;
 
   return path_weight;
 }
@@ -146,23 +155,28 @@ __device__ RGBF bridges_evaluate_bridge(
   ////////////////////////////////////////////////////////////////////
   // Sample vertex count
   ////////////////////////////////////////////////////////////////////
-  // TODO: Actually sample
-  const uint32_t vertex_count = device.bridge_settings.max_num_vertices;
+  float vertex_count_pdf;
+  const uint32_t vertex_count = bridges_sample_vertex_count(seed, pixel, vertex_count_pdf);
 
   vec3 current_point     = data.position;
   vec3 current_direction = rotate_vector_by_quaternion(normalize_vector(initial_direction), rotation);
 
+  float dist;
   RGBF visibility = get_color(1.0f, 1.0f, 1.0f);
 
-  for (int i = 0; i < vertex_count; i++) {
-    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
+  {
+    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel);
 
-    const float dist = -logf(random_dist) * scale;
+    dist = -logf(random_dist) * scale;
 
     // TODO: Do a trace ray.
 
     visibility = mul_color(visibility, volume_integrate_transmittance(current_point, current_direction, dist));
 
+    current_point = add_vector(current_point, scale_vector(current_direction, dist));
+  }
+
+  for (int i = 1; i < vertex_count; i++) {
     current_point = add_vector(current_point, scale_vector(current_direction, dist));
 
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
@@ -170,6 +184,14 @@ __device__ RGBF bridges_evaluate_bridge(
 
     current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
     current_direction = rotate_vector_by_quaternion(current_direction, rotation);
+
+    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
+
+    dist = -logf(random_dist) * scale;
+
+    // TODO: Do a trace ray.
+
+    visibility = mul_color(visibility, volume_integrate_transmittance(current_point, current_direction, dist));
   }
 
   return mul_color(light_color, visibility);
@@ -207,6 +229,8 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
     const float random_light_list = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_LIST + i, pixel);
 
     const uint32_t light_id = uint32_t(__fmul_rd(random_light_list, light_list_length)) + light_list_ptr;
+
+    sample_pdf *= 1.0f / light_list_length;
 
     const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
 
@@ -254,6 +278,9 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
 
     const float target_pdf = color_importance(sample_path_weight);
 
+    if (target_pdf == 0.0f)
+      continue;
+
     const float weight = target_pdf / sample_pdf;
 
     sum_weight += weight;
@@ -273,6 +300,9 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
       random_resampling = (random_resampling - resampling_probability) / (1.0f - resampling_probability);
     }
   }
+
+  if (selected_light_id == LIGHT_ID_NONE)
+    return get_color(0.0f, 0.0f, 0.0f);
 
   sum_weight /= device.bridge_settings.num_ris_samples;
 
