@@ -156,7 +156,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     const bool include_refraction = data_local.albedo.a < 1.0f;
 
     // Microfacet evaluation is not numerically stable for very low roughness. We clamp the evaluation here.
-    data_local.roughness = fmaxf(data_local.roughness, 0.05f);
+    data_local.roughness = fmaxf(data_local.roughness, BSDF_ROUGHNESS_CLAMP);
 
     float sum_weights;
     RGBF selected_eval;
