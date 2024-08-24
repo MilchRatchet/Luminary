@@ -3,6 +3,7 @@
 
 #if defined(SHADING_KERNEL) && defined(OPTIX_KERNEL)
 
+#include "bridges.cuh"
 #include "bsdf.cuh"
 #include "caustics.cuh"
 #include "light.cuh"
@@ -708,9 +709,7 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 #else /* !VOLUME_KERNEL */
 
 __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort2 index) {
-  // TODO: Call bridges
-
-  return get_color(0.0f, 0.0f, 0.0f);
+  return bridges_sample(data, index);
 }
 
 #endif /* VOLUME_KERNEL */

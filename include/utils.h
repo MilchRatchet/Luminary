@@ -570,6 +570,7 @@ struct RaytraceInstance {
   int accum_mode;
   RayEmitter emitter;
   RISSettings ris_settings;
+  BridgeSettings bridge_settings;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;

@@ -9,64 +9,7 @@
 #include "utils.h"
 #include "volume_utils.cuh"
 
-// TODO: I wrote this for fog but obviously it needs to work for all volumes.
-// TODO: Verify that we can ignore phase function value and PDF because it all cancels out.
-//       The idea is the following:
-//        - The phase function obviously cancels out when computing the sum of weights.
-//        - The phase function appears when dividing by the target PDF.
-//        - The exact same phase function values appear when evaluating the main function.
-//        - Hence they cancel out as long as I never include them.
-__device__ RGBF bridges_sample_bridge(
-  const GBufferData data, const vec3 light_point, const uint32_t seed, const ushort2 pixel, float& path_pdf, vec3& end_vertex) {
-  const vec3 initial_direction = sub_vector(light_point, data.position);
-
-  ////////////////////////////////////////////////////////////////////
-  // Sample vertex count
-  ////////////////////////////////////////////////////////////////////
-  // TODO: Actually sample
-  const uint32_t vertex_count = device.bridge_settings.max_num_vertices;
-
-  vec3 current_point     = data.origin;
-  vec3 current_direction = normalize_vector(initial_direction);
-
-  for (int i = 0; i < vertex_count; i++) {
-    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
-
-    const float dist = -logf(random_dist);
-
-    current_point = add_vector(current_point, scale_vector(current_direction, dist));
-
-    const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
-    const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
-
-    current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
-  }
-
-  const float target_scale  = get_length(initial_direction);
-  const float actual_scale  = get_length(sub_vector(current_point, data.position));
-  const float scale         = target_scale / actual_scale;
-  const float inverse_scale = actual_scale / target_scale;
-
-  end_vertex = current_point;
-
-  RGBF path_weight = 1.0f;
-  path_pdf         = 1.0f;
-
-  for (int i = 0; i < vertex_count; i++) {
-    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
-
-    const float dist = -logf(random_dist) * scale;
-
-    // TODO: I can probably simplify this.
-    const float extinction = expf(-dist * FOG_DENSITY);
-    const float pdf        = expf(-dist * inverse_scale);
-
-    path_weight = scale_color(weight, extinction);
-    path_pdf *= pdf;
-  }
-
-  return path_weight;
-}
+#if defined(OPTIX_KERNEL) && defined(VOLUME_KERNEL)
 
 __device__ Quaternion bridges_compute_rotation(const GBufferData data, const vec3 light_point, const vec3 end_vertex) {
   const vec3 target_dir = normalize_vector(sub_vector(light_point, data.position));
@@ -76,7 +19,7 @@ __device__ Quaternion bridges_compute_rotation(const GBufferData data, const vec
 
   Quaternion rotation;
 
-  if (dot_product > 0.999f) {
+  if (dot > 0.999f) {
     rotation.x = 0.0f;
     rotation.y = 0.0f;
     rotation.z = 0.0f;
@@ -84,7 +27,7 @@ __device__ Quaternion bridges_compute_rotation(const GBufferData data, const vec
 
     return rotation;
   }
-  else if (dot_product < -0.999f) {
+  else if (dot < -0.999f) {
     rotation.x = 1.0f;
     rotation.y = 0.0f;
     rotation.z = 0.0f;
@@ -105,10 +48,138 @@ __device__ Quaternion bridges_compute_rotation(const GBufferData data, const vec
   return rotation;
 }
 
+__device__ float bridges_log_factorial(const uint32_t vertex_count) {
+  const float n = (float) (vertex_count - 1);
+
+  // Ramanjuan approximation
+  const float t0 = n * logf(n);
+  const float t1 = (1.0f / 6.0f) * logf(n * (1.0f + 4.0f * n * (1.0f + 2.0f * n)));
+  const float t2 = 0.5f * logf(PI);
+
+  return t0 + t1 + t2 - n;
+}
+
+// TODO: I wrote this for fog but obviously it needs to work for all volumes.
+// TODO: Verify that we can ignore phase function value and PDF because it all cancels out.
+//       The idea is the following:
+//        - The phase function obviously cancels out when computing the sum of weights.
+//        - The phase function appears when dividing by the target PDF.
+//        - The exact same phase function values appear when evaluating the main function.
+//        - Hence they cancel out as long as I never include them.
+__device__ RGBF bridges_sample_bridge(
+  const GBufferData data, const vec3 light_point, const uint32_t seed, const ushort2 pixel, float& path_pdf, vec3& end_vertex,
+  float& scale) {
+  const vec3 initial_direction = sub_vector(light_point, data.position);
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample vertex count
+  ////////////////////////////////////////////////////////////////////
+  // TODO: Actually sample
+  const uint32_t vertex_count = device.bridge_settings.max_num_vertices;
+
+  vec3 current_point     = data.position;
+  vec3 current_direction = normalize_vector(initial_direction);
+
+  {
+    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel);
+    const float dist        = -logf(random_dist);
+    current_point           = add_vector(current_point, scale_vector(current_direction, dist));
+  }
+
+  for (int i = 1; i < vertex_count; i++) {
+    const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
+    const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
+
+    current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
+
+    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
+    const float dist        = -logf(random_dist);
+    current_point           = add_vector(current_point, scale_vector(current_direction, dist));
+  }
+
+  const float target_scale = get_length(initial_direction);
+  const float actual_scale = get_length(sub_vector(current_point, data.position));
+  scale                    = target_scale / actual_scale;
+
+  end_vertex = current_point;
+
+  RGBF path_weight = get_color(1.0f, 1.0f, 1.0f);
+  float sum_dist   = 0.0f;
+
+  for (int i = 0; i < vertex_count; i++) {
+    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
+
+    const float dist = -logf(random_dist) * scale;
+
+    sum_dist += dist;
+
+    // TODO: I can probably simplify this. I can gather the unscaled sum_dist and scale it.
+    //       Also I can do the same for the extinction and then raise it to the power of the scale.
+    const float extinction = expf(-dist * FOG_DENSITY);
+
+    path_weight = scale_color(path_weight, extinction);
+  }
+
+  const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
+
+  // TODO: Include probability of sampling vertex_count.
+  path_pdf = expf(log_path_pdf) * target_scale * target_scale * target_scale;
+
+  return path_weight;
+}
+
+__device__ RGBF bridges_evaluate_bridge(
+  const GBufferData data, const uint32_t light_id, const uint32_t seed, const ushort2 pixel, const Quaternion rotation, const float scale) {
+  const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
+
+  const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + seed, pixel);
+
+  RGBF light_color;
+  float solid_angle;
+  float light_dist;
+  const vec3 light_dir = light_sample_triangle(light, data, random_light_point, solid_angle, light_dist, light_color);
+
+  const vec3 light_point = add_vector(data.position, scale_vector(light_dir, light_dist));
+
+  const vec3 initial_direction = sub_vector(light_point, data.position);
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample vertex count
+  ////////////////////////////////////////////////////////////////////
+  // TODO: Actually sample
+  const uint32_t vertex_count = device.bridge_settings.max_num_vertices;
+
+  vec3 current_point     = data.position;
+  vec3 current_direction = rotate_vector_by_quaternion(normalize_vector(initial_direction), rotation);
+
+  RGBF visibility = get_color(1.0f, 1.0f, 1.0f);
+
+  for (int i = 0; i < vertex_count; i++) {
+    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
+
+    const float dist = -logf(random_dist) * scale;
+
+    // TODO: Do a trace ray.
+
+    visibility = mul_color(visibility, volume_integrate_transmittance(current_point, current_direction, dist));
+
+    current_point = add_vector(current_point, scale_vector(current_direction, dist));
+
+    const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
+    const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
+
+    current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
+    current_direction = rotate_vector_by_quaternion(current_direction, rotation);
+  }
+
+  return mul_color(light_color, visibility);
+}
+
 __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
   uint32_t selected_seed     = 0xFFFFFFFF;
   uint32_t selected_light_id = LIGHT_ID_NONE;
-  vec3 selected_end_vertex;
+  Quaternion selected_rotation;
+  float selected_scale;
   float selected_target_pdf = FLT_MAX;
 
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
@@ -124,7 +195,7 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
     // Sample light
     ////////////////////////////////////////////////////////////////////
 
-    const float random_light_tree = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_TREE + i, task.index);
+    const float random_light_tree = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_TREE + i, pixel);
 
     uint32_t light_list_length;
     float light_list_pdf;
@@ -133,24 +204,24 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
 
     sample_pdf *= light_list_pdf;
 
-    const float random_light_list = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_LIST + i, task.index);
+    const float random_light_list = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_LIST + i, pixel);
 
     const uint32_t light_id = uint32_t(__fmul_rd(random_light_list, light_list_length)) + light_list_ptr;
 
     const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
 
-    const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + i, task.index);
+    const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + i, pixel);
 
     RGBF light_color;
     float solid_angle;
-    float dist;
-    const vec3 light_dir = light_sample_triangle(light, data, random_light_point, solid_angle, dist, light_color);
+    float light_dist;
+    const vec3 light_dir = light_sample_triangle(light, data, random_light_point, solid_angle, light_dist, light_color);
 
     // We sampled a point that emits no light, skip.
     if (color_importance(light_color) == 0.0f)
       continue;
 
-    const vec3 light_point = add_vector(data.position, scale_vector(light_dir, dist));
+    const vec3 light_point = add_vector(data.position, scale_vector(light_dir, light_dist));
 
     sample_pdf *= 1.0f / solid_angle;
 
@@ -159,8 +230,10 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
     ////////////////////////////////////////////////////////////////////
 
     float sample_path_pdf;
+    float sample_path_scale;
     vec3 sample_path_end_vertex;
-    RGBF sample_path_weight = bridges_sample_bridge(data, light_point, i, pixel, sample_path_pdf, sample_path_end_vertex);
+    RGBF sample_path_weight =
+      bridges_sample_bridge(data, light_point, i, pixel, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
 
     sample_pdf *= sample_path_pdf;
 
@@ -187,16 +260,17 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
 
     const float resampling_probability = weight / sum_weight;
 
-    if (resampling_random < random_resampling) {
+    if (random_resampling < resampling_probability) {
       selected_seed       = i;
       selected_light_id   = light_id;
-      selected_end_vertex = sample_path_end_vertex;
+      selected_rotation   = sample_rotation;
+      selected_scale      = sample_path_scale;
       selected_target_pdf = target_pdf;
 
-      resampling_random = resampling_random / resampling_probability;
+      random_resampling = random_resampling / resampling_probability;
     }
     else {
-      resampling_random = (resampling_random - resampling_probability) / (1.0f - resampling_probability);
+      random_resampling = (random_resampling - resampling_probability) / (1.0f - resampling_probability);
     }
   }
 
@@ -205,6 +279,14 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
   ////////////////////////////////////////////////////////////////////
   // Evaluate sampled path
   ////////////////////////////////////////////////////////////////////
+
+  RGBF bridge_color = bridges_evaluate_bridge(data, selected_light_id, selected_seed, pixel, selected_rotation, selected_scale);
+
+  bridge_color = scale_color(bridge_color, sum_weight / selected_target_pdf);
+
+  return bridge_color;
 }
+
+#endif /* OPTIX_KERNEL */
 
 #endif /* CU_BRIDGES_H */
