@@ -262,7 +262,7 @@ __device__ RGBF
 }
 
 __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index) {
-  if (device.scene.sky.constant_color_mode)
+  if (device.scene.sky.mode == SKY_MODE_CONSTANT_COLOR)
     return get_color(0.0f, 0.0f, 0.0f);
 
   const vec3 sky_pos     = world_to_sky_transform(data.position);
@@ -521,7 +521,7 @@ __device__ RGBF optix_compute_light_ray_ambient_sky(
 
   // We don't support compute based sky due to register/performance reasons and because
   // we would have to include clouds then aswell.
-  if (!device.scene.sky.hdri_active && !device.scene.sky.constant_color_mode)
+  if (device.scene.sky.mode == SKY_MODE_DEFAULT)
     return get_color(0.0f, 0.0f, 0.0f);
 
   const vec3 position = shift_origin_vector(data.position, data.V, ray, is_refraction);

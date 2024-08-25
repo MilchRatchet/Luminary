@@ -83,11 +83,11 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (instance->scene.sky.cloud.active && !instance->scene.sky.hdri_active) {
+  if (instance->scene.sky.cloud.active && instance->scene.sky.mode == SKY_MODE_DEFAULT) {
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (instance->scene.sky.aerial_perspective && !instance->scene.sky.constant_color_mode) {
+  if (instance->scene.sky.aerial_perspective && instance->scene.sky.mode != SKY_MODE_CONSTANT_COLOR) {
     process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 

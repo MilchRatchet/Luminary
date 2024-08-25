@@ -107,6 +107,8 @@ enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 
 
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2 } typedef VolumeType;
 
+enum SkyMode { SKY_MODE_DEFAULT = 0, SKY_MODE_HDRI = 1, SKY_MODE_CONSTANT_COLOR = 2 } typedef SkyMode;
+
 enum CameraApertureShape { CAMERA_APERTURE_ROUND = 0, CAMERA_APERTURE_BLADED = 1 } typedef CameraApertureShape;
 
 // Set of architectures supported by Luminary
@@ -292,14 +294,13 @@ struct Sky {
   int hdri_initialized;
   int hdri_dim;
   int settings_hdri_dim;
-  int hdri_active;
   int hdri_samples;
   vec3 hdri_origin;
   float hdri_mip_bias;
   int aerial_perspective;
-  int constant_color_mode;
   RGBF constant_color;
   int ambient_sampling;
+  SkyMode mode;
 } typedef Sky;
 
 enum JerlovWaterType {

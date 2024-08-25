@@ -136,9 +136,9 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
 
   if (dim == 0) {
     error_message("Failed to allocated HDRI because resolution was 0. Turned off HDRI.");
-    instance->scene.sky.hdri_active = 0;
+    instance->scene.sky.mode = SKY_MODE_DEFAULT;
 
-    // Update GPU constants again because we may have already pushed hdri_active.
+    // Update GPU constants again because we may have already pushed HDRI mode.
     raytrace_update_device_scene(instance);
     return;
   }

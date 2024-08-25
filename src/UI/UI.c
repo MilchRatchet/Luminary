@@ -337,7 +337,7 @@ static UITab create_sky_general_hdri_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "Celestial\nAtmosphere\nHDRI");
-  panels[i++] = create_check(ui, "Active", &(instance->scene.sky.hdri_active), 1);
+  panels[i++] = create_dropdown(ui, "Mode", &(instance->scene.sky.mode), 1, 3, "Default\0HDRI\0Constant Color", 3);
   panels[i++] = create_slider(ui, "Resolution", &(instance->scene.sky.settings_hdri_dim), 0, 1.0f, 1.0f, 8192.0f, 0, 1);
   panels[i++] = create_slider(ui, "Samples", &(instance->scene.sky.hdri_samples), 0, 0.01f, 1.0f, 8192.0f, 0, 1);
   panels[i++] = create_slider(ui, "Mip Bias", &(instance->scene.sky.hdri_mip_bias), 1, 0.001f, -16.0f, 16.0f, 0, 0);
@@ -346,7 +346,6 @@ static UITab create_sky_general_hdri_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Origin Z", &(instance->scene.sky.hdri_origin.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_button(ui, "Origin To Camera", instance, (void (*)(void*)) sky_hdri_set_pos_to_cam, 0);
   panels[i++] = create_button(ui, "Generate", instance, (void (*)(void*)) sky_hdri_generate_LUT, 1);
-  panels[i++] = create_check(ui, "Constant color", &(instance->scene.sky.constant_color_mode), 1);
   panels[i++] = create_color(ui, "Color", (float*) &(instance->scene.sky.constant_color));
   panels[i++] = create_slider(ui, "  Red", &(instance->scene.sky.constant_color.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene.sky.constant_color.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);

@@ -229,6 +229,10 @@ static void parse_sky_settings(Sky* sky, char* line) {
   char* value        = line + 9;
 
   switch (key) {
+    /* MODE____ */
+    case 6872316419179302733u:
+      sscanf(value, "%d\n", &sky->mode);
+      break;
     /* OFFSET__ */
     case 6872304213117257295u:
       sscanf(value, "%f %f %f\n", &sky->geometry_offset.x, &sky->geometry_offset.y, &sky->geometry_offset.z);
@@ -321,10 +325,6 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 4994575830040593729u:
       sscanf(value, "%d\n", &sky->aerial_perspective);
       break;
-    /* HDRIACTI */
-    case 5283922210494497864u:
-      sscanf(value, "%d\n", &sky->hdri_active);
-      break;
     /* HDRIDIM_ */
     case 6867225564446606408u:
       sscanf(value, "%d\n", &sky->settings_hdri_dim);
@@ -341,10 +341,6 @@ static void parse_sky_settings(Sky* sky, char* line) {
     /* HDRIORIG */
     case 5136727350478783560u:
       sscanf(value, "%f %f %f\n", &sky->hdri_origin.x, &sky->hdri_origin.y, &sky->hdri_origin.z);
-      break;
-    /* COLORMOD */
-    case 4922237933652299587u:
-      sscanf(value, "%d\n", &sky->constant_color_mode);
       break;
     /* COLORCON */
     case 5642802878915301187u:
@@ -898,6 +894,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");
   fputs(line, file);
 
+  sprintf(line, "SKY MODE____ %d\n", instance->scene.sky.mode);
+  fputs(line, file);
   sprintf(
     line, "SKY OFFSET__ %f %f %f\n", instance->scene.sky.geometry_offset.x, instance->scene.sky.geometry_offset.y,
     instance->scene.sky.geometry_offset.z);
@@ -946,8 +944,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "SKY AERIALPE %d\n", instance->scene.sky.aerial_perspective);
   fputs(line, file);
-  sprintf(line, "SKY HDRIACTI %d\n", instance->scene.sky.hdri_active);
-  fputs(line, file);
   sprintf(line, "SKY HDRIDIM_ %d\n", instance->scene.sky.settings_hdri_dim);
   fputs(line, file);
   sprintf(line, "SKY HDRISAMP %d\n", instance->scene.sky.hdri_samples);
@@ -957,8 +953,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(
     line, "SKY HDRIORIG %f %f %f\n", instance->scene.sky.hdri_origin.x, instance->scene.sky.hdri_origin.y,
     instance->scene.sky.hdri_origin.z);
-  fputs(line, file);
-  sprintf(line, "SKY COLORMOD %d\n", instance->scene.sky.constant_color_mode);
   fputs(line, file);
   sprintf(
     line, "SKY COLORCON %f %f %f\n", instance->scene.sky.constant_color.r, instance->scene.sky.constant_color.g,

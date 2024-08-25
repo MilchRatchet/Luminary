@@ -157,6 +157,12 @@ Set 1 to activate firefly clamping.
 
 ## Sky Settings
 
+`SKY MODE____ [INT32]` <br/>
+Defines the mode of the sky rendering:
+ - 0 = Default (Compute Integration)
+ - 1 = HDRI (Baked to texture)
+ - 2 = Constant Color
+
 `SKY OFFSET__ [FP32] [FP32] [FP32]`<br/>
 Offset of geometry relative to sky. This allows to position the geometry outside the atmosphere.
 

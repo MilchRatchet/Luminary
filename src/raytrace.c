@@ -332,7 +332,7 @@ static void update_special_lights(const Scene scene) {
 ////////////////////////////////////////////////////////////////////
 
 void raytrace_build_structures(RaytraceInstance* instance) {
-  if (instance->scene.sky.hdri_active && !instance->scene.sky.hdri_initialized) {
+  if (instance->scene.sky.mode == SKY_MODE_HDRI && !instance->scene.sky.hdri_initialized) {
     sky_hdri_generate_LUT(instance);
   }
 
