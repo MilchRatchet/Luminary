@@ -62,13 +62,92 @@ __device__ float bridges_log_factorial(const uint32_t vertex_count) {
   return t0 + t1 + t2 - n;
 }
 
-// TODO: Proper importance sampling
-__device__ uint32_t bridges_sample_vertex_count(const uint32_t seed, const ushort2 pixel, float& pdf) {
-  const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_COUNT + seed, pixel);
+__device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count, const float effective_dist) {
+  const uint32_t lut_offset = (vertex_count - 1) * 21;
 
-  pdf = 1.0f / device.bridge_settings.max_num_vertices;
+  const float min_dist    = __ldg(device.bridge_lut + lut_offset + 0);
+  const float center_dist = __ldg(device.bridge_lut + lut_offset + 1);
+  const float max_dist    = __ldg(device.bridge_lut + lut_offset + 2);
 
-  return 1 + random * (device.bridge_settings.max_num_vertices - 1) + 0.5f;
+  if (effective_dist > max_dist)
+    return 0.0f;
+
+  if (effective_dist < min_dist) {
+    const float linear_falloff = __ldg(device.bridge_lut + lut_offset + 3);
+
+    return linear_falloff * effective_dist / min_dist;
+  }
+
+  float step, left_dist;
+  uint32_t left_index;
+
+  if (effective_dist < center_dist) {
+    step = (center_dist - min_dist) * 0.25f;
+
+    const uint32_t step_id = (uint32_t) ((effective_dist - min_dist) / step);
+
+    left_dist  = min_dist + step_id * step;
+    left_index = 3 + 2 * step_id;
+  }
+  else {
+    step = (max_dist - center_dist) * 0.25f;
+
+    const uint32_t step_id = (uint32_t) ((effective_dist - center_dist) / step);
+
+    left_dist  = center_dist + step_id * step;
+    left_index = 3 + 2 * (step_id + 4);
+  }
+
+  const float y0  = __ldg(device.bridge_lut + lut_offset + left_index + 0);
+  const float dy0 = __ldg(device.bridge_lut + lut_offset + left_index + 1);
+  const float y1  = __ldg(device.bridge_lut + lut_offset + left_index + 2);
+  const float dy1 = __ldg(device.bridge_lut + lut_offset + left_index + 3);
+
+  const float t  = __saturatef((effective_dist - left_dist) / step);
+  const float t2 = t * t;
+  const float t3 = t2 * t;
+
+  const float h00 = 2.0f * t3 - 3.0f * t2 + 1.0f;
+  const float h10 = t3 - 2.0f * t2 + t;
+  const float h01 = -2.0f * t3 + 3.0f * t2;
+  const float h11 = t3 - t2;
+
+  return h00 * y0 + h10 * step * dy0 + h01 * y1 + h11 * step * dy1;
+}
+
+__device__ uint32_t bridges_sample_vertex_count(const float light_dist, const uint32_t seed, const ushort2 pixel, float& pdf) {
+  const float effective_dist = light_dist * FOG_DENSITY;
+
+  float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_COUNT + seed, pixel);
+
+  float sum_importance = 0.0f;
+  float count_importance[32];
+
+  for (uint32_t i = 0; i < device.bridge_settings.max_num_vertices; i++) {
+    const float importance = bridges_get_vertex_count_importance(i + 1, effective_dist);
+
+    count_importance[i] = importance;
+    sum_importance += importance;
+  }
+
+  random *= sum_importance;
+
+  uint32_t selected_vertex_count = 0;
+
+  for (uint32_t i = 0; i < device.bridge_settings.max_num_vertices; i++) {
+    const float importance = count_importance[i];
+
+    random -= importance;
+
+    if (random < 0.0f) {
+      selected_vertex_count = i;
+
+      pdf = importance / sum_importance;
+      break;
+    }
+  }
+
+  return 1 + selected_vertex_count;
 }
 
 // TODO: I wrote this for fog but obviously it needs to work for all volumes.
@@ -85,7 +164,8 @@ __device__ RGBF bridges_sample_bridge(
   // Sample vertex count
   ////////////////////////////////////////////////////////////////////
   float vertex_count_pdf;
-  const uint32_t vertex_count = bridges_sample_vertex_count(seed, pixel, vertex_count_pdf);
+  const uint32_t vertex_count =
+    bridges_sample_vertex_count(get_length(sub_vector(light_point, data.position)), seed, pixel, vertex_count_pdf);
 
   vec3 current_point     = data.position;
   vec3 current_direction = normalize_vector(sub_vector(light_point, data.position));
@@ -153,7 +233,7 @@ __device__ RGBF bridges_evaluate_bridge(
   // Sample vertex count
   ////////////////////////////////////////////////////////////////////
   float vertex_count_pdf;
-  const uint32_t vertex_count = bridges_sample_vertex_count(seed, pixel, vertex_count_pdf);
+  const uint32_t vertex_count = bridges_sample_vertex_count(get_length(initial_direction), seed, pixel, vertex_count_pdf);
 
   vec3 current_point     = data.position;
   vec3 current_direction = rotate_vector_by_quaternion(normalize_vector(initial_direction), rotation);
