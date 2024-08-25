@@ -307,7 +307,7 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
     uint32_t light_list_length;
     float light_list_pdf;
     const uint32_t light_list_ptr =
-      light_tree_traverse(data.position, scale_vector(data.V, -1.0f), random_light_tree, light_list_length, light_list_pdf);
+      light_tree_traverse(volume, data.position, scale_vector(data.V, -1.0f), random_light_tree, light_list_length, light_list_pdf);
 
     sample_pdf *= light_list_pdf;
 
