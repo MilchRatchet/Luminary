@@ -299,6 +299,7 @@ struct Sky {
   int aerial_perspective;
   int constant_color_mode;
   RGBF constant_color;
+  int ambient_sampling;
 } typedef Sky;
 
 enum JerlovWaterType {

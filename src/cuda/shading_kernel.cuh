@@ -11,6 +11,7 @@
 #include "memory.cuh"
 #include "optix_shadow_trace.cuh"
 #include "ris.cuh"
+#include "sky.cuh"
 #include "utils.cuh"
 
 ////////////////////////////////////////////////////////////////////
@@ -512,6 +513,31 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 }
 
 #endif /* VOLUME_KERNEL */
+
+__device__ RGBF optix_compute_light_ray_ambient_sky(
+  const GBufferData data, const vec3 ray, const RGBF sample_weight, const bool is_refraction, const ushort2 index) {
+  if (device.depth < device.max_ray_depth || !device.scene.sky.ambient_sampling)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  // We don't support compute based sky due to register/performance reasons and because
+  // we would have to include clouds then aswell.
+  if (!device.scene.sky.hdri_active && !device.scene.sky.constant_color_mode)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  const vec3 position = shift_origin_vector(data.position, data.V, ray, is_refraction);
+
+  RGBF sky_light = sky_color_no_compute(position, ray, get_pixel_id(index.x, index.y), index);
+
+  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
+  unsigned int hit_id         = LIGHT_ID_SUN;
+
+  sky_light = mul_color(sky_light, optix_geometry_shadowing(position, ray, FLT_MAX, hit_id, index, compressed_ior));
+  sky_light = mul_color(sky_light, optix_toy_shadowing(position, ray, FLT_MAX, compressed_ior));
+  sky_light = mul_color(sky_light, volume_integrate_transmittance(position, ray, FLT_MAX));
+  sky_light = mul_color(sky_light, sample_weight);
+
+  return sky_light;
+}
 
 #endif /* SHADING_KERNEL && OPTIX_KERNEL */
 

@@ -149,6 +149,7 @@ void scene_init(Scene** _scene) {
   scene->sky.constant_color.r            = 1.0f;
   scene->sky.constant_color.g            = 1.0f;
   scene->sky.constant_color.b            = 1.0f;
+  scene->sky.ambient_sampling            = 1;
   scene->sky.cloud.active                = 0;
   scene->sky.cloud.initialized           = 0;
   scene->sky.cloud.steps                 = 96;

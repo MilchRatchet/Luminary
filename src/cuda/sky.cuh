@@ -3,6 +3,7 @@
 
 #include <cuda_runtime_api.h>
 
+#include "bench.h"
 #include "cloud_shadow.cuh"
 #include "math.cuh"
 #include "raytrace.h"
@@ -103,6 +104,8 @@ __device__ float2 sky_compute_path(const vec3 origin, const vec3 ray, const floa
 
   return make_float2(start, distance);
 }
+
+#ifndef SHADING_KERNEL
 
 ////////////////////////////////////////////////////////////////////
 // Sky LUT function
@@ -399,6 +402,8 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   bench_toc();
 }
 
+#endif /* SHADING_KERNEL */
+
 ////////////////////////////////////////////////////////////////////
 // Atmosphere Integration
 ////////////////////////////////////////////////////////////////////
@@ -594,6 +599,70 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
   return inscattering;
 }
 
+__device__ RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const uint32_t pixel, const ushort2 index) {
+  const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
+
+  RGBF sky;
+  if (device.scene.sky.constant_color_mode) {
+    sky = device.scene.sky.constant_color;
+  }
+  else if (device.scene.sky.hdri_active) {
+    sky = sky_hdri_sample(ray, 0.0f);
+
+    if (include_sun) {
+      const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
+
+      // HDRI does not include the sun, compute sun visibility
+      const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS);
+      const bool ray_hits_earth = sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS);
+
+      if (ray_hits_sun && !ray_hits_earth) {
+        const RGBF sun_color = sky_get_sun_color(sky_origin, ray);
+
+        sky = add_color(sky, sun_color);
+      }
+    }
+  }
+  else {
+    sky = get_color(0.0f, 0.0f, 0.0f);
+  }
+
+  return sky;
+}
+
+__device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint32_t pixel, const ushort2 index) {
+  const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
+
+  RGBF sky;
+  if (device.scene.sky.constant_color_mode) {
+    sky = device.scene.sky.constant_color;
+  }
+  else if (device.scene.sky.hdri_active) {
+    sky = sky_hdri_sample(ray, 0.0f);
+
+    if (include_sun) {
+      const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
+
+      // HDRI does not include the sun, compute sun visibility
+      const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS);
+      const bool ray_hits_earth = sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS);
+
+      if (ray_hits_sun && !ray_hits_earth) {
+        const RGBF sun_color = sky_get_sun_color(sky_origin, ray);
+
+        sky = add_color(sky, sun_color);
+      }
+    }
+  }
+  else {
+    const vec3 sky_origin = world_to_sky_transform(origin);
+
+    sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.scene.sky.steps, index);
+  }
+
+  return sky;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Kernel
 ////////////////////////////////////////////////////////////////////
@@ -610,34 +679,8 @@ LUMINARY_KERNEL void process_sky_tasks() {
 
     const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
 
-    RGBF sky;
-    if (device.scene.sky.constant_color_mode) {
-      sky = device.scene.sky.constant_color;
-    }
-    else if (device.scene.sky.hdri_active) {
-      sky = sky_hdri_sample(task.ray, 0.0f);
-
-      if (include_sun) {
-        const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
-
-        // HDRI does not include the sun, compute sun visibility
-        const bool ray_hits_sun   = sphere_ray_hit(task.ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS);
-        const bool ray_hits_earth = sph_ray_hit_p0(task.ray, sky_origin, SKY_EARTH_RADIUS);
-
-        if (ray_hits_sun && !ray_hits_earth) {
-          const RGBF sun_color = sky_get_sun_color(sky_origin, task.ray);
-
-          sky = add_color(sky, sun_color);
-        }
-      }
-    }
-    else {
-      const vec3 sky_origin = world_to_sky_transform(task.position);
-
-      sky = sky_get_color(sky_origin, task.ray, FLT_MAX, include_sun, device.scene.sky.steps, task.index);
-    }
-
-    sky = mul_color(sky, record);
+    RGBF sky = sky_color_main(task.position, task.ray, pixel, task.index);
+    sky      = mul_color(sky, record);
 
     write_beauty_buffer(sky, pixel);
     write_albedo_buffer(sky, pixel);
@@ -654,16 +697,7 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
     const int pixel        = task.index.y * device.width + task.index.x;
 
     if (device.shading_mode == SHADING_ALBEDO) {
-      RGBF sky;
-      if (device.scene.sky.constant_color_mode) {
-        sky = device.scene.sky.constant_color;
-      }
-      else if (device.scene.sky.hdri_active) {
-        sky = sky_hdri_sample(task.ray, device.scene.sky.hdri_mip_bias);
-      }
-      else {
-        sky = sky_get_color(world_to_sky_transform(task.position), task.ray, FLT_MAX, true, device.scene.sky.steps, task.index);
-      }
+      RGBF sky = sky_color_main(task.position, task.ray, pixel, task.index);
       write_beauty_buffer(sky, pixel, true);
     }
     else if (device.shading_mode == SHADING_DEPTH) {

@@ -351,6 +351,7 @@ static UITab create_sky_general_hdri_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "  Red", &(instance->scene.sky.constant_color.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Green", &(instance->scene.sky.constant_color.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
   panels[i++] = create_slider(ui, "  Blue", &(instance->scene.sky.constant_color.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_check(ui, "Ambient Sampling", &(instance->scene.sky.ambient_sampling), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
