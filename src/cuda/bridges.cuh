@@ -116,8 +116,9 @@ __device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count
   return h00 * y0 + h10 * step * dy0 + h01 * y1 + h11 * step * dy1;
 }
 
-__device__ uint32_t bridges_sample_vertex_count(const float light_dist, const uint32_t seed, const ushort2 pixel, float& pdf) {
-  const float effective_dist = light_dist * FOG_DENSITY;
+__device__ uint32_t
+  bridges_sample_vertex_count(const VolumeDescriptor volume, const float light_dist, const uint32_t seed, const ushort2 pixel, float& pdf) {
+  const float effective_dist = light_dist * volume.max_scattering;
 
   float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_COUNT + seed, pixel);
 
@@ -151,22 +152,15 @@ __device__ uint32_t bridges_sample_vertex_count(const float light_dist, const ui
   return 1 + selected_vertex_count;
 }
 
-// TODO: I wrote this for fog but obviously it needs to work for all volumes.
-// TODO: Verify that we can ignore phase function value and PDF because it all cancels out.
-//       The idea is the following:
-//        - The phase function obviously cancels out when computing the sum of weights.
-//        - The phase function appears when dividing by the target PDF.
-//        - The exact same phase function values appear when evaluating the main function.
-//        - Hence they cancel out as long as I never include them.
 __device__ RGBF bridges_sample_bridge(
-  const GBufferData data, const vec3 light_point, const uint32_t seed, const ushort2 pixel, float& path_pdf, vec3& end_vertex,
-  float& scale) {
+  const GBufferData data, const VolumeDescriptor volume, const vec3 light_point, const uint32_t seed, const ushort2 pixel, float& path_pdf,
+  vec3& end_vertex, float& scale) {
   ////////////////////////////////////////////////////////////////////
   // Sample vertex count
   ////////////////////////////////////////////////////////////////////
   float vertex_count_pdf;
   const uint32_t vertex_count =
-    bridges_sample_vertex_count(get_length(sub_vector(light_point, data.position)), seed, pixel, vertex_count_pdf);
+    bridges_sample_vertex_count(volume, get_length(sub_vector(light_point, data.position)), seed, pixel, vertex_count_pdf);
 
   vec3 current_point     = data.position;
   vec3 current_direction = normalize_vector(sub_vector(light_point, data.position));
@@ -203,9 +197,9 @@ __device__ RGBF bridges_sample_bridge(
   end_vertex = current_point;
 
   RGBF path_weight = get_color(
-    expf((vertex_count - 1) * logf(FOG_DENSITY) - sum_dist * FOG_DENSITY),
-    expf((vertex_count - 1) * logf(FOG_DENSITY) - sum_dist * FOG_DENSITY),
-    expf((vertex_count - 1) * logf(FOG_DENSITY) - sum_dist * FOG_DENSITY));
+    expf((vertex_count - 1) * logf(volume.scattering.r) - sum_dist * (volume.scattering.r + volume.absorption.r)),
+    expf((vertex_count - 1) * logf(volume.scattering.g) - sum_dist * (volume.scattering.g + volume.absorption.g)),
+    expf((vertex_count - 1) * logf(volume.scattering.b) - sum_dist * (volume.scattering.b + volume.absorption.b)));
 
   const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
 
@@ -215,7 +209,8 @@ __device__ RGBF bridges_sample_bridge(
 }
 
 __device__ RGBF bridges_evaluate_bridge(
-  const GBufferData data, const uint32_t light_id, const uint32_t seed, const ushort2 pixel, const Quaternion rotation, const float scale) {
+  const GBufferData data, const VolumeDescriptor volume, const uint32_t light_id, const uint32_t seed, const ushort2 pixel,
+  const Quaternion rotation, const float scale) {
   const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
 
   const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + seed, pixel);
@@ -233,7 +228,7 @@ __device__ RGBF bridges_evaluate_bridge(
   // Sample vertex count
   ////////////////////////////////////////////////////////////////////
   float vertex_count_pdf;
-  const uint32_t vertex_count = bridges_sample_vertex_count(get_length(initial_direction), seed, pixel, vertex_count_pdf);
+  const uint32_t vertex_count = bridges_sample_vertex_count(volume, get_length(initial_direction), seed, pixel, vertex_count_pdf);
 
   vec3 current_point     = data.position;
   vec3 current_direction = rotate_vector_by_quaternion(normalize_vector(initial_direction), rotation);
@@ -277,7 +272,9 @@ __device__ RGBF bridges_evaluate_bridge(
     sum_dist += dist;
   }
 
-  visibility = scale_color(visibility, expf((vertex_count - 1) * logf(FOG_DENSITY) - sum_dist * FOG_DENSITY));
+  visibility.r *= expf((vertex_count - 1) * logf(volume.scattering.r) - sum_dist * (volume.scattering.r + volume.absorption.r));
+  visibility.g *= expf((vertex_count - 1) * logf(volume.scattering.g) - sum_dist * (volume.scattering.g + volume.absorption.g));
+  visibility.b *= expf((vertex_count - 1) * logf(volume.scattering.b) - sum_dist * (volume.scattering.b + volume.absorption.b));
 
   return mul_color(light_color, visibility);
 }
@@ -290,6 +287,7 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
   float selected_target_pdf = FLT_MAX;
 
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
+  const VolumeDescriptor volume   = volume_get_descriptor_preset(VOLUME_HIT_TYPE(data.hit_id));
 
   float sum_weight = 0.0f;
 
@@ -319,7 +317,6 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
 
     const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
 
-    // TODO: Add check that point is inside the same volume.
     const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + i, pixel);
 
     RGBF light_color;
@@ -333,6 +330,11 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
 
     const vec3 light_point = add_vector(data.position, scale_vector(light_dir, light_dist));
 
+    const bool light_point_underwater = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
+
+    if ((light_point_underwater && data.hit_id == HIT_TYPE_VOLUME_FOG) || (!light_point_underwater && data.hit_id == HIT_TYPE_VOLUME_OCEAN))
+      continue;
+
     sample_pdf *= 1.0f / solid_angle;
 
     ////////////////////////////////////////////////////////////////////
@@ -343,7 +345,7 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
     float sample_path_scale;
     vec3 sample_path_end_vertex;
     RGBF sample_path_weight =
-      bridges_sample_bridge(data, light_point, i, pixel, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
+      bridges_sample_bridge(data, volume, light_point, i, pixel, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
 
     sample_pdf *= sample_path_pdf;
 
@@ -396,7 +398,7 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
   // Evaluate sampled path
   ////////////////////////////////////////////////////////////////////
 
-  RGBF bridge_color = bridges_evaluate_bridge(data, selected_light_id, selected_seed, pixel, selected_rotation, selected_scale);
+  RGBF bridge_color = bridges_evaluate_bridge(data, volume, selected_light_id, selected_seed, pixel, selected_rotation, selected_scale);
 
   bridge_color = scale_color(bridge_color, sum_weight / selected_target_pdf);
 
