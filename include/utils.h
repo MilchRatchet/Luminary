@@ -480,6 +480,7 @@ struct DeviceConstantMemory {
   Quad* particle_quads;
   LightTreeNode8Packed* light_tree_nodes_8;
   uint2* light_tree_paths;
+  float* bridge_lut;
 } typedef DeviceConstantMemory;
 
 struct OptixKernel {

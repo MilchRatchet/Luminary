@@ -1342,3 +1342,21 @@ void lights_process(Scene* scene, int dmm_active) {
 
   bench_toc();
 }
+
+void lights_load_bridge_lut() {
+  uint64_t info = 0;
+
+  void* lut_data;
+  int64_t lut_length;
+  ceb_access("bridge_lut.bin", &lut_data, &lut_length, &info);
+
+  if (info) {
+    crash_message("Failed to load bridge_lut texture.");
+  }
+
+  void* bridge_lut;
+  device_malloc(&bridge_lut, lut_length);
+  device_upload(bridge_lut, lut_data, lut_length);
+
+  device_update_symbol(bridge_lut, bridge_lut);
+}
