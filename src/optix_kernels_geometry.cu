@@ -121,6 +121,8 @@ extern "C" __global__ void __raygen__optix() {
       }
 
       state_release(pixel, flags_to_release);
+
+      state_consume(pixel, STATE_FLAG_BRIDGE_SAMPLING);
     }
   }
 
