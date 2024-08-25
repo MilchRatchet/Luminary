@@ -1,15 +1,16 @@
 #ifndef CU_BRIDGES_H
 #define CU_BRIDGES_H
 
+#if defined(OPTIX_KERNEL) && defined(VOLUME_KERNEL)
+
 #include "light.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "optix_shadow_trace.cuh"
 #include "random.cuh"
 #include "utils.cuh"
 #include "utils.h"
 #include "volume_utils.cuh"
-
-#if defined(OPTIX_KERNEL) && defined(VOLUME_KERNEL)
 
 __device__ Quaternion bridges_compute_rotation(const GBufferData data, const vec3 light_point, const vec3 end_vertex) {
   const vec3 target_dir = normalize_vector(sub_vector(light_point, data.position));
@@ -240,6 +241,8 @@ __device__ RGBF bridges_evaluate_bridge(
   float dist;
   RGBF visibility = get_color(1.0f, 1.0f, 1.0f);
 
+  unsigned int compressed_ior = ior_compress(data.ior_in);
+
   // Apply phase function of first direction.
   const float cos_angle           = -dot_product(current_direction, data.V);
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
@@ -252,7 +255,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     dist = -logf(random_dist) * scale;
 
-    // TODO: Do a trace ray.
+    visibility = mul_color(visibility, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
 
     sum_dist += dist;
   }
@@ -264,13 +267,12 @@ __device__ RGBF bridges_evaluate_bridge(
     const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
     current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
-    // current_direction = rotate_vector_by_quaternion(current_direction, rotation);
 
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
 
     dist = -logf(random_dist) * scale;
 
-    // TODO: Do a trace ray.
+    visibility = mul_color(visibility, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
 
     sum_dist += dist;
   }
