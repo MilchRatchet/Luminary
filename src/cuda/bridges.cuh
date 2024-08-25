@@ -100,7 +100,7 @@ __device__ RGBF bridges_sample_bridge(
     sum_dist += dist;
   }
 
-  for (int i = 1; i < vertex_count; i++) {
+  for (uint32_t i = 1; i < vertex_count; i++) {
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
     const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
@@ -128,9 +128,7 @@ __device__ RGBF bridges_sample_bridge(
 
   const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
 
-  path_pdf = vertex_count_pdf;
-  if (vertex_count > 1) {
-    path_pdf *= expf(log_path_pdf) * target_scale * target_scale * target_scale;
+  path_pdf = vertex_count_pdf * expf(log_path_pdf) * target_scale * target_scale * target_scale;
   }
 
   return path_weight;
@@ -168,6 +166,8 @@ __device__ RGBF bridges_evaluate_bridge(
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
   visibility                      = scale_color(visibility, jendersie_eon_phase_function(cos_angle, params));
 
+  float sum_dist = 0.0f;
+
   {
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel);
 
@@ -175,9 +175,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     // TODO: Do a trace ray.
 
-    visibility = mul_color(visibility, volume_integrate_transmittance(current_point, current_direction, dist));
-
-    current_point = add_vector(current_point, scale_vector(current_direction, dist));
+    sum_dist += dist;
   }
 
   for (int i = 1; i < vertex_count; i++) {
@@ -187,7 +185,7 @@ __device__ RGBF bridges_evaluate_bridge(
     const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
     current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
-    current_direction = rotate_vector_by_quaternion(current_direction, rotation);
+    // current_direction = rotate_vector_by_quaternion(current_direction, rotation);
 
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
 
@@ -195,10 +193,10 @@ __device__ RGBF bridges_evaluate_bridge(
 
     // TODO: Do a trace ray.
 
-    visibility = mul_color(visibility, volume_integrate_transmittance(current_point, current_direction, dist));
+    sum_dist += dist;
   }
 
-  visibility = scale_color(visibility, expf((vertex_count - 1) * logf(FOG_DENSITY)));
+  visibility = scale_color(visibility, expf((vertex_count - 1) * logf(FOG_DENSITY) - sum_dist * FOG_DENSITY));
 
   return mul_color(light_color, visibility);
 }
@@ -240,6 +238,7 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
 
     const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
 
+    // TODO: Add check that point is inside the same volume.
     const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + i, pixel);
 
     RGBF light_color;
@@ -248,7 +247,7 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
     const vec3 light_dir = light_sample_triangle(light, data, random_light_point, solid_angle, light_dist, light_color);
 
     // We sampled a point that emits no light, skip.
-    if (color_importance(light_color) == 0.0f)
+    if (color_importance(light_color) == 0.0f || solid_angle < eps)
       continue;
 
     const vec3 light_point = add_vector(data.position, scale_vector(light_dir, light_dist));
