@@ -56,19 +56,18 @@ __device__ bool optix_evaluate_ior_culling(const uint32_t ior_data, const ushort
   return false;
 }
 
-__device__ bool optix_toy_shadowing(
-  const vec3 position, const vec3 dir, const float dist, unsigned int& compressed_ior, RGBF& light_color) {
+__device__ RGBF optix_toy_shadowing(const vec3 position, const vec3 dir, const float dist, unsigned int& compressed_ior) {
   if (device.scene.toy.active) {
     const float toy_dist = get_toy_distance(position, dir);
 
     if (toy_dist < dist) {
       if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
-        return false;
+        return get_color(0.0f, 0.0f, 0.0f);
 
       RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
 
       if (color_importance(toy_transparency) == 0.0f)
-        return false;
+        return get_color(0.0f, 0.0f, 0.0f);
 
       // Toy can be hit at most twice, compute the intersection and on hit apply the alpha.
       vec3 toy_hit_origin = add_vector(position, scale_vector(dir, toy_dist));
@@ -87,11 +86,11 @@ __device__ bool optix_toy_shadowing(
         compressed_ior |= (toy_is_inside(position, dir)) ? 0x01010000 : 0x00FF0000;
       }
 
-      light_color = mul_color(light_color, toy_transparency);
+      return toy_transparency;
     }
   }
 
-  return true;
+  return get_color(1.0f, 1.0f, 1.0f);
 }
 
 __device__ RGBF optix_geometry_shadowing(

@@ -251,6 +251,7 @@ __device__ RGBF bridges_evaluate_bridge(
     dist = -logf(random_dist) * scale;
 
     visibility = mul_color(visibility, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
+    visibility = mul_color(visibility, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
 
     sum_dist += dist;
   }
@@ -268,6 +269,7 @@ __device__ RGBF bridges_evaluate_bridge(
     dist = -logf(random_dist) * scale;
 
     visibility = mul_color(visibility, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
+    visibility = mul_color(visibility, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
 
     sum_dist += dist;
   }

@@ -110,21 +110,16 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   }
   const vec3 position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
-  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
-
-  if (!optix_toy_shadowing(position, dir, FLT_MAX, compressed_ior, light_color)) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-  }
-
   ////////////////////////////////////////////////////////////////////
   // Compute visibility term
   ////////////////////////////////////////////////////////////////////
 
   // TODO: Add specialized anyhit shaders for non geometry lights
-  unsigned int hit_id = LIGHT_ID_SUN;
+  unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
+  unsigned int hit_id         = LIGHT_ID_SUN;
 
   RGBF visibility = optix_geometry_shadowing(position, dir, dist, hit_id, index, compressed_ior);
+  visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
@@ -246,27 +241,13 @@ __device__ RGBF
   // Compute visibility term
   ////////////////////////////////////////////////////////////////////
 
-  float3 origin = make_float3(position.x, position.y, position.z);
-  float3 ray    = make_float3(dir.x, dir.y, dir.z);
-
   unsigned int compressed_ior = ior_compress(is_underwater ? device.scene.ocean.refractive_index : 1.0f);
-
-  if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color)) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-    sun_dist    = 0.0f;
-  }
-
-  if (!optix_toy_shadowing(connection_point, sun_dir, FLT_MAX, compressed_ior, light_color)) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-    sun_dist    = 0.0f;
-  }
-
-  unsigned int hit_id = LIGHT_ID_SUN;
+  unsigned int hit_id         = LIGHT_ID_SUN;
 
   RGBF visibility = optix_geometry_shadowing(position, dir, dist, hit_id, index, compressed_ior);
+  visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, optix_geometry_shadowing(connection_point, sun_dir, sun_dist, hit_id, index, compressed_ior));
+  visibility      = mul_color(visibility, optix_toy_shadowing(connection_point, sun_dir, sun_dist, compressed_ior));
   visibility      = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, sun_dist));
 
   if (is_underwater) {
@@ -497,15 +478,10 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
-
-  if (!optix_toy_shadowing(position, dir, dist, compressed_ior, light_color)) {
-    light_color = get_color(0.0f, 0.0f, 0.0f);
-    dist        = 0.0f;
-  }
-
-  unsigned int hit_id = light_id;
+  unsigned int hit_id         = light_id;
 
   RGBF visibility = optix_geometry_shadowing(position, dir, dist, hit_id, index, compressed_ior);
+  visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
