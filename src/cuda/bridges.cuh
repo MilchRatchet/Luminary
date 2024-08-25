@@ -209,7 +209,6 @@ __device__ RGBF bridges_sample_bridge(
   const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
 
   path_pdf = vertex_count_pdf * expf(log_path_pdf) * target_scale * target_scale * target_scale;
-  }
 
   return path_weight;
 }
