@@ -12,6 +12,8 @@
 #include "utils.h"
 #include "volume_utils.cuh"
 
+#define BRIDGES_MAX_DEPTH 32
+
 __device__ Quaternion bridges_compute_rotation(const GBufferData data, const vec3 light_point, const vec3 end_vertex) {
   const vec3 target_dir = normalize_vector(sub_vector(light_point, data.position));
   const vec3 actual_dir = normalize_vector(sub_vector(end_vertex, data.position));
@@ -79,32 +81,20 @@ __device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count
     return linear_falloff * effective_dist / min_dist;
   }
 
-  float step, left_dist;
-  uint32_t left_index;
+  const float low_dist  = (effective_dist < center_dist) ? min_dist : center_dist;
+  const float high_dist = (effective_dist < center_dist) ? center_dist : max_dist;
 
-  if (effective_dist < center_dist) {
-    step = (center_dist - min_dist) * 0.25f;
+  const float step       = (high_dist - low_dist) * 0.25f;
+  const uint32_t step_id = (uint32_t) ((effective_dist - low_dist) / step);
+  const float floor_dist = low_dist + step_id * step;
+  const uint32_t index   = (effective_dist < center_dist) ? (3 + 2 * step_id) : (3 + 2 * (step_id + 4));
 
-    const uint32_t step_id = (uint32_t) ((effective_dist - min_dist) / step);
+  const float y0  = __ldg(device.bridge_lut + lut_offset + index + 0);
+  const float dy0 = __ldg(device.bridge_lut + lut_offset + index + 1);
+  const float y1  = __ldg(device.bridge_lut + lut_offset + index + 2);
+  const float dy1 = __ldg(device.bridge_lut + lut_offset + index + 3);
 
-    left_dist  = min_dist + step_id * step;
-    left_index = 3 + 2 * step_id;
-  }
-  else {
-    step = (max_dist - center_dist) * 0.25f;
-
-    const uint32_t step_id = (uint32_t) ((effective_dist - center_dist) / step);
-
-    left_dist  = center_dist + step_id * step;
-    left_index = 3 + 2 * (step_id + 4);
-  }
-
-  const float y0  = __ldg(device.bridge_lut + lut_offset + left_index + 0);
-  const float dy0 = __ldg(device.bridge_lut + lut_offset + left_index + 1);
-  const float y1  = __ldg(device.bridge_lut + lut_offset + left_index + 2);
-  const float dy1 = __ldg(device.bridge_lut + lut_offset + left_index + 3);
-
-  const float t  = __saturatef((effective_dist - left_dist) / step);
+  const float t  = __saturatef((effective_dist - floor_dist) / step);
   const float t2 = t * t;
   const float t3 = t2 * t;
 
@@ -122,8 +112,12 @@ __device__ uint32_t
 
   float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_COUNT + seed, pixel);
 
+  ////////////////////////////////////////////////////////////////////
+  // Compute importance for each vertex count
+  ////////////////////////////////////////////////////////////////////
+
   float sum_importance = 0.0f;
-  float count_importance[32];
+  float count_importance[BRIDGES_MAX_DEPTH];
 
   for (uint32_t i = 0; i < device.bridge_settings.max_num_vertices; i++) {
     const float importance = bridges_get_vertex_count_importance(i + 1, effective_dist);
@@ -132,9 +126,16 @@ __device__ uint32_t
     sum_importance += importance;
   }
 
+  ////////////////////////////////////////////////////////////////////
+  // Choose a vertex count proportional to the evaluated importance
+  ////////////////////////////////////////////////////////////////////
+
   random *= sum_importance;
 
-  uint32_t selected_vertex_count = 0;
+  // Fallback values. These come into play if sum_importance is 0.0f.
+  // This happens when effective dist is too large.
+  uint32_t selected_vertex_count = device.bridge_settings.max_num_vertices - 1;
+  pdf                            = 1.0f;
 
   for (uint32_t i = 0; i < device.bridge_settings.max_num_vertices; i++) {
     const float importance = count_importance[i];
@@ -155,15 +156,22 @@ __device__ uint32_t
 __device__ RGBF bridges_sample_bridge(
   const GBufferData data, const VolumeDescriptor volume, const vec3 light_point, const uint32_t seed, const ushort2 pixel, float& path_pdf,
   vec3& end_vertex, float& scale) {
+  const vec3 light_vector  = sub_vector(light_point, data.position);
+  const float target_scale = get_length(light_vector);
+
   ////////////////////////////////////////////////////////////////////
   // Sample vertex count
   ////////////////////////////////////////////////////////////////////
+
   float vertex_count_pdf;
-  const uint32_t vertex_count =
-    bridges_sample_vertex_count(volume, get_length(sub_vector(light_point, data.position)), seed, pixel, vertex_count_pdf);
+  const uint32_t vertex_count = bridges_sample_vertex_count(volume, target_scale, seed, pixel, vertex_count_pdf);
+
+  ////////////////////////////////////////////////////////////////////
+  // Sample path
+  ////////////////////////////////////////////////////////////////////
 
   vec3 current_point     = data.position;
-  vec3 current_direction = normalize_vector(sub_vector(light_point, data.position));
+  vec3 current_direction = normalize_vector(light_vector);
 
   float sum_dist = 0.0f;
 
@@ -179,6 +187,7 @@ __device__ RGBF bridges_sample_bridge(
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
     const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
+    // TODO: Use correct phase function in ocean
     current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
 
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
@@ -188,7 +197,10 @@ __device__ RGBF bridges_sample_bridge(
     sum_dist += dist;
   }
 
-  const float target_scale = get_length(sub_vector(light_point, data.position));
+  ////////////////////////////////////////////////////////////////////
+  // Compute PDF and approximate visibility of path
+  ////////////////////////////////////////////////////////////////////
+
   const float actual_scale = get_length(sub_vector(current_point, data.position));
   scale                    = target_scale / actual_scale;
 
@@ -211,37 +223,58 @@ __device__ RGBF bridges_sample_bridge(
 __device__ RGBF bridges_evaluate_bridge(
   const GBufferData data, const VolumeDescriptor volume, const uint32_t light_id, const uint32_t seed, const ushort2 pixel,
   const Quaternion rotation, const float scale) {
-  const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
-
-  const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + seed, pixel);
+  ////////////////////////////////////////////////////////////////////
+  // Get light sample
+  ////////////////////////////////////////////////////////////////////
 
   RGBF light_color;
-  float solid_angle;
-  float light_dist;
-  const vec3 light_dir = light_sample_triangle(light, data, random_light_point, solid_angle, light_dist, light_color);
+  vec3 light_vector;
+  if (light_id != LIGHT_ID_NONE) {
+    const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
 
-  const vec3 light_point = add_vector(data.position, scale_vector(light_dir, light_dist));
+    const float2 random_light_point = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_POINT + seed, pixel);
 
-  const vec3 initial_direction = sub_vector(light_point, data.position);
+    float solid_angle;
+    float light_dist;
+    const vec3 light_dir = light_sample_triangle(light, data, random_light_point, solid_angle, light_dist, light_color);
+
+    const vec3 light_point = add_vector(data.position, scale_vector(light_dir, light_dist));
+
+    light_vector = sub_vector(light_point, data.position);
+  }
+  else {
+    light_color  = get_color(0.0f, 0.0f, 0.0f);
+    light_vector = get_vector(0.0f, 0.0f, 1.0f);
+  }
 
   ////////////////////////////////////////////////////////////////////
-  // Sample vertex count
+  // Get sampled vertex count
   ////////////////////////////////////////////////////////////////////
-  float vertex_count_pdf;
-  const uint32_t vertex_count = bridges_sample_vertex_count(volume, get_length(initial_direction), seed, pixel, vertex_count_pdf);
+
+  uint32_t vertex_count;
+  if (light_id != LIGHT_ID_NONE) {
+    float vertex_count_pdf;
+    vertex_count = bridges_sample_vertex_count(volume, get_length(light_vector), seed, pixel, vertex_count_pdf);
+  }
+  else {
+    vertex_count = 1;
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Compute visibility of path
+  ////////////////////////////////////////////////////////////////////
 
   vec3 current_point     = data.position;
-  vec3 current_direction = rotate_vector_by_quaternion(normalize_vector(initial_direction), rotation);
+  vec3 current_direction = rotate_vector_by_quaternion(normalize_vector(light_vector), rotation);
 
   float dist;
-  RGBF visibility = get_color(1.0f, 1.0f, 1.0f);
 
   unsigned int compressed_ior = ior_compress(data.ior_in);
 
   // Apply phase function of first direction.
   const float cos_angle           = -dot_product(current_direction, data.V);
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
-  visibility                      = scale_color(visibility, jendersie_eon_phase_function(cos_angle, params));
+  light_color                     = scale_color(light_color, jendersie_eon_phase_function(cos_angle, params));
 
   float sum_dist = 0.0f;
 
@@ -250,8 +283,8 @@ __device__ RGBF bridges_evaluate_bridge(
 
     dist = -logf(random_dist) * scale;
 
-    visibility = mul_color(visibility, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
-    visibility = mul_color(visibility, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
+    light_color = mul_color(light_color, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
+    light_color = mul_color(light_color, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
 
     sum_dist += dist;
   }
@@ -268,24 +301,24 @@ __device__ RGBF bridges_evaluate_bridge(
 
     dist = -logf(random_dist) * scale;
 
-    visibility = mul_color(visibility, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
-    visibility = mul_color(visibility, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
+    light_color = mul_color(light_color, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
+    light_color = mul_color(light_color, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
 
     sum_dist += dist;
   }
 
-  visibility.r *= expf((vertex_count - 1) * logf(volume.scattering.r) - sum_dist * (volume.scattering.r + volume.absorption.r));
-  visibility.g *= expf((vertex_count - 1) * logf(volume.scattering.g) - sum_dist * (volume.scattering.g + volume.absorption.g));
-  visibility.b *= expf((vertex_count - 1) * logf(volume.scattering.b) - sum_dist * (volume.scattering.b + volume.absorption.b));
+  light_color.r *= expf((vertex_count - 1) * logf(volume.scattering.r) - sum_dist * (volume.scattering.r + volume.absorption.r));
+  light_color.g *= expf((vertex_count - 1) * logf(volume.scattering.g) - sum_dist * (volume.scattering.g + volume.absorption.g));
+  light_color.b *= expf((vertex_count - 1) * logf(volume.scattering.b) - sum_dist * (volume.scattering.b + volume.absorption.b));
 
-  return mul_color(light_color, visibility);
+  return light_color;
 }
 
 __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
   uint32_t selected_seed     = 0xFFFFFFFF;
   uint32_t selected_light_id = LIGHT_ID_NONE;
   Quaternion selected_rotation;
-  float selected_scale;
+  float selected_scale      = 0.0f;
   float selected_target_pdf = FLT_MAX;
 
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
@@ -334,7 +367,10 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
 
     const bool light_point_underwater = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
 
-    if ((light_point_underwater && data.hit_id == HIT_TYPE_VOLUME_FOG) || (!light_point_underwater && data.hit_id == HIT_TYPE_VOLUME_OCEAN))
+    if (device.scene.ocean.active && light_point_underwater && data.hit_id == HIT_TYPE_VOLUME_FOG)
+      continue;
+
+    if (!light_point_underwater && data.hit_id == HIT_TYPE_VOLUME_OCEAN)
       continue;
 
     sample_pdf *= 1.0f / solid_angle;
@@ -390,9 +426,6 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
       random_resampling = (random_resampling - resampling_probability) / (1.0f - resampling_probability);
     }
   }
-
-  if (selected_light_id == LIGHT_ID_NONE)
-    return get_color(0.0f, 0.0f, 0.0f);
 
   sum_weight /= device.bridge_settings.num_ris_samples;
 
