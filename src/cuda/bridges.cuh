@@ -365,12 +365,7 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
 
     const vec3 light_point = add_vector(data.position, scale_vector(light_dir, light_dist));
 
-    const bool light_point_underwater = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
-
-    if (device.scene.ocean.active && light_point_underwater && data.hit_id == HIT_TYPE_VOLUME_FOG)
-      continue;
-
-    if (!light_point_underwater && data.hit_id == HIT_TYPE_VOLUME_OCEAN)
+    if (light_point.y < volume.min_height || light_point.y > volume.max_height)
       continue;
 
     sample_pdf *= 1.0f / solid_angle;
