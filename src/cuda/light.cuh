@@ -402,6 +402,8 @@ __device__ vec3 light_sample_triangle(
 
   if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
     solid_angle = 0.0f;
+    dist        = 1.0f;
+    color       = get_color(0.0f, 0.0f, 0.0f);
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
@@ -421,6 +423,8 @@ __device__ vec3 light_sample_triangle(
 
   if (isnan(dir.x) || isnan(dir.y) || isnan(dir.z)) {
     solid_angle = 0.0f;
+    dist        = FLT_MAX;
+    color       = get_color(0.0f, 0.0f, 0.0f);
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
@@ -430,6 +434,8 @@ __device__ vec3 light_sample_triangle(
   // Our ray does not actually hit the light, abort.
   if (dist == FLT_MAX) {
     solid_angle = 0.0f;
+    dist        = 1.0f;
+    color       = get_color(0.0f, 0.0f, 0.0f);
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
@@ -480,6 +486,7 @@ __device__ void light_sample_triangle_presampled(
   // Our ray does not actually hit the light, abort. This should never happen!
   if (dist == FLT_MAX) {
     solid_angle = 0.0f;
+    color       = get_color(0.0f, 0.0f, 0.0f);
     return;
   }
 

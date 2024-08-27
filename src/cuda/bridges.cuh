@@ -272,8 +272,6 @@ __device__ RGBF bridges_evaluate_bridge(
   vec3 current_point     = data.position;
   vec3 current_direction = rotate_vector_by_quaternion(normalize_vector(light_vector), rotation);
 
-  float dist;
-
   unsigned int compressed_ior = ior_compress(data.ior_in);
 
   // Apply phase function of first direction.
@@ -292,16 +290,12 @@ __device__ RGBF bridges_evaluate_bridge(
 
   float sum_dist = 0.0f;
 
-  {
-    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel);
+  float dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + 0, pixel)) * scale;
 
-    dist = -logf(random_dist) * scale;
+  light_color = mul_color(light_color, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
+  light_color = mul_color(light_color, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
 
-    light_color = mul_color(light_color, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
-    light_color = mul_color(light_color, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
-
-    sum_dist += dist;
-  }
+  sum_dist += dist;
 
   for (int i = 1; i < vertex_count; i++) {
     current_point = add_vector(current_point, scale_vector(current_direction, dist));
@@ -311,9 +305,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
 
-    const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
-
-    dist = -logf(random_dist) * scale;
+    dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel)) * scale;
 
     light_color = mul_color(light_color, optix_geometry_shadowing(current_point, current_direction, dist, light_id, pixel, compressed_ior));
     light_color = mul_color(light_color, optix_toy_shadowing(current_point, current_direction, dist, compressed_ior));
@@ -329,11 +321,11 @@ __device__ RGBF bridges_evaluate_bridge(
 }
 
 __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
-  uint32_t selected_seed     = 0xFFFFFFFF;
-  uint32_t selected_light_id = LIGHT_ID_NONE;
-  Quaternion selected_rotation;
-  float selected_scale      = 0.0f;
-  float selected_target_pdf = FLT_MAX;
+  uint32_t selected_seed       = 0xFFFFFFFF;
+  uint32_t selected_light_id   = LIGHT_ID_NONE;
+  Quaternion selected_rotation = {0.0f, 0.0f, 0.0f, 1.0f};
+  float selected_scale         = 0.0f;
+  float selected_target_pdf    = FLT_MAX;
 
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
   const VolumeDescriptor volume   = volume_get_descriptor_preset(VOLUME_HIT_TYPE(data.hit_id));
