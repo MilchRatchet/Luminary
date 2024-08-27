@@ -6,6 +6,7 @@
 #include "light.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "ocean_utils.cuh"
 #include "optix_shadow_trace.cuh"
 #include "random.cuh"
 #include "utils.cuh"
@@ -187,8 +188,12 @@ __device__ RGBF bridges_sample_bridge(
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
     const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
-    // TODO: Use correct phase function in ocean
-    current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
+    if (volume.type == VOLUME_TYPE_FOG) {
+      current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
+    }
+    else {
+      current_direction = ocean_phase_sampling(current_direction, random_phase, random_method);
+    }
 
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
     const float dist        = -logf(random_dist);
@@ -274,7 +279,16 @@ __device__ RGBF bridges_evaluate_bridge(
   // Apply phase function of first direction.
   const float cos_angle           = -dot_product(current_direction, data.V);
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
-  light_color                     = scale_color(light_color, jendersie_eon_phase_function(cos_angle, params));
+
+  float phase_function_weight;
+  if (volume.type == VOLUME_TYPE_FOG) {
+    phase_function_weight = jendersie_eon_phase_function(cos_angle, params);
+  }
+  else {
+    phase_function_weight = ocean_phase(cos_angle);
+  }
+
+  light_color = scale_color(light_color, phase_function_weight);
 
   float sum_dist = 0.0f;
 
@@ -391,7 +405,15 @@ __device__ RGBF bridges_sample(const GBufferData data, const ushort2 pixel) {
     const vec3 rotation_initial_direction = rotate_vector_by_quaternion(light_dir, sample_rotation);
     const float cos_angle                 = -dot_product(rotation_initial_direction, data.V);
 
-    sample_path_weight = scale_color(sample_path_weight, jendersie_eon_phase_function(cos_angle, params));
+    float phase_function_weight;
+    if (volume.type == VOLUME_TYPE_FOG) {
+      phase_function_weight = jendersie_eon_phase_function(cos_angle, params);
+    }
+    else {
+      phase_function_weight = ocean_phase(cos_angle);
+    }
+
+    sample_path_weight = scale_color(sample_path_weight, phase_function_weight);
 
     ////////////////////////////////////////////////////////////////////
     // Resample
