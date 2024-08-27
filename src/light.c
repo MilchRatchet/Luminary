@@ -104,7 +104,7 @@ struct Bin {
 
 // Note: This is determined by the number of bits that we allocate for each node.
 #define THRESHOLD_TRIANGLES 3
-#define OBJECT_SPLIT_BIN_COUNT 64
+#define OBJECT_SPLIT_BIN_COUNT 32
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
 #define MAX_VALUE 1e10f
