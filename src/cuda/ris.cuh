@@ -29,7 +29,10 @@ __device__ uint32_t ris_sample_light(
 
   float sum_weight = 0.0f;
 
-  selected_light_color = get_color(0.0f, 0.0f, 0.0f);
+  selected_ray           = get_vector(0.0f, 0.0f, 1.0f);
+  selected_light_color   = get_color(0.0f, 0.0f, 0.0f);
+  selected_dist          = 1.0f;
+  selected_is_refraction = false;
 
   if (!device.scene.material.lights_active)
     return LIGHT_ID_NONE;
