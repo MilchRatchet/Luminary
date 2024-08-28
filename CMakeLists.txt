@@ -182,13 +182,14 @@ add_executable(Luminary)
 
 function(compile_ptx kernel_name)
   # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
+  # TODO: This is currently always building for native. Add some logic that ties in with the normal CUDA kernel arch settings.
   # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
   add_custom_command(
     OUTPUT
       "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
     COMMAND
       ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu"
-      --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      -arch=native --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
       -o "${kernel_name}.ptx"
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_SOURCE_DIR}/src/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
