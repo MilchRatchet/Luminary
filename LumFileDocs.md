@@ -62,6 +62,9 @@ Set 1 to cancel light ray when intersecting a boundary of two mediums with diffe
 `MATERIAL INVERTRO [INT32]`<br/>
 Set 1 to invert roughness for geometry, 0 else. Enabling this gives you legacy behaviour where the roughness from the input geometry was always inverted.
 
+`MATERIAL ROUGHCLA [FP32]`<br/>
+Clamps the roughness of materials in indirect lighting to smooth out caustics and help convergence. Number must be in the range [0,1].
+
 ## Camera Settings
 
 `CAMERA POSITION [FP32] [FP32] [FP32]`<br/>

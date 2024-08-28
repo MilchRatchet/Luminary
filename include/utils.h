@@ -354,6 +354,7 @@ struct GlobalMaterial {
   int invert_roughness;
   int override_materials;
   int enable_ior_shadowing;
+  float caustic_roughness_clamp;
 } typedef GlobalMaterial;
 
 struct Particles {

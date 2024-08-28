@@ -21,16 +21,17 @@ static const int LINE_SIZE = 4096;
 void scene_init(Scene** _scene) {
   Scene* scene = calloc(1, sizeof(Scene));
 
-  scene->material.lights_active        = 0;
-  scene->material.light_tree_active    = 1;
-  scene->material.default_material.r   = 0.3f;
-  scene->material.default_material.g   = 0.0f;
-  scene->material.default_material.b   = 1.0f;
-  scene->material.alpha_cutoff         = 0.0f;
-  scene->material.colored_transparency = 0;
-  scene->material.override_materials   = 0;
-  scene->material.invert_roughness     = 0;
-  scene->material.enable_ior_shadowing = 1;
+  scene->material.lights_active           = 0;
+  scene->material.light_tree_active       = 1;
+  scene->material.default_material.r      = 0.3f;
+  scene->material.default_material.g      = 0.0f;
+  scene->material.default_material.b      = 1.0f;
+  scene->material.alpha_cutoff            = 0.0f;
+  scene->material.colored_transparency    = 0;
+  scene->material.override_materials      = 0;
+  scene->material.invert_roughness        = 0;
+  scene->material.enable_ior_shadowing    = 1;
+  scene->material.caustic_roughness_clamp = 0.25f;
 
   scene->camera.pos.x                      = 0.0f;
   scene->camera.pos.y                      = 0.0f;

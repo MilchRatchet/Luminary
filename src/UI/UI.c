@@ -101,6 +101,8 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_check(ui, "Colored Transparency", &(instance->scene.material.colored_transparency), 1);
   panels[i++] = create_check(ui, "IOR Shadowing", &(instance->scene.material.enable_ior_shadowing), 1);
   panels[i++] = create_check(ui, "Invert roughness", &(instance->scene.material.invert_roughness), 1);
+  panels[i++] =
+    create_slider(ui, "Caustic Roughness Clamp", &(instance->scene.material.caustic_roughness_clamp), 1, 0.0002f, 0.0f, 1.0f, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -175,13 +177,13 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Aperture Blade Count", &(instance->scene.camera.aperture_blade_count), 1, 0.0005f, 3.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Focal Length", &(instance->scene.camera.focal_length), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Far Clip Distance", &(instance->scene.camera.far_clip_distance), 1, 0.05f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Russian Roulette Bias", &(instance->scene.camera.russian_roulette_threshold), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Firefly Clamping", &(instance->scene.camera.do_firefly_clamping), 1);
   panels[i++] = create_slider(ui, "Camera Speed", &(instance->scene.camera.wasd_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Mouse Sensitivity", &(instance->scene.camera.mouse_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene.camera.smooth_movement), 0);
   panels[i++] = create_slider(ui, "Smoothing Factor", &(instance->scene.camera.smoothing_factor), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] =
-    create_slider(ui, "Russian Roulette Bias", &(instance->scene.camera.russian_roulette_threshold), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
-  panels[i++] = create_check(ui, "Firefly Clamping", &(instance->scene.camera.do_firefly_clamping), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

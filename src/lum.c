@@ -103,6 +103,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 5715723589413916233u:
       sscanf(value, "%d\n", &material->invert_roughness);
       break;
+    /* ROUGHCLA */
+    case 4705209688408805202u:
+      sscanf(value, "%f\n", &material->caustic_roughness_clamp);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
       break;
@@ -889,6 +893,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "MATERIAL IORSHADO %d\n", instance->scene.material.enable_ior_shadowing);
   fputs(line, file);
   sprintf(line, "MATERIAL INVERTRO %d\n", instance->scene.material.invert_roughness);
+  fputs(line, file);
+  sprintf(line, "MATERIAL ROUGHCLA %f\n", instance->scene.material.caustic_roughness_clamp);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");

@@ -72,15 +72,16 @@ extern "C" __global__ void __raygen__optix() {
     // Light Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    const bool use_light_rays = is_delta_path || data.roughness > GEOMETRY_DELTA_PATH_CUTOFF;
+    // We clamp the roughness to avoid caustics which would never clean up.
+    if (!is_delta_path) {
+      data.roughness = fmaxf(data.roughness, device.scene.material.caustic_roughness_clamp);
+    }
 
     RGBF accumulated_light = (state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION)) ? data.emission : get_color(0.0f, 0.0f, 0.0f);
 
-    if (use_light_rays) {
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
-    }
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
 
     accumulated_light = add_color(
       accumulated_light,
