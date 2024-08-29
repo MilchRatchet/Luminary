@@ -352,8 +352,8 @@ OptixBuildInputOpacityMicromap micromap_opacity_build(RaytraceInstance* instance
   for (uint32_t i = 0; i < total_tri_count; i++) {
     const uint32_t level = (triangle_level[i] == 0xFF) ? max_num_levels - 1 : triangle_level[i];
 
-    desc[i].byteOffset       = array_offset_per_level[level];
-    desc[i].subdivisionLevel = level;
+    desc[i].byteOffset       = (unsigned int) array_offset_per_level[level];
+    desc[i].subdivisionLevel = (unsigned short) level;
     desc[i].format           = format;
 
     const size_t state_size = OMM_STATE_SIZE(level, format);

@@ -68,15 +68,15 @@ __constant__ DeviceConstantMemory device;
 // Functions
 //===========================================================================================
 
-__device__ static bool is_selected_pixel(const ushort2 index) {
+__device__ bool is_selected_pixel(const ushort2 index) {
   return (index.x == device.user_selected_x && index.y == device.user_selected_y);
 }
 
-__device__ static uint32_t get_pixel_id(const int x, const int y) {
+__device__ uint32_t get_pixel_id(const int x, const int y) {
   return x + device.width * y;
 }
 
-__device__ static int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
+__device__ int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
   static_assert(THREADS_PER_BLOCK == 128, "I wrote this using that we have 4 warps per block, this is also used in the 0x3!");
 
   const uint32_t threads_per_warp  = 32;
@@ -85,7 +85,7 @@ __device__ static int get_task_address_of_thread(const int thread_id, const int 
   return threads_per_warp * device.pixels_per_thread * warp_id + threads_per_warp * number + thread_id_in_warp;
 }
 
-__device__ static int get_task_address(const int number) {
+__device__ int get_task_address(const int number) {
 #ifndef OPTIX_KERNEL
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
 #else
