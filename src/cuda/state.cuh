@@ -4,11 +4,11 @@
 #include "utils.cuh"
 
 enum StateFlag {
-  STATE_FLAG_ALBEDO           = 0b00000001u,
-  STATE_FLAG_DELTA_PATH       = 0b00000010u,
-  STATE_FLAG_CAMERA_DIRECTION = 0b00000100u,
-  STATE_FLAG_OCEAN_SCATTERED  = 0b00001000u,
-  STATE_FLAG_BRIDGE_SAMPLING  = 0b00010000u
+  STATE_FLAG_ALBEDO               = 0b00000001u,
+  STATE_FLAG_DELTA_PATH           = 0b00000010u,
+  STATE_FLAG_CAMERA_DIRECTION     = 0b00000100u,
+  STATE_FLAG_OCEAN_SCATTERED      = 0b00001000u,
+  STATE_FLAG_SKIP_BRIDGE_SAMPLING = 0b00010000u
 } typedef StateFlag;
 
 //
@@ -27,8 +27,8 @@ enum StateFlag {
 // STATE_FLAG_OCEAN_SCATTERED: This flag is set for paths that have at least one vertex that is a ocean volume scattering event.
 //                             This flag is used to limit ocean volumes to single scattering for performance reasons.
 //
-// STATE_FLAG_BRIDGE_SAMPLING: This flag is set for paths that are allowed to use bridges sampling.
-//                             This flag is removed after using bridges sampling but set again after a non-volume scattering event.
+// STATE_FLAG_SKIP_BRIDGE_SAMPLING: This flag is set for paths that are not allowed to use bridges sampling.
+//                                  This flag is set after volume scattering events.
 //
 __device__ bool state_consume(const int pixel, const StateFlag flag) {
   if (device.ptrs.state_buffer[pixel] & flag) {

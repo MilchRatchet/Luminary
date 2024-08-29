@@ -54,9 +54,6 @@ extern "C" __global__ void __raygen__optix() {
     // Light Ray Sampling
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
-    if (state_peek(pixel, STATE_FLAG_BRIDGE_SAMPLING)) {
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
-    }
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
     accumulated_light = add_color(
@@ -79,7 +76,8 @@ extern "C" __global__ void __raygen__optix() {
         state_consume(pixel, STATE_FLAG_OCEAN_SCATTERED);
       }
 
-      state_release(pixel, STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_BRIDGE_SAMPLING);
+      state_release(pixel, STATE_FLAG_CAMERA_DIRECTION);
+      state_consume(pixel, STATE_FLAG_SKIP_BRIDGE_SAMPLING);
     }
   }
 

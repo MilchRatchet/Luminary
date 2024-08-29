@@ -11,8 +11,8 @@
 
 #ifdef VOLUME_KERNEL
 __device__ float light_tree_child_importance(
-  const float transmittance_importance, const vec3 origin, const vec3 ray, const LightTreeNode8Packed node, const vec3 exp,
-  const float exp_c, const uint32_t i) {
+  const float transmittance_importance, const vec3 origin, const vec3 ray, const float limit, const LightTreeNode8Packed node,
+  const vec3 exp, const float exp_c, const uint32_t i) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
 
@@ -39,7 +39,7 @@ __device__ float light_tree_child_importance(
   confidence = confidence * exp_c;
 
   // Compute the point along our ray that is closest to the child point.
-  const float t            = fmaxf(dot_product(sub_vector(origin, point), ray), 0.0f);
+  const float t            = fminf(fmaxf(dot_product(sub_vector(origin, point), ray), 0.0f), limit);
   const vec3 closest_point = add_vector(origin, scale_vector(ray, t));
 
   const vec3 diff = sub_vector(point, closest_point);
@@ -49,8 +49,8 @@ __device__ float light_tree_child_importance(
   return expf(-t * transmittance_importance) * energy / fmaxf(get_length(diff), confidence);
 }
 
-__device__ uint32_t
-  light_tree_traverse(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, float random, uint32_t& subset_length, float& pdf) {
+__device__ uint32_t light_tree_traverse(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, float random, uint32_t& subset_length, float& pdf) {
   if (!device.scene.material.light_tree_active) {
     subset_length = device.scene.triangle_lights_count;
     pdf           = 1.0f;
@@ -74,14 +74,14 @@ __device__ uint32_t
 
     float importance[8];
 
-    importance[0] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 0);
-    importance[1] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 1);
-    importance[2] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 2);
-    importance[3] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 3);
-    importance[4] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 4);
-    importance[5] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 5);
-    importance[6] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 6);
-    importance[7] = light_tree_child_importance(transmittance_importance, origin, ray, node, exp, exp_c, 7);
+    importance[0] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 0);
+    importance[1] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 1);
+    importance[2] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 2);
+    importance[3] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 3);
+    importance[4] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 4);
+    importance[5] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 5);
+    importance[6] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 6);
+    importance[7] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 7);
 
     float sum_importance = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
@@ -388,11 +388,11 @@ __device__ float light_triangle_intersection_uv(const TriangleLight triangle, co
  * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
  *
  */
-__device__ vec3 light_sample_triangle(
-  const TriangleLight triangle, const GBufferData data, const float2 random, float& solid_angle, float& dist, RGBF& color) {
-  const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, data.position));
-  const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), data.position));
-  const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), data.position));
+__device__ vec3
+  light_sample_triangle(const TriangleLight triangle, const vec3 pos, const float2 random, float& solid_angle, float& dist, RGBF& color) {
+  const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, pos));
+  const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), pos));
+  const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), pos));
 
   const float G0 = fabsf(dot_product(cross_product(v0, v1), v2));
   const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
@@ -429,7 +429,7 @@ __device__ vec3 light_sample_triangle(
   }
 
   float2 coords;
-  dist = light_triangle_intersection_uv(triangle, data.position, dir, coords);
+  dist = light_triangle_intersection_uv(triangle, pos, dir, coords);
 
   // Our ray does not actually hit the light, abort.
   if (dist == FLT_MAX) {

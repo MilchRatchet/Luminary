@@ -105,7 +105,7 @@ enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJ
 
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
-enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2 } typedef VolumeType;
+enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
 
 enum SkyMode { SKY_MODE_DEFAULT = 0, SKY_MODE_HDRI = 1, SKY_MODE_CONSTANT_COLOR = 2 } typedef SkyMode;
 
@@ -583,6 +583,7 @@ struct RaytraceInstance {
   OptixKernel optix_kernel_geometry;
   OptixKernel optix_kernel_volume;
   OptixKernel optix_kernel_particle;
+  OptixKernel optix_kernel_volume_bridges;
   OptixBVH optix_bvh;
   OptixBVH optix_bvh_shadow;
   OptixBVH optix_bvh_light;

@@ -77,9 +77,12 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
   if (instance->scene.particles.active) {
     optixrt_execute(instance->particles_instance.kernel);
   }
-  // TODO: Think about fixing the sky light issue for volumes by disallowing volume
-  // events as the last scattering event.
+
   if (instance->scene.fog.active || instance->scene.ocean.active) {
+    // It is important to compute bridges lighting before sampling volume scattering events.
+    // We want to sample over the whole unoccluded ray path so sampling scattering events before
+    // that would shorten the path.
+    optixrt_execute(instance->optix_kernel_volume_bridges);
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 

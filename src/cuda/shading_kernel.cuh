@@ -505,11 +505,11 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 
 #else /* !VOLUME_KERNEL */
 
-__device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort2 index) {
+__device__ RGBF optix_compute_light_ray_geo(const TraceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
   if (!TRIANGLE_LIGHTS_ON)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  return bridges_sample(data, index);
+  return bridges_sample(task, volume, limit, ior);
 }
 
 #endif /* VOLUME_KERNEL */

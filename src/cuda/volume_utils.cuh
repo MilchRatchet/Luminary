@@ -60,6 +60,28 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
   }
 }
 
+__device__ VolumeType volume_get_type_at_position(const vec3 pos) {
+  VolumeType type = VOLUME_TYPE_NONE;
+
+  if (device.scene.fog.active) {
+    const VolumeDescriptor volume_fog = volume_get_descriptor_preset_fog();
+
+    if (pos.y <= volume_fog.max_height && pos.y >= volume_fog.min_height) {
+      type = VOLUME_TYPE_FOG;
+    }
+  }
+
+  if (device.scene.ocean.active) {
+    const VolumeDescriptor volume_ocean = volume_get_descriptor_preset_ocean();
+
+    if (pos.y <= volume_ocean.max_height && pos.y >= volume_ocean.min_height) {
+      type = VOLUME_TYPE_OCEAN;
+    }
+  }
+
+  return type;
+}
+
 /*
  * Computes the start and length of a ray path through a volume.
  * The output path is only valid if the start is non-negative.

@@ -114,7 +114,7 @@ __device__ uint32_t ris_sample_light(
 
     float solid_angle, dist;
     RGBF light_color;
-    const vec3 ray = light_sample_triangle(triangle_light, data, ray_random, solid_angle, dist, light_color);
+    const vec3 ray = light_sample_triangle(triangle_light, data.position, ray_random, solid_angle, dist, light_color);
 
     if (dist == FLT_MAX || solid_angle == 0.0f)
       continue;
