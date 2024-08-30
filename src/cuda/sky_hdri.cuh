@@ -8,18 +8,6 @@
 #include "utils.cuh"
 #include "utils.h"
 
-/*
- * For documentation, see the host version in raytrace.c which is used for the camera rays.
- */
-__device__ float sky_hdri_tent_filter_importance_sample(const float x) {
-  if (x > 0.5f) {
-    return 1.0f - sqrtf(2.0f) * sqrtf(1.0f - x);
-  }
-  else {
-    return -1.0f + sqrtf(2.0f) * sqrtf(x);
-  }
-}
-
 // This file contains the code for the precomputation of the sky and storing it in a HDRI like LUT.
 // Note that since the LUT will contain cloud data, it will not parametrized like in Hillaire2020.
 // The main goal is to eliminate the cost of the atmosphere if that is desired.
@@ -39,13 +27,10 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
     const ushort2 pixel_coords = make_ushort2(x, y);
     const uint32_t pixel       = x + y * device.scene.sky.hdri_dim;
 
-    float2 random_jitter = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAMERA_JITTER, pixel_coords);
+    const float2 jitter = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAMERA_JITTER, pixel_coords);
 
-    const float jitter_u = 0.5f + sky_hdri_tent_filter_importance_sample(random_jitter.x);
-    const float jitter_v = 0.5f + sky_hdri_tent_filter_importance_sample(random_jitter.y);
-
-    const float u = (((float) x) + jitter_u) * step_size;
-    const float v = 1.0f - (((float) y) + jitter_v) * step_size;
+    const float u = (((float) x) + jitter.x) * step_size;
+    const float v = 1.0f - (((float) y) + jitter.y) * step_size;
 
     const float altitude = PI * v - 0.5f * PI;
     const float azimuth  = 2.0f * PI * u - PI;

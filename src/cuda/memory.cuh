@@ -142,7 +142,7 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
     return;
 
   if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
-    if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION) {
+    if (device.temporal_frames && device.accumulate) {
       RGBF out_albedo = device.ptrs.albedo_buffer[pixel];
       out_albedo      = scale_color(out_albedo, device.temporal_frames);
       albedo          = add_color(albedo, out_albedo);
@@ -157,7 +157,7 @@ __device__ void write_normal_buffer(const vec3 normal, const int pixel) {
   if ((!device.denoiser && !device.aov_mode) || !IS_PRIMARY_RAY)
     return;
 
-  if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION)
+  if (device.temporal_frames && device.accumulate)
     return;
 
   device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);

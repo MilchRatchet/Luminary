@@ -1249,26 +1249,6 @@ __device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
   return mat;
 }
 
-/*
- * We importance sample for a tent filter of radius 1.
- * The tent filter is defined by 1-abs(x) for all x in [-1,1] and 0 else.
- * To importance sample this filter, we need the cumulative distribution function P(x) where
- *    P(x) = -(x * fabsf(x) - 2 * x - 1) / 2.
- * Then we need the inverse of the CDF which is a piecewise function
- *    P^{-1}(x) = -1 + sqrtf(2) * sqrtf(x)       if x <= 0.5
- *    P^{-1}(x) = 1 - sqrtf(2) * sqrtf(1 - x)    if x > 0.5
- * Then we can take a uniformly distributed random variable Y in [0,1] for which then holds
- *    F^{-1}(Y) is distributed as F.
- */
-__device__ float tent_filter_importance_sample(const float x) {
-  if (x > 0.5f) {
-    return 1.0f - sqrtf(2.0f) * sqrtf(1.0f - x);
-  }
-  else {
-    return -1.0f + sqrtf(2.0f) * sqrtf(x);
-  }
-}
-
 #ifndef OPTIX_KERNEL
 
 /////////////////

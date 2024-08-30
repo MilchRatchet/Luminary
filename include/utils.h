@@ -101,8 +101,6 @@ enum Filter {
 
 enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } typedef SnapResolution;
 
-enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJECTION = 2 } typedef AccumMode;
-
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
@@ -338,13 +336,6 @@ struct Fog {
   float dist;
 } typedef Fog;
 
-struct Jitter {
-  float x;
-  float y;
-  float prev_x;
-  float prev_y;
-} typedef Jitter;
-
 struct GlobalMaterial {
   RGBF default_material;
   int lights_active;
@@ -389,7 +380,6 @@ struct Scene {
 } typedef Scene;
 
 struct RayEmitter {
-  Jitter jitter;
   Mat4x4 view_space;
   Mat4x4 projection;
   float step;
@@ -473,7 +463,7 @@ struct DeviceConstantMemory {
   OutputVariable output_variable;
   RGBF* bloom_scratch;
   RayEmitter emitter;
-  int accum_mode;
+  int accumulate;
   OptixTraversableHandle optix_bvh;
   OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_light;
@@ -570,8 +560,7 @@ struct RaytraceInstance {
   General settings;
   AtmoSettings atmo_settings;
   void* denoise_setup;
-  Jitter jitter;
-  int accum_mode;
+  int accumulate;
   RayEmitter emitter;
   RISSettings ris_settings;
   BridgeSettings bridge_settings;

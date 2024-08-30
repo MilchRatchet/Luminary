@@ -59,7 +59,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_dropdown(ui, "BVH Type", &(instance->bvh_type), 1, 2, "Luminary\0OptiX", 8);
   panels[i++] = create_dropdown(
     ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Identification\0Lights", 9);
-  panels[i++] = create_check(ui, "Accumulate", &(instance->accum_mode), 1);
+  panels[i++] = create_check(ui, "Accumulate", &(instance->accumulate), 1);
   if (instance->aov_mode) {
     panels[i++] = create_dropdown(
       ui, "Output Variable", &(instance->output_variable), 0, 5,

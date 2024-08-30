@@ -185,22 +185,6 @@ static void raytrace_load_bluenoise_texture(RaytraceInstance* instance) {
   device_buffer_upload(instance->bluenoise_2D, bluenoise_2D_data);
 }
 
-/*
- * Same as in math.cuh
- */
-static float tent_filter_importance_sample(const float x) {
-  if (x > 0.5f) {
-    return 1.0f - sqrtf(2.0f) * sqrtf(1.0f - x);
-  }
-  else {
-    return -1.0f + sqrtf(2.0f) * sqrtf(x);
-  }
-}
-
-static float jitter_value(const float x) {
-  return 0.5f + tent_filter_importance_sample(x);
-}
-
 void raytrace_update_ray_emitter(RaytraceInstance* instance) {
   RayEmitter emitter = instance->emitter;
 
@@ -241,11 +225,6 @@ void raytrace_update_ray_emitter(RaytraceInstance* instance) {
   emitter.projection.f33 = -(z_far + z_near) / (z_far - z_near);
   emitter.projection.f43 = -1.0f;
   emitter.projection.f34 = -(2.0f * z_far * z_near) / (z_far - z_near);
-
-  emitter.jitter.prev_x = emitter.jitter.x;
-  emitter.jitter.prev_y = emitter.jitter.y;
-  emitter.jitter.x      = jitter_value(halton(instance->temporal_frames, 2));
-  emitter.jitter.y      = jitter_value(halton(instance->temporal_frames, 3));
 
   instance->emitter = emitter;
   device_update_symbol(emitter, emitter);
@@ -348,7 +327,7 @@ void raytrace_build_structures(RaytraceInstance* instance) {
 
 void raytrace_execute(RaytraceInstance* instance) {
   // In no accumulation mode we always display the 0th frame.
-  if (instance->accum_mode == NO_ACCUMULATION)
+  if (!instance->accumulate)
     instance->temporal_frames = 0;
 
   device_update_symbol(temporal_frames, instance->temporal_frames);
@@ -532,7 +511,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->settings     = general;
   instance->shading_mode = 0;
   instance->aov_mode     = options.aov_mode;
-  instance->accum_mode   = TEMPORAL_ACCUMULATION;
+  instance->accumulate   = 1;
   instance->bvh_type     = BVH_OPTIX;
 
   instance->ris_settings.initial_reservoir_size = 16;
@@ -715,7 +694,7 @@ void raytrace_prepare(RaytraceInstance* instance) {
   device_update_symbol(output_variable, instance->output_variable);
   update_special_lights(instance->scene);
   raytrace_update_ray_emitter(instance);
-  device_update_symbol(accum_mode, instance->accum_mode);
+  device_update_symbol(accumulate, instance->accumulate);
   device_update_symbol(ris_settings, instance->ris_settings);
   device_update_symbol(bridge_settings, instance->bridge_settings);
   device_update_symbol(user_selected_x, instance->user_selected_x);

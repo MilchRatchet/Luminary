@@ -49,16 +49,7 @@ extern "C" void device_init() {
 }
 
 void device_handle_accumulation(RaytraceInstance* instance) {
-  switch (instance->accum_mode) {
-    case NO_ACCUMULATION:
-    case TEMPORAL_ACCUMULATION:
-      temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      break;
-    case TEMPORAL_REPROJECTION:
-    default:
-      error_message("Invalid accumulation mode %d specified", instance->accum_mode);
-      break;
-  }
+  temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
 extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int depth) {

@@ -303,8 +303,7 @@ void realtime_output(RaytraceInstance* instance) {
   Frametime frametime_total = init_frametime();
   UI ui                     = init_UI(instance, window);
 
-  instance->temporal_frames  = 0;
-  int temporal_frames_buffer = 0;
+  instance->temporal_frames = 0;
 
   float mouse_x_speed = 0.0f;
   float mouse_y_speed = 0.0f;
@@ -318,9 +317,6 @@ void realtime_output(RaytraceInstance* instance) {
 
   while (!exit) {
     SDL_Event event;
-
-    if (instance->accum_mode == TEMPORAL_REPROJECTION)
-      instance->temporal_frames = temporal_frames_buffer;
 
     raytrace_prepare(instance);
     start_frametime(&frametime_trace);
@@ -356,7 +352,6 @@ void realtime_output(RaytraceInstance* instance) {
     sample_frametime(&frametime_post);
 
     instance->temporal_frames++;
-    temporal_frames_buffer++;
 
     SDL_PumpEvents();
 
