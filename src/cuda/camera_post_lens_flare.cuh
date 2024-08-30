@@ -38,8 +38,8 @@ LUMINARY_KERNEL void _lens_flare_ghosts(const RGBF* source, const int sw, const 
     const int y = id / tw;
     const int x = id - y * tw;
 
-    const float sx = scale_x * x + 0.5f * scale_x;
-    const float sy = scale_y * y + 0.5f * scale_y;
+    const float sx = scale_x * x;
+    const float sy = scale_y * y;
 
     RGBF pixel = get_color(0.0f, 0.0f, 0.0f);
 
@@ -99,8 +99,8 @@ LUMINARY_KERNEL void _lens_flare_halo(const RGBF* src, const int sw, const int s
     const float chroma_shift = 0.005f;
 
     UV src_uv;
-    src_uv.u = scale_x * x + 0.5f * scale_x;
-    src_uv.v = scale_y * y + 0.5f * scale_y;
+    src_uv.u = scale_x * x;
+    src_uv.v = scale_y * y;
 
     const UV fish_uv          = _lens_flare_fisheye(src_uv, 1.0f, 1.0f);
     const float2 neg_offset   = make_float2(0.5f - src_uv.u, 0.5f - src_uv.v);
