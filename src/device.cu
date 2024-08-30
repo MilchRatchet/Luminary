@@ -48,7 +48,7 @@ extern "C" void device_init() {
   print_info("Copyright (c) 2024 MilchRatchet");
 }
 
-void device_handle_accumulation(RaytraceInstance* instance) {
+void device_handle_accumulation() {
   temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 

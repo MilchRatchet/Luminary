@@ -344,7 +344,7 @@ void raytrace_execute(RaytraceInstance* instance) {
     }
   }
 
-  device_handle_accumulation(instance);
+  device_handle_accumulation();
 
   gpuErrchk(cudaDeviceSynchronize());
 }

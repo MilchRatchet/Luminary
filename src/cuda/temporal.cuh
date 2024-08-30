@@ -28,9 +28,20 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample) {
 LUMINARY_KERNEL void temporal_accumulation() {
   const int amount = device.width * device.height;
 
+  const float scale_x = 1.0f / (device.width - 1);
+  const float scale_y = 1.0f / (device.height - 1);
+
+  const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
+
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    const int y = offset / device.width;
+    const int x = offset - y * device.width;
+
+    const float sx = (x + jitter.x) * scale_x;
+    const float sy = (y + jitter.y) * scale_y;
+
     // Direct Lighting
-    RGBF direct_buffer = load_RGBF(device.ptrs.frame_direct_buffer + offset);
+    RGBF direct_buffer = sample_pixel_clamp(device.ptrs.frame_direct_buffer, sx, sy, device.width, device.height);
     RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer);
@@ -42,7 +53,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
     store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_output);
 
     // Indirect Lighting
-    RGBF indirect_buffer = load_RGBF(device.ptrs.frame_indirect_buffer + offset);
+    RGBF indirect_buffer = sample_pixel_clamp(device.ptrs.frame_indirect_buffer, sx, sy, device.width, device.height);
     RGBF indirect_output = load_RGBF(device.ptrs.frame_indirect_accumulate + offset);
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer);
