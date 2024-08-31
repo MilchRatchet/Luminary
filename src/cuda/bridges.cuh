@@ -321,13 +321,87 @@ __device__ RGBF bridges_evaluate_bridge(
   return light_color;
 }
 
-__device__ vec3 bridges_sample_initial_vertex(
-  const TraceTask task, const VolumeDescriptor volume, const float limit, const TriangleLight light, const ushort2 pixel, float& pdf) {
-  // TODO: Importance sample initial vertex
+__device__ float bridges_sample_initial_vertex_target_pdf(
+  const TraceTask task, const VolumeDescriptor volume, const TriangleLight light, const vec3 light_center, const JendersieEonParams params,
+  const float t) {
+  RGBF weight;
 
+  weight.r = expf(-t * (volume.scattering.r + volume.absorption.r));
+  weight.g = expf(-t * (volume.scattering.g + volume.absorption.g));
+  weight.b = expf(-t * (volume.scattering.b + volume.absorption.b));
+
+  weight = mul_color(weight, volume.scattering);
+
+  const vec3 sample_point = add_vector(task.origin, scale_vector(task.ray, t));
+
+  const float solid_angle = sample_triangle_solid_angle(light, sample_point);
+
+  weight = scale_color(weight, solid_angle);
+
+  const float cos_angle = dot_product(task.ray, normalize_vector(sub_vector(light_center, sample_point)));
+
+  float phase_function_weight;
+  if (volume.type == VOLUME_TYPE_FOG) {
+    phase_function_weight = jendersie_eon_phase_function(cos_angle, params);
+  }
+  else {
+    phase_function_weight = ocean_phase(cos_angle);
+  }
+
+  weight = scale_color(weight, phase_function_weight);
+
+  return color_importance(weight);
+}
+
+__device__ vec3 bridges_sample_initial_vertex(
+  const TraceTask task, const VolumeDescriptor volume, const float limit, const TriangleLight light, const uint32_t seed,
+  const ushort2 pixel, float& pdf) {
   pdf = 1.0f;
 
-  return task.origin;
+  float selected_target_pdf = 1.0f;
+  float selected_t          = -FLT_MAX;
+
+  const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
+  const vec3 light_center         = add_vector(light.vertex, scale_vector(add_vector(light.edge1, light.edge2), 0.33f));
+
+  float sum_weight = 0.0f;
+
+  const uint32_t distance_sample_count = 8;
+
+  float random_resampling = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_RESAMPLING + seed, task.index);
+
+  for (uint32_t i = 0; i < distance_sample_count; i++) {
+    const float sample_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_DISTANCE + seed * 32 + i, task.index);
+
+    const float t = volume_sample_intersection(volume, task.origin, task.ray, 0.0f, limit, sample_random);
+
+    if (t == FLT_MAX)
+      continue;
+
+    const float distance_sample_pdf = volume_sample_intersection_pdf(volume, task.origin, task.ray, 0.0f, t);
+
+    const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, params, t);
+
+    const float weight = target_pdf / (distance_sample_pdf * distance_sample_count);
+
+    sum_weight += weight;
+
+    const float resampling_probability = weight / sum_weight;
+
+    if (random_resampling < resampling_probability) {
+      selected_t          = t;
+      selected_target_pdf = target_pdf;
+
+      random_resampling = random_resampling / resampling_probability;
+    }
+    else {
+      random_resampling = (random_resampling - resampling_probability) / (1.0f - resampling_probability);
+    }
+  }
+
+  pdf = (sum_weight > 0.0f) ? selected_target_pdf / sum_weight : FLT_MAX;
+
+  return add_vector(task.origin, scale_vector(task.ray, selected_t));
 }
 
 __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
@@ -373,7 +447,9 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     ////////////////////////////////////////////////////////////////////
 
     float initial_vertex_pdf;
-    const vec3 sample_initial_vertex = bridges_sample_initial_vertex(task, volume, limit, light, task.index, initial_vertex_pdf);
+    const vec3 sample_initial_vertex = bridges_sample_initial_vertex(task, volume, limit, light, i, task.index, initial_vertex_pdf);
+
+    sample_pdf *= initial_vertex_pdf;
 
     ////////////////////////////////////////////////////////////////////
     // Sample light point

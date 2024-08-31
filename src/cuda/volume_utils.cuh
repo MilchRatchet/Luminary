@@ -208,6 +208,11 @@ __device__ float volume_sample_intersection(
   return start + t;
 }
 
+__device__ float volume_sample_intersection_pdf(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float t) {
+  return volume.max_scattering * expf(-volume.max_scattering * (t - start));
+}
+
 __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType volume_hit_type, const vec3 ray) {
   const float cos_angle = -dot_product(data.V, ray);
 
