@@ -36,6 +36,24 @@ extern "C" __global__ void __raygen__optix() {
     if (state_peek(pixel, STATE_FLAG_SKIP_BRIDGE_SAMPLING))
       continue;
 
+    float start = FLT_MAX;
+
+    if (device.scene.fog.active) {
+      const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+
+      start = fminf(start, path.x);
+    }
+
+    if (device.scene.ocean.active) {
+      const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+
+      start = fminf(start, path.x);
+    }
+
+    task.origin = add_vector(task.origin, scale_vector(task.ray, start * (1.0f + 4.0f * eps)));
+
     const VolumeType volume_type = volume_get_type_at_position(task.origin);
 
     if (volume_type == VOLUME_TYPE_NONE)
