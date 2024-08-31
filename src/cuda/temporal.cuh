@@ -7,6 +7,45 @@
 // TODO: Refactor this into a separate file, the idea of "temporal" is long gone now that reprojection is gone. While we are at it, get rid
 // of the legacy naming of "temporal frames".
 
+// This is a gaussian filter with a sigma of 0.4 and a radius of 2. I cut out a lot of the terms
+// because they were negligible.
+__device__ float temporal_gather_pixel_weight(const RGBF pixel, const float x, const float y) {
+  const float weight_x = expf(-(x * x) * 3.125f);
+  const float weight_y = expf(-(y * y) * 3.125f);
+
+  return weight_x * weight_y;
+}
+
+__device__ RGBF temporal_gather_pixel_load(
+  const RGBF* image, const int width, const int height, const float sx, const float sy, const int i, const int j) {
+  const int index_x = ((int) sx) + i;
+  const int index_y = ((int) sy) + j;
+
+  if (index_x < 0 || index_x >= width || index_y < 0 || index_y >= height)
+    return get_color(0.0f, 0.0f, 0.0f);
+
+  const int index = index_x + index_y * width;
+
+  const RGBF pixel = load_RGBF(image + index);
+
+  const float rx = fabsf(sx - index_x);
+  const float ry = fabsf(sy - index_y);
+
+  return scale_color(pixel, temporal_gather_pixel_weight(pixel, rx, ry));
+}
+
+__device__ RGBF temporal_gather_pixel(const RGBF* image, const float x, const float y, const int width, const int height) {
+  RGBF result = get_color(0.0f, 0.0f, 0.0f);
+
+  for (int j = -1; j <= 2; j++) {
+    for (int i = -1; i <= 2; i++) {
+      result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, i, j));
+    }
+  }
+
+  return result;
+}
+
 __device__ RGBF temporal_reject_invalid_sample(RGBF sample) {
   if (isnan(luminance(sample)) || isinf(luminance(sample))) {
     // Debug code to identify paths that cause NaNs and INFs
@@ -28,20 +67,17 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample) {
 LUMINARY_KERNEL void temporal_accumulation() {
   const int amount = device.width * device.height;
 
-  const float scale_x = 1.0f / (device.width - 1);
-  const float scale_y = 1.0f / (device.height - 1);
-
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const int y = offset / device.width;
     const int x = offset - y * device.width;
 
-    const float sx = (x + jitter.x) * scale_x;
-    const float sy = (y + jitter.y) * scale_y;
+    const float sx = x + jitter.x;
+    const float sy = y + jitter.y;
 
     // Direct Lighting
-    RGBF direct_buffer = sample_pixel_clamp(device.ptrs.frame_direct_buffer, sx, sy, device.width, device.height);
+    RGBF direct_buffer = temporal_gather_pixel(device.ptrs.frame_direct_buffer, sx, sy, device.width, device.height);
     RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer);
@@ -53,7 +89,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
     store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_output);
 
     // Indirect Lighting
-    RGBF indirect_buffer = sample_pixel_clamp(device.ptrs.frame_indirect_buffer, sx, sy, device.width, device.height);
+    RGBF indirect_buffer = temporal_gather_pixel(device.ptrs.frame_indirect_buffer, sx, sy, device.width, device.height);
     RGBF indirect_output = load_RGBF(device.ptrs.frame_indirect_accumulate + offset);
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer);
