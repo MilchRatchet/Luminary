@@ -343,13 +343,13 @@ __device__ float ocean_molecular_weight(const JerlovWaterType type) {
 
 // Henyey Greenstein importance sampling for g = 0
 // pbrt v3 - Light Transport II: Volume Rendering - Sampling Volume Scattering
-__device__ float ocean_molecular_phase_sampling_cosine(const vec3 ray, const float r) {
+__device__ float ocean_molecular_phase_sampling_cosine(const float r) {
   return 2.0f * r - 1.0f;
 }
 
 // Henyey Greenstein importance sampling for g != 0
 // pbrt v3 - Light Transport II: Volume Rendering - Sampling Volume Scattering
-__device__ float ocean_particle_phase_sampling_cosine(const vec3 ray, const float r) {
+__device__ float ocean_particle_phase_sampling_cosine(const float r) {
   const float g = 0.924f;
 
   float denom = (1.0f - g + 2.0f * g * r);
@@ -367,13 +367,27 @@ __device__ vec3 ocean_phase_sampling(const vec3 ray, const float2 r_dir, const f
 
   float cos_angle;
   if (r_choice < molecular_weight) {
-    cos_angle = ocean_molecular_phase_sampling_cosine(ray, r_dir.x);
+    cos_angle = ocean_molecular_phase_sampling_cosine(r_dir.x);
   }
   else {
-    cos_angle = ocean_particle_phase_sampling_cosine(ray, r_dir.x);
+    cos_angle = ocean_particle_phase_sampling_cosine(r_dir.x);
   }
 
   return phase_sample_basis(cos_angle, r_dir.y, ray);
+}
+
+__device__ float ocean_phase_sampling_cos_angle(const float r_dir, const float r_choice) {
+  const float molecular_weight = ocean_molecular_weight(device.scene.ocean.water_type);
+
+  float cos_angle;
+  if (r_choice < molecular_weight) {
+    cos_angle = ocean_molecular_phase_sampling_cosine(r_dir);
+  }
+  else {
+    cos_angle = ocean_particle_phase_sampling_cosine(r_dir);
+  }
+
+  return cos_angle;
 }
 
 __device__ float ocean_molecular_phase(const float cos_angle) {

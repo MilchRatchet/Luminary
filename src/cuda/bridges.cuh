@@ -353,6 +353,14 @@ __device__ float bridges_sample_initial_vertex_target_pdf(
   return color_importance(weight);
 }
 
+__device__ float bridges_initial_vertex_uniform_sample(const float uniform_min, const float uniform_max, const float random) {
+  return uniform_min + random * (uniform_max - uniform_min);
+}
+
+__device__ float bridges_initial_vertex_uniform_sample_pdf(const float uniform_min, const float uniform_max) {
+  return 1.0f / (uniform_max - uniform_min);
+}
+
 __device__ vec3 bridges_sample_initial_vertex(
   const TraceTask task, const VolumeDescriptor volume, const float limit, const TriangleLight light, const uint32_t seed,
   const ushort2 pixel, float& pdf) {
@@ -364,14 +372,51 @@ __device__ vec3 bridges_sample_initial_vertex(
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
   const vec3 light_center         = add_vector(light.vertex, scale_vector(add_vector(light.edge1, light.edge2), 0.33f));
 
+  const float light_center_dist  = fabsf(dot_product(sub_vector(task.origin, light_center), task.ray));
+  const float uniform_min        = 0.0f;
+  const float uniform_max        = fminf(2.0f * light_center_dist, limit);
+  const float uniform_sample_pdf = bridges_initial_vertex_uniform_sample_pdf(uniform_min, uniform_max);
+
   float sum_weight = 0.0f;
 
-  const uint32_t distance_sample_count = 8;
+  const uint32_t uniform_sample_count  = 32;
+  const uint32_t distance_sample_count = 4;
+  // TODO: Try out sampling technique from "Practical product sampling for single scattering in media" by Villeneuve et al.
 
   float random_resampling = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_RESAMPLING + seed, task.index);
 
+  uint32_t sample_id = 0;
+
+  for (uint32_t i = 0; i < uniform_sample_count; i++) {
+    const float sample_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_DISTANCE + seed * 32 + sample_id, task.index);
+    sample_id++;
+
+    const float t = bridges_initial_vertex_uniform_sample(uniform_min, uniform_max, sample_random);
+
+    const float distance_sample_pdf = volume_sample_intersection_pdf(volume, task.origin, task.ray, 0.0f, t);
+
+    const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, params, t);
+
+    const float weight = target_pdf / (distance_sample_pdf * distance_sample_count + uniform_sample_pdf * uniform_sample_count);
+
+    sum_weight += weight;
+
+    const float resampling_probability = weight / sum_weight;
+
+    if (random_resampling < resampling_probability) {
+      selected_t          = t;
+      selected_target_pdf = target_pdf;
+
+      random_resampling = random_resampling / resampling_probability;
+    }
+    else {
+      random_resampling = (random_resampling - resampling_probability) / (1.0f - resampling_probability);
+    }
+  }
+
   for (uint32_t i = 0; i < distance_sample_count; i++) {
-    const float sample_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_DISTANCE + seed * 32 + i, task.index);
+    const float sample_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_VERTEX_DISTANCE + seed * 32 + sample_id, task.index);
+    sample_id++;
 
     const float t = volume_sample_intersection(volume, task.origin, task.ray, 0.0f, limit, sample_random);
 
@@ -382,7 +427,7 @@ __device__ vec3 bridges_sample_initial_vertex(
 
     const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, params, t);
 
-    const float weight = target_pdf / (distance_sample_pdf * distance_sample_count);
+    const float weight = target_pdf / (distance_sample_pdf * distance_sample_count + uniform_sample_pdf * uniform_sample_count);
 
     sum_weight += weight;
 

@@ -1024,15 +1024,27 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
 __device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice) {
   const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
 
-  float u;
+  float cos_angle;
   if (r_choice < params.w_d) {
-    u = draine_phase_sample(params.g_d, params.alpha, r_dir.x);
+    cos_angle = draine_phase_sample(params.g_d, params.alpha, r_dir.x);
   }
   else {
-    u = henyey_greenstein_phase_sample(params.g_hg, r_dir.x);
+    cos_angle = henyey_greenstein_phase_sample(params.g_hg, r_dir.x);
   }
 
-  return phase_sample_basis(u, r_dir.y, ray);
+  return phase_sample_basis(cos_angle, r_dir.y, ray);
+}
+
+__device__ float jendersie_eon_phase_sample_cos_angle(const JendersieEonParams params, const float r_dir, const float r_choice) {
+  float cos_angle;
+  if (r_choice < params.w_d) {
+    cos_angle = draine_phase_sample(params.g_d, params.alpha, r_dir);
+  }
+  else {
+    cos_angle = henyey_greenstein_phase_sample(params.g_hg, r_dir);
+  }
+
+  return cos_angle;
 }
 
 __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
