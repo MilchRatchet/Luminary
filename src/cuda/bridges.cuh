@@ -13,7 +13,7 @@
 #include "utils.h"
 #include "volume_utils.cuh"
 
-#define BRIDGES_MAX_DEPTH 32
+#define BRIDGES_MAX_DEPTH (8)
 
 // This must correspond to the G term used when computing the LUT.
 #define BRIDGES_HG_G_TERM (0.85f)
