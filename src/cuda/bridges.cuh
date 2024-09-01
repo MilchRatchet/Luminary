@@ -214,9 +214,9 @@ __device__ RGBF bridges_sample_bridge(
   end_vertex = current_vertex;
 
   RGBF path_weight = get_color(
-    expf((vertex_count - 1) * logf(volume.scattering.r) - sum_dist * (volume.scattering.r + volume.absorption.r)),
-    expf((vertex_count - 1) * logf(volume.scattering.g) - sum_dist * (volume.scattering.g + volume.absorption.g)),
-    expf((vertex_count - 1) * logf(volume.scattering.b) - sum_dist * (volume.scattering.b + volume.absorption.b)));
+    expf(vertex_count * logf(volume.scattering.r) - sum_dist * (volume.scattering.r + volume.absorption.r)),
+    expf(vertex_count * logf(volume.scattering.g) - sum_dist * (volume.scattering.g + volume.absorption.g)),
+    expf(vertex_count * logf(volume.scattering.b) - sum_dist * (volume.scattering.b + volume.absorption.b)));
 
   const float log_path_pdf = bridges_log_factorial(vertex_count) - vertex_count * logf(sum_dist);
 
@@ -227,7 +227,7 @@ __device__ RGBF bridges_sample_bridge(
 
 __device__ RGBF bridges_evaluate_bridge(
   const TraceTask task, const VolumeDescriptor volume, const vec3 initial_vertex, const uint32_t light_id, const uint32_t seed,
-  const Quaternion rotation, const float scale, const float ior, const ushort2 pixel) {
+  const Quaternion rotation, const float scale, const RGBF initial_vertex_transmittance, const float ior, const ushort2 pixel) {
   ////////////////////////////////////////////////////////////////////
   // Get light sample
   ////////////////////////////////////////////////////////////////////
@@ -251,6 +251,8 @@ __device__ RGBF bridges_evaluate_bridge(
     light_color  = get_color(0.0f, 0.0f, 0.0f);
     light_vector = get_vector(0.0f, 0.0f, 1.0f);
   }
+
+  light_color = mul_color(light_color, initial_vertex_transmittance);
 
   ////////////////////////////////////////////////////////////////////
   // Get sampled vertex count
@@ -323,9 +325,9 @@ __device__ RGBF bridges_evaluate_bridge(
     sum_dist += dist;
   }
 
-  light_color.r *= expf((vertex_count - 1) * logf(volume.scattering.r) - sum_dist * (volume.scattering.r + volume.absorption.r));
-  light_color.g *= expf((vertex_count - 1) * logf(volume.scattering.g) - sum_dist * (volume.scattering.g + volume.absorption.g));
-  light_color.b *= expf((vertex_count - 1) * logf(volume.scattering.b) - sum_dist * (volume.scattering.b + volume.absorption.b));
+  light_color.r *= expf(vertex_count * logf(volume.scattering.r) - sum_dist * (volume.scattering.r + volume.absorption.r));
+  light_color.g *= expf(vertex_count * logf(volume.scattering.g) - sum_dist * (volume.scattering.g + volume.absorption.g));
+  light_color.b *= expf(vertex_count * logf(volume.scattering.b) - sum_dist * (volume.scattering.b + volume.absorption.b));
 
   return light_color;
 }
@@ -394,8 +396,9 @@ __device__ float2 bridges_initial_vertex_uniform_sample_bounds(
 
 __device__ vec3 bridges_sample_initial_vertex(
   const TraceTask task, const VolumeDescriptor volume, const float limit, const TriangleLight light, const uint32_t seed,
-  const ushort2 pixel, float& pdf) {
-  pdf = 1.0f;
+  const ushort2 pixel, float& pdf, RGBF& transmittance) {
+  pdf           = 1.0f;
+  transmittance = get_color(0.0f, 0.0f, 0.0f);
 
   float selected_target_pdf = 1.0f;
   float selected_t          = -FLT_MAX;
@@ -478,16 +481,21 @@ __device__ vec3 bridges_sample_initial_vertex(
 
   pdf = (sum_weight > 0.0f) ? selected_target_pdf / sum_weight : FLT_MAX;
 
+  transmittance.r = expf(-selected_t * (volume.scattering.r + volume.absorption.r));
+  transmittance.g = expf(-selected_t * (volume.scattering.g + volume.absorption.g));
+  transmittance.b = expf(-selected_t * (volume.scattering.b + volume.absorption.b));
+
   return add_vector(task.origin, scale_vector(task.ray, selected_t));
 }
 
 __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
-  uint32_t selected_seed       = 0xFFFFFFFF;
-  uint32_t selected_light_id   = LIGHT_ID_NONE;
-  Quaternion selected_rotation = {0.0f, 0.0f, 0.0f, 1.0f};
-  vec3 selected_initial_vertex = get_vector(0.0f, 0.0f, 0.0f);
-  float selected_scale         = 0.0f;
-  float selected_target_pdf    = FLT_MAX;
+  uint32_t selected_seed                     = 0xFFFFFFFF;
+  uint32_t selected_light_id                 = LIGHT_ID_NONE;
+  Quaternion selected_rotation               = {0.0f, 0.0f, 0.0f, 1.0f};
+  vec3 selected_initial_vertex               = get_vector(0.0f, 0.0f, 0.0f);
+  RGBF selected_initial_vertex_transmittance = get_color(0.0f, 0.0f, 0.0f);
+  float selected_scale                       = 0.0f;
+  float selected_target_pdf                  = FLT_MAX;
 
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
 
@@ -524,7 +532,9 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     ////////////////////////////////////////////////////////////////////
 
     float initial_vertex_pdf;
-    const vec3 sample_initial_vertex = bridges_sample_initial_vertex(task, volume, limit, light, i, task.index, initial_vertex_pdf);
+    RGBF sample_initial_vertex_transmittance;
+    const vec3 sample_initial_vertex =
+      bridges_sample_initial_vertex(task, volume, limit, light, i, task.index, initial_vertex_pdf, sample_initial_vertex_transmittance);
 
     sample_pdf *= initial_vertex_pdf;
 
@@ -580,6 +590,7 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     }
 
     sample_path_weight = scale_color(sample_path_weight, phase_function_weight);
+    sample_path_weight = mul_color(sample_path_weight, sample_initial_vertex_transmittance);
 
     ////////////////////////////////////////////////////////////////////
     // Resample
@@ -597,12 +608,13 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     const float resampling_probability = weight / sum_weight;
 
     if (random_resampling < resampling_probability) {
-      selected_seed           = i;
-      selected_light_id       = light_id;
-      selected_rotation       = sample_rotation;
-      selected_scale          = sample_path_scale;
-      selected_target_pdf     = target_pdf;
-      selected_initial_vertex = sample_initial_vertex;
+      selected_seed                         = i;
+      selected_light_id                     = light_id;
+      selected_rotation                     = sample_rotation;
+      selected_scale                        = sample_path_scale;
+      selected_target_pdf                   = target_pdf;
+      selected_initial_vertex               = sample_initial_vertex;
+      selected_initial_vertex_transmittance = sample_initial_vertex_transmittance;
 
       random_resampling = random_resampling / resampling_probability;
     }
@@ -618,7 +630,8 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
   ////////////////////////////////////////////////////////////////////
 
   RGBF bridge_color = bridges_evaluate_bridge(
-    task, volume, selected_initial_vertex, selected_light_id, selected_seed, selected_rotation, selected_scale, ior, task.index);
+    task, volume, selected_initial_vertex, selected_light_id, selected_seed, selected_rotation, selected_scale,
+    selected_initial_vertex_transmittance, ior, task.index);
 
   bridge_color = scale_color(bridge_color, sum_weight / selected_target_pdf);
 

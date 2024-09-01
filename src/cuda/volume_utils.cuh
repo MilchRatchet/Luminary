@@ -29,7 +29,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
   volume.max_scattering = FOG_DENSITY;
   volume.dist           = device.scene.fog.dist;
   volume.max_height     = device.scene.fog.height;
-  volume.min_height     = (device.scene.ocean.active) ? OCEAN_MAX_HEIGHT : 0.0f;
+  volume.min_height     = (device.scene.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
 
   return volume;
 }
@@ -42,7 +42,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.scattering = ocean_jerlov_scattering_coefficient(device.scene.ocean.water_type);
   volume.dist       = 10000.0f;
   volume.max_height = OCEAN_MIN_HEIGHT * (1.0f - eps);
-  volume.min_height = 0.0f;
+  volume.min_height = -65535.0f;
 
   volume.max_scattering = color_importance(volume.scattering);
 
