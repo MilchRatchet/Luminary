@@ -120,7 +120,7 @@ __device__ float bsdf_refraction_index_ambient(const vec3 position, const vec3 r
 }
 
 // Get normal vector based on incoming ray and refracted ray: PBRT v3 Chapter 8.4.4
-__device__ vec3 bsdf_refraction_normal_from_pair(const vec3 L, const vec3 V, const float refraction_index) {
+__device__ vec3 bsdf_normal_from_pair(const vec3 L, const vec3 V, const float refraction_index) {
   const vec3 refraction_normal = add_vector(L, scale_vector(V, refraction_index));
 
   const float length = get_length(refraction_normal);

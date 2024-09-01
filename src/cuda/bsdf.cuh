@@ -30,11 +30,11 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   vec3 refraction_vector;
   bool total_reflection;
   if (context.is_refraction) {
-    context.H         = bsdf_refraction_normal_from_pair(L, data.V, context.refraction_index);
+    context.H         = bsdf_normal_from_pair(L, data.V, context.refraction_index);
     refraction_vector = L;
   }
   else {
-    context.H         = normalize_vector(add_vector(data.V, L));
+    context.H         = bsdf_normal_from_pair(L, data.V, 1.0f);
     refraction_vector = refract_vector(data.V, context.H, context.refraction_index, total_reflection);
   }
 
