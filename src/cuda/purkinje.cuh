@@ -16,7 +16,12 @@
 #include "math.cuh"
 #include "structs.h"
 
+#define PURKINJE_STRENGTH (5000.0f)
+
 __device__ RGBF purkinje_shift(RGBF pixel) {
+  if (luminance(pixel) >= (1.0f / PURKINJE_STRENGTH))
+    return pixel;
+
   // sRGB => LMSR
   float long_cone   = 0.096869562190332f * pixel.r + 0.318940374720484f * pixel.g - 0.188428411786113f * pixel.b;
   float medium_cone = 0.020208210904239f * pixel.r + 0.291385283197581f * pixel.g - 0.090918262127325f * pixel.b;
@@ -29,11 +34,17 @@ __device__ RGBF purkinje_shift(RGBF pixel) {
   const float mm     = 1.0f / 0.39242f;
   const float sm     = 1.0f / 1.6064f;
 
+  RGBF inverse_signal;
+
+  inverse_signal.r = fmaxf(1.0f + (1.0f / 3.0f) * lm * (long_cone + kappa1 * rod), eps);
+  inverse_signal.g = fmaxf(1.0f + (1.0f / 3.0f) * mm * (medium_cone + kappa1 * rod), eps);
+  inverse_signal.b = fmaxf(1.0f + (1.0f / 3.0f) * sm * (short_cone + kappa2 * rod), eps);
+
   RGBF signal;
 
-  signal.r = 1.0f / sqrtf(1.0f + (1.0f / 3.0f) * lm * (long_cone + kappa1 * rod));
-  signal.g = 1.0f / sqrtf(1.0f + (1.0f / 3.0f) * mm * (medium_cone + kappa1 * rod));
-  signal.b = 1.0f / sqrtf(1.0f + (1.0f / 3.0f) * sm * (short_cone + kappa2 * rod));
+  signal.r = 1.0f / sqrtf(inverse_signal.r);
+  signal.g = 1.0f / sqrtf(inverse_signal.g);
+  signal.b = 1.0f / sqrtf(inverse_signal.b);
 
   const float K  = 45.0f;
   const float S  = 10.0f;
@@ -69,7 +80,9 @@ __device__ RGBF purkinje_shift(RGBF pixel) {
   sRGB.g = -0.9693f * XYZ.r + 1.876f * XYZ.g + 0.0416f * XYZ.b;
   sRGB.b = 0.0556f * XYZ.r - 0.2040f * XYZ.g + 1.0572f * XYZ.b;
 
-  float blend = __saturatef(1.0f - 5000.0f * luminance(pixel));
+  UTILS_CHECK_NANS(UTILS_NO_PIXEL_SELECTED, sRGB);
+
+  float blend = __saturatef(1.0f - PURKINJE_STRENGTH * luminance(pixel));
 
   blend *= blend;
 
