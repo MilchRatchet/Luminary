@@ -15,6 +15,19 @@
 
 #define BRIDGES_MAX_DEPTH 32
 
+// This must correspond to the G term used when computing the LUT.
+#define BRIDGES_HG_G_TERM (0.85f)
+
+__device__ vec3 bridges_phase_sample(const vec3 ray, const float2 r_dir) {
+  const float cos_angle = henyey_greenstein_phase_sample(BRIDGES_HG_G_TERM, r_dir.x);
+
+  return phase_sample_basis(cos_angle, r_dir.y, ray);
+}
+
+__device__ float bridges_phase_function(const float cos_angle) {
+  return henyey_greenstein_phase_function(cos_angle, BRIDGES_HG_G_TERM);
+}
+
 __device__ Quaternion bridges_compute_rotation(const vec3 initial_vertex, const vec3 light_point, const vec3 end_vertex) {
   const vec3 target_dir = normalize_vector(sub_vector(light_point, initial_vertex));
   const vec3 actual_dir = normalize_vector(sub_vector(end_vertex, initial_vertex));
@@ -188,12 +201,7 @@ __device__ RGBF bridges_sample_bridge(
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
     const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
-    if (volume.type == VOLUME_TYPE_FOG) {
-      current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
-    }
-    else {
-      current_direction = ocean_phase_sampling(current_direction, random_phase, random_method);
-    }
+    current_direction = bridges_phase_sample(current_direction, random_phase);
 
     const float random_dist = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel);
     const float dist        = -logf(random_dist);
@@ -285,16 +293,9 @@ __device__ RGBF bridges_evaluate_bridge(
   unsigned int compressed_ior = ior_compress(ior);
 
   // Apply phase function of first direction.
-  const float cos_angle           = dot_product(current_direction, task.ray);
-  const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
+  const float cos_angle = dot_product(current_direction, task.ray);
 
-  float phase_function_weight;
-  if (volume.type == VOLUME_TYPE_FOG) {
-    phase_function_weight = jendersie_eon_phase_function(cos_angle, params);
-  }
-  else {
-    phase_function_weight = ocean_phase(cos_angle);
-  }
+  const float phase_function_weight = bridges_phase_function(cos_angle);
 
   light_color = scale_color(light_color, phase_function_weight);
 
@@ -313,13 +314,7 @@ __device__ RGBF bridges_evaluate_bridge(
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
     const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
-    if (volume.type == VOLUME_TYPE_FOG) {
-      current_direction_sampled =
-        jendersie_eon_phase_sample(current_direction_sampled, device.scene.fog.droplet_diameter, random_phase, random_method);
-    }
-    else {
-      current_direction_sampled = ocean_phase_sampling(current_direction_sampled, random_phase, random_method);
-    }
+    current_direction_sampled = bridges_phase_sample(current_direction, random_phase);
 
     current_direction = rotate_vector_by_quaternion(current_direction_sampled, rotation);
 
@@ -340,8 +335,7 @@ __device__ RGBF bridges_evaluate_bridge(
 }
 
 __device__ float bridges_sample_initial_vertex_target_pdf(
-  const TraceTask task, const VolumeDescriptor volume, const TriangleLight light, const vec3 light_center, const JendersieEonParams params,
-  const float t) {
+  const TraceTask task, const VolumeDescriptor volume, const TriangleLight light, const vec3 light_center, const float t) {
   RGBF weight;
 
   weight.r = expf(-t * (volume.scattering.r + volume.absorption.r));
@@ -358,13 +352,7 @@ __device__ float bridges_sample_initial_vertex_target_pdf(
 
   const float cos_angle = dot_product(task.ray, normalize_vector(sub_vector(light_center, sample_point)));
 
-  float phase_function_weight;
-  if (volume.type == VOLUME_TYPE_FOG) {
-    phase_function_weight = jendersie_eon_phase_function(cos_angle, params);
-  }
-  else {
-    phase_function_weight = ocean_phase(cos_angle);
-  }
+  const float phase_function_weight = bridges_phase_function(cos_angle);
 
   weight = scale_color(weight, phase_function_weight);
 
@@ -385,18 +373,9 @@ __device__ float bridges_initial_vertex_uniform_sample_pdf(const float uniform_m
 __device__ float2 bridges_initial_vertex_uniform_sample_bounds(
   const TraceTask task, const float limit, const TriangleLight light, const vec3 light_center, const ushort2 pixel) {
   const float light_center_dist = dot_product(sub_vector(light_center, task.origin), task.ray);
-  const vec3 p                  = add_vector(task.origin, scale_vector(task.ray, light_center_dist));
-  const float radius            = get_length(sub_vector(light_center, p)) * 3.0f;
 
-  const float t0 = sphere_ray_intersection(task.ray, task.origin, light_center, radius);
-  const float t1 = t0 + 2.0f * (light_center_dist - t0);
-
-  if (t0 == FLT_MAX) {
-    return make_float2(-FLT_MAX, -FLT_MAX * 0.5f);
-  }
-
-  const float uniform_min = fmaxf(fminf(fminf(t0, t1), limit), 0.0f);
-  const float uniform_max = fmaxf(fminf(fmaxf(t0, t1), limit), 0.0f);
+  const float uniform_min = 0.0f;
+  const float uniform_max = fmaxf(fminf(light_center_dist, limit), 0.0f);
 
   return make_float2(uniform_min, uniform_max);
 }
@@ -410,8 +389,7 @@ __device__ vec3 bridges_sample_initial_vertex(
   float selected_target_pdf = 1.0f;
   float selected_t          = -FLT_MAX;
 
-  const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
-  const vec3 light_center         = add_vector(light.vertex, scale_vector(add_vector(light.edge1, light.edge2), 0.33f));
+  const vec3 light_center = add_vector(light.vertex, scale_vector(add_vector(light.edge1, light.edge2), 0.33f));
 
   const float2 uniform_bounds = bridges_initial_vertex_uniform_sample_bounds(task, limit, light, light_center, pixel);
   const float uniform_min     = uniform_bounds.x;
@@ -419,7 +397,7 @@ __device__ vec3 bridges_sample_initial_vertex(
 
   float sum_weight = 0.0f;
 
-  const uint32_t uniform_sample_count  = 32;
+  const uint32_t uniform_sample_count  = 60;
   const uint32_t distance_sample_count = 4;
   // TODO: Try out sampling technique from "Practical product sampling for single scattering in media" by Villeneuve et al.
 
@@ -436,7 +414,7 @@ __device__ vec3 bridges_sample_initial_vertex(
     const float uniform_sample_pdf  = bridges_initial_vertex_uniform_sample_pdf(uniform_min, uniform_max, t);
     const float distance_sample_pdf = volume_sample_intersection_pdf(volume, task.origin, task.ray, 0.0f, t);
 
-    const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, params, t);
+    const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, t);
 
     const float weight = target_pdf / (distance_sample_pdf * distance_sample_count + uniform_sample_pdf * uniform_sample_count);
 
@@ -467,7 +445,7 @@ __device__ vec3 bridges_sample_initial_vertex(
     const float uniform_sample_pdf  = bridges_initial_vertex_uniform_sample_pdf(uniform_min, uniform_max, t);
     const float distance_sample_pdf = volume_sample_intersection_pdf(volume, task.origin, task.ray, 0.0f, t);
 
-    const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, params, t);
+    const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, t);
 
     const float weight = target_pdf / (distance_sample_pdf * distance_sample_count + uniform_sample_pdf * uniform_sample_count);
 
@@ -506,8 +484,6 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
   RGBF selected_initial_vertex_transmittance = get_color(0.0f, 0.0f, 0.0f);
   float selected_scale                       = 0.0f;
   float selected_target_pdf                  = FLT_MAX;
-
-  const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
 
   float sum_weight = 0.0f;
 
@@ -594,13 +570,7 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     const vec3 rotation_initial_direction = rotate_vector_by_quaternion(light_dir, sample_rotation);
     const float cos_angle                 = dot_product(rotation_initial_direction, task.ray);
 
-    float phase_function_weight;
-    if (volume.type == VOLUME_TYPE_FOG) {
-      phase_function_weight = jendersie_eon_phase_function(cos_angle, params);
-    }
-    else {
-      phase_function_weight = ocean_phase(cos_angle);
-    }
+    const float phase_function_weight = bridges_phase_function(cos_angle);
 
     sample_path_weight = scale_color(sample_path_weight, phase_function_weight);
     sample_path_weight = mul_color(sample_path_weight, sample_initial_vertex_transmittance);
