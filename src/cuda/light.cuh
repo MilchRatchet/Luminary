@@ -39,7 +39,7 @@ __device__ float light_tree_child_importance(
   confidence = confidence * exp_c;
 
   // Compute the point along our ray that is closest to the child point.
-  const float t            = fminf(fmaxf(dot_product(sub_vector(origin, point), ray), 0.0f), limit);
+  const float t            = fminf(fmaxf(dot_product(sub_vector(point, origin), ray), 0.0f), limit);
   const vec3 closest_point = add_vector(origin, scale_vector(ray, t));
 
   const vec3 diff = sub_vector(point, closest_point);

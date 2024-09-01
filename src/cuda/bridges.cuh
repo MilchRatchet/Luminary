@@ -366,8 +366,30 @@ __device__ float bridges_initial_vertex_uniform_sample(const float uniform_min, 
   return uniform_min + random * (uniform_max - uniform_min);
 }
 
-__device__ float bridges_initial_vertex_uniform_sample_pdf(const float uniform_min, const float uniform_max) {
+__device__ float bridges_initial_vertex_uniform_sample_pdf(const float uniform_min, const float uniform_max, const float t) {
+  if (t > uniform_max || t < uniform_min)
+    return 0.0f;
+
   return 1.0f / (uniform_max - uniform_min);
+}
+
+__device__ float2 bridges_initial_vertex_uniform_sample_bounds(
+  const TraceTask task, const float limit, const TriangleLight light, const vec3 light_center, const ushort2 pixel) {
+  const float light_center_dist = dot_product(sub_vector(light_center, task.origin), task.ray);
+  const vec3 p                  = add_vector(task.origin, scale_vector(task.ray, light_center_dist));
+  const float radius            = get_length(sub_vector(light_center, p)) * 3.0f;
+
+  const float t0 = sphere_ray_intersection(task.ray, task.origin, light_center, radius);
+  const float t1 = t0 + 2.0f * (light_center_dist - t0);
+
+  if (t0 == FLT_MAX) {
+    return make_float2(-FLT_MAX, -FLT_MAX * 0.5f);
+  }
+
+  const float uniform_min = fmaxf(fminf(fminf(t0, t1), limit), 0.0f);
+  const float uniform_max = fmaxf(fminf(fmaxf(t0, t1), limit), 0.0f);
+
+  return make_float2(uniform_min, uniform_max);
 }
 
 __device__ vec3 bridges_sample_initial_vertex(
@@ -381,10 +403,9 @@ __device__ vec3 bridges_sample_initial_vertex(
   const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.fog.droplet_diameter);
   const vec3 light_center         = add_vector(light.vertex, scale_vector(add_vector(light.edge1, light.edge2), 0.33f));
 
-  const float light_center_dist  = fabsf(dot_product(sub_vector(task.origin, light_center), task.ray));
-  const float uniform_min        = 0.0f;
-  const float uniform_max        = fminf(2.0f * light_center_dist, limit);
-  const float uniform_sample_pdf = bridges_initial_vertex_uniform_sample_pdf(uniform_min, uniform_max);
+  const float2 uniform_bounds = bridges_initial_vertex_uniform_sample_bounds(task, limit, light, light_center, pixel);
+  const float uniform_min     = uniform_bounds.x;
+  const float uniform_max     = uniform_bounds.y;
 
   float sum_weight = 0.0f;
 
@@ -402,6 +423,7 @@ __device__ vec3 bridges_sample_initial_vertex(
 
     const float t = bridges_initial_vertex_uniform_sample(uniform_min, uniform_max, sample_random);
 
+    const float uniform_sample_pdf  = bridges_initial_vertex_uniform_sample_pdf(uniform_min, uniform_max, t);
     const float distance_sample_pdf = volume_sample_intersection_pdf(volume, task.origin, task.ray, 0.0f, t);
 
     const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, params, t);
@@ -432,6 +454,7 @@ __device__ vec3 bridges_sample_initial_vertex(
     if (t == FLT_MAX)
       continue;
 
+    const float uniform_sample_pdf  = bridges_initial_vertex_uniform_sample_pdf(uniform_min, uniform_max, t);
     const float distance_sample_pdf = volume_sample_intersection_pdf(volume, task.origin, task.ray, 0.0f, t);
 
     const float target_pdf = bridges_sample_initial_vertex_target_pdf(task, volume, light, light_center, params, t);
