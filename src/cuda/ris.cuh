@@ -160,6 +160,8 @@ __device__ uint32_t ris_sample_light(
   // Selected light color already includes 1 / target_pdf.
   selected_light_color = scale_color(selected_light_color, sum_weight);
 
+  UTILS_CHECK_NANS(pixel, selected_light_color);
+
   return selected_id;
 }
 #endif /* SHADING_KERNEL && !VOLUME_KERNEL */

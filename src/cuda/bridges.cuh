@@ -207,7 +207,14 @@ __device__ RGBF bridges_sample_bridge(
   ////////////////////////////////////////////////////////////////////
 
   const float actual_scale = get_length(sub_vector(current_vertex, initial_vertex));
-  scale                    = target_scale / actual_scale;
+
+  if (actual_scale == 0.0f) {
+    path_pdf = 0.0f;
+
+    return get_color(0.0f, 0.0f, 0.0f);
+  }
+
+  scale = target_scale / actual_scale;
 
   sum_dist *= scale;
 
@@ -573,6 +580,9 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     RGBF sample_path_weight = bridges_sample_bridge(
       sample_initial_vertex, volume, light_point, i, task.index, sample_path_pdf, sample_path_end_vertex, sample_path_scale);
 
+    if (sample_path_pdf == 0.0f)
+      continue;
+
     sample_pdf *= sample_path_pdf;
 
     ////////////////////////////////////////////////////////////////////
@@ -604,7 +614,7 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     if (target_pdf == 0.0f)
       continue;
 
-    const float weight = target_pdf / sample_pdf;
+    const float weight = (sample_pdf > 0.0f) ? target_pdf / sample_pdf : 0.0f;
 
     sum_weight += weight;
 
@@ -636,7 +646,9 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     task, volume, selected_initial_vertex, selected_light_id, selected_seed, selected_rotation, selected_scale,
     selected_initial_vertex_transmittance, ior, task.index);
 
-  bridge_color = scale_color(bridge_color, sum_weight / selected_target_pdf);
+  bridge_color = (selected_target_pdf > 0.0f) ? scale_color(bridge_color, sum_weight / selected_target_pdf) : get_color(0.0f, 0.0f, 0.0f);
+
+  UTILS_CHECK_NANS(task.index, bridge_color);
 
   return bridge_color;
 }
