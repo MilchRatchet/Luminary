@@ -3,6 +3,7 @@
 
 #if defined(OPTIX_KERNEL) && defined(SHADING_KERNEL)
 
+#include "toy_utils.cuh"
 #include "utils.cuh"
 
 #define SKIP_IOR_CHECK (0xFFFFFFFF)

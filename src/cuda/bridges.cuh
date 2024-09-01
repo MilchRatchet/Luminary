@@ -489,6 +489,9 @@ __device__ vec3 bridges_sample_initial_vertex(
 }
 
 __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
+  if (!TRIANGLE_LIGHTS_ON)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   uint32_t selected_seed                     = 0xFFFFFFFF;
   uint32_t selected_light_id                 = LIGHT_ID_NONE;
   Quaternion selected_rotation               = {0.0f, 0.0f, 0.0f, 1.0f};

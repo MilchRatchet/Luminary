@@ -1,6 +1,8 @@
 #ifndef CU_DIRECTIVES_H
 #define CU_DIRECTIVES_H
 
+#include "math.cuh"
+#include "random.cuh"
 #include "utils.cuh"
 
 /*

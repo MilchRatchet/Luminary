@@ -11,12 +11,12 @@
 
 extern "C" static __constant__ DeviceConstantMemory device;
 
+#include "bridges.cuh"
 #include "bsdf.cuh"
 #include "directives.cuh"
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "shading_kernel.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
@@ -68,7 +68,7 @@ extern "C" __global__ void __raygen__optix() {
 
     const float ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
 
-    RGBF light_color  = optix_compute_light_ray_geo(task, volume, depth, ior);
+    RGBF light_color  = bridges_sample(task, volume, depth, ior);
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
     light_color       = mul_color(light_color, record);
 

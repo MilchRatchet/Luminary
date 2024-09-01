@@ -8,6 +8,7 @@
 #include "sky_utils.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
+#include "volume_utils.cuh"
 
 #ifdef VOLUME_KERNEL
 __device__ float light_tree_child_importance(
