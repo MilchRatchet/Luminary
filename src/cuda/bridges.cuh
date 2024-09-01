@@ -269,8 +269,9 @@ __device__ RGBF bridges_evaluate_bridge(
   // Compute visibility of path
   ////////////////////////////////////////////////////////////////////
 
-  vec3 current_vertex    = initial_vertex;
-  vec3 current_direction = rotate_vector_by_quaternion(normalize_vector(light_vector), rotation);
+  vec3 current_vertex            = initial_vertex;
+  vec3 current_direction_sampled = normalize_vector(light_vector);
+  vec3 current_direction         = rotate_vector_by_quaternion(current_direction_sampled, rotation);
 
   unsigned int compressed_ior = ior_compress(ior);
 
@@ -303,7 +304,15 @@ __device__ RGBF bridges_evaluate_bridge(
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
     const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
-    current_direction = jendersie_eon_phase_sample(current_direction, device.scene.fog.droplet_diameter, random_phase, random_method);
+    if (volume.type == VOLUME_TYPE_FOG) {
+      current_direction_sampled =
+        jendersie_eon_phase_sample(current_direction_sampled, device.scene.fog.droplet_diameter, random_phase, random_method);
+    }
+    else {
+      current_direction_sampled = ocean_phase_sampling(current_direction_sampled, random_phase, random_method);
+    }
+
+    vec3 current_direction = rotate_vector_by_quaternion(current_direction_sampled, rotation);
 
     dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel)) * scale;
 
