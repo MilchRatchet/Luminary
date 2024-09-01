@@ -115,7 +115,7 @@ extern "C" __global__ void __raygen__optix() {
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
       store_RGBF(device.ptrs.records + pixel, bounce_record);
 
-      uint32_t flags_to_release = STATE_FLAG_SKIP_BRIDGE_SAMPLING;
+      uint32_t flags_to_release = 0;
 
       if (is_delta_path && !is_delta_distribution) {
         flags_to_release |= STATE_FLAG_DELTA_PATH;

@@ -531,56 +531,6 @@ __device__ void light_sample_triangle_presampled(
   }
 }
 
-/*
- * Surface sampling a triangle light.
- * @param triangle Triangle.
- * @param random Random numbers.
- * @param color Emission from triangle at sampled point.
- * @result Point on the triangle.
- */
-__device__ vec3 light_sample_triangle_bridge(const TriangleLight triangle, const float2 random, RGBF& color) {
-  float2 coords;
-  const vec3 point = sample_triangle(triangle, random, coords);
-
-  const uint16_t albedo_tex = device.scene.materials[triangle.material_id].albedo_map;
-  const uint16_t illum_tex  = device.scene.materials[triangle.material_id].luminance_map;
-
-  // Load texture coordinates if we need them.
-  UV tex_coords;
-  if (illum_tex != TEXTURE_NONE || albedo_tex != TEXTURE_NONE) {
-    tex_coords = load_triangle_tex_coords(triangle.triangle_id, coords);
-  }
-
-  if (illum_tex != TEXTURE_NONE) {
-    const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
-
-    color = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
-  }
-  else {
-    color.r = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_r);
-    color.g = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_g);
-    color.b = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_b);
-
-    const float scale = (float) (device.scene.materials[triangle.material_id].emission_scale);
-
-    color = scale_color(color, device.scene.material.default_material.b * scale);
-  }
-
-  if (color_importance(color) > 0.0f) {
-    float alpha;
-    if (albedo_tex != TEXTURE_NONE) {
-      alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
-    }
-    else {
-      alpha = random_uint16_t_to_float(device.scene.materials[triangle.material_id].albedo_a);
-    }
-
-    color = scale_color(color, alpha);
-  }
-
-  return point;
-}
-
 #else /* SHADING_KERNEL */
 
 ////////////////////////////////////////////////////////////////////

@@ -77,7 +77,6 @@ extern "C" __global__ void __raygen__optix() {
       }
 
       state_release(pixel, STATE_FLAG_CAMERA_DIRECTION);
-      state_consume(pixel, STATE_FLAG_SKIP_BRIDGE_SAMPLING);
     }
   }
 

@@ -33,7 +33,7 @@ extern "C" __global__ void __raygen__optix() {
 
     const int pixel = task.index.y * device.width + task.index.x;
 
-    if (state_peek(pixel, STATE_FLAG_SKIP_BRIDGE_SAMPLING))
+    if (!state_peek(pixel, STATE_FLAG_DELTA_PATH))
       continue;
 
     float start            = FLT_MAX;

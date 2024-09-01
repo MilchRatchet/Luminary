@@ -71,7 +71,7 @@ extern "C" __global__ void __raygen__optix() {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
 
-      state_release(pixel, STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION | STATE_FLAG_SKIP_BRIDGE_SAMPLING);
+      state_release(pixel, STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
     }
   }
 
