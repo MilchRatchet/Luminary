@@ -43,7 +43,7 @@ extern "C" __global__ void __raygen__optix() {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
-      if (path.x < start) {
+      if (path.y > 0.0f && path.x < start) {
         volume_type = VOLUME_TYPE_FOG;
         start       = path.x;
       }
@@ -53,7 +53,7 @@ extern "C" __global__ void __raygen__optix() {
       const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
-      if (path.x < start) {
+      if (path.y > 0.0f && path.x < start) {
         volume_type = VOLUME_TYPE_OCEAN;
         start       = path.x;
       }
