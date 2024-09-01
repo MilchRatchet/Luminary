@@ -114,25 +114,6 @@ static vec3 angles_to_direction(const float altitude, const float azimuth) {
 // Scene content related functions
 ////////////////////////////////////////////////////////////////////
 
-/*
- * Computes value in halton sequence.
- * @param index Index in halton sequence.
- * @param base Base of halton sequence.
- * @result Value in halton sequence of base at index.
- */
-static float halton(int index, int base) {
-  float fraction = 1.0f;
-  float result   = 0.0f;
-
-  while (index > 0) {
-    fraction /= base;
-    result += fraction * (index % base);
-    index = index / base;
-  }
-
-  return result;
-}
-
 static void raytrace_load_moon_textures(RaytraceInstance* instance) {
   uint64_t info = 0;
 

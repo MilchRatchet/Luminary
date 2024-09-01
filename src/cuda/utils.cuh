@@ -68,8 +68,17 @@ __constant__ DeviceConstantMemory device;
 // Functions
 //===========================================================================================
 
+#define UTILS_NO_PIXEL_SELECTED (make_ushort2(0xFFFF, 0xFFFF))
+
 __device__ bool is_selected_pixel(const ushort2 index) {
   return (index.x == device.user_selected_x && index.y == device.user_selected_y);
+}
+
+__device__ bool is_selected_pixel_lenient(const ushort2 index) {
+  if (device.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
+    return true;
+
+  return is_selected_pixel(index);
 }
 
 __device__ uint32_t get_pixel_id(const int x, const int y) {
@@ -93,5 +102,41 @@ __device__ int get_task_address(const int number) {
   return get_task_address_of_thread(idx.x, idx.y, number);
 #endif
 }
+
+//===========================================================================================
+// Debug utils
+//===========================================================================================
+
+// #define UTILS_DEBUG_MODE
+
+#ifdef UTILS_DEBUG_MODE
+
+__device__ bool _utils_debug_nans(const RGBF color, const char* func, const uint32_t line, const char* var) {
+  const float sum_color = color.r + color.g + color.b;
+  if (isnan(sum_color) || isinf(sum_color)) {
+    printf("[%s:%u] Failed NaN check. %s = (%f %f %f).\n", func, line, var, color.r, color.g, color.b);
+    return true;
+  }
+
+  return false;
+}
+
+__device__ bool _utils_debug_nans(const float value, const char* func, const uint32_t line, const char* var) {
+  if (isnan(value) || isinf(value)) {
+    printf("[%s:%u] Failed NaN check. %s = %f.\n", func, line, var, value);
+
+    return true;
+  }
+
+  return false;
+}
+
+#define UTILS_CHECK_NANS(pixel, var) (is_selected_pixel_lenient(pixel) && _utils_debug_nans(var, __func__, __LINE__, #var))
+
+#else /* UTILS_DEBUG_MODE */
+
+#define UTILS_CHECK_NANS(pixel, var)
+
+#endif /* !UTILS_DEBUG_MODE */
 
 #endif /* CU_UTILS_H */

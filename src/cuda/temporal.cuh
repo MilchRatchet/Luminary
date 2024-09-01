@@ -46,7 +46,7 @@ __device__ RGBF temporal_gather_pixel(const RGBF* image, const float x, const fl
   return result;
 }
 
-__device__ RGBF temporal_reject_invalid_sample(RGBF sample) {
+__device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offset) {
   if (isnan(luminance(sample)) || isinf(luminance(sample))) {
     // Debug code to identify paths that cause NaNs and INFs
 #if 0
@@ -80,7 +80,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
     RGBF direct_buffer = temporal_gather_pixel(device.ptrs.frame_direct_buffer, sx, sy, device.width, device.height);
     RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
 
-    direct_buffer = temporal_reject_invalid_sample(direct_buffer);
+    direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
 
     direct_output = scale_color(direct_output, device.temporal_frames);
     direct_output = add_color(direct_buffer, direct_output);
@@ -92,7 +92,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
     RGBF indirect_buffer = temporal_gather_pixel(device.ptrs.frame_indirect_buffer, sx, sy, device.width, device.height);
     RGBF indirect_output = load_RGBF(device.ptrs.frame_indirect_accumulate + offset);
 
-    indirect_buffer = temporal_reject_invalid_sample(indirect_buffer);
+    indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
     float variance = (device.temporal_frames == 0) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 

@@ -158,11 +158,11 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     // Microfacet evaluation is not numerically stable for very low roughness. We clamp the evaluation here.
     data_local.roughness = fmaxf(data_local.roughness, BSDF_ROUGHNESS_CLAMP);
 
-    float sum_weights;
-    RGBF selected_eval;
+    float sum_weights  = 0.0f;
+    RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
 
     // Microfacet based sample
-    {
+    if (true) {
       const vec3 microfacet    = bsdf_microfacet_sample(data_local, pixel);
       const vec3 ray           = reflect_vector(data_local.V, microfacet);
       const BSDFRayContext ctx = bsdf_sample_context(data_local, microfacet, ray, false);
@@ -173,9 +173,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         (include_refraction)
           ? bsdf_microfacet_refraction_pdf(data_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index)
           : 0.0f;
-      const float mis_weight = pdf / (pdf + diffuse_pdf + refraction_pdf);
+
+      const float sum_pdf    = pdf + diffuse_pdf + refraction_pdf;
+      const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
 
       const float weight = color_importance(eval) * mis_weight;
+
+      UTILS_CHECK_NANS(pixel, weight);
 
       ray_local                = ray;
       sum_weights              = weight;
@@ -196,9 +200,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         (include_refraction)
           ? bsdf_microfacet_refraction_pdf(data_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index)
           : 0.0f;
-      const float mis_weight = pdf / (pdf + microfacet_pdf + refraction_pdf);
+
+      const float sum_pdf    = pdf + microfacet_pdf + refraction_pdf;
+      const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
 
       const float weight = color_importance(eval) * mis_weight;
+
+      UTILS_CHECK_NANS(pixel, weight);
 
       sum_weights += weight;
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_RIS_DIFFUSE, pixel) * sum_weights < weight) {
@@ -227,10 +235,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         const float reflection_pdf = bsdf_microfacet_pdf(data_local, ctx.NdotH, ctx.NdotV);
         const float diffuse_pdf    = (include_diffuse) ? bsdf_diffuse_pdf(data_local, ctx.NdotL) : 0.0f;
 
-        mis_weight = pdf / (pdf + reflection_pdf + diffuse_pdf);
+        const float sum_pdf = pdf + reflection_pdf + diffuse_pdf;
+        mis_weight          = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
       }
 
       const float weight = color_importance(eval) * mis_weight;
+
+      UTILS_CHECK_NANS(pixel, weight);
 
       sum_weights += weight;
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_RIS_REFRACTION, pixel) * sum_weights < weight) {
@@ -244,8 +255,11 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     // For RIS we need to evaluate f / |f| here. This is unstable for low roughness and microfacet BRDFs.
     // Hence we use a little trick, f / p can be evaluated in a stable manner when p is the microfacet PDF,
     // and thus we evaluate f / |f| = (f / p) / |f / p|.
-    info.weight = scale_color(selected_eval, sum_weights / color_importance(selected_eval));
+    info.weight =
+      (sum_weights > 0.0f) ? scale_color(selected_eval, sum_weights / color_importance(selected_eval)) : get_color(0.0f, 0.0f, 0.0f);
   }
+
+  UTILS_CHECK_NANS(pixel, info.weight);
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
 #endif

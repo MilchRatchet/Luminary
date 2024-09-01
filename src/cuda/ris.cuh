@@ -83,7 +83,7 @@ __device__ uint32_t ris_sample_light(
       sum_weight += weight;
 
       selected_id            = initial_sample_id;
-      selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
+      selected_light_color   = (target_pdf > 0.0f) ? scale_color(light_color, 1.0f / target_pdf) : get_color(0.0f, 0.0f, 0.0f);
       selected_ray           = initial_ray;
       selected_dist          = dist;
       selected_is_refraction = initial_is_refraction;

@@ -485,7 +485,11 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
-  return mul_color(light_color, visibility);
+  light_color = mul_color(light_color, visibility);
+
+  UTILS_CHECK_NANS(index, light_color);
+
+  return light_color;
 }
 
 // Shortened from geometry to geo so the function name length would be the same as the other ones.
@@ -526,6 +530,8 @@ __device__ RGBF optix_compute_light_ray_ambient_sky(
   sky_light = mul_color(sky_light, optix_toy_shadowing(position, ray, FLT_MAX, compressed_ior));
   sky_light = mul_color(sky_light, volume_integrate_transmittance(position, ray, FLT_MAX));
   sky_light = mul_color(sky_light, sample_weight);
+
+  UTILS_CHECK_NANS(index, sky_light);
 
   return sky_light;
 }
