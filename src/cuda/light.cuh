@@ -46,9 +46,7 @@ __device__ float light_tree_child_importance(
   const vec3 diff = sub_vector(point, closest_point);
 
   // In the Estevez 2018 paper, they derive that a linear falloff makes more sense, assuming equi-angular sampling.
-  // We penalize far away lights by including a transmittance estimate.
-  // TODO: Check if including transmittance is even a good idea.
-  return expf(-t * transmittance_importance) * energy / fmaxf(get_length(diff), confidence);
+  return energy / fmaxf(get_length(diff), confidence);
 }
 
 __device__ uint32_t light_tree_traverse(
