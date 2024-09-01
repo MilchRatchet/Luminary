@@ -321,7 +321,7 @@ __device__ RGBF bridges_evaluate_bridge(
       current_direction_sampled = ocean_phase_sampling(current_direction_sampled, random_phase, random_method);
     }
 
-    vec3 current_direction = rotate_vector_by_quaternion(current_direction_sampled, rotation);
+    current_direction = rotate_vector_by_quaternion(current_direction_sampled, rotation);
 
     dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel)) * scale;
 
