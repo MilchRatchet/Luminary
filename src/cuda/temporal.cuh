@@ -58,7 +58,7 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
         sample.b);
 #endif
 
-    sample = get_color(0.0f, 0.0f, 0.0f);
+    sample = UTILS_DEBUG_NAN_COLOR;
   }
 
   return sample;

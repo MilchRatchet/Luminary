@@ -111,6 +111,8 @@ __device__ int get_task_address(const int number) {
 
 #ifdef UTILS_DEBUG_MODE
 
+#define UTILS_DEBUG_NAN_COLOR (get_color(1.0f, 0.0f, 0.0f))
+
 __device__ bool _utils_debug_nans(const RGBF color, const char* func, const uint32_t line, const char* var) {
   const float sum_color = color.r + color.g + color.b;
   if (isnan(sum_color) || isinf(sum_color)) {
@@ -134,6 +136,8 @@ __device__ bool _utils_debug_nans(const float value, const char* func, const uin
 #define UTILS_CHECK_NANS(pixel, var) (is_selected_pixel_lenient(pixel) && _utils_debug_nans(var, __func__, __LINE__, #var))
 
 #else /* UTILS_DEBUG_MODE */
+
+#define UTILS_DEBUG_NAN_COLOR (get_color(0.0f, 0.0f, 0.0f))
 
 #define UTILS_CHECK_NANS(pixel, var)
 
