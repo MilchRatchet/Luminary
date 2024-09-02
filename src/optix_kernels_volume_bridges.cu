@@ -49,7 +49,7 @@ extern "C" __global__ void __raygen__optix() {
       }
     }
 
-    if (device.scene.ocean.active) {
+    if (device.scene.ocean.active && device.scene.ocean.triangle_light_contribution) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 

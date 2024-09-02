@@ -499,7 +499,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->ris_settings.num_light_rays         = general.num_light_ray;
 
   instance->bridge_settings.num_ris_samples  = 8;
-  instance->bridge_settings.max_num_vertices = 5;
+  instance->bridge_settings.max_num_vertices = 1;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;

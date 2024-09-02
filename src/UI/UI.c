@@ -593,6 +593,7 @@ static UITab create_procedurals_ocean_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_slider(ui, "Frequency", &(instance->scene.ocean.frequency), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene.ocean.refractive_index), 1, 0.001f, 1.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Multiscattering", &(instance->scene.ocean.multiscattering), 1);
+  panels[i++] = create_check(ui, "Light Contribution", &(instance->scene.ocean.triangle_light_contribution), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

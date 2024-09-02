@@ -552,8 +552,12 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
       sscanf(value, "%f\n", &ocean->caustics_domain_scale);
       break;
     /* MULTISCA */
-    case 4702694010316936525:
+    case 4702694010316936525u:
       sscanf(value, "%d\n", &ocean->multiscattering);
+      break;
+    /* LIGHTSON */
+    case 5642820479573510476u:
+      sscanf(value, "%d\n", &ocean->triangle_light_contribution);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
@@ -1061,6 +1065,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "OCEAN CAUSSCAL %f\n", instance->scene.ocean.caustics_domain_scale);
   fputs(line, file);
   sprintf(line, "OCEAN MULTISCA %d\n", instance->scene.ocean.multiscattering);
+  fputs(line, file);
+  sprintf(line, "OCEAN LIGHTSON %d\n", instance->scene.ocean.triangle_light_contribution);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Particle Settings\n#===============================\n\n");
