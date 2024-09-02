@@ -45,8 +45,14 @@ __device__ float light_tree_child_importance(
 
   const vec3 diff = sub_vector(point, closest_point);
 
+  const vec3 v0 = normalize_vector(sub_vector(origin, point));
+  const vec3 v1 =
+    normalize_vector(sub_vector(add_vector(origin, scale_vector(ray, fminf(limit, device.scene.camera.far_clip_distance))), point));
+
+  const float angle = acosf(fminf(fmaxf(dot_product(v0, v1), -1.0f + eps), 1.0f - eps));
+
   // In the Estevez 2018 paper, they derive that a linear falloff makes more sense, assuming equi-angular sampling.
-  return energy / fmaxf(get_length(diff), confidence);
+  return angle * energy / fmaxf(get_length(diff), confidence);
 }
 
 __device__ uint32_t light_tree_traverse(
