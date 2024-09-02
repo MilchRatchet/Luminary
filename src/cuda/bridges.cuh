@@ -199,7 +199,6 @@ __device__ RGBF bridges_sample_bridge(
 
   for (uint32_t i = 1; i < vertex_count; i++) {
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
-    const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
     current_direction = bridges_phase_sample(current_direction, random_phase);
 
@@ -312,7 +311,6 @@ __device__ RGBF bridges_evaluate_bridge(
     current_vertex = add_vector(current_vertex, scale_vector(current_direction, dist));
 
     const float2 random_phase = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BRIDGE_PHASE + seed * 32 + i, pixel);
-    const float random_method = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_PHASE_METHOD + seed * 32 + i, pixel);
 
     current_direction_sampled = bridges_phase_sample(current_direction, random_phase);
 
