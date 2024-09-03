@@ -411,7 +411,6 @@ struct DevicePointers {
   uint16_t* task_counts;
   uint16_t* task_offsets;
   uint32_t* ior_stack;
-  RGBF* frame_buffer;
   RGBF* frame_temporal;
   float* frame_variance;
   RGBF* frame_accumulate;
@@ -521,7 +520,6 @@ struct RaytraceInstance {
   DeviceBuffer* trace_results;
   DeviceBuffer* task_counts;
   DeviceBuffer* task_offsets;
-  DeviceBuffer* frame_buffer;
   DeviceBuffer* frame_temporal;
   DeviceBuffer* frame_variance;
   DeviceBuffer* frame_accumulate;

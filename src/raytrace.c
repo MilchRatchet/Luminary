@@ -519,7 +519,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->task_counts);
   device_buffer_init(&instance->task_offsets);
   device_buffer_init(&instance->ior_stack);
-  device_buffer_init(&instance->frame_buffer);
   device_buffer_init(&instance->frame_temporal);
   device_buffer_init(&instance->frame_variance);
   device_buffer_init(&instance->frame_accumulate);
@@ -698,7 +697,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_update_symbol(output_height, instance->output_height);
   device_update_symbol(denoiser, instance->denoiser);
 
-  device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_temporal, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_variance, sizeof(float), amount);
   device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), amount);
@@ -744,7 +742,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.task_counts               = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets              = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
   ptrs.ior_stack                 = (uint32_t*) device_buffer_get_pointer(instance->ior_stack);
-  ptrs.frame_buffer              = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
   ptrs.frame_temporal            = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
   ptrs.frame_variance            = (float*) device_buffer_get_pointer(instance->frame_variance);
   ptrs.frame_accumulate          = (RGBF*) device_buffer_get_pointer(instance->frame_accumulate);
@@ -787,7 +784,6 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->trace_results);
   device_buffer_free(instance->task_counts);
   device_buffer_free(instance->task_offsets);
-  device_buffer_free(instance->frame_buffer);
   device_buffer_free(instance->frame_direct_buffer);
   device_buffer_free(instance->frame_indirect_buffer);
   device_buffer_free(instance->frame_temporal);
