@@ -72,6 +72,6 @@ extern "C" __global__ void __raygen__optix() {
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
     light_color       = mul_color(light_color, record);
 
-    write_beauty_buffer(light_color, pixel);
+    write_beauty_buffer_indirect(light_color, pixel);
   }
 }
