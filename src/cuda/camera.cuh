@@ -43,14 +43,8 @@ __device__ vec3 camera_sample_aperture(const ushort2 pixel_coords) {
   return get_vector(sample.x, sample.y, 0.0f);
 }
 
-__device__ float2 camera_jitter(const float2 rand) {
-  return make_float2(0.5f + tent_filter_importance_sample(rand.x), 0.5f + tent_filter_importance_sample(rand.y));
-}
-
 __device__ TraceTask camera_get_ray(TraceTask task, const uint32_t pixel) {
-  const float2 jitter = (device.accum_mode != TEMPORAL_REPROJECTION)
-                          ? camera_jitter(quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER))
-                          : make_float2(device.emitter.jitter.x, device.emitter.jitter.y);
+  const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
   vec3 film_point;
   film_point.x = device.scene.camera.fov - device.emitter.step * (task.index.x + jitter.x);

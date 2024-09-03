@@ -114,25 +114,6 @@ static vec3 angles_to_direction(const float altitude, const float azimuth) {
 // Scene content related functions
 ////////////////////////////////////////////////////////////////////
 
-/*
- * Computes value in halton sequence.
- * @param index Index in halton sequence.
- * @param base Base of halton sequence.
- * @result Value in halton sequence of base at index.
- */
-static float halton(int index, int base) {
-  float fraction = 1.0f;
-  float result   = 0.0f;
-
-  while (index > 0) {
-    fraction /= base;
-    result += fraction * (index % base);
-    index = index / base;
-  }
-
-  return result;
-}
-
 static void raytrace_load_moon_textures(RaytraceInstance* instance) {
   uint64_t info = 0;
 
@@ -185,22 +166,6 @@ static void raytrace_load_bluenoise_texture(RaytraceInstance* instance) {
   device_buffer_upload(instance->bluenoise_2D, bluenoise_2D_data);
 }
 
-/*
- * Same as in math.cuh
- */
-static float tent_filter_importance_sample(const float x) {
-  if (x > 0.5f) {
-    return 1.0f - sqrtf(2.0f) * sqrtf(1.0f - x);
-  }
-  else {
-    return -1.0f + sqrtf(2.0f) * sqrtf(x);
-  }
-}
-
-static float jitter_value(const float x) {
-  return 0.5f + tent_filter_importance_sample(x);
-}
-
 void raytrace_update_ray_emitter(RaytraceInstance* instance) {
   RayEmitter emitter = instance->emitter;
 
@@ -241,11 +206,6 @@ void raytrace_update_ray_emitter(RaytraceInstance* instance) {
   emitter.projection.f33 = -(z_far + z_near) / (z_far - z_near);
   emitter.projection.f43 = -1.0f;
   emitter.projection.f34 = -(2.0f * z_far * z_near) / (z_far - z_near);
-
-  emitter.jitter.prev_x = emitter.jitter.x;
-  emitter.jitter.prev_y = emitter.jitter.y;
-  emitter.jitter.x      = jitter_value(halton(instance->temporal_frames, 2));
-  emitter.jitter.y      = jitter_value(halton(instance->temporal_frames, 3));
 
   instance->emitter = emitter;
   device_update_symbol(emitter, emitter);
@@ -332,7 +292,7 @@ static void update_special_lights(const Scene scene) {
 ////////////////////////////////////////////////////////////////////
 
 void raytrace_build_structures(RaytraceInstance* instance) {
-  if (instance->scene.sky.hdri_active && !instance->scene.sky.hdri_initialized) {
+  if (instance->scene.sky.mode == SKY_MODE_HDRI && !instance->scene.sky.hdri_initialized) {
     sky_hdri_generate_LUT(instance);
   }
 
@@ -348,7 +308,7 @@ void raytrace_build_structures(RaytraceInstance* instance) {
 
 void raytrace_execute(RaytraceInstance* instance) {
   // In no accumulation mode we always display the 0th frame.
-  if (instance->accum_mode == NO_ACCUMULATION)
+  if (!instance->accumulate)
     instance->temporal_frames = 0;
 
   device_update_symbol(temporal_frames, instance->temporal_frames);
@@ -365,7 +325,7 @@ void raytrace_execute(RaytraceInstance* instance) {
     }
   }
 
-  device_handle_accumulation(instance);
+  device_handle_accumulation();
 
   gpuErrchk(cudaDeviceSynchronize());
 }
@@ -532,11 +492,14 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->settings     = general;
   instance->shading_mode = 0;
   instance->aov_mode     = options.aov_mode;
-  instance->accum_mode   = TEMPORAL_ACCUMULATION;
+  instance->accumulate   = 1;
   instance->bvh_type     = BVH_OPTIX;
 
   instance->ris_settings.initial_reservoir_size = 16;
   instance->ris_settings.num_light_rays         = general.num_light_ray;
+
+  instance->bridge_settings.num_ris_samples  = 8;
+  instance->bridge_settings.max_num_vertices = 1;
 
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
@@ -556,7 +519,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->task_counts);
   device_buffer_init(&instance->task_offsets);
   device_buffer_init(&instance->ior_stack);
-  device_buffer_init(&instance->frame_buffer);
   device_buffer_init(&instance->frame_temporal);
   device_buffer_init(&instance->frame_variance);
   device_buffer_init(&instance->frame_accumulate);
@@ -626,6 +588,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   ////////////////////////////////////////////////////////////////////
 
   lights_process(scene, options.dmm_active);
+  lights_load_bridge_lut();
 
   instance->scene.triangle_lights_count = scene->triangle_lights_count;
   instance->scene.triangle_lights_data  = scene->triangle_lights_data;
@@ -711,8 +674,9 @@ void raytrace_prepare(RaytraceInstance* instance) {
   device_update_symbol(output_variable, instance->output_variable);
   update_special_lights(instance->scene);
   raytrace_update_ray_emitter(instance);
-  device_update_symbol(accum_mode, instance->accum_mode);
+  device_update_symbol(accumulate, instance->accumulate);
   device_update_symbol(ris_settings, instance->ris_settings);
+  device_update_symbol(bridge_settings, instance->bridge_settings);
   device_update_symbol(user_selected_x, instance->user_selected_x);
   device_update_symbol(user_selected_y, instance->user_selected_y);
   device_update_symbol(max_ray_depth, instance->max_ray_depth);
@@ -733,7 +697,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_update_symbol(output_height, instance->output_height);
   device_update_symbol(denoiser, instance->denoiser);
 
-  device_buffer_malloc(instance->frame_buffer, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_temporal, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_variance, sizeof(float), amount);
   device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), amount);
@@ -779,7 +742,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.task_counts               = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets              = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
   ptrs.ior_stack                 = (uint32_t*) device_buffer_get_pointer(instance->ior_stack);
-  ptrs.frame_buffer              = (RGBF*) device_buffer_get_pointer(instance->frame_buffer);
   ptrs.frame_temporal            = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
   ptrs.frame_variance            = (float*) device_buffer_get_pointer(instance->frame_variance);
   ptrs.frame_accumulate          = (RGBF*) device_buffer_get_pointer(instance->frame_accumulate);
@@ -822,7 +784,6 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->trace_results);
   device_buffer_free(instance->task_counts);
   device_buffer_free(instance->task_offsets);
-  device_buffer_free(instance->frame_buffer);
   device_buffer_free(instance->frame_direct_buffer);
   device_buffer_free(instance->frame_indirect_buffer);
   device_buffer_free(instance->frame_temporal);

@@ -62,6 +62,9 @@ Set 1 to cancel light ray when intersecting a boundary of two mediums with diffe
 `MATERIAL INVERTRO [INT32]`<br/>
 Set 1 to invert roughness for geometry, 0 else. Enabling this gives you legacy behaviour where the roughness from the input geometry was always inverted.
 
+`MATERIAL ROUGHCLA [FP32]`<br/>
+Clamps the roughness of materials in indirect lighting to smooth out caustics and help convergence. Number must be in the range [0,1].
+
 ## Camera Settings
 
 `CAMERA POSITION [FP32] [FP32] [FP32]`<br/>
@@ -157,6 +160,12 @@ Set 1 to activate firefly clamping.
 
 ## Sky Settings
 
+`SKY MODE____ [INT32]` <br/>
+Defines the mode of the sky rendering:
+ - 0 = Default (Compute Integration)
+ - 1 = HDRI (Baked to texture)
+ - 2 = Constant Color
+
 `SKY OFFSET__ [FP32] [FP32] [FP32]`<br/>
 Offset of geometry relative to sky. This allows to position the geometry outside the atmosphere.
 
@@ -240,6 +249,12 @@ Mipmap bias applied to the HDRI sky.
 
 `SKY HDRIORIG [FP32] [FP32] [FP32]`<br/>
 Position from which the HDRI sky is computed.
+
+`SKY COLORMOD [INT32]`<br/>
+Enables constant color mode.
+
+`SKY COLORCON [FP32] [FP32] [FP32]`<br/>
+Color used in constant color mode.
 
 ## Cloud Settings
 

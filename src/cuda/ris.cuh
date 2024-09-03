@@ -7,7 +7,7 @@
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
-#if defined(SHADING_KERNEL)
+#if defined(SHADING_KERNEL) && !defined(VOLUME_KERNEL)
 
 ////////////////////////////////////////////////////////////////////
 // Literature
@@ -29,7 +29,10 @@ __device__ uint32_t ris_sample_light(
 
   float sum_weight = 0.0f;
 
-  selected_light_color = get_color(0.0f, 0.0f, 0.0f);
+  selected_ray           = get_vector(0.0f, 0.0f, 1.0f);
+  selected_light_color   = get_color(0.0f, 0.0f, 0.0f);
+  selected_dist          = 1.0f;
+  selected_is_refraction = false;
 
   if (!device.scene.material.lights_active)
     return LIGHT_ID_NONE;
@@ -80,7 +83,7 @@ __device__ uint32_t ris_sample_light(
       sum_weight += weight;
 
       selected_id            = initial_sample_id;
-      selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
+      selected_light_color   = (target_pdf > 0.0f) ? scale_color(light_color, 1.0f / target_pdf) : get_color(0.0f, 0.0f, 0.0f);
       selected_ray           = initial_ray;
       selected_dist          = dist;
       selected_is_refraction = initial_is_refraction;
@@ -111,7 +114,7 @@ __device__ uint32_t ris_sample_light(
 
     float solid_angle, dist;
     RGBF light_color;
-    const vec3 ray = light_sample_triangle(triangle_light, data, ray_random, solid_angle, dist, light_color);
+    const vec3 ray = light_sample_triangle(triangle_light, data.position, ray_random, solid_angle, dist, light_color);
 
     if (dist == FLT_MAX || solid_angle == 0.0f)
       continue;
@@ -157,8 +160,10 @@ __device__ uint32_t ris_sample_light(
   // Selected light color already includes 1 / target_pdf.
   selected_light_color = scale_color(selected_light_color, sum_weight);
 
+  UTILS_CHECK_NANS(pixel, selected_light_color);
+
   return selected_id;
 }
-#endif /* !SHADING_KERNEL */
+#endif /* SHADING_KERNEL && !VOLUME_KERNEL */
 
 #endif /* CU_RIS_H */

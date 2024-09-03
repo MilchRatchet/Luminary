@@ -5,7 +5,7 @@
 #define SHADING_KERNEL
 #define OPTIX_KERNEL
 #define PHASE_KERNEL
-#define VOLUME_KERNEL
+#define PARTICLE_KERNEL
 
 #include "utils.h"
 
@@ -16,13 +16,14 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "particle_utils.cuh"
 #include "shading_kernel.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
-  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
-  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
+  const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
+  const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -32,8 +33,8 @@ extern "C" __global__ void __raygen__optix() {
     const VolumeType volume_type  = VOLUME_HIT_TYPE(task.hit_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    GBufferData data = volume_generate_g_buffer(task, pixel, volume);
-    write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
+    GBufferData data = particle_generate_g_buffer(task, pixel);
+    write_albedo_buffer(opaque_color(data.albedo), pixel);
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
@@ -48,12 +49,10 @@ extern "C" __global__ void __raygen__optix() {
 
     RGBF bounce_record = record;
 
-    // Release this flag here so that DL is flagged as indirect light.
-    state_release(pixel, STATE_FLAG_DELTA_PATH);
-
     // Light Ray Sampling
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
 
+    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
     accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
     accumulated_light = add_color(
@@ -72,11 +71,7 @@ extern "C" __global__ void __raygen__optix() {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
       store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
 
-      if (volume_type == VOLUME_TYPE_OCEAN) {
-        state_consume(pixel, STATE_FLAG_OCEAN_SCATTERED);
-      }
-
-      state_release(pixel, STATE_FLAG_CAMERA_DIRECTION);
+      state_release(pixel, STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
     }
   }
 

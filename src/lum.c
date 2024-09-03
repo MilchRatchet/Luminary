@@ -103,6 +103,10 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 5715723589413916233u:
       sscanf(value, "%d\n", &material->invert_roughness);
       break;
+    /* ROUGHCLA */
+    case 4705209688408805202u:
+      sscanf(value, "%f\n", &material->caustic_roughness_clamp);
+      break;
     default:
       warn_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
       break;
@@ -229,6 +233,10 @@ static void parse_sky_settings(Sky* sky, char* line) {
   char* value        = line + 9;
 
   switch (key) {
+    /* MODE____ */
+    case 6872316419179302733u:
+      sscanf(value, "%d\n", &sky->mode);
+      break;
     /* OFFSET__ */
     case 6872304213117257295u:
       sscanf(value, "%f %f %f\n", &sky->geometry_offset.x, &sky->geometry_offset.y, &sky->geometry_offset.z);
@@ -321,26 +329,26 @@ static void parse_sky_settings(Sky* sky, char* line) {
     case 4994575830040593729u:
       sscanf(value, "%d\n", &sky->aerial_perspective);
       break;
-    /* HDRIACTI */
-    case 5283922210494497864u:
-      sscanf(value, "%d\n", &sky->hdri_active);
-      break;
     /* HDRIDIM_ */
     case 6867225564446606408u:
       sscanf(value, "%d\n", &sky->settings_hdri_dim);
       sscanf(value, "%d\n", &sky->hdri_dim);
       break;
-      /* HDRISAMP */
+    /* HDRISAMP */
     case 5786352922209174600u:
       sscanf(value, "%d\n", &sky->hdri_samples);
       break;
-      /* HDRIMIPB */
+    /* HDRIMIPB */
     case 4778399800931533896u:
       sscanf(value, "%f\n", &sky->hdri_mip_bias);
       break;
-      /* HDRIORIG */
+    /* HDRIORIG */
     case 5136727350478783560u:
       sscanf(value, "%f %f %f\n", &sky->hdri_origin.x, &sky->hdri_origin.y, &sky->hdri_origin.z);
+      break;
+    /* COLORCON */
+    case 5642802878915301187u:
+      sscanf(value, "%f %f %f\n", &sky->constant_color.r, &sky->constant_color.g, &sky->constant_color.b);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid SKY setting.", line, key);
@@ -544,8 +552,12 @@ static void parse_ocean_settings(Ocean* ocean, char* line) {
       sscanf(value, "%f\n", &ocean->caustics_domain_scale);
       break;
     /* MULTISCA */
-    case 4702694010316936525:
+    case 4702694010316936525u:
       sscanf(value, "%d\n", &ocean->multiscattering);
+      break;
+    /* LIGHTSON */
+    case 5642820479573510476u:
+      sscanf(value, "%d\n", &ocean->triangle_light_contribution);
       break;
     default:
       warn_message("%8.8s (%zu) is not a valid OCEAN setting.", line, key);
@@ -886,10 +898,14 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "MATERIAL INVERTRO %d\n", instance->scene.material.invert_roughness);
   fputs(line, file);
+  sprintf(line, "MATERIAL ROUGHCLA %f\n", instance->scene.material.caustic_roughness_clamp);
+  fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Sky Settings\n#===============================\n\n");
   fputs(line, file);
 
+  sprintf(line, "SKY MODE____ %d\n", instance->scene.sky.mode);
+  fputs(line, file);
   sprintf(
     line, "SKY OFFSET__ %f %f %f\n", instance->scene.sky.geometry_offset.x, instance->scene.sky.geometry_offset.y,
     instance->scene.sky.geometry_offset.z);
@@ -938,8 +954,6 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   fputs(line, file);
   sprintf(line, "SKY AERIALPE %d\n", instance->scene.sky.aerial_perspective);
   fputs(line, file);
-  sprintf(line, "SKY HDRIACTI %d\n", instance->scene.sky.hdri_active);
-  fputs(line, file);
   sprintf(line, "SKY HDRIDIM_ %d\n", instance->scene.sky.settings_hdri_dim);
   fputs(line, file);
   sprintf(line, "SKY HDRISAMP %d\n", instance->scene.sky.hdri_samples);
@@ -949,6 +963,10 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(
     line, "SKY HDRIORIG %f %f %f\n", instance->scene.sky.hdri_origin.x, instance->scene.sky.hdri_origin.y,
     instance->scene.sky.hdri_origin.z);
+  fputs(line, file);
+  sprintf(
+    line, "SKY COLORCON %f %f %f\n", instance->scene.sky.constant_color.r, instance->scene.sky.constant_color.g,
+    instance->scene.sky.constant_color.b);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Cloud Settings\n#===============================\n\n");
@@ -1047,6 +1065,8 @@ void lum_write_file(FILE* file, RaytraceInstance* instance) {
   sprintf(line, "OCEAN CAUSSCAL %f\n", instance->scene.ocean.caustics_domain_scale);
   fputs(line, file);
   sprintf(line, "OCEAN MULTISCA %d\n", instance->scene.ocean.multiscattering);
+  fputs(line, file);
+  sprintf(line, "OCEAN LIGHTSON %d\n", instance->scene.ocean.triangle_light_contribution);
   fputs(line, file);
 
   sprintf(line, "\n#===============================\n# Particle Settings\n#===============================\n\n");

@@ -142,7 +142,7 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
     return;
 
   if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
-    if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION) {
+    if (device.temporal_frames && device.accumulate) {
       RGBF out_albedo = device.ptrs.albedo_buffer[pixel];
       out_albedo      = scale_color(out_albedo, device.temporal_frames);
       albedo          = add_color(albedo, out_albedo);
@@ -157,35 +157,38 @@ __device__ void write_normal_buffer(const vec3 normal, const int pixel) {
   if ((!device.denoiser && !device.aov_mode) || !IS_PRIMARY_RAY)
     return;
 
-  if (device.temporal_frames && device.accum_mode == TEMPORAL_ACCUMULATION)
+  if (device.temporal_frames && device.accumulate)
     return;
 
   device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
 }
 
-__device__ void write_beauty_buffer(const RGBF beauty, const int pixel, const bool mode_set = false) {
+////////////////////////////////////////////////////////////////////
+// Beauty Buffer IO
+////////////////////////////////////////////////////////////////////
+
+__device__ void write_beauty_buffer_impl(const RGBF beauty, const int pixel, const bool mode_set, RGBF* buffer) {
   RGBF output = beauty;
   if (!mode_set) {
-    output = add_color(beauty, load_RGBF(device.ptrs.frame_buffer + pixel));
+    output = add_color(beauty, load_RGBF(buffer + pixel));
   }
-  store_RGBF(device.ptrs.frame_buffer + pixel, output);
+  store_RGBF(buffer + pixel, output);
+}
 
+__device__ void write_beauty_buffer_direct(const RGBF beauty, const int pixel, const bool mode_set = false) {
+  write_beauty_buffer_impl(beauty, pixel, mode_set, device.ptrs.frame_direct_buffer);
+}
+
+__device__ void write_beauty_buffer_indirect(const RGBF beauty, const int pixel, const bool mode_set = false) {
+  write_beauty_buffer_impl(beauty, pixel, mode_set, device.ptrs.frame_indirect_buffer);
+}
+
+__device__ void write_beauty_buffer(const RGBF beauty, const int pixel, const bool mode_set = false) {
   const bool is_direct = state_peek(pixel, STATE_FLAG_DELTA_PATH);
 
-  if (is_direct) {
-    output = beauty;
-    if (!mode_set) {
-      output = add_color(beauty, load_RGBF(device.ptrs.frame_direct_buffer + pixel));
-    }
-    store_RGBF(device.ptrs.frame_direct_buffer + pixel, output);
-  }
-  else {
-    output = beauty;
-    if (!mode_set) {
-      output = add_color(beauty, load_RGBF(device.ptrs.frame_indirect_buffer + pixel));
-    }
-    store_RGBF(device.ptrs.frame_indirect_buffer + pixel, output);
-  }
+  RGBF* buffer = (is_direct) ? device.ptrs.frame_direct_buffer : device.ptrs.frame_indirect_buffer;
+
+  write_beauty_buffer_impl(beauty, pixel, mode_set, buffer);
 }
 
 __device__ TraversalTriangle load_traversal_triangle(const int offset) {

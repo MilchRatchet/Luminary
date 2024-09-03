@@ -104,7 +104,7 @@ struct Bin {
 
 // Note: This is determined by the number of bits that we allocate for each node.
 #define THRESHOLD_TRIANGLES 3
-#define OBJECT_SPLIT_BIN_COUNT 64
+#define OBJECT_SPLIT_BIN_COUNT 32
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
 #define MAX_VALUE 1e10f
@@ -1281,7 +1281,9 @@ void lights_process(Scene* scene, int dmm_active) {
   // Create light tree.
   ////////////////////////////////////////////////////////////////////
 
-  _lights_build_light_tree(scene);
+  if (scene->triangle_lights_count > 0) {
+    _lights_build_light_tree(scene);
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Setup light ptrs in geometry.
@@ -1339,4 +1341,22 @@ void lights_process(Scene* scene, int dmm_active) {
   scene->triangle_lights_data = tri_data;
 
   bench_toc();
+}
+
+void lights_load_bridge_lut() {
+  uint64_t info = 0;
+
+  void* lut_data;
+  int64_t lut_length;
+  ceb_access("bridge_lut.bin", &lut_data, &lut_length, &info);
+
+  if (info) {
+    crash_message("Failed to load bridge_lut texture.");
+  }
+
+  void* bridge_lut;
+  device_malloc(&bridge_lut, lut_length);
+  device_upload(bridge_lut, lut_data, lut_length);
+
+  device_update_symbol(bridge_lut, bridge_lut);
 }

@@ -26,7 +26,6 @@ enum StateFlag {
 // STATE_FLAG_OCEAN_SCATTERED: This flag is set for paths that have at least one vertex that is a ocean volume scattering event.
 //                             This flag is used to limit ocean volumes to single scattering for performance reasons.
 //
-
 __device__ bool state_consume(const int pixel, const StateFlag flag) {
   if (device.ptrs.state_buffer[pixel] & flag) {
     return false;

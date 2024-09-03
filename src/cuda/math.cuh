@@ -311,6 +311,19 @@ __device__ int trailing_zeros(const unsigned int n) {
   return __clz(__brev(n));
 }
 
+__device__ Quaternion normalize_quaternion(const Quaternion q) {
+  const float length = sqrtf(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w);
+
+  Quaternion res;
+
+  res.x = q.x / length;
+  res.y = q.y / length;
+  res.z = q.z / length;
+  res.w = q.w / length;
+
+  return res;
+}
+
 __device__ Quaternion inverse_quaternion(const Quaternion q) {
   Quaternion result;
   result.x = -q.x;
@@ -1011,15 +1024,27 @@ __device__ float draine_phase_sample(const float g, const float alpha, const flo
 __device__ vec3 jendersie_eon_phase_sample(const vec3 ray, const float diameter, const float2 r_dir, const float r_choice) {
   const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
 
-  float u;
+  float cos_angle;
   if (r_choice < params.w_d) {
-    u = draine_phase_sample(params.g_d, params.alpha, r_dir.x);
+    cos_angle = draine_phase_sample(params.g_d, params.alpha, r_dir.x);
   }
   else {
-    u = henyey_greenstein_phase_sample(params.g_hg, r_dir.x);
+    cos_angle = henyey_greenstein_phase_sample(params.g_hg, r_dir.x);
   }
 
-  return phase_sample_basis(u, r_dir.y, ray);
+  return phase_sample_basis(cos_angle, r_dir.y, ray);
+}
+
+__device__ float jendersie_eon_phase_sample_cos_angle(const JendersieEonParams params, const float r_dir, const float r_choice) {
+  float cos_angle;
+  if (r_choice < params.w_d) {
+    cos_angle = draine_phase_sample(params.g_d, params.alpha, r_dir);
+  }
+  else {
+    cos_angle = henyey_greenstein_phase_sample(params.g_hg, r_dir);
+  }
+
+  return cos_angle;
 }
 
 __device__ float bvh_triangle_intersection(const TraversalTriangle triangle, const vec3 origin, const vec3 ray) {
@@ -1116,15 +1141,12 @@ __device__ vec3 vector_direction_stable(vec3 a, vec3 b) {
 }
 
 /*
- * Surface sample a triangle.
+ * Surface sample a triangle light.
  * @param triangle Triangle.
- * @param origin Point to sample from.
- * @param seed Random seed used to sample the triangle.
- * @result Normalized direction to the point on the triangle.
- *
- * Robust triangle sampling.
+ * @param seed Random number used to sample the triangle.
+ * @result Point on the triangle.
  */
-__device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin, const float2 random) {
+__device__ vec3 sample_triangle(const TriangleLight triangle, const float2 random, float2& uv) {
   float r1 = sqrtf(random.x);
   float r2 = random.y;
 
@@ -1132,12 +1154,10 @@ __device__ vec3 sample_triangle(const TriangleLight triangle, const vec3 origin,
   r1 = 0.025f + 0.95f * r1;
   r2 = 0.025f + 0.95f * r2;
 
-  const float u = 1.0f - r1;
-  const float v = r1 * r2;
+  uv.x = 1.0f - r1;
+  uv.y = r1 * r2;
 
-  const vec3 p = add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, u), scale_vector(triangle.edge2, v)));
-
-  return vector_direction_stable(p, origin);
+  return add_vector(triangle.vertex, add_vector(scale_vector(triangle.edge1, uv.x), scale_vector(triangle.edge2, uv.y)));
 }
 
 /*
@@ -1239,26 +1259,6 @@ __device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
   mat.f33 = normal.z;
 
   return mat;
-}
-
-/*
- * We importance sample for a tent filter of radius 1.
- * The tent filter is defined by 1-abs(x) for all x in [-1,1] and 0 else.
- * To importance sample this filter, we need the cumulative distribution function P(x) where
- *    P(x) = -(x * fabsf(x) - 2 * x - 1) / 2.
- * Then we need the inverse of the CDF which is a piecewise function
- *    P^{-1}(x) = -1 + sqrtf(2) * sqrtf(x)       if x <= 0.5
- *    P^{-1}(x) = 1 - sqrtf(2) * sqrtf(1 - x)    if x > 0.5
- * Then we can take a uniformly distributed random variable Y in [0,1] for which then holds
- *    F^{-1}(Y) is distributed as F.
- */
-__device__ float tent_filter_importance_sample(const float x) {
-  if (x > 0.5f) {
-    return 1.0f - sqrtf(2.0f) * sqrtf(1.0f - x);
-  }
-  else {
-    return -1.0f + sqrtf(2.0f) * sqrtf(x);
-  }
 }
 
 #ifndef OPTIX_KERNEL

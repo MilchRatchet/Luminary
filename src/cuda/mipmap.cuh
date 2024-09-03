@@ -223,13 +223,16 @@ extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Textur
       case Tex2D:
         switch (tex->type) {
           case TexDataFP32:
-            mipmap_generate_level_2D_RGBAF<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src_tex, dst_surface, dst_size.width, dst_size.height);
+            mipmap_generate_level_2D_RGBAF<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+              src_tex, dst_surface, (uint32_t) dst_size.width, (uint32_t) dst_size.height);
             break;
           case TexDataUINT8:
-            mipmap_generate_level_2D_RGBA8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src_tex, dst_surface, dst_size.width, dst_size.height);
+            mipmap_generate_level_2D_RGBA8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+              src_tex, dst_surface, (uint32_t) dst_size.width, (uint32_t) dst_size.height);
             break;
           case TexDataUINT16:
-            mipmap_generate_level_2D_RGBA16<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src_tex, dst_surface, dst_size.width, dst_size.height);
+            mipmap_generate_level_2D_RGBA16<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
+              src_tex, dst_surface, (uint32_t) dst_size.width, (uint32_t) dst_size.height);
             break;
           default:
             error_message("Invalid texture data type %d", tex->type);
@@ -240,15 +243,15 @@ extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Textur
         switch (tex->type) {
           case TexDataFP32:
             mipmap_generate_level_3D_RGBAF<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-              src_tex, dst_surface, dst_size.width, dst_size.height, dst_size.depth);
+              src_tex, dst_surface, (uint32_t) dst_size.width, (uint32_t) dst_size.height, (uint32_t) dst_size.depth);
             break;
           case TexDataUINT8:
             mipmap_generate_level_3D_RGBA8<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-              src_tex, dst_surface, dst_size.width, dst_size.height, dst_size.depth);
+              src_tex, dst_surface, (uint32_t) dst_size.width, (uint32_t) dst_size.height, (uint32_t) dst_size.depth);
             break;
           case TexDataUINT16:
             mipmap_generate_level_3D_RGBA16<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-              src_tex, dst_surface, dst_size.width, dst_size.height, dst_size.depth);
+              src_tex, dst_surface, (uint32_t) dst_size.width, (uint32_t) dst_size.height, (uint32_t) dst_size.depth);
             break;
           default:
             error_message("Invalid texture data type %d", tex->type);

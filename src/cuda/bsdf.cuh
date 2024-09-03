@@ -30,11 +30,11 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   vec3 refraction_vector;
   bool total_reflection;
   if (context.is_refraction) {
-    context.H         = bsdf_refraction_normal_from_pair(L, data.V, context.refraction_index);
+    context.H         = bsdf_normal_from_pair(L, data.V, context.refraction_index);
     refraction_vector = L;
   }
   else {
-    context.H         = normalize_vector(add_vector(data.V, L));
+    context.H         = bsdf_normal_from_pair(L, data.V, 1.0f);
     refraction_vector = refract_vector(data.V, context.H, context.refraction_index, total_reflection);
   }
 
@@ -67,7 +67,7 @@ __device__ RGBF bsdf_evaluate_core(
 __device__ RGBF bsdf_evaluate(
   const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction,
   const float one_over_sampling_pdf = 1.0f) {
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   return scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), L), one_over_sampling_pdf);
 #else
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
@@ -115,7 +115,7 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
 }
 
 __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSampleInfo& info) {
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   const float random_choice = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BOUNCE_DIR_CHOICE, pixel);
   const float2 random_dir   = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_BOUNCE_DIR, pixel);
 
@@ -156,13 +156,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     const bool include_refraction = data_local.albedo.a < 1.0f;
 
     // Microfacet evaluation is not numerically stable for very low roughness. We clamp the evaluation here.
-    data_local.roughness = fmaxf(data_local.roughness, 0.05f);
+    data_local.roughness = fmaxf(data_local.roughness, BSDF_ROUGHNESS_CLAMP);
 
-    float sum_weights;
-    RGBF selected_eval;
+    float sum_weights  = 0.0f;
+    RGBF selected_eval = get_color(0.0f, 0.0f, 0.0f);
 
     // Microfacet based sample
-    {
+    if (true) {
       const vec3 microfacet    = bsdf_microfacet_sample(data_local, pixel);
       const vec3 ray           = reflect_vector(data_local.V, microfacet);
       const BSDFRayContext ctx = bsdf_sample_context(data_local, microfacet, ray, false);
@@ -173,9 +173,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         (include_refraction)
           ? bsdf_microfacet_refraction_pdf(data_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index)
           : 0.0f;
-      const float mis_weight = pdf / (pdf + diffuse_pdf + refraction_pdf);
+
+      const float sum_pdf    = pdf + diffuse_pdf + refraction_pdf;
+      const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
 
       const float weight = color_importance(eval) * mis_weight;
+
+      UTILS_CHECK_NANS(pixel, weight);
 
       ray_local                = ray;
       sum_weights              = weight;
@@ -196,9 +200,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         (include_refraction)
           ? bsdf_microfacet_refraction_pdf(data_local, ctx.NdotH, ctx.NdotV, ctx.NdotL, ctx.HdotV, ctx.HdotL, ctx.refraction_index)
           : 0.0f;
-      const float mis_weight = pdf / (pdf + microfacet_pdf + refraction_pdf);
+
+      const float sum_pdf    = pdf + microfacet_pdf + refraction_pdf;
+      const float mis_weight = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
 
       const float weight = color_importance(eval) * mis_weight;
+
+      UTILS_CHECK_NANS(pixel, weight);
 
       sum_weights += weight;
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_RIS_DIFFUSE, pixel) * sum_weights < weight) {
@@ -227,10 +235,13 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
         const float reflection_pdf = bsdf_microfacet_pdf(data_local, ctx.NdotH, ctx.NdotV);
         const float diffuse_pdf    = (include_diffuse) ? bsdf_diffuse_pdf(data_local, ctx.NdotL) : 0.0f;
 
-        mis_weight = pdf / (pdf + reflection_pdf + diffuse_pdf);
+        const float sum_pdf = pdf + reflection_pdf + diffuse_pdf;
+        mis_weight          = (sum_pdf > 0.0f) ? pdf / sum_pdf : 0.0f;
       }
 
       const float weight = color_importance(eval) * mis_weight;
+
+      UTILS_CHECK_NANS(pixel, weight);
 
       sum_weights += weight;
       if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BSDF_RIS_REFRACTION, pixel) * sum_weights < weight) {
@@ -244,8 +255,11 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
     // For RIS we need to evaluate f / |f| here. This is unstable for low roughness and microfacet BRDFs.
     // Hence we use a little trick, f / p can be evaluated in a stable manner when p is the microfacet PDF,
     // and thus we evaluate f / |f| = (f / p) / |f / p|.
-    info.weight = scale_color(selected_eval, sum_weights / color_importance(selected_eval));
+    info.weight =
+      (sum_weights > 0.0f) ? scale_color(selected_eval, sum_weights / color_importance(selected_eval)) : get_color(0.0f, 0.0f, 0.0f);
   }
+
+  UTILS_CHECK_NANS(pixel, info.weight);
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
 #endif
@@ -271,6 +285,8 @@ __device__ vec3 bsdf_sample_diffuse(const GBufferData data, const ushort2 pixel,
 __device__ void bsdf_sample_for_light_probabilities(
   const GBufferData data, float& reflection_prob, float& refraction_prob, float& diffuse_prob) {
   // TODO: Consider creating a context and sampling also proportional to albedo etc.
+  // TODO: There is this issue where I importance sample the lights too well but end up picking occluded
+  // lights which will give me terrible convergence.
   const float microfacet_reflection_weight = 1.0f;
   const float microfacet_refraction_weight = 1.0f - data.albedo.a;
   const float diffuse_weight               = (1.0f - data.metallic) * data.albedo.a;
@@ -284,7 +300,7 @@ __device__ void bsdf_sample_for_light_probabilities(
 
 __device__ vec3 bsdf_sample_for_light(
   const GBufferData data, const ushort2 pixel, const QuasiRandomTarget random_target, bool& is_refraction, bool& is_valid) {
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   const float2 random_dir   = quasirandom_sequence_2D(random_target, pixel);
   const float random_method = quasirandom_sequence_1D(random_target + 1, pixel);
 
@@ -298,7 +314,7 @@ __device__ vec3 bsdf_sample_for_light(
   is_valid      = true;
 
   return scatter_ray;
-#else   // VOLUME_KERNEL
+#else   // PHASE_KERNEL
   const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
   const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
 
@@ -329,11 +345,11 @@ __device__ vec3 bsdf_sample_for_light(
   is_valid = (is_refraction) ? ray_local.z < 0.0f : ray_local.z > 0.0f;
 
   return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
-#endif  // VOLUME_KERNEL
+#endif  // !PHASE_KERNEL
 }
 
 __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L) {
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   const float cos_angle = -dot_product(data.V, L);
 
   const VolumeType volume_hit_type = VOLUME_HIT_TYPE(data.hit_id);
@@ -349,7 +365,7 @@ __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L)
   }
 
   return pdf;
-#else   // VOLUME_KERNEL
+#else   // PHASE_KERNEL
   float reflection_probability, refraction_probability, diffuse_probability;
   bsdf_sample_for_light_probabilities(data, reflection_probability, refraction_probability, diffuse_probability);
 
@@ -367,7 +383,7 @@ __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L)
 
     return reflection_probability * microfacet_reflection_pdf + diffuse_probability * diffuse_pdf;
   }
-#endif  // VOLUME_KERNEL
+#endif  // !PHASE_KERNEL
 }
 
 #endif /* SHADING_KERNEL */

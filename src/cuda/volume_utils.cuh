@@ -7,7 +7,6 @@
 #define FOG_DENSITY (0.001f * device.scene.fog.density)
 
 struct VolumeDescriptor {
-  // TODO: Correctly pass descriptor to G-Buffer and use in RIS.
   VolumeType type;
   RGBF absorption;
   RGBF scattering;
@@ -30,7 +29,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
   volume.max_scattering = FOG_DENSITY;
   volume.dist           = device.scene.fog.dist;
   volume.max_height     = device.scene.fog.height;
-  volume.min_height     = (device.scene.ocean.active) ? OCEAN_MAX_HEIGHT : 0.0f;
+  volume.min_height     = (device.scene.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
 
   return volume;
 }
@@ -43,7 +42,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   volume.scattering = ocean_jerlov_scattering_coefficient(device.scene.ocean.water_type);
   volume.dist       = 10000.0f;
   volume.max_height = OCEAN_MIN_HEIGHT * (1.0f - eps);
-  volume.min_height = 0.0f;
+  volume.min_height = -65535.0f;
 
   volume.max_scattering = color_importance(volume.scattering);
 
@@ -59,6 +58,28 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
     default:
       return {};
   }
+}
+
+__device__ VolumeType volume_get_type_at_position(const vec3 pos) {
+  VolumeType type = VOLUME_TYPE_NONE;
+
+  if (device.scene.fog.active) {
+    const VolumeDescriptor volume_fog = volume_get_descriptor_preset_fog();
+
+    if (pos.y <= volume_fog.max_height && pos.y >= volume_fog.min_height) {
+      type = VOLUME_TYPE_FOG;
+    }
+  }
+
+  if (device.scene.ocean.active) {
+    const VolumeDescriptor volume_ocean = volume_get_descriptor_preset_ocean();
+
+    if (pos.y <= volume_ocean.max_height && pos.y >= volume_ocean.min_height) {
+      type = VOLUME_TYPE_OCEAN;
+    }
+  }
+
+  return type;
 }
 
 /*
@@ -185,6 +206,11 @@ __device__ float volume_sample_intersection(
     return FLT_MAX;
 
   return start + t;
+}
+
+__device__ float volume_sample_intersection_pdf(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float start, const float t) {
+  return volume.max_scattering * expf(-volume.max_scattering * (t - start));
 }
 
 __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType volume_hit_type, const vec3 ray) {

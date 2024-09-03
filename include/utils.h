@@ -101,11 +101,11 @@ enum Filter {
 
 enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } typedef SnapResolution;
 
-enum AccumMode { NO_ACCUMULATION = 0, TEMPORAL_ACCUMULATION = 1, TEMPORAL_REPROJECTION = 2 } typedef AccumMode;
-
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
-enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE } typedef VolumeType;
+enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
+
+enum SkyMode { SKY_MODE_DEFAULT = 0, SKY_MODE_HDRI = 1, SKY_MODE_CONSTANT_COLOR = 2 } typedef SkyMode;
 
 enum CameraApertureShape { CAMERA_APERTURE_ROUND = 0, CAMERA_APERTURE_BLADED = 1 } typedef CameraApertureShape;
 
@@ -241,6 +241,11 @@ struct Cloud {
   int octaves;
 } typedef Cloud;
 
+struct BridgeSettings {
+  int max_num_vertices;
+  int num_ris_samples;
+} typedef BridgeSettings;
+
 // Settings that affect the sky LUTs
 struct AtmoSettings {
   float rayleigh_density;
@@ -287,11 +292,13 @@ struct Sky {
   int hdri_initialized;
   int hdri_dim;
   int settings_hdri_dim;
-  int hdri_active;
   int hdri_samples;
   vec3 hdri_origin;
   float hdri_mip_bias;
   int aerial_perspective;
+  RGBF constant_color;
+  int ambient_sampling;
+  SkyMode mode;
 } typedef Sky;
 
 enum JerlovWaterType {
@@ -319,6 +326,7 @@ struct Ocean {
   int caustics_ris_sample_count;
   float caustics_domain_scale;
   int multiscattering;
+  int triangle_light_contribution;
 } typedef Ocean;
 
 struct Fog {
@@ -329,13 +337,6 @@ struct Fog {
   float dist;
 } typedef Fog;
 
-struct Jitter {
-  float x;
-  float y;
-  float prev_x;
-  float prev_y;
-} typedef Jitter;
-
 struct GlobalMaterial {
   RGBF default_material;
   int lights_active;
@@ -345,6 +346,7 @@ struct GlobalMaterial {
   int invert_roughness;
   int override_materials;
   int enable_ior_shadowing;
+  float caustic_roughness_clamp;
 } typedef GlobalMaterial;
 
 struct Particles {
@@ -379,7 +381,6 @@ struct Scene {
 } typedef Scene;
 
 struct RayEmitter {
-  Jitter jitter;
   Mat4x4 view_space;
   Mat4x4 projection;
   float step;
@@ -410,7 +411,6 @@ struct DevicePointers {
   uint16_t* task_counts;
   uint16_t* task_offsets;
   uint32_t* ior_stack;
-  RGBF* frame_buffer;
   RGBF* frame_temporal;
   float* frame_variance;
   RGBF* frame_accumulate;
@@ -444,6 +444,7 @@ struct DeviceConstantMemory {
   DevicePointers ptrs;
   Scene scene;
   RISSettings ris_settings;
+  BridgeSettings bridge_settings;
   uint16_t user_selected_x;
   uint16_t user_selected_y;
   int max_ray_depth;
@@ -462,7 +463,7 @@ struct DeviceConstantMemory {
   OutputVariable output_variable;
   RGBF* bloom_scratch;
   RayEmitter emitter;
-  int accum_mode;
+  int accumulate;
   OptixTraversableHandle optix_bvh;
   OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_light;
@@ -472,6 +473,7 @@ struct DeviceConstantMemory {
   Quad* particle_quads;
   LightTreeNode8Packed* light_tree_nodes_8;
   uint2* light_tree_paths;
+  float* bridge_lut;
 } typedef DeviceConstantMemory;
 
 struct OptixKernel {
@@ -518,7 +520,6 @@ struct RaytraceInstance {
   DeviceBuffer* trace_results;
   DeviceBuffer* task_counts;
   DeviceBuffer* task_offsets;
-  DeviceBuffer* frame_buffer;
   DeviceBuffer* frame_temporal;
   DeviceBuffer* frame_variance;
   DeviceBuffer* frame_accumulate;
@@ -558,10 +559,10 @@ struct RaytraceInstance {
   General settings;
   AtmoSettings atmo_settings;
   void* denoise_setup;
-  Jitter jitter;
-  int accum_mode;
+  int accumulate;
   RayEmitter emitter;
   RISSettings ris_settings;
+  BridgeSettings bridge_settings;
   DeviceBuffer* trace_result_buffer;
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
@@ -569,6 +570,8 @@ struct RaytraceInstance {
   OptixKernel optix_kernel;
   OptixKernel optix_kernel_geometry;
   OptixKernel optix_kernel_volume;
+  OptixKernel optix_kernel_particle;
+  OptixKernel optix_kernel_volume_bridges;
   OptixBVH optix_bvh;
   OptixBVH optix_bvh_shadow;
   OptixBVH optix_bvh_light;

@@ -51,7 +51,7 @@ __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool i
 __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, const vec3 L, const bool is_underwater) {
   const vec3 center = caustics_solve_for_normal(data, L, is_underwater, 0.0f, 0.0f);
 
-#ifdef VOLUME_KERNEL
+#ifdef PHASE_KERNEL
   const bool fast_path = true;
 #else
   const bool fast_path = device.scene.ocean.amplitude == 0.0f || !device.scene.ocean.caustics_active;

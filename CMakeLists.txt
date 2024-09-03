@@ -55,9 +55,9 @@ list(REMOVE_ITEM gpu_source_files
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels.cu"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_trace_particle.cu"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_geometry.cu"
-  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_toy.cu"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_volume.cu"
   "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_particle.cu"
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/optix_kernels_volume_bridges.cu"
 )
 
 #=============================================================
@@ -71,10 +71,10 @@ find_package(SDL2_ttf REQUIRED CONFIG)
 #=============================================================
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --use_fast_math --split-compile=0")
 if(WIN32)
-    set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O2 -fp:fast -arch:AVX2")
+    set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O2 -fp:fast -arch:AVX2 -W4")
     set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Od -fp:fast -arch:AVX2 -g")
 else()
-    set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O3 -march=native")
+    set(CMAKE_CUDA_FLAGS_RELEASE "--extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true --compiler-options -O3 -march=native -Wextra")
     set(CMAKE_CUDA_FLAGS_DEBUG "--compiler-options -Og -g")
 endif()
 
@@ -183,13 +183,14 @@ add_executable(Luminary)
 
 function(compile_ptx kernel_name)
   # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
+  # TODO: This is currently always building for native. Add some logic that ties in with the normal CUDA kernel arch settings.
   # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
   add_custom_command(
     OUTPUT
       "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
     COMMAND
       ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu"
-      --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      -arch=native --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
       -o "${kernel_name}.ptx"
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_SOURCE_DIR}/src/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
@@ -214,6 +215,8 @@ compile_ptx(optix_kernels)
 compile_ptx(optix_kernels_trace_particle)
 compile_ptx(optix_kernels_geometry)
 compile_ptx(optix_kernels_volume)
+compile_ptx(optix_kernels_particle)
+compile_ptx(optix_kernels_volume_bridges)
 
 #=============================================================
 # Embed files
@@ -229,11 +232,14 @@ ceb_embed_files(
   ${CMAKE_BINARY_DIR}/optix_kernels_trace_particle.ptx
   ${CMAKE_BINARY_DIR}/optix_kernels_geometry.ptx
   ${CMAKE_BINARY_DIR}/optix_kernels_volume.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_particle.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_volume_bridges.ptx
   ${CMAKE_CURRENT_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/moon/moon_normal.png
   ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_1D.bin
   ${CMAKE_CURRENT_SOURCE_DIR}/data/bluenoise/bluenoise_2D.bin
+  ${CMAKE_CURRENT_SOURCE_DIR}/data/bridge/bridge_lut.bin
 )
 
 #=============================================================

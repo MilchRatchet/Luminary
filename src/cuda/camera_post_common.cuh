@@ -6,9 +6,9 @@
 #include "utils.cuh"
 #include "utils.h"
 
-__device__ RGBF sample_pixel(const RGBF* image, float x, float y, const int width, const int height) {
-  const float source_x = fmaxf(0.0f, x * (width - 1) - 0.5f);
-  const float source_y = fmaxf(0.0f, y * (height - 1) - 0.5f);
+__device__ RGBF sample_pixel(const RGBF* image, const float x, const float y, const int width, const int height) {
+  const float source_x = fmaxf(0.0f, x * (width - 1));
+  const float source_y = fmaxf(0.0f, y * (height - 1));
 
   const int index_x = source_x;
   const int index_y = source_y;
@@ -76,25 +76,25 @@ LUMINARY_KERNEL void image_downsample(const RGBF* source, const int sw, const in
     const int y = id / tw;
     const int x = id - y * tw;
 
-    const float sx = scale_x * x + 0.5f * scale_x;
-    const float sy = scale_y * y + 0.5f * scale_y;
+    const float sx = scale_x * x;
+    const float sy = scale_y * y;
 
-    RGBF a1 = sample_pixel_clamp(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBF a2 = sample_pixel_clamp(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBF a3 = sample_pixel_clamp(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
-    RGBF a4 = sample_pixel_clamp(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBF a1 = sample_pixel_border(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBF a2 = sample_pixel_border(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBF a3 = sample_pixel_border(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBF a4 = sample_pixel_border(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
 
     RGBF pixel = add_color(add_color(a1, a2), add_color(a3, a4));
 
-    pixel = add_color(pixel, sample_pixel_clamp(source, sx, sy, sw, sh));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx, sy - step_y, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx - step_x, sy, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx + step_x, sy, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx, sy + step_y, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx - step_x, sy - step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx + step_x, sy - step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx - step_x, sy + step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx + step_x, sy + step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, sample_pixel_border(source, sx, sy, sw, sh));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx, sy - step_y, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx - step_x, sy, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx + step_x, sy, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx, sy + step_y, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx - step_x, sy - step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx + step_x, sy - step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx - step_x, sy + step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx + step_x, sy + step_y, sw, sh), 0.25f));
 
     pixel = scale_color(pixel, 0.125f);
 
@@ -117,27 +117,27 @@ LUMINARY_KERNEL void image_downsample_threshold(
     const int y = id / tw;
     const int x = id - y * tw;
 
-    const float sx = scale_x * x + 0.5f * scale_x;
-    const float sy = scale_y * y + 0.5f * scale_y;
+    const float sx = scale_x * x;
+    const float sy = scale_y * y;
 
-    RGBF a1 = sample_pixel_clamp(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBF a2 = sample_pixel_clamp(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
-    RGBF a3 = sample_pixel_clamp(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
-    RGBF a4 = sample_pixel_clamp(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBF a1 = sample_pixel_border(source, sx - 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBF a2 = sample_pixel_border(source, sx + 0.5f * step_x, sy - 0.5f * step_y, sw, sh);
+    RGBF a3 = sample_pixel_border(source, sx - 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
+    RGBF a4 = sample_pixel_border(source, sx + 0.5f * step_x, sy + 0.5f * step_y, sw, sh);
 
     RGBF pixel = add_color(add_color(a1, a2), add_color(a3, a4));
 
-    pixel = add_color(pixel, sample_pixel_clamp(source, sx, sy, sw, sh));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx, sy - step_y, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx - step_x, sy, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx + step_x, sy, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx, sy + step_y, sw, sh), 0.5f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx - step_x, sy - step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx + step_x, sy - step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx - step_x, sy + step_y, sw, sh), 0.25f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx + step_x, sy + step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, sample_pixel_border(source, sx, sy, sw, sh));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx, sy - step_y, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx - step_x, sy, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx + step_x, sy, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx, sy + step_y, sw, sh), 0.5f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx - step_x, sy - step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx + step_x, sy - step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx - step_x, sy + step_y, sw, sh), 0.25f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx + step_x, sy + step_y, sw, sh), 0.25f));
 
-    pixel = scale_color(pixel, (__half) 0.125f);
+    pixel = scale_color(pixel, 0.125f);
 
     pixel = max_color(sub_color(pixel, get_color(thresh, thresh, thresh)), get_color(0.0f, 0.0f, 0.0f));
 
@@ -161,19 +161,19 @@ LUMINARY_KERNEL void image_upsample(
     const int y = id / tw;
     const int x = id - y * tw;
 
-    const float sx = scale_x * x + 0.5f * scale_x;
-    const float sy = scale_y * y + 0.5f * scale_y;
+    const float sx = scale_x * x;
+    const float sy = scale_y * y;
 
-    RGBF pixel = sample_pixel_clamp(source, sx - step_x, sy - step_y, sw, sh);
+    RGBF pixel = sample_pixel_border(source, sx - step_x, sy - step_y, sw, sh);
 
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx, sy - step_y, sw, sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel_clamp(source, sx + step_x, sy - step_y, sw, sh));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx - step_x, sy, sw, sh), 2.0f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx, sy, sw, sh), 4.0f));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx + step_x, sy, sw, sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel_clamp(source, sx - step_x, sy + step_y, sw, sh));
-    pixel = add_color(pixel, scale_color(sample_pixel_clamp(source, sx, sy + step_y, sw, sh), 2.0f));
-    pixel = add_color(pixel, sample_pixel_clamp(source, sx + step_x, sy + step_y, sw, sh));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx, sy - step_y, sw, sh), 2.0f));
+    pixel = add_color(pixel, sample_pixel_border(source, sx + step_x, sy - step_y, sw, sh));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx - step_x, sy, sw, sh), 2.0f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx, sy, sw, sh), 4.0f));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx + step_x, sy, sw, sh), 2.0f));
+    pixel = add_color(pixel, sample_pixel_border(source, sx - step_x, sy + step_y, sw, sh));
+    pixel = add_color(pixel, scale_color(sample_pixel_border(source, sx, sy + step_y, sw, sh), 2.0f));
+    pixel = add_color(pixel, sample_pixel_border(source, sx + step_x, sy + step_y, sw, sh));
 
     pixel = scale_color(pixel, 0.0625f * sa);
 

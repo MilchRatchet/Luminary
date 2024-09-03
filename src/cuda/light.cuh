@@ -8,7 +8,151 @@
 #include "sky_utils.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
+#include "volume_utils.cuh"
 
+#ifdef VOLUME_KERNEL
+__device__ float light_tree_child_importance(
+  const float transmittance_importance, const vec3 origin, const vec3 ray, const float limit, const LightTreeNode8Packed node,
+  const vec3 exp, const float exp_c, const uint32_t i) {
+  const bool lower_data = (i < 4);
+  const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
+
+  const uint32_t rel_energy = lower_data ? node.rel_energy[0] : node.rel_energy[1];
+
+  vec3 point;
+  const float energy = (float) ((rel_energy >> shift) & 0xFF);
+
+  if (energy == 0.0f)
+    return 0.0f;
+
+  const uint32_t rel_point_x = lower_data ? node.rel_point_x[0] : node.rel_point_x[1];
+  const uint32_t rel_point_y = lower_data ? node.rel_point_y[0] : node.rel_point_y[1];
+  const uint32_t rel_point_z = lower_data ? node.rel_point_z[0] : node.rel_point_z[1];
+
+  point = get_vector((rel_point_x >> shift) & 0xFF, (rel_point_y >> shift) & 0xFF, (rel_point_z >> shift) & 0xFF);
+  point = mul_vector(point, exp);
+  point = add_vector(point, node.base_point);
+
+  const uint32_t confidence_light = lower_data ? node.confidence_light[0] : node.confidence_light[1];
+
+  float confidence;
+  confidence = (confidence_light >> (shift + 2)) & 0x3F;
+  confidence = confidence * exp_c;
+
+  // Compute the point along our ray that is closest to the child point.
+  const float t            = fminf(fmaxf(dot_product(sub_vector(point, origin), ray), 0.0f), limit);
+  const vec3 closest_point = add_vector(origin, scale_vector(ray, t));
+
+  const vec3 diff = sub_vector(point, closest_point);
+
+  const vec3 v0 = normalize_vector(sub_vector(origin, point));
+  const vec3 v1 =
+    normalize_vector(sub_vector(add_vector(origin, scale_vector(ray, fminf(limit, device.scene.camera.far_clip_distance))), point));
+
+  const float angle = acosf(fminf(fmaxf(dot_product(v0, v1), -1.0f + eps), 1.0f - eps));
+
+  // In the Estevez 2018 paper, they derive that a linear falloff makes more sense, assuming equi-angular sampling.
+  return angle * energy / fmaxf(get_length(diff), confidence);
+}
+
+__device__ uint32_t light_tree_traverse(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, float random, uint32_t& subset_length, float& pdf) {
+  if (!device.scene.material.light_tree_active) {
+    subset_length = device.scene.triangle_lights_count;
+    pdf           = 1.0f;
+    return 0;
+  }
+
+  pdf = 1.0f;
+
+  LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
+
+  const float transmittance_importance = color_importance(add_color(volume.scattering, volume.absorption));
+
+  uint32_t subset_ptr = 0xFFFFFFFF;
+  subset_length       = 0;
+
+  random = random_saturate(random);
+
+  while (subset_length == 0) {
+    const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
+    const float exp_c = exp2f(node.exp_confidence);
+
+    float importance[8];
+
+    importance[0] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 0);
+    importance[1] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 1);
+    importance[2] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 2);
+    importance[3] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 3);
+    importance[4] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 4);
+    importance[5] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 5);
+    importance[6] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 6);
+    importance[7] = light_tree_child_importance(transmittance_importance, origin, ray, limit, node, exp, exp_c, 7);
+
+    float sum_importance = 0.0f;
+    for (uint32_t i = 0; i < 8; i++) {
+      sum_importance += importance[i];
+    }
+
+    float accumulated_importance = 0.0f;
+
+    uint32_t selected_child             = 0xFFFFFFFF;
+    uint32_t selected_child_light_ptr   = 0;
+    uint32_t selected_child_light_count = 0;
+    uint32_t sum_lights                 = 0;
+    float selected_importance           = 0.0f;
+    float random_shift                  = 0.0f;
+
+    random *= sum_importance;
+
+    for (uint32_t i = 0; i < 8; i++) {
+      const float child_importance = importance[i];
+      accumulated_importance += child_importance;
+
+      const bool lower_data                 = (i < 4);
+      const uint32_t child_light_count_data = lower_data ? node.confidence_light[0] : node.confidence_light[1];
+      const uint32_t shift                  = (lower_data ? i : (i - 4)) << 3;
+
+      uint32_t child_light_count = (child_light_count_data >> shift) & 0x3;
+      sum_lights += child_light_count;
+
+      if (accumulated_importance > random) {
+        selected_child             = i;
+        selected_child_light_count = child_light_count;
+        selected_child_light_ptr   = sum_lights - child_light_count;
+        selected_importance        = child_importance;
+
+        random_shift = accumulated_importance - child_importance;
+
+        // No control flow, we always loop over all children.
+        accumulated_importance = -FLT_MAX;
+      }
+    }
+
+    if (selected_child == 0xFFFFFFFF) {
+      subset_length = 0;
+      subset_ptr    = 0;
+      break;
+    }
+
+    pdf *= selected_importance / sum_importance;
+
+    // Rescale random number
+    random = random_saturate((random - random_shift) / selected_importance);
+
+    if (selected_child_light_count > 0) {
+      subset_length = selected_child_light_count;
+      subset_ptr    = node.light_ptr + selected_child_light_ptr;
+      break;
+    }
+
+    node = load_light_tree_node_8(device.light_tree_nodes_8, node.child_ptr + selected_child);
+  }
+
+  return subset_ptr;
+}
+
+#else  /* VOLUME_KERNEL */
 __device__ float light_tree_child_importance(
   const GBufferData data, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i) {
   const bool lower_data = (i < 4);
@@ -212,6 +356,7 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
 
   return pdf;
 }
+#endif /* !VOLUME_KERNEL */
 
 __device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
   const vec3 h  = cross_product(ray, triangle.edge2);
@@ -249,11 +394,11 @@ __device__ float light_triangle_intersection_uv(const TriangleLight triangle, co
  * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
  *
  */
-__device__ vec3 light_sample_triangle(
-  const TriangleLight triangle, const GBufferData data, const float2 random, float& solid_angle, float& dist, RGBF& color) {
-  const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, data.position));
-  const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), data.position));
-  const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), data.position));
+__device__ vec3
+  light_sample_triangle(const TriangleLight triangle, const vec3 pos, const float2 random, float& solid_angle, float& dist, RGBF& color) {
+  const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, pos));
+  const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), pos));
+  const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), pos));
 
   const float G0 = fabsf(dot_product(cross_product(v0, v1), v2));
   const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
@@ -263,6 +408,8 @@ __device__ vec3 light_sample_triangle(
 
   if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
     solid_angle = 0.0f;
+    dist        = 1.0f;
+    color       = get_color(0.0f, 0.0f, 0.0f);
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
@@ -282,15 +429,19 @@ __device__ vec3 light_sample_triangle(
 
   if (isnan(dir.x) || isnan(dir.y) || isnan(dir.z)) {
     solid_angle = 0.0f;
+    dist        = FLT_MAX;
+    color       = get_color(0.0f, 0.0f, 0.0f);
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
   float2 coords;
-  dist = light_triangle_intersection_uv(triangle, data.position, dir, coords);
+  dist = light_triangle_intersection_uv(triangle, pos, dir, coords);
 
   // Our ray does not actually hit the light, abort.
   if (dist == FLT_MAX) {
     solid_angle = 0.0f;
+    dist        = 1.0f;
+    color       = get_color(0.0f, 0.0f, 0.0f);
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
@@ -341,6 +492,7 @@ __device__ void light_sample_triangle_presampled(
   // Our ray does not actually hit the light, abort. This should never happen!
   if (dist == FLT_MAX) {
     solid_angle = 0.0f;
+    color       = get_color(0.0f, 0.0f, 0.0f);
     return;
   }
 

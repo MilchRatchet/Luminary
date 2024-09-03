@@ -21,16 +21,17 @@ static const int LINE_SIZE = 4096;
 void scene_init(Scene** _scene) {
   Scene* scene = calloc(1, sizeof(Scene));
 
-  scene->material.lights_active        = 0;
-  scene->material.light_tree_active    = 1;
-  scene->material.default_material.r   = 0.3f;
-  scene->material.default_material.g   = 0.0f;
-  scene->material.default_material.b   = 1.0f;
-  scene->material.alpha_cutoff         = 0.0f;
-  scene->material.colored_transparency = 0;
-  scene->material.override_materials   = 0;
-  scene->material.invert_roughness     = 0;
-  scene->material.enable_ior_shadowing = 1;
+  scene->material.lights_active           = 0;
+  scene->material.light_tree_active       = 1;
+  scene->material.default_material.r      = 0.3f;
+  scene->material.default_material.g      = 0.0f;
+  scene->material.default_material.b      = 1.0f;
+  scene->material.alpha_cutoff            = 0.0f;
+  scene->material.colored_transparency    = 0;
+  scene->material.override_materials      = 0;
+  scene->material.invert_roughness        = 0;
+  scene->material.enable_ior_shadowing    = 1;
+  scene->material.caustic_roughness_clamp = 0.25f;
 
   scene->camera.pos.x                      = 0.0f;
   scene->camera.pos.y                      = 0.0f;
@@ -74,17 +75,18 @@ void scene_init(Scene** _scene) {
   scene->camera.do_firefly_clamping        = 1;
   scene->camera.film_grain                 = 0.0f;
 
-  scene->ocean.active                    = 0;
-  scene->ocean.height                    = 0.0f;
-  scene->ocean.amplitude                 = 0.2f;
-  scene->ocean.frequency                 = 0.12f;
-  scene->ocean.choppyness                = 4.0f;
-  scene->ocean.refractive_index          = 1.333f;
-  scene->ocean.water_type                = JERLOV_WATER_TYPE_IB;
-  scene->ocean.caustics_active           = 0;
-  scene->ocean.caustics_ris_sample_count = 32;
-  scene->ocean.caustics_domain_scale     = 0.5f;
-  scene->ocean.multiscattering           = 0;
+  scene->ocean.active                      = 0;
+  scene->ocean.height                      = 0.0f;
+  scene->ocean.amplitude                   = 0.2f;
+  scene->ocean.frequency                   = 0.12f;
+  scene->ocean.choppyness                  = 4.0f;
+  scene->ocean.refractive_index            = 1.333f;
+  scene->ocean.water_type                  = JERLOV_WATER_TYPE_IB;
+  scene->ocean.caustics_active             = 0;
+  scene->ocean.caustics_ris_sample_count   = 32;
+  scene->ocean.caustics_domain_scale       = 0.5f;
+  scene->ocean.multiscattering             = 0;
+  scene->ocean.triangle_light_contribution = 0;
 
   scene->toy.active           = 0;
   scene->toy.emissive         = 0;
@@ -134,7 +136,6 @@ void scene_init(Scene** _scene) {
   scene->sky.aerial_perspective          = 0;
   scene->sky.lut_initialized             = 0;
   scene->sky.hdri_initialized            = 0;
-  scene->sky.hdri_active                 = 0;
   scene->sky.hdri_dim                    = 0;
   scene->sky.settings_hdri_dim           = 2048;
   scene->sky.hdri_samples                = 50;
@@ -145,6 +146,11 @@ void scene_init(Scene** _scene) {
   scene->sky.stars_seed                  = 0;
   scene->sky.stars_intensity             = 1.0f;
   scene->sky.settings_stars_count        = 10000;
+  scene->sky.constant_color.r            = 1.0f;
+  scene->sky.constant_color.g            = 1.0f;
+  scene->sky.constant_color.b            = 1.0f;
+  scene->sky.ambient_sampling            = 1;
+  scene->sky.mode                        = SKY_MODE_DEFAULT;
   scene->sky.cloud.active                = 0;
   scene->sky.cloud.initialized           = 0;
   scene->sky.cloud.steps                 = 96;

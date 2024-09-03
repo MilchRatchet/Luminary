@@ -59,7 +59,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_dropdown(ui, "BVH Type", &(instance->bvh_type), 1, 2, "Luminary\0OptiX", 8);
   panels[i++] = create_dropdown(
     ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Identification\0Lights", 9);
-  panels[i++] = create_check(ui, "Accumulate", &(instance->accum_mode), 1);
+  panels[i++] = create_check(ui, "Accumulate", &(instance->accumulate), 1);
   if (instance->aov_mode) {
     panels[i++] = create_dropdown(
       ui, "Output Variable", &(instance->output_variable), 0, 5,
@@ -67,8 +67,10 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   }
   panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
-  panels[i++] = create_slider(ui, "RIS Candidates Count", &(instance->ris_settings.initial_reservoir_size), 1, 0.02f, 0.0f, 32.0f, 0, 1);
+  panels[i++] = create_slider(ui, "RIS Samples", &(instance->ris_settings.initial_reservoir_size), 1, 0.02f, 0.0f, 32.0f, 0, 1);
   panels[i++] = create_slider(ui, "Light Ray Count", &(instance->ris_settings.num_light_rays), 1, 0.01f, 1.0f, 32.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Volume RIS Samples", &(instance->bridge_settings.num_ris_samples), 1, 0.02f, 1.0f, 32.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Volume DL Max Depth", &(instance->bridge_settings.max_num_vertices), 1, 0.02f, 1.0f, 8.0f, 0, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -99,6 +101,8 @@ static UITab create_general_material_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_check(ui, "Colored Transparency", &(instance->scene.material.colored_transparency), 1);
   panels[i++] = create_check(ui, "IOR Shadowing", &(instance->scene.material.enable_ior_shadowing), 1);
   panels[i++] = create_check(ui, "Invert roughness", &(instance->scene.material.invert_roughness), 1);
+  panels[i++] =
+    create_slider(ui, "Caustic Roughness Clamp", &(instance->scene.material.caustic_roughness_clamp), 1, 0.0002f, 0.0f, 1.0f, 0, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -173,13 +177,13 @@ static UITab create_camera_prop_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_slider(ui, "Aperture Blade Count", &(instance->scene.camera.aperture_blade_count), 1, 0.0005f, 3.0f, FLT_MAX, 0, 1);
   panels[i++] = create_slider(ui, "Focal Length", &(instance->scene.camera.focal_length), 1, 0.001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Far Clip Distance", &(instance->scene.camera.far_clip_distance), 1, 0.05f, 0.0f, FLT_MAX, 0, 0);
+  panels[i++] =
+    create_slider(ui, "Russian Roulette Bias", &(instance->scene.camera.russian_roulette_threshold), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
+  panels[i++] = create_check(ui, "Firefly Clamping", &(instance->scene.camera.do_firefly_clamping), 1);
   panels[i++] = create_slider(ui, "Camera Speed", &(instance->scene.camera.wasd_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Mouse Sensitivity", &(instance->scene.camera.mouse_speed), 0, 0.0001f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Smooth Camera Movement", &(instance->scene.camera.smooth_movement), 0);
   panels[i++] = create_slider(ui, "Smoothing Factor", &(instance->scene.camera.smoothing_factor), 0, 0.0001f, 0.0f, 1.0f, 0, 0);
-  panels[i++] =
-    create_slider(ui, "Russian Roulette Bias", &(instance->scene.camera.russian_roulette_threshold), 1, 0.0001f, 0.001f, FLT_MAX, 0, 0);
-  panels[i++] = create_check(ui, "Firefly Clamping", &(instance->scene.camera.do_firefly_clamping), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -335,7 +339,7 @@ static UITab create_sky_general_hdri_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_tab(ui, 0, "General\nCamera\nSky\nProcedurals");
   panels[i++] = create_tab(ui, 1, "General\nClouds\nFog");
   panels[i++] = create_tab(ui, 2, "Celestial\nAtmosphere\nHDRI");
-  panels[i++] = create_check(ui, "Active", &(instance->scene.sky.hdri_active), 1);
+  panels[i++] = create_dropdown(ui, "Mode", &(instance->scene.sky.mode), 1, 3, "Default\0HDRI\0Constant Color", 3);
   panels[i++] = create_slider(ui, "Resolution", &(instance->scene.sky.settings_hdri_dim), 0, 1.0f, 1.0f, 8192.0f, 0, 1);
   panels[i++] = create_slider(ui, "Samples", &(instance->scene.sky.hdri_samples), 0, 0.01f, 1.0f, 8192.0f, 0, 1);
   panels[i++] = create_slider(ui, "Mip Bias", &(instance->scene.sky.hdri_mip_bias), 1, 0.001f, -16.0f, 16.0f, 0, 0);
@@ -344,6 +348,11 @@ static UITab create_sky_general_hdri_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Origin Z", &(instance->scene.sky.hdri_origin.z), 1, 0.001f, -FLT_MAX, FLT_MAX, 1, 0);
   panels[i++] = create_button(ui, "Origin To Camera", instance, (void (*)(void*)) sky_hdri_set_pos_to_cam, 0);
   panels[i++] = create_button(ui, "Generate", instance, (void (*)(void*)) sky_hdri_generate_LUT, 1);
+  panels[i++] = create_color(ui, "Color", (float*) &(instance->scene.sky.constant_color));
+  panels[i++] = create_slider(ui, "  Red", &(instance->scene.sky.constant_color.r), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "  Green", &(instance->scene.sky.constant_color.g), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_slider(ui, "  Blue", &(instance->scene.sky.constant_color.b), 1, 0.001f, 0.0f, 1.0f, 0, 0);
+  panels[i++] = create_check(ui, "Ambient Sampling", &(instance->scene.sky.ambient_sampling), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -577,13 +586,14 @@ static UITab create_procedurals_ocean_panels(UI* ui, RaytraceInstance* instance)
   panels[i++] = create_slider(ui, "Caustics Domain Scale", &(instance->scene.ocean.caustics_domain_scale), 1, 0.001f, 0.0f, 2.0f, 0, 0);
   panels[i++] = create_dropdown(
     ui, "Jerlov Water Type", &(instance->scene.ocean.water_type), 1, 10,
-    "Open (I)\0Open (IA)\0Open (IB)\0Open (II)\0Open (III)\0Coastal (1C)\0Coastal (3C)\0Coastal (5C)\0Coastal (7C)\0Coastal (9C)", 7);
+    "Open (I)\0Open (IA)\0Open (IB)\0Open (II)\0Open (III)\0Coastal (1C)\0Coastal (3C)\0Coastal (5C)\0Coastal (7C)\0Coastal (9C)", 6);
   panels[i++] = create_slider(ui, "Height", &(instance->scene.ocean.height), 1, 0.005f, -FLT_MAX, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Amplitude", &(instance->scene.ocean.amplitude), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Choppyness", &(instance->scene.ocean.choppyness), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Frequency", &(instance->scene.ocean.frequency), 1, 0.005f, 0.0f, FLT_MAX, 0, 0);
   panels[i++] = create_slider(ui, "Refractive Index", &(instance->scene.ocean.refractive_index), 1, 0.001f, 1.0f, FLT_MAX, 0, 0);
   panels[i++] = create_check(ui, "Multiscattering", &(instance->scene.ocean.multiscattering), 1);
+  panels[i++] = create_check(ui, "Light Contribution", &(instance->scene.ocean.triangle_light_contribution), 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

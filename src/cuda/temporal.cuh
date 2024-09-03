@@ -4,65 +4,49 @@
 #include "structs.h"
 #include "utils.cuh"
 
-/*
- * TAA implementation based on blog by Alex Tardiff (http://alextardif.com/TAA.html)
- * CatmullRom filter implementation based on https://gist.github.com/TheRealMJP/c83b8c0f46b63f3a88a5986f4fa982b1
- */
+// TODO: Refactor this into a separate file, the idea of "temporal" is long gone now that reprojection is gone. While we are at it, get rid
+// of the legacy naming of "temporal frames".
 
-__device__ RGBF sample_pixel_catmull_rom(const RGBF* image, float x, float y, const int width, const int height) {
-  float px = floorf(x - 0.5f) + 0.5f;
-  float py = floorf(y - 0.5f) + 0.5f;
+// This is a gaussian filter with a sigma of 0.4 and a radius of 2. I cut out a lot of the terms
+// because they were negligible.
+__device__ float temporal_gather_pixel_weight(const RGBF pixel, const float x, const float y) {
+  const float weight_x = expf(-(x * x) * 3.125f);
+  const float weight_y = expf(-(y * y) * 3.125f);
 
-  float fx = x - px;
-  float fy = y - py;
+  return weight_x * weight_y;
+}
 
-  float wx0 = fx * (-0.5f + fx * (1.0f - 0.5f * fx));
-  float wx1 = 1.0f + fx * fx * (-2.5f + 1.5f * fx);
-  float wx2 = fx * (0.5f + fx * (2.0f - 1.5f * fx));
-  float wx3 = fx * fx * (-0.5f + 0.5f * fx);
-  float wy0 = fy * (-0.5f + fy * (1.0f - 0.5f * fy));
-  float wy1 = 1.0f + fy * fy * (-2.5f + 1.5f * fy);
-  float wy2 = fy * (0.5f + fy * (2.0f - 1.5f * fy));
-  float wy3 = fy * fy * (-0.5f + 0.5f * fy);
+__device__ RGBF temporal_gather_pixel_load(
+  const RGBF* image, const int width, const int height, const float sx, const float sy, const int i, const int j) {
+  const int index_x = ((int) sx) + i;
+  const int index_y = ((int) sy) + j;
 
-  float wx12 = wx1 + wx2;
-  float wy12 = wy1 + wy2;
+  if (index_x < 0 || index_x >= width || index_y < 0 || index_y >= height)
+    return get_color(0.0f, 0.0f, 0.0f);
 
-  float ox12 = wx2 / wx12;
-  float oy12 = wy2 / wy12;
+  const int index = index_x + index_y * width;
 
-  float x0  = px - 1.0f;
-  float y0  = py - 1.0f;
-  float x3  = px + 2.0f;
-  float y3  = py + 2.0f;
-  float x12 = px + ox12;
-  float y12 = py + oy12;
+  const RGBF pixel = load_RGBF(image + index);
 
-  x0 /= (width - 1);
-  y0 /= (height - 1);
-  x3 /= (width - 1);
-  y3 /= (height - 1);
-  x12 /= (width - 1);
-  y12 /= (height - 1);
+  const float rx = fabsf(sx - index_x);
+  const float ry = fabsf(sy - index_y);
 
+  return scale_color(pixel, temporal_gather_pixel_weight(pixel, rx, ry));
+}
+
+__device__ RGBF temporal_gather_pixel(const RGBF* image, const float x, const float y, const int width, const int height) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x0, y0, width, height), wx0 * wy0));
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x12, y0, width, height), wx12 * wy0));
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x3, y0, width, height), wx3 * wy0));
-
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x0, y12, width, height), wx0 * wy12));
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x12, y12, width, height), wx12 * wy12));
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x3, y12, width, height), wx3 * wy12));
-
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x0, y3, width, height), wx0 * wy3));
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x12, y3, width, height), wx12 * wy3));
-  result = add_color(result, scale_color(sample_pixel_clamp(image, x3, y3, width, height), wx3 * wy3));
+  for (int j = -1; j <= 2; j++) {
+    for (int i = -1; i <= 2; i++) {
+      result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, i, j));
+    }
+  }
 
   return result;
 }
 
-__device__ RGBF temporal_reject_invalid_sample(RGBF sample) {
+__device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offset) {
   if (isnan(luminance(sample)) || isinf(luminance(sample))) {
     // Debug code to identify paths that cause NaNs and INFs
 #if 0
@@ -74,7 +58,7 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample) {
         sample.b);
 #endif
 
-    sample = get_color(0.0f, 0.0f, 0.0f);
+    sample = UTILS_DEBUG_NAN_COLOR;
   }
 
   return sample;
@@ -83,12 +67,20 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample) {
 LUMINARY_KERNEL void temporal_accumulation() {
   const int amount = device.width * device.height;
 
+  const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
+
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    const int y = offset / device.width;
+    const int x = offset - y * device.width;
+
+    const float sx = x + jitter.x;
+    const float sy = y + jitter.y;
+
     // Direct Lighting
-    RGBF direct_buffer = load_RGBF(device.ptrs.frame_direct_buffer + offset);
+    RGBF direct_buffer = temporal_gather_pixel(device.ptrs.frame_direct_buffer, sx, sy, device.width, device.height);
     RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
 
-    direct_buffer = temporal_reject_invalid_sample(direct_buffer);
+    direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
 
     direct_output = scale_color(direct_output, device.temporal_frames);
     direct_output = add_color(direct_buffer, direct_output);
@@ -97,10 +89,10 @@ LUMINARY_KERNEL void temporal_accumulation() {
     store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_output);
 
     // Indirect Lighting
-    RGBF indirect_buffer = load_RGBF(device.ptrs.frame_indirect_buffer + offset);
+    RGBF indirect_buffer = temporal_gather_pixel(device.ptrs.frame_indirect_buffer, sx, sy, device.width, device.height);
     RGBF indirect_output = load_RGBF(device.ptrs.frame_indirect_accumulate + offset);
 
-    indirect_buffer = temporal_reject_invalid_sample(indirect_buffer);
+    indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
     float variance = (device.temporal_frames == 0) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
@@ -172,55 +164,5 @@ LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumul
     store_RGBF(accumulate + offset, output);
   }
 }
-
-#if 0
-// Legacy temporal reprojection implementation
-LUMINARY_KERNEL void temporal_reprojection() {
-  const int amount = device.width * device.height;
-
-  for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
-    RGBF output               = load_RGBF(device.ptrs.frame_buffer + offset);
-    const float closest_depth = device.ptrs.trace_result_buffer[offset].depth;
-
-    vec3 hit = add_vector(device.scene.camera.pos, scale_vector(device.ptrs.raydir_buffer[offset], closest_depth));
-
-    vec4 pos;
-    pos.x = hit.x;
-    pos.y = hit.y;
-    pos.z = hit.z;
-    pos.w = 1.0f;
-
-    vec4 prev_pixel = transform_vec4(device.emitter.projection, transform_vec4(device.emitter.view_space, pos));
-
-    prev_pixel.x /= -prev_pixel.w;
-    prev_pixel.y /= -prev_pixel.w;
-
-    prev_pixel.x = device.width * (1.0f - prev_pixel.x) * 0.5f;
-    prev_pixel.y = device.height * (prev_pixel.y + 1.0f) * 0.5f;
-
-    prev_pixel.x -= device.emitter.jitter.x - 0.5f;
-    prev_pixel.y -= device.emitter.jitter.y - 0.5f;
-
-    const int prev_x = prev_pixel.x;
-    const int prev_y = prev_pixel.y;
-
-    if (prev_x >= 0 && prev_x < device.width && prev_y >= 0 && prev_y < device.height) {
-      RGBF temporal = sample_pixel_catmull_rom(device.ptrs.frame_temporal, prev_pixel.x, prev_pixel.y, device.width, device.height);
-
-      float alpha = device.scene.camera.temporal_blend_factor;
-      output      = add_color(scale_color(output, alpha), scale_color(temporal, 1.0f - alpha));
-    }
-
-    if (isinf(output.r) || isnan(output.r) || isinf(output.g) || isnan(output.g) || isinf(output.b) || isnan(output.b)) {
-      output = get_color(0.0f, 0.0f, 0.0f);
-    }
-
-    device.ptrs.frame_accumulate[offset] = output;
-
-    // Interesting motion vector visualization
-    // device.frame_output[offset] = get_color(fabsf(curr_x - prev_pixel.x), 0.0f, fabsf(curr_y - prev_pixel.y));
-  }
-}
-#endif
 
 #endif /* CU_TEMPORAL_H */

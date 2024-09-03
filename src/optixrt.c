@@ -245,6 +245,9 @@ void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel), options);
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.ptx", &(instance->optix_kernel_geometry), options);
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_volume.ptx", &(instance->optix_kernel_volume), options);
+  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_particle.ptx", &(instance->optix_kernel_particle), options);
+  optixrt_compile_kernel(
+    instance->optix_ctx, (char*) "optix_kernels_volume_bridges.ptx", &(instance->optix_kernel_volume_bridges), options);
 
   bench_toc();
 

@@ -72,7 +72,15 @@ extern "C" __global__ void __raygen__optix() {
     // Light Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    const bool use_light_rays = is_delta_path || data.roughness > GEOMETRY_DELTA_PATH_CUTOFF;
+    // We clamp the roughness to avoid caustics which would never clean up.
+    if (!is_delta_path) {
+      data.roughness = fmaxf(data.roughness, device.scene.material.caustic_roughness_clamp);
+    }
+
+    bool use_light_rays = true;
+    if (task.hit_id == HIT_TYPE_OCEAN && !is_delta_path) {
+      use_light_rays = false;
+    }
 
     RGBF accumulated_light = (state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION)) ? data.emission : get_color(0.0f, 0.0f, 0.0f);
 
@@ -81,6 +89,10 @@ extern "C" __global__ void __raygen__optix() {
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
     }
+
+    accumulated_light = add_color(
+      accumulated_light,
+      optix_compute_light_ray_ambient_sky(data, bounce_ray, bounce_info.weight, bounce_info.is_transparent_pass, task.index));
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 

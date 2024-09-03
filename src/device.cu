@@ -48,17 +48,8 @@ extern "C" void device_init() {
   print_info("Copyright (c) 2024 MilchRatchet");
 }
 
-void device_handle_accumulation(RaytraceInstance* instance) {
-  switch (instance->accum_mode) {
-    case NO_ACCUMULATION:
-    case TEMPORAL_ACCUMULATION:
-      temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-      break;
-    case TEMPORAL_REPROJECTION:
-    default:
-      error_message("Invalid accumulation mode %d specified", instance->accum_mode);
-      break;
-  }
+void device_handle_accumulation() {
+  temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
 extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int depth) {
@@ -79,14 +70,18 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
   }
 
   if (instance->scene.fog.active || instance->scene.ocean.active) {
+    // It is important to compute bridges lighting before sampling volume scattering events.
+    // We want to sample over the whole unoccluded ray path so sampling scattering events before
+    // that would shorten the path.
+    optixrt_execute(instance->optix_kernel_volume_bridges);
     volume_process_events<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (instance->scene.sky.cloud.active && !instance->scene.sky.hdri_active) {
+  if (instance->scene.sky.cloud.active && instance->scene.sky.mode == SKY_MODE_DEFAULT) {
     clouds_render_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
-  if (instance->scene.sky.aerial_perspective) {
+  if (instance->scene.sky.aerial_perspective && instance->scene.sky.mode != SKY_MODE_CONSTANT_COLOR) {
     process_sky_inscattering_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
   }
 
@@ -94,8 +89,12 @@ extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int dept
 
   optixrt_execute(instance->optix_kernel_geometry);
 
-  if (instance->scene.fog.active || instance->scene.ocean.active || instance->scene.particles.active) {
+  if (instance->scene.fog.active || instance->scene.ocean.active) {
     optixrt_execute(instance->optix_kernel_volume);
+  }
+
+  if (instance->scene.particles.active) {
+    optixrt_execute(instance->optix_kernel_particle);
   }
 
   process_sky_tasks<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
