@@ -610,6 +610,9 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
   // Evaluate sampled path
   ////////////////////////////////////////////////////////////////////
 
+  if (selected_seed == 0xFFFFFFFF)
+    return get_color(0.0f, 0.0f, 0.0f);
+
   RGBF bridge_color = bridges_evaluate_bridge(
     task, volume, selected_initial_vertex, selected_light_id, selected_seed, selected_rotation, selected_scale,
     selected_initial_vertex_transmittance, ior, task.index);
