@@ -77,11 +77,18 @@ extern "C" __global__ void __raygen__optix() {
       data.roughness = fmaxf(data.roughness, device.scene.material.caustic_roughness_clamp);
     }
 
+    bool use_light_rays = true;
+    if (task.hit_id == HIT_TYPE_OCEAN && !is_delta_path) {
+      use_light_rays = false;
+    }
+
     RGBF accumulated_light = (state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION)) ? data.emission : get_color(0.0f, 0.0f, 0.0f);
 
-    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
-    accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
+    if (use_light_rays) {
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
+      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
+    }
 
     accumulated_light = add_color(
       accumulated_light,
