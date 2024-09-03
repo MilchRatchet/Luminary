@@ -289,7 +289,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
       trace_result.depth  = depth;
       trace_result.hit_id = hit_id;
 
-      device.ptrs.trace_result_buffer[pixel] = trace_result;
+      device.ptrs.trace_results_history[pixel] = trace_result;
     }
 
     if (hit_id != HIT_TYPE_SKY)

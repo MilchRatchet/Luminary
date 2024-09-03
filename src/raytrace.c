@@ -450,10 +450,12 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   general.width  = (options.width) ? options.width : general.width;
   general.height = (options.height) ? options.height : general.height;
 
-  instance->width         = general.width;
-  instance->height        = general.height;
-  instance->output_width  = general.width;
-  instance->output_height = general.height;
+  instance->width           = general.width;
+  instance->height          = general.height;
+  instance->output_width    = general.width;
+  instance->output_height   = general.height;
+  instance->internal_width  = general.width * 2;
+  instance->internal_height = general.height * 2;
 
   instance->user_selected_x = 0xFFFF;
   instance->user_selected_y = 0xFFFF;
@@ -501,6 +503,10 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->bridge_settings.num_ris_samples  = 8;
   instance->bridge_settings.max_num_vertices = 1;
 
+  // TODO: Make this user controllable
+  instance->undersampling_setting = 2;
+  instance->undersampling         = instance->undersampling_setting;
+
   instance->atmo_settings.base_density           = scene->sky.base_density;
   instance->atmo_settings.ground_visibility      = scene->sky.ground_visibility;
   instance->atmo_settings.mie_density            = scene->sky.mie_density;
@@ -519,7 +525,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->task_counts);
   device_buffer_init(&instance->task_offsets);
   device_buffer_init(&instance->ior_stack);
-  device_buffer_init(&instance->frame_temporal);
   device_buffer_init(&instance->frame_variance);
   device_buffer_init(&instance->frame_accumulate);
   device_buffer_init(&instance->frame_output);
@@ -531,7 +536,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->normal_buffer);
   device_buffer_init(&instance->records);
   device_buffer_init(&instance->buffer_8bit);
-  device_buffer_init(&instance->trace_result_buffer);
+  device_buffer_init(&instance->trace_results_history);
   device_buffer_init(&instance->state_buffer);
   device_buffer_init(&instance->cloud_noise);
   device_buffer_init(&instance->sky_ms_luts);
@@ -688,33 +693,35 @@ void raytrace_prepare(RaytraceInstance* instance) {
  * @param instance RaytraceInstance to be used.
  */
 void raytrace_allocate_buffers(RaytraceInstance* instance) {
-  const unsigned int amount        = instance->width * instance->height;
-  const unsigned int output_amount = instance->output_width * instance->output_height;
+  const unsigned int amount          = instance->width * instance->height;
+  const unsigned int output_amount   = instance->output_width * instance->output_height;
+  const unsigned int internal_amount = instance->internal_width * instance->internal_height;
 
   device_update_symbol(width, instance->width);
   device_update_symbol(height, instance->height);
   device_update_symbol(output_width, instance->output_width);
   device_update_symbol(output_height, instance->output_height);
+  device_update_symbol(internal_width, instance->internal_width);
+  device_update_symbol(internal_height, instance->internal_height);
   device_update_symbol(denoiser, instance->denoiser);
 
-  device_buffer_malloc(instance->frame_temporal, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_variance, sizeof(float), amount);
-  device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_variance, sizeof(float), internal_amount);
+  device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), internal_amount);
   device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
-  device_buffer_malloc(instance->records, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->records, sizeof(RGBF), internal_amount);
 
   if (instance->denoiser || instance->aov_mode) {
-    device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), amount);
-    device_buffer_malloc(instance->normal_buffer, sizeof(RGBF), amount);
+    device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), internal_amount);
+    device_buffer_malloc(instance->normal_buffer, sizeof(RGBF), internal_amount);
   }
 
-  device_buffer_malloc(instance->frame_direct_buffer, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_direct_accumulate, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_indirect_buffer, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_indirect_accumulate, sizeof(RGBF), amount);
+  device_buffer_malloc(instance->frame_direct_buffer, sizeof(RGBF), internal_amount);
+  device_buffer_malloc(instance->frame_direct_accumulate, sizeof(RGBF), internal_amount);
+  device_buffer_malloc(instance->frame_indirect_buffer, sizeof(RGBF), internal_amount);
+  device_buffer_malloc(instance->frame_indirect_accumulate, sizeof(RGBF), internal_amount);
 
   const int thread_count      = device_get_thread_count();
-  const int pixels_per_thread = 1 + ((amount + thread_count - 1) / thread_count);
+  const int pixels_per_thread = 1 + ((internal_amount + thread_count - 1) / thread_count);
   const int max_task_count    = pixels_per_thread * thread_count;
 
   device_update_symbol(pixels_per_thread, pixels_per_thread);
@@ -726,11 +733,11 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->task_counts, sizeof(uint16_t), 7 * thread_count);
   device_buffer_malloc(instance->task_offsets, sizeof(uint16_t), 6 * thread_count);
 
-  device_buffer_malloc(instance->ior_stack, sizeof(uint32_t), amount);
-  device_buffer_malloc(instance->trace_result_buffer, sizeof(TraceResult), amount);
-  device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), amount);
+  device_buffer_malloc(instance->ior_stack, sizeof(uint32_t), internal_amount);
+  device_buffer_malloc(instance->trace_results_history, sizeof(TraceResult), internal_amount);
+  device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), internal_amount);
 
-  cudaMemset(device_buffer_get_pointer(instance->trace_result_buffer), 0, sizeof(TraceResult) * amount);
+  cudaMemset(device_buffer_get_pointer(instance->trace_results_history), 0, sizeof(TraceResult) * internal_amount);
 }
 
 void raytrace_update_device_pointers(RaytraceInstance* instance) {
@@ -742,7 +749,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.task_counts               = (uint16_t*) device_buffer_get_pointer(instance->task_counts);
   ptrs.task_offsets              = (uint16_t*) device_buffer_get_pointer(instance->task_offsets);
   ptrs.ior_stack                 = (uint32_t*) device_buffer_get_pointer(instance->ior_stack);
-  ptrs.frame_temporal            = (RGBF*) device_buffer_get_pointer(instance->frame_temporal);
   ptrs.frame_variance            = (float*) device_buffer_get_pointer(instance->frame_variance);
   ptrs.frame_accumulate          = (RGBF*) device_buffer_get_pointer(instance->frame_accumulate);
   ptrs.frame_direct_buffer       = (RGBF*) device_buffer_get_pointer(instance->frame_direct_buffer);
@@ -759,7 +765,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.material_atlas            = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.material);
   ptrs.normal_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.normal);
   ptrs.cloud_noise               = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);
-  ptrs.trace_result_buffer       = (TraceResult*) device_buffer_get_pointer(instance->trace_result_buffer);
+  ptrs.trace_results_history     = (TraceResult*) device_buffer_get_pointer(instance->trace_results_history);
   ptrs.state_buffer              = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
   ptrs.sky_tm_luts               = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
   ptrs.sky_ms_luts               = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
@@ -786,10 +792,9 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->task_offsets);
   device_buffer_free(instance->frame_direct_buffer);
   device_buffer_free(instance->frame_indirect_buffer);
-  device_buffer_free(instance->frame_temporal);
   device_buffer_free(instance->frame_variance);
   device_buffer_free(instance->records);
-  device_buffer_free(instance->trace_result_buffer);
+  device_buffer_free(instance->trace_results_history);
   device_buffer_free(instance->state_buffer);
 
   gpuErrchk(cudaDeviceSynchronize());

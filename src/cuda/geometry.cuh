@@ -12,8 +12,9 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
   const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
-    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(i));
-    const int pixel  = task.index.y * device.width + task.index.x;
+    const uint32_t offset = get_task_address(i);
+    ShadingTask task      = load_shading_task(device.ptrs.trace_tasks + offset);
+    const int pixel       = task.index.y * device.width + task.index.x;
 
     switch (task.hit_id) {
       case HIT_TYPE_TOY: {
@@ -100,7 +101,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
             write_beauty_buffer(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel, true);
           } break;
           case SHADING_HEAT: {
-            const float cost  = device.ptrs.trace_result_buffer[pixel].depth;
+            const float cost  = device.ptrs.trace_results[offset].depth;
             const float value = 0.1f * cost;
             const float red   = __saturatef(2.0f * value);
             const float green = __saturatef(2.0f * (value - 0.5f));

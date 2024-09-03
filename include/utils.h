@@ -411,7 +411,6 @@ struct DevicePointers {
   uint16_t* task_counts;
   uint16_t* task_offsets;
   uint32_t* ior_stack;
-  RGBF* frame_temporal;
   float* frame_variance;
   RGBF* frame_accumulate;
   RGBF* frame_direct_buffer;
@@ -423,7 +422,7 @@ struct DevicePointers {
   RGBF* normal_buffer;
   RGBF* records;
   XRGB8* buffer_8bit;
-  TraceResult* trace_result_buffer;
+  TraceResult* trace_results_history;
   uint8_t* state_buffer;
   const DeviceTexture* albedo_atlas;
   const DeviceTexture* luminance_atlas;
@@ -456,6 +455,8 @@ struct DeviceConstantMemory {
   int height;
   int output_width;
   int output_height;
+  int internal_width;
+  int internal_height;
   vec3 sun_pos;
   vec3 moon_pos;
   int shading_mode;
@@ -511,6 +512,8 @@ struct RaytraceInstance {
   unsigned int height;
   unsigned int output_width;
   unsigned int output_height;
+  unsigned int internal_width;
+  unsigned int internal_height;
   uint16_t user_selected_x;
   uint16_t user_selected_y;
   int realtime;
@@ -520,7 +523,6 @@ struct RaytraceInstance {
   DeviceBuffer* trace_results;
   DeviceBuffer* task_counts;
   DeviceBuffer* task_offsets;
-  DeviceBuffer* frame_temporal;
   DeviceBuffer* frame_variance;
   DeviceBuffer* frame_accumulate;
   DeviceBuffer* frame_output;
@@ -563,7 +565,7 @@ struct RaytraceInstance {
   RayEmitter emitter;
   RISSettings ris_settings;
   BridgeSettings bridge_settings;
-  DeviceBuffer* trace_result_buffer;
+  DeviceBuffer* trace_results_history;
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
   OptixDeviceContext optix_ctx;
@@ -579,6 +581,8 @@ struct RaytraceInstance {
   int luminary_bvh_initialized;
   ParticlesInstance particles_instance;
   DeviceInfo device_info;
+  int undersampling_setting;
+  int undersampling;
 } typedef RaytraceInstance;
 
 #ifndef min
