@@ -449,7 +449,8 @@ struct DeviceConstantMemory {
   int max_ray_depth;
   int pixels_per_thread;
   int depth;
-  int temporal_frames;
+  float temporal_frames;
+  int undersampling;
   int denoiser;
   int width;
   int height;
@@ -548,7 +549,7 @@ struct RaytraceInstance {
   int offline_samples;
   Scene scene;
   DenoisingMode denoiser;
-  int temporal_frames;
+  float temporal_frames;
   int shading_mode;
   RGBF** bloom_mips_gpu;
   int bloom_mips_count;

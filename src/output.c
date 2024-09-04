@@ -105,16 +105,16 @@ void offline_output(RaytraceInstance* instance) {
   clock_t last_frame              = start_of_rt;
   double moving_average_frametime = 0.0;
   bench_tic("Raytracing");
-  for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; instance->temporal_frames++) {
+  for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; raytrace_increment(instance)) {
     raytrace_execute(instance);
     raytrace_update_ray_emitter(instance);
 
     const clock_t current_frame = clock();
-    const double progress       = ((double) (instance->temporal_frames + 1)) / instance->offline_samples;
+    const double progress       = ((double) (instance->temporal_frames + 1.0f)) / instance->offline_samples;
     const double time_elapsed   = ((double) (current_frame - start_of_rt)) / CLOCKS_PER_SEC;
     const double frametime      = ((double) (current_frame - last_frame)) / CLOCKS_PER_SEC;
-    moving_average_frametime    = (instance->temporal_frames == 0) ? frametime : 0.9 * moving_average_frametime + 0.1 * frametime;
-    const double time_left      = (instance->offline_samples - (instance->temporal_frames + 1)) * moving_average_frametime;
+    moving_average_frametime    = (instance->temporal_frames == 0.0f) ? frametime : 0.9 * moving_average_frametime + 0.1 * frametime;
+    const double time_left      = (instance->offline_samples - (instance->temporal_frames + 1.0f)) * moving_average_frametime;
 
     print_info_inline(
       "Progress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Frametime: %.1f ms", 100.0 * progress, time_elapsed, time_left,
@@ -303,7 +303,7 @@ void realtime_output(RaytraceInstance* instance) {
   Frametime frametime_total = init_frametime();
   UI ui                     = init_UI(instance, window);
 
-  instance->temporal_frames = 0;
+  instance->temporal_frames = 0.0f;
 
   float mouse_x_speed = 0.0f;
   float mouse_y_speed = 0.0f;
@@ -351,7 +351,7 @@ void realtime_output(RaytraceInstance* instance) {
 
     sample_frametime(&frametime_post);
 
-    instance->temporal_frames++;
+    raytrace_increment(instance);
 
     SDL_PumpEvents();
 
@@ -371,7 +371,7 @@ void realtime_output(RaytraceInstance* instance) {
           mouse_x_diff += event.motion.yrel * (-0.005f) * instance->scene.camera.mouse_speed;
 
           if (event.motion.xrel || event.motion.yrel)
-            instance->temporal_frames = 0;
+            instance->temporal_frames = 0.0f;
         }
       }
       else if (event.type == SDL_MOUSEWHEEL) {
@@ -403,7 +403,7 @@ void realtime_output(RaytraceInstance* instance) {
       instance->scene.camera.rotation.x += mouse_x_speed;
       instance->scene.camera.rotation.y += mouse_y_speed;
 
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
 
       if (instance->scene.camera.smooth_movement) {
         mouse_x_speed -= mouse_x_speed * instance->scene.camera.smoothing_factor * instance->scene.camera.mouse_speed;
@@ -483,43 +483,43 @@ void realtime_output(RaytraceInstance* instance) {
 
     if (keystate[SDL_SCANCODE_LEFT]) {
       instance->scene.sky.azimuth -= 0.005f * normalized_time;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_RIGHT]) {
       instance->scene.sky.azimuth += 0.005f * normalized_time;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_UP]) {
       instance->scene.sky.altitude += 0.005f * normalized_time;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_DOWN]) {
       instance->scene.sky.altitude -= 0.005f * normalized_time;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_W]) {
       movement_vector.z -= 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_A]) {
       movement_vector.x -= 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_S]) {
       movement_vector.z += 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_D]) {
       movement_vector.x += 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_LCTRL]) {
       movement_vector.y -= 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_SPACE]) {
       movement_vector.y += 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;

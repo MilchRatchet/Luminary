@@ -15,7 +15,7 @@ void handle_mouse_UIPanel_button(UI* ui, UIPanel* panel, int mouse_state, int x,
       panel->func(panel->data);
 
       if (panel->voids_frames)
-        *(ui->temporal_frames) = 0;
+        *(ui->temporal_frames) = 0.0f;
     }
   }
 }

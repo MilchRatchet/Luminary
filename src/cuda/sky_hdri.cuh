@@ -55,7 +55,7 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
     RGBF result;
     float variance;
     float alpha;
-    if (device.temporal_frames) {
+    if (device.temporal_frames != 0.0f) {
       float4 data = __ldcs(dst + pixel);
       alpha       = __ldcs(dst_alpha + pixel);
 
@@ -74,12 +74,15 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
       // Same as in temporal accumulation
       // Here this trick has no real downside
       // Just got to make sure we don't do this in the case of 2 samples
+      // TODO: Adapt to undersampling.
+#if 0
       if (device.temporal_frames == 1 && device.scene.sky.hdri_samples != 2) {
         RGBF min = min_color(color, result);
 
         result = min;
         color  = min;
       }
+#endif
 
       RGBF firefly_rejection = add_color(get_color(0.1f, 0.1f, 0.1f), add_color(result, get_color(deviation, deviation, deviation)));
       firefly_rejection      = max_color(get_color(0.0f, 0.0f, 0.0f), sub_color(color, firefly_rejection));
@@ -150,7 +153,8 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   device_update_symbol(depth, depth);
 
   for (int i = 0; i < instance->scene.sky.hdri_samples; i++) {
-    device_update_symbol(temporal_frames, i);
+    const float temporal_frames = (float) i;
+    device_update_symbol(temporal_frames, temporal_frames);
     print_info_inline("HDRI Progress: %i/%i", i, instance->scene.sky.hdri_samples);
     sky_hdri_compute_hdri_lut<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((float4*) luts_hdri_tex[0].data, (float*) luts_hdri_tex[1].data);
     gpuErrchk(cudaDeviceSynchronize());

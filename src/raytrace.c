@@ -309,9 +309,14 @@ void raytrace_build_structures(RaytraceInstance* instance) {
 void raytrace_execute(RaytraceInstance* instance) {
   // In no accumulation mode we always display the 0th frame.
   if (!instance->accumulate)
-    instance->temporal_frames = 0;
+    instance->temporal_frames = 0.0f;
+
+  if (instance->temporal_frames == 0.0f) {
+    instance->undersampling = instance->undersampling_setting;
+  }
 
   device_update_symbol(temporal_frames, instance->temporal_frames);
+  device_update_symbol(undersampling, instance->undersampling);
 
   device_generate_tasks();
 
@@ -328,6 +333,18 @@ void raytrace_execute(RaytraceInstance* instance) {
   device_handle_accumulation();
 
   gpuErrchk(cudaDeviceSynchronize());
+}
+
+void raytrace_increment(RaytraceInstance* instance) {
+  const uint32_t undersampling_scale = (1 << instance->undersampling) * (1 << instance->undersampling);
+
+  const float increment = 1.0f / undersampling_scale;
+
+  instance->temporal_frames += increment;
+
+  if (instance->undersampling != 0 && instance->temporal_frames >= 4.0f * increment) {
+    instance->undersampling--;
+  }
 }
 
 static char* _raytrace_arch_enum_to_string(const DeviceArch arch) {

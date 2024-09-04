@@ -54,7 +54,7 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
       pixel.y = (uint16_t) (offset / device.width);
       pixel.x = (uint16_t) (offset - pixel.y * device.width);
       printf(
-        "Path at (%u, %u) on frame %u ran into a NaN or INF: (%f %f %f)\n", pixel.x, pixel.y, device.temporal_frames, sample.r, sample.g,
+        "Path at (%u, %u) on frame %u ran into a NaN or INF: (%f %f %f)\n", pixel.x, pixel.y, (uint32_t) device.temporal_frames, sample.r, sample.g,
         sample.b);
 #endif
 
@@ -64,10 +64,18 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
   return sample;
 }
 
+__device__ float temporal_increment() {
+  const uint32_t undersampling_scale = (1 << device.undersampling) * (1 << device.undersampling);
+
+  return 1.0f / undersampling_scale;
+}
+
 LUMINARY_KERNEL void temporal_accumulation() {
   const int amount = device.width * device.height;
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
+
+  const float increment = temporal_increment();
 
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const int y = offset / device.width;
@@ -82,9 +90,9 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
 
-    direct_output = scale_color(direct_output, device.temporal_frames);
+    direct_output = scale_color(direct_output, ceilf(device.temporal_frames));
     direct_output = add_color(direct_buffer, direct_output);
-    direct_output = scale_color(direct_output, 1.0f / (device.temporal_frames + 1));
+    direct_output = scale_color(direct_output, 1.0f / (device.temporal_frames + increment));
 
     store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_output);
 
@@ -94,8 +102,9 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
-    float variance = (device.temporal_frames == 0) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
+    float variance = (device.temporal_frames == 0.0f) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
+#if 0
     if (device.scene.camera.do_firefly_clamping) {
       float luminance_buffer = color_importance(indirect_buffer);
       float luminance_output = color_importance(indirect_output);
@@ -116,6 +125,8 @@ LUMINARY_KERNEL void temporal_accumulation() {
         // Taking neighbouring pixels as reference is not the target since I want to consider each
         // pixel as its own independent entity to preserve fine details.
         // TODO: Improve this method to remove the visible dimming during the second frame.
+        // TODO: Adapt to undersampling.
+#if 0
         if (device.temporal_frames == 1) {
           float min_luminance = fminf(luminance_buffer, luminance_output);
 
@@ -124,6 +135,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
           indirect_buffer =
             (luminance_buffer > eps) ? scale_color(indirect_buffer, min_luminance / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
         }
+#endif
 
         variance += diff;
         variance *= 1.0f / device.temporal_frames;
@@ -137,10 +149,11 @@ LUMINARY_KERNEL void temporal_accumulation() {
       indirect_buffer =
         (luminance_buffer > eps) ? scale_color(indirect_buffer, new_luminance_buffer / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
     }
+#endif
 
-    indirect_output = scale_color(indirect_output, device.temporal_frames);
+    indirect_output = scale_color(indirect_output, ceilf(device.temporal_frames));
     indirect_output = add_color(indirect_buffer, indirect_output);
-    indirect_output = scale_color(indirect_output, 1.0f / (device.temporal_frames + 1));
+    indirect_output = scale_color(indirect_output, 1.0f / (device.temporal_frames + increment));
 
     store_RGBF(device.ptrs.frame_indirect_accumulate + offset, indirect_output);
 
@@ -153,13 +166,15 @@ LUMINARY_KERNEL void temporal_accumulation() {
 LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) {
   const int amount = device.width * device.height;
 
+  const float increment = temporal_increment();
+
   for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBF input  = load_RGBF(buffer + offset);
-    RGBF output = (device.temporal_frames == 0) ? input : load_RGBF(accumulate + offset);
+    RGBF output = (device.temporal_frames == 0.0f) ? input : load_RGBF(accumulate + offset);
 
-    output = scale_color(output, device.temporal_frames);
+    output = scale_color(output, ceilf(device.temporal_frames));
     output = add_color(input, output);
-    output = scale_color(output, 1.0f / (device.temporal_frames + 1));
+    output = scale_color(output, 1.0f / (device.temporal_frames + increment));
 
     store_RGBF(accumulate + offset, output);
   }

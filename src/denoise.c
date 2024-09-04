@@ -200,7 +200,7 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
   if (isnan(brightness) || isinf(brightness) || brightness < 0.0f)
     return exposure;
 
-  const float lerp_factor = 0.2f * (1.0f - 1.0f / (1 + instance->temporal_frames));
+  const float lerp_factor = 0.2f * (1.0f - 1.0f / (1.0f + instance->temporal_frames));
 
   const float min_exposure = instance->scene.camera.min_exposure;
   const float max_exposure = instance->scene.camera.max_exposure;
