@@ -213,9 +213,12 @@ __device__ void* interleaved_buffer_get_entry_address(
   return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
 }
 
+// TODO: Fix this to support undersampling if I need it.
+#if 0
 __device__ void* pixel_buffer_get_entry_address(void* ptr, const uint32_t chunk, const uint32_t offset, const uint32_t pixel) {
   return interleaved_buffer_get_entry_address(ptr, device.width * device.height, chunk, offset, pixel);
 }
+#endif
 
 __device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t tri_id) {
   return interleaved_buffer_get_entry_address(device.scene.triangles, device.scene.triangle_data.triangle_count, chunk, offset, tri_id);

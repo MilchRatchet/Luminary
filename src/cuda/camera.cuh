@@ -43,7 +43,7 @@ __device__ vec3 camera_sample_aperture(const ushort2 pixel_coords) {
   return get_vector(sample.x, sample.y, 0.0f);
 }
 
-__device__ TraceTask camera_get_ray(TraceTask task, const uint32_t pixel) {
+__device__ TraceTask camera_get_ray(TraceTask task) {
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
   vec3 film_point;

@@ -14,7 +14,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
   for (int i = 0; i < task_count; i++) {
     const uint32_t offset = get_task_address(i);
     ShadingTask task      = load_shading_task(device.ptrs.trace_tasks + offset);
-    const int pixel       = task.index.y * device.width + task.index.x;
+    const uint32_t pixel  = get_pixel_id(task.index);
 
     switch (task.hit_id) {
       case HIT_TYPE_TOY: {

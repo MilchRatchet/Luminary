@@ -34,7 +34,7 @@ __device__ RGBF optix_decompress_color(unsigned int data0, unsigned int data1) {
 __device__ bool optix_evaluate_ior_culling(const uint32_t ior_data, const ushort2 index) {
   const int8_t ior_stack_pop_max = (int8_t) (ior_data >> 24);
   if (ior_stack_pop_max > 0) {
-    const uint32_t ior_stack = device.ptrs.ior_stack[get_pixel_id(index.x, index.y)];
+    const uint32_t ior_stack = device.ptrs.ior_stack[get_pixel_id(index)];
 
     const uint32_t ray_ior = (ior_data & 0xFF);
 

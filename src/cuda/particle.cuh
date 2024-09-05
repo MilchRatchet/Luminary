@@ -11,8 +11,8 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
 
   for (int i = 0; i < task_count; i++) {
-    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel  = task.index.y * device.width + task.index.x;
+    ShadingTask task     = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const uint32_t pixel = get_pixel_id(task.index);
 
     if (VOLUME_HIT_CHECK(task.hit_id))
       continue;

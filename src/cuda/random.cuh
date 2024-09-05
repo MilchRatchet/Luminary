@@ -393,7 +393,7 @@ __device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
 }
 
 __device__ float random_grain_mask(const uint32_t x, const uint32_t y) {
-  return white_noise_offset(x + y * device.width);
+  return white_noise_offset(x + y * device.internal_width);
 }
 
 #endif /* CU_RANDOM_H */

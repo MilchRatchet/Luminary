@@ -544,6 +544,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->ior_stack);
   device_buffer_init(&instance->frame_variance);
   device_buffer_init(&instance->frame_accumulate);
+  device_buffer_init(&instance->frame_final);
   device_buffer_init(&instance->frame_output);
   device_buffer_init(&instance->frame_direct_buffer);
   device_buffer_init(&instance->frame_direct_accumulate);
@@ -710,9 +711,9 @@ void raytrace_prepare(RaytraceInstance* instance) {
  * @param instance RaytraceInstance to be used.
  */
 void raytrace_allocate_buffers(RaytraceInstance* instance) {
-  const unsigned int amount          = instance->width * instance->height;
-  const unsigned int output_amount   = instance->output_width * instance->output_height;
-  const unsigned int internal_amount = instance->internal_width * instance->internal_height;
+  const uint32_t amount          = instance->width * instance->height;
+  const uint32_t output_amount   = instance->output_width * instance->output_height;
+  const uint32_t internal_amount = instance->internal_width * instance->internal_height;
 
   device_update_symbol(width, instance->width);
   device_update_symbol(height, instance->height);
@@ -724,6 +725,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
 
   device_buffer_malloc(instance->frame_variance, sizeof(float), internal_amount);
   device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), internal_amount);
+  device_buffer_malloc(instance->frame_final, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->records, sizeof(RGBF), internal_amount);
 
@@ -772,6 +774,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.frame_direct_accumulate   = (RGBF*) device_buffer_get_pointer(instance->frame_direct_accumulate);
   ptrs.frame_indirect_buffer     = (RGBF*) device_buffer_get_pointer(instance->frame_indirect_buffer);
   ptrs.frame_indirect_accumulate = (RGBF*) device_buffer_get_pointer(instance->frame_indirect_accumulate);
+  ptrs.frame_final               = (RGBF*) device_buffer_get_pointer(instance->frame_final);
   ptrs.frame_output              = (RGBF*) device_buffer_get_pointer(instance->frame_output);
   ptrs.albedo_buffer             = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
   ptrs.normal_buffer             = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);

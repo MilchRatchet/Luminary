@@ -31,7 +31,7 @@ extern "C" __global__ void __raygen__optix() {
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
-    const int pixel = task.index.y * device.width + task.index.x;
+    const uint32_t pixel = get_pixel_id(task.index);
 
     if (!state_peek(pixel, STATE_FLAG_DELTA_PATH))
       continue;

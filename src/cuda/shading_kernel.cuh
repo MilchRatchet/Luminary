@@ -521,7 +521,7 @@ __device__ RGBF optix_compute_light_ray_ambient_sky(
 
   const vec3 position = shift_origin_vector(data.position, data.V, ray, is_refraction);
 
-  RGBF sky_light = sky_color_no_compute(position, ray, get_pixel_id(index.x, index.y), index);
+  RGBF sky_light = sky_color_no_compute(position, ray, get_pixel_id(index), index);
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
   unsigned int hit_id         = LIGHT_ID_SUN;

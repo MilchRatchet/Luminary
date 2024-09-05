@@ -1,6 +1,7 @@
 #ifndef CU_TEMPORAL_H
 #define CU_TEMPORAL_H
 
+#include "math.cuh"
 #include "structs.h"
 #include "utils.cuh"
 
@@ -51,8 +52,8 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
     // Debug code to identify paths that cause NaNs and INFs
 #if 0
       ushort2 pixel;
-      pixel.y = (uint16_t) (offset / device.width);
-      pixel.x = (uint16_t) (offset - pixel.y * device.width);
+      pixel.y = (uint16_t) (offset / device.internal_width);
+      pixel.x = (uint16_t) (offset - pixel.y * device.internal_width);
       printf(
         "Path at (%u, %u) on frame %u ran into a NaN or INF: (%f %f %f)\n", pixel.x, pixel.y, (uint32_t) device.temporal_frames, sample.r, sample.g,
         sample.b);
@@ -71,21 +72,21 @@ __device__ float temporal_increment() {
 }
 
 LUMINARY_KERNEL void temporal_accumulation() {
-  const int amount = device.width * device.height;
+  const uint32_t amount = device.internal_width * device.internal_height;
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
   const float increment = temporal_increment();
 
-  for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
-    const int y = offset / device.width;
-    const int x = offset - y * device.width;
+  for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    const uint32_t y = offset / device.internal_width;
+    const uint32_t x = offset - y * device.internal_width;
 
     const float sx = x + jitter.x;
     const float sy = y + jitter.y;
 
     // Direct Lighting
-    RGBF direct_buffer = temporal_gather_pixel(device.ptrs.frame_direct_buffer, sx, sy, device.width, device.height);
+    RGBF direct_buffer = temporal_gather_pixel(device.ptrs.frame_direct_buffer, sx, sy, device.internal_width, device.internal_height);
     RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
@@ -97,7 +98,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
     store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_output);
 
     // Indirect Lighting
-    RGBF indirect_buffer = temporal_gather_pixel(device.ptrs.frame_indirect_buffer, sx, sy, device.width, device.height);
+    RGBF indirect_buffer = temporal_gather_pixel(device.ptrs.frame_indirect_buffer, sx, sy, device.internal_width, device.internal_height);
     RGBF indirect_output = load_RGBF(device.ptrs.frame_indirect_accumulate + offset);
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
@@ -164,11 +165,11 @@ LUMINARY_KERNEL void temporal_accumulation() {
 }
 
 LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) {
-  const int amount = device.width * device.height;
+  const uint32_t amount = device.internal_width * device.internal_height;
 
   const float increment = temporal_increment();
 
-  for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+  for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBF input  = load_RGBF(buffer + offset);
     RGBF output = (device.temporal_frames == 0.0f) ? input : load_RGBF(accumulate + offset);
 

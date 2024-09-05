@@ -81,8 +81,8 @@ __device__ bool is_selected_pixel_lenient(const ushort2 index) {
   return is_selected_pixel(index);
 }
 
-__device__ uint32_t get_pixel_id(const int x, const int y) {
-  return x + device.width * y;
+__device__ uint32_t get_pixel_id(const ushort2 pixel) {
+  return pixel.x + device.internal_width * pixel.y;
 }
 
 __device__ int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
