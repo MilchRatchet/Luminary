@@ -71,7 +71,7 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_slider(ui, "Light Ray Count", &(instance->ris_settings.num_light_rays), 1, 0.01f, 1.0f, 32.0f, 0, 1);
   panels[i++] = create_slider(ui, "Volume RIS Samples", &(instance->bridge_settings.num_ris_samples), 1, 0.02f, 1.0f, 32.0f, 0, 1);
   panels[i++] = create_slider(ui, "Volume DL Max Depth", &(instance->bridge_settings.max_num_vertices), 1, 0.02f, 1.0f, 8.0f, 0, 1);
-  panels[i++] = create_slider(ui, "Undersampling", &(instance->undersampling_setting), 1, 0.02f, 0.0f, 3.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Undersampling", &(instance->undersampling_setting), 1, 0.02f, 0.0f, 6.0f, 0, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;

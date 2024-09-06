@@ -39,21 +39,20 @@ LUMINARY_KERNEL void generate_trace_tasks() {
   const uint32_t undersampling_index = roundf(device.temporal_frames * undersampling_scale * undersampling_scale);
 
   for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
-    TraceTask task;
-
-    uint16_t undersampling_x = (uint16_t) (undersampling_pixel / undersampling_width);
-    uint16_t undersampling_y = (uint16_t) (undersampling_pixel / undersampling_height);
+    uint16_t undersampling_y = (uint16_t) (undersampling_pixel / undersampling_width);
+    uint16_t undersampling_x = (uint16_t) (undersampling_pixel - undersampling_y * undersampling_width);
 
     if (undersampling_scale > 1) {
       undersampling_x *= undersampling_scale;
       undersampling_y *= undersampling_scale;
 
-      undersampling_x += (undersampling_scale >> 1) * ((~undersampling_index) & 0b01);
-      undersampling_y += (undersampling_scale >> 1) * ((undersampling_index) & 0b10);
+      undersampling_x += (undersampling_scale >> 1) * (((~undersampling_index) & 0b01) ? 1.0f : 0.0f);
+      undersampling_y += (undersampling_scale >> 1) * (((undersampling_index) & 0b10) ? 1.0f : 0.0f);
     }
 
-    task.index.y = undersampling_x;
-    task.index.x = undersampling_y;
+    TraceTask task;
+    task.index.x = undersampling_x;
+    task.index.y = undersampling_y;
 
     task = camera_get_ray(task);
 
@@ -363,12 +362,14 @@ LUMINARY_KERNEL void generate_final_image() {
   const uint32_t undersampling_width  = device.internal_width >> undersampling;
   const uint32_t undersampling_height = device.internal_height >> undersampling;
 
-  for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
-    uint16_t x = (uint16_t) (undersampling_pixel / undersampling_width);
-    uint16_t y = (uint16_t) (undersampling_pixel / undersampling_height);
+  const float color_scale = 1.0f / (undersampling_scale * undersampling_scale * __saturatef(device.temporal_frames + temporal_increment()));
 
-    uint16_t source_x = x * undersampling_scale;
-    uint16_t source_y = y * undersampling_scale;
+  for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
+    const uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);
+    const uint16_t x = (uint16_t) (undersampling_pixel - y * undersampling_width);
+
+    const uint16_t source_x = x * undersampling_scale;
+    const uint16_t source_y = y * undersampling_scale;
 
     RGBF accumulated_color = get_color(0.0f, 0.0f, 0.0f);
 
@@ -383,9 +384,20 @@ LUMINARY_KERNEL void generate_final_image() {
       }
     }
 
-    accumulated_color = scale_color(accumulated_color, 1.0f / (undersampling_scale * undersampling_scale));
+    accumulated_color = scale_color(accumulated_color, color_scale);
 
-    store_RGBF(device.ptrs.frame_final, accumulated_color);
+    const uint16_t dst_scale = 1 << (undersampling - 1);
+
+    const uint16_t dst_x = x * dst_scale;
+    const uint16_t dst_y = y * dst_scale;
+
+    for (uint32_t yi = 0; yi < dst_scale; yi++) {
+      for (uint32_t xi = 0; xi < dst_scale; xi++) {
+        const uint32_t index = (dst_x + xi) + (dst_y + yi) * device.width;
+
+        store_RGBF(device.ptrs.frame_final + index, accumulated_color);
+      }
+    }
   }
 }
 

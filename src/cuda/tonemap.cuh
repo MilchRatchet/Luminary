@@ -235,6 +235,8 @@ __device__ RGBF tonemap_apply(RGBF pixel) {
       pixel = tonemap_agx_custom(pixel);
       break;
   }
+
+  return pixel;
 }
 
 #endif /* CU_TONEMAP_H */

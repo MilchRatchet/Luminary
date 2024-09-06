@@ -50,6 +50,7 @@ extern "C" void device_init() {
 
 void device_handle_accumulation() {
   temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
+  generate_final_image<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
 extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int depth) {

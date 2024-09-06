@@ -44,7 +44,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 
     raytrace_update_device_scene(instance);
 
-    DeviceBuffer* base_output_image = instance->frame_accumulate;
+    DeviceBuffer* base_output_image = instance->frame_final;
     if (instance->denoiser) {
       base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
     }
@@ -127,10 +127,10 @@ void offline_output(RaytraceInstance* instance) {
   raytrace_free_work_buffers(instance);
 
   // Create final image based on current settings
-  DeviceBuffer* base_output_image = instance->frame_accumulate;
+  DeviceBuffer* base_output_image = instance->frame_final;
   if (instance->denoiser) {
     denoise_create(instance);
-    base_output_image = denoise_apply(instance, device_buffer_get_pointer(instance->frame_accumulate));
+    base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
   }
 
   device_buffer_copy(base_output_image, instance->frame_output);
@@ -332,7 +332,7 @@ void realtime_output(RaytraceInstance* instance) {
 
       if (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) {
         if (instance->denoiser) {
-          base_output_image = denoise_apply(instance, device_buffer_get_pointer(instance->frame_accumulate));
+          base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
         }
 
         device_buffer_copy(base_output_image, instance->frame_output);

@@ -195,8 +195,8 @@ void raytrace_update_ray_emitter(RaytraceInstance* instance) {
 
   memset(&emitter.projection, 0, sizeof(Mat4x4));
 
-  emitter.step = 2.0f * (instance->scene.camera.fov / instance->width);
-  emitter.vfov = emitter.step * instance->height / 2.0f;
+  emitter.step = 2.0f * (instance->scene.camera.fov / instance->internal_width);
+  emitter.vfov = emitter.step * instance->internal_height / 2.0f;
 
   const float z_far  = instance->scene.camera.far_clip_distance;
   const float z_near = 1.0f;
@@ -313,6 +313,10 @@ void raytrace_execute(RaytraceInstance* instance) {
 
   if (instance->temporal_frames == 0.0f) {
     instance->undersampling = instance->undersampling_setting;
+
+    // TODO: Find a better solution maybe.
+    device_buffer_zero(instance->frame_direct_buffer);
+    device_buffer_zero(instance->frame_indirect_buffer);
   }
 
   device_update_symbol(temporal_frames, instance->temporal_frames);
@@ -851,10 +855,11 @@ void raytrace_update_device_scene(RaytraceInstance* instance) {
 }
 
 DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance, OutputVariable output_variable) {
+  // TODO: This no longer makes sense.
   switch (output_variable) {
     default:
     case OUTPUT_VARIABLE_BEAUTY:
-      return instance->frame_accumulate;
+      return instance->frame_final;
     case OUTPUT_VARIABLE_ALBEDO_GUIDANCE:
       return instance->albedo_buffer;
     case OUTPUT_VARIABLE_NORMAL_GUIDANCE:

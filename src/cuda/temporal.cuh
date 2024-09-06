@@ -91,7 +91,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
 
-    direct_output = scale_color(direct_output, ceilf(device.temporal_frames));
+    direct_output = scale_color(direct_output, device.temporal_frames);
     direct_output = add_color(direct_buffer, direct_output);
     direct_output = scale_color(direct_output, 1.0f / (device.temporal_frames + increment));
 
@@ -103,9 +103,9 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
+#if 0
     float variance = (device.temporal_frames == 0.0f) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
-#if 0
     if (device.scene.camera.do_firefly_clamping) {
       float luminance_buffer = color_importance(indirect_buffer);
       float luminance_output = color_importance(indirect_output);
@@ -152,7 +152,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
     }
 #endif
 
-    indirect_output = scale_color(indirect_output, ceilf(device.temporal_frames));
+    indirect_output = scale_color(indirect_output, device.temporal_frames);
     indirect_output = add_color(indirect_buffer, indirect_output);
     indirect_output = scale_color(indirect_output, 1.0f / (device.temporal_frames + increment));
 
