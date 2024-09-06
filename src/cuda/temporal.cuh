@@ -78,6 +78,10 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
   const float increment = temporal_increment();
 
+  const bool load_accumulate = (device.temporal_frames > 0.0f);
+  const float prev_scale     = fmaxf(1.0f, device.temporal_frames);
+  const float curr_inv_scale = 1.0f / fmaxf(1.0f, device.temporal_frames + increment);
+
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = offset / device.internal_width;
     const uint32_t x = offset - y * device.internal_width;
@@ -87,19 +91,19 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
     // Direct Lighting
     RGBF direct_buffer = temporal_gather_pixel(device.ptrs.frame_direct_buffer, sx, sy, device.internal_width, device.internal_height);
-    RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
+    RGBF direct_output = (load_accumulate) ? load_RGBF(device.ptrs.frame_direct_accumulate + offset) : get_color(0.0f, 0.0f, 0.0f);
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
 
-    direct_output = scale_color(direct_output, device.temporal_frames);
+    direct_output = scale_color(direct_output, prev_scale);
     direct_output = add_color(direct_buffer, direct_output);
-    direct_output = scale_color(direct_output, 1.0f / (device.temporal_frames + increment));
+    direct_output = scale_color(direct_output, curr_inv_scale);
 
     store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_output);
 
     // Indirect Lighting
     RGBF indirect_buffer = temporal_gather_pixel(device.ptrs.frame_indirect_buffer, sx, sy, device.internal_width, device.internal_height);
-    RGBF indirect_output = load_RGBF(device.ptrs.frame_indirect_accumulate + offset);
+    RGBF indirect_output = (load_accumulate) ? load_RGBF(device.ptrs.frame_indirect_accumulate + offset) : get_color(0.0f, 0.0f, 0.0f);
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
@@ -152,9 +156,9 @@ LUMINARY_KERNEL void temporal_accumulation() {
     }
 #endif
 
-    indirect_output = scale_color(indirect_output, device.temporal_frames);
+    indirect_output = scale_color(indirect_output, prev_scale);
     indirect_output = add_color(indirect_buffer, indirect_output);
-    indirect_output = scale_color(indirect_output, 1.0f / (device.temporal_frames + increment));
+    indirect_output = scale_color(indirect_output, curr_inv_scale);
 
     store_RGBF(device.ptrs.frame_indirect_accumulate + offset, indirect_output);
 
