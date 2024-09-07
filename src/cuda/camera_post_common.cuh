@@ -6,26 +6,29 @@
 #include "utils.cuh"
 #include "utils.h"
 
-__device__ RGBF sample_pixel(const RGBF* image, const float x, const float y, const int width, const int height) {
-  const float source_x = fmaxf(0.0f, x * (width - 1));
-  const float source_y = fmaxf(0.0f, y * (height - 1));
+__device__ RGBF
+  sample_pixel(const RGBF* image, const float x, const float y, const uint32_t width, const uint32_t height, const float mem_scale = 1.0f) {
+  const float source_x = fmaxf(0.0f, x * (width - 1)) * mem_scale;
+  const float source_y = fmaxf(0.0f, y * (height - 1)) * mem_scale;
 
-  const int index_x = source_x;
-  const int index_y = source_y;
+  const uint32_t index_x0 = (uint32_t) source_x;
+  const uint32_t index_y0 = (uint32_t) source_y;
+  const uint32_t index_x1 = min((uint32_t) (source_x + mem_scale), width - 1);
+  const uint32_t index_y1 = min((uint32_t) (source_y + mem_scale), height - 1);
 
-  const int index_00 = index_x + index_y * width;
-  const int index_01 = index_00 + ((index_y < height - 1) ? width : 0);
-  const int index_10 = index_00 + ((index_x < width - 1) ? 1 : 0);
-  const int index_11 = index_01 + ((index_x < width - 1) ? 1 : 0);
+  const uint32_t index_00 = index_x0 + index_y0 * width * mem_scale;
+  const uint32_t index_01 = index_x0 + index_y1 * width * mem_scale;
+  const uint32_t index_10 = index_x1 + index_y0 * width * mem_scale;
+  const uint32_t index_11 = index_x1 + index_y1 * width * mem_scale;
 
   const RGBF pixel_00 = load_RGBF(image + index_00);
   const RGBF pixel_01 = load_RGBF(image + index_01);
   const RGBF pixel_10 = load_RGBF(image + index_10);
   const RGBF pixel_11 = load_RGBF(image + index_11);
 
-  const float fx  = source_x - index_x;
+  const float fx  = source_x - index_x0;
   const float ifx = 1.0f - fx;
-  const float fy  = source_y - index_y;
+  const float fy  = source_y - index_y0;
   const float ify = 1.0f - fy;
 
   const float f00 = ifx * ify;
@@ -41,7 +44,7 @@ __device__ RGBF sample_pixel(const RGBF* image, const float x, const float y, co
   return result;
 }
 
-__device__ RGBF sample_pixel_clamp(const RGBF* image, float x, float y, const int width, const int height) {
+__device__ RGBF sample_pixel_clamp(const RGBF* image, float x, float y, const int width, const int height, const float mem_scale = 1.0f) {
   x = fmaxf(x, 0.0f);
   y = fmaxf(y, 0.0f);
 
@@ -49,7 +52,7 @@ __device__ RGBF sample_pixel_clamp(const RGBF* image, float x, float y, const in
   x = fminf(x, __uint_as_float(0b00111111011111111111111111111111));
   y = fminf(y, __uint_as_float(0b00111111011111111111111111111111));
 
-  return sample_pixel(image, x, y, width, height);
+  return sample_pixel(image, x, y, width, height, mem_scale);
 }
 
 __device__ RGBF sample_pixel_border(const RGBF* image, float x, float y, const int width, const int height) {

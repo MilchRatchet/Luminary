@@ -405,18 +405,9 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
 
     accumulated_color = scale_color(accumulated_color, color_scale);
 
-    const uint16_t dst_scale = 1 << (undersampling - 1);
+    const uint32_t index = x + y * undersampling_width;
 
-    const uint16_t dst_x = x * dst_scale;
-    const uint16_t dst_y = y * dst_scale;
-
-    for (uint32_t yi = 0; yi < dst_scale; yi++) {
-      for (uint32_t xi = 0; xi < dst_scale; xi++) {
-        const uint32_t index = (dst_x + xi) + (dst_y + yi) * device.width;
-
-        store_RGBF(device.ptrs.frame_final + index, accumulated_color);
-      }
-    }
+    store_RGBF(device.ptrs.frame_final + index, accumulated_color);
   }
 }
 
@@ -428,6 +419,8 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
   const float scale_x = 1.0f / (width - 1);
   const float scale_y = 1.0f / (height - 1);
 
+  const float mem_scale = 1.0f / (1 << (max(device.undersampling, 1) - 1));
+
   while (id < amount) {
     const int y = id / width;
     const int x = id - y * width;
@@ -435,7 +428,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
     const float sx = x * scale_x;
     const float sy = y * scale_y;
 
-    RGBF pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, device.width, device.height);
+    RGBF pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, device.width, device.height, mem_scale);
 
     switch (device.scene.camera.filter) {
       case FILTER_NONE:
