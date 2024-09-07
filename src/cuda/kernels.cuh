@@ -371,7 +371,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }
 
-LUMINARY_KERNEL void generate_final_image() {
+LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
   const uint32_t undersampling       = max(device.undersampling, 1);
   const uint32_t undersampling_scale = 1 << undersampling;
 
@@ -396,7 +396,7 @@ LUMINARY_KERNEL void generate_final_image() {
       for (uint32_t xi = 0; xi < undersampling_scale; xi++) {
         const uint32_t index = (source_x + xi) + (source_y + yi) * device.internal_width;
 
-        RGBF pixel = load_RGBF(device.ptrs.frame_accumulate + index);
+        RGBF pixel = load_RGBF(src + index);
         pixel      = tonemap_apply(pixel);
 
         accumulated_color = add_color(accumulated_color, pixel);

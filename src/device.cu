@@ -50,7 +50,6 @@ extern "C" void device_init() {
 
 void device_handle_accumulation() {
   temporal_accumulation<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
-  generate_final_image<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>();
 }
 
 extern "C" void device_execute_main_kernels(RaytraceInstance* instance, int depth) {
@@ -147,6 +146,10 @@ extern "C" void device_gather_device_table(void* dst, cudaMemcpyKind kind) {
 
 extern "C" unsigned int device_get_thread_count() {
   return THREADS_PER_BLOCK * BLOCKS_PER_GRID;
+}
+
+extern "C" void device_generate_final_image(RGBF* src) {
+  generate_final_image<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src);
 }
 
 extern "C" void device_copy_framebuffer_to_8bit(

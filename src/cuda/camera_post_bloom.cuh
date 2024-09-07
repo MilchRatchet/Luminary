@@ -36,8 +36,8 @@ static int _bloom_mip_count(const int width, const int height) {
 }
 
 extern "C" void device_bloom_init(RaytraceInstance* instance) {
-  int width  = instance->output_width;
-  int height = instance->output_height;
+  int width  = instance->internal_width;
+  int height = instance->internal_height;
 
   const int mip_count = _bloom_mip_count(width, height);
 
@@ -52,8 +52,8 @@ extern "C" void device_bloom_init(RaytraceInstance* instance) {
 }
 
 extern "C" void device_bloom_apply(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
-  const int width  = instance->output_width;
-  const int height = instance->output_height;
+  const int width  = instance->internal_width;
+  const int height = instance->internal_height;
 
   int mip_count = instance->bloom_mips_count;
 
@@ -93,8 +93,8 @@ extern "C" void device_bloom_apply(RaytraceInstance* instance, const RGBF* src, 
 }
 
 extern "C" void device_bloom_clear(RaytraceInstance* instance) {
-  int width  = instance->output_width;
-  int height = instance->output_height;
+  int width  = instance->internal_width;
+  int height = instance->internal_height;
 
   const int mip_count = _bloom_mip_count(width, height);
 

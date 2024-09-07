@@ -548,6 +548,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->ior_stack);
   device_buffer_init(&instance->frame_variance);
   device_buffer_init(&instance->frame_accumulate);
+  device_buffer_init(&instance->frame_post);
   device_buffer_init(&instance->frame_final);
   device_buffer_init(&instance->frame_output);
   device_buffer_init(&instance->frame_direct_buffer);
@@ -729,6 +730,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
 
   device_buffer_malloc(instance->frame_variance, sizeof(float), internal_amount);
   device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), internal_amount);
+  device_buffer_malloc(instance->frame_post, sizeof(RGBF), internal_amount);
   device_buffer_malloc(instance->frame_final, sizeof(RGBF), amount);
   device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->records, sizeof(RGBF), internal_amount);
@@ -778,6 +780,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.frame_direct_accumulate   = (RGBF*) device_buffer_get_pointer(instance->frame_direct_accumulate);
   ptrs.frame_indirect_buffer     = (RGBF*) device_buffer_get_pointer(instance->frame_indirect_buffer);
   ptrs.frame_indirect_accumulate = (RGBF*) device_buffer_get_pointer(instance->frame_indirect_accumulate);
+  ptrs.frame_post                = (RGBF*) device_buffer_get_pointer(instance->frame_post);
   ptrs.frame_final               = (RGBF*) device_buffer_get_pointer(instance->frame_final);
   ptrs.frame_output              = (RGBF*) device_buffer_get_pointer(instance->frame_output);
   ptrs.albedo_buffer             = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
@@ -859,7 +862,7 @@ DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance, OutputV
   switch (output_variable) {
     default:
     case OUTPUT_VARIABLE_BEAUTY:
-      return instance->frame_final;
+      return instance->frame_accumulate;
     case OUTPUT_VARIABLE_ALBEDO_GUIDANCE:
       return instance->albedo_buffer;
     case OUTPUT_VARIABLE_NORMAL_GUIDANCE:

@@ -36,7 +36,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 
   char* title = (char*) malloc(4096);
 
-  RGBF* gpu_output   = device_buffer_get_pointer(instance->frame_output);
+  RGBF* gpu_output   = device_buffer_get_pointer(instance->frame_post);
   XRGB8* gpu_scratch = device_buffer_get_pointer(window->gpu_buffer);
 
   while (!exit) {
@@ -49,10 +49,13 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
       base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
     }
 
-    device_buffer_copy(base_output_image, instance->frame_output);
+    device_buffer_copy(base_output_image, instance->frame_post);
     device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), gpu_output);
+
+    device_generate_final_image(gpu_output);
     device_copy_framebuffer_to_8bit(
-      gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld, OUTPUT_VARIABLE_BEAUTY);
+      device_buffer_get_pointer(instance->frame_final), gpu_scratch, window->buffer, window->width, window->height, window->ld,
+      OUTPUT_VARIABLE_BEAUTY);
 
     SDL_PumpEvents();
 
@@ -133,8 +136,8 @@ void offline_output(RaytraceInstance* instance) {
     base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
   }
 
-  device_buffer_copy(base_output_image, instance->frame_output);
-  device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
+  device_buffer_copy(base_output_image, instance->frame_post);
+  device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_post));
 
   DeviceBuffer* scratch_buffer = (DeviceBuffer*) 0;
   device_buffer_init(&scratch_buffer);
@@ -144,8 +147,9 @@ void offline_output(RaytraceInstance* instance) {
 
   // Post Process Menu stores a backup of the current image, after the user is done the final output image is stored.
   if (instance->post_process_menu) {
+    device_generate_final_image(device_buffer_get_pointer(instance->frame_post));
     device_copy_framebuffer_to_8bit(
-      device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
+      device_buffer_get_pointer(instance->frame_final), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
       instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
 
     switch (instance->image_format) {
@@ -167,8 +171,9 @@ void offline_output(RaytraceInstance* instance) {
     denoise_free(instance);
   }
 
+  device_generate_final_image(device_buffer_get_pointer(instance->frame_post));
   device_copy_framebuffer_to_8bit(
-    device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
+    device_buffer_get_pointer(instance->frame_final), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
     instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
 
   switch (instance->image_format) {
@@ -335,17 +340,18 @@ void realtime_output(RaytraceInstance* instance) {
           base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
         }
 
-        device_buffer_copy(base_output_image, instance->frame_output);
-        device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
+        device_buffer_copy(base_output_image, instance->frame_post);
+        device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_post));
 
-        output_image = instance->frame_output;
+        output_image = instance->frame_post;
       }
       else {
         output_image = base_output_image;
       }
 
+      device_generate_final_image(device_buffer_get_pointer(output_image));
       device_copy_framebuffer_to_8bit(
-        device_buffer_get_pointer(output_image), gpu_scratch, window->buffer, window->width, window->height, window->ld,
+        device_buffer_get_pointer(instance->frame_final), gpu_scratch, window->buffer, window->width, window->height, window->ld,
         instance->output_variable);
     }
 

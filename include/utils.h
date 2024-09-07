@@ -422,6 +422,7 @@ struct DevicePointers {
   PIXEL_BUFFER RGBF* frame_direct_accumulate;
   PIXEL_BUFFER RGBF* frame_indirect_buffer;
   PIXEL_BUFFER RGBF* frame_indirect_accumulate;
+  PIXEL_BUFFER RGBF* frame_post;
   PIXEL_BUFFER RGBF* frame_final;
   PIXEL_BUFFER RGBF* frame_output;
   PIXEL_BUFFER RGBF* albedo_buffer;
@@ -532,6 +533,7 @@ struct RaytraceInstance {
   DeviceBuffer* task_offsets;
   DeviceBuffer* frame_variance;
   DeviceBuffer* frame_accumulate;
+  DeviceBuffer* frame_post;
   DeviceBuffer* frame_final;
   DeviceBuffer* frame_output;
   DeviceBuffer* frame_direct_buffer;
