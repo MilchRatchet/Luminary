@@ -314,7 +314,9 @@ void raytrace_execute(RaytraceInstance* instance) {
   if (instance->temporal_frames == 0.0f) {
     instance->undersampling = instance->undersampling_setting;
 
-    // TODO: Find a better solution maybe.
+    // I use the buffers for accumulation during undersampling,
+    // so I have to zero it as I will not spawn enough tasks initially
+    // to zero all the pixels.
     device_buffer_zero(instance->frame_direct_buffer);
     device_buffer_zero(instance->frame_indirect_buffer);
   }

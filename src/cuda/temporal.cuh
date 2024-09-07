@@ -78,8 +78,8 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
   const float increment = temporal_increment();
 
-  const bool load_accumulate = (device.temporal_frames > 0.0f);
-  const float prev_scale     = fmaxf(1.0f, device.temporal_frames);
+  const bool load_accumulate = (device.temporal_frames >= 1.0f);
+  const float prev_scale     = device.temporal_frames;
   const float curr_inv_scale = 1.0f / fmaxf(1.0f, device.temporal_frames + increment);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
