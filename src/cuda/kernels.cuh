@@ -428,9 +428,6 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
   const float scale_x = 1.0f / (width - 1);
   const float scale_y = 1.0f / (height - 1);
 
-  const int src_width  = (output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_width : device.width;
-  const int src_height = (output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_height : device.height;
-
   while (id < amount) {
     const int y = id / width;
     const int x = id - y * width;
@@ -438,7 +435,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
     const float sx = x * scale_x;
     const float sy = y * scale_y;
 
-    RGBF pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, src_width, src_height);
+    RGBF pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, device.width, device.height);
 
     switch (device.scene.camera.filter) {
       case FILTER_NONE:
