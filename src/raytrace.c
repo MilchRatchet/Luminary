@@ -661,11 +661,13 @@ void raytrace_reset(RaytraceInstance* instance) {
     denoise_free(instance);
   }
 
-  instance->width         = instance->settings.width;
-  instance->height        = instance->settings.height;
-  instance->output_width  = instance->settings.width;
-  instance->output_height = instance->settings.height;
-  instance->denoiser      = instance->settings.denoiser;
+  instance->width           = instance->settings.width;
+  instance->height          = instance->settings.height;
+  instance->output_width    = instance->settings.width;
+  instance->output_height   = instance->settings.height;
+  instance->internal_width  = instance->settings.width * 2;
+  instance->internal_height = instance->settings.height * 2;
+  instance->denoiser        = instance->settings.denoiser;
 
   if (instance->denoiser == DENOISING_UPSCALING) {
     if (instance->width * instance->height > 18144000) {
