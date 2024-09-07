@@ -69,6 +69,9 @@ LUMINARY_KERNEL void generate_trace_tasks() {
       undersampling_y += (undersampling_scale >> 1) * ((undersampling_index & 0b10) ? 1.0f : 0.0f);
     }
 
+    if (undersampling_x >= device.internal_width || undersampling_y >= device.internal_height)
+      continue;
+
     TraceTask task;
     task.index.x = undersampling_x;
     task.index.y = undersampling_y;
@@ -394,7 +397,10 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
 
     for (uint32_t yi = 0; yi < undersampling_scale; yi++) {
       for (uint32_t xi = 0; xi < undersampling_scale; xi++) {
-        const uint32_t index = (source_x + xi) + (source_y + yi) * device.internal_width;
+        const uint32_t pixel_x = min(source_x + xi, device.internal_width - 1);
+        const uint32_t pixel_y = min(source_y + yi, device.internal_height - 1);
+
+        const uint32_t index = pixel_x + pixel_y * device.internal_width;
 
         RGBF pixel = load_RGBF(src + index);
         pixel      = tonemap_apply(pixel);
@@ -406,7 +412,6 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
     accumulated_color = scale_color(accumulated_color, color_scale);
 
     const uint32_t index = x + y * undersampling_width;
-
     store_RGBF(device.ptrs.frame_final + index, accumulated_color);
   }
 }
