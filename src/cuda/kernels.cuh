@@ -49,11 +49,10 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
   const uint32_t undersampling_scale = 1 << device.undersampling;
 
-  uint32_t amount = device.internal_width * device.internal_height;
-  amount          = amount >> (2 * device.undersampling);
+  const uint32_t undersampling_width  = (device.internal_width + (1 << device.undersampling) - 1) >> device.undersampling;
+  const uint32_t undersampling_height = (device.internal_height + (1 << device.undersampling) - 1) >> device.undersampling;
 
-  const uint32_t undersampling_width  = device.internal_width >> device.undersampling;
-  const uint32_t undersampling_height = device.internal_height >> device.undersampling;
+  const uint32_t amount = undersampling_width * undersampling_height;
 
   const uint32_t undersampling_index = roundf(device.temporal_frames * undersampling_scale * undersampling_scale);
 
@@ -378,11 +377,10 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
   const uint32_t undersampling       = max(device.undersampling, 1);
   const uint32_t undersampling_scale = 1 << undersampling;
 
-  uint32_t amount = device.internal_width * device.internal_height;
-  amount          = amount >> (2 * undersampling);
+  const uint32_t undersampling_width  = (device.internal_width + (1 << undersampling) - 1) >> undersampling;
+  const uint32_t undersampling_height = (device.internal_height + (1 << undersampling) - 1) >> undersampling;
 
-  const uint32_t undersampling_width  = device.internal_width >> undersampling;
-  const uint32_t undersampling_height = device.internal_height >> undersampling;
+  const uint32_t amount = undersampling_width * undersampling_height;
 
   const float color_scale = 1.0f / (undersampling_scale * undersampling_scale * __saturatef(device.temporal_frames + temporal_increment()));
 

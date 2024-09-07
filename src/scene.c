@@ -54,7 +54,7 @@ void scene_init(Scene** _scene) {
   scene->camera.lens_flare_threshold       = 1.0f;
   scene->camera.dithering                  = 1;
   scene->camera.far_clip_distance          = 50000.0f;
-  scene->camera.tonemap                    = TONEMAP_ACES;
+  scene->camera.tonemap                    = TONEMAP_AGX;
   scene->camera.agx_custom_slope           = 1.0f;
   scene->camera.agx_custom_power           = 1.0f;
   scene->camera.agx_custom_saturation      = 1.0f;
