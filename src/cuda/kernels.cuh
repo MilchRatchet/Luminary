@@ -421,7 +421,7 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
 }
 
 LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
-  const RGBF* source, XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
+  XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
   unsigned int id = THREAD_ID;
 
   const int amount    = width * height;
@@ -438,7 +438,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
     const float sx = x * scale_x;
     const float sy = y * scale_y;
 
-    RGBF pixel = sample_pixel_clamp(source, sx, sy, src_width, src_height);
+    RGBF pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, src_width, src_height);
 
     switch (device.scene.camera.filter) {
       case FILTER_NONE:
