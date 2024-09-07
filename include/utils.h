@@ -404,33 +404,28 @@ struct RISSettings {
   int num_light_rays;
 } typedef RISSettings;
 
-// TODO: Access certain pixel buffers in a tight way to improve cache efficiency
-//       during undersampling.
-#define PIXEL_BUFFER
-#define PIXEL_BUFFER_TIGHT
-
 struct DevicePointers {
   TraceTask* trace_tasks;
   uint16_t* trace_counts;
   TraceResult* trace_results;
   uint16_t* task_counts;
   uint16_t* task_offsets;
-  PIXEL_BUFFER uint32_t* ior_stack;
-  PIXEL_BUFFER float* frame_variance;
-  PIXEL_BUFFER RGBF* frame_accumulate;
-  PIXEL_BUFFER RGBF* frame_direct_buffer;
-  PIXEL_BUFFER RGBF* frame_direct_accumulate;
-  PIXEL_BUFFER RGBF* frame_indirect_buffer;
-  PIXEL_BUFFER RGBF* frame_indirect_accumulate;
-  PIXEL_BUFFER RGBF* frame_post;
-  PIXEL_BUFFER RGBF* frame_final;
-  PIXEL_BUFFER RGBF* frame_output;
-  PIXEL_BUFFER RGBF* albedo_buffer;
-  PIXEL_BUFFER RGBF* normal_buffer;
-  PIXEL_BUFFER RGBF* records;
+  uint32_t* ior_stack;
+  float* frame_variance;
+  RGBF* frame_accumulate;
+  RGBF* frame_direct_buffer;
+  RGBF* frame_direct_accumulate;
+  RGBF* frame_indirect_buffer;
+  RGBF* frame_indirect_accumulate;
+  RGBF* frame_post;
+  RGBF* frame_final;
+  RGBF* frame_output;
+  RGBF* albedo_buffer;
+  RGBF* normal_buffer;
+  RGBF* records;
   XRGB8* buffer_8bit;
-  PIXEL_BUFFER TraceResult* trace_results_history;
-  PIXEL_BUFFER uint8_t* state_buffer;
+  TraceResult* trace_results_history;
+  uint8_t* state_buffer;
   const DeviceTexture* albedo_atlas;
   const DeviceTexture* luminance_atlas;
   const DeviceTexture* material_atlas;

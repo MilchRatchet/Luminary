@@ -8,24 +8,17 @@
 // TODO: Refactor this into a separate file, the idea of "temporal" is long gone now that reprojection is gone. While we are at it, get rid
 // of the legacy naming of "temporal frames".
 
-// This is a gaussian filter with a sigma of 0.4 and a radius of 2. I cut out a lot of the terms
-// because they were negligible.
+// Simple tent filter.
 __device__ float temporal_gather_pixel_weight(const RGBF pixel, const float x, const float y) {
-  const float weight_x = expf(-(x * x) * 3.125f);
-  const float weight_y = expf(-(y * y) * 3.125f);
-
-  return weight_x * weight_y;
+  return x * y;
 }
 
 __device__ RGBF temporal_gather_pixel_load(
-  const RGBF* image, const int width, const int height, const float sx, const float sy, const int i, const int j) {
-  const int index_x = ((int) sx) + i;
-  const int index_y = ((int) sy) + j;
+  const RGBF* image, const int width, const int height, const float sx, const float sy, const uint32_t i, const uint32_t j) {
+  const uint32_t index_x = min(((uint32_t) sx) + i, width - 1);
+  const uint32_t index_y = min(((uint32_t) sy) + j, height - 1);
 
-  if (index_x < 0 || index_x >= width || index_y < 0 || index_y >= height)
-    return get_color(0.0f, 0.0f, 0.0f);
-
-  const int index = index_x + index_y * width;
+  const uint32_t index = index_x + index_y * width;
 
   const RGBF pixel = load_RGBF(image + index);
 
@@ -38,11 +31,10 @@ __device__ RGBF temporal_gather_pixel_load(
 __device__ RGBF temporal_gather_pixel(const RGBF* image, const float x, const float y, const int width, const int height) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
-  for (int j = -1; j <= 2; j++) {
-    for (int i = -1; i <= 2; i++) {
-      result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, i, j));
-    }
-  }
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, 0, 0));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, 1, 0));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, 0, 1));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, 1, 1));
 
   return result;
 }
