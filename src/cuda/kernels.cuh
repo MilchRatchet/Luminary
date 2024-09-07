@@ -17,11 +17,30 @@
 #include "utils.cuh"
 #include "volume.cuh"
 
-// Undersampling pattern:
 //
-//  1 | 3
-// ---+---
-//  2 | 0
+// Undersampling pattern:
+// The lowest undersampling pass is used 4 times
+// while the others are done 3 times.
+// Once all undersampling passes have been performed,
+// each pixel has exactly one sample and we continue
+// without undersampling. Example for 3 passes with
+// a 8x8 resolution.
+//
+//  3 | 1 | 2 | 1 | 3 | 1 | 2 | 1
+// ---+---+---+---+---+---+---+---
+//  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
+// ---+---+---+---+---+---+---+---
+//  2 | 1 | 2 | 1 | 2 | 1 | 2 | 1
+// ---+---+---+---+---+---+---+---
+//  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
+// ---+---+---+---+---+---+---+---
+//  3 | 1 | 2 | 1 | 3 | 1 | 2 | 1
+// ---+---+---+---+---+---+---+---
+//  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
+// ---+---+---+---+---+---+---+---
+//  2 | 1 | 2 | 1 | 2 | 1 | 2 | 1
+// ---+---+---+---+---+---+---+---
+//  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
 //
 
 // TODO: Turns this into a function and call this in the trace kernel if primary ray.
@@ -46,8 +65,8 @@ LUMINARY_KERNEL void generate_trace_tasks() {
       undersampling_x *= undersampling_scale;
       undersampling_y *= undersampling_scale;
 
-      undersampling_x += (undersampling_scale >> 1) * (((~undersampling_index) & 0b01) ? 1.0f : 0.0f);
-      undersampling_y += (undersampling_scale >> 1) * (((undersampling_index) & 0b10) ? 1.0f : 0.0f);
+      undersampling_x += (undersampling_scale >> 1) * ((undersampling_index & 0b01) ? 1.0f : 0.0f);
+      undersampling_y += (undersampling_scale >> 1) * ((undersampling_index & 0b10) ? 1.0f : 0.0f);
     }
 
     TraceTask task;
