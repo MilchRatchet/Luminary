@@ -552,7 +552,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->frame_accumulate);
   device_buffer_init(&instance->frame_post);
   device_buffer_init(&instance->frame_final);
-  device_buffer_init(&instance->frame_output);
   device_buffer_init(&instance->frame_direct_buffer);
   device_buffer_init(&instance->frame_direct_accumulate);
   device_buffer_init(&instance->frame_indirect_buffer);
@@ -736,7 +735,6 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_accumulate, sizeof(RGBF), internal_amount);
   device_buffer_malloc(instance->frame_post, sizeof(RGBF), internal_amount);
   device_buffer_malloc(instance->frame_final, sizeof(RGBF), amount);
-  device_buffer_malloc(instance->frame_output, sizeof(RGBF), output_amount);
   device_buffer_malloc(instance->records, sizeof(RGBF), internal_amount);
 
   if (instance->denoiser || instance->aov_mode) {
@@ -786,7 +784,6 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.frame_indirect_accumulate = (RGBF*) device_buffer_get_pointer(instance->frame_indirect_accumulate);
   ptrs.frame_post                = (RGBF*) device_buffer_get_pointer(instance->frame_post);
   ptrs.frame_final               = (RGBF*) device_buffer_get_pointer(instance->frame_final);
-  ptrs.frame_output              = (RGBF*) device_buffer_get_pointer(instance->frame_output);
   ptrs.albedo_buffer             = (RGBF*) device_buffer_get_pointer(instance->albedo_buffer);
   ptrs.normal_buffer             = (RGBF*) device_buffer_get_pointer(instance->normal_buffer);
   ptrs.records                   = (RGBF*) device_buffer_get_pointer(instance->records);
