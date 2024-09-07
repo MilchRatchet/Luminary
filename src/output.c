@@ -453,7 +453,8 @@ void realtime_output(RaytraceInstance* instance) {
       total_time, trace_time, ui_time, post_time, device_memory_usage() * (1.0 / (1024.0 * 1024.0 * 1024.0)),
       device_memory_limit() * (1.0 / (1024.0 * 1024.0 * 1024.0)));
 
-    const double normalized_time = total_time / 16.66667;
+    // TODO: Remove this hack once the UI rework is done.
+    const double normalized_time = total_time / (16.66667 * (1 << (2 * (instance->undersampling_setting - instance->undersampling))));
 
     SDL_SetWindowTitle(window->window, title);
     SDL_UpdateWindowSurface(window->window);
