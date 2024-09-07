@@ -99,44 +99,39 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
-#if 0
-    float variance = (device.temporal_frames == 0.0f) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
+    // Firefly clamping only takes effect after undersampling has stopped.
+    if (device.scene.camera.do_firefly_clamping && device.temporal_frames >= 1.0f) {
+      float variance = (device.temporal_frames < 2.0f) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
-    if (device.scene.camera.do_firefly_clamping) {
       float luminance_buffer = color_importance(indirect_buffer);
       float luminance_output = color_importance(indirect_output);
 
       const float deviation = fminf(0.1f, sqrtf(fmaxf(variance, eps)));
 
-      if (device.temporal_frames) {
-        variance *= device.temporal_frames - 1.0f;
+      variance *= device.temporal_frames - 1.0f;
 
-        float diff = luminance_buffer - luminance_output;
-        diff       = diff * diff;
+      float diff = luminance_buffer - luminance_output;
+      diff       = diff * diff;
 
-        // Hard firefly rejection.
-        // Fireflies that appear during the first frame are accepted by our method since there is
-        // no reference yet to reject them from. This trick here hard rejects them by taking the
-        // dimmer of the two frames. This is not unbiased but since it only happens exactly once
-        // the bias will decrease with the number of frames.
-        // Taking neighbouring pixels as reference is not the target since I want to consider each
-        // pixel as its own independent entity to preserve fine details.
-        // TODO: Improve this method to remove the visible dimming during the second frame.
-        // TODO: Adapt to undersampling.
-#if 0
-        if (device.temporal_frames == 1) {
-          float min_luminance = fminf(luminance_buffer, luminance_output);
+      // Hard firefly rejection.
+      // Fireflies that appear during the first frame are accepted by our method since there is
+      // no reference yet to reject them from. This trick here hard rejects them by taking the
+      // dimmer of the two frames. This is not unbiased but since it only happens exactly once
+      // the bias will decrease with the number of frames.
+      // Taking neighbouring pixels as reference is not the target since I want to consider each
+      // pixel as its own independent entity to preserve fine details.
+      // TODO: Improve this method to remove the visible dimming during the second frame.
+      if (device.temporal_frames < 2.0f) {
+        const float min_luminance = fminf(luminance_buffer, luminance_output);
 
-          indirect_output =
-            (luminance_output > eps) ? scale_color(indirect_output, min_luminance / luminance_output) : get_color(0.0f, 0.0f, 0.0f);
-          indirect_buffer =
-            (luminance_buffer > eps) ? scale_color(indirect_buffer, min_luminance / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
-        }
-#endif
-
-        variance += diff;
-        variance *= 1.0f / device.temporal_frames;
+        indirect_output =
+          (luminance_output > eps) ? scale_color(indirect_output, min_luminance / luminance_output) : get_color(0.0f, 0.0f, 0.0f);
+        indirect_buffer =
+          (luminance_buffer > eps) ? scale_color(indirect_buffer, min_luminance / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
       }
+
+      variance += diff;
+      variance *= 1.0f / device.temporal_frames;
 
       __stcs(device.ptrs.frame_variance + offset, variance);
 
@@ -146,7 +141,6 @@ LUMINARY_KERNEL void temporal_accumulation() {
       indirect_buffer =
         (luminance_buffer > eps) ? scale_color(indirect_buffer, new_luminance_buffer / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
     }
-#endif
 
     indirect_output = scale_color(indirect_output, prev_scale);
     indirect_output = add_color(indirect_buffer, indirect_output);
