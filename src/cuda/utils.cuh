@@ -71,7 +71,8 @@ __constant__ DeviceConstantMemory device;
 #define UTILS_NO_PIXEL_SELECTED (make_ushort2(0xFFFF, 0xFFFF))
 
 __device__ bool is_selected_pixel(const ushort2 index) {
-  return (index.x == device.user_selected_x && index.y == device.user_selected_y);
+  // Only the top left subpixel of a pixel can be selected.
+  return (index.x == (device.user_selected_x << 1) && index.y == (device.user_selected_y << 1));
 }
 
 __device__ bool is_selected_pixel_lenient(const ushort2 index) {
