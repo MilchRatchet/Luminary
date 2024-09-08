@@ -418,9 +418,12 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
   const float scale_x   = 1.0f / (width - 1);
   const float scale_y   = 1.0f / (height - 1);
 
-  const float mem_scale = (device.undersampling > 1) ? 1.0f / (1 << (device.undersampling - 1)) : 1.0f;
+  const uint32_t undersampling       = max(device.undersampling, 1);
+  const uint32_t undersampling_width = (device.internal_width + (1 << undersampling) - 1) >> undersampling;
 
-  const bool scaled_output = (width != device.width) || (height != device.height) || (device.undersampling > 1);
+  const float mem_scale = (undersampling > 1) ? 1.0f / (1 << (undersampling - 1)) : 1.0f;
+
+  const bool scaled_output = (width != device.width) || (height != device.height);
 
   while (id < amount) {
     const uint32_t y = id / width;
@@ -434,7 +437,9 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
       pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, device.width, device.height, mem_scale);
     }
     else {
-      pixel = load_RGBF(device.ptrs.frame_final + x + y * device.width);
+      const uint32_t src_x = x >> (max(device.undersampling, 1) - 1);
+      const uint32_t src_y = y >> (max(device.undersampling, 1) - 1);
+      pixel                = load_RGBF(device.ptrs.frame_final + src_x + src_y * undersampling_width);
     }
 
     switch (device.scene.camera.filter) {
