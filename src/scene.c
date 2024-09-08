@@ -219,8 +219,8 @@ void scene_init(Scene** _scene) {
 
 static General get_default_settings() {
   General general = {
-    .width             = 1280,
-    .height            = 720,
+    .width             = 1920,
+    .height            = 1080,
     .max_ray_depth     = 8,
     .samples           = 64,
     .num_light_ray     = 1,

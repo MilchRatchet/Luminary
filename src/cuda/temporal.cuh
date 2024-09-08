@@ -9,32 +9,35 @@
 // of the legacy naming of "temporal frames".
 
 // Simple tent filter.
-__device__ float temporal_gather_pixel_weight(const RGBF pixel, const float x, const float y) {
-  return x * y;
+__device__ float temporal_gather_pixel_weight(const float x, const float y) {
+  return (1.0f - x) * (1.0f - y);
 }
 
 __device__ RGBF temporal_gather_pixel_load(
-  const RGBF* image, const int width, const int height, const float sx, const float sy, const uint32_t i, const uint32_t j) {
-  const uint32_t index_x = min(((uint32_t) sx) + i, width - 1);
-  const uint32_t index_y = min(((uint32_t) sy) + j, height - 1);
+  const RGBF* image, const uint32_t width, const uint32_t height, const float pixel_x, const float pixel_y, const float sample_x,
+  const float sample_y) {
+  const uint32_t index_x = (uint32_t) max(min((int32_t) sample_x, width - 1), 0);
+  const uint32_t index_y = (uint32_t) max(min((int32_t) sample_y, height - 1), 0);
 
   const uint32_t index = index_x + index_y * width;
 
   const RGBF pixel = load_RGBF(image + index);
 
-  const float rx = fabsf(sx - index_x);
-  const float ry = fabsf(sy - index_y);
+  const float rx = fabsf(pixel_x - sample_x);
+  const float ry = fabsf(pixel_y - sample_y);
 
-  return scale_color(pixel, temporal_gather_pixel_weight(pixel, rx, ry));
+  return scale_color(pixel, temporal_gather_pixel_weight(rx, ry));
 }
 
-__device__ RGBF temporal_gather_pixel(const RGBF* image, const float x, const float y, const int width, const int height) {
+__device__ RGBF temporal_gather_pixel(
+  const RGBF* image, const float pixel_x, const float pixel_y, const float base_x, const float base_y, const uint32_t width,
+  const uint32_t height) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
-  result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, 0, 0));
-  result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, 1, 0));
-  result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, 0, 1));
-  result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, 1, 1));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x, base_y));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x + 1.0f, base_y));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x, base_y + 1.0f));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x + 1.0f, base_y + 1.0f));
 
   return result;
 }
@@ -78,11 +81,15 @@ LUMINARY_KERNEL void temporal_accumulation() {
     const uint32_t y = offset / device.internal_width;
     const uint32_t x = offset - y * device.internal_width;
 
-    const float sx = x + jitter.x;
-    const float sy = y + jitter.y;
+    const float pixel_x = x + 0.5f;
+    const float pixel_y = y + 0.5f;
+
+    const float base_x = floorf(x - (jitter.x - 0.5f)) + jitter.x;
+    const float base_y = floorf(y - (jitter.y - 0.5f)) + jitter.y;
 
     // Direct Lighting
-    RGBF direct_buffer = temporal_gather_pixel(device.ptrs.frame_direct_buffer, sx, sy, device.internal_width, device.internal_height);
+    RGBF direct_buffer = temporal_gather_pixel(
+      device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.internal_width, device.internal_height);
     RGBF direct_output = (load_accumulate) ? load_RGBF(device.ptrs.frame_direct_accumulate + offset) : get_color(0.0f, 0.0f, 0.0f);
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
@@ -94,7 +101,8 @@ LUMINARY_KERNEL void temporal_accumulation() {
     store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_output);
 
     // Indirect Lighting
-    RGBF indirect_buffer = temporal_gather_pixel(device.ptrs.frame_indirect_buffer, sx, sy, device.internal_width, device.internal_height);
+    RGBF indirect_buffer = temporal_gather_pixel(
+      device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.internal_width, device.internal_height);
     RGBF indirect_output = (load_accumulate) ? load_RGBF(device.ptrs.frame_indirect_accumulate + offset) : get_color(0.0f, 0.0f, 0.0f);
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);

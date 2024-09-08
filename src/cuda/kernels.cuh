@@ -405,8 +405,8 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
 
     accumulated_color = scale_color(accumulated_color, color_scale);
 
-    const uint32_t index = x + y * undersampling_width;
-    store_RGBF(device.ptrs.frame_final + index, accumulated_color);
+    const uint32_t dst_index = x + y * undersampling_width;
+    store_RGBF(device.ptrs.frame_final + dst_index, accumulated_color);
   }
 }
 
