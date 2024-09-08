@@ -333,11 +333,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
     const uint32_t pixel  = get_pixel_id(task.index);
 
     if (IS_PRIMARY_RAY) {
-      TraceResult trace_result;
-      trace_result.depth  = depth;
-      trace_result.hit_id = hit_id;
-
-      device.ptrs.trace_results_history[pixel] = trace_result;
+      device.ptrs.hit_id_history[pixel] = hit_id;
     }
 
     if (hit_id != HIT_TYPE_SKY)

@@ -423,7 +423,7 @@ struct DevicePointers {
   RGBF* normal_buffer;
   RGBF* records;
   XRGB8* buffer_8bit;
-  TraceResult* trace_results_history;
+  uint32_t* hit_id_history;
   uint8_t* state_buffer;
   const DeviceTexture* albedo_atlas;
   const DeviceTexture* luminance_atlas;
@@ -568,7 +568,7 @@ struct RaytraceInstance {
   RayEmitter emitter;
   RISSettings ris_settings;
   BridgeSettings bridge_settings;
-  DeviceBuffer* trace_results_history;
+  DeviceBuffer* hit_id_history;
   DeviceBuffer* state_buffer;
   TextureAtlas tex_atlas;
   OptixDeviceContext optix_ctx;

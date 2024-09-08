@@ -560,7 +560,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   device_buffer_init(&instance->normal_buffer);
   device_buffer_init(&instance->records);
   device_buffer_init(&instance->buffer_8bit);
-  device_buffer_init(&instance->trace_results_history);
+  device_buffer_init(&instance->hit_id_history);
   device_buffer_init(&instance->state_buffer);
   device_buffer_init(&instance->cloud_noise);
   device_buffer_init(&instance->sky_ms_luts);
@@ -761,10 +761,10 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->task_offsets, sizeof(uint16_t), 6 * thread_count);
 
   device_buffer_malloc(instance->ior_stack, sizeof(uint32_t), internal_amount);
-  device_buffer_malloc(instance->trace_results_history, sizeof(TraceResult), internal_amount);
+  device_buffer_malloc(instance->hit_id_history, sizeof(uint32_t), internal_amount);
   device_buffer_malloc(instance->state_buffer, sizeof(uint8_t), internal_amount);
 
-  cudaMemset(device_buffer_get_pointer(instance->trace_results_history), 0, sizeof(TraceResult) * internal_amount);
+  cudaMemset(device_buffer_get_pointer(instance->hit_id_history), 0, sizeof(uint32_t) * internal_amount);
 }
 
 void raytrace_update_device_pointers(RaytraceInstance* instance) {
@@ -793,7 +793,7 @@ void raytrace_update_device_pointers(RaytraceInstance* instance) {
   ptrs.material_atlas            = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.material);
   ptrs.normal_atlas              = (DeviceTexture*) device_buffer_get_pointer(instance->tex_atlas.normal);
   ptrs.cloud_noise               = (DeviceTexture*) device_buffer_get_pointer(instance->cloud_noise);
-  ptrs.trace_results_history     = (TraceResult*) device_buffer_get_pointer(instance->trace_results_history);
+  ptrs.hit_id_history            = (uint32_t*) device_buffer_get_pointer(instance->hit_id_history);
   ptrs.state_buffer              = (uint8_t*) device_buffer_get_pointer(instance->state_buffer);
   ptrs.sky_tm_luts               = (DeviceTexture*) device_buffer_get_pointer(instance->sky_tm_luts);
   ptrs.sky_ms_luts               = (DeviceTexture*) device_buffer_get_pointer(instance->sky_ms_luts);
@@ -822,7 +822,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_indirect_buffer);
   device_buffer_free(instance->frame_variance);
   device_buffer_free(instance->records);
-  device_buffer_free(instance->trace_results_history);
+  device_buffer_free(instance->hit_id_history);
   device_buffer_free(instance->state_buffer);
 
   gpuErrchk(cudaDeviceSynchronize());
