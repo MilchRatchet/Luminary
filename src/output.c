@@ -186,30 +186,6 @@ void offline_output(RaytraceInstance* instance) {
       break;
   }
 
-  if (instance->aov_mode) {
-    for (OutputVariable variable = OUTPUT_VARIABLE_ALBEDO_GUIDANCE; variable < OUTPUT_VARIABLE_COUNT; variable++) {
-      device_copy_framebuffer_to_8bit(
-        device_buffer_get_pointer(raytrace_get_accumulate_buffer(instance, variable)), device_buffer_get_pointer(scratch_buffer), frame,
-        instance->output_width, instance->output_height, instance->output_width, variable);
-
-      const char* var_name = raytrace_get_output_variable_name(variable);
-
-      switch (instance->image_format) {
-        case IMGFORMAT_QOI:
-          sprintf(output_path, "%s_%s.qoi", instance->settings.output_path, var_name);
-          store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
-          info_message("QOI file created. (%s)", var_name);
-          break;
-        case IMGFORMAT_PNG:
-        default:
-          sprintf(output_path, "%s_%s.png", instance->settings.output_path, var_name);
-          png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
-          info_message("PNG file created. (%s)", var_name);
-          break;
-      }
-    }
-  }
-
   device_buffer_destroy(&scratch_buffer);
 
   free(output_path);

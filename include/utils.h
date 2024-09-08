@@ -68,10 +68,10 @@ enum ShadingMode {
 
 enum OutputVariable {
   OUTPUT_VARIABLE_BEAUTY            = 0,
-  OUTPUT_VARIABLE_ALBEDO_GUIDANCE   = 1,
-  OUTPUT_VARIABLE_NORMAL_GUIDANCE   = 2,
-  OUTPUT_VARIABLE_DIRECT_LIGHTING   = 3,
-  OUTPUT_VARIABLE_INDIRECT_LIGHTING = 4,
+  OUTPUT_VARIABLE_DIRECT_LIGHTING   = 1,
+  OUTPUT_VARIABLE_INDIRECT_LIGHTING = 2,
+  OUTPUT_VARIABLE_ALBEDO_GUIDANCE   = 3,
+  OUTPUT_VARIABLE_NORMAL_GUIDANCE   = 4,
   OUTPUT_VARIABLE_COUNT             = 5
 } typedef OutputVariable;
 
@@ -127,7 +127,6 @@ struct DeviceBuffer {
 } typedef DeviceBuffer;
 
 struct CommandlineOptions {
-  int aov_mode;
   int width;
   int height;
   int dmm_active;
@@ -462,7 +461,6 @@ struct DeviceConstantMemory {
   vec3 sun_pos;
   vec3 moon_pos;
   int shading_mode;
-  int aov_mode;
   OutputVariable output_variable;
   RGBF* bloom_scratch;
   RayEmitter emitter;
@@ -559,7 +557,6 @@ struct RaytraceInstance {
   int snap_resolution;
   OutputImageFormat image_format;
   int post_process_menu;
-  int aov_mode;
   OutputVariable output_variable;
   General settings;
   AtmoSettings atmo_settings;

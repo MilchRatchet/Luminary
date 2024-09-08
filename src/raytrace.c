@@ -516,7 +516,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->scene        = *scene;
   instance->settings     = general;
   instance->shading_mode = 0;
-  instance->aov_mode     = options.aov_mode;
   instance->accumulate   = 1;
   instance->bvh_type     = BVH_OPTIX;
 
@@ -596,8 +595,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   gpuErrchk(cudaMemcpy(
     instance->scene.triangle_data.index_buffer, scene->triangle_data.index_buffer,
     instance->scene.triangle_data.triangle_count * 4 * sizeof(uint32_t), cudaMemcpyHostToDevice));
-
-  device_update_symbol(aov_mode, instance->aov_mode);
 
   raytrace_load_moon_textures(instance);
   raytrace_load_bluenoise_texture(instance);
@@ -737,7 +734,7 @@ void raytrace_allocate_buffers(RaytraceInstance* instance) {
   device_buffer_malloc(instance->frame_final, sizeof(RGBF), amount);
   device_buffer_malloc(instance->records, sizeof(RGBF), internal_amount);
 
-  if (instance->denoiser || instance->aov_mode) {
+  if (instance->denoiser) {
     device_buffer_malloc(instance->albedo_buffer, sizeof(RGBF), internal_amount);
     device_buffer_malloc(instance->normal_buffer, sizeof(RGBF), internal_amount);
   }
@@ -831,7 +828,7 @@ void raytrace_free_work_buffers(RaytraceInstance* instance) {
 void raytrace_free_output_buffers(RaytraceInstance* instance) {
   device_buffer_free(instance->frame_accumulate);
 
-  if (instance->denoiser || instance->aov_mode) {
+  if (instance->denoiser) {
     device_buffer_free(instance->albedo_buffer);
     device_buffer_free(instance->normal_buffer);
   }
@@ -859,19 +856,18 @@ void raytrace_update_device_scene(RaytraceInstance* instance) {
 }
 
 DeviceBuffer* raytrace_get_accumulate_buffer(RaytraceInstance* instance, OutputVariable output_variable) {
-  // TODO: This no longer makes sense.
   switch (output_variable) {
     default:
     case OUTPUT_VARIABLE_BEAUTY:
       return instance->frame_accumulate;
-    case OUTPUT_VARIABLE_ALBEDO_GUIDANCE:
-      return instance->albedo_buffer;
-    case OUTPUT_VARIABLE_NORMAL_GUIDANCE:
-      return instance->normal_buffer;
     case OUTPUT_VARIABLE_DIRECT_LIGHTING:
       return instance->frame_direct_accumulate;
     case OUTPUT_VARIABLE_INDIRECT_LIGHTING:
       return instance->frame_indirect_accumulate;
+    case OUTPUT_VARIABLE_ALBEDO_GUIDANCE:
+      return instance->albedo_buffer;
+    case OUTPUT_VARIABLE_NORMAL_GUIDANCE:
+      return instance->normal_buffer;
   }
 }
 
@@ -880,13 +876,13 @@ const char* raytrace_get_output_variable_name(OutputVariable output_variable) {
     default:
     case OUTPUT_VARIABLE_BEAUTY:
       return "beauty";
-    case OUTPUT_VARIABLE_ALBEDO_GUIDANCE:
-      return "albedo";
-    case OUTPUT_VARIABLE_NORMAL_GUIDANCE:
-      return "normal";
     case OUTPUT_VARIABLE_DIRECT_LIGHTING:
       return "direct";
     case OUTPUT_VARIABLE_INDIRECT_LIGHTING:
       return "indirect";
+    case OUTPUT_VARIABLE_ALBEDO_GUIDANCE:
+      return "albedo";
+    case OUTPUT_VARIABLE_NORMAL_GUIDANCE:
+      return "normal";
   }
 }

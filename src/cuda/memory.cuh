@@ -138,7 +138,7 @@ __device__ void store_RGBF(RGBF* ptr, const RGBF a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if ((!device.denoiser && !device.aov_mode))
+  if (!device.denoiser)
     return;
 
   if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
@@ -154,7 +154,7 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
 }
 
 __device__ void write_normal_buffer(const vec3 normal, const int pixel) {
-  if ((!device.denoiser && !device.aov_mode) || !IS_PRIMARY_RAY)
+  if (!device.denoiser || !IS_PRIMARY_RAY)
     return;
 
   // TODO: Fix this, this should store the normal if there is no normal stored already.
