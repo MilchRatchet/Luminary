@@ -15,6 +15,7 @@ void raytrace_execute(RaytraceInstance* instance);
 void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas tex_atlas, Scene* scene, CommandlineOptions options);
 void raytrace_reset(RaytraceInstance* instance);
 void raytrace_prepare(RaytraceInstance* instance);
+void raytrace_increment(RaytraceInstance* instance);
 void raytrace_build_structures(RaytraceInstance* instance);
 void raytrace_update_device_pointers(RaytraceInstance* instance);
 void raytrace_allocate_buffers(RaytraceInstance* instance);

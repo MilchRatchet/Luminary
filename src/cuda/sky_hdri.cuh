@@ -55,7 +55,7 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
     RGBF result;
     float variance;
     float alpha;
-    if (device.temporal_frames) {
+    if (device.temporal_frames != 0.0f) {
       float4 data = __ldcs(dst + pixel);
       alpha       = __ldcs(dst_alpha + pixel);
 
@@ -150,7 +150,8 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   device_update_symbol(depth, depth);
 
   for (int i = 0; i < instance->scene.sky.hdri_samples; i++) {
-    device_update_symbol(temporal_frames, i);
+    const float temporal_frames = (float) i;
+    device_update_symbol(temporal_frames, temporal_frames);
     print_info_inline("HDRI Progress: %i/%i", i, instance->scene.sky.hdri_samples);
     sky_hdri_compute_hdri_lut<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((float4*) luts_hdri_tex[0].data, (float*) luts_hdri_tex[1].data);
     gpuErrchk(cudaDeviceSynchronize());

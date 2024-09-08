@@ -1,47 +1,43 @@
 #ifndef CU_TEMPORAL_H
 #define CU_TEMPORAL_H
 
+#include "math.cuh"
 #include "structs.h"
 #include "utils.cuh"
 
 // TODO: Refactor this into a separate file, the idea of "temporal" is long gone now that reprojection is gone. While we are at it, get rid
 // of the legacy naming of "temporal frames".
 
-// This is a gaussian filter with a sigma of 0.4 and a radius of 2. I cut out a lot of the terms
-// because they were negligible.
-__device__ float temporal_gather_pixel_weight(const RGBF pixel, const float x, const float y) {
-  const float weight_x = expf(-(x * x) * 3.125f);
-  const float weight_y = expf(-(y * y) * 3.125f);
-
-  return weight_x * weight_y;
+// Simple tent filter.
+__device__ float temporal_gather_pixel_weight(const float x, const float y) {
+  return (1.0f - x) * (1.0f - y);
 }
 
 __device__ RGBF temporal_gather_pixel_load(
-  const RGBF* image, const int width, const int height, const float sx, const float sy, const int i, const int j) {
-  const int index_x = ((int) sx) + i;
-  const int index_y = ((int) sy) + j;
+  const RGBF* image, const uint32_t width, const uint32_t height, const float pixel_x, const float pixel_y, const float sample_x,
+  const float sample_y) {
+  const uint32_t index_x = (uint32_t) max(min((int32_t) sample_x, width - 1), 0);
+  const uint32_t index_y = (uint32_t) max(min((int32_t) sample_y, height - 1), 0);
 
-  if (index_x < 0 || index_x >= width || index_y < 0 || index_y >= height)
-    return get_color(0.0f, 0.0f, 0.0f);
-
-  const int index = index_x + index_y * width;
+  const uint32_t index = index_x + index_y * width;
 
   const RGBF pixel = load_RGBF(image + index);
 
-  const float rx = fabsf(sx - index_x);
-  const float ry = fabsf(sy - index_y);
+  const float rx = fabsf(pixel_x - sample_x);
+  const float ry = fabsf(pixel_y - sample_y);
 
-  return scale_color(pixel, temporal_gather_pixel_weight(pixel, rx, ry));
+  return scale_color(pixel, temporal_gather_pixel_weight(rx, ry));
 }
 
-__device__ RGBF temporal_gather_pixel(const RGBF* image, const float x, const float y, const int width, const int height) {
+__device__ RGBF temporal_gather_pixel(
+  const RGBF* image, const float pixel_x, const float pixel_y, const float base_x, const float base_y, const uint32_t width,
+  const uint32_t height) {
   RGBF result = get_color(0.0f, 0.0f, 0.0f);
 
-  for (int j = -1; j <= 2; j++) {
-    for (int i = -1; i <= 2; i++) {
-      result = add_color(result, temporal_gather_pixel_load(image, width, height, x, y, i, j));
-    }
-  }
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x, base_y));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x + 1.0f, base_y));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x, base_y + 1.0f));
+  result = add_color(result, temporal_gather_pixel_load(image, width, height, pixel_x, pixel_y, base_x + 1.0f, base_y + 1.0f));
 
   return result;
 }
@@ -51,10 +47,10 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
     // Debug code to identify paths that cause NaNs and INFs
 #if 0
       ushort2 pixel;
-      pixel.y = (uint16_t) (offset / device.width);
-      pixel.x = (uint16_t) (offset - pixel.y * device.width);
+      pixel.y = (uint16_t) (offset / device.internal_width);
+      pixel.x = (uint16_t) (offset - pixel.y * device.internal_width);
       printf(
-        "Path at (%u, %u) on frame %u ran into a NaN or INF: (%f %f %f)\n", pixel.x, pixel.y, device.temporal_frames, sample.r, sample.g,
+        "Path at (%u, %u) on frame %u ran into a NaN or INF: (%f %f %f)\n", pixel.x, pixel.y, (uint32_t) device.temporal_frames, sample.r, sample.g,
         sample.b);
 #endif
 
@@ -64,70 +60,86 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
   return sample;
 }
 
+__device__ float temporal_increment() {
+  const uint32_t undersampling_scale = (1 << device.undersampling) * (1 << device.undersampling);
+
+  return 1.0f / undersampling_scale;
+}
+
 LUMINARY_KERNEL void temporal_accumulation() {
-  const int amount = device.width * device.height;
+  const uint32_t amount = device.internal_width * device.internal_height;
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
-  for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
-    const int y = offset / device.width;
-    const int x = offset - y * device.width;
+  const float increment = temporal_increment();
 
-    const float sx = x + jitter.x;
-    const float sy = y + jitter.y;
+  const bool load_accumulate = (device.temporal_frames >= 1.0f);
+  const float prev_scale     = device.temporal_frames;
+  const float curr_inv_scale = 1.0f / fmaxf(1.0f, device.temporal_frames + increment);
+
+  for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+    const uint32_t y = offset / device.internal_width;
+    const uint32_t x = offset - y * device.internal_width;
+
+    const float pixel_x = x + 0.5f;
+    const float pixel_y = y + 0.5f;
+
+    const float base_x = floorf(x - (jitter.x - 0.5f)) + jitter.x;
+    const float base_y = floorf(y - (jitter.y - 0.5f)) + jitter.y;
 
     // Direct Lighting
-    RGBF direct_buffer = temporal_gather_pixel(device.ptrs.frame_direct_buffer, sx, sy, device.width, device.height);
-    RGBF direct_output = load_RGBF(device.ptrs.frame_direct_accumulate + offset);
+    RGBF direct_buffer = temporal_gather_pixel(
+      device.ptrs.frame_direct_buffer, pixel_x, pixel_y, base_x, base_y, device.internal_width, device.internal_height);
+    RGBF direct_output = (load_accumulate) ? load_RGBF(device.ptrs.frame_direct_accumulate + offset) : get_color(0.0f, 0.0f, 0.0f);
 
     direct_buffer = temporal_reject_invalid_sample(direct_buffer, offset);
 
-    direct_output = scale_color(direct_output, device.temporal_frames);
+    direct_output = scale_color(direct_output, prev_scale);
     direct_output = add_color(direct_buffer, direct_output);
-    direct_output = scale_color(direct_output, 1.0f / (device.temporal_frames + 1));
+    direct_output = scale_color(direct_output, curr_inv_scale);
 
     store_RGBF(device.ptrs.frame_direct_accumulate + offset, direct_output);
 
     // Indirect Lighting
-    RGBF indirect_buffer = temporal_gather_pixel(device.ptrs.frame_indirect_buffer, sx, sy, device.width, device.height);
-    RGBF indirect_output = load_RGBF(device.ptrs.frame_indirect_accumulate + offset);
+    RGBF indirect_buffer = temporal_gather_pixel(
+      device.ptrs.frame_indirect_buffer, pixel_x, pixel_y, base_x, base_y, device.internal_width, device.internal_height);
+    RGBF indirect_output = (load_accumulate) ? load_RGBF(device.ptrs.frame_indirect_accumulate + offset) : get_color(0.0f, 0.0f, 0.0f);
 
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
-    float variance = (device.temporal_frames == 0) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
+    // Firefly clamping only takes effect after undersampling has stopped.
+    if (device.scene.camera.do_firefly_clamping && device.temporal_frames >= 1.0f) {
+      float variance = (device.temporal_frames < 2.0f) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
-    if (device.scene.camera.do_firefly_clamping) {
       float luminance_buffer = color_importance(indirect_buffer);
       float luminance_output = color_importance(indirect_output);
 
       const float deviation = fminf(0.1f, sqrtf(fmaxf(variance, eps)));
 
-      if (device.temporal_frames) {
-        variance *= device.temporal_frames - 1.0f;
+      variance *= device.temporal_frames - 1.0f;
 
-        float diff = luminance_buffer - luminance_output;
-        diff       = diff * diff;
+      float diff = luminance_buffer - luminance_output;
+      diff       = diff * diff;
 
-        // Hard firefly rejection.
-        // Fireflies that appear during the first frame are accepted by our method since there is
-        // no reference yet to reject them from. This trick here hard rejects them by taking the
-        // dimmer of the two frames. This is not unbiased but since it only happens exactly once
-        // the bias will decrease with the number of frames.
-        // Taking neighbouring pixels as reference is not the target since I want to consider each
-        // pixel as its own independent entity to preserve fine details.
-        // TODO: Improve this method to remove the visible dimming during the second frame.
-        if (device.temporal_frames == 1) {
-          float min_luminance = fminf(luminance_buffer, luminance_output);
+      // Hard firefly rejection.
+      // Fireflies that appear during the first frame are accepted by our method since there is
+      // no reference yet to reject them from. This trick here hard rejects them by taking the
+      // dimmer of the two frames. This is not unbiased but since it only happens exactly once
+      // the bias will decrease with the number of frames.
+      // Taking neighbouring pixels as reference is not the target since I want to consider each
+      // pixel as its own independent entity to preserve fine details.
+      // TODO: Improve this method to remove the visible dimming during the second frame.
+      if (device.temporal_frames < 2.0f) {
+        const float min_luminance = fminf(luminance_buffer, luminance_output);
 
-          indirect_output =
-            (luminance_output > eps) ? scale_color(indirect_output, min_luminance / luminance_output) : get_color(0.0f, 0.0f, 0.0f);
-          indirect_buffer =
-            (luminance_buffer > eps) ? scale_color(indirect_buffer, min_luminance / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
-        }
-
-        variance += diff;
-        variance *= 1.0f / device.temporal_frames;
+        indirect_output =
+          (luminance_output > eps) ? scale_color(indirect_output, min_luminance / luminance_output) : get_color(0.0f, 0.0f, 0.0f);
+        indirect_buffer =
+          (luminance_buffer > eps) ? scale_color(indirect_buffer, min_luminance / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
       }
+
+      variance += diff;
+      variance *= 1.0f / device.temporal_frames;
 
       __stcs(device.ptrs.frame_variance + offset, variance);
 
@@ -138,9 +150,9 @@ LUMINARY_KERNEL void temporal_accumulation() {
         (luminance_buffer > eps) ? scale_color(indirect_buffer, new_luminance_buffer / luminance_buffer) : get_color(0.0f, 0.0f, 0.0f);
     }
 
-    indirect_output = scale_color(indirect_output, device.temporal_frames);
+    indirect_output = scale_color(indirect_output, prev_scale);
     indirect_output = add_color(indirect_buffer, indirect_output);
-    indirect_output = scale_color(indirect_output, 1.0f / (device.temporal_frames + 1));
+    indirect_output = scale_color(indirect_output, curr_inv_scale);
 
     store_RGBF(device.ptrs.frame_indirect_accumulate + offset, indirect_output);
 
@@ -151,15 +163,17 @@ LUMINARY_KERNEL void temporal_accumulation() {
 }
 
 LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) {
-  const int amount = device.width * device.height;
+  const uint32_t amount = device.internal_width * device.internal_height;
 
-  for (int offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
+  const float increment = temporal_increment();
+
+  for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBF input  = load_RGBF(buffer + offset);
-    RGBF output = (device.temporal_frames == 0) ? input : load_RGBF(accumulate + offset);
+    RGBF output = (device.temporal_frames == 0.0f) ? input : load_RGBF(accumulate + offset);
 
-    output = scale_color(output, device.temporal_frames);
+    output = scale_color(output, ceilf(device.temporal_frames));
     output = add_color(input, output);
-    output = scale_color(output, 1.0f / (device.temporal_frames + 1));
+    output = scale_color(output, 1.0f / (device.temporal_frames + increment));
 
     store_RGBF(accumulate + offset, output);
   }

@@ -31,10 +31,10 @@ LUMINARY_KERNEL void volume_process_events() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const int offset    = get_task_address(i);
-    TraceTask task      = load_trace_task(device.ptrs.trace_tasks + offset);
-    const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
-    const int pixel     = task.index.y * device.width + task.index.x;
+    const int offset     = get_task_address(i);
+    TraceTask task       = load_trace_task(device.ptrs.trace_tasks + offset);
+    const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
+    const uint32_t pixel = get_pixel_id(task.index);
 
     float depth     = result.x;
     uint32_t hit_id = __float_as_uint(result.y);

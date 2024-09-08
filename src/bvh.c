@@ -1367,7 +1367,7 @@ static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
   free(traversal_triangles);
 
   instance->luminary_bvh_initialized = 1;
-  instance->temporal_frames          = 0;
+  instance->temporal_frames          = 0.0f;
 }
 
 static void _bvh_clear_work(BVHWork* work) {

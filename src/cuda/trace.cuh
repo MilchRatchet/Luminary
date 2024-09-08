@@ -6,7 +6,7 @@
 #include "utils.cuh"
 
 __device__ TraceResult trace_preprocess(const TraceTask task) {
-  const uint32_t pixel = get_pixel_id(task.index.x, task.index.y);
+  const uint32_t pixel = get_pixel_id(task.index);
 
   float depth     = device.scene.camera.far_clip_distance;
   uint32_t hit_id = HIT_TYPE_SKY;
@@ -18,7 +18,7 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
     TraversalTriangle tt;
     uint32_t material_id;
 
-    t_id = device.ptrs.trace_result_buffer[get_pixel_id(task.index.x, task.index.y)].hit_id;
+    t_id = device.ptrs.hit_id_history[get_pixel_id(task.index)];
     if (t_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
       material_id = load_triangle_material_id(t_id);
 

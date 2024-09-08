@@ -36,7 +36,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 
   char* title = (char*) malloc(4096);
 
-  RGBF* gpu_output   = device_buffer_get_pointer(instance->frame_output);
+  RGBF* gpu_output   = device_buffer_get_pointer(instance->frame_post);
   XRGB8* gpu_scratch = device_buffer_get_pointer(window->gpu_buffer);
 
   while (!exit) {
@@ -44,13 +44,14 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 
     raytrace_update_device_scene(instance);
 
-    DeviceBuffer* base_output_image = instance->frame_accumulate;
+    DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, OUTPUT_VARIABLE_BEAUTY);
     if (instance->denoiser) {
       base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
     }
 
-    device_buffer_copy(base_output_image, instance->frame_output);
+    device_buffer_copy(base_output_image, instance->frame_post);
     device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), gpu_output);
+
     device_copy_framebuffer_to_8bit(
       gpu_output, gpu_scratch, window->buffer, window->width, window->height, window->ld, OUTPUT_VARIABLE_BEAUTY);
 
@@ -100,25 +101,29 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 }
 
 void offline_output(RaytraceInstance* instance) {
+  // TODO: Make this cleaner with the host side rework. This is a hack to disable undersampling in offline rendering.
+  instance->undersampling_setting = 0;
+
   raytrace_prepare(instance);
   const clock_t start_of_rt       = clock();
   clock_t last_frame              = start_of_rt;
   double moving_average_frametime = 0.0;
   bench_tic("Raytracing");
-  for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; instance->temporal_frames++) {
+  for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; raytrace_increment(instance)) {
     raytrace_execute(instance);
     raytrace_update_ray_emitter(instance);
 
     const clock_t current_frame = clock();
-    const double progress       = ((double) (instance->temporal_frames + 1)) / instance->offline_samples;
+    const double progress       = ((double) (instance->temporal_frames + 1.0f)) / instance->offline_samples;
     const double time_elapsed   = ((double) (current_frame - start_of_rt)) / CLOCKS_PER_SEC;
     const double frametime      = ((double) (current_frame - last_frame)) / CLOCKS_PER_SEC;
-    moving_average_frametime    = (instance->temporal_frames == 0) ? frametime : 0.9 * moving_average_frametime + 0.1 * frametime;
-    const double time_left      = (instance->offline_samples - (instance->temporal_frames + 1)) * moving_average_frametime;
+    moving_average_frametime    = (instance->temporal_frames == 0.0f) ? frametime : 0.9 * moving_average_frametime + 0.1 * frametime;
+    const double time_left      = (instance->offline_samples - (instance->temporal_frames + 1.0f)) * moving_average_frametime;
 
+    // Frametime is divided by 4 to account for supersampling.
     print_info_inline(
       "Progress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Frametime: %.1f ms", 100.0 * progress, time_elapsed, time_left,
-      1000.0f * moving_average_frametime);
+      1000.0f * moving_average_frametime * 0.25f);
     last_frame = current_frame;
   }
 
@@ -127,36 +132,36 @@ void offline_output(RaytraceInstance* instance) {
   raytrace_free_work_buffers(instance);
 
   // Create final image based on current settings
-  DeviceBuffer* base_output_image = instance->frame_accumulate;
+  DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, OUTPUT_VARIABLE_BEAUTY);
   if (instance->denoiser) {
     denoise_create(instance);
-    base_output_image = denoise_apply(instance, device_buffer_get_pointer(instance->frame_accumulate));
+    base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
   }
 
-  device_buffer_copy(base_output_image, instance->frame_output);
-  device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
+  device_buffer_copy(base_output_image, instance->frame_post);
+  device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_post));
 
   DeviceBuffer* scratch_buffer = (DeviceBuffer*) 0;
   device_buffer_init(&scratch_buffer);
-  device_buffer_malloc(scratch_buffer, sizeof(XRGB8), instance->output_width * instance->output_height);
-  XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->output_width * instance->output_height);
+  device_buffer_malloc(scratch_buffer, sizeof(XRGB8), instance->width * instance->height);
+  XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
   char* output_path = malloc(4096);
 
   // Post Process Menu stores a backup of the current image, after the user is done the final output image is stored.
   if (instance->post_process_menu) {
     device_copy_framebuffer_to_8bit(
-      device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
-      instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
+      device_buffer_get_pointer(instance->frame_post), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
+      instance->width, OUTPUT_VARIABLE_BEAUTY);
 
     switch (instance->image_format) {
       case IMGFORMAT_QOI:
         sprintf(output_path, "%s.qoi1", instance->settings.output_path);
-        store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
+        store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
         break;
       case IMGFORMAT_PNG:
       default:
         sprintf(output_path, "%s.png1", instance->settings.output_path);
-        png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
+        png_store_XRGB8(output_path, frame, instance->width, instance->height);
         break;
     }
 
@@ -168,45 +173,21 @@ void offline_output(RaytraceInstance* instance) {
   }
 
   device_copy_framebuffer_to_8bit(
-    device_buffer_get_pointer(instance->frame_output), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
-    instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
+    device_buffer_get_pointer(instance->frame_post), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
+    instance->width, OUTPUT_VARIABLE_BEAUTY);
 
   switch (instance->image_format) {
     case IMGFORMAT_QOI:
       sprintf(output_path, "%s.qoi", instance->settings.output_path);
-      store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
+      store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
       info_message("QOI file created.");
       break;
     case IMGFORMAT_PNG:
     default:
       sprintf(output_path, "%s.png", instance->settings.output_path);
-      png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
+      png_store_XRGB8(output_path, frame, instance->width, instance->height);
       info_message("PNG file created.");
       break;
-  }
-
-  if (instance->aov_mode) {
-    for (OutputVariable variable = OUTPUT_VARIABLE_ALBEDO_GUIDANCE; variable < OUTPUT_VARIABLE_COUNT; variable++) {
-      device_copy_framebuffer_to_8bit(
-        device_buffer_get_pointer(raytrace_get_accumulate_buffer(instance, variable)), device_buffer_get_pointer(scratch_buffer), frame,
-        instance->output_width, instance->output_height, instance->output_width, variable);
-
-      const char* var_name = raytrace_get_output_variable_name(variable);
-
-      switch (instance->image_format) {
-        case IMGFORMAT_QOI:
-          sprintf(output_path, "%s_%s.qoi", instance->settings.output_path, var_name);
-          store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
-          info_message("QOI file created. (%s)", var_name);
-          break;
-        case IMGFORMAT_PNG:
-        default:
-          sprintf(output_path, "%s_%s.png", instance->settings.output_path, var_name);
-          png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
-          info_message("PNG file created. (%s)", var_name);
-          break;
-      }
-    }
   }
 
   device_buffer_destroy(&scratch_buffer);
@@ -256,8 +237,8 @@ static void make_snapshot(RaytraceInstance* instance, WindowInstance* window, RG
       height = window->height;
       break;
     case SNAP_RESOLUTION_RENDER:
-      width  = (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) ? instance->output_width : instance->width;
-      height = (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) ? instance->output_height : instance->height;
+      width  = instance->width;
+      height = instance->height;
       buffer = malloc(sizeof(XRGB8) * width * height);
       void* gpu_scratch;
       device_malloc(&gpu_scratch, sizeof(XRGB8) * width * height);
@@ -303,7 +284,7 @@ void realtime_output(RaytraceInstance* instance) {
   Frametime frametime_total = init_frametime();
   UI ui                     = init_UI(instance, window);
 
-  instance->temporal_frames = 0;
+  instance->temporal_frames = 0.0f;
 
   float mouse_x_speed = 0.0f;
   float mouse_y_speed = 0.0f;
@@ -331,14 +312,14 @@ void realtime_output(RaytraceInstance* instance) {
       DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, instance->output_variable);
 
       if (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) {
-        if (instance->denoiser) {
-          base_output_image = denoise_apply(instance, device_buffer_get_pointer(instance->frame_accumulate));
+        if (instance->denoiser && instance->undersampling == 0) {
+          base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
         }
 
-        device_buffer_copy(base_output_image, instance->frame_output);
-        device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_output));
+        device_buffer_copy(base_output_image, instance->frame_post);
+        device_camera_post_apply(instance, device_buffer_get_pointer(base_output_image), device_buffer_get_pointer(instance->frame_post));
 
-        output_image = instance->frame_output;
+        output_image = instance->frame_post;
       }
       else {
         output_image = base_output_image;
@@ -351,7 +332,7 @@ void realtime_output(RaytraceInstance* instance) {
 
     sample_frametime(&frametime_post);
 
-    instance->temporal_frames++;
+    raytrace_increment(instance);
 
     SDL_PumpEvents();
 
@@ -371,7 +352,7 @@ void realtime_output(RaytraceInstance* instance) {
           mouse_x_diff += event.motion.yrel * (-0.005f) * instance->scene.camera.mouse_speed;
 
           if (event.motion.xrel || event.motion.yrel)
-            instance->temporal_frames = 0;
+            instance->temporal_frames = 0.0f;
         }
       }
       else if (event.type == SDL_MOUSEWHEEL) {
@@ -403,7 +384,7 @@ void realtime_output(RaytraceInstance* instance) {
       instance->scene.camera.rotation.x += mouse_x_speed;
       instance->scene.camera.rotation.y += mouse_y_speed;
 
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
 
       if (instance->scene.camera.smooth_movement) {
         mouse_x_speed -= mouse_x_speed * instance->scene.camera.smoothing_factor * instance->scene.camera.mouse_speed;
@@ -453,7 +434,8 @@ void realtime_output(RaytraceInstance* instance) {
       total_time, trace_time, ui_time, post_time, device_memory_usage() * (1.0 / (1024.0 * 1024.0 * 1024.0)),
       device_memory_limit() * (1.0 / (1024.0 * 1024.0 * 1024.0)));
 
-    const double normalized_time = total_time / 16.66667;
+    // TODO: Remove this hack once the UI rework is done.
+    const double normalized_time = total_time / (16.66667 * (1 << (2 * (instance->undersampling_setting - instance->undersampling))));
 
     SDL_SetWindowTitle(window->window, title);
     SDL_UpdateWindowSurface(window->window);
@@ -483,43 +465,43 @@ void realtime_output(RaytraceInstance* instance) {
 
     if (keystate[SDL_SCANCODE_LEFT]) {
       instance->scene.sky.azimuth -= 0.005f * normalized_time;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_RIGHT]) {
       instance->scene.sky.azimuth += 0.005f * normalized_time;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_UP]) {
       instance->scene.sky.altitude += 0.005f * normalized_time;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_DOWN]) {
       instance->scene.sky.altitude -= 0.005f * normalized_time;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_W]) {
       movement_vector.z -= 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_A]) {
       movement_vector.x -= 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_S]) {
       movement_vector.z += 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_D]) {
       movement_vector.x += 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_LCTRL]) {
       movement_vector.y -= 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_SPACE]) {
       movement_vector.y += 1.0f;
-      instance->temporal_frames = 0;
+      instance->temporal_frames = 0.0f;
     }
     if (keystate[SDL_SCANCODE_LSHIFT]) {
       shift_pressed = 2;

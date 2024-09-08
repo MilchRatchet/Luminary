@@ -679,7 +679,7 @@ LUMINARY_KERNEL void process_sky_tasks() {
 
   for (int i = 0; i < task_count; i++) {
     const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel        = task.index.y * device.width + task.index.x;
+    const uint32_t pixel   = get_pixel_id(task.index);
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
@@ -700,7 +700,7 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
 
   for (int i = 0; i < task_count; i++) {
     const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel        = task.index.y * device.width + task.index.x;
+    const uint32_t pixel   = get_pixel_id(task.index);
 
     if (device.shading_mode == SHADING_ALBEDO) {
       RGBF sky = sky_color_main(task.position, task.ray, pixel, task.index);

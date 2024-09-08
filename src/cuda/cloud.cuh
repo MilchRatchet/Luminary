@@ -321,7 +321,7 @@ LUMINARY_KERNEL void clouds_render_tasks() {
     const float depth        = __ldcs((float*) (device.ptrs.trace_results + offset));
     vec3 sky_origin          = world_to_sky_transform(task.origin);
     const float sky_max_dist = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
-    const int pixel          = task.index.y * device.width + task.index.x;
+    const uint32_t pixel     = get_pixel_id(task.index);
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
     RGBF color  = get_color(0.0f, 0.0f, 0.0f);

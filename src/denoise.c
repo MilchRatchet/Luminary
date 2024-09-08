@@ -31,17 +31,12 @@ void denoise_create(RaytraceInstance* instance) {
 
   switch (instance->denoiser) {
     case DENOISING_ON:
+    case DENOISING_UPSCALING:
       // We only need OPTIX_DENOISER_MODEL_KIND_HDR, however, a forum post by Nvidia
       // (https://forums.developer.nvidia.com/t/optix-8-0-denoiser-camera-space-vs-world-space/262875/2) suggests that these are legacy and
       // no longer being improved. This is not documented anywhere else but we use the AOV model instead then.
       kind = OPTIX_DENOISER_MODEL_KIND_AOV;
       break;
-    case DENOISING_UPSCALING: {
-      if (instance->width * instance->height > 18144000) {
-        crash_message("Internal resolution is too high for denoising! The maximum is ~18144000 pixels.");
-      }
-      kind = OPTIX_DENOISER_MODEL_KIND_UPSCALE2X;
-    } break;
     default:
       instance->denoiser = DENOISING_OFF;
       return;
@@ -55,8 +50,8 @@ void denoise_create(RaytraceInstance* instance) {
 
   OPTIX_CHECK(optixDenoiserCreate(instance->optix_ctx, kind, &denoise_setup->opt, &denoise_setup->denoiser));
 
-  OPTIX_CHECK(
-    optixDenoiserComputeMemoryResources(denoise_setup->denoiser, instance->width, instance->height, &denoise_setup->denoiserReturnSizes));
+  OPTIX_CHECK(optixDenoiserComputeMemoryResources(
+    denoise_setup->denoiser, instance->internal_width, instance->internal_height, &denoise_setup->denoiserReturnSizes));
 
   device_buffer_init(&denoise_setup->denoiserState);
   device_buffer_malloc(denoise_setup->denoiserState, denoise_setup->denoiserReturnSizes.stateSizeInBytes, 1);
@@ -70,35 +65,35 @@ void denoise_create(RaytraceInstance* instance) {
   device_buffer_malloc(denoise_setup->denoiserScratch, scratchSize, 1);
 
   OPTIX_CHECK(optixDenoiserSetup(
-    denoise_setup->denoiser, 0, instance->width, instance->height, (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserState),
-    device_buffer_get_size(denoise_setup->denoiserState), (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserScratch),
-    device_buffer_get_size(denoise_setup->denoiserScratch)));
+    denoise_setup->denoiser, 0, instance->internal_width, instance->internal_height,
+    (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserState), device_buffer_get_size(denoise_setup->denoiserState),
+    (CUdeviceptr) device_buffer_get_pointer(denoise_setup->denoiserScratch), device_buffer_get_size(denoise_setup->denoiserScratch)));
 
   denoise_setup->layer.input.data               = (CUdeviceptr) 0;
-  denoise_setup->layer.input.width              = instance->width;
-  denoise_setup->layer.input.height             = instance->height;
-  denoise_setup->layer.input.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  denoise_setup->layer.input.width              = instance->internal_width;
+  denoise_setup->layer.input.height             = instance->internal_height;
+  denoise_setup->layer.input.rowStrideInBytes   = instance->internal_width * sizeof(RGBF);
   denoise_setup->layer.input.pixelStrideInBytes = sizeof(RGBF);
   denoise_setup->layer.input.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   denoise_setup->layer.output.data               = (CUdeviceptr) 0;
-  denoise_setup->layer.output.width              = instance->output_width;
-  denoise_setup->layer.output.height             = instance->output_height;
-  denoise_setup->layer.output.rowStrideInBytes   = instance->output_width * sizeof(RGBF);
+  denoise_setup->layer.output.width              = instance->internal_width;
+  denoise_setup->layer.output.height             = instance->internal_height;
+  denoise_setup->layer.output.rowStrideInBytes   = instance->internal_width * sizeof(RGBF);
   denoise_setup->layer.output.pixelStrideInBytes = sizeof(RGBF);
   denoise_setup->layer.output.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   denoise_setup->guide_layer.albedo.data               = (CUdeviceptr) device_buffer_get_pointer(instance->albedo_buffer);
-  denoise_setup->guide_layer.albedo.width              = instance->width;
-  denoise_setup->guide_layer.albedo.height             = instance->height;
-  denoise_setup->guide_layer.albedo.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  denoise_setup->guide_layer.albedo.width              = instance->internal_width;
+  denoise_setup->guide_layer.albedo.height             = instance->internal_height;
+  denoise_setup->guide_layer.albedo.rowStrideInBytes   = instance->internal_width * sizeof(RGBF);
   denoise_setup->guide_layer.albedo.pixelStrideInBytes = sizeof(RGBF);
   denoise_setup->guide_layer.albedo.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
   denoise_setup->guide_layer.normal.data               = (CUdeviceptr) device_buffer_get_pointer(instance->normal_buffer);
-  denoise_setup->guide_layer.normal.width              = instance->width;
-  denoise_setup->guide_layer.normal.height             = instance->height;
-  denoise_setup->guide_layer.normal.rowStrideInBytes   = instance->width * sizeof(RGBF);
+  denoise_setup->guide_layer.normal.width              = instance->internal_width;
+  denoise_setup->guide_layer.normal.height             = instance->internal_height;
+  denoise_setup->guide_layer.normal.rowStrideInBytes   = instance->internal_width * sizeof(RGBF);
   denoise_setup->guide_layer.normal.pixelStrideInBytes = sizeof(RGBF);
   denoise_setup->guide_layer.normal.format             = OPTIX_PIXEL_FORMAT_FLOAT3;
 
@@ -200,7 +195,7 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
   if (isnan(brightness) || isinf(brightness) || brightness < 0.0f)
     return exposure;
 
-  const float lerp_factor = 0.2f * (1.0f - 1.0f / (1 + instance->temporal_frames));
+  const float lerp_factor = 0.2f * (1.0f - 1.0f / (1.0f + instance->temporal_frames));
 
   const float min_exposure = instance->scene.camera.min_exposure;
   const float max_exposure = instance->scene.camera.max_exposure;

@@ -23,7 +23,7 @@ void handle_mouse_UIPanel_dropdown(UI* ui, UIPanel* panel, int mouse_state, int 
         if (SDL_BUTTON_LMASK & mouse_state) {
           *((int*) panel->data) = y;
           if (panel->voids_frames)
-            *(ui->temporal_frames) = 0;
+            *(ui->temporal_frames) = 0.0f;
         }
       }
     }

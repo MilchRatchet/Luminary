@@ -31,7 +31,7 @@ void handle_mouse_UIPanel_slider(UI* ui, UIPanel* panel, int mouse_state, int x,
     }
 
     if (panel->voids_frames && ui->mouse_xrel)
-      *(ui->temporal_frames) = 0;
+      *(ui->temporal_frames) = 0.0f;
   }
 }
 

@@ -1,5 +1,6 @@
 #include "UI_info.h"
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,11 +38,23 @@ static void rerender_data_text(UI* ui, UIPanel* panel) {
     } break;
     case PANEL_INFO_TYPE_FP32: {
       const float value = *((float*) panel->data);
-      sprintf(buffer, "%.2f", value);
+
+      if (fabsf(value - truncf(value)) < 1e-3f) {
+        sprintf(buffer, "%u", (uint32_t) value);
+      }
+      else {
+        sprintf(buffer, "%.2f", value);
+      }
     } break;
     case PANEL_INFO_TYPE_FP64: {
       const double value = *((double*) panel->data);
-      sprintf(buffer, "%.2f", value);
+
+      if (fabs(value - trunc(value)) < 1e-3) {
+        sprintf(buffer, "%u", (uint32_t) value);
+      }
+      else {
+        sprintf(buffer, "%.2f", value);
+      }
     } break;
   }
 

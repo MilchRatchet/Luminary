@@ -26,7 +26,7 @@ extern "C" __global__ void __raygen__optix() {
 
   for (int i = 0; i < task_count; i++) {
     const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel        = task.index.y * device.width + task.index.x;
+    const int pixel        = get_pixel_id(task.index);
 
     GBufferData data;
     if (task.hit_id == HIT_TYPE_TOY) {

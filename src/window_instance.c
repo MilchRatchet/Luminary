@@ -25,10 +25,10 @@ WindowInstance* window_instance_init(RaytraceInstance* instance) {
 
   rect.h -= 4 * taskbar_margin;
 
-  rect.w = min(rect.w, (int) instance->output_width);
-  rect.h = min(rect.h, (int) instance->output_height);
+  rect.w = min(rect.w, (int) instance->width);
+  rect.h = min(rect.h, (int) instance->height);
 
-  const float aspect_ratio = ((float) instance->output_width) / instance->output_height;
+  const float aspect_ratio = ((float) instance->width) / instance->height;
 
   // It seems SDL window dimensions must be a multiple of 4
   rect.h = rect.h & 0xfffffffc;

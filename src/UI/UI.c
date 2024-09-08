@@ -12,7 +12,6 @@
 #include "UI_info.h"
 #include "UI_panel.h"
 #include "UI_text.h"
-#include "baked.h"
 #include "device.h"
 #include "optixrt_particle.h"
 #include "output.h"
@@ -60,17 +59,22 @@ static UITab create_general_renderer_panels(UI* ui, RaytraceInstance* instance) 
   panels[i++] = create_dropdown(
     ui, "Shading Mode", &(instance->shading_mode), 1, 7, "Default\0Albedo\0Depth\0Normal\0Trace Heatmap\0Identification\0Lights", 9);
   panels[i++] = create_check(ui, "Accumulate", &(instance->accumulate), 1);
-  if (instance->aov_mode) {
+  if (instance->denoiser != DENOISING_OFF) {
     panels[i++] = create_dropdown(
       ui, "Output Variable", &(instance->output_variable), 0, 5,
-      "Beauty\0Albedo Guidance\0Normal Guidance\0Direct Lighting\0Indirect Lighting", 11);
+      "Beauty\0Direct Lighting\0Indirect Lighting\0Albedo Guidance\0Normal Guidance", 11);
   }
-  panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_INT32, PANEL_INFO_DYNAMIC);
+  else {
+    panels[i++] =
+      create_dropdown(ui, "Output Variable", &(instance->output_variable), 0, 3, "Beauty\0Direct Lighting\0Indirect Lighting", 11);
+  }
+  panels[i++] = create_info(ui, "Temporal Frames", &(instance->temporal_frames), PANEL_INFO_TYPE_FP32, PANEL_INFO_DYNAMIC);
   panels[i++] = create_info(ui, "Light Source Count", &(instance->scene.triangle_lights_count), PANEL_INFO_TYPE_INT32, PANEL_INFO_STATIC);
   panels[i++] = create_slider(ui, "RIS Samples", &(instance->ris_settings.initial_reservoir_size), 1, 0.02f, 0.0f, 32.0f, 0, 1);
   panels[i++] = create_slider(ui, "Light Ray Count", &(instance->ris_settings.num_light_rays), 1, 0.01f, 1.0f, 32.0f, 0, 1);
   panels[i++] = create_slider(ui, "Volume RIS Samples", &(instance->bridge_settings.num_ris_samples), 1, 0.02f, 1.0f, 32.0f, 0, 1);
   panels[i++] = create_slider(ui, "Volume DL Max Depth", &(instance->bridge_settings.max_num_vertices), 1, 0.02f, 1.0f, 8.0f, 0, 1);
+  panels[i++] = create_slider(ui, "Undersampling", &(instance->undersampling_setting), 1, 0.02f, 0.0f, 6.0f, 0, 1);
 
   tab.panels      = panels;
   tab.panel_count = i;
@@ -126,7 +130,6 @@ static UITab create_general_export_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_dropdown(ui, "Snapshot Resolution", &(instance->snap_resolution), 0, 2, "Window\0Render", 2);
   panels[i++] = create_dropdown(ui, "Output Image Format", &(instance->image_format), 0, 2, "PNG\0QOI", 3);
   panels[i++] = create_button(ui, "Export Settings", instance, (void (*)(void*)) scene_serialize, 0);
-  panels[i++] = create_button(ui, "Export Baked File", instance, (void (*)(void*)) serialize_baked, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

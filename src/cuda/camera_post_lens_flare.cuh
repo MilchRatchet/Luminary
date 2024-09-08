@@ -11,8 +11,8 @@
  */
 
 extern "C" void device_lens_flare_init(RaytraceInstance* instance) {
-  int width  = instance->output_width;
-  int height = instance->output_height;
+  int width  = instance->internal_width;
+  int height = instance->internal_height;
 
   instance->lens_flare_buffers_gpu = (RGBF**) malloc(sizeof(RGBF*) * LENS_FLARE_NUM_BUFFERS);
 
@@ -62,8 +62,8 @@ LUMINARY_KERNEL void _lens_flare_ghosts(const RGBF* source, const int sw, const 
 }
 
 static void _lens_flare_apply_ghosts(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
-  int width  = instance->output_width;
-  int height = instance->output_height;
+  int width  = instance->internal_width;
+  int height = instance->internal_height;
 
   _lens_flare_ghosts<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src, width >> 1, height >> 1, dst, width >> 1, height >> 1);
 }
@@ -133,15 +133,15 @@ LUMINARY_KERNEL void _lens_flare_halo(const RGBF* src, const int sw, const int s
 }
 
 static void _lens_flare_apply_halo(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
-  int width  = instance->output_width;
-  int height = instance->output_height;
+  int width  = instance->internal_width;
+  int height = instance->internal_height;
 
   _lens_flare_halo<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(src, width >> 1, height >> 1, dst, width >> 1, height >> 1);
 }
 
 extern "C" void device_lens_flare_apply(RaytraceInstance* instance, const RGBF* src, RGBF* dst) {
-  int width  = instance->output_width;
-  int height = instance->output_height;
+  int width  = instance->internal_width;
+  int height = instance->internal_height;
 
   if (!instance->lens_flare_buffers_gpu) {
     device_lens_flare_init(instance);
@@ -169,8 +169,8 @@ extern "C" void device_lens_flare_apply(RaytraceInstance* instance, const RGBF* 
 }
 
 extern "C" void device_lens_flare_clear(RaytraceInstance* instance) {
-  int width  = instance->output_width;
-  int height = instance->output_height;
+  int width  = instance->internal_width;
+  int height = instance->internal_height;
 
   device_free(instance->lens_flare_buffers_gpu[0], sizeof(RGBF) * width * height);
   device_free(instance->lens_flare_buffers_gpu[1], sizeof(RGBF) * (width >> 1) * (height >> 1));

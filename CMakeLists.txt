@@ -48,6 +48,7 @@ endif()
 # Set files to compile
 #=============================================================
 file(GLOB cpu_source_files "${CMAKE_SOURCE_DIR}/src/*.c" "${CMAKE_SOURCE_DIR}/src/zlib/*.c" "${CMAKE_SOURCE_DIR}/src/UI/*.c")
+file(GLOB cpu_header_files "${CMAKE_SOURCE_DIR}/include/*.h" "${CMAKE_SOURCE_DIR}/include/UI/*.h")
 file(GLOB gpu_source_files "${CMAKE_SOURCE_DIR}/src/*.cu")
 file(GLOB gpu_header_files "${CMAKE_SOURCE_DIR}/src/cuda/*.cuh")
 
@@ -196,6 +197,7 @@ function(compile_ptx kernel_name)
     DEPENDS
       "${CMAKE_CURRENT_SOURCE_DIR}/src/${kernel_name}.cu"
       "${gpu_header_files}"
+      "${cpu_header_files}"
     COMMENT
       "Compiling ${kernel_name}.ptx"
   )

@@ -138,15 +138,15 @@ __device__ void store_RGBF(RGBF* ptr, const RGBF a) {
  * @param pixel Index of pixel.
  */
 __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if ((!device.denoiser && !device.aov_mode))
+  if (!device.denoiser)
     return;
 
   if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
-    if (device.temporal_frames && device.accumulate) {
+    if (device.temporal_frames != 0.0f && device.accumulate) {
       RGBF out_albedo = device.ptrs.albedo_buffer[pixel];
       out_albedo      = scale_color(out_albedo, device.temporal_frames);
       albedo          = add_color(albedo, out_albedo);
-      albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1));
+      albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1.0f));
     }
 
     device.ptrs.albedo_buffer[pixel] = albedo;
@@ -154,10 +154,11 @@ __device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
 }
 
 __device__ void write_normal_buffer(const vec3 normal, const int pixel) {
-  if ((!device.denoiser && !device.aov_mode) || !IS_PRIMARY_RAY)
+  if (!device.denoiser || !IS_PRIMARY_RAY)
     return;
 
-  if (device.temporal_frames && device.accumulate)
+  // TODO: Fix this, this should store the normal if there is no normal stored already.
+  if (device.temporal_frames != 0.0f && device.accumulate)
     return;
 
   device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
@@ -212,9 +213,12 @@ __device__ void* interleaved_buffer_get_entry_address(
   return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
 }
 
+// TODO: Fix this to support undersampling if I need it.
+#if 0
 __device__ void* pixel_buffer_get_entry_address(void* ptr, const uint32_t chunk, const uint32_t offset, const uint32_t pixel) {
   return interleaved_buffer_get_entry_address(ptr, device.width * device.height, chunk, offset, pixel);
 }
+#endif
 
 __device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t tri_id) {
   return interleaved_buffer_get_entry_address(device.scene.triangles, device.scene.triangle_data.triangle_count, chunk, offset, tri_id);

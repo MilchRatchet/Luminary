@@ -11,8 +11,8 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
 
   for (int i = 0; i < task_count; i++) {
-    ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel  = task.index.y * device.width + task.index.x;
+    ShadingTask task     = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const uint32_t pixel = get_pixel_id(task.index);
 
     if (VOLUME_HIT_CHECK(task.hit_id))
       continue;
@@ -31,14 +31,6 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
       const vec3 normal = data.normal;
 
       write_beauty_buffer(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel, true);
-    }
-    else if (device.shading_mode == SHADING_HEAT) {
-      const float cost  = device.ptrs.trace_result_buffer[pixel].depth;
-      const float value = 0.1f * cost;
-      const float red   = __saturatef(2.0f * value);
-      const float green = __saturatef(2.0f * (value - 0.5f));
-      const float blue  = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
-      write_beauty_buffer(get_color(red, green, blue), pixel, true);
     }
     else if (device.shading_mode == SHADING_IDENTIFICATION) {
       const uint32_t v = random_uint32_t_base(0x55555555, task.hit_id);

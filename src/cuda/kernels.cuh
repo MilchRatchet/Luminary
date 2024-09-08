@@ -17,23 +17,72 @@
 #include "utils.cuh"
 #include "volume.cuh"
 
+//
+// Undersampling pattern:
+// The lowest undersampling pass is used 4 times
+// while the others are done 3 times.
+// Once all undersampling passes have been performed,
+// each pixel has exactly one sample and we continue
+// without undersampling. Example for 3 passes with
+// a 8x8 resolution.
+//
+//  3 | 1 | 2 | 1 | 3 | 1 | 2 | 1
+// ---+---+---+---+---+---+---+---
+//  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
+// ---+---+---+---+---+---+---+---
+//  2 | 1 | 2 | 1 | 2 | 1 | 2 | 1
+// ---+---+---+---+---+---+---+---
+//  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
+// ---+---+---+---+---+---+---+---
+//  3 | 1 | 2 | 1 | 3 | 1 | 2 | 1
+// ---+---+---+---+---+---+---+---
+//  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
+// ---+---+---+---+---+---+---+---
+//  2 | 1 | 2 | 1 | 2 | 1 | 2 | 1
+// ---+---+---+---+---+---+---+---
+//  1 | 1 | 1 | 1 | 1 | 1 | 1 | 1
+//
+
 // TODO: Turns this into a function and call this in the trace kernel if primary ray.
 LUMINARY_KERNEL void generate_trace_tasks() {
-  int offset       = 0;
-  const int amount = device.width * device.height;
+  uint32_t task_count = 0;
 
-  for (int pixel = THREAD_ID; pixel < amount; pixel += blockDim.x * gridDim.x) {
+  const uint32_t undersampling_scale = 1 << device.undersampling;
+
+  const uint32_t undersampling_width  = (device.internal_width + (1 << device.undersampling) - 1) >> device.undersampling;
+  const uint32_t undersampling_height = (device.internal_height + (1 << device.undersampling) - 1) >> device.undersampling;
+
+  const uint32_t amount = undersampling_width * undersampling_height;
+
+  const uint32_t undersampling_index = roundf(device.temporal_frames * undersampling_scale * undersampling_scale);
+
+  for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
+    uint16_t undersampling_y = (uint16_t) (undersampling_pixel / undersampling_width);
+    uint16_t undersampling_x = (uint16_t) (undersampling_pixel - undersampling_y * undersampling_width);
+
+    if (undersampling_scale > 1) {
+      undersampling_x *= undersampling_scale;
+      undersampling_y *= undersampling_scale;
+
+      undersampling_x += (undersampling_scale >> 1) * ((undersampling_index & 0b01) ? 1.0f : 0.0f);
+      undersampling_y += (undersampling_scale >> 1) * ((undersampling_index & 0b10) ? 1.0f : 0.0f);
+    }
+
+    if (undersampling_x >= device.internal_width || undersampling_y >= device.internal_height)
+      continue;
+
     TraceTask task;
+    task.index.x = undersampling_x;
+    task.index.y = undersampling_y;
 
-    task.index.y = (uint16_t) (pixel / device.width);
-    task.index.x = (uint16_t) (pixel - task.index.y * device.width);
+    task = camera_get_ray(task);
 
-    task = camera_get_ray(task, pixel);
+    const uint32_t pixel = get_pixel_id(task.index);
 
     device.ptrs.records[pixel]      = get_color(1.0f, 1.0f, 1.0f);
     device.ptrs.state_buffer[pixel] = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
 
-    if ((device.denoiser || device.aov_mode) && !device.temporal_frames) {
+    if (device.denoiser && device.temporal_frames == 0.0f) {
       device.ptrs.albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
       device.ptrs.normal_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
     }
@@ -44,10 +93,10 @@ LUMINARY_KERNEL void generate_trace_tasks() {
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
     ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
 
-    store_trace_task(device.ptrs.trace_tasks + get_task_address(offset++), task);
+    store_trace_task(device.ptrs.trace_tasks + get_task_address(task_count++), task);
   }
 
-  device.ptrs.trace_counts[THREAD_ID] = offset;
+  device.ptrs.trace_counts[THREAD_ID] = task_count;
 }
 
 LUMINARY_KERNEL void balance_trace_tasks() {
@@ -132,11 +181,10 @@ LUMINARY_KERNEL void process_sky_inscattering_tasks() {
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
 
-    if (hit_id == HIT_TYPE_SKY) {
+    if (hit_id == HIT_TYPE_SKY)
       continue;
-    }
 
-    const int pixel = task.index.y * device.width + task.index.x;
+    const uint32_t pixel = get_pixel_id(task.index);
 
     const vec3 sky_origin = world_to_sky_transform(task.origin);
 
@@ -282,14 +330,10 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
     const float depth     = result.x;
     const uint32_t hit_id = __float_as_uint(result.y);
-    const uint32_t pixel  = get_pixel_id(task.index.x, task.index.y);
+    const uint32_t pixel  = get_pixel_id(task.index);
 
     if (IS_PRIMARY_RAY) {
-      TraceResult trace_result;
-      trace_result.depth  = depth;
-      trace_result.hit_id = hit_id;
-
-      device.ptrs.trace_result_buffer[pixel] = trace_result;
+      device.ptrs.hit_id_history[pixel] = hit_id;
     }
 
     if (hit_id != HIT_TYPE_SKY)
@@ -325,104 +369,100 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }
 
+LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
+  const uint32_t undersampling       = max(device.undersampling, 1);
+  const uint32_t undersampling_scale = 1 << undersampling;
+
+  const uint32_t undersampling_width  = (device.internal_width + (1 << undersampling) - 1) >> undersampling;
+  const uint32_t undersampling_height = (device.internal_height + (1 << undersampling) - 1) >> undersampling;
+
+  const uint32_t amount = undersampling_width * undersampling_height;
+
+  const float color_scale = 1.0f / (undersampling_scale * undersampling_scale * __saturatef(device.temporal_frames + temporal_increment()));
+
+  for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
+    const uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);
+    const uint16_t x = (uint16_t) (undersampling_pixel - y * undersampling_width);
+
+    const uint16_t source_x = x * undersampling_scale;
+    const uint16_t source_y = y * undersampling_scale;
+
+    RGBF accumulated_color = get_color(0.0f, 0.0f, 0.0f);
+
+    for (uint32_t yi = 0; yi < undersampling_scale; yi++) {
+      for (uint32_t xi = 0; xi < undersampling_scale; xi++) {
+        const uint32_t pixel_x = min(source_x + xi, device.internal_width - 1);
+        const uint32_t pixel_y = min(source_y + yi, device.internal_height - 1);
+
+        const uint32_t index = pixel_x + pixel_y * device.internal_width;
+
+        RGBF pixel = load_RGBF(src + index);
+        pixel      = tonemap_apply(pixel, pixel_x, pixel_y);
+
+        accumulated_color = add_color(accumulated_color, pixel);
+      }
+    }
+
+    accumulated_color = scale_color(accumulated_color, color_scale);
+
+    const uint32_t dst_index = x + y * undersampling_width;
+    store_RGBF(device.ptrs.frame_final + dst_index, accumulated_color);
+  }
+}
+
 LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
-  const RGBF* source, XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
-  unsigned int id = THREAD_ID;
+  XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
+  uint32_t id = THREAD_ID;
 
-  const int amount    = width * height;
-  const float scale_x = 1.0f / (width - 1);
-  const float scale_y = 1.0f / (height - 1);
+  const uint32_t amount = width * height;
+  const float scale_x   = 1.0f / (width - 1);
+  const float scale_y   = 1.0f / (height - 1);
 
-  const int src_width  = (output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_width : device.width;
-  const int src_height = (output_variable == OUTPUT_VARIABLE_BEAUTY) ? device.output_height : device.height;
+  const uint32_t undersampling       = max(device.undersampling, 1);
+  const uint32_t undersampling_width = (device.internal_width + (1 << undersampling) - 1) >> undersampling;
+
+  const float mem_scale = (undersampling > 1) ? 1.0f / (1 << (undersampling - 1)) : 1.0f;
+
+  const bool scaled_output = (width != device.width) || (height != device.height);
 
   while (id < amount) {
-    const int y = id / width;
-    const int x = id - y * width;
+    const uint32_t y = id / width;
+    const uint32_t x = id - y * width;
 
-    const float sx = x * scale_x;
-    const float sy = y * scale_y;
+    RGBF pixel;
+    if (scaled_output) {
+      const float sx = x * scale_x;
+      const float sy = y * scale_y;
 
-    RGBF pixel = sample_pixel_clamp(source, sx, sy, src_width, src_height);
+      pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, device.width, device.height, mem_scale);
+    }
+    else {
+      const uint32_t src_x = x >> (max(device.undersampling, 1) - 1);
+      const uint32_t src_y = y >> (max(device.undersampling, 1) - 1);
+      pixel                = load_RGBF(device.ptrs.frame_final + src_x + src_y * undersampling_width);
+    }
 
-    if (
-      device.shading_mode == SHADING_DEFAULT && output_variable != OUTPUT_VARIABLE_ALBEDO_GUIDANCE
-      && output_variable != OUTPUT_VARIABLE_NORMAL_GUIDANCE) {
-      if (device.scene.camera.purkinje) {
-        pixel = purkinje_shift(pixel);
-      }
-
-      if (device.scene.camera.use_color_correction) {
-        RGBF hsv = rgb_to_hsv(pixel);
-
-        hsv = add_color(hsv, device.scene.camera.color_correction);
-
-        if (hsv.r < 0.0f)
-          hsv.r += 1.0f;
-        if (hsv.r > 1.0f)
-          hsv.r -= 1.0f;
-        hsv.g = __saturatef(hsv.g);
-        if (hsv.b < 0.0f)
-          hsv.b = 0.0f;
-
-        pixel = hsv_to_rgb(hsv);
-      }
-
-      pixel.r *= device.scene.camera.exposure;
-      pixel.g *= device.scene.camera.exposure;
-      pixel.b *= device.scene.camera.exposure;
-
-      const float grain = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
-
-      pixel.r = fmaxf(0.0f, pixel.r + grain);
-      pixel.g = fmaxf(0.0f, pixel.g + grain);
-      pixel.b = fmaxf(0.0f, pixel.b + grain);
-
-      switch (device.scene.camera.tonemap) {
-        case TONEMAP_NONE:
-          break;
-        case TONEMAP_ACES:
-          pixel = tonemap_aces(pixel);
-          break;
-        case TONEMAP_REINHARD:
-          pixel = tonemap_reinhard(pixel);
-          break;
-        case TONEMAP_UNCHARTED2:
-          pixel = tonemap_uncharted2(pixel);
-          break;
-        case TONEMAP_AGX:
-          pixel = tonemap_agx(pixel);
-          break;
-        case TONEMAP_AGX_PUNCHY:
-          pixel = tonemap_agx_punchy(pixel);
-          break;
-        case TONEMAP_AGX_CUSTOM:
-          pixel = tonemap_agx_custom(pixel);
-          break;
-      }
-
-      switch (device.scene.camera.filter) {
-        case FILTER_NONE:
-          break;
-        case FILTER_GRAY:
-          pixel = filter_gray(pixel);
-          break;
-        case FILTER_SEPIA:
-          pixel = filter_sepia(pixel);
-          break;
-        case FILTER_GAMEBOY:
-          pixel = filter_gameboy(pixel, x, y);
-          break;
-        case FILTER_2BITGRAY:
-          pixel = filter_2bitgray(pixel, x, y);
-          break;
-        case FILTER_CRT:
-          pixel = filter_crt(pixel, x, y);
-          break;
-        case FILTER_BLACKWHITE:
-          pixel = filter_blackwhite(pixel, x, y);
-          break;
-      }
+    switch (device.scene.camera.filter) {
+      case FILTER_NONE:
+        break;
+      case FILTER_GRAY:
+        pixel = filter_gray(pixel);
+        break;
+      case FILTER_SEPIA:
+        pixel = filter_sepia(pixel);
+        break;
+      case FILTER_GAMEBOY:
+        pixel = filter_gameboy(pixel, x, y);
+        break;
+      case FILTER_2BITGRAY:
+        pixel = filter_2bitgray(pixel, x, y);
+        break;
+      case FILTER_CRT:
+        pixel = filter_crt(pixel, x, y);
+        break;
+      case FILTER_BLACKWHITE:
+        pixel = filter_blackwhite(pixel, x, y);
+        break;
     }
 
     const float dither = (device.scene.camera.dithering) ? random_dither_mask(x, y) : 0.5f;
