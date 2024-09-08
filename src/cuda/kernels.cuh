@@ -412,22 +412,30 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
 
 LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
   XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
-  unsigned int id = THREAD_ID;
+  uint32_t id = THREAD_ID;
 
-  const int amount    = width * height;
-  const float scale_x = 1.0f / (width - 1);
-  const float scale_y = 1.0f / (height - 1);
+  const uint32_t amount = width * height;
+  const float scale_x   = 1.0f / (width - 1);
+  const float scale_y   = 1.0f / (height - 1);
 
-  const float mem_scale = 1.0f / (1 << (max(device.undersampling, 1) - 1));
+  const float mem_scale = (device.undersampling > 1) ? 1.0f / (1 << (device.undersampling - 1)) : 1.0f;
+
+  const bool scaled_output = (width != device.width) || (height != device.height) || (device.undersampling > 1);
 
   while (id < amount) {
-    const int y = id / width;
-    const int x = id - y * width;
+    const uint32_t y = id / width;
+    const uint32_t x = id - y * width;
 
-    const float sx = x * scale_x;
-    const float sy = y * scale_y;
+    RGBF pixel;
+    if (scaled_output) {
+      const float sx = x * scale_x;
+      const float sy = y * scale_y;
 
-    RGBF pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, device.width, device.height, mem_scale);
+      pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, device.width, device.height, mem_scale);
+    }
+    else {
+      pixel = load_RGBF(device.ptrs.frame_final + x + y * device.width);
+    }
 
     switch (device.scene.camera.filter) {
       case FILTER_NONE:
