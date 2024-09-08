@@ -44,7 +44,7 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 
     raytrace_update_device_scene(instance);
 
-    DeviceBuffer* base_output_image = instance->frame_final;
+    DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, OUTPUT_VARIABLE_BEAUTY);
     if (instance->denoiser) {
       base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
     }
@@ -101,6 +101,9 @@ static void offline_post_process_menu(RaytraceInstance* instance) {
 }
 
 void offline_output(RaytraceInstance* instance) {
+  // TODO: Make this cleaner with the host side rework. This is a hack to disable undersampling in offline rendering.
+  instance->undersampling_setting = 0;
+
   raytrace_prepare(instance);
   const clock_t start_of_rt       = clock();
   clock_t last_frame              = start_of_rt;
@@ -117,9 +120,10 @@ void offline_output(RaytraceInstance* instance) {
     moving_average_frametime    = (instance->temporal_frames == 0.0f) ? frametime : 0.9 * moving_average_frametime + 0.1 * frametime;
     const double time_left      = (instance->offline_samples - (instance->temporal_frames + 1.0f)) * moving_average_frametime;
 
+    // Frametime is divided by 4 to account for supersampling.
     print_info_inline(
       "Progress: %2.1f%% - Time Elapsed: %.1fs - Time Remaining: %.1fs - Frametime: %.1f ms", 100.0 * progress, time_elapsed, time_left,
-      1000.0f * moving_average_frametime);
+      1000.0f * moving_average_frametime * 0.25f);
     last_frame = current_frame;
   }
 
@@ -128,7 +132,7 @@ void offline_output(RaytraceInstance* instance) {
   raytrace_free_work_buffers(instance);
 
   // Create final image based on current settings
-  DeviceBuffer* base_output_image = instance->frame_final;
+  DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, OUTPUT_VARIABLE_BEAUTY);
   if (instance->denoiser) {
     denoise_create(instance);
     base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));

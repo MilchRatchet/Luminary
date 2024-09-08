@@ -508,7 +508,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, &optix_device_context_options, &instance->optix_ctx));
 
   instance->max_ray_depth   = general.max_ray_depth;
-  instance->offline_samples = general.samples;
+  instance->offline_samples = (((options.offline_samples > 0) ? options.offline_samples : general.samples) + 3) / 4;  // Account for supersampling.
   instance->denoiser        = general.denoiser;
 
   instance->tex_atlas = tex_atlas;

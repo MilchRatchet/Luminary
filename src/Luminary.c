@@ -164,7 +164,12 @@ int main(int argc, char* argv[]) {
     bench_activate();
 
   CommandlineOptions options = {
-    .width = width, .height = height, .dmm_active = force_displacement, .omm_active = !disable_omm, .optix_validation = optix_validation};
+    .width            = width,
+    .height           = height,
+    .dmm_active       = force_displacement,
+    .omm_active       = !disable_omm,
+    .optix_validation = optix_validation,
+    .offline_samples  = offline_samples};
 
   RaytraceInstance* instance;
 
@@ -194,9 +199,6 @@ int main(int argc, char* argv[]) {
   }
 
   instance->realtime = !offline;
-
-  if (offline_samples)
-    instance->offline_samples = offline_samples;
 
   instance->image_format      = img_format;
   instance->post_process_menu = post_process_menu;

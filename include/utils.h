@@ -132,6 +132,7 @@ struct CommandlineOptions {
   int dmm_active;
   int omm_active;
   int optix_validation;
+  int offline_samples;
 } typedef CommandlineOptions;
 
 struct General {
