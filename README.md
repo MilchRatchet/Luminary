@@ -39,7 +39,7 @@ Meshes and textures in the example images are taken from the Ratchet and Clank H
 
 # Usage
 
-The scene is described through the Luminary Scene Description format (`*.lum`). The format is documented in the [Luminary File Documentations](LumFileDocs.md). It is possible to specify a `*.obj` file instead of a `*.lum` file. This will load the mesh and use the default settings. Then one can make changes to the settings and automatically generate a `*.lum` file. Alternatively, one can generate a `*.baked` file that contains all the necessary data in one file. The advantage is that loading from a `*.baked` file is fast, however, the file can be large.
+The scene is described through the Luminary Scene Description format (`*.lum`). The format is documented in the [Luminary File Documentations](LumFileDocs.md). It is possible to specify a `*.obj` file instead of a `*.lum` file. This will load the mesh and use the default settings. Then one can make changes to the settings and automatically generate a `*.lum` file.
 
 You can start as:
 
@@ -47,7 +47,7 @@ You can start as:
 Luminary [File] [Option]
 ```
 
-where `File` is a relative or absolute path to a `*.obj`, `*.lum` or `*.baked` file and Option is one or more of:
+where `File` is a relative or absolute path to a `*.obj` or `*.lum` file and Option is one or more of:
 
 ```
 -o, --offline

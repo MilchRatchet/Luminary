@@ -12,7 +12,6 @@
 #include "UI_info.h"
 #include "UI_panel.h"
 #include "UI_text.h"
-#include "baked.h"
 #include "device.h"
 #include "optixrt_particle.h"
 #include "output.h"
@@ -131,7 +130,6 @@ static UITab create_general_export_panels(UI* ui, RaytraceInstance* instance) {
   panels[i++] = create_dropdown(ui, "Snapshot Resolution", &(instance->snap_resolution), 0, 2, "Window\0Render", 2);
   panels[i++] = create_dropdown(ui, "Output Image Format", &(instance->image_format), 0, 2, "PNG\0QOI", 3);
   panels[i++] = create_button(ui, "Export Settings", instance, (void (*)(void*)) scene_serialize, 0);
-  panels[i++] = create_button(ui, "Export Baked File", instance, (void (*)(void*)) serialize_baked, 0);
 
   tab.panels      = panels;
   tab.panel_count = i;

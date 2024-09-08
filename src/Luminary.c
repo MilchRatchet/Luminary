@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
       instance = scene_load_obj(argv[1], options);
       break;
     case BAKED_FILE:
-      instance = load_baked(argv[1], options);
+      crash_message("Baked file support was dropped.");
       break;
     default:
       instance = scene_load_lum(argv[1], options);

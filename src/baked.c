@@ -1,5 +1,8 @@
 #include "baked.h"
 
+// Legacy code that is no longer being used.
+#if 0
+
 #include <stdio.h>
 #include <string.h>
 
@@ -12,6 +15,8 @@
 #include "structs.h"
 #include "texture.h"
 #include "utils.h"
+
+
 
 ////////////////////////////////////////////////////////////////////
 // Definition
@@ -411,3 +416,5 @@ void serialize_baked(RaytraceInstance* instance) {
 
   bench_toc();
 }
+
+#endif
