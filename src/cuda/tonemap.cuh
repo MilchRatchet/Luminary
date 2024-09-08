@@ -171,7 +171,7 @@ __device__ RGBF tonemap_agx_custom(RGBF pixel) {
   return pixel;
 }
 
-__device__ RGBF tonemap_apply(RGBF pixel) {
+__device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
   if (device.shading_mode != SHADING_DEFAULT)
     return pixel;
 
@@ -202,12 +202,7 @@ __device__ RGBF tonemap_apply(RGBF pixel) {
   pixel.g *= device.scene.camera.exposure;
   pixel.b *= device.scene.camera.exposure;
 
-  // TODO: Fix grain.
-#if 0
-  const float grain = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f);
-#else
-  const float grain = 0.0f;
-#endif
+  const float grain = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f) * fminf(1.0f, device.temporal_frames);
 
   pixel.r = fmaxf(0.0f, pixel.r + grain);
   pixel.g = fmaxf(0.0f, pixel.g + grain);

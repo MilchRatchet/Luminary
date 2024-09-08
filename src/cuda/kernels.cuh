@@ -397,7 +397,7 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
         const uint32_t index = pixel_x + pixel_y * device.internal_width;
 
         RGBF pixel = load_RGBF(src + index);
-        pixel      = tonemap_apply(pixel);
+        pixel      = tonemap_apply(pixel, pixel_x, pixel_y);
 
         accumulated_color = add_color(accumulated_color, pixel);
       }
