@@ -143,25 +143,25 @@ void offline_output(RaytraceInstance* instance) {
 
   DeviceBuffer* scratch_buffer = (DeviceBuffer*) 0;
   device_buffer_init(&scratch_buffer);
-  device_buffer_malloc(scratch_buffer, sizeof(XRGB8), instance->output_width * instance->output_height);
-  XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->output_width * instance->output_height);
+  device_buffer_malloc(scratch_buffer, sizeof(XRGB8), instance->width * instance->height);
+  XRGB8* frame      = (XRGB8*) malloc(sizeof(XRGB8) * instance->width * instance->height);
   char* output_path = malloc(4096);
 
   // Post Process Menu stores a backup of the current image, after the user is done the final output image is stored.
   if (instance->post_process_menu) {
     device_copy_framebuffer_to_8bit(
-      device_buffer_get_pointer(instance->frame_post), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
-      instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
+      device_buffer_get_pointer(instance->frame_post), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
+      instance->width, OUTPUT_VARIABLE_BEAUTY);
 
     switch (instance->image_format) {
       case IMGFORMAT_QOI:
         sprintf(output_path, "%s.qoi1", instance->settings.output_path);
-        store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
+        store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
         break;
       case IMGFORMAT_PNG:
       default:
         sprintf(output_path, "%s.png1", instance->settings.output_path);
-        png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
+        png_store_XRGB8(output_path, frame, instance->width, instance->height);
         break;
     }
 
@@ -173,19 +173,19 @@ void offline_output(RaytraceInstance* instance) {
   }
 
   device_copy_framebuffer_to_8bit(
-    device_buffer_get_pointer(instance->frame_post), device_buffer_get_pointer(scratch_buffer), frame, instance->output_width,
-    instance->output_height, instance->output_width, OUTPUT_VARIABLE_BEAUTY);
+    device_buffer_get_pointer(instance->frame_post), device_buffer_get_pointer(scratch_buffer), frame, instance->width, instance->height,
+    instance->width, OUTPUT_VARIABLE_BEAUTY);
 
   switch (instance->image_format) {
     case IMGFORMAT_QOI:
       sprintf(output_path, "%s.qoi", instance->settings.output_path);
-      store_XRGB8_qoi(output_path, frame, instance->output_width, instance->output_height);
+      store_XRGB8_qoi(output_path, frame, instance->width, instance->height);
       info_message("QOI file created.");
       break;
     case IMGFORMAT_PNG:
     default:
       sprintf(output_path, "%s.png", instance->settings.output_path);
-      png_store_XRGB8(output_path, frame, instance->output_width, instance->output_height);
+      png_store_XRGB8(output_path, frame, instance->width, instance->height);
       info_message("PNG file created.");
       break;
   }
@@ -237,8 +237,8 @@ static void make_snapshot(RaytraceInstance* instance, WindowInstance* window, RG
       height = window->height;
       break;
     case SNAP_RESOLUTION_RENDER:
-      width  = (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) ? instance->output_width : instance->width;
-      height = (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) ? instance->output_height : instance->height;
+      width  = instance->width;
+      height = instance->height;
       buffer = malloc(sizeof(XRGB8) * width * height);
       void* gpu_scratch;
       device_malloc(&gpu_scratch, sizeof(XRGB8) * width * height);
@@ -312,7 +312,7 @@ void realtime_output(RaytraceInstance* instance) {
       DeviceBuffer* base_output_image = raytrace_get_accumulate_buffer(instance, instance->output_variable);
 
       if (instance->output_variable == OUTPUT_VARIABLE_BEAUTY) {
-        if (instance->denoiser) {
+        if (instance->denoiser && instance->undersampling == 0) {
           base_output_image = denoise_apply(instance, device_buffer_get_pointer(base_output_image));
         }
 

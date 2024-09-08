@@ -45,9 +45,9 @@ void scene_init(Scene** _scene) {
   scene->camera.aperture_shape             = CAMERA_APERTURE_ROUND;
   scene->camera.aperture_blade_count       = 7;
   scene->camera.exposure                   = 1.0f;
-  scene->camera.min_exposure               = 40.0f;
-  scene->camera.max_exposure               = 300.0f;
-  scene->camera.auto_exposure              = 1;
+  scene->camera.min_exposure               = 10.0f;
+  scene->camera.max_exposure               = 400.0f;
+  scene->camera.auto_exposure              = 0;
   scene->camera.bloom                      = 1;
   scene->camera.bloom_blend                = 0.01f;
   scene->camera.lens_flare                 = 0;

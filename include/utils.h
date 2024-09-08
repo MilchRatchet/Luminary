@@ -455,8 +455,6 @@ struct DeviceConstantMemory {
   int denoiser;
   int width;
   int height;
-  int output_width;
-  int output_height;
   int internal_width;
   int internal_height;
   vec3 sun_pos;
@@ -509,12 +507,10 @@ struct DeviceInfo {
 } typedef DeviceInfo;
 
 struct RaytraceInstance {
-  unsigned int width;
-  unsigned int height;
-  unsigned int output_width;
-  unsigned int output_height;
-  unsigned int internal_width;
-  unsigned int internal_height;
+  uint32_t width;
+  uint32_t height;
+  uint32_t internal_width;
+  uint32_t internal_height;
   uint16_t user_selected_x;
   uint16_t user_selected_y;
   int realtime;

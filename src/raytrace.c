@@ -475,8 +475,6 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   instance->width           = general.width;
   instance->height          = general.height;
-  instance->output_width    = general.width;
-  instance->output_height   = general.height;
   instance->internal_width  = general.width * 2;
   instance->internal_height = general.height * 2;
 
@@ -484,15 +482,7 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
   instance->user_selected_y = 0xFFFF;
 
   if (general.denoiser == DENOISING_UPSCALING) {
-    if (instance->width * instance->height > 18144000) {
-      error_message(
-        "Internal resolution is too high for denoising with upscaling! The maximum is ~18144000 pixels. Upscaling is turned off!");
-      general.denoiser = DENOISING_ON;
-    }
-    else {
-      instance->output_width *= 2;
-      instance->output_height *= 2;
-    }
+    crash_message("Upscaling denoiser support was dropped.");
   }
 
   OPTIX_CHECK(optixInit());
@@ -507,9 +497,10 @@ void raytrace_init(RaytraceInstance** _instance, General general, TextureAtlas t
 
   OPTIX_CHECK(optixDeviceContextCreate((CUcontext) 0, &optix_device_context_options, &instance->optix_ctx));
 
-  instance->max_ray_depth   = general.max_ray_depth;
-  instance->offline_samples = (((options.offline_samples > 0) ? options.offline_samples : general.samples) + 3) / 4;  // Account for supersampling.
-  instance->denoiser        = general.denoiser;
+  instance->max_ray_depth = general.max_ray_depth;
+  instance->offline_samples =
+    (((options.offline_samples > 0) ? options.offline_samples : general.samples) + 3) / 4;  // Account for supersampling.
+  instance->denoiser = general.denoiser;
 
   instance->tex_atlas = tex_atlas;
 
@@ -659,22 +650,12 @@ void raytrace_reset(RaytraceInstance* instance) {
 
   instance->width           = instance->settings.width;
   instance->height          = instance->settings.height;
-  instance->output_width    = instance->settings.width;
-  instance->output_height   = instance->settings.height;
   instance->internal_width  = instance->settings.width * 2;
   instance->internal_height = instance->settings.height * 2;
   instance->denoiser        = instance->settings.denoiser;
 
   if (instance->denoiser == DENOISING_UPSCALING) {
-    if (instance->width * instance->height > 18144000) {
-      error_message(
-        "Internal resolution is too high for denoising with upscaling! The maximum is ~18144000 pixels. Upscaling is turned off!");
-      instance->denoiser = DENOISING_ON;
-    }
-    else {
-      instance->output_width *= 2;
-      instance->output_height *= 2;
-    }
+    crash_message("Upscaling denoiser support was dropped.");
   }
 
   raytrace_allocate_buffers(instance);
@@ -717,13 +698,10 @@ void raytrace_prepare(RaytraceInstance* instance) {
  */
 void raytrace_allocate_buffers(RaytraceInstance* instance) {
   const uint32_t amount          = instance->width * instance->height;
-  const uint32_t output_amount   = instance->output_width * instance->output_height;
   const uint32_t internal_amount = instance->internal_width * instance->internal_height;
 
   device_update_symbol(width, instance->width);
   device_update_symbol(height, instance->height);
-  device_update_symbol(output_width, instance->output_width);
-  device_update_symbol(output_height, instance->output_height);
   device_update_symbol(internal_width, instance->internal_width);
   device_update_symbol(internal_height, instance->internal_height);
   device_update_symbol(denoiser, instance->denoiser);
