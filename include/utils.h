@@ -29,6 +29,8 @@
     }                                                                                                    \
   }
 
+#define LUMINARY_API
+
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) ((void) (x))
 
@@ -108,17 +110,6 @@ enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTIC
 enum SkyMode { SKY_MODE_DEFAULT = 0, SKY_MODE_HDRI = 1, SKY_MODE_CONSTANT_COLOR = 2 } typedef SkyMode;
 
 enum CameraApertureShape { CAMERA_APERTURE_ROUND = 0, CAMERA_APERTURE_BLADED = 1 } typedef CameraApertureShape;
-
-// Set of architectures supported by Luminary
-enum DeviceArch {
-  DEVICE_ARCH_UNKNOWN = 0,
-  DEVICE_ARCH_PASCAL  = 1,
-  DEVICE_ARCH_VOLTA   = 11,
-  DEVICE_ARCH_TURING  = 2,
-  DEVICE_ARCH_AMPERE  = 3,
-  DEVICE_ARCH_ADA     = 4,
-  DEVICE_ARCH_HOPPER  = 41
-} typedef DeviceArch;
 
 struct DeviceBuffer {
   void* device_pointer;
