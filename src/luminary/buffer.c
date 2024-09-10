@@ -1,8 +1,7 @@
 #include "buffer.h"
 
 #include <cuda_runtime_api.h>
-
-#include "log.h"
+#include <luminary/log.h>
 
 #define gpuBufferErrchk(ans, buf_name, func, line)                                                                \
   {                                                                                                               \

@@ -7,6 +7,12 @@
 extern "C" {
 #endif
 
+struct DeviceBuffer {
+  void* device_pointer;
+  size_t size;
+  int allocated;
+} typedef DeviceBuffer;
+
 #define device_malloc(buffer, size) _device_malloc((void**) buffer, size, (char*) #buffer, (char*) __func__, __LINE__)
 #define device_malloc_pitch(buffer, rowstride, num_rows) \
   _device_malloc_pitch(buffer, rowstride, num_rows, (char*) #buffer, (char*) __func__, __LINE__)

@@ -1,15 +1,11 @@
 #ifndef LUMINARY_HOST_H
 #define LUMINARY_HOST_H
 
-#include "array.h"
-#include "device.h"
-#include "error.h"
-#include "utils.h"
+#include <luminary/api_utils.h>
+#include <luminary/error.h>
 
-LUMINARY_API struct LuminaryHost {
-  ARRAY Device* devices;
-  Camera camera;
-} typedef LuminaryHost;
+struct LuminaryHost;
+typedef struct LuminaryHost LuminaryHost;
 
 LUMINARY_API enum LuminaryDeviceSelectorStrategy {
   /* Select the device with highest estimated compute performance. */
@@ -38,6 +34,10 @@ LUMINARY_API LuminaryResult luminary_host_start_render(LuminaryHost* host);
 LUMINARY_API LuminaryResult luminary_host_skip_render(LuminaryHost* host);
 LUMINARY_API LuminaryResult luminary_host_stop_render(LuminaryHost* host);
 
+LUMINARY_API LuminaryResult luminary_host_set_enable_output(LuminaryHost* host, bool enable_output);
 LUMINARY_API LuminaryResult luminary_host_get_last_render(LuminaryHost* host);
+
+LUMINARY_API LuminaryResult luminary_host_get_camera(LuminaryHost* host, LuminaryCamera& camera);
+LUMINARY_API LuminaryResult luminary_host_set_camera(LuminaryHost* host, LuminaryCamera camera);
 
 #endif /* LUMINARY_HOST_H */

@@ -1,7 +1,8 @@
-#ifndef LUMINARY_ARRAY_H
-#define LUMINARY_ARRAY_H
+#ifndef LUMINARY_API_ARRAY_H
+#define LUMINARY_API_ARRAY_H
 
-#include "error.h"
+#include <luminary/api_utils.h>
+#include <luminary/error.h>
 
 #define ARRAY
 
@@ -11,9 +12,9 @@
 #define array_resize(array, size) _array_resize((void**) array, size, (const char*) #array, (const char*) __func__, __LINE__)
 #define array_destroy(array) _array_destroy((void**) array, (const char*) #array, (const char*) __func__, __LINE__)
 
-LuminaryResult _array_create(void** array, size_t size_of_element, size_t num_elements);
-LuminaryResult _array_push(void** array, void* object);
-LuminaryResult _array_resize(void** array, size_t size);
-LuminaryResult _array_destroy(void** array);
+LUMINARY_API LuminaryResult _array_create(void** array, size_t size_of_element, size_t num_elements);
+LUMINARY_API LuminaryResult _array_push(void** array, void* object);
+LUMINARY_API LuminaryResult _array_resize(void** array, size_t size);
+LUMINARY_API LuminaryResult _array_destroy(void** array);
 
-#endif /* LUMINARY_ARRAY_H */
+#endif /* LUMINARY_API_ARRAY_H */

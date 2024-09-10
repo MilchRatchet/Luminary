@@ -29,8 +29,6 @@
     }                                                                                                    \
   }
 
-#define LUMINARY_API
-
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) ((void) (x))
 
@@ -79,27 +77,7 @@ enum OutputVariable {
 
 enum ToyShape { TOY_SPHERE = 0, TOY_PLANE = 1 } typedef ToyShape;
 
-enum ToneMap {
-  TONEMAP_NONE       = 0,
-  TONEMAP_ACES       = 1,
-  TONEMAP_REINHARD   = 2,
-  TONEMAP_UNCHARTED2 = 3,
-  TONEMAP_AGX        = 4,
-  TONEMAP_AGX_PUNCHY = 5,
-  TONEMAP_AGX_CUSTOM = 6
-} typedef ToneMap;
-
 enum BVHType { BVH_LUMINARY = 0, BVH_OPTIX = 1 } typedef BVHType;
-
-enum Filter {
-  FILTER_NONE       = 0,
-  FILTER_GRAY       = 1,
-  FILTER_SEPIA      = 2,
-  FILTER_GAMEBOY    = 3,
-  FILTER_2BITGRAY   = 4,
-  FILTER_CRT        = 5,
-  FILTER_BLACKWHITE = 6
-} typedef Filter;
 
 enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } typedef SnapResolution;
 
@@ -108,14 +86,6 @@ enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
 
 enum SkyMode { SKY_MODE_DEFAULT = 0, SKY_MODE_HDRI = 1, SKY_MODE_CONSTANT_COLOR = 2 } typedef SkyMode;
-
-enum CameraApertureShape { CAMERA_APERTURE_ROUND = 0, CAMERA_APERTURE_BLADED = 1 } typedef CameraApertureShape;
-
-struct DeviceBuffer {
-  void* device_pointer;
-  size_t size;
-  int allocated;
-} typedef DeviceBuffer;
 
 struct CommandlineOptions {
   int width;
@@ -138,44 +108,6 @@ struct General {
   int mesh_files_length;
   char* output_path;
 } typedef General;
-
-struct Camera {
-  vec3 pos;
-  vec3 rotation;
-  float fov;
-  float focal_length;
-  float aperture_size;
-  CameraApertureShape aperture_shape;
-  int aperture_blade_count;
-  float exposure;
-  float max_exposure;
-  float min_exposure;
-  int auto_exposure;
-  float far_clip_distance;
-  ToneMap tonemap;
-  float agx_custom_slope;
-  float agx_custom_power;
-  float agx_custom_saturation;
-  Filter filter;
-  int bloom;
-  float bloom_blend;
-  int lens_flare;
-  float lens_flare_threshold;
-  int dithering;
-  int purkinje;
-  float purkinje_kappa1;
-  float purkinje_kappa2;
-  float wasd_speed;
-  float mouse_speed;
-  int smooth_movement;
-  float smoothing_factor;
-  float temporal_blend_factor;
-  float russian_roulette_threshold;
-  int use_color_correction;
-  RGBF color_correction;
-  int do_firefly_clamping;
-  float film_grain;
-} typedef Camera;
 
 struct Toy {
   int active;
