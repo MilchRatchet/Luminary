@@ -1,6 +1,7 @@
 #ifndef LUMINARY_DEVICE_H
 #define LUMINARY_DEVICE_H
 
+#include <luminary/queue.h>
 #include <stdint.h>
 
 // Set of architectures supported by Luminary
@@ -24,6 +25,7 @@ struct DeviceProperties {
 struct Device {
   uint32_t index;
   DeviceProperties properties;
+  Queue* work_queue;
 } typedef Device;
 
 #endif /* LUMINARY_DEVICE_H */

@@ -1,11 +1,10 @@
 #ifndef LUMINARY_INTERNAL_QUEUE_H
 #define LUMINARY_INTERNAL_QUEUE_H
 
-#include <luminary/queue.h>
-
-#include "host.h"
+#include "utils.h"
 
 struct QueueEntry {
+  const char* name;
   LuminaryResult (*function)(Host* host, void* args);
   void* args;
 } typedef QueueEntry;
@@ -16,7 +15,5 @@ struct LuminaryQueue {
   size_t read_ptr;
   size_t write_ptr;
 } typedef LuminaryQueue;
-
-typedef LuminaryQueue Queue;
 
 #endif /* LUMINARY_INTERNAL_QUEUE_H */

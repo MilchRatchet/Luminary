@@ -24,7 +24,7 @@ int print_buffer_size;
 
 int volatile_line = 0;
 
-int write_logs;
+int write_logs = 1;
 
 #ifdef _WIN32
 static void enable_windows_virtual_terminal_sequence() {
@@ -41,7 +41,7 @@ static void enable_windows_virtual_terminal_sequence() {
 /*
  * Initializes all log functionalities. Using logs before calling this function results in undefined behaviour.
  */
-void init_log(int wl) {
+void luminary_init_log() {
   log_buffer        = malloc(8192);
   log_buffer_offset = 0;
   log_buffer_size   = 8192;
@@ -49,15 +49,13 @@ void init_log(int wl) {
   print_buffer      = malloc(4096);
   print_buffer_size = 4096;
 
-  write_logs = wl;
-
   enable_windows_virtual_terminal_sequence();
 }
 
 /*
  * Writes the log to a file.
  */
-void write_log() {
+void luminary_write_log() {
   if (!write_logs)
     return;
 
@@ -128,12 +126,7 @@ static void write_to_log_buffer(const size_t size) {
   log_buffer[log_buffer_offset++] = '\n';
 }
 
-/*
- * Writes a message to log only.
- * @param format Message which may contain format specifiers.
- * @param ... Additional arguments to replace the format speciefiers.
- */
-void print_log(const char* format, ...) {
+void luminary_print_log(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -141,12 +134,7 @@ void print_log(const char* format, ...) {
   write_to_log_buffer(size);
 }
 
-/*
- * Writes a message.
- * @param format Message which may contain format specifiers.
- * @param ... Additional arguments to replace the format speciefiers.
- */
-void print_info(const char* format, ...) {
+void luminary_print_info(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -162,12 +150,7 @@ void print_info(const char* format, ...) {
   volatile_line = 0;
 }
 
-/*
- * Writes a message without a newline. This message will be overwritten by any following message.
- * @param format Message which may contain format specifiers.
- * @param ... Additional arguments to replace the format speciefiers.
- */
-void print_info_inline(const char* format, ...) {
+void luminary_print_info_inline(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -183,12 +166,7 @@ void print_info_inline(const char* format, ...) {
   volatile_line = 1;
 }
 
-/*
- * Writes a message in yellow text.
- * @param format Message which may contain format specifiers.
- * @param ... Additional arguments to replace the format speciefiers.
- */
-void print_warn(const char* format, ...) {
+void luminary_print_warn(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -204,12 +182,7 @@ void print_warn(const char* format, ...) {
   volatile_line = 0;
 }
 
-/*
- * Writes a message in red text.
- * @param format Message which may contain format specifiers.
- * @param ... Additional arguments to replace the format speciefiers.
- */
-void print_error(const char* format, ...) {
+void luminary_print_error(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -225,12 +198,7 @@ void print_error(const char* format, ...) {
   volatile_line = 0;
 }
 
-/*
- * Writes a message in purple text and terminates the program.
- * @param format Message which may contain format specifiers.
- * @param ... Additional arguments to replace the format speciefiers.
- */
-void print_crash(const char* format, ...) {
+void luminary_print_crash(const char* format, ...) {
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
