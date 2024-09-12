@@ -36,6 +36,7 @@
 #include <luminary/host_memory.h>
 #include <luminary/log.h>
 #include <luminary/queue.h>
+#include <luminary/ringbuffer.h>
 #endif /* LUMINARY_INCLUDE_EXTRA_UTILS */
 
 #endif /* LUMINARY_H */

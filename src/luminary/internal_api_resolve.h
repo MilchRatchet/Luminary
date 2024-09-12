@@ -17,6 +17,12 @@ typedef LuminaryApertureShape ApertureShape;
 typedef LuminaryFilter Filter;
 typedef LuminaryToneMap ToneMap;
 
+typedef LuminaryOcean Ocean;
+typedef LuminaryJerlovWaterType JerlovWaterType;
+
 typedef LuminaryQueue Queue;
+typedef LuminaryRingBuffer RingBuffer;
+
+typedef LuminaryHost Host;
 
 #endif /* LUMINARY_INTERNAL_API_RESOLVE */

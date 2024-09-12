@@ -89,4 +89,36 @@ LUMINARY_API struct LuminaryCamera {
   float film_grain;
 } typedef LuminaryCamera;
 
+////////////////////////////////////////////////////////////////////
+// Ocean
+////////////////////////////////////////////////////////////////////
+
+LUMINARY_API enum LuminaryJerlovWaterType {
+  LUMINARY_JERLOV_WATER_TYPE_I   = 0,
+  LUMINARY_JERLOV_WATER_TYPE_IA  = 1,
+  LUMINARY_JERLOV_WATER_TYPE_IB  = 2,
+  LUMINARY_JERLOV_WATER_TYPE_II  = 3,
+  LUMINARY_JERLOV_WATER_TYPE_III = 4,
+  LUMINARY_JERLOV_WATER_TYPE_1C  = 5,
+  LUMINARY_JERLOV_WATER_TYPE_3C  = 6,
+  LUMINARY_JERLOV_WATER_TYPE_5C  = 7,
+  LUMINARY_JERLOV_WATER_TYPE_7C  = 8,
+  LUMINARY_JERLOV_WATER_TYPE_9C  = 9
+} typedef LuminaryJerlovWaterType;
+
+LUMINARY_API struct LuminaryOcean {
+  int active;
+  float height;
+  float amplitude;
+  float frequency;
+  float choppyness;
+  float refractive_index;
+  LuminaryJerlovWaterType water_type;
+  int caustics_active;
+  int caustics_ris_sample_count;
+  float caustics_domain_scale;
+  int multiscattering;
+  int triangle_light_contribution;
+} typedef LuminaryOcean;
+
 #endif /* LUMINARY_STRUCTS_H */

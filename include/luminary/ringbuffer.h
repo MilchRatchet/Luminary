@@ -20,23 +20,22 @@
   SOFTWARE.
 */
 
-#ifndef LUMINARY_API_UTILS_H
-#define LUMINARY_API_UTILS_H
+#ifndef LUMINARY_RINGBUFFER_H
+#define LUMINARY_RINGBUFFER_H
 
-#include <stdbool.h>
+#include <luminary/api_utils.h>
+#include <luminary/error.h>
 
-#define LUMINARY_API
+struct LuminaryRingBuffer;
+typedef struct LuminaryRingBuffer LuminaryRingBuffer;
 
-LUMINARY_API struct LuminaryVec3 {
-  float x;
-  float y;
-  float z;
-} typedef LuminaryVec3;
+#define ringbuffer_create(buffer, size) _ringbuffer_create((void**) buffer, size, (const char*) #buffer, (const char*) __func__, __LINE__)
+#define ringbuffer_destroy(buffer) _ringbuffer_destroy((void**) buffer, (const char*) #buffer, (const char*) __func__, __LINE__)
 
-LUMINARY_API struct LuminaryRGBF {
-  float r;
-  float g;
-  float b;
-} typedef LuminaryRGBF;
+LUMINARY_API LuminaryResult
+  _ringbuffer_create(LuminaryRingBuffer** buffer, size_t size, const char* buf_name, const char* func, uint32_t line);
+LUMINARY_API LuminaryResult ringbuffer_allocate_entry(LuminaryRingBuffer* buffer, size_t entry_size, void** entry);
+LUMINARY_API LuminaryResult ringbuffer_release_entry(LuminaryRingBuffer* buffer, size_t entry_size);
+LUMINARY_API LuminaryResult _ringbuffer_destroy(LuminaryRingBuffer** buffer, const char* buf_name, const char* func, uint32_t line);
 
-#endif /* LUMINARY_API_UTILS_H */
+#endif /* LUMINARY_RINGBUFFER_H */

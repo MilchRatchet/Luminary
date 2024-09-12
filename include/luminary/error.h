@@ -43,6 +43,26 @@ typedef uint64_t LuminaryResult;
  */
 #define LUMINARY_ERROR_ARGUMENT_NULL (0x0000000000000002ull)
 
+/*
+ * Encountered code path that was not implemented.
+ */
+#define LUMINARY_ERROR_NOT_IMPLEMENTED (0x0000000000000004ull)
+
+/*
+ * Argument given to an API function was invalid.
+ */
+#define LUMINARY_ERROR_INVALID_API_ARGUMENT (0x0000000000000008ull)
+
+/*
+ * Action would cause a memory leak.
+ */
+#define LUMINARY_ERROR_MEMORY_LEAK (0x0000000000000010ull)
+
+/*
+ * Insufficient memory for action.
+ */
+#define LUMINARY_ERROR_OUT_OF_MEMORY (0x0000000000000020ull)
+
 LUMINARY_API char* luminary_result_to_string(LuminaryResult result);
 
 #endif /* LUMINARY_API_ERROR_H */
