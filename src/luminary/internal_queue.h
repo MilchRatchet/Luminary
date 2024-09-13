@@ -1,6 +1,7 @@
 #ifndef LUMINARY_INTERNAL_QUEUE_H
 #define LUMINARY_INTERNAL_QUEUE_H
 
+#include "mutex.h"
 #include "utils.h"
 
 struct QueueEntry {
@@ -10,10 +11,13 @@ struct QueueEntry {
 } typedef QueueEntry;
 
 struct LuminaryQueue {
-  QueueEntry* buffer;
-  size_t buffer_size;
+  void* buffer;
+  size_t element_count;
+  size_t element_size;
   size_t read_ptr;
   size_t write_ptr;
+  size_t elements_in_queue;
+  Mutex* mutex;
 } typedef LuminaryQueue;
 
 #endif /* LUMINARY_INTERNAL_QUEUE_H */

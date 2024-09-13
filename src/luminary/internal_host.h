@@ -5,7 +5,7 @@
 #include "internal_queue.h"
 #include "utils.h"
 
-LUMINARY_API struct LuminaryHost {
+struct LuminaryHost {
   ARRAY Device* devices;
   Queue* work_queue;
   RingBuffer* ring_buffer;

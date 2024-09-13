@@ -63,6 +63,16 @@ typedef uint64_t LuminaryResult;
  */
 #define LUMINARY_ERROR_OUT_OF_MEMORY (0x0000000000000020ull)
 
+/*
+ * Error in C standard library.
+ */
+#define LUMINARY_ERROR_C_STD (0x0000000000000040ull)
+
+/*
+ * API function was used in a non-compliant way.
+ */
+#define LUMINARY_ERROR_API_EXCEPTION (0x0000000000000080ull)
+
 LUMINARY_API char* luminary_result_to_string(LuminaryResult result);
 
 #endif /* LUMINARY_API_ERROR_H */
