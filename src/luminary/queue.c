@@ -31,6 +31,7 @@ LuminaryResult _queue_create(
   queue->elements_in_queue = 0;
 
   __FAILURE_HANDLE(mutex_create(&queue->mutex));
+  __FAILURE_HANDLE(condition_variable_create(&queue->cond_var));
 
   *_queue = queue;
 
@@ -63,6 +64,8 @@ LuminaryResult queue_push(Queue* queue, void* object) {
   queue->write_ptr++;
   if (queue->write_ptr >= queue->element_count)
     queue->write_ptr = 0;
+
+  __FAILURE_HANDLE(condition_variable_signal(queue->cond_var));
 
   __FAILURE_HANDLE(mutex_unlock(queue->mutex));
 
@@ -104,6 +107,38 @@ LuminaryResult queue_pop(Queue* queue, void* object, bool* success) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult queue_pop_blocking(LuminaryQueue* queue, void* object) {
+  if (!queue) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue was NULL.");
+  }
+
+  if (!queue->buffer) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer was NULL.");
+  }
+
+  if (!object) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Object was NULL.");
+  }
+
+  __FAILURE_HANDLE(mutex_lock(queue->mutex));
+
+  while (queue->elements_in_queue == 0) {
+    __FAILURE_HANDLE(condition_variable_wait(queue->cond_var, queue->mutex));
+  }
+
+  uint8_t* src_ptr = ((uint8_t) (queue->buffer)) + (queue->read_ptr * queue->element_size);
+
+  memcpy(object, src_ptr, queue->element_size);
+
+  queue->read_ptr++;
+  if (queue->read_ptr >= queue->element_count)
+    queue->read_ptr = 0;
+
+  __FAILURE_HANDLE(mutex_unlock(queue->mutex));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult _queue_destroy(Queue** queue, const char* buf_name, const char* func, uint32_t line) {
   if (!queue) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue ptr was NULL.");
@@ -122,6 +157,7 @@ LuminaryResult _queue_destroy(Queue** queue, const char* buf_name, const char* f
   }
 
   __FAILURE_HANDLE(mutex_destroy(&((*queue)->mutex)));
+  __FAILURE_HANDLE(condition_variable_destroy(&((*queue)->cond_var)));
   __FAILURE_HANDLE(_host_free(&((*queue)->buffer), buf_name, func, line));
   __FAILURE_HANDLE(_host_free(queue, buf_name, func, line));
 

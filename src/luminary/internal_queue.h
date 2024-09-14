@@ -1,6 +1,7 @@
 #ifndef LUMINARY_INTERNAL_QUEUE_H
 #define LUMINARY_INTERNAL_QUEUE_H
 
+#include "cond_var.h"
 #include "mutex.h"
 #include "utils.h"
 
@@ -18,6 +19,7 @@ struct LuminaryQueue {
   size_t write_ptr;
   size_t elements_in_queue;
   Mutex* mutex;
+  ConditionVariable* cond_var;
 } typedef LuminaryQueue;
 
 #endif /* LUMINARY_INTERNAL_QUEUE_H */

@@ -11,7 +11,9 @@ struct LuminaryHost {
   RingBuffer* ring_buffer;
   LuminaryCamera camera;
   LuminaryCamera camera_external;
+  const char* current_work_string;
   bool enable_output;
+  bool exit_requested;
 } typedef LuminaryHost;
 
 #endif /* LUMINARY_INTERNAL_HOST_H */

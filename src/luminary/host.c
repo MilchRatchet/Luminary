@@ -1,6 +1,7 @@
 #include <luminary/host.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 
 #include "camera.h"
 #include "internal_error.h"
@@ -12,6 +13,19 @@
 ////////////////////////////////////////////////////////////////////
 // Queue worker functions
 ////////////////////////////////////////////////////////////////////
+
+void _host_queue_worker(Host* host) {
+  while (!host->exit_requested) {
+    QueueEntry entry;
+    queue_pop_blocking(host->work_queue, &entry);
+
+    host->current_work_string = entry.name;
+
+    __FAILURE_HANDLE(entry.function(host, entry.args));
+
+    host->current_work_string = (const char*) 0;
+  }
+}
 
 ////////////////////////////////////////////////////////////////////
 // Queue work functions
@@ -35,7 +49,7 @@ static LuminaryResult _host_set_camera(Host* host, HostSetCameraArgs* args) {
 
 LuminaryResult luminary_host_create(Host** _host) {
   if (!_host) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host is NULL.");
   }
 
   Host* host;
@@ -50,20 +64,36 @@ LuminaryResult luminary_host_create(Host** _host) {
 
   memcpy(&host->camera_external, &host->camera, sizeof(Camera));
 
-  host->enable_output = false;
+  host->current_work_string = (const char*) 0;
+  host->enable_output       = false;
+  host->exit_requested      = false;
 
   *_host = host;
 
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_get_current_work_string(const LuminaryHost* host, char** string) {
+  if (!host) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host is NULL.");
+  }
+
+  if (!string) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "String is NULL.");
+  }
+
+  *string = host->current_work_string;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
   if (!host) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host is NULL.");
   }
 
   if (!camera) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Camera was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Camera is NULL.");
   }
 
   memcpy(camera, &host->camera_external, sizeof(Camera));
@@ -73,11 +103,11 @@ LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
 
 LuminaryResult luminary_host_set_camera(Host* host, Camera* camera) {
   if (!host) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host is NULL.");
   }
 
   if (!camera) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Camera was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Camera is NULL.");
   }
 
   memcpy(&host->camera_external, camera, sizeof(Camera));

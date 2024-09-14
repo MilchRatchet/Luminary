@@ -56,6 +56,13 @@ LUMINARY_API LuminaryResult luminary_host_start_render(LuminaryHost* host);
 LUMINARY_API LuminaryResult luminary_host_skip_render(LuminaryHost* host);
 LUMINARY_API LuminaryResult luminary_host_stop_render(LuminaryHost* host);
 
+/*
+ * Returns the string identifying the host's current work.
+ * @param host Host instance.
+ * @param string The destination the address of the string will be written to. If the host is idle, NULL will be written.
+ */
+LUMINARY_API LuminaryResult luminary_host_get_current_work_string(const LuminaryHost* host, char** string);
+
 LUMINARY_API LuminaryResult luminary_host_set_enable_output(LuminaryHost* host, int enable_output);
 LUMINARY_API LuminaryResult luminary_host_get_last_render(LuminaryHost* host);
 
