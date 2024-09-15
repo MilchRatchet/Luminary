@@ -4,7 +4,9 @@
 
 #include "internal_error.h"
 
-typedef cnd_t ConditionVariable;
+struct ConditionVariable {
+  cnd_t;
+};
 
 LuminaryResult condition_variable_create(ConditionVariable** cond_var) {
   if (!cond_var) {

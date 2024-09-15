@@ -75,18 +75,18 @@ void luminary_write_log() {
   FILE* file = fopen("luminary.log", "wb");
 
   if (!file) {
-    print_error("Could not write log to file.");
+    luminary_print_error("Could not write log to file.");
     return;
   }
 
   fwrite(log_buffer, log_buffer_offset, 1, file);
   fclose(file);
 
-  print_info("Log written to file.");
+  luminary_print_info("Log written to file.");
 }
 
 static void exit_program() {
-  write_log();
+  luminary_write_log();
   puts("Press enter to close...");
   getchar();
   exit(SIGABRT);

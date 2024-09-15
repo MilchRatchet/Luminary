@@ -1,6 +1,8 @@
 #ifndef LUMINARY_TEXTURE_H
 #define LUMINARY_TEXTURE_H
 
+#include "utils.h"
+
 enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1, TexDataUINT16 = 2 } typedef TextureDataType;
 enum TextureWrappingMode { TexModeWrap = 0, TexModeClamp = 1, TexModeMirror = 2, TexModeBorder = 3 } typedef TextureWrappingMode;
 enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
@@ -10,10 +12,10 @@ enum TextureMipmapMode { TexMipmapNone = 0, TexMipmapGenerate = 1 } typedef Text
 enum TextureReadMode { TexReadModeNormalized = 0, TexReadModeElement = 1 } typedef TextureReadMode;
 
 struct Texture {
-  unsigned int width;
-  unsigned int height;
-  unsigned int depth;
-  unsigned int pitch;
+  uint32_t width;
+  uint32_t height;
+  uint32_t depth;
+  uint32_t pitch;
   TextureDataType type;
   TextureWrappingMode wrap_mode_S;
   TextureWrappingMode wrap_mode_T;
@@ -23,10 +25,10 @@ struct Texture {
   TextureFilterMode filter;
   TextureMipmapMode mipmap;
   TextureReadMode read_mode;
-  int mipmap_max_level;
+  uint32_t mipmap_max_level;
   void* data;
   float gamma;
-  unsigned int num_components;
+  uint32_t num_components;
 } typedef Texture;
 
 LuminaryResult texture_create(

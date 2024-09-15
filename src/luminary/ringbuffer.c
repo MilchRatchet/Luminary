@@ -1,13 +1,15 @@
+#include <string.h>
+
 #include "internal_error.h"
 #include "utils.h"
 
-struct RingBuffer {
+struct LuminaryRingBuffer {
   void* memory;
   size_t size;
   size_t total_allocated_memory;
   size_t ptr;
   size_t last_entry_size;
-} typedef RingBuffer;
+};
 
 LuminaryResult _ringbuffer_create(RingBuffer** _buffer, size_t size, const char* buf_name, const char* func, uint32_t line) {
   if (!_buffer) {
@@ -19,11 +21,11 @@ LuminaryResult _ringbuffer_create(RingBuffer** _buffer, size_t size, const char*
   }
 
   RingBuffer* buffer;
-  __FAILURE_HANDLE(_host_malloc(&buffer, sizeof(RingBuffer), buf_name, func, line));
+  __FAILURE_HANDLE(_host_malloc((void**) &buffer, sizeof(RingBuffer), buf_name, func, line));
 
   memset(buffer, 0, sizeof(RingBuffer));
 
-  __FAILURE_HANDLE(_host_malloc(&buffer->memory, size, buf_name, func, line));
+  __FAILURE_HANDLE(_host_malloc((void**) &buffer->memory, size, buf_name, func, line));
   buffer->size                   = size;
   buffer->total_allocated_memory = 0;
   buffer->ptr                    = 0;
@@ -51,7 +53,7 @@ LuminaryResult ringbuffer_allocate_entry(RingBuffer* buffer, size_t entry_size, 
   if (buffer->ptr + entry_size > buffer->size) {
     const size_t total_size_this_allocation = (buffer->size - buffer->ptr) + entry_size;
 
-    if (buffer->total_allocated_memory + entry_size > buffer->size) {
+    if (buffer->total_allocated_memory + total_size_this_allocation > buffer->size) {
       __RETURN_ERROR(
         LUMINARY_ERROR_OUT_OF_MEMORY, "Insufficient ring buffer size to allocate this entry due to fragmentation. Requested size: %zu.",
         entry_size);
@@ -101,8 +103,8 @@ LuminaryResult _ringbuffer_destroy(RingBuffer** buffer, const char* buf_name, co
     __RETURN_ERROR(LUMINARY_ERROR_MEMORY_LEAK, "Attempted to destroy ringbuffer that has entries that have not been released.");
   }
 
-  __FAILURE_HANDLE(_host_free((*buffer)->memory, buf_name, func, line));
-  __FAILURE_HANDLE(_host_free(buffer, buf_name, func, line));
+  __FAILURE_HANDLE(_host_free((void**) (*buffer)->memory, buf_name, func, line));
+  __FAILURE_HANDLE(_host_free((void**) buffer, buf_name, func, line));
 
   return LUMINARY_SUCCESS;
 }

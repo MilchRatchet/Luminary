@@ -53,7 +53,7 @@ LuminaryResult thread_start(Thread* thread, LuminaryResult (*func)(void* args), 
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Thread is already running.");
   }
 
-  thrd_start_t start_func = _thread_main;
+  const thrd_start_t start_func = (thrd_start_t) _thread_main;
 
   thread->main_args->func = func;
   thread->main_args->args = args;

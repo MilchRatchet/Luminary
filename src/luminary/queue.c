@@ -5,7 +5,7 @@
 #include "mutex.h"
 #include "utils.h"
 
-struct Queue {
+struct LuminaryQueue {
   void* buffer;
   size_t element_count;
   size_t element_size;
@@ -14,7 +14,7 @@ struct Queue {
   size_t elements_in_queue;
   Mutex* mutex;
   ConditionVariable* cond_var;
-} typedef Queue;
+};
 
 LuminaryResult _queue_create(
   Queue** _queue, size_t size_of_element, size_t num_elements, const char* buf_name, const char* func, uint32_t line) {
@@ -31,11 +31,11 @@ LuminaryResult _queue_create(
   }
 
   Queue* queue;
-  __FAILURE_HANDLE(_host_malloc(&queue, sizeof(Queue), buf_name, func, line));
+  __FAILURE_HANDLE(_host_malloc((void**) &queue, sizeof(Queue), buf_name, func, line));
 
   memset(queue, 0, sizeof(Queue));
 
-  __FAILURE_HANDLE(_host_malloc(&queue->buffer, size_of_element * num_elements, buf_name, func, line));
+  __FAILURE_HANDLE(_host_malloc((void**) &queue->buffer, size_of_element * num_elements, buf_name, func, line));
   queue->element_count     = num_elements;
   queue->element_size      = size_of_element;
   queue->write_ptr         = 0;
@@ -69,7 +69,7 @@ LuminaryResult queue_push(Queue* queue, void* object) {
 
   __FAILURE_HANDLE(mutex_lock(queue->mutex));
 
-  uint8_t* dst_ptr = ((uint8_t) (queue->buffer)) + (queue->write_ptr * queue->element_size);
+  uint8_t* dst_ptr = ((uint8_t*) (queue->buffer)) + (queue->write_ptr * queue->element_size);
 
   memcpy(dst_ptr, object, queue->element_size);
 
@@ -104,7 +104,7 @@ LuminaryResult queue_pop(Queue* queue, void* object, bool* success) {
 
   __FAILURE_HANDLE(mutex_lock(queue->mutex));
 
-  uint8_t* src_ptr = ((uint8_t) (queue->buffer)) + (queue->read_ptr * queue->element_size);
+  uint8_t* src_ptr = ((uint8_t*) (queue->buffer)) + (queue->read_ptr * queue->element_size);
 
   memcpy(object, src_ptr, queue->element_size);
 
@@ -138,7 +138,7 @@ LuminaryResult queue_pop_blocking(Queue* queue, void* object) {
     __FAILURE_HANDLE(condition_variable_wait(queue->cond_var, queue->mutex));
   }
 
-  uint8_t* src_ptr = ((uint8_t) (queue->buffer)) + (queue->read_ptr * queue->element_size);
+  uint8_t* src_ptr = ((uint8_t*) (queue->buffer)) + (queue->read_ptr * queue->element_size);
 
   memcpy(object, src_ptr, queue->element_size);
 
@@ -170,8 +170,8 @@ LuminaryResult _queue_destroy(Queue** queue, const char* buf_name, const char* f
 
   __FAILURE_HANDLE(mutex_destroy(&((*queue)->mutex)));
   __FAILURE_HANDLE(condition_variable_destroy(&((*queue)->cond_var)));
-  __FAILURE_HANDLE(_host_free(&((*queue)->buffer), buf_name, func, line));
-  __FAILURE_HANDLE(_host_free(queue, buf_name, func, line));
+  __FAILURE_HANDLE(_host_free((void**) &((*queue)->buffer), buf_name, func, line));
+  __FAILURE_HANDLE(_host_free((void**) queue, buf_name, func, line));
 
   return LUMINARY_SUCCESS;
 }

@@ -12,11 +12,11 @@
 #include <time.h>
 #endif
 
-struct WallTime {
+struct LuminaryWallTime {
   const char* string;
   uint64_t time_point;
   double time;
-} typedef WallTime;
+};
 
 static uint64_t _wall_time_get_time(void) {
 #ifdef _WIN32

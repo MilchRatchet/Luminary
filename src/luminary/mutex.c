@@ -6,7 +6,9 @@
 
 #include "internal_error.h"
 
-typedef mtx_t Mutex;
+struct Mutex {
+  mtx_t;
+};
 
 LuminaryResult mutex_create(Mutex** mutex) {
   if (!mutex) {

@@ -26,7 +26,7 @@ LuminaryResult _array_create(
   }
 
   void* array;
-  __FAILURE_HANDLE(_host_malloc(&array, size_of_element * num_elements + sizeof(ArrayHeader), buf_name, func, line));
+  __FAILURE_HANDLE(_host_malloc((void**) &array, size_of_element * num_elements + sizeof(ArrayHeader), buf_name, func, line));
 
   ArrayHeader* header = array;
 
@@ -55,7 +55,7 @@ LuminaryResult _array_resize(void** array, size_t num_elements, const char* buf_
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
   }
 
-  __FAILURE_HANDLE(_host_realloc(&header, header->size_of_element * num_elements, buf_name, func, line));
+  __FAILURE_HANDLE(_host_realloc((void**) &header, header->size_of_element * num_elements, buf_name, func, line));
 
   header->allocated_num_elements = num_elements;
   header->num_elements           = (header->num_elements < num_elements) ? header->num_elements : num_elements;
@@ -80,7 +80,7 @@ LuminaryResult _array_destroy(void** array, const char* buf_name, const char* fu
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
   }
 
-  __FAILURE_HANDLE(_host_free(&header, buf_name, func, line));
+  __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
 
   *array = (void*) 0;
 
