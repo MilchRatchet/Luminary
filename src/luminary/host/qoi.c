@@ -51,7 +51,7 @@ int store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, c
   return ret;
 }
 
-void* qoi_encode_RGBA8(const TextureRGBA* tex, int* encoded_size) {
+void* qoi_encode_RGBA8(const Texture* tex, int* encoded_size) {
   if (!encoded_size || !tex) {
     return (void*) 0;
   }
@@ -73,15 +73,15 @@ void* qoi_encode_RGBA8(const TextureRGBA* tex, int* encoded_size) {
   return qoi_encode(tex->data, &desc, encoded_size);
 }
 
-TextureRGBA* qoi_decode_RGBA8(const void* data, const int size) {
+Texture* qoi_decode_RGBA8(const void* data, const int size) {
   if (!data) {
-    return (TextureRGBA*) 0;
+    return (Texture*) 0;
   }
 
   qoi_desc desc;
   void* decoded_data = qoi_decode(data, size, &desc, 4);
 
-  TextureRGBA* tex = malloc(sizeof(TextureRGBA));
+  Texture* tex = malloc(sizeof(Texture));
   texture_create(tex, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, 4, TexStorageCPU);
 
   return tex;

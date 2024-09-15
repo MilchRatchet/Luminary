@@ -54,16 +54,16 @@ void wavefront_init(WavefrontContent** content) {
   (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_NORMAL]      = TEXTURE_NONE;
 
-  (*content)->maps[WF_ALBEDO]           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps[WF_ALBEDO]           = (Texture*) malloc(sizeof(Texture) * 1);
   (*content)->maps_count[WF_ALBEDO]     = 0;
   (*content)->maps_length[WF_ALBEDO]    = 1;
-  (*content)->maps[WF_LUMINANCE]        = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps[WF_LUMINANCE]        = (Texture*) malloc(sizeof(Texture) * 1);
   (*content)->maps_count[WF_LUMINANCE]  = 0;
   (*content)->maps_length[WF_LUMINANCE] = 1;
-  (*content)->maps[WF_MATERIAL]         = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps[WF_MATERIAL]         = (Texture*) malloc(sizeof(Texture) * 1);
   (*content)->maps_count[WF_MATERIAL]   = 0;
   (*content)->maps_length[WF_MATERIAL]  = 1;
-  (*content)->maps[WF_NORMAL]           = (TextureRGBA*) malloc(sizeof(TextureRGBA) * 1);
+  (*content)->maps[WF_NORMAL]           = (Texture*) malloc(sizeof(Texture) * 1);
   (*content)->maps_count[WF_NORMAL]     = 0;
   (*content)->maps_length[WF_NORMAL]    = 1;
 
@@ -250,7 +250,7 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
   uint16_t texture_id = find_texture(content->texture_list, hash, type);
 
   if (texture_id == TEXTURE_NONE) {
-    ensure_capacity(content->maps[type], content->maps_count[type], content->maps_length[type], sizeof(TextureRGBA));
+    ensure_capacity(content->maps[type], content->maps_count[type], content->maps_length[type], sizeof(Texture));
     texture_id = content->maps_count[type]++;
     add_texture(content->texture_list, hash, type, texture_id);
     content->maps[type][texture_id] = png_load_from_file(path);

@@ -133,8 +133,8 @@ static void raytrace_load_moon_textures(RaytraceInstance* instance) {
     crash_message("Failed to load moon_normal texture.");
   }
 
-  TextureRGBA moon_albedo_tex = png_load(moon_albedo_data, moon_albedo_data_length, "moon_albedo.png");
-  TextureRGBA moon_normal_tex = png_load(moon_normal_data, moon_normal_data_length, "moon_normal.png");
+  Texture moon_albedo_tex = png_load(moon_albedo_data, moon_albedo_data_length, "moon_albedo.png");
+  Texture moon_normal_tex = png_load(moon_normal_data, moon_normal_data_length, "moon_normal.png");
 
   texture_create_atlas(&instance->sky_moon_albedo_tex, &moon_albedo_tex, 1);
   texture_create_atlas(&instance->sky_moon_normal_tex, &moon_normal_tex, 1);

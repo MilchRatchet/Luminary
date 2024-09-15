@@ -363,7 +363,7 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
     texture_free_atlas(instance->cloud_noise, 3);
   }
 
-  TextureRGBA noise_tex[3];
+  Texture noise_tex[3];
   texture_create(
     noise_tex + 0, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, CLOUD_SHAPE_RES, (void*) 0, TexDataUINT8, 4, TexStorageGPU);
   texture_create(

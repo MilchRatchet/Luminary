@@ -175,7 +175,7 @@ LUMINARY_KERNEL void mipmap_generate_level_2D_RGBAF(cudaTextureObject_t src, cud
   }
 }
 
-extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, TextureRGBA* tex) {
+extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Texture* tex) {
   const unsigned int num_levels = device_mipmap_compute_max_level(tex);
 
   cudaTextureFilterMode filter_mode = texture_get_filter_mode(tex);
@@ -271,7 +271,7 @@ extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Textur
   }
 }
 
-extern "C" unsigned int device_mipmap_compute_max_level(TextureRGBA* tex) {
+extern "C" unsigned int device_mipmap_compute_max_level(Texture* tex) {
   unsigned int max_dim;
 
   switch (tex->dim) {

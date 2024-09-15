@@ -129,7 +129,7 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
 
   raytrace_update_device_scene(instance);
 
-  TextureRGBA luts_hdri_tex[2];
+  Texture luts_hdri_tex[2];
   texture_create(luts_hdri_tex + 0, dim, dim, 1, dim, (void*) 0, TexDataFP32, 4, TexStorageGPU);
   luts_hdri_tex[0].wrap_mode_S = TexModeWrap;
   luts_hdri_tex[0].wrap_mode_T = TexModeClamp;

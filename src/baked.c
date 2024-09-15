@@ -94,7 +94,7 @@ static void* memcpy_texture_to_cpu(void* textures_ptr, uint64_t* count) {
     void* source    = resource.res.pitch2D.devPtr;
     gpuErrchk(cudaMemcpy(cpu_ptr + offset, source, pitch * height, cudaMemcpyDeviceToHost));
 
-    TextureRGBA tex;
+    Texture tex;
     texture_create(&tex, width, height, 1, pitch / sizeof(RGBA8), (void*) (cpu_ptr + offset), TexDataUINT8, 4, TexStorageCPU);
 
     uint32_t encoded_size;
@@ -128,7 +128,7 @@ static void free_host_memory(void* ptr) {
 // Baked file format handlers
 ////////////////////////////////////////////////////////////////////
 
-static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
+static Texture* load_textures(FILE* file, uint64_t count, uint64_t offset) {
   const uint32_t header_element_size = 12;
   const uint64_t header_size         = header_element_size * count;
 
@@ -136,7 +136,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
   fseek(file, offset, SEEK_SET);
   fread(head, header_size, 1, file);
 
-  TextureRGBA* textures = malloc(sizeof(TextureRGBA) * count);
+  Texture* textures = malloc(sizeof(Texture) * count);
   uint32_t width, height, data_size;
   uint64_t total_length = 0;
 
@@ -160,7 +160,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
 
   for (uint64_t i = 0; i < count; i++) {
     const uint64_t size = (uint64_t) textures[i].data;
-    TextureRGBA* tex    = qoi_decode_RGBA8((void*) (encoded_data + encoded_offset), size);
+    Texture* tex    = qoi_decode_RGBA8((void*) (encoded_data + encoded_offset), size);
     textures[i].data    = tex->data;
     textures[i].pitch   = tex->width;
     free(tex);
@@ -171,7 +171,7 @@ static TextureRGBA* load_textures(FILE* file, uint64_t count, uint64_t offset) {
   return textures;
 }
 
-static void free_textures(TextureRGBA* textures, uint64_t count) {
+static void free_textures(Texture* textures, uint64_t count) {
   if (count == 0)
     return;
 
@@ -264,10 +264,10 @@ RaytraceInstance* load_baked(const char* filename, CommandlineOptions options) {
   fseek(file, head[6], SEEK_SET);
   fread(scene->materials, sizeof(PackedMaterial) * scene->materials_count, 1, file);
 
-  TextureRGBA* albedo_tex    = load_textures(file, instance->tex_atlas.albedo_length, head[7]);
-  TextureRGBA* luminance_tex = load_textures(file, instance->tex_atlas.luminance_length, head[8]);
-  TextureRGBA* material_tex  = load_textures(file, instance->tex_atlas.material_length, head[9]);
-  TextureRGBA* normal_tex    = load_textures(file, instance->tex_atlas.normal_length, head[10]);
+  Texture* albedo_tex    = load_textures(file, instance->tex_atlas.albedo_length, head[7]);
+  Texture* luminance_tex = load_textures(file, instance->tex_atlas.luminance_length, head[8]);
+  Texture* material_tex  = load_textures(file, instance->tex_atlas.material_length, head[9]);
+  Texture* normal_tex    = load_textures(file, instance->tex_atlas.normal_length, head[10]);
 
   TextureAtlas tex_atlas = {
     .albedo           = (DeviceBuffer*) 0,

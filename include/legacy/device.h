@@ -68,8 +68,8 @@ OptixBuildInputDisplacementMicromap micromap_displacement_build(RaytraceInstance
 ////////////////////////////////////////////////////////////////////
 // mipmap.cuh
 ////////////////////////////////////////////////////////////////////
-void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, TextureRGBA* tex);
-unsigned int device_mipmap_compute_max_level(TextureRGBA* tex);
+void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Texture* tex);
+unsigned int device_mipmap_compute_max_level(Texture* tex);
 
 ////////////////////////////////////////////////////////////////////
 // particle.cuh

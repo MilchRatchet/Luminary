@@ -258,47 +258,6 @@ struct Material {
   uint16_t normal_map;
 } typedef Material;
 
-struct TextureG {
-  unsigned int width;
-  unsigned int height;
-  float* data;
-} typedef TextureG;
-
-enum TextureDataType { TexDataFP32 = 0, TexDataUINT8 = 1, TexDataUINT16 = 2 } typedef TextureDataType;
-enum TextureWrappingMode { TexModeWrap = 0, TexModeClamp = 1, TexModeMirror = 2, TexModeBorder = 3 } typedef TextureWrappingMode;
-enum TextureDimensionType { Tex2D = 0, Tex3D = 1 } typedef TextureDimensionType;
-enum TextureStorageLocation { TexStorageCPU = 0, TexStorageGPU = 1 } typedef TextureStorageLocation;
-enum TextureFilterMode { TexFilterPoint = 0, TexFilterLinear = 1 } typedef TextureFilterMode;
-enum TextureMipmapMode { TexMipmapNone = 0, TexMipmapGenerate = 1 } typedef TextureMipmapMode;
-enum TextureReadMode { TexReadModeNormalized = 0, TexReadModeElement = 1 } typedef TextureReadMode;
-
-struct TextureRGBA {
-  unsigned int width;
-  unsigned int height;
-  unsigned int depth;
-  unsigned int pitch;
-  TextureDataType type;
-  TextureWrappingMode wrap_mode_S;
-  TextureWrappingMode wrap_mode_T;
-  TextureWrappingMode wrap_mode_R;
-  TextureDimensionType dim;
-  TextureStorageLocation storage;
-  TextureFilterMode filter;
-  TextureMipmapMode mipmap;
-  TextureReadMode read_mode;
-  int mipmap_max_level;
-  void* data;
-  float gamma;
-  unsigned int num_components;
-} typedef TextureRGBA;
-
-struct DeviceTexture {
-  cudaTextureObject_t tex;
-  float inv_width;
-  float inv_height;
-  float gamma;
-} typedef DeviceTexture;
-
 enum GBufferFlags {
   G_BUFFER_VOLUME_HIT           = 0b1,
   G_BUFFER_REFRACTION_IS_INSIDE = 0b10,

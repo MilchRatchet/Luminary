@@ -73,7 +73,7 @@ struct WavefrontContent {
   WavefrontMaterial* materials;
   unsigned int materials_length;
   unsigned int materials_count;
-  TextureRGBA* maps[4];
+  Texture* maps[4];
   unsigned int maps_length[4];
   unsigned int maps_count[4];
   WavefrontTextureList* texture_list;

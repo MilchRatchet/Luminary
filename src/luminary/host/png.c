@@ -298,21 +298,21 @@ static int _png_verify_header(const uint8_t* file, const size_t file_length) {
   return result;
 }
 
-static inline TextureRGBA _png_default_texture() {
+static inline Texture _png_default_texture() {
   RGBA8* data         = malloc(sizeof(RGBA8) * 4);
   RGBA8 default_pixel = {.r = 0, .g = 0, .b = 255, .a = 255};
   data[0]             = default_pixel;
   data[1]             = default_pixel;
   data[2]             = default_pixel;
   data[3]             = default_pixel;
-  TextureRGBA fallback;
+  Texture fallback;
 
   texture_create(&fallback, 2, 2, 1, 2, data, TexDataUINT8, 4, TexStorageCPU);
 
   return fallback;
 }
 
-static inline TextureRGBA _png_default_failure() {
+static inline Texture _png_default_failure() {
   error_message("File content is corrupted!");
   return _png_default_texture();
 }
@@ -432,7 +432,7 @@ static void _png_reconstruction_4(uint8_t* line, const uint32_t line_length, con
   }
 }
 
-TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* hint_name) {
+Texture png_load(const uint8_t* file, const size_t file_length, const char* hint_name) {
   if (_png_verify_header(file, file_length)) {
     error_message("File header does not correspond to png!");
     return _png_default_texture();
@@ -507,7 +507,7 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
 
   const uint32_t byte_per_pixel = byte_per_channel * num_channels;
 
-  TextureRGBA result;
+  Texture result;
   const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
   texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, 4, TexStorageCPU);
 
@@ -733,7 +733,7 @@ TextureRGBA png_load(const uint8_t* file, const size_t file_length, const char* 
   return result;
 }
 
-TextureRGBA png_load_from_file(const char* filename) {
+Texture png_load_from_file(const char* filename) {
   log_message("Loading png file (%s)", filename);
 
   FILE* file = fopen(filename, "rb");
@@ -760,7 +760,7 @@ TextureRGBA png_load_from_file(const char* filename) {
   file_length += read_size;
   file_mem = safe_realloc(file_mem, file_length);
 
-  TextureRGBA tex = png_load(file_mem, file_length, filename);
+  Texture tex = png_load(file_mem, file_length, filename);
 
   free(file_mem);
 
