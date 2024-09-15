@@ -39,4 +39,15 @@
 #include <luminary/ringbuffer.h>
 #endif /* LUMINARY_INCLUDE_EXTRA_UTILS */
 
+/*
+ * Initializes all internal utilities necessary for Luminary to function correctly. This must be called exactly once before any other API
+ * functions.
+ */
+LUMINARY_API void luminary_init();
+
+/*
+ * Shuts down all internal utilities necessary for Luminary to function correctly. This may only be called after luminary_init.
+ */
+LUMINARY_API void luminary_shutdown();
+
 #endif /* LUMINARY_H */
