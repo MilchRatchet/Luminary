@@ -443,24 +443,24 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
     }
 
     switch (device.scene.camera.filter) {
-      case FILTER_NONE:
+      case LUMINARY_FILTER_NONE:
         break;
-      case FILTER_GRAY:
+      case LUMINARY_FILTER_GRAY:
         pixel = filter_gray(pixel);
         break;
-      case FILTER_SEPIA:
+      case LUMINARY_FILTER_SEPIA:
         pixel = filter_sepia(pixel);
         break;
-      case FILTER_GAMEBOY:
+      case LUMINARY_FILTER_GAMEBOY:
         pixel = filter_gameboy(pixel, x, y);
         break;
-      case FILTER_2BITGRAY:
+      case LUMINARY_FILTER_2BITGRAY:
         pixel = filter_2bitgray(pixel, x, y);
         break;
-      case FILTER_CRT:
+      case LUMINARY_FILTER_CRT:
         pixel = filter_crt(pixel, x, y);
         break;
-      case FILTER_BLACKWHITE:
+      case LUMINARY_FILTER_BLACKWHITE:
         pixel = filter_blackwhite(pixel, x, y);
         break;
     }

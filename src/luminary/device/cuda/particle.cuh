@@ -17,7 +17,7 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
     if (VOLUME_HIT_CHECK(task.hit_id))
       continue;
 
-    if (device.shading_mode == SHADING_ALBEDO) {
+    if (device.shading_mode == LUMINARY_SHADING_ALBEDO) {
       write_beauty_buffer(device.scene.particles.albedo, pixel, true);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
@@ -25,14 +25,14 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
       const float value = __saturatef((1.0f / dist) * 2.0f);
       write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
-    else if (device.shading_mode == SHADING_NORMAL) {
+    else if (device.shading_mode == LUMINARY_SHADING_NORMAL) {
       const GBufferData data = particle_generate_g_buffer(task, pixel);
 
       const vec3 normal = data.normal;
 
       write_beauty_buffer(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel, true);
     }
-    else if (device.shading_mode == SHADING_IDENTIFICATION) {
+    else if (device.shading_mode == LUMINARY_SHADING_IDENTIFICATION) {
       const uint32_t v = random_uint32_t_base(0x55555555, task.hit_id);
 
       const uint16_t r = v & 0x7ff;
@@ -47,7 +47,7 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
 
       write_beauty_buffer(color, pixel, true);
     }
-    else if (device.shading_mode == SHADING_LIGHTS) {
+    else if (device.shading_mode == LUMINARY_SHADING_LIGHTS) {
       write_beauty_buffer(device.scene.particles.albedo, pixel, true);
     }
   }

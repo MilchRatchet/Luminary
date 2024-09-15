@@ -32,17 +32,9 @@
 // Flags variables as unused so that no warning is emitted
 #define LUM_UNUSED(x) ((void) (x))
 
-#ifndef PI
-#define PI 3.141592653589f
-#endif
-
 #ifndef ONE_OVER_PI
 #define ONE_OVER_PI 0.31830988618f
 #endif
-
-#define OPTIXRT_NUM_GROUPS 3
-#define THREADS_PER_BLOCK 128
-#define BLOCKS_PER_GRID 2048
 
 enum LightID : uint32_t {
   LIGHT_ID_SUN               = 0xffffffffu,
@@ -55,16 +47,6 @@ enum LightID : uint32_t {
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
 enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
-
-enum ShadingMode {
-  SHADING_DEFAULT        = 0,
-  SHADING_ALBEDO         = 1,
-  SHADING_DEPTH          = 2,
-  SHADING_NORMAL         = 3,
-  SHADING_HEAT           = 4,
-  SHADING_IDENTIFICATION = 5,
-  SHADING_LIGHTS         = 6
-} typedef ShadingMode;
 
 enum OutputVariable {
   OUTPUT_VARIABLE_BEAUTY            = 0,
@@ -298,78 +280,6 @@ struct RISSettings {
   int initial_reservoir_size;
   int num_light_rays;
 } typedef RISSettings;
-
-struct DevicePointers {
-  TraceTask* trace_tasks;
-  uint16_t* trace_counts;
-  TraceResult* trace_results;
-  uint16_t* task_counts;
-  uint16_t* task_offsets;
-  uint32_t* ior_stack;
-  float* frame_variance;
-  RGBF* frame_accumulate;
-  RGBF* frame_direct_buffer;
-  RGBF* frame_direct_accumulate;
-  RGBF* frame_indirect_buffer;
-  RGBF* frame_indirect_accumulate;
-  RGBF* frame_post;
-  RGBF* frame_final;
-  RGBF* albedo_buffer;
-  RGBF* normal_buffer;
-  RGBF* records;
-  XRGB8* buffer_8bit;
-  uint32_t* hit_id_history;
-  uint8_t* state_buffer;
-  const DeviceTexture* albedo_atlas;
-  const DeviceTexture* luminance_atlas;
-  const DeviceTexture* material_atlas;
-  const DeviceTexture* normal_atlas;
-  const DeviceTexture* cloud_noise;
-  const DeviceTexture* sky_ms_luts;
-  const DeviceTexture* sky_tm_luts;
-  const DeviceTexture* sky_hdri_luts;
-  const DeviceTexture* sky_moon_albedo_tex;
-  const DeviceTexture* sky_moon_normal_tex;
-  const DeviceTexture* bsdf_energy_lut;
-  const uint16_t* bluenoise_1D;
-  const uint32_t* bluenoise_2D;
-} typedef DevicePointers;
-
-struct DeviceConstantMemory {
-  DevicePointers ptrs;
-  Scene scene;
-  RISSettings ris_settings;
-  BridgeSettings bridge_settings;
-  uint16_t user_selected_x;
-  uint16_t user_selected_y;
-  int max_ray_depth;
-  int pixels_per_thread;
-  int depth;
-  float temporal_frames;
-  int undersampling;
-  int denoiser;
-  int width;
-  int height;
-  int internal_width;
-  int internal_height;
-  vec3 sun_pos;
-  vec3 moon_pos;
-  int shading_mode;
-  OutputVariable output_variable;
-  RGBF* bloom_scratch;
-  RayEmitter emitter;
-  int accumulate;
-  OptixTraversableHandle optix_bvh;
-  OptixTraversableHandle optix_bvh_shadow;
-  OptixTraversableHandle optix_bvh_light;
-  OptixTraversableHandle optix_bvh_particles;
-  Node8* bvh_nodes;
-  TraversalTriangle* bvh_triangles;
-  Quad* particle_quads;
-  LightTreeNode8Packed* light_tree_nodes_8;
-  uint2* light_tree_paths;
-  float* bridge_lut;
-} typedef DeviceConstantMemory;
 
 struct OptixKernel {
   OptixPipeline pipeline;

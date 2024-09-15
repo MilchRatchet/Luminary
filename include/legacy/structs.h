@@ -5,8 +5,6 @@
 #include <cuda_runtime_api.h>
 #include <stdint.h>
 
-#define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size");
-
 // This struct is stored as a struct of arrays, members are grouped into 16 bytes where possible. Padding is not required.
 #define INTERLEAVED_STORAGE
 // Round the size of an element in an interleaved buffer to the next multiple of 16 bytes
@@ -322,31 +320,5 @@ struct GBufferData {
   /* IOR of medium on the other side. */
   float ior_out;
 } typedef GBufferData;
-
-////////////////////////////////////////////////////////////////////
-// Kernel passing structs
-////////////////////////////////////////////////////////////////////
-
-struct ShadingTask {
-  uint32_t hit_id;
-  ushort2 index;
-  vec3 position;  // (Origin if sky)
-  vec3 ray;
-} typedef ShadingTask;
-LUM_STATIC_SIZE_ASSERT(ShadingTask, 32);
-
-struct TraceTask {
-  uint32_t padding;
-  ushort2 index;
-  vec3 origin;
-  vec3 ray;
-} typedef TraceTask;
-LUM_STATIC_SIZE_ASSERT(TraceTask, 32);
-
-struct TraceResult {
-  float depth;
-  uint32_t hit_id;
-} typedef TraceResult;
-LUM_STATIC_SIZE_ASSERT(TraceResult, 8);
 
 #endif /* STRUCTS_H */

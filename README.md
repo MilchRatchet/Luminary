@@ -109,7 +109,7 @@ In realtime mode, which is used by default, you can control the camera through `
 # Building
 
 Requirements:
-- CUDA Toolkit 12.1
+- CUDA Toolkit 12.6
 - Optix 8.0 SDK
 - SDL2 and SDL2_ttf
 - Modern CMake
@@ -144,11 +144,11 @@ If `cmake` fails to find some packages you will have to specify the directory. F
 ## Windows
 
 Additional requirements:
-- MSVC
+- MSVC 14.40 or later
 - Windows SDK
 - clang-cl
 
-Clang-cl comes for example with mingw-w64 or Visual Studio. MSVC and Windows SDK come with Visual Studio. However, if at some point it is possible to get them standalone, that would probably also suffice. Note that the paths to the CUDA Toolkit, OptiX, SDL2 and SDL2_ttf must be defined in the PATH environment variable, otherwise they need to be defined in CMake using `-D{PACKAGENAME}_ROOT="{PATH}"`.
+All these dependencies come with Visual Studio. However, if at some point it is possible to get them standalone, that would probably also suffice. Note that the paths to the CUDA Toolkit, OptiX, SDL2 and SDL2_ttf must be defined in the PATH environment variable, otherwise they need to be defined in CMake using `-D{PACKAGENAME}_ROOT="{PATH}"`.
 
 Regarding MSVC and Windows SDK paths, there are two possibilities:
 
@@ -181,7 +181,7 @@ cd build && ninja
 or alternatively:
 ```
 mkdir build
-cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/10.0.19041.0" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
+cmake -B ./build -S . -G Ninja -DCMAKE_C_COMPILER="{Path}/clang-cl.exe" -DWIN_LIB_DIR="{Windows SDK Path}/10/Lib/{Version}" -DMSVC_LIB_DIR="{VS Path}/VC/Tools/MSVC/{Version}/lib/x64"
 cd build && ninja
 ```
 

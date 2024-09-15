@@ -7,7 +7,7 @@
 #define PHASE_KERNEL
 #define VOLUME_KERNEL
 
-#include "utils.h"
+#include "utils.cuh"
 
 extern "C" static __constant__ DeviceConstantMemory device;
 
@@ -17,7 +17,6 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "math.cuh"
 #include "memory.cuh"
 #include "shading_kernel.cuh"
-#include "utils.cuh"
 #include "volume_utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {

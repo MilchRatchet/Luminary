@@ -4,8 +4,7 @@
 #include <cuda_fp16.h>
 #include <cuda_runtime_api.h>
 
-#include "log.h"
-#include "utils.h"
+#include "../device_utils.h"
 
 #define NUM_THREADS (THREADS_PER_BLOCK * BLOCKS_PER_GRID)
 

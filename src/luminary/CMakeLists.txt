@@ -1,0 +1,144 @@
+#=============================================================
+# Find packages
+#=============================================================
+
+find_package(CUDAToolkit 12.1 REQUIRED QUIET)
+find_package(Optix 8.0 REQUIRED QUIET)
+
+if(NOT OptiX_VERSION)
+  set(OptiX_VERSION "8.0")
+endif()
+
+#=============================================================
+# Get source files
+#=============================================================
+
+file(GLOB luminary_cpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/zlib/*.c")
+file(GLOB luminary_cpu_header_files "${CMAKE_SOURCE_DIR}/include/luminary/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+file(GLOB luminary_gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/*.cu")
+file(GLOB luminary_gpu_header_files "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/*.cuh")
+file(GLOB luminary_api_header_files "${CMAKE_SOURCE_DIR}/include/luminary/*.h")
+
+#=============================================================
+# Targets
+#=============================================================
+
+add_library(LuminaryHeaders INTERFACE)
+add_library(Luminary::Headers ALIAS LuminaryHeaders)
+set_target_properties(LuminaryHeaders PROPERTIES EXPORT_NAME "Headers")
+target_include_directories(LuminaryHeaders INTERFACE "${CMAKE_SOURCE_DIR}/include")
+
+add_library(LuminaryShared SHARED)
+add_library(Luminary::Shared ALIAS LuminaryShared)
+set_target_properties(LuminaryShared PROPERTIES EXPORT_NAME "luminary" POSITION_INDEPENDENT_CODE TRUE)
+
+add_library(LuminaryStatic STATIC)
+add_library(Luminary::Static ALIAS LuminaryStatic)
+set_target_properties(LuminaryStatic PROPERTIES EXPORT_NAME "luminary" POSITION_INDEPENDENT_CODE TRUE)
+
+#=============================================================
+# Add Ceb
+#=============================================================
+
+add_subdirectory(Ceb)
+include_directories(${CEB_INCLUDE_DIR})
+
+#=============================================================
+# Create PTX files
+#=============================================================
+
+function(compile_ptx kernel_name)
+  # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
+  # TODO: This is currently always building for native. Add some logic that ties in with the normal CUDA kernel arch settings.
+  # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
+  add_custom_command(
+    OUTPUT
+      "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
+    COMMAND
+      ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${kernel_name}.cu"
+      -arch=native --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      -o "${kernel_name}.ptx"
+      -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
+    DEPENDS
+      "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${kernel_name}.cu"
+      "${luminary_gpu_header_files}"
+      "${luminary_cpu_header_files}"
+    COMMENT
+      "Compiling ${kernel_name}.ptx"
+  )
+
+  add_custom_target(
+    ${kernel_name}
+    DEPENDS
+      "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
+    COMMENT
+      "Target for compiled OptiX kernel."
+  )
+
+  add_dependencies(LuminaryShared ${kernel_name})
+  add_dependencies(LuminaryStatic ${kernel_name})
+endfunction()
+
+compile_ptx(optix_kernels)
+compile_ptx(optix_kernels_trace_particle)
+compile_ptx(optix_kernels_geometry)
+compile_ptx(optix_kernels_volume)
+compile_ptx(optix_kernels_particle)
+compile_ptx(optix_kernels_volume_bridges)
+
+#=============================================================
+# Embed files
+#=============================================================
+
+set(EMBED_FILE_NAME "embed_file")
+include(ceb_embed_files)
+ceb_embed_files(
+  PROJECT Luminary
+  OUTPUT ${EMBED_FILE_NAME}
+  INPUT
+  ${CMAKE_BINARY_DIR}/optix_kernels.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_trace_particle.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_geometry.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_volume.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_particle.ptx
+  ${CMAKE_BINARY_DIR}/optix_kernels_volume_bridges.ptx
+  ${CMAKE_SOURCE_DIR}/data/LuminaryFont.ttf
+  ${CMAKE_SOURCE_DIR}/data/moon/moon_albedo.png
+  ${CMAKE_SOURCE_DIR}/data/moon/moon_normal.png
+  ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_1D.bin
+  ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_2D.bin
+  ${CMAKE_SOURCE_DIR}/data/bridge/bridge_lut.bin
+)
+
+#=============================================================
+# Sources
+#=============================================================
+
+target_sources(LuminaryShared PRIVATE ${luminary_cpu_source_files} ${luminary_gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
+target_sources(LuminaryStatic PRIVATE ${luminary_cpu_source_files} ${luminary_gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
+
+#=============================================================
+# Include
+#=============================================================
+
+target_include_directories(LuminaryShared PRIVATE "${OptiX_INCLUDE}")
+target_include_directories(LuminaryShared PRIVATE CUDA::toolkit)
+target_include_directories(LuminaryShared PRIVATE Luminary::Headers)
+target_include_directories(LuminaryShared PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(LuminaryShared PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda")
+
+target_include_directories(LuminaryStatic PRIVATE "${OptiX_INCLUDE}")
+target_include_directories(LuminaryStatic PRIVATE CUDA::toolkit)
+target_include_directories(LuminaryStatic PRIVATE Luminary::Headers)
+target_include_directories(LuminaryStatic PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(LuminaryStatic PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda")
+
+#=============================================================
+# Linking
+#=============================================================
+
+target_link_libraries(LuminaryShared PRIVATE CUDA::cudart)
+target_link_libraries(LuminaryShared PRIVATE CUDA::cuda_driver)
+
+target_link_libraries(LuminaryStatic PRIVATE CUDA::cudart)
+target_link_libraries(LuminaryStatic PRIVATE CUDA::cuda_driver)

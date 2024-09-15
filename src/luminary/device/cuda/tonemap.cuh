@@ -172,7 +172,7 @@ __device__ RGBF tonemap_agx_custom(RGBF pixel) {
 }
 
 __device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
-  if (device.shading_mode != SHADING_DEFAULT)
+  if (device.shading_mode != LUMINARY_SHADING_DEFAULT)
     return pixel;
 
   if (device.output_variable == OUTPUT_VARIABLE_ALBEDO_GUIDANCE || device.output_variable == OUTPUT_VARIABLE_NORMAL_GUIDANCE)
@@ -209,24 +209,24 @@ __device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
   pixel.b = fmaxf(0.0f, pixel.b + grain);
 
   switch (device.scene.camera.tonemap) {
-    case TONEMAP_NONE:
+    case LUMINARY_TONEMAP_NONE:
       break;
-    case TONEMAP_ACES:
+    case LUMINARY_TONEMAP_ACES:
       pixel = tonemap_aces(pixel);
       break;
-    case TONEMAP_REINHARD:
+    case LUMINARY_TONEMAP_REINHARD:
       pixel = tonemap_reinhard(pixel);
       break;
-    case TONEMAP_UNCHARTED2:
+    case LUMINARY_TONEMAP_UNCHARTED2:
       pixel = tonemap_uncharted2(pixel);
       break;
-    case TONEMAP_AGX:
+    case LUMINARY_TONEMAP_AGX:
       pixel = tonemap_agx(pixel);
       break;
-    case TONEMAP_AGX_PUNCHY:
+    case LUMINARY_TONEMAP_AGX_PUNCHY:
       pixel = tonemap_agx_punchy(pixel);
       break;
-    case TONEMAP_AGX_CUSTOM:
+    case LUMINARY_TONEMAP_AGX_CUSTOM:
       pixel = tonemap_agx_custom(pixel);
       break;
   }

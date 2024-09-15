@@ -2,7 +2,7 @@
 
 #define OPTIX_KERNEL
 
-#include "utils.h"
+#include "utils.cuh"
 
 extern "C" static __constant__ DeviceConstantMemory device;
 
@@ -10,7 +10,6 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "math.cuh"
 #include "memory.cuh"
 #include "trace.cuh"
-#include "utils.cuh"
 
 enum OptixAlphaResult {
   OPTIX_ALPHA_RESULT_OPAQUE      = 0,
@@ -41,7 +40,7 @@ extern "C" __global__ void __raygen__optix() {
 
     float2 trace_result;
 
-    if (device.shading_mode == SHADING_HEAT) {
+    if (device.shading_mode == LUMINARY_SHADING_HEAT) {
       trace_result = make_float2(0.0f, __uint_as_float(hit_id));
     }
     else {

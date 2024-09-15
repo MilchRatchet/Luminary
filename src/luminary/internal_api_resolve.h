@@ -12,6 +12,8 @@
 typedef LuminaryVec3 vec3;
 typedef LuminaryRGBF RGBF;
 
+typedef LuminaryShadingMode ShadingMode;
+
 typedef LuminaryCamera Camera;
 typedef LuminaryApertureShape ApertureShape;
 typedef LuminaryFilter Filter;

@@ -1,9 +1,9 @@
 [submodule "Luminary/lib/zlib"]
-	path = src/zlib
+	path = src/luminary/zlib
 	url = https://github.com/madler/zlib.git
 [submodule "include/qoi"]
 	path = include/qoi
 	url = https://github.com/phoboslab/qoi.git
 [submodule "Ceb"]
-	path = Ceb
+	path = src/luminary/Ceb
 	url = https://github.com/MilchRatchet/Ceb.git

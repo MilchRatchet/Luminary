@@ -1,0 +1,2 @@
+add_subdirectory(luminary)
+add_subdirectory(mandarin_duck)

@@ -54,11 +54,11 @@ void scene_init(Scene** _scene) {
   scene->camera.lens_flare_threshold       = 1.0f;
   scene->camera.dithering                  = 1;
   scene->camera.far_clip_distance          = 50000.0f;
-  scene->camera.tonemap                    = TONEMAP_AGX;
+  scene->camera.tonemap                    = LUMINARY_TONEMAP_AGX;
   scene->camera.agx_custom_slope           = 1.0f;
   scene->camera.agx_custom_power           = 1.0f;
   scene->camera.agx_custom_saturation      = 1.0f;
-  scene->camera.filter                     = FILTER_NONE;
+  scene->camera.filter                     = LUMINARY_FILTER_NONE;
   scene->camera.wasd_speed                 = 1.0f;
   scene->camera.mouse_speed                = 1.0f;
   scene->camera.smooth_movement            = 0;
@@ -81,7 +81,7 @@ void scene_init(Scene** _scene) {
   scene->ocean.frequency                   = 0.12f;
   scene->ocean.choppyness                  = 4.0f;
   scene->ocean.refractive_index            = 1.333f;
-  scene->ocean.water_type                  = JERLOV_WATER_TYPE_IB;
+  scene->ocean.water_type                  = LUMINARY_JERLOV_WATER_TYPE_IB;
   scene->ocean.caustics_active             = 0;
   scene->ocean.caustics_ris_sample_count   = 32;
   scene->ocean.caustics_domain_scale       = 0.5f;

@@ -359,12 +359,12 @@ LUMINARY_KERNEL void process_trace_tasks() {
           }
         }
         else {
-          if (device.shading_mode == SHADING_HEAT && hit_id > HIT_TYPE_TRIANGLE_ID_LIMIT) {
+          if (device.shading_mode == LUMINARY_SHADING_HEAT && hit_id > HIT_TYPE_TRIANGLE_ID_LIMIT) {
             hit_id = 0;
           }
 
           float2 result;
-          result.x = (device.shading_mode == SHADING_HEAT) ? cost : depth;
+          result.x = (device.shading_mode == LUMINARY_SHADING_HEAT) ? cost : depth;
           result.y = __uint_as_float(hit_id);
 
           __stcs((float2*) (device.ptrs.trace_results + get_task_address(offset++)), result);

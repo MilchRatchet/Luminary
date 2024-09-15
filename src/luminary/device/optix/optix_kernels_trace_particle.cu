@@ -2,13 +2,12 @@
 
 #define OPTIX_KERNEL
 
-#include "utils.h"
+#include "utils.cuh"
 
 extern "C" static __constant__ DeviceConstantMemory device;
 
 #include "math.cuh"
 #include "memory.cuh"
-#include "utils.cuh"
 
 __device__ bool particle_opacity_cutout(const float2 coord) {
   const float dx = fabsf(coord.x - 0.5f);
@@ -73,7 +72,7 @@ extern "C" __global__ void __raygen__optix() {
         // Hit ID contains the triangle ID but we only store the actual particle / quad ID
         hit_id = HIT_TYPE_PARTICLE_MIN + (hit_id >> 1);
 
-        if (device.shading_mode == SHADING_HEAT) {
+        if (device.shading_mode == LUMINARY_SHADING_HEAT) {
           trace_result = make_float2(cost, __uint_as_float(hit_id));
         }
         else {

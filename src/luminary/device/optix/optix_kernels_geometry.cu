@@ -5,7 +5,7 @@
 #define SHADING_KERNEL
 #define OPTIX_KERNEL
 
-#include "utils.h"
+#include "utils.cuh"
 
 extern "C" static __constant__ DeviceConstantMemory device;
 
@@ -17,7 +17,6 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "memory.cuh"
 #include "shading_kernel.cuh"
 #include "toy_utils.cuh"
-#include "utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];

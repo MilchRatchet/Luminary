@@ -25,6 +25,7 @@
 
 #include <luminary/api_utils.h>
 #include <luminary/error.h>
+#include <luminary/structs.h>
 
 struct LuminaryHost;
 typedef struct LuminaryHost LuminaryHost;

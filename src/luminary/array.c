@@ -10,7 +10,7 @@ struct ArrayHeader {
   uint64_t allocated_num_elements;
   uint64_t padding[4];
 } typedef ArrayHeader;
-_Static_assert(sizeof(ArrayHeader) == 64u, "ArrayHeader must be 64 bytes in size.");
+LUM_STATIC_SIZE_ASSERT(ArrayHeader, 64u);
 
 // LUMARRAY
 #define ARRAY_HEADER_MAGIC (0x59415252414D554Cull)

@@ -13,7 +13,7 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
 
   // Intersect against the triangle we hit in primary visible in the last frame.
   // This is a heuristic to speed up the BVH traversal.
-  if (device.shading_mode != SHADING_HEAT && IS_PRIMARY_RAY) {
+  if (device.shading_mode != LUMINARY_SHADING_HEAT && IS_PRIMARY_RAY) {
     uint32_t t_id;
     TraversalTriangle tt;
     uint32_t material_id;

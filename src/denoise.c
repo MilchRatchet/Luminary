@@ -172,16 +172,16 @@ float denoise_auto_exposure(RaytraceInstance* instance) {
   float target_exposure = 1.0f;
 
   switch (instance->scene.camera.tonemap) {
-    case TONEMAP_NONE:
+    case LUMINARY_TONEMAP_NONE:
       target_exposure = 2.5f;
       break;
-    case TONEMAP_ACES:
+    case LUMINARY_TONEMAP_ACES:
       target_exposure = 5.0f;
       break;
-    case TONEMAP_REINHARD:
+    case LUMINARY_TONEMAP_REINHARD:
       target_exposure = 3.0f;
       break;
-    case TONEMAP_UNCHARTED2:
+    case LUMINARY_TONEMAP_UNCHARTED2:
       target_exposure = 3.0f;
       break;
     default:
