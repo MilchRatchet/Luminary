@@ -9,22 +9,27 @@
 #define CSI "\x1B["
 #endif
 
-#include <luminary/log.h>
 #include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-char* log_buffer;
-size_t log_buffer_size;
-size_t log_buffer_offset;
-char* print_buffer;
-int print_buffer_size;
+#include "internal_log.h"
+#include "mutex.h"
+#include "utils.h"
 
-int volatile_line = 0;
+static char* log_buffer;
+static size_t log_buffer_size;
+static size_t log_buffer_offset;
+static char* print_buffer;
+static int print_buffer_size;
 
-int write_logs = 1;
+static Mutex* mutex;
+
+static int volatile_line = 0;
+
+static int write_logs = 1;
 
 #ifdef _WIN32
 static void enable_windows_virtual_terminal_sequence() {
@@ -41,7 +46,7 @@ static void enable_windows_virtual_terminal_sequence() {
 /*
  * Initializes all log functionalities. Using logs before calling this function results in undefined behaviour.
  */
-void luminary_init_log() {
+void _log_init(void) {
   log_buffer        = malloc(8192);
   log_buffer_offset = 0;
   log_buffer_size   = 8192;
@@ -50,6 +55,14 @@ void luminary_init_log() {
   print_buffer_size = 4096;
 
   enable_windows_virtual_terminal_sequence();
+
+  // This is not allowed to fail.
+  LuminaryResult result = mutex_create(&mutex);
+
+  if (result != LUMINARY_SUCCESS) {
+    puts("Failed to initialize the mutex for the Luminary logger.");
+    exit(SIGABRT);
+  }
 }
 
 /*
@@ -127,14 +140,20 @@ static void write_to_log_buffer(const size_t size) {
 }
 
 void luminary_print_log(const char* format, ...) {
+  mutex_lock(mutex);
+
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
   va_end(args);
   write_to_log_buffer(size);
+
+  mutex_unlock(mutex);
 }
 
 void luminary_print_info(const char* format, ...) {
+  mutex_lock(mutex);
+
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -148,9 +167,13 @@ void luminary_print_info(const char* format, ...) {
   fflush(stdout);
 
   volatile_line = 0;
+
+  mutex_unlock(mutex);
 }
 
 void luminary_print_info_inline(const char* format, ...) {
+  mutex_lock(mutex);
+
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -164,9 +187,13 @@ void luminary_print_info_inline(const char* format, ...) {
   fflush(stdout);
 
   volatile_line = 1;
+
+  mutex_unlock(mutex);
 }
 
 void luminary_print_warn(const char* format, ...) {
+  mutex_lock(mutex);
+
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -180,9 +207,13 @@ void luminary_print_warn(const char* format, ...) {
   fflush(stdout);
 
   volatile_line = 0;
+
+  mutex_unlock(mutex);
 }
 
 void luminary_print_error(const char* format, ...) {
+  mutex_lock(mutex);
+
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -196,9 +227,13 @@ void luminary_print_error(const char* format, ...) {
   fflush(stdout);
 
   volatile_line = 0;
+
+  mutex_unlock(mutex);
 }
 
 void luminary_print_crash(const char* format, ...) {
+  mutex_lock(mutex);
+
   va_list args;
   va_start(args, format);
   int size = format_string(format, args);
@@ -212,6 +247,8 @@ void luminary_print_crash(const char* format, ...) {
   fflush(stdout);
 
   volatile_line = 0;
+
+  mutex_unlock(mutex);
 
   exit_program();
 }

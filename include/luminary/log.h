@@ -35,8 +35,6 @@
 extern "C" {
 #endif
 
-LUMINARY_API void luminary_init_log();
-
 /*
  * Writes a message to log only.
  * @param format Message which may contain format specifiers.

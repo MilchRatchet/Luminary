@@ -11,7 +11,7 @@
 
 struct QueueEntry {
   const char* name;
-  LuminaryResult (*function)(Host* host, void* args);
+  LuminaryResult (*function)(void* worker, void* args);
   void* args;
 } typedef QueueEntry;
 

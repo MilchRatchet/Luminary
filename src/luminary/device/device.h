@@ -1,8 +1,7 @@
 #ifndef LUMINARY_DEVICE_H
 #define LUMINARY_DEVICE_H
 
-#include <luminary/queue.h>
-#include <stdint.h>
+#include "utils.h"
 
 // Set of architectures supported by Luminary
 enum DeviceArch {
@@ -17,8 +16,9 @@ enum DeviceArch {
 } typedef DeviceArch;
 
 struct DeviceProperties {
-  const char* name;
+  const char name[256];
   DeviceArch arch;
+  uint32_t rt_core_version;
   size_t memory_size;
 } typedef DeviceProperties;
 
@@ -26,6 +26,15 @@ struct Device {
   uint32_t index;
   DeviceProperties properties;
   Queue* work_queue;
+  RingBuffer* ringbuffer;
+  WallTime* queue_wall_time;
+  bool exit_requested;
+  bool optix_callback_error;
 } typedef Device;
+
+void _device_init(void);
+
+LuminaryResult device_create(Device** device);
+LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

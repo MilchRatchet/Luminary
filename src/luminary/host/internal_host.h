@@ -1,7 +1,7 @@
 #ifndef LUMINARY_INTERNAL_HOST_H
 #define LUMINARY_INTERNAL_HOST_H
 
-#include "device.h"
+#include "device/device.h"
 #include "utils.h"
 
 struct LuminaryHost {
