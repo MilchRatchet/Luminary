@@ -58,11 +58,18 @@ LUMINARY_API LuminaryResult luminary_host_skip_render(LuminaryHost* host);
 LUMINARY_API LuminaryResult luminary_host_stop_render(LuminaryHost* host);
 
 /*
- * Returns the string identifying the host's current work.
+ * Returns the string identifying the host's current queue task.
  * @param host Host instance.
  * @param string The destination the address of the string will be written to. If the host is idle, NULL will be written.
  */
-LUMINARY_API LuminaryResult luminary_host_get_current_work_string(const LuminaryHost* host, char** string);
+LUMINARY_API LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, char** string);
+
+/*
+ * Returns the wall time that the host's current queue task has thus far taken up.
+ * @param host Host instance.
+ * @param time The destination the time will be written to. The time is given in seconds. If the host is idle, 0.0 will be returned.
+ */
+LUMINARY_API LuminaryResult luminary_host_get_queue_time(const LuminaryHost* host, double* time);
 
 LUMINARY_API LuminaryResult luminary_host_set_enable_output(LuminaryHost* host, int enable_output);
 LUMINARY_API LuminaryResult luminary_host_get_last_render(LuminaryHost* host);

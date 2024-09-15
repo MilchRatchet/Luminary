@@ -1,6 +1,13 @@
 #include "internal_error.h"
-#include "internal_ringbuffer.h"
 #include "utils.h"
+
+struct RingBuffer {
+  void* memory;
+  size_t size;
+  size_t total_allocated_memory;
+  size_t ptr;
+  size_t last_entry_size;
+} typedef RingBuffer;
 
 LuminaryResult _ringbuffer_create(RingBuffer** _buffer, size_t size, const char* buf_name, const char* func, uint32_t line) {
   if (!_buffer) {

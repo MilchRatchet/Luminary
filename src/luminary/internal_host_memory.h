@@ -1,6 +1,6 @@
 #ifndef LUMINARY_INTERNAL_HOST_MEMORY_H
 #define LUMINARY_INTERNAL_HOST_MEMORY_H
 
-void _host_memory_init();
+void _host_memory_init(void);
 
 #endif /* LUMINARY_INTERNAL_HOST_MEMORY_H */

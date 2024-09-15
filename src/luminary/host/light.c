@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "bench.h"
 #include "buffer.h"
 #include "ceb.h"
 #include "device.h"
@@ -1149,8 +1148,6 @@ static float _uint16_t_to_float(const uint16_t v) {
 }
 
 void lights_process(Scene* scene, int dmm_active) {
-  bench_tic("Processing Lights");
-
   ////////////////////////////////////////////////////////////////////
   // Iterate over all triangles and find all light candidates.
   ////////////////////////////////////////////////////////////////////
@@ -1339,8 +1336,6 @@ void lights_process(Scene* scene, int dmm_active) {
   device_upload(tri_data.index_buffer, index_buffer, index_buffer_size);
 
   scene->triangle_lights_data = tri_data;
-
-  bench_toc();
 }
 
 void lights_load_bridge_lut() {

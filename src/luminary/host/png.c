@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bench.h"
 #include "log.h"
 #include "structs.h"
 #include "texture.h"
@@ -182,8 +181,6 @@ void png_store(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
   const PNGColortype color_type, const PNGBitdepth bit_depth) {
   log_message("Storing png file (%s) Size: %dx%d Depth: %d Colortype: %d", filename, width, height, bit_depth, color_type);
-  bench_tic("Storing PNG");
-
   const uint8_t bytes_per_channel = (bit_depth == PNG_BITDEPTH_8) ? 1 : 2;
 
   uint8_t bytes_per_pixel;
@@ -257,8 +254,6 @@ void png_store(
 
   free(compressed_image);
   free(filtered_image);
-
-  bench_toc();
 }
 
 static inline uint32_t _png_read_uint32_big_endian(const uint8_t* buffer) {

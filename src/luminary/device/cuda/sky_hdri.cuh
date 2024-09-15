@@ -1,7 +1,6 @@
 #ifndef CU_SKY_HDRI_H
 #define CU_SKY_HDRI_H
 
-#include "bench.h"
 #include "raytrace.h"
 #include "structs.h"
 #include "texture.h"
@@ -109,8 +108,6 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
 }
 
 extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
-  bench_tic((const char*) "Sky HDRI Computation");
-
   if (instance->scene.sky.hdri_initialized) {
     texture_free_atlas(instance->sky_hdri_luts, 2);
   }
@@ -163,8 +160,6 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   device_free(luts_hdri_tex[1].data, luts_hdri_tex[1].height * luts_hdri_tex[1].pitch * 1 * sizeof(float));
 
   raytrace_update_device_pointers(instance);
-
-  bench_toc();
 }
 
 extern "C" void sky_hdri_set_pos_to_cam(RaytraceInstance* instance) {

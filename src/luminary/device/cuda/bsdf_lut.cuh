@@ -1,7 +1,6 @@
 #ifndef CU_BSDF_LUT_H
 #define CU_BSDF_LUT_H
 
-#include "bench.h"
 #include "bsdf_utils.cuh"
 #include "random.cuh"
 #include "raytrace.h"
@@ -202,8 +201,6 @@ LUMINARY_KERNEL void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_i
 }
 
 extern "C" void bsdf_compute_energy_lut(RaytraceInstance* instance) {
-  bench_tic((const char*) "BSDF Energy LUT Computation");
-
   TextureRGBA luts[4];
   texture_create(&luts[BSDF_LUT_SS], BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, BSDF_LUT_SIZE, (void*) 0, TexDataUINT16, 1, TexStorageGPU);
   luts[BSDF_LUT_SS].wrap_mode_S = TexModeClamp;
@@ -249,8 +246,6 @@ extern "C" void bsdf_compute_energy_lut(RaytraceInstance* instance) {
   device_free(luts[BSDF_LUT_DIELEC_INV].data, lut_sizes[BSDF_LUT_DIELEC_INV]);
 
   raytrace_update_device_pointers(instance);
-
-  bench_toc();
 }
 
 #endif

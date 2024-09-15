@@ -3,7 +3,6 @@
 
 #include <cuda_runtime_api.h>
 
-#include "bench.h"
 #include "cloud_shadow.cuh"
 #include "math.cuh"
 #include "raytrace.h"
@@ -328,8 +327,6 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
 }
 
 extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
-  bench_tic((const char*) "Sky LUT Computation");
-
   if (instance->scene.sky.lut_initialized) {
     texture_free_atlas(instance->sky_tm_luts, 2);
     texture_free_atlas(instance->sky_ms_luts, 2);
@@ -398,8 +395,6 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   raytrace_update_device_pointers(instance);
 
   instance->scene.sky.lut_initialized = 1;
-
-  bench_toc();
 }
 
 #endif /* SHADING_KERNEL */

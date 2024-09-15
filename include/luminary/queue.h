@@ -24,6 +24,7 @@
 #define LUMINARY_QUEUE_H
 
 #include <luminary/api_utils.h>
+#include <luminary/error.h>
 
 struct LuminaryQueue;
 typedef struct LuminaryQueue LuminaryQueue;

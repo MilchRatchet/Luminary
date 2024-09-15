@@ -3,7 +3,6 @@
 #include <math.h>
 #include <stdlib.h>
 
-#include "bench.h"
 #include "buffer.h"
 #include "log.h"
 #include "utils.h"
@@ -21,8 +20,6 @@ static float random_float() {
  * which means we use 64 x 32 blocks.
  */
 void stars_generate(RaytraceInstance* instance) {
-  bench_tic("Generated Stars");
-
   const int grid_x = STARS_GRID_LD;
   const int grid_y = 32;
 
@@ -97,6 +94,4 @@ void stars_generate(RaytraceInstance* instance) {
 
   free(grid);
   free(offsets);
-
-  bench_toc();
 }

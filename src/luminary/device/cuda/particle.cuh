@@ -1,4 +1,4 @@
-#include "bench.h"
+
 #include "buffer.h"
 #include "math.cuh"
 #include "particle_utils.cuh"
@@ -111,8 +111,6 @@ LUMINARY_KERNEL void particle_kernel_generate(
 }
 
 void device_particle_generate(RaytraceInstance* instance) {
-  bench_tic((const char*) "Particles Generation");
-
   ParticlesInstance particles = instance->particles_instance;
 
   if (particles.vertex_buffer)
@@ -145,6 +143,4 @@ void device_particle_generate(RaytraceInstance* instance) {
   gpuErrchk(cudaDeviceSynchronize());
 
   instance->particles_instance = particles;
-
-  bench_toc();
 }

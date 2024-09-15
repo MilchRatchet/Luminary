@@ -1,6 +1,5 @@
 #include "optixrt_particle.h"
 
-#include "bench.h"
 #include "buffer.h"
 #include "device.h"
 #include "utils.h"
@@ -16,8 +15,6 @@
   }
 
 void optixrt_particle_init(RaytraceInstance* instance) {
-  bench_tic("Particles BVH Setup (OptiX)");
-
   OptixAccelBuildOptions build_options;
   memset(&build_options, 0, sizeof(OptixAccelBuildOptions));
   build_options.operation             = OPTIX_BUILD_OPERATION_BUILD;
@@ -99,8 +96,6 @@ void optixrt_particle_init(RaytraceInstance* instance) {
   device_update_symbol(optix_bvh_particles, instance->particles_instance.optix.traversable);
 
   instance->particles_instance.optix.initialized = 1;
-
-  bench_toc();
 }
 
 void optixrt_particle_clear(RaytraceInstance* instance) {

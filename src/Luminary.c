@@ -3,7 +3,6 @@
 #include <stdlib.h>
 
 #include "baked.h"
-#include "bench.h"
 #include "config.h"
 #include "device.h"
 #include "log.h"

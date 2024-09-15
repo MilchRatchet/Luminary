@@ -20,7 +20,7 @@ LUM_STATIC_SIZE_ASSERT(struct HostMemoryHeader, 64);
 // TODO: Do I need to mark this as atomic????
 static uint64_t _host_memory_total_allocation;
 
-void _host_memory_init() {
+void _host_memory_init(void) {
   atomic_store(&_host_memory_total_allocation, 0);
 }
 

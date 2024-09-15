@@ -9,6 +9,12 @@
 
 #include "sky_defines.h"
 
+struct QueueEntry {
+  const char* name;
+  LuminaryResult (*function)(Host* host, void* args);
+  void* args;
+} typedef QueueEntry;
+
 #ifndef PI
 #define PI 3.141592653589f
 #endif

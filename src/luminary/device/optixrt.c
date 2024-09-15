@@ -7,7 +7,6 @@
 
 #define UTILS_NO_DEVICE_TABLE
 
-#include "bench.h"
 #include "buffer.h"
 #include "ceb.h"
 #include "device.h"
@@ -239,8 +238,6 @@ void optixrt_build_bvh(
 }
 
 void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
-  bench_tic("Kernel Setup (OptiX)");
-
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.ptx", &(instance->optix_kernel), options);
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel), options);
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.ptx", &(instance->optix_kernel_geometry), options);
@@ -248,10 +245,6 @@ void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_particle.ptx", &(instance->optix_kernel_particle), options);
   optixrt_compile_kernel(
     instance->optix_ctx, (char*) "optix_kernels_volume_bridges.ptx", &(instance->optix_kernel_volume_bridges), options);
-
-  bench_toc();
-
-  bench_tic("BVH Setup (OptiX)");
 
   ////////////////////////////////////////////////////////////////////
   // Displacement Micromaps Building
@@ -298,8 +291,6 @@ void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   device_update_symbol(optix_bvh_light, instance->optix_bvh_light.traversable);
 
   instance->optix_bvh.initialized = 1;
-
-  bench_toc();
 }
 
 void optixrt_update_params(OptixKernel kernel) {

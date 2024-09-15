@@ -1,8 +1,20 @@
 #include <string.h>
 
+#include "cond_var.h"
 #include "internal_error.h"
-#include "internal_queue.h"
+#include "mutex.h"
 #include "utils.h"
+
+struct Queue {
+  void* buffer;
+  size_t element_count;
+  size_t element_size;
+  size_t read_ptr;
+  size_t write_ptr;
+  size_t elements_in_queue;
+  Mutex* mutex;
+  ConditionVariable* cond_var;
+} typedef Queue;
 
 LuminaryResult _queue_create(
   Queue** _queue, size_t size_of_element, size_t num_elements, const char* buf_name, const char* func, uint32_t line) {
@@ -107,7 +119,7 @@ LuminaryResult queue_pop(Queue* queue, void* object, bool* success) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult queue_pop_blocking(LuminaryQueue* queue, void* object) {
+LuminaryResult queue_pop_blocking(Queue* queue, void* object) {
   if (!queue) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue was NULL.");
   }

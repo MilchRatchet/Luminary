@@ -27,4 +27,6 @@ typedef LuminaryRingBuffer RingBuffer;
 
 typedef LuminaryHost Host;
 
+typedef LuminaryWallTime WallTime;
+
 #endif /* LUMINARY_INTERNAL_API_RESOLVE */

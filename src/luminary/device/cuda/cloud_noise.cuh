@@ -6,7 +6,6 @@
 #include <math.h>
 #include <stdlib.h>
 
-#include "bench.h"
 #include "buffer.h"
 #include "log.h"
 #include "math.cuh"
@@ -360,8 +359,6 @@ LUMINARY_KERNEL void generate_weather_map(const int dim, const float seed, uint8
 #define CLOUD_WEATHER_RES 1024
 
 extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
-  bench_tic((const char*) "Cloud Noise Generation");
-
   if (instance->scene.sky.cloud.initialized) {
     texture_free_atlas(instance->cloud_noise, 3);
   }
@@ -396,8 +393,6 @@ extern "C" void device_cloud_noise_generate(RaytraceInstance* instance) {
   raytrace_update_device_pointers(instance);
 
   instance->scene.sky.cloud.initialized = 1;
-
-  bench_toc();
 }
 
 #endif /* CU_CLOUD_NOISE_H */

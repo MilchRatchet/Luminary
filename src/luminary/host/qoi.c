@@ -1,13 +1,11 @@
 #define QOI_IMPLEMENTATION
 #include "qoi/qoi.h"
 
-#include "bench.h"
 #include "log.h"
 #include "qoi.h"
 #include "texture.h"
 
 int store_as_qoi(const char* filename, const uint8_t* image, const uint32_t width, const uint32_t height, const uint8_t color_type) {
-  bench_tic("Storing QOI");
   char channels;
 
   switch (color_type) {
@@ -32,8 +30,6 @@ int store_as_qoi(const char* filename, const uint8_t* image, const uint32_t widt
     error_message("QOI image has size 0.");
     return 1;
   }
-
-  bench_toc();
 
   return 0;
 }

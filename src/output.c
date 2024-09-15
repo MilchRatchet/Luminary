@@ -9,7 +9,6 @@
 
 #include "SDL.h"
 #include "UI/UI.h"
-#include "bench.h"
 #include "buffer.h"
 #include "denoise.h"
 #include "device.h"
@@ -108,7 +107,6 @@ void offline_output(RaytraceInstance* instance) {
   const clock_t start_of_rt       = clock();
   clock_t last_frame              = start_of_rt;
   double moving_average_frametime = 0.0;
-  bench_tic("Raytracing");
   for (instance->temporal_frames = 0; instance->temporal_frames < instance->offline_samples; raytrace_increment(instance)) {
     raytrace_execute(instance);
     raytrace_update_ray_emitter(instance);
@@ -126,8 +124,6 @@ void offline_output(RaytraceInstance* instance) {
       1000.0f * moving_average_frametime * 0.25f);
     last_frame = current_frame;
   }
-
-  bench_toc();
 
   raytrace_free_work_buffers(instance);
 

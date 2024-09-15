@@ -9,7 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "bench.h"
 #include "log.h"
 #include "png.h"
 #include "structs.h"
@@ -545,7 +544,6 @@ static int read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangl
 }
 
 int wavefront_read_file(WavefrontContent* _content, const char* filename) {
-  bench_tic("Reading *.obj File");
   log_message("Reading *.obj file (%s)", filename);
 
   FILE* file = fopen(filename, "r");
@@ -696,8 +694,6 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
   free(path);
   free(read_buffer);
 
-  bench_toc();
-
   log_message("Mesh: Verts: %d Tris: %d", vertices_count, triangles_count);
 
   return 0;
@@ -741,8 +737,6 @@ PackedMaterial* wavefront_generate_texture_assignments(WavefrontContent* content
 }
 
 unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data) {
-  bench_tic("Converting Mesh");
-
   static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
   unsigned int count = content->triangles_length;
@@ -956,8 +950,6 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
   data->index_buffer   = (uint32_t*) realloc(data->index_buffer, sizeof(uint32_t) * 4 * index_triplet_count);
   data->index_count    = 3 * index_triplet_count;
   data->triangle_count = index_triplet_count;
-
-  bench_toc();
 
   return ptr;
 }

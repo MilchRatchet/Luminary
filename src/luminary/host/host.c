@@ -17,13 +17,15 @@
 void _host_queue_worker(Host* host) {
   while (!host->exit_requested) {
     QueueEntry entry;
-    queue_pop_blocking(host->work_queue, &entry);
+    __FAILURE_HANDLE(queue_pop_blocking(host->work_queue, &entry));
 
-    host->current_work_string = entry.name;
+    __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, entry.name));
+    __FAILURE_HANDLE(wall_time_start(host->queue_wall_time));
 
     __FAILURE_HANDLE(entry.function(host, entry.args));
 
-    host->current_work_string = (const char*) 0;
+    __FAILURE_HANDLE(wall_time_stop(host->queue_wall_time));
+    __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, (const char*) 0));
   }
 }
 
@@ -59,6 +61,7 @@ LuminaryResult luminary_host_create(Host** _host) {
 
   __FAILURE_HANDLE(queue_create(&host->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
   __FAILURE_HANDLE(ringbuffer_create(&host->ring_buffer, HOST_RINGBUFFER_SIZE));
+  __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
 
   __FAILURE_HANDLE(camera_get_default(&host->camera));
 
