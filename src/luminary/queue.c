@@ -14,20 +14,21 @@ struct LuminaryQueue {
   size_t elements_in_queue;
   Mutex* mutex;
   ConditionVariable* cond_var;
+  bool force_quit;
 };
 
 LuminaryResult _queue_create(
   Queue** _queue, size_t size_of_element, size_t num_elements, const char* buf_name, const char* func, uint32_t line) {
   if (!_queue) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue is NULL.");
   }
 
   if (size_of_element == 0) {
-    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Size of element was 0.");
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Size of element is 0.");
   }
 
   if (num_elements == 0) {
-    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Number of elements was 0.");
+    __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Number of elements is 0.");
   }
 
   Queue* queue;
@@ -41,6 +42,7 @@ LuminaryResult _queue_create(
   queue->write_ptr         = 0;
   queue->read_ptr          = 0;
   queue->elements_in_queue = 0;
+  queue->force_quit        = false;
 
   __FAILURE_HANDLE(mutex_create(&queue->mutex));
   __FAILURE_HANDLE(condition_variable_create(&queue->cond_var));
@@ -52,15 +54,15 @@ LuminaryResult _queue_create(
 
 LuminaryResult queue_push(Queue* queue, void* object) {
   if (!queue) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue is NULL.");
   }
 
   if (!queue->buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
   }
 
   if (!object) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Object was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Object is NULL.");
   }
 
   if (queue->elements_in_queue == queue->element_count) {
@@ -86,15 +88,15 @@ LuminaryResult queue_push(Queue* queue, void* object) {
 
 LuminaryResult queue_pop(Queue* queue, void* object, bool* success) {
   if (!queue) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue is NULL.");
   }
 
   if (!queue->buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
   }
 
   if (!object) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Object was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Object is NULL.");
   }
 
   if (queue->elements_in_queue == 0) {
@@ -119,23 +121,31 @@ LuminaryResult queue_pop(Queue* queue, void* object, bool* success) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult queue_pop_blocking(Queue* queue, void* object) {
+LuminaryResult queue_pop_blocking(Queue* queue, void* object, bool* success) {
   if (!queue) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue is NULL.");
   }
 
   if (!queue->buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
   }
 
   if (!object) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Object was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Object is NULL.");
   }
 
   __FAILURE_HANDLE(mutex_lock(queue->mutex));
 
   while (queue->elements_in_queue == 0) {
     __FAILURE_HANDLE(condition_variable_wait(queue->cond_var, queue->mutex));
+
+    if (queue->force_quit) {
+      __FAILURE_HANDLE(mutex_unlock(queue->mutex));
+
+      *success = false;
+
+      return LUMINARY_SUCCESS;
+    }
   }
 
   uint8_t* src_ptr = ((uint8_t*) (queue->buffer)) + (queue->read_ptr * queue->element_size);
@@ -148,25 +158,40 @@ LuminaryResult queue_pop_blocking(Queue* queue, void* object) {
 
   __FAILURE_HANDLE(mutex_unlock(queue->mutex));
 
+  *success = true;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult queue_flush_blocking(Queue* queue) {
+  if (!queue) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue is NULL.");
+  }
+
+  queue->force_quit = true;
+  __FAILURE_HANDLE(condition_variable_broadcast(queue->cond_var));
+
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult _queue_destroy(Queue** queue, const char* buf_name, const char* func, uint32_t line) {
   if (!queue) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue ptr was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Queue ptr is NULL.");
   }
 
   if (!(*queue)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue is NULL.");
   }
 
   if (!(*queue)->buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer was NULL.");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
   }
 
   if ((*queue)->write_ptr != (*queue)->read_ptr) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue is not empty.");
   }
+
+  __FAILURE_HANDLE(queue_flush_blocking(*queue));
 
   __FAILURE_HANDLE(mutex_destroy(&((*queue)->mutex)));
   __FAILURE_HANDLE(condition_variable_destroy(&((*queue)->cond_var)));

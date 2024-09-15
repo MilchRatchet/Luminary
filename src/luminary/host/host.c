@@ -17,7 +17,11 @@
 void _host_queue_worker(Host* host) {
   while (!host->exit_requested) {
     QueueEntry entry;
-    __FAILURE_HANDLE(queue_pop_blocking(host->work_queue, &entry));
+    bool success;
+    __FAILURE_HANDLE(queue_pop_blocking(host->work_queue, &entry, &success));
+
+    if (!success)
+      return;
 
     __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, entry.name));
     __FAILURE_HANDLE(wall_time_start(host->queue_wall_time));

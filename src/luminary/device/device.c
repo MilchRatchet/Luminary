@@ -160,7 +160,11 @@ LuminaryResult _device_get_properties(DeviceProperties* props, const uint32_t in
 static void _device_queue_worker(Device* device) {
   while (!device->exit_requested) {
     QueueEntry entry;
-    __FAILURE_HANDLE(queue_pop_blocking(device->work_queue, &entry));
+    bool success;
+    __FAILURE_HANDLE(queue_pop_blocking(device->work_queue, &entry, &success));
+
+    if (!success)
+      return;
 
     __FAILURE_HANDLE(wall_time_set_string(device->queue_wall_time, entry.name));
     __FAILURE_HANDLE(wall_time_start(device->queue_wall_time));
