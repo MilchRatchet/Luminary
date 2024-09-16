@@ -174,7 +174,8 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture mipmap mode is invalid.");
         case TexMipmapNone: {
           void* data_gpu;
-          size_t pitch_gpu = device_malloc_pitch((void**) &data_gpu, pitch * pixel_size, height);
+          size_t pitch_gpu;
+          device_malloc_pitch((void**) &data_gpu, pitch * pixel_size, height, &pitch_gpu);
 
           enum cudaMemcpyKind memcpy_kind;
           __FAILURE_HANDLE(_device_texture_get_copy_to_device_type(texture, &memcpy_kind));

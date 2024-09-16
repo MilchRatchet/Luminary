@@ -71,7 +71,7 @@ LuminaryResult wall_time_set_string(WallTime* wall_time, const char* string) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult wall_time_get_string(WallTime* wall_time, char** string) {
+LuminaryResult wall_time_get_string(WallTime* wall_time, const char** string) {
   if (!wall_time) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time is NULL.");
   }
@@ -101,6 +101,8 @@ LuminaryResult wall_time_get_time(WallTime* wall_time, double* time) {
   }
 
   wall_time->time = (wall_time->time_point != 0) ? _wall_time_get_time_diff(wall_time->time_point, _wall_time_get_time()) : 0.0f;
+
+  *time = wall_time->time;
 
   return LUMINARY_SUCCESS;
 }

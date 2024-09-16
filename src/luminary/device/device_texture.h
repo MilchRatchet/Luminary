@@ -9,7 +9,7 @@ struct DeviceTexture {
   float inv_width;
   float inv_height;
   float gamma;
-} typedef DeviceTexture;
+};
 
 LuminaryResult device_texture_create(DeviceTexture** device_texture, Texture* texture);
 LuminaryResult device_texture_destroy(DeviceTexture** device_texture);

@@ -73,6 +73,16 @@ typedef uint64_t LuminaryResult;
  */
 #define LUMINARY_ERROR_API_EXCEPTION (0x0000000000000080ull)
 
+/*
+ * Error in CUDA library.
+ */
+#define LUMINARY_ERROR_CUDA (0x0000000000000100ull)
+
+/*
+ * Error in OptiX library.
+ */
+#define LUMINARY_ERROR_OPTIX (0x0000000000000200ull)
+
 LUMINARY_API char* luminary_result_to_string(LuminaryResult result);
 
 #endif /* LUMINARY_API_ERROR_H */

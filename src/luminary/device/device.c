@@ -198,6 +198,8 @@ LuminaryResult device_create(Device** _device) {
   __FAILURE_HANDLE(ringbuffer_create(&device->ringbuffer, DEVICE_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&device->queue_wall_time));
 
+  CUDA_FAILURE_HANDLE(cudaSetDevice(device->index));
+
   _device = device;
 
   return LUMINARY_SUCCESS;

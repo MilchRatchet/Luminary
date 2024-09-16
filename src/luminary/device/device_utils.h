@@ -7,11 +7,31 @@
 
 #include "utils.h"
 
+#define LUMINARY_MAX_NUM_DEVICES 4
 #define OPTIXRT_NUM_GROUPS 3
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 2048
 
 struct DeviceTexture;
+typedef struct DeviceTexture DeviceTexture;
+
+////////////////////////////////////////////////////////////////////
+// Failure handles
+////////////////////////////////////////////////////////////////////
+
+#define CUDA_FAILURE_HANDLE(command)                                                                                                     \
+  const cudaError_t __cuda_err = command;                                                                                                \
+  if (__cuda_err != cudaSuccess) {                                                                                                       \
+    __RETURN_ERROR(                                                                                                                      \
+      LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", cudaGetErrorName(__cuda_err), cudaGetErrorString(__cuda_err), \
+      #command);                                                                                                                         \
+  }
+
+#define OPTIX_FAILURE_HANDLE(command)                                                                                            \
+  const OptixResult __optix_err = command;                                                                                       \
+  if (__optix_err != OPTIX_SUCCESS) {                                                                                            \
+    __RETURN_ERROR(LUMINARY_ERROR_OPTIX, "Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(res), res, #command); \
+  }
 
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs

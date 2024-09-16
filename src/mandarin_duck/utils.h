@@ -1,6 +1,8 @@
 #ifndef MANDARIN_DUCK_UTILS_H
 #define MANDARIN_DUCK_UTILS_H
 
+#define LUMINARY_INCLUDE_EXTRA_UTILS
+
 #include <luminary/luminary.h>
 
 #define LUM_FAILURE_HANDLE(command)                                                           \
