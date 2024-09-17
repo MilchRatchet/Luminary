@@ -7,6 +7,7 @@ struct DeviceMemoryHeader {
   uint64_t magic;
   CUdeviceptr ptr;  // Important that this comes second.
   size_t size;
+  size_t pitch;
 };
 
 // LUMDEVIM
@@ -30,11 +31,41 @@ LuminaryResult _device_malloc(void** _ptr, size_t size, const char* buf_name, co
 
   header->magic = DEVICE_MEMORY_HEADER_MAGIC;
   header->size  = size;
+  header->pitch = 0;
 
   int current_device;
   CUDA_FAILURE_HANDLE(cudaGetDevice(&current_device));
 
   total_memory_allocation[current_device] += size;
+
+  *_ptr = (void**) header;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t height, const char* buf_name, const char* func, uint32_t line) {
+  if (!_ptr) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Pointer is NULL.");
+  }
+
+  struct DeviceMemoryHeader* header;
+  __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
+
+  size_t pitch;
+  CUDA_FAILURE_HANDLE(cudaMallocPitch(&header->ptr, &pitch, width_in_bytes, height));
+
+  const size_t size = pitch * height;
+
+  header->magic = DEVICE_MEMORY_HEADER_MAGIC;
+  header->size  = size;
+  header->pitch = pitch;
+
+  int current_device;
+  CUDA_FAILURE_HANDLE(cudaGetDevice(&current_device));
+
+  total_memory_allocation[current_device] += size;
+
+  *_ptr = (void**) header;
 
   return LUMINARY_SUCCESS;
 }
@@ -126,6 +157,34 @@ LuminaryResult device_download(void* dst, DEVICE const void* src, size_t src_off
   }
 
   CUDA_FAILURE_HANDLE(cudaMemcpy(dst, (void*) (src_header->ptr + src_offset), size, cudaMemcpyDeviceToHost));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pitch, size_t src_width, size_t src_height) {
+  if (!dst) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Destination is NULL.");
+  }
+
+  if (!src) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Source is NULL.");
+  }
+
+  struct DeviceMemoryHeader* dst_header = (struct DeviceMemoryHeader*) dst;
+
+  if (dst_header->magic != DEVICE_MEMORY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Destination is not device memory.");
+  }
+
+  if (src_pitch * src_height > dst_header->size) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION,
+      "Upload exceeds allocated device memory. %llu bytes are allocated and 2D upload would cover %llu bytes.", dst_header->size,
+      src_pitch * src_height);
+  }
+
+  // TODO: src_width is in bytes, make sure that that is clear.
+  CUDA_FAILURE_HANDLE(cudaMemcpy2D(dst_header->ptr, dst_header->pitch, src, src_pitch, src_width, src_height, cudaMemcpyHostToDevice));
 
   return LUMINARY_SUCCESS;
 }

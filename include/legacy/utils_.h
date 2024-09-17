@@ -29,9 +29,6 @@
     }                                                                                                    \
   }
 
-// Flags variables as unused so that no warning is emitted
-#define LUM_UNUSED(x) ((void) (x))
-
 #ifndef ONE_OVER_PI
 #define ONE_OVER_PI 0.31830988618f
 #endif

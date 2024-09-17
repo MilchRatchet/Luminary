@@ -165,6 +165,8 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
   const unsigned int pitch  = texture->pitch;
   void* data                = texture->data;
 
+  // TODO: I think this assumes that the data is already on the GPU.
+
   log_message("Allocating device texture of dimension %ux%ux%u.", width, height, depth);
 
   switch (texture->dim) {

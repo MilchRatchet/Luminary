@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-#include "structs.h"
+#include "texture.h"
+#include "utils.h"
 
 enum PNGColortype {
   PNG_COLORTYPE_GRAYSCALE       = 0,
@@ -35,11 +36,11 @@ enum PNGFilterFunction {
   PNG_FILTER_PAETH   = 4
 } typedef PNGFilterFunction;
 
-void png_store_XRGB8(const char* filename, const XRGB8* image, const int width, const int height);
-void png_store(
+LuminaryResult png_store_XRGB8(const char* filename, const XRGB8* image, const int width, const int height);
+LuminaryResult png_store(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
   const PNGColortype color_type, const PNGBitdepth bit_depth);
-Texture png_load(const uint8_t* file, const size_t file_length, const char* hint_name);
-Texture png_load_from_file(const char* filename);
+LuminaryResult png_load(const uint8_t* file, const size_t file_length, const char* hint_name, Texture** texture);
+LuminaryResult png_load_from_file(const char* filename, Texture** texture);
 
 #endif /* PNG_H */

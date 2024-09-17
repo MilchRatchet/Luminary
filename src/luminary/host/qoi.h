@@ -3,7 +3,8 @@
 
 #include <stdint.h>
 
-#include "structs.h"
+#include "texture.h"
+#include "utils.h"
 
 #if __cplusplus
 extern "C" {
@@ -12,10 +13,11 @@ extern "C" {
 #define QOI_COLORTYPE_TRUECOLOR 3
 #define QOI_COLORTYPE_TRUECOLOR_ALPHA 4
 
-int store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, const int height);
-int store_as_qoi(const char* filename, const uint8_t* image, const uint32_t width, const uint32_t height, const uint8_t color_type);
-void* qoi_encode_RGBA8(const Texture* tex, int* encoded_size);
-Texture* qoi_decode_RGBA8(const void* data, const int size);
+LuminaryResult store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, const int height);
+LuminaryResult store_as_qoi(
+  const char* filename, const uint8_t* image, const uint32_t width, const uint32_t height, const uint8_t color_type);
+LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** data);
+LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture** texture);
 
 #if __cplusplus
 }

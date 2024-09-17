@@ -5,8 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "log.h"
-#include "structs.h"
+#include "internal_error.h"
 #include "texture.h"
 #include "utils.h"
 #include "zlib/zlib.h"
@@ -23,8 +22,7 @@ static inline void _png_write_uint32_big_endian(uint8_t* buffer, const uint32_t 
 }
 
 static void _png_write_header_to_file(FILE* file) {
-  uint8_t* header = (uint8_t*) malloc(PNG_HEADER_SIZE);
-
+  uint8_t header[PNG_HEADER_SIZE];
   header[0] = 0x89u;
 
   header[1] = 0x50u;
@@ -39,14 +37,12 @@ static void _png_write_header_to_file(FILE* file) {
   header[7] = 0x0Au;
 
   fwrite(header, 1, PNG_HEADER_SIZE, file);
-
-  free(header);
 }
 
 static void _png_write_IHDR_chunk_to_file(
   FILE* file, const uint32_t width, const uint32_t height, const uint8_t bit_depth, const uint8_t color_type,
   const uint8_t interlace_method) {
-  uint8_t* chunk = (uint8_t*) malloc(25);
+  uint8_t chunk[25];
 
   _png_write_uint32_big_endian(chunk, 13u);
 
@@ -67,12 +63,10 @@ static void _png_write_IHDR_chunk_to_file(
   _png_write_uint32_big_endian(chunk + 21, (uint32_t) crc32(0, chunk + 4, 17));
 
   fwrite(chunk, 1, 25, file);
-
-  free(chunk);
 }
 
 static void _png_write_sRGB_chunk_to_file(FILE* file) {
-  uint8_t* chunk = (uint8_t*) malloc(13);
+  uint8_t chunk[13];
 
   _png_write_uint32_big_endian(chunk, 1u);
 
@@ -87,12 +81,10 @@ static void _png_write_sRGB_chunk_to_file(FILE* file) {
   _png_write_uint32_big_endian(chunk + 9, (uint32_t) crc32(0, chunk + 4, 5));
 
   fwrite(chunk, 1, 13, file);
-
-  free(chunk);
 }
 
 static void _png_write_gAMA_chunk_to_file(FILE* file) {
-  uint8_t* chunk = (uint8_t*) malloc(16);
+  uint8_t chunk[16];
 
   _png_write_uint32_big_endian(chunk, 4u);
 
@@ -107,12 +99,10 @@ static void _png_write_gAMA_chunk_to_file(FILE* file) {
   _png_write_uint32_big_endian(chunk + 12, (uint32_t) crc32(0, chunk + 4, 8));
 
   fwrite(chunk, 1, 16, file);
-
-  free(chunk);
 }
 
 static void _png_write_cHRM_chunk_to_file(FILE* file) {
-  uint8_t* chunk = (uint8_t*) malloc(44);
+  uint8_t chunk[44];
 
   _png_write_uint32_big_endian(chunk, 32u);
 
@@ -134,12 +124,11 @@ static void _png_write_cHRM_chunk_to_file(FILE* file) {
   _png_write_uint32_big_endian(chunk + 40, (uint32_t) crc32(0, chunk + 4, 36));
 
   fwrite(chunk, 1, 44, file);
-
-  free(chunk);
 }
 
 static void _png_write_IDAT_chunk_to_file(FILE* file, const uint8_t* compressed_image, const uint32_t compressed_length) {
-  uint8_t* chunk = (uint8_t*) malloc(12 + compressed_length);
+  uint8_t* chunk;
+  host_malloc(&chunk, 12 + compressed_length);
 
   _png_write_uint32_big_endian(chunk, compressed_length);
 
@@ -154,11 +143,11 @@ static void _png_write_IDAT_chunk_to_file(FILE* file, const uint8_t* compressed_
 
   fwrite(chunk, 1, 12 + compressed_length, file);
 
-  free(chunk);
+  host_free(&chunk);
 }
 
 static void _png_write_IEND_chunk_to_file(FILE* file) {
-  uint8_t* chunk = (uint8_t*) malloc(12);
+  uint8_t chunk[12];
 
   _png_write_uint32_big_endian(chunk, 0u);
 
@@ -170,17 +159,30 @@ static void _png_write_IEND_chunk_to_file(FILE* file) {
   _png_write_uint32_big_endian(chunk + 8, (uint32_t) crc32(0, chunk + 4, 4));
 
   fwrite(chunk, 1ul, 12ul, file);
-
-  free(chunk);
 }
 
 /*
  * Does not support filter yet.
  */
-void png_store(
+LuminaryResult png_store(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
   const PNGColortype color_type, const PNGBitdepth bit_depth) {
+  if (!filename) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Filename is NULL.");
+  }
+
+  if (!image) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Image is NULL.");
+  }
+
   log_message("Storing png file (%s) Size: %dx%d Depth: %d Colortype: %d", filename, width, height, bit_depth, color_type);
+
+  FILE* file = fopen(filename, "wb");
+
+  if (!file) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to create file: %s", filename);
+  }
+
   const uint8_t bytes_per_channel = (bit_depth == PNG_BITDEPTH_8) ? 1 : 2;
 
   uint8_t bytes_per_pixel;
@@ -201,22 +203,16 @@ void png_store(
       bytes_per_pixel = 4 * bytes_per_channel;
       break;
     default:
-      error_message("Invalid color type: %d", color_type);
-      return;
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid color type: %d", color_type);
   }
 
   /* Adding filter byte at the beginning of each scanline */
-  uint8_t* filtered_image = (uint8_t*) malloc(image_length + height);
+  uint8_t* filtered_image;
+  __FAILURE_HANDLE(host_malloc(&filtered_image, image_length + height));
+
   for (uint32_t i = 0; i < height; i++) {
     filtered_image[i * width * bytes_per_pixel + i] = 0;
     memcpy(filtered_image + i * width * bytes_per_pixel + i + 1, image + i * width * bytes_per_pixel, width * bytes_per_pixel);
-  }
-
-  FILE* file = fopen(filename, "wb");
-
-  if (!file) {
-    error_message("Failed to create file: %s", filename);
-    return;
   }
 
   _png_write_header_to_file(file);
@@ -227,7 +223,8 @@ void png_store(
   _png_write_gAMA_chunk_to_file(file);
   _png_write_cHRM_chunk_to_file(file);
 
-  uint8_t* compressed_image = (uint8_t*) malloc(image_length + height);
+  uint8_t* compressed_image;
+  __FAILURE_HANDLE(host_malloc(&compressed_image, image_length + height));
 
   z_stream defstream;
   defstream.zalloc = Z_NULL;
@@ -252,8 +249,10 @@ void png_store(
 
   fclose(file);
 
-  free(compressed_image);
-  free(filtered_image);
+  __FAILURE_HANDLE(host_free(&compressed_image));
+  __FAILURE_HANDLE(host_free(&filtered_image));
+
+  return LUMINARY_SUCCESS;
 }
 
 static inline uint32_t _png_read_uint32_big_endian(const uint8_t* buffer) {
@@ -298,21 +297,23 @@ static int _png_verify_header(const uint8_t* file, const size_t file_length) {
   return result;
 }
 
-static inline Texture _png_default_texture() {
-  RGBA8* data         = malloc(sizeof(RGBA8) * 4);
+static inline Texture* _png_default_texture() {
+  RGBA8* data;
+  host_malloc(&data, sizeof(RGBA8) * 4);
+
   RGBA8 default_pixel = {.r = 0, .g = 0, .b = 255, .a = 255};
   data[0]             = default_pixel;
   data[1]             = default_pixel;
   data[2]             = default_pixel;
   data[3]             = default_pixel;
-  Texture fallback;
+  Texture* fallback;
 
   texture_create(&fallback, 2, 2, 1, 2, data, TexDataUINT8, 4, TexStorageCPU);
 
   return fallback;
 }
 
-static inline Texture _png_default_failure() {
+static inline Texture* _png_default_failure() {
   error_message("File content is corrupted!");
   return _png_default_texture();
 }
@@ -432,26 +433,32 @@ static void _png_reconstruction_4(uint8_t* line, const uint32_t line_length, con
   }
 }
 
-Texture png_load(const uint8_t* file, const size_t file_length, const char* hint_name) {
+LuminaryResult png_load(const uint8_t* file, const size_t file_length, const char* hint_name, Texture** texture) {
+  if (!texture) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
+  }
+
   if (_png_verify_header(file, file_length)) {
-    error_message("File header does not correspond to png!");
-    return _png_default_texture();
+    *texture = _png_default_texture();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File header does not correspond to png!");
   }
 
   if (file_length < PNG_HEADER_SIZE + 25) {
-    error_message("PNG file is too small to contain a IHDR block.");
-    return _png_default_failure();
+    *texture = _png_default_failure();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "PNG file is too small to contain a IHDR block.");
   }
 
   size_t file_offset  = PNG_HEADER_SIZE;
   const uint8_t* IHDR = file + file_offset;
 
   if (_png_read_uint32_big_endian(IHDR) != 13u) {
-    return _png_default_failure();
+    *texture = _png_default_failure();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Error in IHDR block.");
   }
 
   if (_png_read_uint32_big_endian(IHDR + 4) != CHUNK_IHDR) {
-    return _png_default_failure();
+    *texture = _png_default_failure();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "IHDR block is not in expected position.");
   }
 
   const uint32_t width         = _png_read_uint32_big_endian(IHDR + 8);
@@ -461,25 +468,25 @@ Texture png_load(const uint8_t* file, const size_t file_length, const char* hint
   const uint8_t interlace_type = IHDR[20];
 
   if ((uint32_t) crc32(0, IHDR + 4, 17) != _png_read_uint32_big_endian(IHDR + 21)) {
-    error_message("Texture %s is corrupted!", hint_name);
-    return _png_default_failure();
+    *texture = _png_default_failure();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture %s is corrupted!", hint_name);
   }
 
   if (
     color_type != PNG_COLORTYPE_TRUECOLOR_ALPHA && color_type != PNG_COLORTYPE_TRUECOLOR && color_type != PNG_COLORTYPE_GRAYSCALE
     && color_type != PNG_COLORTYPE_GRAYSCALE_ALPHA) {
-    error_message("Texture %s is either using a color palette or a non standard format!", hint_name);
-    return _png_default_texture();
+    *texture = _png_default_failure();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture %s is either using a color palette or a non standard format!", hint_name);
   }
 
   if (bit_depth != PNG_BITDEPTH_8 && bit_depth != PNG_BITDEPTH_16) {
-    error_message("Texture %s does not have 8 or 16 bit depth!", hint_name);
-    return _png_default_texture();
+    *texture = _png_default_failure();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture %s does not have 8 or 16 bit depth!", hint_name);
   }
 
   if (interlace_type == PNG_INTERLACE_ADAM7) {
-    error_message("Texture %s is interlaced, which is not supported.", hint_name);
-    return _png_default_texture();
+    *texture = _png_default_failure();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture %s is interlaced, which is not supported.", hint_name);
   }
 
   file_offset += 25;
@@ -501,23 +508,21 @@ Texture png_load(const uint8_t* file, const size_t file_length, const char* hint
       num_channels = 4;
       break;
     default:
-      error_message("Invalid color type encountered!");
-      return _png_default_texture();
+      *texture = _png_default_failure();
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid color type encountered!");
   }
 
   const uint32_t byte_per_pixel = byte_per_channel * num_channels;
 
-  Texture result;
+  Texture* result;
   const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
-  texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, 4, TexStorageCPU);
+  __FAILURE_HANDLE(texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, 4, TexStorageCPU));
 
-  uint8_t* filtered_data     = (uint8_t*) malloc(width * height * byte_per_pixel + height);
-  uint8_t* compressed_buffer = (uint8_t*) malloc(2 * (width * height * byte_per_pixel + height));
+  uint8_t* filtered_data;
+  __FAILURE_HANDLE(host_malloc(&filtered_data, width * height * byte_per_pixel + height));
 
-  if (filtered_data == (uint8_t*) 0 || compressed_buffer == (uint8_t*) 0) {
-    error_message("Failed to allocate memory!");
-    return _png_default_texture();
-  }
+  uint8_t* compressed_buffer;
+  __FAILURE_HANDLE(host_malloc(&compressed_buffer, 2 * (width * height * byte_per_pixel + height)));
 
   uint32_t combined_compressed_length = 0;
 
@@ -537,7 +542,8 @@ Texture png_load(const uint8_t* file, const size_t file_length, const char* hint
       chunk = file + file_offset;
 
       if ((uint32_t) crc32(0, chunk_data, length + 4) != _png_read_uint32_big_endian(chunk)) {
-        return _png_default_failure();
+        *texture = _png_default_failure();
+        __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "CRC Error.");
       }
 
       memcpy(compressed_buffer + combined_compressed_length, chunk_data + 4, length);
@@ -556,7 +562,7 @@ Texture png_load(const uint8_t* file, const size_t file_length, const char* hint
         }
         else {
           const uint32_t gAMA_val = _png_read_uint32_big_endian(chunk_data + 4);
-          result.gamma            = 100000.0f / ((float) gAMA_val);
+          result->gamma           = 100000.0f / ((float) gAMA_val);
         }
       }
     }
@@ -583,19 +589,15 @@ Texture png_load(const uint8_t* file, const size_t file_length, const char* hint
 
   inflateEnd(&defstream);
 
-  free(compressed_buffer);
+  host_free(&compressed_buffer);
 
-  uint8_t* data = malloc(width * height * byte_per_pixel);
+  uint8_t* data;
+  __FAILURE_HANDLE(host_malloc(&data, width * height * byte_per_pixel));
 
-  void* line_buffer    = malloc(width * byte_per_pixel);
+  void* line_buffer;
+  __FAILURE_HANDLE(host_malloc(&line_buffer, width * byte_per_pixel));
+
   void* buffer_address = line_buffer;
-
-  if (line_buffer == (void*) 0) {
-    error_message("Failed to allocate memory!");
-    free(data);
-    free(filtered_data);
-    return _png_default_texture();
-  }
 
   memset(line_buffer, 0, width * byte_per_pixel);
 
@@ -629,11 +631,11 @@ Texture png_load(const uint8_t* file, const size_t file_length, const char* hint
     line_buffer = data_ptr;
   }
 
-  free(buffer_address);
+  __FAILURE_HANDLE(host_free(&buffer_address));
 
   void* output_data;
   if (bit_depth == PNG_BITDEPTH_8) {
-    output_data = malloc(width * height * sizeof(RGBA8));
+    __FAILURE_HANDLE(host_malloc(&output_data, width * height * sizeof(RGBA8)));
 
     if (color_type == PNG_COLORTYPE_GRAYSCALE) {
       for (uint32_t i = 0; i < width * height; i++) {
@@ -664,7 +666,7 @@ Texture png_load(const uint8_t* file, const size_t file_length, const char* hint
     }
   }
   else {
-    output_data = malloc(width * height * sizeof(RGBA16));
+    __FAILURE_HANDLE(host_malloc(&output_data, width * height * sizeof(RGBA16)));
 
     if (color_type == PNG_COLORTYPE_GRAYSCALE) {
       for (uint32_t i = 0; i < width * height; i++) {
@@ -722,53 +724,72 @@ Texture png_load(const uint8_t* file, const size_t file_length, const char* hint
     }
   }
 
-  free(data);
+  __FAILURE_HANDLE(host_free(&data));
 
-  result.data = output_data;
+  result->data = output_data;
 
-  free(filtered_data);
+  __FAILURE_HANDLE(host_free(&filtered_data));
 
   log_message("PNG (%s) Size: %dx%d Depth: %d Colortype: %d", hint_name, width, height, bit_depth, color_type);
 
-  return result;
+  *texture = result;
+
+  return LUMINARY_SUCCESS;
 }
 
-Texture png_load_from_file(const char* filename) {
+LuminaryResult png_load_from_file(const char* filename, Texture** texture) {
+  if (!texture) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
+  }
+
   log_message("Loading png file (%s)", filename);
 
   FILE* file = fopen(filename, "rb");
 
   if (!file) {
-    error_message("File %s could not be opened!", filename);
-    return _png_default_texture();
+    *texture = _png_default_texture();
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File %s could not be opened!", filename);
   }
 
   // Block size is very important for performance, it seems that the larger this is the better,
   // however, too large block sizes also means large memory consumption.
   const size_t block_size = 16 * 1024 * 1024;
   size_t file_length      = 0;
-  uint8_t* file_mem       = malloc(block_size);
+
+  uint8_t* file_mem;
+  __FAILURE_HANDLE(host_malloc(&file_mem, block_size));
+
   size_t read_size;
 
   while (read_size = fread(file_mem + file_length, 1, block_size, file), read_size == block_size) {
     file_length += block_size;
-    file_mem = safe_realloc(file_mem, file_length + block_size);
+    __FAILURE_HANDLE(host_realloc(&file_mem, file_length + block_size));
   }
 
   fclose(file);
 
   file_length += read_size;
-  file_mem = safe_realloc(file_mem, file_length);
 
-  Texture tex = png_load(file_mem, file_length, filename);
+  __FAILURE_HANDLE(host_realloc(&file_mem, file_length));
 
-  free(file_mem);
+  __FAILURE_HANDLE(png_load(file_mem, file_length, filename, texture));
 
-  return tex;
+  __FAILURE_HANDLE(host_free(&file_mem));
+
+  return LUMINARY_SUCCESS;
 }
 
-void png_store_XRGB8(const char* filename, const XRGB8* image, const int width, const int height) {
-  uint8_t* buffer = (uint8_t*) malloc(width * height * 3);
+LuminaryResult png_store_XRGB8(const char* filename, const XRGB8* image, const int width, const int height) {
+  if (!filename) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Filename is NULL.");
+  }
+
+  if (!image) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Image is NULL.");
+  }
+
+  uint8_t* buffer;
+  __FAILURE_HANDLE(host_malloc(&buffer, width * height * sizeof(RGB8)));
 
   RGB8* buffer_rgb8 = (RGB8*) buffer;
   for (int i = 0; i < height * width; i++) {
@@ -777,7 +798,9 @@ void png_store_XRGB8(const char* filename, const XRGB8* image, const int width, 
     buffer_rgb8[i] = result;
   }
 
-  png_store(filename, buffer, width * height * 3, width, height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8);
+  __FAILURE_HANDLE(png_store(filename, buffer, width * height * 3, width, height, PNG_COLORTYPE_TRUECOLOR, PNG_BITDEPTH_8));
 
-  free(buffer);
+  __FAILURE_HANDLE(host_free(&buffer));
+
+  return LUMINARY_SUCCESS;
 }

@@ -62,7 +62,7 @@ LUMINARY_API LuminaryResult luminary_host_stop_render(LuminaryHost* host);
  * @param host Host instance.
  * @param string The destination the address of the string will be written to. If the host is idle, NULL will be written.
  */
-LUMINARY_API LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, char** string);
+LUMINARY_API LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, const char** string);
 
 /*
  * Returns the wall time that the host's current queue task has thus far taken up.

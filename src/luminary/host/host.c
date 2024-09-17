@@ -14,14 +14,14 @@
 // Queue worker functions
 ////////////////////////////////////////////////////////////////////
 
-void _host_queue_worker(Host* host) {
+LuminaryResult _host_queue_worker(Host* host) {
   while (!host->exit_requested) {
     QueueEntry entry;
     bool success;
     __FAILURE_HANDLE(queue_pop_blocking(host->work_queue, &entry, &success));
 
     if (!success)
-      return;
+      break;
 
     __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, entry.name));
     __FAILURE_HANDLE(wall_time_start(host->queue_wall_time));
@@ -31,6 +31,8 @@ void _host_queue_worker(Host* host) {
     __FAILURE_HANDLE(wall_time_stop(host->queue_wall_time));
     __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, (const char*) 0));
   }
+
+  return LUMINARY_SUCCESS;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -42,10 +44,8 @@ struct HostSetCameraArgs {
 } typedef HostSetCameraArgs;
 
 static LuminaryResult _host_set_camera(Host* host, HostSetCameraArgs* args) {
-  bool camera_is_dirty = false;
-
-  // TODO: Implement camera update logic.
-
+  LUM_UNUSED(host);
+  LUM_UNUSED(args);
   return LUMINARY_ERROR_NOT_IMPLEMENTED;
 }
 
@@ -80,7 +80,7 @@ LuminaryResult luminary_host_create(Host** _host) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_current_work_string(const LuminaryHost* host, char** string) {
+LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, const char** string) {
   if (!host) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host is NULL.");
   }
@@ -89,7 +89,7 @@ LuminaryResult luminary_host_get_current_work_string(const LuminaryHost* host, c
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "String is NULL.");
   }
 
-  *string = host->current_work_string;
+  __FAILURE_HANDLE(wall_time_get_string(host->queue_wall_time, string));
 
   return LUMINARY_SUCCESS;
 }
@@ -120,14 +120,14 @@ LuminaryResult luminary_host_set_camera(Host* host, Camera* camera) {
   memcpy(&host->camera_external, camera, sizeof(Camera));
 
   HostSetCameraArgs* args;
-  __FAILURE_HANDLE(ringbuffer_get_entry(host->ring_buffer, sizeof(HostSetCameraArgs), &args));
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, sizeof(HostSetCameraArgs), (void**) &args));
 
   memcpy(&args->new_camera, camera, sizeof(Camera));
 
   QueueEntry entry;
 
   entry.name     = "Updating camera";
-  entry.function = _host_set_camera;
+  entry.function = (QueueEntryFunction) _host_set_camera;
   entry.args     = args;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));

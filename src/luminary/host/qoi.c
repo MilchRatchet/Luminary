@@ -1,11 +1,21 @@
 #define QOI_IMPLEMENTATION
 #include "qoi/qoi.h"
 
-#include "log.h"
+#include "internal_error.h"
 #include "qoi.h"
 #include "texture.h"
+#include "utils.h"
 
-int store_as_qoi(const char* filename, const uint8_t* image, const uint32_t width, const uint32_t height, const uint8_t color_type) {
+LuminaryResult store_as_qoi(
+  const char* filename, const uint8_t* image, const uint32_t width, const uint32_t height, const uint8_t color_type) {
+  if (!filename) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Filename is NULL.");
+  }
+
+  if (!image) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Image is NULL.");
+  }
+
   char channels;
 
   switch (color_type) {
@@ -27,15 +37,23 @@ int store_as_qoi(const char* filename, const uint8_t* image, const uint32_t widt
   const int size = qoi_write(filename, image, &desc);
 
   if (!size) {
-    error_message("QOI image has size 0.");
-    return 1;
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "QOI image has size 0.");
   }
 
-  return 0;
+  return LUMINARY_SUCCESS;
 }
 
-int store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, const int height) {
-  uint8_t* buffer = (uint8_t*) malloc(width * height * 3);
+LuminaryResult store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, const int height) {
+  if (!filename) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Filename is NULL.");
+  }
+
+  if (!image) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Image is NULL.");
+  }
+
+  uint8_t* buffer;
+  __FAILURE_HANDLE(host_malloc(&buffer, width * height * sizeof(RGB8)));
 
   RGB8* buffer_rgb8 = (RGB8*) buffer;
   for (int i = 0; i < height * width; i++) {
@@ -44,45 +62,62 @@ int store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, c
     buffer_rgb8[i] = result;
   }
 
-  int ret = store_as_qoi(filename, buffer, width, height, QOI_COLORTYPE_TRUECOLOR);
+  const int ret = store_as_qoi(filename, buffer, width, height, QOI_COLORTYPE_TRUECOLOR);
 
-  free(buffer);
+  __FAILURE_HANDLE(host_free(&buffer));
 
-  return ret;
+  if (ret) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "QOI returned error: %d.", ret);
+  }
+
+  return LUMINARY_SUCCESS;
 }
 
-void* qoi_encode_RGBA8(const Texture* tex, int* encoded_size) {
-  if (!encoded_size || !tex) {
-    return (void*) 0;
+LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** data) {
+  if (!tex) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
+  }
+
+  if (!encoded_size) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Encoded size ptr is NULL.");
+  }
+
+  if (!data) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Data is NULL.");
   }
 
   if (tex->type != TexDataUINT8) {
-    return (void*) 0;
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is not of channel type uint8_t.");
   }
 
   if (tex->storage != TexStorageCPU) {
-    return (void*) 0;
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is not local to the CPU.");
   }
 
   if (tex->dim != Tex2D) {
-    return (void*) 0;
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is not 2D.");
   }
 
   const qoi_desc desc = {.width = tex->pitch, .height = tex->height, .channels = 4, .colorspace = QOI_SRGB};
 
-  return qoi_encode(tex->data, &desc, encoded_size);
+  *data = qoi_encode(tex->data, &desc, encoded_size);
+
+  return LUMINARY_SUCCESS;
 }
 
-Texture* qoi_decode_RGBA8(const void* data, const int size) {
+LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture** texture) {
   if (!data) {
-    return (Texture*) 0;
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Data is NULL.");
+  }
+
+  if (!texture) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
   }
 
   qoi_desc desc;
   void* decoded_data = qoi_decode(data, size, &desc, 4);
 
-  Texture* tex = malloc(sizeof(Texture));
-  texture_create(tex, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, 4, TexStorageCPU);
+  __FAILURE_HANDLE(texture_create(texture, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, 4, TexStorageCPU));
 
-  return tex;
+  return LUMINARY_SUCCESS;
 }
