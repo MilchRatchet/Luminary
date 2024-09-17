@@ -1,6 +1,8 @@
 #include "internal_error.h"
 #include "utils.h"
 
+// TODO: Use timespec_get and timespec_getres instead.
+
 // windows.h must be included before any other windows header
 #ifdef _WIN32
 #include <windows.h>

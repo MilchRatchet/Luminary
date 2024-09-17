@@ -83,6 +83,6 @@ typedef uint64_t LuminaryResult;
  */
 #define LUMINARY_ERROR_OPTIX (0x0000000000000200ull)
 
-LUMINARY_API char* luminary_result_to_string(LuminaryResult result);
+LUMINARY_API const char* luminary_result_to_string(LuminaryResult result);
 
 #endif /* LUMINARY_API_ERROR_H */

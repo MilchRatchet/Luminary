@@ -7,7 +7,7 @@
 #include "internal_error.h"
 
 struct Mutex {
-  mtx_t;
+  mtx_t _mutex;
 };
 
 LuminaryResult mutex_create(Mutex** mutex) {
@@ -17,7 +17,7 @@ LuminaryResult mutex_create(Mutex** mutex) {
 
   __FAILURE_HANDLE(host_malloc(mutex, sizeof(Mutex)));
 
-  const int retval = mtx_init(*mutex, mtx_plain);
+  const int retval = mtx_init((mtx_t*) *mutex, mtx_plain);
 
   if (retval != thrd_success) {
     __FAILURE_HANDLE(host_free(mutex));
@@ -32,7 +32,7 @@ LuminaryResult mutex_lock(Mutex* mutex) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
   }
 
-  const int retval = mtx_lock(mutex);
+  const int retval = mtx_lock((mtx_t*) mutex);
 
   if (retval != thrd_success) {
     __RETURN_ERROR(LUMINARY_ERROR_C_STD, "mtx_lock returned an error.");
@@ -59,7 +59,7 @@ LuminaryResult mutex_timed_lock(Mutex* mutex, const double timeout_time, bool* s
     ts.tv_sec += 1;
   }
 
-  const int retval = mtx_timedlock(mutex, &ts);
+  const int retval = mtx_timedlock((mtx_t*) mutex, &ts);
 
   if (retval == thrd_error) {
     __RETURN_ERROR(LUMINARY_ERROR_C_STD, "mtx_timedlock returned an error.");
@@ -75,7 +75,7 @@ LuminaryResult mutex_try_lock(Mutex* mutex, bool* success) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
   }
 
-  const int retval = mtx_trylock(mutex);
+  const int retval = mtx_trylock((mtx_t*) mutex);
 
   if (retval == thrd_error) {
     __RETURN_ERROR(LUMINARY_ERROR_C_STD, "mtx_trylock returned an error.");
@@ -91,7 +91,7 @@ LuminaryResult mutex_unlock(Mutex* mutex) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
   }
 
-  const int retval = mtx_unlock(mutex);
+  const int retval = mtx_unlock((mtx_t*) mutex);
 
   if (retval != thrd_success) {
     __RETURN_ERROR(LUMINARY_ERROR_C_STD, "mtx_unlock returned an error.");
@@ -116,7 +116,7 @@ LuminaryResult mutex_destroy(Mutex** mutex) {
 
   __FAILURE_HANDLE(mutex_unlock(*mutex));
 
-  mtx_destroy(*mutex);
+  mtx_destroy((mtx_t*) *mutex);
 
   __FAILURE_HANDLE(host_free(mutex));
 

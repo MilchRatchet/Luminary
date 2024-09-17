@@ -34,9 +34,11 @@ LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const
   header->magic = HOST_MEMORY_HEADER_MAGIC;
   header->size  = size;
 
-  atomic_fetch_add(&_host_memory_total_allocation, header->size);
+  const uint64_t prev_total = atomic_fetch_add(&_host_memory_total_allocation, header->size);
 
   *ptr = (void*) (header + 1);
+
+  luminary_print_log("Allocated %12llu bytes. Total: %16llu bytes. [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }
@@ -66,7 +68,9 @@ LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, cons
 
   header->size = size;
 
-  atomic_fetch_add(&_host_memory_total_allocation, header->size);
+  const uint64_t prev_total = atomic_fetch_add(&_host_memory_total_allocation, header->size);
+
+  luminary_print_log("Reallocated %12llu bytes. Total: %16llu bytes. [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }
@@ -90,11 +94,15 @@ LuminaryResult _host_free(void** ptr, const char* buf_name, const char* func, ui
     __RETURN_ERROR(LUMINARY_ERROR_MEMORY_LEAK, "Memory allocation is larger than total allocated memory.");
   }
 
-  atomic_fetch_sub(&_host_memory_total_allocation, header->size);
+  const uint64_t size = header->size;
+
+  const uint64_t prev_total = atomic_fetch_sub(&_host_memory_total_allocation, header->size);
 
   free(header);
 
   *ptr = (void*) 0;
+
+  luminary_print_log("Freed %12llu bytes. Total: %16llu bytes. [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }

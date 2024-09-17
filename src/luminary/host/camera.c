@@ -1,5 +1,8 @@
 #include "camera.h"
 
+#include "internal_error.h"
+#include "utils.h"
+
 LuminaryResult camera_get_default(Camera* camera) {
   if (!camera) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Camera was NULL.");

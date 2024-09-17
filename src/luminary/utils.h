@@ -19,6 +19,9 @@ struct QueueEntry {
 #define PI 3.141592653589f
 #endif
 
-#define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size");
+#define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size")
+
+// Flags variables as unused so that no warning is emitted
+#define LUM_UNUSED(x) ((void) (x))
 
 #endif /* LUMINARY_UTILS_H */
