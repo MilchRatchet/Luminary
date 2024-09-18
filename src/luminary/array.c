@@ -6,9 +6,9 @@
 struct ArrayHeader {
   uint64_t magic;
   uint64_t size_of_element;
-  uint64_t num_elements;
-  uint64_t allocated_num_elements;
-  uint64_t padding[4];
+  uint32_t num_elements;
+  uint32_t allocated_num_elements;
+  uint64_t padding[5];
 } typedef ArrayHeader;
 LUM_STATIC_SIZE_ASSERT(ArrayHeader, 64u);
 
@@ -16,7 +16,7 @@ LUM_STATIC_SIZE_ASSERT(ArrayHeader, 64u);
 #define ARRAY_HEADER_MAGIC (0x59415252414D554Cull)
 
 LuminaryResult _array_create(
-  void** _array, size_t size_of_element, size_t num_elements, const char* buf_name, const char* func, uint32_t line) {
+  void** _array, size_t size_of_element, uint32_t num_elements, const char* buf_name, const char* func, uint32_t line) {
   if (!_array) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array ptr was NULL.");
   }
@@ -87,7 +87,7 @@ LuminaryResult _array_destroy(void** array, const char* buf_name, const char* fu
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult array_push(void** array, void* object) {
+LuminaryResult _array_push(void** array, void* object, const char* buf_name, const char* func, uint32_t line) {
   if (!array) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array ptr was NULL.");
   }
@@ -102,8 +102,12 @@ LuminaryResult array_push(void** array, void* object) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
   }
 
+  if (header->num_elements == 0xFFFFFFFF) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Array exceeded maximum number of elements.");
+  }
+
   if (header->num_elements == header->allocated_num_elements) {
-    __FAILURE_HANDLE(array_resize(array, header->allocated_num_elements * 2));
+    __FAILURE_HANDLE(_array_resize(array, header->allocated_num_elements * 2, buf_name, func, line));
     header = ((ArrayHeader*) (*array)) - 1;
   }
 
@@ -116,18 +120,34 @@ LuminaryResult array_push(void** array, void* object) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult array_get_size(void* array, size_t* size) {
+LuminaryResult array_get_size(const void* array, size_t* size) {
   if (!array) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array was NULL.");
   }
 
-  ArrayHeader* header = ((ArrayHeader*) array) - 1;
+  const ArrayHeader* header = ((const ArrayHeader*) array) - 1;
 
   if (header->magic != ARRAY_HEADER_MAGIC) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
   }
 
   *size = header->allocated_num_elements;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult array_get_num_elements(const void* array, uint32_t* num_elements) {
+  if (!array) {
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array was NULL.");
+  }
+
+  const ArrayHeader* header = ((const ArrayHeader*) array) - 1;
+
+  if (header->magic != ARRAY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
+  }
+
+  *num_elements = header->num_elements;
 
   return LUMINARY_SUCCESS;
 }

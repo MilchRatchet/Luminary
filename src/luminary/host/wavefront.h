@@ -4,7 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "structs.h"
+#include "texture.h"
+#include "utils.h"
 
 struct WavefrontVertex {
   float x;
@@ -24,15 +25,15 @@ struct WavefrontUV {
 } typedef WavefrontUV;
 
 struct WavefrontTriangle {
-  int v1;
-  int v2;
-  int v3;
-  int vt1;
-  int vt2;
-  int vt3;
-  int vn1;
-  int vn2;
-  int vn3;
+  int32_t v1;
+  int32_t v2;
+  int32_t v3;
+  int32_t vt1;
+  int32_t vt2;
+  int32_t vt3;
+  int32_t vn1;
+  int32_t vn2;
+  int32_t vn3;
   uint16_t object;
 } typedef WavefrontTriangle;
 
@@ -55,34 +56,20 @@ struct WavefrontTextureInstance {
   uint16_t offset;
 } typedef WavefrontTextureInstance;
 
-struct WavefrontTextureList {
-  WavefrontTextureInstance* textures;
-  uint32_t count;
-  uint32_t length;
-} typedef WavefrontTextureList;
-
 struct WavefrontContent {
-  WavefrontVertex* vertices;
-  int vertices_length;
-  WavefrontNormal* normals;
-  int normals_length;
-  WavefrontUV* uvs;
-  int uvs_length;
-  WavefrontTriangle* triangles;
-  unsigned int triangles_length;
-  WavefrontMaterial* materials;
-  unsigned int materials_length;
-  unsigned int materials_count;
-  Texture* maps[4];
-  unsigned int maps_length[4];
-  unsigned int maps_count[4];
-  WavefrontTextureList* texture_list;
+  ARRAY WavefrontVertex* vertices;
+  ARRAY WavefrontNormal* normals;
+  ARRAY WavefrontUV* uvs;
+  ARRAY WavefrontTriangle* triangles;
+  ARRAY WavefrontMaterial* materials;
+  ARRAY Texture** maps[4];
+  ARRAY WavefrontTextureInstance* textures;
 } typedef WavefrontContent;
 
-void wavefront_init(WavefrontContent** content);
-void wavefront_clear(WavefrontContent** content);
-int wavefront_read_file(WavefrontContent* _content, const char* filename);
-PackedMaterial* wavefront_generate_texture_assignments(WavefrontContent* content);
-unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data);
+LuminaryResult wavefront_create(WavefrontContent** content);
+LuminaryResult wavefront_read_file(WavefrontContent* _content, const char* filename);
+LuminaryResult wavefront_generate_texture_assignments(const WavefrontContent* content, PackedMaterial** material);
+LuminaryResult wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data, uint32_t* num_triangles);
+LuminaryResult wavefront_destroy(WavefrontContent** content);
 
 #endif /* WAVEFRONT_H */

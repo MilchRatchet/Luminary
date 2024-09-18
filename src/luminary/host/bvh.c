@@ -7,10 +7,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "buffer.h"
 #include "device.h"
 #include "struct_interleaving.h"
-#include "structs.h"
 #include "utils.h"
 
 /*

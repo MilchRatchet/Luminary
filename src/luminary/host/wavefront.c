@@ -9,9 +9,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "log.h"
+#include "internal_error.h"
 #include "png.h"
-#include "structs.h"
 #include "utils.h"
 
 //
@@ -21,20 +20,17 @@
 #define LINE_SIZE 256 * 1024               // 256 KB
 #define READ_BUFFER_SIZE 16 * 1024 * 1024  // 16 MB
 
-void wavefront_init(WavefrontContent** content) {
-  *content = calloc(1, sizeof(WavefrontContent));
+LuminaryResult wavefront_create(WavefrontContent** content) {
+  __CHECK_NULL_ARGUMENT(content);
 
-  (*content)->vertices         = malloc(sizeof(WavefrontVertex) * 1);
-  (*content)->vertices_length  = 0;
-  (*content)->normals          = malloc(sizeof(WavefrontNormal) * 1);
-  (*content)->normals_length   = 0;
-  (*content)->uvs              = malloc(sizeof(WavefrontUV) * 1);
-  (*content)->uvs_length       = 0;
-  (*content)->triangles        = malloc(sizeof(WavefrontTriangle) * 1);
-  (*content)->triangles_length = 0;
-  (*content)->materials        = malloc(sizeof(WavefrontMaterial) * 1);
-  (*content)->materials_length = 1;
-  (*content)->materials_count  = 1;
+  __FAILURE_HANDLE(host_malloc(content, sizeof(WavefrontContent)));
+
+  __FAILURE_HANDLE(array_create(&(*content)->vertices, sizeof(WavefrontVertex), 16));
+  __FAILURE_HANDLE(array_create(&(*content)->normals, sizeof(WavefrontNormal), 16));
+  __FAILURE_HANDLE(array_create(&(*content)->uvs, sizeof(WavefrontUV), 16));
+
+  __FAILURE_HANDLE(array_create(&(*content)->triangles, sizeof(WavefrontTriangle), 16));
+  __FAILURE_HANDLE(array_create(&(*content)->materials, sizeof(WavefrontMaterial), 16));
 
   (*content)->materials[0].hash                    = 0;
   (*content)->materials[0].diffuse_reflectivity.r  = 0.9f;
@@ -54,58 +50,57 @@ void wavefront_init(WavefrontContent** content) {
   (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_NORMAL]      = TEXTURE_NONE;
 
-  (*content)->maps[WF_ALBEDO]           = (Texture*) malloc(sizeof(Texture) * 1);
-  (*content)->maps_count[WF_ALBEDO]     = 0;
-  (*content)->maps_length[WF_ALBEDO]    = 1;
-  (*content)->maps[WF_LUMINANCE]        = (Texture*) malloc(sizeof(Texture) * 1);
-  (*content)->maps_count[WF_LUMINANCE]  = 0;
-  (*content)->maps_length[WF_LUMINANCE] = 1;
-  (*content)->maps[WF_MATERIAL]         = (Texture*) malloc(sizeof(Texture) * 1);
-  (*content)->maps_count[WF_MATERIAL]   = 0;
-  (*content)->maps_length[WF_MATERIAL]  = 1;
-  (*content)->maps[WF_NORMAL]           = (Texture*) malloc(sizeof(Texture) * 1);
-  (*content)->maps_count[WF_NORMAL]     = 0;
-  (*content)->maps_length[WF_NORMAL]    = 1;
+  __FAILURE_HANDLE(array_create((*content)->maps + WF_ALBEDO, sizeof(Texture), 16));
+  __FAILURE_HANDLE(array_create((*content)->maps + WF_LUMINANCE, sizeof(Texture), 16));
+  __FAILURE_HANDLE(array_create((*content)->maps + WF_MATERIAL, sizeof(Texture), 16));
+  __FAILURE_HANDLE(array_create((*content)->maps + WF_NORMAL, sizeof(Texture), 16));
 
-  (*content)->texture_list           = malloc(sizeof(WavefrontTextureList));
-  (*content)->texture_list->textures = malloc(sizeof(WavefrontTextureInstance) * 16);
-  (*content)->texture_list->count    = 0;
-  (*content)->texture_list->length   = 16;
+  __FAILURE_HANDLE(array_create(&(*content)->textures, sizeof(WavefrontTextureInstance), 16));
+
+  return LUMINARY_SUCCESS;
 }
 
-void wavefront_clear(WavefrontContent** content) {
-  if (!content) {
-    error_message("WavefrontContent is NULL.");
-    return;
+LuminaryResult wavefront_destroy(WavefrontContent** content) {
+  __CHECK_NULL_ARGUMENT(content);
+
+  __FAILURE_HANDLE(array_destroy(&(*content)->vertices));
+  __FAILURE_HANDLE(array_destroy(&(*content)->normals));
+  __FAILURE_HANDLE(array_destroy(&(*content)->uvs));
+  __FAILURE_HANDLE(array_destroy(&(*content)->triangles));
+  __FAILURE_HANDLE(array_destroy(&(*content)->materials));
+
+  uint32_t num_albedo_maps;
+  __FAILURE_HANDLE(array_get_num_elements((*content)->maps[WF_ALBEDO], &num_albedo_maps));
+  uint32_t num_luminance_maps;
+  __FAILURE_HANDLE(array_get_num_elements((*content)->maps[WF_LUMINANCE], &num_luminance_maps));
+  uint32_t num_material_maps;
+  __FAILURE_HANDLE(array_get_num_elements((*content)->maps[WF_MATERIAL], &num_material_maps));
+  uint32_t num_normal_maps;
+  __FAILURE_HANDLE(array_get_num_elements((*content)->maps[WF_NORMAL], &num_normal_maps));
+
+  for (uint32_t map_id = 0; map_id < num_albedo_maps; map_id++) {
+    __FAILURE_HANDLE(texture_destroy(&(*content)->maps[WF_ALBEDO][map_id]));
+  }
+  for (uint32_t map_id = 0; map_id < num_luminance_maps; map_id++) {
+    __FAILURE_HANDLE(texture_destroy(&(*content)->maps[WF_LUMINANCE][map_id]));
+  }
+  for (uint32_t map_id = 0; map_id < num_material_maps; map_id++) {
+    __FAILURE_HANDLE(texture_destroy(&(*content)->maps[WF_MATERIAL][map_id]));
+  }
+  for (uint32_t map_id = 0; map_id < num_normal_maps; map_id++) {
+    __FAILURE_HANDLE(texture_destroy(&(*content)->maps[WF_NORMAL][map_id]));
   }
 
-  free((*content)->vertices);
-  free((*content)->normals);
-  free((*content)->uvs);
-  free((*content)->triangles);
-  free((*content)->materials);
+  __FAILURE_HANDLE(array_destroy((*content)->maps + WF_ALBEDO));
+  __FAILURE_HANDLE(array_destroy((*content)->maps + WF_LUMINANCE));
+  __FAILURE_HANDLE(array_destroy((*content)->maps + WF_MATERIAL));
+  __FAILURE_HANDLE(array_destroy((*content)->maps + WF_NORMAL));
 
-  for (unsigned int i = 0; i < (*content)->maps_count[WF_ALBEDO]; i++) {
-    free((*content)->maps[WF_ALBEDO][i].data);
-  }
-  for (unsigned int i = 0; i < (*content)->maps_count[WF_LUMINANCE]; i++) {
-    free((*content)->maps[WF_LUMINANCE][i].data);
-  }
-  for (unsigned int i = 0; i < (*content)->maps_count[WF_MATERIAL]; i++) {
-    free((*content)->maps[WF_MATERIAL][i].data);
-  }
-  for (unsigned int i = 0; i < (*content)->maps_count[WF_NORMAL]; i++) {
-    free((*content)->maps[WF_NORMAL][i].data);
-  }
+  __FAILURE_HANDLE(array_destroy(&(*content)->textures));
 
-  free((*content)->maps[WF_ALBEDO]);
-  free((*content)->maps[WF_LUMINANCE]);
-  free((*content)->maps[WF_MATERIAL]);
-  free((*content)->maps[WF_NORMAL]);
-  free((*content)->texture_list->textures);
-  free((*content)->texture_list);
+  __FAILURE_HANDLE(host_free(content));
 
-  free(*content);
+  return LUMINARY_SUCCESS;
 }
 
 /*
@@ -115,9 +110,9 @@ void wavefront_clear(WavefrontContent** content) {
  * @param dst Array the floating point numbers are written to.
  * @result Returns the number of floating point numbers written.
  */
-static int read_float_line(const char* str, const int n, float* dst) {
+static uint32_t read_float_line(const char* str, const uint32_t n, float* dst) {
   const char* rstr = str;
-  for (int i = 0; i < n; i++) {
+  for (uint32_t i = 0; i < n; i++) {
     char* new_rstr;
     dst[i] = strtof(rstr, &new_rstr);
 
@@ -132,7 +127,7 @@ static int read_float_line(const char* str, const int n, float* dst) {
 
 static size_t hash_djb2(unsigned char* str) {
   size_t hash = 5381;
-  int c;
+  size_t c;
 
   while ((c = *(str++))) {
     hash = ((hash << 5) + hash) + c;
@@ -144,9 +139,12 @@ static size_t hash_djb2(unsigned char* str) {
 /*
  * @result Index of texture if texture is already present, else TEXTURE_NONE
  */
-static uint16_t find_texture(WavefrontTextureList* textures, uint32_t hash, WavefrontTextureInstanceType type) {
-  for (uint32_t i = 0; i < textures->count; i++) {
-    WavefrontTextureInstance tex = textures->textures[i];
+static uint16_t find_texture(WavefrontContent* content, uint32_t hash, WavefrontTextureInstanceType type) {
+  uint32_t texture_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->textures, &texture_count));
+
+  for (uint32_t tex_id = 0; tex_id < texture_count; tex_id++) {
+    WavefrontTextureInstance tex = content->textures[tex_id];
     if (tex.hash == hash && tex.type == type)
       return tex.offset;
   }
@@ -154,28 +152,16 @@ static uint16_t find_texture(WavefrontTextureList* textures, uint32_t hash, Wave
   return TEXTURE_NONE;
 }
 
-static void add_texture(WavefrontTextureList* textures, uint32_t hash, WavefrontTextureInstanceType type, uint16_t offset) {
-  if (textures->count == textures->length) {
-    textures->length   = textures->length * 2;
-    textures->textures = safe_realloc(textures->textures, sizeof(WavefrontTextureInstance) * textures->length);
-  }
-
-  WavefrontTextureInstance tex = {.hash = hash, .offset = offset, .type = type};
-
-  textures->textures[textures->count++] = tex;
-}
-
-static void _wavefront_parse_map(WavefrontContent* content, const char* line, const size_t line_len) {
+static LuminaryResult _wavefront_parse_map(WavefrontContent* content, const char* line, const size_t line_len) {
   if (line_len < 8) {
-    // Line is too short to be a valid map_ line.
-    return;
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Line is too short to be a valid map_ line.");
   }
 
   if (strncmp(line, "map_", 4)) {
-    return;
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Line is not a map_ line.");
   }
 
-  int path_offset = 7;
+  uint32_t path_offset = 7;
 
   // Determine type of map
   WavefrontTextureInstanceType type;
@@ -194,7 +180,7 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
   }
   else {
     // Not a supported type.
-    return;
+    return LUMINARY_SUCCESS;
   }
 
   // Find path
@@ -206,11 +192,11 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
 
     // Valid address, same argument.
     const char* command = path + 1;
-    int is_command      = 1;
+    bool is_command     = true;
 
     while (is_command) {
       // This tells us how many arguments will follow this command, this is how often we have to skip words.
-      int num_args = 0;
+      uint32_t num_args = 0;
 
       if (command[0] == 'o' || command[0] == 's') {
         num_args = 3;  // o or s
@@ -230,12 +216,11 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
         num_args = 1;  // cc or clamp or blendu or blendv or bm
       }
 
-      for (int i = 0; i <= num_args; i++) {
+      for (uint32_t arg = 0; arg <= num_args; arg++) {
         command = strchr(command, ' ');
 
         if (command == (char*) 0) {
-          error_message("Something went wrong parsing the following line in an *.mtl file: %s", line);
-          return;
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Something went wrong parsing the following line in an *.mtl file: %s", line);
         }
 
         is_command = (command[0] == '-');
@@ -247,28 +232,59 @@ static void _wavefront_parse_map(WavefrontContent* content, const char* line, co
   }
 
   const size_t hash   = hash_djb2((unsigned char*) path);
-  uint16_t texture_id = find_texture(content->texture_list, hash, type);
+  uint16_t texture_id = find_texture(content, hash, type);
 
   if (texture_id == TEXTURE_NONE) {
-    ensure_capacity(content->maps[type], content->maps_count[type], content->maps_length[type], sizeof(Texture));
-    texture_id = content->maps_count[type]++;
-    add_texture(content->texture_list, hash, type, texture_id);
-    content->maps[type][texture_id] = png_load_from_file(path);
+    uint32_t new_texture_id;
+    __FAILURE_HANDLE(array_get_num_elements(content->maps[type], &new_texture_id));
+
+    if (new_texture_id > 0xFFFFu) {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Exceeded limit of 65535 textures.");
+    }
+
+    texture_id = (uint16_t) new_texture_id;
+
+    WavefrontTextureInstance texture_instance;
+    texture_instance.hash   = hash;
+    texture_instance.type   = type;
+    texture_instance.offset = texture_id;
+
+    Texture* tex;
+    __FAILURE_HANDLE(png_load_from_file(path, &tex));
+
+    __FAILURE_HANDLE(array_push(&content->maps[type], &tex));
+    __FAILURE_HANDLE(array_push(&content->textures, &texture_instance));
   }
 
-  content->materials[content->materials_count - 1].texture[type] = texture_id;
+  uint32_t current_material_ptr;
+  __FAILURE_HANDLE(array_get_num_elements(content->materials, &current_material_ptr));
+  current_material_ptr--;
+
+  content->materials[current_material_ptr].texture[type] = texture_id;
+
+  return LUMINARY_SUCCESS;
 }
 
-static void read_materials_file(WavefrontContent* content, const char* filename) {
+static LuminaryResult read_materials_file(WavefrontContent* content, const char* filename) {
   log_message("Reading *.mtl file (%s)", filename);
+
+  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(filename);
+
   FILE* file = fopen(filename, "r");
 
   if (!file) {
-    error_message("Could not read material file!");
-    return;
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Could not read material file!");
   }
 
-  char* line = malloc(LINE_SIZE);
+  char* line;
+  __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
+
+  uint32_t current_material_ptr;
+  __FAILURE_HANDLE(array_get_num_elements(content->materials, &current_material_ptr));
+
+  // PTR to the last element in the array.
+  current_material_ptr--;
 
   while (!feof(file)) {
     fgets(line, LINE_SIZE, file);
@@ -286,35 +302,37 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
       char* name  = line + 7;
       size_t hash = hash_djb2((unsigned char*) name);
 
-      ensure_capacity(content->materials, content->materials_count, content->materials_length, sizeof(WavefrontMaterial));
+      WavefrontMaterial mat;
+      mat.hash                    = hash;
+      mat.diffuse_reflectivity.r  = 0.9f;
+      mat.diffuse_reflectivity.g  = 0.9f;
+      mat.diffuse_reflectivity.b  = 0.9f;
+      mat.dissolve                = 1.0f;
+      mat.specular_reflectivity.r = 0.0f;
+      mat.specular_reflectivity.g = 0.0f;
+      mat.specular_reflectivity.b = 0.0f;
+      mat.specular_exponent       = 300.0f;
+      mat.emission.r              = 0.0f;
+      mat.emission.g              = 0.0f;
+      mat.emission.b              = 0.0f;
+      mat.refraction_index        = 1.0f;
+      mat.texture[WF_ALBEDO]      = TEXTURE_NONE;
+      mat.texture[WF_LUMINANCE]   = TEXTURE_NONE;
+      mat.texture[WF_MATERIAL]    = TEXTURE_NONE;
+      mat.texture[WF_NORMAL]      = TEXTURE_NONE;
 
-      content->materials[content->materials_count].hash                    = hash;
-      content->materials[content->materials_count].diffuse_reflectivity.r  = 0.9f;
-      content->materials[content->materials_count].diffuse_reflectivity.g  = 0.9f;
-      content->materials[content->materials_count].diffuse_reflectivity.b  = 0.9f;
-      content->materials[content->materials_count].dissolve                = 1.0f;
-      content->materials[content->materials_count].specular_reflectivity.r = 0.0f;
-      content->materials[content->materials_count].specular_reflectivity.g = 0.0f;
-      content->materials[content->materials_count].specular_reflectivity.b = 0.0f;
-      content->materials[content->materials_count].specular_exponent       = 300.0f;
-      content->materials[content->materials_count].emission.r              = 0.0f;
-      content->materials[content->materials_count].emission.g              = 0.0f;
-      content->materials[content->materials_count].emission.b              = 0.0f;
-      content->materials[content->materials_count].refraction_index        = 1.0f;
-      content->materials[content->materials_count].texture[WF_ALBEDO]      = TEXTURE_NONE;
-      content->materials[content->materials_count].texture[WF_LUMINANCE]   = TEXTURE_NONE;
-      content->materials[content->materials_count].texture[WF_MATERIAL]    = TEXTURE_NONE;
-      content->materials[content->materials_count].texture[WF_NORMAL]      = TEXTURE_NONE;
-      content->materials_count++;
+      __FAILURE_HANDLE(array_push(&content->materials, &mat));
+
+      current_material_ptr++;
     }
     else if (line[0] == 'K' && line[1] == 'd') {
       char* value = line + 3;
 
       float diffuse_reflectivity[3];
       if (read_float_line(value, 3, diffuse_reflectivity) == 3) {
-        content->materials[content->materials_count - 1].diffuse_reflectivity.r = diffuse_reflectivity[0];
-        content->materials[content->materials_count - 1].diffuse_reflectivity.g = diffuse_reflectivity[1];
-        content->materials[content->materials_count - 1].diffuse_reflectivity.b = diffuse_reflectivity[2];
+        content->materials[current_material_ptr].diffuse_reflectivity.r = diffuse_reflectivity[0];
+        content->materials[current_material_ptr].diffuse_reflectivity.g = diffuse_reflectivity[1];
+        content->materials[current_material_ptr].diffuse_reflectivity.b = diffuse_reflectivity[2];
       }
       else {
         warn_message("Expected three values in diffuse reflectivity in *.mtl file but didn't find three numbers. Line: %s.", line);
@@ -325,7 +343,7 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
 
       float dissolve;
       if (read_float_line(value, 1, &dissolve)) {
-        content->materials[content->materials_count - 1].dissolve = dissolve;
+        content->materials[current_material_ptr].dissolve = dissolve;
       }
       else {
         warn_message("Expected dissolve in *.mtl file but didn't find a number. Line: %s.", line);
@@ -336,9 +354,9 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
 
       float specular_reflectivity[3];
       if (read_float_line(value, 3, specular_reflectivity) == 3) {
-        content->materials[content->materials_count - 1].specular_reflectivity.r = specular_reflectivity[0];
-        content->materials[content->materials_count - 1].specular_reflectivity.g = specular_reflectivity[1];
-        content->materials[content->materials_count - 1].specular_reflectivity.b = specular_reflectivity[2];
+        content->materials[current_material_ptr].specular_reflectivity.r = specular_reflectivity[0];
+        content->materials[current_material_ptr].specular_reflectivity.g = specular_reflectivity[1];
+        content->materials[current_material_ptr].specular_reflectivity.b = specular_reflectivity[2];
       }
       else {
         warn_message("Expected three values in specular reflectivity in *.mtl file but didn't find three numbers. Line: %s.", line);
@@ -349,7 +367,7 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
 
       float specular_exponent;
       if (read_float_line(value, 1, &specular_exponent)) {
-        content->materials[content->materials_count - 1].specular_exponent = specular_exponent;
+        content->materials[current_material_ptr].specular_exponent = specular_exponent;
       }
       else {
         warn_message("Expected specular_exponent in *.mtl file but didn't find a number. Line: %s.", line);
@@ -360,9 +378,9 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
 
       float emission[3];
       if (read_float_line(value, 3, emission) == 3) {
-        content->materials[content->materials_count - 1].emission.r = emission[0];
-        content->materials[content->materials_count - 1].emission.g = emission[1];
-        content->materials[content->materials_count - 1].emission.b = emission[2];
+        content->materials[current_material_ptr].emission.r = emission[0];
+        content->materials[current_material_ptr].emission.g = emission[1];
+        content->materials[current_material_ptr].emission.b = emission[2];
       }
       else {
         warn_message("Expected three values in emission in *.mtl file but didn't find three numbers. Line: %s.", line);
@@ -373,7 +391,7 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
 
       float refraction_index;
       if (read_float_line(value, 1, &refraction_index)) {
-        content->materials[content->materials_count - 1].refraction_index = refraction_index;
+        content->materials[current_material_ptr].refraction_index = refraction_index;
       }
       else {
         warn_message("Expected refraction index in *.mtl file but didn't find a number. Line: %s.", line);
@@ -384,12 +402,11 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
     }
   }
 
-  free(line);
+  __FAILURE_HANDLE(host_free(&line));
+
   fclose(file);
 
-  log_message(
-    "Material counts: %d (%d %d %d %d)", content->materials_count, content->maps_count[WF_ALBEDO], content->maps_count[WF_LUMINANCE],
-    content->maps_count[WF_MATERIAL], content->maps_count[WF_NORMAL]);
+  return LUMINARY_SUCCESS;
 }
 
 /*
@@ -399,16 +416,16 @@ static void read_materials_file(WavefrontContent* content, const char* filename)
  * @param face2 Pointer to Triangle which gets filled by the data.
  * @result Returns the number of triangles parsed.
  */
-static int read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangle* face2) {
-  int ptr = 0;
+static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangle* face2) {
+  uint32_t ptr = 0;
 
-  const unsigned int num_check = 0b00110000;
-  const unsigned int num_mask  = 0b11110000;
+  const uint32_t num_check = 0b00110000;
+  const uint32_t num_mask  = 0b11110000;
 
-  int data[12];
-  unsigned int data_ptr = 0;
+  uint32_t data[12];
+  uint32_t data_ptr = 0;
 
-  int sign = 1;
+  int32_t sign = 1;
 
   char c = str[ptr++];
 
@@ -424,10 +441,10 @@ static int read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangl
       sign = -1;
     }
 
-    int value = 0;
+    int32_t value = 0;
 
     while ((c & num_mask) == num_check) {
-      value = value * 10 + (int) (c & 0b00001111);
+      value = value * 10 + (int32_t) (c & 0b00001111);
 
       c = str[ptr++];
     }
@@ -444,7 +461,7 @@ static int read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangl
     c = str[ptr++];
   }
 
-  int tris = 0;
+  uint32_t tris = 0;
 
   switch (data_ptr) {
     case 3:  // Triangle, Only v
@@ -543,35 +560,37 @@ static int read_face(const char* str, WavefrontTriangle* face1, WavefrontTriangl
   return tris;
 }
 
-int wavefront_read_file(WavefrontContent* _content, const char* filename) {
+LuminaryResult wavefront_read_file(WavefrontContent* content, const char* filename) {
+  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(filename);
+
   log_message("Reading *.obj file (%s)", filename);
 
   FILE* file = fopen(filename, "r");
 
   if (!file) {
-    error_message("File could not be opened!");
-    return -1;
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File could not be opened!");
   }
 
-  WavefrontContent content = *_content;
+  uint32_t vertices_offset;
+  __FAILURE_HANDLE(array_get_num_elements(content->vertices, &vertices_offset));
 
-  const unsigned int vertices_offset = content.vertices_length;
-  const unsigned int normals_offset  = content.normals_length;
-  const unsigned int uvs_offset      = content.uvs_length;
+  uint32_t normals_offset;
+  __FAILURE_HANDLE(array_get_num_elements(content->normals, &normals_offset));
 
-  unsigned int triangles_count = content.triangles_length;
-  int vertices_count           = content.vertices_length;
-  int normals_count            = content.normals_length;
-  int uvs_count                = content.uvs_length;
+  uint32_t uvs_offset;
+  __FAILURE_HANDLE(array_get_num_elements(content->uvs, &uvs_offset));
 
-  size_t* loaded_mtls             = malloc(sizeof(size_t) * 16);
-  unsigned int loaded_mtls_count  = 0;
-  unsigned int loaded_mtls_length = 16;
+  ARRAY size_t* loaded_mtls;
+  __FAILURE_HANDLE(array_create(&loaded_mtls, sizeof(size_t), 16));
 
   uint16_t current_material = 0;
 
-  char* path        = malloc(LINE_SIZE);
-  char* read_buffer = malloc(READ_BUFFER_SIZE + LINE_SIZE);
+  char* path;
+  __FAILURE_HANDLE(host_malloc(&path, LINE_SIZE));
+
+  char* read_buffer;
+  __FAILURE_HANDLE(host_malloc(&read_buffer, READ_BUFFER_SIZE + LINE_SIZE));
 
   memset(read_buffer + READ_BUFFER_SIZE, 0, LINE_SIZE);
 
@@ -587,31 +606,27 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
     while ((eol = strchr(line, '\n'))) {
       *eol = '\0';
       if (line[0] == 'v' && line[1] == ' ') {
-        ensure_capacity(content.vertices, vertices_count, content.vertices_length, sizeof(WavefrontVertex));
         WavefrontVertex v;
         read_float_line(line + 2, 3, &v.x);
-        content.vertices[vertices_count] = v;
-        vertices_count++;
+
+        __FAILURE_HANDLE(array_push(&content->vertices, &v));
       }
       else if (line[0] == 'v' && line[1] == 'n') {
-        ensure_capacity(content.normals, normals_count, content.normals_length, sizeof(WavefrontNormal));
         WavefrontNormal n;
         read_float_line(line + 3, 3, &n.x);
-        content.normals[normals_count] = n;
-        normals_count++;
+
+        __FAILURE_HANDLE(array_push(&content->normals, &n));
       }
       else if (line[0] == 'v' && line[1] == 't') {
-        ensure_capacity(content.uvs, uvs_count, content.uvs_length, sizeof(WavefrontUV));
         WavefrontUV uv;
         read_float_line(line + 3, 2, &uv.u);
-        content.uvs[uvs_count] = uv;
-        uvs_count++;
+
+        __FAILURE_HANDLE(array_push(&content->uvs, &uv));
       }
       else if (line[0] == 'f') {
-        ensure_capacity(content.triangles, triangles_count, content.triangles_length, sizeof(WavefrontTriangle));
         WavefrontTriangle face1;
         WavefrontTriangle face2;
-        const int returned_faces = read_face(line, &face1, &face2);
+        const uint32_t returned_faces = read_face(line, &face1, &face2);
 
         if (returned_faces >= 1) {
           face1.object = current_material;
@@ -625,7 +640,7 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
           face1.vt2 += uvs_offset;
           face1.vt3 += uvs_offset;
 
-          content.triangles[triangles_count++] = face1;
+          __FAILURE_HANDLE(array_push(&content->triangles, &face1));
         }
 
         if (returned_faces >= 2) {
@@ -640,33 +655,40 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
           face2.vt2 += uvs_offset;
           face2.vt3 += uvs_offset;
 
-          content.triangles[triangles_count++] = face2;
+          __FAILURE_HANDLE(array_push(&content->triangles, &face2));
         }
       }
       else if (line[0] == 'm' && line[1] == 't' && line[2] == 'l' && line[3] == 'l' && line[4] == 'i' && line[5] == 'b') {
         sscanf(line, "%*s %[^\n]", path);
-        size_t hash = hash_djb2((unsigned char*) path);
+        const size_t hash = hash_djb2((unsigned char*) path);
 
-        int already_loaded = 0;
+        bool already_loaded = false;
 
-        for (unsigned int i = 0; i < loaded_mtls_count; i++) {
-          if (loaded_mtls[i] == hash)
-            already_loaded = 1;
+        uint32_t loaded_mtls_count;
+        __FAILURE_HANDLE(array_get_num_elements(loaded_mtls, &loaded_mtls_count));
+
+        for (uint32_t mtl_id = 0; mtl_id < loaded_mtls_count; mtl_id++) {
+          if (loaded_mtls[mtl_id] == hash)
+            already_loaded = true;
         }
 
         if (!already_loaded) {
-          ensure_capacity(loaded_mtls, loaded_mtls_count, loaded_mtls_length, sizeof(size_t));
-          loaded_mtls[loaded_mtls_count++] = hash;
-          read_materials_file(&content, path);
+          __FAILURE_HANDLE(array_push(&loaded_mtls, &hash));
+
+          read_materials_file(content, path);
         }
       }
       else if (line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {
         sscanf(line, "%*s %[^\n]", path);
         size_t hash      = hash_djb2((unsigned char*) path);
         current_material = 0;
-        for (unsigned int i = 1; i < content.materials_count; i++) {
-          if (content.materials[i].hash == hash) {
-            current_material = i;
+
+        uint32_t material_count;
+        __FAILURE_HANDLE(array_get_num_elements(content->materials, &material_count));
+
+        for (uint32_t material_id = 1; material_id < material_count; material_id++) {
+          if (content->materials[material_id].hash == hash) {
+            current_material = material_id;
             break;
           }
         }
@@ -679,122 +701,135 @@ int wavefront_read_file(WavefrontContent* _content, const char* filename) {
     memcpy(read_buffer, line, offset);
   }
 
-  content.vertices_length  = vertices_count;
-  content.vertices         = safe_realloc(content.vertices, sizeof(WavefrontVertex) * content.vertices_length);
-  content.normals_length   = normals_count;
-  content.normals          = safe_realloc(content.normals, sizeof(WavefrontNormal) * content.normals_length);
-  content.uvs_length       = uvs_count;
-  content.uvs              = safe_realloc(content.uvs, sizeof(WavefrontUV) * content.uvs_length);
-  content.triangles_length = triangles_count;
-  content.triangles        = safe_realloc(content.triangles, sizeof(WavefrontTriangle) * content.triangles_length);
+  __FAILURE_HANDLE(host_free(loaded_mtls));
+  __FAILURE_HANDLE(host_free(path));
+  __FAILURE_HANDLE(host_free(read_buffer));
 
-  *_content = content;
-
-  free(loaded_mtls);
-  free(path);
-  free(read_buffer);
-
-  log_message("Mesh: Verts: %d Tris: %d", vertices_count, triangles_count);
-
-  return 0;
+  return LUMINARY_SUCCESS;
 }
 
 static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
   return (uint16_t) (f * 0xFFFF + 0.5f);
 }
 
-PackedMaterial* wavefront_generate_texture_assignments(WavefrontContent* content) {
-  PackedMaterial* materials = malloc(sizeof(PackedMaterial) * content->materials_count);
+LuminaryResult wavefront_generate_texture_assignments(const WavefrontContent* content, PackedMaterial** material) {
+  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(material);
 
-  for (unsigned int i = 0; i < content->materials_count; i++) {
-    RGBF emission                 = content->materials[i].emission;
+  uint32_t material_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->materials, &material_count));
+
+  PackedMaterial* materials;
+  __FAILURE_HANDLE(host_malloc(&materials, sizeof(PackedMaterial) * material_count));
+
+  for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
+    RGBF emission                 = content->materials[mat_id].emission;
     const uint16_t emission_scale = (uint16_t) fminf(fmaxf(fmaxf(emission.r, emission.g), emission.b) + 1.0f, (float) 0xFFFF);
     emission.r /= (float) emission_scale;
     emission.g /= (float) emission_scale;
     emission.b /= (float) emission_scale;
 
     PackedMaterial mat;
-    mat.refraction_index = content->materials[i].refraction_index;
-    mat.albedo_r         = _wavefront_convert_float01_to_uint16(content->materials[i].diffuse_reflectivity.r);
-    mat.albedo_g         = _wavefront_convert_float01_to_uint16(content->materials[i].diffuse_reflectivity.g);
-    mat.albedo_b         = _wavefront_convert_float01_to_uint16(content->materials[i].diffuse_reflectivity.b);
-    mat.albedo_a         = _wavefront_convert_float01_to_uint16(content->materials[i].dissolve);
+    mat.refraction_index = content->materials[mat_id].refraction_index;
+    mat.albedo_r         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].diffuse_reflectivity.r);
+    mat.albedo_g         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].diffuse_reflectivity.g);
+    mat.albedo_b         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].diffuse_reflectivity.b);
+    mat.albedo_a         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].dissolve);
     mat.emission_r       = _wavefront_convert_float01_to_uint16(emission.r);
     mat.emission_g       = _wavefront_convert_float01_to_uint16(emission.g);
     mat.emission_b       = _wavefront_convert_float01_to_uint16(emission.b);
     mat.emission_scale   = emission_scale;
-    mat.metallic         = _wavefront_convert_float01_to_uint16(content->materials[i].specular_reflectivity.r);
-    mat.roughness        = _wavefront_convert_float01_to_uint16(1.0f - content->materials[i].specular_exponent / 1000.0f);
-    mat.albedo_map       = content->materials[i].texture[WF_ALBEDO];
-    mat.luminance_map    = content->materials[i].texture[WF_LUMINANCE];
-    mat.material_map     = content->materials[i].texture[WF_MATERIAL];
-    mat.normal_map       = content->materials[i].texture[WF_NORMAL];
+    mat.metallic         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].specular_reflectivity.r);
+    mat.roughness        = _wavefront_convert_float01_to_uint16(1.0f - content->materials[mat_id].specular_exponent / 1000.0f);
+    mat.albedo_map       = content->materials[mat_id].texture[WF_ALBEDO];
+    mat.luminance_map    = content->materials[mat_id].texture[WF_LUMINANCE];
+    mat.material_map     = content->materials[mat_id].texture[WF_MATERIAL];
+    mat.normal_map       = content->materials[mat_id].texture[WF_NORMAL];
 
-    materials[i] = mat;
+    materials[mat_id] = mat;
   }
 
-  return materials;
+  *material = materials;
+
+  return LUMINARY_SUCCESS;
 }
 
-unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data) {
+LuminaryResult wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data, uint32_t* num_triangles) {
   static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
-  unsigned int count = content->triangles_length;
+  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(triangles);
+  __CHECK_NULL_ARGUMENT(data);
+  __CHECK_NULL_ARGUMENT(num_triangles);
 
-  *triangles = (Triangle*) malloc(sizeof(Triangle) * count);
+  uint32_t triangle_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->triangles, &triangle_count));
 
-  data->index_buffer  = (uint32_t*) malloc(sizeof(uint32_t) * 4 * count);
-  data->vertex_buffer = (float*) malloc(sizeof(float) * 4 * content->vertices_length);
-  data->vertex_count  = content->vertices_length;
+  uint32_t vertex_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->vertices, &vertex_count));
 
-  for (int j = 0; j < content->vertices_length; j++) {
-    data->vertex_buffer[j * 4 + 0] = content->vertices[j].x;
-    data->vertex_buffer[j * 4 + 1] = content->vertices[j].y;
-    data->vertex_buffer[j * 4 + 2] = content->vertices[j].z;
+  uint32_t uv_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->uvs, &uv_count));
+
+  uint32_t normal_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->normals, &normal_count));
+
+  __FAILURE_HANDLE(host_malloc(triangles, sizeof(Triangle) * triangle_count));
+
+  __FAILURE_HANDLE(host_malloc(&data->index_buffer, sizeof(uint32_t) * 4 * triangle_count));
+  __FAILURE_HANDLE(host_malloc(&data->vertex_buffer, sizeof(float) * 4 * vertex_count));
+
+  data->vertex_count = vertex_count;
+
+  for (uint32_t vertex_id = 0; vertex_id < vertex_count; vertex_id++) {
+    data->vertex_buffer[vertex_id * 4 + 0] = content->vertices[vertex_id].x;
+    data->vertex_buffer[vertex_id * 4 + 1] = content->vertices[vertex_id].y;
+    data->vertex_buffer[vertex_id * 4 + 2] = content->vertices[vertex_id].z;
+    data->vertex_buffer[vertex_id * 4 + 3] = 0.0f;
   }
 
-  unsigned int ptr                 = 0;
-  unsigned int index_triplet_count = 0;
+  uint32_t ptr                 = 0;
+  uint32_t index_triplet_count = 0;
 
-  for (unsigned int j = 0; j < count; j++) {
-    WavefrontTriangle t = content->triangles[j];
+  for (uint32_t tri_id = 0; tri_id < triangle_count; tri_id++) {
+    WavefrontTriangle t = content->triangles[tri_id];
     Triangle triangle;
 
     WavefrontVertex v;
 
-    t.v1 += (t.v1 < 0) ? content->vertices_length + 1 : 0;
+    const uint32_t v1_ptr = (t.v1 >= 0) ? t.v1 + vertex_count + 1 : t.v1;
 
-    if (t.v1 > content->vertices_length) {
+    if (v1_ptr > vertex_count) {
       continue;
     }
     else {
-      v = content->vertices[t.v1 - 1];
+      v = content->vertices[v1_ptr - 1];
     }
 
     triangle.vertex.x = v.x;
     triangle.vertex.y = v.y;
     triangle.vertex.z = v.z;
 
-    t.v2 += (t.v2 < 0) ? content->vertices_length + 1 : 0;
+    const uint32_t v2_ptr = (t.v2 >= 0) ? t.v2 + vertex_count + 1 : t.v2;
 
-    if (t.v2 > content->vertices_length) {
+    if (v2_ptr > vertex_count) {
       continue;
     }
     else {
-      v = content->vertices[t.v2 - 1];
+      v = content->vertices[v2_ptr - 1];
     }
 
     triangle.edge1.x = v.x - triangle.vertex.x;
     triangle.edge1.y = v.y - triangle.vertex.y;
     triangle.edge1.z = v.z - triangle.vertex.z;
 
-    t.v3 += (t.v3 < 0) ? content->vertices_length + 1 : 0;
+    const uint32_t v3_ptr = (t.v3 >= 0) ? t.v3 + vertex_count + 1 : t.v3;
 
-    if (t.v3 > content->vertices_length) {
+    if (v3_ptr > vertex_count) {
       continue;
     }
     else {
-      v = content->vertices[t.v3 - 1];
+      v = content->vertices[v3_ptr - 1];
     }
 
     triangle.edge2.x = v.x - triangle.vertex.x;
@@ -813,40 +848,40 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
 
     WavefrontUV uv;
 
-    t.vt1 += (t.vt1 < 0) ? content->uvs_length + 1 : 0;
+    const uint32_t vt1_ptr = (t.vt1 >= 0) ? t.vt1 + uv_count + 1 : t.vt1;
 
-    if (t.vt1 > content->uvs_length || t.vt1 == 0) {
+    if (vt1_ptr > uv_count || vt1_ptr == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content->uvs[t.vt1 - 1];
+      uv = content->uvs[vt1_ptr - 1];
     }
 
     triangle.vertex_texture.u = uv.u;
     triangle.vertex_texture.v = uv.v;
 
-    t.vt2 += (t.vt2 < 0) ? content->uvs_length + 1 : 0;
+    const uint32_t vt2_ptr = (t.vt2 >= 0) ? t.vt2 + uv_count + 1 : t.vt2;
 
-    if (t.vt2 > content->uvs_length || t.vt2 == 0) {
+    if (vt2_ptr > uv_count || vt2_ptr == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content->uvs[t.vt2 - 1];
+      uv = content->uvs[vt2_ptr - 1];
     }
 
     triangle.edge1_texture.u = uv.u - triangle.vertex_texture.u;
     triangle.edge1_texture.v = uv.v - triangle.vertex_texture.v;
 
-    t.vt3 += (t.vt3 < 0) ? content->uvs_length + 1 : 0;
+    const uint32_t vt3_ptr = (t.vt3 >= 0) ? t.vt3 + uv_count + 1 : t.vt3;
 
-    if (t.vt3 > content->uvs_length || t.vt3 == 0) {
+    if (vt3_ptr > uv_count || vt3_ptr == 0) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content->uvs[t.vt3 - 1];
+      uv = content->uvs[vt3_ptr - 1];
     }
 
     triangle.edge2_texture.u = uv.u - triangle.vertex_texture.u;
@@ -854,15 +889,15 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
 
     WavefrontNormal n;
 
-    t.vn1 += (t.vn1 < 0) ? content->normals_length + 1 : 0;
+    const uint32_t vn1_ptr = (t.vn1 >= 0) ? t.vn1 + normal_count + 1 : t.vn1;
 
-    if (t.vn1 > content->normals_length || t.vn1 == 0) {
+    if (vn1_ptr > normal_count || vn1_ptr == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content->normals[t.vn1 - 1];
+      n = content->normals[vn1_ptr - 1];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
@@ -882,15 +917,15 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
     triangle.vertex_normal.y = n.y;
     triangle.vertex_normal.z = n.z;
 
-    t.vn2 += (t.vn2 < 0) ? content->normals_length + 1 : 0;
+    const uint32_t vn2_ptr = (t.vn2 >= 0) ? t.vn2 + normal_count + 1 : t.vn2;
 
-    if (t.vn2 > content->normals_length || t.vn2 == 0) {
+    if (vn2_ptr > normal_count || t.vn2 == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content->normals[t.vn2 - 1];
+      n = content->normals[vn2_ptr - 1];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
@@ -910,15 +945,15 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
     triangle.edge1_normal.y = n.y - triangle.vertex_normal.y;
     triangle.edge1_normal.z = n.z - triangle.vertex_normal.z;
 
-    t.vn3 += (t.vn3 < 0) ? content->normals_length + 1 : 0;
+    const uint32_t vn3_ptr = (t.vn3 >= 0) ? t.vn3 + normal_count + 1 : t.vn3;
 
-    if (t.vn3 > content->normals_length || t.vn3 == 0) {
+    if (vn3_ptr > normal_count || vn3_ptr == 0) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content->normals[t.vn3 - 1];
+      n = content->normals[vn3_ptr - 1];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
@@ -945,11 +980,15 @@ unsigned int wavefront_convert_content(WavefrontContent* content, Triangle** tri
     index_triplet_count++;
   }
 
-  *triangles = (Triangle*) realloc(*triangles, sizeof(Triangle) * ptr);
+  const uint32_t new_triangle_count = ptr;
 
-  data->index_buffer   = (uint32_t*) realloc(data->index_buffer, sizeof(uint32_t) * 4 * index_triplet_count);
+  __FAILURE_HANDLE(host_realloc(triangles, sizeof(Triangle) * new_triangle_count));
+
+  __FAILURE_HANDLE(host_realloc(&data->index_buffer, sizeof(uint32_t) * 4 * index_triplet_count));
   data->index_count    = 3 * index_triplet_count;
   data->triangle_count = index_triplet_count;
 
-  return ptr;
+  *num_triangles = new_triangle_count;
+
+  return LUMINARY_SUCCESS;
 }

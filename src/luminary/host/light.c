@@ -6,10 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "buffer.h"
 #include "ceb.h"
 #include "device.h"
-#include "structs.h"
 #include "texture.h"
 #include "utils.h"
 

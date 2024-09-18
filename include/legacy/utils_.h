@@ -33,16 +33,6 @@
 #define ONE_OVER_PI 0.31830988618f
 #endif
 
-enum LightID : uint32_t {
-  LIGHT_ID_SUN               = 0xffffffffu,
-  LIGHT_ID_TOY               = 0xfffffffeu,
-  LIGHT_ID_NONE              = 0xfffffff1u,
-  LIGHT_ID_ANY               = 0xfffffff0u,
-  LIGHT_ID_TRIANGLE_ID_LIMIT = 0x7fffffffu
-} typedef LightID;
-
-#define TEXTURE_NONE ((uint16_t) 0xffffu)
-
 enum OutputImageFormat { IMGFORMAT_PNG = 0, IMGFORMAT_QOI = 1 } typedef OutputImageFormat;
 
 enum OutputVariable {

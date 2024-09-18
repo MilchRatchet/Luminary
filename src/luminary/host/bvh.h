@@ -3,7 +3,6 @@
 
 #include <stdint.h>
 
-#include "structs.h"
 #include "utils.h"
 
 struct compressed_vec3 {

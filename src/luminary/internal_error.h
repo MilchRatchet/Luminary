@@ -9,6 +9,11 @@
     return return_code;                       \
   }
 
+#define __CHECK_NULL_ARGUMENT(argument)                                     \
+  if (!(argument)) {                                                        \
+    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "%s is NULL.", #argument); \
+  }
+
 #define __FAILURE_HANDLE(command)                                                                             \
   {                                                                                                           \
     LuminaryResult __lum_func_err = command;                                                                  \
