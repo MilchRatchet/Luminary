@@ -63,6 +63,7 @@ LuminaryResult luminary_host_create(Host** _host) {
 
   memset(host, 0, sizeof(Host));
 
+  __FAILURE_HANDLE(thread_create(&host->work_thread));
   __FAILURE_HANDLE(queue_create(&host->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
   __FAILURE_HANDLE(ringbuffer_create(&host->ring_buffer, HOST_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
@@ -75,6 +76,8 @@ LuminaryResult luminary_host_create(Host** _host) {
   host->enable_output       = false;
   host->exit_requested      = false;
 
+  __FAILURE_HANDLE(thread_start(host->work_thread, (ThreadMainFunc) _host_queue_worker, host));
+
   *_host = host;
 
   return LUMINARY_SUCCESS;
@@ -84,9 +87,16 @@ LuminaryResult luminary_host_destroy(LuminaryHost** host) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(*host);
 
+  (*host)->exit_requested = true;
+  __FAILURE_HANDLE(thread_join((*host)->work_thread));
+
+  __FAILURE_HANDLE(thread_get_last_result((*host)->work_thread));
+
   __FAILURE_HANDLE(wall_time_destroy(&(*host)->queue_wall_time));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ring_buffer));
   __FAILURE_HANDLE(queue_destroy(&(*host)->work_queue));
+
+  __FAILURE_HANDLE(thread_destroy(&(*host)->work_thread));
 
   __FAILURE_HANDLE(host_free(host));
 

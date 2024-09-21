@@ -2,10 +2,12 @@
 #define LUMINARY_INTERNAL_HOST_H
 
 #include "device/device.h"
+#include "thread.h"
 #include "utils.h"
 
 struct LuminaryHost {
   ARRAY Device* devices;
+  Thread* work_thread;
   Queue* work_queue;
   RingBuffer* ring_buffer;
   Camera camera;

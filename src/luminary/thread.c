@@ -14,24 +14,23 @@ struct Thread {
 } typedef Thread;
 
 struct ThreadMainArgs {
-  LuminaryResult (*func)(void* args);
+  ThreadMainFunc func;
   void* args;
   Thread* self;
 };
 
 LuminaryResult thread_create(Thread** _thread) {
-  if (!_thread) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Thread is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(_thread);
 
   Thread* thread;
-
   __FAILURE_HANDLE(host_malloc(&thread, sizeof(Thread)));
 
   __FAILURE_HANDLE(host_malloc(&thread->main_args, sizeof(struct ThreadMainArgs)));
 
   thread->running = false;
   thread->result  = LUMINARY_SUCCESS;
+
+  *_thread = thread;
 
   return LUMINARY_SUCCESS;
 }
@@ -44,10 +43,8 @@ int _thread_main(struct ThreadMainArgs* args) {
   return 0;
 }
 
-LuminaryResult thread_start(Thread* thread, LuminaryResult (*func)(void* args), void* args) {
-  if (!thread) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Thread is NULL.");
-  }
+LuminaryResult thread_start(Thread* thread, ThreadMainFunc func, void* args) {
+  __CHECK_NULL_ARGUMENT(thread);
 
   if (thread->running) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Thread is already running.");
@@ -71,9 +68,7 @@ LuminaryResult thread_start(Thread* thread, LuminaryResult (*func)(void* args), 
 }
 
 LuminaryResult thread_join(Thread* thread) {
-  if (!thread) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Thread is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(thread);
 
   if (!thread->running) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Thread is not running.");
@@ -91,28 +86,21 @@ LuminaryResult thread_join(Thread* thread) {
 }
 
 LuminaryResult thread_get_last_result(const Thread* thread) {
-  if (!thread) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Thread is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(thread);
 
   return thread->result;
 }
 
 LuminaryResult thread_destroy(Thread** thread) {
-  if (!thread) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Thread ptr is NULL.");
-  }
-
-  if (!(*thread)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Thread is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(thread);
+  __CHECK_NULL_ARGUMENT(*thread);
 
   if ((*thread)->running) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Thread is still running.");
   }
 
-  host_free((*thread)->main_args);
-  host_free(thread);
+  __FAILURE_HANDLE(host_free(&(*thread)->main_args));
+  __FAILURE_HANDLE(host_free(thread));
 
   return LUMINARY_SUCCESS;
 }
