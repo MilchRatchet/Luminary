@@ -69,22 +69,41 @@ void _log_init(void) {
   log_initialized = true;
 }
 
+void _log_shutdown(void) {
+  luminary_write_log();
+
+  log_initialized = false;
+
+  mtx_destroy(&mutex);
+
+  free(log_buffer);
+  free(print_buffer);
+}
+
 /*
  * Writes the log to a file.
  */
 void luminary_write_log() {
+  if (!log_initialized)
+    return;
+
   if (!write_logs)
     return;
+
+  mtx_lock(&mutex);
 
   FILE* file = fopen("luminary.log", "wb");
 
   if (!file) {
+    mtx_unlock(&mutex);
     luminary_print_error("Could not write log to file.");
     return;
   }
 
   fwrite(log_buffer, log_buffer_offset, 1, file);
   fclose(file);
+
+  mtx_unlock(&mutex);
 
   luminary_print_info("Log written to file.");
 }

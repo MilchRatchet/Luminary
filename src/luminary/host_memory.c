@@ -1,4 +1,6 @@
+#include <signal.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 // Include stdatomic later, otherwise I run into issues.
@@ -24,6 +26,15 @@ void _host_memory_init(void) {
   atomic_store(&_host_memory_total_allocation, 0);
 }
 
+void _host_memory_shutdown(void) {
+  uint64_t leaked_memory = atomic_load(&_host_memory_total_allocation);
+
+  if (leaked_memory > 0) {
+    printf("Luminary leaked %llu bytes.", leaked_memory);
+    exit(SIGABRT);
+  }
+}
+
 LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const char* func, uint32_t line) {
   if (!ptr) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Ptr is NULL.");
@@ -38,7 +49,7 @@ LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const
 
   *ptr = (void*) (header + 1);
 
-  luminary_print_log("Allocated %12llu bytes. Total: %16llu bytes. [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
+  luminary_print_log("Malloc  %012llu [Total: %016llu] [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }
@@ -70,7 +81,7 @@ LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, cons
 
   const uint64_t prev_total = atomic_fetch_add(&_host_memory_total_allocation, header->size);
 
-  luminary_print_log("Reallocated %12llu bytes. Total: %16llu bytes. [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
+  luminary_print_log("Realloc %012llu [Total: %016llu] [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }
@@ -102,7 +113,7 @@ LuminaryResult _host_free(void** ptr, const char* buf_name, const char* func, ui
 
   *ptr = (void*) 0;
 
-  luminary_print_log("Freed %12llu bytes. Total: %16llu bytes. [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
+  luminary_print_log("Free    %012llu [Total: %016llu] [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }

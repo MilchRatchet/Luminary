@@ -12,4 +12,6 @@ void luminary_init(void) {
 }
 
 void luminary_shutdown(void) {
+  _log_shutdown();
+  _host_memory_shutdown();
 }
