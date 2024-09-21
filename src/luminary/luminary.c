@@ -7,7 +7,8 @@ void luminary_init(void) {
   // Order of initialization is very important.
   _host_memory_init();
   _log_init();
-  _device_init();
+  // TODO: Reenable once device compilation is done.
+  //_device_init();
 }
 
 void luminary_shutdown(void) {

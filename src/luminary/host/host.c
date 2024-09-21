@@ -80,6 +80,19 @@ LuminaryResult luminary_host_create(Host** _host) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_destroy(LuminaryHost** host) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(*host);
+
+  __FAILURE_HANDLE(wall_time_destroy(&(*host)->queue_wall_time));
+  __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ring_buffer));
+  __FAILURE_HANDLE(queue_destroy(&(*host)->work_queue));
+
+  __FAILURE_HANDLE(host_free(host));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, const char** string) {
   if (!host) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Host is NULL.");

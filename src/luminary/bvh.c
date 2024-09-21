@@ -96,10 +96,10 @@ static LuminaryResult _bvh_create_fragments(BVHWork* work, const Mesh* mesh) {
   __CHECK_NULL_ARGUMENT(work);
   __CHECK_NULL_ARGUMENT(mesh);
 
-  const uint32_t triangle_count = mesh->triangle_count;
+  const uint32_t triangle_count = mesh->data->triangle_count;
 
   work->triangles       = mesh->triangles;
-  work->triangles_count = mesh->triangle_count;
+  work->triangles_count = mesh->data->triangle_count;
 
   __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * triangle_count));
 

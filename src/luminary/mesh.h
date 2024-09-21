@@ -5,19 +5,14 @@
 
 struct BVH;
 struct OptixBVH;
-struct LightTree;
+struct LightData;
 
 struct Mesh {
-  float* vertex_buffer;
-  uint32_t vertex_count;
-  uint32_t* index_buffer;
+  TriangleGeomData* data;
   Triangle* triangles;
-  uint32_t triangle_count;
-  TriangleLight* lights;
-  uint32_t light_count;
+  struct LightData* light_data;
   struct BVH* bvh;
   struct OptixBVH* optix_bvh;
-  struct LightTree* light_tree;
 } typedef Mesh;
 
 struct MeshInstance {

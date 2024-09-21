@@ -14,9 +14,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <threads.h>
 
 #include "internal_log.h"
-#include "mutex.h"
 #include "utils.h"
 
 static char* log_buffer;
@@ -25,11 +25,13 @@ static size_t log_buffer_offset;
 static char* print_buffer;
 static int print_buffer_size;
 
-static Mutex* mutex;
+static mtx_t mutex;
 
-static int volatile_line = 0;
+static bool volatile_line = false;
 
-static int write_logs = 1;
+static bool write_logs = true;
+
+static bool log_initialized = false;
 
 #ifdef _WIN32
 static void enable_windows_virtual_terminal_sequence() {
@@ -57,12 +59,14 @@ void _log_init(void) {
   enable_windows_virtual_terminal_sequence();
 
   // This is not allowed to fail.
-  LuminaryResult result = mutex_create(&mutex);
+  const int retval = mtx_init(&mutex, mtx_plain);
 
-  if (result != LUMINARY_SUCCESS) {
+  if (retval != thrd_success) {
     puts("Failed to initialize the mutex for the Luminary logger.");
     exit(SIGABRT);
   }
+
+  log_initialized = true;
 }
 
 /*
@@ -140,7 +144,10 @@ static void write_to_log_buffer(const size_t size) {
 }
 
 void luminary_print_log(const char* format, ...) {
-  mutex_lock(mutex);
+  if (!log_initialized)
+    return;
+
+  mtx_lock(&mutex);
 
   va_list args;
   va_start(args, format);
@@ -148,11 +155,14 @@ void luminary_print_log(const char* format, ...) {
   va_end(args);
   write_to_log_buffer(size);
 
-  mutex_unlock(mutex);
+  mtx_unlock(&mutex);
 }
 
 void luminary_print_info(const char* format, ...) {
-  mutex_lock(mutex);
+  if (!log_initialized)
+    return;
+
+  mtx_lock(&mutex);
 
   va_list args;
   va_start(args, format);
@@ -166,13 +176,16 @@ void luminary_print_info(const char* format, ...) {
   printf("\x1B[1m%s\033[0m\n", print_buffer);
   fflush(stdout);
 
-  volatile_line = 0;
+  volatile_line = false;
 
-  mutex_unlock(mutex);
+  mtx_unlock(&mutex);
 }
 
 void luminary_print_info_inline(const char* format, ...) {
-  mutex_lock(mutex);
+  if (!log_initialized)
+    return;
+
+  mtx_lock(&mutex);
 
   va_list args;
   va_start(args, format);
@@ -186,13 +199,16 @@ void luminary_print_info_inline(const char* format, ...) {
   printf("\x1B[1m%s\033[0m", print_buffer);
   fflush(stdout);
 
-  volatile_line = 1;
+  volatile_line = true;
 
-  mutex_unlock(mutex);
+  mtx_unlock(&mutex);
 }
 
 void luminary_print_warn(const char* format, ...) {
-  mutex_lock(mutex);
+  if (!log_initialized)
+    return;
+
+  mtx_lock(&mutex);
 
   va_list args;
   va_start(args, format);
@@ -206,13 +222,16 @@ void luminary_print_warn(const char* format, ...) {
   printf("\x1B[93m\x1B[1m%s\033[0m\n", print_buffer);
   fflush(stdout);
 
-  volatile_line = 0;
+  volatile_line = false;
 
-  mutex_unlock(mutex);
+  mtx_unlock(&mutex);
 }
 
 void luminary_print_error(const char* format, ...) {
-  mutex_lock(mutex);
+  if (!log_initialized)
+    return;
+
+  mtx_lock(&mutex);
 
   va_list args;
   va_start(args, format);
@@ -226,13 +245,16 @@ void luminary_print_error(const char* format, ...) {
   printf("\x1B[91m\x1B[1m%s\033[0m\n", print_buffer);
   fflush(stdout);
 
-  volatile_line = 0;
+  volatile_line = false;
 
-  mutex_unlock(mutex);
+  mtx_unlock(&mutex);
 }
 
 void luminary_print_crash(const char* format, ...) {
-  mutex_lock(mutex);
+  if (!log_initialized)
+    return;
+
+  mtx_lock(&mutex);
 
   va_list args;
   va_start(args, format);
@@ -246,9 +268,9 @@ void luminary_print_crash(const char* format, ...) {
   printf("\x1B[95m\x1B[1m%s\033[0m\n", print_buffer);
   fflush(stdout);
 
-  volatile_line = 0;
+  volatile_line = false;
 
-  mutex_unlock(mutex);
+  mtx_unlock(&mutex);
 
   exit_program();
 }

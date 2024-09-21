@@ -12,9 +12,7 @@ struct LuminaryRingBuffer {
 };
 
 LuminaryResult _ringbuffer_create(RingBuffer** _buffer, size_t size, const char* buf_name, const char* func, uint32_t line) {
-  if (!_buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Buffer was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(_buffer);
 
   if (size == 0) {
     __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Size was 0.");
@@ -30,17 +28,14 @@ LuminaryResult _ringbuffer_create(RingBuffer** _buffer, size_t size, const char*
   buffer->total_allocated_memory = 0;
   buffer->ptr                    = 0;
 
+  *_buffer = buffer;
+
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult ringbuffer_allocate_entry(RingBuffer* buffer, size_t entry_size, void** entry) {
-  if (!buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Buffer was NULL.");
-  }
-
-  if (!entry) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Entry was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(buffer);
+  __CHECK_NULL_ARGUMENT(entry);
 
   if (entry_size == 0) {
     __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Requested entry size was 0.");
@@ -75,9 +70,7 @@ LuminaryResult ringbuffer_allocate_entry(RingBuffer* buffer, size_t entry_size, 
 }
 
 LuminaryResult ringbuffer_release_entry(RingBuffer* buffer, size_t entry_size) {
-  if (!buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Buffer was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(buffer);
 
   if (entry_size == 0) {
     __RETURN_ERROR(LUMINARY_ERROR_INVALID_API_ARGUMENT, "Tried to release an entry of size 0.");
@@ -95,15 +88,14 @@ LuminaryResult ringbuffer_release_entry(RingBuffer* buffer, size_t entry_size) {
 }
 
 LuminaryResult _ringbuffer_destroy(RingBuffer** buffer, const char* buf_name, const char* func, uint32_t line) {
-  if (!buffer) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Buffer was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(buffer);
+  __CHECK_NULL_ARGUMENT(*buffer);
 
   if ((*buffer)->total_allocated_memory > 0) {
     __RETURN_ERROR(LUMINARY_ERROR_MEMORY_LEAK, "Attempted to destroy ringbuffer that has entries that have not been released.");
   }
 
-  __FAILURE_HANDLE(_host_free((void**) (*buffer)->memory, buf_name, func, line));
+  __FAILURE_HANDLE(_host_free((void**) &(*buffer)->memory, buf_name, func, line));
   __FAILURE_HANDLE(_host_free((void**) buffer, buf_name, func, line));
 
   return LUMINARY_SUCCESS;
