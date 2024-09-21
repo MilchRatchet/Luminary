@@ -158,6 +158,23 @@ struct TriangleGeomData {
   uint32_t triangle_count;
 } typedef TriangleGeomData;
 
+struct BVHNode8 {
+  vec3 p;
+  int8_t ex;
+  int8_t ey;
+  int8_t ez;
+  uint8_t imask;
+  int32_t child_node_base_index;
+  int32_t triangle_base_index;
+  uint8_t meta[8];
+  uint8_t low_x[8];
+  uint8_t low_y[8];
+  uint8_t low_z[8];
+  uint8_t high_x[8];
+  uint8_t high_y[8];
+  uint8_t high_z[8];
+} typedef BVHNode8;
+
 #ifndef PI
 #define PI 3.141592653589f
 #endif

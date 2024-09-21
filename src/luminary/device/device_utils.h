@@ -127,7 +127,7 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_light;
   OptixTraversableHandle optix_bvh_particles;
-  Node8* bvh_nodes;
+  BVHNode8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
   Quad* particle_quads;
   LightTreeNode8Packed* light_tree_nodes_8;

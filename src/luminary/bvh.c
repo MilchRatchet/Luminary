@@ -7,8 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "device.h"
-#include "struct_interleaving.h"
+#include "internal_error.h"
 #include "utils.h"
 
 /*
@@ -31,8 +30,12 @@
 
 #define TRIANGLES_MAX 3
 
-enum Axis { AxisX = 0, AxisY = 1, AxisZ = 2 } typedef Axis;
-enum OptimalStrategy { StrategyNull = 0, StrategyObjectSplit = 1, StrategySpatialSplit = 2 } typedef OptimalStrategy;
+enum Axis { AXIS_X = 0, AXIS_Y = 1, AXIS_Z = 2 } typedef Axis;
+enum OptimalStrategy {
+  OPTIMAL_STRATEGY_NULL          = 0,
+  OPTIMAL_STRATEGY_OBJECT_SPLIT  = 1,
+  OPTIMAL_STRATEGY_SPATIAL_SPLIT = 2
+} typedef OptimalStrategy;
 
 struct vec3_p {
   float x;
@@ -58,6 +61,25 @@ struct Bin {
   uint64_t _p;
 } typedef Bin;
 
+enum NodeType { NODE_TYPE_NULL = 0, NODE_TYPE_INTERNAL = 1, NODE_TYPE_LEAF = 2 } typedef NodeType;
+
+struct Node2 {
+  vec3 left_low;
+  vec3 left_high;
+  vec3 right_low;
+  vec3 right_high;
+  vec3 self_low;
+  vec3 self_high;
+  uint32_t triangle_count;
+  uint32_t triangles_address;
+  uint32_t child_address;
+  float surface_area;
+  float sah_cost[7];
+  uint32_t decision[7];
+  uint32_t cost_computed;
+  NodeType type;
+} typedef Node2;
+
 struct BVHWork {
   Triangle* triangles;
   uint32_t triangles_count;
@@ -66,30 +88,26 @@ struct BVHWork {
   uint32_t fragments_size;
   Node2* binary_nodes;
   uint32_t binary_nodes_count;
-  Node8* nodes;
+  BVHNode8* nodes;
   uint32_t nodes_count;
 } typedef BVHWork;
 
-static void _bvh_create_fragments(RaytraceInstance* instance, BVHWork* work) {
-  const uint32_t triangle_count = instance->scene.triangle_data.triangle_count;
+static LuminaryResult _bvh_create_fragments(BVHWork* work, const Mesh* mesh) {
+  __CHECK_NULL_ARGUMENT(work);
+  __CHECK_NULL_ARGUMENT(mesh);
 
-  Triangle* triangles_interleaved = malloc(sizeof(Triangle) * triangle_count);
-  device_download(triangles_interleaved, instance->scene.triangles, sizeof(Triangle) * triangle_count);
+  const uint32_t triangle_count = mesh->triangle_count;
 
-  Triangle* triangles = malloc(sizeof(Triangle) * triangle_count);
-  struct_triangles_deinterleave(triangles, triangles_interleaved, triangle_count);
+  work->triangles       = mesh->triangles;
+  work->triangles_count = mesh->triangle_count;
 
-  free(triangles_interleaved);
+  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * triangle_count));
 
-  work->triangles       = triangles;
-  work->triangles_count = triangle_count;
-
-  work->fragments       = malloc(sizeof(Fragment) * triangle_count);
   work->fragments_size  = triangle_count;
   work->fragments_count = triangle_count;
 
   for (uint32_t i = 0; i < triangle_count; i++) {
-    Triangle t  = triangles[i];
+    Triangle t  = work->triangles[i];
     vec3_p high = {
       .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
       .y = max(t.vertex.y, max(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
@@ -113,15 +131,17 @@ static void _bvh_create_fragments(RaytraceInstance* instance, BVHWork* work) {
     Fragment frag      = {.high = high, .low = low, .middle = middle, .id = i};
     work->fragments[i] = frag;
   }
+
+  return LUMINARY_SUCCESS;
 }
 
 static float get_entry_by_axis(const vec3_p p, const Axis axis) {
   switch (axis) {
-    case AxisX:
+    case AXIS_X:
       return p.x;
-    case AxisY:
+    case AXIS_Y:
       return p.y;
-    case AxisZ:
+    case AXIS_Z:
     default:
       return p.z;
   }
@@ -291,13 +311,13 @@ static double construct_bins(
   }
 
   switch (axis) {
-    case AxisX:
+    case AXIS_X:
       _construct_bins_kernel(0);
       break;
-    case AxisY:
+    case AXIS_Y:
       _construct_bins_kernel(1);
       break;
-    case AxisZ:
+    case AXIS_Z:
     default:
       _construct_bins_kernel(2);
       break;
@@ -380,19 +400,19 @@ static double construct_chopped_bins(
   }
 
   switch (axis) {
-    case AxisX:
+    case AXIS_X:
       for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
         bins[i].low.x  = fmaxf(bins[i].low.x, low.x + i * interval);
         bins[i].high.x = fminf(bins[i].high.x, low.x + (i + 1) * interval);
       }
       break;
-    case AxisY:
+    case AXIS_Y:
       for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
         bins[i].low.y  = fmaxf(bins[i].low.y, low.y + i * interval);
         bins[i].high.y = fminf(bins[i].high.y, low.y + (i + 1) * interval);
       }
       break;
-    case AxisZ:
+    case AXIS_Z:
     default:
       for (int i = 0; i < SPATIAL_SPLIT_BIN_COUNT; i++) {
         bins[i].low.z  = fmaxf(bins[i].low.z, low.z + i * interval);
@@ -440,21 +460,21 @@ static void divide_along_axis(
     if (low < split) {
       Fragment frag_left = fragments_in[i];
       switch (axis) {
-        case AxisX:
+        case AXIS_X:
           frag_left.high.x = min(frag_left.high.x, split);
           if (frag_left.high.x == frag_left.low.x) {
             frag_left.high.x = nextafterf(frag_left.high.x, FLT_MAX);
           }
           frag_left.middle.x = (frag_left.low.x + frag_left.high.x) * 0.5f;
           break;
-        case AxisY:
+        case AXIS_Y:
           frag_left.high.y = min(frag_left.high.y, split);
           if (frag_left.high.y == frag_left.low.y) {
             frag_left.high.y = nextafterf(frag_left.high.y, FLT_MAX);
           }
           frag_left.middle.y = (frag_left.low.y + frag_left.high.y) * 0.5f;
           break;
-        case AxisZ:
+        case AXIS_Z:
         default:
           frag_left.high.z = min(frag_left.high.z, split);
           if (frag_left.high.z == frag_left.low.z) {
@@ -469,21 +489,21 @@ static void divide_along_axis(
     if (high > split) {
       Fragment frag_right = fragments_in[i];
       switch (axis) {
-        case AxisX:
+        case AXIS_X:
           frag_right.low.x = max(frag_right.low.x, split);
           if (frag_right.high.x == frag_right.low.x) {
             frag_right.low.x = nextafterf(frag_right.low.x, -FLT_MAX);
           }
           frag_right.middle.x = (frag_right.low.x + frag_right.high.x) * 0.5f;
           break;
-        case AxisY:
+        case AXIS_Y:
           frag_right.low.y = max(frag_right.low.y, split);
           if (frag_right.high.y == frag_right.low.y) {
             frag_right.low.y = nextafterf(frag_right.low.y, -FLT_MAX);
           }
           frag_right.middle.y = (frag_right.low.y + frag_right.high.y) * 0.5f;
           break;
-        case AxisZ:
+        case AXIS_Z:
         default:
           frag_right.low.z = max(frag_right.low.z, split);
           if (frag_right.high.z == frag_right.low.z) {
@@ -508,20 +528,27 @@ static void divide_along_axis(
   }
 }
 
-static void _bvh_build_binary_bvh(BVHWork* work) {
+static LuminaryResult _bvh_build_binary_bvh(BVHWork* work) {
+  __CHECK_NULL_ARGUMENT(work);
+
   Fragment* fragments      = work->fragments;
   uint32_t fragments_count = work->fragments_count;
 
-  Fragment* fragments_buffer          = (Fragment*) malloc(sizeof(Fragment) * fragments_count * 2);
-  unsigned int fragments_buffer_size  = fragments_count * 2;
-  unsigned int fragments_buffer_count = fragments_count;
+  Fragment* fragments_buffer;
+  __FAILURE_HANDLE(host_malloc(&fragments_buffer, sizeof(Fragment) * fragments_count * 2));
+
+  uint32_t fragments_buffer_size  = fragments_count * 2;
+  uint32_t fragments_buffer_count = fragments_count;
 
   uint32_t node_count = 1 + fragments_count / THRESHOLD_TRIANGLES;
-  Node2* nodes        = malloc(sizeof(Node2) * node_count);
+
+  Node2* nodes;
+  __FAILURE_HANDLE(host_malloc(&nodes, sizeof(Node2) * node_count));
   memset(nodes, 0, sizeof(Node2) * node_count);
+
   nodes[0].triangles_address = 0;
   nodes[0].triangle_count    = fragments_count;
-  nodes[0].type              = NodeTypeLeaf;
+  nodes[0].type              = NODE_TYPE_LEAF;
 
   uint32_t* leaf_nodes     = malloc(sizeof(uint32_t) * node_count);
   uint32_t leaf_node_count = 0;
@@ -536,7 +563,8 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
     root_surface_area = (double) diff.x * (double) diff.y + (double) diff.x * (double) diff.z + (double) diff.y * (double) diff.z;
   }
 
-  Bin* bins = (Bin*) malloc(sizeof(Bin) * max(OBJECT_SPLIT_BIN_COUNT, SPATIAL_SPLIT_BIN_COUNT));
+  Bin* bins;
+  __FAILURE_HANDLE(host_malloc(&bins, sizeof(Bin) * max(OBJECT_SPLIT_BIN_COUNT, SPATIAL_SPLIT_BIN_COUNT)));
 
   uint32_t begin_of_current_nodes = 0;
   uint32_t end_of_current_nodes   = 1;
@@ -584,7 +612,7 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
       double optimal_cost = DBL_MAX;
       Axis axis;
       double optimal_splitting_plane;
-      OptimalStrategy optimal_strategy = StrategyNull;
+      OptimalStrategy optimal_strategy = OPTIMAL_STRATEGY_NULL;
       int optimal_split                = node.triangle_count / 2;
       int optimal_total_triangles      = node.triangle_count;
 
@@ -630,7 +658,7 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
             optimal_split           = left;
             optimal_total_triangles = node.triangle_count;
             optimal_splitting_plane = low_split + k * interval;
-            optimal_strategy        = StrategyObjectSplit;
+            optimal_strategy        = OPTIMAL_STRATEGY_OBJECT_SPLIT;
             axis                    = a;
             optimal_high_left       = high_left;
             optimal_high_right      = high_right;
@@ -696,7 +724,7 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
               optimal_split           = left;
               optimal_total_triangles = left + right;
               optimal_splitting_plane = low_split + k * interval;
-              optimal_strategy        = StrategySpatialSplit;
+              optimal_strategy        = OPTIMAL_STRATEGY_SPATIAL_SPLIT;
               axis                    = a;
               optimal_high_left       = high_left;
               optimal_high_right      = high_right;
@@ -708,26 +736,27 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
       }
 
       switch (optimal_strategy) {
-        case StrategyNull:
+        case OPTIMAL_STRATEGY_NULL:
           memcpy(fragments_buffer + buffer_ptr, fragments + fragments_ptr, sizeof(Fragment) * node.triangle_count);
           quick_sort_fragments(fragments_buffer + buffer_ptr, node.triangle_count, axis);
           break;
-        case StrategyObjectSplit:
+        case OPTIMAL_STRATEGY_OBJECT_SPLIT:
           divide_middles_along_axis(
             optimal_splitting_plane, axis, fragments_buffer + buffer_ptr, fragments + fragments_ptr, node.triangle_count);
           break;
-        case StrategySpatialSplit: {
-          const unsigned int duplicated_triangles = optimal_total_triangles - node.triangle_count;
+        case OPTIMAL_STRATEGY_SPATIAL_SPLIT: {
+          const uint32_t duplicated_triangles = optimal_total_triangles - node.triangle_count;
           fragments_buffer_count += duplicated_triangles;
 
-          for (unsigned int k = 0; k < leaf_node_count; k++) {
+          for (uint32_t k = 0; k < leaf_node_count; k++) {
             if (nodes[leaf_nodes[k]].triangles_address > buffer_ptr)
               nodes[leaf_nodes[k]].triangles_address += duplicated_triangles;
           }
 
           if (fragments_buffer_count >= fragments_buffer_size) {
             fragments_buffer_size += fragments_count / 2 + 1;
-            fragments_buffer = safe_realloc(fragments_buffer, sizeof(Fragment) * fragments_buffer_size);
+
+            __FAILURE_HANDLE(host_realloc(&fragments_buffer, sizeof(Fragment) * fragments_buffer_size));
           }
 
           divide_along_axis(
@@ -735,16 +764,16 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
             optimal_total_triangles);
         } break;
         default:
-          crash_message("Invalid strategy chosen in BVH construction!");
-          break;
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid strategy chosen in BVH construction!");
       }
 
       fragments_ptr += node.triangle_count;
 
       if (write_ptr + 2 >= node_count) {
         node_count += fragments_count / THRESHOLD_TRIANGLES;
-        nodes      = safe_realloc(nodes, sizeof(Node2) * node_count);
-        leaf_nodes = safe_realloc(leaf_nodes, sizeof(unsigned int) * node_count);
+
+        __FAILURE_HANDLE(host_realloc(&nodes, sizeof(Node2) * node_count));
+        __FAILURE_HANDLE(host_realloc(&leaf_nodes, sizeof(uint32_t) * node_count));
       }
 
       fit_bounds(fragments_buffer + buffer_ptr, optimal_split, &high, &low);
@@ -760,7 +789,7 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
       Node2 node_left = {
         .triangle_count    = optimal_split,
         .triangles_address = buffer_ptr,
-        .type              = NodeTypeLeaf,
+        .type              = NODE_TYPE_LEAF,
         .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
         .self_high.x  = high.x,
         .self_high.y  = high.y,
@@ -787,7 +816,7 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
       Node2 node_right = {
         .triangle_count    = optimal_total_triangles - optimal_split,
         .triangles_address = buffer_ptr,
-        .type              = NodeTypeLeaf,
+        .type              = NODE_TYPE_LEAF,
         .surface_area = (high.x - low.x) * (high.y - low.y) + (high.x - low.x) * (high.z - low.z) + (high.y - low.y) * (high.z - low.z),
         .self_high.x  = high.x,
         .self_high.y  = high.y,
@@ -804,7 +833,7 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
 
       node.triangles_address = 0;
       node.triangle_count    = 0;
-      node.type              = NodeTypeInternal;
+      node.type              = NODE_TYPE_INTERNAL;
 
       nodes[node_ptr] = node;
     }
@@ -819,30 +848,32 @@ static void _bvh_build_binary_bvh(BVHWork* work) {
       fragments_ptr += fragments_count - fragments_ptr;
     }
 
-    free(fragments);
-    fragments             = fragments_buffer;
-    fragments_count       = fragments_buffer_count;
-    fragments_buffer      = malloc(sizeof(Fragment) * fragments_count * 2);
+    __FAILURE_HANDLE(host_free(&fragments));
+
+    fragments       = fragments_buffer;
+    fragments_count = fragments_buffer_count;
+
+    __FAILURE_HANDLE(host_malloc(&fragments_buffer, sizeof(Fragment) * fragments_count * 2));
     fragments_buffer_size = fragments_count * 2;
   }
 
   node_count = write_ptr;
 
-  free(leaf_nodes);
-
-  nodes = safe_realloc(nodes, sizeof(Node2) * node_count);
-
-  free(bins);
+  __FAILURE_HANDLE(host_free(&leaf_nodes));
+  __FAILURE_HANDLE(host_realloc(&nodes, sizeof(Node2) * node_count));
+  __FAILURE_HANDLE(host_free(&bins));
 
   work->fragments          = fragments;
   work->fragments_count    = fragments_count;
   work->fragments_size     = fragments_count;
   work->binary_nodes       = nodes;
   work->binary_nodes_count = node_count;
+
+  return LUMINARY_SUCCESS;
 }
 
 static void compute_single_node_triangles(Node2* binary_nodes, const int index) {
-  if (binary_nodes[index].type == NodeTypeLeaf)
+  if (binary_nodes[index].type == NODE_TYPE_LEAF)
     return;
 
   const int child_address = binary_nodes[index].child_address;
@@ -876,7 +907,7 @@ static float cost_distribute(Node2* binary_nodes, Node2 node, int j, int* decisi
 #define OPTIMAL_LEAF 0xffff
 
 static void compute_single_node_costs(Node2* binary_nodes, const int index) {
-  if (binary_nodes[index].type == NodeTypeLeaf) {
+  if (binary_nodes[index].type == NODE_TYPE_LEAF) {
     Node2 node = binary_nodes[index];
 
     const float cost = node.surface_area * COST_OF_TRIANGLE;
@@ -944,14 +975,14 @@ static void apply_decision(Node2* node, int node_index, int decision, int slot, 
   decision_index++;
 
   if (split == OPTIMAL_LEAF) {
-    node->type                       = NodeTypeLeaf;
+    node->type                       = NODE_TYPE_LEAF;
     node_data.binary_children[slot]  = *node;
     node_data.low[slot]              = node->self_low;
     node_data.high[slot]             = node->self_high;
     node_data.binary_addresses[slot] = node_index;
   }
   else if (decision_index == 0) {
-    node->type                       = NodeTypeInternal;
+    node->type                       = NODE_TYPE_INTERNAL;
     node_data.binary_children[slot]  = *node;
     node_data.low[slot]              = node->self_low;
     node_data.high[slot]             = node->self_high;
@@ -963,7 +994,9 @@ static void apply_decision(Node2* node, int node_index, int decision, int slot, 
   }
 }
 
-static void _bvh_collapse_bvh(BVHWork* work) {
+static LuminaryResult _bvh_collapse_bvh(BVHWork* work) {
+  __CHECK_NULL_ARGUMENT(work);
+
   compute_node_triangle_properties(work->binary_nodes);
   compute_sah_costs(work->binary_nodes);
 
@@ -974,11 +1007,14 @@ static void _bvh_collapse_bvh(BVHWork* work) {
 
   uint32_t node_count = binary_nodes_count;
 
-  Node8* nodes = (Node8*) malloc(sizeof(Node8) * node_count);
-  memset(nodes, 0, sizeof(Node8) * node_count);
+  BVHNode8* nodes;
+  __FAILURE_HANDLE(host_malloc(&nodes, sizeof(BVHNode8) * node_count));
 
-  uint32_t* bvh_fragments = malloc(sizeof(uint32_t) * fragments_count);
-  uint32_t* new_fragments = malloc(sizeof(uint32_t) * fragments_count);
+  uint32_t* bvh_fragments;
+  __FAILURE_HANDLE(host_malloc(&bvh_fragments, sizeof(uint32_t) * fragments_count));
+
+  uint32_t* new_fragments;
+  __FAILURE_HANDLE(host_malloc(&new_fragments, sizeof(uint32_t) * fragments_count));
 
   for (uint32_t i = 0; i < fragments_count; i++) {
     bvh_fragments[i] = i;
@@ -995,7 +1031,7 @@ static void _bvh_collapse_bvh(BVHWork* work) {
 
   while (begin_of_current_nodes != end_of_current_nodes) {
     for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
-      Node8 node = nodes[node_ptr];
+      BVHNode8 node = nodes[node_ptr];
 
       const uint32_t binary_index = node.child_node_base_index;
 
@@ -1005,10 +1041,10 @@ static void _bvh_collapse_bvh(BVHWork* work) {
       Node2 binary_children[8];
       vec3 low[8];
       vec3 high[8];
-      int binary_addresses[8];
+      uint32_t binary_addresses[8];
 
-      for (int i = 0; i < 8; i++) {
-        binary_children[i].type = NodeTypeNull;
+      for (uint32_t i = 0; i < 8; i++) {
+        binary_children[i].type = NODE_TYPE_NULL;
       }
 
       node_packed node_data = {
@@ -1018,8 +1054,8 @@ static void _bvh_collapse_bvh(BVHWork* work) {
         .high             = (vec3*) &high,
         .binary_addresses = (int*) &binary_addresses};
 
-      const int split         = binary_nodes[binary_index].decision[0];
-      const int child_address = binary_nodes[binary_index].child_address;
+      const uint32_t split         = binary_nodes[binary_index].decision[0];
+      const uint32_t child_address = binary_nodes[binary_index].child_address;
 
       apply_decision(binary_nodes + child_address, child_address, split, 0, node_data);
       apply_decision(binary_nodes + child_address + 1, child_address + 1, 8 - split, split, node_data);
@@ -1027,8 +1063,8 @@ static void _bvh_collapse_bvh(BVHWork* work) {
       vec3 node_low  = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE};
       vec3 node_high = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE};
 
-      for (int i = 0; i < 8; i++) {
-        if (binary_children[i].type != NodeTypeNull) {
+      for (uint32_t i = 0; i < 8; i++) {
+        if (binary_children[i].type != NODE_TYPE_NULL) {
           vec3 lo    = low[i];
           node_low.x = min(node_low.x, lo.x);
           node_low.y = min(node_low.y, lo.y);
@@ -1052,19 +1088,19 @@ static void _bvh_collapse_bvh(BVHWork* work) {
       const float compression_z = 1.0f / exp2f(node.ez);
 
       float cost_table[8][8];
-      int order[8];
-      int slot_empty[8];
+      int32_t order[8];
+      int32_t slot_empty[8];
 
-      for (int i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++) {
         slot_empty[i] = 1;
         order[i]      = -1;
       }
 
-      for (int i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++) {
         vec3 direction = {.x = ((i >> 2) & 0b1) ? -1.0f : 1.0f, .y = ((i >> 1) & 0b1) ? -1.0f : 1.0f, .z = ((i >> 0) & 0b1) ? -1.0f : 1.0f};
 
-        for (int j = 0; j < 8; j++) {
-          if (binary_children[j].type == NodeTypeNull) {
+        for (uint32_t j = 0; j < 8; j++) {
+          if (binary_children[j].type == NODE_TYPE_NULL) {
             cost_table[i][j] = FLT_MAX;
           }
           else {
@@ -1077,11 +1113,11 @@ static void _bvh_collapse_bvh(BVHWork* work) {
 
       while (1) {
         float min_cost = FLT_MAX;
-        int slot       = -1;
-        int child      = -1;
+        int32_t slot   = -1;
+        int32_t child  = -1;
 
-        for (int i = 0; i < 8; i++) {
-          for (int j = 0; j < 8; j++) {
+        for (uint32_t i = 0; i < 8; i++) {
+          for (uint32_t j = 0; j < 8; j++) {
             if (order[j] == -1 && slot_empty[i] && cost_table[i][j] < min_cost) {
               min_cost = cost_table[i][j];
               slot     = i;
@@ -1099,9 +1135,9 @@ static void _bvh_collapse_bvh(BVHWork* work) {
         }
       }
 
-      for (int i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++) {
         if (order[i] == -1) {
-          for (int j = 0; j < 8; j++) {
+          for (uint32_t j = 0; j < 8; j++) {
             if (slot_empty[j]) {
               slot_empty[j] = 0;
               order[i]      = j;
@@ -1114,40 +1150,43 @@ static void _bvh_collapse_bvh(BVHWork* work) {
       Node2 old_binary_children[8];
       vec3 old_low[8];
       vec3 old_high[8];
-      int old_binary_addresses[8];
+      uint32_t old_binary_addresses[8];
 
-      for (int i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++) {
         old_binary_children[i]  = binary_children[i];
         old_low[i]              = low[i];
         old_high[i]             = high[i];
         old_binary_addresses[i] = binary_addresses[i];
       }
 
-      for (int i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++) {
         binary_children[order[i]]  = old_binary_children[i];
         low[order[i]]              = old_low[i];
         high[order[i]]             = old_high[i];
         binary_addresses[order[i]] = old_binary_addresses[i];
       }
 
-      node.imask                    = 0;
-      int triangle_counting_address = 0;
+      node.imask                         = 0;
+      uint32_t triangle_counting_address = 0;
 
       if (write_ptr + 8 >= node_count) {
         node_count += binary_nodes_count;
-        nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
+        __FAILURE_HANDLE(host_realloc(&nodes, sizeof(BVHNode8) * node_count));
       }
 
-      for (int i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++) {
         Node2 base_child = binary_children[i];
-        if (base_child.type == NodeTypeInternal) {
+        if (base_child.type == NODE_TYPE_INTERNAL) {
           node.imask |= 1 << i;
           nodes[write_ptr++].child_node_base_index = binary_addresses[i];
           node.meta[i]                             = 0b00100000 + 0b11000 + i;
         }
-        else if (base_child.type == NodeTypeLeaf) {
-          assert(base_child.triangle_count <= TRIANGLES_MAX, "Error when collapsing nodes. There are too many unsplittable triangles.", 1);
-          int meta = 0;
+        else if (base_child.type == NODE_TYPE_LEAF) {
+          if (base_child.triangle_count > TRIANGLES_MAX) {
+            __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Error when collapsing nodes. There are too many unsplittable triangles.");
+          }
+
+          uint32_t meta = 0;
           switch (base_child.triangle_count) {
             case 3:
               meta = 0b111;
@@ -1174,8 +1213,8 @@ static void _bvh_collapse_bvh(BVHWork* work) {
         }
       }
 
-      for (int i = 0; i < 8; i++) {
-        if (binary_children[i].type == NodeTypeNull) {
+      for (uint32_t i = 0; i < 8; i++) {
+        if (binary_children[i].type == NODE_TYPE_NULL) {
           node.low_x[i] = 0;
           node.low_y[i] = 0;
           node.low_z[i] = 0;
@@ -1204,37 +1243,41 @@ static void _bvh_collapse_bvh(BVHWork* work) {
     end_of_current_nodes   = write_ptr;
   }
 
-  free(bvh_fragments);
+  __FAILURE_HANDLE(host_free(&bvh_fragments));
+
   bvh_fragments = new_fragments;
 
-  Fragment* fragments_swap = malloc(sizeof(Fragment) * fragments_count);
+  Fragment* fragments_swap;
+  __FAILURE_HANDLE(host_malloc(&fragments_swap, sizeof(Fragment) * fragments_count));
   memcpy(fragments_swap, work->fragments, sizeof(Fragment) * fragments_count);
 
   for (uint32_t i = 0; i < fragments_count; i++) {
     work->fragments[i] = fragments_swap[bvh_fragments[i]];
   }
 
-  free(fragments_swap);
-  free(new_fragments);
+  __FAILURE_HANDLE(host_free(&fragments_swap));
+  __FAILURE_HANDLE(host_free(&new_fragments));
 
   node_count = write_ptr;
 
-  nodes = safe_realloc(nodes, sizeof(Node8) * node_count);
+  __FAILURE_HANDLE(host_realloc(&nodes, sizeof(BVHNode8) * node_count));
 
   work->nodes       = nodes;
   work->nodes_count = node_count;
+
+  return LUMINARY_SUCCESS;
 }
 
-static void sort_fragments_depth_first(Fragment* src, Fragment* dst, Node8* nodes, const int node_index, int* offset) {
-  Node8* node = nodes + node_index;
+static void sort_fragments_depth_first(Fragment* src, Fragment* dst, BVHNode8* nodes, const uint32_t node_index, uint32_t* offset) {
+  BVHNode8* node = nodes + node_index;
 
   const uint8_t imask = node->imask;
 
-  const int new_fragment_base_index = *offset;
-  int new_rel_offset                = 0;
+  const uint32_t new_fragment_base_index = *offset;
+  uint32_t new_rel_offset                = 0;
 
   // Insert Leaf Nodes
-  for (int i = 0; i < 8; i++) {
+  for (uint32_t i = 0; i < 8; i++) {
     if ((imask >> i) & 0b1)
       continue;
 
@@ -1243,9 +1286,9 @@ static void sort_fragments_depth_first(Fragment* src, Fragment* dst, Node8* node
     if (meta == 0)
       continue;
 
-    const int count = _mm_popcnt_u32(meta & 0b11100000);
-    const int index = node->triangle_base_index + (meta & 0b11111);
-    for (int j = 0; j < count; j++) {
+    const uint32_t count = _mm_popcnt_u32(meta & 0b11100000);
+    const uint32_t index = node->triangle_base_index + (meta & 0b11111);
+    for (uint32_t j = 0; j < count; j++) {
       dst[*offset] = src[index + j];
       *offset      = (*offset) + 1;
     }
@@ -1256,33 +1299,33 @@ static void sort_fragments_depth_first(Fragment* src, Fragment* dst, Node8* node
 
   node->triangle_base_index = new_fragment_base_index;
 
-  int child_index = node->child_node_base_index;
+  uint32_t child_index = node->child_node_base_index;
 
   // Traverse Internal Nodes
-  for (int i = 0; i < 8; i++) {
+  for (uint32_t i = 0; i < 8; i++) {
     if ((~(imask >> i)) & 0b1)
       continue;
 
-    const int index = child_index++;
+    const uint32_t index = child_index++;
     sort_fragments_depth_first(src, dst, nodes, index, offset);
   }
 }
 
-static void sort_nodes_depth_first(Node8* src, Node8* dst, const int src_index, const int dst_index, int* index) {
-  Node8* src_node = src + src_index;
-  Node8* dst_node = dst + dst_index;
+static void sort_nodes_depth_first(BVHNode8* src, BVHNode8* dst, const uint32_t src_index, const int dst_index, uint32_t* index) {
+  BVHNode8* src_node = src + src_index;
+  BVHNode8* dst_node = dst + dst_index;
 
   const uint8_t imask = src_node->imask;
 
   dst_node->child_node_base_index = *index;
 
-  int child_index = 0;
+  uint32_t child_index = 0;
 
-  for (int i = 0; i < 8; i++) {
+  for (uint32_t i = 0; i < 8; i++) {
     if ((~(imask >> i)) & 0b1)
       continue;
 
-    const int si = src_node->child_node_base_index + child_index++;
+    const uint32_t si = src_node->child_node_base_index + child_index++;
 
     dst[*index] = src[si];
     *index      = (*index) + 1;
@@ -1290,28 +1333,31 @@ static void sort_nodes_depth_first(Node8* src, Node8* dst, const int src_index, 
 
   child_index = 0;
 
-  for (int i = 0; i < 8; i++) {
+  for (uint32_t i = 0; i < 8; i++) {
     if ((~(imask >> i)) & 0b1)
       continue;
 
-    const int si = src_node->child_node_base_index + child_index;
-    const int di = dst_node->child_node_base_index + child_index;
+    const uint32_t si = src_node->child_node_base_index + child_index;
+    const uint32_t di = dst_node->child_node_base_index + child_index;
     sort_nodes_depth_first(src, dst, si, di, index);
     child_index++;
   }
 }
 
-static void _bvh_postprocess_sort(BVHWork* work) {
-  Node8* nodes     = work->nodes;
-  Node8* new_nodes = (Node8*) malloc(sizeof(Node8) * work->nodes_count);
+static LuminaryResult _bvh_postprocess_sort(BVHWork* work) {
+  __CHECK_NULL_ARGUMENT(work);
+
+  BVHNode8* nodes = work->nodes;
+  BVHNode8* new_nodes;
+  __FAILURE_HANDLE(host_malloc(&new_nodes, sizeof(BVHNode8) * work->nodes_count));
 
   new_nodes[0] = nodes[0];
 
-  int offset = 1;
+  uint32_t offset = 1;
 
   sort_nodes_depth_first(nodes, new_nodes, 0, 0, &offset);
 
-  free(nodes);
+  __FAILURE_HANDLE(host_free(&nodes));
   work->nodes = new_nodes;
 
   Fragment* fragments     = work->fragments;
@@ -1321,23 +1367,31 @@ static void _bvh_postprocess_sort(BVHWork* work) {
 
   sort_fragments_depth_first(fragments, new_fragments, work->nodes, 0, &offset);
 
-  free(fragments);
+  __FAILURE_HANDLE(host_free(&fragments));
+
   work->fragments = new_fragments;
+
+  return LUMINARY_SUCCESS;
 }
 
-static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
-  // TODO: The traversal triangle construction could be performed on the GPU.
-  PackedMaterial* materials = malloc(sizeof(PackedMaterial) * instance->scene.materials_count);
-  device_download(materials, instance->scene.materials, sizeof(PackedMaterial) * instance->scene.materials_count);
+static LuminaryResult _bvh_finalize(BVHWork* work, BVH* bvh) {
+  __CHECK_NULL_ARGUMENT(work);
+  __CHECK_NULL_ARGUMENT(bvh);
 
-  TraversalTriangle* traversal_triangles = malloc(sizeof(TraversalTriangle) * work->fragments_count);
+  __FAILURE_HANDLE(host_malloc(&bvh->data, sizeof(BVHNode8) * work->nodes_count));
+  memcpy(bvh->data, work->nodes, sizeof(BVHNode8) * work->nodes_count);
+  bvh->size = sizeof(BVHNode8) * work->nodes_count;
+
+  __FAILURE_HANDLE(host_malloc(&bvh->traversal_triangles, sizeof(TraversalTriangle) * work->fragments_count));
+  bvh->triangle_count = work->fragments_count;
 
   for (unsigned int i = 0; i < work->fragments_count; i++) {
     const Fragment frag = work->fragments[i];
 
     const Triangle triangle = work->triangles[frag.id];
 
-    const uint32_t albedo_tex = materials[triangle.material_id].albedo_map;
+    // TODO: Get the albedo_tex from the material.
+    const uint32_t albedo_tex = TEXTURE_NONE;
 
     TraversalTriangle tt = {
       .vertex     = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
@@ -1345,50 +1399,54 @@ static void _bvh_finalize(RaytraceInstance* instance, BVHWork* work) {
       .edge2      = {.x = triangle.edge2.x, .y = triangle.edge2.y, .z = triangle.edge2.z},
       .albedo_tex = albedo_tex,
       .id         = frag.id};
-    traversal_triangles[i] = tt;
+    bvh->traversal_triangles[i] = tt;
   }
-  free(materials);
 
-  void* bvh_triangles;
-  device_malloc(&bvh_triangles, sizeof(TraversalTriangle) * work->fragments_count);
-  device_upload(bvh_triangles, traversal_triangles, sizeof(TraversalTriangle) * work->fragments_count);
-
-  void* nodes;
-  device_malloc(&nodes, sizeof(Node8) * work->nodes_count);
-  device_upload(nodes, work->nodes, sizeof(Node8) * work->nodes_count);
-
-  device_update_symbol(bvh_triangles, bvh_triangles);
-  device_update_symbol(bvh_nodes, nodes);
-
-  // Must be freed only when corresponding upload is known to be finished.
-  free(traversal_triangles);
-
-  instance->luminary_bvh_initialized = 1;
-  instance->temporal_frames          = 0.0f;
+  return LUMINARY_SUCCESS;
 }
 
-static void _bvh_clear_work(BVHWork* work) {
-  if (work->triangles) {
-    free(work->triangles);
-  }
+static LuminaryResult _bvh_clear_work(BVHWork* work) {
+  __CHECK_NULL_ARGUMENT(work);
 
-  if (work->fragments) {
-    free(work->fragments);
-  }
+  __FAILURE_HANDLE(host_free(&work->triangles));
+  __FAILURE_HANDLE(host_free(&work->fragments));
+  __FAILURE_HANDLE(host_free(&work->binary_nodes));
 
-  if (work->binary_nodes) {
-    free(work->binary_nodes);
-  }
+  return LUMINARY_SUCCESS;
 }
 
-void bvh_init(RaytraceInstance* instance) {
-  BVHWork work;
-  memset(&work, 0, sizeof(BVHWork));
+LuminaryResult bvh_create(BVH** _bvh, const Mesh* mesh) {
+  __CHECK_NULL_ARGUMENT(_bvh);
+  __CHECK_NULL_ARGUMENT(mesh);
 
-  _bvh_create_fragments(instance, &work);
-  _bvh_build_binary_bvh(&work);
-  _bvh_collapse_bvh(&work);
-  _bvh_postprocess_sort(&work);
-  _bvh_finalize(instance, &work);
-  _bvh_clear_work(&work);
+  BVH* bvh;
+  __FAILURE_HANDLE(host_malloc(&bvh, sizeof(BVH)));
+
+  BVHWork* work;
+  __FAILURE_HANDLE(host_malloc(&work, sizeof(BVHWork)));
+
+  memset(work, 0, sizeof(BVHWork));
+
+  __FAILURE_HANDLE(_bvh_create_fragments(work, mesh));
+  __FAILURE_HANDLE(_bvh_build_binary_bvh(work));
+  __FAILURE_HANDLE(_bvh_collapse_bvh(work));
+  __FAILURE_HANDLE(_bvh_postprocess_sort(work));
+  __FAILURE_HANDLE(_bvh_finalize(work, bvh));
+  __FAILURE_HANDLE(_bvh_clear_work(work));
+
+  __FAILURE_HANDLE(host_free(&work));
+
+  *_bvh = bvh;
+
+  return LUMINARY_SUCCESS;
+}
+LuminaryResult bvh_destroy(BVH** bvh) {
+  __CHECK_NULL_ARGUMENT(bvh);
+
+  __FAILURE_HANDLE(host_free(&(*bvh)->data));
+  __FAILURE_HANDLE(host_free(&(*bvh)->traversal_triangles));
+
+  __FAILURE_HANDLE(host_free(bvh));
+
+  return LUMINARY_SUCCESS;
 }
