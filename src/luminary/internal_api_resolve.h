@@ -22,6 +22,9 @@ typedef LuminaryToneMap ToneMap;
 typedef LuminaryOcean Ocean;
 typedef LuminaryJerlovWaterType JerlovWaterType;
 
+typedef LuminaryMaterial Material;
+typedef LuminaryMaterialFlags MaterialFlags;
+
 typedef LuminaryQueue Queue;
 typedef LuminaryRingBuffer RingBuffer;
 

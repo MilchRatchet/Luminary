@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "mesh.h"
 #include "texture.h"
 #include "utils.h"
 
@@ -68,8 +69,7 @@ struct WavefrontContent {
 
 LuminaryResult wavefront_create(WavefrontContent** content);
 LuminaryResult wavefront_read_file(WavefrontContent* _content, const char* filename);
-LuminaryResult wavefront_generate_texture_assignments(const WavefrontContent* content, PackedMaterial** material);
-LuminaryResult wavefront_convert_content(WavefrontContent* content, Triangle** triangles, TriangleGeomData* data, uint32_t* num_triangles);
+LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY Mesh* meshes, ARRAY Material* materials);
 LuminaryResult wavefront_destroy(WavefrontContent** content);
 
 #endif /* WAVEFRONT_H */

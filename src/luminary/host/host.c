@@ -68,6 +68,9 @@ LuminaryResult luminary_host_create(Host** _host) {
   __FAILURE_HANDLE(ringbuffer_create(&host->ring_buffer, HOST_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
 
+  __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh), 16));
+  __FAILURE_HANDLE(array_create(&host->materials, sizeof(Material), 16));
+
   __FAILURE_HANDLE(camera_get_default(&host->camera));
 
   memcpy(&host->camera_external, &host->camera, sizeof(Camera));
@@ -97,6 +100,9 @@ LuminaryResult luminary_host_destroy(LuminaryHost** host) {
   __FAILURE_HANDLE(queue_destroy(&(*host)->work_queue));
 
   __FAILURE_HANDLE(thread_destroy(&(*host)->work_thread));
+
+  __FAILURE_HANDLE(array_destroy(&(*host)->meshes));
+  __FAILURE_HANDLE(array_destroy(&(*host)->materials));
 
   __FAILURE_HANDLE(host_free(host));
 

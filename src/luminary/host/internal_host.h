@@ -2,6 +2,7 @@
 #define LUMINARY_INTERNAL_HOST_H
 
 #include "device/device.h"
+#include "mesh.h"
 #include "thread.h"
 #include "utils.h"
 
@@ -14,6 +15,8 @@ struct LuminaryHost {
   Camera camera_external;
   WallTime* queue_wall_time;
   const char* current_work_string;
+  ARRAY Mesh meshes;
+  ARRAY Material materials;
   bool enable_output;
   bool exit_requested;
 } typedef LuminaryHost;

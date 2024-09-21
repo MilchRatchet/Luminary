@@ -135,4 +135,28 @@ LUMINARY_API struct LuminaryOcean {
   int triangle_light_contribution;
 } typedef LuminaryOcean;
 
+////////////////////////////////////////////////////////////////////
+// Material
+////////////////////////////////////////////////////////////////////
+
+struct LuminaryMaterialFlags {
+  bool emission_active : 1;
+  bool ior_shadowing : 1;
+  bool thin_walled : 1;
+  bool colored_transparency : 1;
+} typedef LuminaryMaterialFlags;
+
+struct LuminaryMaterial {
+  LuminaryRGBAF albedo;
+  LuminaryRGBF emission;
+  float metallic;
+  float roughness;
+  float refraction_index;
+  uint16_t albedo_tex;
+  uint16_t luminance_tex;
+  uint16_t material_tex;
+  uint16_t normal_tex;
+  LuminaryMaterialFlags flags;
+} typedef LuminaryMaterial;
+
 #endif /* LUMINARY_STRUCTS_H */

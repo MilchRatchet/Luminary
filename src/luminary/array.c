@@ -17,13 +17,7 @@ LUM_STATIC_SIZE_ASSERT(ArrayHeader, 64u);
 
 LuminaryResult _array_create(
   void** _array, size_t size_of_element, uint32_t num_elements, const char* buf_name, const char* func, uint32_t line) {
-  if (!_array) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array ptr was NULL.");
-  }
-
-  if (!(*_array)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Array was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(_array);
 
   void* array;
   __FAILURE_HANDLE(_host_malloc((void**) &array, size_of_element * num_elements + sizeof(ArrayHeader), buf_name, func, line));
@@ -41,13 +35,8 @@ LuminaryResult _array_create(
 }
 
 LuminaryResult _array_resize(void** array, size_t num_elements, const char* buf_name, const char* func, uint32_t line) {
-  if (!array) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array ptr was NULL.");
-  }
-
-  if (!(*array)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Array was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(array);
+  __CHECK_NULL_ARGUMENT(*array);
 
   ArrayHeader* header = ((ArrayHeader*) (*array)) - 1;
 
@@ -66,13 +55,8 @@ LuminaryResult _array_resize(void** array, size_t num_elements, const char* buf_
 }
 
 LuminaryResult _array_destroy(void** array, const char* buf_name, const char* func, uint32_t line) {
-  if (!array) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array ptr was NULL.");
-  }
-
-  if (!(*array)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Array was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(array);
+  __CHECK_NULL_ARGUMENT(*array);
 
   ArrayHeader* header = ((ArrayHeader*) (*array)) - 1;
 
@@ -88,9 +72,8 @@ LuminaryResult _array_destroy(void** array, const char* buf_name, const char* fu
 }
 
 LuminaryResult _array_push(void** array, void* object, const char* buf_name, const char* func, uint32_t line) {
-  if (!array) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array ptr was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(array);
+  __CHECK_NULL_ARGUMENT(object);
 
   if (!(*array)) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Array was NULL.");
@@ -121,9 +104,7 @@ LuminaryResult _array_push(void** array, void* object, const char* buf_name, con
 }
 
 LuminaryResult array_get_size(const void* array, size_t* size) {
-  if (!array) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(array);
 
   const ArrayHeader* header = ((const ArrayHeader*) array) - 1;
 
@@ -137,9 +118,8 @@ LuminaryResult array_get_size(const void* array, size_t* size) {
 }
 
 LuminaryResult array_get_num_elements(const void* array, uint32_t* num_elements) {
-  if (!array) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Array was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(array);
+  __CHECK_NULL_ARGUMENT(num_elements);
 
   const ArrayHeader* header = ((const ArrayHeader*) array) - 1;
 

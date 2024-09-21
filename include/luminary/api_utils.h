@@ -39,4 +39,11 @@ LUMINARY_API struct LuminaryRGBF {
   float b;
 } typedef LuminaryRGBF;
 
+LUMINARY_API struct LuminaryRGBAF {
+  float r;
+  float g;
+  float b;
+  float a;
+} typedef LuminaryRGBAF;
+
 #endif /* LUMINARY_API_UTILS_H */
