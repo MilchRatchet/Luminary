@@ -5,38 +5,42 @@
 #include "bvh.h"
 #include "internal_error.h"
 
-LuminaryResult mesh_create(Mesh* mesh) {
+LuminaryResult mesh_create(Mesh** mesh) {
   __CHECK_NULL_ARGUMENT(mesh);
 
-  memset(mesh, 0, sizeof(Mesh));
+  __FAILURE_HANDLE(host_malloc(mesh, sizeof(Mesh)));
+
+  memset(*mesh, 0, sizeof(Mesh));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult mesh_destroy(Mesh* mesh) {
+LuminaryResult mesh_destroy(Mesh** mesh) {
   __CHECK_NULL_ARGUMENT(mesh);
 
-  if (mesh->data) {
-    __FAILURE_HANDLE(host_free(&mesh->data->vertex_buffer));
-    __FAILURE_HANDLE(host_free(&mesh->data->index_buffer));
-    __FAILURE_HANDLE(host_free(&mesh->data));
+  if ((*mesh)->data) {
+    __FAILURE_HANDLE(host_free(&(*mesh)->data->vertex_buffer));
+    __FAILURE_HANDLE(host_free(&(*mesh)->data->index_buffer));
+    __FAILURE_HANDLE(host_free(&(*mesh)->data));
   }
 
-  if (mesh->light_data) {
-    __FAILURE_HANDLE(host_free(&mesh->light_data));
+  if ((*mesh)->light_data) {
+    __FAILURE_HANDLE(host_free(&(*mesh)->light_data));
 
     // TODO: Call light_destroy.
     return LUMINARY_ERROR_NOT_IMPLEMENTED;
   }
 
-  if (mesh->bvh) {
-    __FAILURE_HANDLE(bvh_destroy(&mesh->bvh));
+  if ((*mesh)->bvh) {
+    __FAILURE_HANDLE(bvh_destroy(&(*mesh)->bvh));
   }
 
-  if (mesh->optix_bvh) {
+  if ((*mesh)->optix_bvh) {
     // TODO: This is device implementation specific so this shouldn't even be here.
     return LUMINARY_ERROR_NOT_IMPLEMENTED;
   }
+
+  __FAILURE_HANDLE(host_free(mesh));
 
   return LUMINARY_SUCCESS;
 }

@@ -590,13 +590,13 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, const char* filena
   __FAILURE_HANDLE(host_malloc(&path, LINE_SIZE));
 
   char* read_buffer;
-  __FAILURE_HANDLE(host_malloc(&read_buffer, READ_BUFFER_SIZE + LINE_SIZE));
+  __FAILURE_HANDLE(host_malloc(&read_buffer, READ_BUFFER_SIZE));
 
-  memset(read_buffer + READ_BUFFER_SIZE, 0, LINE_SIZE);
+  char* read_buffer_swap;
+  __FAILURE_HANDLE(host_malloc(&read_buffer_swap, READ_BUFFER_SIZE));
 
   size_t offset = 0;
 
-  // TODO: Read from file only in large chunks and then process until the buffer is empty again
   while (!feof(file)) {
     fread(read_buffer + offset, 1, READ_BUFFER_SIZE - offset, file);
 
@@ -698,12 +698,15 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, const char* filena
     }
 
     offset = strlen(line);
-    memcpy(read_buffer, line, offset);
+
+    memcpy(read_buffer_swap, line, offset);
+    memcpy(read_buffer, read_buffer_swap, offset);
   }
 
-  __FAILURE_HANDLE(host_free(loaded_mtls));
-  __FAILURE_HANDLE(host_free(path));
-  __FAILURE_HANDLE(host_free(read_buffer));
+  __FAILURE_HANDLE(array_destroy(&loaded_mtls));
+  __FAILURE_HANDLE(host_free(&path));
+  __FAILURE_HANDLE(host_free(&read_buffer));
+  __FAILURE_HANDLE(host_free(&read_buffer_swap));
 
   return LUMINARY_SUCCESS;
 }
@@ -715,7 +718,7 @@ static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
 }
 #endif
 
-static LuminaryResult _wavefront_convert_materials(const WavefrontContent* content, ARRAY Material* materials) {
+static LuminaryResult _wavefront_convert_materials(const WavefrontContent* content, ARRAY Material** materials) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(materials);
 
@@ -756,25 +759,25 @@ static LuminaryResult _wavefront_convert_materials(const WavefrontContent* conte
   for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];
 
-    Material mat;
+    Material* mat;
     __FAILURE_HANDLE(host_malloc(&mat, sizeof(Material)));
 
-    mat.albedo.r                   = wavefront_mat.diffuse_reflectivity.r;
-    mat.albedo.g                   = wavefront_mat.diffuse_reflectivity.g;
-    mat.albedo.b                   = wavefront_mat.diffuse_reflectivity.b;
-    mat.albedo.r                   = wavefront_mat.dissolve;
-    mat.emission                   = wavefront_mat.emission;
-    mat.refraction_index           = wavefront_mat.refraction_index;
-    mat.metallic                   = wavefront_mat.specular_reflectivity.r;
-    mat.roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
-    mat.albedo_tex                 = wavefront_mat.texture[WF_ALBEDO];
-    mat.luminance_tex              = wavefront_mat.texture[WF_LUMINANCE];
-    mat.material_tex               = wavefront_mat.texture[WF_MATERIAL];
-    mat.normal_tex                 = wavefront_mat.texture[WF_NORMAL];
-    mat.flags.emission_active      = true;
-    mat.flags.ior_shadowing        = true;
-    mat.flags.thin_walled          = false;
-    mat.flags.colored_transparency = true;
+    mat->albedo.r                   = wavefront_mat.diffuse_reflectivity.r;
+    mat->albedo.g                   = wavefront_mat.diffuse_reflectivity.g;
+    mat->albedo.b                   = wavefront_mat.diffuse_reflectivity.b;
+    mat->albedo.r                   = wavefront_mat.dissolve;
+    mat->emission                   = wavefront_mat.emission;
+    mat->refraction_index           = wavefront_mat.refraction_index;
+    mat->metallic                   = wavefront_mat.specular_reflectivity.r;
+    mat->roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
+    mat->albedo_tex                 = wavefront_mat.texture[WF_ALBEDO];
+    mat->luminance_tex              = wavefront_mat.texture[WF_LUMINANCE];
+    mat->material_tex               = wavefront_mat.texture[WF_MATERIAL];
+    mat->normal_tex                 = wavefront_mat.texture[WF_NORMAL];
+    mat->flags.emission_active      = true;
+    mat->flags.ior_shadowing        = true;
+    mat->flags.thin_walled          = false;
+    mat->flags.colored_transparency = true;
 
     __FAILURE_HANDLE(array_push(&materials, &mat));
   }
@@ -782,7 +785,7 @@ static LuminaryResult _wavefront_convert_materials(const WavefrontContent* conte
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY Mesh* meshes, ARRAY Material* materials) {
+LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY Mesh** meshes, ARRAY Material** materials) {
   static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
   __CHECK_NULL_ARGUMENT(content);
@@ -806,26 +809,24 @@ LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY 
 
   __FAILURE_HANDLE(_wavefront_convert_materials(content, materials));
 
-  Mesh mesh;
+  Mesh* mesh;
   __FAILURE_HANDLE(mesh_create(&mesh));
 
-  __FAILURE_HANDLE(array_push(&meshes, &mesh));
+  __FAILURE_HANDLE(host_malloc(&mesh->data, sizeof(TriangleGeomData)));
 
-  __FAILURE_HANDLE(host_malloc(&mesh.data, sizeof(TriangleGeomData)));
+  __FAILURE_HANDLE(host_malloc(&mesh->data->index_buffer, sizeof(uint32_t) * 4 * triangle_count));
+  __FAILURE_HANDLE(host_malloc(&mesh->data->vertex_buffer, sizeof(float) * 4 * vertex_count));
 
-  __FAILURE_HANDLE(host_malloc(&mesh.data->index_buffer, sizeof(uint32_t) * 4 * triangle_count));
-  __FAILURE_HANDLE(host_malloc(&mesh.data->vertex_buffer, sizeof(float) * 4 * vertex_count));
-
-  mesh.data->vertex_count = vertex_count;
+  mesh->data->vertex_count = vertex_count;
 
   for (uint32_t vertex_id = 0; vertex_id < vertex_count; vertex_id++) {
-    mesh.data->vertex_buffer[vertex_id * 4 + 0] = content->vertices[vertex_id].x;
-    mesh.data->vertex_buffer[vertex_id * 4 + 1] = content->vertices[vertex_id].y;
-    mesh.data->vertex_buffer[vertex_id * 4 + 2] = content->vertices[vertex_id].z;
-    mesh.data->vertex_buffer[vertex_id * 4 + 3] = 0.0f;
+    mesh->data->vertex_buffer[vertex_id * 4 + 0] = content->vertices[vertex_id].x;
+    mesh->data->vertex_buffer[vertex_id * 4 + 1] = content->vertices[vertex_id].y;
+    mesh->data->vertex_buffer[vertex_id * 4 + 2] = content->vertices[vertex_id].z;
+    mesh->data->vertex_buffer[vertex_id * 4 + 3] = 0.0f;
   }
 
-  __FAILURE_HANDLE(host_malloc(&mesh.triangles, sizeof(Triangle) * triangle_count));
+  __FAILURE_HANDLE(host_malloc(&mesh->triangles, sizeof(Triangle) * triangle_count));
 
   uint32_t ptr                 = 0;
   uint32_t index_triplet_count = 0;
@@ -881,9 +882,9 @@ LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY 
       continue;
     }
 
-    mesh.data->index_buffer[index_triplet_count * 4 + 0] = t.v1 - 1;
-    mesh.data->index_buffer[index_triplet_count * 4 + 1] = t.v2 - 1;
-    mesh.data->index_buffer[index_triplet_count * 4 + 2] = t.v3 - 1;
+    mesh->data->index_buffer[index_triplet_count * 4 + 0] = t.v1 - 1;
+    mesh->data->index_buffer[index_triplet_count * 4 + 1] = t.v2 - 1;
+    mesh->data->index_buffer[index_triplet_count * 4 + 2] = t.v3 - 1;
 
     WavefrontUV uv;
 
@@ -1015,16 +1016,18 @@ LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY 
     triangle.material_id = t.object;
     triangle.light_id    = LIGHT_ID_NONE;
 
-    mesh.triangles[ptr++] = triangle;
+    mesh->triangles[ptr++] = triangle;
   }
 
   const uint32_t new_triangle_count = ptr;
 
-  __FAILURE_HANDLE(host_realloc(&mesh.triangles, sizeof(Triangle) * new_triangle_count));
+  __FAILURE_HANDLE(host_realloc(&mesh->triangles, sizeof(Triangle) * new_triangle_count));
 
-  __FAILURE_HANDLE(host_realloc(&mesh.data->index_buffer, sizeof(uint32_t) * 4 * new_triangle_count));
-  mesh.data->index_count    = 3 * new_triangle_count;
-  mesh.data->triangle_count = new_triangle_count;
+  __FAILURE_HANDLE(host_realloc(&mesh->data->index_buffer, sizeof(uint32_t) * 4 * new_triangle_count));
+  mesh->data->index_count    = 3 * new_triangle_count;
+  mesh->data->triangle_count = new_triangle_count;
+
+  __FAILURE_HANDLE(array_push(&meshes, &mesh));
 
   return LUMINARY_SUCCESS;
 }

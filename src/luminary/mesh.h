@@ -19,7 +19,7 @@ struct MeshInstance {
   uint32_t mesh_id;
 } typedef MeshInstance;
 
-LuminaryResult mesh_create(Mesh* mesh);
-LuminaryResult mesh_destroy(Mesh* mesh);
+LuminaryResult mesh_create(Mesh** mesh);
+LuminaryResult mesh_destroy(Mesh** mesh);
 
 #endif /* LUMINARY_MESH_H */

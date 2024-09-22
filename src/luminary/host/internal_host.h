@@ -15,10 +15,9 @@ struct LuminaryHost {
   Camera camera_external;
   WallTime* queue_wall_time;
   const char* current_work_string;
-  ARRAY Mesh meshes;
-  ARRAY Material materials;
+  ARRAY Mesh** meshes;
+  ARRAY Material** materials;
   bool enable_output;
-  bool exit_requested;
 } typedef LuminaryHost;
 
 #endif /* LUMINARY_INTERNAL_HOST_H */

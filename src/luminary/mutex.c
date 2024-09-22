@@ -11,9 +11,7 @@ struct Mutex {
 };
 
 LuminaryResult mutex_create(Mutex** mutex) {
-  if (!mutex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(mutex);
 
   __FAILURE_HANDLE(host_malloc(mutex, sizeof(Mutex)));
 
@@ -28,9 +26,7 @@ LuminaryResult mutex_create(Mutex** mutex) {
 }
 
 LuminaryResult mutex_lock(Mutex* mutex) {
-  if (!mutex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(mutex);
 
   const int retval = mtx_lock((mtx_t*) mutex);
 
@@ -42,9 +38,7 @@ LuminaryResult mutex_lock(Mutex* mutex) {
 }
 
 LuminaryResult mutex_timed_lock(Mutex* mutex, const double timeout_time, bool* success) {
-  if (!mutex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(mutex);
 
   struct timespec ts;
   timespec_get(&ts, TIME_UTC);
@@ -71,9 +65,7 @@ LuminaryResult mutex_timed_lock(Mutex* mutex, const double timeout_time, bool* s
 }
 
 LuminaryResult mutex_try_lock(Mutex* mutex, bool* success) {
-  if (!mutex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(mutex);
 
   const int retval = mtx_trylock((mtx_t*) mutex);
 
@@ -87,9 +79,7 @@ LuminaryResult mutex_try_lock(Mutex* mutex, bool* success) {
 }
 
 LuminaryResult mutex_unlock(Mutex* mutex) {
-  if (!mutex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(mutex);
 
   const int retval = mtx_unlock((mtx_t*) mutex);
 
@@ -101,9 +91,7 @@ LuminaryResult mutex_unlock(Mutex* mutex) {
 }
 
 LuminaryResult mutex_destroy(Mutex** mutex) {
-  if (!mutex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Mutex was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(mutex);
 
   // We do not allow for locked mutexes to be destroyed. The C standard
   // gives us undefined behaviour in this case so we need to catch this.

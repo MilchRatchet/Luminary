@@ -49,7 +49,7 @@ LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const
 
   *ptr = (void*) (header + 1);
 
-  luminary_print_log("Malloc  %012llu [Total: %016llu] [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
+  luminary_print_log("Malloc  %012llu [Total: %012llu] [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }
@@ -75,13 +75,15 @@ LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, cons
 
   atomic_fetch_sub(&_host_memory_total_allocation, header->size);
 
-  realloc(header, (uint64_t) size + sizeof(struct HostMemoryHeader));
+  header = realloc(header, (uint64_t) size + sizeof(struct HostMemoryHeader));
 
   header->size = size;
 
   const uint64_t prev_total = atomic_fetch_add(&_host_memory_total_allocation, header->size);
 
-  luminary_print_log("Realloc %012llu [Total: %016llu] [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
+  *ptr = (void*) (header + 1);
+
+  luminary_print_log("Realloc %012llu [Total: %012llu] [%s:%u]: %s", size, prev_total + size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }
@@ -109,11 +111,11 @@ LuminaryResult _host_free(void** ptr, const char* buf_name, const char* func, ui
 
   const uint64_t prev_total = atomic_fetch_sub(&_host_memory_total_allocation, header->size);
 
-  free(header);
+  // free(header);
 
   *ptr = (void*) 0;
 
-  luminary_print_log("Free    %012llu [Total: %016llu] [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
+  luminary_print_log("Free    %012llu [Total: %012llu] [%s:%u]: %s", size, prev_total - size, func, line, buf_name);
 
   return LUMINARY_SUCCESS;
 }

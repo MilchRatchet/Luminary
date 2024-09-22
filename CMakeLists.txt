@@ -95,6 +95,12 @@ else()
     message(SEND_ERROR "No flags available for C Compiler ${CMAKE_C_COMPILER_ID}.")
 endif()
 
+if(USE_ADDRESS_SANITIZER)
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /fsanitize=address")
+  link_libraries(clang_rt.asan_dynamic-x86_64.lib)
+  link_libraries(clang_rt.asan_dynamic_runtime_thunk-x86_64.lib)
+endif()
+
 #=============================================================
 # Print directories
 #=============================================================
