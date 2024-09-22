@@ -3,9 +3,6 @@
 #include "device_utils.h"
 #include "internal_error.h"
 
-#define DEVICE_RINGBUFFER_SIZE (0x10000ull)
-#define DEVICE_QUEUE_SIZE (0x100ull)
-
 void _device_init(void) {
   OPTIX_CHECK(optixInit());
 }
@@ -154,33 +151,10 @@ LuminaryResult _device_get_properties(DeviceProperties* props, const uint32_t in
 }
 
 ////////////////////////////////////////////////////////////////////
-// Queue worker functions
-////////////////////////////////////////////////////////////////////
-
-static void _device_queue_worker(Device* device) {
-  while (!device->exit_requested) {
-    QueueEntry entry;
-    bool success;
-    __FAILURE_HANDLE(queue_pop_blocking(device->work_queue, &entry, &success));
-
-    if (!success)
-      return;
-
-    __FAILURE_HANDLE(wall_time_set_string(device->queue_wall_time, entry.name));
-    __FAILURE_HANDLE(wall_time_start(device->queue_wall_time));
-
-    __FAILURE_HANDLE(entry.function(device, entry.args));
-
-    __FAILURE_HANDLE(wall_time_stop(device->queue_wall_time));
-    __FAILURE_HANDLE(wall_time_set_string(device->queue_wall_time, (const char*) 0));
-  }
-}
-
-////////////////////////////////////////////////////////////////////
 // External API implementation
 ////////////////////////////////////////////////////////////////////
 
-LuminaryResult device_create(Device** _device) {
+LuminaryResult device_create(Device** _device, uint32_t index) {
   if (!_device) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Device is NULL.");
   }
@@ -188,15 +162,13 @@ LuminaryResult device_create(Device** _device) {
   Device* device;
   __FAILURE_HANDLE(host_malloc(&device, sizeof(Device)));
 
-  device->index                = 0;
+  device->index                = index;
   device->optix_callback_error = false;
   device->exit_requested       = false;
 
-  __FAILURE_HANDLE(_device_get_properties(&device->properties, device->index));
+  CUDA_FAILURE_HANDLE(cudaInitDevice(device->index, cudaDeviceScheduleAuto, cudaInitDeviceFlagsAreValid));
 
-  __FAILURE_HANDLE(queue_create(&device->work_queue, sizeof(QueueEntry), DEVICE_QUEUE_SIZE));
-  __FAILURE_HANDLE(ringbuffer_create(&device->ringbuffer, DEVICE_RINGBUFFER_SIZE));
-  __FAILURE_HANDLE(wall_time_create(&device->queue_wall_time));
+  __FAILURE_HANDLE(_device_get_properties(&device->properties, device->index));
 
   CUDA_FAILURE_HANDLE(cudaSetDevice(device->index));
 

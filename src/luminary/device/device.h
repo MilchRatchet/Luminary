@@ -25,16 +25,13 @@ struct DeviceProperties {
 struct Device {
   uint32_t index;
   DeviceProperties properties;
-  Queue* work_queue;
-  RingBuffer* ringbuffer;
-  WallTime* queue_wall_time;
   bool exit_requested;
   bool optix_callback_error;
 } typedef Device;
 
 void _device_init(void);
 
-LuminaryResult device_create(Device** device);
+LuminaryResult device_create(Device** device, uint32_t index);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

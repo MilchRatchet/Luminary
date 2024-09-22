@@ -100,8 +100,7 @@ LuminaryResult luminary_host_create(Host** _host) {
 
   memcpy(&host->camera_external, &host->camera, sizeof(Camera));
 
-  host->current_work_string = (const char*) 0;
-  host->enable_output       = false;
+  host->enable_output = false;
 
   __FAILURE_HANDLE(thread_start(host->work_thread, (ThreadMainFunc) _host_queue_worker, host));
 
