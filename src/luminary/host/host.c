@@ -93,12 +93,13 @@ LuminaryResult luminary_host_create(Host** _host) {
   __FAILURE_HANDLE(ringbuffer_create(&host->ring_buffer, HOST_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
 
+  __FAILURE_HANDLE(mutex_create(&host->scene_update_mutex));
+
   __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
   __FAILURE_HANDLE(array_create(&host->materials, sizeof(Material*), 16));
 
-  __FAILURE_HANDLE(camera_get_default(&host->camera));
-
-  memcpy(&host->camera_external, &host->camera, sizeof(Camera));
+  __FAILURE_HANDLE(scene_create(&host->scene_external));
+  __FAILURE_HANDLE(scene_create(&host->scene_internal));
 
   host->enable_output = false;
 
@@ -118,6 +119,8 @@ LuminaryResult luminary_host_destroy(LuminaryHost** host) {
   __FAILURE_HANDLE(thread_join((*host)->work_thread));
 
   __FAILURE_HANDLE(thread_get_last_result((*host)->work_thread));
+
+  __FAILURE_HANDLE(mutex_destroy(&(*host)->scene_update_mutex));
 
   __FAILURE_HANDLE(wall_time_destroy(&(*host)->queue_wall_time));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ring_buffer));
@@ -142,6 +145,9 @@ LuminaryResult luminary_host_destroy(LuminaryHost** host) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*host)->materials));
+
+  __FAILURE_HANDLE(scene_destroy(&(*host)->scene_external));
+  __FAILURE_HANDLE(scene_destroy(&(*host)->scene_internal));
 
   __FAILURE_HANDLE(host_free(host));
 
@@ -168,6 +174,12 @@ LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, const char* path)
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_load_lum_file(LuminaryHost* host, const char* path) {
+  // LUM file itself is loaded synchronously for proper synchronization of the external settings.
+
+  return LUMINARY_ERROR_NOT_IMPLEMENTED;
+}
+
 LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, const char** string) {
   __CHECK_NULL_ARGUMENT(host);
 
@@ -182,24 +194,18 @@ LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, const ch
 
 LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(camera);
 
-  if (!camera) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Camera is NULL.");
-  }
-
-  memcpy(camera, &host->camera_external, sizeof(Camera));
+  memcpy(camera, &host->scene_external->camera, sizeof(Camera));
 
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult luminary_host_set_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(camera);
 
-  if (!camera) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Camera is NULL.");
-  }
-
-  memcpy(&host->camera_external, camera, sizeof(Camera));
+  memcpy(&host->scene_external->camera, camera, sizeof(Camera));
 
   HostSetCameraArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, sizeof(HostSetCameraArgs), (void**) &args));

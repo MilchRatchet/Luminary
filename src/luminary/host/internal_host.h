@@ -3,6 +3,8 @@
 
 #include "device/device_manager.h"
 #include "mesh.h"
+#include "mutex.h"
+#include "scene.h"
 #include "thread.h"
 #include "utils.h"
 
@@ -12,11 +14,12 @@ struct LuminaryHost {
   RingBuffer* ring_buffer;
   WallTime* queue_wall_time;
   Thread* work_thread;
+  Mutex* scene_update_mutex;
   ARRAY Mesh** meshes;
   ARRAY Material** materials;
   bool enable_output;
-  Camera camera;
-  Camera camera_external;
+  Scene* scene_internal;
+  Scene* scene_external;
 } typedef LuminaryHost;
 
 #endif /* LUMINARY_INTERNAL_HOST_H */
