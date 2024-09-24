@@ -93,8 +93,6 @@ LuminaryResult luminary_host_create(Host** _host) {
   __FAILURE_HANDLE(ringbuffer_create(&host->ring_buffer, HOST_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
 
-  __FAILURE_HANDLE(mutex_create(&host->scene_update_mutex));
-
   __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
   __FAILURE_HANDLE(array_create(&host->materials, sizeof(Material*), 16));
 
@@ -119,8 +117,6 @@ LuminaryResult luminary_host_destroy(LuminaryHost** host) {
   __FAILURE_HANDLE(thread_join((*host)->work_thread));
 
   __FAILURE_HANDLE(thread_get_last_result((*host)->work_thread));
-
-  __FAILURE_HANDLE(mutex_destroy(&(*host)->scene_update_mutex));
 
   __FAILURE_HANDLE(wall_time_destroy(&(*host)->queue_wall_time));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ring_buffer));

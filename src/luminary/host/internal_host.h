@@ -14,7 +14,6 @@ struct LuminaryHost {
   RingBuffer* ring_buffer;
   WallTime* queue_wall_time;
   Thread* work_thread;
-  Mutex* scene_update_mutex;
   ARRAY Mesh** meshes;
   ARRAY Material** materials;
   bool enable_output;

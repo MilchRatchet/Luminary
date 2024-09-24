@@ -139,14 +139,14 @@ LUMINARY_API struct LuminaryOcean {
 // Material
 ////////////////////////////////////////////////////////////////////
 
-struct LuminaryMaterialFlags {
+LUMINARY_API struct LuminaryMaterialFlags {
   bool emission_active : 1;
   bool ior_shadowing : 1;
   bool thin_walled : 1;
   bool colored_transparency : 1;
 } typedef LuminaryMaterialFlags;
 
-struct LuminaryMaterial {
+LUMINARY_API struct LuminaryMaterial {
   LuminaryRGBAF albedo;
   LuminaryRGBF emission;
   float metallic;

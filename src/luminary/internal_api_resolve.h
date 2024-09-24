@@ -32,4 +32,6 @@ typedef LuminaryHost Host;
 
 typedef LuminaryWallTime WallTime;
 
+typedef LuminaryPath Path;
+
 #endif /* LUMINARY_INTERNAL_API_RESOLVE */

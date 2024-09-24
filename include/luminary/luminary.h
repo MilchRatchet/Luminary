@@ -26,6 +26,7 @@
 #include <luminary/api_utils.h>
 #include <luminary/error.h>
 #include <luminary/host.h>
+#include <luminary/path.h>
 #include <luminary/structs.h>
 
 // Luminary provides multiple utility functions that can be used
