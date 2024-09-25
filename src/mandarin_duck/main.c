@@ -7,7 +7,13 @@ int main(int argc, char* argv[]) {
   LUM_FAILURE_HANDLE(luminary_host_create(&host));
 
   if (argc > 1) {
-    LUM_FAILURE_HANDLE(luminary_host_load_obj_file(host, argv[1]));
+    LuminaryPath* obj_path;
+    LUM_FAILURE_HANDLE(luminary_path_create(&obj_path));
+    LUM_FAILURE_HANDLE(luminary_path_set_from_string(obj_path, argv[1]));
+
+    LUM_FAILURE_HANDLE(luminary_host_load_obj_file(host, obj_path));
+
+    LUM_FAILURE_HANDLE(luminary_path_destroy(&obj_path));
   }
 
   LUM_FAILURE_HANDLE(luminary_host_destroy(&host));

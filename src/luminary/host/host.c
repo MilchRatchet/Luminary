@@ -6,6 +6,7 @@
 #include "camera.h"
 #include "internal_error.h"
 #include "internal_host.h"
+#include "internal_path.h"
 #include "wavefront.h"
 
 #define HOST_RINGBUFFER_SIZE (0x10000ull)
@@ -44,7 +45,7 @@ LuminaryResult _host_queue_worker(Host* host) {
 ////////////////////////////////////////////////////////////////////
 
 struct HostLoadObjArgs {
-  const char* path;
+  Path* path;
 } typedef HostLoadObjArgs;
 
 static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
@@ -53,11 +54,17 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   WavefrontContent* wavefront_content;
 
+  // TODO: Pass the path directly so that it can be used in the wavefront implementation.
+  const char* obj_path;
+  __FAILURE_HANDLE(path_apply(args->path, (const char*) 0, &obj_path));
+
   __FAILURE_HANDLE(wavefront_create(&wavefront_content));
-  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path));
+  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, obj_path));
   __FAILURE_HANDLE(wavefront_convert_content(wavefront_content, host->meshes, host->materials));
   __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
 
+  // Clean up
+  __FAILURE_HANDLE(luminary_path_destroy(&args->path));
   __FAILURE_HANDLE(ringbuffer_release_entry(host->ring_buffer, sizeof(HostLoadObjArgs)));
 
   return LUMINARY_SUCCESS;
@@ -150,14 +157,14 @@ LuminaryResult luminary_host_destroy(LuminaryHost** host) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, const char* path) {
+LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
   HostLoadObjArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, sizeof(HostLoadObjArgs), (void**) &args));
 
-  args->path = path;
+  __FAILURE_HANDLE(path_copy(&args->path, path));
 
   QueueEntry entry;
 
@@ -170,13 +177,13 @@ LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, const char* path)
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_load_lum_file(LuminaryHost* host, const char* path) {
+LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
   // LUM file itself is loaded synchronously for proper synchronization of the external settings.
 
   return LUMINARY_ERROR_NOT_IMPLEMENTED;
 }
 
-LuminaryResult luminary_host_get_queue_string(const LuminaryHost* host, const char** string) {
+LuminaryResult luminary_host_get_queue_string(const Host* host, const char** string) {
   __CHECK_NULL_ARGUMENT(host);
 
   if (!string) {

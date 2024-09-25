@@ -4,10 +4,23 @@
 #include "utils.h"
 
 struct LuminaryPath {
+  uint16_t working_dir_len;
+  uint16_t file_path_len;
+  uint16_t output_memory_available;
+  char* memory;
   char* working_dir;
-  char* file;
+  char* file_path;
   char* output;
 } typedef LuminaryPath;
+
+/*
+ * Creates an identical copy of a path instance. This allows Luminary to use a API side given path asynchronously as the API side could
+ * possibly destroy the path in the meantime. The output path is created as if luminary_path_create was called and must be destroyed using
+ * luminary_path_destroy.
+ * @param path Path instance.
+ * @param src_path Path instance to copy from.
+ */
+LuminaryResult path_copy(Path** path, Path* src_path);
 
 /*
  * Returns an ASCII encoded string corresponding to the given path. If override_path is not null,

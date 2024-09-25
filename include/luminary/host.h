@@ -25,6 +25,7 @@
 
 #include <luminary/api_utils.h>
 #include <luminary/error.h>
+#include <luminary/path.h>
 #include <luminary/structs.h>
 
 struct LuminaryHost;
@@ -37,8 +38,8 @@ LUMINARY_API LuminaryResult luminary_host_get_device_list(LuminaryHost* host);
 LUMINARY_API LuminaryResult luminary_host_start_device(LuminaryHost* host, uint32_t index);
 LUMINARY_API LuminaryResult luminary_host_shutdown_device(LuminaryHost* host, uint32_t index);
 
-LUMINARY_API LuminaryResult luminary_host_load_lum_file(LuminaryHost* host, const char* path);
-LUMINARY_API LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, const char* path);
+LUMINARY_API LuminaryResult luminary_host_load_lum_file(LuminaryHost* host, LuminaryPath* path);
+LUMINARY_API LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, LuminaryPath* path);
 
 LUMINARY_API LuminaryResult luminary_host_start_render(LuminaryHost* host);
 LUMINARY_API LuminaryResult luminary_host_skip_render(LuminaryHost* host);
