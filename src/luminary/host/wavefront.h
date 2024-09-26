@@ -68,7 +68,7 @@ struct WavefrontContent {
 } typedef WavefrontContent;
 
 LuminaryResult wavefront_create(WavefrontContent** content);
-LuminaryResult wavefront_read_file(WavefrontContent* _content, const char* filename);
+LuminaryResult wavefront_read_file(WavefrontContent* _content, Path* file);
 LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY Mesh** meshes, ARRAY Material** materials);
 LuminaryResult wavefront_destroy(WavefrontContent** content);
 

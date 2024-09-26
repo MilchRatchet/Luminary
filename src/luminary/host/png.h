@@ -40,7 +40,7 @@ LuminaryResult png_store_XRGB8(const char* filename, const XRGB8* image, const i
 LuminaryResult png_store(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
   const PNGColortype color_type, const PNGBitdepth bit_depth);
-LuminaryResult png_load(const uint8_t* file, const size_t file_length, const char* hint_name, Texture** texture);
-LuminaryResult png_load_from_file(const char* filename, Texture** texture);
+LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t file_length, const char* hint_name);
+LuminaryResult png_load_from_file(Texture** texture, const char* filename);
 
 #endif /* PNG_H */

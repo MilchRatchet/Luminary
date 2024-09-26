@@ -5,6 +5,14 @@
 
 #define PATH_BUFFER_SIZE (1u << 14)
 
+static bool _path_is_absolute(const char* string) {
+  // Windows C:, D:, ...
+  const char* windows_disk_designator = strchr(string, ':');
+
+  // Unix /usr/ ...
+  return (windows_disk_designator || (string[0] == '/'));
+}
+
 LuminaryResult luminary_path_create(Path** _path) {
   __CHECK_NULL_ARGUMENT(_path);
 
@@ -46,6 +54,63 @@ LuminaryResult path_copy(Path** path, Path* src_path) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult path_extend(Path** path, Path* src_path, const char* extension) {
+  __CHECK_NULL_ARGUMENT(path);
+  __CHECK_NULL_ARGUMENT(src_path);
+  __CHECK_NULL_ARGUMENT(extension);
+
+  const bool extension_is_absolute_path = _path_is_absolute(extension);
+
+  if (extension_is_absolute_path) {
+    __FAILURE_HANDLE(luminary_path_create(path));
+    __FAILURE_HANDLE(luminary_path_set_from_string(*path, extension));
+  }
+  else {
+    __FAILURE_HANDLE(path_copy(path, src_path));
+
+    const char* last_forward_slash  = strrchr(extension, '/');
+    const char* last_backward_slash = strrchr(extension, '\\');
+
+    const char* file_path = (last_forward_slash) ? last_forward_slash + 1 : extension;
+    file_path             = (last_backward_slash) ? last_backward_slash + 1 : file_path;
+
+    const size_t file_path_len = strlen(file_path);
+
+    const char* working_dir = (file_path != extension) ? extension : (const char*) 0;
+
+    if (working_dir) {
+      const size_t working_dir_len = (working_dir) ? (size_t) (file_path - extension - 1) : 0;
+
+      if ((*path)->output_memory_available < working_dir_len + 1) {
+        __RETURN_ERROR(
+          LUMINARY_ERROR_OUT_OF_MEMORY, "Path exceeds path buffer size after extension. Working dir size increased by %llu bytes.",
+          working_dir_len + 1);
+      }
+
+#if defined(WIN32)
+      (*path)->memory[(*path)->working_dir_len] = '\\';
+#else  /* WIN32 */
+      (*path)->memory[(*path)->working_dir_len] = '/';
+#endif /* !WIN32 */
+
+      memcpy((*path)->memory + (*path)->working_dir_len + 1, working_dir, working_dir_len);
+      (*path)->working_dir_len += working_dir_len + 1;
+      (*path)->memory[(*path)->working_dir_len] = '\0';
+    }
+
+    (*path)->file_path = (*path)->working_dir + (*path)->working_dir_len + 1;
+    memcpy((*path)->file_path, file_path, file_path_len + 1);
+
+    (*path)->file_path_len = file_path_len;
+
+    (*path)->output = (*path)->file_path + file_path_len + 1;
+
+    (*path)->output_memory_available = PATH_BUFFER_SIZE - (*path)->working_dir_len - (*path)->file_path_len - 2;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_path_set_from_string(Path* path, const char* string) {
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(string);
@@ -68,7 +133,8 @@ LuminaryResult luminary_path_set_from_string(Path* path, const char* string) {
   }
 
   path->working_dir = path->memory;
-  memcpy(path->working_dir, working_dir, working_dir_len + 1);
+  memcpy(path->working_dir, working_dir, working_dir_len);
+  path->working_dir[working_dir_len] = '\0';
 
   path->working_dir_len = working_dir_len;
 
@@ -130,8 +196,7 @@ static LuminaryResult _path_apply_override(Path* path, const char* override) {
     return LUMINARY_SUCCESS;
   }
 
-  const char* windows_disk_designator  = strchr(override, ':');
-  const bool override_is_absolute_path = (windows_disk_designator || (override[0] == '/'));
+  const bool override_is_absolute_path = _path_is_absolute(override);
 
   if (override_is_absolute_path) {
     memcpy(path->output, override, override_len + 1);

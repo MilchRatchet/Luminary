@@ -433,7 +433,7 @@ static void _png_reconstruction_4(uint8_t* line, const uint32_t line_length, con
   }
 }
 
-LuminaryResult png_load(const uint8_t* file, const size_t file_length, const char* hint_name, Texture** texture) {
+LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t file_length, const char* hint_name) {
   if (!texture) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
   }
@@ -737,7 +737,7 @@ LuminaryResult png_load(const uint8_t* file, const size_t file_length, const cha
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult png_load_from_file(const char* filename, Texture** texture) {
+LuminaryResult png_load_from_file(Texture** texture, const char* filename) {
   if (!texture) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
   }
@@ -772,7 +772,7 @@ LuminaryResult png_load_from_file(const char* filename, Texture** texture) {
 
   __FAILURE_HANDLE(host_realloc(&file_mem, file_length));
 
-  __FAILURE_HANDLE(png_load(file_mem, file_length, filename, texture));
+  __FAILURE_HANDLE(png_load(texture, file_mem, file_length, filename));
 
   __FAILURE_HANDLE(host_free(&file_mem));
 

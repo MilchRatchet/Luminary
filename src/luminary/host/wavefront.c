@@ -10,6 +10,7 @@
 #include <string.h>
 
 #include "internal_error.h"
+#include "internal_path.h"
 #include "png.h"
 #include "utils.h"
 
@@ -152,7 +153,7 @@ static uint16_t find_texture(WavefrontContent* content, uint32_t hash, Wavefront
   return TEXTURE_NONE;
 }
 
-static LuminaryResult _wavefront_parse_map(WavefrontContent* content, const char* line, const size_t line_len) {
+static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_file_path, const char* line, const size_t line_len) {
   if (line_len < 8) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Line is too short to be a valid map_ line.");
   }
@@ -249,8 +250,11 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, const char
     texture_instance.type   = type;
     texture_instance.offset = texture_id;
 
+    const char* tex_file_path;
+    __FAILURE_HANDLE(path_apply(mtl_file_path, path, &tex_file_path));
+
     Texture* tex;
-    __FAILURE_HANDLE(png_load_from_file(path, &tex));
+    __FAILURE_HANDLE(png_load_from_file(&tex, tex_file_path));
 
     __FAILURE_HANDLE(array_push(&content->maps[type], &tex));
     __FAILURE_HANDLE(array_push(&content->textures, &texture_instance));
@@ -265,17 +269,22 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, const char
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult read_materials_file(WavefrontContent* content, const char* filename) {
-  log_message("Reading *.mtl file (%s)", filename);
-
+static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_file_path) {
   __CHECK_NULL_ARGUMENT(content);
-  __CHECK_NULL_ARGUMENT(filename);
+  __CHECK_NULL_ARGUMENT(mtl_file_path);
 
-  FILE* file = fopen(filename, "r");
+  const char* mtl_file_path_string;
+  __FAILURE_HANDLE(path_apply(mtl_file_path, (const char*) 0, &mtl_file_path_string));
+
+  log_message("Reading *.mtl file (%s)", mtl_file_path_string);
+  FILE* file = fopen(mtl_file_path_string, "r");
 
   if (!file) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Could not read material file!");
   }
+
+  // Invalidate file path string.
+  mtl_file_path_string = (const char*) 0;
 
   char* line;
   __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
@@ -397,8 +406,8 @@ static LuminaryResult read_materials_file(WavefrontContent* content, const char*
         warn_message("Expected refraction index in *.mtl file but didn't find a number. Line: %s.", line);
       }
     }
-    else {
-      _wavefront_parse_map(content, line, line_len);
+    else if (line[0] == 'm' && line[1] == 'a') {
+      __FAILURE_HANDLE(_wavefront_parse_map(content, mtl_file_path, line, line_len));
     }
   }
 
@@ -560,17 +569,22 @@ static uint32_t read_face(const char* str, WavefrontTriangle* face1, WavefrontTr
   return tris;
 }
 
-LuminaryResult wavefront_read_file(WavefrontContent* content, const char* filename) {
+LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_file_path) {
   __CHECK_NULL_ARGUMENT(content);
-  __CHECK_NULL_ARGUMENT(filename);
+  __CHECK_NULL_ARGUMENT(wavefront_file_path);
 
-  log_message("Reading *.obj file (%s)", filename);
+  const char* file_path_string;
+  __FAILURE_HANDLE(path_apply(wavefront_file_path, (const char*) 0, &file_path_string));
 
-  FILE* file = fopen(filename, "r");
+  log_message("Reading *.obj file (%s)", file_path_string);
+  FILE* file = fopen(file_path_string, "r");
 
   if (!file) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "File could not be opened!");
   }
+
+  // Invalidate this string as we will not need it again.
+  file_path_string = (const char*) 0;
 
   uint32_t vertices_offset;
   __FAILURE_HANDLE(array_get_num_elements(content->vertices, &vertices_offset));
@@ -675,7 +689,12 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, const char* filena
         if (!already_loaded) {
           __FAILURE_HANDLE(array_push(&loaded_mtls, &hash));
 
-          read_materials_file(content, path);
+          Path* mtl_file_path;
+          __FAILURE_HANDLE(path_extend(&mtl_file_path, wavefront_file_path, path));
+
+          __FAILURE_HANDLE(read_materials_file(content, mtl_file_path));
+
+          __FAILURE_HANDLE(luminary_path_destroy(&mtl_file_path));
         }
       }
       else if (line[0] == 'u' && line[1] == 's' && line[2] == 'e' && line[3] == 'm' && line[4] == 't' && line[5] == 'l') {

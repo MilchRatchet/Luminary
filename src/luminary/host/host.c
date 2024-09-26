@@ -54,12 +54,8 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   WavefrontContent* wavefront_content;
 
-  // TODO: Pass the path directly so that it can be used in the wavefront implementation.
-  const char* obj_path;
-  __FAILURE_HANDLE(path_apply(args->path, (const char*) 0, &obj_path));
-
   __FAILURE_HANDLE(wavefront_create(&wavefront_content));
-  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, obj_path));
+  __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path));
   __FAILURE_HANDLE(wavefront_convert_content(wavefront_content, host->meshes, host->materials));
   __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
 
