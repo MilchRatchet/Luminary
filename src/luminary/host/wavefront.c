@@ -51,10 +51,10 @@ LuminaryResult wavefront_create(WavefrontContent** content) {
   (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_NORMAL]      = TEXTURE_NONE;
 
-  __FAILURE_HANDLE(array_create((*content)->maps + WF_ALBEDO, sizeof(Texture), 16));
-  __FAILURE_HANDLE(array_create((*content)->maps + WF_LUMINANCE, sizeof(Texture), 16));
-  __FAILURE_HANDLE(array_create((*content)->maps + WF_MATERIAL, sizeof(Texture), 16));
-  __FAILURE_HANDLE(array_create((*content)->maps + WF_NORMAL, sizeof(Texture), 16));
+  __FAILURE_HANDLE(array_create((*content)->maps + WF_ALBEDO, sizeof(Texture*), 16));
+  __FAILURE_HANDLE(array_create((*content)->maps + WF_LUMINANCE, sizeof(Texture*), 16));
+  __FAILURE_HANDLE(array_create((*content)->maps + WF_MATERIAL, sizeof(Texture*), 16));
+  __FAILURE_HANDLE(array_create((*content)->maps + WF_NORMAL, sizeof(Texture*), 16));
 
   __FAILURE_HANDLE(array_create(&(*content)->textures, sizeof(WavefrontTextureInstance), 16));
 
@@ -609,10 +609,16 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   char* read_buffer_swap;
   __FAILURE_HANDLE(host_malloc(&read_buffer_swap, READ_BUFFER_SIZE));
 
+  // NULL terminate the buffers.
+  read_buffer[READ_BUFFER_SIZE - 1]      = '\0';
+  read_buffer_swap[READ_BUFFER_SIZE - 1] = '\0';
+
   size_t offset = 0;
 
   while (!feof(file)) {
-    fread(read_buffer + offset, 1, READ_BUFFER_SIZE - offset, file);
+    // We only read up to the second last byte in the dst buffer to keep the
+    // buffer NULL terminated.
+    fread(read_buffer + offset, 1, READ_BUFFER_SIZE - offset - 1, file);
 
     char* line = read_buffer;
     char* eol;
@@ -737,7 +743,7 @@ static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
 }
 #endif
 
-static LuminaryResult _wavefront_convert_materials(const WavefrontContent* content, ARRAY Material** materials) {
+static LuminaryResult _wavefront_convert_materials(const WavefrontContent* content, ARRAY Material*** materials) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(materials);
 
@@ -798,13 +804,13 @@ static LuminaryResult _wavefront_convert_materials(const WavefrontContent* conte
     mat->flags.thin_walled          = false;
     mat->flags.colored_transparency = true;
 
-    __FAILURE_HANDLE(array_push(&materials, &mat));
+    __FAILURE_HANDLE(array_push(materials, &mat));
   }
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY Mesh** meshes, ARRAY Material** materials) {
+LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY Mesh*** meshes, ARRAY Material*** materials) {
   static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
   __CHECK_NULL_ARGUMENT(content);
@@ -824,7 +830,7 @@ LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY 
   __FAILURE_HANDLE(array_get_num_elements(content->normals, &normal_count));
 
   uint32_t material_offset;
-  __FAILURE_HANDLE(array_get_num_elements(materials, &material_offset));
+  __FAILURE_HANDLE(array_get_num_elements(*materials, &material_offset));
 
   __FAILURE_HANDLE(_wavefront_convert_materials(content, materials));
 
@@ -1046,7 +1052,7 @@ LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY 
   mesh->data->index_count    = 3 * new_triangle_count;
   mesh->data->triangle_count = new_triangle_count;
 
-  __FAILURE_HANDLE(array_push(&meshes, &mesh));
+  __FAILURE_HANDLE(array_push(meshes, &mesh));
 
   return LUMINARY_SUCCESS;
 }

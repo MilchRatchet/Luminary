@@ -56,7 +56,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   __FAILURE_HANDLE(wavefront_create(&wavefront_content));
   __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path));
-  __FAILURE_HANDLE(wavefront_convert_content(wavefront_content, host->meshes, host->materials));
+  __FAILURE_HANDLE(wavefront_convert_content(wavefront_content, &host->meshes, &host->materials));
   __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
 
   // Clean up
