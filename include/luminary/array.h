@@ -26,8 +26,6 @@
 #include <luminary/api_utils.h>
 #include <luminary/error.h>
 
-#define ARRAY
-
 #define array_create(array, size_of_element, num_elements) \
   _array_create((void**) array, size_of_element, num_elements, (const char*) #array, (const char*) __func__, __LINE__)
 #define array_resize(array, size) _array_resize((void**) array, size, (const char*) #array, (const char*) __func__, __LINE__)

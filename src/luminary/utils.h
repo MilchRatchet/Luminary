@@ -7,6 +7,7 @@
 
 #include <assert.h>
 
+#include "internal_array.h"
 #include "sky_defines.h"
 
 // This struct is stored as a struct of arrays, members are grouped into 16 bytes where possible. Padding is not required.

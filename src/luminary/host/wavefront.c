@@ -743,7 +743,7 @@ static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
 }
 #endif
 
-static LuminaryResult _wavefront_convert_materials(const WavefrontContent* content, ARRAY Material*** materials) {
+static LuminaryResult _wavefront_convert_materials(const WavefrontContent* content, ARRAYPTR Material*** materials) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(materials);
 
@@ -810,7 +810,7 @@ static LuminaryResult _wavefront_convert_materials(const WavefrontContent* conte
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAY Mesh*** meshes, ARRAY Material*** materials) {
+LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Material*** materials) {
   static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
   __CHECK_NULL_ARGUMENT(content);
