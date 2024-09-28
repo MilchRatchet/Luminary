@@ -8,7 +8,6 @@ struct LuminaryRingBuffer {
   size_t size;
   size_t total_allocated_memory;
   size_t ptr;
-  size_t last_entry_size;
 };
 
 LuminaryResult _ringbuffer_create(RingBuffer** _buffer, size_t size, const char* buf_name, const char* func, uint32_t line) {
@@ -59,7 +58,7 @@ LuminaryResult ringbuffer_allocate_entry(RingBuffer* buffer, size_t entry_size, 
     buffer->ptr = entry_size;
   }
   else {
-    *entry = (void*) (((uint8_t*) (buffer->memory)) + entry_size);
+    *entry = (void*) (((uint8_t*) (buffer->memory)) + buffer->ptr);
 
     buffer->ptr += entry_size;
   }
