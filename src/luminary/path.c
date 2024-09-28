@@ -35,7 +35,7 @@ LuminaryResult luminary_path_create(Path** _path) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult path_copy(Path** path, Path* src_path) {
+LuminaryResult path_copy(Path** path, const Path* src_path) {
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(src_path);
 
@@ -54,7 +54,7 @@ LuminaryResult path_copy(Path** path, Path* src_path) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult path_extend(Path** path, Path* src_path, const char* extension) {
+LuminaryResult path_extend(Path** path, const Path* src_path, const char* extension) {
   __CHECK_NULL_ARGUMENT(path);
   __CHECK_NULL_ARGUMENT(src_path);
   __CHECK_NULL_ARGUMENT(extension);

@@ -7,6 +7,7 @@
 #include "internal_error.h"
 #include "internal_host.h"
 #include "internal_path.h"
+#include "lum.h"
 #include "wavefront.h"
 
 #define HOST_RINGBUFFER_SIZE (0x10000ull)
@@ -222,9 +223,34 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(path);
 
-  // LUM file itself is loaded synchronously for proper synchronization of the external settings.
+  LumFileContent* content;
+  __FAILURE_HANDLE(lum_content_create(&content));
 
-  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+  Path* lum_path;
+  __FAILURE_HANDLE(path_copy(&lum_path, path));
+
+  __FAILURE_HANDLE(lum_read_file(lum_path, content));
+
+  __FAILURE_HANDLE(luminary_path_destroy(&lum_path));
+
+  // TODO: Full update
+  __FAILURE_HANDLE(luminary_host_set_camera(host, &content->camera));
+
+  uint32_t num_obj_files_to_load;
+  __FAILURE_HANDLE(array_get_num_elements(content->obj_file_path_strings, &num_obj_files_to_load));
+
+  for (uint32_t obj_file_id = 0; obj_file_id < num_obj_files_to_load; obj_file_id++) {
+    Path* obj_path;
+    __FAILURE_HANDLE(path_extend(&obj_path, path, content->obj_file_path_strings[obj_file_id]));
+
+    __FAILURE_HANDLE(luminary_host_load_obj_file(host, obj_path));
+
+    __FAILURE_HANDLE(luminary_path_destroy(&obj_path));
+  }
+
+  __FAILURE_HANDLE(lum_content_destroy(&content));
+
+  return LUMINARY_SUCCESS;
 }
 
 LuminaryResult luminary_host_get_queue_string(const Host* host, const char** string) {

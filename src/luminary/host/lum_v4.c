@@ -753,7 +753,7 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
     }
   }
 
-  __FAILURE_HANDLE(host_free(line));
+  __FAILURE_HANDLE(host_free(&line));
 
   return LUMINARY_SUCCESS;
 }

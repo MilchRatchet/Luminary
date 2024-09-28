@@ -67,7 +67,7 @@ static LuminaryResult _lum_validate_file(FILE* file, uint32_t* version) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Luminary file has no version information.");
   }
 
-  __FAILURE_HANDLE(host_free(line));
+  __FAILURE_HANDLE(host_free(&line));
 
   return LUMINARY_SUCCESS;
 }

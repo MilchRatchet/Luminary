@@ -20,7 +20,7 @@ struct LuminaryPath {
  * @param path Path instance.
  * @param src_path Path instance to copy from.
  */
-LuminaryResult path_copy(Path** path, Path* src_path);
+LuminaryResult path_copy(Path** path, const Path* src_path);
 
 /*
  * Creates a new path instance by extending the working directory of the src path by the directory given in extension and overrides the file
@@ -31,7 +31,7 @@ LuminaryResult path_copy(Path** path, Path* src_path);
  * @param src_path Path instance to copy from.
  * @param entension String that defines the
  */
-LuminaryResult path_extend(Path** path, Path* src_path, const char* extension);
+LuminaryResult path_extend(Path** path, const Path* src_path, const char* extension);
 
 /*
  * Returns an ASCII encoded string corresponding to the given path. If override_path is not null,
