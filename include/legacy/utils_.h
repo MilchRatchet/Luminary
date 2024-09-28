@@ -46,52 +46,11 @@ enum OutputVariable {
 
 enum ToyShape { TOY_SPHERE = 0, TOY_PLANE = 1 } typedef ToyShape;
 
-enum BVHType { BVH_LUMINARY = 0, BVH_OPTIX = 1 } typedef BVHType;
-
 enum SnapResolution { SNAP_RESOLUTION_WINDOW = 0, SNAP_RESOLUTION_RENDER = 1 } typedef SnapResolution;
 
 enum DenoisingMode { DENOISING_OFF = 0, DENOISING_ON = 1, DENOISING_UPSCALING = 2 } typedef DenoisingMode;
 
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
-
-enum SkyMode { SKY_MODE_DEFAULT = 0, SKY_MODE_HDRI = 1, SKY_MODE_CONSTANT_COLOR = 2 } typedef SkyMode;
-
-struct CommandlineOptions {
-  int width;
-  int height;
-  int dmm_active;
-  int omm_active;
-  int optix_validation;
-  int offline_samples;
-} typedef CommandlineOptions;
-
-struct General {
-  int width;
-  int height;
-  int samples;
-  int max_ray_depth;
-  int num_light_ray;
-  DenoisingMode denoiser;
-  char** mesh_files;
-  int mesh_files_count;
-  int mesh_files_length;
-  char* output_path;
-} typedef General;
-
-struct Toy {
-  int active;
-  ToyShape shape;
-  int emissive;
-  vec3 position;
-  vec3 rotation;
-  float scale;
-  float refractive_index;
-  RGBAF albedo;
-  RGBAF material;
-  RGBF emission;
-  int flashlight_mode;
-  Quaternion computed_rotation;
-} typedef Toy;
 
 struct Star {
   float altitude;
@@ -99,44 +58,6 @@ struct Star {
   float radius;
   float intensity;
 } typedef Star;
-
-struct CloudLayer {
-  int active;
-  float height_max;
-  float height_min;
-  float coverage;
-  float coverage_min;
-  float type;
-  float type_min;
-  float wind_speed;
-  float wind_angle;
-} typedef CloudLayer;
-
-struct Cloud {
-  int active;
-  int initialized;
-  int atmosphere_scattering;
-  CloudLayer low;
-  CloudLayer mid;
-  CloudLayer top;
-  float offset_x;
-  float offset_z;
-  float density;
-  int seed;
-  float droplet_diameter;
-  int steps;
-  int shadow_steps;
-  float noise_shape_scale;
-  float noise_detail_scale;
-  float noise_weather_scale;
-  float mipmap_bias;
-  int octaves;
-} typedef Cloud;
-
-struct BridgeSettings {
-  int max_num_vertices;
-  int num_ris_samples;
-} typedef BridgeSettings;
 
 // Settings that affect the sky LUTs
 struct AtmoSettings {
@@ -153,54 +74,6 @@ struct AtmoSettings {
   float multiscattering_factor;
 } typedef AtmoSettings;
 
-struct Sky {
-  vec3 geometry_offset;
-  float azimuth;
-  float altitude;
-  float moon_azimuth;
-  float moon_altitude;
-  float moon_tex_offset;
-  float sun_strength;
-  float base_density;
-  int ozone_absorption;
-  int steps;
-  Star* stars;
-  int* stars_offsets;
-  int settings_stars_count;
-  int current_stars_count;
-  int stars_seed;
-  float stars_intensity;
-  Cloud cloud;
-  float rayleigh_density;
-  float mie_density;
-  float ozone_density;
-  float rayleigh_falloff;
-  float mie_falloff;
-  float mie_diameter;
-  float ground_visibility;
-  float ozone_layer_thickness;
-  float multiscattering_factor;
-  int lut_initialized;
-  int hdri_initialized;
-  int hdri_dim;
-  int settings_hdri_dim;
-  int hdri_samples;
-  vec3 hdri_origin;
-  float hdri_mip_bias;
-  int aerial_perspective;
-  RGBF constant_color;
-  int ambient_sampling;
-  SkyMode mode;
-} typedef Sky;
-
-struct Fog {
-  int active;
-  float density;
-  float droplet_diameter;
-  float height;
-  float dist;
-} typedef Fog;
-
 struct GlobalMaterial {
   RGBF default_material;
   int lights_active;
@@ -212,20 +85,6 @@ struct GlobalMaterial {
   int enable_ior_shadowing;
   float caustic_roughness_clamp;
 } typedef GlobalMaterial;
-
-struct Particles {
-  int active;
-  uint32_t seed;
-  uint32_t count;
-  RGBF albedo;
-  float speed;
-  float direction_altitude;
-  float direction_azimuth;
-  float phase_diameter;
-  float scale;
-  float size;
-  float size_variation;
-} typedef Particles;
 
 struct Scene {
   Camera camera;
@@ -262,11 +121,6 @@ struct TextureAtlas {
   DeviceBuffer* normal;
   int normal_length;
 } typedef TextureAtlas;
-
-struct RISSettings {
-  int initial_reservoir_size;
-  int num_light_rays;
-} typedef RISSettings;
 
 struct OptixKernel {
   OptixPipeline pipeline;

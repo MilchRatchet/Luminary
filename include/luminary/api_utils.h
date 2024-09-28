@@ -26,6 +26,7 @@
 #include <stdbool.h>
 
 #define LUMINARY_API
+#define LUMINARY_DEPRECATED
 
 LUMINARY_API struct LuminaryVec3 {
   float x;

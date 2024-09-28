@@ -39,6 +39,23 @@ LUMINARY_API enum LuminaryShadingMode {
   LUMINARY_SHADING_LIGHTS         = 6
 } typedef LuminaryShadingMode;
 
+LUMINARY_API struct LuminaryRendererSettings {
+  uint32_t width;
+  uint32_t height;
+  uint32_t max_ray_depth;
+  LUMINARY_DEPRECATED bool use_denoiser;
+  uint32_t bridge_max_num_vertices;
+  uint32_t bridge_num_ris_samples;
+  uint32_t light_initial_reservoir_size;
+  uint32_t light_num_rays;
+  bool use_opacity_micromaps;
+  bool use_displacement_micromaps;
+  bool enable_optix_validation;
+  LUMINARY_DEPRECATED bool use_luminary_bvh;
+  uint32_t undersampling;
+  LuminaryShadingMode shading_mode;
+} typedef LuminaryRendererSettings;
+
 ////////////////////////////////////////////////////////////////////
 // Camera
 ////////////////////////////////////////////////////////////////////
@@ -72,34 +89,34 @@ LUMINARY_API struct LuminaryCamera {
   float focal_length;
   float aperture_size;
   LuminaryApertureShape aperture_shape;
-  int aperture_blade_count;
+  uint32_t aperture_blade_count;
   float exposure;
   float max_exposure;
   float min_exposure;
-  int auto_exposure;
+  bool auto_exposure;
   float far_clip_distance;
   LuminaryToneMap tonemap;
   float agx_custom_slope;
   float agx_custom_power;
   float agx_custom_saturation;
   LuminaryFilter filter;
-  int bloom;
+  bool bloom;
   float bloom_blend;
-  int lens_flare;
+  bool lens_flare;
   float lens_flare_threshold;
-  int dithering;
-  int purkinje;
+  bool dithering;
+  bool purkinje;
   float purkinje_kappa1;
   float purkinje_kappa2;
   float wasd_speed;
   float mouse_speed;
-  int smooth_movement;
+  bool smooth_movement;
   float smoothing_factor;
   float temporal_blend_factor;
   float russian_roulette_threshold;
-  int use_color_correction;
+  bool use_color_correction;
   LuminaryRGBF color_correction;
-  int do_firefly_clamping;
+  bool do_firefly_clamping;
   float film_grain;
 } typedef LuminaryCamera;
 
@@ -121,19 +138,149 @@ LUMINARY_API enum LuminaryJerlovWaterType {
 } typedef LuminaryJerlovWaterType;
 
 LUMINARY_API struct LuminaryOcean {
-  int active;
+  bool active;
   float height;
   float amplitude;
   float frequency;
   float choppyness;
   float refractive_index;
   LuminaryJerlovWaterType water_type;
-  int caustics_active;
-  int caustics_ris_sample_count;
+  bool caustics_active;
+  uint32_t caustics_ris_sample_count;
   float caustics_domain_scale;
-  int multiscattering;
-  int triangle_light_contribution;
+  bool multiscattering;
+  bool triangle_light_contribution;
 } typedef LuminaryOcean;
+
+////////////////////////////////////////////////////////////////////
+// Sky
+////////////////////////////////////////////////////////////////////
+
+enum LuminarySkyMode {
+  LUMINARY_SKY_MODE_DEFAULT        = 0,
+  LUMINARY_SKY_MODE_HDRI           = 1,
+  LUMINARY_SKY_MODE_CONSTANT_COLOR = 2
+} typedef LuminarySkyMode;
+
+struct LuminarySky {
+  LuminaryVec3 geometry_offset;
+  float azimuth;
+  float altitude;
+  float moon_azimuth;
+  float moon_altitude;
+  float moon_tex_offset;
+  float sun_strength;
+  float base_density;
+  bool ozone_absorption;
+  uint32_t steps;
+  uint32_t settings_stars_count;
+  uint32_t current_stars_count;
+  uint32_t stars_seed;
+  float stars_intensity;
+  float rayleigh_density;
+  float mie_density;
+  float ozone_density;
+  float rayleigh_falloff;
+  float mie_falloff;
+  float mie_diameter;
+  float ground_visibility;
+  float ozone_layer_thickness;
+  float multiscattering_factor;
+  bool lut_initialized;
+  bool hdri_initialized;
+  uint32_t hdri_dim;
+  uint32_t settings_hdri_dim;
+  uint32_t hdri_samples;
+  LuminaryVec3 hdri_origin;
+  float hdri_mip_bias;
+  bool aerial_perspective;
+  LuminaryRGBF constant_color;
+  bool ambient_sampling;
+  LuminarySkyMode mode;
+} typedef LuminarySky;
+
+////////////////////////////////////////////////////////////////////
+// Clouds
+////////////////////////////////////////////////////////////////////
+
+LUMINARY_API struct LuminaryCloudLayer {
+  bool active;
+  float height_max;
+  float height_min;
+  float coverage;
+  float coverage_min;
+  float type;
+  float type_min;
+  float wind_speed;
+  float wind_angle;
+} typedef LuminaryCloudLayer;
+
+LUMINARY_API struct LuminaryCloud {
+  bool active;
+  bool initialized;
+  bool atmosphere_scattering;
+  LuminaryCloudLayer low;
+  LuminaryCloudLayer mid;
+  LuminaryCloudLayer top;
+  float offset_x;
+  float offset_z;
+  float density;
+  uint32_t seed;
+  float droplet_diameter;
+  uint32_t steps;
+  uint32_t shadow_steps;
+  float noise_shape_scale;
+  float noise_detail_scale;
+  float noise_weather_scale;
+  float mipmap_bias;
+  uint32_t octaves;
+} typedef LuminaryCloud;
+
+////////////////////////////////////////////////////////////////////
+// Fog
+////////////////////////////////////////////////////////////////////
+
+LUMINARY_API struct LuminaryFog {
+  bool active;
+  float density;
+  float droplet_diameter;
+  float height;
+  float dist;
+} typedef LuminaryFog;
+
+////////////////////////////////////////////////////////////////////
+// Particles
+////////////////////////////////////////////////////////////////////
+
+LUMINARY_API struct LuminaryParticles {
+  bool active;
+  uint32_t seed;
+  uint32_t count;
+  LuminaryRGBF albedo;
+  float speed;
+  float direction_altitude;
+  float direction_azimuth;
+  float phase_diameter;
+  float scale;
+  float size;
+  float size_variation;
+} typedef LuminaryParticles;
+
+////////////////////////////////////////////////////////////////////
+// Toy
+////////////////////////////////////////////////////////////////////
+
+LUMINARY_API LUMINARY_DEPRECATED struct LuminaryToy {
+  bool active;
+  bool emissive;
+  LuminaryVec3 position;
+  LuminaryVec3 rotation;
+  float scale;
+  float refractive_index;
+  LuminaryRGBAF albedo;
+  LuminaryRGBAF material;
+  LuminaryRGBF emission;
+} typedef LuminaryToy;
 
 ////////////////////////////////////////////////////////////////////
 // Material
