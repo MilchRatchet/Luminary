@@ -4,9 +4,7 @@
 #include "utils.h"
 
 LuminaryResult camera_get_default(Camera* camera) {
-  if (!camera) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Camera was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(camera);
 
   camera->pos.x                      = 0.0f;
   camera->pos.y                      = 0.0f;

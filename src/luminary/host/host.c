@@ -148,7 +148,7 @@ LuminaryResult luminary_host_create(Host** _host) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_destroy(LuminaryHost** host) {
+LuminaryResult luminary_host_destroy(Host** host) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(*host);
 
@@ -233,8 +233,14 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
 
   __FAILURE_HANDLE(luminary_path_destroy(&lum_path));
 
-  // TODO: Full update
+  // TODO: Rendersettings
   __FAILURE_HANDLE(luminary_host_set_camera(host, &content->camera));
+  __FAILURE_HANDLE(luminary_host_set_ocean(host, &content->ocean));
+  __FAILURE_HANDLE(luminary_host_set_sky(host, &content->sky));
+  __FAILURE_HANDLE(luminary_host_set_cloud(host, &content->cloud));
+  __FAILURE_HANDLE(luminary_host_set_fog(host, &content->fog));
+  __FAILURE_HANDLE(luminary_host_set_particles(host, &content->particles));
+  __FAILURE_HANDLE(luminary_host_set_toy(host, &content->toy));
 
   uint32_t num_obj_files_to_load;
   __FAILURE_HANDLE(array_get_num_elements(content->obj_file_path_strings, &num_obj_files_to_load));
@@ -265,6 +271,9 @@ LuminaryResult luminary_host_get_queue_string(const Host* host, const char** str
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_get_max_sample_count(Host* host, uint32_t* max_sample_count);
+LuminaryResult luminary_host_set_max_sample_count(Host* host, uint32_t* max_sample_count);
+
 LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
@@ -279,6 +288,114 @@ LuminaryResult luminary_host_set_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(camera);
 
   _host_set_scene_entity(host, (void*) camera, sizeof(Camera), SCENE_ENTITY_CAMERA, "Updating camera");
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_ocean(Host* host, Ocean* ocean) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(ocean);
+
+  __FAILURE_HANDLE(scene_get(host->scene_external, ocean, SCENE_ENTITY_OCEAN));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_set_ocean(Host* host, Ocean* ocean) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(ocean);
+
+  _host_set_scene_entity(host, (void*) ocean, sizeof(Ocean), SCENE_ENTITY_OCEAN, "Updating ocean");
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_sky(Host* host, Sky* sky) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(sky);
+
+  __FAILURE_HANDLE(scene_get(host->scene_external, sky, SCENE_ENTITY_SKY));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_set_sky(Host* host, Sky* sky) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(sky);
+
+  _host_set_scene_entity(host, (void*) sky, sizeof(Sky), SCENE_ENTITY_SKY, "Updating sky");
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_cloud(Host* host, Cloud* cloud) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(cloud);
+
+  __FAILURE_HANDLE(scene_get(host->scene_external, cloud, SCENE_ENTITY_CLOUD));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_set_cloud(Host* host, Cloud* cloud) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(cloud);
+
+  _host_set_scene_entity(host, (void*) cloud, sizeof(Cloud), SCENE_ENTITY_CLOUD, "Updating cloud");
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_fog(Host* host, Fog* fog) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(fog);
+
+  __FAILURE_HANDLE(scene_get(host->scene_external, fog, SCENE_ENTITY_FOG));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_set_fog(Host* host, Fog* fog) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(fog);
+
+  _host_set_scene_entity(host, (void*) fog, sizeof(Fog), SCENE_ENTITY_FOG, "Updating fog");
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_particles(Host* host, Particles* particles) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(particles);
+
+  __FAILURE_HANDLE(scene_get(host->scene_external, particles, SCENE_ENTITY_PARTICLES));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_set_particles(Host* host, Particles* particles) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(particles);
+
+  _host_set_scene_entity(host, (void*) particles, sizeof(Particles), SCENE_ENTITY_PARTICLES, "Updating particles");
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_toy(Host* host, Toy* toy) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(toy);
+
+  __FAILURE_HANDLE(scene_get(host->scene_external, toy, SCENE_ENTITY_TOY));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_set_toy(Host* host, Toy* toy) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(toy);
+
+  _host_set_scene_entity(host, (void*) toy, sizeof(Toy), SCENE_ENTITY_TOY, "Updating toy");
 
   return LUMINARY_SUCCESS;
 }

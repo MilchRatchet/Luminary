@@ -4,8 +4,14 @@
 #include <stdlib.h>
 
 #include "camera.h"
+#include "cloud.h"
+#include "fog.h"
 #include "internal_error.h"
 #include "internal_path.h"
+#include "ocean.h"
+#include "particles.h"
+#include "sky.h"
+#include "toy.h"
 #include "utils.h"
 
 #define LINE_SIZE 4096
@@ -21,6 +27,12 @@ LuminaryResult lum_content_create(LumFileContent** _content) {
   __FAILURE_HANDLE(array_create(&content->obj_file_path_strings, sizeof(char*), 16));
 
   __FAILURE_HANDLE(camera_get_default(&content->camera));
+  __FAILURE_HANDLE(ocean_get_default(&content->ocean));
+  __FAILURE_HANDLE(sky_get_default(&content->sky));
+  __FAILURE_HANDLE(cloud_get_default(&content->cloud));
+  __FAILURE_HANDLE(fog_get_default(&content->fog));
+  __FAILURE_HANDLE(particles_get_default(&content->particles));
+  __FAILURE_HANDLE(toy_get_default(&content->toy));
 
   *_content = content;
 
