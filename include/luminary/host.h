@@ -62,7 +62,31 @@ LUMINARY_API LuminaryResult luminary_host_get_queue_time(const LuminaryHost* hos
 LUMINARY_API LuminaryResult luminary_host_set_enable_output(LuminaryHost* host, int enable_output);
 LUMINARY_API LuminaryResult luminary_host_get_last_render(LuminaryHost* host);
 
+LUMINARY_API LuminaryResult luminary_host_get_max_sample_count(LuminaryHost* host, uint32_t* max_sample_count);
+LUMINARY_API LuminaryResult luminary_host_set_max_sample_count(LuminaryHost* host, uint32_t* max_sample_count);
+
+LUMINARY_API LuminaryResult luminary_host_get_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
+LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
+
 LUMINARY_API LuminaryResult luminary_host_get_camera(LuminaryHost* host, LuminaryCamera* camera);
 LUMINARY_API LuminaryResult luminary_host_set_camera(LuminaryHost* host, LuminaryCamera* camera);
+
+LUMINARY_API LuminaryResult luminary_host_get_ocean(LuminaryHost* host, LuminaryOcean* ocean);
+LUMINARY_API LuminaryResult luminary_host_set_ocean(LuminaryHost* host, LuminaryOcean* ocean);
+
+LUMINARY_API LuminaryResult luminary_host_get_sky(LuminaryHost* host, LuminarySky* sky);
+LUMINARY_API LuminaryResult luminary_host_set_sky(LuminaryHost* host, LuminarySky* sky);
+
+LUMINARY_API LuminaryResult luminary_host_get_cloud(LuminaryHost* host, LuminaryCloud* cloud);
+LUMINARY_API LuminaryResult luminary_host_set_cloud(LuminaryHost* host, LuminaryCloud* cloud);
+
+LUMINARY_API LuminaryResult luminary_host_get_fog(LuminaryHost* host, LuminaryFog* fog);
+LUMINARY_API LuminaryResult luminary_host_set_fog(LuminaryHost* host, LuminaryFog* fog);
+
+LUMINARY_API LuminaryResult luminary_host_get_particles(LuminaryHost* host, LuminaryParticles* particles);
+LUMINARY_API LuminaryResult luminary_host_set_particles(LuminaryHost* host, LuminaryParticles* particles);
+
+LUMINARY_API LuminaryResult luminary_host_get_toy(LuminaryHost* host, LuminaryToy* toy);
+LUMINARY_API LuminaryResult luminary_host_set_toy(LuminaryHost* host, LuminaryToy* toy);
 
 #endif /* LUMINARY_HOST_H */

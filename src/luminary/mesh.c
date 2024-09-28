@@ -28,7 +28,7 @@ LuminaryResult mesh_destroy(Mesh** mesh) {
     __FAILURE_HANDLE(host_free(&(*mesh)->light_data));
 
     // TODO: Call light_destroy.
-    return LUMINARY_ERROR_NOT_IMPLEMENTED;
+    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
   }
 
   if ((*mesh)->bvh) {
@@ -37,7 +37,7 @@ LuminaryResult mesh_destroy(Mesh** mesh) {
 
   if ((*mesh)->optix_bvh) {
     // TODO: This is device implementation specific so this shouldn't even be here.
-    return LUMINARY_ERROR_NOT_IMPLEMENTED;
+    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
   }
 
   __FAILURE_HANDLE(host_free(mesh));

@@ -57,5 +57,6 @@ LuminaryResult camera_check_for_dirty(const Camera* a, const Camera* b, bool* is
   LUM_UNUSED(a);
   LUM_UNUSED(b);
   LUM_UNUSED(is_dirty);
-  return LUMINARY_ERROR_NOT_IMPLEMENTED;
+
+  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
 }

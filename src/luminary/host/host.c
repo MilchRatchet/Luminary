@@ -56,7 +56,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   __FAILURE_HANDLE(wavefront_create(&wavefront_content));
   __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path));
-  __FAILURE_HANDLE(wavefront_convert_content(wavefront_content, &host->meshes, &host->materials));
+  __FAILURE_HANDLE(wavefront_convert_content(wavefront_content, &host->meshes, &host->materials, &host->textures));
   __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
 
   // Clean up
@@ -66,17 +66,52 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   return LUMINARY_SUCCESS;
 }
 
-struct HostSetCameraArgs {
-  Camera new_camera;
-} typedef HostSetCameraArgs;
+struct HostSetSceneEntityArgs {
+  void* object;
+  size_t size_of_object;
+  SceneEntity entity;
+} typedef HostSetSceneEntityArgs;
 
-static LuminaryResult _host_set_camera(Host* host, HostSetCameraArgs* args) {
+static LuminaryResult _host_set_scene_entity_queue_work(Host* host, HostSetSceneEntityArgs* args) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(args);
 
-  __FAILURE_HANDLE(ringbuffer_release_entry(host->ring_buffer, sizeof(HostSetCameraArgs)));
+  __FAILURE_HANDLE(scene_update(host->scene_internal, args->object, args->entity))
 
-  return LUMINARY_ERROR_NOT_IMPLEMENTED;
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ring_buffer, args->size_of_object));
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ring_buffer, sizeof(HostSetSceneEntityArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Internal implementation
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _host_set_scene_entity(Host* host, void* object, size_t size_of_object, SceneEntity entity, const char* string) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(object);
+
+  __FAILURE_HANDLE(scene_update(host->scene_internal, object, entity));
+
+  HostSetSceneEntityArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, sizeof(HostSetSceneEntityArgs), (void**) &args));
+
+  args->size_of_object = size_of_object;
+  args->entity         = entity;
+
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, args->size_of_object, (void**) &args->object));
+  memcpy(args->object, object, args->size_of_object);
+
+  QueueEntry entry;
+
+  entry.name     = string;
+  entry.function = (QueueEntryFunction) _host_set_scene_entity_queue_work;
+  entry.args     = args;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -98,6 +133,7 @@ LuminaryResult luminary_host_create(Host** _host) {
 
   __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
   __FAILURE_HANDLE(array_create(&host->materials, sizeof(Material*), 16));
+  __FAILURE_HANDLE(array_create(&host->textures, sizeof(Texture*), 16));
 
   __FAILURE_HANDLE(scene_create(&host->scene_external));
   __FAILURE_HANDLE(scene_create(&host->scene_internal));
@@ -145,6 +181,15 @@ LuminaryResult luminary_host_destroy(LuminaryHost** host) {
 
   __FAILURE_HANDLE(array_destroy(&(*host)->materials));
 
+  uint32_t texture_count;
+  __FAILURE_HANDLE(array_get_num_elements((*host)->textures, &texture_count));
+
+  for (uint32_t tex_id = 0; tex_id < texture_count; tex_id++) {
+    __FAILURE_HANDLE(texture_destroy(&(*host)->textures[tex_id]));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*host)->textures));
+
   __FAILURE_HANDLE(scene_destroy(&(*host)->scene_external));
   __FAILURE_HANDLE(scene_destroy(&(*host)->scene_internal));
 
@@ -174,9 +219,12 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
 }
 
 LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
   // LUM file itself is loaded synchronously for proper synchronization of the external settings.
 
-  return LUMINARY_ERROR_NOT_IMPLEMENTED;
+  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
 }
 
 LuminaryResult luminary_host_get_queue_string(const Host* host, const char** string) {
@@ -195,7 +243,7 @@ LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
-  memcpy(camera, &host->scene_external->camera, sizeof(Camera));
+  __FAILURE_HANDLE(scene_get(host->scene_external, camera, SCENE_ENTITY_CAMERA));
 
   return LUMINARY_SUCCESS;
 }
@@ -204,20 +252,7 @@ LuminaryResult luminary_host_set_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
-  memcpy(&host->scene_external->camera, camera, sizeof(Camera));
-
-  HostSetCameraArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, sizeof(HostSetCameraArgs), (void**) &args));
-
-  memcpy(&args->new_camera, camera, sizeof(Camera));
-
-  QueueEntry entry;
-
-  entry.name     = "Updating camera";
-  entry.function = (QueueEntryFunction) _host_set_camera;
-  entry.args     = args;
-
-  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+  _host_set_scene_entity(host, (void*) camera, sizeof(Camera), SCENE_ENTITY_CAMERA, "Updating camera");
 
   return LUMINARY_SUCCESS;
 }

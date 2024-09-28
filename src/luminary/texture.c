@@ -1,14 +1,14 @@
 #include "texture.h"
 
+#include <string.h>
+
 #include "internal_error.h"
 #include "utils.h"
 
 LuminaryResult texture_create(
   Texture** _tex, uint32_t width, uint32_t height, uint32_t depth, uint32_t pitch, void* data, TextureDataType type,
   uint32_t num_components, TextureStorageLocation storage) {
-  if (!_tex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(_tex);
 
   Texture* tex;
   __FAILURE_HANDLE(host_malloc(&tex, sizeof(Texture)));
@@ -37,13 +37,8 @@ LuminaryResult texture_create(
 }
 
 LuminaryResult texture_destroy(Texture** tex) {
-  if (!tex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture ptr is NULL.");
-  }
-
-  if (!(*tex)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(tex);
+  __CHECK_NULL_ARGUMENT(*tex);
 
   if ((*tex)->data) {
     __FAILURE_HANDLE(host_free(&(*tex)->data));

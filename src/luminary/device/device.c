@@ -178,5 +178,5 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 }
 
 LuminaryResult device_destroy(Device** device) {
-  return LUMINARY_ERROR_NOT_IMPLEMENTED;
+  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
 }

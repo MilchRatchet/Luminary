@@ -26,6 +26,8 @@ LuminaryResult wavefront_create(WavefrontContent** content) {
 
   __FAILURE_HANDLE(host_malloc(content, sizeof(WavefrontContent)));
 
+  (*content)->state = WAVEFRONT_CONTENT_STATE_READY_TO_READ;
+
   __FAILURE_HANDLE(array_create(&(*content)->vertices, sizeof(WavefrontVertex), 16));
   __FAILURE_HANDLE(array_create(&(*content)->normals, sizeof(WavefrontNormal), 16));
   __FAILURE_HANDLE(array_create(&(*content)->uvs, sizeof(WavefrontUV), 16));
@@ -573,6 +575,12 @@ LuminaryResult wavefront_read_file(WavefrontContent* content, Path* wavefront_fi
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(wavefront_file_path);
 
+  if (content->state != WAVEFRONT_CONTENT_STATE_READY_TO_READ) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Wavefront content was in an illegal state.");
+  }
+
+  content->state = WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT;
+
   const char* file_path_string;
   __FAILURE_HANDLE(path_apply(wavefront_file_path, (const char*) 0, &file_path_string));
 
@@ -743,12 +751,19 @@ static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
 }
 #endif
 
-static LuminaryResult _wavefront_convert_materials(const WavefrontContent* content, ARRAYPTR Material*** materials) {
+static LuminaryResult _wavefront_convert_materials(
+  WavefrontContent* content, ARRAYPTR Material*** materials, ARRAYPTR Texture*** textures) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(materials);
 
   uint32_t material_count;
   __FAILURE_HANDLE(array_get_num_elements(content->materials, &material_count));
+
+  uint32_t texture_offset;
+  __FAILURE_HANDLE(array_get_num_elements(*textures, &texture_offset));
+
+  uint32_t texture_count;
+  __FAILURE_HANDLE(array_get_num_elements(content->textures, &texture_count));
 
   // TODO: This is the old WavefrontMaterial -> PackedMaterial code. Port this to Material -> PackedMaterial and make a function out of
   // that.
@@ -781,6 +796,19 @@ static LuminaryResult _wavefront_convert_materials(const WavefrontContent* conte
   }
 #endif
 
+  for (uint32_t tex_id = 0; tex_id < texture_count; tex_id++) {
+    const WavefrontTextureInstance instance = content->textures[tex_id];
+    const Texture* tex                      = content->maps[instance.type][instance.offset];
+
+    __FAILURE_HANDLE(array_push(textures, &tex));
+  }
+
+  __FAILURE_HANDLE(array_resize(&content->textures, 0));
+  __FAILURE_HANDLE(array_resize(&content->maps[WF_ALBEDO], 0));
+  __FAILURE_HANDLE(array_resize(&content->maps[WF_LUMINANCE], 0));
+  __FAILURE_HANDLE(array_resize(&content->maps[WF_MATERIAL], 0));
+  __FAILURE_HANDLE(array_resize(&content->maps[WF_NORMAL], 0));
+
   for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];
 
@@ -795,10 +823,10 @@ static LuminaryResult _wavefront_convert_materials(const WavefrontContent* conte
     mat->refraction_index           = wavefront_mat.refraction_index;
     mat->metallic                   = wavefront_mat.specular_reflectivity.r;
     mat->roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
-    mat->albedo_tex                 = wavefront_mat.texture[WF_ALBEDO];
-    mat->luminance_tex              = wavefront_mat.texture[WF_LUMINANCE];
-    mat->material_tex               = wavefront_mat.texture[WF_MATERIAL];
-    mat->normal_tex                 = wavefront_mat.texture[WF_NORMAL];
+    mat->albedo_tex                 = texture_offset + wavefront_mat.texture[WF_ALBEDO];
+    mat->luminance_tex              = texture_offset + wavefront_mat.texture[WF_LUMINANCE];
+    mat->material_tex               = texture_offset + wavefront_mat.texture[WF_MATERIAL];
+    mat->normal_tex                 = texture_offset + wavefront_mat.texture[WF_NORMAL];
     mat->flags.emission_active      = true;
     mat->flags.ior_shadowing        = true;
     mat->flags.thin_walled          = false;
@@ -810,8 +838,15 @@ static LuminaryResult _wavefront_convert_materials(const WavefrontContent* conte
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Material*** materials) {
+LuminaryResult wavefront_convert_content(
+  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Material*** materials, ARRAYPTR Texture*** textures) {
   static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
+
+  if (content->state != WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Wavefront content was in an illegal state.");
+  }
+
+  content->state = WAVEFRONT_CONTENT_STATE_FINISHED;
 
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(meshes);
@@ -832,7 +867,7 @@ LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAYP
   uint32_t material_offset;
   __FAILURE_HANDLE(array_get_num_elements(*materials, &material_offset));
 
-  __FAILURE_HANDLE(_wavefront_convert_materials(content, materials));
+  __FAILURE_HANDLE(_wavefront_convert_materials(content, materials, textures));
 
   Mesh* mesh;
   __FAILURE_HANDLE(mesh_create(&mesh));
@@ -1038,7 +1073,7 @@ LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAYP
     triangle.edge2_normal.y = n.y - triangle.vertex_normal.y;
     triangle.edge2_normal.z = n.z - triangle.vertex_normal.z;
 
-    triangle.material_id = t.object;
+    triangle.material_id = material_offset + t.object;
     triangle.light_id    = LIGHT_ID_NONE;
 
     mesh->triangles[ptr++] = triangle;

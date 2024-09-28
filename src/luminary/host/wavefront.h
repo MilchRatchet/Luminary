@@ -57,7 +57,14 @@ struct WavefrontTextureInstance {
   uint16_t offset;
 } typedef WavefrontTextureInstance;
 
+enum WavefrontContentState {
+  WAVEFRONT_CONTENT_STATE_READY_TO_READ    = 0,
+  WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT = 1,
+  WAVEFRONT_CONTENT_STATE_FINISHED         = 2
+} typedef WavefrontContentState;
+
 struct WavefrontContent {
+  WavefrontContentState state;
   ARRAY WavefrontVertex* vertices;
   ARRAY WavefrontNormal* normals;
   ARRAY WavefrontUV* uvs;
@@ -68,8 +75,9 @@ struct WavefrontContent {
 } typedef WavefrontContent;
 
 LuminaryResult wavefront_create(WavefrontContent** content);
-LuminaryResult wavefront_read_file(WavefrontContent* _content, Path* file);
-LuminaryResult wavefront_convert_content(const WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Material*** materials);
+LuminaryResult wavefront_read_file(WavefrontContent* content, Path* file);
+LuminaryResult wavefront_convert_content(
+  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Material*** materials, ARRAYPTR Texture*** textures);
 LuminaryResult wavefront_destroy(WavefrontContent** content);
 
 #endif /* WAVEFRONT_H */
