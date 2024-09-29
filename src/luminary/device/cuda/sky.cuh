@@ -699,7 +699,7 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
     const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
     const uint32_t pixel   = get_pixel_id(task.index);
 
-    if (device.shading_mode == LUMINARY_SHADING_ALBEDO) {
+    if (device.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
       RGBF sky = sky_color_main(task.position, task.ray, pixel, task.index);
       write_beauty_buffer(sky, pixel, true);
     }
@@ -707,7 +707,7 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
       const float value = __saturatef((1.0f / device.scene.camera.far_clip_distance) * 2.0f);
       write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
-    else if (device.shading_mode == LUMINARY_SHADING_IDENTIFICATION) {
+    else if (device.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
       write_beauty_buffer(get_color(0.0f, 0.63f, 1.0f), pixel, true);
     }
   }

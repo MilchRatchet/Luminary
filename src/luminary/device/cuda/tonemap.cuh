@@ -172,7 +172,7 @@ __device__ RGBF tonemap_agx_custom(RGBF pixel) {
 }
 
 __device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
-  if (device.shading_mode != LUMINARY_SHADING_DEFAULT)
+  if (device.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
     return pixel;
 
   if (device.output_variable == OUTPUT_VARIABLE_ALBEDO_GUIDANCE || device.output_variable == OUTPUT_VARIABLE_NORMAL_GUIDANCE)

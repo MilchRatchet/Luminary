@@ -40,7 +40,7 @@ extern "C" __global__ void __raygen__optix() {
 
     float2 trace_result;
 
-    if (device.shading_mode == LUMINARY_SHADING_HEAT) {
+    if (device.shading_mode == LUMINARY_SHADING_MODE_HEAT) {
       trace_result = make_float2(0.0f, __uint_as_float(hit_id));
     }
     else {

@@ -72,7 +72,7 @@ extern "C" __global__ void __raygen__optix() {
         // Hit ID contains the triangle ID but we only store the actual particle / quad ID
         hit_id = HIT_TYPE_PARTICLE_MIN + (hit_id >> 1);
 
-        if (device.shading_mode == LUMINARY_SHADING_HEAT) {
+        if (device.shading_mode == LUMINARY_SHADING_MODE_HEAT) {
           trace_result = make_float2(cost, __uint_as_float(hit_id));
         }
         else {

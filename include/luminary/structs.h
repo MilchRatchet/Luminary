@@ -25,13 +25,13 @@
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_API enum LuminaryShadingMode {
-  LUMINARY_SHADING_DEFAULT        = 0,
-  LUMINARY_SHADING_ALBEDO         = 1,
-  LUMINARY_SHADING_DEPTH          = 2,
-  LUMINARY_SHADING_NORMAL         = 3,
-  LUMINARY_SHADING_HEAT           = 4,
-  LUMINARY_SHADING_IDENTIFICATION = 5,
-  LUMINARY_SHADING_LIGHTS         = 6
+  LUMINARY_SHADING_MODE_DEFAULT        = 0,
+  LUMINARY_SHADING_MODE_ALBEDO         = 1,
+  LUMINARY_SHADING_MODE_DEPTH          = 2,
+  LUMINARY_SHADING_MODE_NORMAL         = 3,
+  LUMINARY_SHADING_MODE_HEAT           = 4,
+  LUMINARY_SHADING_MODE_IDENTIFICATION = 5,
+  LUMINARY_SHADING_MODE_LIGHTS         = 6
 } typedef LuminaryShadingMode;
 
 LUMINARY_API struct LuminaryRendererSettings {
