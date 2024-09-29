@@ -11,6 +11,7 @@
 
 typedef LuminaryVec3 vec3;
 typedef LuminaryRGBF RGBF;
+typedef LuminaryRGBAF RGBAF;
 
 typedef LuminaryRendererSettings RendererSettings;
 typedef LuminaryShadingMode ShadingMode;

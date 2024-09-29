@@ -1,5 +1,6 @@
 #include "device_manager.h"
 
+#include "device_structs.h"
 #include "internal_error.h"
 #include "internal_host.h"
 #include "scene.h"
@@ -35,10 +36,11 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
 
-#define DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE (4096)
+#define DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE (1024)
 
 struct DeviceManagerHandleSceneUpdatesArgs {
-  void* work_buffer;
+  void* entity_buffer;
+  void* device_entity_buffer;
 } typedef DeviceManagerHandleSceneUpdatesArgs;
 
 static LuminaryResult _device_manager_handle_scene_updates_queue_work(
@@ -55,8 +57,8 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   uint64_t current_entity = SCENE_ENTITY_SETTINGS;
   while (flags && current_entity < SCENE_ENTITY_COUNT) {
     if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
-      __FAILURE_HANDLE(scene_get(device_manager->host->scene_internal, args->work_buffer, current_entity));
-      // TODO: Convert entity to device format
+      __FAILURE_HANDLE(scene_get(device_manager->host->scene_internal, args->entity_buffer, current_entity));
+      __FAILURE_HANDLE(device_struct_scene_entity_convert(args->entity_buffer, args->device_entity_buffer, current_entity));
       // TODO: Update entity on devices
     }
 
@@ -75,6 +77,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
 
   // Cleanup
   __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs)));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
   __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
 
   return LUMINARY_SUCCESS;
@@ -148,7 +151,9 @@ LuminaryResult device_manager_handle_scene_updates(DeviceManager* device_manager
   __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs), (void**) &args));
 
   __FAILURE_HANDLE(
-    ringbuffer_allocate_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE, &args->work_buffer));
+    ringbuffer_allocate_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE, &args->entity_buffer));
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(
+    device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE, &args->device_entity_buffer));
 
   QueueEntry entry;
 

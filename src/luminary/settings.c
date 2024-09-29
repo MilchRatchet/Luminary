@@ -5,20 +5,20 @@
 LuminaryResult settings_get_default(RendererSettings* settings) {
   __CHECK_NULL_ARGUMENT(settings);
 
-  settings->width                        = 1920;
-  settings->height                       = 1080;
-  settings->max_ray_depth                = 4;
-  settings->use_denoiser                 = false;
-  settings->bridge_max_num_vertices      = 1;
-  settings->bridge_num_ris_samples       = 8;
-  settings->light_initial_reservoir_size = 16;
-  settings->light_num_rays               = 1;
-  settings->use_opacity_micromaps        = false;
-  settings->use_displacement_micromaps   = false;
-  settings->enable_optix_validation      = false;
-  settings->use_luminary_bvh             = false;
-  settings->undersampling                = 3;
-  settings->shading_mode                 = LUMINARY_SHADING_MODE_DEFAULT;
+  settings->width                      = 1920;
+  settings->height                     = 1080;
+  settings->max_ray_depth              = 4;
+  settings->use_denoiser               = false;
+  settings->bridge_max_num_vertices    = 1;
+  settings->bridge_num_ris_samples     = 8;
+  settings->light_num_ris_samples      = 16;
+  settings->light_num_rays             = 1;
+  settings->use_opacity_micromaps      = false;
+  settings->use_displacement_micromaps = false;
+  settings->enable_optix_validation    = false;
+  settings->use_luminary_bvh           = false;
+  settings->undersampling              = 3;
+  settings->shading_mode               = LUMINARY_SHADING_MODE_DEFAULT;
 
   return LUMINARY_SUCCESS;
 }
@@ -43,7 +43,7 @@ LuminaryResult settings_check_for_dirty(const RendererSettings* new, const Rende
   __SETTINGS_DIRTY(use_denoiser);
   __SETTINGS_DIRTY(bridge_max_num_vertices);
   __SETTINGS_DIRTY(bridge_num_ris_samples);
-  __SETTINGS_DIRTY(light_initial_reservoir_size);
+  __SETTINGS_DIRTY(light_num_ris_samples);
   __SETTINGS_DIRTY(light_num_rays);
   __SETTINGS_DIRTY(use_opacity_micromaps);
   __SETTINGS_DIRTY(use_displacement_micromaps);

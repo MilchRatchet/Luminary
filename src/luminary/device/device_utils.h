@@ -5,6 +5,7 @@
 #include <optix.h>
 #include <optix_stubs.h>
 
+#include "device_structs.h"
 #include "utils.h"
 
 #define LUMINARY_MAX_NUM_DEVICES 4

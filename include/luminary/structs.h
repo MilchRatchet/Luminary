@@ -24,6 +24,7 @@
 // General
 ////////////////////////////////////////////////////////////////////
 
+// 3 bits reserved
 LUMINARY_API enum LuminaryShadingMode {
   LUMINARY_SHADING_MODE_DEFAULT        = 0,
   LUMINARY_SHADING_MODE_ALBEDO         = 1,
@@ -41,7 +42,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   LUMINARY_DEPRECATED bool use_denoiser;
   uint32_t bridge_max_num_vertices;
   uint32_t bridge_num_ris_samples;
-  uint32_t light_initial_reservoir_size;
+  uint32_t light_num_ris_samples;
   uint32_t light_num_rays;
   bool use_opacity_micromaps;
   bool use_displacement_micromaps;
@@ -55,6 +56,7 @@ LUMINARY_API struct LuminaryRendererSettings {
 // Camera
 ////////////////////////////////////////////////////////////////////
 
+// 3 bits reserved
 LUMINARY_API enum LuminaryFilter {
   LUMINARY_FILTER_NONE       = 0,
   LUMINARY_FILTER_GRAY       = 1,
@@ -65,6 +67,7 @@ LUMINARY_API enum LuminaryFilter {
   LUMINARY_FILTER_BLACKWHITE = 6
 } typedef LuminaryFilter;
 
+// 3 bits reserved
 LUMINARY_API enum LuminaryToneMap {
   LUMINARY_TONEMAP_NONE       = 0,
   LUMINARY_TONEMAP_ACES       = 1,
@@ -118,6 +121,7 @@ LUMINARY_API struct LuminaryCamera {
 // Ocean
 ////////////////////////////////////////////////////////////////////
 
+// 4 bits reserved
 LUMINARY_API enum LuminaryJerlovWaterType {
   LUMINARY_JERLOV_WATER_TYPE_I   = 0,
   LUMINARY_JERLOV_WATER_TYPE_IA  = 1,
@@ -150,6 +154,7 @@ LUMINARY_API struct LuminaryOcean {
 // Sky
 ////////////////////////////////////////////////////////////////////
 
+// 2 bits reserved
 enum LuminarySkyMode {
   LUMINARY_SKY_MODE_DEFAULT        = 0,
   LUMINARY_SKY_MODE_HDRI           = 1,
