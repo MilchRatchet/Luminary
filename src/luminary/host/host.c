@@ -233,7 +233,7 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
 
   __FAILURE_HANDLE(luminary_path_destroy(&lum_path));
 
-  // TODO: Rendersettings
+  __FAILURE_HANDLE(luminary_host_set_settings(host, &content->settings));
   __FAILURE_HANDLE(luminary_host_set_camera(host, &content->camera));
   __FAILURE_HANDLE(luminary_host_set_ocean(host, &content->ocean));
   __FAILURE_HANDLE(luminary_host_set_sky(host, &content->sky));
@@ -273,6 +273,24 @@ LuminaryResult luminary_host_get_queue_string(const Host* host, const char** str
 
 LuminaryResult luminary_host_get_max_sample_count(Host* host, uint32_t* max_sample_count);
 LuminaryResult luminary_host_set_max_sample_count(Host* host, uint32_t* max_sample_count);
+
+LuminaryResult luminary_host_get_settings(Host* host, RendererSettings* settings) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(settings);
+
+  __FAILURE_HANDLE(scene_get(host->scene_external, settings, SCENE_ENTITY_SETTINGS));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_set_settings(Host* host, RendererSettings* settings) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(settings);
+
+  _host_set_scene_entity(host, (void*) settings, sizeof(RendererSettings), SCENE_ENTITY_SETTINGS, "Updating settings");
+
+  return LUMINARY_SUCCESS;
+}
 
 LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);

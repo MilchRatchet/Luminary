@@ -8,6 +8,7 @@
 #include "internal_error.h"
 #include "ocean.h"
 #include "particles.h"
+#include "settings.h"
 #include "sky.h"
 #include "toy.h"
 
@@ -74,8 +75,12 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   bool output_dirty      = false;
   bool integration_dirty = false;
 
-  // TODO: Dirty checks
   switch (entity) {
+    case SCENE_ENTITY_SETTINGS:
+      __FAILURE_HANDLE(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &integration_dirty));
+      scene->flags |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_SETTINGS : 0;
+      memcpy(&scene->settings, object, sizeof(RendererSettings));
+      break;
     case SCENE_ENTITY_CAMERA:
       __FAILURE_HANDLE(camera_check_for_dirty((Camera*) object, &scene->camera, &output_dirty, &integration_dirty));
       scene->flags |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_CAMERA : 0;
@@ -128,6 +133,9 @@ LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(object);
 
   switch (entity) {
+    case SCENE_ENTITY_SETTINGS:
+      memcpy(object, &scene->settings, sizeof(RendererSettings));
+      break;
     case SCENE_ENTITY_CAMERA:
       memcpy(object, &scene->camera, sizeof(Camera));
       break;
