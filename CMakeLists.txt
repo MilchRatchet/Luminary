@@ -11,6 +11,7 @@ set(CMAKE_C_STANDARD 11)
 option(DEBUG "Debug Mode" OFF)
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
 option(SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)
+option(LUMINARY_BUILD_SHARED "Build Luminary as a shared library" OFF)
 
 set(CMAKE_BUILD_TYPE "Release")
 

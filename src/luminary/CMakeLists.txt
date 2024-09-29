@@ -30,13 +30,13 @@ add_library(Luminary::Headers ALIAS LuminaryHeaders)
 set_target_properties(LuminaryHeaders PROPERTIES EXPORT_NAME "Headers")
 target_include_directories(LuminaryHeaders INTERFACE "${CMAKE_SOURCE_DIR}/include")
 
-add_library(LuminaryShared SHARED)
-add_library(Luminary::Shared ALIAS LuminaryShared)
-set_target_properties(LuminaryShared PROPERTIES EXPORT_NAME "luminary" POSITION_INDEPENDENT_CODE TRUE)
-
-add_library(LuminaryStatic STATIC)
-add_library(Luminary::Static ALIAS LuminaryStatic)
-set_target_properties(LuminaryStatic PROPERTIES EXPORT_NAME "luminary" POSITION_INDEPENDENT_CODE TRUE)
+if(LUMINARY_BUILD_SHARED)
+  add_library(Luminary SHARED)
+else()
+  add_library(Luminary STATIC)
+endif()
+add_library(Luminary::Shared ALIAS Luminary)
+set_target_properties(Luminary PROPERTIES EXPORT_NAME "luminary" POSITION_INDEPENDENT_CODE TRUE)
 
 #=============================================================
 # Add Ceb
@@ -77,8 +77,7 @@ function(compile_ptx kernel_name)
       "Target for compiled OptiX kernel."
   )
 
-  add_dependencies(LuminaryShared ${kernel_name})
-  add_dependencies(LuminaryStatic ${kernel_name})
+  add_dependencies(Luminary ${kernel_name})
 endfunction()
 
 compile_ptx(optix_kernels)
@@ -116,31 +115,21 @@ ceb_embed_files(
 # Sources
 #=============================================================
 
-target_sources(LuminaryShared PRIVATE ${luminary_cpu_source_files} ${luminary_gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
-target_sources(LuminaryStatic PRIVATE ${luminary_cpu_source_files} ${luminary_gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
+target_sources(Luminary PRIVATE ${luminary_cpu_source_files} ${luminary_gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
 
 #=============================================================
 # Include
 #=============================================================
 
-target_include_directories(LuminaryShared PRIVATE "${OptiX_INCLUDE}")
-target_include_directories(LuminaryShared PRIVATE CUDA::toolkit)
-target_include_directories(LuminaryShared PRIVATE Luminary::Headers)
-target_include_directories(LuminaryShared PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_include_directories(LuminaryShared PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda")
-
-target_include_directories(LuminaryStatic PRIVATE "${OptiX_INCLUDE}")
-target_include_directories(LuminaryStatic PRIVATE CUDA::toolkit)
-target_include_directories(LuminaryStatic PRIVATE Luminary::Headers)
-target_include_directories(LuminaryStatic PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_include_directories(LuminaryStatic PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda")
+target_include_directories(Luminary PRIVATE "${OptiX_INCLUDE}")
+target_include_directories(Luminary PRIVATE CUDA::toolkit)
+target_include_directories(Luminary PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(Luminary PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda")
 
 #=============================================================
 # Linking
 #=============================================================
 
-target_link_libraries(LuminaryShared PRIVATE CUDA::cudart)
-target_link_libraries(LuminaryShared PRIVATE CUDA::cuda_driver)
-
-target_link_libraries(LuminaryStatic PRIVATE CUDA::cudart)
-target_link_libraries(LuminaryStatic PRIVATE CUDA::cuda_driver)
+target_link_libraries(Luminary PRIVATE CUDA::cudart)
+target_link_libraries(Luminary PRIVATE CUDA::cuda_driver)
+target_link_libraries(Luminary PUBLIC $<TARGET_NAME:Luminary::Headers>)
