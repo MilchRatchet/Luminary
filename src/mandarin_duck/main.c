@@ -1,3 +1,4 @@
+#include "instance.h"
 #include "utils.h"
 
 int main(int argc, char* argv[]) {
@@ -32,6 +33,11 @@ int main(int argc, char* argv[]) {
   camera.exposure *= 2.0f;
 
   LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
+
+  Instance* instance;
+  instance_create(&instance, host);
+  instance_run(instance);
+  instance_destroy(&instance);
 
   LUM_FAILURE_HANDLE(luminary_host_destroy(&host));
 

@@ -13,4 +13,9 @@
     }                                                                                         \
   }
 
+#define MD_CHECK_NULL_ARGUMENT(arg)     \
+  if (!(arg)) {                         \
+    crash_message("%s is NULL.", #arg); \
+  }
+
 #endif /* MANDARIN_DUCK_UTILS_H */

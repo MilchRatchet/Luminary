@@ -278,7 +278,7 @@ LuminaryResult luminary_host_get_settings(Host* host, RendererSettings* settings
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(settings);
 
-  __FAILURE_HANDLE(scene_get(host->scene_external, settings, SCENE_ENTITY_SETTINGS));
+  __FAILURE_HANDLE(scene_get_locking(host->scene_external, settings, SCENE_ENTITY_SETTINGS));
 
   return LUMINARY_SUCCESS;
 }
@@ -296,7 +296,7 @@ LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
-  __FAILURE_HANDLE(scene_get(host->scene_external, camera, SCENE_ENTITY_CAMERA));
+  __FAILURE_HANDLE(scene_get_locking(host->scene_external, camera, SCENE_ENTITY_CAMERA));
 
   return LUMINARY_SUCCESS;
 }
@@ -314,7 +314,7 @@ LuminaryResult luminary_host_get_ocean(Host* host, Ocean* ocean) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(ocean);
 
-  __FAILURE_HANDLE(scene_get(host->scene_external, ocean, SCENE_ENTITY_OCEAN));
+  __FAILURE_HANDLE(scene_get_locking(host->scene_external, ocean, SCENE_ENTITY_OCEAN));
 
   return LUMINARY_SUCCESS;
 }
@@ -332,7 +332,7 @@ LuminaryResult luminary_host_get_sky(Host* host, Sky* sky) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(sky);
 
-  __FAILURE_HANDLE(scene_get(host->scene_external, sky, SCENE_ENTITY_SKY));
+  __FAILURE_HANDLE(scene_get_locking(host->scene_external, sky, SCENE_ENTITY_SKY));
 
   return LUMINARY_SUCCESS;
 }
@@ -350,7 +350,7 @@ LuminaryResult luminary_host_get_cloud(Host* host, Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(cloud);
 
-  __FAILURE_HANDLE(scene_get(host->scene_external, cloud, SCENE_ENTITY_CLOUD));
+  __FAILURE_HANDLE(scene_get_locking(host->scene_external, cloud, SCENE_ENTITY_CLOUD));
 
   return LUMINARY_SUCCESS;
 }
@@ -368,7 +368,7 @@ LuminaryResult luminary_host_get_fog(Host* host, Fog* fog) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(fog);
 
-  __FAILURE_HANDLE(scene_get(host->scene_external, fog, SCENE_ENTITY_FOG));
+  __FAILURE_HANDLE(scene_get_locking(host->scene_external, fog, SCENE_ENTITY_FOG));
 
   return LUMINARY_SUCCESS;
 }
@@ -386,7 +386,7 @@ LuminaryResult luminary_host_get_particles(Host* host, Particles* particles) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(particles);
 
-  __FAILURE_HANDLE(scene_get(host->scene_external, particles, SCENE_ENTITY_PARTICLES));
+  __FAILURE_HANDLE(scene_get_locking(host->scene_external, particles, SCENE_ENTITY_PARTICLES));
 
   return LUMINARY_SUCCESS;
 }
@@ -404,7 +404,7 @@ LuminaryResult luminary_host_get_toy(Host* host, Toy* toy) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(toy);
 
-  __FAILURE_HANDLE(scene_get(host->scene_external, toy, SCENE_ENTITY_TOY));
+  __FAILURE_HANDLE(scene_get_locking(host->scene_external, toy, SCENE_ENTITY_TOY));
 
   return LUMINARY_SUCCESS;
 }

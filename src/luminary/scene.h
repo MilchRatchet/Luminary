@@ -71,6 +71,7 @@ LuminaryResult scene_create(Scene** scene);
 LuminaryResult scene_lock(Scene* scene);
 LuminaryResult scene_get_dirty_flags(const Scene* scene, SceneDirtyFlags* flags);
 LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity);
+LuminaryResult scene_get_locking(Scene* scene, void* object, SceneEntity entity);
 LuminaryResult scene_unlock(Scene* scene);
 LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_destroy(Scene** scene);

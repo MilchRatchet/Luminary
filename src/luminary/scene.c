@@ -21,6 +21,7 @@ LuminaryResult scene_create(Scene** _scene) {
   __FAILURE_HANDLE(mutex_create(&scene->mutex));
 
   __FAILURE_HANDLE(sample_count_get_default(&scene->sample_count));
+  __FAILURE_HANDLE(settings_get_default(&scene->settings));
   __FAILURE_HANDLE(camera_get_default(&scene->camera));
   __FAILURE_HANDLE(ocean_get_default(&scene->ocean));
   __FAILURE_HANDLE(sky_get_default(&scene->sky));
@@ -161,6 +162,17 @@ LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity) {
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_get yet.");
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_get_locking(Scene* scene, void* object, SceneEntity entity) {
+  __CHECK_NULL_ARGUMENT(scene);
+  __CHECK_NULL_ARGUMENT(object);
+
+  __FAILURE_HANDLE(scene_lock(scene));
+  __FAILURE_HANDLE(scene_get(scene, object, entity));
+  __FAILURE_HANDLE(scene_unlock(scene));
 
   return LUMINARY_SUCCESS;
 }
