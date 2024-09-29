@@ -25,6 +25,7 @@ struct DeviceProperties {
 struct Device {
   uint32_t index;
   DeviceProperties properties;
+  uint32_t accumulated_sample_count;
   bool exit_requested;
   bool optix_callback_error;
 } typedef Device;

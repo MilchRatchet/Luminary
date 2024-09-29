@@ -62,7 +62,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   // Clean up
   __FAILURE_HANDLE(luminary_path_destroy(&args->path));
-  __FAILURE_HANDLE(ringbuffer_release_entry(host->ring_buffer, sizeof(HostLoadObjArgs)));
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostLoadObjArgs)));
 
   return LUMINARY_SUCCESS;
 }
@@ -79,8 +79,8 @@ static LuminaryResult _host_set_scene_entity_queue_work(Host* host, HostSetScene
 
   __FAILURE_HANDLE(scene_update(host->scene_internal, args->object, args->entity))
 
-  __FAILURE_HANDLE(ringbuffer_release_entry(host->ring_buffer, args->size_of_object));
-  __FAILURE_HANDLE(ringbuffer_release_entry(host->ring_buffer, sizeof(HostSetSceneEntityArgs)));
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, args->size_of_object));
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostSetSceneEntityArgs)));
 
   return LUMINARY_SUCCESS;
 }
@@ -96,12 +96,12 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, size_t si
   __FAILURE_HANDLE(scene_update(host->scene_internal, object, entity));
 
   HostSetSceneEntityArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, sizeof(HostSetSceneEntityArgs), (void**) &args));
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostSetSceneEntityArgs), (void**) &args));
 
   args->size_of_object = size_of_object;
   args->entity         = entity;
 
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, args->size_of_object, (void**) &args->object));
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, args->size_of_object, (void**) &args->object));
   memcpy(args->object, object, args->size_of_object);
 
   QueueEntry entry;
@@ -129,7 +129,7 @@ LuminaryResult luminary_host_create(Host** _host) {
 
   __FAILURE_HANDLE(thread_create(&host->work_thread));
   __FAILURE_HANDLE(queue_create(&host->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
-  __FAILURE_HANDLE(ringbuffer_create(&host->ring_buffer, HOST_RINGBUFFER_SIZE));
+  __FAILURE_HANDLE(ringbuffer_create(&host->ringbuffer, HOST_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
 
   __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
@@ -159,7 +159,7 @@ LuminaryResult luminary_host_destroy(Host** host) {
   __FAILURE_HANDLE(thread_get_last_result((*host)->work_thread));
 
   __FAILURE_HANDLE(wall_time_destroy(&(*host)->queue_wall_time));
-  __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ring_buffer));
+  __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*host)->work_queue));
 
   __FAILURE_HANDLE(thread_destroy(&(*host)->work_thread));
@@ -204,7 +204,7 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   __CHECK_NULL_ARGUMENT(path);
 
   HostLoadObjArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ring_buffer, sizeof(HostLoadObjArgs), (void**) &args));
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
 
   __FAILURE_HANDLE(path_copy(&args->path, path));
 

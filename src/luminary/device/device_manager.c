@@ -1,6 +1,8 @@
 #include "device_manager.h"
 
 #include "internal_error.h"
+#include "internal_host.h"
+#include "scene.h"
 
 #define DEVICE_MANAGER_RINGBUFFER_SIZE (0x10000ull)
 #define DEVICE_MANAGER_QUEUE_SIZE (0x100ull)
@@ -27,6 +29,55 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
     __FAILURE_HANDLE(wall_time_stop(device_manager->queue_wall_time));
     __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, (const char*) 0));
   }
+}
+
+////////////////////////////////////////////////////////////////////
+// Queue work functions
+////////////////////////////////////////////////////////////////////
+
+#define DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE (4096)
+
+struct DeviceManagerHandleSceneUpdatesArgs {
+  void* work_buffer;
+} typedef DeviceManagerHandleSceneUpdatesArgs;
+
+static LuminaryResult _device_manager_handle_scene_updates_queue_work(
+  DeviceManager* device_manager, DeviceManagerHandleSceneUpdatesArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(scene_lock(device_manager->host->scene_internal));
+
+  SceneDirtyFlags flags;
+  __FAILURE_HANDLE(scene_get_dirty_flags(device_manager->host->scene_internal, &flags));
+
+  // SCENE_ENTITY_SAMPLE_COUNT is handled differently
+  uint64_t current_entity = SCENE_ENTITY_SETTINGS;
+  while (flags && current_entity < SCENE_ENTITY_COUNT) {
+    if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
+      __FAILURE_HANDLE(scene_get(device_manager->host->scene_internal, args->work_buffer, current_entity));
+      // TODO: Convert entity to device format
+      // TODO: Update entity on devices
+    }
+
+    current_entity = current_entity << 1;
+  }
+
+  if (flags & SCENE_DIRTY_FLAG_OUTPUT) {
+    // TODO: Signal main device to output current image again.
+  }
+
+  if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
+    // TODO: Signal all devices to restart integration
+  }
+
+  __FAILURE_HANDLE(scene_unlock(device_manager->host->scene_internal));
+
+  // Cleanup
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs)));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
+
+  return LUMINARY_SUCCESS;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -86,6 +137,26 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(array_destroy(&(*device_manager)->devices));
 
   __FAILURE_HANDLE(host_free(device_manager));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_handle_scene_updates(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  DeviceManagerHandleSceneUpdatesArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs), (void**) &args));
+
+  __FAILURE_HANDLE(
+    ringbuffer_allocate_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE, &args->work_buffer));
+
+  QueueEntry entry;
+
+  entry.name     = "Device handle scene updates";
+  entry.function = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
+  entry.args     = args;
+
+  __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
 
   return LUMINARY_SUCCESS;
 }

@@ -33,8 +33,7 @@ LuminaryResult scene_create(Scene** _scene) {
   __FAILURE_HANDLE(array_create(&scene->instances, sizeof(Instance), 16));
   __FAILURE_HANDLE(array_create(&scene->instance_updates, sizeof(InstanceUpdate), 16));
 
-  // TODO: Maybe set all flags so that device manager can naturally update devices based on flags
-  scene->flags = 0;
+  scene->flags = 0xFFFFFFFFFFFFFFFFu;
 
   *_scene = scene;
 

@@ -162,9 +162,10 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   Device* device;
   __FAILURE_HANDLE(host_malloc(&device, sizeof(Device)));
 
-  device->index                = index;
-  device->optix_callback_error = false;
-  device->exit_requested       = false;
+  device->index                    = index;
+  device->optix_callback_error     = false;
+  device->exit_requested           = false;
+  device->accumulated_sample_count = 0;
 
   CUDA_FAILURE_HANDLE(cudaInitDevice(device->index, cudaDeviceScheduleAuto, cudaInitDeviceFlagsAreValid));
 

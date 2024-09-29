@@ -12,7 +12,7 @@
 struct LuminaryHost {
   DeviceManager* device_manager;
   Queue* work_queue;
-  RingBuffer* ring_buffer;
+  RingBuffer* ringbuffer;
   WallTime* queue_wall_time;
   Thread* work_thread;
   ARRAY Mesh** meshes;
