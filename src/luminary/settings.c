@@ -23,36 +23,47 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   return LUMINARY_SUCCESS;
 }
 
-#define __SETTINGS_DIRTY(var)   \
-  {                             \
-    if (new->var != old->var) { \
-      *dirty = true;            \
-      return LUMINARY_SUCCESS;  \
-    }                           \
+#define __SETTINGS_STANDARD_DIRTY(var) \
+  {                                    \
+    if (new->var != old->var) {        \
+      *integration_dirty = true;       \
+      *buffers_dirty     = true;       \
+      return LUMINARY_SUCCESS;         \
+    }                                  \
   }
 
-LuminaryResult settings_check_for_dirty(const RendererSettings* new, const RendererSettings* old, bool* dirty) {
+#define __SETTINGS_INTEGRATION_DIRTY(var) \
+  {                                       \
+    if (new->var != old->var) {           \
+      *integration_dirty = true;          \
+    }                                     \
+  }
+
+LuminaryResult settings_check_for_dirty(
+  const RendererSettings* new, const RendererSettings* old, bool* integration_dirty, bool* buffers_dirty) {
   __CHECK_NULL_ARGUMENT(new);
   __CHECK_NULL_ARGUMENT(old);
-  __CHECK_NULL_ARGUMENT(dirty);
+  __CHECK_NULL_ARGUMENT(integration_dirty);
+  __CHECK_NULL_ARGUMENT(buffers_dirty);
 
-  *dirty = false;
+  *integration_dirty = false;
+  *buffers_dirty     = false;
 
-  __SETTINGS_DIRTY(width);
-  __SETTINGS_DIRTY(height);
-  __SETTINGS_DIRTY(use_denoiser);
-  __SETTINGS_DIRTY(bridge_max_num_vertices);
-  __SETTINGS_DIRTY(bridge_num_ris_samples);
-  __SETTINGS_DIRTY(light_num_ris_samples);
-  __SETTINGS_DIRTY(light_num_rays);
-  __SETTINGS_DIRTY(use_opacity_micromaps);
-  __SETTINGS_DIRTY(use_displacement_micromaps);
-  __SETTINGS_DIRTY(enable_optix_validation);
-  __SETTINGS_DIRTY(use_luminary_bvh);
-  __SETTINGS_DIRTY(undersampling);
+  __SETTINGS_STANDARD_DIRTY(width);
+  __SETTINGS_STANDARD_DIRTY(height);
+  __SETTINGS_STANDARD_DIRTY(use_denoiser);
+  __SETTINGS_INTEGRATION_DIRTY(bridge_max_num_vertices);
+  __SETTINGS_INTEGRATION_DIRTY(bridge_num_ris_samples);
+  __SETTINGS_INTEGRATION_DIRTY(light_num_ris_samples);
+  __SETTINGS_INTEGRATION_DIRTY(light_num_rays);
+  __SETTINGS_INTEGRATION_DIRTY(use_opacity_micromaps);
+  __SETTINGS_INTEGRATION_DIRTY(use_displacement_micromaps);
+  __SETTINGS_INTEGRATION_DIRTY(enable_optix_validation);
+  __SETTINGS_INTEGRATION_DIRTY(use_luminary_bvh);
+  __SETTINGS_INTEGRATION_DIRTY(undersampling);
 
   if (new->shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
-    __SETTINGS_DIRTY(max_ray_depth);
+    __SETTINGS_INTEGRATION_DIRTY(max_ray_depth);
   }
 
   return LUMINARY_SUCCESS;

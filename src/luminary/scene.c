@@ -73,11 +73,12 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
 
   bool output_dirty      = false;
   bool integration_dirty = false;
+  bool buffers_dirty     = false;
 
   switch (entity) {
     case SCENE_ENTITY_SETTINGS:
-      __FAILURE_HANDLE(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &integration_dirty));
-      scene->flags |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_SETTINGS : 0;
+      __FAILURE_HANDLE(settings_check_for_dirty((RendererSettings*) object, &scene->settings, &integration_dirty, &buffers_dirty));
+      scene->flags |= (integration_dirty || buffers_dirty) ? SCENE_DIRTY_FLAG_SETTINGS : 0;
       memcpy(&scene->settings, object, sizeof(RendererSettings));
       break;
     case SCENE_ENTITY_CAMERA:
@@ -121,6 +122,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
 
   scene->flags |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_OUTPUT : 0;
   scene->flags |= (integration_dirty) ? SCENE_DIRTY_FLAG_INTEGRATION : 0;
+  scene->flags |= (buffers_dirty) ? SCENE_DIRTY_FLAG_BUFFERS : 0;
 
   __FAILURE_HANDLE(mutex_unlock(scene->mutex));
 

@@ -73,6 +73,10 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     // TODO: Signal all devices to restart integration
   }
 
+  if (flags & SCENE_DIRTY_FLAG_BUFFERS) {
+    // TODO: Reallocate buffers on all devices
+  }
+
   __FAILURE_HANDLE(scene_unlock(device_manager->host->scene_internal));
 
   // Cleanup
