@@ -21,3 +21,38 @@ LuminaryResult particles_get_default(Particles* particles) {
 
   return LUMINARY_SUCCESS;
 }
+
+#define __PARTICLES_DIRTY(var)  \
+  {                             \
+    if (new->var != old->var) { \
+      *dirty = true;            \
+      return LUMINARY_SUCCESS;  \
+    }                           \
+  }
+
+LuminaryResult particles_check_for_dirty(const Particles* new, const Particles* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(new);
+  __CHECK_NULL_ARGUMENT(old);
+  __CHECK_NULL_ARGUMENT(dirty);
+
+  *dirty = false;
+
+  __PARTICLES_DIRTY(active);
+
+  if (new->active) {
+    __PARTICLES_DIRTY(scale);
+    __PARTICLES_DIRTY(albedo.r);
+    __PARTICLES_DIRTY(albedo.g);
+    __PARTICLES_DIRTY(albedo.b);
+    __PARTICLES_DIRTY(direction_altitude);
+    __PARTICLES_DIRTY(direction_azimuth);
+    __PARTICLES_DIRTY(speed);
+    __PARTICLES_DIRTY(phase_diameter);
+    __PARTICLES_DIRTY(seed);
+    __PARTICLES_DIRTY(count);
+    __PARTICLES_DIRTY(size);
+    __PARTICLES_DIRTY(size_variation);
+  }
+
+  return LUMINARY_SUCCESS;
+}

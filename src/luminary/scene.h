@@ -24,6 +24,8 @@ enum SceneEntity {
 #define SCENE_ENTITY_TO_DIRTY(ENTITY) (1u << ENTITY)
 
 enum SceneDirtyFlag {
+  SCENE_DIRTY_FLAG_OUTPUT       = 0x8000000000000000,
+  SCENE_DIRTY_FLAG_INTEGRATION  = 0x4000000000000000,
   SCENE_DIRTY_FLAG_SAMPLE_COUNT = SCENE_ENTITY_TO_DIRTY(SCENE_ENTITY_SAMPLE_COUNT),
   SCENE_DIRTY_FLAG_SETTINGS     = SCENE_ENTITY_TO_DIRTY(SCENE_ENTITY_SETTINGS),
   SCENE_DIRTY_FLAG_CAMERA       = SCENE_ENTITY_TO_DIRTY(SCENE_ENTITY_CAMERA),
@@ -47,6 +49,7 @@ typedef uint64_t SceneDirtyFlags;
  * Instances can be transformed and are hence present here.
  */
 struct Scene {
+  SceneDirtyFlags flags;
   Mutex* mutex;
   SampleCountSlice sample_count;
   RendererSettings settings;
@@ -63,8 +66,11 @@ struct Scene {
 } typedef Scene;
 
 LuminaryResult scene_create(Scene** scene);
-LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity);
+LuminaryResult scene_lock(Scene* scene);
+LuminaryResult scene_get_dirty_flags(const Scene* scene, SceneDirtyFlags* flags);
 LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity);
+LuminaryResult scene_unlock(Scene* scene);
+LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_destroy(Scene** scene);
 
 #endif /* LUMINARY_SCENE_H */

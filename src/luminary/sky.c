@@ -47,3 +47,68 @@ LuminaryResult sky_get_default(Sky* sky) {
 
   return LUMINARY_SUCCESS;
 }
+
+#define __SKY_DIRTY(var)        \
+  {                             \
+    if (new->var != old->var) { \
+      *dirty = true;            \
+      return LUMINARY_SUCCESS;  \
+    }                           \
+  }
+
+LuminaryResult sky_check_for_dirty(const Sky* new, const Sky* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(new);
+  __CHECK_NULL_ARGUMENT(old);
+  __CHECK_NULL_ARGUMENT(dirty);
+
+  *dirty = false;
+
+  __SKY_DIRTY(mode);
+
+  __SKY_DIRTY(ambient_sampling);
+
+  switch (new->mode) {
+    case LUMINARY_SKY_MODE_DEFAULT:
+      __SKY_DIRTY(geometry_offset.x);
+      __SKY_DIRTY(geometry_offset.y);
+      __SKY_DIRTY(geometry_offset.z);
+      __SKY_DIRTY(altitude);
+      __SKY_DIRTY(azimuth);
+      __SKY_DIRTY(moon_altitude);
+      __SKY_DIRTY(moon_azimuth);
+      __SKY_DIRTY(moon_tex_offset);
+      __SKY_DIRTY(sun_strength);
+      __SKY_DIRTY(base_density);
+      __SKY_DIRTY(ozone_absorption);
+      __SKY_DIRTY(steps);
+      __SKY_DIRTY(stars_intensity);
+      __SKY_DIRTY(rayleigh_density);
+      __SKY_DIRTY(mie_density);
+      __SKY_DIRTY(ozone_density);
+      __SKY_DIRTY(rayleigh_falloff);
+      __SKY_DIRTY(mie_falloff);
+      __SKY_DIRTY(mie_diameter);
+      __SKY_DIRTY(ground_visibility);
+      __SKY_DIRTY(ozone_layer_thickness);
+      __SKY_DIRTY(multiscattering_factor);
+      __SKY_DIRTY(rayleigh_density);
+      __SKY_DIRTY(aerial_perspective);
+      break;
+    case LUMINARY_SKY_MODE_HDRI:
+      __SKY_DIRTY(altitude);
+      __SKY_DIRTY(azimuth);
+      __SKY_DIRTY(sun_strength);
+      __SKY_DIRTY(hdri_mip_bias);
+      __SKY_DIRTY(aerial_perspective);
+      break;
+    case LUMINARY_SKY_MODE_CONSTANT_COLOR:
+      __SKY_DIRTY(constant_color.r);
+      __SKY_DIRTY(constant_color.g);
+      __SKY_DIRTY(constant_color.b);
+      break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Invalid sky mode.");
+  }
+
+  return LUMINARY_SUCCESS;
+}

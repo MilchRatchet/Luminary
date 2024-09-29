@@ -36,7 +36,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->mouse_speed                = 1.0f;
   camera->smooth_movement            = 0;
   camera->smoothing_factor           = 0.1f;
-  camera->temporal_blend_factor      = 0.15f;
   camera->purkinje                   = 1;
   camera->purkinje_kappa1            = 0.2f;
   camera->purkinje_kappa2            = 0.29f;
@@ -51,10 +50,77 @@ LuminaryResult camera_get_default(Camera* camera) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult camera_check_for_dirty(const Camera* a, const Camera* b, bool* is_dirty) {
-  LUM_UNUSED(a);
-  LUM_UNUSED(b);
-  LUM_UNUSED(is_dirty);
+#define __CAMERA_STANDARD_DIRTY(var) \
+  {                                  \
+    if (new->var != old->var) {      \
+      *output_dirty      = true;     \
+      *integration_dirty = true;     \
+      return LUMINARY_SUCCESS;       \
+    }                                \
+  }
 
-  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+#define __CAMERA_OUTPUT_DIRTY(var) \
+  {                                \
+    if (new->var != old->var) {    \
+      *output_dirty = true;        \
+    }                              \
+  }
+
+LuminaryResult camera_check_for_dirty(const Camera* new, const Camera* old, bool* output_dirty, bool* integration_dirty) {
+  __CHECK_NULL_ARGUMENT(new);
+  __CHECK_NULL_ARGUMENT(old);
+  __CHECK_NULL_ARGUMENT(output_dirty);
+  __CHECK_NULL_ARGUMENT(integration_dirty);
+
+  *output_dirty      = false;
+  *integration_dirty = false;
+
+  __CAMERA_STANDARD_DIRTY(pos.x);
+  __CAMERA_STANDARD_DIRTY(pos.y);
+  __CAMERA_STANDARD_DIRTY(pos.z);
+  __CAMERA_STANDARD_DIRTY(rotation.x);
+  __CAMERA_STANDARD_DIRTY(rotation.y);
+  __CAMERA_STANDARD_DIRTY(rotation.z);
+  __CAMERA_STANDARD_DIRTY(fov);
+  __CAMERA_STANDARD_DIRTY(aperture_size);
+  __CAMERA_STANDARD_DIRTY(far_clip_distance);
+  __CAMERA_STANDARD_DIRTY(russian_roulette_threshold);
+  __CAMERA_STANDARD_DIRTY(do_firefly_clamping);
+
+  if (new->aperture_size > 0.0f) {
+    __CAMERA_STANDARD_DIRTY(focal_length);
+    __CAMERA_STANDARD_DIRTY(aperture_shape);
+
+    if (new->aperture_shape != LUMINARY_APERTURE_ROUND) {
+      __CAMERA_STANDARD_DIRTY(aperture_blade_count);
+    }
+  }
+
+  __CAMERA_OUTPUT_DIRTY(exposure);
+  __CAMERA_OUTPUT_DIRTY(bloom);
+  __CAMERA_OUTPUT_DIRTY(bloom_blend);
+  __CAMERA_OUTPUT_DIRTY(lens_flare);
+  __CAMERA_OUTPUT_DIRTY(lens_flare_threshold);
+  __CAMERA_OUTPUT_DIRTY(dithering);
+  __CAMERA_OUTPUT_DIRTY(tonemap);
+  __CAMERA_OUTPUT_DIRTY(filter);
+  __CAMERA_OUTPUT_DIRTY(purkinje);
+  __CAMERA_OUTPUT_DIRTY(purkinje_kappa1);
+  __CAMERA_OUTPUT_DIRTY(purkinje_kappa2);
+  __CAMERA_OUTPUT_DIRTY(use_color_correction);
+  __CAMERA_OUTPUT_DIRTY(film_grain);
+
+  if (new->tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {
+    __CAMERA_OUTPUT_DIRTY(agx_custom_slope);
+    __CAMERA_OUTPUT_DIRTY(agx_custom_power);
+    __CAMERA_OUTPUT_DIRTY(agx_custom_saturation);
+  }
+
+  if (new->use_color_correction) {
+    __CAMERA_OUTPUT_DIRTY(color_correction.r);
+    __CAMERA_OUTPUT_DIRTY(color_correction.g);
+    __CAMERA_OUTPUT_DIRTY(color_correction.b);
+  }
+
+  return LUMINARY_SUCCESS;
 }

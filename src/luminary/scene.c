@@ -32,7 +32,35 @@ LuminaryResult scene_create(Scene** _scene) {
   __FAILURE_HANDLE(array_create(&scene->instances, sizeof(Instance), 16));
   __FAILURE_HANDLE(array_create(&scene->instance_updates, sizeof(InstanceUpdate), 16));
 
+  // TODO: Maybe set all flags so that device manager can naturally update devices based on flags
+  scene->flags = 0;
+
   *_scene = scene;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_lock(Scene* scene) {
+  __CHECK_NULL_ARGUMENT(scene);
+
+  __FAILURE_HANDLE(mutex_lock(scene->mutex));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_get_dirty_flags(const Scene* scene, SceneDirtyFlags* flags) {
+  __CHECK_NULL_ARGUMENT(scene);
+  __CHECK_NULL_ARGUMENT(flags);
+
+  *flags = scene->flags;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_unlock(Scene* scene) {
+  __CHECK_NULL_ARGUMENT(scene);
+
+  __FAILURE_HANDLE(mutex_unlock(scene->mutex));
 
   return LUMINARY_SUCCESS;
 }
@@ -43,32 +71,52 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
 
   __FAILURE_HANDLE(mutex_lock(scene->mutex));
 
+  bool output_dirty      = false;
+  bool integration_dirty = false;
+
   // TODO: Dirty checks
   switch (entity) {
     case SCENE_ENTITY_CAMERA:
+      __FAILURE_HANDLE(camera_check_for_dirty((Camera*) object, &scene->camera, &output_dirty, &integration_dirty));
+      scene->flags |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_CAMERA : 0;
       memcpy(&scene->camera, object, sizeof(Camera));
       break;
     case SCENE_ENTITY_OCEAN:
+      __FAILURE_HANDLE(ocean_check_for_dirty((Ocean*) object, &scene->ocean, &integration_dirty));
+      scene->flags |= (integration_dirty) ? SCENE_DIRTY_FLAG_OCEAN : 0;
       memcpy(&scene->ocean, object, sizeof(Ocean));
       break;
     case SCENE_ENTITY_SKY:
+      __FAILURE_HANDLE(sky_check_for_dirty((Sky*) object, &scene->sky, &integration_dirty));
+      scene->flags |= (integration_dirty) ? SCENE_DIRTY_FLAG_SKY : 0;
       memcpy(&scene->sky, object, sizeof(Sky));
       break;
     case SCENE_ENTITY_CLOUD:
+      __FAILURE_HANDLE(cloud_check_for_dirty((Cloud*) object, &scene->cloud, &integration_dirty));
+      scene->flags |= (integration_dirty) ? SCENE_DIRTY_FLAG_CLOUD : 0;
       memcpy(&scene->cloud, object, sizeof(Cloud));
       break;
     case SCENE_ENTITY_FOG:
+      __FAILURE_HANDLE(fog_check_for_dirty((Fog*) object, &scene->fog, &integration_dirty));
+      scene->flags |= (integration_dirty) ? SCENE_DIRTY_FLAG_FOG : 0;
       memcpy(&scene->fog, object, sizeof(Fog));
       break;
     case SCENE_ENTITY_PARTICLES:
+      __FAILURE_HANDLE(particles_check_for_dirty((Particles*) object, &scene->particles, &integration_dirty));
+      scene->flags |= (integration_dirty) ? SCENE_DIRTY_FLAG_PARTICLES : 0;
       memcpy(&scene->particles, object, sizeof(Particles));
       break;
     case SCENE_ENTITY_TOY:
+      __FAILURE_HANDLE(toy_check_for_dirty((Toy*) object, &scene->toy, &integration_dirty));
+      scene->flags |= (integration_dirty) ? SCENE_DIRTY_FLAG_TOY : 0;
       memcpy(&scene->toy, object, sizeof(Toy));
       break;
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_update yet.");
   }
+
+  scene->flags |= (output_dirty || integration_dirty) ? SCENE_DIRTY_FLAG_OUTPUT : 0;
+  scene->flags |= (integration_dirty) ? SCENE_DIRTY_FLAG_INTEGRATION : 0;
 
   __FAILURE_HANDLE(mutex_unlock(scene->mutex));
 
@@ -78,8 +126,6 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
 LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(scene);
   __CHECK_NULL_ARGUMENT(object);
-
-  __FAILURE_HANDLE(mutex_lock(scene->mutex));
 
   switch (entity) {
     case SCENE_ENTITY_CAMERA:
@@ -106,8 +152,6 @@ LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity) {
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support scene_get yet.");
   }
-
-  __FAILURE_HANDLE(mutex_unlock(scene->mutex));
 
   return LUMINARY_SUCCESS;
 }

@@ -50,3 +50,75 @@ LuminaryResult cloud_get_default(Cloud* cloud) {
 
   return LUMINARY_SUCCESS;
 }
+
+#define __CLOUD_DIRTY(var)      \
+  {                             \
+    if (new->var != old->var) { \
+      *dirty = true;            \
+      return LUMINARY_SUCCESS;  \
+    }                           \
+  }
+
+static LuminaryResult _cloud_layer_check_for_dirty(const CloudLayer* new, const CloudLayer* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(new);
+  __CHECK_NULL_ARGUMENT(old);
+  __CHECK_NULL_ARGUMENT(dirty);
+
+  __CLOUD_DIRTY(active);
+
+  if (new->active) {
+    __CLOUD_DIRTY(height_max);
+    __CLOUD_DIRTY(height_min);
+    __CLOUD_DIRTY(coverage);
+    __CLOUD_DIRTY(coverage_min);
+    __CLOUD_DIRTY(type);
+    __CLOUD_DIRTY(type_min);
+    __CLOUD_DIRTY(wind_speed);
+    __CLOUD_DIRTY(wind_angle);
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult cloud_check_for_dirty(const Cloud* new, const Cloud* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(new);
+  __CHECK_NULL_ARGUMENT(old);
+  __CHECK_NULL_ARGUMENT(dirty);
+
+  *dirty = false;
+
+  __CLOUD_DIRTY(active);
+
+  if (new->active) {
+    __CLOUD_DIRTY(atmosphere_scattering);
+    __CLOUD_DIRTY(offset_x);
+    __CLOUD_DIRTY(offset_z);
+    __CLOUD_DIRTY(density);
+    __CLOUD_DIRTY(seed);
+    __CLOUD_DIRTY(droplet_diameter);
+    __CLOUD_DIRTY(steps);
+    __CLOUD_DIRTY(shadow_steps);
+    __CLOUD_DIRTY(noise_shape_scale);
+    __CLOUD_DIRTY(noise_detail_scale);
+    __CLOUD_DIRTY(noise_weather_scale);
+    __CLOUD_DIRTY(mipmap_bias);
+    __CLOUD_DIRTY(octaves);
+
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&new->low, &old->low, dirty));
+    if (dirty) {
+      return LUMINARY_SUCCESS;
+    }
+
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&new->mid, &old->mid, dirty));
+    if (dirty) {
+      return LUMINARY_SUCCESS;
+    }
+
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&new->top, &old->top, dirty));
+    if (dirty) {
+      return LUMINARY_SUCCESS;
+    }
+  }
+
+  return LUMINARY_SUCCESS;
+}

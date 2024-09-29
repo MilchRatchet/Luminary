@@ -107,7 +107,6 @@ LUMINARY_API struct LuminaryCamera {
   float mouse_speed;
   bool smooth_movement;
   float smoothing_factor;
-  float temporal_blend_factor;
   float russian_roulette_threshold;
   bool use_color_correction;
   LuminaryRGBF color_correction;

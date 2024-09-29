@@ -4,5 +4,6 @@
 #include "utils.h"
 
 LuminaryResult sky_get_default(Sky* sky);
+LuminaryResult sky_check_for_dirty(const Sky* new, const Sky* old, bool* dirty);
 
 #endif /* LUMINARY_SKY_H */

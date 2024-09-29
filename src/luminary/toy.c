@@ -30,3 +30,53 @@ LuminaryResult toy_get_default(Toy* toy) {
 
   return LUMINARY_SUCCESS;
 }
+
+#define __TOY_DIRTY(var)        \
+  {                             \
+    if (new->var != old->var) { \
+      *dirty = true;            \
+      return LUMINARY_SUCCESS;  \
+    }                           \
+  }
+
+LuminaryResult toy_check_for_dirty(const Toy* new, const Toy* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(new);
+  __CHECK_NULL_ARGUMENT(old);
+  __CHECK_NULL_ARGUMENT(dirty);
+
+  *dirty = false;
+
+  __TOY_DIRTY(active);
+
+  if (new->active) {
+    __TOY_DIRTY(emissive);
+    __TOY_DIRTY(position.x);
+    __TOY_DIRTY(position.y);
+    __TOY_DIRTY(position.z);
+    __TOY_DIRTY(rotation.x);
+    __TOY_DIRTY(rotation.y);
+    __TOY_DIRTY(rotation.z);
+    __TOY_DIRTY(scale);
+    __TOY_DIRTY(albedo.r);
+    __TOY_DIRTY(albedo.g);
+    __TOY_DIRTY(albedo.b);
+    __TOY_DIRTY(albedo.a);
+
+    if (new->albedo.a < 1.0f) {
+      __TOY_DIRTY(refractive_index);
+    }
+
+    __TOY_DIRTY(material.r);
+    __TOY_DIRTY(material.g);
+    __TOY_DIRTY(material.b);
+    __TOY_DIRTY(material.a);
+
+    if (new->emissive) {
+      __TOY_DIRTY(emission.r);
+      __TOY_DIRTY(emission.g);
+      __TOY_DIRTY(emission.b);
+    }
+  }
+
+  return LUMINARY_SUCCESS;
+}
