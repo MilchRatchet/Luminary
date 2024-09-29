@@ -30,12 +30,8 @@ add_library(Luminary::Headers ALIAS LuminaryHeaders)
 set_target_properties(LuminaryHeaders PROPERTIES EXPORT_NAME "Headers")
 target_include_directories(LuminaryHeaders INTERFACE "${CMAKE_SOURCE_DIR}/include")
 
-if(LUMINARY_BUILD_SHARED)
-  add_library(Luminary SHARED)
-else()
-  add_library(Luminary STATIC)
-endif()
-add_library(Luminary::Shared ALIAS Luminary)
+add_library(Luminary STATIC)
+add_library(Luminary::Library ALIAS Luminary)
 set_target_properties(Luminary PROPERTIES EXPORT_NAME "luminary" POSITION_INDEPENDENT_CODE TRUE)
 
 #=============================================================
