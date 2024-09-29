@@ -192,9 +192,9 @@ Notes:
 
 >📝 This is all only necessary because CUDA only supports MSVC as a host compiler on Windows. If this changes in the future then the Windows build will look similar to the Linux build.
 
-# Licences
+# Licence
 
-The licence for this code can be found in the `LICENCE` file.
+Luminary and MandarinDuck are licensed under the terms of the **AGPL v.3** (GNU Affero General Public Licence). You can find the entire licence in the `LICENCE` file.
 
 The default font provided by `Luminary` is the font `Tuffy` by Ulrich Thatcher which he placed in the `Public Domain`.
 
