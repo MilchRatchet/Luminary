@@ -161,7 +161,7 @@ struct DeviceToy {
   RGBAF material;
   RGBF emission;
 } typedef DeviceToy;
-LUM_STATIC_SIZE_ASSERT(DeviceToy, 80u);
+LUM_STATIC_SIZE_ASSERT(DeviceToy, 0x50u);
 
 struct DeviceMaterial {
   uint16_t emission_active : 1;
@@ -187,7 +187,21 @@ struct DeviceMaterial {
   uint16_t material_tex;
   uint16_t normal_tex;
 } typedef DeviceMaterial;
-LUM_STATIC_SIZE_ASSERT(DeviceMaterial, 32u);
+LUM_STATIC_SIZE_ASSERT(DeviceMaterial, 0x20u);
+
+struct DeviceTriangle {
+  vec3 vertex;
+  vec3 edge1;
+  vec3 edge2;
+  uint32_t vertex_normal;
+  uint32_t edge1_normal;
+  uint32_t edge2_normal;
+  uint32_t vertex_texture;
+  uint32_t edge1_texture;
+  uint32_t edge2_texture;
+  uint32_t light_id;
+} typedef DeviceTriangle;
+LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings);
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera);
@@ -199,5 +213,6 @@ LuminaryResult device_struct_particles_convert(const Particles* particles, Devic
 LuminaryResult device_struct_toy_convert(const Toy* toy, DeviceToy* device_toy);
 LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterial* device_material);
 LuminaryResult device_struct_scene_entity_convert(const void* source, void* dst, SceneEntity entity);
+LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle);
 
 #endif /* LUMINARY_DEVICE_STRUCTS_H */

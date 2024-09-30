@@ -1,5 +1,7 @@
 #include "device_structs.h"
 
+#include <math.h>
+
 #include "internal_error.h"
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings) {
@@ -271,6 +273,61 @@ LuminaryResult device_struct_scene_entity_convert(const void* restrict source, v
     default:
       __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Scene entity does not support conversion to device format yet.");
   }
+
+  return LUMINARY_SUCCESS;
+}
+
+// Octahedron encoding, for example: https://www.shadertoy.com/view/clXXD8
+static uint32_t _device_vec3_to_uint(const vec3 normal) {
+  double x = normal.x;
+  double y = normal.y;
+  double z = normal.z;
+
+  const double recip_norm = 1.0 / (x * x + y * y + z * z);
+
+  x *= recip_norm;
+  y *= recip_norm;
+  z *= recip_norm;
+
+  const double t = fmax(fmin(-z, 1.0f), 0.0f);
+
+  x += (x >= 0.0) ? t : -t;
+  y += (y >= 0.0) ? t : -t;
+
+  const uint32_t x_u16 = (uint16_t) round(x * 0x7FFF);
+  const uint32_t y_u16 = (uint16_t) round(y * 0x7FFF);
+
+  return (x_u16 << 16) | y_u16;
+}
+
+static uint32_t _device_UV_to_uint(const UV uv) {
+  const uint32_t u = *((uint32_t*) (&uv.u));
+  const uint32_t v = *((uint32_t*) (&uv.v));
+
+  uint32_t compressed;
+  compressed = (u & 0x80000000) | ((u << 1) & 0x7F000000) | ((u << 1) & 0x00FF0000);
+  compressed |= ((v >> 16) & 0x00008000) | ((v >> 15) & 0x00007F00) | ((v >> 15) & 0x000000FF);
+
+  return compressed;
+}
+
+LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle) {
+  __CHECK_NULL_ARGUMENT(triangle);
+  __CHECK_NULL_ARGUMENT(device_triangle);
+
+  device_triangle->vertex = triangle->vertex;
+  device_triangle->edge1  = triangle->edge1;
+  device_triangle->edge2  = triangle->edge2;
+
+  device_triangle->vertex_normal = _device_vec3_to_uint(triangle->vertex_normal);
+  device_triangle->edge1_normal  = _device_vec3_to_uint(triangle->edge1_normal);
+  device_triangle->edge2_normal  = _device_vec3_to_uint(triangle->edge2_normal);
+
+  device_triangle->vertex_texture = _device_UV_to_uint(triangle->vertex_texture);
+  device_triangle->edge1_texture  = _device_UV_to_uint(triangle->edge1_texture);
+  device_triangle->edge2_texture  = _device_UV_to_uint(triangle->edge2_texture);
+
+  device_triangle->light_id = triangle->light_id;
 
   return LUMINARY_SUCCESS;
 }

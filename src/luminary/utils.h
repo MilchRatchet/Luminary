@@ -120,7 +120,7 @@ struct PackedMaterial {
 // Mesh
 ////////////////////////////////////////////////////////////////////
 
-INTERLEAVED_STORAGE struct Triangle {
+struct Triangle {
   vec3 vertex;
   vec3 edge1;
   vec3 edge2;
