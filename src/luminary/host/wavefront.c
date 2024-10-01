@@ -897,39 +897,39 @@ LuminaryResult wavefront_convert_content(
 
     WavefrontVertex v;
 
-    const uint32_t v1_ptr = (t.v1 >= 0) ? t.v1 + vertex_count + 1 : t.v1;
+    const uint32_t v1_ptr = (t.v1 > 0) ? t.v1 - 1 : t.v1 + vertex_count;
 
-    if (v1_ptr > vertex_count) {
+    if (v1_ptr >= vertex_count) {
       continue;
     }
     else {
-      v = content->vertices[v1_ptr - 1];
+      v = content->vertices[v1_ptr];
     }
 
     triangle.vertex.x = v.x;
     triangle.vertex.y = v.y;
     triangle.vertex.z = v.z;
 
-    const uint32_t v2_ptr = (t.v2 >= 0) ? t.v2 + vertex_count + 1 : t.v2;
+    const uint32_t v2_ptr = (t.v2 > 0) ? t.v2 - 1 : t.v2 + vertex_count;
 
-    if (v2_ptr > vertex_count) {
+    if (v2_ptr >= vertex_count) {
       continue;
     }
     else {
-      v = content->vertices[v2_ptr - 1];
+      v = content->vertices[v2_ptr];
     }
 
     triangle.edge1.x = v.x - triangle.vertex.x;
     triangle.edge1.y = v.y - triangle.vertex.y;
     triangle.edge1.z = v.z - triangle.vertex.z;
 
-    const uint32_t v3_ptr = (t.v3 >= 0) ? t.v3 + vertex_count + 1 : t.v3;
+    const uint32_t v3_ptr = (t.v3 > 0) ? t.v3 - 1 : t.v3 + vertex_count;
 
-    if (v3_ptr > vertex_count) {
+    if (v3_ptr >= vertex_count) {
       continue;
     }
     else {
-      v = content->vertices[v3_ptr - 1];
+      v = content->vertices[v3_ptr];
     }
 
     triangle.edge2.x = v.x - triangle.vertex.x;
@@ -948,40 +948,40 @@ LuminaryResult wavefront_convert_content(
 
     WavefrontUV uv;
 
-    const uint32_t vt1_ptr = (t.vt1 >= 0) ? t.vt1 + uv_count + 1 : t.vt1;
+    const uint32_t vt1_ptr = (t.vt1 > 0) ? t.vt1 - 1 : t.vt1 + uv_count;
 
-    if (vt1_ptr > uv_count || vt1_ptr == 0) {
+    if (vt1_ptr >= uv_count) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content->uvs[vt1_ptr - 1];
+      uv = content->uvs[vt1_ptr];
     }
 
     triangle.vertex_texture.u = uv.u;
     triangle.vertex_texture.v = uv.v;
 
-    const uint32_t vt2_ptr = (t.vt2 >= 0) ? t.vt2 + uv_count + 1 : t.vt2;
+    const uint32_t vt2_ptr = (t.vt2 > 0) ? t.vt2 - 1 : t.vt2 + uv_count;
 
-    if (vt2_ptr > uv_count || vt2_ptr == 0) {
+    if (vt2_ptr >= uv_count) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content->uvs[vt2_ptr - 1];
+      uv = content->uvs[vt2_ptr];
     }
 
     triangle.edge1_texture.u = uv.u - triangle.vertex_texture.u;
     triangle.edge1_texture.v = uv.v - triangle.vertex_texture.v;
 
-    const uint32_t vt3_ptr = (t.vt3 >= 0) ? t.vt3 + uv_count + 1 : t.vt3;
+    const uint32_t vt3_ptr = (t.vt3 > 0) ? t.vt3 - 1 : t.vt3 + uv_count;
 
-    if (vt3_ptr > uv_count || vt3_ptr == 0) {
+    if (vt3_ptr >= uv_count) {
       uv.u = 0.0f;
       uv.v = 0.0f;
     }
     else {
-      uv = content->uvs[vt3_ptr - 1];
+      uv = content->uvs[vt3_ptr];
     }
 
     triangle.edge2_texture.u = uv.u - triangle.vertex_texture.u;
@@ -989,15 +989,15 @@ LuminaryResult wavefront_convert_content(
 
     WavefrontNormal n;
 
-    const uint32_t vn1_ptr = (t.vn1 >= 0) ? t.vn1 + normal_count + 1 : t.vn1;
+    const uint32_t vn1_ptr = (t.vn1 > 0) ? t.vn1 - 1 : t.vn1 + normal_count;
 
-    if (vn1_ptr > normal_count || vn1_ptr == 0) {
+    if (vn1_ptr >= normal_count) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content->normals[vn1_ptr - 1];
+      n = content->normals[vn1_ptr];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
@@ -1017,15 +1017,15 @@ LuminaryResult wavefront_convert_content(
     triangle.vertex_normal.y = n.y;
     triangle.vertex_normal.z = n.z;
 
-    const uint32_t vn2_ptr = (t.vn2 >= 0) ? t.vn2 + normal_count + 1 : t.vn2;
+    const uint32_t vn2_ptr = (t.vn2 > 0) ? t.vn2 - 1 : t.vn2 + normal_count;
 
-    if (vn2_ptr > normal_count || t.vn2 == 0) {
+    if (vn2_ptr >= normal_count) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content->normals[vn2_ptr - 1];
+      n = content->normals[vn2_ptr];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
@@ -1045,15 +1045,15 @@ LuminaryResult wavefront_convert_content(
     triangle.edge1_normal.y = n.y - triangle.vertex_normal.y;
     triangle.edge1_normal.z = n.z - triangle.vertex_normal.z;
 
-    const uint32_t vn3_ptr = (t.vn3 >= 0) ? t.vn3 + normal_count + 1 : t.vn3;
+    const uint32_t vn3_ptr = (t.vn3 > 0) ? t.vn3 - 1 : t.vn3 + normal_count;
 
-    if (vn3_ptr > normal_count || vn3_ptr == 0) {
+    if (vn3_ptr >= normal_count) {
       n.x = 0.0f;
       n.y = 0.0f;
       n.z = 0.0f;
     }
     else {
-      n = content->normals[vn3_ptr - 1];
+      n = content->normals[vn3_ptr];
 
       const float n_length = 1.0f / sqrtf(n.x * n.x + n.y * n.y + n.z * n.z);
 
@@ -1086,6 +1086,8 @@ LuminaryResult wavefront_convert_content(
   __FAILURE_HANDLE(host_realloc(&mesh->data->index_buffer, sizeof(uint32_t) * 4 * new_triangle_count));
   mesh->data->index_count    = 3 * new_triangle_count;
   mesh->data->triangle_count = new_triangle_count;
+
+  __FAILURE_HANDLE(mesh_build_meshlets(mesh));
 
   __FAILURE_HANDLE(array_push(meshes, &mesh));
 
