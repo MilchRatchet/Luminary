@@ -17,8 +17,15 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   SDL_Rect rect;
   SDL_Rect screen_size;
 
-  SDL_GetDisplayUsableBounds(0, &rect);
-  SDL_GetDisplayBounds(0, &screen_size);
+  int display_count;
+  SDL_DisplayID* displays = SDL_GetDisplays(&display_count);
+
+  if (display_count == 0) {
+    crash_message("No displays available.");
+  }
+
+  SDL_GetDisplayUsableBounds(displays[0], &rect);
+  SDL_GetDisplayBounds(displays[0], &screen_size);
 
   rect.w = min(rect.w, (int) width);
   rect.h = min(rect.h, (int) height);

@@ -93,7 +93,7 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, size_t si
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(object);
 
-  __FAILURE_HANDLE(scene_update(host->scene_internal, object, entity));
+  __FAILURE_HANDLE(scene_update(host->scene_external, object, entity));
 
   HostSetSceneEntityArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostSetSceneEntityArgs), (void**) &args));
