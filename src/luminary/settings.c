@@ -15,7 +15,6 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->light_num_rays             = 1;
   settings->use_opacity_micromaps      = false;
   settings->use_displacement_micromaps = false;
-  settings->enable_optix_validation    = false;
   settings->use_luminary_bvh           = false;
   settings->undersampling              = 3;
   settings->shading_mode               = LUMINARY_SHADING_MODE_DEFAULT;
@@ -58,7 +57,6 @@ LuminaryResult settings_check_for_dirty(
   __SETTINGS_INTEGRATION_DIRTY(light_num_rays);
   __SETTINGS_INTEGRATION_DIRTY(use_opacity_micromaps);
   __SETTINGS_INTEGRATION_DIRTY(use_displacement_micromaps);
-  __SETTINGS_INTEGRATION_DIRTY(enable_optix_validation);
   __SETTINGS_INTEGRATION_DIRTY(use_luminary_bvh);
   __SETTINGS_INTEGRATION_DIRTY(undersampling);
 

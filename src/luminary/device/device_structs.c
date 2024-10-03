@@ -141,9 +141,9 @@ LuminaryResult device_struct_cloud_convert(const Cloud* cloud, DeviceCloud* devi
   device_cloud->noise_weather_scale = cloud->noise_weather_scale;
   device_cloud->mipmap_bias         = cloud->mipmap_bias;
 
-  __FAILURE_HANDLE(_device_struct_cloud_layer_convert(&device_cloud->low, &cloud->low));
-  __FAILURE_HANDLE(_device_struct_cloud_layer_convert(&device_cloud->mid, &cloud->mid));
-  __FAILURE_HANDLE(_device_struct_cloud_layer_convert(&device_cloud->top, &cloud->top));
+  __FAILURE_HANDLE(_device_struct_cloud_layer_convert(&cloud->low, &device_cloud->low));
+  __FAILURE_HANDLE(_device_struct_cloud_layer_convert(&cloud->mid, &device_cloud->mid));
+  __FAILURE_HANDLE(_device_struct_cloud_layer_convert(&cloud->top, &device_cloud->top));
 
   return LUMINARY_SUCCESS;
 }

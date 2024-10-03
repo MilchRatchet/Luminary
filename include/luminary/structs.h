@@ -46,7 +46,6 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t light_num_rays;
   bool use_opacity_micromaps;
   bool use_displacement_micromaps;
-  bool enable_optix_validation;
   LUMINARY_DEPRECATED bool use_luminary_bvh;
   uint32_t undersampling;
   LuminaryShadingMode shading_mode;

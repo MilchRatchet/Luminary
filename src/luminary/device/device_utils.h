@@ -13,6 +13,8 @@
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 2048
 
+#define OPTIX_VALIDATION
+
 struct DeviceTexture;
 typedef struct DeviceTexture DeviceTexture;
 
@@ -20,23 +22,48 @@ typedef struct DeviceTexture DeviceTexture;
 // Failure handles
 ////////////////////////////////////////////////////////////////////
 
-#define CUDA_FAILURE_HANDLE(command)                                                                                                     \
-  const cudaError_t __cuda_err = command;                                                                                                \
-  if (__cuda_err != cudaSuccess) {                                                                                                       \
-    __RETURN_ERROR(                                                                                                                      \
-      LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", cudaGetErrorName(__cuda_err), cudaGetErrorString(__cuda_err), \
-      #command);                                                                                                                         \
+#define CUDA_FAILURE_HANDLE(command)                                                                                                       \
+  {                                                                                                                                        \
+    const cudaError_t __cuda_err = command;                                                                                                \
+    if (__cuda_err != cudaSuccess) {                                                                                                       \
+      __RETURN_ERROR(                                                                                                                      \
+        LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", cudaGetErrorName(__cuda_err), cudaGetErrorString(__cuda_err), \
+        #command);                                                                                                                         \
+    }                                                                                                                                      \
   }
 
-#define OPTIX_FAILURE_HANDLE(command)                                                                                            \
-  const OptixResult __optix_err = command;                                                                                       \
-  if (__optix_err != OPTIX_SUCCESS) {                                                                                            \
-    __RETURN_ERROR(LUMINARY_ERROR_OPTIX, "Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(res), res, #command); \
+#define OPTIX_FAILURE_HANDLE(command)                                                                                                 \
+  {                                                                                                                                   \
+    const OptixResult __optix_err = command;                                                                                          \
+    if (__optix_err != OPTIX_SUCCESS) {                                                                                               \
+      __RETURN_ERROR(                                                                                                                 \
+        LUMINARY_ERROR_OPTIX, "Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(__optix_err), __optix_err, #command); \
+    }                                                                                                                                 \
+  }
+
+#define OPTIX_FAILURE_HANDLE_LOG(command, log)                                                                                        \
+  {                                                                                                                                   \
+    const OptixResult __optix_err = command;                                                                                          \
+                                                                                                                                      \
+    if (__optix_err != OPTIX_SUCCESS) {                                                                                               \
+      error_message("Optix returned message: %s", log);                                                                               \
+      __RETURN_ERROR(                                                                                                                 \
+        LUMINARY_ERROR_OPTIX, "Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(__optix_err), __optix_err, #command); \
+    }                                                                                                                                 \
   }
 
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////
+
+// Proposal:
+struct PackedHitIDIndex {
+  uint64_t x : 14;
+  uint64_t y : 14;
+  uint64_t instance_id : 24;
+  uint64_t tri_id : 12;
+};
+LUM_STATIC_SIZE_ASSERT(struct PackedHitIDIndex, 8u);
 
 struct ShadingTask {
   uint32_t hit_id;
@@ -102,11 +129,18 @@ struct DevicePointers {
 
 struct DeviceConstantMemory {
   DevicePointers ptrs;
-  Scene scene;
-  RISSettings ris_settings;
-  BridgeSettings bridge_settings;
+  DeviceRendererSettings settings;
+  DeviceCamera camera;
+  DeviceOcean ocean;
+  DeviceSky sky;
+  DeviceCloud cloud;
+  DeviceFog fog;
+  DeviceParticles particles;
+  DeviceToy toy;
   uint16_t user_selected_x;
   uint16_t user_selected_y;
+
+  /*
   int max_ray_depth;
   int pixels_per_thread;
   int depth;
@@ -120,9 +154,8 @@ struct DeviceConstantMemory {
   vec3 sun_pos;
   vec3 moon_pos;
   int shading_mode;
-  OutputVariable output_variable;
+
   RGBF* bloom_scratch;
-  RayEmitter emitter;
   int accumulate;
   OptixTraversableHandle optix_bvh;
   OptixTraversableHandle optix_bvh_shadow;
@@ -134,6 +167,7 @@ struct DeviceConstantMemory {
   LightTreeNode8Packed* light_tree_nodes_8;
   uint2* light_tree_paths;
   float* bridge_lut;
+  */
 } typedef DeviceConstantMemory;
 
 #endif /* LUMINARY_DEVICE_UTILS_H */

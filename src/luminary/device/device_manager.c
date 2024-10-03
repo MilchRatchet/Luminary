@@ -1,8 +1,9 @@
 #include "device_manager.h"
 
 #include "device_structs.h"
+#include "device_utils.h"
+#include "host/internal_host.h"
 #include "internal_error.h"
-#include "internal_host.h"
 #include "scene.h"
 
 #define DEVICE_MANAGER_RINGBUFFER_SIZE (0x10000ull)
@@ -20,7 +21,7 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
     __FAILURE_HANDLE(queue_pop_blocking(device_manager->work_queue, &entry, &success));
 
     if (!success)
-      return;
+      return LUMINARY_SUCCESS;
 
     __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, entry.name));
     __FAILURE_HANDLE(wall_time_start(device_manager->queue_wall_time));
@@ -30,6 +31,8 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
     __FAILURE_HANDLE(wall_time_stop(device_manager->queue_wall_time));
     __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, (const char*) 0));
   }
+
+  return LUMINARY_SUCCESS;
 }
 
 ////////////////////////////////////////////////////////////////////

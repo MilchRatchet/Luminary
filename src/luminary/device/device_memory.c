@@ -20,14 +20,12 @@ void _device_memory_init(void) {
 }
 
 LuminaryResult _device_malloc(void** _ptr, size_t size, const char* buf_name, const char* func, uint32_t line) {
-  if (!_ptr) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Pointer is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(_ptr);
 
   struct DeviceMemoryHeader* header;
   __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
 
-  CUDA_FAILURE_HANDLE(cudaMalloc(&header->ptr, size));
+  CUDA_FAILURE_HANDLE(cudaMalloc((void**) &header->ptr, size));
 
   header->magic = DEVICE_MEMORY_HEADER_MAGIC;
   header->size  = size;
@@ -44,15 +42,13 @@ LuminaryResult _device_malloc(void** _ptr, size_t size, const char* buf_name, co
 }
 
 LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t height, const char* buf_name, const char* func, uint32_t line) {
-  if (!_ptr) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Pointer is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(_ptr);
 
   struct DeviceMemoryHeader* header;
   __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
 
   size_t pitch;
-  CUDA_FAILURE_HANDLE(cudaMallocPitch(&header->ptr, &pitch, width_in_bytes, height));
+  CUDA_FAILURE_HANDLE(cudaMallocPitch((void**) &header->ptr, &pitch, width_in_bytes, height));
 
   const size_t size = pitch * height;
 
@@ -71,13 +67,8 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
 }
 
 LuminaryResult device_upload(DEVICE void* dst, const void* src, size_t dst_offset, size_t size) {
-  if (!dst) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Destination is NULL.");
-  }
-
-  if (!src) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Source is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(src);
 
   struct DeviceMemoryHeader* dst_header = (struct DeviceMemoryHeader*) dst;
 
@@ -97,13 +88,8 @@ LuminaryResult device_upload(DEVICE void* dst, const void* src, size_t dst_offse
 }
 
 LuminaryResult device_memcpy(DEVICE void* dst, DEVICE const void* src, size_t dst_offset, size_t src_offset, size_t size) {
-  if (!dst) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Destination is NULL.");
-  }
-
-  if (!src) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Source is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(src);
 
   struct DeviceMemoryHeader* dst_header = (struct DeviceMemoryHeader*) dst;
   struct DeviceMemoryHeader* src_header = (struct DeviceMemoryHeader*) src;
@@ -136,13 +122,8 @@ LuminaryResult device_memcpy(DEVICE void* dst, DEVICE const void* src, size_t ds
 }
 
 LuminaryResult device_download(void* dst, DEVICE const void* src, size_t src_offset, size_t size) {
-  if (!dst) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Destination is NULL.");
-  }
-
-  if (!src) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Source is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(src);
 
   struct DeviceMemoryHeader* src_header = (struct DeviceMemoryHeader*) src;
 
@@ -162,13 +143,8 @@ LuminaryResult device_download(void* dst, DEVICE const void* src, size_t src_off
 }
 
 LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pitch, size_t src_width, size_t src_height) {
-  if (!dst) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Destination is NULL.");
-  }
-
-  if (!src) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Source is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(src);
 
   struct DeviceMemoryHeader* dst_header = (struct DeviceMemoryHeader*) dst;
 
@@ -184,15 +160,14 @@ LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pit
   }
 
   // TODO: src_width is in bytes, make sure that that is clear.
-  CUDA_FAILURE_HANDLE(cudaMemcpy2D(dst_header->ptr, dst_header->pitch, src, src_pitch, src_width, src_height, cudaMemcpyHostToDevice));
+  CUDA_FAILURE_HANDLE(
+    cudaMemcpy2D((void*) dst_header->ptr, dst_header->pitch, src, src_pitch, src_width, src_height, cudaMemcpyHostToDevice));
 
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, size_t size) {
-  if (!ptr) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Pointer is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(ptr);
 
   struct DeviceMemoryHeader* header = (struct DeviceMemoryHeader*) ptr;
 
@@ -200,7 +175,7 @@ LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, siz
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Pointer is not device memory.");
   }
 
-  if (header + size > header->size) {
+  if (offset + size > header->size) {
     __RETURN_ERROR(
       LUMINARY_ERROR_API_EXCEPTION, "Memset exceeds allocated device memory. %llu bytes are allocated and destination is [%llu, %llu].",
       header->size, offset, offset + size);
@@ -212,13 +187,8 @@ LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, siz
 }
 
 LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char* func, uint32_t line) {
-  if (!ptr) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Pointer is NULL.");
-  }
-
-  if (!(*ptr)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Pointer is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(ptr);
+  __CHECK_NULL_ARGUMENT(*ptr);
 
   struct DeviceMemoryHeader* header = (struct DeviceMemoryHeader*) *ptr;
 
@@ -237,9 +207,9 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
 
   total_memory_allocation[current_device] -= header->size;
 
-  CUDA_FAILURE_HANDLE(cudaFree(header->ptr));
+  CUDA_FAILURE_HANDLE(cudaFree((void*) header->ptr));
 
-  __FAILURE_HANDLE(_host_free(&header, buf_name, func, line));
+  __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
 
   return LUMINARY_SUCCESS;
 }

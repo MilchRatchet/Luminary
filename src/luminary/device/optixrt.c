@@ -7,22 +7,14 @@
 
 #define UTILS_NO_DEVICE_TABLE
 
-#include "buffer.h"
 #include "ceb.h"
 #include "device.h"
+#include "device_memory.h"
+#include "internal_error.h"
 #include "utils.h"
 
-#define OPTIX_CHECK_LOGS(call, log)                                                                      \
-  {                                                                                                      \
-    OptixResult res = call;                                                                              \
-                                                                                                         \
-    if (res != OPTIX_SUCCESS) {                                                                          \
-      error_message("Optix returned message: %s", log);                                                  \
-      crash_message("Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(res), res, #call); \
-    }                                                                                                    \
-  }
-
-void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel, CommandlineOptions options) {
+LuminaryResult optixrt_compile_kernel(
+  const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel, RendererSettings settings) {
   log_message("Compiling kernels: %s.", kernels_name);
 
   ////////////////////////////////////////////////////////////////////
@@ -57,10 +49,10 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
 
-  if (options.omm_active)
+  if (settings.use_opacity_micromaps)
     pipeline_compile_options.allowOpacityMicromaps = 1;
 
-  if (options.dmm_active)
+  if (settings.use_displacement_micromaps)
     pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
 
   char log[4096];
@@ -68,7 +60,7 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
 
   OptixModule module;
 
-  OPTIX_CHECK_LOGS(
+  OPTIX_FAILURE_HANDLE_LOG(
     optixModuleCreate(optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module), log);
 
   ////////////////////////////////////////////////////////////////////
@@ -95,7 +87,7 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
 
   OptixProgramGroup groups[OPTIXRT_NUM_GROUPS];
 
-  OPTIX_CHECK_LOGS(optixProgramGroupCreate(optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, groups), log);
+  OPTIX_FAILURE_HANDLE_LOG(optixProgramGroupCreate(optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, groups), log);
 
   ////////////////////////////////////////////////////////////////////
   // Pipeline Creation
@@ -104,7 +96,7 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
   OptixPipelineLinkOptions pipeline_link_options;
   pipeline_link_options.maxTraceDepth = 1;
 
-  OPTIX_CHECK_LOGS(
+  OPTIX_FAILURE_HANDLE_LOG(
     optixPipelineCreate(
       optix_ctx, &pipeline_compile_options, &pipeline_link_options, groups, OPTIXRT_NUM_GROUPS, log, &log_size, &kernel->pipeline),
     log);
@@ -113,20 +105,20 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
   // Shader Binding Table Creation
   ////////////////////////////////////////////////////////////////////
 
-  char* records;
-  device_malloc((void**) &records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE);
+  DEVICE char* records;
+  __FAILURE_HANDLE(device_malloc((void**) &records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
 
   char host_records[OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE];
 
   for (int i = 0; i < OPTIXRT_NUM_GROUPS; i++) {
-    OPTIX_CHECK(optixSbtRecordPackHeader(groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
+    OPTIX_FAILURE_HANDLE(optixSbtRecordPackHeader(groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
   }
 
-  gpuErrchk(cudaMemcpy(records, host_records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE, cudaMemcpyHostToDevice));
+  __FAILURE_HANDLE(device_upload(records, host_records, 0, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
 
-  kernel->shaders.raygenRecord       = (CUdeviceptr) (records + 0 * OPTIX_SBT_RECORD_HEADER_SIZE);
-  kernel->shaders.missRecordBase     = (CUdeviceptr) (records + 1 * OPTIX_SBT_RECORD_HEADER_SIZE);
-  kernel->shaders.hitgroupRecordBase = (CUdeviceptr) (records + 2 * OPTIX_SBT_RECORD_HEADER_SIZE);
+  kernel->shaders.raygenRecord       = DEVICE_PTR(records) + 0 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  kernel->shaders.missRecordBase     = DEVICE_PTR(records) + 1 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  kernel->shaders.hitgroupRecordBase = DEVICE_PTR(records) + 2 * OPTIX_SBT_RECORD_HEADER_SIZE;
 
   kernel->shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
   kernel->shaders.missRecordCount         = 1;
@@ -138,11 +130,13 @@ void optixrt_compile_kernel(const OptixDeviceContext optix_ctx, const char* kern
   // Params Creation
   ////////////////////////////////////////////////////////////////////
 
-  device_malloc(&(kernel->params), sizeof(DeviceConstantMemory));
+  __FAILURE_HANDLE(device_malloc(&(kernel->params), sizeof(DeviceConstantMemory)));
+
+  return LUMINARY_SUCCESS;
 }
 
-void optixrt_build_bvh(
-  OptixDeviceContext optix_ctx, OptixBVH* bvh, const TriangleGeomData tri_data, const OptixBuildInputDisplacementMicromap* dmm,
+LuminaryResult optixrt_build_bvh(
+  OptixDeviceContext optix_ctx, OptixBVH* bvh, const Mesh* mesh, const OptixBuildInputDisplacementMicromap* dmm,
   const OptixBuildInputOpacityMicromap* omm, const OptixRTBVHType type) {
   OptixAccelBuildOptions build_options;
   memset(&build_options, 0, sizeof(OptixAccelBuildOptions));
@@ -151,21 +145,61 @@ void optixrt_build_bvh(
   build_options.motionOptions.numKeys = 1;
   build_options.buildFlags            = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
 
-  OptixBuildInput build_inputs;
-  memset(&build_inputs, 0, sizeof(OptixBuildInput));
-  build_inputs.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+  // TODO: I need to create a build input for each meshlets
 
-  build_inputs.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
-  build_inputs.triangleArray.vertexStrideInBytes = 16;
-  build_inputs.triangleArray.numVertices         = tri_data.vertex_count;
-  build_inputs.triangleArray.vertexBuffers       = (CUdeviceptr*) &(tri_data.vertex_buffer);
+  uint32_t meshlet_count;
+  __FAILURE_HANDLE(array_get_num_elements(mesh->meshlets, &meshlet_count));
 
-  build_inputs.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-  build_inputs.triangleArray.indexStrideInBytes = 16;
-  build_inputs.triangleArray.numIndexTriplets   = tri_data.triangle_count;
-  build_inputs.triangleArray.indexBuffer        = (CUdeviceptr) tri_data.index_buffer;
+  DEVICE float* device_vertex_buffer;
+  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * mesh->data->vertex_count));
+  __FAILURE_HANDLE(device_upload(device_vertex_buffer, mesh->data->vertex_buffer, 0, sizeof(float) * 4 * mesh->data->vertex_count));
+
+  CUdeviceptr device_vertex_buffer_ptr = DEVICE_PTR(device_vertex_buffer);
+
+  DEVICE uint32_t** meshlet_device_index_buffers;
+  __FAILURE_HANDLE(host_malloc(&meshlet_device_index_buffers, sizeof(DEVICE uint32_t*) * meshlet_count));
+
+  OptixBuildInput* build_inputs;
+  __FAILURE_HANDLE(host_malloc(&build_inputs, sizeof(OptixBuildInput) * meshlet_count));
+
+  unsigned int inputFlags = 0;
+  inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
+  inputFlags |= (type == OPTIX_RT_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
+
+  for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
+    const Meshlet meshlet = mesh->meshlets[meshlet_id];
+
+    OptixBuildInput build_input;
+    memset(&build_input, 0, sizeof(OptixBuildInput));
+    build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+
+    build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+    build_input.triangleArray.vertexStrideInBytes = 16;
+    build_input.triangleArray.numVertices         = mesh->data->vertex_count;
+    build_input.triangleArray.vertexBuffers       = &device_vertex_buffer_ptr;
+
+    __FAILURE_HANDLE(device_malloc(&meshlet_device_index_buffers[meshlet_id], sizeof(uint32_t) * 4 * meshlet.triangle_count));
+    __FAILURE_HANDLE(
+      device_upload(meshlet_device_index_buffers[meshlet_id], meshlet.index_buffer, 0, sizeof(uint32_t) * 4 * meshlet.triangle_count));
+
+    build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+    build_input.triangleArray.indexStrideInBytes = 16;
+    build_input.triangleArray.numIndexTriplets   = meshlet.triangle_count;
+    build_input.triangleArray.indexBuffer        = DEVICE_PTR(meshlet_device_index_buffers[meshlet_id]);
+
+    build_input.triangleArray.flags         = &inputFlags;
+    build_input.triangleArray.numSbtRecords = 1;
+
+    // Lower 12 bits is the triangle id inside the meshlet, upper bits are the meshlet id.
+    build_input.triangleArray.primitiveIndexOffset = (meshlet_id << 12);
+
+    build_inputs[meshlet_id] = build_input;
+  }
 
   // OptiX requires pointers to be null if there is no data.
+  // TODO: Make sure that we don't need that anymore by requiring that meshes are not empty and that the renderer can handle having no
+  // geometry.
+#if 0
   if (tri_data.vertex_count == 0) {
     build_inputs.triangleArray.vertexBuffers = (CUdeviceptr*) 0;
   }
@@ -173,85 +207,95 @@ void optixrt_build_bvh(
   if (build_inputs.triangleArray.numIndexTriplets == 0) {
     build_inputs.triangleArray.indexBuffer = (CUdeviceptr) 0;
   }
+#endif
 
-  unsigned int inputFlags = 0;
-  inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
-  inputFlags |= (type == OPTIX_RT_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
-
-  build_inputs.triangleArray.flags         = &inputFlags;
-  build_inputs.triangleArray.numSbtRecords = 1;
-
+  // TODO: Figure out how to do this now that we have meshlets
+#if 0
   if (omm)
     build_inputs.triangleArray.opacityMicromap = *omm;
 
   if (dmm)
     build_inputs.triangleArray.displacementMicromap = *dmm;
+#endif
 
   OptixAccelBufferSizes buffer_sizes;
 
-  OPTIX_CHECK(optixAccelComputeMemoryUsage(optix_ctx, &build_options, &build_inputs, 1, &buffer_sizes));
-  gpuErrchk(cudaDeviceSynchronize());
+  OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(optix_ctx, &build_options, build_inputs, meshlet_count, &buffer_sizes));
+  CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
 
-  void* temp_buffer;
-  device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes);
+  DEVICE void* temp_buffer;
+  __FAILURE_HANDLE(device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes));
 
-  void* output_buffer;
-  device_malloc(&output_buffer, buffer_sizes.outputSizeInBytes);
+  DEVICE void* output_buffer;
+  __FAILURE_HANDLE(device_malloc(&output_buffer, buffer_sizes.outputSizeInBytes));
 
   OptixTraversableHandle traversable;
+
+  DEVICE size_t* accel_emit_buffer;
+  __FAILURE_HANDLE(device_malloc(&accel_emit_buffer, sizeof(size_t)));
 
   OptixAccelEmitDesc accel_emit;
   memset(&accel_emit, 0, sizeof(OptixAccelEmitDesc));
 
-  device_malloc((void**) &accel_emit.result, sizeof(size_t));
-  accel_emit.type = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
+  accel_emit.result = DEVICE_PTR(accel_emit_buffer);
+  accel_emit.type   = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
 
-  OPTIX_CHECK(optixAccelBuild(
-    optix_ctx, 0, &build_options, &build_inputs, 1, (CUdeviceptr) temp_buffer, buffer_sizes.tempSizeInBytes, (CUdeviceptr) output_buffer,
-    buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
-  gpuErrchk(cudaDeviceSynchronize());
+  OPTIX_FAILURE_HANDLE(optixAccelBuild(
+    optix_ctx, 0, &build_options, build_inputs, meshlet_count, DEVICE_PTR(temp_buffer), buffer_sizes.tempSizeInBytes,
+    DEVICE_PTR(output_buffer), buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
+  CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
 
   size_t compact_size;
+  __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t)));
 
-  device_download(&compact_size, (void*) accel_emit.result, sizeof(size_t));
-
-  device_free((void*) accel_emit.result, sizeof(size_t));
-  device_free(temp_buffer, buffer_sizes.tempSizeInBytes);
+  __FAILURE_HANDLE(device_free(&accel_emit_buffer));
+  __FAILURE_HANDLE(device_free(&temp_buffer));
 
   if (compact_size < buffer_sizes.outputSizeInBytes) {
     log_message("OptiX BVH is being compacted from size %zu to size %zu", buffer_sizes.outputSizeInBytes, compact_size);
-    void* output_buffer_compact;
-    device_malloc(&output_buffer_compact, compact_size);
+    DEVICE void* output_buffer_compact;
+    __FAILURE_HANDLE(device_malloc(&output_buffer_compact, compact_size));
 
-    OPTIX_CHECK(optixAccelCompact(optix_ctx, 0, traversable, (CUdeviceptr) output_buffer_compact, compact_size, &traversable));
-    gpuErrchk(cudaDeviceSynchronize());
+    OPTIX_FAILURE_HANDLE(optixAccelCompact(optix_ctx, 0, traversable, DEVICE_PTR(output_buffer_compact), compact_size, &traversable));
+    CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
 
-    device_free(output_buffer, buffer_sizes.outputSizeInBytes);
+    __FAILURE_HANDLE(device_free(&output_buffer));
 
     output_buffer                  = output_buffer_compact;
     buffer_sizes.outputSizeInBytes = compact_size;
   }
 
+  // Cleanup
+  __FAILURE_HANDLE(host_free(&build_inputs));
+  __FAILURE_HANDLE(device_free(&device_vertex_buffer));
+
+  for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
+    __FAILURE_HANDLE(device_free(&meshlet_device_index_buffers[meshlet_id]));
+  }
+
+  __FAILURE_HANDLE(host_free(&meshlet_device_index_buffers));
+
   bvh->bvh_data     = output_buffer;
   bvh->bvh_mem_size = buffer_sizes.outputSizeInBytes;
   bvh->traversable  = traversable;
+
+  return LUMINARY_SUCCESS;
 }
 
-void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels.ptx", &(instance->optix_kernel), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", &(instance->particles_instance.kernel), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_geometry.ptx", &(instance->optix_kernel_geometry), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_volume.ptx", &(instance->optix_kernel_volume), options);
-  optixrt_compile_kernel(instance->optix_ctx, (char*) "optix_kernels_particle.ptx", &(instance->optix_kernel_particle), options);
-  optixrt_compile_kernel(
-    instance->optix_ctx, (char*) "optix_kernels_volume_bridges.ptx", &(instance->optix_kernel_volume_bridges), options);
+LuminaryResult optixrt_init(Device* device, RendererSettings settings) {
+  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels.ptx", device->optix_kernel, settings);
+  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", device->particles_instance.kernel, settings);
+  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_geometry.ptx", device->optix_kernel_geometry, settings);
+  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_volume.ptx", device->optix_kernel_volume, settings);
+  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_particle.ptx", device->optix_kernel_particle, settings);
+  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_volume_bridges.ptx", device->optix_kernel_volume_bridges, settings);
 
   ////////////////////////////////////////////////////////////////////
   // Displacement Micromaps Building
   ////////////////////////////////////////////////////////////////////
 
   OptixBuildInputDisplacementMicromap dmm;
-  if ((instance->device_info.rt_core_version >= 1 && options.dmm_active) || instance->device_info.rt_core_version >= 3) {
+  if ((device->properties.rt_core_version >= 1 && settings.use_opacity_micromaps) || device->properties.rt_core_version >= 3) {
     dmm = micromap_displacement_build(instance);
   }
   else {
@@ -264,10 +308,10 @@ void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   ////////////////////////////////////////////////////////////////////
 
   OptixBuildInputOpacityMicromap omm;
-  // OMM and DMM at the same time are only supported on RT core version 3.0 (Ada Lovelace)
+  // OMM and DMM at the same time are only supported on RT core version 3.0 or later (Ada+)
   if (
-    options.omm_active
-    && (((instance->device_info.rt_core_version >= 1 && !dmm.displacementMicromapArray) || instance->device_info.rt_core_version >= 3))) {
+    settings.use_opacity_micromaps
+    && (((device->properties.rt_core_version >= 1 && !dmm.displacementMicromapArray) || device->properties.rt_core_version >= 3))) {
     omm = micromap_opacity_build(instance);
   }
   else {
@@ -278,6 +322,8 @@ void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   ////////////////////////////////////////////////////////////////////
   // BVH Building
   ////////////////////////////////////////////////////////////////////
+
+  // TODO: This must be separate
 
   optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh, instance->scene.triangle_data, &dmm, &omm, OPTIX_RT_BVH_TYPE_DEFAULT);
   optixrt_build_bvh(instance->optix_ctx, &instance->optix_bvh_shadow, instance->scene.triangle_data, &dmm, &omm, OPTIX_RT_BVH_TYPE_SHADOW);
@@ -291,15 +337,22 @@ void optixrt_init(RaytraceInstance* instance, CommandlineOptions options) {
   device_update_symbol(optix_bvh_light, instance->optix_bvh_light.traversable);
 
   instance->optix_bvh.initialized = 1;
+
+  return LUMINARY_SUCCESS;
 }
 
-void optixrt_update_params(OptixKernel kernel) {
+LuminaryResult optixrt_update_params(OptixKernel kernel) {
   // Since this is device -> device, the cost of this is negligble.
+  // TODO: Only do this if dirty, we only need to update the sample slice.
   device_gather_device_table(kernel.params, cudaMemcpyDeviceToDevice);
+
+  return LUMINARY_SUCCESS;
 }
 
-void optixrt_execute(OptixKernel kernel) {
+LuminaryResult optixrt_execute(OptixKernel kernel) {
   optixrt_update_params(kernel);
-  OPTIX_CHECK(optixLaunch(
+  OPTIX_FAILURE_HANDLE(optixLaunch(
     kernel.pipeline, 0, (CUdeviceptr) kernel.params, sizeof(DeviceConstantMemory), &kernel.shaders, THREADS_PER_BLOCK, BLOCKS_PER_GRID, 1));
+
+  return LUMINARY_SUCCESS;
 }

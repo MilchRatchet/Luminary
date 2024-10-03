@@ -4,32 +4,38 @@
 #include "internal_error.h"
 
 void _device_init(void) {
-  OPTIX_CHECK(optixInit());
+  OptixResult result = optixInit();
+
+  if (result != OPTIX_SUCCESS) {
+    crash_message("Failed to init optix.");
+  }
 }
 
 ////////////////////////////////////////////////////////////////////
 // OptiX Log Callback
 ////////////////////////////////////////////////////////////////////
 
+#ifdef OPTIX_VALIDATION
 static void _device_optix_log_callback(unsigned int level, const char* tag, const char* message, void* cbdata) {
   Device* device = (Device*) cbdata;
 
   switch (level) {
     case 1:
       device->optix_callback_error = true;
-      print_error("[OptiX Log Message][%s] %s", tag, message);
+      luminary_print_error("[OptiX Log Message][%s] %s", tag, message);
       break;
     case 2:
-      print_error("[OptiX Log Message][%s] %s", tag, message);
+      luminary_print_error("[OptiX Log Message][%s] %s", tag, message);
       break;
     case 3:
-      print_warn("[OptiX Log Message][%s] %s", tag, message);
+      luminary_print_warn("[OptiX Log Message][%s] %s", tag, message);
       break;
     default:
-      print_info("[OptiX Log Message][%s] %s", tag, message);
+      luminary_print_info("[OptiX Log Message][%s] %s", tag, message);
       break;
   }
 }
+#endif
 
 static char* _device_arch_enum_to_string(const DeviceArch arch) {
   switch (arch) {
@@ -145,7 +151,7 @@ LuminaryResult _device_get_properties(DeviceProperties* props, const uint32_t in
 
   props->memory_size = prop.totalGlobalMem;
 
-  memcpy(props->name, prop.name, 256);
+  memcpy((void*) props->name, prop.name, 256);
 
   return LUMINARY_SUCCESS;
 }
@@ -155,9 +161,7 @@ LuminaryResult _device_get_properties(DeviceProperties* props, const uint32_t in
 ////////////////////////////////////////////////////////////////////
 
 LuminaryResult device_create(Device** _device, uint32_t index) {
-  if (!_device) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Device is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(_device);
 
   Device* device;
   __FAILURE_HANDLE(host_malloc(&device, sizeof(Device)));
@@ -173,11 +177,25 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   CUDA_FAILURE_HANDLE(cudaSetDevice(device->index));
 
-  _device = device;
+  OptixDeviceContextOptions optix_device_context_options;
+  memset(&optix_device_context_options, 0, sizeof(OptixDeviceContextOptions));
+
+#ifdef OPTIX_VALIDATION
+  optix_device_context_options.logCallbackData     = (void*) 0;
+  optix_device_context_options.logCallbackFunction = _device_optix_log_callback;
+  optix_device_context_options.logCallbackLevel    = 3;
+  optix_device_context_options.validationMode      = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
+#endif
+
+  OPTIX_FAILURE_HANDLE(optixDeviceContextCreate((CUcontext) 0, &optix_device_context_options, &device->optix_ctx));
+
+  *_device = device;
 
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult device_destroy(Device** device) {
+  __CHECK_NULL_ARGUMENT(device);
+
   __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
 }
