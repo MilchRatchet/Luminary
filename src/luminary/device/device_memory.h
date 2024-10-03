@@ -5,7 +5,7 @@
 
 #define DEVICE
 
-#define DEVICE_PTR(device_mem) (*((CUdeviceptr*) (((uint64_t*) device_mem) + 1)))
+#define DEVICE_PTR(device_mem) (*((CUdeviceptr*) (((uint64_t*) (device_mem)) + 1)))
 
 #define device_malloc(ptr, size) _device_malloc((void**) ptr, size, (const char*) #ptr, (const char*) __func__, __LINE__)
 #define device_malloc2D(ptr, size) _device_malloc2D((void**) ptr, size, (const char*) #ptr, (const char*) __func__, __LINE__)

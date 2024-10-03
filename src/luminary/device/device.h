@@ -2,8 +2,7 @@
 #define LUMINARY_DEVICE_H
 
 #include "device_utils.h"
-
-struct OptixKernel;
+#include "optixrt.h"
 
 // Set of architectures supported by Luminary
 enum DeviceArch {
@@ -31,11 +30,7 @@ struct Device {
   bool exit_requested;
   bool optix_callback_error;
   OptixDeviceContext optix_ctx;
-  struct OptixKernel* optix_kernel;
-  struct OptixKernel* optix_kernel_geometry;
-  struct OptixKernel* optix_kernel_volume;
-  struct OptixKernel* optix_kernel_particle;
-  struct OptixKernel* optix_kernel_volume_bridges;
+  OptixKernel* optix_kernels[OPTIX_KERNEL_TYPE_COUNT];
 } typedef Device;
 
 void _device_init(void);

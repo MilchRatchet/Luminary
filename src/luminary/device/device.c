@@ -2,6 +2,7 @@
 
 #include "device_utils.h"
 #include "internal_error.h"
+#include "optixrt.h"
 
 void _device_init(void) {
   OptixResult result = optixInit();
@@ -57,10 +58,8 @@ static char* _device_arch_enum_to_string(const DeviceArch arch) {
   }
 }
 
-LuminaryResult _device_get_properties(DeviceProperties* props, const uint32_t index) {
-  if (!props) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Properties is NULL.");
-  }
+static LuminaryResult _device_get_properties(DeviceProperties* props, const uint32_t index) {
+  __CHECK_NULL_ARGUMENT(props);
 
   // TODO: Use correct device ID.
   struct cudaDeviceProp prop;
@@ -156,6 +155,14 @@ LuminaryResult _device_get_properties(DeviceProperties* props, const uint32_t in
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_compile_optix_kernel(Device* device, OptixKernelType type) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  __FAILURE_HANDLE(optixrt_kernel_create(&device->optix_kernels[type], device, type));
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // External API implementation
 ////////////////////////////////////////////////////////////////////
@@ -188,6 +195,17 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 #endif
 
   OPTIX_FAILURE_HANDLE(optixDeviceContextCreate((CUcontext) 0, &optix_device_context_options, &device->optix_ctx));
+
+  ////////////////////////////////////////////////////////////////////
+  // Compile OptiX kernels
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY));
+  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES));
+  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_SHADING_GEOMETRY));
+  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_SHADING_VOLUME));
+  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_SHADING_PARTICLES));
+  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES));
 
   *_device = device;
 

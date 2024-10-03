@@ -3,10 +3,13 @@
 
 #include "utils.h"
 
-#define __RETURN_ERROR(return_code, fmt, ...) \
-  {                                           \
-    log_message(fmt, ##__VA_ARGS__);          \
-    return return_code;                       \
+#define __RETURN_ERROR(return_code, fmt, ...)    \
+  {                                              \
+    if (return_code & LUMINARY_ERROR_PROPAGATED) \
+      log_message(fmt, ##__VA_ARGS__);           \
+    else                                         \
+      error_message(fmt, ##__VA_ARGS__);         \
+    return return_code;                          \
   }
 
 #define __CHECK_NULL_ARGUMENT(argument)                                     \

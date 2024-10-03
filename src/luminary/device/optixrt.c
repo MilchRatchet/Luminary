@@ -13,23 +13,46 @@
 #include "internal_error.h"
 #include "utils.h"
 
-LuminaryResult optixrt_compile_kernel(
-  const OptixDeviceContext optix_ctx, const char* kernels_name, OptixKernel* kernel, RendererSettings settings) {
-  log_message("Compiling kernels: %s.", kernels_name);
+// TODO: Specify things like num payloads etc.
+struct OptixKernelConfig {
+  const char* name;
+} typedef OptixKernelConfig;
+
+// TODO: Rename the ptx to the same as the types.
+static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
+  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernels.ptx"},
+  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernels_trace_particle.ptx"},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernels_geometry.ptx"},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernels_volume.ptx"},
+  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx"},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx"}};
+
+LuminaryResult optixrt_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type) {
+  __CHECK_NULL_ARGUMENT(kernel);
+  __CHECK_NULL_ARGUMENT(device);
+
+  log_message("Compiling kernel %s for %s.", optix_kernel_configs[type].name, device->properties.name);
+
+  __FAILURE_HANDLE(host_malloc(kernel, sizeof(OptixKernel)));
 
   ////////////////////////////////////////////////////////////////////
-  // Module Compilation
+  // Get PTX
   ////////////////////////////////////////////////////////////////////
 
   int64_t ptx_length;
   char* ptx;
   uint64_t ptx_info;
 
-  ceb_access(kernels_name, (void**) &ptx, &ptx_length, &ptx_info);
+  ceb_access(optix_kernel_configs[type].name, (void**) &ptx, &ptx_length, &ptx_info);
 
   if (ptx_info || !ptx_length) {
-    crash_message("Failed to load OptiX kernels %s. Ceb Error Code: %zu", kernels_name, ptx_info);
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION, "Failed to load OptiX kernels %s. Ceb Error Code: %zu.", optix_kernel_configs[type].name, ptx_info);
   }
+
+  ////////////////////////////////////////////////////////////////////
+  // Module Compilation
+  ////////////////////////////////////////////////////////////////////
 
   OptixModuleCompileOptions module_compile_options;
   memset(&module_compile_options, 0, sizeof(OptixModuleCompileOptions));
@@ -49,11 +72,14 @@ LuminaryResult optixrt_compile_kernel(
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
   pipeline_compile_options.usesPrimitiveTypeFlags           = OPTIX_PRIMITIVE_TYPE_FLAGS_TRIANGLE;
 
+  // TODO: Handle OMMs and DMMs.
+#if 0
   if (settings.use_opacity_micromaps)
     pipeline_compile_options.allowOpacityMicromaps = 1;
 
   if (settings.use_displacement_micromaps)
     pipeline_compile_options.usesPrimitiveTypeFlags |= OPTIX_PRIMITIVE_TYPE_FLAGS_DISPLACED_MICROMESH_TRIANGLE;
+#endif
 
   char log[4096];
   size_t log_size = sizeof(log);
@@ -61,7 +87,8 @@ LuminaryResult optixrt_compile_kernel(
   OptixModule module;
 
   OPTIX_FAILURE_HANDLE_LOG(
-    optixModuleCreate(optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module), log);
+    optixModuleCreate(device->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module),
+    log);
 
   ////////////////////////////////////////////////////////////////////
   // Group Creation
@@ -85,9 +112,8 @@ LuminaryResult optixrt_compile_kernel(
   group_desc[2].hitgroup.moduleCH            = module;
   group_desc[2].hitgroup.entryFunctionNameCH = "__closesthit__optix";
 
-  OptixProgramGroup groups[OPTIXRT_NUM_GROUPS];
-
-  OPTIX_FAILURE_HANDLE_LOG(optixProgramGroupCreate(optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, groups), log);
+  OPTIX_FAILURE_HANDLE_LOG(
+    optixProgramGroupCreate(device->optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, (*kernel)->groups), log);
 
   ////////////////////////////////////////////////////////////////////
   // Pipeline Creation
@@ -98,7 +124,8 @@ LuminaryResult optixrt_compile_kernel(
 
   OPTIX_FAILURE_HANDLE_LOG(
     optixPipelineCreate(
-      optix_ctx, &pipeline_compile_options, &pipeline_link_options, groups, OPTIXRT_NUM_GROUPS, log, &log_size, &kernel->pipeline),
+      device->optix_ctx, &pipeline_compile_options, &pipeline_link_options, (*kernel)->groups, OPTIXRT_NUM_GROUPS, log, &log_size,
+      &(*kernel)->pipeline),
     log);
 
   ////////////////////////////////////////////////////////////////////
@@ -110,42 +137,88 @@ LuminaryResult optixrt_compile_kernel(
 
   char host_records[OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE];
 
-  for (int i = 0; i < OPTIXRT_NUM_GROUPS; i++) {
-    OPTIX_FAILURE_HANDLE(optixSbtRecordPackHeader(groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
+  for (uint32_t i = 0; i < OPTIXRT_NUM_GROUPS; i++) {
+    OPTIX_FAILURE_HANDLE(optixSbtRecordPackHeader((*kernel)->groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
   }
 
   __FAILURE_HANDLE(device_upload(records, host_records, 0, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
 
-  kernel->shaders.raygenRecord       = DEVICE_PTR(records) + 0 * OPTIX_SBT_RECORD_HEADER_SIZE;
-  kernel->shaders.missRecordBase     = DEVICE_PTR(records) + 1 * OPTIX_SBT_RECORD_HEADER_SIZE;
-  kernel->shaders.hitgroupRecordBase = DEVICE_PTR(records) + 2 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.raygenRecord       = DEVICE_PTR(records) + 0 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.missRecordBase     = DEVICE_PTR(records) + 1 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.hitgroupRecordBase = DEVICE_PTR(records) + 2 * OPTIX_SBT_RECORD_HEADER_SIZE;
 
-  kernel->shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
-  kernel->shaders.missRecordCount         = 1;
+  (*kernel)->shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.missRecordCount         = 1;
 
-  kernel->shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
-  kernel->shaders.hitgroupRecordCount         = 1;
+  (*kernel)->shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.hitgroupRecordCount         = 1;
 
   ////////////////////////////////////////////////////////////////////
   // Params Creation
   ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(device_malloc(&(kernel->params), sizeof(DeviceConstantMemory)));
+  __FAILURE_HANDLE(device_malloc(&((*kernel)->params), sizeof(DeviceConstantMemory)));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optixrt_build_bvh(
-  OptixDeviceContext optix_ctx, OptixBVH* bvh, const Mesh* mesh, const OptixBuildInputDisplacementMicromap* dmm,
-  const OptixBuildInputOpacityMicromap* omm, const OptixRTBVHType type) {
+LuminaryResult optixrt_kernel_update_params(OptixKernel* kernel) {
+  __CHECK_NULL_ARGUMENT(kernel);
+
+  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+}
+
+LuminaryResult optixrt_kernel_update_sample_id(OptixKernel* kernel) {
+  __CHECK_NULL_ARGUMENT(kernel);
+
+  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+}
+
+LuminaryResult optixrt_kernel_execute(OptixKernel* kernel) {
+  __CHECK_NULL_ARGUMENT(kernel);
+
+  OPTIX_FAILURE_HANDLE(optixLaunch(
+    kernel->pipeline, 0, DEVICE_PTR(kernel->params), sizeof(DeviceConstantMemory), &kernel->shaders, THREADS_PER_BLOCK, BLOCKS_PER_GRID,
+    1));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult optixrt_kernel_destroy(OptixKernel** kernel) {
+  __CHECK_NULL_ARGUMENT(kernel);
+
+  OPTIX_FAILURE_HANDLE(optixPipelineDestroy((*kernel)->pipeline));
+
+  for (uint32_t group_id = 0; group_id < OPTIXRT_NUM_GROUPS; group_id++) {
+    OPTIX_FAILURE_HANDLE(optixProgramGroupDestroy((*kernel)->groups[group_id]));
+  }
+
+  OPTIX_FAILURE_HANDLE(optixModuleDestroy((*kernel)->module))
+
+  __FAILURE_HANDLE(device_free(&(*kernel)->params));
+
+  __FAILURE_HANDLE(host_free(kernel));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult optixrt_bvh_create(OptixBVH** bvh, Device* device, const Mesh* mesh, OptixRTBVHType type) {
+  __CHECK_NULL_ARGUMENT(bvh);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(mesh);
+
+  __FAILURE_HANDLE(host_malloc(bvh, sizeof(OptixBVH)));
+
+  ////////////////////////////////////////////////////////////////////
+  // Setting up build input
+  ////////////////////////////////////////////////////////////////////
+
   OptixAccelBuildOptions build_options;
   memset(&build_options, 0, sizeof(OptixAccelBuildOptions));
   build_options.operation             = OPTIX_BUILD_OPERATION_BUILD;
   build_options.motionOptions.flags   = OPTIX_MOTION_FLAG_NONE;
   build_options.motionOptions.numKeys = 1;
   build_options.buildFlags            = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
-
-  // TODO: I need to create a build input for each meshlets
 
   uint32_t meshlet_count;
   __FAILURE_HANDLE(array_get_num_elements(mesh->meshlets, &meshlet_count));
@@ -196,9 +269,9 @@ LuminaryResult optixrt_build_bvh(
     build_inputs[meshlet_id] = build_input;
   }
 
-  // OptiX requires pointers to be null if there is no data.
-  // TODO: Make sure that we don't need that anymore by requiring that meshes are not empty and that the renderer can handle having no
-  // geometry.
+// OptiX requires pointers to be null if there is no data.
+// TODO: Make sure that we don't need that anymore by requiring that meshes are not empty and that the renderer can handle having no
+// geometry.
 #if 0
   if (tri_data.vertex_count == 0) {
     build_inputs.triangleArray.vertexBuffers = (CUdeviceptr*) 0;
@@ -218,9 +291,13 @@ LuminaryResult optixrt_build_bvh(
     build_inputs.triangleArray.displacementMicromap = *dmm;
 #endif
 
+  ////////////////////////////////////////////////////////////////////
+  // Building BVH
+  ////////////////////////////////////////////////////////////////////
+
   OptixAccelBufferSizes buffer_sizes;
 
-  OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(optix_ctx, &build_options, build_inputs, meshlet_count, &buffer_sizes));
+  OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(device->optix_ctx, &build_options, build_inputs, meshlet_count, &buffer_sizes));
   CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
 
   DEVICE void* temp_buffer;
@@ -241,7 +318,7 @@ LuminaryResult optixrt_build_bvh(
   accel_emit.type   = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
 
   OPTIX_FAILURE_HANDLE(optixAccelBuild(
-    optix_ctx, 0, &build_options, build_inputs, meshlet_count, DEVICE_PTR(temp_buffer), buffer_sizes.tempSizeInBytes,
+    device->optix_ctx, 0, &build_options, build_inputs, meshlet_count, DEVICE_PTR(temp_buffer), buffer_sizes.tempSizeInBytes,
     DEVICE_PTR(output_buffer), buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
   CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
 
@@ -256,7 +333,8 @@ LuminaryResult optixrt_build_bvh(
     DEVICE void* output_buffer_compact;
     __FAILURE_HANDLE(device_malloc(&output_buffer_compact, compact_size));
 
-    OPTIX_FAILURE_HANDLE(optixAccelCompact(optix_ctx, 0, traversable, DEVICE_PTR(output_buffer_compact), compact_size, &traversable));
+    OPTIX_FAILURE_HANDLE(
+      optixAccelCompact(device->optix_ctx, 0, traversable, DEVICE_PTR(output_buffer_compact), compact_size, &traversable));
     CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
 
     __FAILURE_HANDLE(device_free(&output_buffer));
@@ -265,7 +343,10 @@ LuminaryResult optixrt_build_bvh(
     buffer_sizes.outputSizeInBytes = compact_size;
   }
 
-  // Cleanup
+  ////////////////////////////////////////////////////////////////////
+  // Clean up
+  ////////////////////////////////////////////////////////////////////
+
   __FAILURE_HANDLE(host_free(&build_inputs));
   __FAILURE_HANDLE(device_free(&device_vertex_buffer));
 
@@ -275,20 +356,25 @@ LuminaryResult optixrt_build_bvh(
 
   __FAILURE_HANDLE(host_free(&meshlet_device_index_buffers));
 
-  bvh->bvh_data     = output_buffer;
-  bvh->bvh_mem_size = buffer_sizes.outputSizeInBytes;
-  bvh->traversable  = traversable;
+  (*bvh)->bvh_data    = output_buffer;
+  (*bvh)->traversable = traversable;
 
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult optixrt_bvh_destroy(OptixBVH** bvh) {
+  __CHECK_NULL_ARGUMENT(bvh);
+
+  __FAILURE_HANDLE(device_free((*bvh)->bvh_data));
+
+  __FAILURE_HANDLE(host_free(bvh));
+
+  return LUMINARY_SUCCESS;
+}
+
+// TODO: Remove, this is just a reference for later for OMMs and DMMs
+#if 0
 LuminaryResult optixrt_init(Device* device, RendererSettings settings) {
-  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels.ptx", device->optix_kernel, settings);
-  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_trace_particle.ptx", device->particles_instance.kernel, settings);
-  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_geometry.ptx", device->optix_kernel_geometry, settings);
-  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_volume.ptx", device->optix_kernel_volume, settings);
-  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_particle.ptx", device->optix_kernel_particle, settings);
-  optixrt_compile_kernel(device->optix_ctx, (char*) "optix_kernels_volume_bridges.ptx", device->optix_kernel_volume_bridges, settings);
 
   ////////////////////////////////////////////////////////////////////
   // Displacement Micromaps Building
@@ -340,19 +426,4 @@ LuminaryResult optixrt_init(Device* device, RendererSettings settings) {
 
   return LUMINARY_SUCCESS;
 }
-
-LuminaryResult optixrt_update_params(OptixKernel kernel) {
-  // Since this is device -> device, the cost of this is negligble.
-  // TODO: Only do this if dirty, we only need to update the sample slice.
-  device_gather_device_table(kernel.params, cudaMemcpyDeviceToDevice);
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult optixrt_execute(OptixKernel kernel) {
-  optixrt_update_params(kernel);
-  OPTIX_FAILURE_HANDLE(optixLaunch(
-    kernel.pipeline, 0, (CUdeviceptr) kernel.params, sizeof(DeviceConstantMemory), &kernel.shaders, THREADS_PER_BLOCK, BLOCKS_PER_GRID, 1));
-
-  return LUMINARY_SUCCESS;
-}
+#endif
