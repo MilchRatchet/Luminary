@@ -166,6 +166,25 @@ LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pit
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_memory_get_pitch(DEVICE const void* ptr, size_t* pitch) {
+  __CHECK_NULL_ARGUMENT(ptr);
+  __CHECK_NULL_ARGUMENT(pitch);
+
+  struct DeviceMemoryHeader* header = (struct DeviceMemoryHeader*) ptr;
+
+  if (header->magic != DEVICE_MEMORY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Destination is not device memory.");
+  }
+
+  if (header->pitch == 0) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device memory was not allocated with a pitch.");
+  }
+
+  *pitch = header->pitch;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, size_t size) {
   __CHECK_NULL_ARGUMENT(ptr);
 

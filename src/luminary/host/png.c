@@ -308,7 +308,7 @@ static inline Texture* _png_default_texture() {
   data[3]             = default_pixel;
   Texture* fallback;
 
-  texture_create(&fallback, 2, 2, 1, 2, data, TexDataUINT8, 4, TexStorageCPU);
+  texture_create(&fallback, 2, 2, 1, 2, data, TexDataUINT8, 4);
 
   return fallback;
 }
@@ -516,7 +516,7 @@ LuminaryResult png_load(Texture** texture, const uint8_t* file, const size_t fil
 
   Texture* result;
   const TextureDataType tex_data_type = (bit_depth == PNG_BITDEPTH_8) ? TexDataUINT8 : TexDataUINT16;
-  __FAILURE_HANDLE(texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, 4, TexStorageCPU));
+  __FAILURE_HANDLE(texture_create(&result, width, height, 1, width, (void*) 0, tex_data_type, 4));
 
   uint8_t* filtered_data;
   __FAILURE_HANDLE(host_malloc(&filtered_data, width * height * byte_per_pixel + height));

@@ -74,24 +74,12 @@ LuminaryResult store_XRGB8_qoi(const char* filename, const XRGB8* image, const i
 }
 
 LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** data) {
-  if (!tex) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
-  }
-
-  if (!encoded_size) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Encoded size ptr is NULL.");
-  }
-
-  if (!data) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Data is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(tex);
+  __CHECK_NULL_ARGUMENT(encoded_size);
+  __CHECK_NULL_ARGUMENT(data);
 
   if (tex->type != TexDataUINT8) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is not of channel type uint8_t.");
-  }
-
-  if (tex->storage != TexStorageCPU) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is not local to the CPU.");
   }
 
   if (tex->dim != Tex2D) {
@@ -106,18 +94,13 @@ LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** da
 }
 
 LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture** texture) {
-  if (!data) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Data is NULL.");
-  }
-
-  if (!texture) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(data);
+  __CHECK_NULL_ARGUMENT(texture);
 
   qoi_desc desc;
   void* decoded_data = qoi_decode(data, size, &desc, 4);
 
-  __FAILURE_HANDLE(texture_create(texture, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, 4, TexStorageCPU));
+  __FAILURE_HANDLE(texture_create(texture, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, 4));
 
   return LUMINARY_SUCCESS;
 }

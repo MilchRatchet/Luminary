@@ -15,8 +15,8 @@
 
 #define OPTIX_VALIDATION
 
-struct DeviceTexture;
-typedef struct DeviceTexture DeviceTexture;
+struct DeviceTexture typedef DeviceTexture;
+typedef cudaTextureObject_t DeviceTextureHandle;
 
 ////////////////////////////////////////////////////////////////////
 // Failure handles

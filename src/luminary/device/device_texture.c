@@ -14,7 +14,7 @@ struct cudaPitchedPtr _device_texture_make_cudapitchedptr(void* ptr, size_t pitc
   return pitchedptr;
 }
 
-LuminaryResult _device_texture_get_address_mode(const TextureWrappingMode mode, enum cudaTextureAddressMode* address_mode) {
+static LuminaryResult _device_texture_get_address_mode(const TextureWrappingMode mode, enum cudaTextureAddressMode* address_mode) {
   switch (mode) {
     case TexModeWrap:
       *address_mode = cudaAddressModeWrap;
@@ -33,7 +33,7 @@ LuminaryResult _device_texture_get_address_mode(const TextureWrappingMode mode, 
   }
 }
 
-LuminaryResult _device_texture_get_read_mode(const Texture* tex, enum cudaTextureReadMode* mode) {
+static LuminaryResult _device_texture_get_read_mode(const Texture* tex, enum cudaTextureReadMode* mode) {
   switch (tex->type) {
     case TexDataFP32:
       *mode = cudaReadModeElementType;
@@ -55,7 +55,7 @@ LuminaryResult _device_texture_get_read_mode(const Texture* tex, enum cudaTextur
   }
 }
 
-LuminaryResult _device_texture_get_filter_mode(const Texture* tex, enum cudaTextureFilterMode* mode) {
+static LuminaryResult _device_texture_get_filter_mode(const Texture* tex, enum cudaTextureFilterMode* mode) {
   switch (tex->filter) {
     case TexFilterPoint:
       *mode = cudaFilterModePoint;
@@ -68,20 +68,7 @@ LuminaryResult _device_texture_get_filter_mode(const Texture* tex, enum cudaText
   }
 }
 
-LuminaryResult _device_texture_get_copy_to_device_type(const Texture* tex, enum cudaMemcpyKind* kind) {
-  switch (tex->storage) {
-    case TexStorageCPU:
-      *kind = cudaMemcpyHostToDevice;
-      return LUMINARY_SUCCESS;
-    case TexStorageGPU:
-      *kind = cudaMemcpyDeviceToDevice;
-      return LUMINARY_SUCCESS;
-    default:
-      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture storage location is invalid.");
-  }
-}
-
-LuminaryResult _device_texture_get_channel_format_desc(const Texture* tex, struct cudaChannelFormatDesc* desc) {
+static LuminaryResult _device_texture_get_channel_format_desc(const Texture* tex, struct cudaChannelFormatDesc* desc) {
   const int x_bits = (tex->num_components >= 1) ? 1 : 0;
   const int y_bits = (tex->num_components >= 2) ? 1 : 0;
   const int z_bits = (tex->num_components >= 3) ? 1 : 0;
@@ -112,7 +99,7 @@ LuminaryResult _device_texture_get_channel_format_desc(const Texture* tex, struc
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult _device_texture_get_pixel_size(const Texture* tex, size_t* size) {
+static LuminaryResult _device_texture_get_pixel_size(const Texture* tex, size_t* size) {
   switch (tex->type) {
     case TexDataFP32:
       *size = tex->num_components * sizeof(float);
@@ -129,13 +116,8 @@ LuminaryResult _device_texture_get_pixel_size(const Texture* tex, size_t* size) 
 }
 
 LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* texture) {
-  if (!_device_texture) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Device texture is NULL.");
-  }
-
-  if (!texture) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Texture is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(_device_texture);
+  __CHECK_NULL_ARGUMENT(texture);
 
   size_t pixel_size;
   __FAILURE_HANDLE(_device_texture_get_pixel_size(texture, &pixel_size));
@@ -157,7 +139,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
   memset(&res_desc, 0, sizeof(res_desc));
 
   struct cudaChannelFormatDesc channel_desc;
-  __FAILURE_HANDLE(texture_get_channel_format_desc(texture, &channel_desc));
+  __FAILURE_HANDLE(_device_texture_get_channel_format_desc(texture, &channel_desc));
 
   const unsigned int width  = texture->width;
   const unsigned int height = texture->height;
@@ -165,9 +147,9 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
   const unsigned int pitch  = texture->pitch;
   void* data                = texture->data;
 
-  // TODO: I think this assumes that the data is already on the GPU.
-
   log_message("Allocating device texture of dimension %ux%ux%u.", width, height, depth);
+
+  DEVICE void* data_device;
 
   switch (texture->dim) {
     case Tex2D: {
@@ -175,23 +157,23 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
         default:
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture mipmap mode is invalid.");
         case TexMipmapNone: {
-          void* data_gpu;
+          __FAILURE_HANDLE(device_malloc2D(&data_device, pitch * pixel_size, height));
+
           size_t pitch_gpu;
-          device_malloc_pitch((void**) &data_gpu, pitch * pixel_size, height, &pitch_gpu);
+          __FAILURE_HANDLE(device_memory_get_pitch(data_device, &pitch_gpu));
 
-          enum cudaMemcpyKind memcpy_kind;
-          __FAILURE_HANDLE(_device_texture_get_copy_to_device_type(texture, &memcpy_kind));
-
-          gpuErrchk(cudaMemcpy2D(data_gpu, pitch_gpu, data, pitch * pixel_size, width * pixel_size, height, memcpy_kind));
+          __FAILURE_HANDLE(device_upload2D(data_device, data, pitch * pixel_size, width * pixel_size, height));
 
           res_desc.resType                  = cudaResourceTypePitch2D;
-          res_desc.res.pitch2D.devPtr       = data_gpu;
+          res_desc.res.pitch2D.devPtr       = data_device;
           res_desc.res.pitch2D.width        = width;
           res_desc.res.pitch2D.height       = height;
           res_desc.res.pitch2D.desc         = channel_desc;
           res_desc.res.pitch2D.pitchInBytes = pitch_gpu;
         } break;
         case TexMipmapGenerate: {
+          __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Mipmaps are currently not supported.");
+#if 0
           if (texture->num_components != 4) {
             __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture num components is invalid.");
           }
@@ -219,7 +201,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
 
           res_desc.resType           = cudaResourceTypeMipmappedArray;
           res_desc.res.mipmap.mipmap = mipmap_array;
-
+#endif
         } break;
       }
     } break;
@@ -228,22 +210,24 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
         default:
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture mipmap mode is invalid.");
         case TexMipmapNone: {
-          struct cudaArray* array_gpu;
-          gpuErrchk(cudaMalloc3DArray(&array_gpu, &channel_desc, _device_texture_make_cudaextent(depth, height, pitch), 0));
+          // TODO: Add support in device_memory.
+          CUDA_FAILURE_HANDLE(
+            cudaMalloc3DArray((struct cudaArray**) &data_device, &channel_desc, _device_texture_make_cudaextent(depth, height, pitch), 0));
 
           struct cudaMemcpy3DParms copy_params = {0};
           copy_params.srcPtr                   = _device_texture_make_cudapitchedptr(data, pitch * pixel_size, width, height);
-          copy_params.dstArray                 = array_gpu;
+          copy_params.dstArray                 = (struct cudaArray*) data_device;
           copy_params.extent                   = _device_texture_make_cudaextent(depth, height, pitch);
+          copy_params.kind                     = cudaMemcpyHostToDevice;
 
-          __FAILURE_HANDLE(texture_get_copy_to_device_type(texture, &copy_params.kind));
-
-          gpuErrchk(cudaMemcpy3D(&copy_params));
+          CUDA_FAILURE_HANDLE(cudaMemcpy3D(&copy_params));
 
           res_desc.resType         = cudaResourceTypeArray;
-          res_desc.res.array.array = array_gpu;
+          res_desc.res.array.array = (struct cudaArray*) data_device;
         } break;
         case TexMipmapGenerate: {
+          __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Mipmaps are currently not supported.");
+#if 0
           if (texture->num_components != 4) {
             __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture num components is invalid.");
           }
@@ -271,6 +255,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
 
           res_desc.resType           = cudaResourceTypeMipmappedArray;
           res_desc.res.mipmap.mipmap = mipmap_array;
+#endif
         } break;
       }
 
@@ -282,11 +267,32 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
   DeviceTexture* device_texture;
   __FAILURE_HANDLE(host_malloc(&device_texture, sizeof(DeviceTexture)));
 
-  gpuErrchk(cudaCreateTextureObject(&device_texture->tex, &res_desc, &tex_desc, (const struct cudaResourceViewDesc*) 0));
+  CUDA_FAILURE_HANDLE(cudaCreateTextureObject(&device_texture->tex, &res_desc, &tex_desc, (const struct cudaResourceViewDesc*) 0));
 
+  device_texture->memory     = data_device;
   device_texture->inv_width  = 1.0f / width;
   device_texture->inv_height = 1.0f / height;
   device_texture->gamma      = texture->gamma;
+  device_texture->is_3D      = (texture->dim == Tex3D);
+
+  *_device_texture = device_texture;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_texture_destroy(DeviceTexture** device_texture) {
+  __CHECK_NULL_ARGUMENT(device_texture);
+
+  __FAILURE_HANDLE(cudaDestroyTextureObject((*device_texture)->tex));
+
+  if ((*device_texture)->is_3D) {
+    CUDA_FAILURE_HANDLE(cudaFreeArray((struct cudaArray*) (*device_texture)->memory));
+  }
+  else {
+    __FAILURE_HANDLE(device_free(&(*device_texture)->memory));
+  }
+
+  __FAILURE_HANDLE(host_free(device_texture));
 
   return LUMINARY_SUCCESS;
 }
