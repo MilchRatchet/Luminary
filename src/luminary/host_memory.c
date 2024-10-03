@@ -18,6 +18,7 @@ LUM_STATIC_SIZE_ASSERT(struct HostMemoryHeader, 64);
 
 // LUMHOSTM
 #define HOST_MEMORY_HEADER_MAGIC (0x4D54534F484D554Cull)
+#define HOST_MEMORY_HEADER_FREED_MAGIC (1337ull)
 
 // TODO: Do I need to mark this as atomic????
 static _Atomic uint64_t _host_memory_total_allocation;
@@ -36,9 +37,7 @@ void _host_memory_shutdown(void) {
 }
 
 LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const char* func, uint32_t line) {
-  if (!ptr) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Ptr is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(ptr);
 
   struct HostMemoryHeader* header = (struct HostMemoryHeader*) malloc((uint64_t) size + sizeof(struct HostMemoryHeader));
 
@@ -55,13 +54,8 @@ LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const
 }
 
 LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, const char* func, uint32_t line) {
-  if (!ptr) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Ptr is NULL.");
-  }
-
-  if (!(*ptr)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Ptr is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(ptr);
+  __CHECK_NULL_ARGUMENT(*ptr);
 
   struct HostMemoryHeader* header = ((struct HostMemoryHeader*) (*ptr)) - 1;
 
@@ -89,13 +83,8 @@ LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, cons
 }
 
 LuminaryResult _host_free(void** ptr, const char* buf_name, const char* func, uint32_t line) {
-  if (!ptr) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Ptr is NULL.");
-  }
-
-  if (!(*ptr)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Ptr is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(ptr);
+  __CHECK_NULL_ARGUMENT(*ptr);
 
   struct HostMemoryHeader* header = ((struct HostMemoryHeader*) (*ptr)) - 1;
 
@@ -107,11 +96,13 @@ LuminaryResult _host_free(void** ptr, const char* buf_name, const char* func, ui
     __RETURN_ERROR(LUMINARY_ERROR_MEMORY_LEAK, "Memory allocation is larger than total allocated memory.");
   }
 
+  header->magic = HOST_MEMORY_HEADER_FREED_MAGIC;
+
   const uint64_t size = header->size;
 
   const uint64_t prev_total = atomic_fetch_sub(&_host_memory_total_allocation, header->size);
 
-  // free(header);
+  free(header);
 
   *ptr = (void*) 0;
 

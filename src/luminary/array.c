@@ -14,6 +14,7 @@ LUM_STATIC_SIZE_ASSERT(ArrayHeader, 64u);
 
 // LUMARRAY
 #define ARRAY_HEADER_MAGIC (0x59415252414D554Cull)
+#define ARRAY_HEADER_FREED_MAGIC (420ull)
 
 LuminaryResult _array_create(
   void** _array, size_t size_of_element, uint32_t num_elements, const char* buf_name, const char* func, uint32_t line) {
@@ -63,6 +64,8 @@ LuminaryResult _array_destroy(void** array, const char* buf_name, const char* fu
   if (header->magic != ARRAY_HEADER_MAGIC) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
   }
+
+  header->magic = ARRAY_HEADER_FREED_MAGIC;
 
   __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
 

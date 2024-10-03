@@ -12,6 +12,7 @@ struct DeviceMemoryHeader {
 
 // LUMDEVIM
 #define DEVICE_MEMORY_HEADER_MAGIC (0x4D454D49444D554Cull)
+#define DEVICE_MEMORY_HEADER_FREED_MAGIC (69ull)
 
 static size_t total_memory_allocation[LUMINARY_MAX_NUM_DEVICES];
 
@@ -214,6 +215,8 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
   if (header->magic != DEVICE_MEMORY_HEADER_MAGIC) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Pointer is not device memory.");
   }
+
+  header->magic = DEVICE_MEMORY_HEADER_FREED_MAGIC;
 
   int current_device;
   CUDA_FAILURE_HANDLE(cudaGetDevice(&current_device));
