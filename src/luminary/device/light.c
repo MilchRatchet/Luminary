@@ -8,6 +8,7 @@
 
 #include "ceb.h"
 #include "device.h"
+#include "internal_error.h"
 #include "texture.h"
 #include "utils.h"
 
@@ -83,7 +84,7 @@ struct LightTreeWork {
   Fragment* fragments;
   uint2* paths;
   uint32_t triangles_count;
-  LightTreeBinaryNode* binary_nodes;
+  ARRAY LightTreeBinaryNode* binary_nodes;
   LightTreeNode* nodes;
   LightTreeNode8Packed* nodes8_packed;
   uint32_t nodes_count;
@@ -108,16 +109,18 @@ struct Bin {
 
 #define FRAGMENT_ERROR_COMP (FLT_EPSILON * 4.0f)
 
-static void _lights_tree_create_fragments(Scene* scene, LightTreeWork* work) {
-  const uint32_t triangle_count = scene->triangle_lights_count;
+static LuminaryResult _light_tree_create_fragments(Meshlet* meshlet, LightTreeWork* work) {
+  const uint32_t triangle_count = meshlet->triangle_count;
 
-  work->triangles       = scene->triangle_lights;
+  work->triangles       = meshlet->triangle_lights;
   work->triangles_count = triangle_count;
 
-  work->fragments = malloc(sizeof(Fragment) * triangle_count);
+  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * triangle_count));
 
-  for (uint32_t i = 0; i < triangle_count; i++) {
-    TriangleLight t = scene->triangle_lights[i];
+  // TODO: Add some code that during bottom level tree construction removes any triangle lights that don't have any emission, i.e., textured
+  // lights with zero normalized emission.
+  for (uint32_t tri_id = 0; tri_id < triangle_count; tri_id++) {
+    TriangleLight t = meshlet->triangle_lights[tri_id];
 
     vec3_p high = {
       .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
@@ -147,9 +150,13 @@ static void _lights_tree_create_fragments(Scene* scene, LightTreeWork* work) {
 
     const float area = 0.5f * sqrtf(cross.x * cross.x + cross.y * cross.y + cross.z * cross.z);
 
-    Fragment frag      = {.high = high, .low = low, .middle = middle, .id = i, .power = t.power * area};
-    work->fragments[i] = frag;
+    const float emission = (meshlet->has_textured_emission) ? meshlet->normalized_emission[tri_id] : 1.0f;
+
+    Fragment frag           = {.high = high, .low = low, .middle = middle, .id = tri_id, .power = emission * area};
+    work->fragments[tri_id] = frag;
   }
+
+  return LUMINARY_SUCCESS;
 }
 
 static float get_entry_by_axis(const vec3_p p, const LightTreeSweepAxis axis) {
@@ -317,21 +324,28 @@ static void divide_middles_along_axis(
   }
 }
 
-static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
+static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
   Fragment* fragments      = work->fragments;
   uint32_t fragments_count = work->triangles_count;
 
-  uint32_t nodes_length      = 1 + fragments_count;
-  LightTreeBinaryNode* nodes = malloc(sizeof(LightTreeBinaryNode) * nodes_length);
-  memset(nodes, 0, sizeof(LightTreeBinaryNode) * nodes_length);
+  ARRAY LightTreeBinaryNode* nodes;
+  __FAILURE_HANDLE(array_create(&nodes, sizeof(LightTreeBinaryNode), 1 + fragments_count));
 
-  nodes[0].triangles_address = 0;
-  nodes[0].triangle_count    = fragments_count;
-  nodes[0].type              = LIGHT_TREE_NODE_TYPE_LEAF;
-  nodes[0].path              = 0;
-  nodes[0].depth             = 0;
+  {
+    LightTreeBinaryNode root_node;
+    memset(&root_node, 0, sizeof(LightTreeBinaryNode));
 
-  Bin* bins = (Bin*) malloc(sizeof(Bin) * OBJECT_SPLIT_BIN_COUNT);
+    root_node.triangles_address = 0;
+    root_node.triangle_count    = fragments_count;
+    root_node.type              = LIGHT_TREE_NODE_TYPE_LEAF;
+    root_node.path              = 0;
+    root_node.depth             = 0;
+
+    __FAILURE_HANDLE(array_push(&nodes, &root_node));
+  }
+
+  Bin* bins;
+  __FAILURE_HANDLE(host_malloc(&bins, sizeof(Bin) * OBJECT_SPLIT_BIN_COUNT));
 
   uint32_t begin_of_current_nodes = 0;
   uint32_t end_of_current_nodes   = 1;
@@ -457,24 +471,19 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         continue;
       }
 
-      // At this point we are committed to split, hence we need to make sure that we have enough memory allocated for that.
-      if (write_ptr + 2 >= nodes_length) {
-        nodes_length *= 2;
-        nodes = safe_realloc(nodes, sizeof(LightTreeBinaryNode) * nodes_length);
-      }
-
       node.left_energy  = optimal_left_energy;
       node.right_energy = optimal_right_energy;
 
       fit_bounds(fragments + fragments_ptr, optimal_split, &high, &low);
 
-      node.left_high.x   = high.x;
-      node.left_high.y   = high.y;
-      node.left_high.z   = high.z;
-      node.left_low.x    = low.x;
-      node.left_low.y    = low.y;
-      node.left_low.z    = low.z;
-      node.child_address = write_ptr;
+      node.left_high.x = high.x;
+      node.left_high.y = high.y;
+      node.left_high.z = high.z;
+      node.left_low.x  = low.x;
+      node.left_low.y  = low.y;
+      node.left_low.z  = low.z;
+
+      __FAILURE_HANDLE(array_get_num_elements(nodes, &node.child_address));
 
       LightTreeBinaryNode node_left = {
         .triangle_count    = optimal_split,
@@ -491,9 +500,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         .depth        = node.depth + 1,
       };
 
-      nodes[write_ptr] = node_left;
-
-      write_ptr++;
+      __FAILURE_HANDLE(array_push(&nodes, &node_left));
 
       fit_bounds(fragments + fragments_ptr + optimal_split, node.triangle_count - optimal_split, &high, &low);
 
@@ -519,9 +526,7 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
         .depth        = node.depth + 1,
       };
 
-      nodes[write_ptr] = node_right;
-
-      write_ptr++;
+      __FAILURE_HANDLE(array_push(&nodes, &node_right));
 
       node.type = LIGHT_TREE_NODE_TYPE_INTERNAL;
 
@@ -532,14 +537,13 @@ static void _lights_tree_build_binary_bvh(LightTreeWork* work) {
     end_of_current_nodes   = write_ptr;
   }
 
-  nodes_length = write_ptr;
-
-  nodes = safe_realloc(nodes, sizeof(LightTreeBinaryNode) * nodes_length);
-
-  free(bins);
+  __FAILURE_HANDLE(host_free(&bins));
 
   work->binary_nodes = nodes;
-  work->nodes_count  = nodes_length;
+
+  __FAILURE_HANDLE(array_get_num_elements(work->binary_nodes, &work->nodes_count));
+
+  return LUMINARY_SUCCESS;
 }
 
 static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryNode node, float energy, vec3* ref_point, float* ref_dist) {
@@ -578,7 +582,7 @@ static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryN
 // Set the reference point in each node to be the energy weighted mean of the centers of the lights.
 // Then, based on that reference point, compute the smallest distance to any light center.
 // This is our spatial confidence that we use to clamp the distance with when evaluating the importance during traversal.
-static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
+static void _light_tree_build_traversal_structure(LightTreeWork* work) {
   LightTreeNode* nodes = malloc(sizeof(LightTreeNode) * work->nodes_count);
 
   for (uint32_t i = 0; i < work->nodes_count; i++) {
@@ -614,7 +618,7 @@ static void _lights_tree_build_traversal_structure(LightTreeWork* work) {
   work->nodes = nodes;
 }
 
-static void _lights_tree_collapse(LightTreeWork* work) {
+static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   const uint32_t fragments_count = work->triangles_count;
 
   LightTreeNode* binary_nodes       = work->nodes;
@@ -622,14 +626,20 @@ static void _lights_tree_collapse(LightTreeWork* work) {
 
   uint32_t node_count = binary_nodes_count;
 
-  LightTreeNode8Packed* nodes = (LightTreeNode8Packed*) malloc(sizeof(LightTreeNode8Packed) * node_count);
-  memset(nodes, 0, sizeof(LightTreeNode8Packed) * node_count);
+  LightTreeNode8Packed* nodes;
+  __FAILURE_HANDLE(host_malloc(&nodes, sizeof(LightTreeNode8Packed) * node_count));
 
-  uint64_t* node_paths  = (uint64_t*) malloc(sizeof(uint64_t) * node_count);
-  uint32_t* node_depths = (uint32_t*) malloc(sizeof(uint32_t) * node_count);
+  uint64_t* node_paths;
+  __FAILURE_HANDLE(host_malloc(&node_paths, sizeof(uint64_t) * node_count));
 
-  uint32_t* new_fragments  = (uint32_t*) malloc(sizeof(uint32_t) * fragments_count);
-  uint64_t* fragment_paths = (uint64_t*) malloc(sizeof(uint64_t) * fragments_count);
+  uint32_t* node_depths;
+  __FAILURE_HANDLE(host_malloc(&node_depths, sizeof(uint32_t) * node_count));
+
+  uint32_t* new_fragments;
+  __FAILURE_HANDLE(host_malloc(&new_fragments, sizeof(uint32_t) * fragments_count));
+
+  uint64_t* fragment_paths;
+  __FAILURE_HANDLE(host_malloc(&fragment_paths, sizeof(uint64_t) * fragments_count));
 
   memset(new_fragments, 0xFF, sizeof(uint32_t) * fragments_count);
   memset(fragment_paths, 0xFF, sizeof(uint64_t) * fragments_count);
@@ -862,7 +872,7 @@ static void _lights_tree_collapse(LightTreeWork* work) {
         uint64_t child_confidence_light = (((uint64_t) (child_node.confidence * compression_c)) << 2) | ((uint64_t) child_node.light_count);
 
         if (child_rel_point_x > 255 || child_rel_point_y > 255 || child_rel_point_z > 255 || (child_confidence_light >> 2) > 63) {
-          crash_message("Fatal error during light tree compression. Value exceeded bit limit.");
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Value exceeded bit limit.");
         }
 
         child_rel_energy = max(1, child_rel_energy);
@@ -924,11 +934,6 @@ static void _lights_tree_collapse(LightTreeWork* work) {
       node.confidence_light[0] = (uint32_t) (confidence_light & 0xFFFFFFFF);
       node.confidence_light[1] = (uint32_t) ((confidence_light >> 32) & 0xFFFFFFFF);
 
-      if (write_ptr + child_count >= node_count) {
-        node_count += binary_nodes_count;
-        nodes = safe_realloc(nodes, sizeof(LightTreeNode8Packed) * node_count);
-      }
-
       // Prepare the next nodes to be constructed from the respective binary nodes.
       for (uint64_t i = 0; i < child_count; i++) {
         node_paths[write_ptr]        = current_node_path | (i << (3 * current_node_depth));
@@ -948,11 +953,13 @@ static void _lights_tree_collapse(LightTreeWork* work) {
   // Check
   for (uint32_t i = 0; i < fragments_count; i++) {
     if (new_fragments[i] == 0xFFFFFFFF || fragment_paths[i] == 0xFFFFFFFFFFFFFFFF) {
-      crash_message("Fatal error during light tree compression. Light was lost.");
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Fatal error during light tree compression. Light was lost.");
     }
   }
 
-  Fragment* fragments_swap = malloc(sizeof(Fragment) * fragments_count);
+  Fragment* fragments_swap;
+  __FAILURE_HANDLE(host_malloc(&fragments_swap, sizeof(Fragment) * fragments_count));
+
   memcpy(fragments_swap, work->fragments, sizeof(Fragment) * fragments_count);
 
   work->paths = (uint2*) malloc(sizeof(uint2) * fragments_count);
@@ -970,21 +977,23 @@ static void _lights_tree_collapse(LightTreeWork* work) {
     work->paths[i] = light_path;
   }
 
-  free(node_paths);
-  free(node_depths);
-  free(fragments_swap);
-  free(new_fragments);
-  free(fragment_paths);
+  __FAILURE_HANDLE(host_free(&node_paths));
+  __FAILURE_HANDLE(host_free(&node_depths));
+  __FAILURE_HANDLE(host_free(&fragments_swap));
+  __FAILURE_HANDLE(host_free(&new_fragments));
+  __FAILURE_HANDLE(host_free(&fragment_paths));
 
   node_count = write_ptr;
 
-  nodes = safe_realloc(nodes, sizeof(LightTreeNode8Packed) * node_count);
+  __FAILURE_HANDLE(host_realloc(&nodes, sizeof(LightTreeNode8Packed) * node_count));
 
   work->nodes8_packed = nodes;
   work->nodes_8_count = node_count;
+
+  return LUMINARY_SUCCESS;
 }
 
-static void _lights_tree_finalize(LightTreeWork* work) {
+static void _light_tree_finalize(LightTreeWork* work) {
   TriangleLight* reordered_lights = (TriangleLight*) malloc(sizeof(TriangleLight) * work->triangles_count);
 
   for (uint32_t i = 0; i < work->triangles_count; i++) {
@@ -996,6 +1005,7 @@ static void _lights_tree_finalize(LightTreeWork* work) {
 
   free(reordered_lights);
 
+#if 0
   // TODO: Clean up this mess, this is the same as in bvh.c but I would like this to be cleaned, we need this anyway for instance support.
   void* paths;
   device_malloc(&paths, sizeof(uint2) * work->triangles_count);
@@ -1007,9 +1017,10 @@ static void _lights_tree_finalize(LightTreeWork* work) {
 
   device_update_symbol(light_tree_nodes_8, light_tree_nodes_8);
   device_update_symbol(light_tree_paths, paths);
+#endif
 }
 
-static void _lights_tree_clear_work(LightTreeWork* work) {
+static void _light_tree_clear_work(LightTreeWork* work) {
   free(work->fragments);
   free(work->paths);
   free(work->binary_nodes);
@@ -1018,7 +1029,7 @@ static void _lights_tree_clear_work(LightTreeWork* work) {
 }
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
-static void _lights_tree_debug_output_export_binary_node(
+static void _light_tree_debug_output_export_binary_node(
   FILE* obj_file, FILE* mtl_file, LightTreeWork* work, uint32_t id, uint32_t* vertex_offset) {
   LightTreeBinaryNode node = work->binary_nodes[id];
 
@@ -1107,7 +1118,7 @@ static void _lights_tree_debug_output_export_binary_node(
   *vertex_offset = v_offset;
 }
 
-static void _lights_tree_debug_output(LightTreeWork* work) {
+static void _light_tree_debug_output(LightTreeWork* work) {
   FILE* obj_file = fopen("LuminaryLightTree.obj", "wb");
   FILE* mtl_file = fopen("LuminaryLightTree.mtl", "wb");
 
@@ -1116,7 +1127,7 @@ static void _lights_tree_debug_output(LightTreeWork* work) {
   uint32_t vertex_offset = 1;
 
   for (uint32_t i = 1; i < work->nodes_count; i++) {
-    _lights_tree_debug_output_export_binary_node(obj_file, mtl_file, work, i, &vertex_offset);
+    _light_tree_debug_output_export_binary_node(obj_file, mtl_file, work, i, &vertex_offset);
   }
 
   fclose(obj_file);
@@ -1124,19 +1135,21 @@ static void _lights_tree_debug_output(LightTreeWork* work) {
 }
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
 
-static void _lights_build_light_tree(Scene* scene) {
+static LuminaryResult _light_tree_build(Meshlet* meshlet) {
   LightTreeWork work;
   memset(&work, 0, sizeof(LightTreeWork));
 
-  _lights_tree_create_fragments(scene, &work);
-  _lights_tree_build_binary_bvh(&work);
-  _lights_tree_build_traversal_structure(&work);
-  _lights_tree_collapse(&work);
-  _lights_tree_finalize(&work);
+  __FAILURE_HANDLE(_light_tree_create_fragments(meshlet, &work));
+  _light_tree_build_binary_bvh(&work);
+  _light_tree_build_traversal_structure(&work);
+  _light_tree_collapse(&work);
+  _light_tree_finalize(&work);
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
-  _lights_tree_debug_output(&work);
+  _light_tree_debug_output(&work);
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
-  _lights_tree_clear_work(&work);
+  _light_tree_clear_work(&work);
+
+  return LUMINARY_SUCCESS;
 }
 
 static float _uint16_t_to_float(const uint16_t v) {
@@ -1145,6 +1158,58 @@ static float _uint16_t_to_float(const uint16_t v) {
   return *(float*) (&i) - 1.0f;
 }
 
+static LuminaryResult _light_compute_normalized_emission(Device* device, Meshlet* meshlet) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(meshlet);
+
+  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+}
+
+LuminaryResult light_tree_create(LightTree** tree, Device* device, ARRAY const Material** materials, Meshlet* meshlet) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(materials);
+  __CHECK_NULL_ARGUMENT(meshlet);
+
+  const Material* material = materials[meshlet->material_id];
+
+  // Triangles with displacement can't be light sources.
+#if 0
+    if (dmm_active && scene->materials[triangle.material_id].normal_map)
+      continue;
+#endif
+
+  ////////////////////////////////////////////////////////////////////
+  // Iterate over all triangles and find all light candidates.
+  ////////////////////////////////////////////////////////////////////
+
+  meshlet->has_textured_emission = (material->luminance_tex != TEXTURE_NONE);
+
+  if (meshlet->has_textured_emission) {
+    __FAILURE_HANDLE(_light_compute_normalized_emission(device, meshlet));
+  }
+
+  __FAILURE_HANDLE(host_malloc(&meshlet->triangle_lights, sizeof(TriangleLight) * meshlet->triangle_count));
+
+  for (uint32_t tri_id = 0; tri_id < meshlet->triangle_count; tri_id++) {
+    const Triangle triangle = meshlet->triangles[tri_id];
+
+    TriangleLight light;
+
+    light.vertex  = triangle.vertex;
+    light.edge1   = triangle.edge1;
+    light.edge2   = triangle.edge2;
+    light.padding = 0;
+
+    meshlet->triangle_lights[tri_id] = light;
+  }
+
+  _light_tree_build(meshlet);
+
+  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+}
+
+#if 0
 void lights_process(Scene* scene, int dmm_active) {
   ////////////////////////////////////////////////////////////////////
   // Iterate over all triangles and find all light candidates.
@@ -1335,8 +1400,9 @@ void lights_process(Scene* scene, int dmm_active) {
 
   scene->triangle_lights_data = tri_data;
 }
+#endif
 
-void lights_load_bridge_lut() {
+LuminaryResult light_load_bridge_lut(Device* device) {
   uint64_t info = 0;
 
   void* lut_data;
@@ -1344,12 +1410,11 @@ void lights_load_bridge_lut() {
   ceb_access("bridge_lut.bin", &lut_data, &lut_length, &info);
 
   if (info) {
-    crash_message("Failed to load bridge_lut texture.");
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load bridge_lut texture.");
   }
 
-  void* bridge_lut;
-  device_malloc(&bridge_lut, lut_length);
-  device_upload(bridge_lut, lut_data, lut_length);
+  __FAILURE_HANDLE(device_malloc(&device->buffers.bridge_lut, lut_length));
+  __FAILURE_HANDLE(device_upload(device->buffers.bridge_lut, lut_data, 0, lut_length));
 
-  device_update_symbol(bridge_lut, bridge_lut);
+  return LUMINARY_SUCCESS;
 }

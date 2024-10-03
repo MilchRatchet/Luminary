@@ -1,8 +1,10 @@
 #ifndef LUMINARY_LIGHT_H
 #define LUMINARY_LIGHT_H
 
+#include "device_utils.h"
 #include "mesh.h"
-#include "utils.h"
+
+struct Device typedef Device;
 
 // Light Tree construction flow:
 // Mesh is dirty on Host => Host queues main device with light tree construction for mesh
@@ -16,15 +18,15 @@ struct LightTree {
   size_t size;
 } typedef LightTree;
 
-struct LightData {
+struct MeshletLightData {
   LightTree* light_tree;
   TriangleLight* lights;
   uint32_t light_count;
-} typedef LightData;
+} typedef MeshletLightData;
 
-LuminaryResult light_tree_create(LightTree** tree, Mesh* mesh);
-
-void lights_process(Scene* scene, int dmm_active);
-void lights_load_bridge_lut();
+LuminaryResult light_load_bridge_lut(Device* device);
+LuminaryResult light_tree_create(LightTree** tree, Device* device, ARRAY const Material** materials, Meshlet* meshlet);
+LuminaryResult light_tree_create_toplevel(LightTree** tree);
+LuminaryResult light_tree_destroy(LightTree** tree);
 
 #endif /* LUMINARY_LIGHT_H */

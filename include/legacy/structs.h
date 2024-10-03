@@ -57,22 +57,6 @@ struct Mat3x3 {
  * Mesh
  ********************************************************/
 
-struct LightTreeNode8Packed {
-  vec3 base_point;
-  int8_t exp_x;
-  int8_t exp_y;
-  int8_t exp_z;
-  int8_t exp_confidence;
-  uint32_t child_ptr;
-  uint32_t light_ptr;
-  uint32_t rel_point_x[2];
-  uint32_t rel_point_y[2];
-  uint32_t rel_point_z[2];
-  uint32_t rel_energy[2];
-  uint32_t confidence_light[2];
-} typedef LightTreeNode8Packed;
-static_assert(sizeof(LightTreeNode8Packed) == 0x40, "Incorrect packing size.");
-
 struct Quad {
   vec3 vertex;
   vec3 edge1;

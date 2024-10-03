@@ -63,7 +63,7 @@ struct PackedHitIDIndex {
   uint64_t instance_id : 24;
   uint64_t tri_id : 12;
 };
-LUM_STATIC_SIZE_ASSERT(struct PackedHitIDIndex, 8u);
+LUM_STATIC_SIZE_ASSERT(struct PackedHitIDIndex, 0x08);
 
 struct ShadingTask {
   uint32_t hit_id;
@@ -71,7 +71,7 @@ struct ShadingTask {
   vec3 position;  // (Origin if sky)
   vec3 ray;
 } typedef ShadingTask;
-LUM_STATIC_SIZE_ASSERT(ShadingTask, 32);
+LUM_STATIC_SIZE_ASSERT(ShadingTask, 0x20);
 
 struct TraceTask {
   uint32_t padding;
@@ -79,13 +79,29 @@ struct TraceTask {
   vec3 origin;
   vec3 ray;
 } typedef TraceTask;
-LUM_STATIC_SIZE_ASSERT(TraceTask, 32);
+LUM_STATIC_SIZE_ASSERT(TraceTask, 0x20);
 
 struct TraceResult {
   float depth;
   uint32_t hit_id;
 } typedef TraceResult;
-LUM_STATIC_SIZE_ASSERT(TraceResult, 8);
+LUM_STATIC_SIZE_ASSERT(TraceResult, 0x08);
+
+struct LightTreeNode8Packed {
+  vec3 base_point;
+  int8_t exp_x;
+  int8_t exp_y;
+  int8_t exp_z;
+  int8_t exp_confidence;
+  uint32_t child_ptr;
+  uint32_t light_ptr;
+  uint32_t rel_point_x[2];
+  uint32_t rel_point_y[2];
+  uint32_t rel_point_z[2];
+  uint32_t rel_energy[2];
+  uint32_t confidence_light[2];
+} typedef LightTreeNode8Packed;
+LUM_STATIC_SIZE_ASSERT(LightTreeNode8Packed, 0x40);
 
 ////////////////////////////////////////////////////////////////////
 // Globals

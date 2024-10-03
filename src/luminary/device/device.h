@@ -23,10 +23,15 @@ struct DeviceProperties {
   size_t memory_size;
 } typedef DeviceProperties;
 
+struct DeviceBuffers {
+  DEVICE void* bridge_lut;
+} typedef DeviceBuffers;
+
 struct Device {
   uint32_t index;
   DeviceProperties properties;
   uint32_t accumulated_sample_count;
+  DeviceBuffers buffers;
   bool exit_requested;
   bool optix_callback_error;
   OptixDeviceContext optix_ctx;

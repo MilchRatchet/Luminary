@@ -147,11 +147,9 @@ struct TriangleLight {
   vec3 vertex;
   vec3 edge1;
   vec3 edge2;
-  uint32_t triangle_id;
-  uint32_t material_id;
-  float power;
+  uint32_t padding;
 } typedef TriangleLight;
-static_assert(sizeof(TriangleLight) == 0x30, "Incorrect packing size.");
+static_assert(sizeof(TriangleLight) == 0x28, "Incorrect packing size.");
 
 struct BVHNode8 {
   vec3 p;

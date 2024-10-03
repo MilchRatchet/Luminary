@@ -173,6 +173,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   Device* device;
   __FAILURE_HANDLE(host_malloc(&device, sizeof(Device)));
 
+  memset(device, 0, sizeof(Device));
+
   device->index                    = index;
   device->optix_callback_error     = false;
   device->exit_requested           = false;
