@@ -38,7 +38,7 @@ LuminaryResult mesh_build_meshlets(Mesh* mesh) {
       for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
         const Meshlet* meshlet = mesh->meshlets + meshlet_id;
 
-        if (meshlet->material_id == mat_id && meshlet->triangle_count < 4096) {
+        if (meshlet->material_id == mat_id && meshlet->triangle_count < 0x10000) {
           current_material = mat_id;
           current_meshlet  = meshlet_id;
           break;
@@ -53,8 +53,8 @@ LuminaryResult mesh_build_meshlets(Mesh* mesh) {
 
         meshlet.triangle_count = 0;
         meshlet.material_id    = mat_id;
-        __FAILURE_HANDLE(host_malloc(&meshlet.index_buffer, sizeof(uint32_t) * 4096 * 3));
-        __FAILURE_HANDLE(host_malloc(&meshlet.triangles, sizeof(Triangle) * 4096));
+        __FAILURE_HANDLE(host_malloc(&meshlet.index_buffer, sizeof(uint32_t) * 0x10000 * 3));
+        __FAILURE_HANDLE(host_malloc(&meshlet.triangles, sizeof(Triangle) * 0x10000));
 
         __FAILURE_HANDLE(array_push(&mesh->meshlets, &meshlet));
 
@@ -74,13 +74,20 @@ LuminaryResult mesh_build_meshlets(Mesh* mesh) {
     meshlet->triangle_count++;
 
     // If the meshlet has run full, invalidate our bookmark so we create a new meshlet.
-    if (meshlet->triangle_count == 4096) {
+    if (meshlet->triangle_count == 0x10000) {
       current_material = 0xFFFFu;
     }
   }
 
   uint32_t meshlet_count;
   __FAILURE_HANDLE(array_get_num_elements(mesh->meshlets, &meshlet_count));
+
+  for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
+    Meshlet* meshlet = mesh->meshlets + meshlet_id;
+
+    __FAILURE_HANDLE(host_realloc(&meshlet->index_buffer, sizeof(uint32_t) * meshlet->triangle_count * 3));
+    __FAILURE_HANDLE(host_realloc(&meshlet->triangles, sizeof(Triangle) * meshlet->triangle_count));
+  }
 
   log_message("Created %u meshlets.", meshlet_count);
 

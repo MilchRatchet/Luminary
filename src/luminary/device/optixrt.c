@@ -263,8 +263,8 @@ LuminaryResult optixrt_bvh_create(OptixBVH** bvh, Device* device, const Mesh* me
     build_input.triangleArray.flags         = &inputFlags;
     build_input.triangleArray.numSbtRecords = 1;
 
-    // Lower 12 bits is the triangle id inside the meshlet, upper bits are the meshlet id.
-    build_input.triangleArray.primitiveIndexOffset = (meshlet_id << 12);
+    // Lower 16 bits is the triangle id inside the meshlet, upper bits are the meshlet id.
+    build_input.triangleArray.primitiveIndexOffset = (meshlet_id << 16);
 
     build_inputs[meshlet_id] = build_input;
   }

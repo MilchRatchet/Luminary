@@ -18,6 +18,9 @@ struct TriangleGeomData {
   uint32_t triangle_count;
 } typedef TriangleGeomData;
 
+/*
+ * Subset of mesh in which all triangles have the same material. A meshlet may contain up to 65536 triangles, i.e., 16 bits for addressing.
+ */
 struct Meshlet {
   struct MeshletLightData* light_data;
   Triangle* triangles;
@@ -25,7 +28,7 @@ struct Meshlet {
   bool has_textured_emission;
   float* normalized_emission;
   uint32_t* index_buffer;
-  uint16_t triangle_count;
+  uint32_t triangle_count;
   uint16_t material_id;
 } typedef Meshlet;
 

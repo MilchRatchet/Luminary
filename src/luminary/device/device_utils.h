@@ -73,6 +73,17 @@ struct ShadingTask {
 } typedef ShadingTask;
 LUM_STATIC_SIZE_ASSERT(ShadingTask, 0x20);
 
+struct CompressedShadingTask {
+  uint2 compressed_ray;
+  vec3 position;  // (Origin if sky)
+  uint32_t instancelet_id;
+  ushort2 index;
+  uint16_t tri_id;
+  uint8_t state;
+  uint8_t padding;
+} typedef CompressedShadingTask;
+LUM_STATIC_SIZE_ASSERT(CompressedShadingTask, 0x20);
+
 struct TraceTask {
   uint32_t padding;
   ushort2 index;
