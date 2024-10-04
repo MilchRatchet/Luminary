@@ -3,6 +3,7 @@
 
 #include "utils.h"
 
+// Note: Remove this, actual definition is in mesh.h and also I will need to place this into the public API.
 struct Instance {
   uint32_t mesh_id;
 } typedef Instance;

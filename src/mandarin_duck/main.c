@@ -1,4 +1,4 @@
-#include "instance.h"
+#include "mandarin_duck.h"
 #include "utils.h"
 
 int main(int argc, char* argv[]) {
@@ -34,10 +34,10 @@ int main(int argc, char* argv[]) {
 
   LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
 
-  Instance* instance;
-  instance_create(&instance, host);
-  instance_run(instance);
-  instance_destroy(&instance);
+  MandarinDuck* duck;
+  mandarin_duck_create(&duck, host);
+  mandarin_duck_run(duck);
+  mandarin_duck_destroy(&duck);
 
   LUM_FAILURE_HANDLE(luminary_host_destroy(&host));
 
