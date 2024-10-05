@@ -1,5 +1,7 @@
 #include "device.h"
 
+#include <optix_function_table_definition.h>
+
 #include "device_utils.h"
 #include "internal_error.h"
 #include "optixrt.h"
@@ -155,14 +157,6 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, const uint
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_compile_optix_kernel(Device* device, OptixKernelType type) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  __FAILURE_HANDLE(optixrt_kernel_create(&device->optix_kernels[type], device, type));
-
-  return LUMINARY_SUCCESS;
-}
-
 ////////////////////////////////////////////////////////////////////
 // External API implementation
 ////////////////////////////////////////////////////////////////////
@@ -198,18 +192,17 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   OPTIX_FAILURE_HANDLE(optixDeviceContextCreate((CUcontext) 0, &optix_device_context_options, &device->optix_ctx));
 
-  ////////////////////////////////////////////////////////////////////
-  // Compile OptiX kernels
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY));
-  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES));
-  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_SHADING_GEOMETRY));
-  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_SHADING_VOLUME));
-  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_SHADING_PARTICLES));
-  __FAILURE_HANDLE(_device_compile_optix_kernel(device, OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES));
-
   *_device = device;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_compile_kernels(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
+    __FAILURE_HANDLE(optixrt_kernel_create(&device->optix_kernels[kernel_id], device, kernel_id));
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -217,5 +210,13 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 LuminaryResult device_destroy(Device** device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+  for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
+    __FAILURE_HANDLE(optixrt_kernel_destroy(&(*device)->optix_kernels[kernel_id]));
+  }
+
+  OPTIX_FAILURE_HANDLE(optixDeviceContextDestroy((*device)->optix_ctx));
+
+  __FAILURE_HANDLE(host_free(device));
+
+  return LUMINARY_SUCCESS;
 }

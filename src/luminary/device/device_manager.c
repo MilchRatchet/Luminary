@@ -90,6 +90,21 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_manager, void* args) {
+  LUM_UNUSED(args);
+
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_compile_kernels(device_manager->devices[device_id]));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // API functions
 ////////////////////////////////////////////////////////////////////
@@ -117,6 +132,22 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager) {
   __FAILURE_HANDLE(wall_time_create(&device_manager->queue_wall_time));
 
   __FAILURE_HANDLE(thread_start(device_manager->work_thread, (ThreadMainFunc) _device_manager_queue_worker, device_manager));
+
+  ////////////////////////////////////////////////////////////////////
+  // Queue setup functions
+  ////////////////////////////////////////////////////////////////////
+
+  QueueEntry entry;
+
+  entry.name     = "Kernel compilation";
+  entry.function = (QueueEntryFunction) _device_manager_compile_kernels;
+  entry.args     = (void*) 0;
+
+  __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
+
+  ////////////////////////////////////////////////////////////////////
+  // Finalize
+  ////////////////////////////////////////////////////////////////////
 
   *_device_manager = device_manager;
 

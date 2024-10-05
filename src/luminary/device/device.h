@@ -41,6 +41,7 @@ struct Device {
 void _device_init(void);
 
 LuminaryResult device_create(Device** device, uint32_t index);
+LuminaryResult device_compile_kernels(Device* device);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */
