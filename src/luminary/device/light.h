@@ -1,6 +1,7 @@
 #ifndef LUMINARY_LIGHT_H
 #define LUMINARY_LIGHT_H
 
+#include "device_memory.h"
 #include "device_utils.h"
 #include "mesh.h"
 
@@ -14,19 +15,21 @@ struct Device typedef Device;
 // Once top level light tree is done => queue upload light tree to all devices
 
 struct LightTree {
-  void* data;
-  size_t size;
+  void* nodes_data;
+  size_t nodes_size;
+  void* paths_data;
+  size_t paths_size;
 } typedef LightTree;
 
 struct MeshletLightData {
   LightTree* light_tree;
   TriangleLight* lights;
-  uint32_t light_count;
 } typedef MeshletLightData;
 
 LuminaryResult light_load_bridge_lut(Device* device);
-LuminaryResult light_tree_create(LightTree** tree, Device* device, ARRAY const Material** materials, Meshlet* meshlet);
-LuminaryResult light_tree_create_toplevel(LightTree** tree);
-LuminaryResult light_tree_destroy(LightTree** tree);
+LuminaryResult light_tree_create(Meshlet* meshlet, Device* device, ARRAY const Material** materials);
+LuminaryResult light_tree_create_toplevel(LightTree** tree, ARRAY const Instance** instances, ARRAY const Mesh** meshes);
+LuminaryResult light_tree_destroy(Meshlet* meshlet);
+LuminaryResult light_tree_destroy_toplevel(LightTree** tree);
 
 #endif /* LUMINARY_LIGHT_H */

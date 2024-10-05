@@ -24,7 +24,6 @@ struct TriangleGeomData {
 struct Meshlet {
   struct MeshletLightData* light_data;
   Triangle* triangles;
-  TriangleLight* triangle_lights;
   bool has_textured_emission;
   float* normalized_emission;
   uint32_t* index_buffer;

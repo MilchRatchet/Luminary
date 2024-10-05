@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "bvh.h"
+#include "device/light.h"
 #include "internal_error.h"
 
 LuminaryResult mesh_create(Mesh** mesh) {
@@ -104,8 +105,7 @@ LuminaryResult mesh_destroy(Mesh** mesh) {
     Meshlet meshlet = (*mesh)->meshlets[meshlet_id];
 
     if (meshlet.light_data) {
-      // TODO: Call light_destroy.
-      __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+      __FAILURE_HANDLE(light_tree_destroy(&meshlet));
     }
 
     __FAILURE_HANDLE(host_free(&meshlet.triangles));

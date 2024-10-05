@@ -80,10 +80,9 @@ struct LightTreeChildNode {
 } typedef LightTreeChildNode;
 
 struct LightTreeWork {
-  TriangleLight* triangles;
   Fragment* fragments;
   uint2* paths;
-  uint32_t triangles_count;
+  uint32_t fragments_count;
   ARRAY LightTreeBinaryNode* binary_nodes;
   LightTreeNode* nodes;
   LightTreeNode8Packed* nodes8_packed;
@@ -110,17 +109,17 @@ struct Bin {
 #define FRAGMENT_ERROR_COMP (FLT_EPSILON * 4.0f)
 
 static LuminaryResult _light_tree_create_fragments(Meshlet* meshlet, LightTreeWork* work) {
-  const uint32_t triangle_count = meshlet->triangle_count;
+  __CHECK_NULL_ARGUMENT(meshlet);
+  __CHECK_NULL_ARGUMENT(work);
 
-  work->triangles       = meshlet->triangle_lights;
-  work->triangles_count = triangle_count;
+  work->fragments_count = meshlet->triangle_count;
 
-  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * triangle_count));
+  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * work->fragments_count));
 
   // TODO: Add some code that during bottom level tree construction removes any triangle lights that don't have any emission, i.e., textured
   // lights with zero normalized emission.
-  for (uint32_t tri_id = 0; tri_id < triangle_count; tri_id++) {
-    TriangleLight t = meshlet->triangle_lights[tri_id];
+  for (uint32_t tri_id = 0; tri_id < work->fragments_count; tri_id++) {
+    TriangleLight t = meshlet->light_data->lights[tri_id];
 
     vec3_p high = {
       .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
@@ -325,8 +324,10 @@ static void divide_middles_along_axis(
 }
 
 static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(work);
+
   Fragment* fragments      = work->fragments;
-  uint32_t fragments_count = work->triangles_count;
+  uint32_t fragments_count = work->fragments_count;
 
   ARRAY LightTreeBinaryNode* nodes;
   __FAILURE_HANDLE(array_create(&nodes, sizeof(LightTreeBinaryNode), 1 + fragments_count));
@@ -582,8 +583,9 @@ static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryN
 // Set the reference point in each node to be the energy weighted mean of the centers of the lights.
 // Then, based on that reference point, compute the smallest distance to any light center.
 // This is our spatial confidence that we use to clamp the distance with when evaluating the importance during traversal.
-static void _light_tree_build_traversal_structure(LightTreeWork* work) {
-  LightTreeNode* nodes = malloc(sizeof(LightTreeNode) * work->nodes_count);
+static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work) {
+  LightTreeNode* nodes;
+  __FAILURE_HANDLE(host_malloc(&nodes, sizeof(LightTreeNode) * work->nodes_count));
 
   for (uint32_t i = 0; i < work->nodes_count; i++) {
     LightTreeBinaryNode binary_node = work->binary_nodes[i];
@@ -608,18 +610,21 @@ static void _light_tree_build_traversal_structure(LightTreeWork* work) {
         node.ptr         = binary_node.triangles_address;
         break;
       default:
-        crash_message("Encountered illegal node type!");
-        break;
+        __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Encountered illegal node type!");
     }
 
     nodes[i] = node;
   }
 
   work->nodes = nodes;
+
+  return LUMINARY_SUCCESS;
 }
 
 static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
-  const uint32_t fragments_count = work->triangles_count;
+  __CHECK_NULL_ARGUMENT(work);
+
+  const uint32_t fragments_count = work->fragments_count;
 
   LightTreeNode* binary_nodes       = work->nodes;
   const uint32_t binary_nodes_count = work->nodes_count;
@@ -962,7 +967,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
 
   memcpy(fragments_swap, work->fragments, sizeof(Fragment) * fragments_count);
 
-  work->paths = (uint2*) malloc(sizeof(uint2) * fragments_count);
+  __FAILURE_HANDLE(host_malloc(&work->paths, sizeof(uint2) * fragments_count));
 
   for (uint32_t i = 0; i < fragments_count; i++) {
     work->fragments[i] = fragments_swap[new_fragments[i]];
@@ -993,39 +998,68 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   return LUMINARY_SUCCESS;
 }
 
-static void _light_tree_finalize(LightTreeWork* work) {
-  TriangleLight* reordered_lights = (TriangleLight*) malloc(sizeof(TriangleLight) * work->triangles_count);
+static LuminaryResult _light_tree_finalize(Meshlet* meshlet, LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(meshlet);
+  __CHECK_NULL_ARGUMENT(work);
 
-  for (uint32_t i = 0; i < work->triangles_count; i++) {
-    Fragment frag       = work->fragments[i];
-    reordered_lights[i] = work->triangles[frag.id];
+  ////////////////////////////////////////////////////////////////////
+  // Apply permutation obtained in tree construction
+  ////////////////////////////////////////////////////////////////////
+
+  Triangle* reordered_triangles;
+  __FAILURE_HANDLE(host_malloc(&reordered_triangles, sizeof(Triangle) * work->fragments_count));
+
+  TriangleLight* reordered_lights;
+  __FAILURE_HANDLE(host_malloc(&reordered_lights, sizeof(TriangleLight) * work->fragments_count));
+
+  uint32_t* reordered_index_buffer;
+  __FAILURE_HANDLE(host_malloc(&reordered_index_buffer, sizeof(uint32_t) * 3 * work->fragments_count));
+
+  for (uint32_t id = 0; id < work->fragments_count; id++) {
+    Fragment frag = work->fragments[id];
+
+    reordered_triangles[id] = meshlet->triangles[frag.id];
+    reordered_lights[id]    = meshlet->light_data->lights[frag.id];
+
+    reordered_index_buffer[id * 3 + 0] = meshlet->index_buffer[frag.id * 3 + 0];
+    reordered_index_buffer[id * 3 + 1] = meshlet->index_buffer[frag.id * 3 + 1];
+    reordered_index_buffer[id * 3 + 2] = meshlet->index_buffer[frag.id * 3 + 2];
   }
 
-  memcpy(work->triangles, reordered_lights, sizeof(TriangleLight) * work->triangles_count);
+  memcpy(meshlet->triangles, reordered_triangles, sizeof(Triangle) * work->fragments_count);
+  memcpy(meshlet->light_data->lights, reordered_lights, sizeof(TriangleLight) * work->fragments_count);
+  memcpy(meshlet->index_buffer, reordered_index_buffer, sizeof(uint32_t) * 3 * work->fragments_count);
 
-  free(reordered_lights);
+  __FAILURE_HANDLE(host_free(&reordered_triangles));
+  __FAILURE_HANDLE(host_free(&reordered_lights));
+  __FAILURE_HANDLE(host_free(&reordered_index_buffer));
 
-#if 0
-  // TODO: Clean up this mess, this is the same as in bvh.c but I would like this to be cleaned, we need this anyway for instance support.
-  void* paths;
-  device_malloc(&paths, sizeof(uint2) * work->triangles_count);
-  device_upload(paths, work->paths, sizeof(uint2) * work->triangles_count);
+  ////////////////////////////////////////////////////////////////////
+  // Create light tree buffer
+  ////////////////////////////////////////////////////////////////////
 
-  void* light_tree_nodes_8;
-  device_malloc(&light_tree_nodes_8, sizeof(LightTreeNode8Packed) * work->nodes_8_count);
-  device_upload(light_tree_nodes_8, work->nodes8_packed, sizeof(LightTreeNode8Packed) * work->nodes_8_count);
+  __FAILURE_HANDLE(host_malloc(&meshlet->light_data->light_tree, sizeof(LightTree)));
 
-  device_update_symbol(light_tree_nodes_8, light_tree_nodes_8);
-  device_update_symbol(light_tree_paths, paths);
-#endif
+  meshlet->light_data->light_tree->nodes_size = sizeof(LightTreeNode8Packed) * work->nodes_8_count;
+  meshlet->light_data->light_tree->nodes_data = (void*) work->nodes8_packed;
+
+  meshlet->light_data->light_tree->paths_size = sizeof(uint2) * work->fragments_count;
+  meshlet->light_data->light_tree->paths_data = (void*) work->paths;
+
+  work->nodes8_packed = (LightTreeNode8Packed*) 0;
+  work->paths         = (uint2*) 0;
+
+  return LUMINARY_SUCCESS;
 }
 
-static void _light_tree_clear_work(LightTreeWork* work) {
-  free(work->fragments);
-  free(work->paths);
-  free(work->binary_nodes);
-  free(work->nodes);
-  free(work->nodes8_packed);
+static LuminaryResult _light_tree_clear_work(LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(work);
+
+  __FAILURE_HANDLE(host_free(&work->fragments));
+  __FAILURE_HANDLE(host_free(&work->binary_nodes));
+  __FAILURE_HANDLE(host_free(&work->nodes));
+
+  return LUMINARY_SUCCESS;
 }
 
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
@@ -1140,10 +1174,10 @@ static LuminaryResult _light_tree_build(Meshlet* meshlet) {
   memset(&work, 0, sizeof(LightTreeWork));
 
   __FAILURE_HANDLE(_light_tree_create_fragments(meshlet, &work));
-  _light_tree_build_binary_bvh(&work);
-  _light_tree_build_traversal_structure(&work);
-  _light_tree_collapse(&work);
-  _light_tree_finalize(&work);
+  __FAILURE_HANDLE(_light_tree_build_binary_bvh(&work));
+  __FAILURE_HANDLE(_light_tree_build_traversal_structure(&work));
+  __FAILURE_HANDLE(_light_tree_collapse(&work));
+  __FAILURE_HANDLE(_light_tree_finalize(meshlet, &work));
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
   _light_tree_debug_output(&work);
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
@@ -1165,11 +1199,10 @@ static LuminaryResult _light_compute_normalized_emission(Device* device, Meshlet
   __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
 }
 
-LuminaryResult light_tree_create(LightTree** tree, Device* device, ARRAY const Material** materials, Meshlet* meshlet) {
-  __CHECK_NULL_ARGUMENT(tree);
+LuminaryResult light_tree_create(Meshlet* meshlet, Device* device, ARRAY const Material** materials) {
+  __CHECK_NULL_ARGUMENT(meshlet);
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(materials);
-  __CHECK_NULL_ARGUMENT(meshlet);
 
   const Material* material = materials[meshlet->material_id];
 
@@ -1189,7 +1222,8 @@ LuminaryResult light_tree_create(LightTree** tree, Device* device, ARRAY const M
     __FAILURE_HANDLE(_light_compute_normalized_emission(device, meshlet));
   }
 
-  __FAILURE_HANDLE(host_malloc(&meshlet->triangle_lights, sizeof(TriangleLight) * meshlet->triangle_count));
+  __FAILURE_HANDLE(host_malloc(&meshlet->light_data, sizeof(MeshletLightData)));
+  __FAILURE_HANDLE(host_malloc(&meshlet->light_data->lights, sizeof(TriangleLight) * meshlet->triangle_count));
 
   for (uint32_t tri_id = 0; tri_id < meshlet->triangle_count; tri_id++) {
     const Triangle triangle = meshlet->triangles[tri_id];
@@ -1201,12 +1235,30 @@ LuminaryResult light_tree_create(LightTree** tree, Device* device, ARRAY const M
     light.edge2   = triangle.edge2;
     light.padding = 0;
 
-    meshlet->triangle_lights[tri_id] = light;
+    meshlet->light_data->lights[tri_id] = light;
   }
 
-  _light_tree_build(meshlet);
+  ////////////////////////////////////////////////////////////////////
+  // Build light tree
+  ////////////////////////////////////////////////////////////////////
 
-  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
+  __FAILURE_HANDLE(_light_tree_build(meshlet));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult light_tree_destroy(Meshlet* meshlet) {
+  __CHECK_NULL_ARGUMENT(meshlet);
+
+  __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->nodes_data));
+  __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->paths_data));
+
+  __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree));
+  __FAILURE_HANDLE(host_free(&meshlet->light_data->lights));
+
+  __FAILURE_HANDLE(host_free(&meshlet->light_data));
+
+  return LUMINARY_SUCCESS;
 }
 
 #if 0
