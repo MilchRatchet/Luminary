@@ -26,6 +26,9 @@ LuminaryResult _host_queue_worker(Host* host) {
     QueueEntry entry;
     __FAILURE_HANDLE(queue_pop_blocking(host->work_queue, &entry, &success));
 
+    // Verify that the device_manager didn't crash.
+    __FAILURE_HANDLE(thread_get_last_result(host->device_manager->work_thread));
+
     if (!success)
       break;
 
@@ -132,6 +135,8 @@ LuminaryResult luminary_host_create(Host** _host) {
   __FAILURE_HANDLE(ringbuffer_create(&host->ringbuffer, HOST_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
 
+  __FAILURE_HANDLE(device_manager_create(&host->device_manager));
+
   __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
   __FAILURE_HANDLE(array_create(&host->materials, sizeof(Material*), 16));
   __FAILURE_HANDLE(array_create(&host->textures, sizeof(Texture*), 16));
@@ -151,6 +156,8 @@ LuminaryResult luminary_host_create(Host** _host) {
 LuminaryResult luminary_host_destroy(Host** host) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(*host);
+
+  __FAILURE_HANDLE(device_manager_destroy(&(*host)->device_manager));
 
   __FAILURE_HANDLE(queue_flush_blocking((*host)->work_queue));
 

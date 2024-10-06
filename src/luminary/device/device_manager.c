@@ -114,6 +114,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager) {
 
   DeviceManager* device_manager;
   __FAILURE_HANDLE(host_malloc(&device_manager, sizeof(DeviceManager)));
+  memset(device_manager, 0, sizeof(DeviceManager));
 
   int device_count;
   CUDA_FAILURE_HANDLE(cudaGetDeviceCount(&device_count));
@@ -127,6 +128,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager) {
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
 
+  __FAILURE_HANDLE(thread_create(&device_manager->work_thread));
   __FAILURE_HANDLE(queue_create(&device_manager->work_queue, sizeof(QueueEntry), DEVICE_MANAGER_QUEUE_SIZE));
   __FAILURE_HANDLE(ringbuffer_create(&device_manager->ringbuffer, DEVICE_MANAGER_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&device_manager->queue_wall_time));
@@ -167,6 +169,8 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(wall_time_destroy(&(*device_manager)->queue_wall_time));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*device_manager)->ringbuffer));
   __FAILURE_HANDLE(queue_destroy(&(*device_manager)->work_queue));
+
+  __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements((*device_manager)->devices, &device_count));
