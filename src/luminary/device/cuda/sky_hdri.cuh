@@ -15,16 +15,16 @@
 LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
   unsigned int id = THREAD_ID;
 
-  const int amount = device.scene.sky.hdri_dim * device.scene.sky.hdri_dim;
+  const int amount = device.sky.hdri_dim * device.sky.hdri_dim;
 
-  const float step_size = 1.0f / (device.scene.sky.hdri_dim - 1);
+  const float step_size = 1.0f / (device.sky.hdri_dim - 1);
 
   while (id < amount) {
-    const int y = id / device.scene.sky.hdri_dim;
-    const int x = id - y * device.scene.sky.hdri_dim;
+    const int y = id / device.sky.hdri_dim;
+    const int x = id - y * device.sky.hdri_dim;
 
     const ushort2 pixel_coords = make_ushort2(x, y);
-    const uint32_t pixel       = x + y * device.scene.sky.hdri_dim;
+    const uint32_t pixel       = x + y * device.sky.hdri_dim;
 
     const float2 jitter = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAMERA_JITTER, pixel_coords);
 
@@ -39,22 +39,22 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
     RGBF color                = get_color(0.0f, 0.0f, 0.0f);
     RGBF transmittance        = get_color(1.0f, 1.0f, 1.0f);
     float cloud_transmittance = 1.0f;
-    vec3 sky_origin           = world_to_sky_transform(device.scene.sky.hdri_origin);
+    vec3 sky_origin           = world_to_sky_transform(device.sky.hdri_origin);
 
-    if (device.scene.sky.cloud.active) {
+    if (device.cloud.active) {
       const float offset = clouds_render(sky_origin, ray, FLT_MAX, pixel_coords, color, transmittance, cloud_transmittance);
 
       sky_origin = add_vector(sky_origin, scale_vector(ray, offset));
     }
 
-    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, false, device.scene.sky.steps, pixel_coords);
+    const RGBF sky = sky_get_color(sky_origin, ray, FLT_MAX, false, device.sky.steps, pixel_coords);
 
     color = add_color(color, mul_color(sky, transmittance));
 
     RGBF result;
     float variance;
     float alpha;
-    if (device.temporal_frames != 0.0f) {
+    if (device.sample_id != 0.0f) {
       float4 data = __ldcs(dst + pixel);
       alpha       = __ldcs(dst_alpha + pixel);
 
@@ -63,17 +63,17 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
 
       const float deviation = sqrtf(fmaxf(variance, eps));
 
-      variance  = variance * (device.temporal_frames - 1.0f);
+      variance  = variance * (device.sample_id - 1.0f);
       RGBF diff = sub_color(color, result);
       diff      = mul_color(diff, diff);
 
       variance = variance + color_importance(diff);
-      variance = variance * (1.0f / device.temporal_frames);
+      variance = variance * (1.0f / device.sample_id);
 
       // Same as in temporal accumulation
       // Here this trick has no real downside
       // Just got to make sure we don't do this in the case of 2 samples
-      if (device.temporal_frames == 1 && device.scene.sky.hdri_samples != 2) {
+      if (device.sample_id == 1 && device.sky.hdri_samples != 2) {
         RGBF min = min_color(color, result);
 
         result = min;
@@ -83,8 +83,8 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
       RGBF firefly_rejection = add_color(get_color(0.1f, 0.1f, 0.1f), add_color(result, get_color(deviation, deviation, deviation)));
       firefly_rejection      = max_color(get_color(0.0f, 0.0f, 0.0f), sub_color(color, firefly_rejection));
 
-      result = scale_color(result, device.temporal_frames);
-      alpha *= device.temporal_frames;
+      result = scale_color(result, device.sample_id);
+      alpha *= device.sample_id;
 
       color = sub_color(color, firefly_rejection);
     }
@@ -97,8 +97,8 @@ LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
     result = add_color(result, color);
     alpha += cloud_transmittance;
 
-    result = scale_color(result, 1.0f / (device.temporal_frames + 1));
-    alpha *= 1.0f / (device.temporal_frames + 1);
+    result = scale_color(result, 1.0f / (device.sample_id + 1));
+    alpha *= 1.0f / (device.sample_id + 1);
 
     __stcs(dst + pixel, make_float4(result.r, result.g, result.b, variance));
     __stcs(dst_alpha + pixel, alpha);
@@ -147,8 +147,8 @@ extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
   device_update_symbol(depth, depth);
 
   for (int i = 0; i < instance->scene.sky.hdri_samples; i++) {
-    const float temporal_frames = (float) i;
-    device_update_symbol(temporal_frames, temporal_frames);
+    const float sample_id = (float) i;
+    device_update_symbol(sample_id, sample_id);
     print_info_inline("HDRI Progress: %i/%i", i, instance->scene.sky.hdri_samples);
     sky_hdri_compute_hdri_lut<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((float4*) luts_hdri_tex[0].data, (float*) luts_hdri_tex[1].data);
     gpuErrchk(cudaDeviceSynchronize());

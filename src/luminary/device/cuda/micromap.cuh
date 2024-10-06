@@ -26,7 +26,7 @@ struct OMMTextureTriangle {
 
 __device__ OMMTextureTriangle micromap_get_ommtexturetriangle(const uint32_t id) {
   const uint32_t material_id = load_triangle_material_id(id);
-  const uint16_t tex         = device.scene.materials[material_id].albedo_map;
+  const uint16_t tex         = device.ptrs.materials[material_id].albedo_tex;
 
   OMMTextureTriangle tri;
   tri.tex_id = tex;
@@ -479,7 +479,7 @@ struct DMMTextureTriangle {
 
 __device__ DMMTextureTriangle micromap_get_dmmtexturetriangle(const uint32_t id) {
   const uint32_t material_id = load_triangle_material_id(id);
-  const uint16_t tex         = device.scene.materials[material_id].normal_map;
+  const uint16_t tex         = device.ptrs.materials[material_id].normal_tex;
 
   DMMTextureTriangle tri;
   tri.tex_id = tex;
@@ -506,7 +506,7 @@ LUMINARY_KERNEL void dmm_precompute_indices(uint32_t* dst) {
 
   while (id < triangle_count) {
     const uint32_t material_id = load_triangle_material_id(id);
-    const uint16_t tex         = __ldg(&(device.scene.materials[material_id].normal_map));
+    const uint16_t tex         = __ldg(&(device.ptrs.materials[material_id].normal_tex));
 
     dst[id] = (tex == TEXTURE_NONE) ? 0 : 1;
 

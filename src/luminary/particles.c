@@ -22,16 +22,16 @@ LuminaryResult particles_get_default(Particles* particles) {
   return LUMINARY_SUCCESS;
 }
 
-#define __PARTICLES_DIRTY(var)  \
-  {                             \
-    if (new->var != old->var) { \
-      *dirty = true;            \
-      return LUMINARY_SUCCESS;  \
-    }                           \
+#define __PARTICLES_DIRTY(var)    \
+  {                               \
+    if (input->var != old->var) { \
+      *dirty = true;              \
+      return LUMINARY_SUCCESS;    \
+    }                             \
   }
 
-LuminaryResult particles_check_for_dirty(const Particles* new, const Particles* old, bool* dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+LuminaryResult particles_check_for_dirty(const Particles* input, const Particles* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(dirty);
 
@@ -39,7 +39,7 @@ LuminaryResult particles_check_for_dirty(const Particles* new, const Particles* 
 
   __PARTICLES_DIRTY(active);
 
-  if (new->active) {
+  if (input->active) {
     __PARTICLES_DIRTY(scale);
     __PARTICLES_DIRTY(albedo.r);
     __PARTICLES_DIRTY(albedo.g);

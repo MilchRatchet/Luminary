@@ -1,13 +1,7 @@
-#define UTILS_NO_DEVICE_TABLE
-
 // Functions work differently when executed from this kernel
 // This emulates the old device.iteration_type == TYPE_LIGHT checks.
 #define SHADING_KERNEL
 #define OPTIX_KERNEL
-
-#include "utils.cuh"
-
-extern "C" static __constant__ DeviceConstantMemory device;
 
 #include "bsdf.cuh"
 #include "directives.cuh"
@@ -17,6 +11,7 @@ extern "C" static __constant__ DeviceConstantMemory device;
 #include "memory.cuh"
 #include "shading_kernel.cuh"
 #include "toy_utils.cuh"
+#include "utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
@@ -37,11 +32,6 @@ extern "C" __global__ void __raygen__optix() {
     else {
       data = geometry_generate_g_buffer(task, pixel);
     }
-
-    write_normal_buffer(data.normal, pixel);
-
-    if (!material_is_mirror(data.roughness, data.metallic))
-      write_albedo_buffer(opaque_color(data.albedo), pixel);
 
     const bool is_delta_path = state_peek(pixel, STATE_FLAG_DELTA_PATH);
 

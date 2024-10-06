@@ -4,7 +4,7 @@
 #include "ocean_utils.cuh"
 #include "utils.cuh"
 
-#define FOG_DENSITY (0.001f * device.scene.fog.density)
+#define FOG_DENSITY (0.001f * device.fog.density)
 
 struct VolumeDescriptor {
   VolumeType type;
@@ -27,9 +27,9 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_fog() {
   volume.absorption     = get_color(0.0f, 0.0f, 0.0f);
   volume.scattering     = get_color(FOG_DENSITY, FOG_DENSITY, FOG_DENSITY);
   volume.max_scattering = FOG_DENSITY;
-  volume.dist           = device.scene.fog.dist;
-  volume.max_height     = device.scene.fog.height;
-  volume.min_height     = (device.scene.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
+  volume.dist           = device.fog.dist;
+  volume.max_height     = device.fog.height;
+  volume.min_height     = (device.ocean.active) ? OCEAN_MAX_HEIGHT : -65535.0f;
 
   return volume;
 }
@@ -38,8 +38,8 @@ __device__ VolumeDescriptor volume_get_descriptor_preset_ocean() {
   VolumeDescriptor volume;
 
   volume.type       = VOLUME_TYPE_OCEAN;
-  volume.absorption = ocean_jerlov_absorption_coefficient(device.scene.ocean.water_type);
-  volume.scattering = ocean_jerlov_scattering_coefficient(device.scene.ocean.water_type);
+  volume.absorption = ocean_jerlov_absorption_coefficient((JerlovWaterType) device.ocean.water_type);
+  volume.scattering = ocean_jerlov_scattering_coefficient((JerlovWaterType) device.ocean.water_type);
   volume.dist       = 10000.0f;
   volume.max_height = OCEAN_MIN_HEIGHT * (1.0f - eps);
   volume.min_height = -65535.0f;
@@ -63,7 +63,7 @@ __device__ VolumeDescriptor volume_get_descriptor_preset(const VolumeType type) 
 __device__ VolumeType volume_get_type_at_position(const vec3 pos) {
   VolumeType type = VOLUME_TYPE_NONE;
 
-  if (device.scene.fog.active) {
+  if (device.fog.active) {
     const VolumeDescriptor volume_fog = volume_get_descriptor_preset_fog();
 
     if (pos.y <= volume_fog.max_height && pos.y >= volume_fog.min_height) {
@@ -71,7 +71,7 @@ __device__ VolumeType volume_get_type_at_position(const vec3 pos) {
     }
   }
 
-  if (device.scene.ocean.active) {
+  if (device.ocean.active) {
     const VolumeDescriptor volume_ocean = volume_get_descriptor_preset_ocean();
 
     if (pos.y <= volume_ocean.max_height && pos.y >= volume_ocean.min_height) {
@@ -150,8 +150,8 @@ __device__ float2 volume_compute_path(const VolumeDescriptor volume, const vec3 
   const float rx = ray.x * rn;
   const float rz = ray.z * rn;
 
-  const float dx = origin.x - device.scene.camera.pos.x;
-  const float dz = origin.z - device.scene.camera.pos.z;
+  const float dx = origin.x - device.camera.pos.x;
+  const float dz = origin.z - device.camera.pos.z;
 
   const float dot = dx * rx + dz * rz;
   const float r2  = volume.dist * volume.dist;
@@ -221,7 +221,7 @@ __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType v
     phase = ocean_phase(cos_angle);
   }
   else {
-    const float diameter = (volume_hit_type == VOLUME_TYPE_FOG) ? device.scene.fog.droplet_diameter : device.scene.particles.phase_diameter;
+    const float diameter            = (volume_hit_type == VOLUME_TYPE_FOG) ? device.fog.droplet_diameter : device.particles.phase_diameter;
     const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
     phase                           = jendersie_eon_phase_function(cos_angle, params);
   }
@@ -232,7 +232,7 @@ __device__ RGBF volume_phase_evaluate(const GBufferData data, const VolumeType v
 __device__ RGBF volume_integrate_transmittance_ocean(const vec3 origin, const vec3 ray, const float depth, const bool force_path = false) {
   RGBF ocean_transmittance = get_color(1.0f, 1.0f, 1.0f);
 
-  if (device.scene.ocean.active) {
+  if (device.ocean.active) {
     const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
     const float2 path             = (force_path) ? make_float2(0.0f, depth) : volume_compute_path(volume, origin, ray, depth);
 
@@ -251,7 +251,7 @@ __device__ RGBF volume_integrate_transmittance_ocean(const vec3 origin, const ve
 __device__ float volume_integrate_transmittance_fog(const vec3 origin, const vec3 ray, const float depth) {
   float fog_transmittance = 1.0f;
 
-  if (device.scene.fog.active) {
+  if (device.fog.active) {
     const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
     const float2 path             = volume_compute_path(volume, origin, ray, depth);
 
@@ -286,7 +286,7 @@ __device__ GBufferData volume_generate_g_buffer(const ShadingTask task, const in
   data.normal    = get_vector(0.0f, 0.0f, 0.0f);
   data.position  = task.position;
   data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = device.scene.fog.droplet_diameter;
+  data.roughness = device.fog.droplet_diameter;
   data.metallic  = 0.0f;
   data.flags     = G_BUFFER_VOLUME_HIT;
   data.ior_in    = ray_ior;

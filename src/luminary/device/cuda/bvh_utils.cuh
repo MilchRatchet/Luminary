@@ -17,14 +17,14 @@ __device__ BVHAlphaResult bvh_triangle_intersection_alpha_test(TraversalTriangle
   if (t.albedo_tex == TEXTURE_NONE)
     return BVH_ALPHA_RESULT_OPAQUE;
 
-  const UV tex_coords    = load_triangle_tex_coords(t_id, coords);
-  const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[t.albedo_tex].tex, tex_coords.u, 1.0f - tex_coords.v);
+  const UV tex_coords = load_triangle_tex_coords(t_id, coords);
+  const float alpha   = tex2D<float4>(device.ptrs.albedo_atlas[t.albedo_tex].handle, tex_coords.u, 1.0f - tex_coords.v).w;
 
-  if (tex_value.w <= device.scene.material.alpha_cutoff) {
+  if (alpha == 0.0f) {
     return BVH_ALPHA_RESULT_TRANSPARENT;
   }
 
-  if (tex_value.w < 1.0f) {
+  if (alpha < 1.0f) {
     return BVH_ALPHA_RESULT_SEMI;
   }
 

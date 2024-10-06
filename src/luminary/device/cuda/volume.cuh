@@ -43,7 +43,7 @@ LUMINARY_KERNEL void volume_process_events() {
 
     const float random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_VOLUME_DIST, task.index);
 
-    if (device.scene.fog.active) {
+    if (device.fog.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
@@ -57,7 +57,7 @@ LUMINARY_KERNEL void volume_process_events() {
       }
     }
 
-    if (device.scene.ocean.active) {
+    if (device.ocean.active) {
       bool ocean_intersection_possible = true;
       if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
         const float short_distance  = ocean_short_distance(task.origin, task.ray);
@@ -79,7 +79,7 @@ LUMINARY_KERNEL void volume_process_events() {
       if (path.x >= 0.0f) {
         float integration_depth = path.y;
 
-        const bool allow_ocean_volume_hit = device.scene.ocean.multiscattering || !state_peek(pixel, STATE_FLAG_OCEAN_SCATTERED);
+        const bool allow_ocean_volume_hit = device.ocean.multiscattering || !state_peek(pixel, STATE_FLAG_OCEAN_SCATTERED);
 
         if (allow_ocean_volume_hit) {
           const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);

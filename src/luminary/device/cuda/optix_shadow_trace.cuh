@@ -58,14 +58,14 @@ __device__ bool optix_evaluate_ior_culling(const uint32_t ior_data, const ushort
 }
 
 __device__ RGBF optix_toy_shadowing(const vec3 position, const vec3 dir, const float dist, unsigned int& compressed_ior) {
-  if (device.scene.toy.active) {
+  if (device.toy.active) {
     const float toy_dist = get_toy_distance(position, dir);
 
     if (toy_dist < dist) {
-      if (device.scene.material.enable_ior_shadowing && ior_compress(device.scene.toy.refractive_index) != compressed_ior)
+      if (device.scene.material.enable_ior_shadowing && ior_compress(device.toy.refractive_index) != compressed_ior)
         return get_color(0.0f, 0.0f, 0.0f);
 
-      RGBF toy_transparency = scale_color(opaque_color(device.scene.toy.albedo), 1.0f - device.scene.toy.albedo.a);
+      RGBF toy_transparency = scale_color(opaque_color(device.toy.albedo), 1.0f - device.toy.albedo.a);
 
       if (color_importance(toy_transparency) == 0.0f)
         return get_color(0.0f, 0.0f, 0.0f);
@@ -137,7 +137,7 @@ __device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
 
   // Don't check for IOR when querying a light from a BSDF sample
   if (ray_ior != SKIP_IOR_CHECK) {
-    const uint32_t compressed_ior = ior_compress(__ldg(&(device.scene.materials[material_id].refraction_index)));
+    const uint32_t compressed_ior = ior_compress(__ldg(&(device.ptrs.materials[material_id].refraction_index)));
 
     // This assumes that IOR is compressed into 8 bits.
     if (device.scene.material.enable_ior_shadowing && compressed_ior != (ray_ior & 0xFF)) {
@@ -146,12 +146,12 @@ __device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
     }
   }
 
-  const uint16_t tex = __ldg(&(device.scene.materials[material_id].albedo_map));
+  const uint16_t tex = __ldg(&(device.ptrs.materials[material_id].albedo_tex));
 
   if (tex != TEXTURE_NONE) {
     const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
 
-    const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v);
+    const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[tex].handle, uv.u, 1.0f - uv.v);
 
     RGBAF albedo;
     albedo.r = tex_value.x;
@@ -163,10 +163,10 @@ __device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
   }
 
   RGBAF albedo;
-  albedo.r = random_uint16_t_to_float(__ldg(&(device.scene.materials[material_id].albedo_r)));
-  albedo.g = random_uint16_t_to_float(__ldg(&(device.scene.materials[material_id].albedo_g)));
-  albedo.b = random_uint16_t_to_float(__ldg(&(device.scene.materials[material_id].albedo_b)));
-  albedo.a = random_uint16_t_to_float(__ldg(&(device.scene.materials[material_id].albedo_a)));
+  albedo.r = random_uint16_t_to_float(__ldg(&(device.ptrs.materials[material_id].albedo_r)));
+  albedo.g = random_uint16_t_to_float(__ldg(&(device.ptrs.materials[material_id].albedo_g)));
+  albedo.b = random_uint16_t_to_float(__ldg(&(device.ptrs.materials[material_id].albedo_b)));
+  albedo.a = random_uint16_t_to_float(__ldg(&(device.ptrs.materials[material_id].albedo_a)));
 
   return albedo;
 }

@@ -46,8 +46,7 @@ __device__ float light_tree_child_importance(
   const vec3 diff = sub_vector(point, closest_point);
 
   const vec3 v0 = normalize_vector(sub_vector(origin, point));
-  const vec3 v1 =
-    normalize_vector(sub_vector(add_vector(origin, scale_vector(ray, fminf(limit, device.scene.camera.far_clip_distance))), point));
+  const vec3 v1 = normalize_vector(sub_vector(add_vector(origin, scale_vector(ray, fminf(limit, device.camera.far_clip_distance))), point));
 
   const float angle = acosf(fminf(fmaxf(dot_product(v0, v1), -1.0f + eps), 1.0f - eps));
 
@@ -445,8 +444,8 @@ __device__ vec3
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
-  const uint16_t albedo_tex = device.scene.materials[triangle.material_id].albedo_map;
-  const uint16_t illum_tex  = device.scene.materials[triangle.material_id].luminance_map;
+  const uint16_t albedo_tex = device.ptrs.materials[triangle.material_id].albedo_tex;
+  const uint16_t illum_tex  = device.ptrs.materials[triangle.material_id].luminance_tex;
 
   // Load texture coordinates if we need them.
   UV tex_coords;
@@ -457,16 +456,16 @@ __device__ vec3
   if (illum_tex != TEXTURE_NONE) {
     const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
 
-    color = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
+    color = scale_color(get_color(emission.x, emission.y, emission.z), emission.w);
   }
   else {
-    color.r = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_r);
-    color.g = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_g);
-    color.b = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_b);
+    color.r = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_r);
+    color.g = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_g);
+    color.b = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_b);
 
-    const float scale = (float) (device.scene.materials[triangle.material_id].emission_scale);
+    const float scale = (float) (device.ptrs.materials[triangle.material_id].emission_scale);
 
-    color = scale_color(color, device.scene.material.default_material.b * scale);
+    color = scale_color(color, scale);
   }
 
   if (color_importance(color) > 0.0f) {
@@ -475,7 +474,7 @@ __device__ vec3
       alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
     }
     else {
-      alpha = random_uint16_t_to_float(device.scene.materials[triangle.material_id].albedo_a);
+      alpha = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].albedo_a);
     }
 
     color = scale_color(color, alpha);
@@ -498,8 +497,8 @@ __device__ void light_sample_triangle_presampled(
 
   solid_angle = sample_triangle_solid_angle(triangle, data.position);
 
-  const uint16_t albedo_tex = device.scene.materials[triangle.material_id].albedo_map;
-  const uint16_t illum_tex  = device.scene.materials[triangle.material_id].luminance_map;
+  const uint16_t albedo_tex = device.ptrs.materials[triangle.material_id].albedo_tex;
+  const uint16_t illum_tex  = device.ptrs.materials[triangle.material_id].luminance_tex;
 
   // Load texture coordinates if we need them.
   UV tex_coords;
@@ -510,16 +509,16 @@ __device__ void light_sample_triangle_presampled(
   if (illum_tex != TEXTURE_NONE) {
     const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
 
-    color = scale_color(get_color(emission.x, emission.y, emission.z), device.scene.material.default_material.b * emission.w);
+    color = scale_color(get_color(emission.x, emission.y, emission.z), emission.w);
   }
   else {
-    color.r = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_r);
-    color.g = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_g);
-    color.b = random_uint16_t_to_float(device.scene.materials[triangle.material_id].emission_b);
+    color.r = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_r);
+    color.g = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_g);
+    color.b = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_b);
 
-    const float scale = (float) (device.scene.materials[triangle.material_id].emission_scale);
+    const float scale = (float) (device.ptrs.materials[triangle.material_id].emission_scale);
 
-    color = scale_color(color, device.scene.material.default_material.b * scale);
+    color = scale_color(color, scale);
   }
 
   if (color_importance(color) > 0.0f) {
@@ -528,7 +527,7 @@ __device__ void light_sample_triangle_presampled(
       alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
     }
     else {
-      alpha = random_uint16_t_to_float(device.scene.materials[triangle.material_id].albedo_a);
+      alpha = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].albedo_a);
     }
 
     color = scale_color(color, alpha);
@@ -542,9 +541,9 @@ __device__ void light_sample_triangle_presampled(
 ////////////////////////////////////////////////////////////////////
 
 __device__ float lights_integrate_emission(const TriangleLight light, const UV vertex, const UV edge1, const UV edge2) {
-  const Material mat = load_material(device.scene.materials, light.material_id);
+  const Material mat = load_material(device.ptrs.materials, light.material_id);
 
-  const DeviceTexture tex = device.ptrs.luminance_atlas[mat.luminance_map];
+  const DeviceTexture tex = device.ptrs.luminance_atlas[mat.luminance_tex];
 
   // Super crude way of determining the number of texel fetches I will need. If performance of this becomes an issue
   // then I will have to rethink this here.

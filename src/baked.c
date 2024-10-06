@@ -215,7 +215,7 @@ static TraversalTriangle* construct_traversal_triangles(
 
   for (unsigned int i = 0; i < triangles_length; i++) {
     const Triangle triangle   = triangles[i];
-    const uint32_t albedo_tex = materials[triangle.material_id].albedo_map;
+    const uint32_t albedo_tex = materials[triangle.material_id].albedo_tex;
     TraversalTriangle tt      = {
            .vertex     = {.x = triangle.vertex.x, .y = triangle.vertex.y, .z = triangle.vertex.z},
            .edge1      = {.x = triangle.edge1.x, .y = triangle.edge1.y, .z = triangle.edge1.z},

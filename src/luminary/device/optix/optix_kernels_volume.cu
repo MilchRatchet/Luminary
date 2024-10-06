@@ -1,5 +1,3 @@
-#define UTILS_NO_DEVICE_TABLE
-
 // Functions work differently when executed from this kernel
 // This emulates the old device.iteration_type == TYPE_LIGHT checks.
 #define SHADING_KERNEL
@@ -7,16 +5,13 @@
 #define PHASE_KERNEL
 #define VOLUME_KERNEL
 
-#include "utils.cuh"
-
-extern "C" static __constant__ DeviceConstantMemory device;
-
 #include "bsdf.cuh"
 #include "directives.cuh"
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "shading_kernel.cuh"
+#include "utils.cuh"
 #include "volume_utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
@@ -32,7 +27,6 @@ extern "C" __global__ void __raygen__optix() {
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
     GBufferData data = volume_generate_g_buffer(task, pixel, volume);
-    write_albedo_buffer(get_color(0.0f, 0.0f, 0.0f), pixel);
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 

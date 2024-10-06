@@ -1208,7 +1208,7 @@ LuminaryResult light_tree_create(Meshlet* meshlet, Device* device, ARRAY const M
 
   // Triangles with displacement can't be light sources.
 #if 0
-    if (dmm_active && scene->materials[triangle.material_id].normal_map)
+    if (dmm_active && scene->materials[triangle.material_id].normal_tex)
       continue;
 #endif
 
@@ -1279,10 +1279,10 @@ void lights_process(Scene* scene, int dmm_active) {
     const Triangle triangle = scene->triangles[i];
 
     const PackedMaterial material = scene->materials[triangle.material_id];
-    const uint16_t tex_index      = material.luminance_map;
+    const uint16_t tex_index      = material.luminance_tex;
 
     // Triangles with displacement can't be light sources.
-    if (dmm_active && scene->materials[triangle.material_id].normal_map)
+    if (dmm_active && scene->materials[triangle.material_id].normal_tex)
       continue;
 
     const int is_textured_light = (tex_index != TEXTURE_NONE);

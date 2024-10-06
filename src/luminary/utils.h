@@ -25,6 +25,8 @@ enum LightID {
   LIGHT_ID_TRIANGLE_ID_LIMIT = 0x7fffffffu
 } typedef LightID;
 
+enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
+
 typedef LuminaryResult (*QueueEntryFunction)(void* worker, void* args);
 
 struct QueueEntry {
@@ -93,28 +95,6 @@ struct RGBA16 {
   uint16_t b;
   uint16_t a;
 } typedef RGBA16;
-
-////////////////////////////////////////////////////////////////////
-// Material
-////////////////////////////////////////////////////////////////////
-
-struct PackedMaterial {
-  float refraction_index;
-  uint16_t albedo_r;
-  uint16_t albedo_g;
-  uint16_t albedo_b;
-  uint16_t albedo_a;
-  uint16_t emission_r;
-  uint16_t emission_g;
-  uint16_t emission_b;
-  uint16_t emission_scale;
-  uint16_t metallic;
-  uint16_t roughness;
-  uint16_t albedo_map;
-  uint16_t luminance_map;
-  uint16_t material_map;
-  uint16_t normal_map;
-} typedef PackedMaterial;
 
 ////////////////////////////////////////////////////////////////////
 // Mesh

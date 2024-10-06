@@ -359,7 +359,7 @@ __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L)
     pdf = ocean_phase(cos_angle);
   }
   else {
-    const float diameter = (volume_hit_type == VOLUME_TYPE_FOG) ? device.scene.fog.droplet_diameter : device.scene.particles.phase_diameter;
+    const float diameter            = (volume_hit_type == VOLUME_TYPE_FOG) ? device.fog.droplet_diameter : device.particles.phase_diameter;
     const JendersieEonParams params = jendersie_eon_phase_parameters(diameter);
     pdf                             = jendersie_eon_phase_function(cos_angle, params);
   }

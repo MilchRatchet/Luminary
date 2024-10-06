@@ -18,13 +18,14 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->use_luminary_bvh           = false;
   settings->undersampling              = 3;
   settings->shading_mode               = LUMINARY_SHADING_MODE_DEFAULT;
+  settings->accumulate                 = true;
 
   return LUMINARY_SUCCESS;
 }
 
 #define __SETTINGS_STANDARD_DIRTY(var) \
   {                                    \
-    if (new->var != old->var) {        \
+    if (input->var != old->var) {      \
       *integration_dirty = true;       \
       *buffers_dirty     = true;       \
       return LUMINARY_SUCCESS;         \
@@ -33,14 +34,14 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
 
 #define __SETTINGS_INTEGRATION_DIRTY(var) \
   {                                       \
-    if (new->var != old->var) {           \
+    if (input->var != old->var) {         \
       *integration_dirty = true;          \
     }                                     \
   }
 
 LuminaryResult settings_check_for_dirty(
-  const RendererSettings* new, const RendererSettings* old, bool* integration_dirty, bool* buffers_dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+  const RendererSettings* input, const RendererSettings* old, bool* integration_dirty, bool* buffers_dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(integration_dirty);
   __CHECK_NULL_ARGUMENT(buffers_dirty);
@@ -59,8 +60,9 @@ LuminaryResult settings_check_for_dirty(
   __SETTINGS_INTEGRATION_DIRTY(use_displacement_micromaps);
   __SETTINGS_INTEGRATION_DIRTY(use_luminary_bvh);
   __SETTINGS_INTEGRATION_DIRTY(undersampling);
+  __SETTINGS_INTEGRATION_DIRTY(accumulate);
 
-  if (new->shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
+  if (input->shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
     __SETTINGS_INTEGRATION_DIRTY(max_ray_depth);
   }
 

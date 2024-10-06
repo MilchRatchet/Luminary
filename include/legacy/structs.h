@@ -140,10 +140,10 @@ struct Material {
   RGBF emission;
   float metallic;
   float roughness;
-  uint16_t albedo_map;
-  uint16_t luminance_map;
-  uint16_t material_map;
-  uint16_t normal_map;
+  uint16_t albedo_tex;
+  uint16_t luminance_tex;
+  uint16_t material_tex;
+  uint16_t normal_tex;
 } typedef Material;
 
 enum GBufferFlags {

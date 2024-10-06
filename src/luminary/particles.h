@@ -4,6 +4,6 @@
 #include "utils.h"
 
 LuminaryResult particles_get_default(Particles* particles);
-LuminaryResult particles_check_for_dirty(const Particles* new, const Particles* old, bool* dirty);
+LuminaryResult particles_check_for_dirty(const Particles* input, const Particles* old, bool* dirty);
 
 #endif /* LUMINARY_PARTICLES_H */

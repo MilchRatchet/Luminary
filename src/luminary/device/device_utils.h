@@ -15,8 +15,7 @@
 
 #define OPTIX_VALIDATION
 
-struct DeviceTexture typedef DeviceTexture;
-typedef cudaTextureObject_t DeviceTextureHandle;
+#define STARS_GRID_LD 64
 
 ////////////////////////////////////////////////////////////////////
 // Failure handles
@@ -52,18 +51,58 @@ typedef cudaTextureObject_t DeviceTextureHandle;
     }                                                                                                                                 \
   }
 
+struct Mat3x3 {
+  float f11;
+  float f12;
+  float f13;
+  float f21;
+  float f22;
+  float f23;
+  float f31;
+  float f32;
+  float f33;
+} typedef Mat3x3;
+
+struct Mat3x4 {
+  float f11;
+  float f12;
+  float f13;
+  float f14;
+  float f21;
+  float f22;
+  float f23;
+  float f24;
+  float f31;
+  float f32;
+  float f33;
+  float f34;
+} typedef Mat3x4;
+
+enum GBufferFlags {
+  G_BUFFER_VOLUME_HIT           = 0b1,
+  G_BUFFER_REFRACTION_IS_INSIDE = 0b10,
+  G_BUFFER_COLORED_DIELECTRIC   = 0b100
+} typedef GBufferFlags;
+
+struct GBufferData {
+  uint32_t hit_id;
+  RGBAF albedo;
+  RGBF emission;
+  vec3 position;
+  vec3 V;
+  vec3 normal;
+  float roughness;
+  float metallic;
+  uint32_t flags;
+  /* IOR of medium in direction of V. */
+  float ior_in;
+  /* IOR of medium on the other side. */
+  float ior_out;
+} typedef GBufferData;
+
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////
-
-// Proposal:
-struct PackedHitIDIndex {
-  uint64_t x : 14;
-  uint64_t y : 14;
-  uint64_t instance_id : 24;
-  uint64_t tri_id : 12;
-};
-LUM_STATIC_SIZE_ASSERT(struct PackedHitIDIndex, 0x08);
 
 struct ShadingTask {
   uint32_t hit_id;
@@ -133,25 +172,25 @@ struct DevicePointers {
   RGBF* frame_indirect_accumulate;
   RGBF* frame_post;
   RGBF* frame_final;
-  RGBF* albedo_buffer;
-  RGBF* normal_buffer;
   RGBF* records;
   XRGB8* buffer_8bit;
   uint32_t* hit_id_history;
   uint8_t* state_buffer;
-  const DeviceTexture* albedo_atlas;
-  const DeviceTexture* luminance_atlas;
-  const DeviceTexture* material_atlas;
-  const DeviceTexture* normal_atlas;
-  const DeviceTexture* cloud_noise;
-  const DeviceTexture* sky_ms_luts;
-  const DeviceTexture* sky_tm_luts;
-  const DeviceTexture* sky_hdri_luts;
-  const DeviceTexture* sky_moon_albedo_tex;
-  const DeviceTexture* sky_moon_normal_tex;
-  const DeviceTexture* bsdf_energy_lut;
+  const DeviceTextureObject* albedo_atlas;
+  const DeviceTextureObject* luminance_atlas;
+  const DeviceTextureObject* material_atlas;
+  const DeviceTextureObject* normal_atlas;
+  const DeviceTextureObject* cloud_noise;
+  const DeviceTextureObject* sky_ms_luts;
+  const DeviceTextureObject* sky_tm_luts;
+  const DeviceTextureObject* sky_hdri_luts;
+  const DeviceTextureObject* sky_moon_albedo_tex;
+  const DeviceTextureObject* sky_moon_normal_tex;
+  const DeviceTextureObject* bsdf_energy_lut;
   const uint16_t* bluenoise_1D;
   const uint32_t* bluenoise_2D;
+  const float* bridge_lut;
+  const DeviceMaterialCompressed* materials;
 } typedef DevicePointers;
 
 struct DeviceConstantMemory {
@@ -166,6 +205,15 @@ struct DeviceConstantMemory {
   DeviceToy toy;
   uint16_t user_selected_x;
   uint16_t user_selected_y;
+  // Warning: This used to be a float, I will from now on have to emulate the old behaviour whenever we do undersampling
+  uint32_t sample_id;
+  uint32_t depth;
+  uint32_t undersampling;
+  uint32_t pixels_per_thread;
+  OptixTraversableHandle optix_bvh;
+  OptixTraversableHandle optix_bvh_shadow;
+  OptixTraversableHandle optix_bvh_light;
+  OptixTraversableHandle optix_bvh_particles;
 
   /*
   int max_ray_depth;
@@ -184,10 +232,6 @@ struct DeviceConstantMemory {
 
   RGBF* bloom_scratch;
   int accumulate;
-  OptixTraversableHandle optix_bvh;
-  OptixTraversableHandle optix_bvh_shadow;
-  OptixTraversableHandle optix_bvh_light;
-  OptixTraversableHandle optix_bvh_particles;
   BVHNode8* bvh_nodes;
   TraversalTriangle* bvh_triangles;
   Quad* particle_quads;

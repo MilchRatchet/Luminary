@@ -787,10 +787,10 @@ static LuminaryResult _wavefront_convert_materials(
     mat.emission_scale   = emission_scale;
     mat.metallic         = _wavefront_convert_float01_to_uint16(content->materials[mat_id].specular_reflectivity.r);
     mat.roughness        = _wavefront_convert_float01_to_uint16(1.0f - content->materials[mat_id].specular_exponent / 1000.0f);
-    mat.albedo_map       = content->materials[mat_id].texture[WF_ALBEDO];
-    mat.luminance_map    = content->materials[mat_id].texture[WF_LUMINANCE];
-    mat.material_map     = content->materials[mat_id].texture[WF_MATERIAL];
-    mat.normal_map       = content->materials[mat_id].texture[WF_NORMAL];
+    mat.albedo_tex       = content->materials[mat_id].texture[WF_ALBEDO];
+    mat.luminance_tex    = content->materials[mat_id].texture[WF_LUMINANCE];
+    mat.material_tex     = content->materials[mat_id].texture[WF_MATERIAL];
+    mat.normal_tex       = content->materials[mat_id].texture[WF_NORMAL];
 
     materials[mat_id] = mat;
   }

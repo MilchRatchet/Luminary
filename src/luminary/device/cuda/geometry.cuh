@@ -20,10 +20,10 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
       case HIT_TYPE_TOY: {
         switch (device.shading_mode) {
           case LUMINARY_SHADING_MODE_ALBEDO: {
-            write_beauty_buffer(opaque_color(device.scene.toy.albedo), pixel, true);
+            write_beauty_buffer(opaque_color(device.toy.albedo), pixel, true);
           } break;
           case SHADING_DEPTH: {
-            const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
+            const float dist  = get_length(sub_vector(device.camera.pos, task.position));
             const float value = __saturatef((1.0f / dist) * 2.0f);
             write_beauty_buffer(get_color(value, value, value), pixel, true);
           } break;
@@ -45,11 +45,11 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
           } break;
           case LUMINARY_SHADING_MODE_LIGHTS: {
             RGBF color;
-            if (device.scene.toy.emissive) {
+            if (device.toy.emissive) {
               color = get_color(100.0f, 100.0f, 100.0f);
             }
             else {
-              color = scale_color(opaque_color(device.scene.toy.albedo), 0.1f);
+              color = scale_color(opaque_color(device.toy.albedo), 0.1f);
             }
 
             write_beauty_buffer(color, pixel, true);
@@ -61,7 +61,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
       case HIT_TYPE_OCEAN: {
         switch (device.shading_mode) {
           case SHADING_DEPTH: {
-            const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
+            const float dist  = get_length(sub_vector(device.camera.pos, task.position));
             const float value = __saturatef((1.0f / dist) * 2.0f);
             write_beauty_buffer(get_color(value, value, value), pixel, true);
           } break;
@@ -89,7 +89,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
             write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
           } break;
           case SHADING_DEPTH: {
-            const float dist  = get_length(sub_vector(device.scene.camera.pos, task.position));
+            const float dist  = get_length(sub_vector(device.camera.pos, task.position));
             const float value = __saturatef((1.0f / dist) * 2.0f);
             write_beauty_buffer(get_color(value, value, value), pixel, true);
           } break;

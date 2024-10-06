@@ -5,8 +5,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define UTILS_NO_DEVICE_TABLE
-
 #include "ceb.h"
 #include "device.h"
 #include "device_memory.h"

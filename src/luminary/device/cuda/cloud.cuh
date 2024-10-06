@@ -45,7 +45,7 @@
 ////////////////////////////////////////////////////////////////////
 
 __device__ float cloud_extinction(const vec3 origin, const vec3 ray, const CloudLayerType layer) {
-  const float iter_step = 1.0f / device.scene.sky.cloud.shadow_steps;
+  const float iter_step = 1.0f / device.cloud.shadow_steps;
 
   float optical_depth = 0.0f;
 
@@ -95,19 +95,19 @@ __device__ CloudRenderResult
   int step_count;
   switch (layer) {
     case CLOUD_LAYER_LOW: {
-      const float span = device.scene.sky.cloud.low.height_max - device.scene.sky.cloud.low.height_min;
+      const float span = device.cloud.low.height_max - device.cloud.low.height_min;
       dist             = fminf(6.0f * span, dist);
-      step_count       = device.scene.sky.cloud.steps * __saturatef(dist / (6.0f * span));
+      step_count       = device.cloud.steps * __saturatef(dist / (6.0f * span));
     } break;
     case CLOUD_LAYER_MID: {
-      const float span = device.scene.sky.cloud.mid.height_max - device.scene.sky.cloud.mid.height_min;
+      const float span = device.cloud.mid.height_max - device.cloud.mid.height_min;
       dist             = fminf(6.0f * span, dist);
-      step_count       = (device.scene.sky.cloud.steps / 4) * __saturatef(dist / (6.0f * span));
+      step_count       = (device.cloud.steps / 4) * __saturatef(dist / (6.0f * span));
     } break;
     case CLOUD_LAYER_TOP: {
-      const float span = device.scene.sky.cloud.top.height_max - device.scene.sky.cloud.top.height_min;
+      const float span = device.cloud.top.height_max - device.cloud.top.height_min;
       dist             = fminf(6.0f * span, dist);
-      step_count       = (device.scene.sky.cloud.steps / 8) * __saturatef(dist / (6.0f * span));
+      step_count       = (device.cloud.steps / 8) * __saturatef(dist / (6.0f * span));
     } break;
     default: {
       CloudRenderResult result;
@@ -128,9 +128,9 @@ __device__ CloudRenderResult
   const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CLOUD_STEP_OFFSET + layer, pixel);
   float reach               = start + (0.1f + random_offset * 0.9f) * step_size;
 
-  const float sun_solid_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
+  const float sun_solid_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, add_vector(origin, scale_vector(ray, reach)));
 
-  const JendersieEonParams params = jendersie_eon_phase_parameters(device.scene.sky.cloud.droplet_diameter);
+  const JendersieEonParams params = jendersie_eon_phase_parameters(device.cloud.droplet_diameter);
 
   float transmittance  = 1.0f;
   RGBF scattered_light = get_color(0.0f, 0.0f, 0.0f);
@@ -166,7 +166,7 @@ __device__ CloudRenderResult
       ambient_r.x      = 2.0f * ambient_r.x - 1.0f;
 
       const vec3 ambient_ray = sample_ray_sphere(ambient_r.x, ambient_r.y);
-      RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.scene.sky.steps / 2, pixel);
+      RGBF ambient_color     = sky_get_color(pos, ambient_ray, FLT_MAX, false, device.sky.steps / 2, pixel);
 
       float ambient_extinction      = cloud_extinction(pos, ambient_ray, layer);
       const float ambient_cos_angle = dot_product(ray, ambient_ray);
@@ -175,7 +175,7 @@ __device__ CloudRenderResult
       float sun_extinction;
       float sun_cos_angle;
 
-      const vec3 sun_ray = normalize_vector(sub_vector(device.sun_pos, pos));
+      const vec3 sun_ray = normalize_vector(sub_vector(device.sky.sun_pos, pos));
 
       const int sun_visible = !sph_ray_hit_p0(sun_ray, pos, SKY_EARTH_RADIUS);
       if (sun_visible) {
@@ -194,7 +194,7 @@ __device__ CloudRenderResult
       float scattering   = density * CLOUD_SCATTERING_DENSITY;
       float extinction   = fmaxf(density * CLOUD_EXTINCTION_DENSITY, 0.0001f);
       float phase_factor = 1.0f;
-      for (int i = 0; i < device.scene.sky.cloud.octaves; i++) {
+      for (int i = 0; i < device.cloud.octaves; i++) {
         scattering *= CLOUD_OCTAVE_SCATTERING_FACTOR;
         extinction *= CLOUD_OCTAVE_EXTINCTION_FACTOR;
 
@@ -292,7 +292,7 @@ __device__ float clouds_render(
       break;
 
 #ifndef SHADING_KERNEL
-    if (device.scene.sky.cloud.atmosphere_scattering) {
+    if (device.cloud.atmosphere_scattering) {
       color  = add_color(color, sky_trace_inscattering(origin, ray, result.hit_dist - prev_start, transmittance, pixel));
       origin = add_vector(origin, scale_vector(ray, result.hit_dist - prev_start));
     }
@@ -320,7 +320,7 @@ LUMINARY_KERNEL void clouds_render_tasks() {
     TraceTask task           = load_trace_task(device.ptrs.trace_tasks + offset);
     const float depth        = __ldcs((float*) (device.ptrs.trace_results + offset));
     vec3 sky_origin          = world_to_sky_transform(task.origin);
-    const float sky_max_dist = (depth == device.scene.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+    const float sky_max_dist = (depth == device.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
     const uint32_t pixel     = get_pixel_id(task.index);
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
@@ -329,14 +329,14 @@ LUMINARY_KERNEL void clouds_render_tasks() {
     float cloud_transmittance;
     const float cloud_offset = clouds_render(sky_origin, task.ray, sky_max_dist, task.index, color, record, cloud_transmittance);
 
-    if (device.scene.sky.cloud.atmosphere_scattering) {
+    if (device.cloud.atmosphere_scattering) {
       if (cloud_offset != FLT_MAX && cloud_offset > 0.0f) {
         const float cloud_world_offset = sky_to_world_scale(cloud_offset);
 
         task.origin = add_vector(task.origin, scale_vector(task.ray, cloud_world_offset));
         store_trace_task(device.ptrs.trace_tasks + offset, task);
 
-        if (depth != device.scene.camera.far_clip_distance) {
+        if (depth != device.camera.far_clip_distance) {
           __stcs((float*) (device.ptrs.trace_results + offset), depth - cloud_world_offset);
         }
       }

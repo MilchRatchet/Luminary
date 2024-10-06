@@ -8,12 +8,12 @@
 __device__ TraceResult trace_preprocess(const TraceTask task) {
   const uint32_t pixel = get_pixel_id(task.index);
 
-  float depth     = device.scene.camera.far_clip_distance;
+  float depth     = device.camera.far_clip_distance;
   uint32_t hit_id = HIT_TYPE_SKY;
 
   // Intersect against the triangle we hit in primary visible in the last frame.
   // This is a heuristic to speed up the BVH traversal.
-  if (device.shading_mode != LUMINARY_SHADING_MODE_HEAT && IS_PRIMARY_RAY) {
+  if (device.settings.shading_mode != LUMINARY_SHADING_MODE_HEAT && IS_PRIMARY_RAY) {
     uint32_t t_id;
     TraversalTriangle tt;
     uint32_t material_id;
@@ -31,12 +31,12 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
       tt.edge2  = get_vector(data1.z, data1.w, data2);
       tt.id     = t_id;
 
-      const Material mat = load_material(device.scene.materials, material_id);
+      const DeviceMaterial mat = load_material(device.ptrs.materials, material_id);
 
-      tt.albedo_tex = mat.albedo_map;
+      tt.albedo_tex = mat.albedo_tex;
 
       // This optimization does not work with displacement.
-      if (mat.normal_map == TEXTURE_NONE) {
+      if (mat.normal_tex == TEXTURE_NONE) {
         float2 coords;
         const float dist = bvh_triangle_intersection_uv(tt, task.origin, task.ray, coords);
 
@@ -52,7 +52,7 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
     }
   }
 
-  if (device.scene.toy.active) {
+  if (device.toy.active) {
     const float toy_dist = get_toy_distance(task.origin, task.ray);
 
     if (toy_dist < depth) {
@@ -61,7 +61,7 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
     }
   }
 
-  if (device.scene.ocean.active) {
+  if (device.ocean.active) {
     if (task.origin.y < OCEAN_MIN_HEIGHT && task.origin.y > OCEAN_MAX_HEIGHT) {
       const float far_distance = ocean_far_distance(task.origin, task.ray);
 

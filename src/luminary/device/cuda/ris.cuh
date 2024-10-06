@@ -34,14 +34,11 @@ __device__ uint32_t ris_sample_light(
   selected_dist          = 1.0f;
   selected_is_refraction = false;
 
-  if (!device.scene.material.lights_active)
-    return LIGHT_ID_NONE;
-
   uint32_t light_list_length;
   float light_list_pdf;
 
   // TODO: Once the light tree is implemented. Consider reducing the number of samples for deep bounces.
-  const int reservoir_size = device.ris_settings.initial_reservoir_size;
+  const int reservoir_size = device.settings.light_num_ris_samples;
 
   // Don't allow triangles to sample themselves.
   uint32_t blocked_light_id = LIGHT_ID_NONE;

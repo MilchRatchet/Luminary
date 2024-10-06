@@ -51,22 +51,22 @@ LuminaryResult cloud_get_default(Cloud* cloud) {
   return LUMINARY_SUCCESS;
 }
 
-#define __CLOUD_DIRTY(var)      \
-  {                             \
-    if (new->var != old->var) { \
-      *dirty = true;            \
-      return LUMINARY_SUCCESS;  \
-    }                           \
+#define __CLOUD_DIRTY(var)        \
+  {                               \
+    if (input->var != old->var) { \
+      *dirty = true;              \
+      return LUMINARY_SUCCESS;    \
+    }                             \
   }
 
-static LuminaryResult _cloud_layer_check_for_dirty(const CloudLayer* new, const CloudLayer* old, bool* dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+static LuminaryResult _cloud_layer_check_for_dirty(const CloudLayer* input, const CloudLayer* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(dirty);
 
   __CLOUD_DIRTY(active);
 
-  if (new->active) {
+  if (input->active) {
     __CLOUD_DIRTY(height_max);
     __CLOUD_DIRTY(height_min);
     __CLOUD_DIRTY(coverage);
@@ -80,8 +80,8 @@ static LuminaryResult _cloud_layer_check_for_dirty(const CloudLayer* new, const 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult cloud_check_for_dirty(const Cloud* new, const Cloud* old, bool* dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+LuminaryResult cloud_check_for_dirty(const Cloud* input, const Cloud* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(dirty);
 
@@ -89,7 +89,7 @@ LuminaryResult cloud_check_for_dirty(const Cloud* new, const Cloud* old, bool* d
 
   __CLOUD_DIRTY(active);
 
-  if (new->active) {
+  if (input->active) {
     __CLOUD_DIRTY(atmosphere_scattering);
     __CLOUD_DIRTY(offset_x);
     __CLOUD_DIRTY(offset_z);
@@ -104,17 +104,17 @@ LuminaryResult cloud_check_for_dirty(const Cloud* new, const Cloud* old, bool* d
     __CLOUD_DIRTY(mipmap_bias);
     __CLOUD_DIRTY(octaves);
 
-    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&new->low, &old->low, dirty));
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->low, &old->low, dirty));
     if (dirty) {
       return LUMINARY_SUCCESS;
     }
 
-    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&new->mid, &old->mid, dirty));
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->mid, &old->mid, dirty));
     if (dirty) {
       return LUMINARY_SUCCESS;
     }
 
-    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&new->top, &old->top, dirty));
+    __FAILURE_HANDLE(_cloud_layer_check_for_dirty(&input->top, &old->top, dirty));
     if (dirty) {
       return LUMINARY_SUCCESS;
     }

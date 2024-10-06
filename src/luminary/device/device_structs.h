@@ -15,7 +15,7 @@ struct DeviceRendererSettings {
   uint16_t width;
   uint16_t height;
 } typedef DeviceRendererSettings;
-LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 8u);
+LUM_STATIC_SIZE_ASSERT(DeviceRendererSettings, 0x08u);
 
 struct DeviceCamera {
   uint32_t aperture_shape : 1;
@@ -38,7 +38,7 @@ struct DeviceCamera {
   float russian_roulette_threshold;
   float film_grain;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 64u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x40u);
 
 struct DeviceOcean {
   uint32_t active : 1;
@@ -55,7 +55,7 @@ struct DeviceOcean {
   float refractive_index;
   float caustics_domain_scale;
 } typedef DeviceOcean;
-LUM_STATIC_SIZE_ASSERT(DeviceOcean, 28u);
+LUM_STATIC_SIZE_ASSERT(DeviceOcean, 0x1Cu);
 
 struct DeviceSky {
   uint32_t ozone_absorption : 1;
@@ -65,10 +65,6 @@ struct DeviceSky {
   uint32_t mode : 2;
 
   vec3 geometry_offset;
-  float azimuth;
-  float altitude;
-  float moon_azimuth;
-  float moon_altitude;
   float moon_tex_offset;
   float sun_strength;
   float base_density;
@@ -82,11 +78,13 @@ struct DeviceSky {
   float ground_visibility;
   float ozone_layer_thickness;
   float multiscattering_factor;
+  vec3 sun_pos;
+  vec3 moon_pos;
   vec3 hdri_origin;
   float hdri_mip_bias;
   RGBF constant_color;
 } typedef DeviceSky;
-LUM_STATIC_SIZE_ASSERT(DeviceSky, 112u);
+LUM_STATIC_SIZE_ASSERT(DeviceSky, 0x78u);
 
 struct DeviceCloudLayer {
   float height_max;
@@ -98,7 +96,7 @@ struct DeviceCloudLayer {
   float wind_speed;
   float wind_angle;
 } typedef DeviceCloudLayer;
-LUM_STATIC_SIZE_ASSERT(DeviceCloudLayer, 32u);
+LUM_STATIC_SIZE_ASSERT(DeviceCloudLayer, 0x20u);
 
 struct DeviceCloud {
   uint32_t active : 1;
@@ -122,7 +120,7 @@ struct DeviceCloud {
   DeviceCloudLayer mid;
   DeviceCloudLayer top;
 } typedef DeviceCloud;
-LUM_STATIC_SIZE_ASSERT(DeviceCloud, 132u);
+LUM_STATIC_SIZE_ASSERT(DeviceCloud, 0x84u);
 
 struct DeviceFog {
   uint32_t active : 1;
@@ -132,7 +130,7 @@ struct DeviceFog {
   float height;
   float dist;
 } typedef DeviceFog;
-LUM_STATIC_SIZE_ASSERT(DeviceFog, 20u);
+LUM_STATIC_SIZE_ASSERT(DeviceFog, 0x14u);
 
 struct DeviceParticles {
   uint32_t active : 1;
@@ -147,7 +145,7 @@ struct DeviceParticles {
   float size;
   float size_variation;
 } typedef DeviceParticles;
-LUM_STATIC_SIZE_ASSERT(DeviceParticles, 44u);
+LUM_STATIC_SIZE_ASSERT(DeviceParticles, 0x2Cu);
 
 struct DeviceToy {
   uint32_t active : 1;
@@ -163,11 +161,15 @@ struct DeviceToy {
 } typedef DeviceToy;
 LUM_STATIC_SIZE_ASSERT(DeviceToy, 0x50u);
 
-struct DeviceMaterial {
-  uint16_t emission_active : 1;
-  uint16_t ior_shadowing : 1;
-  uint16_t thin_walled : 1;
-  uint16_t colored_transparency : 1;
+enum DeviceMaterialFlags {
+  DEVICE_MATERIAL_FLAG_EMISSION             = 0x00000001,
+  DEVICE_MATERIAL_FLAG_IOR_SHADOWING        = 0x00000002,
+  DEVICE_MATERIAL_FLAG_THIN_WALLED          = 0x00000004,
+  DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY = 0x00000008
+} typedef DeviceMaterialFlags;
+
+struct DeviceMaterialCompressed {
+  uint16_t flags;
   uint16_t metallic;
   uint16_t roughness;
   uint16_t refraction_index;
@@ -186,8 +188,24 @@ struct DeviceMaterial {
   uint16_t luminance_tex;
   uint16_t material_tex;
   uint16_t normal_tex;
+
+} typedef DeviceMaterialCompressed;
+LUM_STATIC_SIZE_ASSERT(DeviceMaterialCompressed, 0x20u);
+
+struct DeviceMaterial {
+  uint16_t flags;
+  float metallic;
+  float roughness;
+  float refraction_index;
+
+  RGBAF albedo;
+  RGBF emission;
+
+  uint16_t albedo_tex;
+  uint16_t luminance_tex;
+  uint16_t material_tex;
+  uint16_t normal_tex;
 } typedef DeviceMaterial;
-LUM_STATIC_SIZE_ASSERT(DeviceMaterial, 0x20u);
 
 struct DeviceTriangle {
   vec3 vertex;
@@ -203,6 +221,16 @@ struct DeviceTriangle {
 } typedef DeviceTriangle;
 LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);
 
+struct DeviceTexture;
+typedef cudaTextureObject_t DeviceTextureHandle;
+
+struct DeviceTextureObject {
+  DeviceTextureHandle handle;
+  float gamma;
+  float padding;
+} typedef DeviceTextureObject;
+LUM_STATIC_SIZE_ASSERT(DeviceTextureObject, 0x10u);
+
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings);
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera);
 LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* device_ocean);
@@ -211,8 +239,9 @@ LuminaryResult device_struct_cloud_convert(const Cloud* cloud, DeviceCloud* devi
 LuminaryResult device_struct_fog_convert(const Fog* fog, DeviceFog* device_fog);
 LuminaryResult device_struct_particles_convert(const Particles* particles, DeviceParticles* device_particles);
 LuminaryResult device_struct_toy_convert(const Toy* toy, DeviceToy* device_toy);
-LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterial* device_material);
+LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterialCompressed* device_material);
 LuminaryResult device_struct_scene_entity_convert(const void* source, void* dst, SceneEntity entity);
 LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle);
+LuminaryResult device_struct_texture_object_convert(const struct DeviceTexture* texture, DeviceTextureObject* texture_object);
 
 #endif /* LUMINARY_DEVICE_STRUCTS_H */

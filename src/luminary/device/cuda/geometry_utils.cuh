@@ -7,14 +7,14 @@
 #include "utils.cuh"
 
 __device__ vec3 geometry_compute_normal(
-  vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 e1, vec3 e2, UV e1_tex, UV e2_tex, uint16_t normal_map, float2 coords,
+  vec3 v_normal, vec3 e1_normal, vec3 e2_normal, vec3 ray, vec3 e1, vec3 e2, UV e1_tex, UV e2_tex, uint16_t normal_tex, float2 coords,
   UV tex_coords, bool& is_inside) {
   vec3 face_normal = normalize_vector(cross_product(e1, e2));
   vec3 normal      = lerp_normals(v_normal, e1_normal, e2_normal, coords, face_normal);
   is_inside        = dot_product(face_normal, ray) > 0.0f;
 
-  if (normal_map != TEXTURE_NONE) {
-    const float4 normal_f = texture_load(device.ptrs.normal_atlas[normal_map], tex_coords);
+  if (normal_tex != TEXTURE_NONE) {
+    const float4 normal_f = texture_load(device.ptrs.normal_atlas[normal_tex], tex_coords);
 
     vec3 map_normal = get_vector(normal_f.x, normal_f.y, normal_f.z);
 
@@ -76,7 +76,7 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
 
   const UV tex_coords = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 
-  const Material mat = load_material(device.scene.materials, material_id);
+  const DeviceMaterial mat = load_material(device.ptrs.materials, material_id);
 
   const vec3 vertex_normal = get_vector(t3.y, t3.z, t3.w);
   const vec3 edge1_normal  = get_vector(t4.x, t4.y, t4.z);
@@ -84,45 +84,33 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
 
   bool is_inside;
   const vec3 normal = geometry_compute_normal(
-    vertex_normal, edge1_normal, edge2_normal, task.ray, edge1, edge2, edge1_texture, edge2_texture, mat.normal_map, coords, tex_coords,
+    vertex_normal, edge1_normal, edge2_normal, task.ray, edge1, edge2, edge1_texture, edge2_texture, mat.normal_tex, coords, tex_coords,
     is_inside);
 
   RGBAF albedo = mat.albedo;
-  if (mat.albedo_map != TEXTURE_NONE) {
-    const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[mat.albedo_map], tex_coords);
+  if (mat.albedo_tex != TEXTURE_NONE) {
+    const float4 albedo_f = texture_load(device.ptrs.albedo_atlas[mat.albedo_tex], tex_coords);
     albedo.r              = albedo_f.x;
     albedo.g              = albedo_f.y;
     albedo.b              = albedo_f.z;
     albedo.a              = albedo_f.w;
   }
 
-  if (albedo.a <= device.scene.material.alpha_cutoff)
-    albedo.a = 0.0f;
-
-  RGBF emission = (device.scene.material.lights_active) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
-  if (mat.luminance_map != TEXTURE_NONE && device.scene.material.lights_active) {
-    const float4 luminance_f = texture_load(device.ptrs.luminance_atlas[mat.luminance_map], tex_coords);
+  RGBF emission = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
+  if (mat.luminance_tex != TEXTURE_NONE && (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION)) {
+    const float4 luminance_f = texture_load(device.ptrs.luminance_atlas[mat.luminance_tex], tex_coords);
 
     emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
     emission = scale_color(emission, luminance_f.w * albedo.a);
   }
-  emission = scale_color(emission, device.scene.material.default_material.b);
 
   float roughness = mat.roughness;
   float metallic  = mat.metallic;
-  if (mat.material_map != TEXTURE_NONE) {
-    const float4 material_f = texture_load(device.ptrs.material_atlas[mat.material_map], tex_coords);
+  if (mat.material_tex != TEXTURE_NONE) {
+    const float4 material_f = texture_load(device.ptrs.material_atlas[mat.material_tex], tex_coords);
 
     roughness = material_f.x;
     metallic  = material_f.y;
-  }
-  else if (device.scene.material.override_materials) {
-    roughness = 1.0f - device.scene.material.default_material.r;
-    metallic  = device.scene.material.default_material.g;
-  }
-
-  if ((!device.scene.material.override_materials || mat.material_map != TEXTURE_NONE) && device.scene.material.invert_roughness) {
-    roughness = 1.0f - roughness;
   }
 
   uint32_t flags = 0;
@@ -135,7 +123,7 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
     (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(mat.refraction_index, pixel, ior_stack_method);
 
-  if (device.scene.material.colored_transparency) {
+  if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
     flags |= G_BUFFER_COLORED_DIELECTRIC;
   }
 

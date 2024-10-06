@@ -2,6 +2,7 @@
 
 #include <math.h>
 
+#include "device_texture.h"
 #include "internal_error.h"
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings) {
@@ -68,6 +69,15 @@ LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* devi
   return LUMINARY_SUCCESS;
 }
 
+static vec3 _angles_to_direction(const float altitude, const float azimuth) {
+  vec3 dir;
+  dir.x = cosf(azimuth) * cosf(altitude);
+  dir.y = sinf(altitude);
+  dir.z = sinf(azimuth) * cosf(altitude);
+
+  return dir;
+}
+
 LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) {
   __CHECK_NULL_ARGUMENT(sky);
   __CHECK_NULL_ARGUMENT(device_sky);
@@ -79,10 +89,6 @@ LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) 
   device_sky->mode               = sky->mode;
 
   device_sky->geometry_offset        = sky->geometry_offset;
-  device_sky->azimuth                = sky->azimuth;
-  device_sky->altitude               = sky->altitude;
-  device_sky->moon_azimuth           = sky->moon_azimuth;
-  device_sky->moon_altitude          = sky->moon_altitude;
   device_sky->moon_tex_offset        = sky->moon_tex_offset;
   device_sky->sun_strength           = sky->sun_strength;
   device_sky->base_density           = sky->base_density;
@@ -99,6 +105,44 @@ LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) 
   device_sky->hdri_origin            = sky->hdri_origin;
   device_sky->hdri_mip_bias          = sky->hdri_mip_bias;
   device_sky->constant_color         = sky->constant_color;
+
+  ////////////////////////////////////////////////////////////////////
+  // Precompute sun and moon positions
+  ////////////////////////////////////////////////////////////////////
+
+  double sun_x = cos(sky->azimuth) * cos(sky->altitude);
+  double sun_y = sin(sky->altitude);
+  double sun_z = sin(sky->azimuth) * cos(sky->altitude);
+
+  const double scale_sun = 1.0 / (sqrt(sun_x * sun_x + sun_y * sun_y + sun_z * sun_z));
+  sun_x *= scale_sun * SKY_SUN_DISTANCE;
+  sun_y *= scale_sun * SKY_SUN_DISTANCE;
+  sun_z *= scale_sun * SKY_SUN_DISTANCE;
+  sun_y -= SKY_EARTH_RADIUS;
+  sun_x -= sky->geometry_offset.x;
+  sun_y -= sky->geometry_offset.y;
+  sun_z -= sky->geometry_offset.z;
+
+  device_sky->sun_pos.x = sun_x;
+  device_sky->sun_pos.y = sun_y;
+  device_sky->sun_pos.z = sun_z;
+
+  double moon_x = cos(sky->moon_azimuth) * cos(sky->moon_altitude);
+  double moon_y = sin(sky->moon_altitude);
+  double moon_z = sin(sky->moon_azimuth) * cos(sky->moon_altitude);
+
+  const double scale_moon = 1.0 / (sqrt(moon_x * moon_x + moon_y * moon_y + moon_z * moon_z));
+  moon_x *= scale_moon * SKY_MOON_DISTANCE;
+  moon_y *= scale_moon * SKY_MOON_DISTANCE;
+  moon_z *= scale_moon * SKY_MOON_DISTANCE;
+  moon_y -= SKY_EARTH_RADIUS;
+  moon_x -= sky->geometry_offset.x;
+  moon_y -= sky->geometry_offset.y;
+  moon_z -= sky->geometry_offset.z;
+
+  device_sky->moon_pos.x = moon_x;
+  device_sky->moon_pos.y = moon_y;
+  device_sky->moon_pos.z = moon_z;
 
   return LUMINARY_SUCCESS;
 }
@@ -203,14 +247,15 @@ static uint16_t _device_struct_convert_float01_to_uint16(const float f) {
   return (uint16_t) (f * 0xFFFFu + 0.5f);
 }
 
-LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterial* device_material) {
+LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterialCompressed* device_material) {
   __CHECK_NULL_ARGUMENT(material);
   __CHECK_NULL_ARGUMENT(device_material);
 
-  device_material->emission_active      = material->flags.emission_active;
-  device_material->ior_shadowing        = material->flags.ior_shadowing;
-  device_material->thin_walled          = material->flags.thin_walled;
-  device_material->colored_transparency = material->flags.colored_transparency;
+  device_material->flags = 0;
+  device_material->flags |= material->flags.emission_active ? DEVICE_MATERIAL_FLAG_EMISSION : 0;
+  device_material->flags |= material->flags.ior_shadowing ? DEVICE_MATERIAL_FLAG_IOR_SHADOWING : 0;
+  device_material->flags |= material->flags.thin_walled ? DEVICE_MATERIAL_FLAG_THIN_WALLED : 0;
+  device_material->flags |= material->flags.colored_transparency ? DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY : 0;
 
   device_material->metallic         = _device_struct_convert_float01_to_uint16(material->metallic);
   device_material->roughness        = _device_struct_convert_float01_to_uint16(material->roughness);
@@ -328,6 +373,17 @@ LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTr
   device_triangle->edge2_texture  = _device_UV_to_uint(triangle->edge2_texture);
 
   device_triangle->light_id = triangle->light_id;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_struct_texture_object_convert(const struct DeviceTexture* texture, DeviceTextureObject* texture_object) {
+  __CHECK_NULL_ARGUMENT(texture);
+  __CHECK_NULL_ARGUMENT(texture_object);
+
+  texture_object->handle  = texture->tex;
+  texture_object->gamma   = texture->gamma;
+  texture_object->padding = 0.0f;
 
   return LUMINARY_SUCCESS;
 }

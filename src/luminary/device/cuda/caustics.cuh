@@ -26,7 +26,7 @@ __device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, 
   vec3 V;
   if (is_underwater) {
     bool total_reflection;
-    V = refract_vector(L, get_vector(0.0f, 1.0f, 0.0f), 1.0f / device.scene.ocean.refractive_index, total_reflection);
+    V = refract_vector(L, get_vector(0.0f, 1.0f, 0.0f), 1.0f / device.ocean.refractive_index, total_reflection);
   }
   else {
     V = get_vector(-L.x, L.y, -L.z);
@@ -41,7 +41,7 @@ __device__ vec3 caustics_solve_for_normal(const GBufferData data, const vec3 L, 
 __device__ vec3 caustics_transform(const vec3 V, const vec3 normal, const bool is_refraction) {
   if (is_refraction) {
     bool total_reflection;
-    return refract_vector(V, normal, device.scene.ocean.refractive_index, total_reflection);
+    return refract_vector(V, normal, device.ocean.refractive_index, total_reflection);
   }
   else {
     return reflect_vector(V, normal);
@@ -54,7 +54,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
 #ifdef PHASE_KERNEL
   const bool fast_path = true;
 #else
-  const bool fast_path = device.scene.ocean.amplitude == 0.0f || !device.scene.ocean.caustics_active;
+  const bool fast_path = device.ocean.amplitude == 0.0f || !device.ocean.caustics_active;
 #endif
 
   // Fast path that assumes a flat ocean.
@@ -65,10 +65,10 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
     domain.edge1 = get_vector(0.0f, 0.0f, 0.0f);
     domain.edge2 = get_vector(0.0f, 0.0f, 0.0f);
 
-    domain.area = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(data.position));
+    domain.area = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, world_to_sky_transform(data.position));
 
-    domain.ior_in  = (is_underwater) ? device.scene.ocean.refractive_index : 1.0f;
-    domain.ior_out = (is_underwater) ? 1.0f : device.scene.ocean.refractive_index;
+    domain.ior_in  = (is_underwater) ? device.ocean.refractive_index : 1.0f;
+    domain.ior_out = (is_underwater) ? 1.0f : device.ocean.refractive_index;
 
     domain.fast_path = true;
 
@@ -80,7 +80,7 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
   float azimuth, altitude;
   direction_to_angles(center_dir, azimuth, altitude);
 
-  const float angle        = 0.3f * device.scene.ocean.caustics_domain_scale;
+  const float angle        = 0.3f * device.ocean.caustics_domain_scale;
   const float plane_height = caustics_get_plane_height(is_underwater);
 
   const vec3 v0_dir = angles_to_direction(altitude - angle, azimuth - angle);
@@ -103,8 +103,8 @@ __device__ CausticsSamplingDomain caustics_get_domain(const GBufferData data, co
 
   domain.area = get_length(cross_product(domain.edge1, domain.edge2));
 
-  domain.ior_in  = (is_underwater) ? device.scene.ocean.refractive_index : 1.0f;
-  domain.ior_out = (is_underwater) ? 1.0f : device.scene.ocean.refractive_index;
+  domain.ior_in  = (is_underwater) ? device.ocean.refractive_index : 1.0f;
+  domain.ior_out = (is_underwater) ? 1.0f : device.ocean.refractive_index;
 
   domain.fast_path = false;
 
@@ -140,7 +140,7 @@ __device__ bool caustics_find_connection_point(
   const vec3 L = caustics_transform(V, normal, is_refraction);
 
   const vec3 sky_point = world_to_sky_transform(point);
-  const bool sun_hit   = sphere_ray_hit(L, sky_point, device.sun_pos, SKY_SUN_RADIUS);
+  const bool sun_hit   = sphere_ray_hit(L, sky_point, device.sky.sun_pos, SKY_SUN_RADIUS);
 
   if (!sun_hit)
     return false;

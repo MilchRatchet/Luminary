@@ -102,24 +102,6 @@ __device__ ShadingTask load_shading_task(TraceTask* ptr) {
   return task;
 }
 
-__device__ RGBAhalf load_RGBAhalf(void* ptr) {
-  const ushort4 data0 = __ldcs((ushort4*) ptr);
-
-  RGBAhalf result;
-  result.rg.x = __ushort_as_half(data0.x);
-  result.rg.y = __ushort_as_half(data0.y);
-  result.ba.x = __ushort_as_half(data0.z);
-  result.ba.y = __ushort_as_half(data0.w);
-
-  return result;
-}
-
-__device__ void store_RGBAhalf(void* ptr, const RGBAhalf a) {
-  ushort4 data0 = make_ushort4(__half_as_ushort(a.rg.x), __half_as_ushort(a.rg.y), __half_as_ushort(a.ba.x), __half_as_ushort(a.ba.y));
-
-  __stcs((ushort4*) ptr, data0);
-}
-
 __device__ RGBF load_RGBF(RGBF* ptr) {
   return *ptr;
 }
@@ -130,38 +112,6 @@ __device__ RGBF load_RGBF(const RGBF* ptr) {
 
 __device__ void store_RGBF(RGBF* ptr, const RGBF a) {
   *ptr = a;
-}
-
-/*
- * Updates the albedo buffer if criteria are met.
- * @param albedo Albedo color to be added to the albedo buffer.
- * @param pixel Index of pixel.
- */
-__device__ void write_albedo_buffer(RGBF albedo, const int pixel) {
-  if (!device.denoiser)
-    return;
-
-  if (state_consume(pixel, STATE_FLAG_ALBEDO)) {
-    if (device.temporal_frames != 0.0f && device.accumulate) {
-      RGBF out_albedo = device.ptrs.albedo_buffer[pixel];
-      out_albedo      = scale_color(out_albedo, device.temporal_frames);
-      albedo          = add_color(albedo, out_albedo);
-      albedo          = scale_color(albedo, 1.0f / (device.temporal_frames + 1.0f));
-    }
-
-    device.ptrs.albedo_buffer[pixel] = albedo;
-  }
-}
-
-__device__ void write_normal_buffer(const vec3 normal, const int pixel) {
-  if (!device.denoiser || !IS_PRIMARY_RAY)
-    return;
-
-  // TODO: Fix this, this should store the normal if there is no normal stored already.
-  if (device.temporal_frames != 0.0f && device.accumulate)
-    return;
-
-  device.ptrs.normal_buffer[pixel] = get_color(normal.x, normal.y, normal.z);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -216,7 +166,7 @@ __device__ void* interleaved_buffer_get_entry_address(
 // TODO: Fix this to support undersampling if I need it.
 #if 0
 __device__ void* pixel_buffer_get_entry_address(void* ptr, const uint32_t chunk, const uint32_t offset, const uint32_t pixel) {
-  return interleaved_buffer_get_entry_address(ptr, device.width * device.height, chunk, offset, pixel);
+  return interleaved_buffer_get_entry_address(ptr, OUTPUT_DIM(device.settings.width) * OUTPUT_DIM(device.settings.height), chunk, offset, pixel);
 }
 #endif
 
@@ -275,27 +225,28 @@ __device__ Quad load_quad(const Quad* data, const int offset) {
   return quad;
 }
 
-__device__ Material load_material(const PackedMaterial* data, const int offset) {
+__device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v0   = __ldg(ptr + 0);
   const float4 v1   = __ldg(ptr + 1);
 
-  Material mat;
-  mat.refraction_index = v0.x;
-  mat.albedo.r         = random_uint16_t_to_float(__float_as_uint(v0.y) & 0xFFFF);
-  mat.albedo.g         = random_uint16_t_to_float(__float_as_uint(v0.y) >> 16);
-  mat.albedo.b         = random_uint16_t_to_float(__float_as_uint(v0.z) & 0xFFFF);
-  mat.albedo.a         = random_uint16_t_to_float(__float_as_uint(v0.z) >> 16);
-  mat.emission.r       = random_uint16_t_to_float(__float_as_uint(v0.w) & 0xFFFF);
-  mat.emission.g       = random_uint16_t_to_float(__float_as_uint(v0.w) >> 16);
-  mat.emission.b       = random_uint16_t_to_float(__float_as_uint(v1.x) & 0xFFFF);
-  float emission_scale = (float) (__float_as_uint(v1.x) >> 16);
-  mat.metallic         = random_uint16_t_to_float(__float_as_uint(v1.y) & 0xFFFF);
-  mat.roughness        = random_uint16_t_to_float(__float_as_uint(v1.y) >> 16);
-  mat.albedo_map       = __float_as_uint(v1.z) & 0xFFFF;
-  mat.luminance_map    = __float_as_uint(v1.z) >> 16;
-  mat.material_map     = __float_as_uint(v1.w) & 0xFFFF;
-  mat.normal_map       = __float_as_uint(v1.w) >> 16;
+  DeviceMaterial mat;
+  mat.flags            = __float_as_uint(v0.x) & 0xFFFF;
+  mat.metallic         = random_uint16_t_to_float(__float_as_uint(v0.x) >> 16);
+  mat.roughness        = random_uint16_t_to_float(__float_as_uint(v0.y) & 0xFFFF);
+  mat.refraction_index = random_uint16_t_to_float(__float_as_uint(v0.y) >> 16) * 2.0f + 1.0f;
+  mat.albedo.r         = random_uint16_t_to_float(__float_as_uint(v0.z) & 0xFFFF);
+  mat.albedo.g         = random_uint16_t_to_float(__float_as_uint(v0.z) >> 16);
+  mat.albedo.b         = random_uint16_t_to_float(__float_as_uint(v0.w) & 0xFFFF);
+  mat.albedo.a         = random_uint16_t_to_float(__float_as_uint(v0.w) >> 16);
+  mat.emission.r       = random_uint16_t_to_float(__float_as_uint(v1.x) & 0xFFFF);
+  mat.emission.g       = random_uint16_t_to_float(__float_as_uint(v1.x) >> 16);
+  mat.emission.b       = random_uint16_t_to_float(__float_as_uint(v1.y) & 0xFFFF);
+  float emission_scale = (float) (__float_as_uint(v1.y) >> 16);
+  mat.albedo_tex       = __float_as_uint(v1.z) & 0xFFFF;
+  mat.luminance_tex    = __float_as_uint(v1.z) >> 16;
+  mat.material_tex     = __float_as_uint(v1.w) & 0xFFFF;
+  mat.normal_tex       = __float_as_uint(v1.w) >> 16;
 
   mat.emission = scale_color(mat.emission, emission_scale);
 

@@ -5,10 +5,7 @@
 
 #include "cloud_shadow.cuh"
 #include "math.cuh"
-#include "raytrace.h"
 #include "sky_utils.cuh"
-#include "stars.h"
-#include "texture.h"
 #include "texture_utils.cuh"
 #include "utils.cuh"
 
@@ -50,7 +47,7 @@
 // [Wil21]
 __device__ float sky_mie_density(const float height) {
   // INSO (insoluble = dust-like particles)
-  const float INSO = expf(-height * (1.0f / device.scene.sky.mie_falloff));
+  const float INSO = expf(-height * (1.0f / device.sky.mie_falloff));
 
   // WASO (water soluble = biogenic particles, organic carbon)
   float WASO = 0.0f;
@@ -60,17 +57,17 @@ __device__ float sky_mie_density(const float height) {
   else if (height < 3.0f) {
     WASO = 3.0f - height;
   }
-  WASO *= 60.0f / device.scene.sky.ground_visibility;
+  WASO *= 60.0f / device.sky.ground_visibility;
 
-  return device.scene.sky.base_density * (INSO + WASO);
+  return device.sky.base_density * (INSO + WASO);
 }
 
 __device__ float sky_ozone_density(const float height) {
-  if (!device.scene.sky.ozone_absorption)
+  if (!device.sky.ozone_absorption)
     return 0.0f;
 
   const float min_val = (height > 25.0f) ? 0.0f : 0.1f;
-  return device.scene.sky.base_density * fmaxf(min_val, 1.0f - fabsf(height - 25.0f) / device.scene.sky.ozone_layer_thickness);
+  return device.sky.base_density * fmaxf(min_val, 1.0f - fabsf(height - 25.0f) / device.sky.ozone_layer_thickness);
 }
 
 /*
@@ -126,9 +123,9 @@ __device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const
     const float reach  = i * step_size;
     const float height = sqrtf(reach * reach + 2.0f * r * mu * reach + r * r) - SKY_EARTH_RADIUS;
 
-    const float density_rayleigh = sky_rayleigh_density(height) * device.scene.sky.rayleigh_density;
-    const float density_mie      = sky_mie_density(height) * device.scene.sky.mie_density;
-    const float density_ozone    = sky_ozone_density(height) * device.scene.sky.ozone_density;
+    const float density_rayleigh = sky_rayleigh_density(height) * device.sky.rayleigh_density;
+    const float density_mie      = sky_mie_density(height) * device.sky.mie_density;
+    const float density_ozone    = sky_ozone_density(height) * device.sky.ozone_density;
 
     const Spectrum extinction_rayleigh = spectrum_scale(SKY_RAYLEIGH_EXTINCTION, density_rayleigh);
     const float extinction_mie         = SKY_MIE_EXTINCTION * density_mie;
@@ -211,7 +208,7 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
 
     Spectrum transmittance = spectrum_set1(1.0f);
 
-    const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.scene.sky.mie_diameter);
+    const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.sky.mie_diameter);
 
     for (int i = 0; i < steps; i++) {
       const float newReach = start + distance * (i + 0.3f) / steps;
@@ -229,13 +226,13 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0].tex, transmittance_uv.u, transmittance_uv.v);
-      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1].tex, transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0].handle, transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1].handle, transmittance_uv.u, transmittance_uv.v);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
-      const float density_rayleigh = sky_rayleigh_density(height) * device.scene.sky.rayleigh_density;
-      const float density_mie      = sky_mie_density(height) * device.scene.sky.mie_density;
-      const float density_ozone    = sky_ozone_density(height) * device.scene.sky.ozone_density;
+      const float density_rayleigh = sky_rayleigh_density(height) * device.sky.rayleigh_density;
+      const float density_mie      = sky_mie_density(height) * device.sky.mie_density;
+      const float density_ozone    = sky_ozone_density(height) * device.sky.ozone_density;
 
       const Spectrum scattering_rayleigh = spectrum_scale(SKY_RAYLEIGH_SCATTERING, density_rayleigh);
       const float scattering_mie         = SKY_MIE_SCATTERING * density_mie;
@@ -320,7 +317,7 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
 
   const Spectrum multiScatteringContribution = spectrum_inv(spectrum_sub(spectrum_set1(1.0f), multiscattering));
 
-  const Spectrum L = spectrum_scale(spectrum_mul(luminance, multiScatteringContribution), device.scene.sky.multiscattering_factor);
+  const Spectrum L = spectrum_scale(spectrum_mul(luminance, multiScatteringContribution), device.sky.multiscattering_factor);
 
   multiscattering_tex_lower[x + y * SKY_MS_TEX_SIZE]  = spectrum_split_low(L);
   multiscattering_tex_higher[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
@@ -419,10 +416,10 @@ __device__ Spectrum sky_compute_atmosphere(
     float reach = start;
     float step_size;
 
-    const float light_angle   = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, origin);
+    const float light_angle   = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, origin);
     const float random_offset = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_STEP_OFFSET, pixel);
 
-    const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.scene.sky.mie_diameter);
+    const JendersieEonParams mie_params = jendersie_eon_phase_parameters(device.sky.mie_diameter);
 
     for (int i = 0; i < steps; i++) {
       const float new_reach = start + distance * (i + random_offset) / steps;
@@ -432,7 +429,7 @@ __device__ Spectrum sky_compute_atmosphere(
       const vec3 pos     = add_vector(origin, scale_vector(ray, reach));
       const float height = sky_height(pos);
 
-      const vec3 ray_scatter       = normalize_vector(sub_vector(device.sun_pos, pos));
+      const vec3 ray_scatter       = normalize_vector(sub_vector(device.sky.sun_pos, pos));
       const float cos_angle        = dot_product(ray, ray_scatter);
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
       const float phase_rayleigh   = sky_rayleigh_phase(cos_angle);
@@ -447,13 +444,13 @@ __device__ Spectrum sky_compute_atmosphere(
       }
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0].tex, transmittance_uv.u, transmittance_uv.v);
-      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1].tex, transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_low  = tex2D<float4>(device.ptrs.sky_tm_luts[0].handle, transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_high = tex2D<float4>(device.ptrs.sky_tm_luts[1].handle, transmittance_uv.u, transmittance_uv.v);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
-      const float density_rayleigh = sky_rayleigh_density(height) * device.scene.sky.rayleigh_density;
-      const float density_mie      = sky_mie_density(height) * device.scene.sky.mie_density;
-      const float density_ozone    = sky_ozone_density(height) * device.scene.sky.ozone_density;
+      const float density_rayleigh = sky_rayleigh_density(height) * device.sky.rayleigh_density;
+      const float density_mie      = sky_mie_density(height) * device.sky.mie_density;
+      const float density_ozone    = sky_ozone_density(height) * device.sky.ozone_density;
 
       const Spectrum scattering_rayleigh = spectrum_scale(SKY_RAYLEIGH_SCATTERING, density_rayleigh);
       const float scattering_mie         = SKY_MIE_SCATTERING * density_mie;
@@ -470,8 +467,8 @@ __device__ Spectrum sky_compute_atmosphere(
       const Spectrum ss_radiance = spectrum_scale(spectrum_mul(extinction_sun, phase_times_scattering), shadow * light_angle);
 
       const UV multiscattering_uv        = get_uv(zenith_cos_angle * 0.5f + 0.5f, height / SKY_ATMO_HEIGHT);
-      const float4 multiscattering_low   = tex2D<float4>(device.ptrs.sky_ms_luts[0].tex, multiscattering_uv.u, multiscattering_uv.v);
-      const float4 multiscattering_high  = tex2D<float4>(device.ptrs.sky_ms_luts[1].tex, multiscattering_uv.u, multiscattering_uv.v);
+      const float4 multiscattering_low   = tex2D<float4>(device.ptrs.sky_ms_luts[0].handle, multiscattering_uv.u, multiscattering_uv.v);
+      const float4 multiscattering_high  = tex2D<float4>(device.ptrs.sky_ms_luts[1].handle, multiscattering_uv.u, multiscattering_uv.v);
       const Spectrum multiscattering_tex = spectrum_merge(multiscattering_low, multiscattering_high);
       const Spectrum ms_radiance         = spectrum_mul(multiscattering_tex, scattering);
 
@@ -487,28 +484,28 @@ __device__ Spectrum sky_compute_atmosphere(
       transmittance = spectrum_mul(transmittance, step_transmittance);
     }
 
-    const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength);
+    const Spectrum sun_radiance = spectrum_scale(SKY_SUN_RADIANCE, device.sky.sun_strength);
     result                      = spectrum_mul(result, sun_radiance);
   }
 
   if (celestials) {
-    const float sun_hit   = sphere_ray_intersection(ray, origin, device.sun_pos, SKY_SUN_RADIUS);
+    const float sun_hit   = sphere_ray_intersection(ray, origin, device.sky.sun_pos, SKY_SUN_RADIUS);
     const float earth_hit = sph_ray_int_p0(ray, origin, SKY_EARTH_RADIUS);
-    const float moon_hit  = sphere_ray_intersection(ray, origin, device.moon_pos, SKY_MOON_RADIUS);
+    const float moon_hit  = sphere_ray_intersection(ray, origin, device.sky.moon_pos, SKY_MOON_RADIUS);
 
     if (earth_hit > sun_hit && moon_hit > sun_hit) {
-      const Spectrum S = spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, device.scene.sky.sun_strength));
+      const Spectrum S = spectrum_mul(transmittance, spectrum_scale(SKY_SUN_RADIANCE, device.sky.sun_strength));
 
       result = spectrum_add(result, S);
     }
     else if (earth_hit > moon_hit) {
       const vec3 moon_pos   = add_vector(origin, scale_vector(ray, moon_hit));
-      const vec3 bounce_ray = normalize_vector(sub_vector(device.sun_pos, moon_pos));
+      const vec3 bounce_ray = normalize_vector(sub_vector(device.sky.sun_pos, moon_pos));
 
       if (!sphere_ray_hit(bounce_ray, moon_pos, get_vector(0.0f, 0.0f, 0.0f), SKY_EARTH_RADIUS)) {
-        vec3 normal = normalize_vector(sub_vector(moon_pos, device.moon_pos));
+        vec3 normal = normalize_vector(sub_vector(moon_pos, device.sky.moon_pos));
 
-        const float tex_u = 0.5f + device.scene.sky.moon_tex_offset + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
+        const float tex_u = 0.5f + device.sky.moon_tex_offset + atan2f(normal.z, normal.x) * (1.0f / (2.0f * PI));
         const float tex_v = 0.5f + asinf(normal.y) * (1.0f / PI);
 
         const UV uv = get_uv(tex_u, tex_v);
@@ -528,8 +525,8 @@ __device__ Spectrum sky_compute_atmosphere(
         if (NdotL > 0.0f) {
           const float albedo = texture_load(*device.ptrs.sky_moon_albedo_tex, uv).x;
 
-          const float light_angle = sample_sphere_solid_angle(device.sun_pos, SKY_SUN_RADIUS, moon_pos);
-          const float weight      = albedo * device.scene.sky.sun_strength * NdotL * light_angle / (2.0f * PI);
+          const float light_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, moon_pos);
+          const float weight      = albedo * device.sky.sun_strength * NdotL * light_angle / (2.0f * PI);
 
           result =
             spectrum_add(result, spectrum_mul(transmittance, spectrum_mul(SKY_MOON_SOLAR_FLUX, spectrum_scale(SKY_SUN_RADIANCE, weight))));
@@ -546,15 +543,15 @@ __device__ Spectrum sky_compute_atmosphere(
 
       const int grid = x + y * STARS_GRID_LD;
 
-      const int a = device.scene.sky.stars_offsets[grid];
-      const int b = device.scene.sky.stars_offsets[grid + 1];
+      const int a = device.sky.stars_offsets[grid];
+      const int b = device.sky.stars_offsets[grid + 1];
 
       for (int i = a; i < b; i++) {
-        const Star star     = device.scene.sky.stars[i];
+        const Star star     = device.sky.stars[i];
         const vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
 
         if (sphere_ray_hit(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius)) {
-          result = spectrum_add(result, spectrum_scale(transmittance, star.intensity * device.scene.sky.stars_intensity));
+          result = spectrum_add(result, spectrum_scale(transmittance, star.intensity * device.sky.stars_intensity));
         }
       }
     }
@@ -582,7 +579,7 @@ __device__ RGBF sky_trace_inscattering(const vec3 origin, const vec3 ray, const 
 
   const float base_range = (IS_PRIMARY_RAY) ? 40.0f : 80.0f;
 
-  const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.scene.sky.steps / 6)
+  const int steps = fminf(fmaxf(0.5f, limit / base_range), 2.0f) * (device.sky.steps / 6)
                     + quasirandom_sequence_1D(QUASI_RANDOM_TARGET_SKY_INSCATTERING_STEP, pixel) - 0.5f;
 
   const Spectrum radiance = sky_compute_atmosphere(transmittance, origin, ray, limit, false, true, steps, pixel);
@@ -598,19 +595,19 @@ __device__ RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const ui
   const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
 
   RGBF sky;
-  switch (device.scene.sky.mode) {
+  switch (device.sky.mode) {
     default:
-    case SKY_MODE_DEFAULT: {
+    case LUMINARY_SKY_MODE_DEFAULT: {
       sky = get_color(0.0f, 0.0f, 0.0f);
     } break;
-    case SKY_MODE_HDRI: {
+    case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray, 0.0f);
 
       if (include_sun) {
-        const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
+        const vec3 sky_origin = world_to_sky_transform(device.sky.hdri_origin);
 
         // HDRI does not include the sun, compute sun visibility
-        const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS);
+        const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
         const bool ray_hits_earth = sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS);
 
         if (ray_hits_sun && !ray_hits_earth) {
@@ -620,8 +617,8 @@ __device__ RGBF sky_color_no_compute(const vec3 origin, const vec3 ray, const ui
         }
       }
     } break;
-    case SKY_MODE_CONSTANT_COLOR: {
-      sky = device.scene.sky.constant_color;
+    case LUMINARY_SKY_MODE_CONSTANT_COLOR: {
+      sky = device.sky.constant_color;
     } break;
   }
 
@@ -632,21 +629,21 @@ __device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint32_t
   const bool include_sun = state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION);
 
   RGBF sky;
-  switch (device.scene.sky.mode) {
+  switch (device.sky.mode) {
     default:
-    case SKY_MODE_DEFAULT: {
+    case LUMINARY_SKY_MODE_DEFAULT: {
       const vec3 sky_origin = world_to_sky_transform(origin);
 
-      sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.scene.sky.steps, index);
+      sky = sky_get_color(sky_origin, ray, FLT_MAX, include_sun, device.sky.steps, index);
     } break;
-    case SKY_MODE_HDRI: {
+    case LUMINARY_SKY_MODE_HDRI: {
       sky = sky_hdri_sample(ray, 0.0f);
 
       if (include_sun) {
-        const vec3 sky_origin = world_to_sky_transform(device.scene.sky.hdri_origin);
+        const vec3 sky_origin = world_to_sky_transform(device.sky.hdri_origin);
 
         // HDRI does not include the sun, compute sun visibility
-        const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sun_pos, SKY_SUN_RADIUS);
+        const bool ray_hits_sun   = sphere_ray_hit(ray, sky_origin, device.sky.sun_pos, SKY_SUN_RADIUS);
         const bool ray_hits_earth = sph_ray_hit_p0(ray, sky_origin, SKY_EARTH_RADIUS);
 
         if (ray_hits_sun && !ray_hits_earth) {
@@ -656,8 +653,8 @@ __device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint32_t
         }
       }
     } break;
-    case SKY_MODE_CONSTANT_COLOR: {
-      sky = device.scene.sky.constant_color;
+    case LUMINARY_SKY_MODE_CONSTANT_COLOR: {
+      sky = device.sky.constant_color;
     } break;
   }
 
@@ -686,8 +683,6 @@ LUMINARY_KERNEL void process_sky_tasks() {
     sky      = mul_color(sky, record);
 
     write_beauty_buffer(sky, pixel);
-    write_albedo_buffer(sky, pixel);
-    write_normal_buffer(get_vector(0.0f, 0.0f, 0.0f), pixel);
   }
 }
 
@@ -704,7 +699,7 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
       write_beauty_buffer(sky, pixel, true);
     }
     else if (device.shading_mode == SHADING_DEPTH) {
-      const float value = __saturatef((1.0f / device.scene.camera.far_clip_distance) * 2.0f);
+      const float value = __saturatef((1.0f / device.camera.far_clip_distance) * 2.0f);
       write_beauty_buffer(get_color(value, value, value), pixel, true);
     }
     else if (device.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {

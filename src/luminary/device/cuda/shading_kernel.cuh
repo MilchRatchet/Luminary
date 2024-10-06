@@ -35,7 +35,7 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   const RGBF value_bsdf = bsdf_evaluate(data, dir_bsdf, BSDF_SAMPLING_GENERAL, is_refraction_bsdf, 1.0f);
   light_bsdf            = mul_color(light_bsdf, value_bsdf);
 
-  if (!sphere_ray_hit(dir_bsdf, sky_pos, device.sun_pos, SKY_SUN_RADIUS)) {
+  if (!sphere_ray_hit(dir_bsdf, sky_pos, device.sky.sun_pos, SKY_SUN_RADIUS)) {
     light_bsdf = get_color(0.0f, 0.0f, 0.0f);
   }
 
@@ -46,7 +46,7 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
   const float2 random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_LIGHT_SUN_RAY, index);
 
   float solid_angle;
-  const vec3 dir_solid_angle = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
+  const vec3 dir_solid_angle = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, random, solid_angle);
   RGBF light_solid_angle     = sky_get_sun_color(sky_pos, dir_solid_angle);
 
   bool is_refraction_solid_angle;
@@ -134,7 +134,7 @@ __device__ RGBF
 
   float solid_angle;
   const float2 sun_dir_random                  = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAUSTIC_SUN_DIR, index);
-  const vec3 sun_dir                           = sample_sphere(device.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
+  const vec3 sun_dir                           = sample_sphere(device.sky.sun_pos, SKY_SUN_RADIUS, sky_pos, sun_dir_random, solid_angle);
   const CausticsSamplingDomain sampling_domain = caustics_get_domain(data, sun_dir, is_underwater);
 
   vec3 connection_point;
@@ -151,7 +151,7 @@ __device__ RGBF
     connection_weight     = sample_weight;
   }
   else {
-    const uint32_t num_samples = device.scene.ocean.caustics_ris_sample_count;
+    const uint32_t num_samples = device.ocean.caustics_ris_sample_count;
 
     float resampling_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_CAUSTIC_RESAMPLE, index);
 
@@ -181,11 +181,11 @@ __device__ RGBF
     // I start caring.
 
     // Inspired by the famous factor required for refraction when sampling importance. Note that one of the IOR is 1.0f.
-    connection_weight *= device.scene.ocean.refractive_index * device.scene.ocean.refractive_index;
+    connection_weight *= device.ocean.refractive_index * device.ocean.refractive_index;
 
     if (is_underwater) {
       // ... and why not apply it again, we are just sampling some extra importance clearly. And a 2.0f for good measure.
-      connection_weight *= device.scene.ocean.refractive_index * device.scene.ocean.refractive_index * 2.0f;
+      connection_weight *= device.ocean.refractive_index * device.ocean.refractive_index * 2.0f;
     }
   }
 
@@ -242,7 +242,7 @@ __device__ RGBF
   // Compute visibility term
   ////////////////////////////////////////////////////////////////////
 
-  unsigned int compressed_ior = ior_compress(is_underwater ? device.scene.ocean.refractive_index : 1.0f);
+  unsigned int compressed_ior = ior_compress(is_underwater ? device.ocean.refractive_index : 1.0f);
   unsigned int hit_id         = LIGHT_ID_SUN;
 
   RGBF visibility = optix_geometry_shadowing(position, dir, dist, hit_id, index, compressed_ior);
@@ -262,11 +262,11 @@ __device__ RGBF
 }
 
 __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort2 index) {
-  if (device.scene.sky.mode == SKY_MODE_CONSTANT_COLOR)
+  if (device.sky.mode == LUMINARY_SKY_MODE_CONSTANT_COLOR)
     return get_color(0.0f, 0.0f, 0.0f);
 
   const vec3 sky_pos     = world_to_sky_transform(data.position);
-  const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
+  const bool sun_visible = !sph_ray_hit_p0(normalize_vector(sub_vector(device.sky.sun_pos, sky_pos)), sky_pos, SKY_EARTH_RADIUS);
 
   // This sucks. I want to avoid conditionally executing optixTrace but removing this conditional would hurt performance
   // in night scenes. And in large scenes we may have divergence here during twilight.
@@ -277,10 +277,10 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
   bool sample_caustic = false;
   bool is_underwater  = false;
 
-  if (device.scene.ocean.active && data.hit_id != HIT_TYPE_OCEAN) {
+  if (device.ocean.active && data.hit_id != HIT_TYPE_OCEAN) {
     is_underwater  = ocean_get_relative_height(data.position, OCEAN_ITERATIONS_NORMAL) < 0.0f;
     sample_direct  = !is_underwater;
-    sample_caustic = device.scene.ocean.caustics_active || is_underwater;
+    sample_caustic = device.ocean.caustics_active || is_underwater;
   }
 
   RGBF sun_light = get_color(0.0f, 0.0f, 0.0f);
@@ -303,12 +303,12 @@ __device__ RGBF optix_compute_light_ray_sun(const GBufferData data, const ushort
 ////////////////////////////////////////////////////////////////////
 
 __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 index) {
-  const bool toy_visible = (device.scene.toy.active && device.scene.toy.emissive);
+  const bool toy_visible = (device.toy.active && device.toy.emissive);
 
   if (!toy_visible)
     return get_color(0.0f, 0.0f, 0.0f);
 
-  const RGBF toy_emission = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+  const RGBF toy_emission = scale_color(device.toy.emission, device.toy.material.b);
 
   if (color_importance(toy_emission) == 0.0f)
     return get_color(0.0f, 0.0f, 0.0f);
@@ -419,9 +419,6 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
 #ifndef VOLUME_KERNEL
 
 __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const ushort2 index, const uint32_t light_ray_index) {
-  if (!TRIANGLE_LIGHTS_ON)
-    return get_color(0.0f, 0.0f, 0.0f);
-
   // We have to clamp due to numerical precision issues in the microfacet models.
   data.roughness = fmaxf(data.roughness, BSDF_ROUGHNESS_CLAMP);
 
@@ -496,12 +493,12 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
 __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort2 index) {
   RGBF geometry_light = get_color(0.0f, 0.0f, 0.0f);
 
-  if (device.ris_settings.num_light_rays) {
-    for (int j = 0; j < device.ris_settings.num_light_rays; j++) {
+  if (device.settings.light_num_rays) {
+    for (int j = 0; j < device.settings.light_num_rays; j++) {
       geometry_light = add_color(geometry_light, optix_compute_light_ray_geometry_single(data, index, j));
     }
 
-    geometry_light = scale_color(geometry_light, 1.0f / device.ris_settings.num_light_rays);
+    geometry_light = scale_color(geometry_light, 1.0f / device.settings.light_num_rays);
   }
 
   return geometry_light;
@@ -511,12 +508,12 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 
 __device__ RGBF optix_compute_light_ray_ambient_sky(
   const GBufferData data, const vec3 ray, const RGBF sample_weight, const bool is_refraction, const ushort2 index) {
-  if (device.depth < device.max_ray_depth || !device.scene.sky.ambient_sampling)
+  if (device.depth < device.settings.max_ray_depth || !device.sky.ambient_sampling)
     return get_color(0.0f, 0.0f, 0.0f);
 
   // We don't support compute based sky due to register/performance reasons and because
   // we would have to include clouds then aswell.
-  if (device.scene.sky.mode == SKY_MODE_DEFAULT)
+  if (device.sky.mode == LUMINARY_SKY_MODE_DEFAULT)
     return get_color(0.0f, 0.0f, 0.0f);
 
   const vec3 position = shift_origin_vector(data.position, data.V, ray, is_refraction);

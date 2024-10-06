@@ -49,12 +49,12 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
   const uint32_t undersampling_scale = 1 << device.undersampling;
 
-  const uint32_t undersampling_width  = (device.internal_width + (1 << device.undersampling) - 1) >> device.undersampling;
-  const uint32_t undersampling_height = (device.internal_height + (1 << device.undersampling) - 1) >> device.undersampling;
+  const uint32_t undersampling_width  = (device.settings.width + (1 << device.undersampling) - 1) >> device.undersampling;
+  const uint32_t undersampling_height = (device.settings.height + (1 << device.undersampling) - 1) >> device.undersampling;
 
   const uint32_t amount = undersampling_width * undersampling_height;
 
-  const uint32_t undersampling_index = roundf(device.temporal_frames * undersampling_scale * undersampling_scale);
+  const uint32_t undersampling_index = roundf(device.sample_id * undersampling_scale * undersampling_scale);
 
   for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
     uint16_t undersampling_y = (uint16_t) (undersampling_pixel / undersampling_width);
@@ -68,7 +68,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
       undersampling_y += (undersampling_scale >> 1) * ((undersampling_index & 0b10) ? 1.0f : 0.0f);
     }
 
-    if (undersampling_x >= device.internal_width || undersampling_y >= device.internal_height)
+    if (undersampling_x >= device.settings.width || undersampling_y >= device.settings.height)
       continue;
 
     TraceTask task;
@@ -81,11 +81,6 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
     device.ptrs.records[pixel]      = get_color(1.0f, 1.0f, 1.0f);
     device.ptrs.state_buffer[pixel] = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
-
-    if (device.denoiser && device.temporal_frames == 0.0f) {
-      device.ptrs.albedo_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
-      device.ptrs.normal_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
-    }
 
     device.ptrs.frame_direct_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
     device.ptrs.frame_indirect_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
@@ -373,12 +368,12 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
   const uint32_t undersampling       = max(device.undersampling, 1);
   const uint32_t undersampling_scale = 1 << undersampling;
 
-  const uint32_t undersampling_width  = (device.internal_width + (1 << undersampling) - 1) >> undersampling;
-  const uint32_t undersampling_height = (device.internal_height + (1 << undersampling) - 1) >> undersampling;
+  const uint32_t undersampling_width  = (device.settings.width + (1 << undersampling) - 1) >> undersampling;
+  const uint32_t undersampling_height = (device.settings.height + (1 << undersampling) - 1) >> undersampling;
 
   const uint32_t amount = undersampling_width * undersampling_height;
 
-  const float color_scale = 1.0f / (undersampling_scale * undersampling_scale * __saturatef(device.temporal_frames + temporal_increment()));
+  const float color_scale = 1.0f / (undersampling_scale * undersampling_scale * __saturatef(device.sample_id + temporal_increment()));
 
   for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
     const uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);
@@ -391,10 +386,10 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
 
     for (uint32_t yi = 0; yi < undersampling_scale; yi++) {
       for (uint32_t xi = 0; xi < undersampling_scale; xi++) {
-        const uint32_t pixel_x = min(source_x + xi, device.internal_width - 1);
-        const uint32_t pixel_y = min(source_y + yi, device.internal_height - 1);
+        const uint32_t pixel_x = min(source_x + xi, device.settings.width - 1);
+        const uint32_t pixel_y = min(source_y + yi, device.settings.height - 1);
 
-        const uint32_t index = pixel_x + pixel_y * device.internal_width;
+        const uint32_t index = pixel_x + pixel_y * device.settings.width;
 
         RGBF pixel = load_RGBF(src + index);
         pixel      = tonemap_apply(pixel, pixel_x, pixel_y);
@@ -419,11 +414,11 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
   const float scale_y   = 1.0f / (height - 1);
 
   const uint32_t undersampling       = max(device.undersampling, 1);
-  const uint32_t undersampling_width = (device.internal_width + (1 << undersampling) - 1) >> undersampling;
+  const uint32_t undersampling_width = (device.settings.width + (1 << undersampling) - 1) >> undersampling;
 
   const float mem_scale = (undersampling > 1) ? 1.0f / (1 << (undersampling - 1)) : 1.0f;
 
-  const bool scaled_output = (width != device.width) || (height != device.height);
+  const bool scaled_output = (width != OUTPUT_DIM(device.settings.width)) || (height != OUTPUT_DIM(device.settings.height));
 
   while (id < amount) {
     const uint32_t y = id / width;
@@ -434,7 +429,8 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
       const float sx = x * scale_x;
       const float sy = y * scale_y;
 
-      pixel = sample_pixel_clamp(device.ptrs.frame_final, sx, sy, device.width, device.height, mem_scale);
+      pixel = sample_pixel_clamp(
+        device.ptrs.frame_final, sx, sy, OUTPUT_DIM(device.settings.width), OUTPUT_DIM(device.settings.height), mem_scale);
     }
     else {
       const uint32_t src_x = x >> (max(device.undersampling, 1) - 1);
@@ -442,7 +438,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
       pixel                = load_RGBF(device.ptrs.frame_final + src_x + src_y * undersampling_width);
     }
 
-    switch (device.scene.camera.filter) {
+    switch (device.camera.filter) {
       case LUMINARY_FILTER_NONE:
         break;
       case LUMINARY_FILTER_GRAY:
@@ -465,7 +461,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
         break;
     }
 
-    const float dither = (device.scene.camera.dithering) ? random_dither_mask(x, y) : 0.5f;
+    const float dither = (device.camera.dithering) ? random_dither_mask(x, y) : 0.5f;
 
     pixel.r = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.r)));
     pixel.g = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.g)));

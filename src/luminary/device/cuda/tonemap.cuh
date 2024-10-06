@@ -162,10 +162,10 @@ __device__ RGBF tonemap_agx_punchy(RGBF pixel) {
 __device__ RGBF tonemap_agx_custom(RGBF pixel) {
   pixel = agx_conversion(pixel);
 
-  RGBF slope = get_color(device.scene.camera.agx_custom_slope, device.scene.camera.agx_custom_slope, device.scene.camera.agx_custom_slope);
-  RGBF power = get_color(device.scene.camera.agx_custom_power, device.scene.camera.agx_custom_power, device.scene.camera.agx_custom_power);
+  RGBF slope = get_color(device.camera.agx_custom_slope, device.camera.agx_custom_slope, device.camera.agx_custom_slope);
+  RGBF power = get_color(device.camera.agx_custom_power, device.camera.agx_custom_power, device.camera.agx_custom_power);
 
-  pixel = agx_look(pixel, slope, power, device.scene.camera.agx_custom_saturation);
+  pixel = agx_look(pixel, slope, power, device.camera.agx_custom_saturation);
   pixel = agx_inv_conversion(pixel);
 
   return pixel;
@@ -178,14 +178,14 @@ __device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
   if (device.output_variable == OUTPUT_VARIABLE_ALBEDO_GUIDANCE || device.output_variable == OUTPUT_VARIABLE_NORMAL_GUIDANCE)
     return pixel;
 
-  if (device.scene.camera.purkinje) {
+  if (device.camera.purkinje) {
     pixel = purkinje_shift(pixel);
   }
 
-  if (device.scene.camera.use_color_correction) {
+  if (device.camera.use_color_correction) {
     RGBF hsv = rgb_to_hsv(pixel);
 
-    hsv = add_color(hsv, device.scene.camera.color_correction);
+    hsv = add_color(hsv, device.camera.color_correction);
 
     if (hsv.r < 0.0f)
       hsv.r += 1.0f;
@@ -198,17 +198,17 @@ __device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
     pixel = hsv_to_rgb(hsv);
   }
 
-  pixel.r *= device.scene.camera.exposure;
-  pixel.g *= device.scene.camera.exposure;
-  pixel.b *= device.scene.camera.exposure;
+  pixel.r *= device.camera.exposure;
+  pixel.g *= device.camera.exposure;
+  pixel.b *= device.camera.exposure;
 
-  const float grain = device.scene.camera.film_grain * (random_grain_mask(x, y) - 0.5f) * fminf(1.0f, device.temporal_frames);
+  const float grain = device.camera.film_grain * (random_grain_mask(x, y) - 0.5f) * fminf(1.0f, device.sample_id);
 
   pixel.r = fmaxf(0.0f, pixel.r + grain);
   pixel.g = fmaxf(0.0f, pixel.g + grain);
   pixel.b = fmaxf(0.0f, pixel.b + grain);
 
-  switch (device.scene.camera.tonemap) {
+  switch (device.camera.tonemap) {
     case LUMINARY_TONEMAP_NONE:
       break;
     case LUMINARY_TONEMAP_ACES:

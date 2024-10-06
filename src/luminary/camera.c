@@ -52,7 +52,7 @@ LuminaryResult camera_get_default(Camera* camera) {
 
 #define __CAMERA_STANDARD_DIRTY(var) \
   {                                  \
-    if (new->var != old->var) {      \
+    if (input->var != old->var) {    \
       *output_dirty      = true;     \
       *integration_dirty = true;     \
       return LUMINARY_SUCCESS;       \
@@ -61,13 +61,13 @@ LuminaryResult camera_get_default(Camera* camera) {
 
 #define __CAMERA_OUTPUT_DIRTY(var) \
   {                                \
-    if (new->var != old->var) {    \
+    if (input->var != old->var) {  \
       *output_dirty = true;        \
     }                              \
   }
 
-LuminaryResult camera_check_for_dirty(const Camera* new, const Camera* old, bool* output_dirty, bool* integration_dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bool* output_dirty, bool* integration_dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(output_dirty);
   __CHECK_NULL_ARGUMENT(integration_dirty);
@@ -87,11 +87,11 @@ LuminaryResult camera_check_for_dirty(const Camera* new, const Camera* old, bool
   __CAMERA_STANDARD_DIRTY(russian_roulette_threshold);
   __CAMERA_STANDARD_DIRTY(do_firefly_clamping);
 
-  if (new->aperture_size > 0.0f) {
+  if (input->aperture_size > 0.0f) {
     __CAMERA_STANDARD_DIRTY(focal_length);
     __CAMERA_STANDARD_DIRTY(aperture_shape);
 
-    if (new->aperture_shape != LUMINARY_APERTURE_ROUND) {
+    if (input->aperture_shape != LUMINARY_APERTURE_ROUND) {
       __CAMERA_STANDARD_DIRTY(aperture_blade_count);
     }
   }
@@ -110,13 +110,13 @@ LuminaryResult camera_check_for_dirty(const Camera* new, const Camera* old, bool
   __CAMERA_OUTPUT_DIRTY(use_color_correction);
   __CAMERA_OUTPUT_DIRTY(film_grain);
 
-  if (new->tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {
+  if (input->tonemap == LUMINARY_TONEMAP_AGX_CUSTOM) {
     __CAMERA_OUTPUT_DIRTY(agx_custom_slope);
     __CAMERA_OUTPUT_DIRTY(agx_custom_power);
     __CAMERA_OUTPUT_DIRTY(agx_custom_saturation);
   }
 
-  if (new->use_color_correction) {
+  if (input->use_color_correction) {
     __CAMERA_OUTPUT_DIRTY(color_correction.r);
     __CAMERA_OUTPUT_DIRTY(color_correction.g);
     __CAMERA_OUTPUT_DIRTY(color_correction.b);

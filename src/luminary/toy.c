@@ -31,16 +31,16 @@ LuminaryResult toy_get_default(Toy* toy) {
   return LUMINARY_SUCCESS;
 }
 
-#define __TOY_DIRTY(var)        \
-  {                             \
-    if (new->var != old->var) { \
-      *dirty = true;            \
-      return LUMINARY_SUCCESS;  \
-    }                           \
+#define __TOY_DIRTY(var)          \
+  {                               \
+    if (input->var != old->var) { \
+      *dirty = true;              \
+      return LUMINARY_SUCCESS;    \
+    }                             \
   }
 
-LuminaryResult toy_check_for_dirty(const Toy* new, const Toy* old, bool* dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+LuminaryResult toy_check_for_dirty(const Toy* input, const Toy* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(dirty);
 
@@ -48,7 +48,7 @@ LuminaryResult toy_check_for_dirty(const Toy* new, const Toy* old, bool* dirty) 
 
   __TOY_DIRTY(active);
 
-  if (new->active) {
+  if (input->active) {
     __TOY_DIRTY(emissive);
     __TOY_DIRTY(position.x);
     __TOY_DIRTY(position.y);
@@ -62,7 +62,7 @@ LuminaryResult toy_check_for_dirty(const Toy* new, const Toy* old, bool* dirty) 
     __TOY_DIRTY(albedo.b);
     __TOY_DIRTY(albedo.a);
 
-    if (new->albedo.a < 1.0f) {
+    if (input->albedo.a < 1.0f) {
       __TOY_DIRTY(refractive_index);
     }
 
@@ -71,7 +71,7 @@ LuminaryResult toy_check_for_dirty(const Toy* new, const Toy* old, bool* dirty) 
     __TOY_DIRTY(material.b);
     __TOY_DIRTY(material.a);
 
-    if (new->emissive) {
+    if (input->emissive) {
       __TOY_DIRTY(emission.r);
       __TOY_DIRTY(emission.g);
       __TOY_DIRTY(emission.b);

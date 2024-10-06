@@ -82,15 +82,15 @@ __device__ float bridges_log_factorial(const uint32_t vertex_count) {
 __device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count, const float effective_dist) {
   const uint32_t lut_offset = (vertex_count - 1) * 21;
 
-  const float min_dist    = __ldg(device.bridge_lut + lut_offset + 0);
-  const float center_dist = __ldg(device.bridge_lut + lut_offset + 1);
-  const float max_dist    = __ldg(device.bridge_lut + lut_offset + 2);
+  const float min_dist    = __ldg(device.ptrs.bridge_lut + lut_offset + 0);
+  const float center_dist = __ldg(device.ptrs.bridge_lut + lut_offset + 1);
+  const float max_dist    = __ldg(device.ptrs.bridge_lut + lut_offset + 2);
 
   if (effective_dist > max_dist)
     return 0.0f;
 
   if (effective_dist < min_dist) {
-    const float linear_falloff = __ldg(device.bridge_lut + lut_offset + 3);
+    const float linear_falloff = __ldg(device.ptrs.bridge_lut + lut_offset + 3);
 
     return linear_falloff * effective_dist / min_dist;
   }
@@ -103,10 +103,10 @@ __device__ float bridges_get_vertex_count_importance(const uint32_t vertex_count
   const float floor_dist = low_dist + step_id * step;
   const uint32_t index   = (effective_dist < center_dist) ? (3 + 2 * step_id) : (3 + 2 * (step_id + 4));
 
-  const float y0  = __ldg(device.bridge_lut + lut_offset + index + 0);
-  const float dy0 = __ldg(device.bridge_lut + lut_offset + index + 1);
-  const float y1  = __ldg(device.bridge_lut + lut_offset + index + 2);
-  const float dy1 = __ldg(device.bridge_lut + lut_offset + index + 3);
+  const float y0  = __ldg(device.ptrs.bridge_lut + lut_offset + index + 0);
+  const float dy0 = __ldg(device.ptrs.bridge_lut + lut_offset + index + 1);
+  const float y1  = __ldg(device.ptrs.bridge_lut + lut_offset + index + 2);
+  const float dy1 = __ldg(device.ptrs.bridge_lut + lut_offset + index + 3);
 
   const float t  = __saturatef((effective_dist - floor_dist) / step);
   const float t2 = t * t;
@@ -133,7 +133,7 @@ __device__ uint32_t
   float sum_importance = 0.0f;
   float count_importance[BRIDGES_MAX_DEPTH];
 
-  for (uint32_t i = 0; i < device.bridge_settings.max_num_vertices; i++) {
+  for (uint32_t i = 0; i < device.settings.bridge_max_num_vertices; i++) {
     const float importance = bridges_get_vertex_count_importance(i + 1, effective_dist);
 
     count_importance[i] = importance;
@@ -148,10 +148,10 @@ __device__ uint32_t
 
   // Fallback values. These come into play if sum_importance is 0.0f.
   // This happens when effective dist is too large.
-  uint32_t selected_vertex_count = device.bridge_settings.max_num_vertices - 1;
+  uint32_t selected_vertex_count = device.settings.bridge_max_num_vertices - 1;
   pdf                            = 1.0f;
 
-  for (uint32_t i = 0; i < device.bridge_settings.max_num_vertices; i++) {
+  for (uint32_t i = 0; i < device.settings.bridge_max_num_vertices; i++) {
     const float importance = count_importance[i];
 
     random -= importance;
@@ -472,9 +472,6 @@ __device__ vec3 bridges_sample_initial_vertex(
 }
 
 __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
-  if (!TRIANGLE_LIGHTS_ON)
-    return get_color(0.0f, 0.0f, 0.0f);
-
   uint32_t selected_seed                     = 0xFFFFFFFF;
   uint32_t selected_light_id                 = LIGHT_ID_NONE;
   Quaternion selected_rotation               = {0.0f, 0.0f, 0.0f, 1.0f};
@@ -487,7 +484,7 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
 
   float random_resampling = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_RESAMPLING, task.index);
 
-  for (uint32_t i = 0; i < device.bridge_settings.num_ris_samples; i++) {
+  for (uint32_t i = 0; i < device.settings.bridge_num_ris_samples; i++) {
     float sample_pdf = 1.0f;
 
     ////////////////////////////////////////////////////////////////////
@@ -604,7 +601,7 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
     }
   }
 
-  sum_weight /= device.bridge_settings.num_ris_samples;
+  sum_weight /= device.settings.bridge_num_ris_samples;
 
   ////////////////////////////////////////////////////////////////////
   // Evaluate sampled path

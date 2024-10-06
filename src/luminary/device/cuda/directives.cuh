@@ -19,9 +19,9 @@ __device__ int validate_trace_task(const TraceTask task, RGBF& record) {
   const float value = color_importance(record);
 
   // Inf and NaN are handled in the temporal accumulation.
-  if (value < device.scene.camera.russian_roulette_threshold) {
+  if (value < device.camera.russian_roulette_threshold) {
     // Clamp probability to avoid fireflies. Always remove paths that carry no light at all.
-    const float p = (value > 0.0f) ? fmaxf(value / device.scene.camera.russian_roulette_threshold, RUSSIAN_ROULETTE_CLAMP) : 0.0f;
+    const float p = (value > 0.0f) ? fmaxf(value / device.camera.russian_roulette_threshold, RUSSIAN_ROULETTE_CLAMP) : 0.0f;
     if (quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RUSSIAN_ROULETTE, task.index) > p) {
       valid = 0;
     }

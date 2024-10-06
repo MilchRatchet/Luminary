@@ -368,21 +368,21 @@ __device__ float quasirandom_sequence_1D_base_float(
 }
 
 __device__ float quasirandom_sequence_1D(const uint32_t target, const ushort2 pixel) {
-  return quasirandom_sequence_1D_base_float(target, pixel, device.temporal_frames, device.depth);
+  return quasirandom_sequence_1D_base_float(target, pixel, device.sample_id, device.depth);
 }
 
 // This is a global version that is constant within a given frame.
 __device__ float quasirandom_sequence_1D_global(const uint32_t target) {
-  return quasirandom_sequence_1D_base_float(target, make_ushort2(0, 0), device.temporal_frames, 0);
+  return quasirandom_sequence_1D_base_float(target, make_ushort2(0, 0), device.sample_id, 0);
 }
 
 __device__ float2 quasirandom_sequence_2D(const uint32_t target, const ushort2 pixel) {
-  return quasirandom_sequence_2D_base_float(target, pixel, device.temporal_frames, device.depth);
+  return quasirandom_sequence_2D_base_float(target, pixel, device.sample_id, device.depth);
 }
 
 // This is a global version that is constant within a given frame.
 __device__ float2 quasirandom_sequence_2D_global(const uint32_t target) {
-  return quasirandom_sequence_2D_base_float(target, make_ushort2(0, 0), device.temporal_frames, 0);
+  return quasirandom_sequence_2D_base_float(target, make_ushort2(0, 0), device.sample_id, 0);
 }
 
 __device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
@@ -393,7 +393,7 @@ __device__ float random_dither_mask(const uint32_t x, const uint32_t y) {
 }
 
 __device__ float random_grain_mask(const uint32_t x, const uint32_t y) {
-  return white_noise_offset(x + y * device.internal_width);
+  return white_noise_offset(x + y * device.settings.width);
 }
 
 #endif /* CU_RANDOM_H */

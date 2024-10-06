@@ -1,13 +1,8 @@
-#define UTILS_NO_DEVICE_TABLE
-
 #define OPTIX_KERNEL
-
-#include "utils.cuh"
-
-extern "C" static __constant__ DeviceConstantMemory device;
 
 #include "math.cuh"
 #include "memory.cuh"
+#include "utils.cuh"
 
 __device__ bool particle_opacity_cutout(const float2 coord) {
   const float dx = fabsf(coord.x - 0.5f);
@@ -25,16 +20,16 @@ extern "C" __global__ void __raygen__optix() {
   const uint16_t trace_task_count = device.ptrs.trace_counts[THREAD_ID];
 
   const float time         = quasirandom_sequence_1D_global(QUASI_RANDOM_TARGET_CAMERA_TIME);
-  const vec3 motion        = angles_to_direction(device.scene.particles.direction_altitude, device.scene.particles.direction_azimuth);
-  const vec3 motion_offset = scale_vector(motion, time * device.scene.particles.speed);
+  const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
+  const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
 
   for (int i = 0; i < trace_task_count; i++) {
     const int offset     = get_task_address(i);
     const TraceTask task = load_trace_task(device.ptrs.trace_tasks + offset);
     const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
 
-    const vec3 scaled_ray = scale_vector(task.ray, 1.0f / device.scene.particles.scale);
-    const vec3 reference  = scale_vector(add_vector(task.origin, motion_offset), 1.0f / device.scene.particles.scale);
+    const vec3 scaled_ray = scale_vector(task.ray, 1.0f / device.particles.scale);
+    const vec3 reference  = scale_vector(add_vector(task.origin, motion_offset), 1.0f / device.particles.scale);
 
     const float3 origin = make_float3(reference.x, reference.y, reference.z);
     const float3 ray    = make_float3(scaled_ray.x, scaled_ray.y, scaled_ray.z);
@@ -72,7 +67,7 @@ extern "C" __global__ void __raygen__optix() {
         // Hit ID contains the triangle ID but we only store the actual particle / quad ID
         hit_id = HIT_TYPE_PARTICLE_MIN + (hit_id >> 1);
 
-        if (device.shading_mode == LUMINARY_SHADING_MODE_HEAT) {
+        if (device.settings.shading_mode == LUMINARY_SHADING_MODE_HEAT) {
           trace_result = make_float2(cost, __uint_as_float(hit_id));
         }
         else {

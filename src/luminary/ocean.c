@@ -21,23 +21,23 @@ LuminaryResult ocean_get_default(Ocean* ocean) {
   return LUMINARY_SUCCESS;
 }
 
-#define __OCEAN_DIRTY(var)      \
-  {                             \
-    if (new->var != old->var) { \
-      *dirty = true;            \
-      return LUMINARY_SUCCESS;  \
-    }                           \
+#define __OCEAN_DIRTY(var)        \
+  {                               \
+    if (input->var != old->var) { \
+      *dirty = true;              \
+      return LUMINARY_SUCCESS;    \
+    }                             \
   }
 
-LuminaryResult ocean_check_for_dirty(const Ocean* new, const Ocean* old, bool* dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+LuminaryResult ocean_check_for_dirty(const Ocean* input, const Ocean* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
 
   *dirty = false;
 
   __OCEAN_DIRTY(active);
 
-  if (new->active) {
+  if (input->active) {
     __OCEAN_DIRTY(height);
     __OCEAN_DIRTY(amplitude);
     __OCEAN_DIRTY(frequency);
@@ -46,7 +46,7 @@ LuminaryResult ocean_check_for_dirty(const Ocean* new, const Ocean* old, bool* d
     __OCEAN_DIRTY(water_type);
     __OCEAN_DIRTY(caustics_active);
 
-    if (new->caustics_active) {
+    if (input->caustics_active) {
       __OCEAN_DIRTY(caustics_ris_sample_count);
       __OCEAN_DIRTY(caustics_domain_scale);
     }

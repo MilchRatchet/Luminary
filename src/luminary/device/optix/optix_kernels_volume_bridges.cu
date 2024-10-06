@@ -1,5 +1,3 @@
-#define UTILS_NO_DEVICE_TABLE
-
 // Functions work differently when executed from this kernel
 // This emulates the old device.iteration_type == TYPE_LIGHT checks.
 #define SHADING_KERNEL
@@ -7,16 +5,13 @@
 #define PHASE_KERNEL
 #define VOLUME_KERNEL
 
-#include "utils.cuh"
-
-extern "C" static __constant__ DeviceConstantMemory device;
-
 #include "bridges.cuh"
 #include "bsdf.cuh"
 #include "directives.cuh"
 #include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
+#include "utils.cuh"
 #include "volume_utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
@@ -38,7 +33,7 @@ extern "C" __global__ void __raygen__optix() {
     float start            = FLT_MAX;
     VolumeType volume_type = VOLUME_TYPE_NONE;
 
-    if (device.scene.fog.active) {
+    if (device.fog.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
@@ -48,7 +43,7 @@ extern "C" __global__ void __raygen__optix() {
       }
     }
 
-    if (device.scene.ocean.active && device.scene.ocean.triangle_light_contribution) {
+    if (device.ocean.active && device.ocean.triangle_light_contribution) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
       const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 

@@ -16,9 +16,9 @@
 // The water is handled by the volume implementation.
 //
 
-#define OCEAN_MAX_HEIGHT (device.scene.ocean.height + 2.66f * device.scene.ocean.amplitude)
-#define OCEAN_MIN_HEIGHT (device.scene.ocean.height)
-#define OCEAN_LIPSCHITZ (device.scene.ocean.amplitude * 4.0f)
+#define OCEAN_MAX_HEIGHT (device.ocean.height + 2.66f * device.ocean.amplitude)
+#define OCEAN_MIN_HEIGHT (device.ocean.height)
+#define OCEAN_LIPSCHITZ (device.ocean.amplitude * 4.0f)
 
 #define OCEAN_ITERATIONS_INTERSECTION 5
 #define OCEAN_ITERATIONS_NORMAL 8
@@ -82,8 +82,8 @@ __device__ float ocean_octave(float2 p, const float choppyness) {
 
 __device__ float ocean_get_height(const vec3 p, const int steps) {
   float amplitude  = 1.0f;
-  float choppyness = device.scene.ocean.choppyness;
-  float frequency  = device.scene.ocean.frequency;
+  float choppyness = device.ocean.choppyness;
+  float frequency  = device.ocean.frequency;
 
   float2 q = make_float2(p.x * 0.75f, p.z);
 
@@ -103,13 +103,13 @@ __device__ float ocean_get_height(const vec3 p, const int steps) {
     choppyness = lerp(choppyness, 1.0f, 0.2f);
   }
 
-  h *= 2.0f * device.scene.ocean.amplitude;
+  h *= 2.0f * device.ocean.amplitude;
 
   return h;
 }
 
 __device__ float ocean_get_relative_height(const vec3 p, const int steps) {
-  return (p.y - device.scene.ocean.height) - ocean_get_height(p, steps);
+  return (p.y - device.ocean.height) - ocean_get_height(p, steps);
 }
 
 __device__ vec3 ocean_get_normal(const vec3 p, const uint32_t iterations = OCEAN_ITERATIONS_NORMAL) {
@@ -196,7 +196,7 @@ __device__ float ocean_intersection_solver(const vec3 origin, const vec3 ray, co
   if (start >= limit)
     return FLT_MAX;
 
-  const float target_residual = (1.0f + fabsf(device.scene.ocean.height) + start / 10.0f) * 0.5f * eps;
+  const float target_residual = (1.0f + fabsf(device.ocean.height) + start / 10.0f) * 0.5f * eps;
 
   float t                       = start;
   float last_residual           = 0.0f;
@@ -247,7 +247,7 @@ __device__ float ocean_intersection_distance(const vec3 origin, const vec3 ray, 
     start = short_distance;
   }
 
-  if (device.scene.ocean.amplitude == 0.0f) {
+  if (device.ocean.amplitude == 0.0f) {
     return start;
   }
 
@@ -363,7 +363,7 @@ __device__ float ocean_particle_phase_sampling_cosine(const float r) {
 }
 
 __device__ vec3 ocean_phase_sampling(const vec3 ray, const float2 r_dir, const float r_choice) {
-  const float molecular_weight = ocean_molecular_weight(device.scene.ocean.water_type);
+  const float molecular_weight = ocean_molecular_weight((JerlovWaterType) device.ocean.water_type);
 
   float cos_angle;
   if (r_choice < molecular_weight) {
@@ -377,7 +377,7 @@ __device__ vec3 ocean_phase_sampling(const vec3 ray, const float2 r_dir, const f
 }
 
 __device__ float ocean_phase_sampling_cos_angle(const float r_dir, const float r_choice) {
-  const float molecular_weight = ocean_molecular_weight(device.scene.ocean.water_type);
+  const float molecular_weight = ocean_molecular_weight((JerlovWaterType) device.ocean.water_type);
 
   float cos_angle;
   if (r_choice < molecular_weight) {
@@ -399,7 +399,7 @@ __device__ float ocean_particle_phase(const float cos_angle) {
 }
 
 __device__ float ocean_phase(const float cos_angle) {
-  const float molecular_weight = ocean_molecular_weight(device.scene.ocean.water_type);
+  const float molecular_weight = ocean_molecular_weight((JerlovWaterType) device.ocean.water_type);
 
   const float molecular_phase = ocean_molecular_phase(cos_angle);
   const float particle_phase  = ocean_particle_phase(cos_angle);
@@ -450,7 +450,7 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const int
 
   const IORStackMethod ior_stack_method =
     (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(device.scene.toy.refractive_index, pixel, ior_stack_method);
+  const float ray_ior = ior_stack_interact(device.toy.refractive_index, pixel, ior_stack_method);
 
   GBufferData data;
   data.hit_id    = HIT_TYPE_OCEAN;
@@ -462,8 +462,8 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const int
   data.roughness = 0.045f;
   data.metallic  = 1.0f;
   data.flags     = flags;
-  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.ocean.refractive_index : ray_ior;
-  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.scene.ocean.refractive_index;
+  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;
+  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.ocean.refractive_index;
 
   return data;
 }

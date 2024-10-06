@@ -48,16 +48,16 @@ LuminaryResult sky_get_default(Sky* sky) {
   return LUMINARY_SUCCESS;
 }
 
-#define __SKY_DIRTY(var)        \
-  {                             \
-    if (new->var != old->var) { \
-      *dirty = true;            \
-      return LUMINARY_SUCCESS;  \
-    }                           \
+#define __SKY_DIRTY(var)          \
+  {                               \
+    if (input->var != old->var) { \
+      *dirty = true;              \
+      return LUMINARY_SUCCESS;    \
+    }                             \
   }
 
-LuminaryResult sky_check_for_dirty(const Sky* new, const Sky* old, bool* dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+LuminaryResult sky_check_for_dirty(const Sky* input, const Sky* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(dirty);
 
@@ -67,7 +67,7 @@ LuminaryResult sky_check_for_dirty(const Sky* new, const Sky* old, bool* dirty) 
 
   __SKY_DIRTY(ambient_sampling);
 
-  switch (new->mode) {
+  switch (input->mode) {
     case LUMINARY_SKY_MODE_DEFAULT:
       __SKY_DIRTY(geometry_offset.x);
       __SKY_DIRTY(geometry_offset.y);

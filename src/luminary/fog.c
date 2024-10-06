@@ -14,16 +14,16 @@ LuminaryResult fog_get_default(Fog* fog) {
   return LUMINARY_SUCCESS;
 }
 
-#define __FOG_DIRTY(var)        \
-  {                             \
-    if (new->var != old->var) { \
-      *dirty = true;            \
-      return LUMINARY_SUCCESS;  \
-    }                           \
+#define __FOG_DIRTY(var)          \
+  {                               \
+    if (input->var != old->var) { \
+      *dirty = true;              \
+      return LUMINARY_SUCCESS;    \
+    }                             \
   }
 
-LuminaryResult fog_check_for_dirty(const Fog* new, const Fog* old, bool* dirty) {
-  __CHECK_NULL_ARGUMENT(new);
+LuminaryResult fog_check_for_dirty(const Fog* input, const Fog* old, bool* dirty) {
+  __CHECK_NULL_ARGUMENT(input);
   __CHECK_NULL_ARGUMENT(old);
   __CHECK_NULL_ARGUMENT(dirty);
 
@@ -31,7 +31,7 @@ LuminaryResult fog_check_for_dirty(const Fog* new, const Fog* old, bool* dirty) 
 
   __FOG_DIRTY(active);
 
-  if (new->active) {
+  if (input->active) {
     __FOG_DIRTY(density);
     __FOG_DIRTY(droplet_diameter);
     __FOG_DIRTY(height);

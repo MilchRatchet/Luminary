@@ -6,123 +6,41 @@
 #include "utils.cuh"
 
 /*
- * Requirement:
- *      - Position should be the middle of the shape
- *      - Scale should be the radius of the shape
+ * Toy is deprecated and will soon be removed in favor of preset meshlets that we can then instantiate.
  */
 
-__device__ float toy_plane_distance(const vec3 origin, const vec3 ray) {
-  const vec3 n = rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
-
-  const float denom = dot_product(n, ray);
-  if (fabsf(denom) > eps) {
-    const vec3 d  = sub_vector(device.scene.toy.position, origin);
-    const float t = dot_product(d, n) / denom;
-
-    if (t <= 0.0f)
-      return FLT_MAX;
-
-    const vec3 p  = add_vector(origin, scale_vector(ray, t));
-    const float r = get_length(sub_vector(device.scene.toy.position, p));
-
-    if (r >= device.scene.toy.scale)
-      return FLT_MAX;
-
-    return t;
-  }
-
-  return FLT_MAX;
-}
-
 __device__ float get_toy_distance(const vec3 origin, const vec3 ray) {
-  switch (device.scene.toy.shape) {
-    case TOY_SPHERE:
-      return sphere_ray_intersection(ray, origin, device.scene.toy.position, device.scene.toy.scale);
-    case TOY_PLANE:
-      return toy_plane_distance(origin, ray);
-  }
-
-  return FLT_MAX;
+  return sphere_ray_intersection(ray, origin, device.toy.position, device.toy.scale);
 }
 
 __device__ vec3 toy_sphere_normal(const vec3 position) {
-  const vec3 diff = sub_vector(position, device.scene.toy.position);
+  const vec3 diff = sub_vector(position, device.toy.position);
   return normalize_vector(diff);
 }
 
-__device__ vec3 toy_plane_normal(const vec3 position) {
-  return rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
-}
-
 __device__ vec3 get_toy_normal(const vec3 position) {
-  switch (device.scene.toy.shape) {
-    case TOY_SPHERE:
-      return toy_sphere_normal(position);
-    case TOY_PLANE:
-      return toy_plane_normal(position);
-  }
-
-  return get_vector(0.0f, 1.0f, 0.0f);
+  return toy_sphere_normal(position);
 }
 
 __device__ bool toy_is_inside(const vec3 position, const vec3 ray) {
-  // There is no inside for a plane.
-  if (device.scene.toy.shape == TOY_PLANE)
-    return false;
+  const float dist = get_length(sub_vector(position, device.toy.position));
 
-  const float dist = get_length(sub_vector(position, device.scene.toy.position));
-
-  if (fabsf(dist - device.scene.toy.scale) < 32.0f * eps) {
+  if (fabsf(dist - device.toy.scale) < 32.0f * eps) {
     const vec3 normal = get_toy_normal(position);
 
     return (dot_product(normal, ray) >= 0.0f);
   }
 
-  return (dist < device.scene.toy.scale);
-}
-
-__device__ float toy_plane_solid_angle(const vec3 position) {
-  // this is not correct, fix this in the future if this is important
-  const float sphere = sample_sphere_solid_angle(device.scene.toy.position, device.scene.toy.scale, position);
-
-  const vec3 n = rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
-
-  return sphere * fabsf(dot_product(n, normalize_vector(sub_vector(device.scene.toy.position, position))));
+  return (dist < device.toy.scale);
 }
 
 __device__ float toy_get_solid_angle(const vec3 position) {
-  switch (device.scene.toy.shape) {
-    case TOY_SPHERE:
-      return sample_sphere_solid_angle(device.scene.toy.position, device.scene.toy.scale, position);
-    case TOY_PLANE:
-      return toy_plane_solid_angle(position);
-  }
-
-  return 0.0f;
-}
-
-__device__ vec3 toy_plane_sample_ray(const vec3 position, const float2 random) {
-  const float alpha = random.x * 2.0f * PI;
-  const float beta  = sqrtf(random.y);
-
-  const vec3 n = rotate_vector_by_quaternion(get_vector(0.0f, 1.0f, 0.0f), device.scene.toy.computed_rotation);
-
-  const vec3 d = sample_hemisphere_basis(0.0f, alpha, n);
-  const vec3 p = add_vector(device.scene.toy.position, scale_vector(d, beta * device.scene.toy.scale));
-
-  return normalize_vector(sub_vector(p, position));
+  return sample_sphere_solid_angle(device.toy.position, device.toy.scale, position);
 }
 
 __device__ vec3 toy_sample_ray(const vec3 position, const float2 random) {
-  switch (device.scene.toy.shape) {
-    case TOY_SPHERE:
-      float dummy;
-      return sample_sphere(device.scene.toy.position, device.scene.toy.scale, position, random, dummy);
-    case TOY_PLANE:
-      return toy_plane_sample_ray(position, random);
-  }
-
-  return normalize_vector(sub_vector(device.scene.toy.position, position));
+  float dummy;
+  return sample_sphere(device.toy.position, device.toy.scale, position, random, dummy);
 }
 
 #ifdef SHADING_KERNEL
@@ -137,8 +55,8 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const int p
   uint32_t flags = G_BUFFER_COLORED_DIELECTRIC;
 
   RGBF emission;
-  if (device.scene.toy.emissive) {
-    emission = scale_color(device.scene.toy.emission, device.scene.toy.material.b);
+  if (device.toy.emissive) {
+    emission = scale_color(device.toy.emission, device.toy.material.b);
   }
   else {
     emission = get_color(0.0f, 0.0f, 0.0f);
@@ -150,20 +68,20 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const int p
 
   const IORStackMethod ior_stack_method =
     (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
-  const float ray_ior = ior_stack_interact(device.scene.toy.refractive_index, pixel, ior_stack_method);
+  const float ray_ior = ior_stack_interact(device.toy.refractive_index, pixel, ior_stack_method);
 
   GBufferData data;
   data.hit_id    = HIT_TYPE_TOY;
-  data.albedo    = device.scene.toy.albedo;
+  data.albedo    = device.toy.albedo;
   data.emission  = emission;
   data.normal    = normal;
   data.position  = task.position;
   data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = (1.0f - device.scene.toy.material.r);
-  data.metallic  = device.scene.toy.material.g;
+  data.roughness = (1.0f - device.toy.material.r);
+  data.metallic  = device.toy.material.g;
   data.flags     = flags;
-  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.scene.toy.refractive_index : ray_ior;
-  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.scene.toy.refractive_index;
+  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.toy.refractive_index : ray_ior;
+  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.toy.refractive_index;
 
   return data;
 }

@@ -1,15 +1,10 @@
-#define UTILS_NO_DEVICE_TABLE
-
 #define OPTIX_KERNEL
-
-#include "utils.cuh"
-
-extern "C" static __constant__ DeviceConstantMemory device;
 
 #include "bvh_utils.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "trace.cuh"
+#include "utils.cuh"
 
 enum OptixAlphaResult {
   OPTIX_ALPHA_RESULT_OPAQUE      = 0,
@@ -40,7 +35,7 @@ extern "C" __global__ void __raygen__optix() {
 
     float2 trace_result;
 
-    if (device.shading_mode == LUMINARY_SHADING_MODE_HEAT) {
+    if (device.settings.shading_mode == LUMINARY_SHADING_MODE_HEAT) {
       trace_result = make_float2(0.0f, __uint_as_float(hit_id));
     }
     else {
@@ -59,18 +54,18 @@ __device__ OptixAlphaResult optix_alpha_test() {
   const unsigned int hit_id = optixGetPrimitiveIndex();
 
   const uint32_t material_id = load_triangle_material_id(hit_id);
-  const uint16_t tex         = __ldg(&(device.scene.materials[material_id].albedo_map));
+  const uint16_t tex         = __ldg(&(device.ptrs.materials[material_id].albedo_tex));
 
   if (tex != TEXTURE_NONE) {
     const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
 
-    const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[tex].tex, uv.u, 1.0f - uv.v);
+    const float alpha = tex2D<float4>(device.ptrs.albedo_atlas[tex].handle, uv.u, 1.0f - uv.v).w;
 
-    if (tex_value.w <= device.scene.material.alpha_cutoff) {
+    if (alpha == 0.0f) {
       return OPTIX_ALPHA_RESULT_TRANSPARENT;
     }
 
-    if (tex_value.w < 1.0f) {
+    if (alpha < 1.0f) {
       return OPTIX_ALPHA_RESULT_SEMI;
     }
   }

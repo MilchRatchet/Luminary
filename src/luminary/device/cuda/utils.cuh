@@ -2,7 +2,6 @@
 #define CU_UTILS_H
 
 #include <cuda_fp16.h>
-#include <cuda_runtime_api.h>
 
 #include "../device_utils.h"
 
@@ -53,14 +52,15 @@ enum TaskAddressOffset {
 #define VOLUME_HIT_TYPE(X) ((X <= HIT_TYPE_PARTICLE_MAX) ? VOLUME_TYPE_PARTICLE : ((VolumeType) (X & 0x00000001u)))
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
 #define IS_PRIMARY_RAY (device.depth == 0)
-#define TRIANGLE_LIGHTS_ON (device.scene.material.lights_active && device.scene.triangle_lights_count > 0)
 
 //===========================================================================================
 // Device Variables
 //===========================================================================================
 
-#ifndef UTILS_NO_DEVICE_TABLE
+#ifndef OPTIX_KERNEL
 __constant__ DeviceConstantMemory device;
+#else
+extern "C" static __constant__ DeviceConstantMemory device;
 #endif
 
 //===========================================================================================
@@ -68,6 +68,8 @@ __constant__ DeviceConstantMemory device;
 //===========================================================================================
 
 #define UTILS_NO_PIXEL_SELECTED (make_ushort2(0xFFFF, 0xFFFF))
+
+#define OUTPUT_DIM(dim) (dim >> 1)
 
 __device__ bool is_selected_pixel(const ushort2 index) {
   // Only the top left subpixel of a pixel can be selected.
@@ -82,7 +84,7 @@ __device__ bool is_selected_pixel_lenient(const ushort2 index) {
 }
 
 __device__ uint32_t get_pixel_id(const ushort2 pixel) {
-  return pixel.x + device.internal_width * pixel.y;
+  return pixel.x + device.settings.width * pixel.y;
 }
 
 __device__ int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {

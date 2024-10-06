@@ -4,17 +4,13 @@
 #include "utils.cuh"
 
 enum StateFlag {
-  STATE_FLAG_ALBEDO           = 0b00000001u,
-  STATE_FLAG_DELTA_PATH       = 0b00000010u,
-  STATE_FLAG_CAMERA_DIRECTION = 0b00000100u,
-  STATE_FLAG_OCEAN_SCATTERED  = 0b00001000u
+  STATE_FLAG_DELTA_PATH       = 0b00000001u,
+  STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
+  STATE_FLAG_OCEAN_SCATTERED  = 0b00000100u
 } typedef StateFlag;
 
 //
 // Usage documentation:
-//
-// STATE_FLAG_ALBEDO: This flag is set for each pixel once a valid albedo value is found that can be written to the albedo buffer.
-//                    The flag gets reset at the start of every frame.
 //
 // STATE_FLAG_DELTA_PATH: This flag is set for paths whose vertices generated bounce rays only from delta (or near-delta) distributions.
 //                        This flag is used for firefly clamping as it only applies to light gathered on path suffixes of non-delta paths.
