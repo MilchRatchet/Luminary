@@ -54,15 +54,19 @@ __device__ vec3 geometry_compute_normal(
   return normal;
 }
 
-__device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const int pixel) {
-  const float4 t1 = __ldg((float4*) triangle_get_entry_address(0, 0, task.hit_id));
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(1, 0, task.hit_id));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(2, 0, task.hit_id));
-  const float4 t4 = __ldg((float4*) triangle_get_entry_address(3, 0, task.hit_id));
-  const float4 t5 = __ldg((float4*) triangle_get_entry_address(4, 0, task.hit_id));
-  const float4 t6 = __ldg((float4*) triangle_get_entry_address(5, 0, task.hit_id));
+__device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const ShadingTaskAuxData aux_task, const int pixel) {
+  const DeviceInstancelet instance = load_instance(device.ptrs.instances, task.instance_id);
+  const DeviceTransform trans      = load_transform(device.ptrs.instance_transforms, task.instance_id);
 
-  const uint32_t material_id = load_triangle_material_id(task.hit_id);
+  // TODO: This is now wrong, triangles are more compact nowadays.
+  const float4 t1 = __ldg((float4*) triangle_get_entry_address(0, 0, instance.triangles_offset + aux_task.tri_id));
+  const float4 t2 = __ldg((float4*) triangle_get_entry_address(1, 0, instance.triangles_offset + aux_task.tri_id));
+  const float4 t3 = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + aux_task.tri_id));
+  const float4 t4 = __ldg((float4*) triangle_get_entry_address(3, 0, instance.triangles_offset + aux_task.tri_id));
+  const float4 t5 = __ldg((float4*) triangle_get_entry_address(4, 0, instance.triangles_offset + aux_task.tri_id));
+  const float4 t6 = __ldg((float4*) triangle_get_entry_address(5, 0, instance.triangles_offset + aux_task.tri_id));
+
+  const uint32_t material_id = load_instance_material_id(task.instance_id);
 
   const vec3 vertex = get_vector(t1.x, t1.y, t1.z);
   const vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
@@ -128,17 +132,19 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
   }
 
   GBufferData data;
-  data.hit_id    = task.hit_id;
-  data.albedo    = albedo;
-  data.emission  = emission;
-  data.normal    = normal;
-  data.position  = task.position;
-  data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = roughness;
-  data.metallic  = metallic;
-  data.flags     = flags;
-  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
-  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
+  data.instance_id = task.instance_id;
+  data.tri_id      = aux_task.tri_id;
+  data.albedo      = albedo;
+  data.emission    = emission;
+  data.normal      = normal;
+  data.position    = task.position;
+  data.V           = scale_vector(task.ray, -1.0f);
+  data.roughness   = roughness;
+  data.metallic    = metallic;
+  data.state       = aux_task.state;
+  data.flags       = flags;
+  data.ior_in      = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
+  data.ior_out     = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
 
   return data;
 }

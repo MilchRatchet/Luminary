@@ -55,16 +55,16 @@ __device__ float light_tree_child_importance(
 }
 
 __device__ uint32_t light_tree_traverse(
-  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, float random, uint32_t& subset_length, float& pdf) {
-  if (!device.scene.material.light_tree_active) {
-    subset_length = device.scene.triangle_lights_count;
-    pdf           = 1.0f;
-    return 0;
-  }
-
+  const VolumeDescriptor volume, const DeviceTransformation trans, uint32_t instance_id, vec3 origin, vec3 ray, const float limit,
+  float random, uint32_t& subset_length, float& pdf) {
   pdf = 1.0f;
 
-  LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
+  origin = transform_apply_absolute_inv(trans, origin);
+  ray    = transform_apply_relative_inv(trans, ray);
+
+  const LightTreeNode8Packed* light_tree_ptr = (const LightTreeNode8Packed*) device.ptrs.bottom_level_light_trees[instance_id];
+
+  LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
 
   const float transmittance_importance = color_importance(add_color(volume.scattering, volume.absorption));
 
@@ -145,7 +145,7 @@ __device__ uint32_t light_tree_traverse(
       break;
     }
 
-    node = load_light_tree_node_8(device.light_tree_nodes_8, node.child_ptr + selected_child);
+    node = load_light_tree_node(light_tree_ptr, node.child_ptr + selected_child);
   }
 
   return subset_ptr;
@@ -153,7 +153,7 @@ __device__ uint32_t light_tree_traverse(
 
 #else  /* VOLUME_KERNEL */
 __device__ float light_tree_child_importance(
-  const GBufferData data, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i) {
+  const vec3 position, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i) {
   const bool lower_data = (i < 4);
   const uint32_t shift  = (lower_data ? i : (i - 4)) << 3;
 
@@ -179,21 +179,20 @@ __device__ float light_tree_child_importance(
   confidence = (confidence_light >> (shift + 2)) & 0x3F;
   confidence = confidence * exp_c;
 
-  const vec3 diff = sub_vector(point, data.position);
+  const vec3 diff = sub_vector(point, position);
 
   return energy / fmaxf(dot_product(diff, diff), confidence * confidence);
 }
 
-__device__ uint32_t light_tree_traverse(const GBufferData data, float random, uint32_t& subset_length, float& pdf) {
-  if (!device.scene.material.light_tree_active) {
-    subset_length = device.scene.triangle_lights_count;
-    pdf           = 1.0f;
-    return 0;
-  }
-
+__device__ uint32_t light_tree_traverse(
+  const GBufferData data, const DeviceTransform trans, uint32_t instance_id, float random, uint32_t& subset_length, float& pdf) {
   pdf = 1.0f;
 
-  LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
+  const vec3 position = transform_apply_absolute_inv(trans, data.position);
+
+  const LightTreeNode8Packed* light_tree_ptr = (const LightTreeNode8Packed*) device.ptrs.bottom_level_light_trees[instance_id];
+
+  LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
 
   uint32_t subset_ptr = 0xFFFFFFFF;
   subset_length       = 0;
@@ -206,14 +205,14 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
 
     float importance[8];
 
-    importance[0] = light_tree_child_importance(data, node, exp, exp_c, 0);
-    importance[1] = light_tree_child_importance(data, node, exp, exp_c, 1);
-    importance[2] = light_tree_child_importance(data, node, exp, exp_c, 2);
-    importance[3] = light_tree_child_importance(data, node, exp, exp_c, 3);
-    importance[4] = light_tree_child_importance(data, node, exp, exp_c, 4);
-    importance[5] = light_tree_child_importance(data, node, exp, exp_c, 5);
-    importance[6] = light_tree_child_importance(data, node, exp, exp_c, 6);
-    importance[7] = light_tree_child_importance(data, node, exp, exp_c, 7);
+    importance[0] = light_tree_child_importance(position, node, exp, exp_c, 0);
+    importance[1] = light_tree_child_importance(position, node, exp, exp_c, 1);
+    importance[2] = light_tree_child_importance(position, node, exp, exp_c, 2);
+    importance[3] = light_tree_child_importance(position, node, exp, exp_c, 3);
+    importance[4] = light_tree_child_importance(position, node, exp, exp_c, 4);
+    importance[5] = light_tree_child_importance(position, node, exp, exp_c, 5);
+    importance[6] = light_tree_child_importance(position, node, exp, exp_c, 6);
+    importance[7] = light_tree_child_importance(position, node, exp, exp_c, 7);
 
     float sum_importance = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
@@ -272,24 +271,25 @@ __device__ uint32_t light_tree_traverse(const GBufferData data, float random, ui
       break;
     }
 
-    node = load_light_tree_node_8(device.light_tree_nodes_8, node.child_ptr + selected_child);
+    node = load_light_tree_node(light_tree_ptr, node.child_ptr + selected_child);
   }
 
   return subset_ptr;
 }
 
-__device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_id) {
-  if (!device.scene.material.light_tree_active) {
-    return 1.0f / device.scene.triangle_lights_count;
-  }
-
+__device__ float light_tree_traverse_pdf(const GBufferData data, const DeviceTransform trans, uint32_t instance_id, uint32_t tri_id) {
   float pdf = 1.0f;
 
-  uint2 light_paths           = __ldg(device.light_tree_paths + light_id);
+  const uint2 light_paths = __ldg(device.ptrs.bottom_level_light_paths[instance_id] + tri_id);
+
+  const vec3 position = transform_apply_absolute(trans, data.position);
+
   uint32_t current_light_path = light_paths.x;
   uint32_t current_depth      = 0;
 
-  LightTreeNode8Packed node = load_light_tree_node_8(device.light_tree_nodes_8, 0);
+  const LightTreeNode8Packed* light_tree_ptr = (const LightTreeNode8Packed*) device.ptrs.bottom_level_light_trees[instance_id];
+
+  LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
 
   uint32_t subset_length = 0;
 
@@ -299,14 +299,14 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
 
     float importance[8];
 
-    importance[0] = light_tree_child_importance(data, node, exp, exp_c, 0);
-    importance[1] = light_tree_child_importance(data, node, exp, exp_c, 1);
-    importance[2] = light_tree_child_importance(data, node, exp, exp_c, 2);
-    importance[3] = light_tree_child_importance(data, node, exp, exp_c, 3);
-    importance[4] = light_tree_child_importance(data, node, exp, exp_c, 4);
-    importance[5] = light_tree_child_importance(data, node, exp, exp_c, 5);
-    importance[6] = light_tree_child_importance(data, node, exp, exp_c, 6);
-    importance[7] = light_tree_child_importance(data, node, exp, exp_c, 7);
+    importance[0] = light_tree_child_importance(position, node, exp, exp_c, 0);
+    importance[1] = light_tree_child_importance(position, node, exp, exp_c, 1);
+    importance[2] = light_tree_child_importance(position, node, exp, exp_c, 2);
+    importance[3] = light_tree_child_importance(position, node, exp, exp_c, 3);
+    importance[4] = light_tree_child_importance(position, node, exp, exp_c, 4);
+    importance[5] = light_tree_child_importance(position, node, exp, exp_c, 5);
+    importance[6] = light_tree_child_importance(position, node, exp, exp_c, 6);
+    importance[7] = light_tree_child_importance(position, node, exp, exp_c, 7);
 
     float sum_importance = 0.0f;
     for (uint32_t i = 0; i < 8; i++) {
@@ -348,7 +348,7 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, uint32_t light_
       current_light_path = light_paths.y;
     }
 
-    node = load_light_tree_node_8(device.light_tree_nodes_8, node.child_ptr + selected_child);
+    node = load_light_tree_node(light_tree_ptr, node.child_ptr + selected_child);
   }
 
   pdf *= 1.0f / subset_length;
@@ -444,37 +444,24 @@ __device__ vec3
     return get_vector(0.0f, 0.0f, 0.0f);
   }
 
-  const uint16_t albedo_tex = device.ptrs.materials[triangle.material_id].albedo_tex;
-  const uint16_t illum_tex  = device.ptrs.materials[triangle.material_id].luminance_tex;
+  const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
 
-  // Load texture coordinates if we need them.
-  UV tex_coords;
-  if (illum_tex != TEXTURE_NONE || albedo_tex != TEXTURE_NONE) {
-    tex_coords = load_triangle_tex_coords(triangle.triangle_id, coords);
-  }
+  if (mat.luminance_tex != TEXTURE_NONE) {
+    const float4 emission = texture_load(device.ptrs.luminance_atlas[mat.luminance_tex], triangle.tex_coords);
 
-  if (illum_tex != TEXTURE_NONE) {
-    const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
-
-    color = scale_color(get_color(emission.x, emission.y, emission.z), emission.w);
+    color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
   }
   else {
-    color.r = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_r);
-    color.g = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_g);
-    color.b = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_b);
-
-    const float scale = (float) (device.ptrs.materials[triangle.material_id].emission_scale);
-
-    color = scale_color(color, scale);
+    color = mat.emission;
   }
 
   if (color_importance(color) > 0.0f) {
     float alpha;
-    if (albedo_tex != TEXTURE_NONE) {
-      alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
+    if (mat.albedo_tex != TEXTURE_NONE) {
+      alpha = texture_load(device.ptrs.albedo_atlas[mat.albedo_tex], triangle.tex_coords).w;
     }
     else {
-      alpha = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].albedo_a);
+      alpha = mat.albedo.a;
     }
 
     color = scale_color(color, alpha);
@@ -497,37 +484,24 @@ __device__ void light_sample_triangle_presampled(
 
   solid_angle = sample_triangle_solid_angle(triangle, data.position);
 
-  const uint16_t albedo_tex = device.ptrs.materials[triangle.material_id].albedo_tex;
-  const uint16_t illum_tex  = device.ptrs.materials[triangle.material_id].luminance_tex;
+  const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
 
-  // Load texture coordinates if we need them.
-  UV tex_coords;
-  if (illum_tex != TEXTURE_NONE || albedo_tex != TEXTURE_NONE) {
-    tex_coords = load_triangle_tex_coords(triangle.triangle_id, coords);
-  }
+  if (mat.luminance_tex != TEXTURE_NONE) {
+    const float4 emission = texture_load(device.ptrs.luminance_atlas[mat.luminance_tex], triangle.tex_coords);
 
-  if (illum_tex != TEXTURE_NONE) {
-    const float4 emission = texture_load(device.ptrs.luminance_atlas[illum_tex], tex_coords);
-
-    color = scale_color(get_color(emission.x, emission.y, emission.z), emission.w);
+    color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
   }
   else {
-    color.r = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_r);
-    color.g = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_g);
-    color.b = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].emission_b);
-
-    const float scale = (float) (device.ptrs.materials[triangle.material_id].emission_scale);
-
-    color = scale_color(color, scale);
+    color = mat.emission;
   }
 
   if (color_importance(color) > 0.0f) {
     float alpha;
-    if (albedo_tex != TEXTURE_NONE) {
-      alpha = texture_load(device.ptrs.albedo_atlas[albedo_tex], tex_coords).w;
+    if (mat.albedo_tex != TEXTURE_NONE) {
+      alpha = texture_load(device.ptrs.albedo_atlas[mat.albedo_tex], triangle.tex_coords).w;
     }
     else {
-      alpha = random_uint16_t_to_float(device.ptrs.materials[triangle.material_id].albedo_a);
+      alpha = mat.albedo.a;
     }
 
     color = scale_color(color, alpha);

@@ -324,7 +324,7 @@ __device__ Quaternion normalize_quaternion(const Quaternion q) {
   return res;
 }
 
-__device__ Quaternion inverse_quaternion(const Quaternion q) {
+__device__ Quaternion quaternion_inverse(const Quaternion q) {
   Quaternion result;
   result.x = -q.x;
   result.y = -q.y;
@@ -333,7 +333,7 @@ __device__ Quaternion inverse_quaternion(const Quaternion q) {
   return result;
 }
 
-__device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
+__device__ Quaternion quaternion_rotation_to_z_canonical(const vec3 v) {
   Quaternion res;
   if (v.z < -1.0f + eps) {
     res.x = 1.0f;
@@ -356,9 +356,7 @@ __device__ Quaternion get_rotation_to_z_canonical(const vec3 v) {
   return res;
 }
 
-__device__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
-  vec3 result;
-
+__device__ vec3 quaternion_apply(const Quaternion q, const vec3 v) {
   const vec3 u  = get_vector(q.x, q.y, q.z);
   const float s = q.w;
 
@@ -367,10 +365,30 @@ __device__ vec3 rotate_vector_by_quaternion(const vec3 v, const Quaternion q) {
 
   const vec3 cross = cross_product(u, v);
 
+  vec3 result;
   result = scale_vector(u, 2.0f * dot_uv);
   result = add_vector(result, scale_vector(v, s * s - dot_uu));
   result = add_vector(result, scale_vector(cross, 2.0f * s));
 
+  return result;
+}
+
+__device__ vec3 quaternion16_apply(const Quaternion16 q, const vec3 v) {
+  Quaternion quat;
+  quat.x = q.x * (1.0f / 0x7FFF);
+  quat.y = q.y * (1.0f / 0x7FFF);
+  quat.z = q.z * (1.0f / 0x7FFF);
+  quat.w = q.w * (1.0f / 0x7FFF);
+
+  return quaternion_apply(quat, v);
+}
+
+__device__ Quaternion16 quaternion16_inverse(const Quaternion16 q) {
+  Quaternion16 result;
+  result.x = -q.x;
+  result.y = -q.y;
+  result.z = -q.z;
+  result.w = q.w;
   return result;
 }
 
@@ -392,6 +410,34 @@ __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
   res.z = m.f31 * p.x + m.f32 * p.y + m.f33 * p.z;
 
   return res;
+}
+
+////////////////////////////////////////////////////////////////////
+// Transformation API
+////////////////////////////////////////////////////////////////////
+
+__device__ vec3 transform_apply_absolute(const DeviceTransform trans, const vec3 v) {
+  return add_vector(v, trans.offset);
+}
+
+__device__ vec3 transform_apply_absolute_inv(const DeviceTransform trans, const vec3 v) {
+  return sub_vector(v, trans.offset);
+}
+
+__device__ vec3 transform_apply_relative(const DeviceTransform trans, const vec3 v) {
+  return mul_vector(quaternion16_apply(trans.rotation, v), trans.scale);
+}
+
+__device__ vec3 transform_apply_relative_inv(const DeviceTransform trans, const vec3 v) {
+  return mul_vector(quaternion16_apply(quaternion16_inverse(trans.rotation), v), inv_vector(trans.scale));
+}
+
+__device__ vec3 transform_apply(const DeviceTransform trans, const vec3 v) {
+  return transform_apply_absolute(trans, transform_apply_relative(trans, v));
+}
+
+__device__ vec3 transform_apply_inv(const DeviceTransform trans, const vec3 v) {
+  return transform_apply_absolute_inv(trans, transform_apply_relative_inv(trans, v));
 }
 
 /*

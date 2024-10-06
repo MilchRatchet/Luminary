@@ -62,9 +62,6 @@ __device__ RGBF optix_toy_shadowing(const vec3 position, const vec3 dir, const f
     const float toy_dist = get_toy_distance(position, dir);
 
     if (toy_dist < dist) {
-      if (device.scene.material.enable_ior_shadowing && ior_compress(device.toy.refractive_index) != compressed_ior)
-        return get_color(0.0f, 0.0f, 0.0f);
-
       RGBF toy_transparency = scale_color(opaque_color(device.toy.albedo), 1.0f - device.toy.albedo.a);
 
       if (color_importance(toy_transparency) == 0.0f)
@@ -119,7 +116,7 @@ __device__ RGBF optix_geometry_shadowing(
     visibility = get_color(0.0f, 0.0f, 0.0f);
   }
 
-  if (device.scene.material.enable_ior_shadowing && optix_evaluate_ior_culling(compressed_ior, index)) {
+  if (optix_evaluate_ior_culling(compressed_ior, index)) {
     visibility = get_color(0.0f, 0.0f, 0.0f);
   }
 
@@ -130,17 +127,13 @@ __device__ RGBF optix_geometry_shadowing(
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
-  const unsigned int hit_id = optixGetPrimitiveIndex();
-
-  const uint32_t material_id = load_triangle_material_id(hit_id);
-
+__device__ RGBAF optix_alpha_test(const uint32_t material_id, const unsigned int ray_ior) {
   // Don't check for IOR when querying a light from a BSDF sample
   if (ray_ior != SKIP_IOR_CHECK) {
     const uint32_t compressed_ior = ior_compress(__ldg(&(device.ptrs.materials[material_id].refraction_index)));
 
     // This assumes that IOR is compressed into 8 bits.
-    if (device.scene.material.enable_ior_shadowing && compressed_ior != (ray_ior & 0xFF)) {
+    if (compressed_ior != (ray_ior & 0xFF)) {
       // Terminate ray.
       return get_RGBAF(0.0f, 0.0f, 0.0f, 1.0f);
     }
@@ -162,13 +155,7 @@ __device__ RGBAF optix_alpha_test(const unsigned int ray_ior) {
     return albedo;
   }
 
-  RGBAF albedo;
-  albedo.r = random_uint16_t_to_float(__ldg(&(device.ptrs.materials[material_id].albedo_r)));
-  albedo.g = random_uint16_t_to_float(__ldg(&(device.ptrs.materials[material_id].albedo_g)));
-  albedo.b = random_uint16_t_to_float(__ldg(&(device.ptrs.materials[material_id].albedo_b)));
-  albedo.a = random_uint16_t_to_float(__ldg(&(device.ptrs.materials[material_id].albedo_a)));
-
-  return albedo;
+  return load_material_albedo(device.ptrs.materials, material_id);
 }
 
 extern "C" __global__ void __anyhit__optix() {
@@ -179,11 +166,17 @@ extern "C" __global__ void __anyhit__optix() {
     optixIgnoreIntersection();
   }
 
-  const bool bsdf_sampling_query = (target_light == HIT_TYPE_LIGHT_BSDF_HINT);
+  const uint32_t instance_id = optixGetInstanceId();
+  const uint32_t tri_id      = optixGetPrimitiveIndex();
 
-  unsigned int ray_ior = (bsdf_sampling_query) ? SKIP_IOR_CHECK : optixGetPayload_3();
+  const uint32_t material_id = load_instance_material_id(instance_id);
 
-  const RGBAF albedo = optix_alpha_test(ray_ior);
+  const bool bsdf_sampling_query        = (target_light == HIT_TYPE_LIGHT_BSDF_HINT);
+  const bool material_has_ior_shadowing = (device.ptrs.materials[material_id].flags & DEVICE_MATERIAL_FLAG_IOR_SHADOWING) != 0;
+
+  unsigned int ray_ior = (bsdf_sampling_query || !material_has_ior_shadowing) ? SKIP_IOR_CHECK : optixGetPayload_3();
+
+  const RGBAF albedo = optix_alpha_test(material_id, ray_ior);
 
   // For finding the hit light of BSDF rays we only care about ignoring fully transparent hits.
   // I don't have OMMs for this BVH.
@@ -215,8 +208,9 @@ extern "C" __global__ void __anyhit__optix() {
     optixIgnoreIntersection();
   }
 
-  const RGBF alpha = (device.scene.material.colored_transparency) ? scale_color(opaque_color(albedo), 1.0f - albedo.a)
-                                                                  : get_color(1.0f - albedo.a, 1.0f - albedo.a, 1.0f - albedo.a);
+  const RGBF alpha = (device.ptrs.materials[material_id].flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY)
+                       ? scale_color(opaque_color(albedo), 1.0f - albedo.a)
+                       : get_color(1.0f - albedo.a, 1.0f - albedo.a, 1.0f - albedo.a);
 
   unsigned int alpha_data0 = optixGetPayload_1();
   unsigned int alpha_data1 = optixGetPayload_2();

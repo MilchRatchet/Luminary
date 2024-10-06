@@ -49,7 +49,8 @@ __device__ TraceTask load_trace_task(const TraceTask* ptr) {
   const float4 data1 = __ldcs(((float4*) ptr) + 1);
 
   TraceTask task;
-  task.index.x  = __float_as_uint(data0.y) & 0xffff;
+  task.state    = __float_as_uint(data0.x) & 0xFF;
+  task.index.x  = __float_as_uint(data0.y) & 0xFFFF;
   task.index.y  = (__float_as_uint(data0.y) >> 16);
   task.origin.x = data0.z;
   task.origin.y = data0.w;
@@ -64,8 +65,8 @@ __device__ TraceTask load_trace_task(const TraceTask* ptr) {
 
 __device__ void store_trace_task(TraceTask* ptr, const TraceTask task) {
   float4 data0;
-  data0.x = __uint_as_float(0xffffffff);
-  data0.y = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
+  data0.x = __uint_as_float(task.state);
+  data0.y = __uint_as_float(((uint32_t) task.index.x & 0xFFFF) | ((uint32_t) task.index.y << 16));
   data0.z = task.origin.x;
   data0.w = task.origin.y;
 
@@ -88,11 +89,11 @@ __device__ ShadingTask load_shading_task(TraceTask* ptr) {
   const float4 data1 = __ldcs(data_ptr + 1);
 
   ShadingTask task;
-  task.hit_id     = __float_as_uint(data0.x);
-  task.index.x    = __float_as_uint(data0.y) & 0xffff;
-  task.index.y    = (__float_as_uint(data0.y) >> 16);
-  task.position.x = data0.z;
-  task.position.y = data0.w;
+  task.instance_id = __float_as_uint(data0.x);
+  task.index.x     = __float_as_uint(data0.y) & 0xFFFF;
+  task.index.y     = (__float_as_uint(data0.y) >> 16);
+  task.position.x  = data0.z;
+  task.position.y  = data0.w;
 
   task.position.z = data1.x;
   task.ray.x      = data1.y;
@@ -100,6 +101,18 @@ __device__ ShadingTask load_shading_task(TraceTask* ptr) {
   task.ray.z      = data1.w;
 
   return task;
+}
+
+__device__ ShadingTaskAuxData load_shading_task_aux_data(const ShadingTaskAuxData* ptr) {
+  float* data_ptr = (float*) ptr;
+
+  const float data = __ldcs(data_ptr);
+
+  ShadingTaskAuxData aux_data;
+  aux_data.tri_id = __float_as_uint(data) & 0xFFFF;
+  aux_data.state  = (__float_as_uint(data) >> 16) & 0xFF;
+
+  return aux_data;
 }
 
 __device__ RGBF load_RGBF(RGBF* ptr) {
@@ -142,6 +155,8 @@ __device__ void write_beauty_buffer(const RGBF beauty, const int pixel, const bo
   write_beauty_buffer_impl(beauty, pixel, mode_set, buffer);
 }
 
+#ifndef NO_LUMINARY_BVH
+
 __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   float4* ptr     = (float4*) (device.bvh_triangles + offset);
   const float4 v1 = __ldg(ptr);
@@ -158,6 +173,8 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
   return triangle;
 }
 
+#endif
+
 __device__ void* interleaved_buffer_get_entry_address(
   void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
   return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
@@ -171,7 +188,7 @@ __device__ void* pixel_buffer_get_entry_address(void* ptr, const uint32_t chunk,
 #endif
 
 __device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t tri_id) {
-  return interleaved_buffer_get_entry_address(device.scene.triangles, device.scene.triangle_data.triangle_count, chunk, offset, tri_id);
+  return interleaved_buffer_get_entry_address((void*) device.ptrs.triangles, device.non_instanced_triangle_count, chunk, offset, tri_id);
 }
 
 __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
@@ -185,12 +202,8 @@ __device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
   return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 }
 
-__device__ uint32_t load_triangle_material_id(const uint32_t id) {
-  return __ldg((uint32_t*) triangle_get_entry_address(6, 0, id));
-}
-
-__device__ uint32_t load_triangle_light_id(const uint32_t id) {
-  return __ldg((uint32_t*) triangle_get_entry_address(6, 1, id));
+__device__ uint32_t load_instance_material_id(const uint32_t instance_id) {
+  return __ldg(&device.ptrs.instances[instance_id].material_id);
 }
 
 __device__ TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {
@@ -200,12 +213,9 @@ __device__ TriangleLight load_triangle_light(const TriangleLight* data, const in
   const float4 v3   = __ldg(ptr + 2);
 
   TriangleLight triangle;
-  triangle.vertex      = get_vector(v1.x, v1.y, v1.z);
-  triangle.edge1       = get_vector(v1.w, v2.x, v2.y);
-  triangle.edge2       = get_vector(v2.z, v2.w, v3.x);
-  triangle.triangle_id = __float_as_uint(v3.y);
-  triangle.material_id = __float_as_uint(v3.z);
-  triangle.power       = v3.w;
+  triangle.vertex = get_vector(v1.x, v1.y, v1.z);
+  triangle.edge1  = get_vector(v1.w, v2.x, v2.y);
+  triangle.edge2  = get_vector(v2.z, v2.w, v3.x);
 
   return triangle;
 }
@@ -225,7 +235,7 @@ __device__ Quad load_quad(const Quad* data, const int offset) {
   return quad;
 }
 
-__device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, const int offset) {
+__device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, const uint32_t offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v0   = __ldg(ptr + 0);
   const float4 v1   = __ldg(ptr + 1);
@@ -242,18 +252,63 @@ __device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, co
   mat.emission.r       = random_uint16_t_to_float(__float_as_uint(v1.x) & 0xFFFF);
   mat.emission.g       = random_uint16_t_to_float(__float_as_uint(v1.x) >> 16);
   mat.emission.b       = random_uint16_t_to_float(__float_as_uint(v1.y) & 0xFFFF);
-  float emission_scale = (float) (__float_as_uint(v1.y) >> 16);
+  mat.emission_scale   = (float) (__float_as_uint(v1.y) >> 16);
   mat.albedo_tex       = __float_as_uint(v1.z) & 0xFFFF;
   mat.luminance_tex    = __float_as_uint(v1.z) >> 16;
   mat.material_tex     = __float_as_uint(v1.w) & 0xFFFF;
   mat.normal_tex       = __float_as_uint(v1.w) >> 16;
 
-  mat.emission = scale_color(mat.emission, emission_scale);
+  mat.emission = scale_color(mat.emission, mat.emission_scale);
 
   return mat;
 }
 
-__device__ LightTreeNode8Packed load_light_tree_node_8(const LightTreeNode8Packed* data, const int offset) {
+__device__ RGBAF load_material_albedo(const DeviceMaterialCompressed* data, const uint32_t offset) {
+  const float2* ptr = (float2*) (data + offset);
+  const float2 v    = __ldg(ptr + 1);
+
+  RGBAF albedo;
+  albedo.r = random_uint16_t_to_float(__float_as_uint(v.x) & 0xFFFF);
+  albedo.g = random_uint16_t_to_float(__float_as_uint(v.x) >> 16);
+  albedo.b = random_uint16_t_to_float(__float_as_uint(v.y) & 0xFFFF);
+  albedo.a = random_uint16_t_to_float(__float_as_uint(v.y) >> 16);
+
+  return albedo;
+}
+
+__device__ DeviceTransform load_transform(const DeviceTransform* data, const uint32_t offset) {
+  const float4* ptr = (float4*) (data + offset);
+  const float4 v0   = __ldg(ptr + 0);
+  const float4 v1   = __ldg(ptr + 1);
+
+  DeviceTransform trans;
+  trans.offset.x = v0.x;
+  trans.offset.y = v0.y;
+  trans.offset.z = v0.z;
+  trans.scale.x  = v0.w;
+
+  trans.scale.y    = v1.x;
+  trans.scale.z    = v1.y;
+  trans.rotation.x = __float_as_uint(v1.z) & 0xFFFF;
+  trans.rotation.y = __float_as_uint(v1.z) >> 16;
+  trans.rotation.z = __float_as_uint(v1.w) & 0xFFFF;
+  trans.rotation.w = __float_as_uint(v1.w) >> 16;
+
+  return trans;
+}
+
+__device__ DeviceInstancelet load_instance(const DeviceInstancelet* data, const uint32_t offset) {
+  const float2* ptr = (float2*) (data + offset);
+  const float2 v    = __ldg(ptr);
+
+  DeviceInstancelet instance;
+  instance.triangles_offset = __float_as_uint(v.x);
+  instance.material_id      = __float_as_uint(v.y) & 0xFFFF;
+
+  return instance;
+}
+
+__device__ LightTreeNode8Packed load_light_tree_node(const LightTreeNode8Packed* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v0   = __ldg(ptr + 0);
   const float4 v1   = __ldg(ptr + 1);

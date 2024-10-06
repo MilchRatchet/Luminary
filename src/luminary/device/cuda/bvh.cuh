@@ -1,6 +1,8 @@
 #ifndef CU_BVH_H
 #define CU_BVH_H
 
+#ifndef NO_LUMINARY_BVH
+
 #include <cuda_runtime_api.h>
 
 #include "bvh_utils.cuh"
@@ -378,5 +380,7 @@ LUMINARY_KERNEL void process_trace_tasks() {
     } while (iterations_lost < 16);
   }
 }
+
+#endif
 
 #endif /* CU_BVH_H */

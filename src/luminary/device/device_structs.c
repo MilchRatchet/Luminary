@@ -372,7 +372,7 @@ LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTr
   device_triangle->edge1_texture  = _device_UV_to_uint(triangle->edge1_texture);
   device_triangle->edge2_texture  = _device_UV_to_uint(triangle->edge2_texture);
 
-  device_triangle->light_id = triangle->light_id;
+  device_triangle->padding = 0;
 
   return LUMINARY_SUCCESS;
 }

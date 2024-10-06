@@ -42,8 +42,8 @@ __device__ uint32_t ris_sample_light(
 
   // Don't allow triangles to sample themselves.
   uint32_t blocked_light_id = LIGHT_ID_NONE;
-  if (data.hit_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-    blocked_light_id = load_triangle_light_id(data.hit_id);
+  if (data.instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
+    blocked_light_id = load_triangle_light_id(data.instance_id);
   }
 
   ////////////////////////////////////////////////////////////////////

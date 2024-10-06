@@ -287,7 +287,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
   vec3 current_vertex            = initial_vertex;
   vec3 current_direction_sampled = normalize_vector(light_vector);
-  vec3 current_direction         = rotate_vector_by_quaternion(current_direction_sampled, rotation);
+  vec3 current_direction         = quaternion_apply(rotation, current_direction_sampled);
 
   unsigned int compressed_ior = ior_compress(ior);
 
@@ -314,7 +314,7 @@ __device__ RGBF bridges_evaluate_bridge(
 
     current_direction_sampled = bridges_phase_sample(current_direction, random_phase);
 
-    current_direction = rotate_vector_by_quaternion(current_direction_sampled, rotation);
+    current_direction = quaternion_apply(rotation, current_direction_sampled);
 
     dist = -logf(quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_DISTANCE + seed * 32 + i, pixel)) * scale;
 
@@ -562,7 +562,7 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
 
     const Quaternion sample_rotation = bridges_compute_rotation(sample_initial_vertex, light_point, sample_path_end_vertex);
 
-    const vec3 rotation_initial_direction = rotate_vector_by_quaternion(light_dir, sample_rotation);
+    const vec3 rotation_initial_direction = quaternion_apply(sample_rotation, light_dir);
     const float cos_angle                 = dot_product(rotation_initial_direction, task.ray);
 
     const float phase_function_weight = bridges_phase_function(cos_angle);

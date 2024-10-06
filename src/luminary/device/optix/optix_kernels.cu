@@ -46,6 +46,8 @@ extern "C" __global__ void __raygen__optix() {
   }
 }
 
+// TODO: This is fucked, I need to fix it by checking for IOR aswell.
+#if 0
 /*
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
@@ -74,12 +76,18 @@ __device__ OptixAlphaResult optix_alpha_test() {
 }
 
 extern "C" __global__ void __anyhit__optix() {
+
   const OptixAlphaResult alpha_result = optix_alpha_test();
 
   if (alpha_result == OPTIX_ALPHA_RESULT_TRANSPARENT) {
     optixIgnoreIntersection();
   }
 }
+#else
+extern "C" __global__ void __anyhit__optix() {
+  return;
+}
+#endif
 
 extern "C" __global__ void __closesthit__optix() {
   optixSetPayload_0(__float_as_uint(optixGetRayTmax()));

@@ -10,6 +10,15 @@
 #include "internal_array.h"
 #include "sky_defines.h"
 
+#ifndef PI
+#define PI 3.141592653589f
+#endif
+
+#define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size")
+
+// Flags variables as unused so that no warning is emitted
+#define LUM_UNUSED(x) ((void) (x))
+
 // This struct is stored as a struct of arrays, members are grouped into 16 bytes where possible. Padding is not required.
 #define INTERLEAVED_STORAGE
 // Round the size of an element in an interleaved buffer to the next multiple of 16 bytes
@@ -17,13 +26,11 @@
 
 #define TEXTURE_NONE ((uint16_t) 0xffffu)
 
-enum LightID {
-  LIGHT_ID_SUN               = 0xffffffffu,
-  LIGHT_ID_TOY               = 0xfffffffeu,
-  LIGHT_ID_NONE              = 0xfffffff1u,
-  LIGHT_ID_ANY               = 0xfffffff0u,
-  LIGHT_ID_TRIANGLE_ID_LIMIT = 0x7fffffffu
-} typedef LightID;
+#define LIGHT_ID_SUN (0xffffffffu)
+#define LIGHT_ID_TOY (0xfffffffeu)
+#define LIGHT_ID_NONE (0xfffffff1u)
+#define LIGHT_ID_ANY (0xfffffff0u)
+#define LIGHT_ID_TRIANGLE_ID_LIMIT (0x7fffffffu)
 
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
 
@@ -36,11 +43,18 @@ struct QueueEntry {
 } typedef QueueEntry;
 
 struct Quaternion {
-  float w;
   float x;
   float y;
   float z;
+  float w;
 } typedef Quaternion;
+
+struct Quaternion16 {
+  int16_t x;
+  int16_t y;
+  int16_t z;
+  int16_t w;
+} typedef Quaternion16;
 
 struct UV {
   float u;
@@ -123,13 +137,28 @@ struct TraversalTriangle {
   float padding2;
 } typedef TraversalTriangle;
 
+/*
+ * This struct is computed on the device when needed, it is not stored in memory.
+ * The expectation is that the vertex positions are already transformed and the UV
+ * is already transformed using the triangle transforms.
+ */
 struct TriangleLight {
   vec3 vertex;
   vec3 edge1;
   vec3 edge2;
-  uint32_t padding;
+  uint16_t material_id;
+  uint16_t padding;
+  UV tex_coords;
 } typedef TriangleLight;
-static_assert(sizeof(TriangleLight) == 0x28, "Incorrect packing size.");
+LUM_STATIC_SIZE_ASSERT(TriangleLight, 0x30u);
+
+struct Star {
+  float altitude;
+  float azimuth;
+  float radius;
+  float intensity;
+} typedef Star;
+LUM_STATIC_SIZE_ASSERT(Star, 0x10u);
 
 struct BVHNode8 {
   vec3 p;
@@ -147,14 +176,5 @@ struct BVHNode8 {
   uint8_t high_y[8];
   uint8_t high_z[8];
 } typedef BVHNode8;
-
-#ifndef PI
-#define PI 3.141592653589f
-#endif
-
-#define LUM_STATIC_SIZE_ASSERT(struct, size) static_assert(sizeof(struct) == size, #struct " has invalid size")
-
-// Flags variables as unused so that no warning is emitted
-#define LUM_UNUSED(x) ((void) (x))
 
 #endif /* LUMINARY_UTILS_H */

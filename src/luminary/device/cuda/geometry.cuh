@@ -12,17 +12,18 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
   const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset = get_task_address(i);
-    ShadingTask task      = load_shading_task(device.ptrs.trace_tasks + offset);
-    const uint32_t pixel  = get_pixel_id(task.index);
+    const uint32_t offset       = get_task_address(i);
+    ShadingTask task            = load_shading_task(device.ptrs.trace_tasks + offset);
+    ShadingTaskAuxData aux_data = load_shading_task_aux_data(device.ptrs.aux_data + offset);
+    const uint32_t pixel        = get_pixel_id(task.index);
 
-    switch (task.hit_id) {
+    switch (task.instance_id) {
       case HIT_TYPE_TOY: {
-        switch (device.shading_mode) {
+        switch (device.settings.shading_mode) {
           case LUMINARY_SHADING_MODE_ALBEDO: {
             write_beauty_buffer(opaque_color(device.toy.albedo), pixel, true);
           } break;
-          case SHADING_DEPTH: {
+          case LUMINARY_SHADING_MODE_DEPTH: {
             const float dist  = get_length(sub_vector(device.camera.pos, task.position));
             const float value = __saturatef((1.0f / dist) * 2.0f);
             write_beauty_buffer(get_color(value, value, value), pixel, true);
@@ -59,8 +60,8 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
         }
       } break;
       case HIT_TYPE_OCEAN: {
-        switch (device.shading_mode) {
-          case SHADING_DEPTH: {
+        switch (device.settings.shading_mode) {
+          case LUMINARY_SHADING_MODE_DEPTH: {
             const float dist  = get_length(sub_vector(device.camera.pos, task.position));
             const float value = __saturatef((1.0f / dist) * 2.0f);
             write_beauty_buffer(get_color(value, value, value), pixel, true);
@@ -82,19 +83,19 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
         }
       } break;
       default: {
-        switch (device.shading_mode) {
+        switch (device.settings.shading_mode) {
           case LUMINARY_SHADING_MODE_ALBEDO: {
-            const GBufferData data = geometry_generate_g_buffer(task, pixel);
+            const GBufferData data = geometry_generate_g_buffer(task, aux_data, pixel);
 
             write_beauty_buffer(add_color(opaque_color(data.albedo), data.emission), pixel, true);
           } break;
-          case SHADING_DEPTH: {
+          case LUMINARY_SHADING_MODE_DEPTH: {
             const float dist  = get_length(sub_vector(device.camera.pos, task.position));
             const float value = __saturatef((1.0f / dist) * 2.0f);
             write_beauty_buffer(get_color(value, value, value), pixel, true);
           } break;
           case LUMINARY_SHADING_MODE_NORMAL: {
-            const GBufferData data = geometry_generate_g_buffer(task, pixel);
+            const GBufferData data = geometry_generate_g_buffer(task, aux_data, pixel);
 
             const vec3 normal = data.normal;
 
@@ -109,7 +110,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
             write_beauty_buffer(get_color(red, green, blue), pixel, true);
           } break;
           case LUMINARY_SHADING_MODE_IDENTIFICATION: {
-            const uint32_t v = random_uint32_t_base(0x55555555, task.hit_id);
+            const uint32_t v = random_uint32_t_base(0x55555555, (task.instance_id << 16) | aux_data.tri_id);
 
             const uint16_t r = v & 0x7ff;
             const uint16_t g = (v >> 10) & 0x7ff;
@@ -124,7 +125,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
             write_beauty_buffer(color, pixel, true);
           } break;
           case LUMINARY_SHADING_MODE_LIGHTS: {
-            const GBufferData data = geometry_generate_g_buffer(task, pixel);
+            const GBufferData data = geometry_generate_g_buffer(task, aux_data, pixel);
 
             const uint32_t light_id = load_triangle_light_id(task.hit_id);
 
@@ -137,7 +138,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
               const float power = tri_light.power;
 
               color = add_color(color, get_color(power, power, power));
-#else
+#elif 0
               const float value = 5.0f * tri_light.power;
               const float red   = __saturatef(2.0f * value);
               const float green = __saturatef(2.0f * (value - 0.5f));
@@ -145,6 +146,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
 
               color = get_color(red, green, blue);
 #endif
+              color = get_color(1.0f, 1.0f, 1.0f);
             }
 
             write_beauty_buffer(color, pixel, true);

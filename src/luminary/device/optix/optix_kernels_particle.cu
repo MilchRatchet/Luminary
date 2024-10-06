@@ -21,13 +21,14 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel        = get_pixel_id(task.index);
+    const ShadingTask task            = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(device.ptrs.aux_data + get_task_address(task_offset + i));
+    const int pixel                   = get_pixel_id(task.index);
 
-    const VolumeType volume_type  = VOLUME_HIT_TYPE(task.hit_id);
+    const VolumeType volume_type  = VOLUME_HIT_TYPE(task.instance_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    GBufferData data = particle_generate_g_buffer(task, pixel);
+    GBufferData data = particle_generate_g_buffer(task, aux_data, pixel);
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 

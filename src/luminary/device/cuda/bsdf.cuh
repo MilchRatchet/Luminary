@@ -68,7 +68,7 @@ __device__ RGBF bsdf_evaluate(
   const GBufferData data, const vec3 L, const BSDFSamplingHint sampling_hint, bool& is_refraction,
   const float one_over_sampling_pdf = 1.0f) {
 #ifdef PHASE_KERNEL
-  return scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.hit_id), L), one_over_sampling_pdf);
+  return scale_color(volume_phase_evaluate(data, VOLUME_HIT_TYPE(data.instance_id), L), one_over_sampling_pdf);
 #else
   const BSDFRayContext context = bsdf_evaluate_analyze(data, L);
 
@@ -121,7 +121,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   const vec3 ray = scale_vector(data.V, -1.0f);
 
-  const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
+  const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.instance_id) != VOLUME_TYPE_OCEAN)
                              ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_choice)
                              : ocean_phase_sampling(ray, random_dir, random_choice);
 
@@ -130,8 +130,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   return scatter_ray;
 #else
   // Transformation to +Z-Up
-  const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
-  const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
+  const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(data.normal);
+  const vec3 V_local             = quaternion_apply(rotation_to_z, data.V);
 
   // G Buffer Data (+Z-Up)
   GBufferData data_local = data;
@@ -147,7 +147,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
   if (ior_compress(data_local.ior_in) == ior_compress(data_local.ior_out) && data_local.albedo.a == 0.0f) {
     // Fast path for transparent surfaces without refraction/reflection
     ray_local                = scale_vector(data_local.V, -1.0f);
-    info.weight              = (data_local.flags & G_BUFFER_COLORED_DIELECTRIC) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
+    info.weight              = (data_local.state & G_BUFFER_COLORED_DIELECTRIC) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
     info.is_transparent_pass = true;
     info.is_microfacet_based = true;
   }
@@ -261,7 +261,7 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   UTILS_CHECK_NANS(pixel, info.weight);
 
-  return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+  return normalize_vector(quaternion_apply(quaternion_inverse(rotation_to_z), ray_local));
 #endif
 }
 
@@ -306,7 +306,7 @@ __device__ vec3 bsdf_sample_for_light(
 
   const vec3 ray = scale_vector(data.V, -1.0f);
 
-  const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.hit_id) != VOLUME_TYPE_OCEAN)
+  const vec3 scatter_ray = (VOLUME_HIT_TYPE(data.instance_id) != VOLUME_TYPE_OCEAN)
                              ? jendersie_eon_phase_sample(ray, data.roughness, random_dir, random_method)
                              : ocean_phase_sampling(ray, random_dir, random_method);
 
@@ -315,8 +315,8 @@ __device__ vec3 bsdf_sample_for_light(
 
   return scatter_ray;
 #else   // PHASE_KERNEL
-  const Quaternion rotation_to_z = get_rotation_to_z_canonical(data.normal);
-  const vec3 V_local             = rotate_vector_by_quaternion(data.V, rotation_to_z);
+  const Quaternion rotation_to_z = quaternion_rotation_to_z_canonical(data.normal);
+  const vec3 V_local             = quaternion_apply(rotation_to_z, data.V);
 
   GBufferData data_local = data;
 
@@ -344,7 +344,7 @@ __device__ vec3 bsdf_sample_for_light(
 
   is_valid = (is_refraction) ? ray_local.z < 0.0f : ray_local.z > 0.0f;
 
-  return normalize_vector(rotate_vector_by_quaternion(ray_local, inverse_quaternion(rotation_to_z)));
+  return normalize_vector(quaternion_apply(quaternion_inverse(rotation_to_z), ray_local));
 #endif  // !PHASE_KERNEL
 }
 
@@ -352,7 +352,7 @@ __device__ float bsdf_sample_for_light_pdf(const GBufferData data, const vec3 L)
 #ifdef PHASE_KERNEL
   const float cos_angle = -dot_product(data.V, L);
 
-  const VolumeType volume_hit_type = VOLUME_HIT_TYPE(data.hit_id);
+  const VolumeType volume_hit_type = VOLUME_HIT_TYPE(data.instance_id);
 
   float pdf;
   if (volume_hit_type == VOLUME_TYPE_OCEAN) {

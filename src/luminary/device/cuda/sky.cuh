@@ -538,16 +538,16 @@ __device__ Spectrum sky_compute_atmosphere(
       const float ray_altitude = asinf(ray.y);
       const float ray_azimuth  = atan2f(-ray.z, -ray.x) + PI;
 
-      const int x = (int) (ray_azimuth * 10.0f);
-      const int y = (int) ((ray_altitude + PI * 0.5f) * 10.0f);
+      const uint32_t x = (uint32_t) (ray_azimuth * 10.0f);
+      const uint32_t y = (uint32_t) ((ray_altitude + PI * 0.5f) * 10.0f);
 
-      const int grid = x + y * STARS_GRID_LD;
+      const uint32_t grid = x + y * STARS_GRID_LD;
 
-      const int a = device.sky.stars_offsets[grid];
-      const int b = device.sky.stars_offsets[grid + 1];
+      const uint32_t a = device.ptrs.stars_offsets[grid];
+      const uint32_t b = device.ptrs.stars_offsets[grid + 1];
 
-      for (int i = a; i < b; i++) {
-        const Star star     = device.sky.stars[i];
+      for (uint32_t i = a; i < b; i++) {
+        const Star star     = device.ptrs.stars[i];
         const vec3 star_pos = angles_to_direction(star.altitude, star.azimuth);
 
         if (sphere_ray_hit(ray, get_vector(0.0f, 0.0f, 0.0f), star_pos, star.radius)) {

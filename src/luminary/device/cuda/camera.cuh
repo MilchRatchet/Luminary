@@ -58,8 +58,8 @@ __device__ TraceTask camera_get_ray(TraceTask task) {
 
   vec3 aperture_point = camera_sample_aperture(task.index);
 
-  focal_point    = rotate_vector_by_quaternion(focal_point, device.emitter.camera_rotation);
-  aperture_point = rotate_vector_by_quaternion(aperture_point, device.emitter.camera_rotation);
+  focal_point    = quaternion_apply(device.emitter.camera_rotation, focal_point);
+  aperture_point = quaternion_apply(device.emitter.camera_rotation, aperture_point);
 
   task.ray    = normalize_vector(sub_vector(focal_point, aperture_point));
   task.origin = add_vector(device.camera.pos, aperture_point);

@@ -19,18 +19,19 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const int pixel        = get_pixel_id(task.index);
+    const ShadingTask task            = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(device.ptrs.aux_data + get_task_address(task_offset + i));
+    const int pixel                   = get_pixel_id(task.index);
 
     GBufferData data;
-    if (task.hit_id == HIT_TYPE_TOY) {
-      data = toy_generate_g_buffer(task, pixel);
+    if (task.instance_id == HIT_TYPE_TOY) {
+      data = toy_generate_g_buffer(task, aux_data, pixel);
     }
-    else if (task.hit_id == HIT_TYPE_OCEAN) {
-      data = ocean_generate_g_buffer(task, pixel);
+    else if (task.instance_id == HIT_TYPE_OCEAN) {
+      data = ocean_generate_g_buffer(task, aux_data, pixel);
     }
     else {
-      data = geometry_generate_g_buffer(task, pixel);
+      data = geometry_generate_g_buffer(task, aux_data, pixel);
     }
 
     const bool is_delta_path = state_peek(pixel, STATE_FLAG_DELTA_PATH);
@@ -67,7 +68,7 @@ extern "C" __global__ void __raygen__optix() {
     }
 
     bool use_light_rays = true;
-    if (task.hit_id == HIT_TYPE_OCEAN && !is_delta_path) {
+    if (task.instance_id == HIT_TYPE_OCEAN && !is_delta_path) {
       use_light_rays = false;
     }
 

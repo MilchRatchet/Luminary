@@ -14,6 +14,7 @@
 #define BLOCKS_PER_GRID 2048
 
 #define OPTIX_VALIDATION
+#define NO_LUMINARY_BVH
 
 #define STARS_GRID_LD 64
 
@@ -78,14 +79,18 @@ struct Mat3x4 {
   float f34;
 } typedef Mat3x4;
 
-enum GBufferFlags {
-  G_BUFFER_VOLUME_HIT           = 0b1,
-  G_BUFFER_REFRACTION_IS_INSIDE = 0b10,
-  G_BUFFER_COLORED_DIELECTRIC   = 0b100
-} typedef GBufferFlags;
+struct Quad {
+  vec3 vertex;
+  vec3 edge1;
+  vec3 edge2;
+  vec3 normal;
+} typedef Quad;
+
+enum GBufferFlags { G_BUFFER_REFRACTION_IS_INSIDE = 0b1, G_BUFFER_COLORED_DIELECTRIC = 0b10 } typedef GBufferFlags;
 
 struct GBufferData {
-  uint32_t hit_id;
+  uint32_t instance_id;
+  uint16_t tri_id;
   RGBAF albedo;
   RGBF emission;
   vec3 position;
@@ -93,7 +98,8 @@ struct GBufferData {
   vec3 normal;
   float roughness;
   float metallic;
-  uint32_t flags;
+  uint8_t state;
+  uint8_t flags;
   /* IOR of medium in direction of V. */
   float ior_in;
   /* IOR of medium on the other side. */
@@ -105,26 +111,24 @@ struct GBufferData {
 ////////////////////////////////////////////////////////////////////
 
 struct ShadingTask {
-  uint32_t hit_id;
+  uint32_t instance_id;
   ushort2 index;
   vec3 position;  // (Origin if sky)
   vec3 ray;
 } typedef ShadingTask;
 LUM_STATIC_SIZE_ASSERT(ShadingTask, 0x20);
 
-struct CompressedShadingTask {
-  uint2 compressed_ray;
-  vec3 position;  // (Origin if sky)
-  uint32_t instancelet_id;
-  ushort2 index;
+struct ShadingTaskAuxData {
   uint16_t tri_id;
   uint8_t state;
   uint8_t padding;
-} typedef CompressedShadingTask;
-LUM_STATIC_SIZE_ASSERT(CompressedShadingTask, 0x20);
+} typedef ShadingTaskAuxData;
+LUM_STATIC_SIZE_ASSERT(ShadingTaskAuxData, 0x04);
 
 struct TraceTask {
-  uint32_t padding;
+  uint8_t state;
+  uint8_t padding;
+  uint16_t padding1;
   ushort2 index;
   vec3 origin;
   vec3 ray;
@@ -159,6 +163,7 @@ LUM_STATIC_SIZE_ASSERT(LightTreeNode8Packed, 0x40);
 
 struct DevicePointers {
   TraceTask* trace_tasks;
+  ShadingTaskAuxData* aux_data;
   uint16_t* trace_counts;
   TraceResult* trace_results;
   uint16_t* task_counts;
@@ -191,6 +196,16 @@ struct DevicePointers {
   const uint32_t* bluenoise_2D;
   const float* bridge_lut;
   const DeviceMaterialCompressed* materials;
+  const DeviceTriangle* triangles;
+  const DeviceInstancelet* instances;
+  const DeviceTransform* instance_transforms;
+  const void** bottom_level_light_trees;
+  const uint2** bottom_level_light_paths;
+  const void* top_level_light_tree;
+  const uint2* top_level_light_paths;
+  const Quad* particle_quads;
+  const Star* stars;
+  const uint32_t* stars_offsets;
 } typedef DevicePointers;
 
 struct DeviceConstantMemory {
@@ -214,6 +229,7 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_light;
   OptixTraversableHandle optix_bvh_particles;
+  uint32_t non_instanced_triangle_count;
 
   /*
   int max_ray_depth;

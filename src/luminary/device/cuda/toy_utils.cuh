@@ -45,7 +45,7 @@ __device__ vec3 toy_sample_ray(const vec3 position, const float2 random) {
 
 #ifdef SHADING_KERNEL
 
-__device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const int pixel) {
+__device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const ShadingTaskAuxData aux_data, const int pixel) {
   vec3 normal = get_toy_normal(task.position);
 
   if (dot_product(normal, task.ray) > 0.0f) {
@@ -71,17 +71,19 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const int p
   const float ray_ior = ior_stack_interact(device.toy.refractive_index, pixel, ior_stack_method);
 
   GBufferData data;
-  data.hit_id    = HIT_TYPE_TOY;
-  data.albedo    = device.toy.albedo;
-  data.emission  = emission;
-  data.normal    = normal;
-  data.position  = task.position;
-  data.V         = scale_vector(task.ray, -1.0f);
-  data.roughness = (1.0f - device.toy.material.r);
-  data.metallic  = device.toy.material.g;
-  data.flags     = flags;
-  data.ior_in    = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.toy.refractive_index : ray_ior;
-  data.ior_out   = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.toy.refractive_index;
+  data.instance_id = HIT_TYPE_TOY;
+  data.tri_id      = 0;
+  data.albedo      = device.toy.albedo;
+  data.emission    = emission;
+  data.normal      = normal;
+  data.position    = task.position;
+  data.V           = scale_vector(task.ray, -1.0f);
+  data.roughness   = (1.0f - device.toy.material.r);
+  data.metallic    = device.toy.material.g;
+  data.state       = aux_data.state;
+  data.flags       = flags;
+  data.ior_in      = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.toy.refractive_index : ray_ior;
+  data.ior_out     = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.toy.refractive_index;
 
   return data;
 }

@@ -200,6 +200,7 @@ struct DeviceMaterial {
 
   RGBAF albedo;
   RGBF emission;
+  float emission_scale;
 
   uint16_t albedo_tex;
   uint16_t luminance_tex;
@@ -217,7 +218,7 @@ struct DeviceTriangle {
   uint32_t vertex_texture;
   uint32_t edge1_texture;
   uint32_t edge2_texture;
-  uint32_t light_id;
+  uint32_t padding;
 } typedef DeviceTriangle;
 LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);
 
@@ -230,6 +231,20 @@ struct DeviceTextureObject {
   float padding;
 } typedef DeviceTextureObject;
 LUM_STATIC_SIZE_ASSERT(DeviceTextureObject, 0x10u);
+
+struct DeviceInstancelet {
+  uint32_t triangles_offset;
+  uint16_t material_id;
+  uint16_t padding;
+} typedef DeviceInstancelet;
+LUM_STATIC_SIZE_ASSERT(DeviceInstancelet, 0x08u);
+
+struct DeviceTransform {
+  vec3 offset;
+  vec3 scale;
+  Quaternion16 rotation;
+} typedef DeviceTransform;
+LUM_STATIC_SIZE_ASSERT(DeviceTransform, 0x20u);
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings);
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera);

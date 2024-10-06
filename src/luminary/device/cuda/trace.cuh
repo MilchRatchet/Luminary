@@ -13,6 +13,8 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
 
   // Intersect against the triangle we hit in primary visible in the last frame.
   // This is a heuristic to speed up the BVH traversal.
+  // TODO: Reenable this.
+#if 0
   if (device.settings.shading_mode != LUMINARY_SHADING_MODE_HEAT && IS_PRIMARY_RAY) {
     uint32_t t_id;
     TraversalTriangle tt;
@@ -51,6 +53,7 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
       }
     }
   }
+#endif
 
   if (device.toy.active) {
     const float toy_dist = get_toy_distance(task.origin, task.ray);
