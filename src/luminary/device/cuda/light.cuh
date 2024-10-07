@@ -10,6 +10,58 @@
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
+__device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
+  const vec3 h  = cross_product(ray, triangle.edge2);
+  const float a = dot_product(triangle.edge1, h);
+
+  const float f = 1.0f / a;
+  const vec3 s  = sub_vector(origin, triangle.vertex);
+  const float u = f * dot_product(s, h);
+
+  const vec3 q  = cross_product(s, triangle.edge1);
+  const float v = f * dot_product(ray, q);
+
+  coords = make_float2(u, v);
+
+  //  The third check is inverted to catch NaNs since NaNs always return false, the not will turn it into a true
+  if (v < 0.0f || u < 0.0f || !(u + v <= 1.0f))
+    return FLT_MAX;
+
+  const float t = f * dot_product(triangle.edge2, q);
+
+  return __fslctf(t, FLT_MAX, t);
+}
+
+__device__ TriangleLight
+  light_load(const TriangleHandle handle, const vec3 origin, const vec3 ray, const DeviceTransform trans, float& dist) {
+  const DeviceInstancelet instance = load_instance(device.ptrs.instances, handle.instance_id);
+
+  const float4 v0 = __ldg((float4*) triangle_get_entry_address(0, 0, instance.triangles_offset + handle.tri_id));
+  const float4 v1 = __ldg((float4*) triangle_get_entry_address(1, 0, instance.triangles_offset + handle.tri_id));
+  const float4 v2 = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + handle.tri_id));
+
+  TriangleLight triangle;
+  triangle.vertex = get_vector(v0.x, v0.y, v0.z);
+  triangle.edge1  = get_vector(v0.w, v1.x, v1.y);
+  triangle.edge2  = get_vector(v1.z, v1.w, v2.x);
+
+  triangle.vertex = transform_apply(trans, triangle.vertex);
+  triangle.edge1  = transform_apply(trans, triangle.edge1);
+  triangle.edge2  = transform_apply(trans, triangle.edge2);
+
+  const UV vertex_texture = uv_unpack(__float_as_uint(v2.y));
+  const UV edge1_texture  = uv_unpack(__float_as_uint(v2.z));
+  const UV edge2_texture  = uv_unpack(__float_as_uint(v2.w));
+
+  float2 coords;
+  dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
+
+  triangle.tex_coords  = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+  triangle.material_id = instance.material_id;
+
+  return triangle;
+}
+
 #ifdef VOLUME_KERNEL
 __device__ float light_tree_child_importance(
   const float transmittance_importance, const vec3 origin, const vec3 ray, const float limit, const LightTreeNode8Packed node,
@@ -357,28 +409,6 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, const DeviceTra
 }
 #endif /* !VOLUME_KERNEL */
 
-__device__ float light_triangle_intersection_uv(const TriangleLight triangle, const vec3 origin, const vec3 ray, float2& coords) {
-  const vec3 h  = cross_product(ray, triangle.edge2);
-  const float a = dot_product(triangle.edge1, h);
-
-  const float f = 1.0f / a;
-  const vec3 s  = sub_vector(origin, triangle.vertex);
-  const float u = f * dot_product(s, h);
-
-  const vec3 q  = cross_product(s, triangle.edge1);
-  const float v = f * dot_product(ray, q);
-
-  coords = make_float2(u, v);
-
-  //  The third check is inverted to catch NaNs since NaNs always return false, the not will turn it into a true
-  if (v < 0.0f || u < 0.0f || !(u + v <= 1.0f))
-    return FLT_MAX;
-
-  const float t = f * dot_product(triangle.edge2, q);
-
-  return __fslctf(t, FLT_MAX, t);
-}
-
 /*
  * Solid angle sample a triangle.
  * @param triangle Triangle.
@@ -470,20 +500,8 @@ __device__ vec3
   return dir;
 }
 
-__device__ void light_sample_triangle_presampled(
-  const TriangleLight triangle, const GBufferData data, const vec3 ray, float& solid_angle, float& dist, RGBF& color) {
-  float2 coords;
-  dist = light_triangle_intersection_uv(triangle, data.position, ray, coords);
-
-  // Our ray does not actually hit the light, abort. This should never happen!
-  if (dist == FLT_MAX) {
-    solid_angle = 0.0f;
-    color       = get_color(0.0f, 0.0f, 0.0f);
-    return;
-  }
-
-  solid_angle = sample_triangle_solid_angle(triangle, data.position);
-
+__device__ RGBF light_get_color(const TriangleLight triangle) {
+  RGBF color;
   const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
 
   if (mat.luminance_tex != TEXTURE_NONE) {
@@ -506,6 +524,8 @@ __device__ void light_sample_triangle_presampled(
 
     color = scale_color(color, alpha);
   }
+
+  return color;
 }
 
 #else /* SHADING_KERNEL */

@@ -345,13 +345,14 @@ static uint32_t _device_vec3_to_uint(const vec3 normal) {
   return (x_u16 << 16) | y_u16;
 }
 
+/*
+ * Each component gets 1 sign bit, 8 exponent bit and 7 mantissa bits.
+ */
 static uint32_t _device_UV_to_uint(const UV uv) {
   const uint32_t u = *((uint32_t*) (&uv.u));
   const uint32_t v = *((uint32_t*) (&uv.v));
 
-  uint32_t compressed;
-  compressed = (u & 0x80000000) | ((u << 1) & 0x7F000000) | ((u << 1) & 0x00FF0000);
-  compressed |= ((v >> 16) & 0x00008000) | ((v >> 15) & 0x00007F00) | ((v >> 15) & 0x000000FF);
+  const uint32_t compressed = (u & 0xFFFF0000) | (v >> 16);
 
   return compressed;
 }

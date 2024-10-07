@@ -231,6 +231,15 @@ __device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV 
   return result;
 }
 
+__device__ UV uv_unpack(const uint32_t data) {
+  UV uv;
+
+  uv.u = __uint_as_float(data & 0xFFFF0000);
+  uv.v = __uint_as_float(data << 16);
+
+  return uv;
+}
+
 /*
  * Uses a orthonormal basis which is built as described in
  * T. Duff, J. Burgess, P. Christensen, C. Hery, A. Kensler, M. Liani, R. Villemin, _Building an Orthonormal Basis, Revisited_
@@ -1125,7 +1134,7 @@ __device__ float clampf(const float x, const float a, const float b) {
  * @param normal Normalized normal of surface from which you sample.
  * @result Solid angle of triangle.
  */
-__device__ float sample_triangle_solid_angle(const TriangleLight triangle, const vec3 origin) {
+__device__ float light_get_solid_angle(const TriangleLight triangle, const vec3 origin) {
   vec3 a       = sub_vector(triangle.vertex, origin);
   const vec3 b = normalize_vector(add_vector(triangle.edge1, a));
   const vec3 c = normalize_vector(add_vector(triangle.edge2, a));

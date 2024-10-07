@@ -206,20 +206,6 @@ __device__ uint32_t load_instance_material_id(const uint32_t instance_id) {
   return __ldg(&device.ptrs.instances[instance_id].material_id);
 }
 
-__device__ TriangleLight load_triangle_light(const TriangleLight* data, const int offset) {
-  const float4* ptr = (float4*) (data + offset);
-  const float4 v1   = __ldg(ptr);
-  const float4 v2   = __ldg(ptr + 1);
-  const float4 v3   = __ldg(ptr + 2);
-
-  TriangleLight triangle;
-  triangle.vertex = get_vector(v1.x, v1.y, v1.z);
-  triangle.edge1  = get_vector(v1.w, v2.x, v2.y);
-  triangle.edge2  = get_vector(v2.z, v2.w, v3.x);
-
-  return triangle;
-}
-
 __device__ Quad load_quad(const Quad* data, const int offset) {
   const float4* ptr = (float4*) (data + offset);
   const float4 v1   = __ldg(ptr);

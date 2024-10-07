@@ -23,9 +23,10 @@
 // High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
 
 __device__ uint32_t ris_sample_light(
-  const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const uint32_t initial_sample_id, const vec3 initial_ray,
-  const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist, bool& selected_is_refraction) {
-  uint32_t selected_id = LIGHT_ID_NONE;
+  const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const TriangleHandle bsdf_sample_handle,
+  const vec3 bsdf_sample_ray, const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist,
+  bool& selected_is_refraction) {
+  TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
 
   float sum_weight = 0.0f;
 
@@ -41,32 +42,31 @@ __device__ uint32_t ris_sample_light(
   const int reservoir_size = device.settings.light_num_ris_samples;
 
   // Don't allow triangles to sample themselves.
-  uint32_t blocked_light_id = LIGHT_ID_NONE;
-  if (data.instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
-    blocked_light_id = load_triangle_light_id(data.instance_id);
-  }
+  const TriangleHandle blocked_handle = triangle_handle_get(data.instance_id, data.tri_id);
 
   ////////////////////////////////////////////////////////////////////
   // Initialize reservoir with an initial sample
   ////////////////////////////////////////////////////////////////////
 
-  if (initial_sample_id != HIT_TYPE_LIGHT_BSDF_HINT && initial_sample_id != blocked_light_id) {
-    const TriangleLight triangle_light = load_triangle_light(device.scene.triangle_lights, initial_sample_id);
+  if (bsdf_sample_handle.instance_id != HIT_TYPE_LIGHT_BSDF_HINT && !triangle_handle_equal(bsdf_sample_handle, blocked_handle)) {
+    const DeviceTransform trans = load_transform(device.ptrs.instance_transforms, bsdf_sample_handle.instance_id);
 
-    float solid_angle, dist;
-    RGBF light_color;
-    light_sample_triangle_presampled(triangle_light, data, initial_ray, solid_angle, dist, light_color);
+    float dist;
+    const TriangleLight triangle_light = light_load(bsdf_sample_handle, data.position, bsdf_sample_ray, trans, dist);
+    const float solid_angle            = light_get_solid_angle(triangle_light, data.position);
 
     if (dist < FLT_MAX && solid_angle > 0.0f) {
+      RGBF light_color = light_get_color(triangle_light);
+
       bool is_refraction;
-      const RGBF bsdf_weight = bsdf_evaluate(data, initial_ray, BSDF_SAMPLING_GENERAL, is_refraction);
+      const RGBF bsdf_weight = bsdf_evaluate(data, bsdf_sample_ray, BSDF_SAMPLING_GENERAL, is_refraction);
       light_color            = mul_color(light_color, bsdf_weight);
 
       const float target_pdf = color_importance(light_color);
 
-      const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, initial_ray);
+      const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, bsdf_sample_ray);
 
-      const float nee_light_tree_pdf      = light_tree_traverse_pdf(data, initial_sample_id);
+      const float nee_light_tree_pdf      = light_tree_traverse_pdf(data, bsdf_sample_handle);
       const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
 
       // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
@@ -79,9 +79,9 @@ __device__ uint32_t ris_sample_light(
 
       sum_weight += weight;
 
-      selected_id            = initial_sample_id;
+      selected_handle        = bsdf_sample_handle;
       selected_light_color   = (target_pdf > 0.0f) ? scale_color(light_color, 1.0f / target_pdf) : get_color(0.0f, 0.0f, 0.0f);
-      selected_ray           = initial_ray;
+      selected_ray           = bsdf_sample_ray;
       selected_dist          = dist;
       selected_is_refraction = initial_is_refraction;
     }

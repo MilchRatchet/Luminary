@@ -212,12 +212,12 @@ struct DeviceTriangle {
   vec3 vertex;
   vec3 edge1;
   vec3 edge2;
-  uint32_t vertex_normal;
-  uint32_t edge1_normal;
-  uint32_t edge2_normal;
   uint32_t vertex_texture;
   uint32_t edge1_texture;
   uint32_t edge2_texture;
+  uint32_t vertex_normal;
+  uint32_t edge1_normal;
+  uint32_t edge2_normal;
   uint32_t padding;
 } typedef DeviceTriangle;
 LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);

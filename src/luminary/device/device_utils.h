@@ -196,7 +196,7 @@ struct DevicePointers {
   const uint32_t* bluenoise_2D;
   const float* bridge_lut;
   const DeviceMaterialCompressed* materials;
-  const DeviceTriangle* triangles;
+  INTERLEAVED_STORAGE const DeviceTriangle* triangles;
   const DeviceInstancelet* instances;
   const DeviceTransform* instance_transforms;
   const void** bottom_level_light_trees;

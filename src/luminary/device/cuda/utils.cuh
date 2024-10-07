@@ -145,4 +145,26 @@ __device__ bool _utils_debug_nans(const float value, const char* func, const uin
 
 #endif /* !UTILS_DEBUG_MODE */
 
+//===========================================================================================
+// Triangle addressing
+//===========================================================================================
+
+struct TriangleHandle {
+  uint32_t instance_id;
+  uint16_t tri_id;
+} typedef TriangleHandle;
+
+__device__ TriangleHandle triangle_handle_get(const uint32_t instance_id, const uint16_t tri_id) {
+  TriangleHandle handle;
+
+  handle.instance_id = instance_id;
+  handle.tri_id      = tri_id;
+
+  return handle;
+}
+
+__device__ bool triangle_handle_equal(const TriangleHandle handle1, const TriangleHandle handle2) {
+  return (handle1.instance_id == handle2.instance_id) && (handle1.tri_id == handle2.tri_id);
+}
+
 #endif /* CU_UTILS_H */
