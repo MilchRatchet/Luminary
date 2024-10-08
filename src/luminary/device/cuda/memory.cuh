@@ -175,6 +175,17 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
 
 #endif
 
+__device__ DeviceInstancelet load_instance(const DeviceInstancelet* data, const uint32_t offset) {
+  const float2* ptr = (float2*) (data + offset);
+  const float2 v    = __ldg(ptr);
+
+  DeviceInstancelet instance;
+  instance.triangles_offset = __float_as_uint(v.x);
+  instance.material_id      = __float_as_uint(v.y) & 0xFFFF;
+
+  return instance;
+}
+
 __device__ void* interleaved_buffer_get_entry_address(
   void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
   return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
@@ -191,13 +202,14 @@ __device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t
   return interleaved_buffer_get_entry_address((void*) device.ptrs.triangles, device.non_instanced_triangle_count, chunk, offset, tri_id);
 }
 
-__device__ UV load_triangle_tex_coords(const int offset, const float2 coords) {
-  const float2 bytes0x48 = __ldg((float2*) triangle_get_entry_address(4, 2, offset));
-  const float4 bytes0x50 = __ldg((float4*) triangle_get_entry_address(5, 0, offset));
+__device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
+  const DeviceInstancelet instance = load_instance(device.ptrs.instances, handle.instance_id);
 
-  const UV vertex_texture = get_uv(bytes0x48.x, bytes0x48.y);
-  const UV edge1_texture  = get_uv(bytes0x50.x, bytes0x50.y);
-  const UV edge2_texture  = get_uv(bytes0x50.z, bytes0x50.w);
+  const float4 data = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + handle.tri_id));
+
+  const UV vertex_texture = uv_unpack(__float_as_uint(data.y));
+  const UV edge1_texture  = uv_unpack(__float_as_uint(data.z));
+  const UV edge2_texture  = uv_unpack(__float_as_uint(data.w));
 
   return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
 }
@@ -281,17 +293,6 @@ __device__ DeviceTransform load_transform(const DeviceTransform* data, const uin
   trans.rotation.w = __float_as_uint(v1.w) >> 16;
 
   return trans;
-}
-
-__device__ DeviceInstancelet load_instance(const DeviceInstancelet* data, const uint32_t offset) {
-  const float2* ptr = (float2*) (data + offset);
-  const float2 v    = __ldg(ptr);
-
-  DeviceInstancelet instance;
-  instance.triangles_offset = __float_as_uint(v.x);
-  instance.material_id      = __float_as_uint(v.y) & 0xFFFF;
-
-  return instance;
 }
 
 __device__ LightTreeNode8Packed load_light_tree_node(const LightTreeNode8Packed* data, const int offset) {

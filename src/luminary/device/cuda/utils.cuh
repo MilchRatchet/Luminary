@@ -48,6 +48,12 @@ enum TaskAddressOffset {
   TASK_ADDRESS_COUNT_STRIDE      = 5
 } typedef TaskAddressOffset;
 
+struct CompressedAlpha {
+  // Unsigned int for OptiX compatibility
+  unsigned int data0;
+  unsigned int data1;
+} typedef CompressedAlpha;
+
 #define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))
 #define VOLUME_HIT_TYPE(X) ((X <= HIT_TYPE_PARTICLE_MAX) ? VOLUME_TYPE_PARTICLE : ((VolumeType) (X & 0x00000001u)))
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
@@ -150,8 +156,9 @@ __device__ bool _utils_debug_nans(const float value, const char* func, const uin
 //===========================================================================================
 
 struct TriangleHandle {
-  uint32_t instance_id;
-  uint16_t tri_id;
+  // Unsigned int for OptiX compatibility
+  unsigned int instance_id;
+  unsigned int tri_id;
 } typedef TriangleHandle;
 
 __device__ TriangleHandle triangle_handle_get(const uint32_t instance_id, const uint16_t tri_id) {

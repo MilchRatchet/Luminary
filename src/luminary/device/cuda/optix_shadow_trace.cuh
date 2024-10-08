@@ -3,25 +3,29 @@
 
 #if defined(OPTIX_KERNEL) && defined(SHADING_KERNEL)
 
+#include "optix_utils.cuh"
 #include "toy_utils.cuh"
 #include "utils.cuh"
 
 #define SKIP_IOR_CHECK (0xFFFFFFFF)
 #define MAX_COMPRESSABLE_COLOR (1.99999988079071044921875f)
 
-__device__ void optix_compress_color(RGBF color, unsigned int& data0, unsigned int& data1) {
-  uint32_t bits_r = (__float_as_uint(fminf(color.r + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
-  uint32_t bits_g = (__float_as_uint(fminf(color.g + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
-  uint32_t bits_b = (__float_as_uint(fminf(color.b + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
+__device__ CompressedAlpha optix_compress_color(const RGBF color) {
+  const uint32_t bits_r = (__float_as_uint(fminf(color.r + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
+  const uint32_t bits_g = (__float_as_uint(fminf(color.g + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
+  const uint32_t bits_b = (__float_as_uint(fminf(color.b + 1.0f, MAX_COMPRESSABLE_COLOR)) >> 2) & 0x1FFFFF;
 
-  data0 = bits_r | (bits_g << 21);
-  data1 = (bits_g >> 11) | (bits_b << 10);
+  CompressedAlpha alpha;
+  alpha.data0 = bits_r | (bits_g << 21);
+  alpha.data1 = (bits_g >> 11) | (bits_b << 10);
+
+  return alpha;
 }
 
-__device__ RGBF optix_decompress_color(unsigned int data0, unsigned int data1) {
-  uint32_t bits_r = data0 & 0x1FFFFF;
-  uint32_t bits_g = (data0 >> 21) & 0x7FF | ((data1 & 0x3FF) << 11);
-  uint32_t bits_b = (data1 >> 10) & 0x1FFFFF;
+__device__ RGBF optix_decompress_color(const CompressedAlpha alpha) {
+  const uint32_t bits_r = alpha.data0 & 0x1FFFFF;
+  const uint32_t bits_g = (alpha.data0 >> 21) & 0x7FF | ((alpha.data1 & 0x3FF) << 11);
+  const uint32_t bits_b = (alpha.data1 >> 10) & 0x1FFFFF;
 
   RGBF color;
   color.r = __uint_as_float(0x3F800000u | (bits_r << 2)) - 1.0f;
@@ -92,27 +96,26 @@ __device__ RGBF optix_toy_shadowing(const vec3 position, const vec3 dir, const f
 }
 
 __device__ RGBF optix_geometry_shadowing(
-  const vec3 position, const vec3 dir, const float dist, unsigned int hit_id, const ushort2 index, unsigned int& compressed_ior) {
+  const vec3 position, const vec3 dir, const float dist, TriangleHandle target_light, const ushort2 index, unsigned int& compressed_ior) {
   const float3 origin = make_float3(position.x, position.y, position.z);
   const float3 ray    = make_float3(dir.x, dir.y, dir.z);
 
   // 21 bits for each color component.
-  unsigned int alpha_data0, alpha_data1;
-  optix_compress_color(get_color(1.0f, 1.0f, 1.0f), alpha_data0, alpha_data1);
+  CompressedAlpha alpha = optix_compress_color(get_color(1.0f, 1.0f, 1.0f));
 
   // For triangle lights, we cannot rely on fully opaque OMMs because if we first hit the target light and then execute the closest hit for
   // that, then we will never know if there is an occluder. Similarly, skipping anyhit for fully opaque needs to still terminate the ray so
   // I enforce anyhit.
   const unsigned int ray_flag =
-    (hit_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? OPTIX_RAY_FLAG_ENFORCE_ANYHIT : OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
+    (target_light.instance_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? OPTIX_RAY_FLAG_ENFORCE_ANYHIT : OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
 
   optixTrace(
-    device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), ray_flag, 0, 0, 0, hit_id, alpha_data0,
-    alpha_data1, compressed_ior);
+    device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), ray_flag, 0, 0, 0, target_light.instance_id,
+    target_light.tri_id, alpha.data0, alpha.data1, compressed_ior);
 
-  RGBF visibility = optix_decompress_color(alpha_data0, alpha_data1);
+  RGBF visibility = optix_decompress_color(alpha);
 
-  if (hit_id == HIT_TYPE_REJECT) {
+  if (target_light.instance_id == HIT_TYPE_REJECT) {
     visibility = get_color(0.0f, 0.0f, 0.0f);
   }
 
@@ -127,7 +130,7 @@ __device__ RGBF optix_geometry_shadowing(
  * Performs alpha test on triangle
  * @result 0 if opaque, 1 if transparent, 2 if alpha cutoff
  */
-__device__ RGBAF optix_alpha_test(const uint32_t material_id, const unsigned int ray_ior) {
+__device__ RGBAF optix_alpha_test(const TriangleHandle handle, const uint32_t material_id, const unsigned int ray_ior) {
   // Don't check for IOR when querying a light from a BSDF sample
   if (ray_ior != SKIP_IOR_CHECK) {
     const uint32_t compressed_ior = ior_compress(__ldg(&(device.ptrs.materials[material_id].refraction_index)));
@@ -142,7 +145,7 @@ __device__ RGBAF optix_alpha_test(const uint32_t material_id, const unsigned int
   const uint16_t tex = __ldg(&(device.ptrs.materials[material_id].albedo_tex));
 
   if (tex != TEXTURE_NONE) {
-    const UV uv = load_triangle_tex_coords(hit_id, optixGetTriangleBarycentrics());
+    const UV uv = load_triangle_tex_coords(handle, optixGetTriangleBarycentrics());
 
     const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[tex].handle, uv.u, 1.0f - uv.v);
 
@@ -159,24 +162,22 @@ __device__ RGBAF optix_alpha_test(const uint32_t material_id, const unsigned int
 }
 
 extern "C" __global__ void __anyhit__optix() {
-  unsigned int target_light = optixGetPayload_0();
+  const TriangleHandle handle = optixGetTriangleHandle();
 
-  // First check if the target light is a triangle light so we don't unnecessarily load light IDs when sampling the sun or the toy.
-  if (target_light < LIGHT_ID_TRIANGLE_ID_LIMIT && target_light == load_triangle_light_id(optixGetPrimitiveIndex())) {
+  const TriangleHandle target_light = optixGetPayloadTriangleHandle();
+
+  if (triangle_handle_equal(handle, target_light)) {
     optixIgnoreIntersection();
   }
 
-  const uint32_t instance_id = optixGetInstanceId();
-  const uint32_t tri_id      = optixGetPrimitiveIndex();
+  const uint32_t material_id = load_instance_material_id(handle.instance_id);
 
-  const uint32_t material_id = load_instance_material_id(instance_id);
-
-  const bool bsdf_sampling_query        = (target_light == HIT_TYPE_LIGHT_BSDF_HINT);
+  const bool bsdf_sampling_query        = (target_light.instance_id == HIT_TYPE_LIGHT_BSDF_HINT);
   const bool material_has_ior_shadowing = (device.ptrs.materials[material_id].flags & DEVICE_MATERIAL_FLAG_IOR_SHADOWING) != 0;
 
   unsigned int ray_ior = (bsdf_sampling_query || !material_has_ior_shadowing) ? SKIP_IOR_CHECK : optixGetPayload_3();
 
-  const RGBAF albedo = optix_alpha_test(material_id, ray_ior);
+  const RGBAF albedo = optix_alpha_test(handle, material_id, ray_ior);
 
   // For finding the hit light of BSDF rays we only care about ignoring fully transparent hits.
   // I don't have OMMs for this BVH.
@@ -189,7 +190,7 @@ extern "C" __global__ void __anyhit__optix() {
   }
 
   if (albedo.a == 1.0f) {
-    optixSetPayload_0(HIT_TYPE_REJECT);
+    optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE, HIT_TYPE_REJECT);
 
     optixTerminateRay();
   }
@@ -202,7 +203,7 @@ extern "C" __global__ void __anyhit__optix() {
 
   ray_ior = (ray_ior & 0xFFFF) | (uint32_t) (ray_ior_pop_balance << 16) | (uint32_t) (ray_ior_pop_max << 24);
 
-  optixSetPayload_3(ray_ior);
+  optixSetPayloadGeneric(OPTIX_PAYLOAD_IOR, ray_ior);
 
   if (albedo.a == 0.0f) {
     optixIgnoreIntersection();
@@ -212,15 +213,13 @@ extern "C" __global__ void __anyhit__optix() {
                        ? scale_color(opaque_color(albedo), 1.0f - albedo.a)
                        : get_color(1.0f - albedo.a, 1.0f - albedo.a, 1.0f - albedo.a);
 
-  unsigned int alpha_data0 = optixGetPayload_1();
-  unsigned int alpha_data1 = optixGetPayload_2();
+  CompressedAlpha compressed_alpha = optixGetPayloadCompressedAlpha();
 
-  RGBF accumulated_alpha = optix_decompress_color(alpha_data0, alpha_data1);
+  RGBF accumulated_alpha = optix_decompress_color(compressed_alpha);
   accumulated_alpha      = mul_color(accumulated_alpha, alpha);
-  optix_compress_color(accumulated_alpha, alpha_data0, alpha_data1);
+  compressed_alpha       = optix_compress_color(accumulated_alpha);
 
-  optixSetPayload_1(alpha_data0);
-  optixSetPayload_2(alpha_data1);
+  optixSetPayloadCompressedAlpha(compressed_alpha);
 
   optixIgnoreIntersection();
 }

@@ -107,8 +107,8 @@ __device__ float light_tree_child_importance(
 }
 
 __device__ uint32_t light_tree_traverse(
-  const VolumeDescriptor volume, const DeviceTransformation trans, uint32_t instance_id, vec3 origin, vec3 ray, const float limit,
-  float random, uint32_t& subset_length, float& pdf) {
+  const VolumeDescriptor volume, const DeviceTransform trans, uint32_t instance_id, vec3 origin, vec3 ray, const float limit, float random,
+  uint32_t& subset_length, float& pdf) {
   pdf = 1.0f;
 
   origin = transform_apply_absolute_inv(trans, origin);
