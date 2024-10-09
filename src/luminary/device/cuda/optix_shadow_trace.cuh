@@ -109,6 +109,9 @@ __device__ RGBF optix_geometry_shadowing(
   const unsigned int ray_flag =
     (target_light.instance_id <= LIGHT_ID_TRIANGLE_ID_LIMIT) ? OPTIX_RAY_FLAG_ENFORCE_ANYHIT : OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT;
 
+  OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 0);
+  OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_COMPRESSED_ALPHA, 2);
+  OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_IOR, 4);
   optixTrace(
     device.optix_bvh_shadow, origin, ray, 0.0f, dist, 0.0f, OptixVisibilityMask(0xFFFF), ray_flag, 0, 0, 0, target_light.instance_id,
     target_light.tri_id, alpha.data0, alpha.data1, compressed_ior);

@@ -3,7 +3,6 @@
 #define OPTIX_PAYLOAD_DEPTH 0
 #define OPTIX_PAYLOAD_TRIANGLE_HANDLE 1
 
-#include "bvh_utils.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "optix_utils.cuh"
@@ -24,7 +23,7 @@ extern "C" __global__ void __raygen__optix() {
 
   for (int i = 0; i < trace_task_count; i++) {
     const int offset         = get_task_address(i);
-    const TraceTask task     = load_trace_task(device.ptrs.trace_tasks + offset);
+    const TraceTask task     = load_trace_task(offset);
     const TraceResult result = trace_preprocess(task);
 
     const float3 origin = make_float3(task.origin.x, task.origin.y, task.origin.z);
@@ -34,22 +33,19 @@ extern "C" __global__ void __raygen__optix() {
 
     unsigned int depth = __float_as_uint(result.depth);
 
-    // TODO: This needs to be corrected
-    TriangleHandle handle = triangle_handle_get(result.hit_id, 0);
+    TriangleHandle handle = triangle_handle_get(result.instance_id, result.tri_id);
 
+    OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_DEPTH, 0);
+    OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 1);
     optixTrace(
       device.optix_bvh, origin, ray, 0.0f, tmax, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0, depth, handle.instance_id, handle.tri_id);
 
-    float2 trace_result;
+    TraceResult trace_result;
+    trace_result.depth       = __uint_as_float(depth);
+    trace_result.instance_id = handle.instance_id;
+    trace_result.tri_id      = handle.tri_id;
 
-    if (device.settings.shading_mode == LUMINARY_SHADING_MODE_HEAT) {
-      trace_result = make_float2(0.0f, __uint_as_float(handle.instance_id));
-    }
-    else {
-      trace_result = make_float2(__uint_as_float(depth), __uint_as_float(handle.instance_id));
-    }
-
-    __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
+    store_trace_result(trace_result, offset);
   }
 }
 

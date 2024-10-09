@@ -5,6 +5,10 @@
 #define PHASE_KERNEL
 #define PARTICLE_KERNEL
 
+#define OPTIX_PAYLOAD_TRIANGLE_HANDLE 0
+#define OPTIX_PAYLOAD_COMPRESSED_ALPHA 2
+#define OPTIX_PAYLOAD_IOR 4
+
 #include "bsdf.cuh"
 #include "directives.cuh"
 #include "ior_stack.cuh"
@@ -21,8 +25,9 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const ShadingTask task            = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(device.ptrs.aux_data + get_task_address(task_offset + i));
+    const uint32_t offset             = get_task_address(task_offset + i);
+    const ShadingTask task            = load_shading_task(offset);
+    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
     const int pixel                   = get_pixel_id(task.index);
 
     const VolumeType volume_type  = VOLUME_HIT_TYPE(task.instance_id);
@@ -37,6 +42,7 @@ extern "C" __global__ void __raygen__optix() {
     const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
     TraceTask bounce_task;
+    bounce_task.state  = aux_data.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
     bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
@@ -55,7 +61,7 @@ extern "C" __global__ void __raygen__optix() {
 
     accumulated_light = mul_color(accumulated_light, record);
 
-    write_beauty_buffer(accumulated_light, pixel);
+    write_beauty_buffer(accumulated_light, pixel, aux_data.state);
 
     // This must be done after the trace rays due to some optimization in the compiler.
     // The compiler reloads these values at some point for some reason and if we overwrite
@@ -63,9 +69,7 @@ extern "C" __global__ void __raygen__optix() {
     // behaviour on my side.
     if (validate_trace_task(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
-      store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
-
-      state_release(pixel, STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
+      store_trace_task(bounce_task, get_task_address(trace_count++));
     }
   }
 

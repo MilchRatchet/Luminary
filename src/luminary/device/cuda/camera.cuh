@@ -13,13 +13,13 @@ __device__ vec3 camera_sample_aperture(const ushort2 pixel_coords) {
 
   switch (device.camera.aperture_shape) {
     default:
-    case CAMERA_APERTURE_ROUND: {
+    case LUMINARY_APERTURE_ROUND: {
       const float alpha = random.x * 2.0f * PI;
       const float beta  = sqrtf(random.y) * device.camera.aperture_size;
 
       sample = make_float2(cosf(alpha) * beta, sinf(alpha) * beta);
     } break;
-    case CAMERA_APERTURE_BLADED: {
+    case LUMINARY_APERTURE_BLADED: {
       const int blade   = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_LENS_BLADE, pixel_coords) * device.camera.aperture_blade_count;
       const float alpha = sqrtf(random.x);
       const float beta  = random.y;

@@ -10,27 +10,28 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
 
   for (int i = 0; i < task_count; i++) {
-    ShadingTask task            = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    ShadingTaskAuxData aux_data = load_shading_task_aux_data(device.ptrs.aux_data + get_task_address(task_offset + i));
+    const uint32_t offset       = get_task_address(task_offset + i);
+    ShadingTask task            = load_shading_task(offset);
+    ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
     const uint32_t pixel        = get_pixel_id(task.index);
 
     if (VOLUME_HIT_CHECK(task.instance_id))
       continue;
 
     if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
-      write_beauty_buffer(device.particles.albedo, pixel, true);
+      write_beauty_buffer_forced(device.particles.albedo, pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
       const float dist  = get_length(sub_vector(device.camera.pos, task.position));
       const float value = __saturatef((1.0f / dist) * 2.0f);
-      write_beauty_buffer(get_color(value, value, value), pixel, true);
+      write_beauty_buffer_forced(get_color(value, value, value), pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_NORMAL) {
       const GBufferData data = particle_generate_g_buffer(task, aux_data, pixel);
 
       const vec3 normal = data.normal;
 
-      write_beauty_buffer(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel, true);
+      write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
       const uint32_t v = random_uint32_t_base(0x55555555, task.instance_id);
@@ -45,10 +46,10 @@ LUMINARY_KERNEL void particle_process_debug_tasks() {
 
       const RGBF color = get_color(cr, cg, cb);
 
-      write_beauty_buffer(color, pixel, true);
+      write_beauty_buffer_forced(color, pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_LIGHTS) {
-      write_beauty_buffer(device.particles.albedo, pixel, true);
+      write_beauty_buffer_forced(device.particles.albedo, pixel);
     }
   }
 }

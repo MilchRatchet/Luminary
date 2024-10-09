@@ -4,7 +4,6 @@
 #include "directives.cuh"
 #include "math.cuh"
 #include "ocean_utils.cuh"
-#include "state.cuh"
 #include "utils.cuh"
 #include "volume_utils.cuh"
 
@@ -32,12 +31,9 @@ LUMINARY_KERNEL void volume_process_events() {
 
   for (int i = 0; i < task_count; i++) {
     const int offset     = get_task_address(i);
-    TraceTask task       = load_trace_task(device.ptrs.trace_tasks + offset);
-    const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
+    TraceTask task       = load_trace_task(offset);
+    TraceResult result   = load_trace_result(offset);
     const uint32_t pixel = get_pixel_id(task.index);
-
-    float depth     = result.x;
-    uint32_t hit_id = __float_as_uint(result.y);
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
 
@@ -45,14 +41,15 @@ LUMINARY_KERNEL void volume_process_events() {
 
     if (device.fog.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, result.depth);
 
       if (path.x >= 0.0f) {
         const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
-        if (volume_dist < depth) {
-          depth  = volume_dist;
-          hit_id = HIT_TYPE_VOLUME_FOG;
+        if (volume_dist < result.depth) {
+          result.depth       = volume_dist;
+          result.instance_id = HIT_TYPE_VOLUME_FOG;
+          result.tri_id      = 0;
         }
       }
     }
@@ -61,20 +58,21 @@ LUMINARY_KERNEL void volume_process_events() {
       bool ocean_intersection_possible = true;
       if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
         const float short_distance  = ocean_short_distance(task.origin, task.ray);
-        ocean_intersection_possible = (short_distance != FLT_MAX) && (short_distance <= depth);
+        ocean_intersection_possible = (short_distance != FLT_MAX) && (short_distance <= result.depth);
       }
 
       if (ocean_intersection_possible) {
-        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
+        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, result.depth);
 
-        if (ocean_depth < depth) {
-          depth  = ocean_depth;
-          hit_id = HIT_TYPE_OCEAN;
+        if (ocean_depth < result.depth) {
+          result.depth       = ocean_depth;
+          result.instance_id = HIT_TYPE_OCEAN;
+          result.tri_id      = 0;
         }
       }
 
       const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, result.depth);
 
       if (path.x >= 0.0f) {
         float integration_depth = path.y;
@@ -84,11 +82,12 @@ LUMINARY_KERNEL void volume_process_events() {
         if (allow_ocean_volume_hit) {
           const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
-          if (volume_dist < depth) {
-            depth  = volume_dist;
-            hit_id = HIT_TYPE_VOLUME_OCEAN;
+          if (volume_dist < result.depth) {
+            result.depth       = volume_dist;
+            result.instance_id = HIT_TYPE_VOLUME_OCEAN;
+            result.tri_id      = 0;
 
-            integration_depth = depth - path.x;
+            integration_depth = result.depth - path.x;
 
             const float sampling_pdf = volume.max_scattering * expf(-integration_depth * volume.max_scattering);
             record                   = mul_color(record, scale_color(volume.scattering, 1.0f / sampling_pdf));
@@ -101,8 +100,7 @@ LUMINARY_KERNEL void volume_process_events() {
       }
     }
 
-    __stcs((float2*) (device.ptrs.trace_results + offset), make_float2(depth, __uint_as_float(hit_id)));
-
+    store_trace_result(result, offset);
     store_RGBF(device.ptrs.records + pixel, record);
   }
 }

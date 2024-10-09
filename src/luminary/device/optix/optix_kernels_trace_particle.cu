@@ -1,7 +1,11 @@
 #define OPTIX_KERNEL
 
+#define OPTIX_PAYLOAD_DEPTH 0
+#define OPTIX_PAYLOAD_INSTANCE_ID 1
+
 #include "math.cuh"
 #include "memory.cuh"
+#include "optix_utils.cuh"
 #include "utils.cuh"
 
 __device__ bool particle_opacity_cutout(const float2 coord) {
@@ -23,10 +27,10 @@ extern "C" __global__ void __raygen__optix() {
   const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
   const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
 
-  for (int i = 0; i < trace_task_count; i++) {
-    const int offset     = get_task_address(i);
-    const TraceTask task = load_trace_task(device.ptrs.trace_tasks + offset);
-    const float2 result  = __ldcs((float2*) (device.ptrs.trace_results + offset));
+  for (uint32_t i = 0; i < trace_task_count; i++) {
+    const uint32_t offset    = get_task_address(i);
+    const TraceTask task     = load_trace_task(offset);
+    const TraceResult result = load_trace_result(offset);
 
     const vec3 scaled_ray = scale_vector(task.ray, 1.0f / device.particles.scale);
     const vec3 reference  = scale_vector(add_vector(task.origin, motion_offset), 1.0f / device.particles.scale);
@@ -34,11 +38,10 @@ extern "C" __global__ void __raygen__optix() {
     const float3 origin = make_float3(reference.x, reference.y, reference.z);
     const float3 ray    = make_float3(scaled_ray.x, scaled_ray.y, scaled_ray.z);
 
-    float tmax = result.x;
+    float tmax = result.depth;
 
-    unsigned int depth  = __float_as_uint(result.x);
-    unsigned int hit_id = __float_as_uint(result.y);
-    unsigned int cost   = 0;
+    unsigned int depth       = __float_as_uint(result.depth);
+    unsigned int instance_id = result.instance_id;
 
     const unsigned int vis_mask = OptixVisibilityMask(0xFFFF);
 
@@ -57,24 +60,22 @@ extern "C" __global__ void __raygen__optix() {
       p.y = p.y - floorf(p.y);
       p.z = p.z - floorf(p.z);
 
-      optixTrace(device.optix_bvh_particles, p, ray, 0.0f, tmax, 0.0f, vis_mask, OPTIX_RAY_FLAG_NONE, 0, 0, 0, depth, hit_id, cost);
+      OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_DEPTH, 0);
+      OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_INSTANCE_ID, 1);
+      optixTrace(device.optix_bvh_particles, p, ray, 0.0f, tmax, 0.0f, vis_mask, OPTIX_RAY_FLAG_NONE, 0, 0, 0, depth, instance_id);
 
       const float intersection_dist = __uint_as_float(depth);
 
       if (intersection_dist < tmax) {
-        float2 trace_result = result;
-
         // Hit ID contains the triangle ID but we only store the actual particle / quad ID
-        hit_id = HIT_TYPE_PARTICLE_MIN + (hit_id >> 1);
+        instance_id = HIT_TYPE_PARTICLE_MIN + (instance_id >> 1);
 
-        if (device.settings.shading_mode == LUMINARY_SHADING_MODE_HEAT) {
-          trace_result = make_float2(cost, __uint_as_float(hit_id));
-        }
-        else {
-          trace_result = make_float2(t + intersection_dist, __uint_as_float(hit_id));
-        }
+        TraceResult trace_result;
+        trace_result.depth       = t + intersection_dist;
+        trace_result.instance_id = instance_id;
+        trace_result.tri_id      = 0;
 
-        __stcs((float2*) (device.ptrs.trace_results + offset), trace_result);
+        store_trace_result(trace_result, offset);
         break;
       }
       else {
@@ -95,14 +96,12 @@ extern "C" __global__ void __raygen__optix() {
 }
 
 extern "C" __global__ void __anyhit__optix() {
-  optixSetPayload_2(optixGetPayload_2() + 1);
-
   if (particle_opacity_cutout(optixGetTriangleBarycentrics())) {
     optixIgnoreIntersection();
   }
 }
 
 extern "C" __global__ void __closesthit__optix() {
-  optixSetPayload_0(__float_as_uint(optixGetRayTmax()));
-  optixSetPayload_1(optixGetPrimitiveIndex());
+  optixSetPayloadGeneric(OPTIX_PAYLOAD_DEPTH, __float_as_uint(optixGetRayTmax()));
+  optixSetPayloadGeneric(OPTIX_PAYLOAD_INSTANCE_ID, optixGetPrimitiveIndex());
 }

@@ -2,24 +2,38 @@
 #define CU_MEMORY_H
 
 #include "math.cuh"
-#include "state.cuh"
 #include "utils.cuh"
 
-//===========================================================================================
-// Memory Prefetch Functions
-//===========================================================================================
+////////////////////////////////////////////////////////////////////
+// Interleaved storage access
+////////////////////////////////////////////////////////////////////
 
-__device__ void __prefetch_global_l1(const void* const ptr) {
-  asm("prefetch.global.L1 [%0];" : : "l"(ptr));
+__device__ void* interleaved_buffer_get_entry_address_chunk_16(
+  void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
+  return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
 }
 
-__device__ void __prefetch_global_l2(const void* const ptr) {
-  asm("prefetch.global.L2 [%0];" : : "l"(ptr));
+__device__ void* interleaved_buffer_get_entry_address_chunk_8(
+  void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
+  return (void*) (((float*) ptr) + (count * chunk + id) * 2 + offset);
 }
 
-//===========================================================================================
-// Minimal Cache Pollution Loads/Stores
-//===========================================================================================
+__device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t tri_id) {
+  return interleaved_buffer_get_entry_address_chunk_16(
+    (void*) device.ptrs.triangles, device.non_instanced_triangle_count, chunk, offset, tri_id);
+}
+
+__device__ void* trace_result_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t task_id) {
+  return interleaved_buffer_get_entry_address_chunk_8((void*) device.ptrs.trace_results, device.max_task_count, chunk, offset, task_id);
+}
+
+////////////////////////////////////////////////////////////////////
+// Load/Store functions
+////////////////////////////////////////////////////////////////////
+
+__device__ void stream_uint16(const uint16_t* source, uint16_t* target) {
+  __stcs(target, __ldcs(source));
+}
 
 __device__ void stream_float2(const float2* source, float2* target) {
   __stcs(target, __ldcs(source));
@@ -29,24 +43,30 @@ __device__ void stream_float4(const float4* source, float4* target) {
   __stcs(target, __ldcs(source));
 }
 
-__device__ void swap_trace_data(const int index0, const int index1) {
-  const int offset0  = get_task_address(index0);
-  const float2 temp  = __ldcs((float2*) (device.ptrs.trace_results + offset0));
-  const float4 data0 = __ldcs((float4*) (device.ptrs.trace_tasks + offset0));
-  const float4 data1 = __ldcs((float4*) (device.ptrs.trace_tasks + offset0) + 1);
+__device__ void swap_trace_data(const uint32_t index0, const uint32_t index1) {
+  const uint32_t offset0 = get_task_address(index0);
 
-  const int offset1 = get_task_address(index1);
-  stream_float2((float2*) (device.ptrs.trace_results + offset1), (float2*) (device.ptrs.trace_results + offset0));
+  const float2 trace0   = __ldcs((float2*) trace_result_get_entry_address(0, 0, offset0));
+  const uint16_t trace1 = __ldcs((uint16_t*) trace_result_get_entry_address(1, 0, offset0));
+  const float4 data0    = __ldcs((float4*) (device.ptrs.trace_tasks + offset0));
+  const float4 data1    = __ldcs((float4*) (device.ptrs.trace_tasks + offset0) + 1);
+
+  const uint32_t offset1 = get_task_address(index1);
+  stream_float2((float2*) trace_result_get_entry_address(0, 0, offset1), (float2*) trace_result_get_entry_address(0, 0, offset0));
+  stream_uint16((uint16_t*) trace_result_get_entry_address(1, 0, offset1), (uint16_t*) trace_result_get_entry_address(1, 0, offset0));
   stream_float4((float4*) (device.ptrs.trace_tasks + offset1), (float4*) (device.ptrs.trace_tasks + offset0));
   stream_float4((float4*) (device.ptrs.trace_tasks + offset1) + 1, (float4*) (device.ptrs.trace_tasks + offset0) + 1);
-  __stcs((float2*) (device.ptrs.trace_results + offset1), temp);
+
+  __stcs((float2*) trace_result_get_entry_address(0, 0, offset1), trace0);
+  __stcs((uint16_t*) trace_result_get_entry_address(1, 0, offset1), trace1);
   __stcs((float4*) (device.ptrs.trace_tasks + offset1), data0);
   __stcs((float4*) (device.ptrs.trace_tasks + offset1) + 1, data1);
 }
 
-__device__ TraceTask load_trace_task(const TraceTask* ptr) {
-  const float4 data0 = __ldcs((float4*) ptr);
-  const float4 data1 = __ldcs(((float4*) ptr) + 1);
+__device__ TraceTask load_trace_task(const uint32_t offset) {
+  const float4* ptr  = (float4*) (device.ptrs.trace_tasks + offset);
+  const float4 data0 = __ldcs(ptr + 0);
+  const float4 data1 = __ldcs(ptr + 1);
 
   TraceTask task;
   task.state    = __float_as_uint(data0.x) & 0xFF;
@@ -63,7 +83,7 @@ __device__ TraceTask load_trace_task(const TraceTask* ptr) {
   return task;
 }
 
-__device__ void store_trace_task(TraceTask* ptr, const TraceTask task) {
+__device__ void store_trace_task(const TraceTask task, const uint32_t offset) {
   float4 data0;
   data0.x = __uint_as_float(task.state);
   data0.y = __uint_as_float(((uint32_t) task.index.x & 0xFFFF) | ((uint32_t) task.index.y << 16));
@@ -76,14 +96,13 @@ __device__ void store_trace_task(TraceTask* ptr, const TraceTask task) {
   data1.z = task.ray.y;
   data1.w = task.ray.z;
 
-  float4* data_ptr = (float4*) ptr;
-
-  __stcs(data_ptr + 0, data0);
-  __stcs(data_ptr + 1, data1);
+  float4* ptr = (float4*) (device.ptrs.trace_tasks + offset);
+  __stcs(ptr + 0, data0);
+  __stcs(ptr + 1, data1);
 }
 
-__device__ ShadingTask load_shading_task(TraceTask* ptr) {
-  float4* data_ptr = (float4*) ptr;
+__device__ ShadingTask load_shading_task(const uint32_t offset) {
+  float4* data_ptr = (float4*) (device.ptrs.trace_tasks + offset);
 
   const float4 data0 = __ldcs(data_ptr + 0);
   const float4 data1 = __ldcs(data_ptr + 1);
@@ -103,16 +122,44 @@ __device__ ShadingTask load_shading_task(TraceTask* ptr) {
   return task;
 }
 
-__device__ ShadingTaskAuxData load_shading_task_aux_data(const ShadingTaskAuxData* ptr) {
-  float* data_ptr = (float*) ptr;
+__device__ void store_shading_task(const ShadingTask task, const uint32_t offset) {
+  float4* ptr = (float4*) (device.ptrs.trace_tasks + offset);
+  float4 data0;
+  float4 data1;
 
-  const float data = __ldcs(data_ptr);
+  data0.x = __uint_as_float(task.instance_id);
+  data0.y = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
+  data0.z = task.position.x;
+  data0.w = task.position.y;
+
+  __stcs(ptr, data0);
+
+  data1.x = task.position.z;
+  data1.y = task.ray.x;
+  data1.z = task.ray.y;
+  data1.w = task.ray.z;
+
+  __stcs(ptr + 1, data1);
+}
+
+__device__ ShadingTaskAuxData load_shading_task_aux_data(const uint32_t offset) {
+  uint32_t* data_ptr = (uint32_t*) (device.ptrs.aux_data + offset);
+
+  const uint32_t data = __ldcs(data_ptr);
 
   ShadingTaskAuxData aux_data;
-  aux_data.tri_id = __float_as_uint(data) & 0xFFFF;
-  aux_data.state  = (__float_as_uint(data) >> 16) & 0xFF;
+  aux_data.tri_id = data & 0xFFFF;
+  aux_data.state  = (data >> 16) & 0xFF;
 
   return aux_data;
+}
+
+__device__ void store_shading_task_aux_data(const ShadingTaskAuxData aux_data, const uint32_t offset) {
+  uint32_t* ptr = (uint32_t*) (device.ptrs.aux_data + offset);
+
+  const uint32_t data = aux_data.tri_id | (((uint32_t) aux_data.state) << 16);
+
+  __stcs(ptr, data);
 }
 
 __device__ RGBF load_RGBF(RGBF* ptr) {
@@ -125,6 +172,27 @@ __device__ RGBF load_RGBF(const RGBF* ptr) {
 
 __device__ void store_RGBF(RGBF* ptr, const RGBF a) {
   *ptr = a;
+}
+
+__device__ TraceResult load_trace_result(const uint32_t task_offset) {
+  const float2 data0   = __ldcs((float2*) trace_result_get_entry_address(0, 0, task_offset));
+  const uint16_t data1 = __ldcs((uint16_t*) trace_result_get_entry_address(1, 0, task_offset));
+
+  TraceResult result;
+  result.depth       = data0.x;
+  result.instance_id = __float_as_uint(data0.y);
+  result.tri_id      = data1;
+
+  return result;
+}
+
+__device__ void store_trace_result(const TraceResult result, const uint32_t task_offset) {
+  float2 data0;
+  data0.x = result.depth;
+  data0.y = __uint_as_float(result.instance_id);
+
+  __stcs((float2*) trace_result_get_entry_address(0, 0, task_offset), data0);
+  __stcs((uint16_t*) trace_result_get_entry_address(1, 0, task_offset), result.tri_id);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -147,12 +215,16 @@ __device__ void write_beauty_buffer_indirect(const RGBF beauty, const int pixel,
   write_beauty_buffer_impl(beauty, pixel, mode_set, device.ptrs.frame_indirect_buffer);
 }
 
-__device__ void write_beauty_buffer(const RGBF beauty, const int pixel, const bool mode_set = false) {
-  const bool is_direct = state_peek(pixel, STATE_FLAG_DELTA_PATH);
+__device__ void write_beauty_buffer(const RGBF beauty, const int pixel, const uint8_t state, const bool mode_set = false) {
+  const bool is_direct = state & STATE_FLAG_DELTA_PATH;
 
   RGBF* buffer = (is_direct) ? device.ptrs.frame_direct_buffer : device.ptrs.frame_indirect_buffer;
 
   write_beauty_buffer_impl(beauty, pixel, mode_set, buffer);
+}
+
+__device__ void write_beauty_buffer_forced(const RGBF beauty, const int pixel) {
+  write_beauty_buffer(beauty, pixel, STATE_FLAG_DELTA_PATH, true);
 }
 
 #ifndef NO_LUMINARY_BVH
@@ -184,22 +256,6 @@ __device__ DeviceInstancelet load_instance(const DeviceInstancelet* data, const 
   instance.material_id      = __float_as_uint(v.y) & 0xFFFF;
 
   return instance;
-}
-
-__device__ void* interleaved_buffer_get_entry_address(
-  void* ptr, const uint32_t count, const uint32_t chunk, const uint32_t offset, const uint32_t id) {
-  return (void*) (((float*) ptr) + (count * chunk + id) * 4 + offset);
-}
-
-// TODO: Fix this to support undersampling if I need it.
-#if 0
-__device__ void* pixel_buffer_get_entry_address(void* ptr, const uint32_t chunk, const uint32_t offset, const uint32_t pixel) {
-  return interleaved_buffer_get_entry_address(ptr, OUTPUT_DIM(device.settings.width) * OUTPUT_DIM(device.settings.height), chunk, offset, pixel);
-}
-#endif
-
-__device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t tri_id) {
-  return interleaved_buffer_get_entry_address((void*) device.ptrs.triangles, device.non_instanced_triangle_count, chunk, offset, tri_id);
 }
 
 __device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {

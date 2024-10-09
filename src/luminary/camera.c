@@ -26,7 +26,6 @@ LuminaryResult camera_get_default(Camera* camera) {
   camera->lens_flare                 = 0;
   camera->lens_flare_threshold       = 1.0f;
   camera->dithering                  = 1;
-  camera->far_clip_distance          = 50000.0f;
   camera->tonemap                    = LUMINARY_TONEMAP_AGX;
   camera->agx_custom_slope           = 1.0f;
   camera->agx_custom_power           = 1.0f;
@@ -83,7 +82,6 @@ LuminaryResult camera_check_for_dirty(const Camera* input, const Camera* old, bo
   __CAMERA_STANDARD_DIRTY(rotation.z);
   __CAMERA_STANDARD_DIRTY(fov);
   __CAMERA_STANDARD_DIRTY(aperture_size);
-  __CAMERA_STANDARD_DIRTY(far_clip_distance);
   __CAMERA_STANDARD_DIRTY(russian_roulette_threshold);
   __CAMERA_STANDARD_DIRTY(do_firefly_clamping);
 

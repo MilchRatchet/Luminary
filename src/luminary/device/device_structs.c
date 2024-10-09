@@ -40,7 +40,6 @@ LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* 
   device_camera->focal_length               = camera->focal_length;
   device_camera->aperture_size              = camera->aperture_size;
   device_camera->exposure                   = camera->exposure;
-  device_camera->far_clip_distance          = camera->far_clip_distance;
   device_camera->purkinje_kappa1            = camera->purkinje_kappa1;
   device_camera->purkinje_kappa2            = camera->purkinje_kappa2;
   device_camera->russian_roulette_threshold = camera->russian_roulette_threshold;

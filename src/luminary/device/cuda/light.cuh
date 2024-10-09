@@ -98,7 +98,7 @@ __device__ float light_tree_child_importance(
   const vec3 diff = sub_vector(point, closest_point);
 
   const vec3 v0 = normalize_vector(sub_vector(origin, point));
-  const vec3 v1 = normalize_vector(sub_vector(add_vector(origin, scale_vector(ray, fminf(limit, device.camera.far_clip_distance))), point));
+  const vec3 v1 = normalize_vector(sub_vector(add_vector(origin, scale_vector(ray, limit)), point));
 
   const float angle = acosf(fminf(fmaxf(dot_product(v0, v1), -1.0f + eps), 1.0f - eps));
 

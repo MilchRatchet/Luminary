@@ -8,11 +8,15 @@ __device__ TriangleHandle optixGetTriangleHandle() {
   return triangle_handle_get(optixGetInstanceId(), optixGetPrimitiveIndex());
 }
 
+#define OPTIX_PAYLOAD_INDEX_REQUIRE(payload, index) static_assert(payload == index, "OptiX Payload is not in the correct index.")
+
 ////////////////////////////////////////////////////////////////////
 // Payload generics
 ////////////////////////////////////////////////////////////////////
 
 // IMPORTANT: Verify that OptiX still implements these intrinsics in this way whenever updating OptiX.
+// IMPORTANT: I suppose OptiX implemented these functions in this particular way because the index must be a compile time constant,
+// so I better make sure that I honor that :D
 // Intellisense does not understand the usage of volatile here :(
 
 #ifndef __INTELLISENSE__

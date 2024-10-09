@@ -30,9 +30,8 @@ LUMINARY_API enum LuminaryShadingMode {
   LUMINARY_SHADING_MODE_ALBEDO         = 1,
   LUMINARY_SHADING_MODE_DEPTH          = 2,
   LUMINARY_SHADING_MODE_NORMAL         = 3,
-  LUMINARY_SHADING_MODE_HEAT           = 4,
-  LUMINARY_SHADING_MODE_IDENTIFICATION = 5,
-  LUMINARY_SHADING_MODE_LIGHTS         = 6
+  LUMINARY_SHADING_MODE_IDENTIFICATION = 4,
+  LUMINARY_SHADING_MODE_LIGHTS         = 5
 } typedef LuminaryShadingMode;
 
 LUMINARY_API struct LuminaryRendererSettings {
@@ -92,7 +91,6 @@ LUMINARY_API struct LuminaryCamera {
   float max_exposure;
   float min_exposure;
   bool auto_exposure;
-  float far_clip_distance;
   LuminaryToneMap tonemap;
   float agx_custom_slope;
   float agx_custom_power;

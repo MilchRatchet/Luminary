@@ -86,7 +86,11 @@ struct Quad {
   vec3 normal;
 } typedef Quad;
 
-enum GBufferFlags { G_BUFFER_REFRACTION_IS_INSIDE = 0b1, G_BUFFER_COLORED_DIELECTRIC = 0b10 } typedef GBufferFlags;
+enum GBufferFlags {
+  G_BUFFER_REFRACTION_IS_INSIDE = 0b1,
+  G_BUFFER_COLORED_DIELECTRIC   = 0b10,
+  G_BUFFER_USE_LIGHT_RAYS       = 0b100
+} typedef GBufferFlags;
 
 struct GBufferData {
   uint32_t instance_id;
@@ -135,11 +139,11 @@ struct TraceTask {
 } typedef TraceTask;
 LUM_STATIC_SIZE_ASSERT(TraceTask, 0x20);
 
-struct TraceResult {
+INTERLEAVED_STORAGE struct TraceResult {
   float depth;
-  uint32_t hit_id;
+  uint32_t instance_id;
+  uint16_t tri_id;
 } typedef TraceResult;
-LUM_STATIC_SIZE_ASSERT(TraceResult, 0x08);
 
 struct LightTreeNode8Packed {
   vec3 base_point;
@@ -165,7 +169,7 @@ struct DevicePointers {
   TraceTask* trace_tasks;
   ShadingTaskAuxData* aux_data;
   uint16_t* trace_counts;
-  TraceResult* trace_results;
+  INTERLEAVED_STORAGE TraceResult* trace_results;
   uint16_t* task_counts;
   uint16_t* task_offsets;
   uint32_t* ior_stack;
@@ -180,7 +184,6 @@ struct DevicePointers {
   RGBF* records;
   XRGB8* buffer_8bit;
   uint32_t* hit_id_history;
-  uint8_t* state_buffer;
   const DeviceTextureObject* albedo_atlas;
   const DeviceTextureObject* luminance_atlas;
   const DeviceTextureObject* material_atlas;
@@ -230,6 +233,7 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh_light;
   OptixTraversableHandle optix_bvh_particles;
   uint32_t non_instanced_triangle_count;
+  uint32_t max_task_count;
 
   /*
   int max_ray_depth;

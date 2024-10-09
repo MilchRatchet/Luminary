@@ -23,8 +23,9 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const ShadingTask task            = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(device.ptrs.aux_data + get_task_address(task_offset + i));
+    const uint32_t offset             = get_task_address(task_offset + i);
+    const ShadingTask task            = load_shading_task(offset);
+    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
     const int pixel                   = get_pixel_id(task.index);
 
     GBufferData data;
@@ -37,8 +38,6 @@ extern "C" __global__ void __raygen__optix() {
     else {
       data = geometry_generate_g_buffer(task, aux_data, pixel);
     }
-
-    const bool is_delta_path = state_peek(pixel, STATE_FLAG_DELTA_PATH);
 
     ////////////////////////////////////////////////////////////////////
     // Bounce Ray Sampling
@@ -66,19 +65,9 @@ extern "C" __global__ void __raygen__optix() {
     // Light Ray Sampling
     ////////////////////////////////////////////////////////////////////
 
-    // We clamp the roughness to avoid caustics which would never clean up.
-    if (!is_delta_path) {
-      data.roughness = fmaxf(data.roughness, device.scene.material.caustic_roughness_clamp);
-    }
+    RGBF accumulated_light = data.emission;
 
-    bool use_light_rays = true;
-    if (task.instance_id == HIT_TYPE_OCEAN && !is_delta_path) {
-      use_light_rays = false;
-    }
-
-    RGBF accumulated_light = (state_peek(pixel, STATE_FLAG_CAMERA_DIRECTION)) ? data.emission : get_color(0.0f, 0.0f, 0.0f);
-
-    if (use_light_rays) {
+    if (data.flags & G_BUFFER_USE_LIGHT_RAYS) {
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
@@ -92,7 +81,7 @@ extern "C" __global__ void __raygen__optix() {
 
     accumulated_light = mul_color(accumulated_light, record);
 
-    write_beauty_buffer(accumulated_light, pixel);
+    write_beauty_buffer(accumulated_light, pixel, aux_data.state);
 
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
@@ -101,7 +90,18 @@ extern "C" __global__ void __raygen__optix() {
 
     data.position = shift_origin_vector(data.position, data.V, bounce_ray, bounce_info.is_transparent_pass);
 
+    uint8_t new_state = aux_data.state;
+
+    if (!is_delta_distribution) {
+      new_state &= ~STATE_FLAG_DELTA_PATH;
+    }
+
+    if (!is_pass_through) {
+      new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
+    }
+
     TraceTask bounce_task;
+    bounce_task.state  = new_state;
     bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
@@ -113,20 +113,8 @@ extern "C" __global__ void __raygen__optix() {
     // the values we will get garbage. I am not sure if this is a compiler bug or some undefined
     // behaviour on my side.
     if (validate_trace_task(bounce_task, bounce_record)) {
-      store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
+      store_trace_task(bounce_task, get_task_address(trace_count++));
       store_RGBF(device.ptrs.records + pixel, bounce_record);
-
-      uint32_t flags_to_release = 0;
-
-      if (is_delta_path && !is_delta_distribution) {
-        flags_to_release |= STATE_FLAG_DELTA_PATH;
-      }
-
-      if (!is_pass_through) {
-        flags_to_release |= STATE_FLAG_CAMERA_DIRECTION;
-      }
-
-      state_release(pixel, flags_to_release);
     }
   }
 

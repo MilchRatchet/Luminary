@@ -59,6 +59,25 @@ struct CompressedAlpha {
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
 #define IS_PRIMARY_RAY (device.depth == 0)
 
+//
+// Usage documentation:
+//
+// STATE_FLAG_DELTA_PATH: This flag is set for paths whose vertices generated bounce rays only from delta (or near-delta) distributions.
+//                        This flag is used for firefly clamping as it only applies to light gathered on path suffixes of non-delta paths.
+//
+// STATE_FLAG_CAMERA_DIRECTION: This flag is set while the current path is just a line along the original camera direction.
+//                              This flag is used to allow light to be gathered through non-refractive transparencies when coming directly
+//                              from the camera where no DL is executed.
+//
+// STATE_FLAG_OCEAN_SCATTERED: This flag is set for paths that have at least one vertex that is a ocean volume scattering event.
+//                             This flag is used to limit ocean volumes to single scattering for performance reasons.
+//
+enum StateFlag {
+  STATE_FLAG_DELTA_PATH       = 0b00000001u,
+  STATE_FLAG_CAMERA_DIRECTION = 0b00000010u,
+  STATE_FLAG_OCEAN_SCATTERED  = 0b00000100u
+} typedef StateFlag;
+
 //===========================================================================================
 // Device Variables
 //===========================================================================================
@@ -93,7 +112,7 @@ __device__ uint32_t get_pixel_id(const ushort2 pixel) {
   return pixel.x + device.settings.width * pixel.y;
 }
 
-__device__ int get_task_address_of_thread(const int thread_id, const int block_id, const int number) {
+__device__ uint32_t get_task_address_of_thread(const uint32_t thread_id, const uint32_t block_id, const uint32_t number) {
   static_assert(THREADS_PER_BLOCK == 128, "I wrote this using that we have 4 warps per block, this is also used in the 0x3!");
 
   const uint32_t threads_per_warp  = 32;
@@ -102,7 +121,7 @@ __device__ int get_task_address_of_thread(const int thread_id, const int block_i
   return threads_per_warp * device.pixels_per_thread * warp_id + threads_per_warp * number + thread_id_in_warp;
 }
 
-__device__ int get_task_address(const int number) {
+__device__ uint32_t get_task_address(const uint32_t number) {
 #ifndef OPTIX_KERNEL
   return get_task_address_of_thread(threadIdx.x, blockIdx.x, number);
 #else

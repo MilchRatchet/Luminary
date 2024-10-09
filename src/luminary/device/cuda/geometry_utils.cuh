@@ -100,8 +100,10 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
     albedo.a              = albedo_f.w;
   }
 
-  RGBF emission = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
-  if (mat.luminance_tex != TEXTURE_NONE && (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION)) {
+  const bool include_emission = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (aux_task.state & STATE_FLAG_CAMERA_DIRECTION);
+
+  RGBF emission = (include_emission) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
+  if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
     const float4 luminance_f = texture_load(device.ptrs.luminance_atlas[mat.luminance_tex], tex_coords);
 
     emission = get_color(luminance_f.x, luminance_f.y, luminance_f.z);
@@ -117,7 +119,7 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
     metallic  = material_f.y;
   }
 
-  uint32_t flags = 0;
+  uint32_t flags = G_BUFFER_USE_LIGHT_RAYS;
 
   if (is_inside) {
     flags |= G_BUFFER_REFRACTION_IS_INSIDE;
@@ -129,6 +131,11 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
 
   if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
     flags |= G_BUFFER_COLORED_DIELECTRIC;
+  }
+
+  // We clamp the roughness to avoid caustics which would never clean up.
+  if (!(aux_task.state & STATE_FLAG_DELTA_PATH)) {
+    roughness = fmaxf(roughness, device.scene.material.caustic_roughness_clamp);
   }
 
   GBufferData data;

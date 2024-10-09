@@ -189,10 +189,6 @@ static LuminaryResult parse_camera_settings(Camera* camera, char* line) {
       sscanf(value, "%u\n", &bool_uint);
       camera->dithering = bool_uint;
       break;
-    /* FARCLIPD */
-    case 4922514984611758406u:
-      sscanf(value, "%f\n", &camera->far_clip_distance);
-      break;
     /* TONEMAP_ */
     case 6868061231871053652u:
       sscanf(value, "%u\n", &camera->tonemap);

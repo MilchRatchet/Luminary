@@ -317,10 +317,10 @@ LUMINARY_KERNEL void clouds_render_tasks() {
 
   for (int i = 0; i < task_count; i++) {
     const int offset         = get_task_address(i);
-    TraceTask task           = load_trace_task(device.ptrs.trace_tasks + offset);
-    const float depth        = __ldcs((float*) (device.ptrs.trace_results + offset));
+    TraceTask task           = load_trace_task(offset);
+    const TraceResult result = load_trace_result(offset);
     vec3 sky_origin          = world_to_sky_transform(task.origin);
-    const float sky_max_dist = (depth == device.camera.far_clip_distance) ? FLT_MAX : world_to_sky_scale(depth);
+    const float sky_max_dist = (result.depth == FLT_MAX) ? FLT_MAX : world_to_sky_scale(result.depth);
     const uint32_t pixel     = get_pixel_id(task.index);
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
@@ -334,16 +334,19 @@ LUMINARY_KERNEL void clouds_render_tasks() {
         const float cloud_world_offset = sky_to_world_scale(cloud_offset);
 
         task.origin = add_vector(task.origin, scale_vector(task.ray, cloud_world_offset));
-        store_trace_task(device.ptrs.trace_tasks + offset, task);
+        store_trace_task(task, offset);
 
-        if (depth != device.camera.far_clip_distance) {
-          __stcs((float*) (device.ptrs.trace_results + offset), depth - cloud_world_offset);
+        if (result.depth != FLT_MAX) {
+          // Move past the clouds
+          TraceResult trace_result = load_trace_result(offset);
+          trace_result.depth       = result.depth - cloud_world_offset;
+          store_trace_result(trace_result, offset);
         }
       }
     }
 
     store_RGBF(device.ptrs.records + pixel, record);
-    write_beauty_buffer(color, pixel);
+    write_beauty_buffer(color, pixel, task.state);
   }
 }
 

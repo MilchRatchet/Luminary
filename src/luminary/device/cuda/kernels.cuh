@@ -11,7 +11,6 @@
 #include "purkinje.cuh"
 #include "sky.cuh"
 #include "sky_utils.cuh"
-#include "state.cuh"
 #include "temporal.cuh"
 #include "tonemap.cuh"
 #include "utils.cuh"
@@ -72,6 +71,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
       continue;
 
     TraceTask task;
+    task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
     task.index.x = undersampling_x;
     task.index.y = undersampling_y;
 
@@ -79,8 +79,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
     const uint32_t pixel = get_pixel_id(task.index);
 
-    device.ptrs.records[pixel]      = get_color(1.0f, 1.0f, 1.0f);
-    device.ptrs.state_buffer[pixel] = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
+    device.ptrs.records[pixel] = get_color(1.0f, 1.0f, 1.0f);
 
     device.ptrs.frame_direct_buffer[pixel]   = get_color(0.0f, 0.0f, 0.0f);
     device.ptrs.frame_indirect_buffer[pixel] = get_color(0.0f, 0.0f, 0.0f);
@@ -88,7 +87,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
     ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
 
-    store_trace_task(device.ptrs.trace_tasks + get_task_address(task_count++), task);
+    store_trace_task(task, get_task_address(task_count++));
   }
 
   device.ptrs.trace_counts[THREAD_ID] = task_count;
@@ -169,14 +168,11 @@ LUMINARY_KERNEL void process_sky_inscattering_tasks() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const int offset    = get_task_address(i);
-    TraceTask task      = load_trace_task(device.ptrs.trace_tasks + offset);
-    const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
+    const int offset         = get_task_address(i);
+    TraceTask task           = load_trace_task(offset);
+    const TraceResult result = load_trace_result(offset);
 
-    const float depth     = result.x;
-    const uint32_t hit_id = __float_as_uint(result.y);
-
-    if (hit_id == HIT_TYPE_SKY)
+    if (result.instance_id == HIT_TYPE_SKY)
       continue;
 
     const uint32_t pixel = get_pixel_id(task.index);
@@ -190,12 +186,12 @@ LUMINARY_KERNEL void process_sky_inscattering_tasks() {
     const RGBF inscattering = sky_trace_inscattering(sky_origin, task.ray, inscattering_limit, record, task.index);
 
     store_RGBF(device.ptrs.records + pixel, record);
-    write_beauty_buffer(inscattering, pixel);
+    write_beauty_buffer(inscattering, pixel, task.state);
   }
 }
 
 LUMINARY_KERNEL void postprocess_trace_tasks() {
-  const int task_count         = device.ptrs.trace_counts[THREAD_ID];
+  const uint32_t task_count    = device.ptrs.trace_counts[THREAD_ID];
   uint16_t geometry_task_count = 0;
   uint16_t particle_task_count = 0;
   uint16_t sky_task_count      = 0;
@@ -204,97 +200,98 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   uint16_t volume_task_count   = 0;
 
   // count data
-  for (int i = 0; i < task_count; i++) {
-    const int offset      = get_task_address(i);
-    const uint32_t hit_id = __ldca(&device.ptrs.trace_results[offset].hit_id);
+  for (uint32_t i = 0; i < task_count; i++) {
+    const uint32_t offset = get_task_address(i);
+    // TODO: We only need the instance_id
+    const uint32_t instance_id = load_trace_result(offset).instance_id;
 
-    if (hit_id == HIT_TYPE_SKY) {
+    if (instance_id == HIT_TYPE_SKY) {
       sky_task_count++;
     }
-    else if (hit_id == HIT_TYPE_OCEAN) {
+    else if (instance_id == HIT_TYPE_OCEAN) {
       ocean_task_count++;
     }
-    else if (hit_id == HIT_TYPE_TOY) {
+    else if (instance_id == HIT_TYPE_TOY) {
       toy_task_count++;
     }
-    else if (VOLUME_HIT_CHECK(hit_id)) {
+    else if (VOLUME_HIT_CHECK(instance_id)) {
       volume_task_count++;
     }
-    else if (hit_id <= HIT_TYPE_PARTICLE_MAX && hit_id >= HIT_TYPE_PARTICLE_MIN) {
+    else if (instance_id <= HIT_TYPE_PARTICLE_MAX && instance_id >= HIT_TYPE_PARTICLE_MIN) {
       particle_task_count++;
     }
-    else if (hit_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
+    else if (instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
       geometry_task_count++;
     }
   }
 
-  int geometry_offset = 0;
-  int toy_offset      = geometry_offset + geometry_task_count;
-  int ocean_offset    = toy_offset + toy_task_count;
-  int volume_offset   = ocean_offset + ocean_task_count;
-  int particle_offset = volume_offset + volume_task_count;
-  int sky_offset      = particle_offset + particle_task_count;
-  int rejects_offset  = sky_offset + sky_task_count;
-  int k               = 0;
+  uint32_t geometry_offset = 0;
+  uint32_t toy_offset      = geometry_offset + geometry_task_count;
+  uint32_t ocean_offset    = toy_offset + toy_task_count;
+  uint32_t volume_offset   = ocean_offset + ocean_task_count;
+  uint32_t particle_offset = volume_offset + volume_task_count;
+  uint32_t sky_offset      = particle_offset + particle_task_count;
+  uint32_t rejects_offset  = sky_offset + sky_task_count;
+  uint32_t k               = 0;
 
   device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY] = geometry_offset;
   device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME]   = volume_offset;
   device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE] = particle_offset;
   device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY]      = sky_offset;
 
-  const int num_tasks               = rejects_offset;
-  const int initial_geometry_offset = 0;
-  const int initial_toy_offset      = initial_geometry_offset + geometry_task_count;
-  const int initial_ocean_offset    = initial_toy_offset + toy_task_count;
-  const int initial_volume_offset   = initial_ocean_offset + ocean_task_count;
-  const int initial_particle_offset = initial_volume_offset + volume_task_count;
-  const int initial_sky_offset      = initial_particle_offset + particle_task_count;
-  const int initial_rejects_offset  = initial_sky_offset + sky_task_count;
+  const uint32_t num_tasks               = rejects_offset;
+  const uint32_t initial_geometry_offset = 0;
+  const uint32_t initial_toy_offset      = initial_geometry_offset + geometry_task_count;
+  const uint32_t initial_ocean_offset    = initial_toy_offset + toy_task_count;
+  const uint32_t initial_volume_offset   = initial_ocean_offset + ocean_task_count;
+  const uint32_t initial_particle_offset = initial_volume_offset + volume_task_count;
+  const uint32_t initial_sky_offset      = initial_particle_offset + particle_task_count;
+  const uint32_t initial_rejects_offset  = initial_sky_offset + sky_task_count;
 
   // order data
   while (k < task_count) {
-    const int offset      = get_task_address(k);
-    const uint32_t hit_id = __ldca(&device.ptrs.trace_results[offset].hit_id);
+    const uint32_t offset      = get_task_address(k);
+    const uint32_t instance_id = load_trace_result(offset).instance_id;
 
-    int index;
-    int needs_swapping;
+    uint32_t index;
+    bool needs_swapping;
 
-    if (hit_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
+    if (instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
       index          = geometry_offset;
       needs_swapping = (k < initial_geometry_offset) || (k >= geometry_task_count + initial_geometry_offset);
       if (needs_swapping || k >= geometry_offset) {
         geometry_offset++;
       }
     }
-    else if (hit_id == HIT_TYPE_TOY) {
+    else if (instance_id == HIT_TYPE_TOY) {
       index          = toy_offset;
       needs_swapping = (k < initial_toy_offset) || (k >= toy_task_count + initial_toy_offset);
       if (needs_swapping || k >= toy_offset) {
         toy_offset++;
       }
     }
-    else if (hit_id == HIT_TYPE_OCEAN) {
+    else if (instance_id == HIT_TYPE_OCEAN) {
       index          = ocean_offset;
       needs_swapping = (k < initial_ocean_offset) || (k >= ocean_task_count + initial_ocean_offset);
       if (needs_swapping || k >= ocean_offset) {
         ocean_offset++;
       }
     }
-    else if (VOLUME_HIT_CHECK(hit_id)) {
+    else if (VOLUME_HIT_CHECK(instance_id)) {
       index          = volume_offset;
       needs_swapping = (k < initial_volume_offset) || (k >= volume_task_count + initial_volume_offset);
       if (needs_swapping || k >= volume_offset) {
         volume_offset++;
       }
     }
-    else if (hit_id <= HIT_TYPE_PARTICLE_MAX) {
+    else if (instance_id <= HIT_TYPE_PARTICLE_MAX) {
       index          = particle_offset;
       needs_swapping = (k < initial_particle_offset) || (k >= particle_task_count + initial_particle_offset);
       if (needs_swapping || k >= particle_offset) {
         particle_offset++;
       }
     }
-    else if (hit_id == HIT_TYPE_SKY) {
+    else if (instance_id == HIT_TYPE_SKY) {
       index          = sky_offset;
       needs_swapping = (k < initial_sky_offset) || (k >= sky_task_count + initial_sky_offset);
       if (needs_swapping || k >= sky_offset) {
@@ -318,39 +315,34 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   }
 
   // process data
-  for (int i = 0; i < num_tasks; i++) {
-    const int offset    = get_task_address(i);
-    TraceTask task      = load_trace_task(device.ptrs.trace_tasks + offset);
-    const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
+  for (uint32_t i = 0; i < num_tasks; i++) {
+    const uint32_t offset    = get_task_address(i);
+    TraceTask task           = load_trace_task(offset);
+    const TraceResult result = load_trace_result(offset);
 
-    const float depth     = result.x;
-    const uint32_t hit_id = __float_as_uint(result.y);
-    const uint32_t pixel  = get_pixel_id(task.index);
+    const uint32_t pixel = get_pixel_id(task.index);
 
+#if 0
     if (IS_PRIMARY_RAY) {
       device.ptrs.hit_id_history[pixel] = hit_id;
     }
+#endif
 
-    if (hit_id != HIT_TYPE_SKY)
+    if (result.instance_id != HIT_TYPE_SKY)
       task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    float4* ptr = (float4*) (device.ptrs.trace_tasks + offset);
-    float4 data0;
-    float4 data1;
+    ShadingTask shading_task;
+    shading_task.instance_id = result.instance_id;
+    shading_task.index       = task.index;
+    shading_task.position    = task.origin;
+    shading_task.ray         = task.ray;
 
-    data0.x = __uint_as_float(hit_id);
-    data0.y = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
-    data0.z = task.origin.x;
-    data0.w = task.origin.y;
+    ShadingTaskAuxData shading_task_aux;
+    shading_task_aux.tri_id = result.tri_id;
+    shading_task_aux.state  = task.state;
 
-    __stcs(ptr, data0);
-
-    data1.x = task.origin.z;
-    data1.y = task.ray.x;
-    data1.z = task.ray.y;
-    data1.w = task.ray.z;
-
-    __stcs(ptr + 1, data1);
+    store_shading_task(shading_task, offset);
+    store_shading_task_aux_data(shading_task_aux, offset);
   }
 
   const uint16_t geometry_kernel_task_count = geometry_task_count + toy_task_count + ocean_task_count;

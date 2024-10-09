@@ -452,6 +452,15 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const Sha
     (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(device.toy.refractive_index, pixel, ior_stack_method);
 
+  // We clamp the roughness to avoid caustics which would never clean up.
+  float roughness = 0.045f;
+  if ((aux_task.state & STATE_FLAG_DELTA_PATH)) {
+    flags |= G_BUFFER_USE_LIGHT_RAYS;
+  }
+  else {
+    roughness = fmaxf(roughness, device.scene.material.caustic_roughness_clamp);
+  }
+
   GBufferData data;
   data.instance_id = HIT_TYPE_OCEAN;
   data.tri_id      = 0;
@@ -460,7 +469,7 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const Sha
   data.normal      = normal;
   data.position    = task.position;
   data.V           = scale_vector(task.ray, -1.0f);
-  data.roughness   = 0.045f;
+  data.roughness   = roughness;
   data.metallic    = 1.0f;
   data.state       = aux_task.state;
   data.flags       = flags;

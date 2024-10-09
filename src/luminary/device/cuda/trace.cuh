@@ -8,14 +8,14 @@
 __device__ TraceResult trace_preprocess(const TraceTask task) {
   const uint32_t pixel = get_pixel_id(task.index);
 
-  float depth     = device.camera.far_clip_distance;
-  uint32_t hit_id = HIT_TYPE_SKY;
+  float depth          = FLT_MAX;
+  uint32_t instance_id = HIT_TYPE_SKY;
 
   // Intersect against the triangle we hit in primary visible in the last frame.
   // This is a heuristic to speed up the BVH traversal.
   // TODO: Reenable this.
 #if 0
-  if (device.settings.shading_mode != LUMINARY_SHADING_MODE_HEAT && IS_PRIMARY_RAY) {
+  if (IS_PRIMARY_RAY) {
     uint32_t t_id;
     TraversalTriangle tt;
     uint32_t material_id;
@@ -59,8 +59,8 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
     const float toy_dist = get_toy_distance(task.origin, task.ray);
 
     if (toy_dist < depth) {
-      depth  = toy_dist;
-      hit_id = HIT_TYPE_TOY;
+      depth       = toy_dist;
+      instance_id = HIT_TYPE_TOY;
     }
   }
 
@@ -69,15 +69,16 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
       const float far_distance = ocean_far_distance(task.origin, task.ray);
 
       if (far_distance < depth) {
-        depth  = far_distance;
-        hit_id = HIT_TYPE_REJECT;
+        depth       = far_distance;
+        instance_id = HIT_TYPE_REJECT;
       }
     }
   }
 
   TraceResult result;
-  result.depth  = depth;
-  result.hit_id = hit_id;
+  result.depth       = depth;
+  result.instance_id = instance_id;
+  result.tri_id      = 0;
 
   return result;
 }

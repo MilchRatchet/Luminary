@@ -5,6 +5,10 @@
 #define PHASE_KERNEL
 #define VOLUME_KERNEL
 
+#define OPTIX_PAYLOAD_TRIANGLE_HANDLE 0
+#define OPTIX_PAYLOAD_COMPRESSED_ALPHA 2
+#define OPTIX_PAYLOAD_IOR 4
+
 #include "bsdf.cuh"
 #include "directives.cuh"
 #include "ior_stack.cuh"
@@ -20,8 +24,9 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const ShadingTask task            = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(device.ptrs.aux_data + get_task_address(task_offset + i));
+    const uint32_t offset             = get_task_address(task_offset + i);
+    const ShadingTask task            = load_shading_task(offset);
+    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
     const uint32_t pixel              = get_pixel_id(task.index);
 
     const VolumeType volume_type  = VOLUME_HIT_TYPE(task.instance_id);
@@ -35,15 +40,19 @@ extern "C" __global__ void __raygen__optix() {
     BSDFSampleInfo bounce_info;
     const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
+    uint8_t new_state = aux_data.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
+
+    if (volume_type == VOLUME_TYPE_OCEAN) {
+      new_state &= ~STATE_FLAG_OCEAN_SCATTERED;
+    }
+
     TraceTask bounce_task;
+    bounce_task.state  = new_state;
     bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
     bounce_task.index  = task.index;
 
     RGBF bounce_record = record;
-
-    // Release this flag here so that DL is flagged as indirect light.
-    state_release(pixel, STATE_FLAG_DELTA_PATH);
 
     // Light Ray Sampling
     RGBF accumulated_light = get_color(0.0f, 0.0f, 0.0f);
@@ -56,7 +65,7 @@ extern "C" __global__ void __raygen__optix() {
 
     accumulated_light = mul_color(accumulated_light, record);
 
-    write_beauty_buffer(accumulated_light, pixel);
+    write_beauty_buffer_indirect(accumulated_light, pixel);
 
     // This must be done after the trace rays due to some optimization in the compiler.
     // The compiler reloads these values at some point for some reason and if we overwrite
@@ -64,13 +73,7 @@ extern "C" __global__ void __raygen__optix() {
     // behaviour on my side.
     if (validate_trace_task(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
-      store_trace_task(device.ptrs.trace_tasks + get_task_address(trace_count++), bounce_task);
-
-      if (volume_type == VOLUME_TYPE_OCEAN) {
-        state_consume(pixel, STATE_FLAG_OCEAN_SCATTERED);
-      }
-
-      state_release(pixel, STATE_FLAG_CAMERA_DIRECTION);
+      store_trace_task(bounce_task, get_task_address(trace_count++));
     }
   }
 

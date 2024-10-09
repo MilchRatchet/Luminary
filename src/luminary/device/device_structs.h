@@ -32,13 +32,12 @@ struct DeviceCamera {
   float focal_length;
   float aperture_size;
   float exposure;
-  float far_clip_distance;
   float purkinje_kappa1;
   float purkinje_kappa2;
   float russian_roulette_threshold;
   float film_grain;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x40u);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x3Cu);
 
 struct DeviceOcean {
   uint32_t active : 1;

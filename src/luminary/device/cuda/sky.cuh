@@ -672,8 +672,10 @@ LUMINARY_KERNEL void process_sky_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
   for (int i = 0; i < task_count; i++) {
-    const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
-    const uint32_t pixel   = get_pixel_id(task.index);
+    const uint32_t offset  = get_task_address(task_offset + i);
+    const ShadingTask task = load_shading_task(offset);
+
+    const uint32_t pixel = get_pixel_id(task.index);
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
@@ -682,7 +684,8 @@ LUMINARY_KERNEL void process_sky_tasks() {
     RGBF sky = sky_color_main(task.position, task.ray, pixel, task.index);
     sky      = mul_color(sky, record);
 
-    write_beauty_buffer(sky, pixel);
+    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
+    write_beauty_buffer(sky, pixel, aux_data.state);
   }
 }
 
@@ -691,19 +694,18 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
   for (int i = 0; i < task_count; i++) {
-    const ShadingTask task = load_shading_task(device.ptrs.trace_tasks + get_task_address(task_offset + i));
+    const ShadingTask task = load_shading_task(get_task_address(task_offset + i));
     const uint32_t pixel   = get_pixel_id(task.index);
 
     if (device.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
       RGBF sky = sky_color_main(task.position, task.ray, pixel, task.index);
-      write_beauty_buffer(sky, pixel, true);
+      write_beauty_buffer_forced(sky, pixel);
     }
-    else if (device.shading_mode == SHADING_DEPTH) {
-      const float value = __saturatef((1.0f / device.camera.far_clip_distance) * 2.0f);
-      write_beauty_buffer(get_color(value, value, value), pixel, true);
+    else if (device.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
+      write_beauty_buffer_forced(get_color(0.0f, 0.0f, 0.0f), pixel);
     }
     else if (device.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
-      write_beauty_buffer(get_color(0.0f, 0.63f, 1.0f), pixel, true);
+      write_beauty_buffer_forced(get_color(0.0f, 0.63f, 1.0f), pixel);
     }
   }
 }

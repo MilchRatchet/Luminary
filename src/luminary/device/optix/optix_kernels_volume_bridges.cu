@@ -5,6 +5,10 @@
 #define PHASE_KERNEL
 #define VOLUME_KERNEL
 
+#define OPTIX_PAYLOAD_TRIANGLE_HANDLE 0
+#define OPTIX_PAYLOAD_COMPRESSED_ALPHA 2
+#define OPTIX_PAYLOAD_IOR 4
+
 #include "bridges.cuh"
 #include "bsdf.cuh"
 #include "directives.cuh"
@@ -18,16 +22,14 @@ extern "C" __global__ void __raygen__optix() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const int offset    = get_task_address(i);
-    TraceTask task      = load_trace_task(device.ptrs.trace_tasks + offset);
-    const float2 result = __ldcs((float2*) (device.ptrs.trace_results + offset));
-
-    const float depth     = result.x;
-    const uint32_t hit_id = __float_as_uint(result.y);
+    const int offset = get_task_address(i);
+    TraceTask task   = load_trace_task(offset);
+    // TODO: We don't need to load the tri_id (and we also don't even need the instance_id either)
+    const TraceResult result = load_trace_result(offset);
 
     const uint32_t pixel = get_pixel_id(task.index);
 
-    if (!state_peek(pixel, STATE_FLAG_DELTA_PATH))
+    if (!(task.state & STATE_FLAG_DELTA_PATH))
       continue;
 
     float start            = FLT_MAX;
@@ -35,7 +37,7 @@ extern "C" __global__ void __raygen__optix() {
 
     if (device.fog.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, result.depth);
 
       if (path.y > 0.0f && path.x < start) {
         volume_type = VOLUME_TYPE_FOG;
@@ -45,7 +47,7 @@ extern "C" __global__ void __raygen__optix() {
 
     if (device.ocean.active && device.ocean.triangle_light_contribution) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, result.depth);
 
       if (path.y > 0.0f && path.x < start) {
         volume_type = VOLUME_TYPE_OCEAN;
@@ -62,7 +64,7 @@ extern "C" __global__ void __raygen__optix() {
 
     const float ior = ior_stack_interact(1.0f, pixel, IOR_STACK_METHOD_PEEK_CURRENT);
 
-    RGBF light_color  = bridges_sample(task, volume, depth, ior);
+    RGBF light_color  = bridges_sample(task, volume, result.depth, ior);
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
     light_color       = mul_color(light_color, record);
 

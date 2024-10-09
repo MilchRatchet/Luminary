@@ -52,15 +52,10 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const Shadi
     normal = scale_vector(normal, -1.0f);
   }
 
-  uint32_t flags = G_BUFFER_COLORED_DIELECTRIC;
+  uint32_t flags = G_BUFFER_COLORED_DIELECTRIC | G_BUFFER_USE_LIGHT_RAYS;
 
-  RGBF emission;
-  if (device.toy.emissive) {
-    emission = scale_color(device.toy.emission, device.toy.material.b);
-  }
-  else {
-    emission = get_color(0.0f, 0.0f, 0.0f);
-  }
+  const bool include_emission = device.toy.emissive && (aux_data.state & STATE_FLAG_CAMERA_DIRECTION);
+  const RGBF emission         = (include_emission) ? scale_color(device.toy.emission, device.toy.material.b) : get_color(0.0f, 0.0f, 0.0f);
 
   if (toy_is_inside(task.position, task.ray)) {
     flags |= G_BUFFER_REFRACTION_IS_INSIDE;
