@@ -454,11 +454,8 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const Sha
 
   // We clamp the roughness to avoid caustics which would never clean up.
   float roughness = 0.045f;
-  if ((aux_task.state & STATE_FLAG_DELTA_PATH)) {
+  if (aux_task.state & STATE_FLAG_DELTA_PATH) {
     flags |= G_BUFFER_USE_LIGHT_RAYS;
-  }
-  else {
-    roughness = fmaxf(roughness, device.scene.material.caustic_roughness_clamp);
   }
 
   GBufferData data;

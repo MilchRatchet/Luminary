@@ -119,6 +119,11 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
     metallic  = material_f.y;
   }
 
+  // We clamp the roughness to avoid caustics which would never clean up.
+  if (!(aux_task.state & STATE_FLAG_DELTA_PATH)) {
+    roughness = fmaxf(roughness, mat.roughness_clamp);
+  }
+
   uint32_t flags = G_BUFFER_USE_LIGHT_RAYS;
 
   if (is_inside) {
@@ -131,11 +136,6 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
 
   if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
     flags |= G_BUFFER_COLORED_DIELECTRIC;
-  }
-
-  // We clamp the roughness to avoid caustics which would never clean up.
-  if (!(aux_task.state & STATE_FLAG_DELTA_PATH)) {
-    roughness = fmaxf(roughness, device.scene.material.caustic_roughness_clamp);
   }
 
   GBufferData data;

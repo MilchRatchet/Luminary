@@ -256,6 +256,8 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->flags |= material->flags.thin_walled ? DEVICE_MATERIAL_FLAG_THIN_WALLED : 0;
   device_material->flags |= material->flags.colored_transparency ? DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY : 0;
 
+  device_material->roughness_clamp = _device_struct_convert_float01_to_uint16(material->roughness_clamp) >> 8;
+
   device_material->metallic         = _device_struct_convert_float01_to_uint16(material->metallic);
   device_material->roughness        = _device_struct_convert_float01_to_uint16(material->roughness);
   device_material->refraction_index = _device_struct_convert_float01_to_uint16(0.5f * (material->refraction_index - 1.0f));

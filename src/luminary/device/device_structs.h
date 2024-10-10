@@ -161,14 +161,15 @@ struct DeviceToy {
 LUM_STATIC_SIZE_ASSERT(DeviceToy, 0x50u);
 
 enum DeviceMaterialFlags {
-  DEVICE_MATERIAL_FLAG_EMISSION             = 0x00000001,
-  DEVICE_MATERIAL_FLAG_IOR_SHADOWING        = 0x00000002,
-  DEVICE_MATERIAL_FLAG_THIN_WALLED          = 0x00000004,
-  DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY = 0x00000008
+  DEVICE_MATERIAL_FLAG_EMISSION             = 0x01,
+  DEVICE_MATERIAL_FLAG_IOR_SHADOWING        = 0x02,
+  DEVICE_MATERIAL_FLAG_THIN_WALLED          = 0x04,
+  DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY = 0x08
 } typedef DeviceMaterialFlags;
 
 struct DeviceMaterialCompressed {
-  uint16_t flags;
+  uint8_t flags;
+  uint8_t roughness_clamp;
   uint16_t metallic;
   uint16_t roughness;
   uint16_t refraction_index;
@@ -187,12 +188,12 @@ struct DeviceMaterialCompressed {
   uint16_t luminance_tex;
   uint16_t material_tex;
   uint16_t normal_tex;
-
 } typedef DeviceMaterialCompressed;
 LUM_STATIC_SIZE_ASSERT(DeviceMaterialCompressed, 0x20u);
 
 struct DeviceMaterial {
-  uint16_t flags;
+  uint8_t flags;
+  float roughness_clamp;
   float metallic;
   float roughness;
   float refraction_index;

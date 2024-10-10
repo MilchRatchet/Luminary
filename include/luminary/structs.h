@@ -295,6 +295,7 @@ LUMINARY_API struct LuminaryMaterial {
   LuminaryRGBF emission;
   float metallic;
   float roughness;
+  float roughness_clamp;
   float refraction_index;
   uint16_t albedo_tex;
   uint16_t luminance_tex;

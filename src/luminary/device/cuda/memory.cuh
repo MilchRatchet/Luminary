@@ -295,7 +295,8 @@ __device__ DeviceMaterial load_material(const DeviceMaterialCompressed* data, co
   const float4 v1   = __ldg(ptr + 1);
 
   DeviceMaterial mat;
-  mat.flags            = __float_as_uint(v0.x) & 0xFFFF;
+  mat.flags            = __float_as_uint(v0.x) & 0xFF;
+  mat.roughness_clamp  = random_uint16_t_to_float(__float_as_uint(v0.x) & 0xFF00);
   mat.metallic         = random_uint16_t_to_float(__float_as_uint(v0.x) >> 16);
   mat.roughness        = random_uint16_t_to_float(__float_as_uint(v0.y) & 0xFFFF);
   mat.refraction_index = random_uint16_t_to_float(__float_as_uint(v0.y) >> 16) * 2.0f + 1.0f;

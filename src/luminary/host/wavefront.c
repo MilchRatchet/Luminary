@@ -823,6 +823,7 @@ static LuminaryResult _wavefront_convert_materials(
     mat->refraction_index           = wavefront_mat.refraction_index;
     mat->metallic                   = wavefront_mat.specular_reflectivity.r;
     mat->roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
+    mat->roughness_clamp            = 0.25f;
     mat->albedo_tex                 = texture_offset + wavefront_mat.texture[WF_ALBEDO];
     mat->luminance_tex              = texture_offset + wavefront_mat.texture[WF_LUMINANCE];
     mat->material_tex               = texture_offset + wavefront_mat.texture[WF_MATERIAL];
