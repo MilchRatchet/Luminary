@@ -87,9 +87,9 @@ struct Quad {
 } typedef Quad;
 
 enum GBufferFlags {
-  G_BUFFER_REFRACTION_IS_INSIDE = 0b1,
-  G_BUFFER_COLORED_DIELECTRIC   = 0b10,
-  G_BUFFER_USE_LIGHT_RAYS       = 0b100
+  G_BUFFER_FLAG_REFRACTION_IS_INSIDE = 0b1,
+  G_BUFFER_FLAG_COLORED_DIELECTRIC   = 0b10,
+  G_BUFFER_FLAG_USE_LIGHT_RAYS       = 0b100
 } typedef GBufferFlags;
 
 struct GBufferData {

@@ -67,7 +67,7 @@ extern "C" __global__ void __raygen__optix() {
 
     RGBF accumulated_light = data.emission;
 
-    if (data.flags & G_BUFFER_USE_LIGHT_RAYS) {
+    if (data.flags & G_BUFFER_FLAG_USE_LIGHT_RAYS) {
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
@@ -84,7 +84,8 @@ extern "C" __global__ void __raygen__optix() {
     write_beauty_buffer(accumulated_light, pixel, aux_data.state);
 
     if (bounce_info.is_transparent_pass) {
-      const IORStackMethod ior_stack_method = (data.flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
+      const IORStackMethod ior_stack_method =
+        (data.flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PULL : IOR_STACK_METHOD_PUSH;
       ior_stack_interact(data.ior_out, pixel, ior_stack_method);
     }
 

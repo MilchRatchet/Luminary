@@ -41,13 +41,11 @@ struct Mesh {
   struct BVH* bvh;
 } typedef Mesh;
 
-struct MeshletInstance {
-  uint32_t meshlet_id;
-} typedef MeshletInstance;
-
 struct MeshInstance {
   uint32_t mesh_id;
-  ARRAY MeshletInstance* meshlet_instances;
+  vec3 offset;
+  vec3 scale;
+  Quaternion rotation;
 } typedef MeshInstance;
 
 LuminaryResult mesh_create(Mesh** mesh);

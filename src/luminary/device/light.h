@@ -19,6 +19,11 @@ struct LightTree {
   size_t nodes_size;
   void* paths_data;
   size_t paths_size;
+  void* child_remapper_data;
+  size_t child_remapper_size;
+  float bounding_sphere_size;
+  vec3 bounding_sphere_center;
+  float normalized_power;
 } typedef LightTree;
 
 struct MeshletLightData {
@@ -28,7 +33,8 @@ struct MeshletLightData {
 
 LuminaryResult light_load_bridge_lut(Device* device);
 LuminaryResult light_tree_create(Meshlet* meshlet, Device* device, ARRAY const Material** materials);
-LuminaryResult light_tree_create_toplevel(LightTree** tree, ARRAY const Instance** instances, ARRAY const Mesh** meshes);
+LuminaryResult light_tree_create_toplevel(
+  LightTree** tree, ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials);
 LuminaryResult light_tree_destroy(Meshlet* meshlet);
 LuminaryResult light_tree_destroy_toplevel(LightTree** tree);
 

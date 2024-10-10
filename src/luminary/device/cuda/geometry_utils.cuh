@@ -124,18 +124,18 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
     roughness = fmaxf(roughness, mat.roughness_clamp);
   }
 
-  uint32_t flags = G_BUFFER_USE_LIGHT_RAYS;
+  uint32_t flags = G_BUFFER_FLAG_USE_LIGHT_RAYS;
 
   if (is_inside) {
-    flags |= G_BUFFER_REFRACTION_IS_INSIDE;
+    flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
   }
 
   const IORStackMethod ior_stack_method =
-    (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+    (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(mat.refraction_index, pixel, ior_stack_method);
 
   if (mat.flags & DEVICE_MATERIAL_FLAG_COLORED_TRANSPARENCY) {
-    flags |= G_BUFFER_COLORED_DIELECTRIC;
+    flags |= G_BUFFER_FLAG_COLORED_DIELECTRIC;
   }
 
   GBufferData data;
@@ -150,8 +150,8 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
   data.metallic    = metallic;
   data.state       = aux_task.state;
   data.flags       = flags;
-  data.ior_in      = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
-  data.ior_out     = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
+  data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
+  data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;
 
   return data;
 }

@@ -88,6 +88,9 @@ struct LightTreeWork {
   LightTreeNode8Packed* nodes8_packed;
   uint32_t nodes_count;
   uint32_t nodes_8_count;
+  float total_normalized_power;
+  float bounding_sphere_size;
+  vec3 bounding_sphere_center;
 } typedef LightTreeWork;
 
 struct Bin {
@@ -99,64 +102,12 @@ struct Bin {
   uint32_t _p;
 } typedef Bin;
 
-// Note: This is determined by the number of bits that we allocate for each node.
-#define THRESHOLD_TRIANGLES 3
 #define OBJECT_SPLIT_BIN_COUNT 32
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
 #define MAX_VALUE 1e10f
 
 #define FRAGMENT_ERROR_COMP (FLT_EPSILON * 4.0f)
-
-static LuminaryResult _light_tree_create_fragments(Meshlet* meshlet, LightTreeWork* work) {
-  __CHECK_NULL_ARGUMENT(meshlet);
-  __CHECK_NULL_ARGUMENT(work);
-
-  work->fragments_count = meshlet->triangle_count;
-
-  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * work->fragments_count));
-
-  // TODO: Add some code that during bottom level tree construction removes any triangle lights that don't have any emission, i.e., textured
-  // lights with zero normalized emission.
-  for (uint32_t tri_id = 0; tri_id < work->fragments_count; tri_id++) {
-    TriangleLight t = meshlet->light_data->lights[tri_id];
-
-    vec3_p high = {
-      .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
-      .y = max(t.vertex.y, max(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
-      .z = max(t.vertex.z, max(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
-    vec3_p low = {
-      .x = min(t.vertex.x, min(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
-      .y = min(t.vertex.y, min(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
-      .z = min(t.vertex.z, min(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
-
-    vec3_p middle = {.x = (high.x + low.x) * 0.5f, .y = (high.y + low.y) * 0.5f, .z = (high.z + low.z) * 0.5f};
-
-    // Fragments are supposed to be hulls that contain a triangle
-    // They should be as tight as possible but if they are too tight then numerical errors
-    // could result in broken BVHs
-    high.x += fabsf(high.x) * FRAGMENT_ERROR_COMP;
-    high.y += fabsf(high.y) * FRAGMENT_ERROR_COMP;
-    high.z += fabsf(high.z) * FRAGMENT_ERROR_COMP;
-    low.x -= fabsf(low.x) * FRAGMENT_ERROR_COMP;
-    low.y -= fabsf(low.y) * FRAGMENT_ERROR_COMP;
-    low.z -= fabsf(low.z) * FRAGMENT_ERROR_COMP;
-
-    vec3 cross = {
-      .x = t.edge1.y * t.edge2.z - t.edge1.z * t.edge2.y,
-      .y = t.edge1.z * t.edge2.x - t.edge1.x * t.edge2.z,
-      .z = t.edge1.x * t.edge2.y - t.edge1.y * t.edge2.x};
-
-    const float area = 0.5f * sqrtf(cross.x * cross.x + cross.y * cross.y + cross.z * cross.z);
-
-    const float emission = (meshlet->has_textured_emission) ? meshlet->normalized_emission[tri_id] : 1.0f;
-
-    Fragment frag           = {.high = high, .low = low, .middle = middle, .id = tri_id, .power = emission * area};
-    work->fragments[tri_id] = frag;
-  }
-
-  return LUMINARY_SUCCESS;
-}
 
 static float get_entry_by_axis(const vec3_p p, const LightTreeSweepAxis axis) {
   switch (axis) {
@@ -323,6 +274,147 @@ static void divide_middles_along_axis(
   }
 }
 
+static LuminaryResult _light_tree_create_fragments(Meshlet* meshlet, LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(meshlet);
+  __CHECK_NULL_ARGUMENT(work);
+
+  work->fragments_count = meshlet->triangle_count;
+
+  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * work->fragments_count));
+
+  work->total_normalized_power = 0.0f;
+
+  // TODO: Add some code that during bottom level tree construction removes any triangle lights that don't have any emission, i.e., textured
+  // lights with zero normalized emission.
+  for (uint32_t tri_id = 0; tri_id < work->fragments_count; tri_id++) {
+    TriangleLight t = meshlet->light_data->lights[tri_id];
+
+    vec3_p high = {
+      .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
+      .y = max(t.vertex.y, max(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
+      .z = max(t.vertex.z, max(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
+    vec3_p low = {
+      .x = min(t.vertex.x, min(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
+      .y = min(t.vertex.y, min(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
+      .z = min(t.vertex.z, min(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
+
+    vec3_p middle = {.x = (high.x + low.x) * 0.5f, .y = (high.y + low.y) * 0.5f, .z = (high.z + low.z) * 0.5f};
+
+    // Fragments are supposed to be hulls that contain a triangle
+    // They should be as tight as possible but if they are too tight then numerical errors
+    // could result in broken BVHs
+    high.x += fabsf(high.x) * FRAGMENT_ERROR_COMP;
+    high.y += fabsf(high.y) * FRAGMENT_ERROR_COMP;
+    high.z += fabsf(high.z) * FRAGMENT_ERROR_COMP;
+    low.x -= fabsf(low.x) * FRAGMENT_ERROR_COMP;
+    low.y -= fabsf(low.y) * FRAGMENT_ERROR_COMP;
+    low.z -= fabsf(low.z) * FRAGMENT_ERROR_COMP;
+
+    vec3 cross = {
+      .x = t.edge1.y * t.edge2.z - t.edge1.z * t.edge2.y,
+      .y = t.edge1.z * t.edge2.x - t.edge1.x * t.edge2.z,
+      .z = t.edge1.x * t.edge2.y - t.edge1.y * t.edge2.x};
+
+    const float area = 0.5f * sqrtf(cross.x * cross.x + cross.y * cross.y + cross.z * cross.z);
+
+    const float emission = (meshlet->has_textured_emission) ? meshlet->normalized_emission[tri_id] : 1.0f;
+
+    work->total_normalized_power += emission * area;
+
+    Fragment frag           = {.high = high, .low = low, .middle = middle, .id = tri_id, .power = emission * area};
+    work->fragments[tri_id] = frag;
+  }
+
+  vec3_p total_bounds_high = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX, ._p = 0.0f};
+  vec3_p total_bounds_low  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX, ._p = 0.0f};
+  fit_bounds(work->fragments, work->fragments_count, &total_bounds_high, &total_bounds_low);
+
+  work->bounding_sphere_center.x = (total_bounds_high.x + total_bounds_low.x) * 0.5f;
+  work->bounding_sphere_center.y = (total_bounds_high.y + total_bounds_low.y) * 0.5f;
+  work->bounding_sphere_center.z = (total_bounds_high.z + total_bounds_low.z) * 0.5f;
+
+  work->bounding_sphere_size = 0.0f;
+  work->bounding_sphere_size = fmaxf(work->bounding_sphere_size, (total_bounds_high.x - total_bounds_low.x) * 0.5f);
+  work->bounding_sphere_size = fmaxf(work->bounding_sphere_size, (total_bounds_high.y - total_bounds_low.y) * 0.5f);
+  work->bounding_sphere_size = fmaxf(work->bounding_sphere_size, (total_bounds_high.z - total_bounds_low.z) * 0.5f);
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _light_tree_create_fragments_top_level(
+  ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials, LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(instances);
+  __CHECK_NULL_ARGUMENT(meshes);
+  __CHECK_NULL_ARGUMENT(materials);
+  __CHECK_NULL_ARGUMENT(work);
+
+  uint32_t instance_count;
+  __FAILURE_HANDLE(array_get_num_elements(instances, &instance_count));
+
+  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * instance_count));
+
+  ARRAY Fragment* fragments;
+  __FAILURE_HANDLE(array_create(&fragments, sizeof(Fragment), 16));
+
+  uint32_t num_fragments = 0;
+  for (uint32_t instance_id = 0; instance_id < instance_count; instance_id++) {
+    const MeshInstance* instance = instances[instance_id];
+
+    const Mesh* mesh = meshes[instance->mesh_id];
+
+    uint32_t meshlet_count;
+    __FAILURE_HANDLE(array_get_num_elements(mesh->meshlets, &meshlet_count));
+
+    for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
+      const Meshlet meshlet = mesh->meshlets[meshlet_id];
+
+      if (meshlet.light_data->light_tree->normalized_power == 0.0f)
+        continue;
+
+      const Material* material = materials[meshlet.material_id];
+
+      if (!material->flags.emission_active)
+        continue;
+
+      const float max_emission = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b));
+
+      if (max_emission == 0.0f)
+        continue;
+
+      vec3 center  = meshlet.light_data->light_tree->bounding_sphere_center;
+      float radius = meshlet.light_data->light_tree->bounding_sphere_size;
+
+      center.x += instance->offset.x;
+      center.y += instance->offset.y;
+      center.z += instance->offset.z;
+      radius *= fmaxf(instance->scale.x, fmaxf(instance->scale.y, instance->scale.z));
+
+      const vec3_p high = {.x = center.x + radius, .y = center.y + radius, .z = center.z + radius, ._p = 0.0f};
+      const vec3_p low  = {.x = center.x - radius, .y = center.y - radius, .z = center.z - radius, ._p = 0.0f};
+
+      const vec3_p middle = {.x = center.x, .y = center.y, .z = center.z, ._p = 0.0f};
+
+      const Fragment frag = {
+        .high   = high,
+        .low    = low,
+        .middle = middle,
+        .id     = num_fragments++,
+        .power  = meshlet.light_data->light_tree->normalized_power * max_emission};
+
+      __FAILURE_HANDLE(array_push(&fragments, &frag));
+    }
+  }
+
+  work->fragments_count = num_fragments;
+
+  // TODO: This is wasteful, can I improve this?
+  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * work->fragments_count));
+
+  memcpy(work->fragments, fragments, sizeof(Fragment) * work->fragments_count);
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
 
@@ -450,7 +542,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       if (found_split) {
         divide_middles_along_axis(optimal_splitting_plane, axis, fragments + fragments_ptr, fragments_count);
       }
-      else if (fragments_count > THRESHOLD_TRIANGLES) {
+      else {
         // We didn't find a split but we have too many triangles so we need to do a simply list split.
         optimal_split = fragments_count / 2;
 
@@ -466,10 +558,6 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
         for (; frag_id < fragments_count; frag_id++) {
           optimal_right_energy += fragments[fragments_ptr + frag_id].power;
         }
-      }
-      else {
-        // We didn't find a split but there are few enough triangles so we will leave this as a leaf node.
-        continue;
       }
 
       node.left_energy  = optimal_left_energy;
@@ -1046,8 +1134,54 @@ static LuminaryResult _light_tree_finalize(Meshlet* meshlet, LightTreeWork* work
   meshlet->light_data->light_tree->paths_size = sizeof(uint2) * work->fragments_count;
   meshlet->light_data->light_tree->paths_data = (void*) work->paths;
 
+  meshlet->light_data->light_tree->child_remapper_size = 0;
+  meshlet->light_data->light_tree->child_remapper_data = (void*) 0;
+
+  meshlet->light_data->light_tree->normalized_power       = work->total_normalized_power;
+  meshlet->light_data->light_tree->bounding_sphere_center = work->bounding_sphere_center;
+  meshlet->light_data->light_tree->bounding_sphere_size   = work->bounding_sphere_size;
+
   work->nodes8_packed = (LightTreeNode8Packed*) 0;
   work->paths         = (uint2*) 0;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _light_tree_finalize_top_level(LightTree** tree, LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(work);
+
+  ////////////////////////////////////////////////////////////////////
+  // Apply permutation obtained in tree construction
+  ////////////////////////////////////////////////////////////////////
+
+  uint32_t* remapper;
+  __FAILURE_HANDLE(host_malloc(&remapper, sizeof(uint32_t) * work->fragments_count));
+
+  for (uint32_t id = 0; id < work->fragments_count; id++) {
+    Fragment frag = work->fragments[id];
+
+    remapper[id] = frag.id;
+  }
+
+  ////////////////////////////////////////////////////////////////////
+  // Create light tree buffer
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(host_malloc(tree, sizeof(LightTree)));
+
+  (*tree)->nodes_size = sizeof(LightTreeNode8Packed) * work->nodes_8_count;
+  (*tree)->nodes_data = (void*) work->nodes8_packed;
+
+  (*tree)->paths_size = sizeof(uint2) * work->fragments_count;
+  (*tree)->paths_data = (void*) work->paths;
+
+  (*tree)->child_remapper_size = sizeof(uint32_t) * work->fragments_count;
+  (*tree)->child_remapper_data = (void*) remapper;
+
+  work->nodes8_packed = (LightTreeNode8Packed*) 0;
+  work->paths         = (uint2*) 0;
+  remapper            = (uint32_t*) 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -1186,6 +1320,24 @@ static LuminaryResult _light_tree_build(Meshlet* meshlet) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _light_tree_build_top_level(
+  LightTree** tree, ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials) {
+  LightTreeWork work;
+  memset(&work, 0, sizeof(LightTreeWork));
+
+  __FAILURE_HANDLE(_light_tree_create_fragments(instances, meshes, materials, &work));
+  __FAILURE_HANDLE(_light_tree_build_binary_bvh(&work));
+  __FAILURE_HANDLE(_light_tree_build_traversal_structure(&work));
+  __FAILURE_HANDLE(_light_tree_collapse(&work));
+  __FAILURE_HANDLE(_light_tree_finalize_top_level(tree, &work));
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+  _light_tree_debug_output(&work);
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
+  _light_tree_clear_work(&work);
+
+  return LUMINARY_SUCCESS;
+}
+
 static float _uint16_t_to_float(const uint16_t v) {
   const uint32_t i = 0x3F800000u | (((uint32_t) v) << 7);
 
@@ -1253,10 +1405,27 @@ LuminaryResult light_tree_destroy(Meshlet* meshlet) {
   __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->nodes_data));
   __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->paths_data));
 
+  if (meshlet->light_data->light_tree->child_remapper_data) {
+    __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->child_remapper_data));
+  }
+
   __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree));
   __FAILURE_HANDLE(host_free(&meshlet->light_data->lights));
 
   __FAILURE_HANDLE(host_free(&meshlet->light_data));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult light_tree_destroy_toplevel(LightTree** tree) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(*tree);
+
+  __FAILURE_HANDLE(host_free((*tree)->nodes_data));
+  __FAILURE_HANDLE(host_free((*tree)->paths_data));
+  __FAILURE_HANDLE(host_free((*tree)->child_remapper_data));
+
+  __FAILURE_HANDLE(host_free(tree));
 
   return LUMINARY_SUCCESS;
 }

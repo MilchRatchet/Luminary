@@ -2,7 +2,7 @@
 #define LUMINARY_SCENE_H
 
 #include "camera.h"
-#include "instance.h"
+#include "mesh.h"
 #include "mutex.h"
 #include "sample_count.h"
 #include "utils.h"
@@ -63,8 +63,7 @@ struct Scene {
   Particles particles;
   Toy toy;
   ARRAY Material* materials;
-  ARRAY Instance* instances;
-  ARRAY InstanceUpdate* instance_updates;
+  ARRAY MeshInstance* instances;
 } typedef Scene;
 
 LuminaryResult scene_create(Scene** scene);

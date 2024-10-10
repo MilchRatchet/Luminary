@@ -52,17 +52,17 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const Shadi
     normal = scale_vector(normal, -1.0f);
   }
 
-  uint32_t flags = G_BUFFER_COLORED_DIELECTRIC | G_BUFFER_USE_LIGHT_RAYS;
+  uint32_t flags = G_BUFFER_FLAG_COLORED_DIELECTRIC | G_BUFFER_FLAG_USE_LIGHT_RAYS;
 
   const bool include_emission = device.toy.emissive && (aux_data.state & STATE_FLAG_CAMERA_DIRECTION);
   const RGBF emission         = (include_emission) ? scale_color(device.toy.emission, device.toy.material.b) : get_color(0.0f, 0.0f, 0.0f);
 
   if (toy_is_inside(task.position, task.ray)) {
-    flags |= G_BUFFER_REFRACTION_IS_INSIDE;
+    flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
   }
 
   const IORStackMethod ior_stack_method =
-    (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
+    (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? IOR_STACK_METHOD_PEEK_PREVIOUS : IOR_STACK_METHOD_PEEK_CURRENT;
   const float ray_ior = ior_stack_interact(device.toy.refractive_index, pixel, ior_stack_method);
 
   GBufferData data;
@@ -77,8 +77,8 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const Shadi
   data.metallic    = device.toy.material.g;
   data.state       = aux_data.state;
   data.flags       = flags;
-  data.ior_in      = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? device.toy.refractive_index : ray_ior;
-  data.ior_out     = (flags & G_BUFFER_REFRACTION_IS_INSIDE) ? ray_ior : device.toy.refractive_index;
+  data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? device.toy.refractive_index : ray_ior;
+  data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.toy.refractive_index;
 
   return data;
 }
