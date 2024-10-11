@@ -202,9 +202,10 @@ struct DevicePointers {
   INTERLEAVED_STORAGE const DeviceTriangle* triangles;
   const DeviceInstancelet* instances;
   const DeviceTransform* instance_transforms;
-  const void** bottom_level_light_trees;
+  const uint32_t* light_instance_map;
+  const LightTreeNode8Packed** bottom_level_light_trees;
   const uint2** bottom_level_light_paths;
-  const void* top_level_light_tree;
+  const LightTreeNode8Packed* top_level_light_tree;
   const uint2* top_level_light_paths;
   const Quad* particle_quads;
   const Star* stars;

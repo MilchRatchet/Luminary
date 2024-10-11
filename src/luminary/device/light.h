@@ -19,8 +19,8 @@ struct LightTree {
   size_t nodes_size;
   void* paths_data;
   size_t paths_size;
-  void* child_remapper_data;
-  size_t child_remapper_size;
+  void* light_instance_map_data;
+  size_t light_instance_map_size;
   float bounding_sphere_size;
   vec3 bounding_sphere_center;
   float normalized_power;

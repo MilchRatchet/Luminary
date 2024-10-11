@@ -23,7 +23,7 @@
 // High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
 
 __device__ uint32_t ris_sample_light(
-  const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const TriangleHandle bsdf_sample_handle,
+  const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const LightTriangleHandle bsdf_sample_handle,
   const vec3 bsdf_sample_ray, const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist,
   bool& selected_is_refraction) {
   TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
@@ -34,9 +34,6 @@ __device__ uint32_t ris_sample_light(
   selected_light_color   = get_color(0.0f, 0.0f, 0.0f);
   selected_dist          = 1.0f;
   selected_is_refraction = false;
-
-  uint32_t light_list_length;
-  float light_list_pdf;
 
   // TODO: Once the light tree is implemented. Consider reducing the number of samples for deep bounces.
   const int reservoir_size = device.settings.light_num_ris_samples;
@@ -49,7 +46,11 @@ __device__ uint32_t ris_sample_light(
   ////////////////////////////////////////////////////////////////////
 
   if (bsdf_sample_handle.instance_id != HIT_TYPE_LIGHT_BSDF_HINT && !triangle_handle_equal(bsdf_sample_handle, blocked_handle)) {
-    const DeviceTransform trans = load_transform(device.ptrs.instance_transforms, bsdf_sample_handle.instance_id);
+    TriangleHandle light_handle;
+    light_handle.instance_id = __ldg(device.ptrs.light_instance_map + bsdf_sample_handle.instance_id);
+    light_handle.tri_id      = bsdf_sample_handle.tri_id;
+
+    const DeviceTransform trans = load_transform(light_handle.instance_id);
 
     float dist;
     const TriangleLight triangle_light = light_load(bsdf_sample_handle, data.position, bsdf_sample_ray, trans, dist);
@@ -66,7 +67,7 @@ __device__ uint32_t ris_sample_light(
 
       const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, bsdf_sample_ray);
 
-      const float nee_light_tree_pdf      = light_tree_traverse_pdf(data, bsdf_sample_handle);
+      const float nee_light_tree_pdf      = light_tree_query_pdf(data, bsdf_sample_handle, light_handle.instance_id, trans);
       const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
 
       // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.
@@ -97,12 +98,12 @@ __device__ uint32_t ris_sample_light(
     const uint32_t random_offset = light_ray_index * reservoir_size + i;
 
     const float light_tree_random = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_TREE + random_offset, pixel);
-    const uint32_t light_list_ptr = light_tree_traverse(data, light_tree_random, light_list_length, light_list_pdf);
 
-    const float id_rand = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_RIS_LIGHT_ID + random_offset, pixel);
-    const uint32_t id   = uint32_t(__fmul_rd(id_rand, light_list_length)) + light_list_ptr;
+    float light_tree_pdf;
+    DeviceTransform trans;
+    const TriangleHandle light_handle = light_tree_query(data, light_tree_random, light_tree_pdf, trans);
 
-    if (id == blocked_light_id)
+    if (triangle_handle_equal(light_handle, blocked_handle))
       continue;
 
     const TriangleLight triangle_light = load_triangle_light(device.scene.triangle_lights, id);
@@ -137,7 +138,7 @@ __device__ uint32_t ris_sample_light(
     const float resampling_probability = weight / sum_weight;
 
     if (resampling_random < resampling_probability) {
-      selected_id            = id;
+      selected_handle        = light_handle;
       selected_light_color   = scale_color(light_color, 1.0f / target_pdf);
       selected_ray           = ray;
       selected_dist          = dist;

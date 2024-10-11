@@ -180,6 +180,9 @@ struct TriangleHandle {
   unsigned int tri_id;
 } typedef TriangleHandle;
 
+/* instance_id refers to the light instance id, the actual instance_id is obtain through device.ptrs.light_instance_map. */
+typedef TriangleHandle LightTriangleHandle;
+
 __device__ TriangleHandle triangle_handle_get(const uint32_t instance_id, const uint16_t tri_id) {
   TriangleHandle handle;
 

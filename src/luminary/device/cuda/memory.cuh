@@ -331,8 +331,8 @@ __device__ RGBAF load_material_albedo(const DeviceMaterialCompressed* data, cons
   return albedo;
 }
 
-__device__ DeviceTransform load_transform(const DeviceTransform* data, const uint32_t offset) {
-  const float4* ptr = (float4*) (data + offset);
+__device__ DeviceTransform load_transform(const uint32_t offset) {
+  const float4* ptr = (float4*) (device.ptrs.instance_transforms + offset);
   const float4 v0   = __ldg(ptr + 0);
   const float4 v1   = __ldg(ptr + 1);
 

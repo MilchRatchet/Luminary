@@ -493,18 +493,12 @@ __device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volu
 
     const float random_light_tree = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_TREE + i, task.index);
 
-    uint32_t light_list_length;
     float light_list_pdf;
-    const uint32_t light_list_ptr =
-      light_tree_traverse(volume, task.origin, task.ray, limit, random_light_tree, light_list_length, light_list_pdf);
+    DeviceTransform light_transform;
+    const TriangleHandle light_handle =
+      light_tree_query(volume, task.origin, task.ray, limit, random_light_tree, light_list_pdf, light_transform);
 
     sample_pdf *= light_list_pdf;
-
-    const float random_light_list = quasirandom_sequence_1D(QUASI_RANDOM_TARGET_BRIDGE_LIGHT_LIST + i, task.index);
-
-    const uint32_t light_id = uint32_t(__fmul_rd(random_light_list, light_list_length)) + light_list_ptr;
-
-    sample_pdf *= 1.0f / light_list_length;
 
     const TriangleLight light = load_triangle_light(device.scene.triangle_lights, light_id);
 

@@ -56,7 +56,7 @@ __device__ vec3 geometry_compute_normal(
 
 __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const ShadingTaskAuxData aux_task, const int pixel) {
   const DeviceInstancelet instance = load_instance(device.ptrs.instances, task.instance_id);
-  const DeviceTransform trans      = load_transform(device.ptrs.instance_transforms, task.instance_id);
+  const DeviceTransform trans      = load_transform(task.instance_id);
 
   // TODO: This is now wrong, triangles are more compact nowadays.
   const float4 t1 = __ldg((float4*) triangle_get_entry_address(0, 0, instance.triangles_offset + aux_task.tri_id));

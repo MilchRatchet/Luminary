@@ -107,25 +107,19 @@ __device__ float light_tree_child_importance(
 }
 
 __device__ uint32_t light_tree_traverse(
-  const VolumeDescriptor volume, const DeviceTransform trans, uint32_t instance_id, vec3 origin, vec3 ray, const float limit, float random,
-  uint32_t& subset_length, float& pdf) {
+  const VolumeDescriptor volume, const LightTreeNode8Packed* light_tree_ptr, const vec3 origin, const vec3 ray, const float limit,
+  float& random, float& pdf) {
   pdf = 1.0f;
-
-  origin = transform_apply_absolute_inv(trans, origin);
-  ray    = transform_apply_relative_inv(trans, ray);
-
-  const LightTreeNode8Packed* light_tree_ptr = (const LightTreeNode8Packed*) device.ptrs.bottom_level_light_trees[instance_id];
 
   LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
 
   const float transmittance_importance = color_importance(add_color(volume.scattering, volume.absorption));
 
-  uint32_t subset_ptr = 0xFFFFFFFF;
-  subset_length       = 0;
+  uint32_t subset_ptr = 0xFFFFFFFFu;
 
   random = random_saturate(random);
 
-  while (subset_length == 0) {
+  while (subset_ptr == 0xFFFFFFFFu) {
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
     const float exp_c = exp2f(node.exp_confidence);
 
@@ -181,8 +175,7 @@ __device__ uint32_t light_tree_traverse(
     }
 
     if (selected_child == 0xFFFFFFFF) {
-      subset_length = 0;
-      subset_ptr    = 0;
+      subset_ptr = 0;
       break;
     }
 
@@ -192,8 +185,7 @@ __device__ uint32_t light_tree_traverse(
     random = random_saturate((random - random_shift) / selected_importance);
 
     if (selected_child_light_count > 0) {
-      subset_length = selected_child_light_count;
-      subset_ptr    = node.light_ptr + selected_child_light_ptr;
+      subset_ptr = node.light_ptr + selected_child_light_ptr;
       break;
     }
 
@@ -203,7 +195,31 @@ __device__ uint32_t light_tree_traverse(
   return subset_ptr;
 }
 
-#else  /* VOLUME_KERNEL */
+__device__ TriangleHandle light_tree_query(
+  const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, float random, float& pdf, DeviceTransform& trans) {
+  pdf = 1.0f;
+
+  const uint32_t light_instance_id = light_tree_traverse(volume, device.ptrs.top_level_light_tree, origin, ray, limit, random, pdf);
+
+  const uint32_t instance_id = __ldg(device.ptrs.light_instance_map + light_instance_id);
+
+  trans = load_transform(instance_id);
+
+  const vec3 origin_transformated = transform_apply_absolute_inv(trans, origin);
+  const vec3 ray_transformed      = transform_apply_relative_inv(trans, ray);
+
+  const uint32_t tri_id = light_tree_traverse(
+    volume, device.ptrs.bottom_level_light_trees[instance_id], origin_transformated, ray_transformed, limit, random, pdf);
+
+  TriangleHandle handle;
+  handle.instance_id = instance_id;
+  handle.tri_id      = tri_id;
+
+  return handle;
+}
+
+#else /* VOLUME_KERNEL */
+
 __device__ float light_tree_child_importance(
   const vec3 position, const LightTreeNode8Packed node, const vec3 exp, const float exp_c, const uint32_t i) {
   const bool lower_data = (i < 4);
@@ -236,22 +252,14 @@ __device__ float light_tree_child_importance(
   return energy / fmaxf(dot_product(diff, diff), confidence * confidence);
 }
 
-__device__ uint32_t light_tree_traverse(
-  const GBufferData data, const DeviceTransform trans, uint32_t instance_id, float random, uint32_t& subset_length, float& pdf) {
-  pdf = 1.0f;
-
-  const vec3 position = transform_apply_absolute_inv(trans, data.position);
-
-  const LightTreeNode8Packed* light_tree_ptr = (const LightTreeNode8Packed*) device.ptrs.bottom_level_light_trees[instance_id];
-
+__device__ uint32_t light_tree_traverse(const LightTreeNode8Packed* light_tree_ptr, const vec3 position, float& random, float& pdf) {
   LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
 
-  uint32_t subset_ptr = 0xFFFFFFFF;
-  subset_length       = 0;
+  uint32_t result_id = 0xFFFFFFFF;
 
   random = random_saturate(random);
 
-  while (subset_length == 0) {
+  while (result_id == 0xFFFFFFFFu) {
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
     const float exp_c = exp2f(node.exp_confidence);
 
@@ -307,8 +315,7 @@ __device__ uint32_t light_tree_traverse(
     }
 
     if (selected_child == 0xFFFFFFFF) {
-      subset_length = 0;
-      subset_ptr    = 0;
+      result_id = 0;
       break;
     }
 
@@ -318,34 +325,28 @@ __device__ uint32_t light_tree_traverse(
     random = random_saturate((random - random_shift) / selected_importance);
 
     if (selected_child_light_count > 0) {
-      subset_length = selected_child_light_count;
-      subset_ptr    = node.light_ptr + selected_child_light_ptr;
+      result_id = node.light_ptr + selected_child_light_ptr;
       break;
     }
 
     node = load_light_tree_node(light_tree_ptr, node.child_ptr + selected_child);
   }
 
-  return subset_ptr;
+  return result_id;
 }
 
-__device__ float light_tree_traverse_pdf(const GBufferData data, const DeviceTransform trans, uint32_t instance_id, uint32_t tri_id) {
+__device__ float light_tree_traverse_pdf(
+  const LightTreeNode8Packed* light_tree_ptr, const uint2* light_paths_ptr, const vec3 position, const uint32_t primitive_id) {
   float pdf = 1.0f;
 
-  const uint2 light_paths = __ldg(device.ptrs.bottom_level_light_paths[instance_id] + tri_id);
-
-  const vec3 position = transform_apply_absolute(trans, data.position);
+  const uint2 light_paths = __ldg(light_paths_ptr + primitive_id);
 
   uint32_t current_light_path = light_paths.x;
   uint32_t current_depth      = 0;
 
-  const LightTreeNode8Packed* light_tree_ptr = (const LightTreeNode8Packed*) device.ptrs.bottom_level_light_trees[instance_id];
-
   LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
 
-  uint32_t subset_length = 0;
-
-  while (subset_length == 0) {
+  while (true) {
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
     const float exp_c = exp2f(node.exp_confidence);
 
@@ -382,14 +383,12 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, const DeviceTra
     }
 
     if (selected_child == 0xFFFFFFFF) {
-      subset_length = 0;
       break;
     }
 
     pdf *= child_pdf;
 
     if (selected_child_light_count > 0) {
-      subset_length = selected_child_light_count;
       break;
     }
 
@@ -403,10 +402,44 @@ __device__ float light_tree_traverse_pdf(const GBufferData data, const DeviceTra
     node = load_light_tree_node(light_tree_ptr, node.child_ptr + selected_child);
   }
 
-  pdf *= 1.0f / subset_length;
+  return pdf;
+}
+
+__device__ TriangleHandle light_tree_query(const GBufferData data, float random, float& pdf, DeviceTransform& trans) {
+  pdf = 1.0f;
+
+  const uint32_t light_instance_id = light_tree_traverse(device.ptrs.top_level_light_tree, data.position, random, pdf);
+
+  const uint32_t instance_id = __ldg(device.ptrs.light_instance_map + light_instance_id);
+
+  trans = load_transform(instance_id);
+
+  const vec3 position_transformated = transform_apply_absolute_inv(trans, data.position);
+
+  const uint32_t tri_id = light_tree_traverse(device.ptrs.bottom_level_light_trees[instance_id], position_transformated, random, pdf);
+
+  TriangleHandle handle;
+  handle.instance_id = instance_id;
+  handle.tri_id      = tri_id;
+
+  return handle;
+}
+
+__device__ float light_tree_query_pdf(
+  const GBufferData data, const LightTriangleHandle handle, const uint32_t instance_id, const DeviceTransform trans) {
+  float pdf = 1.0f;
+
+  pdf *= light_tree_traverse_pdf(device.ptrs.top_level_light_tree, device.ptrs.top_level_light_paths, data.position, handle.instance_id);
+
+  const vec3 position_transformated = transform_apply_absolute_inv(trans, data.position);
+
+  pdf *= light_tree_traverse_pdf(
+    device.ptrs.bottom_level_light_trees[instance_id], device.ptrs.bottom_level_light_paths[instance_id], position_transformated,
+    handle.tri_id);
 
   return pdf;
 }
+
 #endif /* !VOLUME_KERNEL */
 
 /*

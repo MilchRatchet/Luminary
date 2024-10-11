@@ -1134,8 +1134,8 @@ static LuminaryResult _light_tree_finalize(Meshlet* meshlet, LightTreeWork* work
   meshlet->light_data->light_tree->paths_size = sizeof(uint2) * work->fragments_count;
   meshlet->light_data->light_tree->paths_data = (void*) work->paths;
 
-  meshlet->light_data->light_tree->child_remapper_size = 0;
-  meshlet->light_data->light_tree->child_remapper_data = (void*) 0;
+  meshlet->light_data->light_tree->light_instance_map_size = 0;
+  meshlet->light_data->light_tree->light_instance_map_data = (void*) 0;
 
   meshlet->light_data->light_tree->normalized_power       = work->total_normalized_power;
   meshlet->light_data->light_tree->bounding_sphere_center = work->bounding_sphere_center;
@@ -1159,7 +1159,7 @@ static LuminaryResult _light_tree_finalize_top_level(LightTree** tree, LightTree
   __FAILURE_HANDLE(host_malloc(&remapper, sizeof(uint32_t) * work->fragments_count));
 
   for (uint32_t id = 0; id < work->fragments_count; id++) {
-    Fragment frag = work->fragments[id];
+    const Fragment frag = work->fragments[id];
 
     remapper[id] = frag.id;
   }
@@ -1176,8 +1176,8 @@ static LuminaryResult _light_tree_finalize_top_level(LightTree** tree, LightTree
   (*tree)->paths_size = sizeof(uint2) * work->fragments_count;
   (*tree)->paths_data = (void*) work->paths;
 
-  (*tree)->child_remapper_size = sizeof(uint32_t) * work->fragments_count;
-  (*tree)->child_remapper_data = (void*) remapper;
+  (*tree)->light_instance_map_size = sizeof(uint32_t) * work->fragments_count;
+  (*tree)->light_instance_map_data = (void*) remapper;
 
   work->nodes8_packed = (LightTreeNode8Packed*) 0;
   work->paths         = (uint2*) 0;
@@ -1405,8 +1405,8 @@ LuminaryResult light_tree_destroy(Meshlet* meshlet) {
   __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->nodes_data));
   __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->paths_data));
 
-  if (meshlet->light_data->light_tree->child_remapper_data) {
-    __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->child_remapper_data));
+  if (meshlet->light_data->light_tree->light_instance_map_data) {
+    __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->light_instance_map_data));
   }
 
   __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree));
@@ -1423,7 +1423,7 @@ LuminaryResult light_tree_destroy_toplevel(LightTree** tree) {
 
   __FAILURE_HANDLE(host_free((*tree)->nodes_data));
   __FAILURE_HANDLE(host_free((*tree)->paths_data));
-  __FAILURE_HANDLE(host_free((*tree)->child_remapper_data));
+  __FAILURE_HANDLE(host_free((*tree)->light_instance_map_data));
 
   __FAILURE_HANDLE(host_free(tree));
 
