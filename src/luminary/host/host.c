@@ -27,7 +27,9 @@ LuminaryResult _host_queue_worker(Host* host) {
     __FAILURE_HANDLE(queue_pop_blocking(host->work_queue, &entry, &success));
 
     // Verify that the device_manager didn't crash.
-    __FAILURE_HANDLE(thread_get_last_result(host->device_manager->work_thread));
+    if (host->device_manager) {
+      __FAILURE_HANDLE(thread_get_last_result(host->device_manager->work_thread));
+    }
 
     if (!success)
       break;

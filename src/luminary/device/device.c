@@ -14,6 +14,11 @@ void _device_init(void) {
   }
 }
 
+#define OPTIX_CHECK_CALLBACK_ERROR(device)                                        \
+  if (device->optix_callback_error) {                                             \
+    __RETURN_ERROR(LUMINARY_ERROR_OPTIX, "OptiX callback logged a fatal error."); \
+  }
+
 ////////////////////////////////////////////////////////////////////
 // OptiX Log Callback
 ////////////////////////////////////////////////////////////////////
@@ -203,6 +208,8 @@ LuminaryResult device_compile_kernels(Device* device) {
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(optixrt_kernel_create(&device->optix_kernels[kernel_id], device, kernel_id));
   }
+
+  OPTIX_CHECK_CALLBACK_ERROR(device);
 
   return LUMINARY_SUCCESS;
 }

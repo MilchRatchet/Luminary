@@ -14,16 +14,17 @@
 // TODO: Specify things like num payloads etc.
 struct OptixKernelConfig {
   const char* name;
+  int num_payloads;
 } typedef OptixKernelConfig;
 
 // TODO: Rename the ptx to the same as the types.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernels.ptx"},
-  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernels_trace_particle.ptx"},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernels_geometry.ptx"},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernels_volume.ptx"},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx"},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx"}};
+  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernels.ptx", .num_payloads = 3},
+  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernels_trace_particle.ptx", .num_payloads = 2},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernels_geometry.ptx", .num_payloads = 5},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernels_volume.ptx", .num_payloads = 5},
+  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx", .num_payloads = 5},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx", .num_payloads = 5}};
 
 LuminaryResult optixrt_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type) {
   __CHECK_NULL_ARGUMENT(kernel);
@@ -64,7 +65,7 @@ LuminaryResult optixrt_kernel_create(OptixKernel** kernel, Device* device, Optix
 
   pipeline_compile_options.usesMotionBlur                   = 0;
   pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
-  pipeline_compile_options.numPayloadValues                 = 4;
+  pipeline_compile_options.numPayloadValues                 = optix_kernel_configs[type].num_payloads;
   pipeline_compile_options.numAttributeValues               = 2;
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
   pipeline_compile_options.pipelineLaunchParamsVariableName = "device";
@@ -82,10 +83,9 @@ LuminaryResult optixrt_kernel_create(OptixKernel** kernel, Device* device, Optix
   char log[4096];
   size_t log_size = sizeof(log);
 
-  OptixModule module;
-
   OPTIX_FAILURE_HANDLE_LOG(
-    optixModuleCreate(device->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &module),
+    optixModuleCreate(
+      device->optix_ctx, &module_compile_options, &pipeline_compile_options, ptx, ptx_length, log, &log_size, &(*kernel)->module),
     log);
 
   ////////////////////////////////////////////////////////////////////
@@ -99,15 +99,15 @@ LuminaryResult optixrt_kernel_create(OptixKernel** kernel, Device* device, Optix
   memset(group_desc, 0, OPTIXRT_NUM_GROUPS * sizeof(OptixProgramGroupDesc));
 
   group_desc[0].kind                     = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
-  group_desc[0].raygen.module            = module;
+  group_desc[0].raygen.module            = (*kernel)->module;
   group_desc[0].raygen.entryFunctionName = "__raygen__optix";
 
   group_desc[1].kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
 
   group_desc[2].kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-  group_desc[2].hitgroup.moduleAH            = module;
+  group_desc[2].hitgroup.moduleAH            = (*kernel)->module;
   group_desc[2].hitgroup.entryFunctionNameAH = "__anyhit__optix";
-  group_desc[2].hitgroup.moduleCH            = module;
+  group_desc[2].hitgroup.moduleCH            = (*kernel)->module;
   group_desc[2].hitgroup.entryFunctionNameCH = "__closesthit__optix";
 
   OPTIX_FAILURE_HANDLE_LOG(
