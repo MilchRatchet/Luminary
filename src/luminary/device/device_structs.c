@@ -68,15 +68,6 @@ LuminaryResult device_struct_ocean_convert(const Ocean* ocean, DeviceOcean* devi
   return LUMINARY_SUCCESS;
 }
 
-static vec3 _angles_to_direction(const float altitude, const float azimuth) {
-  vec3 dir;
-  dir.x = cosf(azimuth) * cosf(altitude);
-  dir.y = sinf(altitude);
-  dir.z = sinf(azimuth) * cosf(altitude);
-
-  return dir;
-}
-
 LuminaryResult device_struct_sky_convert(const Sky* sky, DeviceSky* device_sky) {
   __CHECK_NULL_ARGUMENT(sky);
   __CHECK_NULL_ARGUMENT(device_sky);

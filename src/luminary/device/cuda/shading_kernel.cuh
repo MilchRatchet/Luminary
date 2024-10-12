@@ -117,9 +117,9 @@ __device__ RGBF optix_compute_light_ray_sun_direct(GBufferData data, const ushor
 
   // TODO: Add specialized anyhit shaders for non geometry lights
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
-  unsigned int hit_id         = LIGHT_ID_SUN;
+  const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, hit_id, index, compressed_ior);
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index, compressed_ior);
   visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
@@ -243,11 +243,11 @@ __device__ RGBF
   ////////////////////////////////////////////////////////////////////
 
   unsigned int compressed_ior = ior_compress(is_underwater ? device.ocean.refractive_index : 1.0f);
-  unsigned int hit_id         = LIGHT_ID_SUN;
+  const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, hit_id, index, compressed_ior);
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index, compressed_ior);
   visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
-  visibility      = mul_color(visibility, optix_geometry_shadowing(connection_point, sun_dir, sun_dist, hit_id, index, compressed_ior));
+  visibility      = mul_color(visibility, optix_geometry_shadowing(connection_point, sun_dir, sun_dist, handle, index, compressed_ior));
   visibility      = mul_color(visibility, optix_toy_shadowing(connection_point, sun_dir, sun_dist, compressed_ior));
   visibility      = scale_color(visibility, volume_integrate_transmittance_fog(connection_point, sun_dir, sun_dist));
 
@@ -402,11 +402,10 @@ __device__ RGBF optix_compute_light_ray_toy(GBufferData data, const ushort2 inde
     dist        = 0.0f;
   }
 
-  unsigned int hit_id = LIGHT_ID_TOY;
-
+  const TriangleHandle handle = triangle_handle_get(LIGHT_ID_TOY, 0);
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
 
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, hit_id, index, compressed_ior);
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, handle, index, compressed_ior);
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
   return mul_color(light_color, visibility);
@@ -440,12 +439,15 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   origin = make_float3(position.x, position.y, position.z);
   ray    = make_float3(bsdf_dir.x, bsdf_dir.y, bsdf_dir.z);
 
-  unsigned int bsdf_light_id = HIT_TYPE_LIGHT_BSDF_HINT;
+  TriangleHandle bsdf_light_handle = triangle_handle_get(HIT_TYPE_LIGHT_BSDF_HINT, 0);
 
-  float light_search_dist = (bsdf_sample_is_valid) ? FLT_MAX : -1.0f;
+  const float light_search_dist = (bsdf_sample_is_valid) ? FLT_MAX : -1.0f;
 
   // The compiler has issues with conditional optixTrace, hence we disable them using a negative max dist.
-  optixTrace(device.optix_bvh_light, origin, ray, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0, bsdf_light_id);
+  OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 0);
+  optixTrace(
+    device.optix_bvh_light, origin, ray, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0,
+    bsdf_light_handle.instance_id, bsdf_light_handle.tri_id);
 
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions
@@ -455,10 +457,10 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   RGBF light_color;
   float dist;
   bool is_refraction;
-  const uint32_t light_id = ris_sample_light(
-    data, index, light_ray_index, bsdf_light_id, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
+  const TriangleHandle light_handle = ris_sample_light(
+    data, index, light_ray_index, bsdf_light_handle, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
 
-  if (color_importance(light_color) == 0.0f || light_id == LIGHT_ID_NONE) {
+  if (color_importance(light_color) == 0.0f || light_handle.instance_id == LIGHT_ID_NONE) {
     light_color = get_color(0.0f, 0.0f, 0.0f);
     dist        = 0.0f;
   }
@@ -476,9 +478,8 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   position = shift_origin_vector(data.position, data.V, dir, is_refraction);
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
-  unsigned int hit_id         = light_id;
 
-  RGBF visibility = optix_geometry_shadowing(position, dir, dist, hit_id, index, compressed_ior);
+  RGBF visibility = optix_geometry_shadowing(position, dir, dist, light_handle, index, compressed_ior);
   visibility      = mul_color(visibility, optix_toy_shadowing(position, dir, dist, compressed_ior));
   visibility      = mul_color(visibility, volume_integrate_transmittance(position, dir, dist));
 
@@ -521,11 +522,9 @@ __device__ RGBF optix_compute_light_ray_ambient_sky(
   RGBF sky_light = sky_color_no_compute(position, ray, data.state, get_pixel_id(index), index);
 
   unsigned int compressed_ior = ior_compress(is_refraction ? data.ior_out : data.ior_in);
-  unsigned int hit_id         = LIGHT_ID_SUN;
+  const TriangleHandle handle = triangle_handle_get(LIGHT_ID_SUN, 0);
 
-  const TriangleHandle triangle_handle = triangle_handle_get(data.instance_id, data.tri_id);
-
-  sky_light = mul_color(sky_light, optix_geometry_shadowing(position, ray, FLT_MAX, triangle_handle, index, compressed_ior));
+  sky_light = mul_color(sky_light, optix_geometry_shadowing(position, ray, FLT_MAX, handle, index, compressed_ior));
   sky_light = mul_color(sky_light, optix_toy_shadowing(position, ray, FLT_MAX, compressed_ior));
   sky_light = mul_color(sky_light, volume_integrate_transmittance(position, ray, FLT_MAX));
   sky_light = mul_color(sky_light, sample_weight);

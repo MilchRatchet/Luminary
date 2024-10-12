@@ -1322,10 +1322,15 @@ static LuminaryResult _light_tree_build(Meshlet* meshlet) {
 
 static LuminaryResult _light_tree_build_top_level(
   LightTree** tree, ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(instances);
+  __CHECK_NULL_ARGUMENT(meshes);
+  __CHECK_NULL_ARGUMENT(materials);
+
   LightTreeWork work;
   memset(&work, 0, sizeof(LightTreeWork));
 
-  __FAILURE_HANDLE(_light_tree_create_fragments(instances, meshes, materials, &work));
+  __FAILURE_HANDLE(_light_tree_create_fragments_top_level(instances, meshes, materials, &work));
   __FAILURE_HANDLE(_light_tree_build_binary_bvh(&work));
   __FAILURE_HANDLE(_light_tree_build_traversal_structure(&work));
   __FAILURE_HANDLE(_light_tree_collapse(&work));
@@ -1413,6 +1418,18 @@ LuminaryResult light_tree_destroy(Meshlet* meshlet) {
   __FAILURE_HANDLE(host_free(&meshlet->light_data->lights));
 
   __FAILURE_HANDLE(host_free(&meshlet->light_data));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult light_tree_create_toplevel(
+  LightTree** tree, ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(instances);
+  __CHECK_NULL_ARGUMENT(meshes);
+  __CHECK_NULL_ARGUMENT(materials);
+
+  __FAILURE_HANDLE(_light_tree_build_top_level(tree, instances, meshes, materials));
 
   return LUMINARY_SUCCESS;
 }

@@ -22,7 +22,7 @@
 // C. Wyman, A. Panteleev, "Rearchitecting Spatiotemporal Resampling for Production",
 // High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
 
-__device__ uint32_t ris_sample_light(
+__device__ TriangleHandle ris_sample_light(
   const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const LightTriangleHandle bsdf_sample_handle,
   const vec3 bsdf_sample_ray, const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist,
   bool& selected_is_refraction) {
@@ -106,16 +106,19 @@ __device__ uint32_t ris_sample_light(
     if (triangle_handle_equal(light_handle, blocked_handle))
       continue;
 
-    const TriangleLight triangle_light = load_triangle_light(device.scene.triangle_lights, id);
+    uint3 light_uv_packed;
+    TriangleLight triangle_light = light_load_sample_init(light_handle, trans, light_uv_packed);
 
     const float2 ray_random = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_RIS_RAY_DIR + light_ray_index * reservoir_size + i, pixel);
 
-    float solid_angle, dist;
-    RGBF light_color;
-    const vec3 ray = light_sample_triangle(triangle_light, data.position, ray_random, solid_angle, dist, light_color);
+    vec3 ray;
+    float dist, solid_angle;
+    light_load_sample_finalize(triangle_light, light_uv_packed, data.position, ray_random, ray, dist, solid_angle);
 
     if (dist == FLT_MAX || solid_angle == 0.0f)
       continue;
+
+    RGBF light_color = light_get_color(triangle_light);
 
     bool is_refraction;
     const RGBF bsdf_weight = bsdf_evaluate(data, ray, BSDF_SAMPLING_GENERAL, is_refraction);
@@ -126,7 +129,7 @@ __device__ uint32_t ris_sample_light(
       continue;
 
     const float bsdf_sample_pdf         = bsdf_sample_for_light_pdf(data, ray);
-    const float one_over_nee_sample_pdf = solid_angle * light_list_length / ((float) reservoir_size * light_list_pdf);
+    const float one_over_nee_sample_pdf = solid_angle / ((float) reservoir_size * light_tree_pdf);
 
     const float mis_weight =
       one_over_nee_sample_pdf / (bsdf_sample_pdf * bsdf_sample_pdf * one_over_nee_sample_pdf * one_over_nee_sample_pdf + 1.0f);
@@ -160,7 +163,7 @@ __device__ uint32_t ris_sample_light(
 
   UTILS_CHECK_NANS(pixel, selected_light_color);
 
-  return selected_id;
+  return selected_handle;
 }
 #endif /* SHADING_KERNEL && !VOLUME_KERNEL */
 

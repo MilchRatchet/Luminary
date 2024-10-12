@@ -1,10 +1,6 @@
 #ifndef LUMINARY_DEVICE_UTILS_H
 #define LUMINARY_DEVICE_UTILS_H
 
-#include <cuda_runtime_api.h>
-#include <optix.h>
-#include <optix_stubs.h>
-
 #include "device_structs.h"
 #include "utils.h"
 

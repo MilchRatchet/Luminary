@@ -62,6 +62,118 @@ __device__ TriangleLight
   return triangle;
 }
 
+__device__ TriangleLight light_load_sample_init(const TriangleHandle handle, const DeviceTransform trans, uint3& packed_light_data) {
+  const DeviceInstancelet instance = load_instance(device.ptrs.instances, handle.instance_id);
+
+  const float4 v0 = __ldg((float4*) triangle_get_entry_address(0, 0, instance.triangles_offset + handle.tri_id));
+  const float4 v1 = __ldg((float4*) triangle_get_entry_address(1, 0, instance.triangles_offset + handle.tri_id));
+  const float4 v2 = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + handle.tri_id));
+
+  TriangleLight triangle;
+  triangle.vertex = get_vector(v0.x, v0.y, v0.z);
+  triangle.edge1  = get_vector(v0.w, v1.x, v1.y);
+  triangle.edge2  = get_vector(v1.z, v1.w, v2.x);
+
+  triangle.vertex = transform_apply(trans, triangle.vertex);
+  triangle.edge1  = transform_apply(trans, triangle.edge1);
+  triangle.edge2  = transform_apply(trans, triangle.edge2);
+
+  packed_light_data.x = __float_as_uint(v2.y);
+  packed_light_data.y = __float_as_uint(v2.z);
+  packed_light_data.z = __float_as_uint(v2.w);
+
+  triangle.material_id = instance.material_id;
+
+  return triangle;
+}
+
+/*
+ * Robust solid angle sampling method from
+ * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
+ */
+__device__ void light_load_sample_finalize(
+  TriangleLight& triangle, const uint3 packed_light_data, const vec3 origin, const float2 random, vec3& ray, float& dist,
+  float& solid_angle) {
+  const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, origin));
+  const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), origin));
+  const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), origin));
+
+  const float G0 = fabsf(dot_product(cross_product(v0, v1), v2));
+  const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
+  const float G2 = 1.0f + dot_product(v0, v1);
+
+  solid_angle = 2.0f * atan2f(G0, G1 + G2);
+
+  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
+    solid_angle = 0.0f;
+    dist        = 1.0f;
+    return;
+  }
+
+  const float sampled_solid_angle = random.x * solid_angle;
+
+  const vec3 r = add_vector(
+    scale_vector(v0, G0 * cosf(0.5f * sampled_solid_angle) - G1 * sinf(0.5f * sampled_solid_angle)),
+    scale_vector(v2, G2 * sinf(0.5f * sampled_solid_angle)));
+
+  const vec3 v2_t = sub_vector(scale_vector(r, 2.0f * dot_product(v0, r) / dot_product(r, r)), v0);
+
+  const float s2 = dot_product(v1, v2_t);
+  const float s  = (1.0f - random.y) + random.y * s2;
+  const float t  = sqrtf(fmaxf((1.0f - s * s) / (1.0f - s2 * s2), 0.0f));
+
+  ray = normalize_vector(add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t)));
+
+  if (isnan(ray.x) || isnan(ray.y) || isnan(ray.z)) {
+    solid_angle = 0.0f;
+    dist        = FLT_MAX;
+    return;
+  }
+
+  float2 coords;
+  dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
+
+  // Our ray does not actually hit the light, abort.
+  if (dist == FLT_MAX) {
+    solid_angle = 0.0f;
+    dist        = 1.0f;
+    return;
+  }
+
+  const UV vertex_texture = uv_unpack(packed_light_data.x);
+  const UV edge1_texture  = uv_unpack(packed_light_data.y);
+  const UV edge2_texture  = uv_unpack(packed_light_data.z);
+  triangle.tex_coords     = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+}
+
+__device__ RGBF light_get_color(const TriangleLight triangle) {
+  RGBF color;
+  const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
+
+  if (mat.luminance_tex != TEXTURE_NONE) {
+    const float4 emission = texture_load(device.ptrs.luminance_atlas[mat.luminance_tex], triangle.tex_coords);
+
+    color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
+  }
+  else {
+    color = mat.emission;
+  }
+
+  if (color_importance(color) > 0.0f) {
+    float alpha;
+    if (mat.albedo_tex != TEXTURE_NONE) {
+      alpha = texture_load(device.ptrs.albedo_atlas[mat.albedo_tex], triangle.tex_coords).w;
+    }
+    else {
+      alpha = mat.albedo.a;
+    }
+
+    color = scale_color(color, alpha);
+  }
+
+  return color;
+}
+
 #ifdef VOLUME_KERNEL
 __device__ float light_tree_child_importance(
   const float transmittance_importance, const vec3 origin, const vec3 ray, const float limit, const LightTreeNode8Packed node,
@@ -441,125 +553,6 @@ __device__ float light_tree_query_pdf(
 }
 
 #endif /* !VOLUME_KERNEL */
-
-/*
- * Solid angle sample a triangle.
- * @param triangle Triangle.
- * @param data Data about shading point.
- * @param random Random numbers.
- * @param pdf PDF of sampled direction.
- * @param dist Distance to sampled point on triangle.
- * @param color Emission from triangle at sampled point.
- * @result Normalized direction to the point on the triangle.
- *
- * Robust solid angle sampling method from
- * C. Peters, "BRDF Importance Sampling for Linear Lights", Computer Graphics Forum (Proc. HPG) 40, 8, 2021.
- *
- */
-__device__ vec3
-  light_sample_triangle(const TriangleLight triangle, const vec3 pos, const float2 random, float& solid_angle, float& dist, RGBF& color) {
-  const vec3 v0 = normalize_vector(sub_vector(triangle.vertex, pos));
-  const vec3 v1 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge1), pos));
-  const vec3 v2 = normalize_vector(sub_vector(add_vector(triangle.vertex, triangle.edge2), pos));
-
-  const float G0 = fabsf(dot_product(cross_product(v0, v1), v2));
-  const float G1 = dot_product(v0, v2) + dot_product(v1, v2);
-  const float G2 = 1.0f + dot_product(v0, v1);
-
-  solid_angle = 2.0f * atan2f(G0, G1 + G2);
-
-  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
-    solid_angle = 0.0f;
-    dist        = 1.0f;
-    color       = get_color(0.0f, 0.0f, 0.0f);
-    return get_vector(0.0f, 0.0f, 0.0f);
-  }
-
-  const float sampled_solid_angle = random.x * solid_angle;
-
-  const vec3 r = add_vector(
-    scale_vector(v0, G0 * cosf(0.5f * sampled_solid_angle) - G1 * sinf(0.5f * sampled_solid_angle)),
-    scale_vector(v2, G2 * sinf(0.5f * sampled_solid_angle)));
-
-  const vec3 v2_t = sub_vector(scale_vector(r, 2.0f * dot_product(v0, r) / dot_product(r, r)), v0);
-
-  const float s2 = dot_product(v1, v2_t);
-  const float s  = (1.0f - random.y) + random.y * s2;
-  const float t  = sqrtf(fmaxf((1.0f - s * s) / (1.0f - s2 * s2), 0.0f));
-
-  const vec3 dir = normalize_vector(add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t)));
-
-  if (isnan(dir.x) || isnan(dir.y) || isnan(dir.z)) {
-    solid_angle = 0.0f;
-    dist        = FLT_MAX;
-    color       = get_color(0.0f, 0.0f, 0.0f);
-    return get_vector(0.0f, 0.0f, 0.0f);
-  }
-
-  float2 coords;
-  dist = light_triangle_intersection_uv(triangle, pos, dir, coords);
-
-  // Our ray does not actually hit the light, abort.
-  if (dist == FLT_MAX) {
-    solid_angle = 0.0f;
-    dist        = 1.0f;
-    color       = get_color(0.0f, 0.0f, 0.0f);
-    return get_vector(0.0f, 0.0f, 0.0f);
-  }
-
-  const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
-
-  if (mat.luminance_tex != TEXTURE_NONE) {
-    const float4 emission = texture_load(device.ptrs.luminance_atlas[mat.luminance_tex], triangle.tex_coords);
-
-    color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
-  }
-  else {
-    color = mat.emission;
-  }
-
-  if (color_importance(color) > 0.0f) {
-    float alpha;
-    if (mat.albedo_tex != TEXTURE_NONE) {
-      alpha = texture_load(device.ptrs.albedo_atlas[mat.albedo_tex], triangle.tex_coords).w;
-    }
-    else {
-      alpha = mat.albedo.a;
-    }
-
-    color = scale_color(color, alpha);
-  }
-
-  return dir;
-}
-
-__device__ RGBF light_get_color(const TriangleLight triangle) {
-  RGBF color;
-  const DeviceMaterial mat = load_material(device.ptrs.materials, triangle.material_id);
-
-  if (mat.luminance_tex != TEXTURE_NONE) {
-    const float4 emission = texture_load(device.ptrs.luminance_atlas[mat.luminance_tex], triangle.tex_coords);
-
-    color = scale_color(get_color(emission.x, emission.y, emission.z), mat.emission_scale * emission.w);
-  }
-  else {
-    color = mat.emission;
-  }
-
-  if (color_importance(color) > 0.0f) {
-    float alpha;
-    if (mat.albedo_tex != TEXTURE_NONE) {
-      alpha = texture_load(device.ptrs.albedo_atlas[mat.albedo_tex], triangle.tex_coords).w;
-    }
-    else {
-      alpha = mat.albedo.a;
-    }
-
-    color = scale_color(color, alpha);
-  }
-
-  return color;
-}
 
 #else /* SHADING_KERNEL */
 

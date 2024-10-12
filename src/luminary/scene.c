@@ -31,10 +31,9 @@ LuminaryResult scene_create(Scene** _scene) {
   __FAILURE_HANDLE(toy_get_default(&scene->toy));
 
   __FAILURE_HANDLE(array_create(&scene->materials, sizeof(Material), 16));
-  __FAILURE_HANDLE(array_create(&scene->instances, sizeof(Instance), 16));
-  __FAILURE_HANDLE(array_create(&scene->instance_updates, sizeof(InstanceUpdate), 16));
+  __FAILURE_HANDLE(array_create(&scene->instances, sizeof(MeshInstance), 16));
 
-  scene->flags = 0xFFFFFFFFFFFFFFFFu;
+  scene->flags = 0xFFFFFFFFu;
 
   *_scene = scene;
 
@@ -184,7 +183,6 @@ LuminaryResult scene_destroy(Scene** scene) {
 
   __FAILURE_HANDLE(array_destroy(&(*scene)->materials));
   __FAILURE_HANDLE(array_destroy(&(*scene)->instances));
-  __FAILURE_HANDLE(array_destroy(&(*scene)->instance_updates));
 
   __FAILURE_HANDLE(host_free(scene));
 

@@ -51,11 +51,11 @@ function(compile_ptx kernel_name)
   # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
   add_custom_command(
     OUTPUT
-      "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
+      "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
     COMMAND
       ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${kernel_name}.cu"
       -arch=native --ptx --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
-      -o "${kernel_name}.ptx"
+      -o "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
       -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
     DEPENDS
       "${CMAKE_CURRENT_SOURCE_DIR}/device/optix/${kernel_name}.cu"
@@ -68,7 +68,7 @@ function(compile_ptx kernel_name)
   add_custom_target(
     ${kernel_name}
     DEPENDS
-      "${CMAKE_BINARY_DIR}/${kernel_name}.ptx"
+      "${CMAKE_BINARY_DIR}/ptx/${kernel_name}.ptx"
     COMMENT
       "Target for compiled OptiX kernel."
   )
@@ -93,12 +93,12 @@ ceb_embed_files(
   PROJECT Luminary
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
-  ${CMAKE_BINARY_DIR}/optix_kernels.ptx
-  ${CMAKE_BINARY_DIR}/optix_kernels_trace_particle.ptx
-  ${CMAKE_BINARY_DIR}/optix_kernels_geometry.ptx
-  ${CMAKE_BINARY_DIR}/optix_kernels_volume.ptx
-  ${CMAKE_BINARY_DIR}/optix_kernels_particle.ptx
-  ${CMAKE_BINARY_DIR}/optix_kernels_volume_bridges.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernels.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernels_trace_particle.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernels_geometry.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernels_volume.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernels_particle.ptx
+  ${CMAKE_BINARY_DIR}/ptx/optix_kernels_volume_bridges.ptx
   ${CMAKE_SOURCE_DIR}/data/LuminaryFont.ttf
   ${CMAKE_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_SOURCE_DIR}/data/moon/moon_normal.png

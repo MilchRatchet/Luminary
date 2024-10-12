@@ -1,6 +1,7 @@
 #ifndef LUMINARY_DEVICE_STRUCTS_H
 #define LUMINARY_DEVICE_STRUCTS_H
 
+#include "device_nv_includes.h"
 #include "scene.h"
 #include "utils.h"
 
@@ -222,7 +223,6 @@ struct DeviceTriangle {
 } typedef DeviceTriangle;
 LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);
 
-struct DeviceTexture;
 typedef cudaTextureObject_t DeviceTextureHandle;
 
 struct DeviceTextureObject {
@@ -245,6 +245,8 @@ struct DeviceTransform {
   Quaternion16 rotation;
 } typedef DeviceTransform;
 LUM_STATIC_SIZE_ASSERT(DeviceTransform, 0x20u);
+
+struct DeviceTexture;
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings);
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera);
