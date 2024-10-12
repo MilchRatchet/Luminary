@@ -3,14 +3,15 @@
 
 #include "device_utils.h"
 
-#define DEVICE
-
 #define DEVICE_PTR(device_mem) (*((CUdeviceptr*) (((uint64_t*) (device_mem)) + 1)))
 
 #define device_malloc(ptr, size) _device_malloc((void**) ptr, size, (const char*) #ptr, (const char*) __func__, __LINE__)
 #define device_malloc2D(ptr, width_in_bytes, height) \
   _device_malloc2D((void**) ptr, width_in_bytes, height, (const char*) #ptr, (const char*) __func__, __LINE__)
 #define device_free(ptr) _device_free((void**) ptr, (const char*) #ptr, (const char*) __func__, __LINE__)
+
+void _device_memory_init(void);
+void _device_memory_shutdown(void);
 
 LuminaryResult _device_malloc(void** ptr, size_t size, const char* buf_name, const char* func, uint32_t line);
 LuminaryResult _device_malloc2D(void** ptr, size_t width_in_bytes, size_t height, const char* buf_name, const char* func, uint32_t line);

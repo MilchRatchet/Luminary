@@ -20,6 +20,14 @@ void _device_memory_init(void) {
   memset(total_memory_allocation, 0, sizeof(size_t) * LUMINARY_MAX_NUM_DEVICES);
 }
 
+void _device_memory_shutdown(void) {
+  for (uint32_t device_id = 0; device_id < LUMINARY_MAX_NUM_DEVICES; device_id++) {
+    if (total_memory_allocation[device_id]) {
+      luminary_print_error("Device %u leaked %llu bytes.", device_id, total_memory_allocation[device_id]);
+    }
+  }
+}
+
 LuminaryResult _device_malloc(void** _ptr, size_t size, const char* buf_name, const char* func, uint32_t line) {
   __CHECK_NULL_ARGUMENT(_ptr);
 

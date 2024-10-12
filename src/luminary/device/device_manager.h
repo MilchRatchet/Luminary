@@ -27,6 +27,7 @@
 struct DeviceManager {
   Host* host;
   ARRAY Device** devices;
+  uint32_t main_device_index;
   Queue* work_queue;
   RingBuffer* ringbuffer;
   WallTime* queue_wall_time;

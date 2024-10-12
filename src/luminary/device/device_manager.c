@@ -105,6 +105,32 @@ static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_mana
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_select_main_device(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  uint32_t num_devices;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &num_devices));
+
+  DeviceArch max_arch      = DEVICE_ARCH_UNKNOWN;
+  size_t max_memory        = 0;
+  uint32_t selected_device = 0;
+
+  for (uint32_t device_id = 0; device_id < num_devices; device_id++) {
+    const Device* device = device_manager->devices[device_id];
+
+    if ((device->properties.arch > max_arch) || (device->properties.arch == max_arch && device->properties.memory_size > max_memory)) {
+      max_arch   = device->properties.arch;
+      max_memory = device->properties.memory_size;
+
+      selected_device = device_id;
+    }
+  }
+
+  device_manager->main_device_index = selected_device;
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // API functions
 ////////////////////////////////////////////////////////////////////
@@ -127,6 +153,16 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager) {
 
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
+
+  ////////////////////////////////////////////////////////////////////
+  // Select main device
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(_device_manager_select_main_device(device_manager));
+
+  ////////////////////////////////////////////////////////////////////
+  // Create work queue
+  ////////////////////////////////////////////////////////////////////
 
   __FAILURE_HANDLE(thread_create(&device_manager->work_thread));
   __FAILURE_HANDLE(queue_create(&device_manager->work_queue, sizeof(QueueEntry), DEVICE_MANAGER_QUEUE_SIZE));

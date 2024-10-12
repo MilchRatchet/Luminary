@@ -12,6 +12,8 @@
 #define OPTIX_VALIDATION
 #define NO_LUMINARY_BVH
 
+#define DEVICE
+
 #define STARS_GRID_LD 64
 
 ////////////////////////////////////////////////////////////////////
@@ -162,50 +164,50 @@ LUM_STATIC_SIZE_ASSERT(LightTreeNode8Packed, 0x40);
 ////////////////////////////////////////////////////////////////////
 
 struct DevicePointers {
-  TraceTask* trace_tasks;
-  ShadingTaskAuxData* aux_data;
-  uint16_t* trace_counts;
-  INTERLEAVED_STORAGE TraceResult* trace_results;
-  uint16_t* task_counts;
-  uint16_t* task_offsets;
-  uint32_t* ior_stack;
-  float* frame_variance;
-  RGBF* frame_accumulate;
-  RGBF* frame_direct_buffer;
-  RGBF* frame_direct_accumulate;
-  RGBF* frame_indirect_buffer;
-  RGBF* frame_indirect_accumulate;
-  RGBF* frame_post;
-  RGBF* frame_final;
-  RGBF* records;
-  XRGB8* buffer_8bit;
-  uint32_t* hit_id_history;
-  const DeviceTextureObject* albedo_atlas;
-  const DeviceTextureObject* luminance_atlas;
-  const DeviceTextureObject* material_atlas;
-  const DeviceTextureObject* normal_atlas;
-  const DeviceTextureObject* cloud_noise;
-  const DeviceTextureObject* sky_ms_luts;
-  const DeviceTextureObject* sky_tm_luts;
-  const DeviceTextureObject* sky_hdri_luts;
-  const DeviceTextureObject* sky_moon_albedo_tex;
-  const DeviceTextureObject* sky_moon_normal_tex;
-  const DeviceTextureObject* bsdf_energy_lut;
-  const uint16_t* bluenoise_1D;
-  const uint32_t* bluenoise_2D;
-  const float* bridge_lut;
-  const DeviceMaterialCompressed* materials;
-  INTERLEAVED_STORAGE const DeviceTriangle* triangles;
-  const DeviceInstancelet* instances;
-  const DeviceTransform* instance_transforms;
-  const uint32_t* light_instance_map;
-  const LightTreeNode8Packed** bottom_level_light_trees;
-  const uint2** bottom_level_light_paths;
-  const LightTreeNode8Packed* top_level_light_tree;
-  const uint2* top_level_light_paths;
-  const Quad* particle_quads;
-  const Star* stars;
-  const uint32_t* stars_offsets;
+  DEVICE TraceTask* trace_tasks;
+  DEVICE ShadingTaskAuxData* aux_data;
+  DEVICE uint16_t* trace_counts;
+  DEVICE INTERLEAVED_STORAGE TraceResult* trace_results;
+  DEVICE uint16_t* task_counts;
+  DEVICE uint16_t* task_offsets;
+  DEVICE uint32_t* ior_stack;
+  DEVICE float* frame_variance;
+  DEVICE RGBF* frame_accumulate;
+  DEVICE RGBF* frame_direct_buffer;
+  DEVICE RGBF* frame_direct_accumulate;
+  DEVICE RGBF* frame_indirect_buffer;
+  DEVICE RGBF* frame_indirect_accumulate;
+  DEVICE RGBF* frame_post;
+  DEVICE RGBF* frame_final;
+  DEVICE RGBF* records;
+  DEVICE XRGB8* buffer_8bit;
+  DEVICE uint32_t* hit_id_history;
+  DEVICE const DeviceTextureObject* albedo_atlas;
+  DEVICE const DeviceTextureObject* luminance_atlas;
+  DEVICE const DeviceTextureObject* material_atlas;
+  DEVICE const DeviceTextureObject* normal_atlas;
+  DEVICE const DeviceTextureObject* cloud_noise;
+  DEVICE const DeviceTextureObject* sky_ms_luts;
+  DEVICE const DeviceTextureObject* sky_tm_luts;
+  DEVICE const DeviceTextureObject* sky_hdri_luts;
+  DEVICE const DeviceTextureObject* sky_moon_albedo_tex;
+  DEVICE const DeviceTextureObject* sky_moon_normal_tex;
+  DEVICE const DeviceTextureObject* bsdf_energy_lut;
+  DEVICE const uint16_t* bluenoise_1D;
+  DEVICE const uint32_t* bluenoise_2D;
+  DEVICE const float* bridge_lut;
+  DEVICE const DeviceMaterialCompressed* materials;
+  DEVICE INTERLEAVED_STORAGE const DeviceTriangle* triangles;
+  DEVICE const DeviceInstancelet* instances;
+  DEVICE const DeviceTransform* instance_transforms;
+  DEVICE const uint32_t* light_instance_map;
+  DEVICE const LightTreeNode8Packed** bottom_level_light_trees;
+  DEVICE const uint2** bottom_level_light_paths;
+  DEVICE const LightTreeNode8Packed* top_level_light_tree;
+  DEVICE const uint2* top_level_light_paths;
+  DEVICE const Quad* particle_quads;
+  DEVICE const Star* stars;
+  DEVICE const uint32_t* stars_offsets;
 } typedef DevicePointers;
 
 struct DeviceConstantMemory {

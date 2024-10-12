@@ -2,6 +2,7 @@
 
 #include <optix_function_table_definition.h>
 
+#include "device_memory.h"
 #include "device_utils.h"
 #include "internal_error.h"
 #include "optixrt.h"
@@ -12,6 +13,12 @@ void _device_init(void) {
   if (result != OPTIX_SUCCESS) {
     crash_message("Failed to init optix.");
   }
+
+  _device_memory_init();
+}
+
+void _device_shutdown(void) {
+  _device_memory_shutdown();
 }
 
 #define OPTIX_CHECK_CALLBACK_ERROR(device)                                        \
@@ -162,6 +169,62 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, const uint
   return LUMINARY_SUCCESS;
 }
 
+#define __DEVICE_BUFFER_FREE(buffer)          \
+  if (buffer) {                               \
+    __FAILURE_HANDLE(device_free(&(buffer))); \
+  }
+
+static LuminaryResult _device_free_buffers(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  __DEVICE_BUFFER_FREE(device->buffers.trace_tasks);
+  __DEVICE_BUFFER_FREE(device->buffers.aux_data);
+  __DEVICE_BUFFER_FREE(device->buffers.trace_counts);
+  __DEVICE_BUFFER_FREE(device->buffers.trace_results);
+  __DEVICE_BUFFER_FREE(device->buffers.task_counts);
+  __DEVICE_BUFFER_FREE(device->buffers.task_offsets);
+  __DEVICE_BUFFER_FREE(device->buffers.ior_stack);
+  __DEVICE_BUFFER_FREE(device->buffers.frame_variance);
+  __DEVICE_BUFFER_FREE(device->buffers.frame_accumulate);
+  __DEVICE_BUFFER_FREE(device->buffers.frame_direct_buffer);
+  __DEVICE_BUFFER_FREE(device->buffers.frame_direct_accumulate);
+  __DEVICE_BUFFER_FREE(device->buffers.frame_indirect_buffer);
+  __DEVICE_BUFFER_FREE(device->buffers.frame_indirect_accumulate);
+  __DEVICE_BUFFER_FREE(device->buffers.frame_post);
+  __DEVICE_BUFFER_FREE(device->buffers.frame_final);
+  __DEVICE_BUFFER_FREE(device->buffers.records);
+  __DEVICE_BUFFER_FREE(device->buffers.buffer_8bit);
+  __DEVICE_BUFFER_FREE(device->buffers.hit_id_history);
+  __DEVICE_BUFFER_FREE(device->buffers.albedo_atlas);
+  __DEVICE_BUFFER_FREE(device->buffers.luminance_atlas);
+  __DEVICE_BUFFER_FREE(device->buffers.material_atlas);
+  __DEVICE_BUFFER_FREE(device->buffers.normal_atlas);
+  __DEVICE_BUFFER_FREE(device->buffers.cloud_noise);
+  __DEVICE_BUFFER_FREE(device->buffers.sky_ms_luts);
+  __DEVICE_BUFFER_FREE(device->buffers.sky_tm_luts);
+  __DEVICE_BUFFER_FREE(device->buffers.sky_hdri_luts);
+  __DEVICE_BUFFER_FREE(device->buffers.sky_moon_albedo_tex);
+  __DEVICE_BUFFER_FREE(device->buffers.sky_moon_normal_tex);
+  __DEVICE_BUFFER_FREE(device->buffers.bsdf_energy_lut);
+  __DEVICE_BUFFER_FREE(device->buffers.bluenoise_1D);
+  __DEVICE_BUFFER_FREE(device->buffers.bluenoise_2D);
+  __DEVICE_BUFFER_FREE(device->buffers.bridge_lut);
+  __DEVICE_BUFFER_FREE(device->buffers.materials);
+  __DEVICE_BUFFER_FREE(device->buffers.triangles);
+  __DEVICE_BUFFER_FREE(device->buffers.instances);
+  __DEVICE_BUFFER_FREE(device->buffers.instance_transforms);
+  __DEVICE_BUFFER_FREE(device->buffers.light_instance_map);
+  __DEVICE_BUFFER_FREE(device->buffers.bottom_level_light_trees);
+  __DEVICE_BUFFER_FREE(device->buffers.bottom_level_light_paths);
+  __DEVICE_BUFFER_FREE(device->buffers.top_level_light_tree);
+  __DEVICE_BUFFER_FREE(device->buffers.top_level_light_paths);
+  __DEVICE_BUFFER_FREE(device->buffers.particle_quads);
+  __DEVICE_BUFFER_FREE(device->buffers.stars);
+  __DEVICE_BUFFER_FREE(device->buffers.stars_offsets);
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // External API implementation
 ////////////////////////////////////////////////////////////////////
@@ -216,6 +279,11 @@ LuminaryResult device_compile_kernels(Device* device) {
 
 LuminaryResult device_destroy(Device** device) {
   __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cudaSetDevice((*device)->index));
+  CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
+
+  __FAILURE_HANDLE(_device_free_buffers(*device));
 
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(optixrt_kernel_destroy(&(*device)->optix_kernels[kernel_id]));

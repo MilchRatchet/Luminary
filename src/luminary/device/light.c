@@ -1652,7 +1652,7 @@ LuminaryResult light_load_bridge_lut(Device* device) {
   }
 
   __FAILURE_HANDLE(device_malloc(&device->buffers.bridge_lut, lut_length));
-  __FAILURE_HANDLE(device_upload(device->buffers.bridge_lut, lut_data, 0, lut_length));
+  __FAILURE_HANDLE(device_upload((void*) device->buffers.bridge_lut, lut_data, 0, lut_length));
 
   return LUMINARY_SUCCESS;
 }
