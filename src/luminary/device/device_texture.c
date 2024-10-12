@@ -165,7 +165,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
           __FAILURE_HANDLE(device_upload2D(data_device, data, pitch * pixel_size, width * pixel_size, height));
 
           res_desc.resType                  = cudaResourceTypePitch2D;
-          res_desc.res.pitch2D.devPtr       = data_device;
+          res_desc.res.pitch2D.devPtr       = (void*) DEVICE_PTR(data_device);
           res_desc.res.pitch2D.width        = width;
           res_desc.res.pitch2D.height       = height;
           res_desc.res.pitch2D.desc         = channel_desc;

@@ -105,6 +105,21 @@ static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_mana
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_manager, void* args) {
+  LUM_UNUSED(args);
+
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_load_embedded_data(device_manager->devices[device_id]));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_manager_select_main_device(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
@@ -179,6 +194,12 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager) {
 
   entry.name     = "Kernel compilation";
   entry.function = (QueueEntryFunction) _device_manager_compile_kernels;
+  entry.args     = (void*) 0;
+
+  __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
+
+  entry.name     = "Device initialization";
+  entry.function = (QueueEntryFunction) _device_manager_initialize_devices;
   entry.args     = (void*) 0;
 
   __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));

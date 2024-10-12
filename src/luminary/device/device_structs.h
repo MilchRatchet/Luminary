@@ -246,7 +246,7 @@ struct DeviceTransform {
 } typedef DeviceTransform;
 LUM_STATIC_SIZE_ASSERT(DeviceTransform, 0x20u);
 
-struct DeviceTexture;
+struct DeviceTexture typedef DeviceTexture;
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings);
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera);

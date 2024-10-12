@@ -2,9 +2,13 @@
 
 #include <optix_function_table_definition.h>
 
+#include "ceb.h"
 #include "device_memory.h"
+#include "device_texture.h"
 #include "device_utils.h"
+#include "host/png.h"
 #include "internal_error.h"
+#include "light.h"
 #include "optixrt.h"
 
 void _device_init(void) {
@@ -169,6 +173,89 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, const uint
   return LUMINARY_SUCCESS;
 }
 
+////////////////////////////////////////////////////////////////////
+// Embedded data
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _device_load_moon_textures(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  uint64_t info = 0;
+
+  void* moon_albedo_data;
+  int64_t moon_albedo_data_length;
+  ceb_access("moon_albedo.png", &moon_albedo_data, &moon_albedo_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load moon_albedo texture.");
+  }
+
+  void* moon_normal_data;
+  int64_t moon_normal_data_length;
+  ceb_access("moon_normal.png", &moon_normal_data, &moon_normal_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load moon_normal texture.");
+  }
+
+  Texture* moon_albedo_tex;
+  __FAILURE_HANDLE(png_load(&moon_albedo_tex, moon_albedo_data, moon_albedo_data_length, "moon_albedo.png"));
+
+  __FAILURE_HANDLE(device_texture_create(&device->moon_albedo_tex, moon_albedo_tex));
+
+  __FAILURE_HANDLE(texture_destroy(&moon_albedo_tex));
+
+  Texture* moon_normal_tex;
+  __FAILURE_HANDLE(png_load(&moon_normal_tex, moon_normal_data, moon_normal_data_length, "moon_normal.png"));
+
+  __FAILURE_HANDLE(device_texture_create(&device->moon_normal_tex, moon_normal_tex));
+
+  __FAILURE_HANDLE(texture_destroy(&moon_normal_tex));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_load_bluenoise_texture(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  uint64_t info = 0;
+
+  void* bluenoise_1D_data;
+  int64_t bluenoise_1D_data_length;
+  ceb_access("bluenoise_1D.bin", &bluenoise_1D_data, &bluenoise_1D_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load bluenoise_1D texture.");
+  }
+
+  void* bluenoise_2D_data;
+  int64_t bluenoise_2D_data_length;
+  ceb_access("bluenoise_2D.bin", &bluenoise_2D_data, &bluenoise_2D_data_length, &info);
+
+  if (info) {
+    crash_message("Failed to load bluenoise_2D texture.");
+  }
+
+  __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_1D, bluenoise_1D_data_length));
+  __FAILURE_HANDLE(device_upload((void*) device->buffers.bluenoise_1D, bluenoise_1D_data, 0, bluenoise_1D_data_length));
+
+  __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_2D, bluenoise_2D_data_length));
+  __FAILURE_HANDLE(device_upload((void*) device->buffers.bluenoise_2D, bluenoise_2D_data, 0, bluenoise_2D_data_length));
+
+  device->constant_memory_dirty = true;
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_free_embedded_data(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  __FAILURE_HANDLE(device_texture_destroy(&device->moon_albedo_tex));
+  __FAILURE_HANDLE(device_texture_destroy(&device->moon_normal_tex));
+
+  return LUMINARY_SUCCESS;
+}
+
 #define __DEVICE_BUFFER_FREE(buffer)          \
   if (buffer) {                               \
     __FAILURE_HANDLE(device_free(&(buffer))); \
@@ -203,8 +290,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(device->buffers.sky_ms_luts);
   __DEVICE_BUFFER_FREE(device->buffers.sky_tm_luts);
   __DEVICE_BUFFER_FREE(device->buffers.sky_hdri_luts);
-  __DEVICE_BUFFER_FREE(device->buffers.sky_moon_albedo_tex);
-  __DEVICE_BUFFER_FREE(device->buffers.sky_moon_normal_tex);
   __DEVICE_BUFFER_FREE(device->buffers.bsdf_energy_lut);
   __DEVICE_BUFFER_FREE(device->buffers.bluenoise_1D);
   __DEVICE_BUFFER_FREE(device->buffers.bluenoise_2D);
@@ -221,6 +306,8 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(device->buffers.particle_quads);
   __DEVICE_BUFFER_FREE(device->buffers.stars);
   __DEVICE_BUFFER_FREE(device->buffers.stars_offsets);
+
+  device->constant_memory_dirty = true;
 
   return LUMINARY_SUCCESS;
 }
@@ -240,6 +327,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   device->index                    = index;
   device->optix_callback_error     = false;
   device->exit_requested           = false;
+  device->constant_memory_dirty    = true;
   device->accumulated_sample_count = 0;
 
   CUDA_FAILURE_HANDLE(cudaInitDevice(device->index, cudaDeviceScheduleAuto, cudaInitDeviceFlagsAreValid));
@@ -247,6 +335,10 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(_device_get_properties(&device->properties, device->index));
 
   CUDA_FAILURE_HANDLE(cudaSetDevice(device->index));
+
+  ////////////////////////////////////////////////////////////////////
+  // OptiX context creation
+  ////////////////////////////////////////////////////////////////////
 
   OptixDeviceContextOptions optix_device_context_options;
   memset(&optix_device_context_options, 0, sizeof(OptixDeviceContextOptions));
@@ -277,12 +369,26 @@ LuminaryResult device_compile_kernels(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_load_embedded_data(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  __FAILURE_HANDLE(light_load_bridge_lut(device));
+  __FAILURE_HANDLE(_device_load_bluenoise_texture(device));
+  __FAILURE_HANDLE(_device_load_moon_textures(device));
+
+  device->constant_memory_dirty = true;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_destroy(Device** device) {
   __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(*device);
 
   CUDA_FAILURE_HANDLE(cudaSetDevice((*device)->index));
   CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
 
+  __FAILURE_HANDLE(_device_free_embedded_data(*device));
   __FAILURE_HANDLE(_device_free_buffers(*device));
 
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {

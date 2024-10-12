@@ -190,8 +190,6 @@ struct DevicePointers {
   DEVICE const DeviceTextureObject* sky_ms_luts;
   DEVICE const DeviceTextureObject* sky_tm_luts;
   DEVICE const DeviceTextureObject* sky_hdri_luts;
-  DEVICE const DeviceTextureObject* sky_moon_albedo_tex;
-  DEVICE const DeviceTextureObject* sky_moon_normal_tex;
   DEVICE const DeviceTextureObject* bsdf_energy_lut;
   DEVICE const uint16_t* bluenoise_1D;
   DEVICE const uint32_t* bluenoise_2D;
@@ -233,6 +231,8 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh_particles;
   uint32_t non_instanced_triangle_count;
   uint32_t max_task_count;
+  DeviceTextureObject sky_moon_albedo_tex;
+  DeviceTextureObject sky_moon_normal_tex;
 
   /*
   int max_ray_depth;
