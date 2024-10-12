@@ -130,8 +130,7 @@ LuminaryResult optixrt_kernel_create(OptixKernel** kernel, Device* device, Optix
   // Shader Binding Table Creation
   ////////////////////////////////////////////////////////////////////
 
-  DEVICE char* records;
-  __FAILURE_HANDLE(device_malloc((void**) &records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
+  __FAILURE_HANDLE(device_malloc(&(*kernel)->records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
 
   char host_records[OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE];
 
@@ -139,11 +138,11 @@ LuminaryResult optixrt_kernel_create(OptixKernel** kernel, Device* device, Optix
     OPTIX_FAILURE_HANDLE(optixSbtRecordPackHeader((*kernel)->groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
   }
 
-  __FAILURE_HANDLE(device_upload(records, host_records, 0, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
+  __FAILURE_HANDLE(device_upload((*kernel)->records, host_records, 0, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
 
-  (*kernel)->shaders.raygenRecord       = DEVICE_PTR(records) + 0 * OPTIX_SBT_RECORD_HEADER_SIZE;
-  (*kernel)->shaders.missRecordBase     = DEVICE_PTR(records) + 1 * OPTIX_SBT_RECORD_HEADER_SIZE;
-  (*kernel)->shaders.hitgroupRecordBase = DEVICE_PTR(records) + 2 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.raygenRecord       = DEVICE_PTR((*kernel)->records) + 0 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.missRecordBase     = DEVICE_PTR((*kernel)->records) + 1 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.hitgroupRecordBase = DEVICE_PTR((*kernel)->records) + 2 * OPTIX_SBT_RECORD_HEADER_SIZE;
 
   (*kernel)->shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
   (*kernel)->shaders.missRecordCount         = 1;
@@ -184,6 +183,8 @@ LuminaryResult optixrt_kernel_execute(OptixKernel* kernel) {
 
 LuminaryResult optixrt_kernel_destroy(OptixKernel** kernel) {
   __CHECK_NULL_ARGUMENT(kernel);
+
+  __FAILURE_HANDLE(device_free(&(*kernel)->records));
 
   OPTIX_FAILURE_HANDLE(optixPipelineDestroy((*kernel)->pipeline));
 

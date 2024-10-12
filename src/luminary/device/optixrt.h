@@ -22,6 +22,7 @@ struct OptixKernel {
   OptixModule module;
   OptixProgramGroup groups[OPTIXRT_NUM_GROUPS];
   OptixPipeline pipeline;
+  DEVICE char* records;
   OptixShaderBindingTable shaders;
   DEVICE DeviceConstantMemory* params;
 } typedef OptixKernel;
