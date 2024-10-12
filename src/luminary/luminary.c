@@ -5,12 +5,12 @@
 
 void luminary_init(void) {
   // Order of initialization is very important.
-  _host_memory_init();
   _log_init();
+  _host_memory_init();
   _device_init();
 }
 
 void luminary_shutdown(void) {
-  _log_shutdown();
   _host_memory_shutdown();
+  _log_shutdown();
 }

@@ -9,6 +9,7 @@ project("Luminary" LANGUAGES C CUDA)
 set(CMAKE_C_STANDARD 11)
 
 option(DEBUG "Debug Mode" OFF)
+option(LUMINARY_MEMORY_DEBUG "Verbose memory checking" OFF)
 option(NATIVE_CUDA_ARCH "Use Native CUDA Architecture" ON)
 option(SHOW_KERNEL_STATS "Show CUDA Kernel Stats at Compilation" OFF)
 
