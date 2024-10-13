@@ -5,6 +5,7 @@
 
 #include "cloud_shadow.cuh"
 #include "math.cuh"
+#include "memory.cuh"
 #include "sky_utils.cuh"
 #include "texture_utils.cuh"
 #include "utils.cuh"
@@ -323,6 +324,7 @@ __global__ void sky_compute_multiscattering_lut(float4* multiscattering_tex_lowe
   multiscattering_tex_higher[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
 }
 
+#if 0
 extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
   if (instance->scene.sky.lut_initialized) {
     texture_free_atlas(instance->sky_tm_luts, 2);
@@ -393,6 +395,7 @@ extern "C" void device_sky_generate_LUTs(RaytraceInstance* instance) {
 
   instance->scene.sky.lut_initialized = 1;
 }
+#endif
 
 #endif /* SHADING_KERNEL */
 
@@ -512,7 +515,7 @@ __device__ Spectrum sky_compute_atmosphere(
 
         const Mat3x3 tangent_space = create_basis(normal);
 
-        const float4 normal_vals = texture_load(*device.ptrs.sky_moon_normal_tex, uv);
+        const float4 normal_vals = texture_load(device.moon_normal_tex, uv);
 
         vec3 map_normal = get_vector(normal_vals.x, normal_vals.y, normal_vals.z);
         map_normal      = scale_vector(map_normal, 2.0f);
@@ -523,7 +526,7 @@ __device__ Spectrum sky_compute_atmosphere(
         const float NdotL = dot_product(normal, bounce_ray);
 
         if (NdotL > 0.0f) {
-          const float albedo = texture_load(*device.ptrs.sky_moon_albedo_tex, uv).x;
+          const float albedo = texture_load(device.moon_albedo_tex, uv).x;
 
           const float light_angle = sample_sphere_solid_angle(device.sky.sun_pos, SKY_SUN_RADIUS, moon_pos);
           const float weight      = albedo * device.sky.sun_strength * NdotL * light_angle / (2.0f * PI);
@@ -666,7 +669,7 @@ __device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t 
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_KERNEL void process_sky_tasks() {
+LUMINARY_KERNEL void sky_process_tasks() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
@@ -694,14 +697,14 @@ LUMINARY_KERNEL void process_debug_sky_tasks() {
     const ShadingTask task = load_shading_task(get_task_address(task_offset + i));
     const uint32_t pixel   = get_pixel_id(task.index);
 
-    if (device.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
+    if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
       RGBF sky = sky_color_main(task.position, task.ray, STATE_FLAG_CAMERA_DIRECTION, pixel, task.index);
       write_beauty_buffer_forced(sky, pixel);
     }
-    else if (device.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
+    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
       write_beauty_buffer_forced(get_color(0.0f, 0.0f, 0.0f), pixel);
     }
-    else if (device.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
+    else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
       write_beauty_buffer_forced(get_color(0.0f, 0.63f, 1.0f), pixel);
     }
   }

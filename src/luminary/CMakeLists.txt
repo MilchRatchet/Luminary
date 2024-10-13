@@ -4,7 +4,7 @@ set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
 # Find packages
 #=============================================================
 
-find_package(CUDAToolkit 12.1 REQUIRED QUIET)
+find_package(CUDAToolkit 12.6 REQUIRED QUIET)
 find_package(Optix 8.0 REQUIRED QUIET)
 
 if(NOT OptiX_VERSION)
@@ -15,9 +15,8 @@ endif()
 # Get source files
 #=============================================================
 
-file(GLOB luminary_cpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/zlib/*.c")
+file(GLOB luminary_cpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/host/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/device/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/zlib/*.c")
 file(GLOB luminary_cpu_header_files "${CMAKE_SOURCE_DIR}/include/luminary/*.h" "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
-file(GLOB luminary_gpu_source_files "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/*.cu")
 file(GLOB luminary_gpu_header_files "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/*.cuh")
 file(GLOB luminary_api_header_files "${CMAKE_SOURCE_DIR}/include/luminary/*.h")
 
@@ -40,6 +39,43 @@ set_target_properties(Luminary PROPERTIES EXPORT_NAME "luminary" POSITION_INDEPE
 
 add_subdirectory(Ceb)
 include_directories(${CEB_INCLUDE_DIR})
+
+#=============================================================
+# Create CUBIN files
+#=============================================================
+
+function(compile_cubin kernel_name)
+  # TODO: Change this into a proper target so that changes to cuh files are automatically tracked. Currently, any change to cuh files will cause a rebuild of this.
+  # TODO: This is currently always building for native. Add some logic that ties in with the normal CUDA kernel arch settings.
+  # Warning: Do not use --optix-ir, I have tried it multiple times over the months now but it is always beyond broken.
+  add_custom_command(
+    OUTPUT
+      "${CMAKE_BINARY_DIR}/cubin/${kernel_name}.cubin"
+    COMMAND
+      ${CUDAToolkit_NVCC_EXECUTABLE} "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/${kernel_name}.cu"
+      -arch=native --cubin --use_fast_math --generate-line-info --Wreorder --ptxas-options=-warn-double-usage --ptxas-options=-warn-spills --ptxas-options=-warn-lmem-usage --extra-device-vectorization --ptxas-options=-O3 --ptxas-options=-allow-expensive-optimizations=true
+      -o "${CMAKE_BINARY_DIR}/cubin/${kernel_name}.cubin"
+      -I"${CMAKE_SOURCE_DIR}/include" -I"${CMAKE_CURRENT_SOURCE_DIR}" -I"${CMAKE_CURRENT_SOURCE_DIR}/device/cuda" -I"${OptiX_INCLUDE}"
+    DEPENDS
+      "${CMAKE_CURRENT_SOURCE_DIR}/device/cuda/${kernel_name}.cu"
+      "${luminary_gpu_header_files}"
+      "${luminary_cpu_header_files}"
+    COMMENT
+      "Compiling ${kernel_name}.cubin"
+  )
+
+  add_custom_target(
+    ${kernel_name}
+    DEPENDS
+      "${CMAKE_BINARY_DIR}/cubin/${kernel_name}.cubin"
+    COMMENT
+      "Target for compiled CUBIN kernel."
+  )
+
+  add_dependencies(Luminary ${kernel_name})
+endfunction()
+
+compile_cubin(cuda_kernels)
 
 #=============================================================
 # Create PTX files
@@ -93,6 +129,7 @@ ceb_embed_files(
   PROJECT Luminary
   OUTPUT ${EMBED_FILE_NAME}
   INPUT
+  ${CMAKE_BINARY_DIR}/cubin/cuda_kernels.cubin
   ${CMAKE_BINARY_DIR}/ptx/optix_kernels.ptx
   ${CMAKE_BINARY_DIR}/ptx/optix_kernels_trace_particle.ptx
   ${CMAKE_BINARY_DIR}/ptx/optix_kernels_geometry.ptx
@@ -111,7 +148,7 @@ ceb_embed_files(
 # Sources
 #=============================================================
 
-target_sources(Luminary PRIVATE ${luminary_cpu_source_files} ${luminary_gpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
+target_sources(Luminary PRIVATE ${luminary_cpu_source_files} ${CEB_OUTPUT_FILE_${EMBED_FILE_NAME}})
 
 #=============================================================
 # Include

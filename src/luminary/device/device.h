@@ -2,6 +2,7 @@
 #define LUMINARY_DEVICE_H
 
 #include "device_utils.h"
+#include "kernel.h"
 #include "optixrt.h"
 
 // Set of architectures supported by Luminary
@@ -32,6 +33,7 @@ struct Device {
   bool constant_memory_dirty;
   OptixDeviceContext optix_ctx;
   OptixKernel* optix_kernels[OPTIX_KERNEL_TYPE_COUNT];
+  CUDAKernel* cuda_kernels[CUDA_KERNEL_TYPE_COUNT];
   DevicePointers buffers;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
@@ -41,7 +43,7 @@ void _device_init(void);
 void _device_shutdown(void);
 
 LuminaryResult device_create(Device** device, uint32_t index);
-LuminaryResult device_compile_kernels(Device* device);
+LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
 LuminaryResult device_destroy(Device** device);
 

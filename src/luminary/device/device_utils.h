@@ -22,7 +22,7 @@
 
 #define CUDA_FAILURE_HANDLE(command)                                                                                                       \
   {                                                                                                                                        \
-    const cudaError_t __cuda_err = command;                                                                                                \
+    const cudaError_t __cuda_err = (command);                                                                                              \
     if (__cuda_err != cudaSuccess) {                                                                                                       \
       __RETURN_ERROR(                                                                                                                      \
         LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", cudaGetErrorName(__cuda_err), cudaGetErrorString(__cuda_err), \
@@ -30,9 +30,21 @@
     }                                                                                                                                      \
   }
 
+#define CUDA_DRIVER_FAILURE_HANDLE(command)                                                                                        \
+  {                                                                                                                                \
+    const CUresult __cuda_err = (command);                                                                                         \
+    if (__cuda_err != cudaSuccess) {                                                                                               \
+      const char* __error_name;                                                                                                    \
+      const char* __error_string;                                                                                                  \
+      cuGetErrorName(__cuda_err, &__error_name);                                                                                   \
+      cuGetErrorString(__cuda_err, &__error_name);                                                                                 \
+      __RETURN_ERROR(LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", __error_name, __error_string, #command); \
+    }                                                                                                                              \
+  }
+
 #define OPTIX_FAILURE_HANDLE(command)                                                                                                 \
   {                                                                                                                                   \
-    const OptixResult __optix_err = command;                                                                                          \
+    const OptixResult __optix_err = (command);                                                                                        \
     if (__optix_err != OPTIX_SUCCESS) {                                                                                               \
       __RETURN_ERROR(                                                                                                                 \
         LUMINARY_ERROR_OPTIX, "Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(__optix_err), __optix_err, #command); \
@@ -41,7 +53,7 @@
 
 #define OPTIX_FAILURE_HANDLE_LOG(command, log)                                                                                        \
   {                                                                                                                                   \
-    const OptixResult __optix_err = command;                                                                                          \
+    const OptixResult __optix_err = (command);                                                                                        \
                                                                                                                                       \
     if (__optix_err != OPTIX_SUCCESS) {                                                                                               \
       error_message("Optix returned message: %s", log);                                                                               \
@@ -231,8 +243,8 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh_particles;
   uint32_t non_instanced_triangle_count;
   uint32_t max_task_count;
-  DeviceTextureObject sky_moon_albedo_tex;
-  DeviceTextureObject sky_moon_normal_tex;
+  DeviceTextureObject moon_albedo_tex;
+  DeviceTextureObject moon_normal_tex;
 
   /*
   int max_ray_depth;

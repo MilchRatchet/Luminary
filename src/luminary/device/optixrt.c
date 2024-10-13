@@ -11,7 +11,6 @@
 #include "internal_error.h"
 #include "utils.h"
 
-// TODO: Specify things like num payloads etc.
 struct OptixKernelConfig {
   const char* name;
   int num_payloads;

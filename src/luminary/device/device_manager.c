@@ -1,5 +1,6 @@
 #include "device_manager.h"
 
+#include "ceb.h"
 #include "device_structs.h"
 #include "device_utils.h"
 #include "host/internal_host.h"
@@ -95,11 +96,55 @@ static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_mana
 
   __CHECK_NULL_ARGUMENT(device_manager);
 
+  ////////////////////////////////////////////////////////////////////
+  // Load CUBIN
+  ////////////////////////////////////////////////////////////////////
+
+  uint64_t info = 0;
+
+  void* cuda_kernels_data;
+  int64_t cuda_kernels_data_length;
+  ceb_access("cuda_kernels.cubin", &cuda_kernels_data, &cuda_kernels_data_length, &info);
+
+  if (info) {
+    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load cuda_kernels cubin. Luminary was not compiled correctly.");
+  }
+
+  // Tells CUDA that we keep the cubin data unchanged which allows CUDA to not create a copy.
+  CUlibraryOption library_option = CU_LIBRARY_BINARY_IS_PRESERVED;
+
+  CUDA_DRIVER_FAILURE_HANDLE(cuLibraryLoadData(&device_manager->cuda_library, cuda_kernels_data, 0, 0, 0, &library_option, 0, 1));
+
+  ////////////////////////////////////////////////////////////////////
+  // Gather library content
+  ////////////////////////////////////////////////////////////////////
+
+  uint32_t kernel_count;
+  CUDA_DRIVER_FAILURE_HANDLE(cuLibraryGetKernelCount(&kernel_count, device_manager->cuda_library));
+
+  CUkernel* kernels;
+  __FAILURE_HANDLE(host_malloc(&kernels, sizeof(CUkernel) * kernel_count));
+
+  CUDA_DRIVER_FAILURE_HANDLE(cuLibraryEnumerateKernels(kernels, kernel_count, device_manager->cuda_library));
+
+  for (uint32_t kernel_id = 0; kernel_id < kernel_count; kernel_id++) {
+    const char* kernel_name;
+    CUDA_DRIVER_FAILURE_HANDLE(cuKernelGetName(&kernel_name, kernels[kernel_id]));
+
+    info_message("CUDA Kernel: %s", kernel_name);
+  }
+
+  __FAILURE_HANDLE(host_free(&kernels));
+
+  ////////////////////////////////////////////////////////////////////
+  // Compile kernels
+  ////////////////////////////////////////////////////////////////////
+
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_compile_kernels(device_manager->devices[device_id]));
+    __FAILURE_HANDLE(device_compile_kernels(device_manager->devices[device_id], device_manager->cuda_library));
   }
 
   return LUMINARY_SUCCESS;

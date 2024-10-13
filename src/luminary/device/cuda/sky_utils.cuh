@@ -1,7 +1,9 @@
 #ifndef SKY_UTILS_CUH
 #define SKY_UTILS_CUH
 
+#include "math.cuh"
 #include "sky_defines.h"
+#include "utils.cuh"
 
 __device__ float sky_height(const vec3 point) {
   return get_length(point) - SKY_EARTH_RADIUS;

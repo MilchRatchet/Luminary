@@ -187,7 +187,7 @@ static LuminaryResult _device_load_moon_textures(Device* device) {
   ceb_access("moon_albedo.png", &moon_albedo_data, &moon_albedo_data_length, &info);
 
   if (info) {
-    crash_message("Failed to load moon_albedo texture.");
+    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load moon_albedo texture. Luminary was not compiled correctly.");
   }
 
   void* moon_normal_data;
@@ -195,7 +195,7 @@ static LuminaryResult _device_load_moon_textures(Device* device) {
   ceb_access("moon_normal.png", &moon_normal_data, &moon_normal_data_length, &info);
 
   if (info) {
-    crash_message("Failed to load moon_normal texture.");
+    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load moon_normal texture. Luminary was not compiled correctly.");
   }
 
   Texture* moon_albedo_tex;
@@ -225,7 +225,7 @@ static LuminaryResult _device_load_bluenoise_texture(Device* device) {
   ceb_access("bluenoise_1D.bin", &bluenoise_1D_data, &bluenoise_1D_data_length, &info);
 
   if (info) {
-    crash_message("Failed to load bluenoise_1D texture.");
+    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load bluenoise_1D texture. Luminary was not compiled correctly.");
   }
 
   void* bluenoise_2D_data;
@@ -233,7 +233,7 @@ static LuminaryResult _device_load_bluenoise_texture(Device* device) {
   ceb_access("bluenoise_2D.bin", &bluenoise_2D_data, &bluenoise_2D_data_length, &info);
 
   if (info) {
-    crash_message("Failed to load bluenoise_2D texture.");
+    __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load bluenoise_2D texture. Luminary was not compiled correctly.");
   }
 
   __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_1D, bluenoise_1D_data_length));
@@ -357,8 +357,12 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_compile_kernels(Device* device) {
+LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
   __CHECK_NULL_ARGUMENT(device);
+
+  for (uint32_t kernel_id = 0; kernel_id < CUDA_KERNEL_TYPE_COUNT; kernel_id++) {
+    __FAILURE_HANDLE(kernel_create(&device->cuda_kernels[kernel_id], device, library, kernel_id));
+  }
 
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(optixrt_kernel_create(&device->optix_kernels[kernel_id], device, kernel_id));
