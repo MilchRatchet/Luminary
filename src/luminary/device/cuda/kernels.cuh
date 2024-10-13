@@ -1,8 +1,6 @@
 #ifndef CU_KERNELS_H
 #define CU_KERNELS_H
 
-#include <cuda_runtime_api.h>
-
 #include "bsdf_utils.cuh"
 #include "bvh.cuh"
 #include "camera.cuh"

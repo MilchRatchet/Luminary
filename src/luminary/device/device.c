@@ -12,10 +12,16 @@
 #include "optixrt.h"
 
 void _device_init(void) {
-  OptixResult result = optixInit();
+  CUresult cuda_result = cuInit(0);
 
-  if (result != OPTIX_SUCCESS) {
-    crash_message("Failed to init optix.");
+  if (cuda_result != CUDA_SUCCESS) {
+    crash_message("Failed to initialize CUDA.");
+  }
+
+  OptixResult optix_result = optixInit();
+
+  if (optix_result != OPTIX_SUCCESS) {
+    crash_message("Failed to initialize OptiX.");
   }
 
   _device_memory_init();
@@ -76,16 +82,22 @@ static char* _device_arch_enum_to_string(const DeviceArch arch) {
   }
 }
 
-static LuminaryResult _device_get_properties(DeviceProperties* props, const uint32_t index) {
+static LuminaryResult _device_get_properties(DeviceProperties* props, Device* device) {
   __CHECK_NULL_ARGUMENT(props);
 
-  // TODO: Use correct device ID.
-  struct cudaDeviceProp prop;
-  cudaGetDeviceProperties(&prop, index);
+  int major;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&major, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR, device->cuda_device));
 
-  switch (prop.major) {
+  int minor;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&minor, CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR, device->cuda_device));
+
+  CUDA_FAILURE_HANDLE(cuDeviceGetName(props->name, 256, device->cuda_device));
+
+  CUDA_FAILURE_HANDLE(cuDeviceTotalMem(&props->memory_size, device->cuda_device));
+
+  switch (major) {
     case 6: {
-      if (prop.minor == 0 || prop.minor == 1 || prop.minor == 2) {
+      if (minor == 0 || minor == 1 || minor == 2) {
         props->arch            = DEVICE_ARCH_PASCAL;
         props->rt_core_version = 0;
       }
@@ -95,18 +107,19 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, const uint
       }
     } break;
     case 7: {
-      if (prop.minor == 0 || prop.minor == 2) {
+      if (minor == 0 || minor == 2) {
         props->arch            = DEVICE_ARCH_VOLTA;
         props->rt_core_version = 0;
       }
-      else if (prop.minor == 5) {
+      else if (minor == 5) {
         props->arch            = DEVICE_ARCH_TURING;
         props->rt_core_version = 1;
 
         // TU116 and TU117 do not have RT cores, these can be detected by searching for GTX in the name
-        for (int i = 0; i < 256; i++) {
-          if (prop.name[i] == 'G') {
+        for (int i = 0; i < 250; i++) {
+          if (props->name[i] == 'G' && props->name[i + 1] == 'T' && props->name[i + 2] == 'X') {
             props->rt_core_version = 0;
+            break;
           }
         }
       }
@@ -116,16 +129,16 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, const uint
       }
     } break;
     case 8: {
-      if (prop.minor == 0) {
+      if (minor == 0) {
         // GA100 has no RT cores
         props->arch            = DEVICE_ARCH_AMPERE;
         props->rt_core_version = 0;
       }
-      else if (prop.minor == 6 || prop.minor == 7) {
+      else if (minor == 6 || minor == 7) {
         props->arch            = DEVICE_ARCH_AMPERE;
         props->rt_core_version = 2;
       }
-      else if (prop.minor == 9) {
+      else if (minor == 9) {
         props->arch            = DEVICE_ARCH_ADA;
         props->rt_core_version = 3;
       }
@@ -135,7 +148,7 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, const uint
       }
     } break;
     case 9: {
-      if (prop.minor == 0) {
+      if (minor == 0) {
         props->arch            = DEVICE_ARCH_HOPPER;
         props->rt_core_version = 0;
       }
@@ -145,7 +158,7 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, const uint
       }
     } break;
     case 10: {
-      if (prop.minor == 0) {
+      if (minor == 0) {
         props->arch            = DEVICE_ARCH_BLACKWELL;
         props->rt_core_version = 0;
       }
@@ -162,13 +175,8 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, const uint
 
   if (props->arch == DEVICE_ARCH_UNKNOWN) {
     warn_message(
-      "Luminary failed to identify architecture of CUDA compute capability %d.%d. Some features may not be working.", prop.major,
-      prop.minor);
+      "Luminary failed to identify architecture of CUDA compute capability %d.%d. Some features may not be working.", major, minor);
   }
-
-  props->memory_size = prop.totalGlobalMem;
-
-  memcpy((void*) props->name, prop.name, 256);
 
   return LUMINARY_SUCCESS;
 }
@@ -201,14 +209,14 @@ static LuminaryResult _device_load_moon_textures(Device* device) {
   Texture* moon_albedo_tex;
   __FAILURE_HANDLE(png_load(&moon_albedo_tex, moon_albedo_data, moon_albedo_data_length, "moon_albedo.png"));
 
-  __FAILURE_HANDLE(device_texture_create(&device->moon_albedo_tex, moon_albedo_tex));
+  __FAILURE_HANDLE(device_texture_create(&device->moon_albedo_tex, moon_albedo_tex, device->stream_main));
 
   __FAILURE_HANDLE(texture_destroy(&moon_albedo_tex));
 
   Texture* moon_normal_tex;
   __FAILURE_HANDLE(png_load(&moon_normal_tex, moon_normal_data, moon_normal_data_length, "moon_normal.png"));
 
-  __FAILURE_HANDLE(device_texture_create(&device->moon_normal_tex, moon_normal_tex));
+  __FAILURE_HANDLE(device_texture_create(&device->moon_normal_tex, moon_normal_tex, device->stream_main));
 
   __FAILURE_HANDLE(texture_destroy(&moon_normal_tex));
 
@@ -237,10 +245,12 @@ static LuminaryResult _device_load_bluenoise_texture(Device* device) {
   }
 
   __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_1D, bluenoise_1D_data_length));
-  __FAILURE_HANDLE(device_upload((void*) device->buffers.bluenoise_1D, bluenoise_1D_data, 0, bluenoise_1D_data_length));
+  __FAILURE_HANDLE(
+    device_upload((void*) device->buffers.bluenoise_1D, bluenoise_1D_data, 0, bluenoise_1D_data_length, device->stream_main));
 
   __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_2D, bluenoise_2D_data_length));
-  __FAILURE_HANDLE(device_upload((void*) device->buffers.bluenoise_2D, bluenoise_2D_data, 0, bluenoise_2D_data_length));
+  __FAILURE_HANDLE(
+    device_upload((void*) device->buffers.bluenoise_2D, bluenoise_2D_data, 0, bluenoise_2D_data_length, device->stream_main));
 
   device->constant_memory_dirty = true;
 
@@ -330,11 +340,17 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   device->constant_memory_dirty    = true;
   device->accumulated_sample_count = 0;
 
-  CUDA_FAILURE_HANDLE(cudaInitDevice(device->index, cudaDeviceScheduleAuto, cudaInitDeviceFlagsAreValid));
+  CUDA_FAILURE_HANDLE(cuDeviceGet(&device->cuda_device, device->index));
 
-  __FAILURE_HANDLE(_device_get_properties(&device->properties, device->index));
+  __FAILURE_HANDLE(_device_get_properties(&device->properties, device));
 
-  CUDA_FAILURE_HANDLE(cudaSetDevice(device->index));
+  ////////////////////////////////////////////////////////////////////
+  // CUDA context creation
+  ////////////////////////////////////////////////////////////////////
+
+  CUDA_FAILURE_HANDLE(cuCtxCreate(&device->cuda_ctx, 0, device->cuda_device));
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   ////////////////////////////////////////////////////////////////////
   // OptiX context creation
@@ -352,6 +368,15 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   OPTIX_FAILURE_HANDLE(optixDeviceContextCreate((CUcontext) 0, &optix_device_context_options, &device->optix_ctx));
 
+  ////////////////////////////////////////////////////////////////////
+  // Stream creation
+  ////////////////////////////////////////////////////////////////////
+
+  CUDA_FAILURE_HANDLE(cuStreamCreate(&device->stream_main, CU_STREAM_NON_BLOCKING));
+  CUDA_FAILURE_HANDLE(cuStreamCreate(&device->stream_secondary, CU_STREAM_NON_BLOCKING));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
   *_device = device;
 
   return LUMINARY_SUCCESS;
@@ -359,6 +384,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
   __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   for (uint32_t kernel_id = 0; kernel_id < CUDA_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(kernel_create(&device->cuda_kernels[kernel_id], device, library, kernel_id));
@@ -370,17 +397,23 @@ LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
 
   OPTIX_CHECK_CALLBACK_ERROR(device);
 
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
   return LUMINARY_SUCCESS;
 }
 
 LuminaryResult device_load_embedded_data(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
   __FAILURE_HANDLE(light_load_bridge_lut(device));
   __FAILURE_HANDLE(_device_load_bluenoise_texture(device));
   __FAILURE_HANDLE(_device_load_moon_textures(device));
 
   device->constant_memory_dirty = true;
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;
 }
@@ -389,17 +422,25 @@ LuminaryResult device_destroy(Device** device) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(*device);
 
-  CUDA_FAILURE_HANDLE(cudaSetDevice((*device)->index));
-  CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent((*device)->cuda_ctx));
+  CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
   __FAILURE_HANDLE(_device_free_embedded_data(*device));
   __FAILURE_HANDLE(_device_free_buffers(*device));
+
+  for (uint32_t kernel_id = 0; kernel_id < CUDA_KERNEL_TYPE_COUNT; kernel_id++) {
+    __FAILURE_HANDLE(kernel_destroy(&(*device)->cuda_kernels[kernel_id]));
+  }
 
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(optixrt_kernel_destroy(&(*device)->optix_kernels[kernel_id]));
   }
 
+  CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_main));
+  CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_secondary));
+
   OPTIX_FAILURE_HANDLE(optixDeviceContextDestroy((*device)->optix_ctx));
+  CUDA_FAILURE_HANDLE(cuCtxDestroy((*device)->cuda_ctx));
 
   __FAILURE_HANDLE(host_free(device));
 

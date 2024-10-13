@@ -223,7 +223,7 @@ struct DeviceTriangle {
 } typedef DeviceTriangle;
 LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);
 
-typedef cudaTextureObject_t DeviceTextureHandle;
+typedef CUtexObject DeviceTextureHandle;
 
 struct DeviceTextureObject {
   DeviceTextureHandle handle;

@@ -1,7 +1,6 @@
 #ifndef CU_MATH_H
 #define CU_MATH_H
 
-#include <cuda_runtime_api.h>
 #include <float.h>
 
 #include "intrinsics.cuh"

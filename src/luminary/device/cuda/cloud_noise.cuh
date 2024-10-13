@@ -1,7 +1,6 @@
 #ifndef CU_CLOUD_NOISE_H
 #define CU_CLOUD_NOISE_H
 
-#include <cuda_runtime_api.h>
 #include <float.h>
 #include <math.h>
 #include <stdlib.h>

@@ -113,23 +113,23 @@ static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_mana
   // Tells CUDA that we keep the cubin data unchanged which allows CUDA to not create a copy.
   CUlibraryOption library_option = CU_LIBRARY_BINARY_IS_PRESERVED;
 
-  CUDA_DRIVER_FAILURE_HANDLE(cuLibraryLoadData(&device_manager->cuda_library, cuda_kernels_data, 0, 0, 0, &library_option, 0, 1));
+  CUDA_FAILURE_HANDLE(cuLibraryLoadData(&device_manager->cuda_library, cuda_kernels_data, 0, 0, 0, &library_option, 0, 1));
 
   ////////////////////////////////////////////////////////////////////
   // Gather library content
   ////////////////////////////////////////////////////////////////////
 
   uint32_t kernel_count;
-  CUDA_DRIVER_FAILURE_HANDLE(cuLibraryGetKernelCount(&kernel_count, device_manager->cuda_library));
+  CUDA_FAILURE_HANDLE(cuLibraryGetKernelCount(&kernel_count, device_manager->cuda_library));
 
   CUkernel* kernels;
   __FAILURE_HANDLE(host_malloc(&kernels, sizeof(CUkernel) * kernel_count));
 
-  CUDA_DRIVER_FAILURE_HANDLE(cuLibraryEnumerateKernels(kernels, kernel_count, device_manager->cuda_library));
+  CUDA_FAILURE_HANDLE(cuLibraryEnumerateKernels(kernels, kernel_count, device_manager->cuda_library));
 
   for (uint32_t kernel_id = 0; kernel_id < kernel_count; kernel_id++) {
     const char* kernel_name;
-    CUDA_DRIVER_FAILURE_HANDLE(cuKernelGetName(&kernel_name, kernels[kernel_id]));
+    CUDA_FAILURE_HANDLE(cuKernelGetName(&kernel_name, kernels[kernel_id]));
 
     info_message("CUDA Kernel: %s", kernel_name);
   }
@@ -203,7 +203,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager) {
   memset(device_manager, 0, sizeof(DeviceManager));
 
   int device_count;
-  CUDA_FAILURE_HANDLE(cudaGetDeviceCount(&device_count));
+  CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
 
   __FAILURE_HANDLE(array_create(&device_manager->devices, sizeof(Device*), device_count));
 

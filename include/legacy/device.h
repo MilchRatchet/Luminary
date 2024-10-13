@@ -1,7 +1,6 @@
 #ifndef DEVICE_H
 #define DEVICE_H
 
-#include <cuda_runtime_api.h>
 #include <optix.h>
 #include <optix_stubs.h>
 

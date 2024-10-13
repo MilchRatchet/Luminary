@@ -19,7 +19,7 @@ LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary libr
 
   const CUDAKernelConfig* config = cuda_kernel_configs + type;
 
-  CUDA_DRIVER_FAILURE_HANDLE(cuLibraryGetKernel(&(*kernel)->cuda_kernel, library, config->name));
+  CUDA_FAILURE_HANDLE(cuLibraryGetKernel(&(*kernel)->cuda_kernel, library, config->name));
 
   (*kernel)->shared_memory_size = config->shared_memory_size;
 
@@ -42,7 +42,7 @@ LuminaryResult kernel_execute(CUDAKernel* kernel) {
   launch_config.attrs          = (CUlaunchAttribute*) 0;
   launch_config.numAttrs       = 0;
 
-  CUDA_DRIVER_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, (void**) 0, (void**) 0));
+  CUDA_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, (void**) 0, (void**) 0));
 
   return LUMINARY_SUCCESS;
 }
@@ -66,7 +66,7 @@ LuminaryResult kernel_execute_custom(
 
   void* kernel_args[] = {CU_LAUNCH_PARAM_BUFFER_POINTER, arg_struct, CU_LAUNCH_PARAM_BUFFER_SIZE, &arg_struct_size, CU_LAUNCH_PARAM_END};
 
-  CUDA_DRIVER_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, (void**) 0, kernel_args));
+  CUDA_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, (void**) 0, kernel_args));
 
   return LUMINARY_SUCCESS;
 }

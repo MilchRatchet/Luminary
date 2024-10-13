@@ -1,14 +1,12 @@
 #ifndef CU_MIPMAP_H
 #define CU_MIPMAP_H
 
-#include <cuda_runtime_api.h>
-
 #include "device.h"
 #include "structs.h"
 #include "texture.h"
 #include "utils.cuh"
 
-LUMINARY_KERNEL void mipmap_generate_level_3D_RGBA8(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
+LUMINARY_KERNEL void mipmap_generate_level_3D_RGBA8(CUtexObject src, cudaSurfaceObject_t dst, int width, int height, int depth) {
   unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
@@ -39,7 +37,7 @@ LUMINARY_KERNEL void mipmap_generate_level_3D_RGBA8(cudaTextureObject_t src, cud
   }
 }
 
-LUMINARY_KERNEL void mipmap_generate_level_2D_RGBA8(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
+LUMINARY_KERNEL void mipmap_generate_level_2D_RGBA8(CUtexObject src, cudaSurfaceObject_t dst, int width, int height) {
   unsigned int id = THREAD_ID;
 
   const int amount = width * height;
@@ -67,7 +65,7 @@ LUMINARY_KERNEL void mipmap_generate_level_2D_RGBA8(cudaTextureObject_t src, cud
   }
 }
 
-LUMINARY_KERNEL void mipmap_generate_level_3D_RGBA16(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
+LUMINARY_KERNEL void mipmap_generate_level_3D_RGBA16(CUtexObject src, cudaSurfaceObject_t dst, int width, int height, int depth) {
   unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
@@ -98,7 +96,7 @@ LUMINARY_KERNEL void mipmap_generate_level_3D_RGBA16(cudaTextureObject_t src, cu
   }
 }
 
-LUMINARY_KERNEL void mipmap_generate_level_2D_RGBA16(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
+LUMINARY_KERNEL void mipmap_generate_level_2D_RGBA16(CUtexObject src, cudaSurfaceObject_t dst, int width, int height) {
   unsigned int id = THREAD_ID;
 
   const int amount = width * height;
@@ -126,7 +124,7 @@ LUMINARY_KERNEL void mipmap_generate_level_2D_RGBA16(cudaTextureObject_t src, cu
   }
 }
 
-LUMINARY_KERNEL void mipmap_generate_level_3D_RGBAF(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height, int depth) {
+LUMINARY_KERNEL void mipmap_generate_level_3D_RGBAF(CUtexObject src, cudaSurfaceObject_t dst, int width, int height, int depth) {
   unsigned int id = THREAD_ID;
 
   const int amount = width * height * depth;
@@ -152,7 +150,7 @@ LUMINARY_KERNEL void mipmap_generate_level_3D_RGBAF(cudaTextureObject_t src, cud
   }
 }
 
-LUMINARY_KERNEL void mipmap_generate_level_2D_RGBAF(cudaTextureObject_t src, cudaSurfaceObject_t dst, int width, int height) {
+LUMINARY_KERNEL void mipmap_generate_level_2D_RGBAF(CUtexObject src, cudaSurfaceObject_t dst, int width, int height) {
   unsigned int id = THREAD_ID;
 
   const int amount = width * height;
@@ -190,7 +188,7 @@ extern "C" void device_mipmap_generate(cudaMipmappedArray_t mipmap_array, Textur
     cudaExtent dst_size;
     gpuErrchk(cudaArrayGetInfo(NULL, &dst_size, NULL, level_dst));
 
-    cudaTextureObject_t src_tex;
+    CUtexObject src_tex;
     cudaResourceDesc res_desc;
     memset(&res_desc, 0, sizeof(cudaResourceDesc));
 

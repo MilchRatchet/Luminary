@@ -163,7 +163,6 @@ target_include_directories(Luminary PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/device/
 # Linking
 #=============================================================
 
-target_link_libraries(Luminary PRIVATE CUDA::cudart)
 target_link_libraries(Luminary PRIVATE CUDA::cuda_driver)
 target_link_libraries(Luminary PUBLIC $<TARGET_NAME:Luminary::Headers>)
 

@@ -18,7 +18,7 @@ enum DeviceArch {
 } typedef DeviceArch;
 
 struct DeviceProperties {
-  const char name[256];
+  char name[256];
   DeviceArch arch;
   uint32_t rt_core_version;
   size_t memory_size;
@@ -31,9 +31,13 @@ struct Device {
   bool exit_requested;
   bool optix_callback_error;
   bool constant_memory_dirty;
+  CUdevice cuda_device;
+  CUcontext cuda_ctx;
+  CUDAKernel* cuda_kernels[CUDA_KERNEL_TYPE_COUNT];
   OptixDeviceContext optix_ctx;
   OptixKernel* optix_kernels[OPTIX_KERNEL_TYPE_COUNT];
-  CUDAKernel* cuda_kernels[CUDA_KERNEL_TYPE_COUNT];
+  CUstream stream_main;
+  CUstream stream_secondary;
   DevicePointers buffers;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;

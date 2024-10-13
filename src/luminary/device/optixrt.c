@@ -137,7 +137,8 @@ LuminaryResult optixrt_kernel_create(OptixKernel** kernel, Device* device, Optix
     OPTIX_FAILURE_HANDLE(optixSbtRecordPackHeader((*kernel)->groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
   }
 
-  __FAILURE_HANDLE(device_upload((*kernel)->records, host_records, 0, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
+  __FAILURE_HANDLE(
+    device_upload((*kernel)->records, host_records, 0, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE, device->stream_main));
 
   (*kernel)->shaders.raygenRecord       = DEVICE_PTR((*kernel)->records) + 0 * OPTIX_SBT_RECORD_HEADER_SIZE;
   (*kernel)->shaders.missRecordBase     = DEVICE_PTR((*kernel)->records) + 1 * OPTIX_SBT_RECORD_HEADER_SIZE;
@@ -223,7 +224,8 @@ LuminaryResult optixrt_bvh_create(OptixBVH** bvh, Device* device, const Mesh* me
 
   DEVICE float* device_vertex_buffer;
   __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * mesh->data->vertex_count));
-  __FAILURE_HANDLE(device_upload(device_vertex_buffer, mesh->data->vertex_buffer, 0, sizeof(float) * 4 * mesh->data->vertex_count));
+  __FAILURE_HANDLE(
+    device_upload(device_vertex_buffer, mesh->data->vertex_buffer, 0, sizeof(float) * 4 * mesh->data->vertex_count, device->stream_main));
 
   CUdeviceptr device_vertex_buffer_ptr = DEVICE_PTR(device_vertex_buffer);
 
@@ -250,8 +252,9 @@ LuminaryResult optixrt_bvh_create(OptixBVH** bvh, Device* device, const Mesh* me
     build_input.triangleArray.vertexBuffers       = &device_vertex_buffer_ptr;
 
     __FAILURE_HANDLE(device_malloc(&meshlet_device_index_buffers[meshlet_id], sizeof(uint32_t) * 4 * meshlet.triangle_count));
-    __FAILURE_HANDLE(
-      device_upload(meshlet_device_index_buffers[meshlet_id], meshlet.index_buffer, 0, sizeof(uint32_t) * 4 * meshlet.triangle_count));
+    __FAILURE_HANDLE(device_upload(
+      meshlet_device_index_buffers[meshlet_id], meshlet.index_buffer, 0, sizeof(uint32_t) * 4 * meshlet.triangle_count,
+      device->stream_main));
 
     build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
     build_input.triangleArray.indexStrideInBytes = 16;
@@ -296,7 +299,8 @@ LuminaryResult optixrt_bvh_create(OptixBVH** bvh, Device* device, const Mesh* me
   OptixAccelBufferSizes buffer_sizes;
 
   OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(device->optix_ctx, &build_options, build_inputs, meshlet_count, &buffer_sizes));
-  CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
+
+  CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
   DEVICE void* temp_buffer;
   __FAILURE_HANDLE(device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes));
@@ -318,10 +322,11 @@ LuminaryResult optixrt_bvh_create(OptixBVH** bvh, Device* device, const Mesh* me
   OPTIX_FAILURE_HANDLE(optixAccelBuild(
     device->optix_ctx, 0, &build_options, build_inputs, meshlet_count, DEVICE_PTR(temp_buffer), buffer_sizes.tempSizeInBytes,
     DEVICE_PTR(output_buffer), buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
-  CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
+  CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
   size_t compact_size;
-  __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t)));
+  __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
   __FAILURE_HANDLE(device_free(&accel_emit_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));
@@ -333,7 +338,7 @@ LuminaryResult optixrt_bvh_create(OptixBVH** bvh, Device* device, const Mesh* me
 
     OPTIX_FAILURE_HANDLE(
       optixAccelCompact(device->optix_ctx, 0, traversable, DEVICE_PTR(output_buffer_compact), compact_size, &traversable));
-    CUDA_FAILURE_HANDLE(cudaDeviceSynchronize());
+    CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
     __FAILURE_HANDLE(device_free(&output_buffer));
 

@@ -20,24 +20,14 @@
 // Failure handles
 ////////////////////////////////////////////////////////////////////
 
-#define CUDA_FAILURE_HANDLE(command)                                                                                                       \
-  {                                                                                                                                        \
-    const cudaError_t __cuda_err = (command);                                                                                              \
-    if (__cuda_err != cudaSuccess) {                                                                                                       \
-      __RETURN_ERROR(                                                                                                                      \
-        LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", cudaGetErrorName(__cuda_err), cudaGetErrorString(__cuda_err), \
-        #command);                                                                                                                         \
-    }                                                                                                                                      \
-  }
-
-#define CUDA_DRIVER_FAILURE_HANDLE(command)                                                                                        \
+#define CUDA_FAILURE_HANDLE(command)                                                                                               \
   {                                                                                                                                \
     const CUresult __cuda_err = (command);                                                                                         \
-    if (__cuda_err != cudaSuccess) {                                                                                               \
-      const char* __error_name;                                                                                                    \
-      const char* __error_string;                                                                                                  \
+    if (__cuda_err != CUDA_SUCCESS) {                                                                                              \
+      const char* __error_name   = (const char*) 0;                                                                                \
+      const char* __error_string = (const char*) 0;                                                                                \
       cuGetErrorName(__cuda_err, &__error_name);                                                                                   \
-      cuGetErrorString(__cuda_err, &__error_name);                                                                                 \
+      cuGetErrorString(__cuda_err, &__error_string);                                                                               \
       __RETURN_ERROR(LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", __error_name, __error_string, #command); \
     }                                                                                                                              \
   }
@@ -61,6 +51,24 @@
         LUMINARY_ERROR_OPTIX, "Optix returned error \"%s\"(%d) in call (%s)", optixGetErrorName(__optix_err), __optix_err, #command); \
     }                                                                                                                                 \
   }
+
+////////////////////////////////////////////////////////////////////
+// CUDA data types
+////////////////////////////////////////////////////////////////////
+
+struct ushort2 {
+  uint16_t x;
+  uint16_t y;
+} typedef ushort2;
+
+struct uint2 {
+  uint32_t x;
+  uint32_t y;
+} typedef uint2;
+
+////////////////////////////////////////////////////////////////////
+// Misc data types
+////////////////////////////////////////////////////////////////////
 
 struct Mat3x3 {
   float f11;

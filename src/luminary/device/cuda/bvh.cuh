@@ -3,8 +3,6 @@
 
 #ifndef NO_LUMINARY_BVH
 
-#include <cuda_runtime_api.h>
-
 #include "bvh_utils.cuh"
 #include "intrinsics.cuh"
 #include "math.cuh"

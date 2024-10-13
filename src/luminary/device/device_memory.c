@@ -34,16 +34,19 @@ LuminaryResult _device_malloc(void** _ptr, size_t size, const char* buf_name, co
   struct DeviceMemoryHeader* header;
   __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
 
-  CUDA_FAILURE_HANDLE(cudaMalloc((void**) &header->ptr, size));
+  CUDA_FAILURE_HANDLE(cuMemAlloc(&header->ptr, size));
 
   header->magic = DEVICE_MEMORY_HEADER_MAGIC;
   header->size  = size;
   header->pitch = 0;
 
-  int current_device;
-  CUDA_FAILURE_HANDLE(cudaGetDevice(&current_device));
+  CUdevice device;
+  CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
 
-  total_memory_allocation[current_device] += size;
+  int current_device_id;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&current_device_id, CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, device));
+
+  total_memory_allocation[current_device_id] += size;
 
   *_ptr = (void**) header;
 
@@ -57,7 +60,7 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
   __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
 
   size_t pitch;
-  CUDA_FAILURE_HANDLE(cudaMallocPitch((void**) &header->ptr, &pitch, width_in_bytes, height));
+  CUDA_FAILURE_HANDLE(cuMemAllocPitch(&header->ptr, &pitch, width_in_bytes, height, 16));
 
   const size_t size = pitch * height;
 
@@ -65,17 +68,20 @@ LuminaryResult _device_malloc2D(void** _ptr, size_t width_in_bytes, size_t heigh
   header->size  = size;
   header->pitch = pitch;
 
-  int current_device;
-  CUDA_FAILURE_HANDLE(cudaGetDevice(&current_device));
+  CUdevice device;
+  CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
 
-  total_memory_allocation[current_device] += size;
+  int current_device_id;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&current_device_id, CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, device));
+
+  total_memory_allocation[current_device_id] += size;
 
   *_ptr = (void**) header;
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_upload(DEVICE void* dst, const void* src, size_t dst_offset, size_t size) {
+LuminaryResult device_upload(DEVICE void* dst, const void* src, size_t dst_offset, size_t size, CUstream stream) {
   __CHECK_NULL_ARGUMENT(dst);
   __CHECK_NULL_ARGUMENT(src);
 
@@ -91,12 +97,12 @@ LuminaryResult device_upload(DEVICE void* dst, const void* src, size_t dst_offse
       dst_header->size, dst_offset, dst_offset + size);
   }
 
-  CUDA_FAILURE_HANDLE(cudaMemcpy((void*) (dst_header->ptr + dst_offset), src, size, cudaMemcpyHostToDevice));
+  CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync(dst_header->ptr + dst_offset, src, size, stream));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_memcpy(DEVICE void* dst, DEVICE const void* src, size_t dst_offset, size_t src_offset, size_t size) {
+LuminaryResult device_memcpy(DEVICE void* dst, DEVICE const void* src, size_t dst_offset, size_t src_offset, size_t size, CUstream stream) {
   __CHECK_NULL_ARGUMENT(dst);
   __CHECK_NULL_ARGUMENT(src);
 
@@ -124,13 +130,12 @@ LuminaryResult device_memcpy(DEVICE void* dst, DEVICE const void* src, size_t ds
       src_header->size, src_offset, src_offset + size);
   }
 
-  CUDA_FAILURE_HANDLE(
-    cudaMemcpy((void*) (dst_header->ptr + dst_offset), (void*) (src_header->ptr + src_offset), size, cudaMemcpyDeviceToDevice));
+  CUDA_FAILURE_HANDLE(cuMemcpyAsync(dst_header->ptr + dst_offset, src_header->ptr + src_offset, size, stream));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_download(void* dst, DEVICE const void* src, size_t src_offset, size_t size) {
+LuminaryResult device_download(void* dst, DEVICE const void* src, size_t src_offset, size_t size, CUstream stream) {
   __CHECK_NULL_ARGUMENT(dst);
   __CHECK_NULL_ARGUMENT(src);
 
@@ -146,12 +151,12 @@ LuminaryResult device_download(void* dst, DEVICE const void* src, size_t src_off
       src_header->size, src_offset, src_offset + size);
   }
 
-  CUDA_FAILURE_HANDLE(cudaMemcpy(dst, (void*) (src_header->ptr + src_offset), size, cudaMemcpyDeviceToHost));
+  CUDA_FAILURE_HANDLE(cuMemcpyDtoHAsync(dst, src_header->ptr + src_offset, size, stream));
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pitch, size_t src_width, size_t src_height) {
+LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pitch, size_t src_width, size_t src_height, CUstream stream) {
   __CHECK_NULL_ARGUMENT(dst);
   __CHECK_NULL_ARGUMENT(src);
 
@@ -169,8 +174,21 @@ LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pit
   }
 
   // TODO: src_width is in bytes, make sure that that is clear.
-  CUDA_FAILURE_HANDLE(
-    cudaMemcpy2D((void*) dst_header->ptr, dst_header->pitch, src, src_pitch, src_width, src_height, cudaMemcpyHostToDevice));
+  CUDA_MEMCPY2D copy_info;
+  copy_info.dstDevice     = dst_header->ptr;
+  copy_info.dstMemoryType = CU_MEMORYTYPE_DEVICE;
+  copy_info.dstPitch      = dst_header->pitch;
+  copy_info.dstXInBytes   = 0;
+  copy_info.dstY          = 0;
+  copy_info.srcHost       = src;
+  copy_info.srcMemoryType = CU_MEMORYTYPE_HOST;
+  copy_info.srcPitch      = src_pitch;
+  copy_info.srcXInBytes   = 0;
+  copy_info.srcY          = 0;
+  copy_info.WidthInBytes  = src_width;
+  copy_info.Height        = src_height;
+
+  CUDA_FAILURE_HANDLE(cuMemcpy2DAsync(&copy_info, stream));
 
   return LUMINARY_SUCCESS;
 }
@@ -194,7 +212,7 @@ LuminaryResult device_memory_get_pitch(DEVICE const void* ptr, size_t* pitch) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, size_t size) {
+LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, size_t size, CUstream stream) {
   __CHECK_NULL_ARGUMENT(ptr);
 
   struct DeviceMemoryHeader* header = (struct DeviceMemoryHeader*) ptr;
@@ -209,7 +227,7 @@ LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, siz
       header->size, offset, offset + size);
   }
 
-  CUDA_FAILURE_HANDLE(cudaMemset((void*) (header->ptr + offset), value, size));
+  CUDA_FAILURE_HANDLE(cuMemsetD8Async(header->ptr + offset, value, size, stream));
 
   return LUMINARY_SUCCESS;
 }
@@ -226,18 +244,21 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
 
   header->magic = DEVICE_MEMORY_HEADER_FREED_MAGIC;
 
-  int current_device;
-  CUDA_FAILURE_HANDLE(cudaGetDevice(&current_device));
+  CUdevice device;
+  CUDA_FAILURE_HANDLE(cuCtxGetDevice(&device));
 
-  if (header->size > total_memory_allocation[current_device]) {
+  int current_device_id;
+  CUDA_FAILURE_HANDLE(cuDeviceGetAttribute(&current_device_id, CU_DEVICE_ATTRIBUTE_PCI_DEVICE_ID, device));
+
+  if (header->size > total_memory_allocation[current_device_id]) {
     __RETURN_ERROR(
       LUMINARY_ERROR_MEMORY_LEAK, "Device memory allocation is %llu bytes large but only %llu bytes are allocated in total.", header->size,
-      total_memory_allocation[current_device]);
+      total_memory_allocation[current_device_id]);
   }
 
-  total_memory_allocation[current_device] -= header->size;
+  total_memory_allocation[current_device_id] -= header->size;
 
-  CUDA_FAILURE_HANDLE(cudaFree((void*) header->ptr));
+  CUDA_FAILURE_HANDLE(cuMemFree(header->ptr));
 
   __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
 

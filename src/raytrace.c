@@ -1,6 +1,5 @@
 #include "raytrace.h"
 
-#include <cuda_runtime_api.h>
 #include <math.h>
 #include <optix.h>
 // This header must be included exactly be one translation unit

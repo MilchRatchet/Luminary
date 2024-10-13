@@ -2,7 +2,6 @@
 #define STRUCTS_H
 
 #include <assert.h>
-#include <cuda_runtime_api.h>
 #include <stdint.h>
 
 /********************************************************

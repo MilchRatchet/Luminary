@@ -1,8 +1,6 @@
 #ifndef CU_SKY_H
 #define CU_SKY_H
 
-#include <cuda_runtime_api.h>
-
 #include "cloud_shadow.cuh"
 #include "math.cuh"
 #include "memory.cuh"
