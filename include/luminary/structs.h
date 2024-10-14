@@ -48,7 +48,7 @@ LUMINARY_API struct LuminaryRendererSettings {
   LUMINARY_DEPRECATED bool use_luminary_bvh;
   uint32_t undersampling;
   LuminaryShadingMode shading_mode;
-  bool accumulate;
+  uint32_t max_sample_count;
 } typedef LuminaryRendererSettings;
 
 ////////////////////////////////////////////////////////////////////

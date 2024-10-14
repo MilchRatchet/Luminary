@@ -57,9 +57,6 @@ LUMINARY_API LuminaryResult luminary_host_get_queue_time(const LuminaryHost* hos
 LUMINARY_API LuminaryResult luminary_host_set_enable_output(LuminaryHost* host, int enable_output);
 LUMINARY_API LuminaryResult luminary_host_get_last_render(LuminaryHost* host);
 
-LUMINARY_API LuminaryResult luminary_host_get_max_sample_count(LuminaryHost* host, uint32_t* max_sample_count);
-LUMINARY_API LuminaryResult luminary_host_set_max_sample_count(LuminaryHost* host, uint32_t* max_sample_count);
-
 LUMINARY_API LuminaryResult luminary_host_get_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
 LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
 

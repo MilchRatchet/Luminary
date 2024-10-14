@@ -10,7 +10,7 @@
 #include "lum.h"
 #include "wavefront.h"
 
-#define HOST_RINGBUFFER_SIZE (0x10000ull)
+#define HOST_RINGBUFFER_SIZE (0x100000ull)
 #define HOST_QUEUE_SIZE (0x100ull)
 
 ////////////////////////////////////////////////////////////////////
@@ -72,20 +72,14 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   return LUMINARY_SUCCESS;
 }
 
-struct HostSetSceneEntityArgs {
-  void* object;
-  size_t size_of_object;
-  SceneEntity entity;
-} typedef HostSetSceneEntityArgs;
+static LuminaryResult _host_propagate_scene_changes_queue_work(Host* host, void* args) {
+  LUM_UNUSED(args);
 
-static LuminaryResult _host_set_scene_entity_queue_work(Host* host, HostSetSceneEntityArgs* args) {
   __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(args);
 
-  __FAILURE_HANDLE(scene_update(host->scene_internal, args->object, args->entity))
+  __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
 
-  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, args->size_of_object));
-  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(HostSetSceneEntityArgs)));
+  __FAILURE_HANDLE(device_manager_update_scene(host->device_manager));
 
   return LUMINARY_SUCCESS;
 }
@@ -94,26 +88,17 @@ static LuminaryResult _host_set_scene_entity_queue_work(Host* host, HostSetScene
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _host_set_scene_entity(Host* host, void* object, size_t size_of_object, SceneEntity entity, const char* string) {
+static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(object);
 
-  __FAILURE_HANDLE(scene_update(host->scene_external, object, entity));
-
-  HostSetSceneEntityArgs* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostSetSceneEntityArgs), (void**) &args));
-
-  args->size_of_object = size_of_object;
-  args->entity         = entity;
-
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, args->size_of_object, (void**) &args->object));
-  memcpy(args->object, object, args->size_of_object);
+  __FAILURE_HANDLE(scene_update(host->scene_caller, object, entity));
 
   QueueEntry entry;
 
-  entry.name     = string;
-  entry.function = (QueueEntryFunction) _host_set_scene_entity_queue_work;
-  entry.args     = args;
+  entry.name     = "Updating scene";
+  entry.function = (QueueEntryFunction) _host_propagate_scene_changes_queue_work;
+  entry.args     = (void*) 0;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
@@ -143,8 +128,8 @@ LuminaryResult luminary_host_create(Host** _host) {
   __FAILURE_HANDLE(array_create(&host->materials, sizeof(Material*), 16));
   __FAILURE_HANDLE(array_create(&host->textures, sizeof(Texture*), 16));
 
-  __FAILURE_HANDLE(scene_create(&host->scene_external));
-  __FAILURE_HANDLE(scene_create(&host->scene_internal));
+  __FAILURE_HANDLE(scene_create(&host->scene_caller));
+  __FAILURE_HANDLE(scene_create(&host->scene_host));
 
   host->enable_output = false;
 
@@ -200,8 +185,8 @@ LuminaryResult luminary_host_destroy(Host** host) {
 
   __FAILURE_HANDLE(array_destroy(&(*host)->textures));
 
-  __FAILURE_HANDLE(scene_destroy(&(*host)->scene_external));
-  __FAILURE_HANDLE(scene_destroy(&(*host)->scene_internal));
+  __FAILURE_HANDLE(scene_destroy(&(*host)->scene_caller));
+  __FAILURE_HANDLE(scene_destroy(&(*host)->scene_host));
 
   __FAILURE_HANDLE(host_free(host));
 
@@ -280,14 +265,11 @@ LuminaryResult luminary_host_get_queue_string(const Host* host, const char** str
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_get_max_sample_count(Host* host, uint32_t* max_sample_count);
-LuminaryResult luminary_host_set_max_sample_count(Host* host, uint32_t* max_sample_count);
-
 LuminaryResult luminary_host_get_settings(Host* host, RendererSettings* settings) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(settings);
 
-  __FAILURE_HANDLE(scene_get_locking(host->scene_external, settings, SCENE_ENTITY_SETTINGS));
+  __FAILURE_HANDLE(scene_get(host->scene_caller, settings, SCENE_ENTITY_SETTINGS));
 
   return LUMINARY_SUCCESS;
 }
@@ -296,7 +278,7 @@ LuminaryResult luminary_host_set_settings(Host* host, RendererSettings* settings
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(settings);
 
-  _host_set_scene_entity(host, (void*) settings, sizeof(RendererSettings), SCENE_ENTITY_SETTINGS, "Updating settings");
+  _host_set_scene_entity(host, (void*) settings, SCENE_ENTITY_SETTINGS);
 
   return LUMINARY_SUCCESS;
 }
@@ -305,7 +287,7 @@ LuminaryResult luminary_host_get_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
-  __FAILURE_HANDLE(scene_get_locking(host->scene_external, camera, SCENE_ENTITY_CAMERA));
+  __FAILURE_HANDLE(scene_get(host->scene_caller, camera, SCENE_ENTITY_CAMERA));
 
   return LUMINARY_SUCCESS;
 }
@@ -314,7 +296,7 @@ LuminaryResult luminary_host_set_camera(Host* host, Camera* camera) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(camera);
 
-  _host_set_scene_entity(host, (void*) camera, sizeof(Camera), SCENE_ENTITY_CAMERA, "Updating camera");
+  _host_set_scene_entity(host, (void*) camera, SCENE_ENTITY_CAMERA);
 
   return LUMINARY_SUCCESS;
 }
@@ -323,7 +305,7 @@ LuminaryResult luminary_host_get_ocean(Host* host, Ocean* ocean) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(ocean);
 
-  __FAILURE_HANDLE(scene_get_locking(host->scene_external, ocean, SCENE_ENTITY_OCEAN));
+  __FAILURE_HANDLE(scene_get(host->scene_caller, ocean, SCENE_ENTITY_OCEAN));
 
   return LUMINARY_SUCCESS;
 }
@@ -332,7 +314,7 @@ LuminaryResult luminary_host_set_ocean(Host* host, Ocean* ocean) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(ocean);
 
-  _host_set_scene_entity(host, (void*) ocean, sizeof(Ocean), SCENE_ENTITY_OCEAN, "Updating ocean");
+  _host_set_scene_entity(host, (void*) ocean, SCENE_ENTITY_OCEAN);
 
   return LUMINARY_SUCCESS;
 }
@@ -341,7 +323,7 @@ LuminaryResult luminary_host_get_sky(Host* host, Sky* sky) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(sky);
 
-  __FAILURE_HANDLE(scene_get_locking(host->scene_external, sky, SCENE_ENTITY_SKY));
+  __FAILURE_HANDLE(scene_get(host->scene_caller, sky, SCENE_ENTITY_SKY));
 
   return LUMINARY_SUCCESS;
 }
@@ -350,7 +332,7 @@ LuminaryResult luminary_host_set_sky(Host* host, Sky* sky) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(sky);
 
-  _host_set_scene_entity(host, (void*) sky, sizeof(Sky), SCENE_ENTITY_SKY, "Updating sky");
+  _host_set_scene_entity(host, (void*) sky, SCENE_ENTITY_SKY);
 
   return LUMINARY_SUCCESS;
 }
@@ -359,7 +341,7 @@ LuminaryResult luminary_host_get_cloud(Host* host, Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(cloud);
 
-  __FAILURE_HANDLE(scene_get_locking(host->scene_external, cloud, SCENE_ENTITY_CLOUD));
+  __FAILURE_HANDLE(scene_get(host->scene_caller, cloud, SCENE_ENTITY_CLOUD));
 
   return LUMINARY_SUCCESS;
 }
@@ -368,7 +350,7 @@ LuminaryResult luminary_host_set_cloud(Host* host, Cloud* cloud) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(cloud);
 
-  _host_set_scene_entity(host, (void*) cloud, sizeof(Cloud), SCENE_ENTITY_CLOUD, "Updating cloud");
+  _host_set_scene_entity(host, (void*) cloud, SCENE_ENTITY_CLOUD);
 
   return LUMINARY_SUCCESS;
 }
@@ -377,7 +359,7 @@ LuminaryResult luminary_host_get_fog(Host* host, Fog* fog) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(fog);
 
-  __FAILURE_HANDLE(scene_get_locking(host->scene_external, fog, SCENE_ENTITY_FOG));
+  __FAILURE_HANDLE(scene_get(host->scene_caller, fog, SCENE_ENTITY_FOG));
 
   return LUMINARY_SUCCESS;
 }
@@ -386,7 +368,7 @@ LuminaryResult luminary_host_set_fog(Host* host, Fog* fog) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(fog);
 
-  _host_set_scene_entity(host, (void*) fog, sizeof(Fog), SCENE_ENTITY_FOG, "Updating fog");
+  _host_set_scene_entity(host, (void*) fog, SCENE_ENTITY_FOG);
 
   return LUMINARY_SUCCESS;
 }
@@ -395,7 +377,7 @@ LuminaryResult luminary_host_get_particles(Host* host, Particles* particles) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(particles);
 
-  __FAILURE_HANDLE(scene_get_locking(host->scene_external, particles, SCENE_ENTITY_PARTICLES));
+  __FAILURE_HANDLE(scene_get(host->scene_caller, particles, SCENE_ENTITY_PARTICLES));
 
   return LUMINARY_SUCCESS;
 }
@@ -404,7 +386,7 @@ LuminaryResult luminary_host_set_particles(Host* host, Particles* particles) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(particles);
 
-  _host_set_scene_entity(host, (void*) particles, sizeof(Particles), SCENE_ENTITY_PARTICLES, "Updating particles");
+  _host_set_scene_entity(host, (void*) particles, SCENE_ENTITY_PARTICLES);
 
   return LUMINARY_SUCCESS;
 }
@@ -413,7 +395,7 @@ LuminaryResult luminary_host_get_toy(Host* host, Toy* toy) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(toy);
 
-  __FAILURE_HANDLE(scene_get_locking(host->scene_external, toy, SCENE_ENTITY_TOY));
+  __FAILURE_HANDLE(scene_get(host->scene_caller, toy, SCENE_ENTITY_TOY));
 
   return LUMINARY_SUCCESS;
 }
@@ -422,7 +404,7 @@ LuminaryResult luminary_host_set_toy(Host* host, Toy* toy) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(toy);
 
-  _host_set_scene_entity(host, (void*) toy, sizeof(Toy), SCENE_ENTITY_TOY, "Updating toy");
+  _host_set_scene_entity(host, (void*) toy, SCENE_ENTITY_TOY);
 
   return LUMINARY_SUCCESS;
 }

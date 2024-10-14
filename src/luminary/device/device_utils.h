@@ -56,6 +56,8 @@
 // CUDA data types
 ////////////////////////////////////////////////////////////////////
 
+// CUDA already defines these. We can query that by checking for C++.
+#ifndef __cplusplus
 struct ushort2 {
   uint16_t x;
   uint16_t y;
@@ -65,6 +67,7 @@ struct uint2 {
   uint32_t x;
   uint32_t y;
 } typedef uint2;
+#endif /* __cplusplus */
 
 ////////////////////////////////////////////////////////////////////
 // Misc data types

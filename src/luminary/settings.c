@@ -18,7 +18,7 @@ LuminaryResult settings_get_default(RendererSettings* settings) {
   settings->use_luminary_bvh           = false;
   settings->undersampling              = 3;
   settings->shading_mode               = LUMINARY_SHADING_MODE_DEFAULT;
-  settings->accumulate                 = true;
+  settings->max_sample_count           = 0xFFFFFFFF;
 
   return LUMINARY_SUCCESS;
 }
@@ -60,7 +60,6 @@ LuminaryResult settings_check_for_dirty(
   __SETTINGS_INTEGRATION_DIRTY(use_displacement_micromaps);
   __SETTINGS_INTEGRATION_DIRTY(use_luminary_bvh);
   __SETTINGS_INTEGRATION_DIRTY(undersampling);
-  __SETTINGS_INTEGRATION_DIRTY(accumulate);
 
   if (input->shading_mode == LUMINARY_SHADING_MODE_DEFAULT) {
     __SETTINGS_INTEGRATION_DIRTY(max_ray_depth);

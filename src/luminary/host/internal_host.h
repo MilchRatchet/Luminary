@@ -19,8 +19,8 @@ struct LuminaryHost {
   ARRAY Material** materials;  // TODO: Remove and handle through scene
   ARRAY Texture** textures;
   bool enable_output;
-  Scene* scene_internal;
-  Scene* scene_external;
+  Scene* scene_host;
+  Scene* scene_caller;
 } typedef LuminaryHost;
 
 #endif /* LUMINARY_INTERNAL_HOST_H */

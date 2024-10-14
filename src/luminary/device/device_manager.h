@@ -26,6 +26,8 @@
 
 struct DeviceManager {
   Host* host;
+  Scene* scene_device;
+  SampleCountSlice sample_count;
   ARRAY Device** devices;
   uint32_t main_device_index;
   CUlibrary cuda_library;
@@ -36,6 +38,7 @@ struct DeviceManager {
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager);
+LuminaryResult device_manager_update_scene(DeviceManager* device_manager);
 LuminaryResult device_manager_destroy(DeviceManager** device_manager);
 
 #endif /* LUMINARY_DEVICE_MANAGER */
