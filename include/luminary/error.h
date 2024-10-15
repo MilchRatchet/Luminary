@@ -78,6 +78,11 @@ typedef uint64_t LuminaryResult;
  */
 #define LUMINARY_ERROR_OPTIX (0x0000000000000200ull)
 
+/*
+ * Error due to Luminary being in an unstable state caused by a previous error.
+ */
+#define LUMINARY_ERROR_PREVIOUS_ERROR (0x0000000000000400ull)
+
 LUMINARY_API const char* luminary_result_to_string(LuminaryResult result);
 
 #endif /* LUMINARY_API_ERROR_H */

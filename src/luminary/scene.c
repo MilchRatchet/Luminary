@@ -208,9 +208,13 @@ LuminaryResult scene_get_locking(Scene* scene, void* object, SceneEntity entity)
   __CHECK_NULL_ARGUMENT(scene);
   __CHECK_NULL_ARGUMENT(object);
 
-  __FAILURE_HANDLE(scene_lock(scene));
-  __FAILURE_HANDLE(scene_get(scene, object, entity));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock(scene));
+  __FAILURE_HANDLE_CRITICAL(scene_get(scene, object, entity));
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(scene));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }
@@ -220,14 +224,15 @@ LuminaryResult scene_propagate_changes(Scene* scene, Scene* src) {
   __CHECK_NULL_ARGUMENT(src);
 
   // This cannot deadlock because propagation only happens caller->host->device.
-  __FAILURE_HANDLE(scene_lock(scene));
-  __FAILURE_HANDLE(scene_lock(src));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock(scene));
+  __FAILURE_HANDLE_CRITICAL(scene_lock(src));
 
   uint64_t current_entity = SCENE_ENTITY_SETTINGS;
   while (src->flags && current_entity < SCENE_ENTITY_COUNT) {
     if (src->flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
-      __FAILURE_HANDLE(scene_get(src, scene->scratch_buffer, current_entity));
-      __FAILURE_HANDLE(scene_update_force(scene, scene->scratch_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(scene_get(src, scene->scratch_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(scene_update_force(scene, scene->scratch_buffer, current_entity));
     }
 
     current_entity++;
@@ -236,8 +241,11 @@ LuminaryResult scene_propagate_changes(Scene* scene, Scene* src) {
   scene->flags |= src->flags;
   src->flags = 0;
 
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(src));
   __FAILURE_HANDLE(scene_unlock(scene));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }

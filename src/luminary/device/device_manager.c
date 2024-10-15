@@ -52,17 +52,18 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(args);
 
-  __FAILURE_HANDLE(scene_lock(device_manager->scene_device));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock(device_manager->scene_device));
 
   SceneDirtyFlags flags;
-  __FAILURE_HANDLE(scene_get_dirty_flags(device_manager->scene_device, &flags));
+  __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(device_manager->scene_device, &flags));
 
   // SCENE_ENTITY_SAMPLE_COUNT is handled differently
   uint64_t current_entity = SCENE_ENTITY_SETTINGS;
   while (flags && current_entity < SCENE_ENTITY_COUNT) {
     if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
-      __FAILURE_HANDLE(scene_get(device_manager->scene_device, args->entity_buffer, current_entity));
-      __FAILURE_HANDLE(device_struct_scene_entity_convert(args->entity_buffer, args->device_entity_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(scene_get(device_manager->scene_device, args->entity_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(device_struct_scene_entity_convert(args->entity_buffer, args->device_entity_buffer, current_entity));
       // TODO: Update entity on devices
     }
 
@@ -81,7 +82,10 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     // TODO: Reallocate buffers on all devices
   }
 
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(device_manager->scene_device));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   // Cleanup
   __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs)));

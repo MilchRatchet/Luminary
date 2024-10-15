@@ -20,11 +20,36 @@
 #define __FAILURE_HANDLE(command)                                                                             \
   {                                                                                                           \
     LuminaryResult __lum_func_err = command;                                                                  \
-    if (__lum_func_err != 0) {                                                                                \
+    if (__lum_func_err != LUMINARY_SUCCESS) {                                                                 \
       __RETURN_ERROR(                                                                                         \
         __lum_func_err | LUMINARY_ERROR_PROPAGATED, "Luminary internal function [=%s] returned %s", #command, \
         luminary_result_to_string(__lum_func_err));                                                           \
     }                                                                                                         \
+  }
+
+////////////////////////////////////////////////////////////////////
+// Mutex aware error handling
+////////////////////////////////////////////////////////////////////
+
+#define __FAILURE_HANDLE_LOCK_CRITICAL() LuminaryResult __locked_section_result = LUMINARY_SUCCESS;
+
+#define __FAILURE_HANDLE_UNLOCK_CRITICAL() \
+  __UNLOCKING_CRITICAL_LABEL:
+
+#define __FAILURE_HANDLE_CRITICAL(command)       \
+  {                                              \
+    LuminaryResult __lum_func_err = command;     \
+    if (__lum_func_err != LUMINARY_SUCCESS) {    \
+      __locked_section_result |= __lum_func_err; \
+      goto __UNLOCKING_CRITICAL_LABEL;           \
+    }                                            \
+  }
+
+#define __FAILURE_HANDLE_CHECK_CRITICAL()                                                    \
+  if (__locked_section_result != LUMINARY_SUCCESS) {                                         \
+    __RETURN_ERROR(                                                                          \
+      __locked_section_result | LUMINARY_ERROR_PROPAGATED, "Error in critical section: %s.", \
+      luminary_result_to_string(__locked_section_result));                                   \
   }
 
 #endif /* LUMINARY_INTERNAL_ERROR_H */

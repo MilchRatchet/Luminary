@@ -62,7 +62,8 @@ LuminaryResult queue_push(Queue* queue, void* object) {
     __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Queue ran out of memory.");
   }
 
-  __FAILURE_HANDLE(mutex_lock(queue->mutex));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(queue->mutex));
 
   uint8_t* dst_ptr = ((uint8_t*) (queue->buffer)) + (queue->write_ptr * queue->element_size);
 
@@ -74,9 +75,12 @@ LuminaryResult queue_push(Queue* queue, void* object) {
 
   queue->elements_in_queue++;
 
-  __FAILURE_HANDLE(condition_variable_signal(queue->cond_var));
+  __FAILURE_HANDLE_CRITICAL(condition_variable_signal(queue->cond_var));
 
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(queue->mutex));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   return LUMINARY_SUCCESS;
 }
@@ -124,18 +128,19 @@ LuminaryResult queue_pop_blocking(Queue* queue, void* object, bool* success) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
   }
 
-  __FAILURE_HANDLE(mutex_lock(queue->mutex));
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(queue->mutex));
 
   while (queue->elements_in_queue == 0) {
     if (queue->shutdown) {
-      __FAILURE_HANDLE(mutex_unlock(queue->mutex));
+      __FAILURE_HANDLE_CRITICAL(mutex_unlock(queue->mutex));
 
       *success = false;
 
       return LUMINARY_SUCCESS;
     }
 
-    __FAILURE_HANDLE(condition_variable_wait(queue->cond_var, queue->mutex));
+    __FAILURE_HANDLE_CRITICAL(condition_variable_wait(queue->cond_var, queue->mutex));
   }
 
   uint8_t* src_ptr = ((uint8_t*) (queue->buffer)) + (queue->read_ptr * queue->element_size);
@@ -148,7 +153,10 @@ LuminaryResult queue_pop_blocking(Queue* queue, void* object, bool* success) {
 
   queue->elements_in_queue--;
 
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(queue->mutex));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
 
   *success = true;
 
