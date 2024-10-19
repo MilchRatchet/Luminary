@@ -55,6 +55,9 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock(device_manager->scene_device));
 
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+
   SceneDirtyFlags flags;
   __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(device_manager->scene_device, &flags));
 
@@ -75,7 +78,13 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   }
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
-    // TODO: Signal all devices to restart integration
+    __FAILURE_HANDLE(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
+
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+      __FAILURE_HANDLE(sample_count_get_slice(&device_manager->sample_count, 32, &device->sample_count));
+      // TODO: Signal all devices to restart integration
+    }
   }
 
   if (flags & SCENE_DIRTY_FLAG_BUFFERS) {

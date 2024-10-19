@@ -334,11 +334,13 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   memset(device, 0, sizeof(Device));
 
-  device->index                    = index;
-  device->optix_callback_error     = false;
-  device->exit_requested           = false;
-  device->constant_memory_dirty    = true;
-  device->accumulated_sample_count = 0;
+  device->index                 = index;
+  device->optix_callback_error  = false;
+  device->exit_requested        = false;
+  device->constant_memory_dirty = true;
+
+  // Device has no samples queued by default.
+  __FAILURE_HANDLE(sample_count_reset(&device->sample_count, 0));
 
   CUDA_FAILURE_HANDLE(cuDeviceGet(&device->cuda_device, device->index));
 

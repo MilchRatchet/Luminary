@@ -5,8 +5,25 @@
 LuminaryResult sample_count_get_default(SampleCountSlice* slice) {
   __CHECK_NULL_ARGUMENT(slice);
 
+  __FAILURE_HANDLE(sample_count_reset(slice, 0xFFFFFFFFu));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult sample_count_set(SampleCountSlice* slice, uint32_t count) {
+  __CHECK_NULL_ARGUMENT(slice);
+
+  slice->end_sample_count = count;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult sample_count_reset(SampleCountSlice* slice, uint32_t count) {
+  __CHECK_NULL_ARGUMENT(slice);
+
   slice->current_sample_count = 0;
-  slice->end_sample_count     = 0xFFFFFFFFu;
+
+  __FAILURE_HANDLE(sample_count_set(slice, count));
 
   return LUMINARY_SUCCESS;
 }
