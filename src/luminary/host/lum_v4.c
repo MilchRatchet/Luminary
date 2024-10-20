@@ -1,10 +1,13 @@
+#include <string.h>
+
 #include "internal_error.h"
 #include "lum.h"
 
 #define LINE_SIZE 4096
 #define CURRENT_VERSION 4
 
-static LuminaryResult parse_general_settings(RendererSettings* settings, ARRAYPTR char*** obj_file_path_strings, char* line) {
+static LuminaryResult parse_general_settings(
+  RendererSettings* settings, ARRAYPTR char*** obj_file_path_strings, ARRAY MeshInstance** instances, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
   uint32_t bool_uint = 0;
@@ -17,7 +20,15 @@ static LuminaryResult parse_general_settings(RendererSettings* settings, ARRAYPT
 
       sscanf(value, "%s\n", obj_file_path);
 
+      // Legacy behaviour means to always create a instance without transform for each mesh that is loaded.
+      MeshInstance instance;
+      __FAILURE_HANDLE(mesh_instance_get_default(&instance));
+
+      // Set the mesh ID to the mesh ID in this lum file. We will later adjust it to account for any previously loaded meshes.
+      __FAILURE_HANDLE(array_get_num_elements(*obj_file_path_strings, &instance.mesh_id));
+
       __FAILURE_HANDLE(array_push(obj_file_path_strings, &obj_file_path));
+      __FAILURE_HANDLE(array_push(instances, &instance));
       break;
     }
     /* WIDTH___ */
@@ -715,7 +726,7 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
       break;
 
     if (line[0] == 'G') {
-      __FAILURE_HANDLE(parse_general_settings(&content->settings, &content->obj_file_path_strings, line + 7 + 1));
+      __FAILURE_HANDLE(parse_general_settings(&content->settings, &content->obj_file_path_strings, &content->instances, line + 7 + 1));
     }
     else if (line[0] == 'M') {
       // parse_material_settings(&content->material, line + 8 + 1);

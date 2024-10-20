@@ -8,16 +8,22 @@
 #include "utils.h"
 
 enum SceneEntity {
-  SCENE_ENTITY_SETTINGS  = 0,
-  SCENE_ENTITY_CAMERA    = 1,
-  SCENE_ENTITY_OCEAN     = 2,
-  SCENE_ENTITY_SKY       = 3,
-  SCENE_ENTITY_CLOUD     = 4,
-  SCENE_ENTITY_FOG       = 5,
-  SCENE_ENTITY_PARTICLES = 6,
-  SCENE_ENTITY_TOY       = 7,
-  SCENE_ENTITY_MATERIALS = 8,
-  SCENE_ENTITY_INSTANCES = 9,
+  SCENE_ENTITY_SETTINGS     = 0,
+  SCENE_ENTITY_CAMERA       = 1,
+  SCENE_ENTITY_OCEAN        = 2,
+  SCENE_ENTITY_SKY          = 3,
+  SCENE_ENTITY_CLOUD        = 4,
+  SCENE_ENTITY_FOG          = 5,
+  SCENE_ENTITY_PARTICLES    = 6,
+  SCENE_ENTITY_TOY          = 7,
+  SCENE_ENTITY_GLOBAL_START = SCENE_ENTITY_SETTINGS,
+  SCENE_ENTITY_GLOBAL_END   = SCENE_ENTITY_TOY,
+
+  SCENE_ENTITY_MATERIALS  = 8,
+  SCENE_ENTITY_INSTANCES  = 9,
+  SCENE_ENTITY_LIST_START = SCENE_ENTITY_MATERIALS,
+  SCENE_ENTITY_LIST_END   = SCENE_ENTITY_INSTANCES,
+
   SCENE_ENTITY_COUNT
 } typedef SceneEntity;
 
@@ -46,6 +52,16 @@ enum SceneDirtyFlag {
 
 typedef uint32_t SceneDirtyFlags;
 
+struct MaterialUpdate {
+  Material material;
+  uint32_t material_id;
+} typedef MaterialUpdate;
+
+struct MeshInstanceUpdate {
+  MeshInstance instance;
+  uint32_t instance_id;
+} typedef MeshInstanceUpdate;
+
 /*
  * The scene struct holds all the data that can be modified at runtime.
  * Scene data is subject to dirty checking.
@@ -65,7 +81,9 @@ struct Scene {
   Particles particles;
   Toy toy;
   ARRAY Material* materials;
+  ARRAY MaterialUpdate* material_updates;
   ARRAY MeshInstance* instances;
+  ARRAY MeshInstanceUpdate* instance_updates;
   void* scratch_buffer;
 } typedef Scene;
 
@@ -74,9 +92,14 @@ LuminaryResult scene_lock(Scene* scene);
 LuminaryResult scene_get_dirty_flags(const Scene* scene, SceneDirtyFlags* flags);
 LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity);
 LuminaryResult scene_get_locking(Scene* scene, void* object, SceneEntity entity);
+LuminaryResult scene_get_entry(Scene* scene, void* object, SceneEntity entity, uint32_t index);
+LuminaryResult scene_get_entry_locking(Scene* scene, void* object, SceneEntity entity, uint32_t index);
 LuminaryResult scene_unlock(Scene* scene);
 LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_update_force(Scene* scene, const void* object, SceneEntity entity);
+LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t index);
+LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity);
+LuminaryResult scene_apply_list_changes(Scene* scene, SceneEntity entity);
 LuminaryResult scene_propagate_changes(Scene* scene, Scene* src);
 LuminaryResult scene_destroy(Scene** scene);
 

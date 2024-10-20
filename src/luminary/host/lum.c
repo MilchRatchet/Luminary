@@ -34,6 +34,8 @@ LuminaryResult lum_content_create(LumFileContent** _content) {
   __FAILURE_HANDLE(particles_get_default(&content->particles));
   __FAILURE_HANDLE(toy_get_default(&content->toy));
 
+  __FAILURE_HANDLE(array_create(&content->instances, sizeof(MeshInstance), 16));
+
   *_content = content;
 
   return LUMINARY_SUCCESS;
@@ -142,6 +144,7 @@ LuminaryResult lum_content_destroy(LumFileContent** content) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*content)->obj_file_path_strings));
+  __FAILURE_HANDLE(array_destroy(&(*content)->instances));
 
   __FAILURE_HANDLE(host_free(content));
 

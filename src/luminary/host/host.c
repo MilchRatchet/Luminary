@@ -117,19 +117,19 @@ LuminaryResult luminary_host_create(Host** _host) {
 
   memset(host, 0, sizeof(Host));
 
-  __FAILURE_HANDLE(thread_create(&host->work_thread));
-  __FAILURE_HANDLE(queue_create(&host->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
-  __FAILURE_HANDLE(ringbuffer_create(&host->ringbuffer, HOST_RINGBUFFER_SIZE));
-  __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
-
-  __FAILURE_HANDLE(device_manager_create(&host->device_manager));
-
   __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
   __FAILURE_HANDLE(array_create(&host->materials, sizeof(Material*), 16));
   __FAILURE_HANDLE(array_create(&host->textures, sizeof(Texture*), 16));
 
   __FAILURE_HANDLE(scene_create(&host->scene_caller));
   __FAILURE_HANDLE(scene_create(&host->scene_host));
+
+  __FAILURE_HANDLE(thread_create(&host->work_thread));
+  __FAILURE_HANDLE(queue_create(&host->work_queue, sizeof(QueueEntry), HOST_QUEUE_SIZE));
+  __FAILURE_HANDLE(ringbuffer_create(&host->ringbuffer, HOST_RINGBUFFER_SIZE));
+  __FAILURE_HANDLE(wall_time_create(&host->queue_wall_time));
+
+  __FAILURE_HANDLE(device_manager_create(&host->device_manager, host));
 
   host->enable_output = false;
 
@@ -235,6 +235,21 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
   __FAILURE_HANDLE(luminary_host_set_fog(host, &content->fog));
   __FAILURE_HANDLE(luminary_host_set_particles(host, &content->particles));
   __FAILURE_HANDLE(luminary_host_set_toy(host, &content->toy));
+
+  uint32_t num_instances_added;
+  __FAILURE_HANDLE(array_get_num_elements(content->instances, &num_instances_added));
+
+  uint32_t mesh_id_offset;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &mesh_id_offset));
+
+  for (uint32_t instance_id = 0; instance_id < num_instances_added; instance_id++) {
+    MeshInstance instance = content->instances[instance_id];
+
+    // Account for any meshes that were loaded prior to loading this lum file.
+    instance.mesh_id += mesh_id_offset;
+
+    __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES));
+  }
 
   uint32_t num_obj_files_to_load;
   __FAILURE_HANDLE(array_get_num_elements(content->obj_file_path_strings, &num_obj_files_to_load));

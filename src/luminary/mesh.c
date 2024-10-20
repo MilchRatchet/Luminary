@@ -145,3 +145,17 @@ LuminaryResult mesh_destroy(Mesh** mesh) {
 
   return LUMINARY_SUCCESS;
 }
+
+LuminaryResult mesh_instance_get_default(MeshInstance* instance) {
+  __CHECK_NULL_ARGUMENT(instance);
+
+  memset(instance, 0, sizeof(MeshInstance));
+
+  instance->rotation.w = 1.0f;
+  instance->scale.x    = 1.0f;
+  instance->scale.y    = 1.0f;
+  instance->scale.z    = 1.0f;
+  instance->deleted    = false;
+
+  return LUMINARY_SUCCESS;
+}

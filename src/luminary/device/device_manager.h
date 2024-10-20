@@ -37,7 +37,7 @@ struct DeviceManager {
   Thread* work_thread;
 } typedef DeviceManager;
 
-LuminaryResult device_manager_create(DeviceManager** device_manager);
+LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager);
 LuminaryResult device_manager_destroy(DeviceManager** device_manager);
 

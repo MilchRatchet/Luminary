@@ -77,10 +77,7 @@ LuminaryResult _array_destroy(void** array, const char* buf_name, const char* fu
 LuminaryResult _array_push(void** array, void* object, const char* buf_name, const char* func, uint32_t line) {
   __CHECK_NULL_ARGUMENT(array);
   __CHECK_NULL_ARGUMENT(object);
-
-  if (!(*array)) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Array was NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(*array);
 
   ArrayHeader* header = ((ArrayHeader*) (*array)) - 1;
 
@@ -102,6 +99,65 @@ LuminaryResult _array_push(void** array, void* object, const char* buf_name, con
   memcpy(dst_ptr, object, header->size_of_element);
 
   header->num_elements++;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult _array_copy(void** dst, const void* src, const char* buf_name, const char* func, uint32_t line) {
+  __CHECK_NULL_ARGUMENT(src);
+  __CHECK_NULL_ARGUMENT(dst);
+
+  __FAILURE_HANDLE(array_clear(*dst));
+  __FAILURE_HANDLE(_array_append(dst, src, buf_name, func, line));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult _array_append(void** dst, const void* src, const char* buf_name, const char* func, uint32_t line) {
+  __CHECK_NULL_ARGUMENT(src);
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(*dst);
+
+  const ArrayHeader* src_header = ((const ArrayHeader*) src) - 1;
+
+  ArrayHeader* dst_header = ((ArrayHeader*) (*dst)) - 1;
+
+  if (src_header->magic != ARRAY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
+  }
+
+  if (dst_header->magic != ARRAY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
+  }
+
+  if (dst_header->size_of_element != src_header->size_of_element) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Array elements are of different size.");
+  }
+
+  if (dst_header->allocated_num_elements < dst_header->num_elements + src_header->num_elements) {
+    __FAILURE_HANDLE(_array_resize(dst, dst_header->num_elements + src_header->num_elements, buf_name, func, line));
+    dst_header = ((ArrayHeader*) (*dst)) - 1;
+  }
+
+  void* memcpy_dst = (void*) (((uint8_t*) (*dst)) + dst_header->size_of_element * dst_header->num_elements);
+
+  memcpy(memcpy_dst, src, src_header->size_of_element * src_header->num_elements);
+
+  dst_header->num_elements += src_header->num_elements;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult array_clear(void* array) {
+  __CHECK_NULL_ARGUMENT(array);
+
+  ArrayHeader* src_header = ((ArrayHeader*) array) - 1;
+
+  if (src_header->magic != ARRAY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
+  }
+
+  src_header->num_elements = 0;
 
   return LUMINARY_SUCCESS;
 }

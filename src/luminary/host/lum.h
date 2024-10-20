@@ -16,6 +16,7 @@ struct LumFileContent {
   Fog fog;
   Particles particles;
   Toy toy;
+  ARRAY MeshInstance* instances;
 } typedef LumFileContent;
 
 LuminaryResult lum_content_create(LumFileContent** content);

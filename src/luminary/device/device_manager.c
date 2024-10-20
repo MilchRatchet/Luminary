@@ -208,19 +208,24 @@ static LuminaryResult _device_manager_select_main_device(DeviceManager* device_m
 // API functions
 ////////////////////////////////////////////////////////////////////
 
-LuminaryResult device_manager_create(DeviceManager** _device_manager) {
+LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host) {
   __CHECK_NULL_ARGUMENT(_device_manager);
+  __CHECK_NULL_ARGUMENT(host);
 
   DeviceManager* device_manager;
   __FAILURE_HANDLE(host_malloc(&device_manager, sizeof(DeviceManager)));
   memset(device_manager, 0, sizeof(DeviceManager));
 
-  int device_count;
+  device_manager->host = host;
+
+  __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
+
+  int32_t device_count;
   CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
 
   __FAILURE_HANDLE(array_create(&device_manager->devices, sizeof(Device*), device_count));
 
-  for (int device_id = 0; device_id < device_count; device_id++) {
+  for (int32_t device_id = 0; device_id < device_count; device_id++) {
     Device* device;
     __FAILURE_HANDLE(device_create(&device, device_id));
 

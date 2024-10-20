@@ -52,4 +52,14 @@
       luminary_result_to_string(__locked_section_result));                                   \
   }
 
+#define __RETURN_ERROR_CRITICAL(return_code, fmt, ...) \
+  {                                                    \
+    if (return_code & LUMINARY_ERROR_PROPAGATED)       \
+      log_message(fmt, ##__VA_ARGS__);                 \
+    else                                               \
+      error_message(fmt, ##__VA_ARGS__);               \
+    __locked_section_result |= return_code;            \
+    goto __UNLOCKING_CRITICAL_LABEL;                   \
+  }
+
 #endif /* LUMINARY_INTERNAL_ERROR_H */

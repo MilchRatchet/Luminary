@@ -32,6 +32,9 @@ LuminaryResult scene_create(Scene** _scene) {
   __FAILURE_HANDLE(array_create(&scene->materials, sizeof(Material), 16));
   __FAILURE_HANDLE(array_create(&scene->instances, sizeof(MeshInstance), 16));
 
+  __FAILURE_HANDLE(array_create(&scene->material_updates, sizeof(MaterialUpdate), 16));
+  __FAILURE_HANDLE(array_create(&scene->instance_updates, sizeof(MeshInstanceUpdate), 16));
+
   __FAILURE_HANDLE(host_malloc(&scene->scratch_buffer, 4096));
 
   scene->flags = 0xFFFFFFFFu;
@@ -228,24 +231,173 @@ LuminaryResult scene_propagate_changes(Scene* scene, Scene* src) {
   __FAILURE_HANDLE_CRITICAL(scene_lock(scene));
   __FAILURE_HANDLE_CRITICAL(scene_lock(src));
 
-  uint64_t current_entity = SCENE_ENTITY_SETTINGS;
-  while (src->flags && current_entity < SCENE_ENTITY_COUNT) {
-    if (src->flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
+  scene->flags |= src->flags;
+
+  uint64_t current_entity = SCENE_ENTITY_GLOBAL_START;
+  while (src->flags && current_entity <= SCENE_ENTITY_GLOBAL_END) {
+    const uint32_t entity_dirty_flag = SCENE_ENTITY_TO_DIRTY(current_entity);
+    if (src->flags & entity_dirty_flag) {
       __FAILURE_HANDLE_CRITICAL(scene_get(src, scene->scratch_buffer, current_entity));
       __FAILURE_HANDLE_CRITICAL(scene_update_force(scene, scene->scratch_buffer, current_entity));
+      src->flags &= ~entity_dirty_flag;
     }
 
     current_entity++;
   }
 
-  scene->flags |= src->flags;
-  src->flags = 0;
+  current_entity = SCENE_ENTITY_LIST_START;
+  while (src->flags && current_entity <= SCENE_ENTITY_LIST_END) {
+    const uint32_t entity_dirty_flag = SCENE_ENTITY_TO_DIRTY(current_entity);
+    if (src->flags & entity_dirty_flag) {
+      switch (current_entity) {
+        case SCENE_ENTITY_MATERIALS:
+          __FAILURE_HANDLE_CRITICAL(array_append(&scene->material_updates, src->material_updates));
+          break;
+        case SCENE_ENTITY_INSTANCES:
+          __FAILURE_HANDLE_CRITICAL(array_append(&scene->instance_updates, src->instance_updates));
+          break;
+        default:
+          __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
+      }
+
+      __FAILURE_HANDLE_CRITICAL(scene_apply_list_changes(src, current_entity));
+
+      src->flags &= ~entity_dirty_flag;
+    }
+
+    current_entity++;
+  }
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock(src));
   __FAILURE_HANDLE(scene_unlock(scene));
 
   __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_apply_list_changes(Scene* scene, SceneEntity entity) {
+  __CHECK_NULL_ARGUMENT(scene);
+
+  switch (entity) {
+    case SCENE_ENTITY_MATERIALS: {
+      uint32_t material_updates_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &material_updates_count));
+
+      uint32_t material_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->materials, &material_count));
+
+      for (uint32_t material_update_id = 0; material_update_id < material_updates_count; material_update_id++) {
+        const MaterialUpdate update = scene->material_updates[material_update_id];
+
+        // New element
+        if (update.material_id >= material_count) {
+          __FAILURE_HANDLE(array_push(&scene->materials, &update.material));
+          continue;
+        }
+
+        scene->materials[update.material_id] = update.material;
+      }
+
+      __FAILURE_HANDLE(array_clear(scene->material_updates));
+    } break;
+    case SCENE_ENTITY_INSTANCES: {
+      uint32_t instance_updates_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->instance_updates, &instance_updates_count));
+
+      uint32_t instance_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->instances, &instance_count));
+
+      for (uint32_t instance_update_id = 0; instance_update_id < instance_updates_count; instance_update_id++) {
+        const MeshInstanceUpdate update = scene->instance_updates[instance_update_id];
+
+        // New element
+        if (update.instance_id >= instance_count) {
+          __FAILURE_HANDLE(array_push(&scene->instances, &update.instance));
+          continue;
+        }
+
+        scene->instances[update.instance_id] = update.instance;
+      }
+
+      __FAILURE_HANDLE(array_clear(scene->instance_updates));
+    } break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity) {
+  __CHECK_NULL_ARGUMENT(scene);
+  __CHECK_NULL_ARGUMENT(object);
+
+  switch (entity) {
+    case SCENE_ENTITY_MATERIALS: {
+      // Get canonical new material ID.
+      uint32_t material_id;
+      __FAILURE_HANDLE(array_get_num_elements(scene->materials, &material_id));
+
+      // There could be new materials queued in the material_updates, we need to check for that.
+      uint32_t material_updates_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &material_updates_count));
+
+      for (uint32_t material_update_id = 0; material_update_id < material_updates_count; material_update_id++) {
+        const uint32_t material_id_of_update = scene->material_updates[material_update_id].material_id;
+        if (material_id_of_update >= material_id) {
+          material_id = material_id_of_update;
+        }
+      }
+
+      MaterialUpdate update;
+      update.material_id = material_id;
+
+      memcpy(&update.material, object, sizeof(Material));
+
+      __FAILURE_HANDLE(array_push(&scene->material_updates, &update));
+    } break;
+    case SCENE_ENTITY_INSTANCES: {
+      // Get canonical new instance ID.
+      uint32_t instances_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->instances, &instances_count));
+
+      uint32_t instance_id = instances_count;
+
+      // If there are already instance updates queued, insert them at the end, otherwise, replace deleted instances.
+      if (scene->flags & SCENE_DIRTY_FLAG_INSTANCES) {
+        // There could be new instances queued in the instance_updates, we need to check for that.
+        uint32_t instance_updates_count;
+        __FAILURE_HANDLE(array_get_num_elements(scene->instance_updates, &instance_updates_count));
+
+        for (uint32_t instance_update_id = 0; instance_update_id < instance_updates_count; instance_update_id++) {
+          const uint32_t instance_id_of_update = scene->instance_updates[instance_update_id].instance_id;
+          if (instance_id_of_update >= instance_id) {
+            instance_id = instance_id_of_update;
+          }
+        }
+      }
+      else {
+        // Search for the first deleted instance and replace it.
+        for (uint32_t instance_list_id = 0; instance_list_id < instances_count; instance_list_id++) {
+          if (scene->instances[instance_list_id].deleted) {
+            instance_id = instance_list_id;
+            break;
+          }
+        }
+      }
+
+      MeshInstanceUpdate update;
+      update.instance_id = instance_id;
+
+      memcpy(&update.instance, object, sizeof(MeshInstance));
+
+      __FAILURE_HANDLE(array_push(&scene->instance_updates, &update));
+    } break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -257,6 +409,9 @@ LuminaryResult scene_destroy(Scene** scene) {
 
   __FAILURE_HANDLE(array_destroy(&(*scene)->materials));
   __FAILURE_HANDLE(array_destroy(&(*scene)->instances));
+
+  __FAILURE_HANDLE(array_destroy(&(*scene)->material_updates));
+  __FAILURE_HANDLE(array_destroy(&(*scene)->instance_updates));
 
   __FAILURE_HANDLE(host_free(&(*scene)->scratch_buffer));
 
