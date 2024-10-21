@@ -329,6 +329,9 @@ LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager) {
   __FAILURE_HANDLE(thread_join(device_manager->work_thread));
   __FAILURE_HANDLE(thread_get_last_result(device_manager->work_thread));
 
+  // There could still be some unfinished work that was queued during shutdown, so execute that now.
+  __FAILURE_HANDLE(_device_manager_queue_worker(device_manager));
+
   return LUMINARY_SUCCESS;
 }
 
