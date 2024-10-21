@@ -14,7 +14,7 @@ struct LuminaryQueue {
   size_t elements_in_queue;
   Mutex* mutex;
   ConditionVariable* cond_var;
-  bool shutdown;
+  bool is_blocking;
 };
 
 LuminaryResult _queue_create(
@@ -40,7 +40,7 @@ LuminaryResult _queue_create(
   queue->write_ptr         = 0;
   queue->read_ptr          = 0;
   queue->elements_in_queue = 0;
-  queue->shutdown          = false;
+  queue->is_blocking       = true;
 
   __FAILURE_HANDLE(mutex_create(&queue->mutex));
   __FAILURE_HANDLE(condition_variable_create(&queue->cond_var));
@@ -132,7 +132,7 @@ LuminaryResult queue_pop_blocking(Queue* queue, void* object, bool* success) {
   __FAILURE_HANDLE_CRITICAL(mutex_lock(queue->mutex));
 
   while (queue->elements_in_queue == 0) {
-    if (queue->shutdown) {
+    if (!queue->is_blocking) {
       __FAILURE_HANDLE_CRITICAL(mutex_unlock(queue->mutex));
 
       *success = false;
@@ -163,10 +163,10 @@ LuminaryResult queue_pop_blocking(Queue* queue, void* object, bool* success) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult queue_flush_blocking(Queue* queue) {
+LuminaryResult queue_set_is_blocking(Queue* queue, bool is_blocking) {
   __CHECK_NULL_ARGUMENT(queue);
 
-  queue->shutdown = true;
+  queue->is_blocking = is_blocking;
   __FAILURE_HANDLE(condition_variable_broadcast(queue->cond_var));
 
   return LUMINARY_SUCCESS;
@@ -184,7 +184,7 @@ LuminaryResult _queue_destroy(Queue** queue, const char* buf_name, const char* f
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue is not empty.");
   }
 
-  __FAILURE_HANDLE(queue_flush_blocking(*queue));
+  __FAILURE_HANDLE(queue_set_is_blocking(*queue, false));
 
   __FAILURE_HANDLE(mutex_destroy(&((*queue)->mutex)));
   __FAILURE_HANDLE(condition_variable_destroy(&((*queue)->cond_var)));

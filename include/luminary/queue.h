@@ -33,7 +33,7 @@ LUMINARY_API LuminaryResult
 LUMINARY_API LuminaryResult queue_push(LuminaryQueue* queue, void* object);
 LUMINARY_API LuminaryResult queue_pop(LuminaryQueue* queue, void* object, bool* success);
 LUMINARY_API LuminaryResult queue_pop_blocking(LuminaryQueue* queue, void* object, bool* success);
-LUMINARY_API LuminaryResult queue_flush_blocking(LuminaryQueue* queue);
+LUMINARY_API LuminaryResult queue_set_is_blocking(LuminaryQueue* queue, bool is_blocking);
 LUMINARY_API LuminaryResult _queue_destroy(LuminaryQueue** queue, const char* buf_name, const char* func, uint32_t line);
 
 #endif /* LUMINARY_QUEUE_H */

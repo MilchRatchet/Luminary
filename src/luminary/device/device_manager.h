@@ -39,6 +39,9 @@ struct DeviceManager {
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager);
+LuminaryResult device_manager_start_queue(DeviceManager* device_manager);
+LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEntry* entry);
+LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager);
 LuminaryResult device_manager_destroy(DeviceManager** device_manager);
 
 #endif /* LUMINARY_DEVICE_MANAGER */

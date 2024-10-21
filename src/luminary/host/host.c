@@ -144,13 +144,25 @@ LuminaryResult luminary_host_destroy(Host** host) {
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(*host);
 
-  __FAILURE_HANDLE(device_manager_destroy(&(*host)->device_manager));
+  ////////////////////////////////////////////////////////////////////
+  // Shutdown device thread queue
+  ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(queue_flush_blocking((*host)->work_queue));
+  __FAILURE_HANDLE(device_manager_shutdown_queue((*host)->device_manager));
 
+  ////////////////////////////////////////////////////////////////////
+  // Shutdown host thread queue
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(queue_set_is_blocking((*host)->work_queue, false));
   __FAILURE_HANDLE(thread_join((*host)->work_thread));
-
   __FAILURE_HANDLE(thread_get_last_result((*host)->work_thread));
+
+  ////////////////////////////////////////////////////////////////////
+  // Destroy member
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(device_manager_destroy(&(*host)->device_manager));
 
   __FAILURE_HANDLE(wall_time_destroy(&(*host)->queue_wall_time));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*host)->ringbuffer));

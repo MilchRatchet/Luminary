@@ -255,7 +255,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   __FAILURE_HANDLE(ringbuffer_create(&device_manager->ringbuffer, DEVICE_MANAGER_RINGBUFFER_SIZE));
   __FAILURE_HANDLE(wall_time_create(&device_manager->queue_wall_time));
 
-  __FAILURE_HANDLE(thread_start(device_manager->work_thread, (ThreadMainFunc) _device_manager_queue_worker, device_manager));
+  __FAILURE_HANDLE(device_manager_start_queue(device_manager));
 
   ////////////////////////////////////////////////////////////////////
   // Queue setup functions
@@ -267,13 +267,13 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   entry.function = (QueueEntryFunction) _device_manager_compile_kernels;
   entry.args     = (void*) 0;
 
-  __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
   entry.name     = "Device initialization";
   entry.function = (QueueEntryFunction) _device_manager_initialize_devices;
   entry.args     = (void*) 0;
 
-  __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
   ////////////////////////////////////////////////////////////////////
   // Finalize
@@ -284,15 +284,59 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_manager_start_queue(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  bool device_thread_is_running;
+  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+
+  if (device_thread_is_running)
+    return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE(queue_set_is_blocking(device_manager->work_queue, true));
+  __FAILURE_HANDLE(thread_start(device_manager->work_thread, (ThreadMainFunc) _device_manager_queue_worker, device_manager));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEntry* entry) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(entry);
+
+  __FAILURE_HANDLE(queue_push(device_manager->work_queue, entry));
+
+  bool device_thread_is_running;
+  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+
+  // If the device thread is not running, execute on current thread.
+  if (!device_thread_is_running) {
+    __FAILURE_HANDLE(_device_manager_queue_worker(device_manager));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  bool device_thread_is_running;
+  __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
+
+  if (!device_thread_is_running)
+    return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE(queue_set_is_blocking(device_manager->work_queue, false));
+  __FAILURE_HANDLE(thread_join(device_manager->work_thread));
+  __FAILURE_HANDLE(thread_get_last_result(device_manager->work_thread));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(*device_manager);
 
-  __FAILURE_HANDLE(queue_flush_blocking((*device_manager)->work_queue));
-
-  __FAILURE_HANDLE(thread_join((*device_manager)->work_thread));
-
-  __FAILURE_HANDLE(thread_get_last_result((*device_manager)->work_thread));
+  __FAILURE_HANDLE(device_manager_shutdown_queue(*device_manager));
 
   __FAILURE_HANDLE(wall_time_destroy(&(*device_manager)->queue_wall_time));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*device_manager)->ringbuffer));
@@ -335,7 +379,7 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   entry.function = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
   entry.args     = args;
 
-  __FAILURE_HANDLE(queue_push(device_manager->work_queue, &entry));
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
   return LUMINARY_SUCCESS;
 }
