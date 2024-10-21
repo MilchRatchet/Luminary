@@ -61,12 +61,20 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   SceneDirtyFlags flags;
   __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(device_manager->scene_device, &flags));
 
-  // SCENE_ENTITY_SAMPLE_COUNT is handled differently
-  uint64_t current_entity = SCENE_ENTITY_SETTINGS;
-  while (flags && current_entity < SCENE_ENTITY_COUNT) {
+  uint64_t current_entity = SCENE_ENTITY_GLOBAL_START;
+  while (flags && current_entity <= SCENE_ENTITY_GLOBAL_END) {
     if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
       __FAILURE_HANDLE_CRITICAL(scene_get(device_manager->scene_device, args->entity_buffer, current_entity));
       __FAILURE_HANDLE_CRITICAL(device_struct_scene_entity_convert(args->entity_buffer, args->device_entity_buffer, current_entity));
+      // TODO: Update entity on devices
+    }
+
+    current_entity++;
+  }
+
+  current_entity = SCENE_ENTITY_LIST_START;
+  while (flags && current_entity <= SCENE_ENTITY_LIST_END) {
+    if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
       // TODO: Update entity on devices
     }
 
@@ -300,6 +308,8 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*device_manager)->devices));
+
+  __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));
 
   __FAILURE_HANDLE(host_free(device_manager));
 
