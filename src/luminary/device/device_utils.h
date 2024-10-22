@@ -231,6 +231,20 @@ struct DevicePointers {
   DEVICE const uint32_t* stars_offsets;
 } typedef DevicePointers;
 
+enum DeviceConstantMemoryMember {
+  DEVICE_CONSTANT_MEMORY_MEMBER_PTRS      = 0,
+  DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS  = 1,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA    = 2,
+  DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN     = 3,
+  DEVICE_CONSTANT_MEMORY_MEMBER_SKY       = 4,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD     = 5,
+  DEVICE_CONSTANT_MEMORY_MEMBER_FOG       = 6,
+  DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES = 7,
+  DEVICE_CONSTANT_MEMORY_MEMBER_TOY       = 8,
+
+  DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
+} typedef DeviceConstantMemoryMember;
+
 struct DeviceConstantMemory {
   DevicePointers ptrs;
   DeviceRendererSettings settings;

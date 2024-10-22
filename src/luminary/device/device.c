@@ -11,6 +11,43 @@
 #include "light.h"
 #include "optixrt.h"
 
+static DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[] = {
+  DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,   // SCENE_ENTITY_SETTINGS
+  DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA,     // SCENE_ENTITY_CAMERA
+  DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN,      // SCENE_ENTITY_OCEAN
+  DEVICE_CONSTANT_MEMORY_MEMBER_SKY,        // SCENE_ENTITY_SKY
+  DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD,      // SCENE_ENTITY_CLOUD
+  DEVICE_CONSTANT_MEMORY_MEMBER_FOG,        // SCENE_ENTITY_FOG
+  DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES,  // SCENE_ENTITY_PARTICLES
+  DEVICE_CONSTANT_MEMORY_MEMBER_TOY         // SCENE_ENTITY_TOY
+};
+LUM_STATIC_SIZE_ASSERT(device_scene_entity_to_const_memory_member, sizeof(DeviceConstantMemoryMember) * SCENE_ENTITY_GLOBAL_COUNT);
+
+static size_t device_cuda_const_memory_offsets[] = {
+  offsetof(DeviceConstantMemory, ptrs),       // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
+  offsetof(DeviceConstantMemory, settings),   // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
+  offsetof(DeviceConstantMemory, camera),     // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
+  offsetof(DeviceConstantMemory, ocean),      // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
+  offsetof(DeviceConstantMemory, sky),        // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
+  offsetof(DeviceConstantMemory, cloud),      // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
+  offsetof(DeviceConstantMemory, fog),        // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
+  offsetof(DeviceConstantMemory, particles),  // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
+  offsetof(DeviceConstantMemory, toy)         // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
+};
+LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_offsets, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
+
+static size_t device_scene_entity_size[] = {
+  sizeof(DeviceRendererSettings),  // SCENE_ENTITY_SETTINGS     = 0,
+  sizeof(DeviceCamera),            // SCENE_ENTITY_CAMERA       = 1,
+  sizeof(DeviceOcean),             // SCENE_ENTITY_OCEAN        = 2,
+  sizeof(DeviceSky),               // SCENE_ENTITY_SKY          = 3,
+  sizeof(DeviceCloud),             // SCENE_ENTITY_CLOUD        = 4,
+  sizeof(DeviceFog),               // SCENE_ENTITY_FOG          = 5,
+  sizeof(DeviceParticles),         // SCENE_ENTITY_PARTICLES    = 6,
+  sizeof(DeviceToy)                // SCENE_ENTITY_TOY          = 7,
+};
+LUM_STATIC_SIZE_ASSERT(device_scene_entity_size, sizeof(size_t) * SCENE_ENTITY_GLOBAL_COUNT);
+
 void _device_init(void) {
   CUresult cuda_result = cuInit(0);
 
@@ -397,6 +434,15 @@ LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
     __FAILURE_HANDLE(optixrt_kernel_create(&device->optix_kernels[kernel_id], device, kernel_id));
   }
 
+  size_t const_memory_size;
+  CUDA_FAILURE_HANDLE(cuLibraryGetGlobal(&device->cuda_device_const_memory, &const_memory_size, library, "device"));
+
+  if (const_memory_size != sizeof(DeviceConstantMemory)) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION, "Const memory is expected to be %llu bytes in size but is %llu.", sizeof(DeviceConstantMemory),
+      const_memory_size);
+  }
+
   OPTIX_CHECK_CALLBACK_ERROR(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -414,6 +460,23 @@ LuminaryResult device_load_embedded_data(Device* device) {
   __FAILURE_HANDLE(_device_load_moon_textures(device));
 
   device->constant_memory_dirty = true;
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_scene_entity(Device* device, void* object, SceneEntity entity) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(object);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  const DeviceConstantMemoryMember member = device_scene_entity_to_const_memory_member[entity];
+  const size_t member_offset              = device_cuda_const_memory_offsets[member];
+  const size_t member_size                = device_scene_entity_size[entity];
+
+  CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync_v2(device->cuda_device_const_memory + member_offset, object, member_size, device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

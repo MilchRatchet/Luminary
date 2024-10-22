@@ -12,6 +12,18 @@
 #include "sky.h"
 #include "toy.h"
 
+size_t scene_entity_size[] = {
+  sizeof(RendererSettings),  // SCENE_ENTITY_SETTINGS     = 0,
+  sizeof(Camera),            // SCENE_ENTITY_CAMERA       = 1,
+  sizeof(Ocean),             // SCENE_ENTITY_OCEAN        = 2,
+  sizeof(Sky),               // SCENE_ENTITY_SKY          = 3,
+  sizeof(Cloud),             // SCENE_ENTITY_CLOUD        = 4,
+  sizeof(Fog),               // SCENE_ENTITY_FOG          = 5,
+  sizeof(Particles),         // SCENE_ENTITY_PARTICLES    = 6,
+  sizeof(Toy)                // SCENE_ENTITY_TOY          = 7,
+};
+LUM_STATIC_SIZE_ASSERT(scene_entity_size, sizeof(size_t) * SCENE_ENTITY_GLOBAL_COUNT);
+
 LuminaryResult scene_create(Scene** _scene) {
   __CHECK_NULL_ARGUMENT(_scene);
 

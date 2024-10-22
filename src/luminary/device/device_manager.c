@@ -37,6 +37,24 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
 }
 
 ////////////////////////////////////////////////////////////////////
+// Internal utility functions
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _device_manager_update_scene_entity_on_devices(DeviceManager* device_manager, void* object, SceneEntity entity) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(object);
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_update_scene_entity(device_manager->devices[device_id], object, entity));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
 
@@ -66,7 +84,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
       __FAILURE_HANDLE_CRITICAL(scene_get(device_manager->scene_device, args->entity_buffer, current_entity));
       __FAILURE_HANDLE_CRITICAL(device_struct_scene_entity_convert(args->entity_buffer, args->device_entity_buffer, current_entity));
-      // TODO: Update entity on devices
+      __FAILURE_HANDLE_CRITICAL(_device_manager_update_scene_entity_on_devices(device_manager, args->entity_buffer, current_entity));
     }
 
     current_entity++;

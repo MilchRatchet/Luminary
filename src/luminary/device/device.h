@@ -34,6 +34,7 @@ struct Device {
   CUdevice cuda_device;
   CUcontext cuda_ctx;
   CUDAKernel* cuda_kernels[CUDA_KERNEL_TYPE_COUNT];
+  CUdeviceptr cuda_device_const_memory;
   OptixDeviceContext optix_ctx;
   OptixKernel* optix_kernels[OPTIX_KERNEL_TYPE_COUNT];
   CUstream stream_main;
@@ -49,6 +50,7 @@ void _device_shutdown(void);
 LuminaryResult device_create(Device** device, uint32_t index);
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
+LuminaryResult device_update_scene_entity(Device* device, void* object, SceneEntity entity);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */
