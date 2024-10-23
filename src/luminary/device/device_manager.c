@@ -48,7 +48,7 @@ static LuminaryResult _device_manager_update_scene_entity_on_devices(DeviceManag
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_update_scene_entity(device_manager->devices[device_id], object, entity));
+    __FAILURE_HANDLE(device_update_scene_entity(device_manager->devices[device_id], object, entity, false));
   }
 
   return LUMINARY_SUCCESS;

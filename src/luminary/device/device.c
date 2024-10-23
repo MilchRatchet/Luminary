@@ -466,7 +466,7 @@ LuminaryResult device_load_embedded_data(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_update_scene_entity(Device* device, void* object, SceneEntity entity) {
+LuminaryResult device_update_scene_entity(Device* device, void* object, SceneEntity entity, bool async) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(object);
 
@@ -476,7 +476,11 @@ LuminaryResult device_update_scene_entity(Device* device, void* object, SceneEnt
   const size_t member_offset              = device_cuda_const_memory_offsets[member];
   const size_t member_size                = device_scene_entity_size[entity];
 
-  CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync_v2(device->cuda_device_const_memory + member_offset, object, member_size, device->stream_main));
+  const CUstream stream = (async) ? device->stream_secondary : device->stream_main;
+
+  // TODO: Use staging buffer.
+  CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync_v2(device->cuda_device_const_memory + member_offset, object, member_size, stream));
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(stream));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

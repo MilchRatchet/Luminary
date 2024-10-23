@@ -50,7 +50,7 @@ void _device_shutdown(void);
 LuminaryResult device_create(Device** device, uint32_t index);
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
-LuminaryResult device_update_scene_entity(Device* device, void* object, SceneEntity entity);
+LuminaryResult device_update_scene_entity(Device* device, void* object, SceneEntity entity, bool async);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */
