@@ -28,7 +28,7 @@ void _device_memory_shutdown(void) {
   }
 }
 
-LuminaryResult _device_malloc(void** _ptr, size_t size, const char* buf_name, const char* func, uint32_t line) {
+LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_name, const char* func, uint32_t line) {
   __CHECK_NULL_ARGUMENT(_ptr);
 
   struct DeviceMemoryHeader* header;
@@ -261,6 +261,53 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
   CUDA_FAILURE_HANDLE(cuMemFree(header->ptr));
 
   __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
+
+  return LUMINARY_SUCCESS;
+}
+
+struct DeviceStagingMemoryHeader {
+  uint64_t magic;
+  uint64_t size;
+};
+
+// LUMDEVIS
+#define DEVICE_STAGING_MEMORY_HEADER_MAGIC (0x53454D49444D554Cull)
+#define DEVICE_STAGING_MEMORY_HEADER_FREED_MAGIC (70ull)
+
+LuminaryResult device_malloc_staging(STAGING void** ptr, size_t size, bool upload_only) {
+  __CHECK_NULL_ARGUMENT(ptr);
+
+  struct DeviceStagingMemoryHeader* header;
+
+  // CU_MEMHOSTALLOC_WRITECOMBINED allows for fast transfer over PCI-E bus but is very slow to read from on the CPU.
+  // Hence we can't use it for stuff like downloading images from the GPU as it would be slow to then use the image on the CPU.
+  const uint32_t flags = (upload_only) ? CU_MEMHOSTALLOC_WRITECOMBINED : 0;
+
+  CUDA_FAILURE_HANDLE(cuMemHostAlloc((void**) &header, size + sizeof(struct DeviceStagingMemoryHeader), flags));
+
+  header->magic = DEVICE_STAGING_MEMORY_HEADER_MAGIC;
+  header->size  = size;
+
+  *ptr = (void*) (header + 1);
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_free_staging(STAGING void** ptr) {
+  __CHECK_NULL_ARGUMENT(ptr);
+  __CHECK_NULL_ARGUMENT(*ptr);
+
+  struct DeviceStagingMemoryHeader* header = ((struct DeviceStagingMemoryHeader*) *ptr) - 1;
+
+  if (header->magic != DEVICE_STAGING_MEMORY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Pointer is not staging memory.");
+  }
+
+  header->magic = DEVICE_STAGING_MEMORY_HEADER_FREED_MAGIC;
+
+  CUDA_FAILURE_HANDLE(cuMemFreeHost(*ptr));
+
+  *ptr = (void*) 0;
 
   return LUMINARY_SUCCESS;
 }
