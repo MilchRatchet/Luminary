@@ -31,7 +31,6 @@ struct MeshletLightData {
   TriangleLight* lights;
 } typedef MeshletLightData;
 
-LuminaryResult light_load_bridge_lut(Device* device);
 LuminaryResult light_tree_create(Meshlet* meshlet, Device* device, ARRAY const Material** materials);
 LuminaryResult light_tree_create_toplevel(
   LightTree** tree, ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials);

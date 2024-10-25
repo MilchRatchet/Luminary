@@ -189,7 +189,7 @@ LUM_STATIC_SIZE_ASSERT(LightTreeNode8Packed, 0x40);
 struct DevicePointers {
   DEVICE TraceTask* trace_tasks;
   DEVICE ShadingTaskAuxData* aux_data;
-  DEVICE uint16_t* trace_counts;
+  DEVICE uint16_t* trace_counts;  // TODO: Remove and reuse inside task_counts
   DEVICE INTERLEAVED_STORAGE TraceResult* trace_results;
   DEVICE uint16_t* task_counts;
   DEVICE uint16_t* task_offsets;
@@ -203,8 +203,8 @@ struct DevicePointers {
   DEVICE RGBF* frame_post;
   DEVICE RGBF* frame_final;
   DEVICE RGBF* records;
-  DEVICE XRGB8* buffer_8bit;
   DEVICE uint32_t* hit_id_history;
+  DEVICE XRGB8* buffer_8bit;
   DEVICE const DeviceTextureObject* albedo_atlas;
   DEVICE const DeviceTextureObject* luminance_atlas;
   DEVICE const DeviceTextureObject* material_atlas;
@@ -241,60 +241,54 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_FOG       = 6,
   DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES = 7,
   DEVICE_CONSTANT_MEMORY_MEMBER_TOY       = 8,
+  DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META = 9,
+  DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH = 10,
+  DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT = 11,
+  DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX  = 12,
+  DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC   = 13,
 
   DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 } typedef DeviceConstantMemoryMember;
 
 struct DeviceConstantMemory {
+  // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
   DevicePointers ptrs;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
   DeviceRendererSettings settings;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
   DeviceCamera camera;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
   DeviceOcean ocean;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
   DeviceSky sky;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
   DeviceCloud cloud;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
   DeviceFog fog;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
   DeviceParticles particles;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
   DeviceToy toy;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
+  uint32_t pixels_per_thread;
+  uint32_t max_task_count;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
+  OptixTraversableHandle optix_bvh;
+  OptixTraversableHandle optix_bvh_shadow;
+  OptixTraversableHandle optix_bvh_light;
+  OptixTraversableHandle optix_bvh_particles;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT
+  uint32_t non_instanced_triangle_count;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  DeviceTextureObject moon_albedo_tex;
+  DeviceTextureObject moon_normal_tex;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
   uint16_t user_selected_x;
   uint16_t user_selected_y;
   // Warning: This used to be a float, I will from now on have to emulate the old behaviour whenever we do undersampling
   uint32_t sample_id;
   uint32_t depth;
   uint32_t undersampling;
-  uint32_t pixels_per_thread;
-  OptixTraversableHandle optix_bvh;
-  OptixTraversableHandle optix_bvh_shadow;
-  OptixTraversableHandle optix_bvh_light;
-  OptixTraversableHandle optix_bvh_particles;
-  uint32_t non_instanced_triangle_count;
-  uint32_t max_task_count;
-  DeviceTextureObject moon_albedo_tex;
-  DeviceTextureObject moon_normal_tex;
-
-  /*
-  int max_ray_depth;
-  int pixels_per_thread;
-  int depth;
-  float temporal_frames;
-  int undersampling;
-  int denoiser;
-  int width;
-  int height;
-  int internal_width;
-  int internal_height;
-  vec3 sun_pos;
-  vec3 moon_pos;
-  int shading_mode;
-
-  RGBF* bloom_scratch;
-  int accumulate;
-  BVHNode8* bvh_nodes;
-  TraversalTriangle* bvh_triangles;
-  Quad* particle_quads;
-  LightTreeNode8Packed* light_tree_nodes_8;
-  uint2* light_tree_paths;
-  float* bridge_lut;
-  */
 } typedef DeviceConstantMemory;
 
 #endif /* LUMINARY_DEVICE_UTILS_H */

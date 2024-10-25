@@ -48,7 +48,7 @@ static LuminaryResult _device_manager_update_scene_entity_on_devices(DeviceManag
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_update_scene_entity(device_manager->devices[device_id], object, entity, false));
+    __FAILURE_HANDLE(device_update_scene_entity(device_manager->devices[device_id], object, entity));
   }
 
   return LUMINARY_SUCCESS;
@@ -79,6 +79,22 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   SceneDirtyFlags flags;
   __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(device_manager->scene_device, &flags));
 
+  bool update_device_data_asynchronously = true;
+
+  if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
+    // We will override rendering related data, we need to synchronously so the stale
+    // render kernels don't read crap and crash,
+    update_device_data_asynchronously = false;
+
+    __FAILURE_HANDLE(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
+
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+      __FAILURE_HANDLE(sample_count_get_slice(&device_manager->sample_count, 32, &device->sample_count));
+      // TODO: Signal all devices to restart integration
+    }
+  }
+
   uint64_t current_entity = SCENE_ENTITY_GLOBAL_START;
   while (flags && current_entity <= SCENE_ENTITY_GLOBAL_END) {
     if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
@@ -103,17 +119,12 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     // TODO: Signal main device to output current image again.
   }
 
-  if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
-    __FAILURE_HANDLE(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
-
+  if (flags & SCENE_DIRTY_FLAG_BUFFERS) {
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
-      __FAILURE_HANDLE(sample_count_get_slice(&device_manager->sample_count, 32, &device->sample_count));
-      // TODO: Signal all devices to restart integration
+      __FAILURE_HANDLE(device_allocate_work_buffers(device));
     }
-  }
 
-  if (flags & SCENE_DIRTY_FLAG_BUFFERS) {
     // TODO: Reallocate buffers on all devices
   }
 

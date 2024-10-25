@@ -133,7 +133,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* t
           __FAILURE_HANDLE(device_upload2D(data_device, data, pitch * pixel_size, width * pixel_size, height, stream));
 
           res_desc.resType                  = CU_RESOURCE_TYPE_PITCH2D;
-          res_desc.res.pitch2D.devPtr       = DEVICE_PTR(data_device);
+          res_desc.res.pitch2D.devPtr       = DEVICE_CUPTR(data_device);
           res_desc.res.pitch2D.width        = width;
           res_desc.res.pitch2D.height       = height;
           res_desc.res.pitch2D.numChannels  = texture->num_components;

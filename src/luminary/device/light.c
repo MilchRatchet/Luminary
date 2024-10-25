@@ -1639,20 +1639,3 @@ void lights_process(Scene* scene, int dmm_active) {
   scene->triangle_lights_data = tri_data;
 }
 #endif
-
-LuminaryResult light_load_bridge_lut(Device* device) {
-  uint64_t info = 0;
-
-  void* lut_data;
-  int64_t lut_length;
-  ceb_access("bridge_lut.bin", &lut_data, &lut_length, &info);
-
-  if (info) {
-    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Failed to load bridge_lut texture.");
-  }
-
-  __FAILURE_HANDLE(device_malloc(&device->buffers.bridge_lut, lut_length));
-  __FAILURE_HANDLE(device_upload((void*) device->buffers.bridge_lut, lut_data, 0, lut_length, device->stream_main));
-
-  return LUMINARY_SUCCESS;
-}

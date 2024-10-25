@@ -5,7 +5,10 @@
 
 #define STAGING
 
-#define DEVICE_PTR(device_mem) (*((CUdeviceptr*) (((uint64_t*) (device_mem)) + 1)))
+#define DEVICE_PTR_GATHER_ABSTRACTION(device_mem, type) (*((type*) (((uint64_t*) (device_mem)) + 1)))
+
+#define DEVICE_PTR(device_mem) DEVICE_PTR_GATHER_ABSTRACTION(device_mem, void*)
+#define DEVICE_CUPTR(device_mem) DEVICE_PTR_GATHER_ABSTRACTION(device_mem, CUdeviceptr)
 
 #define device_malloc(ptr, size) _device_malloc((void**) ptr, size, (const char*) #ptr, (const char*) __func__, __LINE__)
 #define device_malloc2D(ptr, width_in_bytes, height) \
@@ -25,7 +28,10 @@ LuminaryResult device_memory_get_pitch(DEVICE const void* ptr, size_t* pitch);
 LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, size_t size, CUstream stream);
 LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char* func, uint32_t line);
 
-LuminaryResult device_malloc_staging(STAGING void** ptr, size_t size, bool upload_only);
-LuminaryResult device_free_staging(STAGING void** ptr);
+#define device_malloc_staging(ptr, size, upload_only) _device_malloc_staging((void**) ptr, size, upload_only)
+#define device_free_staging(ptr) _device_free_staging((void**) ptr)
+
+LuminaryResult _device_malloc_staging(STAGING void** ptr, size_t size, bool upload_only);
+LuminaryResult _device_free_staging(STAGING void** ptr);
 
 #endif /* LUMINARY_DEVICE_MEMORY_H */

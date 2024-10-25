@@ -274,13 +274,15 @@ struct DeviceStagingMemoryHeader {
 #define DEVICE_STAGING_MEMORY_HEADER_MAGIC (0x53454D49444D554Cull)
 #define DEVICE_STAGING_MEMORY_HEADER_FREED_MAGIC (70ull)
 
-LuminaryResult device_malloc_staging(STAGING void** ptr, size_t size, bool upload_only) {
+LuminaryResult _device_malloc_staging(STAGING void** ptr, size_t size, bool upload_only) {
   __CHECK_NULL_ARGUMENT(ptr);
 
   struct DeviceStagingMemoryHeader* header;
 
   // CU_MEMHOSTALLOC_WRITECOMBINED allows for fast transfer over PCI-E bus but is very slow to read from on the CPU.
   // Hence we can't use it for stuff like downloading images from the GPU as it would be slow to then use the image on the CPU.
+  // TODO: Implement a memcpy STAGING->HOST using the SSE4 instruction MOVNTDQA which allows me to use this flag also for downloads
+  // because I can then use this memcpy to retrieve the data on the CPU.
   const uint32_t flags = (upload_only) ? CU_MEMHOSTALLOC_WRITECOMBINED : 0;
 
   CUDA_FAILURE_HANDLE(cuMemHostAlloc((void**) &header, size + sizeof(struct DeviceStagingMemoryHeader), flags));
@@ -293,7 +295,7 @@ LuminaryResult device_malloc_staging(STAGING void** ptr, size_t size, bool uploa
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_free_staging(STAGING void** ptr) {
+LuminaryResult _device_free_staging(STAGING void** ptr) {
   __CHECK_NULL_ARGUMENT(ptr);
   __CHECK_NULL_ARGUMENT(*ptr);
 
