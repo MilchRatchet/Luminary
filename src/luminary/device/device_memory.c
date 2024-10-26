@@ -262,6 +262,8 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
 
   __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
 
+  *ptr = (void*) 0;
+
   return LUMINARY_SUCCESS;
 }
 
@@ -307,7 +309,7 @@ LuminaryResult _device_free_staging(STAGING void** ptr) {
 
   header->magic = DEVICE_STAGING_MEMORY_HEADER_FREED_MAGIC;
 
-  CUDA_FAILURE_HANDLE(cuMemFreeHost(*ptr));
+  CUDA_FAILURE_HANDLE(cuMemFreeHost(header));
 
   *ptr = (void*) 0;
 

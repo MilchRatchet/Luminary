@@ -400,11 +400,15 @@ static LuminaryResult _device_free_embedded_data(Device* device) {
 // Buffer handling
 ////////////////////////////////////////////////////////////////////
 
+#define __DEVICE_BUFFER_FREE(buffer)                          \
+  if (device->buffers.buffer) {                               \
+    __FAILURE_HANDLE(device_free(&(device->buffers.buffer))); \
+    device->constant_memory->ptrs.buffer = (void*) 0;         \
+  }
+
 #define __DEVICE_BUFFER_ALLOCATE(buffer, size)                                 \
   {                                                                            \
-    if (device->buffers.buffer) {                                              \
-      __FAILURE_HANDLE(device_free(&device->buffers.buffer));                  \
-    }                                                                          \
+    __DEVICE_BUFFER_FREE(buffer);                                              \
     __FAILURE_HANDLE(device_malloc(&device->buffers.buffer, size));            \
     device->constant_memory->ptrs.buffer = DEVICE_PTR(device->buffers.buffer); \
   }
@@ -448,56 +452,51 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-#define __DEVICE_BUFFER_FREE(buffer)          \
-  if (buffer) {                               \
-    __FAILURE_HANDLE(device_free(&(buffer))); \
-  }
-
 static LuminaryResult _device_free_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.trace_tasks);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.aux_data);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.trace_counts);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.trace_results);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.task_counts);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.task_offsets);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.ior_stack);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.frame_variance);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.frame_accumulate);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.frame_direct_buffer);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.frame_direct_accumulate);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.frame_indirect_buffer);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.frame_indirect_accumulate);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.frame_post);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.frame_final);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.records);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.buffer_8bit);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.hit_id_history);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.albedo_atlas);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.luminance_atlas);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.material_atlas);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.normal_atlas);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.cloud_noise);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.sky_ms_luts);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.sky_tm_luts);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.sky_hdri_luts);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.bsdf_energy_lut);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.bluenoise_1D);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.bluenoise_2D);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.bridge_lut);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.materials);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.triangles);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.instances);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.instance_transforms);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.light_instance_map);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.bottom_level_light_trees);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.bottom_level_light_paths);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.top_level_light_tree);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.top_level_light_paths);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.particle_quads);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.stars);
-  __DEVICE_BUFFER_FREE(device->constant_memory->ptrs.stars_offsets);
+  __DEVICE_BUFFER_FREE(trace_tasks);
+  __DEVICE_BUFFER_FREE(aux_data);
+  __DEVICE_BUFFER_FREE(trace_counts);
+  __DEVICE_BUFFER_FREE(trace_results);
+  __DEVICE_BUFFER_FREE(task_counts);
+  __DEVICE_BUFFER_FREE(task_offsets);
+  __DEVICE_BUFFER_FREE(ior_stack);
+  __DEVICE_BUFFER_FREE(frame_variance);
+  __DEVICE_BUFFER_FREE(frame_accumulate);
+  __DEVICE_BUFFER_FREE(frame_direct_buffer);
+  __DEVICE_BUFFER_FREE(frame_direct_accumulate);
+  __DEVICE_BUFFER_FREE(frame_indirect_buffer);
+  __DEVICE_BUFFER_FREE(frame_indirect_accumulate);
+  __DEVICE_BUFFER_FREE(frame_post);
+  __DEVICE_BUFFER_FREE(frame_final);
+  __DEVICE_BUFFER_FREE(records);
+  __DEVICE_BUFFER_FREE(buffer_8bit);
+  __DEVICE_BUFFER_FREE(hit_id_history);
+  __DEVICE_BUFFER_FREE(albedo_atlas);
+  __DEVICE_BUFFER_FREE(luminance_atlas);
+  __DEVICE_BUFFER_FREE(material_atlas);
+  __DEVICE_BUFFER_FREE(normal_atlas);
+  __DEVICE_BUFFER_FREE(cloud_noise);
+  __DEVICE_BUFFER_FREE(sky_ms_luts);
+  __DEVICE_BUFFER_FREE(sky_tm_luts);
+  __DEVICE_BUFFER_FREE(sky_hdri_luts);
+  __DEVICE_BUFFER_FREE(bsdf_energy_lut);
+  __DEVICE_BUFFER_FREE(bluenoise_1D);
+  __DEVICE_BUFFER_FREE(bluenoise_2D);
+  __DEVICE_BUFFER_FREE(bridge_lut);
+  __DEVICE_BUFFER_FREE(materials);
+  __DEVICE_BUFFER_FREE(triangles);
+  __DEVICE_BUFFER_FREE(instances);
+  __DEVICE_BUFFER_FREE(instance_transforms);
+  __DEVICE_BUFFER_FREE(light_instance_map);
+  __DEVICE_BUFFER_FREE(bottom_level_light_trees);
+  __DEVICE_BUFFER_FREE(bottom_level_light_paths);
+  __DEVICE_BUFFER_FREE(top_level_light_tree);
+  __DEVICE_BUFFER_FREE(top_level_light_paths);
+  __DEVICE_BUFFER_FREE(particle_quads);
+  __DEVICE_BUFFER_FREE(stars);
+  __DEVICE_BUFFER_FREE(stars_offsets);
 
   __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
 
@@ -564,6 +563,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   ////////////////////////////////////////////////////////////////////
 
   __FAILURE_HANDLE(device_malloc_staging(&device->constant_memory, sizeof(DeviceConstantMemory), true));
+  memset(device->constant_memory, 0, sizeof(DeviceConstantMemory));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -653,8 +653,6 @@ LuminaryResult device_destroy(Device** device) {
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent((*device)->cuda_ctx));
   CUDA_FAILURE_HANDLE(cuCtxSynchronize());
 
-  __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
-
   __FAILURE_HANDLE(_device_free_embedded_data(*device));
   __FAILURE_HANDLE(_device_free_buffers(*device));
 
@@ -665,6 +663,8 @@ LuminaryResult device_destroy(Device** device) {
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(optixrt_kernel_destroy(&(*device)->optix_kernels[kernel_id]));
   }
+
+  __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
 
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_secondary));
