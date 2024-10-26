@@ -619,13 +619,17 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(object);
 
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
   const DeviceConstantMemoryMember member = device_scene_entity_to_const_memory_member[entity];
   const size_t member_offset              = device_cuda_const_memory_offsets[member];
   const size_t member_size                = device_cuda_const_memory_sizes[member];
 
-  memcpy(device->constant_memory + member_offset, object, member_size);
+  memcpy(((uint8_t*) device->constant_memory) + member_offset, object, member_size);
 
   __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, member));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   return LUMINARY_SUCCESS;
 }

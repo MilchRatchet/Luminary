@@ -100,7 +100,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
       __FAILURE_HANDLE_CRITICAL(scene_get(device_manager->scene_device, args->entity_buffer, current_entity));
       __FAILURE_HANDLE_CRITICAL(device_struct_scene_entity_convert(args->entity_buffer, args->device_entity_buffer, current_entity));
-      __FAILURE_HANDLE_CRITICAL(_device_manager_update_scene_entity_on_devices(device_manager, args->entity_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(_device_manager_update_scene_entity_on_devices(device_manager, args->device_entity_buffer, current_entity));
     }
 
     current_entity++;
