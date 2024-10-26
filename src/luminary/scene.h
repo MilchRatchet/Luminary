@@ -104,6 +104,7 @@ LuminaryResult scene_unlock(Scene* scene);
 LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_update_force(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t index);
+LuminaryResult scene_get_entry_count(const Scene* scene, SceneEntity entity, uint32_t* count);
 LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_apply_list_changes(Scene* scene, SceneEntity entity);
 LuminaryResult scene_propagate_changes(Scene* scene, Scene* src);

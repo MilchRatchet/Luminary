@@ -62,8 +62,40 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   __FAILURE_HANDLE(wavefront_create(&wavefront_content));
   __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path));
-  __FAILURE_HANDLE(wavefront_convert_content(wavefront_content, &host->meshes, &host->materials, &host->textures));
+
+  // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
+
+  // Lock the scene because we need to freeze the current material count and then add all the new materials.
+  // This can cause the caller to stall which is not great.
+  // TODO: Consider if using separate mutexes for scene globals and lists is an option.
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(scene_lock(host->scene_caller));
+
+  ARRAY Material** added_materials;
+  __FAILURE_HANDLE_CRITICAL(array_create(&added_materials, sizeof(Material*), 16));
+
+  uint32_t material_offset;
+  __FAILURE_HANDLE_CRITICAL(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
+
+  __FAILURE_HANDLE_CRITICAL(
+    wavefront_convert_content(wavefront_content, &host->meshes, &host->textures, &added_materials, material_offset));
+
+  uint32_t num_added_materials;
+  __FAILURE_HANDLE_CRITICAL(array_get_num_elements(added_materials, &num_added_materials));
+
+  for (uint32_t new_material_id = 0; new_material_id < num_added_materials; new_material_id++) {
+    __FAILURE_HANDLE_CRITICAL(scene_add_entry(host->scene_caller, added_materials + new_material_id, SCENE_ENTITY_MATERIALS));
+  }
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(scene_unlock(host->scene_caller));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  __FAILURE_HANDLE(array_destroy(&added_materials));
   __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
+
+  __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
 
   // Clean up
   __FAILURE_HANDLE(luminary_path_destroy(&args->path));
@@ -118,7 +150,6 @@ LuminaryResult luminary_host_create(Host** _host) {
   memset(host, 0, sizeof(Host));
 
   __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
-  __FAILURE_HANDLE(array_create(&host->materials, sizeof(Material*), 16));
   __FAILURE_HANDLE(array_create(&host->textures, sizeof(Texture*), 16));
 
   __FAILURE_HANDLE(scene_create(&host->scene_caller));
@@ -178,15 +209,6 @@ LuminaryResult luminary_host_destroy(Host** host) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*host)->meshes));
-
-  uint32_t material_count;
-  __FAILURE_HANDLE(array_get_num_elements((*host)->materials, &material_count));
-
-  for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
-    __FAILURE_HANDLE(host_free(&(*host)->materials[mat_id]));
-  }
-
-  __FAILURE_HANDLE(array_destroy(&(*host)->materials));
 
   uint32_t texture_count;
   __FAILURE_HANDLE(array_get_num_elements((*host)->textures, &texture_count));

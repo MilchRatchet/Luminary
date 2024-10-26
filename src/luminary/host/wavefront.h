@@ -77,7 +77,7 @@ struct WavefrontContent {
 LuminaryResult wavefront_create(WavefrontContent** content);
 LuminaryResult wavefront_read_file(WavefrontContent* content, Path* file);
 LuminaryResult wavefront_convert_content(
-  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Material*** materials, ARRAYPTR Texture*** textures);
+  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material*** materials, uint32_t material_offset);
 LuminaryResult wavefront_destroy(WavefrontContent** content);
 
 #endif /* WAVEFRONT_H */

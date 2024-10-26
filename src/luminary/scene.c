@@ -342,6 +342,55 @@ LuminaryResult scene_apply_list_changes(Scene* scene, SceneEntity entity) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult scene_get_entry_count(const Scene* scene, SceneEntity entity, uint32_t* count) {
+  __CHECK_NULL_ARGUMENT(scene);
+
+  uint32_t entity_count = 0;
+
+  switch (entity) {
+    case SCENE_ENTITY_MATERIALS:
+      __FAILURE_HANDLE(array_get_num_elements(scene->materials, &entity_count));
+
+      if (scene->flags & SCENE_DIRTY_FLAG_MATERIALS) {
+        // There could be more entities queued in the updates.
+        uint32_t material_updates_count;
+        __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &material_updates_count));
+
+        for (uint32_t material_update_id = 0; material_update_id < material_updates_count; material_update_id++) {
+          const uint32_t material_id = scene->material_updates[material_update_id].material_id;
+
+          if (material_id >= entity_count) {
+            entity_count = material_id + 1;
+          }
+        }
+      }
+      break;
+    case SCENE_ENTITY_INSTANCES:
+      __FAILURE_HANDLE(array_get_num_elements(scene->instances, &entity_count));
+
+      if (scene->flags & SCENE_DIRTY_FLAG_INSTANCES) {
+        // There could be more entities queued in the updates.
+        uint32_t instance_updates_count;
+        __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &instance_updates_count));
+
+        for (uint32_t instance_update_id = 0; instance_update_id < instance_updates_count; instance_update_id++) {
+          const uint32_t instance_id = scene->instance_updates[instance_update_id].instance_id;
+
+          if (instance_id >= entity_count) {
+            entity_count = instance_id + 1;
+          }
+        }
+      }
+      break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
+  }
+
+  *count = entity_count;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(scene);
   __CHECK_NULL_ARGUMENT(object);

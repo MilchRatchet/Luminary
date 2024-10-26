@@ -839,19 +839,21 @@ static LuminaryResult _wavefront_convert_materials(
   return LUMINARY_SUCCESS;
 }
 
+static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
+
 LuminaryResult wavefront_convert_content(
-  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Material*** materials, ARRAYPTR Texture*** textures) {
-  static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
+  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material*** materials,
+  uint32_t material_offset) {
+  __CHECK_NULL_ARGUMENT(content);
+  __CHECK_NULL_ARGUMENT(meshes);
+  __CHECK_NULL_ARGUMENT(textures);
+  __CHECK_NULL_ARGUMENT(materials);
 
   if (content->state != WAVEFRONT_CONTENT_STATE_READY_TO_CONVERT) {
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Wavefront content was in an illegal state.");
   }
 
   content->state = WAVEFRONT_CONTENT_STATE_FINISHED;
-
-  __CHECK_NULL_ARGUMENT(content);
-  __CHECK_NULL_ARGUMENT(meshes);
-  __CHECK_NULL_ARGUMENT(materials);
 
   uint32_t triangle_count;
   __FAILURE_HANDLE(array_get_num_elements(content->triangles, &triangle_count));
@@ -864,9 +866,6 @@ LuminaryResult wavefront_convert_content(
 
   uint32_t normal_count;
   __FAILURE_HANDLE(array_get_num_elements(content->normals, &normal_count));
-
-  uint32_t material_offset;
-  __FAILURE_HANDLE(array_get_num_elements(*materials, &material_offset));
 
   __FAILURE_HANDLE(_wavefront_convert_materials(content, materials, textures));
 

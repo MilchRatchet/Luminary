@@ -16,7 +16,6 @@ struct LuminaryHost {
   WallTime* queue_wall_time;
   Thread* work_thread;
   ARRAY Mesh** meshes;
-  ARRAY Material** materials;  // TODO: Remove and handle through scene
   ARRAY Texture** textures;
   bool enable_output;
   Scene* scene_host;
