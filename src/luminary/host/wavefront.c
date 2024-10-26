@@ -751,8 +751,7 @@ static uint16_t _wavefront_convert_float01_to_uint16(const float f) {
 }
 #endif
 
-static LuminaryResult _wavefront_convert_materials(
-  WavefrontContent* content, ARRAYPTR Material*** materials, ARRAYPTR Texture*** textures) {
+static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, ARRAYPTR Material** materials, ARRAYPTR Texture*** textures) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(materials);
 
@@ -812,26 +811,24 @@ static LuminaryResult _wavefront_convert_materials(
   for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];
 
-    Material* mat;
-    __FAILURE_HANDLE(host_malloc(&mat, sizeof(Material)));
-
-    mat->albedo.r                   = wavefront_mat.diffuse_reflectivity.r;
-    mat->albedo.g                   = wavefront_mat.diffuse_reflectivity.g;
-    mat->albedo.b                   = wavefront_mat.diffuse_reflectivity.b;
-    mat->albedo.r                   = wavefront_mat.dissolve;
-    mat->emission                   = wavefront_mat.emission;
-    mat->refraction_index           = wavefront_mat.refraction_index;
-    mat->metallic                   = wavefront_mat.specular_reflectivity.r;
-    mat->roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
-    mat->roughness_clamp            = 0.25f;
-    mat->albedo_tex                 = texture_offset + wavefront_mat.texture[WF_ALBEDO];
-    mat->luminance_tex              = texture_offset + wavefront_mat.texture[WF_LUMINANCE];
-    mat->material_tex               = texture_offset + wavefront_mat.texture[WF_MATERIAL];
-    mat->normal_tex                 = texture_offset + wavefront_mat.texture[WF_NORMAL];
-    mat->flags.emission_active      = true;
-    mat->flags.ior_shadowing        = true;
-    mat->flags.thin_walled          = false;
-    mat->flags.colored_transparency = true;
+    Material mat;
+    mat.albedo.r                   = wavefront_mat.diffuse_reflectivity.r;
+    mat.albedo.g                   = wavefront_mat.diffuse_reflectivity.g;
+    mat.albedo.b                   = wavefront_mat.diffuse_reflectivity.b;
+    mat.albedo.r                   = wavefront_mat.dissolve;
+    mat.emission                   = wavefront_mat.emission;
+    mat.refraction_index           = wavefront_mat.refraction_index;
+    mat.metallic                   = wavefront_mat.specular_reflectivity.r;
+    mat.roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;
+    mat.roughness_clamp            = 0.25f;
+    mat.albedo_tex                 = texture_offset + wavefront_mat.texture[WF_ALBEDO];
+    mat.luminance_tex              = texture_offset + wavefront_mat.texture[WF_LUMINANCE];
+    mat.material_tex               = texture_offset + wavefront_mat.texture[WF_MATERIAL];
+    mat.normal_tex                 = texture_offset + wavefront_mat.texture[WF_NORMAL];
+    mat.flags.emission_active      = true;
+    mat.flags.ior_shadowing        = true;
+    mat.flags.thin_walled          = false;
+    mat.flags.colored_transparency = true;
 
     __FAILURE_HANDLE(array_push(materials, &mat));
   }
@@ -842,7 +839,7 @@ static LuminaryResult _wavefront_convert_materials(
 static_assert(sizeof(WavefrontVertex) == 3 * sizeof(float), "Wavefront Vertex must be a struct of 3 floats!.");
 
 LuminaryResult wavefront_convert_content(
-  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material*** materials,
+  WavefrontContent* content, ARRAYPTR Mesh*** meshes, ARRAYPTR Texture*** textures, ARRAYPTR Material** materials,
   uint32_t material_offset) {
   __CHECK_NULL_ARGUMENT(content);
   __CHECK_NULL_ARGUMENT(meshes);

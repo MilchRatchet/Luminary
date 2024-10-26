@@ -353,13 +353,16 @@ static LuminaryResult _device_load_bluenoise_texture(Device* device) {
     __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "Failed to load bluenoise_2D texture. Luminary was not compiled correctly.");
   }
 
-  __FAILURE_HANDLE(device_malloc(&device->constant_memory->ptrs.bluenoise_1D, bluenoise_1D_data_length));
+  __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_1D, bluenoise_1D_data_length));
   __FAILURE_HANDLE(
-    device_upload((void*) device->constant_memory->ptrs.bluenoise_1D, bluenoise_1D_data, 0, bluenoise_1D_data_length, device->stream_main));
+    device_upload((void*) device->buffers.bluenoise_1D, bluenoise_1D_data, 0, bluenoise_1D_data_length, device->stream_main));
 
-  __FAILURE_HANDLE(device_malloc(&device->constant_memory->ptrs.bluenoise_2D, bluenoise_2D_data_length));
+  __FAILURE_HANDLE(device_malloc(&device->buffers.bluenoise_2D, bluenoise_2D_data_length));
   __FAILURE_HANDLE(
-    device_upload((void*) device->constant_memory->ptrs.bluenoise_2D, bluenoise_2D_data, 0, bluenoise_2D_data_length, device->stream_main));
+    device_upload((void*) device->buffers.bluenoise_2D, bluenoise_2D_data, 0, bluenoise_2D_data_length, device->stream_main));
+
+  device->constant_memory->ptrs.bluenoise_1D = DEVICE_PTR(device->buffers.bluenoise_1D);
+  device->constant_memory->ptrs.bluenoise_2D = DEVICE_PTR(device->buffers.bluenoise_2D);
 
   __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
 

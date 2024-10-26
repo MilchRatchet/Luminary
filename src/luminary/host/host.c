@@ -71,8 +71,8 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(scene_lock(host->scene_caller));
 
-  ARRAY Material** added_materials;
-  __FAILURE_HANDLE_CRITICAL(array_create(&added_materials, sizeof(Material*), 16));
+  ARRAY Material* added_materials;
+  __FAILURE_HANDLE_CRITICAL(array_create(&added_materials, sizeof(Material), 16));
 
   uint32_t material_offset;
   __FAILURE_HANDLE_CRITICAL(scene_get_entry_count(host->scene_caller, SCENE_ENTITY_MATERIALS, &material_offset));
