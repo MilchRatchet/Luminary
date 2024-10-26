@@ -31,6 +31,13 @@ enum SceneEntity {
   SCENE_ENTITY_LIST_COUNT = SCENE_ENTITY_LIST_END + 1,
 } typedef SceneEntity;
 
+enum SceneEntityType {
+  SCENE_ENTITY_TYPE_GLOBAL = 0,
+  SCENE_ENTITY_TYPE_LIST   = 1,
+
+  SCENE_ENTITY_TYPE_COUNT
+} typedef SceneEntityType;
+
 #define SCENE_ENTITY_TO_DIRTY(ENTITY) (1ull << ENTITY)
 
 enum SceneDirtyFlag {
@@ -76,8 +83,8 @@ struct MeshInstanceUpdate {
  * Instances can be transformed and are hence present here.
  */
 struct Scene {
-  SceneDirtyFlags flags;
-  Mutex* mutex;
+  SceneDirtyFlags flags[SCENE_ENTITY_TYPE_COUNT];
+  Mutex* mutex[SCENE_ENTITY_TYPE_COUNT];
   RendererSettings settings;
   Camera camera;
   Ocean ocean;
@@ -94,13 +101,15 @@ struct Scene {
 } typedef Scene;
 
 LuminaryResult scene_create(Scene** scene);
-LuminaryResult scene_lock(Scene* scene);
+LuminaryResult scene_lock(Scene* scene, SceneEntityType entity_mutex);
+LuminaryResult scene_lock_all(Scene* scene);
 LuminaryResult scene_get_dirty_flags(const Scene* scene, SceneDirtyFlags* flags);
 LuminaryResult scene_get(Scene* scene, void* object, SceneEntity entity);
 LuminaryResult scene_get_locking(Scene* scene, void* object, SceneEntity entity);
 LuminaryResult scene_get_entry(Scene* scene, void* object, SceneEntity entity, uint32_t index);
 LuminaryResult scene_get_entry_locking(Scene* scene, void* object, SceneEntity entity, uint32_t index);
-LuminaryResult scene_unlock(Scene* scene);
+LuminaryResult scene_unlock(Scene* scene, SceneEntityType entity_mutex);
+LuminaryResult scene_unlock_all(Scene* scene);
 LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_update_force(Scene* scene, const void* object, SceneEntity entity);
 LuminaryResult scene_update_entry(Scene* scene, const void* object, SceneEntity entity, uint32_t index);

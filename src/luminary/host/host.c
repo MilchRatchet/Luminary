@@ -65,11 +65,10 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
 
-  // Lock the scene because we need to freeze the current material count and then add all the new materials.
-  // This can cause the caller to stall which is not great.
-  // TODO: Consider if using separate mutexes for scene globals and lists is an option.
+  // Lock the scene lists because we need to freeze the current material count and then add all the new materials.
+  // This can cause the caller to stall if he performs other list updates.
   __FAILURE_HANDLE_LOCK_CRITICAL();
-  __FAILURE_HANDLE_CRITICAL(scene_lock(host->scene_caller));
+  __FAILURE_HANDLE_CRITICAL(scene_lock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
 
   ARRAY Material* added_materials;
   __FAILURE_HANDLE_CRITICAL(array_create(&added_materials, sizeof(Material), 16));
@@ -88,7 +87,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   }
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
-  __FAILURE_HANDLE(scene_unlock(host->scene_caller));
+  __FAILURE_HANDLE(scene_unlock(host->scene_caller, SCENE_ENTITY_TYPE_LIST));
 
   __FAILURE_HANDLE_CHECK_CRITICAL();
 

@@ -71,7 +71,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   __CHECK_NULL_ARGUMENT(args);
 
   __FAILURE_HANDLE_LOCK_CRITICAL();
-  __FAILURE_HANDLE_CRITICAL(scene_lock(device_manager->scene_device));
+  __FAILURE_HANDLE_CRITICAL(scene_lock_all(device_manager->scene_device));
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
@@ -82,7 +82,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   bool update_device_data_asynchronously = true;
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
-    // We will override rendering related data, we need to synchronously so the stale
+    // We will override rendering related data, we need to do this synchronously so the stale
     // render kernels don't read crap and crash,
     update_device_data_asynchronously = false;
 
@@ -129,7 +129,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   }
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
-  __FAILURE_HANDLE(scene_unlock(device_manager->scene_device));
+  __FAILURE_HANDLE(scene_unlock_all(device_manager->scene_device));
 
   __FAILURE_HANDLE_CHECK_CRITICAL();
 
