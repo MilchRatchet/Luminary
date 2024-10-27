@@ -141,6 +141,21 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_upload_meshes(DeviceManager* device_manager, void* args) {
+  LUM_UNUSED(args);
+
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_upload_meshes(device_manager->devices[device_id], (const ARRAY DeviceMesh**) device_manager->meshes));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_manager, void* args) {
   LUM_UNUSED(args);
 
@@ -256,6 +271,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   device_manager->host = host;
 
   __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
+  __FAILURE_HANDLE(array_create(&device_manager->meshes, sizeof(DeviceMesh*), 4));
 
   int32_t device_count;
   CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
@@ -376,6 +392,15 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
 
   __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
 
+  uint32_t mesh_count;
+  __FAILURE_HANDLE(array_get_num_elements((*device_manager)->meshes, &mesh_count));
+
+  for (uint32_t mesh_id = 0; mesh_id < mesh_count; mesh_id++) {
+    __FAILURE_HANDLE(device_mesh_destroy(&(*device_manager)->meshes[mesh_id]));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*device_manager)->meshes));
+
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements((*device_manager)->devices, &device_count));
 
@@ -410,6 +435,28 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   entry.name     = "Update device scene";
   entry.function = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
   entry.args     = args;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Mesh** meshes, uint32_t num_meshes) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(meshes);
+
+  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+    DeviceMesh* device_mesh;
+    __FAILURE_HANDLE(device_mesh_create(&device_mesh, meshes[mesh_id]));
+
+    __FAILURE_HANDLE(array_push(&device_manager->meshes, &device_mesh));
+  }
+
+  QueueEntry entry;
+
+  entry.name     = "Upload meshes";
+  entry.function = (QueueEntryFunction) _device_manager_upload_meshes;
+  entry.args     = (void*) 0;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 

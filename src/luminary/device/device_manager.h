@@ -22,6 +22,7 @@
 // queue a device task.
 
 #include "device.h"
+#include "device_mesh.h"
 #include "thread.h"
 
 struct DeviceManager {
@@ -35,10 +36,12 @@ struct DeviceManager {
   RingBuffer* ringbuffer;
   WallTime* queue_wall_time;
   Thread* work_thread;
+  ARRAY DeviceMesh** meshes;
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager);
+LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Mesh** meshes, uint32_t num_to_add);
 LuminaryResult device_manager_start_queue(DeviceManager* device_manager);
 LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEntry* entry);
 LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager);

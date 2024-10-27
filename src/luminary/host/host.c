@@ -65,6 +65,9 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
 
+  uint32_t num_meshes_before;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_before));
+
   // Lock the scene lists because we need to freeze the current material count and then add all the new materials.
   // This can cause the caller to stall if he performs other list updates.
   __FAILURE_HANDLE_LOCK_CRITICAL();
@@ -95,6 +98,12 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
   __FAILURE_HANDLE(wavefront_destroy(&wavefront_content));
 
   __FAILURE_HANDLE(scene_propagate_changes(host->scene_host, host->scene_caller));
+
+  uint32_t num_meshes_after;
+  __FAILURE_HANDLE(array_get_num_elements(host->meshes, &num_meshes_after));
+
+  __FAILURE_HANDLE(
+    device_manager_add_meshes(host->device_manager, (const Mesh**) host->meshes + num_meshes_before, num_meshes_after - num_meshes_before));
 
   // Clean up
   __FAILURE_HANDLE(luminary_path_destroy(&args->path));

@@ -1,6 +1,7 @@
 #ifndef LUMINARY_DEVICE_H
 #define LUMINARY_DEVICE_H
 
+#include "device_mesh.h"
 #include "device_utils.h"
 #include "kernel.h"
 #include "optixrt.h"
@@ -49,6 +50,7 @@ struct Device {
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
+  STAGING void* staging_buffer;
 } typedef Device;
 
 void _device_init(void);
@@ -59,6 +61,7 @@ LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
 LuminaryResult device_allocate_work_buffers(Device* device);
+LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** meshes);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

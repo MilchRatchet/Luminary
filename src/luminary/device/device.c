@@ -17,6 +17,8 @@
 #include "sky.h"
 #include "toy.h"
 
+#define STAGING_BUFFER_SIZE (1024u * 1024u * 512u)
+
 static DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[] = {
   DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,   // SCENE_ENTITY_SETTINGS
   DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA,     // SCENE_ENTITY_CAMERA
@@ -507,6 +509,49 @@ static LuminaryResult _device_free_buffers(Device* device) {
 }
 
 ////////////////////////////////////////////////////////////////////
+// Staging implementation
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _device_stage_memory(
+  Device* device, DEVICE void* dst, void* src, size_t dst_offset, size_t src_offset, size_t* size) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(src);
+
+  size_t size_this_stage = *size;
+
+  if (size_this_stage > STAGING_BUFFER_SIZE) {
+    size_this_stage = STAGING_BUFFER_SIZE;
+  }
+
+  *size -= size_this_stage;
+
+  memcpy(device->staging_buffer, ((uint8_t*) src) + src_offset, size_this_stage);
+
+  __FAILURE_HANDLE(device_upload(dst, src, dst_offset, size_this_stage, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_stage_memory_full(Device* device, DEVICE void* dst, void* src, size_t offset, size_t size) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(src);
+
+  size_t dst_offset = offset;
+  size_t src_offset = 0;
+
+  while (size) {
+    __FAILURE_HANDLE(_device_stage_memory(device, dst, src, dst_offset, src_offset, &size));
+    dst_offset += STAGING_BUFFER_SIZE;
+    src_offset += STAGING_BUFFER_SIZE;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
 // External API implementation
 ////////////////////////////////////////////////////////////////////
 
@@ -567,6 +612,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   __FAILURE_HANDLE(device_malloc_staging(&device->constant_memory, sizeof(DeviceConstantMemory), true));
   memset(device->constant_memory, 0, sizeof(DeviceConstantMemory));
+
+  __FAILURE_HANDLE(device_malloc_staging(&device->staging_buffer, STAGING_BUFFER_SIZE, true));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -649,6 +696,52 @@ LuminaryResult device_allocate_work_buffers(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** meshes) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  uint32_t mesh_count;
+  __FAILURE_HANDLE(array_get_num_elements(meshes, &mesh_count));
+
+  uint32_t non_instanced_triangle_count = 0;
+
+  for (uint32_t mesh_id = 0; mesh_id < mesh_count; mesh_id++) {
+    const DeviceMesh* mesh = meshes[mesh_id];
+
+    uint32_t triangle_count;
+    __FAILURE_HANDLE(array_get_num_elements(mesh->triangles, &triangle_count));
+
+    non_instanced_triangle_count += triangle_count;
+  }
+
+  __DEVICE_BUFFER_ALLOCATE(triangles, sizeof(DeviceTriangle) * non_instanced_triangle_count);
+
+  uint32_t triangles_offset = 0;
+
+  for (uint32_t mesh_id = 0; mesh_id < mesh_count; mesh_id++) {
+    const DeviceMesh* mesh = meshes[mesh_id];
+
+    uint32_t triangle_count;
+    __FAILURE_HANDLE(array_get_num_elements(mesh->triangles, &triangle_count));
+
+    __FAILURE_HANDLE(_device_stage_memory_full(
+      device, (void*) device->buffers.triangles, (void*) mesh->triangles, triangles_offset, sizeof(DeviceTriangle) * triangle_count));
+
+    triangles_offset += triangle_count;
+  }
+
+  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
+
+  device->constant_memory->non_instanced_triangle_count = non_instanced_triangle_count;
+
+  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_destroy(Device** device) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(*device);
@@ -668,6 +761,7 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
+  __FAILURE_HANDLE(device_free_staging(&(*device)->staging_buffer));
 
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_secondary));
