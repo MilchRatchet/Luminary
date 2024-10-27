@@ -53,12 +53,8 @@ LuminaryResult wavefront_create(WavefrontContent** content) {
   (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
   (*content)->materials[0].texture[WF_NORMAL]      = TEXTURE_NONE;
 
-  __FAILURE_HANDLE(array_create((*content)->maps + WF_ALBEDO, sizeof(Texture*), 16));
-  __FAILURE_HANDLE(array_create((*content)->maps + WF_LUMINANCE, sizeof(Texture*), 16));
-  __FAILURE_HANDLE(array_create((*content)->maps + WF_MATERIAL, sizeof(Texture*), 16));
-  __FAILURE_HANDLE(array_create((*content)->maps + WF_NORMAL, sizeof(Texture*), 16));
-
-  __FAILURE_HANDLE(array_create(&(*content)->textures, sizeof(WavefrontTextureInstance), 16));
+  __FAILURE_HANDLE(array_create(&(*content)->textures, sizeof(Texture*), 16));
+  __FAILURE_HANDLE(array_create(&(*content)->texture_instances, sizeof(WavefrontTextureInstance), 16));
 
   return LUMINARY_SUCCESS;
 }
@@ -72,34 +68,15 @@ LuminaryResult wavefront_destroy(WavefrontContent** content) {
   __FAILURE_HANDLE(array_destroy(&(*content)->triangles));
   __FAILURE_HANDLE(array_destroy(&(*content)->materials));
 
-  uint32_t num_albedo_maps;
-  __FAILURE_HANDLE(array_get_num_elements((*content)->maps[WF_ALBEDO], &num_albedo_maps));
-  uint32_t num_luminance_maps;
-  __FAILURE_HANDLE(array_get_num_elements((*content)->maps[WF_LUMINANCE], &num_luminance_maps));
-  uint32_t num_material_maps;
-  __FAILURE_HANDLE(array_get_num_elements((*content)->maps[WF_MATERIAL], &num_material_maps));
-  uint32_t num_normal_maps;
-  __FAILURE_HANDLE(array_get_num_elements((*content)->maps[WF_NORMAL], &num_normal_maps));
+  uint32_t num_textures;
+  __FAILURE_HANDLE(array_get_num_elements((*content)->textures, &num_textures));
 
-  for (uint32_t map_id = 0; map_id < num_albedo_maps; map_id++) {
-    __FAILURE_HANDLE(texture_destroy(&(*content)->maps[WF_ALBEDO][map_id]));
+  for (uint32_t texture_id = 0; texture_id < num_textures; texture_id++) {
+    __FAILURE_HANDLE(texture_destroy(&(*content)->textures[texture_id]));
   }
-  for (uint32_t map_id = 0; map_id < num_luminance_maps; map_id++) {
-    __FAILURE_HANDLE(texture_destroy(&(*content)->maps[WF_LUMINANCE][map_id]));
-  }
-  for (uint32_t map_id = 0; map_id < num_material_maps; map_id++) {
-    __FAILURE_HANDLE(texture_destroy(&(*content)->maps[WF_MATERIAL][map_id]));
-  }
-  for (uint32_t map_id = 0; map_id < num_normal_maps; map_id++) {
-    __FAILURE_HANDLE(texture_destroy(&(*content)->maps[WF_NORMAL][map_id]));
-  }
-
-  __FAILURE_HANDLE(array_destroy((*content)->maps + WF_ALBEDO));
-  __FAILURE_HANDLE(array_destroy((*content)->maps + WF_LUMINANCE));
-  __FAILURE_HANDLE(array_destroy((*content)->maps + WF_MATERIAL));
-  __FAILURE_HANDLE(array_destroy((*content)->maps + WF_NORMAL));
 
   __FAILURE_HANDLE(array_destroy(&(*content)->textures));
+  __FAILURE_HANDLE(array_destroy(&(*content)->texture_instances));
 
   __FAILURE_HANDLE(host_free(content));
 
@@ -142,14 +119,14 @@ static size_t hash_djb2(unsigned char* str) {
 /*
  * @result Index of texture if texture is already present, else TEXTURE_NONE
  */
-static uint16_t find_texture(WavefrontContent* content, uint32_t hash, WavefrontTextureInstanceType type) {
+static uint16_t find_texture(const WavefrontContent* content, uint32_t hash) {
   uint32_t texture_count;
-  __FAILURE_HANDLE(array_get_num_elements(content->textures, &texture_count));
+  __FAILURE_HANDLE(array_get_num_elements(content->texture_instances, &texture_count));
 
   for (uint32_t tex_id = 0; tex_id < texture_count; tex_id++) {
-    WavefrontTextureInstance tex = content->textures[tex_id];
-    if (tex.hash == hash && tex.type == type)
-      return tex.offset;
+    WavefrontTextureInstance tex = content->texture_instances[tex_id];
+    if (tex.hash == hash)
+      return tex.texture_id;
   }
 
   return TEXTURE_NONE;
@@ -167,7 +144,7 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_
   uint32_t path_offset = 7;
 
   // Determine type of map
-  WavefrontTextureInstanceType type;
+  WavefrontTextureType type;
   if (!strncmp(line + 4, "Kd", 2)) {
     type = WF_ALBEDO;
   }
@@ -235,11 +212,11 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_
   }
 
   const size_t hash   = hash_djb2((unsigned char*) path);
-  uint16_t texture_id = find_texture(content, hash, type);
+  uint16_t texture_id = find_texture(content, hash);
 
   if (texture_id == TEXTURE_NONE) {
     uint32_t new_texture_id;
-    __FAILURE_HANDLE(array_get_num_elements(content->maps[type], &new_texture_id));
+    __FAILURE_HANDLE(array_get_num_elements(content->textures, &new_texture_id));
 
     if (new_texture_id > 0xFFFFu) {
       __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Exceeded limit of 65535 textures.");
@@ -248,9 +225,8 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_
     texture_id = (uint16_t) new_texture_id;
 
     WavefrontTextureInstance texture_instance;
-    texture_instance.hash   = hash;
-    texture_instance.type   = type;
-    texture_instance.offset = texture_id;
+    texture_instance.hash       = hash;
+    texture_instance.texture_id = texture_id;
 
     const char* tex_file_path;
     __FAILURE_HANDLE(path_apply(mtl_file_path, path, &tex_file_path));
@@ -258,8 +234,8 @@ static LuminaryResult _wavefront_parse_map(WavefrontContent* content, Path* mtl_
     Texture* tex;
     __FAILURE_HANDLE(png_load_from_file(&tex, tex_file_path));
 
-    __FAILURE_HANDLE(array_push(&content->maps[type], &tex));
-    __FAILURE_HANDLE(array_push(&content->textures, &texture_instance));
+    __FAILURE_HANDLE(array_push(&content->textures, &tex));
+    __FAILURE_HANDLE(array_push(&content->texture_instances, &texture_instance));
   }
 
   uint32_t current_material_ptr;
@@ -762,7 +738,7 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
   __FAILURE_HANDLE(array_get_num_elements(*textures, &texture_offset));
 
   uint32_t texture_count;
-  __FAILURE_HANDLE(array_get_num_elements(content->textures, &texture_count));
+  __FAILURE_HANDLE(array_get_num_elements(content->texture_instances, &texture_count));
 
   // TODO: This is the old WavefrontMaterial -> PackedMaterial code. Port this to Material -> PackedMaterial and make a function out of
   // that.
@@ -796,17 +772,14 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
 #endif
 
   for (uint32_t tex_id = 0; tex_id < texture_count; tex_id++) {
-    const WavefrontTextureInstance instance = content->textures[tex_id];
-    const Texture* tex                      = content->maps[instance.type][instance.offset];
+    const WavefrontTextureInstance instance = content->texture_instances[tex_id];
+    const Texture* tex                      = content->textures[instance.texture_id];
 
     __FAILURE_HANDLE(array_push(textures, &tex));
   }
 
+  __FAILURE_HANDLE(array_resize(&content->texture_instances, 0));
   __FAILURE_HANDLE(array_resize(&content->textures, 0));
-  __FAILURE_HANDLE(array_resize(&content->maps[WF_ALBEDO], 0));
-  __FAILURE_HANDLE(array_resize(&content->maps[WF_LUMINANCE], 0));
-  __FAILURE_HANDLE(array_resize(&content->maps[WF_MATERIAL], 0));
-  __FAILURE_HANDLE(array_resize(&content->maps[WF_NORMAL], 0));
 
   for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];

@@ -156,6 +156,29 @@ static LuminaryResult _device_manager_upload_meshes(DeviceManager* device_manage
   return LUMINARY_SUCCESS;
 }
 
+struct DeviceManagerAddTexturesArgs {
+  const Texture** textures;
+  uint32_t num_textures;
+} typedef DeviceManagerAddTexturesArgs;
+
+static LuminaryResult _device_manager_add_textures(DeviceManager* device_manager, DeviceManagerAddTexturesArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_add_textures(device_manager->devices[device_id], args->textures, args->num_textures));
+  }
+
+  // Cleanup
+  __FAILURE_HANDLE(host_free(&args->textures));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddTexturesArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_manager, void* args) {
   LUM_UNUSED(args);
 
@@ -457,6 +480,34 @@ LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Me
   entry.name     = "Upload meshes";
   entry.function = (QueueEntryFunction) _device_manager_upload_meshes;
   entry.args     = (void*) 0;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_add_textures(DeviceManager* device_manager, const Texture** textures, uint32_t num_textures) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(textures);
+
+  // We need to make a copy because the caller could add textures which could cause a reallocation of the textures array in the host which
+  // would invalidate our pointer.
+  Texture** textures_copy;
+  __FAILURE_HANDLE(host_malloc(&textures_copy, sizeof(Texture*) * num_textures));
+
+  memcpy(textures_copy, textures, sizeof(Texture*) * num_textures);
+
+  DeviceManagerAddTexturesArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddTexturesArgs), (void**) &args));
+
+  args->textures     = (const Texture**) textures_copy;
+  args->num_textures = num_textures;
+
+  QueueEntry entry;
+
+  entry.name     = "Add textures";
+  entry.function = (QueueEntryFunction) _device_manager_add_textures;
+  entry.args     = (void*) args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 

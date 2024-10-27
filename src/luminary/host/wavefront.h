@@ -38,6 +38,14 @@ struct WavefrontTriangle {
   uint16_t object;
 } typedef WavefrontTriangle;
 
+enum WavefrontTextureType {
+  WF_ALBEDO    = 0,
+  WF_LUMINANCE = 1,
+  WF_MATERIAL  = 2,
+  WF_NORMAL    = 3,
+  WF_TEX_TYPE_COUNT
+} typedef WavefrontTextureType;
+
 struct WavefrontMaterial {
   size_t hash;
   RGBF diffuse_reflectivity;
@@ -46,15 +54,12 @@ struct WavefrontMaterial {
   float specular_exponent; /* [0, 1000] */
   RGBF emission;
   float refraction_index;
-  uint16_t texture[4];
+  uint16_t texture[WF_TEX_TYPE_COUNT];
 } typedef WavefrontMaterial;
-
-enum WavefrontTextureInstanceType { WF_ALBEDO = 0, WF_LUMINANCE = 1, WF_MATERIAL = 2, WF_NORMAL = 3 } typedef WavefrontTextureInstanceType;
 
 struct WavefrontTextureInstance {
   size_t hash;
-  WavefrontTextureInstanceType type;
-  uint16_t offset;
+  uint16_t texture_id;
 } typedef WavefrontTextureInstance;
 
 enum WavefrontContentState {
@@ -70,8 +75,8 @@ struct WavefrontContent {
   ARRAY WavefrontUV* uvs;
   ARRAY WavefrontTriangle* triangles;
   ARRAY WavefrontMaterial* materials;
-  ARRAY Texture** maps[4];
-  ARRAY WavefrontTextureInstance* textures;
+  ARRAY Texture** textures;
+  ARRAY WavefrontTextureInstance* texture_instances;
 } typedef WavefrontContent;
 
 LuminaryResult wavefront_create(WavefrontContent** content);

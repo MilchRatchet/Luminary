@@ -14,7 +14,7 @@ struct DeviceTexture {
   bool is_3D;
 };
 
-LuminaryResult device_texture_create(DeviceTexture** device_texture, Texture* texture, CUstream stream);
+LuminaryResult device_texture_create(DeviceTexture** device_texture, const Texture* texture, CUstream stream);
 LuminaryResult device_texture_destroy(DeviceTexture** device_texture);
 
 #endif /* LUMINARY_DEVICE_TEXTURE_H */

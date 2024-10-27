@@ -150,7 +150,7 @@ __device__ RGBAF optix_alpha_test(const TriangleHandle handle, const uint32_t ma
   if (tex != TEXTURE_NONE) {
     const UV uv = load_triangle_tex_coords(handle, optixGetTriangleBarycentrics());
 
-    const float4 tex_value = tex2D<float4>(device.ptrs.albedo_atlas[tex].handle, uv.u, 1.0f - uv.v);
+    const float4 tex_value = tex2D<float4>(device.ptrs.textures[tex].handle, uv.u, 1.0f - uv.v);
 
     RGBAF albedo;
     albedo.r = tex_value.x;

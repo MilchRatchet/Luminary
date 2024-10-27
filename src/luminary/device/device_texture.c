@@ -86,7 +86,7 @@ static LuminaryResult _device_texture_get_pixel_size(const Texture* tex, size_t*
   }
 }
 
-LuminaryResult device_texture_create(DeviceTexture** _device_texture, Texture* texture, CUstream stream) {
+LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Texture* texture, CUstream stream) {
   __CHECK_NULL_ARGUMENT(_device_texture);
   __CHECK_NULL_ARGUMENT(texture);
 

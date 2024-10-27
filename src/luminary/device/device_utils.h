@@ -205,10 +205,7 @@ struct DevicePointers {
   DEVICE RGBF* records;
   DEVICE uint32_t* hit_id_history;
   DEVICE XRGB8* buffer_8bit;
-  DEVICE const DeviceTextureObject* albedo_atlas;
-  DEVICE const DeviceTextureObject* luminance_atlas;
-  DEVICE const DeviceTextureObject* material_atlas;
-  DEVICE const DeviceTextureObject* normal_atlas;
+  DEVICE const DeviceTextureObject* textures;
   DEVICE const DeviceTextureObject* cloud_noise;
   DEVICE const DeviceTextureObject* sky_ms_luts;
   DEVICE const DeviceTextureObject* sky_tm_luts;

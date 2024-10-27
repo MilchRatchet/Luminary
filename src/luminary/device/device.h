@@ -5,6 +5,7 @@
 #include "device_utils.h"
 #include "kernel.h"
 #include "optixrt.h"
+#include "texture.h"
 
 // Set of architectures supported by Luminary
 enum DeviceArch {
@@ -51,6 +52,7 @@ struct Device {
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
   STAGING void* staging_buffer;
+  ARRAY DeviceTexture** textures;
 } typedef Device;
 
 void _device_init(void);
@@ -62,6 +64,7 @@ LuminaryResult device_load_embedded_data(Device* device);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
 LuminaryResult device_allocate_work_buffers(Device* device);
 LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** meshes);
+LuminaryResult device_add_textures(Device* device, const Texture** textures, uint32_t num_textures);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

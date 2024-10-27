@@ -478,10 +478,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(records);
   __DEVICE_BUFFER_FREE(buffer_8bit);
   __DEVICE_BUFFER_FREE(hit_id_history);
-  __DEVICE_BUFFER_FREE(albedo_atlas);
-  __DEVICE_BUFFER_FREE(luminance_atlas);
-  __DEVICE_BUFFER_FREE(material_atlas);
-  __DEVICE_BUFFER_FREE(normal_atlas);
+  __DEVICE_BUFFER_FREE(textures);
   __DEVICE_BUFFER_FREE(cloud_noise);
   __DEVICE_BUFFER_FREE(sky_ms_luts);
   __DEVICE_BUFFER_FREE(sky_tm_luts);
@@ -615,6 +612,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   __FAILURE_HANDLE(device_malloc_staging(&device->staging_buffer, STAGING_BUFFER_SIZE, true));
 
+  __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
+
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   *_device = device;
@@ -742,6 +741,52 @@ LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** mes
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_add_textures(Device* device, const Texture** textures, uint32_t num_textures) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(textures);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  for (uint32_t texture_id = 0; texture_id < num_textures; texture_id++) {
+    DeviceTexture* device_texture;
+    __FAILURE_HANDLE(device_texture_create(&device_texture, textures[texture_id], device->stream_main));
+
+    __FAILURE_HANDLE(array_push(&device->textures, &device_texture));
+  }
+
+  uint32_t texture_object_count;
+  __FAILURE_HANDLE(array_get_num_elements(device->textures, &texture_object_count));
+
+  const size_t total_texture_object_size = sizeof(DeviceTextureObject) * texture_object_count;
+
+  __DEVICE_BUFFER_ALLOCATE(textures, total_texture_object_size);
+
+  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
+
+  DeviceTextureObject* buffer;
+  if (total_texture_object_size <= STAGING_BUFFER_SIZE) {
+    buffer = (DeviceTextureObject*) device->staging_buffer;
+  }
+  else {
+    __FAILURE_HANDLE(host_malloc(&buffer, total_texture_object_size));
+  }
+
+  for (uint32_t texture_object_id = 0; texture_object_id < texture_object_count; texture_object_id++) {
+    __FAILURE_HANDLE(device_struct_texture_object_convert(device->textures[texture_object_id], buffer + texture_object_id));
+  }
+
+  __FAILURE_HANDLE(device_upload((void*) device->buffers.textures, buffer, 0, total_texture_object_size, device->stream_main));
+  __FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
+  if (total_texture_object_size > STAGING_BUFFER_SIZE) {
+    __FAILURE_HANDLE(host_free(&buffer));
+  }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_destroy(Device** device) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(*device);
@@ -751,6 +796,15 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(_device_free_embedded_data(*device));
   __FAILURE_HANDLE(_device_free_buffers(*device));
+
+  uint32_t num_textures;
+  __FAILURE_HANDLE(array_get_num_elements((*device)->textures, &num_textures));
+
+  for (uint32_t texture_id = 0; texture_id < num_textures; texture_id++) {
+    __FAILURE_HANDLE(device_texture_destroy(&(*device)->textures[texture_id]));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*device)->textures));
 
   for (uint32_t kernel_id = 0; kernel_id < CUDA_KERNEL_TYPE_COUNT; kernel_id++) {
     __FAILURE_HANDLE(kernel_destroy(&(*device)->cuda_kernels[kernel_id]));
