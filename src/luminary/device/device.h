@@ -53,6 +53,8 @@ struct Device {
   DeviceTexture* moon_normal_tex;
   STAGING void* staging_buffer;
   ARRAY DeviceTexture** textures;
+  uint32_t num_materials;
+  uint32_t num_instances;
 } typedef Device;
 
 void _device_init(void);
@@ -65,6 +67,8 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
 LuminaryResult device_allocate_work_buffers(Device* device);
 LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** meshes);
 LuminaryResult device_add_textures(Device* device, const Texture** textures, uint32_t num_textures);
+LuminaryResult device_apply_material_updates(
+  Device* device, const ARRAY MaterialUpdate* updates, const ARRAY DeviceMaterialCompressed* materials);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

@@ -54,6 +54,38 @@ static LuminaryResult _device_manager_update_scene_entity_on_devices(DeviceManag
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_handle_device_material_updates(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  ARRAY MaterialUpdate* list_updates;
+  __FAILURE_HANDLE(scene_get_list_changes(device_manager->scene_device, (void**) &list_updates, SCENE_ENTITY_MATERIALS));
+
+  uint32_t num_updates;
+  __FAILURE_HANDLE(array_get_num_elements(list_updates, &num_updates));
+
+  ARRAY DeviceMaterialCompressed* device_list_updates;
+  __FAILURE_HANDLE(array_create(&device_list_updates, sizeof(DeviceMaterialCompressed), num_updates));
+
+  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
+    DeviceMaterialCompressed device_material;
+    __FAILURE_HANDLE(device_struct_material_convert(&list_updates[update_id].material, &device_material));
+
+    __FAILURE_HANDLE(array_push(&device_list_updates, &device_material));
+  }
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_apply_material_updates(device_manager->devices[device_id], list_updates, device_list_updates));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&list_updates));
+  __FAILURE_HANDLE(array_destroy(&device_list_updates));
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
@@ -104,6 +136,10 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     }
 
     current_entity++;
+  }
+
+  if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
+    __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_material_updates(device_manager));
   }
 
   current_entity = SCENE_ENTITY_LIST_START;

@@ -333,6 +333,32 @@ LuminaryResult scene_propagate_changes(Scene* scene, Scene* src) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult scene_get_list_changes(Scene* scene, ARRAYPTR void** list, SceneEntity entity) {
+  __CHECK_NULL_ARGUMENT(scene);
+  __CHECK_NULL_ARGUMENT(list);
+
+  switch (entity) {
+    case SCENE_ENTITY_MATERIALS: {
+      uint32_t material_updates_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &material_updates_count));
+
+      __FAILURE_HANDLE(array_create(list, sizeof(MaterialUpdate), material_updates_count));
+      __FAILURE_HANDLE(array_append(list, scene->material_updates));
+    } break;
+    case SCENE_ENTITY_INSTANCES: {
+      uint32_t instance_updates_count;
+      __FAILURE_HANDLE(array_get_num_elements(scene->instance_updates, &instance_updates_count));
+
+      __FAILURE_HANDLE(array_create(list, sizeof(MeshInstanceUpdate), instance_updates_count));
+      __FAILURE_HANDLE(array_append(list, scene->instance_updates));
+    } break;
+    default:
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult scene_apply_list_changes(Scene* scene, SceneEntity entity) {
   __CHECK_NULL_ARGUMENT(scene);
 

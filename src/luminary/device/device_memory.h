@@ -25,6 +25,7 @@ LuminaryResult device_memcpy(DEVICE void* dst, DEVICE const void* src, size_t ds
 LuminaryResult device_download(void* dst, DEVICE const void* src, size_t src_offset, size_t size, CUstream stream);
 LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pitch, size_t src_width, size_t src_height, CUstream stream);
 LuminaryResult device_memory_get_pitch(DEVICE const void* ptr, size_t* pitch);
+LuminaryResult device_memory_get_size(DEVICE const void* ptr, size_t* size);
 LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, size_t size, CUstream stream);
 LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char* func, uint32_t line);
 

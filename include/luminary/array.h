@@ -26,7 +26,7 @@
 #define array_resize(array, size) _array_resize((void**) array, size, (const char*) #array, (const char*) __func__, __LINE__)
 #define array_push(array, object) _array_push((void**) array, (void*) object, (const char*) #array, (const char*) __func__, __LINE__)
 #define array_copy(dst, src) _array_copy((void**) dst, (void**) src, (const char*) #dst, (const char*) __func__, __LINE__)
-#define array_append(dst, src) _array_append((void**) dst, (void**) src, (const char*) #dst, (const char*) __func__, __LINE__)
+#define array_append(dst, src) _array_append((void**) dst, (const void*) src, (const char*) #dst, (const char*) __func__, __LINE__)
 #define array_destroy(array) _array_destroy((void**) array, (const char*) #array, (const char*) __func__, __LINE__)
 
 LUMINARY_API LuminaryResult

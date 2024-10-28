@@ -212,6 +212,21 @@ LuminaryResult device_memory_get_pitch(DEVICE const void* ptr, size_t* pitch) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_memory_get_size(DEVICE const void* ptr, size_t* size) {
+  __CHECK_NULL_ARGUMENT(ptr);
+  __CHECK_NULL_ARGUMENT(size);
+
+  struct DeviceMemoryHeader* header = (struct DeviceMemoryHeader*) ptr;
+
+  if (header->magic != DEVICE_MEMORY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Destination is not device memory.");
+  }
+
+  *size = header->size;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_memset(DEVICE void* ptr, uint8_t value, size_t offset, size_t size, CUstream stream) {
   __CHECK_NULL_ARGUMENT(ptr);
 
