@@ -30,6 +30,7 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   vec3 refraction_vector;
   bool total_reflection;
   if (context.is_refraction) {
+    total_reflection  = false;  // TODO: Correctly check if this refraction is possible.
     context.H         = bsdf_normal_from_pair(L, data.V, context.refraction_index);
     refraction_vector = L;
   }
@@ -40,7 +41,7 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
 
   context.NdotH = dot_product(data.normal, context.H);
 
-  if (dot_product(context.H, data.normal) < 0.0f) {
+  if (context.NdotH < 0.0f) {
     context.H     = scale_vector(context.H, -1.0f);
     context.NdotH = -context.NdotH;
   }
@@ -146,8 +147,8 @@ __device__ vec3 bsdf_sample(const GBufferData data, const ushort2 pixel, BSDFSam
 
   if (ior_compress(data_local.ior_in) == ior_compress(data_local.ior_out) && data_local.albedo.a == 0.0f) {
     // Fast path for transparent surfaces without refraction/reflection
-    ray_local                = scale_vector(data_local.V, -1.0f);
-    info.weight              = (data_local.state & G_BUFFER_FLAG_COLORED_DIELECTRIC) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
+    ray_local   = scale_vector(data_local.V, -1.0f);
+    info.weight = (data_local.state & G_BUFFER_FLAG_COLORED_DIELECTRIC) ? opaque_color(data.albedo) : get_color(1.0f, 1.0f, 1.0f);
     info.is_transparent_pass = true;
     info.is_microfacet_based = true;
   }
