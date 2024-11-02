@@ -12,7 +12,6 @@
 #include "host/png.h"
 #include "internal_error.h"
 #include "light.h"
-#include "optixrt.h"
 #include "particles.h"
 #include "sky.h"
 #include "toy.h"
@@ -660,7 +659,7 @@ LuminaryResult device_compile_kernels(Device* device, CUlibrary library) {
   }
 
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
-    __FAILURE_HANDLE(optixrt_kernel_create(&device->optix_kernels[kernel_id], device, kernel_id));
+    __FAILURE_HANDLE(optix_kernel_create(&device->optix_kernels[kernel_id], device, kernel_id));
   }
 
   size_t const_memory_size;
@@ -881,7 +880,7 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   for (uint32_t kernel_id = 0; kernel_id < OPTIX_KERNEL_TYPE_COUNT; kernel_id++) {
-    __FAILURE_HANDLE(optixrt_kernel_destroy(&(*device)->optix_kernels[kernel_id]));
+    __FAILURE_HANDLE(optix_kernel_destroy(&(*device)->optix_kernels[kernel_id]));
   }
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));

@@ -1,10 +1,12 @@
 #ifndef LUMINARY_DEVICE_H
 #define LUMINARY_DEVICE_H
 
+#include "device_memory.h"
 #include "device_mesh.h"
 #include "device_utils.h"
 #include "kernel.h"
-#include "optixrt.h"
+#include "optix_bvh.h"
+#include "optix_kernel.h"
 #include "texture.h"
 
 // Set of architectures supported by Luminary
