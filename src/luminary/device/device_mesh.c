@@ -12,6 +12,7 @@ LuminaryResult device_mesh_create(DeviceMesh** device_mesh, const Mesh* mesh) {
   __FAILURE_HANDLE(array_get_num_elements(mesh->meshlets, &meshlet_count));
 
   __FAILURE_HANDLE(array_create(&(*device_mesh)->meshlet_triangle_offsets, sizeof(uint32_t), meshlet_count));
+  __FAILURE_HANDLE(array_create(&(*device_mesh)->meshlet_material_ids, sizeof(uint16_t), meshlet_count));
 
   uint32_t triangle_count = 0;
 
@@ -25,6 +26,8 @@ LuminaryResult device_mesh_create(DeviceMesh** device_mesh, const Mesh* mesh) {
 
   for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
     const Meshlet* meshlet = mesh->meshlets + meshlet_id;
+
+    __FAILURE_HANDLE(array_push(&(*device_mesh)->meshlet_material_ids, &meshlet->material_id));
 
     DeviceTriangle triangle;
     for (uint32_t triangle_id = 0; triangle_id < meshlet->triangle_count; triangle_id++) {
@@ -43,6 +46,7 @@ LuminaryResult device_mesh_destroy(DeviceMesh** device_mesh) {
 
   __FAILURE_HANDLE(array_destroy(&(*device_mesh)->triangles));
   __FAILURE_HANDLE(array_destroy(&(*device_mesh)->meshlet_triangle_offsets));
+  __FAILURE_HANDLE(array_destroy(&(*device_mesh)->meshlet_material_ids));
 
   __FAILURE_HANDLE(host_free(device_mesh));
 

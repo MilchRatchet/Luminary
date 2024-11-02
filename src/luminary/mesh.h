@@ -46,7 +46,7 @@ struct MeshInstance {
   vec3 offset;
   vec3 scale;
   Quaternion rotation;
-  bool deleted; /* On deletion, instances will be marked as deleted and will be overwritten when new instances get added. */
+  bool active; /* On deletion, instances will be marked as deleted and will be overwritten when new instances get added. */
 } typedef MeshInstance;
 
 LuminaryResult mesh_create(Mesh** mesh);

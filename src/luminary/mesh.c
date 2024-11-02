@@ -155,7 +155,7 @@ LuminaryResult mesh_instance_get_default(MeshInstance* instance) {
   instance->scale.x    = 1.0f;
   instance->scale.y    = 1.0f;
   instance->scale.z    = 1.0f;
-  instance->deleted    = false;
+  instance->active     = false;
 
   return LUMINARY_SUCCESS;
 }

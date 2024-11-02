@@ -2,6 +2,7 @@
 
 #include <math.h>
 
+#include "device_mesh.h"
 #include "device_texture.h"
 #include "internal_error.h"
 
@@ -377,6 +378,42 @@ LuminaryResult device_struct_texture_object_convert(const struct DeviceTexture* 
   texture_object->handle  = texture->tex;
   texture_object->gamma   = texture->gamma;
   texture_object->padding = 0.0f;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult _device_struct_quaternion_to_quaternion16(Quaternion16* dst, const Quaternion* src) {
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(src);
+
+  const int64_t x = (int64_t) ((src->x * 0x7FFF) + 0.5f);
+  dst->x          = (int16_t) ((x >> 48) | (x & 0x7FFF));
+
+  const int64_t y = (int64_t) ((src->y * 0x7FFF) + 0.5f);
+  dst->y          = (int16_t) ((y >> 48) | (y & 0x7FFF));
+
+  const int64_t z = (int64_t) ((src->z * 0x7FFF) + 0.5f);
+  dst->z          = (int16_t) ((z >> 48) | (z & 0x7FFF));
+
+  const int64_t w = (int64_t) ((src->w * 0x7FFF) + 0.5f);
+  dst->w          = (int16_t) ((w >> 48) | (w & 0x7FFF));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_struct_instance_convert(
+  const MeshInstance* instance, DeviceInstancelet* device_instance, DeviceTransform* device_transform, const DeviceMesh* device_mesh,
+  const uint32_t meshlet_id) {
+  __CHECK_NULL_ARGUMENT(instance);
+  __CHECK_NULL_ARGUMENT(device_instance);
+  __CHECK_NULL_ARGUMENT(device_transform);
+  __CHECK_NULL_ARGUMENT(device_mesh);
+
+  device_instance->material_id = device_mesh->meshlet_material_ids[meshlet_id];
+
+  device_transform->offset = instance->offset;
+  device_transform->scale  = instance->scale;
+  __FAILURE_HANDLE(_device_struct_quaternion_to_quaternion16(&device_transform->rotation, &instance->rotation));
 
   return LUMINARY_SUCCESS;
 }

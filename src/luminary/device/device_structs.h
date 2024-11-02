@@ -247,6 +247,7 @@ struct DeviceTransform {
 LUM_STATIC_SIZE_ASSERT(DeviceTransform, 0x20u);
 
 struct DeviceTexture typedef DeviceTexture;
+struct DeviceMesh typedef DeviceMesh;
 
 LuminaryResult device_struct_settings_convert(const RendererSettings* settings, DeviceRendererSettings* device_settings);
 LuminaryResult device_struct_camera_convert(const Camera* camera, DeviceCamera* device_camera);
@@ -260,5 +261,8 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
 LuminaryResult device_struct_scene_entity_convert(const void* source, void* dst, SceneEntity entity);
 LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle);
 LuminaryResult device_struct_texture_object_convert(const struct DeviceTexture* texture, DeviceTextureObject* texture_object);
+LuminaryResult device_struct_instance_convert(
+  const MeshInstance* instance, DeviceInstancelet* device_instance, DeviceTransform* device_transform, const DeviceMesh* device_mesh,
+  const uint32_t meshlet_id);
 
 #endif /* LUMINARY_DEVICE_STRUCTS_H */
