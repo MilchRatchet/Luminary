@@ -16,8 +16,6 @@
 #include "sky.h"
 #include "toy.h"
 
-#define STAGING_BUFFER_SIZE (1024u * 1024u * 512u)
-
 static DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[] = {
   DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,   // SCENE_ENTITY_SETTINGS
   DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA,     // SCENE_ENTITY_CAMERA
@@ -423,21 +421,16 @@ static LuminaryResult _device_free_embedded_data(Device* device) {
       size_t __macro_previous_size;                                                                                                       \
       __FAILURE_HANDLE(device_memory_get_size(device->buffers.buffer, &__macro_previous_size));                                           \
       if (size > __macro_previous_size) {                                                                                                 \
-        STAGING void* __macro_staging_buffer;                                                                                             \
-        if (size <= STAGING_BUFFER_SIZE) {                                                                                                \
-          __macro_staging_buffer = device->staging_buffer;                                                                                \
-        }                                                                                                                                 \
-        else {                                                                                                                            \
-          __FAILURE_HANDLE(device_malloc_staging(&__macro_staging_buffer, size, true));                                                   \
-        }                                                                                                                                 \
+        DEVICE void* __macro_new_device_buffer;                                                                                           \
+        __FAILURE_HANDLE(device_malloc(&__macro_new_device_buffer, size));                                                                \
+        void* __macro_staging_buffer;                                                                                                     \
+        __FAILURE_HANDLE(device_staging_manager_register_direct_access(                                                                   \
+          device->staging_manager, __macro_new_device_buffer, 0, size, &__macro_staging_buffer));                                         \
         __FAILURE_HANDLE(device_download(__macro_staging_buffer, device->buffers.buffer, 0, __macro_previous_size, device->stream_main)); \
         CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));                                                                    \
-        __DEVICE_BUFFER_ALLOCATE(buffer, size);                                                                                           \
-        __FAILURE_HANDLE(device_upload((DEVICE void*) device->buffers.buffer, __macro_staging_buffer, 0, size, device->stream_main));     \
-        CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));                                                                    \
-        if (size > STAGING_BUFFER_SIZE) {                                                                                                 \
-          __FAILURE_HANDLE(device_free_staging(&__macro_staging_buffer));                                                                 \
-        }                                                                                                                                 \
+        __DEVICE_BUFFER_FREE(buffer);                                                                                                     \
+        device->buffers.buffer               = __macro_new_device_buffer;                                                                 \
+        device->constant_memory->ptrs.buffer = DEVICE_PTR(device->buffers.buffer);                                                        \
         __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));                                  \
       }                                                                                                                                   \
     }                                                                                                                                     \
@@ -534,49 +527,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
 }
 
 ////////////////////////////////////////////////////////////////////
-// Staging implementation
-////////////////////////////////////////////////////////////////////
-
-static LuminaryResult _device_stage_memory(
-  Device* device, DEVICE void* dst, void* src, size_t dst_offset, size_t src_offset, size_t* size) {
-  __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(dst);
-  __CHECK_NULL_ARGUMENT(src);
-
-  size_t size_this_stage = *size;
-
-  if (size_this_stage > STAGING_BUFFER_SIZE) {
-    size_this_stage = STAGING_BUFFER_SIZE;
-  }
-
-  *size -= size_this_stage;
-
-  memcpy(device->staging_buffer, ((uint8_t*) src) + src_offset, size_this_stage);
-
-  __FAILURE_HANDLE(device_upload(dst, src, dst_offset, size_this_stage, device->stream_main));
-  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _device_stage_memory_full(Device* device, DEVICE void* dst, void* src, size_t offset, size_t size) {
-  __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(dst);
-  __CHECK_NULL_ARGUMENT(src);
-
-  size_t dst_offset = offset;
-  size_t src_offset = 0;
-
-  while (size) {
-    __FAILURE_HANDLE(_device_stage_memory(device, dst, src, dst_offset, src_offset, &size));
-    dst_offset += STAGING_BUFFER_SIZE;
-    src_offset += STAGING_BUFFER_SIZE;
-  }
-
-  return LUMINARY_SUCCESS;
-}
-
-////////////////////////////////////////////////////////////////////
 // External API implementation
 ////////////////////////////////////////////////////////////////////
 
@@ -638,7 +588,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_malloc_staging(&device->constant_memory, sizeof(DeviceConstantMemory), true));
   memset(device->constant_memory, 0, sizeof(DeviceConstantMemory));
 
-  __FAILURE_HANDLE(device_malloc_staging(&device->staging_buffer, STAGING_BUFFER_SIZE, true));
+  __FAILURE_HANDLE(device_staging_manager_create(&device->staging_manager, device));
 
   __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
 
@@ -752,8 +702,9 @@ LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** mes
     uint32_t triangle_count;
     __FAILURE_HANDLE(array_get_num_elements(mesh->triangles, &triangle_count));
 
-    __FAILURE_HANDLE(_device_stage_memory_full(
-      device, (void*) device->buffers.triangles, (void*) mesh->triangles, triangles_offset, sizeof(DeviceTriangle) * triangle_count));
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, (void const*) mesh->triangles, (void*) device->buffers.triangles, triangles_offset,
+      sizeof(DeviceTriangle) * triangle_count));
 
     triangles_offset += triangle_count;
   }
@@ -792,22 +743,11 @@ LuminaryResult device_add_textures(Device* device, const Texture** textures, uin
   __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
 
   DeviceTextureObject* buffer;
-  if (total_texture_object_size <= STAGING_BUFFER_SIZE) {
-    buffer = (DeviceTextureObject*) device->staging_buffer;
-  }
-  else {
-    __FAILURE_HANDLE(host_malloc(&buffer, total_texture_object_size));
-  }
+  __FAILURE_HANDLE(device_staging_manager_register_direct_access(
+    device->staging_manager, (void*) device->buffers.textures, 0, total_texture_object_size, (void**) &buffer));
 
   for (uint32_t texture_object_id = 0; texture_object_id < texture_object_count; texture_object_id++) {
     __FAILURE_HANDLE(device_struct_texture_object_convert(device->textures[texture_object_id], buffer + texture_object_id));
-  }
-
-  __FAILURE_HANDLE(device_upload((void*) device->buffers.textures, buffer, 0, total_texture_object_size, device->stream_main));
-  __FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
-
-  if (total_texture_object_size > STAGING_BUFFER_SIZE) {
-    __FAILURE_HANDLE(host_free(&buffer));
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -884,7 +824,8 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
-  __FAILURE_HANDLE(device_free_staging(&(*device)->staging_buffer));
+
+  __FAILURE_HANDLE(device_staging_manager_destroy(&(*device)->staging_manager));
 
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_secondary));

@@ -3,6 +3,7 @@
 
 #include "device_memory.h"
 #include "device_mesh.h"
+#include "device_staging_manager.h"
 #include "device_utils.h"
 #include "kernel.h"
 #include "optix_bvh.h"
@@ -53,7 +54,7 @@ struct Device {
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
-  STAGING void* staging_buffer;
+  DeviceStagingManager* staging_manager;
   ARRAY DeviceTexture** textures;
   uint32_t num_materials;
   uint32_t num_instances;
