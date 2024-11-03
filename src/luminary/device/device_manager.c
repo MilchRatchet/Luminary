@@ -214,17 +214,30 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _device_manager_upload_meshes(DeviceManager* device_manager, void* args) {
-  LUM_UNUSED(args);
+struct DeviceManagerAddMeshesArgs {
+  const Mesh** meshes;
+  uint32_t num_meshes;
+} typedef DeviceManagerAddMeshesArgs;
 
+static LuminaryResult _device_manager_add_meshes(DeviceManager* device_manager, DeviceManagerAddMeshesArgs* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_upload_meshes(device_manager->devices[device_id], (const ARRAY DeviceMesh**) device_manager->meshes));
+    Device* device = device_manager->devices[device_id];
+
+    __FAILURE_HANDLE(device_upload_meshes(device, (const ARRAY DeviceMesh**) device_manager->meshes));
+
+    for (uint32_t mesh_id = 0; mesh_id < args->num_meshes; mesh_id++) {
+      __FAILURE_HANDLE(device_build_mesh_bvh(device, args->meshes[mesh_id]));
+    }
   }
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddMeshesArgs)));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(Mesh*) * args->num_meshes));
 
   return LUMINARY_SUCCESS;
 }
@@ -551,11 +564,20 @@ LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Me
     __FAILURE_HANDLE(array_push(&device_manager->meshes, &device_mesh));
   }
 
+  DeviceManagerAddMeshesArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddMeshesArgs), (void**) &args));
+
+  args->num_meshes = num_meshes;
+
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(Mesh*) * num_meshes, (void**) &args->meshes));
+
+  memcpy(args->meshes, meshes, sizeof(Mesh*) * num_meshes);
+
   QueueEntry entry;
 
-  entry.name     = "Upload meshes";
-  entry.function = (QueueEntryFunction) _device_manager_upload_meshes;
-  entry.args     = (void*) 0;
+  entry.name     = "Add meshes";
+  entry.function = (QueueEntryFunction) _device_manager_add_meshes;
+  entry.args     = args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 

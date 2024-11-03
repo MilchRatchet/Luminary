@@ -858,8 +858,7 @@ LuminaryResult wavefront_convert_content(
 
   __FAILURE_HANDLE(host_malloc(&mesh->triangles, sizeof(Triangle) * triangle_count));
 
-  uint32_t ptr                 = 0;
-  uint32_t index_triplet_count = 0;
+  uint32_t ptr = 0;
 
   for (uint32_t tri_id = 0; tri_id < triangle_count; tri_id++) {
     WavefrontTriangle t = content->triangles[tri_id];
@@ -912,9 +911,9 @@ LuminaryResult wavefront_convert_content(
       continue;
     }
 
-    mesh->data->index_buffer[index_triplet_count * 4 + 0] = t.v1 - 1;
-    mesh->data->index_buffer[index_triplet_count * 4 + 1] = t.v2 - 1;
-    mesh->data->index_buffer[index_triplet_count * 4 + 2] = t.v3 - 1;
+    mesh->data->index_buffer[ptr * 4 + 0] = t.v1 - 1;
+    mesh->data->index_buffer[ptr * 4 + 1] = t.v2 - 1;
+    mesh->data->index_buffer[ptr * 4 + 2] = t.v3 - 1;
 
     WavefrontUV uv;
 

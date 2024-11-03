@@ -590,6 +590,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   __FAILURE_HANDLE(device_staging_manager_create(&device->staging_manager, device));
 
+  __FAILURE_HANDLE(array_create(&device->optix_mesh_bvhs, sizeof(OptixBVH*), 4));
   __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -720,6 +721,22 @@ LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** mes
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_build_mesh_bvh(Device* device, const Mesh* mesh) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(mesh);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  OptixBVH* mesh_bvh;
+  __FAILURE_HANDLE(optix_bvh_create(&mesh_bvh, device, mesh, OPTIX_BVH_TYPE_DEFAULT));
+
+  __FAILURE_HANDLE(array_push(&device->optix_mesh_bvhs, &mesh_bvh));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_add_textures(Device* device, const Texture** textures, uint32_t num_textures) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(textures);
@@ -805,6 +822,15 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(_device_free_embedded_data(*device));
   __FAILURE_HANDLE(_device_free_buffers(*device));
+
+  uint32_t num_meshes;
+  __FAILURE_HANDLE(array_get_num_elements((*device)->optix_mesh_bvhs, &num_meshes));
+
+  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+    __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_mesh_bvhs[mesh_id]));
+  }
+
+  __FAILURE_HANDLE(array_destroy(&(*device)->optix_mesh_bvhs));
 
   uint32_t num_textures;
   __FAILURE_HANDLE(array_get_num_elements((*device)->textures, &num_textures));

@@ -34,8 +34,8 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh, Device* device, const Mesh* mesh
 
   DEVICE float* device_vertex_buffer;
   __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * mesh->data->vertex_count));
-  __FAILURE_HANDLE(
-    device_upload(device_vertex_buffer, mesh->data->vertex_buffer, 0, sizeof(float) * 4 * mesh->data->vertex_count, device->stream_main));
+  __FAILURE_HANDLE(device_upload(
+    device_vertex_buffer, mesh->data->vertex_buffer, 0, sizeof(float) * 4 * mesh->data->vertex_count, device->stream_secondary));
 
   CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(device_vertex_buffer);
 
@@ -47,7 +47,7 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh, Device* device, const Mesh* mesh
 
   unsigned int inputFlags = 0;
   inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
-  inputFlags |= (type == OPTIX_RT_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
+  inputFlags |= (type == OPTIX_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
 
   for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
     const Meshlet meshlet = mesh->meshlets[meshlet_id];
@@ -64,7 +64,7 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh, Device* device, const Mesh* mesh
     __FAILURE_HANDLE(device_malloc(&meshlet_device_index_buffers[meshlet_id], sizeof(uint32_t) * 4 * meshlet.triangle_count));
     __FAILURE_HANDLE(device_upload(
       meshlet_device_index_buffers[meshlet_id], meshlet.index_buffer, 0, sizeof(uint32_t) * 4 * meshlet.triangle_count,
-      device->stream_main));
+      device->stream_secondary));
 
     build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
     build_input.triangleArray.indexStrideInBytes = 16;
@@ -110,8 +110,6 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh, Device* device, const Mesh* mesh
 
   OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(device->optix_ctx, &build_options, build_inputs, meshlet_count, &buffer_sizes));
 
-  CUDA_FAILURE_HANDLE(cuCtxSynchronize());
-
   DEVICE void* temp_buffer;
   __FAILURE_HANDLE(device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes));
 
@@ -130,13 +128,12 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh, Device* device, const Mesh* mesh
   accel_emit.type   = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
 
   OPTIX_FAILURE_HANDLE(optixAccelBuild(
-    device->optix_ctx, 0, &build_options, build_inputs, meshlet_count, DEVICE_CUPTR(temp_buffer), buffer_sizes.tempSizeInBytes,
-    DEVICE_CUPTR(output_buffer), buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
-  CUDA_FAILURE_HANDLE(cuCtxSynchronize());
+    device->optix_ctx, device->stream_secondary, &build_options, build_inputs, meshlet_count, DEVICE_CUPTR(temp_buffer),
+    buffer_sizes.tempSizeInBytes, DEVICE_CUPTR(output_buffer), buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
 
   size_t compact_size;
-  __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
-  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+  __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_secondary));
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_secondary));
 
   __FAILURE_HANDLE(device_free(&accel_emit_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));
@@ -146,9 +143,8 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh, Device* device, const Mesh* mesh
     DEVICE void* output_buffer_compact;
     __FAILURE_HANDLE(device_malloc(&output_buffer_compact, compact_size));
 
-    OPTIX_FAILURE_HANDLE(
-      optixAccelCompact(device->optix_ctx, 0, traversable, DEVICE_CUPTR(output_buffer_compact), compact_size, &traversable));
-    CUDA_FAILURE_HANDLE(cuCtxSynchronize());
+    OPTIX_FAILURE_HANDLE(optixAccelCompact(
+      device->optix_ctx, device->stream_secondary, traversable, DEVICE_CUPTR(output_buffer_compact), compact_size, &traversable));
 
     __FAILURE_HANDLE(device_free(&output_buffer));
 
@@ -178,7 +174,7 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh, Device* device, const Mesh* mesh
 LuminaryResult optix_bvh_destroy(OptixBVH** bvh) {
   __CHECK_NULL_ARGUMENT(bvh);
 
-  __FAILURE_HANDLE(device_free((*bvh)->bvh_data));
+  __FAILURE_HANDLE(device_free(&(*bvh)->bvh_data));
 
   __FAILURE_HANDLE(host_free(bvh));
 

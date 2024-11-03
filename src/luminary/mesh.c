@@ -54,7 +54,7 @@ LuminaryResult mesh_build_meshlets(Mesh* mesh) {
 
         meshlet.triangle_count = 0;
         meshlet.material_id    = mat_id;
-        __FAILURE_HANDLE(host_malloc(&meshlet.index_buffer, sizeof(uint32_t) * 0x10000 * 3));
+        __FAILURE_HANDLE(host_malloc(&meshlet.index_buffer, sizeof(uint32_t) * 0x10000 * 4));
         __FAILURE_HANDLE(host_malloc(&meshlet.triangles, sizeof(Triangle) * 0x10000));
 
         __FAILURE_HANDLE(array_push(&mesh->meshlets, &meshlet));
@@ -66,9 +66,9 @@ LuminaryResult mesh_build_meshlets(Mesh* mesh) {
 
     Meshlet* meshlet = mesh->meshlets + current_meshlet;
 
-    meshlet->index_buffer[meshlet->triangle_count * 3 + 0] = mesh->data->index_buffer[tri_id * 3 + 0];
-    meshlet->index_buffer[meshlet->triangle_count * 3 + 1] = mesh->data->index_buffer[tri_id * 3 + 1];
-    meshlet->index_buffer[meshlet->triangle_count * 3 + 2] = mesh->data->index_buffer[tri_id * 3 + 2];
+    meshlet->index_buffer[meshlet->triangle_count * 4 + 0] = mesh->data->index_buffer[tri_id * 4 + 0];
+    meshlet->index_buffer[meshlet->triangle_count * 4 + 1] = mesh->data->index_buffer[tri_id * 4 + 1];
+    meshlet->index_buffer[meshlet->triangle_count * 4 + 2] = mesh->data->index_buffer[tri_id * 4 + 2];
 
     meshlet->triangles[meshlet->triangle_count] = tri;
 
@@ -86,7 +86,7 @@ LuminaryResult mesh_build_meshlets(Mesh* mesh) {
   for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
     Meshlet* meshlet = mesh->meshlets + meshlet_id;
 
-    __FAILURE_HANDLE(host_realloc(&meshlet->index_buffer, sizeof(uint32_t) * meshlet->triangle_count * 3));
+    __FAILURE_HANDLE(host_realloc(&meshlet->index_buffer, sizeof(uint32_t) * meshlet->triangle_count * 4));
     __FAILURE_HANDLE(host_realloc(&meshlet->triangles, sizeof(Triangle) * meshlet->triangle_count));
   }
 

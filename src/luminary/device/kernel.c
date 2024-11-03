@@ -26,7 +26,7 @@ LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary libr
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult kernel_execute(CUDAKernel* kernel) {
+LuminaryResult kernel_execute(CUDAKernel* kernel, CUstream stream) {
   __CHECK_NULL_ARGUMENT(kernel);
 
   CUlaunchConfig launch_config;
@@ -38,7 +38,7 @@ LuminaryResult kernel_execute(CUDAKernel* kernel) {
   launch_config.gridDimY       = 1;
   launch_config.gridDimZ       = 1;
   launch_config.sharedMemBytes = kernel->shared_memory_size;
-  launch_config.hStream        = (CUstream) 0;
+  launch_config.hStream        = stream;
   launch_config.attrs          = (CUlaunchAttribute*) 0;
   launch_config.numAttrs       = 0;
 
@@ -48,7 +48,7 @@ LuminaryResult kernel_execute(CUDAKernel* kernel) {
 }
 
 LuminaryResult kernel_execute_custom(
-  CUDAKernel* kernel, uint32_t threads_per_block, uint32_t blocks_per_grid, void* arg_struct, size_t arg_struct_size) {
+  CUDAKernel* kernel, uint32_t threads_per_block, uint32_t blocks_per_grid, void* arg_struct, size_t arg_struct_size, CUstream stream) {
   __CHECK_NULL_ARGUMENT(kernel);
 
   CUlaunchConfig launch_config;
@@ -60,7 +60,7 @@ LuminaryResult kernel_execute_custom(
   launch_config.gridDimY       = 1;
   launch_config.gridDimZ       = 1;
   launch_config.sharedMemBytes = kernel->shared_memory_size;
-  launch_config.hStream        = (CUstream) 0;
+  launch_config.hStream        = stream;
   launch_config.attrs          = (CUlaunchAttribute*) 0;
   launch_config.numAttrs       = 0;
 
