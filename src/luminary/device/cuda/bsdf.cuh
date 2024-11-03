@@ -13,14 +13,10 @@ __device__ BSDFRayContext bsdf_evaluate_analyze(const GBufferData data, const ve
   BSDFRayContext context;
 
   context.NdotL = dot_product(data.normal, L);
-  context.NdotV = fabsf(dot_product(data.normal, data.V));
+  context.NdotV = __saturatef(dot_product(data.normal, data.V));
 
-  context.is_refraction = false;
-
-  if (context.NdotL < 0.0f) {
-    context.NdotL *= -1.0f;
-    context.is_refraction = true;
-  }
+  context.is_refraction = (context.NdotL < 0.0f);
+  context.NdotL         = (context.is_refraction) ? -context.NdotL : context.NdotL;
 
   const float ior_in  = fminf(2.999f, fmaxf(1.0f, data.ior_in));
   const float ior_out = fminf(2.999f, fmaxf(1.0f, data.ior_out));
@@ -83,11 +79,11 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   BSDFRayContext context;
 
   context.NdotL = dot_product(data.normal, L);
-  context.NdotV = fabsf(dot_product(data.normal, data.V));
+  context.NdotV = __saturatef(dot_product(data.normal, data.V));
 
   context.is_refraction = is_refraction;
 
-  context.NdotL = fabsf(context.NdotL);
+  context.NdotL = (is_refraction) ? -context.NdotL : context.NdotL;
 
   const float ior_in  = fminf(2.999f, fmaxf(1.0f, data.ior_in));
   const float ior_out = fminf(2.999f, fmaxf(1.0f, data.ior_out));
@@ -100,7 +96,13 @@ __device__ BSDFRayContext bsdf_sample_context(const GBufferData data, const vec3
   const vec3 refraction_vector =
     (context.is_refraction) ? L : refract_vector(data.V, context.H, context.refraction_index, total_reflection);
 
-  context.NdotH = fabsf(dot_product(data.normal, context.H));
+  context.NdotH = dot_product(data.normal, context.H);
+
+  if (context.NdotH < 0.0f) {
+    context.H     = scale_vector(context.H, -1.0f);
+    context.NdotH = -context.NdotH;
+  }
+
   context.HdotV = fabsf(dot_product(context.H, data.V));
   context.HdotL = fabsf(dot_product(context.H, L));
 
