@@ -12,7 +12,15 @@
 #define OPTIX_VALIDATION
 #define NO_LUMINARY_BVH
 
+/*
+ * Annotation to signal that this pointer is a device allocation. Dereferencing this pointer on the host is undefined behaviour.
+ */
 #define DEVICE
+
+/*
+ * Annotation to signal that this function may only be called from within a valid device context.
+ */
+#define DEVICE_CTX_FUNC
 
 #define STARS_GRID_LD 64
 

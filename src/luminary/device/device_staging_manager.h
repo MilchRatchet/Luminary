@@ -18,14 +18,16 @@ struct DeviceStagingManager {
   uint32_t entries_count_in_use;
 } typedef DeviceStagingManager;
 
-LuminaryResult device_staging_manager_create(DeviceStagingManager** staging_manager, Device* device);
-LuminaryResult device_staging_manager_register(
-  DeviceStagingManager* staging_manager, void const* src, DEVICE void* dst, size_t dst_offset, size_t size);
+DEVICE_CTX_FUNC LuminaryResult device_staging_manager_create(DeviceStagingManager** staging_manager, Device* device);
+DEVICE_CTX_FUNC LuminaryResult
+  device_staging_manager_register(DeviceStagingManager* staging_manager, void const* src, DEVICE void* dst, size_t dst_offset, size_t size);
 
-// Registers memory for staging and returns a ptr which points to a memory section of the registered size that will be staged.
-LuminaryResult device_staging_manager_register_direct_access(
+/*
+ * Registers memory for staging and returns a ptr which points to a memory section of the registered size that will be staged.
+ */
+DEVICE_CTX_FUNC LuminaryResult device_staging_manager_register_direct_access(
   DeviceStagingManager* staging_manager, DEVICE void* dst, size_t dst_offset, size_t size, void** buffer);
-LuminaryResult device_staging_manager_execute(DeviceStagingManager* staging_manager);
-LuminaryResult device_staging_manager_destroy(DeviceStagingManager** staging_manager);
+DEVICE_CTX_FUNC LuminaryResult device_staging_manager_execute(DeviceStagingManager* staging_manager);
+DEVICE_CTX_FUNC LuminaryResult device_staging_manager_destroy(DeviceStagingManager** staging_manager);
 
 #endif /* LUMINARY_DEVICE_STAGING_MANAGER_H */

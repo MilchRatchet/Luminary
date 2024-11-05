@@ -57,31 +57,31 @@ static LuminaryResult _device_manager_update_scene_entity_on_devices(DeviceManag
 static LuminaryResult _device_manager_handle_device_material_updates(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
-  ARRAY MaterialUpdate* list_updates;
-  __FAILURE_HANDLE(scene_get_list_changes(device_manager->scene_device, (void**) &list_updates, SCENE_ENTITY_MATERIALS));
+  ARRAY MaterialUpdate* material_updates;
+  __FAILURE_HANDLE(scene_get_list_changes(device_manager->scene_device, (void**) &material_updates, SCENE_ENTITY_MATERIALS));
 
   uint32_t num_updates;
-  __FAILURE_HANDLE(array_get_num_elements(list_updates, &num_updates));
+  __FAILURE_HANDLE(array_get_num_elements(material_updates, &num_updates));
 
-  ARRAY DeviceMaterialCompressed* device_list_updates;
-  __FAILURE_HANDLE(array_create(&device_list_updates, sizeof(DeviceMaterialCompressed), num_updates));
+  ARRAY DeviceMaterialCompressed* device_material_updates;
+  __FAILURE_HANDLE(array_create(&device_material_updates, sizeof(DeviceMaterialCompressed), num_updates));
 
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
     DeviceMaterialCompressed device_material;
-    __FAILURE_HANDLE(device_struct_material_convert(&list_updates[update_id].material, &device_material));
+    __FAILURE_HANDLE(device_struct_material_convert(&material_updates[update_id].material, &device_material));
 
-    __FAILURE_HANDLE(array_push(&device_list_updates, &device_material));
+    __FAILURE_HANDLE(array_push(&device_material_updates, &device_material));
   }
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_apply_material_updates(device_manager->devices[device_id], list_updates, device_list_updates));
+    __FAILURE_HANDLE(device_apply_material_updates(device_manager->devices[device_id], material_updates, device_material_updates));
   }
 
-  __FAILURE_HANDLE(array_destroy(&list_updates));
-  __FAILURE_HANDLE(array_destroy(&device_list_updates));
+  __FAILURE_HANDLE(array_destroy(&material_updates));
+  __FAILURE_HANDLE(array_destroy(&device_material_updates));
 
   return LUMINARY_SUCCESS;
 }
@@ -89,11 +89,11 @@ static LuminaryResult _device_manager_handle_device_material_updates(DeviceManag
 static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
-  ARRAY MeshInstanceUpdate* list_updates;
-  __FAILURE_HANDLE(scene_get_list_changes(device_manager->scene_device, (void**) &list_updates, SCENE_ENTITY_INSTANCES));
+  ARRAY MeshInstanceUpdate* instance_updates;
+  __FAILURE_HANDLE(scene_get_list_changes(device_manager->scene_device, (void**) &instance_updates, SCENE_ENTITY_INSTANCES));
 
   uint32_t num_updates;
-  __FAILURE_HANDLE(array_get_num_elements(list_updates, &num_updates));
+  __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_updates));
 
   uint32_t num_meshes;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->meshes, &num_meshes));
@@ -103,7 +103,7 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
 
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
     __FAILURE_HANDLE(device_instance_handler_update(
-      device_manager->instance_handler, list_updates + update_id, &device_instancelets_to_upload,
+      device_manager->instance_handler, instance_updates + update_id, &device_instancelets_to_upload,
       (const ARRAY DeviceMesh**) device_manager->meshes));
   }
 
@@ -111,9 +111,10 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_apply_instance_updates(device_manager->devices[device_id], instance_updates));
   }
 
-  __FAILURE_HANDLE(array_destroy(&list_updates));
+  __FAILURE_HANDLE(array_destroy(&instance_updates));
   __FAILURE_HANDLE(array_destroy(&device_instancelets_to_upload));
 
   return LUMINARY_SUCCESS;

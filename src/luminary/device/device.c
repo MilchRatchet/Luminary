@@ -590,8 +590,15 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   __FAILURE_HANDLE(device_staging_manager_create(&device->staging_manager, device));
 
-  __FAILURE_HANDLE(array_create(&device->optix_mesh_bvhs, sizeof(OptixBVH*), 4));
   __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
+
+  ////////////////////////////////////////////////////////////////////
+  // Optix data
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(array_create(&device->optix_mesh_bvhs, sizeof(OptixBVH*), 4));
+  __FAILURE_HANDLE(optix_bvh_instance_cache_create(&device->optix_instance_cache, device));
+  __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -728,7 +735,8 @@ LuminaryResult device_build_mesh_bvh(Device* device, const Mesh* mesh) {
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   OptixBVH* mesh_bvh;
-  __FAILURE_HANDLE(optix_bvh_create(&mesh_bvh, device, mesh, OPTIX_BVH_TYPE_DEFAULT));
+  __FAILURE_HANDLE(optix_bvh_create(&mesh_bvh));
+  __FAILURE_HANDLE(optix_bvh_gas_build(mesh_bvh, device, mesh, OPTIX_BVH_TYPE_DEFAULT));
 
   __FAILURE_HANDLE(array_push(&device->optix_mesh_bvhs, &mesh_bvh));
 
@@ -772,6 +780,22 @@ LuminaryResult device_add_textures(Device* device, const Texture** textures, uin
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshInstanceUpdate* instance_updates) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(instance_updates);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(optix_bvh_instance_cache_update(device->optix_instance_cache, instance_updates));
+  __FAILURE_HANDLE(optix_bvh_ias_build(device->optix_bvh_ias, device));
+
+  // TODO: Update constant memory traversable section.
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_apply_material_updates(
   Device* device, const ARRAY MaterialUpdate* updates, const ARRAY DeviceMaterialCompressed* materials) {
   __CHECK_NULL_ARGUMENT(device);
@@ -802,6 +826,7 @@ LuminaryResult device_apply_material_updates(
     const uint32_t material_id              = updates[update_id].material_id;
     const DeviceMaterialCompressed material = materials[update_id];
 
+    // TODO: Use the new staging system.
     __FAILURE_HANDLE(device_upload(
       (DEVICE void*) device->buffers.materials, &material, sizeof(DeviceMaterialCompressed) * material_id, sizeof(DeviceMaterialCompressed),
       device->stream_main));
@@ -829,6 +854,9 @@ LuminaryResult device_destroy(Device** device) {
   for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
     __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_mesh_bvhs[mesh_id]));
   }
+
+  __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
+  __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));
 
   __FAILURE_HANDLE(array_destroy(&(*device)->optix_mesh_bvhs));
 

@@ -59,6 +59,8 @@ struct Device {
   uint32_t num_materials;
   uint32_t num_instances;
   ARRAY OptixBVH** optix_mesh_bvhs;
+  OptixBVHInstanceCache* optix_instance_cache;
+  OptixBVH* optix_bvh_ias;
 } typedef Device;
 
 void _device_init(void);
@@ -71,6 +73,7 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
 LuminaryResult device_allocate_work_buffers(Device* device);
 LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** meshes);
 LuminaryResult device_build_mesh_bvh(Device* device, const Mesh* mesh);
+LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshInstanceUpdate* instance_updates);
 LuminaryResult device_add_textures(Device* device, const Texture** textures, uint32_t num_textures);
 LuminaryResult device_apply_material_updates(
   Device* device, const ARRAY MaterialUpdate* updates, const ARRAY DeviceMaterialCompressed* materials);
