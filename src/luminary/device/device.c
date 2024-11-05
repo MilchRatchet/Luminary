@@ -823,14 +823,11 @@ LuminaryResult device_apply_material_updates(
   }
 
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    const uint32_t material_id              = updates[update_id].material_id;
-    const DeviceMaterialCompressed material = materials[update_id];
+    const uint32_t material_id = updates[update_id].material_id;
 
-    // TODO: Use the new staging system.
-    __FAILURE_HANDLE(device_upload(
-      (DEVICE void*) device->buffers.materials, &material, sizeof(DeviceMaterialCompressed) * material_id, sizeof(DeviceMaterialCompressed),
-      device->stream_main));
-    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, materials + update_id, (DEVICE void*) device->buffers.materials,
+      sizeof(DeviceMaterialCompressed) * material_id, sizeof(DeviceMaterialCompressed)));
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
