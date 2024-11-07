@@ -16,7 +16,7 @@
 #include "sky.h"
 #include "toy.h"
 
-static DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[] = {
+static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[] = {
   DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,   // SCENE_ENTITY_SETTINGS
   DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA,     // SCENE_ENTITY_CAMERA
   DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN,      // SCENE_ENTITY_OCEAN
@@ -28,7 +28,7 @@ static DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[] =
 };
 LUM_STATIC_SIZE_ASSERT(device_scene_entity_to_const_memory_member, sizeof(DeviceConstantMemoryMember) * SCENE_ENTITY_GLOBAL_COUNT);
 
-static size_t device_cuda_const_memory_offsets[] = {
+static const size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, ptrs),                          // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
   offsetof(DeviceConstantMemory, settings),                      // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
   offsetof(DeviceConstantMemory, camera),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
@@ -42,11 +42,12 @@ static size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, optix_bvh),                     // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   offsetof(DeviceConstantMemory, non_instanced_triangle_count),  // DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT
   offsetof(DeviceConstantMemory, moon_albedo_tex),               // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
-  offsetof(DeviceConstantMemory, user_selected_x)                // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
+  offsetof(DeviceConstantMemory, user_selected_x),               // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
+  SIZE_MAX                                                       // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
-LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_offsets, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
+LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_offsets, sizeof(size_t) * (DEVICE_CONSTANT_MEMORY_MEMBER_COUNT + 1));
 
-static size_t device_cuda_const_memory_sizes[] = {
+static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(DevicePointers),                      // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
   sizeof(DeviceRendererSettings),              // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
   sizeof(DeviceCamera),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
@@ -63,6 +64,17 @@ static size_t device_cuda_const_memory_sizes[] = {
   sizeof(uint16_t) * 2 + sizeof(uint32_t) * 3  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_sizes, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
+
+#define DEVICE_UPDATE_CONSTANT_MEMORY(member, value)                                              \
+  {                                                                                               \
+    device->constant_memory->member      = (value);                                               \
+    const size_t __macro_offset          = offsetof(DeviceConstantMemory, member);                \
+    uint32_t __macro_const_memory_member = 0;                                                     \
+    while (__macro_offset >= device_cuda_const_memory_offsets[__macro_const_memory_member + 1]) { \
+      __macro_const_memory_member++;                                                              \
+    }                                                                                             \
+    __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, __macro_const_memory_member));     \
+  }
 
 void _device_init(void) {
   CUresult cuda_result = cuInit(0);
@@ -360,10 +372,8 @@ static LuminaryResult _device_load_bluenoise_texture(Device* device) {
   __FAILURE_HANDLE(
     device_upload((void*) device->buffers.bluenoise_2D, bluenoise_2D_data, 0, bluenoise_2D_data_length, device->stream_main));
 
-  device->constant_memory->ptrs.bluenoise_1D = DEVICE_PTR(device->buffers.bluenoise_1D);
-  device->constant_memory->ptrs.bluenoise_2D = DEVICE_PTR(device->buffers.bluenoise_2D);
-
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
+  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bluenoise_1D, DEVICE_PTR(device->buffers.bluenoise_1D));
+  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bluenoise_2D, DEVICE_PTR(device->buffers.bluenoise_2D));
 
   return LUMINARY_SUCCESS;
 }
@@ -382,9 +392,7 @@ static LuminaryResult _device_load_light_bridge_lut(Device* device) {
   __FAILURE_HANDLE(device_malloc(&device->buffers.bridge_lut, lut_length));
   __FAILURE_HANDLE(device_upload((void*) device->buffers.bridge_lut, lut_data, 0, lut_length, device->stream_main));
 
-  device->constant_memory->ptrs.bridge_lut = DEVICE_PTR(device->buffers.bridge_lut);
-
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
+  DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.bridge_lut, DEVICE_PTR(device->buffers.bridge_lut));
 
   return LUMINARY_SUCCESS;
 }
@@ -405,14 +413,14 @@ static LuminaryResult _device_free_embedded_data(Device* device) {
 #define __DEVICE_BUFFER_FREE(buffer)                          \
   if (device->buffers.buffer) {                               \
     __FAILURE_HANDLE(device_free(&(device->buffers.buffer))); \
-    device->constant_memory->ptrs.buffer = (void*) 0;         \
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, (void*) 0);    \
   }
 
-#define __DEVICE_BUFFER_ALLOCATE(buffer, size)                                 \
-  {                                                                            \
-    __DEVICE_BUFFER_FREE(buffer);                                              \
-    __FAILURE_HANDLE(device_malloc(&device->buffers.buffer, size));            \
-    device->constant_memory->ptrs.buffer = DEVICE_PTR(device->buffers.buffer); \
+#define __DEVICE_BUFFER_ALLOCATE(buffer, size)                                      \
+  {                                                                                 \
+    __DEVICE_BUFFER_FREE(buffer);                                                   \
+    __FAILURE_HANDLE(device_malloc(&device->buffers.buffer, size));                 \
+    DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, DEVICE_PTR(device->buffers.buffer)); \
   }
 
 #define __DEVICE_BUFFER_REALLOC(buffer, size)                                                                                             \
@@ -429,9 +437,8 @@ static LuminaryResult _device_free_embedded_data(Device* device) {
         __FAILURE_HANDLE(device_download(__macro_staging_buffer, device->buffers.buffer, 0, __macro_previous_size, device->stream_main)); \
         CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));                                                                    \
         __DEVICE_BUFFER_FREE(buffer);                                                                                                     \
-        device->buffers.buffer               = __macro_new_device_buffer;                                                                 \
-        device->constant_memory->ptrs.buffer = DEVICE_PTR(device->buffers.buffer);                                                        \
-        __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));                                  \
+        device->buffers.buffer = __macro_new_device_buffer;                                                                               \
+        DEVICE_UPDATE_CONSTANT_MEMORY(ptrs.buffer, DEVICE_PTR(device->buffers.buffer));                                                   \
       }                                                                                                                                   \
     }                                                                                                                                     \
     else {                                                                                                                                \
@@ -468,12 +475,8 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 
   __FAILURE_HANDLE(device_memset(device->buffers.hit_id_history, 0, 0, sizeof(uint32_t) * internal_pixel_count, device->stream_main));
 
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
-
-  device->constant_memory->max_task_count    = max_task_count;
-  device->constant_memory->pixels_per_thread = pixels_per_thread;
-
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META));
+  DEVICE_UPDATE_CONSTANT_MEMORY(max_task_count, max_task_count);
+  DEVICE_UPDATE_CONSTANT_MEMORY(pixels_per_thread, pixels_per_thread);
 
   return LUMINARY_SUCCESS;
 }
@@ -520,8 +523,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
-
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
 
   return LUMINARY_SUCCESS;
 }
@@ -717,11 +718,9 @@ LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** mes
     triangles_offset += triangle_count;
   }
 
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
-
   device->constant_memory->non_instanced_triangle_count = non_instanced_triangle_count;
 
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT));
+  DEVICE_UPDATE_CONSTANT_MEMORY(non_instanced_triangle_count, non_instanced_triangle_count);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -765,8 +764,6 @@ LuminaryResult device_add_textures(Device* device, const Texture** textures, uin
 
   __DEVICE_BUFFER_ALLOCATE(textures, total_texture_object_size);
 
-  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
-
   DeviceTextureObject* buffer;
   __FAILURE_HANDLE(device_staging_manager_register_direct_access(
     device->staging_manager, (void*) device->buffers.textures, 0, total_texture_object_size, (void**) &buffer));
@@ -789,7 +786,7 @@ LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshIns
   __FAILURE_HANDLE(optix_bvh_instance_cache_update(device->optix_instance_cache, instance_updates));
   __FAILURE_HANDLE(optix_bvh_ias_build(device->optix_bvh_ias, device));
 
-  // TODO: Update constant memory traversable section.
+  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh, device->optix_bvh_ias->traversable);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

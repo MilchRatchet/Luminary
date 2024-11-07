@@ -3,13 +3,13 @@
 
 #include "utils.h"
 
-#define __RETURN_ERROR(return_code, fmt, ...)    \
-  {                                              \
-    if (return_code & LUMINARY_ERROR_PROPAGATED) \
-      log_message(fmt, ##__VA_ARGS__);           \
-    else                                         \
-      error_message(fmt, ##__VA_ARGS__);         \
-    return return_code;                          \
+#define __RETURN_ERROR(return_code, fmt, ...)      \
+  {                                                \
+    if ((return_code) & LUMINARY_ERROR_PROPAGATED) \
+      log_message(fmt, ##__VA_ARGS__);             \
+    else                                           \
+      error_message(fmt, ##__VA_ARGS__);           \
+    return return_code;                            \
   }
 
 #define __CHECK_NULL_ARGUMENT(argument)                                     \
@@ -19,7 +19,7 @@
 
 #define __FAILURE_HANDLE(command)                                                                             \
   {                                                                                                           \
-    LuminaryResult __lum_func_err = command;                                                                  \
+    LuminaryResult __lum_func_err = (command);                                                                \
     if (__lum_func_err != LUMINARY_SUCCESS) {                                                                 \
       __RETURN_ERROR(                                                                                         \
         __lum_func_err | LUMINARY_ERROR_PROPAGATED, "Luminary internal function [=%s] returned %s", #command, \
@@ -38,7 +38,7 @@
 
 #define __FAILURE_HANDLE_CRITICAL(command)       \
   {                                              \
-    LuminaryResult __lum_func_err = command;     \
+    LuminaryResult __lum_func_err = (command);   \
     if (__lum_func_err != LUMINARY_SUCCESS) {    \
       __locked_section_result |= __lum_func_err; \
       goto __UNLOCKING_CRITICAL_LABEL;           \
@@ -54,7 +54,7 @@
 
 #define __RETURN_ERROR_CRITICAL(return_code, fmt, ...) \
   {                                                    \
-    if (return_code & LUMINARY_ERROR_PROPAGATED)       \
+    if ((return_code) & LUMINARY_ERROR_PROPAGATED)     \
       log_message(fmt, ##__VA_ARGS__);                 \
     else                                               \
       error_message(fmt, ##__VA_ARGS__);               \
