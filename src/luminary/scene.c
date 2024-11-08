@@ -290,19 +290,18 @@ LuminaryResult scene_propagate_changes(Scene* scene, Scene* src) {
   }
 
   uint64_t current_entity = SCENE_ENTITY_GLOBAL_START;
-  while (src->flags[SCENE_ENTITY_TYPE_GLOBAL] && current_entity <= SCENE_ENTITY_GLOBAL_END) {
+  while (current_entity <= SCENE_ENTITY_GLOBAL_END) {
     const uint32_t entity_dirty_flag = SCENE_ENTITY_TO_DIRTY(current_entity);
     if (src->flags[SCENE_ENTITY_TYPE_GLOBAL] & entity_dirty_flag) {
       __FAILURE_HANDLE_CRITICAL(scene_get(src, scene->scratch_buffer, current_entity));
       __FAILURE_HANDLE_CRITICAL(scene_update_force(scene, scene->scratch_buffer, current_entity));
-      src->flags[SCENE_ENTITY_TYPE_GLOBAL] &= ~entity_dirty_flag;
     }
 
     current_entity++;
   }
 
   current_entity = SCENE_ENTITY_LIST_START;
-  while (src->flags[SCENE_ENTITY_TYPE_LIST] && current_entity <= SCENE_ENTITY_LIST_END) {
+  while (current_entity <= SCENE_ENTITY_LIST_END) {
     const uint32_t entity_dirty_flag = SCENE_ENTITY_TO_DIRTY(current_entity);
     if (src->flags[SCENE_ENTITY_TYPE_LIST] & entity_dirty_flag) {
       switch (current_entity) {
@@ -315,14 +314,12 @@ LuminaryResult scene_propagate_changes(Scene* scene, Scene* src) {
         default:
           __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
       }
-
-      __FAILURE_HANDLE_CRITICAL(scene_apply_list_changes(src, current_entity));
-
-      src->flags[SCENE_ENTITY_TYPE_LIST] &= ~entity_dirty_flag;
     }
 
     current_entity++;
   }
+
+  __FAILURE_HANDLE_CRITICAL(scene_apply_changes(src));
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock_all(src));
@@ -359,55 +356,71 @@ LuminaryResult scene_get_list_changes(Scene* scene, ARRAYPTR void** list, SceneE
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult scene_apply_list_changes(Scene* scene, SceneEntity entity) {
+LuminaryResult scene_apply_changes(Scene* scene) {
   __CHECK_NULL_ARGUMENT(scene);
 
-  switch (entity) {
-    case SCENE_ENTITY_MATERIALS: {
-      uint32_t material_updates_count;
-      __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &material_updates_count));
+  uint32_t entity;
 
-      uint32_t material_count;
-      __FAILURE_HANDLE(array_get_num_elements(scene->materials, &material_count));
+  // No updates needed for global entries.
 
-      for (uint32_t material_update_id = 0; material_update_id < material_updates_count; material_update_id++) {
-        const MaterialUpdate update = scene->material_updates[material_update_id];
+  scene->flags[SCENE_ENTITY_TYPE_GLOBAL] = 0;
 
-        // New element
-        if (update.material_id >= material_count) {
-          __FAILURE_HANDLE(array_push(&scene->materials, &update.material));
-          continue;
-        }
+  entity = SCENE_ENTITY_LIST_START;
+  while (entity <= SCENE_ENTITY_LIST_END) {
+    const uint32_t entity_dirty_flag = SCENE_ENTITY_TO_DIRTY(entity);
+    if (scene->flags[SCENE_ENTITY_TYPE_LIST] & entity_dirty_flag) {
+      switch (entity) {
+        case SCENE_ENTITY_MATERIALS: {
+          uint32_t material_updates_count;
+          __FAILURE_HANDLE(array_get_num_elements(scene->material_updates, &material_updates_count));
 
-        scene->materials[update.material_id] = update.material;
+          uint32_t material_count;
+          __FAILURE_HANDLE(array_get_num_elements(scene->materials, &material_count));
+
+          for (uint32_t material_update_id = 0; material_update_id < material_updates_count; material_update_id++) {
+            const MaterialUpdate update = scene->material_updates[material_update_id];
+
+            // New element
+            if (update.material_id >= material_count) {
+              __FAILURE_HANDLE(array_push(&scene->materials, &update.material));
+              continue;
+            }
+
+            scene->materials[update.material_id] = update.material;
+          }
+
+          __FAILURE_HANDLE(array_clear(scene->material_updates));
+        } break;
+        case SCENE_ENTITY_INSTANCES: {
+          uint32_t instance_updates_count;
+          __FAILURE_HANDLE(array_get_num_elements(scene->instance_updates, &instance_updates_count));
+
+          uint32_t instance_count;
+          __FAILURE_HANDLE(array_get_num_elements(scene->instances, &instance_count));
+
+          for (uint32_t instance_update_id = 0; instance_update_id < instance_updates_count; instance_update_id++) {
+            const MeshInstanceUpdate update = scene->instance_updates[instance_update_id];
+
+            // New element
+            if (update.instance_id >= instance_count) {
+              __FAILURE_HANDLE(array_push(&scene->instances, &update.instance));
+              continue;
+            }
+
+            scene->instances[update.instance_id] = update.instance;
+          }
+
+          __FAILURE_HANDLE(array_clear(scene->instance_updates));
+        } break;
+        default:
+          __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
       }
+    }
 
-      __FAILURE_HANDLE(array_clear(scene->material_updates));
-    } break;
-    case SCENE_ENTITY_INSTANCES: {
-      uint32_t instance_updates_count;
-      __FAILURE_HANDLE(array_get_num_elements(scene->instance_updates, &instance_updates_count));
-
-      uint32_t instance_count;
-      __FAILURE_HANDLE(array_get_num_elements(scene->instances, &instance_count));
-
-      for (uint32_t instance_update_id = 0; instance_update_id < instance_updates_count; instance_update_id++) {
-        const MeshInstanceUpdate update = scene->instance_updates[instance_update_id];
-
-        // New element
-        if (update.instance_id >= instance_count) {
-          __FAILURE_HANDLE(array_push(&scene->instances, &update.instance));
-          continue;
-        }
-
-        scene->instances[update.instance_id] = update.instance;
-      }
-
-      __FAILURE_HANDLE(array_clear(scene->instance_updates));
-    } break;
-    default:
-      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Entity is not a list entity.");
+    entity++;
   }
+
+  scene->flags[SCENE_ENTITY_TYPE_LIST] = 0;
 
   return LUMINARY_SUCCESS;
 }

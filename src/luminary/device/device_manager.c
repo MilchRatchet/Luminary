@@ -140,7 +140,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   __FAILURE_HANDLE_CRITICAL(scene_lock_all(device_manager->scene_device));
 
   uint32_t device_count;
-  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+  __FAILURE_HANDLE_CRITICAL(array_get_num_elements(device_manager->devices, &device_count));
 
   SceneDirtyFlags flags;
   __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(device_manager->scene_device, &flags));
@@ -152,11 +152,11 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     // render kernels don't read crap and crash,
     update_device_data_asynchronously = false;
 
-    __FAILURE_HANDLE(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
+    __FAILURE_HANDLE_CRITICAL(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
-      __FAILURE_HANDLE(sample_count_get_slice(&device_manager->sample_count, 32, &device->sample_count));
+      __FAILURE_HANDLE_CRITICAL(sample_count_get_slice(&device_manager->sample_count, 32, &device->sample_count));
       // TODO: Signal all devices to restart integration
     }
   }
@@ -180,15 +180,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_instance_updates(device_manager));
   }
 
-  current_entity = SCENE_ENTITY_LIST_START;
-  while (flags && current_entity <= SCENE_ENTITY_LIST_END) {
-    if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
-      // TODO: Update entity on devices
-    }
-
-    current_entity++;
-  }
-
   if (flags & SCENE_DIRTY_FLAG_OUTPUT) {
     // TODO: Signal main device to output current image again.
   }
@@ -196,11 +187,13 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   if (flags & SCENE_DIRTY_FLAG_BUFFERS) {
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
-      __FAILURE_HANDLE(device_allocate_work_buffers(device));
+      __FAILURE_HANDLE_CRITICAL(device_allocate_work_buffers(device));
     }
 
     // TODO: Reallocate buffers on all devices
   }
+
+  __FAILURE_HANDLE_CRITICAL(scene_apply_changes(device_manager->scene_device));
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(scene_unlock_all(device_manager->scene_device));
