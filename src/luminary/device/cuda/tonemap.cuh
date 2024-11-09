@@ -159,23 +159,21 @@ __device__ RGBF tonemap_agx_punchy(RGBF pixel) {
   return pixel;
 }
 
-__device__ RGBF tonemap_agx_custom(RGBF pixel) {
+__device__ RGBF tonemap_agx_custom(RGBF pixel, const AGXCustomParams agx_params) {
   pixel = agx_conversion(pixel);
 
-  RGBF slope = get_color(device.camera.agx_custom_slope, device.camera.agx_custom_slope, device.camera.agx_custom_slope);
-  RGBF power = get_color(device.camera.agx_custom_power, device.camera.agx_custom_power, device.camera.agx_custom_power);
+  RGBF slope = get_color(agx_params.slope, agx_params.slope, agx_params.slope);
+  RGBF power = get_color(agx_params.power, agx_params.power, agx_params.power);
 
-  pixel = agx_look(pixel, slope, power, device.camera.agx_custom_saturation);
+  pixel = agx_look(pixel, slope, power, agx_params.saturation);
   pixel = agx_inv_conversion(pixel);
 
   return pixel;
 }
 
-__device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
-  if (device.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
-    return pixel;
-
-  if (device.output_variable == OUTPUT_VARIABLE_ALBEDO_GUIDANCE || device.output_variable == OUTPUT_VARIABLE_NORMAL_GUIDANCE)
+__device__ RGBF
+  tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y, const RGBF color_correction, const AGXCustomParams agx_params) {
+  if (device.settings.shading_mode != LUMINARY_SHADING_MODE_DEFAULT)
     return pixel;
 
   if (device.camera.purkinje) {
@@ -185,7 +183,7 @@ __device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
   if (device.camera.use_color_correction) {
     RGBF hsv = rgb_to_hsv(pixel);
 
-    hsv = add_color(hsv, device.camera.color_correction);
+    hsv = add_color(hsv, color_correction);
 
     if (hsv.r < 0.0f)
       hsv.r += 1.0f;
@@ -227,7 +225,7 @@ __device__ RGBF tonemap_apply(RGBF pixel, const uint32_t x, const uint32_t y) {
       pixel = tonemap_agx_punchy(pixel);
       break;
     case LUMINARY_TONEMAP_AGX_CUSTOM:
-      pixel = tonemap_agx_custom(pixel);
+      pixel = tonemap_agx_custom(pixel, agx_params);
       break;
   }
 

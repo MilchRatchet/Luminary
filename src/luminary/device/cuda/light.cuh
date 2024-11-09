@@ -594,7 +594,7 @@ __device__ float lights_integrate_emission(const TriangleLight light, const UV v
   return color_importance(accumulator) / texel_count;
 }
 
-LUMINARY_KERNEL void lights_compute_power(const TriangleLight* tris, const uint32_t lights_count, float* power_dst) {
+LUMINARY_KERNEL void light_compute_power(const TriangleLight* tris, const uint32_t lights_count, float* power_dst) {
   for (uint32_t light = THREAD_ID; light < lights_count; light += blockDim.x * gridDim.x) {
     const TriangleLight light_triangle = load_triangle_light(tris, light);
 

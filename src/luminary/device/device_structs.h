@@ -28,7 +28,7 @@ struct DeviceCamera {
   uint32_t do_firefly_clamping : 1;
 
   vec3 pos;
-  vec3 rotation;
+  Quaternion rotation;
   float fov;
   float focal_length;
   float aperture_size;
@@ -38,7 +38,7 @@ struct DeviceCamera {
   float russian_roulette_threshold;
   float film_grain;
 } typedef DeviceCamera;
-LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x3Cu);
+LUM_STATIC_SIZE_ASSERT(DeviceCamera, 0x40u);
 
 struct DeviceOcean {
   uint32_t active : 1;

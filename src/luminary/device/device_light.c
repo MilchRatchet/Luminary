@@ -1,4 +1,4 @@
-#include "light.h"
+#include "device_light.h"
 
 #include <float.h>
 #include <immintrin.h>

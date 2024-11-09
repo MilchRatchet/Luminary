@@ -4,6 +4,7 @@
 #include "bsdf_utils.cuh"
 #include "bvh.cuh"
 #include "camera.cuh"
+#include "camera_post_common.cuh"
 #include "cloud.cuh"
 #include "ior_stack.cuh"
 #include "purkinje.cuh"
@@ -162,7 +163,7 @@ LUMINARY_KERNEL void balance_trace_tasks() {
   }
 }
 
-LUMINARY_KERNEL void process_sky_inscattering_tasks() {
+LUMINARY_KERNEL void sky_process_inscattering_events() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
@@ -177,7 +178,7 @@ LUMINARY_KERNEL void process_sky_inscattering_tasks() {
 
     const vec3 sky_origin = world_to_sky_transform(task.origin);
 
-    const float inscattering_limit = world_to_sky_scale(depth);
+    const float inscattering_limit = world_to_sky_scale(result.depth);
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
 
@@ -256,7 +257,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
     if (instance_id <= HIT_TYPE_TRIANGLE_ID_LIMIT) {
       index          = geometry_offset;
-      needs_swapping = (k < initial_geometry_offset) || (k >= geometry_task_count + initial_geometry_offset);
+      needs_swapping = k >= geometry_task_count + initial_geometry_offset;
       if (needs_swapping || k >= geometry_offset) {
         geometry_offset++;
       }
@@ -327,7 +328,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 #endif
 
     if (result.instance_id != HIT_TYPE_SKY)
-      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
+      task.origin = add_vector(task.origin, scale_vector(task.ray, result.depth));
 
     ShadingTask shading_task;
     shading_task.instance_id = result.instance_id;
@@ -354,7 +355,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }
 
-LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
+LUMINARY_KERNEL void generate_final_image(const RGBF* src, const RGBF color_correction, const AGXCustomParams agx_params) {
   const uint32_t undersampling       = max(device.undersampling, 1);
   const uint32_t undersampling_scale = 1 << undersampling;
 
@@ -382,7 +383,7 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
         const uint32_t index = pixel_x + pixel_y * device.settings.width;
 
         RGBF pixel = load_RGBF(src + index);
-        pixel      = tonemap_apply(pixel, pixel_x, pixel_y);
+        pixel      = tonemap_apply(pixel, pixel_x, pixel_y, color_correction, agx_params);
 
         accumulated_color = add_color(accumulated_color, pixel);
       }
@@ -395,8 +396,7 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src) {
   }
 }
 
-LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
-  XRGB8* dest, const int width, const int height, const int ld, const OutputVariable output_variable) {
+LUMINARY_KERNEL void convert_RGBF_to_XRGB8(XRGB8* dest, const int width, const int height, const int ld, const Filter filter) {
   uint32_t id = THREAD_ID;
 
   const uint32_t amount = width * height;
@@ -428,7 +428,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(
       pixel                = load_RGBF(device.ptrs.frame_final + src_x + src_y * undersampling_width);
     }
 
-    switch (device.camera.filter) {
+    switch (filter) {
       case LUMINARY_FILTER_NONE:
         break;
       case LUMINARY_FILTER_GRAY:

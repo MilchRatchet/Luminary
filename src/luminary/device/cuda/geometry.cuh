@@ -117,28 +117,7 @@ LUMINARY_KERNEL void process_debug_geometry_tasks() {
           } break;
           case LUMINARY_SHADING_MODE_LIGHTS: {
             const GBufferData data = geometry_generate_g_buffer(task, aux_data, pixel);
-
-            const uint32_t light_id = load_triangle_light_id(task.hit_id);
-
-            RGBF color = scale_color(opaque_color(data.albedo), 0.025f);
-
-            if (light_id != LIGHT_ID_NONE) {
-              const TriangleLight tri_light = load_triangle_light(device.scene.triangle_lights, light_id);
-
-#if 0
-              const float power = tri_light.power;
-
-              color = add_color(color, get_color(power, power, power));
-#elif 0
-              const float value = 5.0f * tri_light.power;
-              const float red   = __saturatef(2.0f * value);
-              const float green = __saturatef(2.0f * (value - 0.5f));
-              const float blue = __saturatef((value > 0.5f) ? 4.0f * (0.25f - fabsf(value - 1.0f)) : 4.0f * (0.25f - fabsf(value - 0.25f)));
-
-              color = get_color(red, green, blue);
-#endif
-              color = get_color(1.0f, 1.0f, 1.0f);
-            }
+            const RGBF color       = add_color(scale_color(opaque_color(data.albedo), 0.025f), data.emission);
 
             write_beauty_buffer_forced(color, pixel);
           } break;

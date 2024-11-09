@@ -8,7 +8,7 @@ struct CUDAKernelConfig {
 } typedef CUDAKernelConfig;
 
 static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
-  [CUDA_KERNEL_TYPE_SKY_SHADING] = {.name = "sky_process_tasks", .shared_memory_size = 0}};
+  [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS] = {.name = "sky_process_tasks", .shared_memory_size = 0}};
 
 LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type) {
   __CHECK_NULL_ARGUMENT(kernel);

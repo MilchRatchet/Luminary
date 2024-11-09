@@ -12,7 +12,7 @@
 // The main goal is to eliminate the cost of the atmosphere if that is desired.
 // Sampling Sun => (pos - hdri_pos) and then precompute the sun pos based on hdri values instead.
 
-LUMINARY_KERNEL void sky_hdri_compute_hdri_lut(float4* dst, float* dst_alpha) {
+LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha) {
   unsigned int id = THREAD_ID;
 
   const int amount = device.sky.hdri_dim * device.sky.hdri_dim;

@@ -46,9 +46,12 @@ __device__ vec3 camera_sample_aperture(const ushort2 pixel_coords) {
 __device__ TraceTask camera_get_ray(TraceTask task) {
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
+  const float step = 2.0f * (device.camera.fov / device.settings.width);
+  const float vfov = step * device.settings.height * 0.5f;
+
   vec3 film_point;
-  film_point.x = device.camera.fov - device.emitter.step * (task.index.x + jitter.x);
-  film_point.y = -device.emitter.vfov + device.emitter.step * (task.index.y + jitter.y);
+  film_point.x = device.camera.fov - step * (task.index.x + jitter.x);
+  film_point.y = -vfov + step * (task.index.y + jitter.y);
   film_point.z = 1.0f;
 
   vec3 film_to_focal_ray = normalize_vector(sub_vector(get_vector(0.0f, 0.0f, 0.0f), film_point));
@@ -58,8 +61,8 @@ __device__ TraceTask camera_get_ray(TraceTask task) {
 
   vec3 aperture_point = camera_sample_aperture(task.index);
 
-  focal_point    = quaternion_apply(device.emitter.camera_rotation, focal_point);
-  aperture_point = quaternion_apply(device.emitter.camera_rotation, aperture_point);
+  focal_point    = quaternion_apply(device.camera.rotation, focal_point);
+  aperture_point = quaternion_apply(device.camera.rotation, aperture_point);
 
   task.ray    = normalize_vector(sub_vector(focal_point, aperture_point));
   task.origin = add_vector(device.camera.pos, aperture_point);

@@ -687,7 +687,7 @@ LUMINARY_KERNEL void sky_process_tasks() {
   }
 }
 
-LUMINARY_KERNEL void process_debug_sky_tasks() {
+LUMINARY_KERNEL void sky_process_tasks_debug() {
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 

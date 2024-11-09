@@ -115,6 +115,12 @@ struct Quad {
   vec3 normal;
 } typedef Quad;
 
+struct AGXCustomParams {
+  float slope;
+  float power;
+  float saturation;
+} typedef AGXCustomParams;
+
 enum GBufferFlags {
   G_BUFFER_FLAG_REFRACTION_IS_INSIDE = 0b1,
   G_BUFFER_FLAG_COLORED_DIELECTRIC   = 0b10,

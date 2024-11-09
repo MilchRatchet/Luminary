@@ -67,7 +67,8 @@ __device__ RGBF sample_pixel_border(const RGBF* image, float x, float y, const i
   return sample_pixel(image, x, y, width, height);
 }
 
-LUMINARY_KERNEL void image_downsample(const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
+LUMINARY_KERNEL void camera_post_image_downsample(
+  const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th) {
   unsigned int id = THREAD_ID;
 
   const float scale_x = 1.0f / (tw - 1);
@@ -107,7 +108,7 @@ LUMINARY_KERNEL void image_downsample(const RGBF* source, const int sw, const in
   }
 }
 
-LUMINARY_KERNEL void image_downsample_threshold(
+LUMINARY_KERNEL void camera_post_image_downsample_threshold(
   const RGBF* source, const int sw, const int sh, RGBF* target, const int tw, const int th, const float thresh) {
   unsigned int id = THREAD_ID;
 
@@ -150,7 +151,7 @@ LUMINARY_KERNEL void image_downsample_threshold(
   }
 }
 
-LUMINARY_KERNEL void image_upsample(
+LUMINARY_KERNEL void camera_post_image_upsample(
   const RGBF* source, const int sw, const int sh, RGBF* target, const RGBF* base, const int tw, const int th, const float sa,
   const float sb) {
   unsigned int id = THREAD_ID;

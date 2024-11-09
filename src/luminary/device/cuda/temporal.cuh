@@ -2,7 +2,6 @@
 #define CU_TEMPORAL_H
 
 #include "math.cuh"
-#include "structs.h"
 #include "utils.cuh"
 
 // TODO: Refactor this into a separate file, the idea of "temporal" is long gone now that reprojection is gone. While we are at it, get rid

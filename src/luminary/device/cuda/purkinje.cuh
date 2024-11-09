@@ -14,7 +14,7 @@
  */
 
 #include "math.cuh"
-#include "structs.h"
+#include "utils.cuh"
 
 #define PURKINJE_STRENGTH (5000.0f)
 

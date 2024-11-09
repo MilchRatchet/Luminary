@@ -1,6 +1,7 @@
 #ifndef CU_GEOMETRY_UTILS_H
 #define CU_GEOMETRY_UTILS_H
 
+#include "ior_stack.cuh"
 #include "math.cuh"
 #include "memory.cuh"
 #include "texture_utils.cuh"

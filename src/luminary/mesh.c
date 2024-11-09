@@ -3,7 +3,7 @@
 #include <string.h>
 
 #include "bvh.h"
-#include "device/light.h"
+#include "device/device_light.h"
 #include "internal_error.h"
 
 LuminaryResult mesh_create(Mesh** mesh) {

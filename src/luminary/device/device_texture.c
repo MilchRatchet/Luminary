@@ -130,7 +130,9 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
           size_t pitch_gpu;
           __FAILURE_HANDLE(device_memory_get_pitch(data_device, &pitch_gpu));
 
-          __FAILURE_HANDLE(device_upload2D(data_device, data, pitch * pixel_size, width * pixel_size, height, stream));
+          if (data != (void*) 0) {
+            __FAILURE_HANDLE(device_upload2D(data_device, data, pitch * pixel_size, width * pixel_size, height, stream));
+          }
 
           res_desc.resType                  = CU_RESOURCE_TYPE_PITCH2D;
           res_desc.res.pitch2D.devPtr       = DEVICE_CUPTR(data_device);
@@ -164,18 +166,20 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
 
           CUDA_FAILURE_HANDLE(cuArray3DCreate((CUarray*) &data_device, &descriptor));
 
-          CUDA_MEMCPY3D memcpy_info;
-          memset(&memcpy_info, 0, sizeof(CUDA_MEMCPY3D));
+          if (data != (void*) 0) {
+            CUDA_MEMCPY3D memcpy_info;
+            memset(&memcpy_info, 0, sizeof(CUDA_MEMCPY3D));
 
-          memcpy_info.dstArray      = (CUarray) data_device;
-          memcpy_info.dstMemoryType = CU_MEMORYTYPE_ARRAY;
-          memcpy_info.srcHost       = data;
-          memcpy_info.srcMemoryType = CU_MEMORYTYPE_HOST;
-          memcpy_info.WidthInBytes  = width * pixel_size;
-          memcpy_info.Height        = height;
-          memcpy_info.Depth         = depth;
+            memcpy_info.dstArray      = (CUarray) data_device;
+            memcpy_info.dstMemoryType = CU_MEMORYTYPE_ARRAY;
+            memcpy_info.srcHost       = data;
+            memcpy_info.srcMemoryType = CU_MEMORYTYPE_HOST;
+            memcpy_info.WidthInBytes  = width * pixel_size;
+            memcpy_info.Height        = height;
+            memcpy_info.Depth         = depth;
 
-          CUDA_FAILURE_HANDLE(cuMemcpy3DAsync(&memcpy_info, stream));
+            CUDA_FAILURE_HANDLE(cuMemcpy3DAsync(&memcpy_info, stream));
+          }
 
           res_desc.resType          = CU_RESOURCE_TYPE_ARRAY;
           res_desc.res.array.hArray = (CUarray) data_device;
