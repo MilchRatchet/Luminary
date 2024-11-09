@@ -23,14 +23,15 @@ __device__ bool particle_opacity_cutout(const float2 coord) {
 extern "C" __global__ void __raygen__optix() {
   const uint16_t trace_task_count = device.ptrs.trace_counts[THREAD_ID];
 
+  // TODO: Time should not be global but per task.
   const float time         = quasirandom_sequence_1D_global(QUASI_RANDOM_TARGET_CAMERA_TIME);
   const vec3 motion        = angles_to_direction(device.particles.direction_altitude, device.particles.direction_azimuth);
   const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
 
   for (uint32_t i = 0; i < trace_task_count; i++) {
-    const uint32_t offset    = get_task_address(i);
-    const TraceTask task     = load_trace_task(offset);
-    const TraceResult result = load_trace_result(offset);
+    const uint32_t offset = get_task_address(i);
+    const DeviceTask task = task_load(offset);
+    float tmax            = trace_depth_load(offset);
 
     const vec3 scaled_ray = scale_vector(task.ray, 1.0f / device.particles.scale);
     const vec3 reference  = scale_vector(add_vector(task.origin, motion_offset), 1.0f / device.particles.scale);
@@ -38,10 +39,8 @@ extern "C" __global__ void __raygen__optix() {
     const float3 origin = make_float3(reference.x, reference.y, reference.z);
     const float3 ray    = make_float3(scaled_ray.x, scaled_ray.y, scaled_ray.z);
 
-    float tmax = result.depth;
-
-    unsigned int depth       = __float_as_uint(result.depth);
-    unsigned int instance_id = result.instance_id;
+    unsigned int depth       = __float_as_uint(tmax);
+    unsigned int instance_id = HIT_TYPE_REJECT;
 
     const unsigned int vis_mask = OptixVisibilityMask(0xFFFF);
 
@@ -66,31 +65,30 @@ extern "C" __global__ void __raygen__optix() {
 
       const float intersection_dist = __uint_as_float(depth);
 
-      if (intersection_dist < tmax) {
-        // Hit ID contains the triangle ID but we only store the actual particle / quad ID
-        instance_id = HIT_TYPE_PARTICLE_MIN + (instance_id >> 1);
-
-        TraceResult trace_result;
-        trace_result.depth       = t + intersection_dist;
-        trace_result.instance_id = instance_id;
-        trace_result.tri_id      = 0;
-
-        store_trace_result(trace_result, offset);
+      if (intersection_dist < tmax)
         break;
-      }
-      else {
-        const float tx = inv_ray.x * (((ray.x < 0.0f) ? 0.0f : 1.0f) - p.x);
-        const float ty = inv_ray.y * (((ray.y < 0.0f) ? 0.0f : 1.0f) - p.y);
-        const float tz = inv_ray.z * (((ray.z < 0.0f) ? 0.0f : 1.0f) - p.z);
 
-        const float step = fminf(fminf(tx, ty), tz) + 128.0f * eps;
+      const float tx = inv_ray.x * (((ray.x < 0.0f) ? 0.0f : 1.0f) - p.x);
+      const float ty = inv_ray.y * (((ray.y < 0.0f) ? 0.0f : 1.0f) - p.y);
+      const float tz = inv_ray.z * (((ray.z < 0.0f) ? 0.0f : 1.0f) - p.z);
 
-        t += step;
-        tmax -= step;
+      const float step = fminf(fminf(tx, ty), tz) + 128.0f * eps;
 
-        if (tmax < 0.0f)
-          break;
-      }
+      t += step;
+      tmax -= step;
+
+      if (tmax < 0.0f)
+        break;
+    }
+
+    if (instance_id != HIT_TYPE_REJECT) {
+      // Hit ID contains the triangle ID but we only store the actual particle / quad ID
+      instance_id = HIT_TYPE_PARTICLE_MIN + (instance_id >> 1);
+
+      const TriangleHandle handle = triangle_handle_get(instance_id, 0);
+
+      triangle_handle_store(handle, offset);
+      trace_depth_store(t + __uint_as_float(depth), offset);
     }
   }
 }

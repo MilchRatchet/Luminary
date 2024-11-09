@@ -24,15 +24,15 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset             = get_task_address(task_offset + i);
-    const ShadingTask task            = load_shading_task(offset);
-    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
-    const uint32_t pixel              = get_pixel_id(task.index);
+    const uint32_t offset       = get_task_address(task_offset + i);
+    const DeviceTask task       = task_load(offset);
+    const TriangleHandle handle = triangle_handle_load(offset);
+    const uint32_t pixel        = get_pixel_id(task.index);
 
-    const VolumeType volume_type  = VOLUME_HIT_TYPE(task.instance_id);
+    const VolumeType volume_type  = VOLUME_HIT_TYPE(handle.instance_id);
     const VolumeDescriptor volume = volume_get_descriptor_preset(volume_type);
 
-    GBufferData data = volume_generate_g_buffer(task, aux_data, pixel, volume);
+    GBufferData data = volume_generate_g_buffer(task, handle.instance_id, pixel, volume);
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
@@ -40,13 +40,13 @@ extern "C" __global__ void __raygen__optix() {
     BSDFSampleInfo bounce_info;
     const vec3 bounce_ray = bsdf_sample(data, task.index, bounce_info);
 
-    uint8_t new_state = aux_data.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
+    uint8_t new_state = task.state & ~(STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION);
 
     if (volume_type == VOLUME_TYPE_OCEAN) {
       new_state &= ~STATE_FLAG_OCEAN_SCATTERED;
     }
 
-    TraceTask bounce_task;
+    DeviceTask bounce_task;
     bounce_task.state  = new_state;
     bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
@@ -71,9 +71,9 @@ extern "C" __global__ void __raygen__optix() {
     // The compiler reloads these values at some point for some reason and if we overwrite
     // the values we will get garbage. I am not sure if this is a compiler bug or some undefined
     // behaviour on my side.
-    if (validate_trace_task(bounce_task, bounce_record)) {
+    if (task_russian_roulette(bounce_task, bounce_record)) {
       store_RGBF(device.ptrs.records + pixel, bounce_record);
-      store_trace_task(bounce_task, get_task_address(trace_count++));
+      task_store(bounce_task, get_task_address(trace_count++));
     }
   }
 

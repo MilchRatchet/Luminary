@@ -241,7 +241,7 @@ __device__ RGBF bridges_sample_bridge(
 
 // TODO: Check if I can maybe get rid of all these duplicate computations and just reuse what I computed in the RIS step.
 __device__ RGBF bridges_evaluate_bridge(
-  const TraceTask task, const VolumeDescriptor volume, const vec3 initial_vertex, const TriangleHandle light_handle, const uint32_t seed,
+  const DeviceTask task, const VolumeDescriptor volume, const vec3 initial_vertex, const TriangleHandle light_handle, const uint32_t seed,
   const Quaternion rotation, const float scale, const RGBF initial_vertex_transmittance, const float ior, const ushort2 pixel) {
   ////////////////////////////////////////////////////////////////////
   // Get light sample
@@ -337,7 +337,7 @@ __device__ RGBF bridges_evaluate_bridge(
 }
 
 __device__ float bridges_sample_initial_vertex_target_pdf(
-  const TraceTask task, const VolumeDescriptor volume, const TriangleLight light, const vec3 light_center, const float t) {
+  const DeviceTask task, const VolumeDescriptor volume, const TriangleLight light, const vec3 light_center, const float t) {
   RGBF weight;
 
   weight.r = expf(-t * (volume.scattering.r + volume.absorption.r));
@@ -373,7 +373,7 @@ __device__ float bridges_initial_vertex_uniform_sample_pdf(const float uniform_m
 }
 
 __device__ float2 bridges_initial_vertex_uniform_sample_bounds(
-  const TraceTask task, const float limit, const TriangleLight light, const vec3 light_center, const ushort2 pixel) {
+  const DeviceTask task, const float limit, const TriangleLight light, const vec3 light_center, const ushort2 pixel) {
   const float light_center_dist = dot_product(sub_vector(light_center, task.origin), task.ray);
 
   const float uniform_min = 0.0f;
@@ -383,7 +383,7 @@ __device__ float2 bridges_initial_vertex_uniform_sample_bounds(
 }
 
 __device__ vec3 bridges_sample_initial_vertex(
-  const TraceTask task, const VolumeDescriptor volume, const float limit, const TriangleLight light, const uint32_t seed,
+  const DeviceTask task, const VolumeDescriptor volume, const float limit, const TriangleLight light, const uint32_t seed,
   const ushort2 pixel, float& pdf, RGBF& transmittance) {
   pdf           = 1.0f;
   transmittance = get_color(0.0f, 0.0f, 0.0f);
@@ -475,7 +475,7 @@ __device__ vec3 bridges_sample_initial_vertex(
   return add_vector(task.origin, scale_vector(task.ray, selected_t));
 }
 
-__device__ RGBF bridges_sample(const TraceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
+__device__ RGBF bridges_sample(const DeviceTask task, const VolumeDescriptor volume, const float limit, const float ior) {
   uint32_t selected_seed                     = 0xFFFFFFFF;
   TriangleHandle selected_handle             = triangle_handle_get(LIGHT_ID_NONE, 0);
   Quaternion selected_rotation               = {0.0f, 0.0f, 0.0f, 1.0f};

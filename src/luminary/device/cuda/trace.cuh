@@ -5,11 +5,11 @@
 #include "toy_utils.cuh"
 #include "utils.cuh"
 
-__device__ TraceResult trace_preprocess(const TraceTask task) {
+__device__ float trace_preprocess(const DeviceTask task, uint32_t& instance_id) {
   const uint32_t pixel = get_pixel_id(task.index);
 
-  float depth          = FLT_MAX;
-  uint32_t instance_id = HIT_TYPE_SKY;
+  float depth = FLT_MAX;
+  instance_id = HIT_TYPE_SKY;
 
   // Intersect against the triangle we hit in primary visible in the last frame.
   // This is a heuristic to speed up the BVH traversal.
@@ -75,12 +75,7 @@ __device__ TraceResult trace_preprocess(const TraceTask task) {
     }
   }
 
-  TraceResult result;
-  result.depth       = depth;
-  result.instance_id = instance_id;
-  result.tri_id      = 0;
-
-  return result;
+  return depth;
 }
 
 #endif /* CU_TRACE_H */

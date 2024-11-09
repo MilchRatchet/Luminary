@@ -8,8 +8,8 @@ __device__ vec3 particle_transform_relative(vec3 p) {
   return sub_vector(p, device.camera.pos);
 }
 
-__device__ GBufferData particle_generate_g_buffer(const ShadingTask task, const ShadingTaskAuxData aux_data, const int pixel) {
-  Quad q   = load_quad(device.ptrs.particle_quads, task.instance_id & HIT_TYPE_PARTICLE_MASK);
+__device__ GBufferData particle_generate_g_buffer(const DeviceTask task, const uint32_t instance_id, const int pixel) {
+  Quad q   = load_quad(device.ptrs.particle_quads, instance_id & HIT_TYPE_PARTICLE_MASK);
   q.vertex = particle_transform_relative(q.vertex);
   q.edge1  = particle_transform_relative(q.edge1);
   q.edge2  = particle_transform_relative(q.edge2);
@@ -26,16 +26,16 @@ __device__ GBufferData particle_generate_g_buffer(const ShadingTask task, const 
 
   // Particles BSDF is emulated using volume BSDFs
   GBufferData data;
-  data.instance_id = task.instance_id;
+  data.instance_id = instance_id;
   data.tri_id      = 0;
   data.albedo      = albedo;
   data.emission    = get_color(0.0f, 0.0f, 0.0f);
   data.normal      = normal;
-  data.position    = task.position;
+  data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = device.particles.phase_diameter;
   data.metallic    = 0.0f;
-  data.state       = aux_data.state;
+  data.state       = task.state;
   data.flags       = 0;
   data.ior_in      = ray_ior;
   data.ior_out     = ray_ior;

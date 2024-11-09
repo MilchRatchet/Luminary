@@ -69,7 +69,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
     if (undersampling_x >= device.settings.width || undersampling_y >= device.settings.height)
       continue;
 
-    TraceTask task;
+    DeviceTask task;
     task.state   = STATE_FLAG_DELTA_PATH | STATE_FLAG_CAMERA_DIRECTION;
     task.index.x = undersampling_x;
     task.index.y = undersampling_y;
@@ -86,7 +86,7 @@ LUMINARY_KERNEL void generate_trace_tasks() {
     const float ambient_ior = bsdf_refraction_index_ambient(task.origin, task.ray);
     ior_stack_interact(ambient_ior, pixel, IOR_STACK_METHOD_RESET);
 
-    store_trace_task(task, get_task_address(task_count++));
+    task_store(task, get_task_address(task_count++));
   }
 
   device.ptrs.trace_counts[THREAD_ID] = task_count;
@@ -139,9 +139,9 @@ LUMINARY_KERNEL void balance_trace_tasks() {
       const int block_id       = warp >> 2;
 
       for (int j = 0; j < swaps; j++) {
-        TraceTask* source_ptr =
-          device.ptrs.trace_tasks + get_task_address_of_thread(thread_id_base + source_index, block_id, source_count - 1);
-        TraceTask* sink_ptr = device.ptrs.trace_tasks + get_task_address_of_thread(thread_id_base + i, block_id, count);
+        // TODO: Write a function for this
+        DeviceTask* source_ptr = device.ptrs.tasks + get_task_address_of_thread(thread_id_base + source_index, block_id, source_count - 1);
+        DeviceTask* sink_ptr   = device.ptrs.tasks + get_task_address_of_thread(thread_id_base + i, block_id, count);
 
         __stwb((float4*) sink_ptr, __ldca((float4*) source_ptr));
         __stwb((float4*) (sink_ptr) + 1, __ldca((float4*) (source_ptr) + 1));
@@ -167,18 +167,20 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const int offset         = get_task_address(i);
-    TraceTask task           = load_trace_task(offset);
-    const TraceResult result = load_trace_result(offset);
+    const int offset            = get_task_address(i);
+    DeviceTask task             = task_load(offset);
+    const TriangleHandle handle = triangle_handle_load(offset);
 
-    if (result.instance_id == HIT_TYPE_SKY)
+    if (handle.instance_id == HIT_TYPE_SKY)
       continue;
+
+    const float depth = trace_depth_load(offset);
 
     const uint32_t pixel = get_pixel_id(task.index);
 
     const vec3 sky_origin = world_to_sky_transform(task.origin);
 
-    const float inscattering_limit = world_to_sky_scale(result.depth);
+    const float inscattering_limit = world_to_sky_scale(depth);
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
 
@@ -200,9 +202,8 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   // count data
   for (uint32_t i = 0; i < task_count; i++) {
-    const uint32_t offset = get_task_address(i);
-    // TODO: We only need the instance_id
-    const uint32_t instance_id = load_trace_result(offset).instance_id;
+    const uint32_t offset      = get_task_address(i);
+    const uint32_t instance_id = triangle_handle_load(offset).instance_id;
 
     if (instance_id == HIT_TYPE_SKY) {
       sky_task_count++;
@@ -250,7 +251,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   // order data
   while (k < task_count) {
     const uint32_t offset      = get_task_address(k);
-    const uint32_t instance_id = load_trace_result(offset).instance_id;
+    const uint32_t instance_id = triangle_handle_load(offset).instance_id;
 
     uint32_t index;
     bool needs_swapping;
@@ -315,33 +316,25 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   // process data
   for (uint32_t i = 0; i < num_tasks; i++) {
-    const uint32_t offset    = get_task_address(i);
-    TraceTask task           = load_trace_task(offset);
-    const TraceResult result = load_trace_result(offset);
+    const uint32_t offset       = get_task_address(i);
+    const TriangleHandle handle = triangle_handle_load(offset);
 
-    const uint32_t pixel = get_pixel_id(task.index);
+    if (handle.instance_id != HIT_TYPE_SKY) {
+      DeviceTask task   = task_load(offset);
+      const float depth = trace_depth_load(offset);
 
 #if 0
     if (IS_PRIMARY_RAY) {
+      const uint32_t pixel        = get_pixel_id(task.index);
       device.ptrs.hit_id_history[pixel] = hit_id;
     }
 #endif
 
-    if (result.instance_id != HIT_TYPE_SKY)
-      task.origin = add_vector(task.origin, scale_vector(task.ray, result.depth));
+      // TODO: This is wasteful, either move this to the next kernel or keep it if the hit_id history trick is worth it still.
+      task.origin = add_vector(task.origin, scale_vector(task.ray, depth));
 
-    ShadingTask shading_task;
-    shading_task.instance_id = result.instance_id;
-    shading_task.index       = task.index;
-    shading_task.position    = task.origin;
-    shading_task.ray         = task.ray;
-
-    ShadingTaskAuxData shading_task_aux;
-    shading_task_aux.tri_id = result.tri_id;
-    shading_task_aux.state  = task.state;
-
-    store_shading_task(shading_task, offset);
-    store_shading_task_aux_data(shading_task_aux, offset);
+      task_store(task, offset);
+    }
   }
 
   const uint16_t geometry_kernel_task_count = geometry_task_count + toy_task_count + ocean_task_count;

@@ -433,8 +433,8 @@ __device__ float ocean_reflection_coefficient(
   return __saturatef(0.5f * (reflection_s_pol + reflection_p_pol));
 }
 
-__device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const ShadingTaskAuxData aux_task, const int pixel) {
-  vec3 normal = ocean_get_normal(task.position);
+__device__ GBufferData ocean_generate_g_buffer(const DeviceTask task, const uint32_t pixel) {
+  vec3 normal = ocean_get_normal(task.origin);
 
   const bool inside_water = dot_product(task.ray, normal) > 0.0f;
 
@@ -454,7 +454,7 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const Sha
 
   // We clamp the roughness to avoid caustics which would never clean up.
   float roughness = 0.045f;
-  if (aux_task.state & STATE_FLAG_DELTA_PATH) {
+  if (task.state & STATE_FLAG_DELTA_PATH) {
     flags |= G_BUFFER_FLAG_USE_LIGHT_RAYS;
   }
 
@@ -464,11 +464,11 @@ __device__ GBufferData ocean_generate_g_buffer(const ShadingTask task, const Sha
   data.albedo      = get_RGBAF(0.0f, 0.0f, 0.0f, 0.0f);  // Albedo doesn't matter because it is not a colored dielectric
   data.emission    = get_color(0.0f, 0.0f, 0.0f);
   data.normal      = normal;
-  data.position    = task.position;
+  data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = roughness;
   data.metallic    = 1.0f;
-  data.state       = aux_task.state;
+  data.state       = task.state;
   data.flags       = flags;
   data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? device.ocean.refractive_index : ray_ior;
   data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.ocean.refractive_index;

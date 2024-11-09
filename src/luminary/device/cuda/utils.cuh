@@ -174,12 +174,6 @@ __device__ bool _utils_debug_nans(const float value, const char* func, const uin
 // Triangle addressing
 //===========================================================================================
 
-struct TriangleHandle {
-  // Unsigned int for OptiX compatibility
-  unsigned int instance_id;
-  unsigned int tri_id;
-} typedef TriangleHandle;
-
 /* instance_id refers to the light instance id, the actual instance_id is obtain through device.ptrs.light_instance_map. */
 typedef TriangleHandle LightTriangleHandle;
 

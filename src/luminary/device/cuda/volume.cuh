@@ -30,9 +30,11 @@ LUMINARY_KERNEL void volume_process_events() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const int offset     = get_task_address(i);
-    TraceTask task       = load_trace_task(offset);
-    TraceResult result   = load_trace_result(offset);
+    const int offset      = get_task_address(i);
+    DeviceTask task       = task_load(offset);
+    float depth           = trace_depth_load(offset);
+    TriangleHandle handle = triangle_handle_load(offset);
+
     const uint32_t pixel = get_pixel_id(task.index);
 
     RGBF record = load_RGBF(device.ptrs.records + pixel);
@@ -41,15 +43,15 @@ LUMINARY_KERNEL void volume_process_events() {
 
     if (device.fog.active) {
       const VolumeDescriptor volume = volume_get_descriptor_preset_fog();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, result.depth);
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
         const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
-        if (volume_dist < result.depth) {
-          result.depth       = volume_dist;
-          result.instance_id = HIT_TYPE_VOLUME_FOG;
-          result.tri_id      = 0;
+        if (volume_dist < depth) {
+          depth              = volume_dist;
+          handle.instance_id = HIT_TYPE_VOLUME_FOG;
+          handle.tri_id      = 0;
         }
       }
     }
@@ -58,21 +60,21 @@ LUMINARY_KERNEL void volume_process_events() {
       bool ocean_intersection_possible = true;
       if (task.origin.y < OCEAN_MIN_HEIGHT || task.origin.y > OCEAN_MAX_HEIGHT) {
         const float short_distance  = ocean_short_distance(task.origin, task.ray);
-        ocean_intersection_possible = (short_distance != FLT_MAX) && (short_distance <= result.depth);
+        ocean_intersection_possible = (short_distance != FLT_MAX) && (short_distance <= depth);
       }
 
       if (ocean_intersection_possible) {
-        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, result.depth);
+        const float ocean_depth = ocean_intersection_distance(task.origin, task.ray, depth);
 
-        if (ocean_depth < result.depth) {
-          result.depth       = ocean_depth;
-          result.instance_id = HIT_TYPE_OCEAN;
-          result.tri_id      = 0;
+        if (ocean_depth < depth) {
+          depth              = ocean_depth;
+          handle.instance_id = HIT_TYPE_OCEAN;
+          handle.tri_id      = 0;
         }
       }
 
       const VolumeDescriptor volume = volume_get_descriptor_preset_ocean();
-      const float2 path             = volume_compute_path(volume, task.origin, task.ray, result.depth);
+      const float2 path             = volume_compute_path(volume, task.origin, task.ray, depth);
 
       if (path.x >= 0.0f) {
         float integration_depth = path.y;
@@ -82,12 +84,12 @@ LUMINARY_KERNEL void volume_process_events() {
         if (allow_ocean_volume_hit) {
           const float volume_dist = volume_sample_intersection(volume, task.origin, task.ray, path.x, path.y, random);
 
-          if (volume_dist < result.depth) {
-            result.depth       = volume_dist;
-            result.instance_id = HIT_TYPE_VOLUME_OCEAN;
-            result.tri_id      = 0;
+          if (volume_dist < depth) {
+            depth              = volume_dist;
+            handle.instance_id = HIT_TYPE_VOLUME_OCEAN;
+            handle.tri_id      = 0;
 
-            integration_depth = result.depth - path.x;
+            integration_depth = depth - path.x;
 
             const float sampling_pdf = volume.max_scattering * expf(-integration_depth * volume.max_scattering);
             record                   = mul_color(record, scale_color(volume.scattering, 1.0f / sampling_pdf));
@@ -100,7 +102,8 @@ LUMINARY_KERNEL void volume_process_events() {
       }
     }
 
-    store_trace_result(result, offset);
+    trace_depth_store(depth, offset);
+    triangle_handle_store(handle, offset);
     store_RGBF(device.ptrs.records + pixel, record);
   }
 }

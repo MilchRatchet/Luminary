@@ -45,8 +45,8 @@ __device__ vec3 toy_sample_ray(const vec3 position, const float2 random) {
 
 #ifdef SHADING_KERNEL
 
-__device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const ShadingTaskAuxData aux_data, const int pixel) {
-  vec3 normal = get_toy_normal(task.position);
+__device__ GBufferData toy_generate_g_buffer(const DeviceTask task, const int pixel) {
+  vec3 normal = get_toy_normal(task.origin);
 
   if (dot_product(normal, task.ray) > 0.0f) {
     normal = scale_vector(normal, -1.0f);
@@ -54,10 +54,10 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const Shadi
 
   uint32_t flags = G_BUFFER_FLAG_COLORED_DIELECTRIC | G_BUFFER_FLAG_USE_LIGHT_RAYS;
 
-  const bool include_emission = device.toy.emissive && (aux_data.state & STATE_FLAG_CAMERA_DIRECTION);
+  const bool include_emission = device.toy.emissive && (task.state & STATE_FLAG_CAMERA_DIRECTION);
   const RGBF emission         = (include_emission) ? scale_color(device.toy.emission, device.toy.material.b) : get_color(0.0f, 0.0f, 0.0f);
 
-  if (toy_is_inside(task.position, task.ray)) {
+  if (toy_is_inside(task.origin, task.ray)) {
     flags |= G_BUFFER_FLAG_REFRACTION_IS_INSIDE;
   }
 
@@ -71,11 +71,11 @@ __device__ GBufferData toy_generate_g_buffer(const ShadingTask task, const Shadi
   data.albedo      = device.toy.albedo;
   data.emission    = emission;
   data.normal      = normal;
-  data.position    = task.position;
+  data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = (1.0f - device.toy.material.r);
   data.metallic    = device.toy.material.g;
-  data.state       = aux_data.state;
+  data.state       = task.state;
   data.flags       = flags;
   data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? device.toy.refractive_index : ray_ior;
   data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : device.toy.refractive_index;

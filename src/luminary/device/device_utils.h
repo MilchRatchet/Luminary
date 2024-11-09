@@ -121,6 +121,12 @@ struct AGXCustomParams {
   float saturation;
 } typedef AGXCustomParams;
 
+struct TriangleHandle {
+  // Unsigned int for OptiX compatibility
+  unsigned int instance_id;
+  unsigned int tri_id;
+} typedef TriangleHandle;
+
 enum GBufferFlags {
   G_BUFFER_FLAG_REFRACTION_IS_INSIDE = 0b1,
   G_BUFFER_FLAG_COLORED_DIELECTRIC   = 0b10,
@@ -129,7 +135,7 @@ enum GBufferFlags {
 
 struct GBufferData {
   uint32_t instance_id;
-  uint16_t tri_id;
+  uint32_t tri_id;
   RGBAF albedo;
   RGBF emission;
   vec3 position;
@@ -137,7 +143,7 @@ struct GBufferData {
   vec3 normal;
   float roughness;
   float metallic;
-  uint8_t state;
+  uint16_t state;
   uint8_t flags;
   /* IOR of medium in direction of V. */
   float ior_in;
@@ -149,36 +155,14 @@ struct GBufferData {
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////
 
-struct ShadingTask {
-  uint32_t instance_id;
+struct DeviceTask {
+  uint16_t state;
+  uint16_t padding;
   ushort2 index;
-  vec3 position;  // (Origin if sky)
+  vec3 origin;  // (Position if shading and not sky)
   vec3 ray;
-} typedef ShadingTask;
-LUM_STATIC_SIZE_ASSERT(ShadingTask, 0x20);
-
-struct ShadingTaskAuxData {
-  uint16_t tri_id;
-  uint8_t state;
-  uint8_t padding;
-} typedef ShadingTaskAuxData;
-LUM_STATIC_SIZE_ASSERT(ShadingTaskAuxData, 0x04);
-
-struct TraceTask {
-  uint8_t state;
-  uint8_t padding;
-  uint16_t padding1;
-  ushort2 index;
-  vec3 origin;
-  vec3 ray;
-} typedef TraceTask;
-LUM_STATIC_SIZE_ASSERT(TraceTask, 0x20);
-
-INTERLEAVED_STORAGE struct TraceResult {
-  float depth;
-  uint32_t instance_id;
-  uint16_t tri_id;
-} typedef TraceResult;
+} typedef DeviceTask;
+LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
 
 struct LightTreeNode8Packed {
   vec3 base_point;
@@ -201,10 +185,10 @@ LUM_STATIC_SIZE_ASSERT(LightTreeNode8Packed, 0x40);
 ////////////////////////////////////////////////////////////////////
 
 struct DevicePointers {
-  DEVICE TraceTask* trace_tasks;
-  DEVICE ShadingTaskAuxData* aux_data;
+  DEVICE DeviceTask* tasks;
+  DEVICE TriangleHandle* triangle_handles;
+  DEVICE float* trace_depths;
   DEVICE uint16_t* trace_counts;  // TODO: Remove and reuse inside task_counts
-  DEVICE INTERLEAVED_STORAGE TraceResult* trace_results;
   DEVICE uint16_t* task_counts;
   DEVICE uint16_t* task_offsets;
   DEVICE uint32_t* ior_stack;

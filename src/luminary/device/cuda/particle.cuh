@@ -11,30 +11,30 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
 
   for (int i = 0; i < task_count; i++) {
     const uint32_t offset       = get_task_address(task_offset + i);
-    ShadingTask task            = load_shading_task(offset);
-    ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
+    const DeviceTask task       = task_load(offset);
+    const TriangleHandle handle = triangle_handle_load(offset);
     const uint32_t pixel        = get_pixel_id(task.index);
 
-    if (VOLUME_HIT_CHECK(task.instance_id))
+    if (VOLUME_HIT_CHECK(handle.instance_id))
       continue;
 
     if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
       write_beauty_buffer_forced(device.particles.albedo, pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {
-      const float dist  = get_length(sub_vector(device.camera.pos, task.position));
+      const float dist  = get_length(sub_vector(device.camera.pos, task.origin));
       const float value = __saturatef((1.0f / dist) * 2.0f);
       write_beauty_buffer_forced(get_color(value, value, value), pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_NORMAL) {
-      const GBufferData data = particle_generate_g_buffer(task, aux_data, pixel);
+      const GBufferData data = particle_generate_g_buffer(task, handle.instance_id, pixel);
 
       const vec3 normal = data.normal;
 
       write_beauty_buffer_forced(get_color(__saturatef(normal.x), __saturatef(normal.y), __saturatef(normal.z)), pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_IDENTIFICATION) {
-      const uint32_t v = random_uint32_t_base(0x55555555, task.instance_id);
+      const uint32_t v = random_uint32_t_base(0x55555555, handle.instance_id);
 
       const uint16_t r = v & 0x7ff;
       const uint16_t g = (v >> 10) & 0x7ff;

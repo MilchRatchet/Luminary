@@ -5,17 +5,12 @@
 #include "random.cuh"
 #include "utils.cuh"
 
-/*
- * This is just russian roulette. Before I knew of this, I made this file and experimented with different
- * ways of culling less important rays. I can clean this up eventually.
- */
-#define WEIGHT_BASED_EXIT
+// TODO: It is time to move this to another file, directives is a name coming from some really ancient Luminary days.
 #define RUSSIAN_ROULETTE_CLAMP (1.0f / 8.0f)
 
-__device__ int validate_trace_task(const TraceTask task, RGBF& record) {
+__device__ int task_russian_roulette(const DeviceTask task, RGBF& record) {
   int valid = 1;
 
-#ifdef WEIGHT_BASED_EXIT
   const float value = color_importance(record);
 
   // Inf and NaN are handled in the temporal accumulation.
@@ -29,7 +24,6 @@ __device__ int validate_trace_task(const TraceTask task, RGBF& record) {
       record = scale_color(record, 1.0f / p);
     }
   }
-#endif
 
   return valid;
 }

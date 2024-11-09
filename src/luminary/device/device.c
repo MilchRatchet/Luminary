@@ -455,10 +455,10 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
   const uint32_t pixels_per_thread = 1 + ((internal_pixel_count + thread_count - 1) / thread_count);
   const uint32_t max_task_count    = pixels_per_thread * thread_count;
 
-  __DEVICE_BUFFER_ALLOCATE(trace_tasks, sizeof(TraceTask) * max_task_count);
-  __DEVICE_BUFFER_ALLOCATE(aux_data, sizeof(ShadingTaskAuxData) * max_task_count);
+  __DEVICE_BUFFER_ALLOCATE(tasks, sizeof(DeviceTask) * max_task_count);
+  __DEVICE_BUFFER_ALLOCATE(triangle_handles, sizeof(TriangleHandle) * max_task_count);
+  __DEVICE_BUFFER_ALLOCATE(trace_depths, sizeof(float) * max_task_count);
   __DEVICE_BUFFER_ALLOCATE(trace_counts, sizeof(uint16_t) * thread_count);
-  __DEVICE_BUFFER_ALLOCATE(trace_results, sizeof(TraceResult) * max_task_count);
   __DEVICE_BUFFER_ALLOCATE(task_counts, sizeof(uint16_t) * 7 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(task_offsets, sizeof(uint16_t) * 6 * thread_count);
   __DEVICE_BUFFER_ALLOCATE(ior_stack, sizeof(uint32_t) * internal_pixel_count);
@@ -484,10 +484,10 @@ static LuminaryResult _device_allocate_work_buffers(Device* device) {
 static LuminaryResult _device_free_buffers(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
-  __DEVICE_BUFFER_FREE(trace_tasks);
-  __DEVICE_BUFFER_FREE(aux_data);
+  __DEVICE_BUFFER_FREE(tasks);
+  __DEVICE_BUFFER_FREE(triangle_handles);
+  __DEVICE_BUFFER_FREE(trace_depths);
   __DEVICE_BUFFER_FREE(trace_counts);
-  __DEVICE_BUFFER_FREE(trace_results);
   __DEVICE_BUFFER_FREE(task_counts);
   __DEVICE_BUFFER_FREE(task_offsets);
   __DEVICE_BUFFER_FREE(ior_stack);

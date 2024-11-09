@@ -672,18 +672,16 @@ LUMINARY_KERNEL void sky_process_tasks() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset             = get_task_address(task_offset + i);
-    const ShadingTask task            = load_shading_task(offset);
-    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
-
-    const uint32_t pixel = get_pixel_id(task.index);
+    const uint32_t offset = get_task_address(task_offset + i);
+    const DeviceTask task = task_load(offset);
+    const uint32_t pixel  = get_pixel_id(task.index);
 
     const RGBF record = load_RGBF(device.ptrs.records + pixel);
 
-    RGBF sky = sky_color_main(task.position, task.ray, aux_data.state, pixel, task.index);
+    RGBF sky = sky_color_main(task.origin, task.ray, task.state, pixel, task.index);
     sky      = mul_color(sky, record);
 
-    write_beauty_buffer(sky, pixel, aux_data.state);
+    write_beauty_buffer(sky, pixel, task.state);
   }
 }
 
@@ -692,11 +690,12 @@ LUMINARY_KERNEL void sky_process_tasks_debug() {
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
   for (int i = 0; i < task_count; i++) {
-    const ShadingTask task = load_shading_task(get_task_address(task_offset + i));
-    const uint32_t pixel   = get_pixel_id(task.index);
+    const uint32_t offset = get_task_address(task_offset + i);
+    const DeviceTask task = task_load(offset);
+    const uint32_t pixel  = get_pixel_id(task.index);
 
     if (device.settings.shading_mode == LUMINARY_SHADING_MODE_ALBEDO) {
-      RGBF sky = sky_color_main(task.position, task.ray, STATE_FLAG_CAMERA_DIRECTION, pixel, task.index);
+      RGBF sky = sky_color_main(task.origin, task.ray, STATE_FLAG_CAMERA_DIRECTION, pixel, task.index);
       write_beauty_buffer_forced(sky, pixel);
     }
     else if (device.settings.shading_mode == LUMINARY_SHADING_MODE_DEPTH) {

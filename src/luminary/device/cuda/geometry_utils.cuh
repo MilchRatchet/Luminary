@@ -55,25 +55,25 @@ __device__ vec3 geometry_compute_normal(
   return normal;
 }
 
-__device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const ShadingTaskAuxData aux_task, const int pixel) {
-  const DeviceInstancelet instance = load_instance(device.ptrs.instances, task.instance_id);
-  const DeviceTransform trans      = load_transform(task.instance_id);
+__device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const TriangleHandle triangle_handle, const int pixel) {
+  const DeviceInstancelet instance = load_instance(device.ptrs.instances, triangle_handle.instance_id);
+  const DeviceTransform trans      = load_transform(triangle_handle.instance_id);
 
   // TODO: This is now wrong, triangles are more compact nowadays.
-  const float4 t1 = __ldg((float4*) triangle_get_entry_address(0, 0, instance.triangles_offset + aux_task.tri_id));
-  const float4 t2 = __ldg((float4*) triangle_get_entry_address(1, 0, instance.triangles_offset + aux_task.tri_id));
-  const float4 t3 = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + aux_task.tri_id));
-  const float4 t4 = __ldg((float4*) triangle_get_entry_address(3, 0, instance.triangles_offset + aux_task.tri_id));
-  const float4 t5 = __ldg((float4*) triangle_get_entry_address(4, 0, instance.triangles_offset + aux_task.tri_id));
-  const float4 t6 = __ldg((float4*) triangle_get_entry_address(5, 0, instance.triangles_offset + aux_task.tri_id));
+  const float4 t1 = __ldg((float4*) triangle_get_entry_address(0, 0, instance.triangles_offset + triangle_handle.tri_id));
+  const float4 t2 = __ldg((float4*) triangle_get_entry_address(1, 0, instance.triangles_offset + triangle_handle.tri_id));
+  const float4 t3 = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + triangle_handle.tri_id));
+  const float4 t4 = __ldg((float4*) triangle_get_entry_address(3, 0, instance.triangles_offset + triangle_handle.tri_id));
+  const float4 t5 = __ldg((float4*) triangle_get_entry_address(4, 0, instance.triangles_offset + triangle_handle.tri_id));
+  const float4 t6 = __ldg((float4*) triangle_get_entry_address(5, 0, instance.triangles_offset + triangle_handle.tri_id));
 
-  const uint32_t material_id = load_instance_material_id(task.instance_id);
+  const uint32_t material_id = load_instance_material_id(triangle_handle.instance_id);
 
   const vec3 vertex = get_vector(t1.x, t1.y, t1.z);
   const vec3 edge1  = get_vector(t1.w, t2.x, t2.y);
   const vec3 edge2  = get_vector(t2.z, t2.w, t3.x);
 
-  const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.position);
+  const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.origin);
 
   const UV vertex_texture = get_uv(t5.z, t5.w);
   const UV edge1_texture  = get_uv(t6.x, t6.y);
@@ -101,7 +101,7 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
     albedo.a              = albedo_f.w;
   }
 
-  const bool include_emission = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (aux_task.state & STATE_FLAG_CAMERA_DIRECTION);
+  const bool include_emission = (mat.flags & DEVICE_MATERIAL_FLAG_EMISSION) && (task.state & STATE_FLAG_CAMERA_DIRECTION);
 
   RGBF emission = (include_emission) ? mat.emission : get_color(0.0f, 0.0f, 0.0f);
   if (include_emission && (mat.luminance_tex != TEXTURE_NONE)) {
@@ -121,7 +121,7 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
   }
 
   // We clamp the roughness to avoid caustics which would never clean up.
-  if (!(aux_task.state & STATE_FLAG_DELTA_PATH)) {
+  if (!(task.state & STATE_FLAG_DELTA_PATH)) {
     roughness = fmaxf(roughness, mat.roughness_clamp);
   }
 
@@ -140,16 +140,16 @@ __device__ GBufferData geometry_generate_g_buffer(const ShadingTask task, const 
   }
 
   GBufferData data;
-  data.instance_id = task.instance_id;
-  data.tri_id      = aux_task.tri_id;
+  data.instance_id = triangle_handle.instance_id;
+  data.tri_id      = triangle_handle.tri_id;
   data.albedo      = albedo;
   data.emission    = emission;
   data.normal      = normal;
-  data.position    = task.position;
+  data.position    = task.origin;
   data.V           = scale_vector(task.ray, -1.0f);
   data.roughness   = roughness;
   data.metallic    = metallic;
-  data.state       = aux_task.state;
+  data.state       = task.state;
   data.flags       = flags;
   data.ior_in      = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? mat.refraction_index : ray_ior;
   data.ior_out     = (flags & G_BUFFER_FLAG_REFRACTION_IS_INSIDE) ? ray_ior : mat.refraction_index;

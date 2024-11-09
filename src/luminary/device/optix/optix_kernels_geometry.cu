@@ -23,20 +23,20 @@ extern "C" __global__ void __raygen__optix() {
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    const uint32_t offset             = get_task_address(task_offset + i);
-    const ShadingTask task            = load_shading_task(offset);
-    const ShadingTaskAuxData aux_data = load_shading_task_aux_data(offset);
-    const int pixel                   = get_pixel_id(task.index);
+    const uint32_t offset                = get_task_address(task_offset + i);
+    const DeviceTask task                = task_load(offset);
+    const TriangleHandle triangle_handle = triangle_handle_load(offset);
+    const uint32_t pixel                 = get_pixel_id(task.index);
 
     GBufferData data;
-    if (task.instance_id == HIT_TYPE_TOY) {
-      data = toy_generate_g_buffer(task, aux_data, pixel);
+    if (triangle_handle.instance_id == HIT_TYPE_TOY) {
+      data = toy_generate_g_buffer(task, pixel);
     }
-    else if (task.instance_id == HIT_TYPE_OCEAN) {
-      data = ocean_generate_g_buffer(task, aux_data, pixel);
+    else if (triangle_handle.instance_id == HIT_TYPE_OCEAN) {
+      data = ocean_generate_g_buffer(task, pixel);
     }
     else {
-      data = geometry_generate_g_buffer(task, aux_data, pixel);
+      data = geometry_generate_g_buffer(task, triangle_handle, pixel);
     }
 
     ////////////////////////////////////////////////////////////////////
@@ -81,7 +81,7 @@ extern "C" __global__ void __raygen__optix() {
 
     accumulated_light = mul_color(accumulated_light, record);
 
-    write_beauty_buffer(accumulated_light, pixel, aux_data.state);
+    write_beauty_buffer(accumulated_light, pixel, task.state);
 
     if (bounce_info.is_transparent_pass) {
       const IORStackMethod ior_stack_method =
@@ -91,7 +91,7 @@ extern "C" __global__ void __raygen__optix() {
 
     data.position = shift_origin_vector(data.position, data.V, bounce_ray, bounce_info.is_transparent_pass);
 
-    uint8_t new_state = aux_data.state;
+    uint16_t new_state = task.state;
 
     if (!is_delta_distribution) {
       new_state &= ~STATE_FLAG_DELTA_PATH;
@@ -101,7 +101,7 @@ extern "C" __global__ void __raygen__optix() {
       new_state &= ~STATE_FLAG_CAMERA_DIRECTION;
     }
 
-    TraceTask bounce_task;
+    DeviceTask bounce_task;
     bounce_task.state  = new_state;
     bounce_task.origin = data.position;
     bounce_task.ray    = bounce_ray;
@@ -113,8 +113,8 @@ extern "C" __global__ void __raygen__optix() {
     // The compiler reloads these values at some point for some reason and if we overwrite
     // the values we will get garbage. I am not sure if this is a compiler bug or some undefined
     // behaviour on my side.
-    if (validate_trace_task(bounce_task, bounce_record)) {
-      store_trace_task(bounce_task, get_task_address(trace_count++));
+    if (task_russian_roulette(bounce_task, bounce_record)) {
+      task_store(bounce_task, get_task_address(trace_count++));
       store_RGBF(device.ptrs.records + pixel, bounce_record);
     }
   }

@@ -23,19 +23,15 @@ __device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t
     (void*) device.ptrs.triangles, device.non_instanced_triangle_count, chunk, offset, tri_id);
 }
 
-__device__ void* trace_result_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t task_id) {
-  return interleaved_buffer_get_entry_address_chunk_8((void*) device.ptrs.trace_results, device.max_task_count, chunk, offset, task_id);
-}
-
 ////////////////////////////////////////////////////////////////////
-// Load/Store functions
+// Task IO
 ////////////////////////////////////////////////////////////////////
 
-__device__ void stream_uint16(const uint16_t* source, uint16_t* target) {
+__device__ void stream_uint2(const uint2* source, uint2* target) {
   __stcs(target, __ldcs(source));
 }
 
-__device__ void stream_float2(const float2* source, float2* target) {
+__device__ void stream_float(const float* source, float* target) {
   __stcs(target, __ldcs(source));
 }
 
@@ -46,32 +42,34 @@ __device__ void stream_float4(const float4* source, float4* target) {
 __device__ void swap_trace_data(const uint32_t index0, const uint32_t index1) {
   const uint32_t offset0 = get_task_address(index0);
 
-  const float2 trace0   = __ldcs((float2*) trace_result_get_entry_address(0, 0, offset0));
-  const uint16_t trace1 = __ldcs((uint16_t*) trace_result_get_entry_address(1, 0, offset0));
-  const float4 data0    = __ldcs((float4*) (device.ptrs.trace_tasks + offset0));
-  const float4 data1    = __ldcs((float4*) (device.ptrs.trace_tasks + offset0) + 1);
+  const float4 data0 = __ldcs((float4*) (device.ptrs.tasks + offset0));
+  const float4 data1 = __ldcs((float4*) (device.ptrs.tasks + offset0) + 1);
+  const float depth  = __ldcs((float*) (device.ptrs.trace_depths + offset0));
+  const uint2 handle = __ldcs((uint2*) (device.ptrs.triangle_handles + offset0));
 
   const uint32_t offset1 = get_task_address(index1);
-  stream_float2((float2*) trace_result_get_entry_address(0, 0, offset1), (float2*) trace_result_get_entry_address(0, 0, offset0));
-  stream_uint16((uint16_t*) trace_result_get_entry_address(1, 0, offset1), (uint16_t*) trace_result_get_entry_address(1, 0, offset0));
-  stream_float4((float4*) (device.ptrs.trace_tasks + offset1), (float4*) (device.ptrs.trace_tasks + offset0));
-  stream_float4((float4*) (device.ptrs.trace_tasks + offset1) + 1, (float4*) (device.ptrs.trace_tasks + offset0) + 1);
+  stream_float4((float4*) (device.ptrs.tasks + offset1), (float4*) (device.ptrs.tasks + offset0));
+  stream_float4((float4*) (device.ptrs.tasks + offset1) + 1, (float4*) (device.ptrs.tasks + offset0) + 1);
+  stream_float((float*) (device.ptrs.trace_depths + offset1), (float*) (device.ptrs.trace_depths + offset0));
+  stream_uint2((uint2*) (device.ptrs.triangle_handles + offset1), (uint2*) (device.ptrs.triangle_handles + offset0));
 
-  __stcs((float2*) trace_result_get_entry_address(0, 0, offset1), trace0);
-  __stcs((uint16_t*) trace_result_get_entry_address(1, 0, offset1), trace1);
-  __stcs((float4*) (device.ptrs.trace_tasks + offset1), data0);
-  __stcs((float4*) (device.ptrs.trace_tasks + offset1) + 1, data1);
+  __stcs((float4*) (device.ptrs.tasks + offset1), data0);
+  __stcs((float4*) (device.ptrs.tasks + offset1) + 1, data1);
+  __stcs((float*) (device.ptrs.trace_depths + offset1), depth);
+  __stcs((uint2*) (device.ptrs.triangle_handles + offset1), handle);
 }
 
-__device__ TraceTask load_trace_task(const uint32_t offset) {
-  const float4* ptr  = (float4*) (device.ptrs.trace_tasks + offset);
-  const float4 data0 = __ldcs(ptr + 0);
-  const float4 data1 = __ldcs(ptr + 1);
+__device__ DeviceTask task_load(const uint32_t offset) {
+  const float4* data_ptr = (const float4*) (device.ptrs.tasks + offset);
 
-  TraceTask task;
-  task.state    = __float_as_uint(data0.x) & 0xFF;
+  const float4 data0 = __ldcs(data_ptr + 0);
+  const float4 data1 = __ldcs(data_ptr + 1);
+
+  DeviceTask task;
+  task.state    = __float_as_uint(data0.x) & 0xFFFF;
+  task.padding  = __float_as_uint(data0.x) >> 16;
   task.index.x  = __float_as_uint(data0.y) & 0xFFFF;
-  task.index.y  = (__float_as_uint(data0.y) >> 16);
+  task.index.y  = __float_as_uint(data0.y) >> 16;
   task.origin.x = data0.z;
   task.origin.y = data0.w;
 
@@ -83,83 +81,46 @@ __device__ TraceTask load_trace_task(const uint32_t offset) {
   return task;
 }
 
-__device__ void store_trace_task(const TraceTask task, const uint32_t offset) {
+__device__ void task_store(const DeviceTask task, const uint32_t offset) {
+  float4* ptr = (float4*) (device.ptrs.tasks + offset);
   float4 data0;
-  data0.x = __uint_as_float(task.state);
-  data0.y = __uint_as_float(((uint32_t) task.index.x & 0xFFFF) | ((uint32_t) task.index.y << 16));
+  float4 data1;
+
+  data0.x = __uint_as_float(((uint32_t) task.state & 0xffff) | ((uint32_t) 0 << 16));
+  data0.y = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
   data0.z = task.origin.x;
   data0.w = task.origin.y;
 
-  float4 data1;
+  __stcs(ptr, data0);
+
   data1.x = task.origin.z;
   data1.y = task.ray.x;
   data1.z = task.ray.y;
   data1.w = task.ray.z;
 
-  float4* ptr = (float4*) (device.ptrs.trace_tasks + offset);
-  __stcs(ptr + 0, data0);
   __stcs(ptr + 1, data1);
 }
 
-__device__ ShadingTask load_shading_task(const uint32_t offset) {
-  float4* data_ptr = (float4*) (device.ptrs.trace_tasks + offset);
+__device__ TriangleHandle triangle_handle_load(const uint32_t offset) {
+  const uint2* data_ptr = (const uint2*) (device.ptrs.triangle_handles + offset);
 
-  const float4 data0 = __ldcs(data_ptr + 0);
-  const float4 data1 = __ldcs(data_ptr + 1);
+  const uint2 data = __ldcs(data_ptr + 0);
 
-  ShadingTask task;
-  task.instance_id = __float_as_uint(data0.x);
-  task.index.x     = __float_as_uint(data0.y) & 0xFFFF;
-  task.index.y     = (__float_as_uint(data0.y) >> 16);
-  task.position.x  = data0.z;
-  task.position.y  = data0.w;
+  TriangleHandle handle;
+  handle.instance_id = data.x;
+  handle.tri_id      = data.y;
 
-  task.position.z = data1.x;
-  task.ray.x      = data1.y;
-  task.ray.y      = data1.z;
-  task.ray.z      = data1.w;
-
-  return task;
+  return handle;
 }
 
-__device__ void store_shading_task(const ShadingTask task, const uint32_t offset) {
-  float4* ptr = (float4*) (device.ptrs.trace_tasks + offset);
-  float4 data0;
-  float4 data1;
+__device__ void triangle_handle_store(const TriangleHandle handle, const uint32_t offset) {
+  uint2* data_ptr = (uint2*) (device.ptrs.triangle_handles + offset);
 
-  data0.x = __uint_as_float(task.instance_id);
-  data0.y = __uint_as_float(((uint32_t) task.index.x & 0xffff) | ((uint32_t) task.index.y << 16));
-  data0.z = task.position.x;
-  data0.w = task.position.y;
+  uint2 data;
+  data.x = handle.instance_id;
+  data.y = handle.tri_id;
 
-  __stcs(ptr, data0);
-
-  data1.x = task.position.z;
-  data1.y = task.ray.x;
-  data1.z = task.ray.y;
-  data1.w = task.ray.z;
-
-  __stcs(ptr + 1, data1);
-}
-
-__device__ ShadingTaskAuxData load_shading_task_aux_data(const uint32_t offset) {
-  uint32_t* data_ptr = (uint32_t*) (device.ptrs.aux_data + offset);
-
-  const uint32_t data = __ldcs(data_ptr);
-
-  ShadingTaskAuxData aux_data;
-  aux_data.tri_id = data & 0xFFFF;
-  aux_data.state  = (data >> 16) & 0xFF;
-
-  return aux_data;
-}
-
-__device__ void store_shading_task_aux_data(const ShadingTaskAuxData aux_data, const uint32_t offset) {
-  uint32_t* ptr = (uint32_t*) (device.ptrs.aux_data + offset);
-
-  const uint32_t data = aux_data.tri_id | (((uint32_t) aux_data.state) << 16);
-
-  __stcs(ptr, data);
+  __stcs(data_ptr, data);
 }
 
 __device__ RGBF load_RGBF(RGBF* ptr) {
@@ -174,25 +135,12 @@ __device__ void store_RGBF(RGBF* ptr, const RGBF a) {
   *ptr = a;
 }
 
-__device__ TraceResult load_trace_result(const uint32_t task_offset) {
-  const float2 data0   = __ldcs((float2*) trace_result_get_entry_address(0, 0, task_offset));
-  const uint16_t data1 = __ldcs((uint16_t*) trace_result_get_entry_address(1, 0, task_offset));
-
-  TraceResult result;
-  result.depth       = data0.x;
-  result.instance_id = __float_as_uint(data0.y);
-  result.tri_id      = data1;
-
-  return result;
+__device__ float trace_depth_load(const uint32_t offset) {
+  return __ldcs((float*) (device.ptrs.trace_depths + offset));
 }
 
-__device__ void store_trace_result(const TraceResult result, const uint32_t task_offset) {
-  float2 data0;
-  data0.x = result.depth;
-  data0.y = __uint_as_float(result.instance_id);
-
-  __stcs((float2*) trace_result_get_entry_address(0, 0, task_offset), data0);
-  __stcs((uint16_t*) trace_result_get_entry_address(1, 0, task_offset), result.tri_id);
+__device__ void trace_depth_store(const float depth, const uint32_t offset) {
+  __stcs((float*) (device.ptrs.trace_depths + offset), depth);
 }
 
 ////////////////////////////////////////////////////////////////////
