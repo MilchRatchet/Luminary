@@ -12,7 +12,7 @@ struct CloudNoise {
   DeviceTexture* weather_tex;
 } typedef CloudNoise;
 
-DEVICE_CTX_FUNC LuminaryResult device_cloud_noise_create(CloudNoise** cloud_noise, Device* device);
+DEVICE_CTX_FUNC LuminaryResult device_cloud_noise_create(CloudNoise** cloud_noise, Cloud* cloud, Device* device);
 DEVICE_CTX_FUNC LuminaryResult device_cloud_noise_destroy(CloudNoise** cloud_noise, Device* device);
 
 #endif /* LUMINARY_DEVICE_CLOUD_H */

@@ -2,13 +2,14 @@
 
 #include "device.h"
 #include "internal_error.h"
+#include "kernel_args.h"
 #include "texture.h"
 
 #define CLOUD_SHAPE_RES 128
 #define CLOUD_DETAIL_RES 32
 #define CLOUD_WEATHER_RES 1024
 
-LuminaryResult device_cloud_noise_create(CloudNoise** cloud_noise, Device* device) {
+LuminaryResult device_cloud_noise_create(CloudNoise** cloud_noise, Cloud* cloud, Device* device) {
   __CHECK_NULL_ARGUMENT(cloud_noise);
   __CHECK_NULL_ARGUMENT(device);
 
@@ -33,11 +34,27 @@ LuminaryResult device_cloud_noise_create(CloudNoise** cloud_noise, Device* devic
   __FAILURE_HANDLE(texture_destroy(&detail_tex));
   __FAILURE_HANDLE(texture_destroy(&weather_tex));
 
-  // TODO: Execute kernels with args
+  KernelArgsCloudComputeShapeNoise shape_args;
+  shape_args.dim = CLOUD_SHAPE_RES;
+  shape_args.tex = (*cloud_noise)->shape_tex->memory;
 
-  __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_CLOUD_COMPUTE_SHAPE_NOISE], device->stream_main));
-  __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_CLOUD_COMPUTE_DETAIL_NOISE], device->stream_main));
-  __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_CLOUD_COMPUTE_WEATHER_NOISE], device->stream_main));
+  __FAILURE_HANDLE(
+    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CLOUD_COMPUTE_SHAPE_NOISE], &shape_args, device->stream_main));
+
+  KernelArgsCloudComputeDetailNoise detail_args;
+  detail_args.dim = CLOUD_DETAIL_RES;
+  detail_args.tex = (*cloud_noise)->detail_tex->memory;
+
+  __FAILURE_HANDLE(
+    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CLOUD_COMPUTE_DETAIL_NOISE], &detail_args, device->stream_main));
+
+  KernelArgsCloudComputeWeatherNoise weather_args;
+  weather_args.dim  = CLOUD_WEATHER_RES;
+  weather_args.seed = cloud->seed;
+  weather_args.tex  = (*cloud_noise)->weather_tex->memory;
+
+  __FAILURE_HANDLE(
+    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CLOUD_COMPUTE_WEATHER_NOISE], &weather_args, device->stream_main));
 
   return LUMINARY_SUCCESS;
 }

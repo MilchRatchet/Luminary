@@ -205,20 +205,20 @@ __device__ float dilate_perlin_worley(const float p, const float w, float x) {
   }
 }
 
-LUMINARY_KERNEL void cloud_compute_shape_noise(const int dim, uint8_t* tex) {
-  unsigned int id = THREAD_ID;
+LUMINARY_KERNEL void cloud_compute_shape_noise(const KernelArgsCloudComputeShapeNoise args) {
+  uint32_t id = THREAD_ID;
 
-  uchar4* dst = (uchar4*) tex;
+  uchar4* dst = (uchar4*) args.tex;
 
-  const int amount    = dim * dim * dim;
-  const float scale_x = 1.0f / dim;
-  const float scale_y = 1.0f / dim;
-  const float scale_z = 1.0f / dim;
+  const uint32_t amount = args.dim * args.dim * args.dim;
+  const float scale_x   = 1.0f / args.dim;
+  const float scale_y   = 1.0f / args.dim;
+  const float scale_z   = 1.0f / args.dim;
 
   while (id < amount) {
-    const int z = id / (dim * dim);
-    const int y = (id - z * (dim * dim)) / dim;
-    const int x = id - y * dim - z * dim * dim;
+    const uint32_t z = id / (args.dim * args.dim);
+    const uint32_t y = (id - z * (args.dim * args.dim)) / args.dim;
+    const uint32_t x = id - y * args.dim - z * args.dim * args.dim;
 
     const float sx = x * scale_x;
     const float sy = y * scale_y;
@@ -242,7 +242,7 @@ LUMINARY_KERNEL void cloud_compute_shape_noise(const int dim, uint8_t* tex) {
 
     float perlin_worley = dilate_perlin_worley(perlin_dilate, worley_dilate, 0.3f);
 
-    dst[x + y * dim + z * dim * dim] = make_uchar4(
+    dst[x + y * args.dim + z * args.dim * args.dim] = make_uchar4(
       __saturatef(perlin_worley) * 255.0f, __saturatef(worley_large) * 255.0f, __saturatef(worley_medium) * 255.0f,
       __saturatef(worley_small) * 255.0f);
 
@@ -250,20 +250,20 @@ LUMINARY_KERNEL void cloud_compute_shape_noise(const int dim, uint8_t* tex) {
   }
 }
 
-LUMINARY_KERNEL void cloud_compute_detail_noise(const int dim, uint8_t* tex) {
-  unsigned int id = THREAD_ID;
+LUMINARY_KERNEL void cloud_compute_detail_noise(const KernelArgsCloudComputeDetailNoise args) {
+  uint32_t id = THREAD_ID;
 
-  uchar4* dst = (uchar4*) tex;
+  uchar4* dst = (uchar4*) args.tex;
 
-  const int amount    = dim * dim * dim;
-  const float scale_x = 1.0f / dim;
-  const float scale_y = 1.0f / dim;
-  const float scale_z = 1.0f / dim;
+  const uint32_t amount = args.dim * args.dim * args.dim;
+  const float scale_x   = 1.0f / args.dim;
+  const float scale_y   = 1.0f / args.dim;
+  const float scale_z   = 1.0f / args.dim;
 
   while (id < amount) {
-    const int z = id / (dim * dim);
-    const int y = (id - z * (dim * dim)) / dim;
-    const int x = id - y * dim - z * dim * dim;
+    const uint32_t z = id / (args.dim * args.dim);
+    const uint32_t y = (id - z * (args.dim * args.dim)) / args.dim;
+    const uint32_t x = id - y * args.dim - z * args.dim * args.dim;
 
     const float sx = x * scale_x;
     const float sy = y * scale_y;
@@ -279,25 +279,25 @@ LUMINARY_KERNEL void cloud_compute_detail_noise(const int dim, uint8_t* tex) {
     worley_medium = remap01(worley_medium, -1.0f, 1.0f);
     worley_small  = remap01(worley_small, -1.0f, 1.0f);
 
-    dst[x + y * dim + z * dim * dim] =
+    dst[x + y * args.dim + z * args.dim * args.dim] =
       make_uchar4(__saturatef(worley_large) * 255.0f, __saturatef(worley_medium) * 255.0f, __saturatef(worley_small) * 255.0f, 255);
 
     id += blockDim.x * gridDim.x;
   }
 }
 
-LUMINARY_KERNEL void cloud_compute_weather_noise(const int dim, const float seed, uint8_t* tex) {
-  unsigned int id = THREAD_ID;
+LUMINARY_KERNEL void cloud_compute_weather_noise(const KernelArgsCloudComputeWeatherNoise args) {
+  uint32_t id = THREAD_ID;
 
-  uchar4* dst = (uchar4*) tex;
+  uchar4* dst = (uchar4*) args.tex;
 
-  const int amount    = dim * dim;
-  const float scale_x = 1.0f / dim;
-  const float scale_y = 1.0f / dim;
+  const uint32_t amount = args.dim * args.dim;
+  const float scale_x   = 1.0f / args.dim;
+  const float scale_y   = 1.0f / args.dim;
 
   while (id < amount) {
-    const int y = id / dim;
-    const int x = id - y * dim;
+    const uint32_t y = id / args.dim;
+    const uint32_t x = id - y * args.dim;
 
     const float sx = x * scale_x;
     const float sy = y * scale_y;
@@ -309,7 +309,7 @@ LUMINARY_KERNEL void cloud_compute_weather_noise(const int dim, const float seed
     const float remap_high = 1.3f;
 
     float perlin1 = perlin_octaves(get_vector(sx, sy, 0.0f), 2.0f * size_scale, 7, true);
-    float worley1 = worley_octaves(get_vector(sx, sy, 0.0f), 3.0f * size_scale, 2, seed, 0.25f);
+    float worley1 = worley_octaves(get_vector(sx, sy, 0.0f), 3.0f * size_scale, 2, args.seed, 0.25f);
     float perlin2 = perlin_octaves(get_vector(sx, sy, 500.0f), 4.0f * size_scale, 7, true);
     float perlin3 = perlin_octaves(get_vector(sx, sy, 100.0f), 2.0f * size_scale, 7, true);
     float perlin4 = perlin_octaves(get_vector(sx, sy, 200.0f), 3.0f * size_scale, 7, true);
@@ -338,7 +338,7 @@ LUMINARY_KERNEL void cloud_compute_weather_noise(const int dim, const float seed
 
     perlin1 = remap01(2.0f * perlin1, 0.05, 1.0);
 
-    dst[x + y * dim] = make_uchar4(
+    dst[x + y * args.dim] = make_uchar4(
       __saturatef(perlin1) * 255.0f, __saturatef(perlin2) * 255.0f, __saturatef(perlin3) * 255.0f, __saturatef(perlin4) * 255.0f);
 
     id += blockDim.x * gridDim.x;

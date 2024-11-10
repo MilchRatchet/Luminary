@@ -7,7 +7,7 @@
 #include "ocean_utils.cuh"
 #include "toy_utils.cuh"
 
-LUMINARY_KERNEL void process_debug_geometry_tasks() {
+LUMINARY_KERNEL void geometry_process_tasks_debug() {
   const int task_count = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_GEOMETRY];
 
   for (int i = 0; i < task_count; i++) {
