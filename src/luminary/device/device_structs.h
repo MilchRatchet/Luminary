@@ -219,7 +219,8 @@ struct DeviceTriangle {
   uint32_t vertex_normal;
   uint32_t edge1_normal;
   uint32_t edge2_normal;
-  uint32_t padding;
+  uint16_t material_id;
+  uint16_t padding;
 } typedef DeviceTriangle;
 LUM_STATIC_SIZE_ASSERT(DeviceTriangle, 0x40u);
 
@@ -231,13 +232,6 @@ struct DeviceTextureObject {
   float padding;
 } typedef DeviceTextureObject;
 LUM_STATIC_SIZE_ASSERT(DeviceTextureObject, 0x10u);
-
-struct DeviceInstancelet {
-  uint32_t triangles_offset;
-  uint16_t material_id;
-  uint16_t padding;
-} typedef DeviceInstancelet;
-LUM_STATIC_SIZE_ASSERT(DeviceInstancelet, 0x08u);
 
 struct DeviceTransform {
   vec3 offset;
@@ -261,8 +255,6 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
 LuminaryResult device_struct_scene_entity_convert(const void* source, void* dst, SceneEntity entity);
 LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTriangle* device_triangle);
 LuminaryResult device_struct_texture_object_convert(const struct DeviceTexture* texture, DeviceTextureObject* texture_object);
-LuminaryResult device_struct_instance_convert(
-  const MeshInstance* instance, DeviceInstancelet* device_instance, DeviceTransform* device_transform, const DeviceMesh* device_mesh,
-  const uint32_t meshlet_id);
+LuminaryResult device_struct_instance_transform_convert(const MeshInstance* instance, DeviceTransform* device_transform);
 
 #endif /* LUMINARY_DEVICE_STRUCTS_H */

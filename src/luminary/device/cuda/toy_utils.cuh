@@ -6,7 +6,7 @@
 #include "utils.cuh"
 
 /*
- * Toy is deprecated and will soon be removed in favor of preset meshlets that we can then instantiate.
+ * Toy is deprecated and will soon be removed in favor of preset meshes that we can then instantiate.
  */
 
 __device__ float get_toy_distance(const vec3 origin, const vec3 ray) {

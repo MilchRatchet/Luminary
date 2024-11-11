@@ -43,7 +43,7 @@ static LuminaryResult _optix_bvh_compute_transform(Quaternion rotation, vec3 sca
 static LuminaryResult _optix_bvh_get_optix_instance(
   const Device* device, const MeshInstance* instance, uint32_t instance_id, OptixInstance* optix_instance) {
   __CHECK_NULL_ARGUMENT(device);
-  __CHECK_NULL_ARGUMENT(device->optix_mesh_bvhs);
+  __CHECK_NULL_ARGUMENT(device->meshes);
   __CHECK_NULL_ARGUMENT(instance);
   __CHECK_NULL_ARGUMENT(optix_instance);
 
@@ -51,7 +51,7 @@ static LuminaryResult _optix_bvh_get_optix_instance(
   optix_instance->sbtOffset         = 0;
   optix_instance->visibilityMask    = (instance->active) ? 0xFFFFFFFF : 0;
   optix_instance->flags             = OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
-  optix_instance->traversableHandle = device->optix_mesh_bvhs[instance->mesh_id]->traversable;
+  optix_instance->traversableHandle = device->meshes[instance->mesh_id]->bvh->traversable;
 
   __FAILURE_HANDLE(_optix_bvh_compute_transform(instance->rotation, instance->scale, instance->offset, optix_instance->transform));
 
@@ -179,56 +179,38 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
   build_options.motionOptions.numKeys = 1;
   build_options.buildFlags            = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
 
-  uint32_t meshlet_count;
-  __FAILURE_HANDLE(array_get_num_elements(mesh->meshlets, &meshlet_count));
+  OptixBuildInput build_input;
+  memset(&build_input, 0, sizeof(OptixBuildInput));
+  build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
 
   DEVICE float* device_vertex_buffer;
-  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * mesh->data->vertex_count));
-  __FAILURE_HANDLE(device_upload(
-    device_vertex_buffer, mesh->data->vertex_buffer, 0, sizeof(float) * 4 * mesh->data->vertex_count, device->stream_secondary));
+  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * mesh->data.vertex_count));
+  __FAILURE_HANDLE(
+    device_upload(device_vertex_buffer, mesh->data.vertex_buffer, 0, sizeof(float) * 4 * mesh->data.vertex_count, device->stream_main));
 
   CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(device_vertex_buffer);
 
-  DEVICE uint32_t** meshlet_device_index_buffers;
-  __FAILURE_HANDLE(host_malloc(&meshlet_device_index_buffers, sizeof(DEVICE uint32_t*) * meshlet_count));
+  build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+  build_input.triangleArray.vertexStrideInBytes = 16;
+  build_input.triangleArray.numVertices         = mesh->data.vertex_count;
+  build_input.triangleArray.vertexBuffers       = &device_vertex_buffer_ptr;
 
-  OptixBuildInput* build_inputs;
-  __FAILURE_HANDLE(host_malloc(&build_inputs, sizeof(OptixBuildInput) * meshlet_count));
+  DEVICE uint32_t* device_index_buffer;
+  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(uint32_t) * 4 * mesh->data.triangle_count));
+  __FAILURE_HANDLE(
+    device_upload(device_vertex_buffer, mesh->data.index_buffer, 0, sizeof(uint32_t) * 4 * mesh->data.triangle_count, device->stream_main));
+
+  build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
+  build_input.triangleArray.indexStrideInBytes = 16;
+  build_input.triangleArray.numIndexTriplets   = mesh->data.triangle_count;
+  build_input.triangleArray.indexBuffer        = DEVICE_CUPTR(device_index_buffer);
 
   unsigned int inputFlags = 0;
   inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
   inputFlags |= (type == OPTIX_BVH_TYPE_SHADOW) ? OPTIX_GEOMETRY_FLAG_REQUIRE_SINGLE_ANYHIT_CALL : 0;
 
-  for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
-    const Meshlet meshlet = mesh->meshlets[meshlet_id];
-
-    OptixBuildInput build_input;
-    memset(&build_input, 0, sizeof(OptixBuildInput));
-    build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
-
-    build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
-    build_input.triangleArray.vertexStrideInBytes = 16;
-    build_input.triangleArray.numVertices         = mesh->data->vertex_count;
-    build_input.triangleArray.vertexBuffers       = &device_vertex_buffer_ptr;
-
-    __FAILURE_HANDLE(device_malloc(&meshlet_device_index_buffers[meshlet_id], sizeof(uint32_t) * 4 * meshlet.triangle_count));
-    __FAILURE_HANDLE(device_upload(
-      meshlet_device_index_buffers[meshlet_id], meshlet.index_buffer, 0, sizeof(uint32_t) * 4 * meshlet.triangle_count,
-      device->stream_secondary));
-
-    build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
-    build_input.triangleArray.indexStrideInBytes = 16;
-    build_input.triangleArray.numIndexTriplets   = meshlet.triangle_count;
-    build_input.triangleArray.indexBuffer        = DEVICE_CUPTR(meshlet_device_index_buffers[meshlet_id]);
-
-    build_input.triangleArray.flags         = &inputFlags;
-    build_input.triangleArray.numSbtRecords = 1;
-
-    // Lower 16 bits is the triangle id inside the meshlet, upper bits are the meshlet id.
-    build_input.triangleArray.primitiveIndexOffset = (meshlet_id << 16);
-
-    build_inputs[meshlet_id] = build_input;
-  }
+  build_input.triangleArray.flags         = &inputFlags;
+  build_input.triangleArray.numSbtRecords = 1;
 
 // OptiX requires pointers to be null if there is no data.
 // TODO: Make sure that we don't need that anymore by requiring that meshes are not empty and that the renderer can handle having no
@@ -258,7 +240,7 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
 
   OptixAccelBufferSizes buffer_sizes;
 
-  OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(device->optix_ctx, &build_options, build_inputs, meshlet_count, &buffer_sizes));
+  OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(device->optix_ctx, &build_options, &build_input, 1, &buffer_sizes));
 
   DEVICE void* temp_buffer;
   __FAILURE_HANDLE(device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes));
@@ -278,12 +260,12 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
   accel_emit.type   = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
 
   OPTIX_FAILURE_HANDLE(optixAccelBuild(
-    device->optix_ctx, device->stream_secondary, &build_options, build_inputs, meshlet_count, DEVICE_CUPTR(temp_buffer),
-    buffer_sizes.tempSizeInBytes, DEVICE_CUPTR(output_buffer), buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
+    device->optix_ctx, device->stream_main, &build_options, &build_input, 1, DEVICE_CUPTR(temp_buffer), buffer_sizes.tempSizeInBytes,
+    DEVICE_CUPTR(output_buffer), buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
 
   size_t compact_size;
-  __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_secondary));
-  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_secondary));
+  __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
   __FAILURE_HANDLE(device_free(&accel_emit_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));
@@ -294,7 +276,7 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
     __FAILURE_HANDLE(device_malloc(&output_buffer_compact, compact_size));
 
     OPTIX_FAILURE_HANDLE(optixAccelCompact(
-      device->optix_ctx, device->stream_secondary, traversable, DEVICE_CUPTR(output_buffer_compact), compact_size, &traversable));
+      device->optix_ctx, device->stream_main, traversable, DEVICE_CUPTR(output_buffer_compact), compact_size, &traversable));
 
     __FAILURE_HANDLE(device_free(&output_buffer));
 
@@ -306,14 +288,8 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
   // Clean up
   ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(host_free(&build_inputs));
   __FAILURE_HANDLE(device_free(&device_vertex_buffer));
-
-  for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
-    __FAILURE_HANDLE(device_free(&meshlet_device_index_buffers[meshlet_id]));
-  }
-
-  __FAILURE_HANDLE(host_free(&meshlet_device_index_buffers));
+  __FAILURE_HANDLE(device_free(&device_index_buffer));
 
   bvh->allocated   = true;
   bvh->fast_trace  = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);

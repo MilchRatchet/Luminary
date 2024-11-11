@@ -842,18 +842,16 @@ LuminaryResult wavefront_convert_content(
   Mesh* mesh;
   __FAILURE_HANDLE(mesh_create(&mesh));
 
-  __FAILURE_HANDLE(host_malloc(&mesh->data, sizeof(TriangleGeomData)));
+  __FAILURE_HANDLE(host_malloc(&mesh->data.index_buffer, sizeof(uint32_t) * 4 * triangle_count));
+  __FAILURE_HANDLE(host_malloc(&mesh->data.vertex_buffer, sizeof(float) * 4 * vertex_count));
 
-  __FAILURE_HANDLE(host_malloc(&mesh->data->index_buffer, sizeof(uint32_t) * 4 * triangle_count));
-  __FAILURE_HANDLE(host_malloc(&mesh->data->vertex_buffer, sizeof(float) * 4 * vertex_count));
-
-  mesh->data->vertex_count = vertex_count;
+  mesh->data.vertex_count = vertex_count;
 
   for (uint32_t vertex_id = 0; vertex_id < vertex_count; vertex_id++) {
-    mesh->data->vertex_buffer[vertex_id * 4 + 0] = content->vertices[vertex_id].x;
-    mesh->data->vertex_buffer[vertex_id * 4 + 1] = content->vertices[vertex_id].y;
-    mesh->data->vertex_buffer[vertex_id * 4 + 2] = content->vertices[vertex_id].z;
-    mesh->data->vertex_buffer[vertex_id * 4 + 3] = 0.0f;
+    mesh->data.vertex_buffer[vertex_id * 4 + 0] = content->vertices[vertex_id].x;
+    mesh->data.vertex_buffer[vertex_id * 4 + 1] = content->vertices[vertex_id].y;
+    mesh->data.vertex_buffer[vertex_id * 4 + 2] = content->vertices[vertex_id].z;
+    mesh->data.vertex_buffer[vertex_id * 4 + 3] = 0.0f;
   }
 
   __FAILURE_HANDLE(host_malloc(&mesh->triangles, sizeof(Triangle) * triangle_count));
@@ -911,9 +909,9 @@ LuminaryResult wavefront_convert_content(
       continue;
     }
 
-    mesh->data->index_buffer[ptr * 4 + 0] = t.v1 - 1;
-    mesh->data->index_buffer[ptr * 4 + 1] = t.v2 - 1;
-    mesh->data->index_buffer[ptr * 4 + 2] = t.v3 - 1;
+    mesh->data.index_buffer[ptr * 4 + 0] = t.v1 - 1;
+    mesh->data.index_buffer[ptr * 4 + 1] = t.v2 - 1;
+    mesh->data.index_buffer[ptr * 4 + 2] = t.v3 - 1;
 
     WavefrontUV uv;
 
@@ -1043,7 +1041,6 @@ LuminaryResult wavefront_convert_content(
     triangle.edge2_normal.z = n.z - triangle.vertex_normal.z;
 
     triangle.material_id = material_offset + t.object;
-    triangle.light_id    = LIGHT_ID_NONE;
 
     mesh->triangles[ptr++] = triangle;
   }
@@ -1052,11 +1049,9 @@ LuminaryResult wavefront_convert_content(
 
   __FAILURE_HANDLE(host_realloc(&mesh->triangles, sizeof(Triangle) * new_triangle_count));
 
-  __FAILURE_HANDLE(host_realloc(&mesh->data->index_buffer, sizeof(uint32_t) * 4 * new_triangle_count));
-  mesh->data->index_count    = 3 * new_triangle_count;
-  mesh->data->triangle_count = new_triangle_count;
-
-  __FAILURE_HANDLE(mesh_build_meshlets(mesh));
+  __FAILURE_HANDLE(host_realloc(&mesh->data.index_buffer, sizeof(uint32_t) * 4 * new_triangle_count));
+  mesh->data.index_count    = 3 * new_triangle_count;
+  mesh->data.triangle_count = new_triangle_count;
 
   __FAILURE_HANDLE(array_push(meshes, &mesh));
 

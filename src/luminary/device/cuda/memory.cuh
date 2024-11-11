@@ -195,17 +195,6 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
 
 #endif
 
-__device__ DeviceInstancelet load_instance(const DeviceInstancelet* data, const uint32_t offset) {
-  const float2* ptr = (float2*) (data + offset);
-  const float2 v    = __ldg(ptr);
-
-  DeviceInstancelet instance;
-  instance.triangles_offset = __float_as_uint(v.x);
-  instance.material_id      = __float_as_uint(v.y) & 0xFFFF;
-
-  return instance;
-}
-
 __device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
   const DeviceInstancelet instance = load_instance(device.ptrs.instances, handle.instance_id);
 

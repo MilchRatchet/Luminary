@@ -513,7 +513,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(bridge_lut);
   __DEVICE_BUFFER_FREE(materials);
   __DEVICE_BUFFER_FREE(triangles);
-  __DEVICE_BUFFER_FREE(instances);
   __DEVICE_BUFFER_FREE(instance_transforms);
   __DEVICE_BUFFER_FREE(light_instance_map);
   __DEVICE_BUFFER_FREE(bottom_level_light_trees);
@@ -597,7 +596,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // Optix data
   ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(array_create(&device->optix_mesh_bvhs, sizeof(OptixBVH*), 4));
+  __FAILURE_HANDLE(array_create(&device->meshes, sizeof(DeviceMesh*), 4));
   __FAILURE_HANDLE(optix_bvh_instance_cache_create(&device->optix_instance_cache, device));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
 
@@ -682,62 +681,63 @@ LuminaryResult device_allocate_work_buffers(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_upload_meshes(Device* device, const ARRAY DeviceMesh** meshes) {
-  __CHECK_NULL_ARGUMENT(device);
-
-  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
-
-  uint32_t mesh_count;
-  __FAILURE_HANDLE(array_get_num_elements(meshes, &mesh_count));
-
-  uint32_t non_instanced_triangle_count = 0;
-
-  for (uint32_t mesh_id = 0; mesh_id < mesh_count; mesh_id++) {
-    const DeviceMesh* mesh = meshes[mesh_id];
-
-    uint32_t triangle_count;
-    __FAILURE_HANDLE(array_get_num_elements(mesh->triangles, &triangle_count));
-
-    non_instanced_triangle_count += triangle_count;
-  }
-
-  __DEVICE_BUFFER_ALLOCATE(triangles, sizeof(DeviceTriangle) * non_instanced_triangle_count);
-
-  uint32_t triangles_offset = 0;
-
-  for (uint32_t mesh_id = 0; mesh_id < mesh_count; mesh_id++) {
-    const DeviceMesh* mesh = meshes[mesh_id];
-
-    uint32_t triangle_count;
-    __FAILURE_HANDLE(array_get_num_elements(mesh->triangles, &triangle_count));
-
-    __FAILURE_HANDLE(device_staging_manager_register(
-      device->staging_manager, (void const*) mesh->triangles, (void*) device->buffers.triangles, triangles_offset,
-      sizeof(DeviceTriangle) * triangle_count));
-
-    triangles_offset += triangle_count;
-  }
-
-  device->constant_memory->non_instanced_triangle_count = non_instanced_triangle_count;
-
-  DEVICE_UPDATE_CONSTANT_MEMORY(non_instanced_triangle_count, non_instanced_triangle_count);
-
-  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult device_build_mesh_bvh(Device* device, const Mesh* mesh) {
+LuminaryResult device_update_mesh(Device* device, const Mesh* mesh) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(mesh);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  OptixBVH* mesh_bvh;
-  __FAILURE_HANDLE(optix_bvh_create(&mesh_bvh));
-  __FAILURE_HANDLE(optix_bvh_gas_build(mesh_bvh, device, mesh, OPTIX_BVH_TYPE_DEFAULT));
+  ////////////////////////////////////////////////////////////////////
+  // Compute new device mesh
+  ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(array_push(&device->optix_mesh_bvhs, &mesh_bvh));
+  uint32_t num_meshes;
+  __FAILURE_HANDLE(array_get_num_elements(device->meshes, &num_meshes));
+
+  if (mesh->id > num_meshes) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Meshes were not added in sequence.");
+  }
+
+  if (mesh->id < num_meshes) {
+    __FAILURE_HANDLE(device_mesh_destroy(device->meshes + mesh->id));
+  }
+
+  DeviceMesh* device_mesh;
+  __FAILURE_HANDLE(device_mesh_create(device, &device_mesh, mesh));
+
+  if (mesh->id == num_meshes) {
+    __FAILURE_HANDLE(array_push(&device->meshes, &device_mesh));
+
+    num_meshes++;
+    __DEVICE_BUFFER_REALLOC(triangles, sizeof(DeviceTriangle*) * num_meshes);
+  }
+  else {
+    device->meshes[mesh->id] = device_mesh;
+  }
+
+  void** direct_access_buffer;
+  __FAILURE_HANDLE(device_staging_manager_register_direct_access(
+    device->staging_manager, device->buffers.triangles, sizeof(DeviceTriangle*) * mesh->id, sizeof(DeviceTriangle*),
+    &direct_access_buffer));
+
+  *direct_access_buffer = DEVICE_PTR(device->meshes[mesh->id]->triangles);
+
+  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_PTRS));
+
+  ////////////////////////////////////////////////////////////////////
+  // Update total triangle count
+  ////////////////////////////////////////////////////////////////////
+
+  uint32_t total_triangle_count = 0;
+
+  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+    uint32_t num_triangles;
+    __FAILURE_HANDLE(array_get_num_elements(device->meshes[mesh_id]->triangles, &num_triangles));
+
+    total_triangle_count += num_triangles;
+  }
+
+  DEVICE_UPDATE_CONSTANT_MEMORY(non_instanced_triangle_count, total_triangle_count);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -843,16 +843,16 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(_device_free_buffers(*device));
 
   uint32_t num_meshes;
-  __FAILURE_HANDLE(array_get_num_elements((*device)->optix_mesh_bvhs, &num_meshes));
+  __FAILURE_HANDLE(array_get_num_elements((*device)->meshes, &num_meshes));
 
   for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
-    __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_mesh_bvhs[mesh_id]));
+    __FAILURE_HANDLE(device_mesh_destroy(&(*device)->meshes[mesh_id]));
   }
+
+  __FAILURE_HANDLE(array_destroy(&(*device)->meshes));
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));
-
-  __FAILURE_HANDLE(array_destroy(&(*device)->optix_mesh_bvhs));
 
   uint32_t num_textures;
   __FAILURE_HANDLE(array_get_num_elements((*device)->textures, &num_textures));

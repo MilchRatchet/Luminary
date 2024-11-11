@@ -92,21 +92,6 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
   ARRAY MeshInstanceUpdate* instance_updates;
   __FAILURE_HANDLE(scene_get_list_changes(device_manager->scene_device, (void**) &instance_updates, SCENE_ENTITY_INSTANCES));
 
-  uint32_t num_updates;
-  __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_updates));
-
-  uint32_t num_meshes;
-  __FAILURE_HANDLE(array_get_num_elements(device_manager->meshes, &num_meshes));
-
-  ARRAY uint32_t* device_instancelets_to_upload;
-  __FAILURE_HANDLE(array_create(&device_instancelets_to_upload, sizeof(uint32_t), num_updates));
-
-  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
-    __FAILURE_HANDLE(device_instance_handler_update(
-      device_manager->instance_handler, instance_updates + update_id, &device_instancelets_to_upload,
-      (const ARRAY DeviceMesh**) device_manager->meshes));
-  }
-
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
@@ -115,7 +100,6 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
   }
 
   __FAILURE_HANDLE(array_destroy(&instance_updates));
-  __FAILURE_HANDLE(array_destroy(&device_instancelets_to_upload));
 
   return LUMINARY_SUCCESS;
 }
@@ -223,10 +207,8 @@ static LuminaryResult _device_manager_add_meshes(DeviceManager* device_manager, 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     Device* device = device_manager->devices[device_id];
 
-    __FAILURE_HANDLE(device_upload_meshes(device, (const ARRAY DeviceMesh**) device_manager->meshes));
-
     for (uint32_t mesh_id = 0; mesh_id < args->num_meshes; mesh_id++) {
-      __FAILURE_HANDLE(device_build_mesh_bvh(device, args->meshes[mesh_id]));
+      __FAILURE_HANDLE(device_update_mesh(device, args->meshes[mesh_id]));
     }
   }
 
@@ -374,9 +356,6 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   device_manager->host = host;
 
   __FAILURE_HANDLE(scene_create(&device_manager->scene_device));
-  __FAILURE_HANDLE(array_create(&device_manager->meshes, sizeof(DeviceMesh*), 4));
-
-  __FAILURE_HANDLE(device_instance_handler_create(&device_manager->instance_handler));
 
   int32_t device_count;
   CUDA_FAILURE_HANDLE(cuDeviceGetCount(&device_count));
@@ -497,16 +476,6 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
 
   __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
 
-  uint32_t mesh_count;
-  __FAILURE_HANDLE(array_get_num_elements((*device_manager)->meshes, &mesh_count));
-
-  for (uint32_t mesh_id = 0; mesh_id < mesh_count; mesh_id++) {
-    __FAILURE_HANDLE(device_mesh_destroy(&(*device_manager)->meshes[mesh_id]));
-  }
-
-  __FAILURE_HANDLE(array_destroy(&(*device_manager)->meshes));
-  __FAILURE_HANDLE(device_instance_handler_destroy(&(*device_manager)->instance_handler));
-
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements((*device_manager)->devices, &device_count));
 
@@ -550,13 +519,6 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
 LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Mesh** meshes, uint32_t num_meshes) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(meshes);
-
-  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
-    DeviceMesh* device_mesh;
-    __FAILURE_HANDLE(device_mesh_create(&device_mesh, meshes[mesh_id]));
-
-    __FAILURE_HANDLE(array_push(&device_manager->meshes, &device_mesh));
-  }
 
   DeviceManagerAddMeshesArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddMeshesArgs), (void**) &args));

@@ -125,7 +125,6 @@ struct Triangle {
   UV edge1_texture;
   UV edge2_texture;
   uint32_t material_id;
-  uint32_t light_id;
 } typedef Triangle;
 
 struct TraversalTriangle {

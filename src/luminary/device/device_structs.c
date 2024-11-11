@@ -391,7 +391,8 @@ LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTr
   device_triangle->edge1_texture  = _device_UV_to_uint(triangle->edge1_texture);
   device_triangle->edge2_texture  = _device_UV_to_uint(triangle->edge2_texture);
 
-  device_triangle->padding = 0;
+  device_triangle->material_id = triangle->material_id;
+  device_triangle->padding     = 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -426,15 +427,9 @@ LuminaryResult _device_struct_quaternion_to_quaternion16(Quaternion16* dst, cons
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_struct_instance_convert(
-  const MeshInstance* instance, DeviceInstancelet* device_instance, DeviceTransform* device_transform, const DeviceMesh* device_mesh,
-  const uint32_t meshlet_id) {
+LuminaryResult device_struct_instance_transform_convert(const MeshInstance* instance, DeviceTransform* device_transform) {
   __CHECK_NULL_ARGUMENT(instance);
-  __CHECK_NULL_ARGUMENT(device_instance);
   __CHECK_NULL_ARGUMENT(device_transform);
-  __CHECK_NULL_ARGUMENT(device_mesh);
-
-  device_instance->material_id = device_mesh->meshlet_material_ids[meshlet_id];
 
   device_transform->offset = instance->offset;
   device_transform->scale  = instance->scale;
