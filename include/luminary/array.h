@@ -40,5 +40,6 @@ LUMINARY_API LuminaryResult _array_destroy(void** array, const char* buf_name, c
 LUMINARY_API LuminaryResult array_clear(void* array);
 LUMINARY_API LuminaryResult array_get_size(const void* array, size_t* size);
 LUMINARY_API LuminaryResult array_get_num_elements(const void* array, uint32_t* num_elements);
+LUMINARY_API LuminaryResult array_set_num_elements(void** array, uint32_t num_elements);
 
 #endif /* LUMINARY_API_ARRAY_H */

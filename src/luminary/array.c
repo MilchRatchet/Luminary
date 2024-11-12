@@ -190,3 +190,27 @@ LuminaryResult array_get_num_elements(const void* array, uint32_t* num_elements)
 
   return LUMINARY_SUCCESS;
 }
+
+LuminaryResult array_set_num_elements(void** array, uint32_t num_elements) {
+  __CHECK_NULL_ARGUMENT(array);
+
+  ArrayHeader* header = ((ArrayHeader*) *array) - 1;
+
+  if (header->magic != ARRAY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Given pointer is not an array.");
+  }
+
+  if (num_elements > header->allocated_num_elements) {
+    __FAILURE_HANDLE(array_resize(array, num_elements));
+    header = ((ArrayHeader*) *array) - 1;
+  }
+
+  if (num_elements > header->num_elements) {
+    uint8_t* data = (uint8_t*) *array;
+    memset(data + header->size_of_element * header->num_elements, 0, header->size_of_element * (num_elements - header->num_elements));
+  }
+
+  header->num_elements = num_elements;
+
+  return LUMINARY_SUCCESS;
+}
