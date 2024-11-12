@@ -53,7 +53,7 @@ static LuminaryResult _optix_bvh_get_optix_instance(
   optix_instance->flags             = OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
   optix_instance->traversableHandle = device->meshes[instance->mesh_id]->bvh->traversable;
 
-  __FAILURE_HANDLE(_optix_bvh_compute_transform(instance->rotation, instance->scale, instance->offset, optix_instance->transform));
+  __FAILURE_HANDLE(_optix_bvh_compute_transform(instance->rotation, instance->scale, instance->translation, optix_instance->transform));
 
   return LUMINARY_SUCCESS;
 }

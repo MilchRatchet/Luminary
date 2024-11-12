@@ -5,16 +5,34 @@
 #include "device_utils.h"
 #include "mesh.h"
 
-struct Device typedef Device;
+struct LightTreeCacheTriangle {
+  uint64_t emission_texture_hash;
+  bool has_textured_emission;
+  float constant_emission_intensity;
+  vec3 cross_product;
+} typedef LightTreeCacheTriangle;
 
-// Light Tree construction flow:
-// Mesh is dirty on Host => Host queues main device with light tree construction for mesh
-// LightTree construction on device is done => queues signal work on host
-// Host keeps track of in flight light tree constructions
-// If counter reaches 0 inside the signal work, then queue build top level light tree
-// Once top level light tree is done => queue upload light tree to all devices
+struct LightTreeCacheMesh {
+  uint32_t instance_count;
+  ARRAY LightTreeCacheTriangle* triangles;
+} typedef LightTreeCacheMesh;
+
+struct LightTreeCacheInstance {
+  bool active;
+  uint32_t mesh_id;
+  Quaternion rotation;
+  vec3 scale;
+  vec3 translation;
+} typedef LightTreeCacheInstance;
+
+struct LightTreeCache {
+  bool has_changed;
+  ARRAY LightTreeCacheMesh* meshes;
+  ARRAY LightTreeCacheInstance* instances;
+} typedef LightTreeCache;
 
 struct LightTree {
+  LightTreeCache cache;
   void* nodes_data;
   size_t nodes_size;
   void* paths_data;
@@ -23,18 +41,22 @@ struct LightTree {
   size_t light_instance_map_size;
   float bounding_sphere_size;
   vec3 bounding_sphere_center;
-  float normalized_power;
 } typedef LightTree;
 
-struct MeshletLightData {
-  LightTree* light_tree;
-  TriangleLight* lights;
-} typedef MeshletLightData;
+struct Device typedef Device;
 
-LuminaryResult light_tree_create(Meshlet* meshlet, Device* device, ARRAY const Material** materials);
-LuminaryResult light_tree_create_toplevel(
-  LightTree** tree, ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials);
-LuminaryResult light_tree_destroy(Meshlet* meshlet);
-LuminaryResult light_tree_destroy_toplevel(LightTree** tree);
+LuminaryResult light_tree_create(LightTree** tree);
+
+/*
+ * This requires that all meshes, materials and textures are already synced with the device.
+ */
+DEVICE_CTX_FUNC LuminaryResult
+  light_tree_update_cache_mesh(LightTree* tree, Device* device, const Mesh* mesh, const ARRAY Material* materials);
+
+LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInstance* instance);
+
+LuminaryResult light_tree_build(LightTree* tree);
+
+LuminaryResult light_tree_destroy(LightTree** tree);
 
 #endif /* LUMINARY_LIGHT_H */

@@ -22,6 +22,7 @@
 // queue a device task.
 
 #include "device.h"
+#include "device_light.h"
 #include "thread.h"
 
 struct DeviceManager {
@@ -35,6 +36,7 @@ struct DeviceManager {
   RingBuffer* ringbuffer;
   WallTime* queue_wall_time;
   Thread* work_thread;
+  LightTree* light_tree;
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);

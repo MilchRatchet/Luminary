@@ -7,7 +7,8 @@
 #include "internal_error.h"
 
 // TODO: Make per host instance
-static uint32_t mesh_id_counter = 0;
+static uint32_t mesh_id_counter     = 0;
+static uint32_t instance_id_counter = 0;
 
 LuminaryResult mesh_create(Mesh** mesh) {
   __CHECK_NULL_ARGUMENT(mesh);
@@ -43,6 +44,7 @@ LuminaryResult mesh_instance_get_default(MeshInstance* instance) {
 
   memset(instance, 0, sizeof(MeshInstance));
 
+  instance->id         = instance_id_counter++;
   instance->rotation.w = 1.0f;
   instance->scale.x    = 1.0f;
   instance->scale.y    = 1.0f;

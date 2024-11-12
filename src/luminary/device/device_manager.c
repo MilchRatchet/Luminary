@@ -369,6 +369,8 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
 
+  __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
+
   ////////////////////////////////////////////////////////////////////
   // Select main device
   ////////////////////////////////////////////////////////////////////
@@ -484,6 +486,8 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*device_manager)->devices));
+
+  __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
 
   __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));
 

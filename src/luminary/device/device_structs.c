@@ -431,8 +431,8 @@ LuminaryResult device_struct_instance_transform_convert(const MeshInstance* inst
   __CHECK_NULL_ARGUMENT(instance);
   __CHECK_NULL_ARGUMENT(device_transform);
 
-  device_transform->offset = instance->offset;
-  device_transform->scale  = instance->scale;
+  device_transform->translation = instance->translation;
+  device_transform->scale       = instance->scale;
   __FAILURE_HANDLE(_device_struct_quaternion_to_quaternion16(&device_transform->rotation, &instance->rotation));
 
   return LUMINARY_SUCCESS;

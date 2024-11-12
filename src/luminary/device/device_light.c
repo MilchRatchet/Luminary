@@ -274,11 +274,11 @@ static void divide_middles_along_axis(
   }
 }
 
-static LuminaryResult _light_tree_create_fragments(Meshlet* meshlet, LightTreeWork* work) {
-  __CHECK_NULL_ARGUMENT(meshlet);
+static LuminaryResult _light_tree_create_fragments(const Mesh* mesh, LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(mesh);
   __CHECK_NULL_ARGUMENT(work);
 
-  work->fragments_count = meshlet->triangle_count;
+  work->fragments_count = mesh->data.triangle_count;
 
   __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * work->fragments_count));
 
@@ -287,7 +287,7 @@ static LuminaryResult _light_tree_create_fragments(Meshlet* meshlet, LightTreeWo
   // TODO: Add some code that during bottom level tree construction removes any triangle lights that don't have any emission, i.e., textured
   // lights with zero normalized emission.
   for (uint32_t tri_id = 0; tri_id < work->fragments_count; tri_id++) {
-    TriangleLight t = meshlet->light_data->lights[tri_id];
+    TriangleLight t = mesh->light_data->lights[tri_id];
 
     vec3_p high = {
       .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
@@ -317,7 +317,7 @@ static LuminaryResult _light_tree_create_fragments(Meshlet* meshlet, LightTreeWo
 
     const float area = 0.5f * sqrtf(cross.x * cross.x + cross.y * cross.y + cross.z * cross.z);
 
-    const float emission = (meshlet->has_textured_emission) ? meshlet->normalized_emission[tri_id] : 1.0f;
+    const float emission = (mesh->has_textured_emission) ? meshlet->normalized_emission[tri_id] : 1.0f;
 
     work->total_normalized_power += emission * area;
 
@@ -1404,43 +1404,188 @@ LuminaryResult light_tree_create(Meshlet* meshlet, Device* device, ARRAY const M
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult light_tree_destroy(Meshlet* meshlet) {
-  __CHECK_NULL_ARGUMENT(meshlet);
+LuminaryResult light_tree_create(LightTree** tree) {
+  __CHECK_NULL_ARGUMENT(tree);
 
-  __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->nodes_data));
-  __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->paths_data));
+  __FAILURE_HANDLE(host_malloc(tree, sizeof(LightTree)));
+  memset(*tree, 0, sizeof(LightTree));
 
-  if (meshlet->light_data->light_tree->light_instance_map_data) {
-    __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree->light_instance_map_data));
-  }
+  ////////////////////////////////////////////////////////////////////
+  // Initialize cache
+  ////////////////////////////////////////////////////////////////////
 
-  __FAILURE_HANDLE(host_free(&meshlet->light_data->light_tree));
-  __FAILURE_HANDLE(host_free(&meshlet->light_data->lights));
-
-  __FAILURE_HANDLE(host_free(&meshlet->light_data));
+  __FAILURE_HANDLE(array_create(&(*tree)->cache.meshes, sizeof(LightTreeCacheMesh), 4));
+  __FAILURE_HANDLE(array_create(&(*tree)->cache.instances, sizeof(LightTreeCacheInstance), 4));
+  (*tree)->cache.has_changed = true;
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult light_tree_create_toplevel(
-  LightTree** tree, ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials) {
-  __CHECK_NULL_ARGUMENT(tree);
-  __CHECK_NULL_ARGUMENT(instances);
-  __CHECK_NULL_ARGUMENT(meshes);
+static LuminaryResult _light_tree_update_cache_mesh(
+  LightTreeCacheMesh* cache, Device* device, const Mesh* mesh, const ARRAY Material* materials, bool* mesh_has_changed) {
+  __CHECK_NULL_ARGUMENT(cache);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(mesh);
   __CHECK_NULL_ARGUMENT(materials);
 
-  __FAILURE_HANDLE(_light_tree_build_top_level(tree, instances, meshes, materials));
+  // We process meshes that are not references by instances, but we don't set the dirty flag.
+  const bool mesh_is_referenced = (cache->instance_count != 0);
+  bool mesh_has_changes         = false;
+
+  uint32_t cache_num_triangles;
+  __FAILURE_HANDLE(array_get_num_elements(cache->triangles, &cache_num_triangles));
+
+  if (cache_num_triangles != mesh->data.triangle_count) {
+    __FAILURE_HANDLE(array_clear(cache->triangles));
+    __FAILURE_HANDLE(array_resize(&cache->triangles, mesh->data.triangle_count));
+    __FAILURE_HANDLE(array_set_num_elements(&cache->triangles, mesh->data.triangle_count));
+
+    mesh_has_changes = true;
+  }
+
+  ARRAY uint32_t* tris_require_tex_integration;
+  __FAILURE_HANDLE(array_create(&tris_require_tex_integration, sizeof(uint32_t), 16));
+
+  for (uint32_t tri_id = 0; tri_id < mesh->data.triangle_count; tri_id++) {
+    LightTreeCacheTriangle* cache_triangle = cache->triangles + tri_id;
+    const Triangle* triangle               = mesh->triangles + tri_id;
+    const Material* material               = triangle->material_id;
+
+    bool tri_requires_integretation = false;
+
+    const bool triangle_has_textured_emission = material->luminance_tex != TEXTURE_NONE;
+    if (cache_triangle->has_textured_emission != triangle_has_textured_emission) {
+      tri_requires_integretation |= triangle_has_textured_emission;
+      mesh_has_changes = true;
+    }
+
+    // TODO: Check if triangle_has_textured_emission && (emission texture hash are not equal) then reintegrate.
+
+    if (!triangle_has_textured_emission) {
+      const float intensity = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b));
+
+      if (intensity != cache_triangle->constant_emission_intensity) {
+        cache_triangle->constant_emission_intensity = intensity;
+        mesh_has_changes                            = true;
+      }
+    }
+
+    // TODO: Check if triangle surface area has changed.
+
+    if (tri_requires_integretation) {
+      __FAILURE_HANDLE(array_push(&tris_require_tex_integration, &tri_id));
+    }
+  }
+
+  // TODO: Queue updates of the cache using the GPU
+
+  if (mesh_is_referenced) {
+    *mesh_has_changed = *mesh_has_changed || mesh_has_changes;
+  }
 
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult light_tree_destroy_toplevel(LightTree** tree) {
+LuminaryResult light_tree_update_cache_mesh(LightTree* tree, Device* device, const Mesh* mesh, const ARRAY Material* materials) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(mesh);
+  __CHECK_NULL_ARGUMENT(materials);
+
+  uint32_t num_meshes;
+  __FAILURE_HANDLE(array_get_num_elements(tree->cache.meshes, &num_meshes));
+
+  if (mesh->id >= num_meshes) {
+    __FAILURE_HANDLE(array_set_num_elements(&tree->cache.meshes, mesh->id + 1));
+  }
+
+  __FAILURE_HANDLE(_light_tree_update_cache_mesh(tree->cache.meshes + mesh->id, device, mesh, materials, &tree->cache.has_changed));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _light_tree_update_cache_instance(
+  LightTreeCacheInstance* cache, ARRAY LightTreeCacheMesh* cache_meshes, const MeshInstance* instance, bool* instance_has_changed) {
+  __CHECK_NULL_ARGUMENT(cache);
+  __CHECK_NULL_ARGUMENT(instance);
+
+  if (cache->active != instance->active) {
+    cache->active         = instance->active;
+    *instance_has_changed = true;
+
+    // Skip further processing if this instance is inactive.
+    if (!cache->active) {
+      return LUMINARY_SUCCESS;
+    }
+  }
+
+  if (cache->mesh_id != instance->mesh_id) {
+    uint32_t num_meshes;
+    __FAILURE_HANDLE(array_get_num_elements(cache_meshes, &num_meshes));
+
+    if (num_meshes <= cache->mesh_id || num_meshes <= instance->mesh_id) {
+      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "MeshID [%u/%u] was out of range [%u].", cache->mesh_id, instance->mesh_id, num_meshes);
+    }
+
+    cache_meshes[cache->mesh_id].instance_count--;
+    cache_meshes[instance->mesh_id].instance_count++;
+
+    cache->mesh_id        = instance->mesh_id;
+    *instance_has_changed = true;
+  }
+
+  if (memcmp(&cache->rotation, &instance->rotation, sizeof(Quaternion))) {
+    cache->rotation       = instance->rotation;
+    *instance_has_changed = true;
+  }
+
+  if (memcmp(&cache->scale, &instance->scale, sizeof(vec3))) {
+    cache->scale          = instance->scale;
+    *instance_has_changed = true;
+  }
+
+  if (memcmp(&cache->translation, &instance->translation, sizeof(vec3))) {
+    cache->translation    = instance->translation;
+    *instance_has_changed = true;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInstance* instance) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(instance);
+
+  uint32_t num_instances;
+  __FAILURE_HANDLE(array_get_num_elements(tree->cache.instances, &num_instances));
+
+  if (instance->id >= num_instances) {
+    __FAILURE_HANDLE(array_set_num_elements(&tree->cache.instances, instance->id + 1));
+  }
+
+  __FAILURE_HANDLE(
+    _light_tree_update_cache_instance(tree->cache.instances + instance->id, tree->cache.meshes, instance, &tree->cache.has_changed));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult light_tree_destroy(LightTree** tree) {
   __CHECK_NULL_ARGUMENT(tree);
   __CHECK_NULL_ARGUMENT(*tree);
 
-  __FAILURE_HANDLE(host_free((*tree)->nodes_data));
-  __FAILURE_HANDLE(host_free((*tree)->paths_data));
-  __FAILURE_HANDLE(host_free((*tree)->light_instance_map_data));
+  uint32_t num_meshes;
+  __FAILURE_HANDLE(array_get_num_elements((*tree)->cache.meshes, &num_meshes));
+
+  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+    LightTreeCacheMesh* mesh = (*tree)->cache.meshes + mesh_id;
+
+    if (mesh->triangles) {
+      __FAILURE_HANDLE(host_free(&mesh->triangles));
+    }
+  }
+
+  __FAILURE_HANDLE(host_free(&(*tree)->cache.meshes));
+  __FAILURE_HANDLE(host_free(&(*tree)->cache.instances));
 
   __FAILURE_HANDLE(host_free(tree));
 

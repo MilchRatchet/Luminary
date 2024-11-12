@@ -234,7 +234,7 @@ struct DeviceTextureObject {
 LUM_STATIC_SIZE_ASSERT(DeviceTextureObject, 0x10u);
 
 struct DeviceTransform {
-  vec3 offset;
+  vec3 translation;
   vec3 scale;
   Quaternion16 rotation;
 } typedef DeviceTransform;
