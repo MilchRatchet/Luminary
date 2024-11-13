@@ -1404,6 +1404,10 @@ LuminaryResult light_tree_create(Meshlet* meshlet, Device* device, ARRAY const M
   return LUMINARY_SUCCESS;
 }
 
+////////////////////////////////////////////////////////////////////
+// Constructor
+////////////////////////////////////////////////////////////////////
+
 LuminaryResult light_tree_create(LightTree** tree) {
   __CHECK_NULL_ARGUMENT(tree);
 
@@ -1416,13 +1420,16 @@ LuminaryResult light_tree_create(LightTree** tree) {
 
   __FAILURE_HANDLE(array_create(&(*tree)->cache.meshes, sizeof(LightTreeCacheMesh), 4));
   __FAILURE_HANDLE(array_create(&(*tree)->cache.instances, sizeof(LightTreeCacheInstance), 4));
-  (*tree)->cache.has_changed = true;
 
   return LUMINARY_SUCCESS;
 }
 
+////////////////////////////////////////////////////////////////////
+// Mesh updating
+////////////////////////////////////////////////////////////////////
+
 static LuminaryResult _light_tree_update_cache_mesh(
-  LightTreeCacheMesh* cache, Device* device, const Mesh* mesh, const ARRAY Material* materials, bool* mesh_has_changed) {
+  LightTreeCacheMesh* cache, Device* device, const Mesh* mesh, const ARRAY Material* materials) {
   __CHECK_NULL_ARGUMENT(cache);
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(mesh);
@@ -1430,7 +1437,7 @@ static LuminaryResult _light_tree_update_cache_mesh(
 
   // We process meshes that are not references by instances, but we don't set the dirty flag.
   const bool mesh_is_referenced = (cache->instance_count != 0);
-  bool mesh_has_changes         = false;
+  bool mesh_is_dirty            = false;
 
   uint32_t cache_num_triangles;
   __FAILURE_HANDLE(array_get_num_elements(cache->triangles, &cache_num_triangles));
@@ -1440,23 +1447,26 @@ static LuminaryResult _light_tree_update_cache_mesh(
     __FAILURE_HANDLE(array_resize(&cache->triangles, mesh->data.triangle_count));
     __FAILURE_HANDLE(array_set_num_elements(&cache->triangles, mesh->data.triangle_count));
 
-    mesh_has_changes = true;
+    mesh_is_dirty = true;
   }
 
   ARRAY uint32_t* tris_require_tex_integration;
   __FAILURE_HANDLE(array_create(&tris_require_tex_integration, sizeof(uint32_t), 16));
+
+  bool mesh_has_emission = false;
 
   for (uint32_t tri_id = 0; tri_id < mesh->data.triangle_count; tri_id++) {
     LightTreeCacheTriangle* cache_triangle = cache->triangles + tri_id;
     const Triangle* triangle               = mesh->triangles + tri_id;
     const Material* material               = triangle->material_id;
 
-    bool tri_requires_integretation = false;
+    bool tri_has_changes          = false;
+    bool tri_requires_integration = false;
 
     const bool triangle_has_textured_emission = material->luminance_tex != TEXTURE_NONE;
     if (cache_triangle->has_textured_emission != triangle_has_textured_emission) {
-      tri_requires_integretation |= triangle_has_textured_emission;
-      mesh_has_changes = true;
+      tri_requires_integration |= triangle_has_textured_emission;
+      tri_has_changes = true;
     }
 
     // TODO: Check if triangle_has_textured_emission && (emission texture hash are not equal) then reintegrate.
@@ -1466,21 +1476,52 @@ static LuminaryResult _light_tree_update_cache_mesh(
 
       if (intensity != cache_triangle->constant_emission_intensity) {
         cache_triangle->constant_emission_intensity = intensity;
-        mesh_has_changes                            = true;
+        tri_has_changes                             = true;
+
+        mesh_has_emission |= (intensity > 0.0f);
       }
     }
 
-    // TODO: Check if triangle surface area has changed.
+    const Vec128 vertex = vec128_set(triangle->vertex.x, triangle->vertex.y, triangle->vertex.z, 0.0f);
+    const Vec128 edge1  = vec128_set(triangle->edge1.x, triangle->edge1.y, triangle->edge1.z, 0.0f);
+    const Vec128 edge2  = vec128_set(triangle->edge2.x, triangle->edge2.y, triangle->edge2.z, 0.0f);
+    const Vec128 cross  = vec128_cross(edge1, edge2);
 
-    if (tri_requires_integretation) {
+    if (!vec128_is_equal(cross, cache_triangle->cross_product)) {
+      cache_triangle->cross_product = cross;
+      tri_has_changes               = true;
+    }
+
+    if (!vec128_is_equal(vertex, cache_triangle->vertex)) {
+      cache_triangle->vertex = vertex;
+      tri_has_changes        = true;
+    }
+
+    if (!vec128_is_equal(edge1, cache_triangle->edge1)) {
+      cache_triangle->edge1 = edge1;
+      tri_has_changes       = true;
+    }
+
+    if (!vec128_is_equal(edge2, cache_triangle->edge2)) {
+      cache_triangle->edge2 = edge2;
+      tri_has_changes       = true;
+    }
+
+    if (tri_has_changes) {
+      mesh_is_dirty = true;
+    }
+
+    if (tri_requires_integration) {
       __FAILURE_HANDLE(array_push(&tris_require_tex_integration, &tri_id));
     }
   }
 
-  // TODO: Queue updates of the cache using the GPU
+  // TODO: Do emission texture integration on the GPU
 
-  if (mesh_is_referenced) {
-    *mesh_has_changed = *mesh_has_changed || mesh_has_changes;
+  cache->has_emission = mesh_has_emission;
+
+  if (mesh_is_referenced && mesh_is_dirty) {
+    cache->is_dirty = true;
   }
 
   return LUMINARY_SUCCESS;
@@ -1499,19 +1540,29 @@ LuminaryResult light_tree_update_cache_mesh(LightTree* tree, Device* device, con
     __FAILURE_HANDLE(array_set_num_elements(&tree->cache.meshes, mesh->id + 1));
   }
 
-  __FAILURE_HANDLE(_light_tree_update_cache_mesh(tree->cache.meshes + mesh->id, device, mesh, materials, &tree->cache.has_changed));
+  __FAILURE_HANDLE(_light_tree_update_cache_mesh(tree->cache.meshes + mesh->id, device, mesh, materials));
+
+  if (tree->cache.meshes[mesh->id].is_dirty) {
+    tree->cache.is_dirty = true;
+  }
 
   return LUMINARY_SUCCESS;
 }
 
+////////////////////////////////////////////////////////////////////
+// Instance updating
+////////////////////////////////////////////////////////////////////
+
 static LuminaryResult _light_tree_update_cache_instance(
-  LightTreeCacheInstance* cache, ARRAY LightTreeCacheMesh* cache_meshes, const MeshInstance* instance, bool* instance_has_changed) {
+  LightTreeCacheInstance* cache, ARRAY LightTreeCacheMesh* cache_meshes, const MeshInstance* instance) {
   __CHECK_NULL_ARGUMENT(cache);
   __CHECK_NULL_ARGUMENT(instance);
 
+  bool instance_is_dirty = false;
+
   if (cache->active != instance->active) {
-    cache->active         = instance->active;
-    *instance_has_changed = true;
+    cache->active     = instance->active;
+    instance_is_dirty = true;
 
     // Skip further processing if this instance is inactive.
     if (!cache->active) {
@@ -1523,30 +1574,39 @@ static LuminaryResult _light_tree_update_cache_instance(
     uint32_t num_meshes;
     __FAILURE_HANDLE(array_get_num_elements(cache_meshes, &num_meshes));
 
-    if (num_meshes <= cache->mesh_id || num_meshes <= instance->mesh_id) {
-      __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "MeshID [%u/%u] was out of range [%u].", cache->mesh_id, instance->mesh_id, num_meshes);
+    if (cache->mesh_id != MESH_ID_INVALID) {
+      if (num_meshes <= cache->mesh_id || num_meshes <= instance->mesh_id) {
+        __RETURN_ERROR(
+          LUMINARY_ERROR_API_EXCEPTION, "MeshID [%u/%u] was out of range [%u].", cache->mesh_id, instance->mesh_id, num_meshes);
+      }
+
+      cache_meshes[cache->mesh_id].instance_count--;
     }
 
-    cache_meshes[cache->mesh_id].instance_count--;
     cache_meshes[instance->mesh_id].instance_count++;
 
-    cache->mesh_id        = instance->mesh_id;
-    *instance_has_changed = true;
+    cache->mesh_id    = instance->mesh_id;
+    instance_is_dirty = true;
   }
 
   if (memcmp(&cache->rotation, &instance->rotation, sizeof(Quaternion))) {
-    cache->rotation       = instance->rotation;
-    *instance_has_changed = true;
+    cache->rotation   = instance->rotation;
+    instance_is_dirty = true;
   }
 
   if (memcmp(&cache->scale, &instance->scale, sizeof(vec3))) {
-    cache->scale          = instance->scale;
-    *instance_has_changed = true;
+    cache->scale      = instance->scale;
+    instance_is_dirty = true;
   }
 
   if (memcmp(&cache->translation, &instance->translation, sizeof(vec3))) {
-    cache->translation    = instance->translation;
-    *instance_has_changed = true;
+    cache->translation = instance->translation;
+    instance_is_dirty  = true;
+  }
+
+  // Only set the dirty flag if the referenced mesh is present in the light tree.
+  if (instance_is_dirty && cache_meshes[cache->mesh_id].has_emission) {
+    cache_meshes[cache->mesh_id].is_dirty = true;
   }
 
   return LUMINARY_SUCCESS;
@@ -1561,13 +1621,125 @@ LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInsta
 
   if (instance->id >= num_instances) {
     __FAILURE_HANDLE(array_set_num_elements(&tree->cache.instances, instance->id + 1));
+
+    // Invalidate the mesh ID for proper reference counting.
+    for (uint32_t instance_id = num_instances; instance_id < instance->id + 1; instance_id++) {
+      tree->cache.instances[instance_id].mesh_id = MESH_ID_INVALID;
+    }
   }
 
-  __FAILURE_HANDLE(
-    _light_tree_update_cache_instance(tree->cache.instances + instance->id, tree->cache.meshes, instance, &tree->cache.has_changed));
+  __FAILURE_HANDLE(_light_tree_update_cache_instance(tree->cache.instances + instance->id, tree->cache.meshes, instance));
+
+  if (tree->cache.instances[instance->id].is_dirty) {
+    tree->cache.is_dirty = true;
+  }
 
   return LUMINARY_SUCCESS;
 }
+
+////////////////////////////////////////////////////////////////////
+// Light Tree construction
+////////////////////////////////////////////////////////////////////
+
+static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, const uint32_t instance_id) {
+  __CHECK_NULL_ARGUMENT(tree);
+
+  LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
+
+  if (instance->fragments) {
+    __FAILURE_HANDLE(array_destroy(&instance->fragments));
+  }
+
+  if (instance->mesh_id == MESH_ID_INVALID)
+    return LUMINARY_SUCCESS;
+
+  const LightTreeCacheMesh* mesh = tree->cache.meshes + instance->mesh_id;
+
+  if (!mesh->has_emission)
+    return LUMINARY_SUCCESS;
+
+  uint32_t num_triangles;
+  __FAILURE_HANDLE(array_get_num_elements(mesh->triangles, &num_triangles));
+
+  __FAILURE_HANDLE(array_create(&instance->fragments, sizeof(LightTreeFragment), 16));
+
+  for (uint32_t tri_id = 0; tri_id < num_triangles; tri_id++) {
+    const LightTreeCacheTriangle* triangle = mesh->triangles + tri_id;
+
+    if (triangle->constant_emission_intensity == 0.0f)
+      continue;
+
+    const float area = 0.5f * sqrtf(vec128_hsum(triangle->cross_product));
+
+    const Vec128 vertex1 = vec128_add(triangle->vertex, triangle->edge1);
+    const Vec128 vertex2 = vec128_add(triangle->vertex, triangle->edge2);
+
+    LightTreeFragment fragment;
+    fragment.low         = vec128_min(triangle->vertex, vec128_min(vertex1, vertex2));
+    fragment.high        = vec128_max(triangle->vertex, vec128_max(vertex1, vertex2));
+    fragment.middle      = vec128_mul(vec128_add(fragment.low, fragment.high), vec128_set_1(0.5f));
+    fragment.power       = triangle->constant_emission_intensity * area;
+    fragment.instance_id = instance_id;
+    fragment.tri_id      = tri_id;
+
+    __FAILURE_HANDLE(array_push(&instance->fragments, &fragment));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _light_tree_handle_dirty_states(LightTree* tree) {
+  __CHECK_NULL_ARGUMENT(tree);
+
+  uint32_t num_instances;
+  __FAILURE_HANDLE(array_get_num_elements(tree->cache.instances, &num_instances));
+
+  for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
+    bool instance_is_dirty = tree->cache.instances[instance_id].is_dirty;
+
+    const uint32_t mesh_id = tree->cache.instances[instance_id].mesh_id;
+
+    if (mesh_id != MESH_ID_INVALID) {
+      instance_is_dirty |= tree->cache.meshes[mesh_id].is_dirty;
+    }
+
+    if (instance_is_dirty) {
+      __FAILURE_HANDLE(_light_tree_compute_instance_fragments(tree, instance_id));
+    }
+
+    tree->cache.instances[instance_id].is_dirty = false;
+  }
+
+  // Reset mesh dirty flags
+  uint32_t num_meshes;
+  __FAILURE_HANDLE(array_get_num_elements(tree->cache.meshes, &num_meshes));
+
+  for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
+    tree->cache.meshes[mesh_id].is_dirty = false;
+  }
+
+  tree->cache.is_dirty = false;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult light_tree_build(LightTree* tree) {
+  __CHECK_NULL_ARGUMENT(tree);
+
+  // Only build if the cache is dirty.
+  if (!tree->cache.is_dirty)
+    return LUMINARY_SUCCESS;
+
+  __FAILURE_HANDLE(_light_tree_handle_dirty_states(tree));
+
+  tree->build_id++;
+
+  return LUMINARY_SUCCESS;
+}
+
+////////////////////////////////////////////////////////////////////
+// Destructor
+////////////////////////////////////////////////////////////////////
 
 LuminaryResult light_tree_destroy(LightTree** tree) {
   __CHECK_NULL_ARGUMENT(tree);

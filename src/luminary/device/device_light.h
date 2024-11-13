@@ -3,18 +3,35 @@
 
 #include "device_memory.h"
 #include "device_utils.h"
+#include "host_intrinsics.h"
 #include "mesh.h"
+
+struct LightTreeFragment {
+  Vec128 high;
+  Vec128 low;
+  Vec128 middle;
+  uint32_t instance_id;
+  uint32_t tri_id;
+  float power;
+  uint32_t padding;
+} typedef LightTreeFragment;
+LUM_STATIC_SIZE_ASSERT(LightTreeFragment, 0x40);
 
 struct LightTreeCacheTriangle {
   uint64_t emission_texture_hash;
   bool has_textured_emission;
   float constant_emission_intensity;
-  vec3 cross_product;
+  Vec128 cross_product;
+  Vec128 vertex;
+  Vec128 edge1;
+  Vec128 edge2;
 } typedef LightTreeCacheTriangle;
 
 struct LightTreeCacheMesh {
   uint32_t instance_count;
+  bool has_emission;
   ARRAY LightTreeCacheTriangle* triangles;
+  bool is_dirty;
 } typedef LightTreeCacheMesh;
 
 struct LightTreeCacheInstance {
@@ -23,15 +40,18 @@ struct LightTreeCacheInstance {
   Quaternion rotation;
   vec3 scale;
   vec3 translation;
+  bool is_dirty;
+  ARRAY LightTreeFragment* fragments; /* Computed during build step */
 } typedef LightTreeCacheInstance;
 
 struct LightTreeCache {
-  bool has_changed;
+  bool is_dirty;
   ARRAY LightTreeCacheMesh* meshes;
   ARRAY LightTreeCacheInstance* instances;
 } typedef LightTreeCache;
 
 struct LightTree {
+  uint32_t build_id;
   LightTreeCache cache;
   void* nodes_data;
   size_t nodes_size;

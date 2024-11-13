@@ -3,6 +3,8 @@
 
 #include "utils.h"
 
+#define MESH_ID_INVALID (0xFFFFFFFF)
+
 // Traditional description through vertex buffer and index buffer which is required for OptiX RT.
 // Both vertex buffer and index buffer have a stride of 16 bytes for each triplet
 // but the counts only indicate the number of actual data entries.
