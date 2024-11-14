@@ -63,15 +63,6 @@ struct vec3_p {
   float _p;
 } typedef vec3_p;
 
-struct Fragment {
-  vec3_p high;
-  vec3_p low;
-  vec3_p middle;
-  uint32_t id;
-  float power;
-  uint64_t _p;
-} typedef Fragment;
-
 struct LightTreeChildNode {
   vec3 point;
   float energy;
@@ -80,9 +71,9 @@ struct LightTreeChildNode {
 } typedef LightTreeChildNode;
 
 struct LightTreeWork {
-  Fragment* fragments;
-  uint2* paths;
+  LightTreeFragment* fragments;
   uint32_t fragments_count;
+  uint2* paths;
   ARRAY LightTreeBinaryNode* binary_nodes;
   LightTreeNode* nodes;
   LightTreeNode8Packed* nodes8_packed;
@@ -1723,6 +1714,44 @@ static LuminaryResult _light_tree_handle_dirty_states(LightTree* tree) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(tree);
+  __CHECK_NULL_ARGUMENT(work);
+
+  uint32_t num_instances;
+  __FAILURE_HANDLE(array_get_num_elements(tree->cache.instances, &num_instances));
+
+  uint32_t total_fragments = 0;
+
+  for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
+    LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
+
+    uint32_t num_fragments;
+    __FAILURE_HANDLE(array_get_num_elements(instance->fragments, &num_fragments));
+
+    total_fragments += num_fragments;
+  }
+
+  work->fragments_count = total_fragments;
+
+  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(LightTreeFragment) * work->fragments_count));
+
+  uint32_t fragment_offset = 0;
+
+  for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
+    LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
+
+    uint32_t num_fragments;
+    __FAILURE_HANDLE(array_get_num_elements(instance->fragments, &num_fragments));
+
+    memcpy(work->fragments + fragment_offset, instance->fragments, sizeof(LightTreeFragment) * num_fragments);
+
+    fragment_offset += num_fragments;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult light_tree_build(LightTree* tree) {
   __CHECK_NULL_ARGUMENT(tree);
 
@@ -1731,6 +1760,15 @@ LuminaryResult light_tree_build(LightTree* tree) {
     return LUMINARY_SUCCESS;
 
   __FAILURE_HANDLE(_light_tree_handle_dirty_states(tree));
+
+  LightTreeWork work;
+  memset(&work, 0, sizeof(LightTreeWork));
+
+  __FAILURE_HANDLE(_light_tree_collect_fragments(tree, &work));
+#ifdef LIGHT_TREE_DEBUG_OUTPUT
+  _light_tree_debug_output(&work);
+#endif /* LIGHT_TREE_DEBUG_OUTPUT */
+  _light_tree_clear_work(&work);
 
   tree->build_id++;
 
