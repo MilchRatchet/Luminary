@@ -56,13 +56,6 @@ struct LightTreeNode {
 } typedef LightTreeNode;
 static_assert(sizeof(LightTreeNode) == 0x30, "Incorrect packing size.");
 
-struct vec3_p {
-  float x;
-  float y;
-  float z;
-  float _p;
-} typedef vec3_p;
-
 struct LightTreeChildNode {
   vec3 point;
   float energy;
@@ -79,126 +72,108 @@ struct LightTreeWork {
   LightTreeNode8Packed* nodes8_packed;
   uint32_t nodes_count;
   uint32_t nodes_8_count;
-  float total_normalized_power;
-  float bounding_sphere_size;
-  vec3 bounding_sphere_center;
 } typedef LightTreeWork;
 
 struct Bin {
-  vec3_p high;
-  vec3_p low;
+  Vec128 high;
+  Vec128 low;
   int32_t entry;
   int32_t exit;
   float energy;
-  uint32_t _p;
+  uint32_t padding;
 } typedef Bin;
 
-#define OBJECT_SPLIT_BIN_COUNT 32
+#define OBJECT_SPLIT_BIN_COUNT_LOG (5)
+#define OBJECT_SPLIT_BIN_COUNT (1 << 5)
 
 // We need to bound the dimensions, the number must be large but still much smaller than FLT_MAX
 #define MAX_VALUE 1e10f
 
 #define FRAGMENT_ERROR_COMP (FLT_EPSILON * 4.0f)
 
-static float get_entry_by_axis(const vec3_p p, const LightTreeSweepAxis axis) {
-  switch (axis) {
-    case LIGHT_TREE_SWEEP_AXIS_X:
-      return p.x;
-    case LIGHT_TREE_SWEEP_AXIS_Y:
-      return p.y;
-    case LIGHT_TREE_SWEEP_AXIS_Z:
-    default:
-      return p.z;
-  }
-}
-
-#define _get_entry_by_axis(ptr, axis) \
-  _mm_cvtss_f32(_mm_shuffle_ps(_mm_loadu_ps((float*) (ptr)), _mm_loadu_ps((float*) (ptr)), _MM_SHUFFLE(0, 0, 0, axis)))
-
-static void fit_bounds(const Fragment* fragments, const uint32_t fragments_count, vec3_p* high_out, vec3_p* low_out) {
-  __m128 high = _mm_set1_ps(-MAX_VALUE);
-  __m128 low  = _mm_set1_ps(MAX_VALUE);
+inline void _light_tree_fit_bounds(
+  const LightTreeFragment* fragments, const uint32_t fragments_count, Vec128* restrict high_out, Vec128* restrict low_out) {
+  Vec128 high = vec128_set_1(-MAX_VALUE);
+  Vec128 low  = vec128_set_1(MAX_VALUE);
 
   for (uint32_t i = 0; i < fragments_count; i++) {
-    __m128 high_frag = _mm_loadu_ps((float*) &(fragments[i].high));
-    __m128 low_frag  = _mm_loadu_ps((float*) &(fragments[i].low));
+    // TODO: Split fragment array memory layout so that bounds fitting can be done in a more cache friendly way
+    const Vec128 high_frag = vec128_load((float*) &(fragments[i].high));
+    const Vec128 low_frag  = vec128_load((float*) &(fragments[i].low));
 
-    high = _mm_max_ps(high, high_frag);
-    low  = _mm_min_ps(low, low_frag);
+    high = vec128_max(high, high_frag);
+    low  = vec128_min(low, low_frag);
   }
 
   if (high_out)
-    _mm_storeu_ps((float*) high_out, high);
+    vec128_store((float*) high_out, high);
   if (low_out)
-    _mm_storeu_ps((float*) low_out, low);
+    vec128_store((float*) low_out, low);
 }
 
-static void fit_bounds_of_bins(const Bin* bins, const int bins_length, vec3_p* high_out, vec3_p* low_out) {
-  __m128 high = _mm_set1_ps(-MAX_VALUE);
-  __m128 low  = _mm_set1_ps(MAX_VALUE);
+inline void _light_tree_fit_bounds_of_bins(
+  const Bin* bins, const uint32_t bins_count, Vec128* restrict high_out, Vec128* restrict low_out) {
+  Vec128 high = vec128_set_1(-MAX_VALUE);
+  Vec128 low  = vec128_set_1(MAX_VALUE);
 
-  for (int i = 0; i < bins_length; i++) {
-    const __m128 high_bin = _mm_loadu_ps((float*) &(bins[i].high));
-    const __m128 low_bin  = _mm_loadu_ps((float*) &(bins[i].low));
+  for (uint32_t i = 0; i < bins_count; i++) {
+    // TODO: Split bin array memory layout so that bounds fitting can be done in a more cache friendly way
+    const Vec128 high_frag = vec128_load((float*) &(bins[i].high));
+    const Vec128 low_frag  = vec128_load((float*) &(bins[i].low));
 
-    high = _mm_max_ps(high, high_bin);
-    low  = _mm_min_ps(low, low_bin);
+    high = vec128_max(high, high_frag);
+    low  = vec128_min(low, low_frag);
   }
 
   if (high_out)
-    _mm_storeu_ps((float*) high_out, high);
+    vec128_store((float*) high_out, high);
   if (low_out)
-    _mm_storeu_ps((float*) low_out, low);
+    vec128_store((float*) low_out, low);
 }
 
-static void update_bounds_of_bins(const Bin* bins, vec3_p* restrict high_out, vec3_p* restrict low_out) {
-  __m128 high = _mm_loadu_ps((float*) high_out);
-  __m128 low  = _mm_loadu_ps((float*) low_out);
-
-  const float* baseptr = (float*) (bins);
-
-  __m128 high_bin = _mm_loadu_ps(baseptr);
-  __m128 low_bin  = _mm_loadu_ps(baseptr + 4);
-
-  high = _mm_max_ps(high, high_bin);
-  low  = _mm_min_ps(low, low_bin);
-
-  _mm_storeu_ps((float*) high_out, high);
-  _mm_storeu_ps((float*) low_out, low);
-}
-
-#define _construct_bins_kernel(_axis_)                                         \
-  {                                                                            \
-    for (uint32_t i = 0; i < fragments_count; i++) {                           \
-      const double value = _get_entry_by_axis(&(fragments[i].middle), _axis_); \
-      int pos            = ((int) ceil((value - low_axis) / interval)) - 1;    \
-      if (pos < 0)                                                             \
-        pos = 0;                                                               \
-                                                                               \
-      bins[pos].entry++;                                                       \
-      bins[pos].exit++;                                                        \
-      bins[pos].energy += fragments[i].power;                                  \
-                                                                               \
-      __m128 high_bin  = _mm_loadu_ps((float*) &(bins[pos].high));             \
-      __m128 low_bin   = _mm_loadu_ps((float*) &(bins[pos].low));              \
-      __m128 high_frag = _mm_loadu_ps((float*) &(fragments[i].high));          \
-      __m128 low_frag  = _mm_loadu_ps((float*) &(fragments[i].low));           \
-                                                                               \
-      high_bin = _mm_max_ps(high_bin, high_frag);                              \
-      low_bin  = _mm_min_ps(low_bin, low_frag);                                \
-                                                                               \
-      _mm_storeu_ps((float*) &(bins[pos].high), high_bin);                     \
-      _mm_storeu_ps((float*) &(bins[pos].low), low_bin);                       \
-    }                                                                          \
+#define _light_tree_update_bounds_of_bins(__macro_in_bins, __macro_in_high, __macro_in_low) \
+  {                                                                                         \
+    const float* __macro_baseptr  = (float*) (__macro_in_bins);                             \
+    const Vec128 __macro_high_bin = vec128_load(__macro_baseptr);                           \
+    const Vec128 __macro_low_bin  = vec128_load(__macro_baseptr + 4);                       \
+    __macro_in_high               = vec128_max(__macro_in_high, __macro_high_bin);          \
+    __macro_in_low                = vec128_min(__macro_in_low, __macro_low_bin);            \
   }
 
-static double construct_bins(
-  Bin* restrict bins, const Fragment* restrict fragments, const uint32_t fragments_count, const LightTreeSweepAxis axis, double* offset) {
-  vec3_p high, low;
-  fit_bounds(fragments, fragments_count, &high, &low);
+#define _light_tree_construct_bins_kernel(                                                                                       \
+  __macro_in_fragments, __macro_in_fragments_count, __macro_in_bins, __macro_in_low_axis, __macro_in_interval, __macro_in_axis_) \
+  {                                                                                                                              \
+    const double __macro_inv_interval = 1.0 / __macro_in_interval;                                                               \
+    for (uint32_t __macro_i = 0; __macro_i < __macro_in_fragments_count; __macro_i++) {                                          \
+      const double __macro_value = vec128_get_1(vec128_load(&(__macro_in_fragments[__macro_i].middle)), __macro_in_axis_);       \
+      int32_t __macro_pos        = ((int32_t) ceil((__macro_value - __macro_in_low_axis) * __macro_inv_interval)) - 1;           \
+      if (__macro_pos < 0)                                                                                                       \
+        __macro_pos = 0;                                                                                                         \
+                                                                                                                                 \
+      __macro_in_bins[__macro_pos].entry++;                                                                                      \
+      __macro_in_bins[__macro_pos].exit++;                                                                                       \
+      __macro_in_bins[__macro_pos].energy += __macro_in_fragments[__macro_i].power;                                              \
+                                                                                                                                 \
+      Vec128 __macro_high_bin        = vec128_load((float*) &(__macro_in_bins[__macro_pos].high));                               \
+      Vec128 __macro_low_bin         = vec128_load((float*) &(__macro_in_bins[__macro_pos].low));                                \
+      const Vec128 __macro_high_frag = vec128_load((float*) &(__macro_in_fragments[__macro_i].high));                            \
+      const Vec128 __macro_low_frag  = vec128_load((float*) &(__macro_in_fragments[__macro_i].low));                             \
+                                                                                                                                 \
+      __macro_high_bin = vec128_max(__macro_high_bin, __macro_high_frag);                                                        \
+      __macro_low_bin  = vec128_min(__macro_low_bin, __macro_low_frag);                                                          \
+                                                                                                                                 \
+      vec128_store((float*) &(__macro_in_bins[__macro_pos].high), __macro_high_bin);                                             \
+      vec128_store((float*) &(__macro_in_bins[__macro_pos].low), __macro_low_bin);                                               \
+    }                                                                                                                            \
+  }
 
-  const double high_axis = get_entry_by_axis(high, axis);
-  const double low_axis  = get_entry_by_axis(low, axis);
+static double _light_tree_construct_bins(
+  Bin* bins, const LightTreeFragment* fragments, const uint32_t fragments_count, const LightTreeSweepAxis axis, double* offset) {
+  Vec128 high, low;
+  _light_tree_fit_bounds(fragments, fragments_count, &high, &low);
+
+  const double high_axis = high.data[axis];
+  const double low_axis  = low.data[axis];
 
   const double span     = high_axis - low_axis;
   const double interval = span / OBJECT_SPLIT_BIN_COUNT;
@@ -224,38 +199,27 @@ static double construct_bins(
     memcpy(bins + i, bins, i * sizeof(Bin));
   }
 
-  switch (axis) {
-    case LIGHT_TREE_SWEEP_AXIS_X:
-      _construct_bins_kernel(0);
-      break;
-    case LIGHT_TREE_SWEEP_AXIS_Y:
-      _construct_bins_kernel(1);
-      break;
-    case LIGHT_TREE_SWEEP_AXIS_Z:
-    default:
-      _construct_bins_kernel(2);
-      break;
-  }
+  _light_tree_construct_bins_kernel(fragments, fragments_count, bins, low_axis, interval, axis);
 
   return interval;
 }
 
-static void divide_middles_along_axis(
-  const double split, const LightTreeSweepAxis axis, Fragment* fragments, const uint32_t fragments_count) {
+static void _light_tree_divide_middles_along_axis(
+  const double split, const LightTreeSweepAxis axis, LightTreeFragment* fragments, const uint32_t fragments_count) {
   uint32_t left  = 0;
   uint32_t right = 0;
 
   while (left + right < fragments_count) {
-    const Fragment frag = fragments[left];
+    const LightTreeFragment frag = fragments[left];
 
     const double middle = get_entry_by_axis(frag.middle, axis);
 
     if (middle > split) {
       const uint32_t swap_index = fragments_count - 1 - right;
 
-      Fragment temp         = fragments[swap_index];
-      fragments[swap_index] = frag;
-      fragments[left]       = temp;
+      LightTreeFragment temp = fragments[swap_index];
+      fragments[swap_index]  = frag;
+      fragments[left]        = temp;
 
       right++;
     }
@@ -265,152 +229,11 @@ static void divide_middles_along_axis(
   }
 }
 
-static LuminaryResult _light_tree_create_fragments(const Mesh* mesh, LightTreeWork* work) {
-  __CHECK_NULL_ARGUMENT(mesh);
-  __CHECK_NULL_ARGUMENT(work);
-
-  work->fragments_count = mesh->data.triangle_count;
-
-  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * work->fragments_count));
-
-  work->total_normalized_power = 0.0f;
-
-  // TODO: Add some code that during bottom level tree construction removes any triangle lights that don't have any emission, i.e., textured
-  // lights with zero normalized emission.
-  for (uint32_t tri_id = 0; tri_id < work->fragments_count; tri_id++) {
-    TriangleLight t = mesh->light_data->lights[tri_id];
-
-    vec3_p high = {
-      .x = max(t.vertex.x, max(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
-      .y = max(t.vertex.y, max(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
-      .z = max(t.vertex.z, max(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
-    vec3_p low = {
-      .x = min(t.vertex.x, min(t.vertex.x + t.edge1.x, t.vertex.x + t.edge2.x)),
-      .y = min(t.vertex.y, min(t.vertex.y + t.edge1.y, t.vertex.y + t.edge2.y)),
-      .z = min(t.vertex.z, min(t.vertex.z + t.edge1.z, t.vertex.z + t.edge2.z))};
-
-    vec3_p middle = {.x = (high.x + low.x) * 0.5f, .y = (high.y + low.y) * 0.5f, .z = (high.z + low.z) * 0.5f};
-
-    // Fragments are supposed to be hulls that contain a triangle
-    // They should be as tight as possible but if they are too tight then numerical errors
-    // could result in broken BVHs
-    high.x += fabsf(high.x) * FRAGMENT_ERROR_COMP;
-    high.y += fabsf(high.y) * FRAGMENT_ERROR_COMP;
-    high.z += fabsf(high.z) * FRAGMENT_ERROR_COMP;
-    low.x -= fabsf(low.x) * FRAGMENT_ERROR_COMP;
-    low.y -= fabsf(low.y) * FRAGMENT_ERROR_COMP;
-    low.z -= fabsf(low.z) * FRAGMENT_ERROR_COMP;
-
-    vec3 cross = {
-      .x = t.edge1.y * t.edge2.z - t.edge1.z * t.edge2.y,
-      .y = t.edge1.z * t.edge2.x - t.edge1.x * t.edge2.z,
-      .z = t.edge1.x * t.edge2.y - t.edge1.y * t.edge2.x};
-
-    const float area = 0.5f * sqrtf(cross.x * cross.x + cross.y * cross.y + cross.z * cross.z);
-
-    const float emission = (mesh->has_textured_emission) ? meshlet->normalized_emission[tri_id] : 1.0f;
-
-    work->total_normalized_power += emission * area;
-
-    Fragment frag           = {.high = high, .low = low, .middle = middle, .id = tri_id, .power = emission * area};
-    work->fragments[tri_id] = frag;
-  }
-
-  vec3_p total_bounds_high = {.x = -FLT_MAX, .y = -FLT_MAX, .z = -FLT_MAX, ._p = 0.0f};
-  vec3_p total_bounds_low  = {.x = FLT_MAX, .y = FLT_MAX, .z = FLT_MAX, ._p = 0.0f};
-  fit_bounds(work->fragments, work->fragments_count, &total_bounds_high, &total_bounds_low);
-
-  work->bounding_sphere_center.x = (total_bounds_high.x + total_bounds_low.x) * 0.5f;
-  work->bounding_sphere_center.y = (total_bounds_high.y + total_bounds_low.y) * 0.5f;
-  work->bounding_sphere_center.z = (total_bounds_high.z + total_bounds_low.z) * 0.5f;
-
-  work->bounding_sphere_size = 0.0f;
-  work->bounding_sphere_size = fmaxf(work->bounding_sphere_size, (total_bounds_high.x - total_bounds_low.x) * 0.5f);
-  work->bounding_sphere_size = fmaxf(work->bounding_sphere_size, (total_bounds_high.y - total_bounds_low.y) * 0.5f);
-  work->bounding_sphere_size = fmaxf(work->bounding_sphere_size, (total_bounds_high.z - total_bounds_low.z) * 0.5f);
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _light_tree_create_fragments_top_level(
-  ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials, LightTreeWork* work) {
-  __CHECK_NULL_ARGUMENT(instances);
-  __CHECK_NULL_ARGUMENT(meshes);
-  __CHECK_NULL_ARGUMENT(materials);
-  __CHECK_NULL_ARGUMENT(work);
-
-  uint32_t instance_count;
-  __FAILURE_HANDLE(array_get_num_elements(instances, &instance_count));
-
-  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * instance_count));
-
-  ARRAY Fragment* fragments;
-  __FAILURE_HANDLE(array_create(&fragments, sizeof(Fragment), 16));
-
-  uint32_t num_fragments = 0;
-  for (uint32_t instance_id = 0; instance_id < instance_count; instance_id++) {
-    const MeshInstance* instance = instances[instance_id];
-
-    const Mesh* mesh = meshes[instance->mesh_id];
-
-    uint32_t meshlet_count;
-    __FAILURE_HANDLE(array_get_num_elements(mesh->meshlets, &meshlet_count));
-
-    for (uint32_t meshlet_id = 0; meshlet_id < meshlet_count; meshlet_id++) {
-      const Meshlet meshlet = mesh->meshlets[meshlet_id];
-
-      if (meshlet.light_data->light_tree->normalized_power == 0.0f)
-        continue;
-
-      const Material* material = materials[meshlet.material_id];
-
-      if (!material->flags.emission_active)
-        continue;
-
-      const float max_emission = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b));
-
-      if (max_emission == 0.0f)
-        continue;
-
-      vec3 center  = meshlet.light_data->light_tree->bounding_sphere_center;
-      float radius = meshlet.light_data->light_tree->bounding_sphere_size;
-
-      center.x += instance->offset.x;
-      center.y += instance->offset.y;
-      center.z += instance->offset.z;
-      radius *= fmaxf(instance->scale.x, fmaxf(instance->scale.y, instance->scale.z));
-
-      const vec3_p high = {.x = center.x + radius, .y = center.y + radius, .z = center.z + radius, ._p = 0.0f};
-      const vec3_p low  = {.x = center.x - radius, .y = center.y - radius, .z = center.z - radius, ._p = 0.0f};
-
-      const vec3_p middle = {.x = center.x, .y = center.y, .z = center.z, ._p = 0.0f};
-
-      const Fragment frag = {
-        .high   = high,
-        .low    = low,
-        .middle = middle,
-        .id     = num_fragments++,
-        .power  = meshlet.light_data->light_tree->normalized_power * max_emission};
-
-      __FAILURE_HANDLE(array_push(&fragments, &frag));
-    }
-  }
-
-  work->fragments_count = num_fragments;
-
-  // TODO: This is wasteful, can I improve this?
-  __FAILURE_HANDLE(host_malloc(&work->fragments, sizeof(Fragment) * work->fragments_count));
-
-  memcpy(work->fragments, fragments, sizeof(Fragment) * work->fragments_count);
-
-  return LUMINARY_SUCCESS;
-}
-
 static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
 
-  Fragment* fragments      = work->fragments;
-  uint32_t fragments_count = work->fragments_count;
+  LightTreeFragment* fragments = work->fragments;
+  uint32_t fragments_count     = work->fragments_count;
 
   ARRAY LightTreeBinaryNode* nodes;
   __FAILURE_HANDLE(array_create(&nodes, sizeof(LightTreeBinaryNode), 1 + fragments_count));
@@ -448,30 +271,26 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       }
 
       // Compute surface area of current node.
-      double parent_surface_area;
-      float max_axis_interval = 0.0f;
-      {
-        vec3_p high_parent, low_parent;
-        fit_bounds(fragments + fragments_ptr, fragments_count, &high_parent, &low_parent);
-        const vec3 diff = {.x = high_parent.x - low_parent.x, .y = high_parent.y - low_parent.y, .z = high_parent.z - low_parent.z};
+      Vec128 high_parent, low_parent;
+      _light_tree_fit_bounds(fragments + fragments_ptr, fragments_count, &high_parent, &low_parent);
 
-        max_axis_interval = fmaxf(diff.x, fmaxf(diff.y, diff.z));
+      const Vec128 diff               = vec128_set_w_to_0(vec128_sub(high_parent, low_parent));
+      const float max_axis_interval   = vec128_hmax(diff);
+      const float parent_surface_area = vec128_box_area(diff);
 
-        parent_surface_area = (double) diff.x * (double) diff.y + (double) diff.x * (double) diff.z + (double) diff.y * (double) diff.z;
-      }
-
-      vec3_p high, low;
+      Vec128 high, low;
       double optimal_cost = DBL_MAX;
       LightTreeSweepAxis axis;
       double optimal_splitting_plane;
-      int found_split = 0;
+      bool found_split = false;
       uint32_t optimal_split;
       float optimal_left_energy, optimal_right_energy;
 
       // For each axis, perform a greedy search for an optimal split.
-      for (int a = 0; a < 3; a++) {
+      for (uint32_t a = 0; a < 3; a++) {
         double low_split;
-        const double interval = construct_bins(bins, fragments + fragments_ptr, fragments_count, (LightTreeSweepAxis) a, &low_split);
+        const double interval =
+          _light_tree_construct_bins(bins, fragments + fragments_ptr, fragments_count, (LightTreeSweepAxis) a, &low_split);
 
         if (interval == 0.0)
           continue;
@@ -483,33 +302,27 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
         float left_energy  = 0.0f;
         float right_energy = 0.0f;
 
-        for (int k = 0; k < OBJECT_SPLIT_BIN_COUNT; k++) {
+        for (uint32_t k = 0; k < OBJECT_SPLIT_BIN_COUNT; k++) {
           right_energy += bins[k].energy;
         }
 
-        vec3_p high_left  = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE, ._p = -MAX_VALUE};
-        vec3_p high_right = {.x = -MAX_VALUE, .y = -MAX_VALUE, .z = -MAX_VALUE, ._p = -MAX_VALUE};
-        vec3_p low_left   = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE, ._p = MAX_VALUE};
-        vec3_p low_right  = {.x = MAX_VALUE, .y = MAX_VALUE, .z = MAX_VALUE, ._p = MAX_VALUE};
+        Vec128 high_left  = vec128_set_1(-MAX_VALUE);
+        Vec128 high_right = vec128_set_1(-MAX_VALUE);
+        Vec128 low_left   = vec128_set_1(MAX_VALUE);
+        Vec128 low_right  = vec128_set_1(MAX_VALUE);
 
-        for (int k = 1; k < OBJECT_SPLIT_BIN_COUNT; k++) {
-          update_bounds_of_bins(bins + k - 1, &high_left, &low_left);
-          fit_bounds_of_bins(bins + k, OBJECT_SPLIT_BIN_COUNT - k, &high_right, &low_right);
+        for (uint32_t k = 1; k < OBJECT_SPLIT_BIN_COUNT; k++) {
+          _light_tree_update_bounds_of_bins(bins + k - 1, high_left, low_left);
+          _light_tree_fit_bounds_of_bins(bins + k, OBJECT_SPLIT_BIN_COUNT - k, &high_right, &low_right);
 
           left_energy += bins[k - 1].energy;
           right_energy -= bins[k - 1].energy;
 
-          vec3_p diff_left = {
-            .x = high_left.x - low_left.x, .y = high_left.y - low_left.y, .z = high_left.z - low_left.z, ._p = high_left._p - low_left._p};
+          const Vec128 diff_left  = vec128_sub(high_left, low_left);
+          const Vec128 diff_right = vec128_sub(high_right, low_right);
 
-          vec3_p diff_right = {
-            .x  = high_right.x - low_right.x,
-            .y  = high_right.y - low_right.y,
-            .z  = high_right.z - low_right.z,
-            ._p = high_right._p - low_right._p};
-
-          const double left_area  = diff_left.x * diff_left.y + diff_left.x * diff_left.z + diff_left.y * diff_left.z;
-          const double right_area = diff_right.x * diff_right.y + diff_right.x * diff_right.z + diff_right.y * diff_right.z;
+          const float left_area  = vec128_box_area(vec128_set_w_to_0(diff_left));
+          const float right_area = vec128_box_area(vec128_set_w_to_0(diff_right));
 
           left += bins[k - 1].entry;
 
@@ -522,7 +335,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
             optimal_cost            = total_cost;
             optimal_split           = left;
             optimal_splitting_plane = low_split + k * interval;
-            found_split             = 1;
+            found_split             = true;
             axis                    = a;
             optimal_left_energy     = left_energy;
             optimal_right_energy    = right_energy;
@@ -531,7 +344,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       }
 
       if (found_split) {
-        divide_middles_along_axis(optimal_splitting_plane, axis, fragments + fragments_ptr, fragments_count);
+        _light_tree_divide_middles_along_axis(optimal_splitting_plane, axis, fragments + fragments_ptr, fragments_count);
       }
       else {
         // We didn't find a split but we have too many triangles so we need to do a simply list split.
@@ -554,7 +367,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
       node.left_energy  = optimal_left_energy;
       node.right_energy = optimal_right_energy;
 
-      fit_bounds(fragments + fragments_ptr, optimal_split, &high, &low);
+      _light_tree_fit_bounds(fragments + fragments_ptr, optimal_split, &high, &low);
 
       node.left_high.x = high.x;
       node.left_high.y = high.y;
@@ -582,7 +395,7 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 
       __FAILURE_HANDLE(array_push(&nodes, &node_left));
 
-      fit_bounds(fragments + fragments_ptr + optimal_split, node.triangle_count - optimal_split, &high, &low);
+      _light_tree_fit_bounds(fragments + fragments_ptr + optimal_split, node.triangle_count - optimal_split, &high, &low);
 
       node.right_high.x = high.x;
       node.right_high.y = high.y;
@@ -631,7 +444,7 @@ static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryN
 
   vec3 p = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
   for (uint32_t i = 0; i < node.triangle_count; i++) {
-    Fragment frag = work->fragments[node.triangles_address + i];
+    const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
     const float weight = frag.power * inverse_total_energy;
 
@@ -642,7 +455,7 @@ static void _lights_get_ref_point_and_dist(LightTreeWork* work, LightTreeBinaryN
 
   float weighted_dist = 0.0f;
   for (uint32_t i = 0; i < node.triangle_count; i++) {
-    Fragment frag = work->fragments[node.triangles_address + i];
+    const LightTreeFragment frag = work->fragments[node.triangles_address + i];
 
     const vec3 diff = {.x = frag.middle.x - p.x, .y = frag.middle.y - p.y, .z = frag.middle.z - p.z};
 
@@ -759,7 +572,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
       uint32_t child_leaf_light_ptr[8];
       uint32_t child_leaf_light_count[8];
 
-      for (int i = 0; i < 8; i++) {
+      for (uint32_t i = 0; i < 8; i++) {
         child_binary_index[i]     = 0xFFFFFFFF;
         child_leaf_light_ptr[i]   = 0xFFFFFFFF;
         child_leaf_light_count[i] = 0;
@@ -1041,10 +854,10 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
     }
   }
 
-  Fragment* fragments_swap;
-  __FAILURE_HANDLE(host_malloc(&fragments_swap, sizeof(Fragment) * fragments_count));
+  LightTreeFragment* fragments_swap;
+  __FAILURE_HANDLE(host_malloc(&fragments_swap, sizeof(LightTreeFragment) * fragments_count));
 
-  memcpy(fragments_swap, work->fragments, sizeof(Fragment) * fragments_count);
+  memcpy(fragments_swap, work->fragments, sizeof(LightTreeFragment) * fragments_count);
 
   __FAILURE_HANDLE(host_malloc(&work->paths, sizeof(uint2) * fragments_count));
 
@@ -1077,8 +890,8 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _light_tree_finalize(Meshlet* meshlet, LightTreeWork* work) {
-  __CHECK_NULL_ARGUMENT(meshlet);
+static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work) {
+  __CHECK_NULL_ARGUMENT(tree);
   __CHECK_NULL_ARGUMENT(work);
 
   ////////////////////////////////////////////////////////////////////
@@ -1095,7 +908,7 @@ static LuminaryResult _light_tree_finalize(Meshlet* meshlet, LightTreeWork* work
   __FAILURE_HANDLE(host_malloc(&reordered_index_buffer, sizeof(uint32_t) * 3 * work->fragments_count));
 
   for (uint32_t id = 0; id < work->fragments_count; id++) {
-    Fragment frag = work->fragments[id];
+    LightTreeFragment frag = work->fragments[id];
 
     reordered_triangles[id] = meshlet->triangles[frag.id];
     reordered_lights[id]    = meshlet->light_data->lights[frag.id];
@@ -1293,46 +1106,6 @@ static void _light_tree_debug_output(LightTreeWork* work) {
   fclose(mtl_file);
 }
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
-
-static LuminaryResult _light_tree_build(Meshlet* meshlet) {
-  LightTreeWork work;
-  memset(&work, 0, sizeof(LightTreeWork));
-
-  __FAILURE_HANDLE(_light_tree_create_fragments(meshlet, &work));
-  __FAILURE_HANDLE(_light_tree_build_binary_bvh(&work));
-  __FAILURE_HANDLE(_light_tree_build_traversal_structure(&work));
-  __FAILURE_HANDLE(_light_tree_collapse(&work));
-  __FAILURE_HANDLE(_light_tree_finalize(meshlet, &work));
-#ifdef LIGHT_TREE_DEBUG_OUTPUT
-  _light_tree_debug_output(&work);
-#endif /* LIGHT_TREE_DEBUG_OUTPUT */
-  _light_tree_clear_work(&work);
-
-  return LUMINARY_SUCCESS;
-}
-
-static LuminaryResult _light_tree_build_top_level(
-  LightTree** tree, ARRAY const MeshInstance** instances, ARRAY const Mesh** meshes, ARRAY const Material** materials) {
-  __CHECK_NULL_ARGUMENT(tree);
-  __CHECK_NULL_ARGUMENT(instances);
-  __CHECK_NULL_ARGUMENT(meshes);
-  __CHECK_NULL_ARGUMENT(materials);
-
-  LightTreeWork work;
-  memset(&work, 0, sizeof(LightTreeWork));
-
-  __FAILURE_HANDLE(_light_tree_create_fragments_top_level(instances, meshes, materials, &work));
-  __FAILURE_HANDLE(_light_tree_build_binary_bvh(&work));
-  __FAILURE_HANDLE(_light_tree_build_traversal_structure(&work));
-  __FAILURE_HANDLE(_light_tree_collapse(&work));
-  __FAILURE_HANDLE(_light_tree_finalize_top_level(tree, &work));
-#ifdef LIGHT_TREE_DEBUG_OUTPUT
-  _light_tree_debug_output(&work);
-#endif /* LIGHT_TREE_DEBUG_OUTPUT */
-  _light_tree_clear_work(&work);
-
-  return LUMINARY_SUCCESS;
-}
 
 static float _uint16_t_to_float(const uint16_t v) {
   const uint32_t i = 0x3F800000u | (((uint32_t) v) << 7);
@@ -1660,7 +1433,7 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
     if (triangle->constant_emission_intensity == 0.0f)
       continue;
 
-    const float area = 0.5f * sqrtf(vec128_hsum(triangle->cross_product));
+    const float area = 0.5f * vec128_norm2(triangle->cross_product);
 
     const Vec128 vertex1 = vec128_add(triangle->vertex, triangle->edge1);
     const Vec128 vertex2 = vec128_add(triangle->vertex, triangle->edge2);
@@ -1765,6 +1538,10 @@ LuminaryResult light_tree_build(LightTree* tree) {
   memset(&work, 0, sizeof(LightTreeWork));
 
   __FAILURE_HANDLE(_light_tree_collect_fragments(tree, &work));
+  __FAILURE_HANDLE(_light_tree_build_binary_bvh(&work));
+  __FAILURE_HANDLE(_light_tree_build_traversal_structure(&work));
+  __FAILURE_HANDLE(_light_tree_collapse(&work));
+  __FAILURE_HANDLE(_light_tree_finalize(tree, &work));
 #ifdef LIGHT_TREE_DEBUG_OUTPUT
   _light_tree_debug_output(&work);
 #endif /* LIGHT_TREE_DEBUG_OUTPUT */
