@@ -3,6 +3,7 @@
 
 #include "device_memory.h"
 #include "device_utils.h"
+#include "hashmap.h"
 #include "host_intrinsics.h"
 #include "mesh.h"
 
@@ -18,20 +19,19 @@ struct LightTreeFragment {
 LUM_STATIC_SIZE_ASSERT(LightTreeFragment, 0x40);
 
 struct LightTreeCacheTriangle {
-  uint64_t emission_texture_hash;
-  bool has_textured_emission;
-  float constant_emission_intensity;
-  Vec128 cross_product;
+  uint32_t tri_id;
   Vec128 vertex;
-  Vec128 edge1;
-  Vec128 edge2;
+  Vec128 vertex1;
+  Vec128 vertex2;
+  Vec128 cross;
 } typedef LightTreeCacheTriangle;
 
 struct LightTreeCacheMesh {
+  bool is_dirty;
   uint32_t instance_count;
   bool has_emission;
-  ARRAY LightTreeCacheTriangle* triangles;
-  bool is_dirty;
+  ARRAY uint16_t* materials;
+  ARRAY LightTreeCacheTriangle* ARRAY* triangles;
 } typedef LightTreeCacheMesh;
 
 struct LightTreeCacheInstance {
@@ -44,10 +44,19 @@ struct LightTreeCacheInstance {
   ARRAY LightTreeFragment* fragments; /* Computed during build step */
 } typedef LightTreeCacheInstance;
 
+struct LightTreeCacheMaterial {
+  bool is_dirty;
+  bool has_emission;
+  uint64_t emission_texture_hash;
+  bool has_textured_emission;
+  float constant_emission_intensity;
+} typedef LightTreeCacheMaterial;
+
 struct LightTreeCache {
   bool is_dirty;
   ARRAY LightTreeCacheMesh* meshes;
   ARRAY LightTreeCacheInstance* instances;
+  ARRAY LightTreeCacheMaterial* materials;
 } typedef LightTreeCache;
 
 struct LightTree {
@@ -57,10 +66,9 @@ struct LightTree {
   size_t nodes_size;
   void* paths_data;
   size_t paths_size;
-  void* light_instance_map_data;
-  size_t light_instance_map_size;
-  float bounding_sphere_size;
-  vec3 bounding_sphere_center;
+  void* tri_handle_map_data;
+  size_t tri_handle_map_size;
+  HashMap* hash_map;
 } typedef LightTree;
 
 struct Device typedef Device;
@@ -70,10 +78,9 @@ LuminaryResult light_tree_create(LightTree** tree);
 /*
  * This requires that all meshes, materials and textures are already synced with the device.
  */
-DEVICE_CTX_FUNC LuminaryResult
-  light_tree_update_cache_mesh(LightTree* tree, Device* device, const Mesh* mesh, const ARRAY Material* materials);
-
+LuminaryResult light_tree_update_cache_mesh(LightTree* tree, const Mesh* mesh);
 LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInstance* instance);
+LuminaryResult light_tree_update_cache_material(LightTree* tree, const Material* material);
 
 LuminaryResult light_tree_build(LightTree* tree);
 

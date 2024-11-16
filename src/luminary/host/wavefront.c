@@ -785,6 +785,7 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];
 
     Material mat;
+    mat.id                         = material_count + mat_id;
     mat.albedo.r                   = wavefront_mat.diffuse_reflectivity.r;
     mat.albedo.g                   = wavefront_mat.diffuse_reflectivity.g;
     mat.albedo.b                   = wavefront_mat.diffuse_reflectivity.b;

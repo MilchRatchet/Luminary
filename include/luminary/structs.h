@@ -291,6 +291,7 @@ LUMINARY_API struct LuminaryMaterialFlags {
 } typedef LuminaryMaterialFlags;
 
 LUMINARY_API struct LuminaryMaterial {
+  uint32_t id;
   LuminaryRGBAF albedo;
   LuminaryRGBF emission;
   float metallic;
