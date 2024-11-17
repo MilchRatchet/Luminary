@@ -164,7 +164,7 @@ struct DeviceTask {
 } typedef DeviceTask;
 LUM_STATIC_SIZE_ASSERT(DeviceTask, 0x20);
 
-struct LightTreeNode8Packed {
+struct DeviceLightTreeNode {
   vec3 base_point;
   int8_t exp_x;
   int8_t exp_y;
@@ -177,8 +177,10 @@ struct LightTreeNode8Packed {
   uint32_t rel_point_z[2];
   uint32_t rel_energy[2];
   uint32_t confidence_light[2];
-} typedef LightTreeNode8Packed;
-LUM_STATIC_SIZE_ASSERT(LightTreeNode8Packed, 0x40);
+} typedef DeviceLightTreeNode;
+LUM_STATIC_SIZE_ASSERT(DeviceLightTreeNode, 0x40);
+
+typedef DeviceLightTreeNode LightTreeNode8Packed;
 
 ////////////////////////////////////////////////////////////////////
 // Globals
@@ -216,30 +218,31 @@ struct DevicePointers {
   DEVICE INTERLEAVED_STORAGE const DeviceTriangle** triangles;
   DEVICE const DeviceTransform* instance_transforms;
   DEVICE const uint32_t* light_instance_map;
-  DEVICE const LightTreeNode8Packed** bottom_level_light_trees;
-  DEVICE const uint2** bottom_level_light_paths;
-  DEVICE const LightTreeNode8Packed* top_level_light_tree;
-  DEVICE const uint2* top_level_light_paths;
+  DEVICE const LightTreeNode8Packed* light_tree_nodes;
+  DEVICE const uint2* light_tree_paths;
+  DEVICE const TriangleHandle* light_tree_tri_handle_map;
+  DEVICE const uint32_t* light_tree_hash_map;
   DEVICE const Quad* particle_quads;
   DEVICE const Star* stars;
   DEVICE const uint32_t* stars_offsets;
 } typedef DevicePointers;
 
 enum DeviceConstantMemoryMember {
-  DEVICE_CONSTANT_MEMORY_MEMBER_PTRS      = 0,
-  DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS  = 1,
-  DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA    = 2,
-  DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN     = 3,
-  DEVICE_CONSTANT_MEMORY_MEMBER_SKY       = 4,
-  DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD     = 5,
-  DEVICE_CONSTANT_MEMORY_MEMBER_FOG       = 6,
-  DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES = 7,
-  DEVICE_CONSTANT_MEMORY_MEMBER_TOY       = 8,
-  DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META = 9,
-  DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH = 10,
-  DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT = 11,
-  DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX  = 12,
-  DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC   = 13,
+  DEVICE_CONSTANT_MEMORY_MEMBER_PTRS            = 0,
+  DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS        = 1,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA          = 2,
+  DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN           = 3,
+  DEVICE_CONSTANT_MEMORY_MEMBER_SKY             = 4,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD           = 5,
+  DEVICE_CONSTANT_MEMORY_MEMBER_FOG             = 6,
+  DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES       = 7,
+  DEVICE_CONSTANT_MEMORY_MEMBER_TOY             = 8,
+  DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META       = 9,
+  DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH       = 10,
+  DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT       = 11,
+  DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX        = 12,
+  DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META = 13,
+  DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC         = 14,
 
   DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 } typedef DeviceConstantMemoryMember;
@@ -276,6 +279,8 @@ struct DeviceConstantMemory {
   // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   DeviceTextureObject moon_albedo_tex;
   DeviceTextureObject moon_normal_tex;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
+  uint32_t light_tree_hash_map_mask;
   // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
   uint16_t user_selected_x;
   uint16_t user_selected_y;

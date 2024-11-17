@@ -76,6 +76,8 @@ LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshIns
 LuminaryResult device_add_textures(Device* device, const Texture** textures, uint32_t num_textures);
 LuminaryResult device_apply_material_updates(
   Device* device, const ARRAY MaterialUpdate* updates, const ARRAY DeviceMaterialCompressed* materials);
+LuminaryResult device_build_light_tree(Device* device, LightTree* tree);
+LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

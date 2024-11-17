@@ -1214,16 +1214,16 @@ static LuminaryResult _light_tree_update_cache_instance(
   __CHECK_NULL_ARGUMENT(cache);
   __CHECK_NULL_ARGUMENT(instance);
 
-  bool instance_is_dirty = false;
+  bool instance_is_dirty          = false;
+  bool previous_mesh_has_emission = false;
 
   if (cache->active != instance->active) {
     cache->active     = instance->active;
     instance_is_dirty = true;
-
+  }
+  else if (!cache->active) {
     // Skip further processing if this instance is inactive.
-    if (!cache->active) {
-      return LUMINARY_SUCCESS;
-    }
+    return LUMINARY_SUCCESS;
   }
 
   if (cache->mesh_id != instance->mesh_id) {
@@ -1237,6 +1237,10 @@ static LuminaryResult _light_tree_update_cache_instance(
       }
 
       cache_meshes[cache->mesh_id].instance_count--;
+
+      if (cache_meshes[cache->mesh_id].has_emission) {
+        previous_mesh_has_emission = true;
+      }
     }
 
     cache_meshes[instance->mesh_id].instance_count++;
@@ -1244,6 +1248,8 @@ static LuminaryResult _light_tree_update_cache_instance(
     cache->mesh_id    = instance->mesh_id;
     instance_is_dirty = true;
   }
+
+  const bool current_mesh_has_emission = cache_meshes[cache->mesh_id].has_emission;
 
   if (memcmp(&cache->rotation, &instance->rotation, sizeof(Quaternion))) {
     cache->rotation   = instance->rotation;
@@ -1260,8 +1266,8 @@ static LuminaryResult _light_tree_update_cache_instance(
     instance_is_dirty  = true;
   }
 
-  // Only set the dirty flag if the referenced mesh is present in the light tree.
-  if (instance_is_dirty && cache_meshes[cache->mesh_id].has_emission) {
+  // Only set the dirty flag if the referenced mesh is present or was present in the light tree.
+  if (instance_is_dirty && (current_mesh_has_emission || (current_mesh_has_emission != previous_mesh_has_emission))) {
     cache->is_dirty = true;
   }
 
@@ -1294,7 +1300,7 @@ LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInsta
 }
 
 ////////////////////////////////////////////////////////////////////
-// Instance updating
+// Material updating
 ////////////////////////////////////////////////////////////////////
 
 static LuminaryResult _light_tree_update_cache_material(

@@ -82,7 +82,7 @@ LuminaryResult light_tree_update_cache_mesh(LightTree* tree, const Mesh* mesh);
 LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInstance* instance);
 LuminaryResult light_tree_update_cache_material(LightTree* tree, const Material* material);
 
-LuminaryResult light_tree_build(LightTree* tree);
+DEVICE_CTX_FUNC LuminaryResult light_tree_build(LightTree* tree, Device* device);
 
 LuminaryResult light_tree_destroy(LightTree** tree);
 

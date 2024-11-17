@@ -80,6 +80,13 @@ static LuminaryResult _device_manager_handle_device_material_updates(DeviceManag
     __FAILURE_HANDLE(device_apply_material_updates(device_manager->devices[device_id], material_updates, device_material_updates));
   }
 
+  uint32_t num_material_updates;
+  __FAILURE_HANDLE(array_get_num_elements(material_updates, &num_material_updates));
+
+  for (uint32_t material_update_id = 0; material_update_id < num_material_updates; material_update_id++) {
+    __FAILURE_HANDLE(light_tree_update_cache_material(device_manager->light_tree, &material_updates[material_update_id].material));
+  }
+
   __FAILURE_HANDLE(array_destroy(&material_updates));
   __FAILURE_HANDLE(array_destroy(&device_material_updates));
 
@@ -97,6 +104,13 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_apply_instance_updates(device_manager->devices[device_id], instance_updates));
+  }
+
+  uint32_t num_instance_updates;
+  __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_instance_updates));
+
+  for (uint32_t instance_update_id = 0; instance_update_id < num_instance_updates; instance_update_id++) {
+    __FAILURE_HANDLE(light_tree_update_cache_instance(device_manager->light_tree, &instance_updates[instance_update_id].instance));
   }
 
   __FAILURE_HANDLE(array_destroy(&instance_updates));
@@ -133,16 +147,8 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
     // We will override rendering related data, we need to do this synchronously so the stale
-    // render kernels don't read crap and crash,
+    // render kernels don't read crap and crash.
     update_device_data_asynchronously = false;
-
-    __FAILURE_HANDLE_CRITICAL(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
-
-    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-      Device* device = device_manager->devices[device_id];
-      __FAILURE_HANDLE_CRITICAL(sample_count_get_slice(&device_manager->sample_count, 32, &device->sample_count));
-      // TODO: Signal all devices to restart integration
-    }
   }
 
   uint64_t current_entity = SCENE_ENTITY_GLOBAL_START;
@@ -177,6 +183,26 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     // TODO: Reallocate buffers on all devices
   }
 
+  if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
+    const uint32_t previous_light_tree_build_id = device_manager->light_tree->build_id;
+    __FAILURE_HANDLE(device_build_light_tree(device_manager->devices[device_manager->main_device_index], device_manager->light_tree));
+
+    if (previous_light_tree_build_id != device_manager->light_tree->build_id) {
+      for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+        Device* device = device_manager->devices[device_id];
+        __FAILURE_HANDLE(device_update_light_tree_data(device, device_manager->light_tree));
+      }
+    }
+
+    __FAILURE_HANDLE_CRITICAL(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
+
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+      __FAILURE_HANDLE_CRITICAL(sample_count_get_slice(&device_manager->sample_count, 32, &device->sample_count));
+      // TODO: Signal all devices to restart integration
+    }
+  }
+
   __FAILURE_HANDLE_CRITICAL(scene_apply_changes(device_manager->scene_device));
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
@@ -209,6 +235,7 @@ static LuminaryResult _device_manager_add_meshes(DeviceManager* device_manager, 
 
     for (uint32_t mesh_id = 0; mesh_id < args->num_meshes; mesh_id++) {
       __FAILURE_HANDLE(device_update_mesh(device, args->meshes[mesh_id]));
+      __FAILURE_HANDLE(light_tree_update_cache_mesh(device_manager->light_tree, args->meshes[mesh_id]));
     }
   }
 

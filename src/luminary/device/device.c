@@ -42,6 +42,7 @@ static const size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, optix_bvh),                     // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   offsetof(DeviceConstantMemory, non_instanced_triangle_count),  // DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT
   offsetof(DeviceConstantMemory, moon_albedo_tex),               // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  offsetof(DeviceConstantMemory, light_tree_hash_map_mask),      // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
   offsetof(DeviceConstantMemory, user_selected_x),               // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
   SIZE_MAX                                                       // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
@@ -61,6 +62,7 @@ static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(OptixTraversableHandle) * 4,          // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   sizeof(uint32_t),                            // DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT
   sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  sizeof(uint32_t),                            // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
   sizeof(uint16_t) * 2 + sizeof(uint32_t) * 3  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_sizes, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
@@ -515,10 +517,10 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(triangles);
   __DEVICE_BUFFER_FREE(instance_transforms);
   __DEVICE_BUFFER_FREE(light_instance_map);
-  __DEVICE_BUFFER_FREE(bottom_level_light_trees);
-  __DEVICE_BUFFER_FREE(bottom_level_light_paths);
-  __DEVICE_BUFFER_FREE(top_level_light_tree);
-  __DEVICE_BUFFER_FREE(top_level_light_paths);
+  __DEVICE_BUFFER_FREE(light_tree_nodes);
+  __DEVICE_BUFFER_FREE(light_tree_paths);
+  __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
+  __DEVICE_BUFFER_FREE(light_tree_hash_map);
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
@@ -826,6 +828,53 @@ LuminaryResult device_apply_material_updates(
       device->staging_manager, materials + update_id, (DEVICE void*) device->buffers.materials,
       sizeof(DeviceMaterialCompressed) * material_id, sizeof(DeviceMaterialCompressed)));
   }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_build_light_tree(Device* device, LightTree* tree) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(tree);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(light_tree_build(tree, device));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(tree);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __DEVICE_BUFFER_FREE(light_tree_nodes);
+  __DEVICE_BUFFER_FREE(light_tree_paths);
+  __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
+  __DEVICE_BUFFER_FREE(light_tree_hash_map);
+
+  __DEVICE_BUFFER_ALLOCATE(light_tree_nodes, tree->nodes_size);
+  __DEVICE_BUFFER_ALLOCATE(light_tree_paths, tree->paths_size);
+  __DEVICE_BUFFER_ALLOCATE(light_tree_tri_handle_map, tree->tri_handle_map_size);
+  __DEVICE_BUFFER_ALLOCATE(light_tree_hash_map, sizeof(uint32_t) * tree->hash_map->size);
+
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, tree->nodes_data, (DEVICE void*) device->buffers.light_tree_nodes, 0, tree->nodes_size));
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, tree->paths_data, (DEVICE void*) device->buffers.light_tree_paths, 0, tree->paths_size));
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, tree->tri_handle_map_data, (DEVICE void*) device->buffers.light_tree_tri_handle_map, 0,
+    tree->tri_handle_map_size));
+  __FAILURE_HANDLE(device_staging_manager_register(
+    device->staging_manager, tree->hash_map->data, (DEVICE void*) device->buffers.light_tree_hash_map, 0,
+    sizeof(uint32_t) * tree->hash_map->size));
+
+  DEVICE_UPDATE_CONSTANT_MEMORY(light_tree_hash_map_mask, tree->hash_map->size - 1);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
