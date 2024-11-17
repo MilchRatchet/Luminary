@@ -131,6 +131,13 @@ __device__ uint32_t get_task_address(const uint32_t number) {
 #endif
 }
 
+__device__ bool is_finite(const float a) {
+  const bool is_nan = a != a;
+  const bool is_inf = a < -FLT_MAX || a > FLT_MAX;
+
+  return is_nan || is_inf;
+}
+
 //===========================================================================================
 // Debug utils
 //===========================================================================================
@@ -178,7 +185,7 @@ __device__ bool _utils_debug_nans(const float value, const char* func, const uin
 /* instance_id refers to the light instance id, the actual instance_id is obtain through device.ptrs.light_instance_map. */
 typedef TriangleHandle LightTriangleHandle;
 
-__device__ TriangleHandle triangle_handle_get(const uint32_t instance_id, const uint16_t tri_id) {
+__device__ TriangleHandle triangle_handle_get(const uint32_t instance_id, const uint32_t tri_id) {
   TriangleHandle handle;
 
   handle.instance_id = instance_id;

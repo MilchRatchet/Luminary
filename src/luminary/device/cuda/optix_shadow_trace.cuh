@@ -173,7 +173,11 @@ extern "C" __global__ void __anyhit__optix() {
     optixIgnoreIntersection();
   }
 
-  const uint32_t material_id = load_instance_material_id(handle.instance_id);
+  const uint32_t mesh_id = mesh_id_load(handle.instance_id);
+
+  const uint32_t data = __ldg(
+    (uint32_t*) triangle_get_entry_address(device.ptrs.triangles[mesh_id], 3, 3, handle.tri_id, device.ptrs.triangle_counts[mesh_id]));
+  const uint16_t material_id = data & 0xFFFF;
 
   const bool bsdf_sampling_query        = (target_light.instance_id == HIT_TYPE_LIGHT_BSDF_HINT);
   const bool material_has_ior_shadowing = (device.ptrs.materials[material_id].flags & DEVICE_MATERIAL_FLAG_IOR_SHADOWING) != 0;

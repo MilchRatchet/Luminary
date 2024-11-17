@@ -439,7 +439,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   origin = make_float3(position.x, position.y, position.z);
   ray    = make_float3(bsdf_dir.x, bsdf_dir.y, bsdf_dir.z);
 
-  TriangleHandle bsdf_light_handle = triangle_handle_get(HIT_TYPE_LIGHT_BSDF_HINT, 0);
+  TriangleHandle bsdf_sample_light_key = triangle_handle_get(HIT_TYPE_LIGHT_BSDF_HINT, HIT_TYPE_LIGHT_BSDF_HINT);
 
   const float light_search_dist = (bsdf_sample_is_valid) ? FLT_MAX : -1.0f;
 
@@ -447,7 +447,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 0);
   optixTrace(
     device.optix_bvh_light, origin, ray, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0,
-    bsdf_light_handle.instance_id, bsdf_light_handle.tri_id);
+    bsdf_sample_light_key.instance_id, bsdf_sample_light_key.tri_id);
 
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions
@@ -458,7 +458,7 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   float dist;
   bool is_refraction;
   const TriangleHandle light_handle = ris_sample_light(
-    data, index, light_ray_index, bsdf_light_handle, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
+    data, index, light_ray_index, bsdf_sample_light_key.tri_id, bsdf_dir, bsdf_sample_is_refraction, dir, light_color, dist, is_refraction);
 
   if (color_importance(light_color) == 0.0f || light_handle.instance_id == LIGHT_ID_NONE) {
     light_color = get_color(0.0f, 0.0f, 0.0f);

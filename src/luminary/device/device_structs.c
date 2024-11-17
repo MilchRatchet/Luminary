@@ -357,10 +357,10 @@ static uint32_t _device_vec3_to_uint(const vec3 normal) {
   x += (x >= 0.0) ? t : -t;
   y += (y >= 0.0) ? t : -t;
 
-  const uint32_t x_u16 = (uint16_t) round(x * 0x7FFF);
-  const uint32_t y_u16 = (uint16_t) round(y * 0x7FFF);
+  const uint32_t x_u16 = (uint32_t) ((int16_t) round(x * 0x7FFF));
+  const uint32_t y_u16 = (uint32_t) ((int16_t) round(y * 0x7FFF));
 
-  return (x_u16 << 16) | y_u16;
+  return (y_u16 << 16) | x_u16;
 }
 
 /*
@@ -384,12 +384,29 @@ LuminaryResult device_struct_triangle_convert(const Triangle* triangle, DeviceTr
   device_triangle->edge2  = triangle->edge2;
 
   device_triangle->vertex_normal = _device_vec3_to_uint(triangle->vertex_normal);
-  device_triangle->edge1_normal  = _device_vec3_to_uint(triangle->edge1_normal);
-  device_triangle->edge2_normal  = _device_vec3_to_uint(triangle->edge2_normal);
 
-  device_triangle->vertex_texture = _device_UV_to_uint(triangle->vertex_texture);
-  device_triangle->edge1_texture  = _device_UV_to_uint(triangle->edge1_texture);
-  device_triangle->edge2_texture  = _device_UV_to_uint(triangle->edge2_texture);
+  const vec3 vertex1_normal = (vec3){
+    .x = triangle->vertex_normal.x + triangle->edge1_normal.x,
+    .y = triangle->vertex_normal.y + triangle->edge1_normal.y,
+    .z = triangle->vertex_normal.z + triangle->edge1_normal.z};
+
+  const vec3 vertex2_normal = (vec3){
+    .x = triangle->vertex_normal.x + triangle->edge2_normal.x,
+    .y = triangle->vertex_normal.y + triangle->edge2_normal.y,
+    .z = triangle->vertex_normal.z + triangle->edge2_normal.z};
+
+  device_triangle->vertex1_normal = _device_vec3_to_uint(vertex1_normal);
+  device_triangle->vertex2_normal = _device_vec3_to_uint(vertex2_normal);
+
+  const UV vertex1_texture =
+    (UV){.u = triangle->vertex_texture.u + triangle->edge1_texture.u, .v = triangle->vertex_texture.v + triangle->edge1_texture.v};
+
+  const UV vertex2_texture =
+    (UV){.u = triangle->vertex_texture.u + triangle->edge2_texture.u, .v = triangle->vertex_texture.v + triangle->edge2_texture.v};
+
+  device_triangle->vertex_texture  = _device_UV_to_uint(triangle->vertex_texture);
+  device_triangle->vertex1_texture = _device_UV_to_uint(vertex1_texture);
+  device_triangle->vertex2_texture = _device_UV_to_uint(vertex2_texture);
 
   device_triangle->material_id = triangle->material_id;
   device_triangle->padding     = 0;

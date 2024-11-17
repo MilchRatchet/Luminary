@@ -214,11 +214,11 @@ struct DeviceTriangle {
   vec3 edge1;
   vec3 edge2;
   uint32_t vertex_texture;
-  uint32_t edge1_texture;
-  uint32_t edge2_texture;
+  uint32_t vertex1_texture;
+  uint32_t vertex2_texture;
   uint32_t vertex_normal;
-  uint32_t edge1_normal;
-  uint32_t edge2_normal;
+  uint32_t vertex1_normal;
+  uint32_t vertex2_normal;
   uint16_t material_id;
   uint16_t padding;
 } typedef DeviceTriangle;

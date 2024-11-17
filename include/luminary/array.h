@@ -27,6 +27,8 @@
 #define array_push(array, object) _array_push((void**) array, (void*) object, (const char*) #array, (const char*) __func__, __LINE__)
 #define array_copy(dst, src) _array_copy((void**) dst, (void**) src, (const char*) #dst, (const char*) __func__, __LINE__)
 #define array_append(dst, src) _array_append((void**) dst, (const void*) src, (const char*) #dst, (const char*) __func__, __LINE__)
+#define array_set_num_elements(array, num_elements) \
+  _array_set_num_elements((void**) array, num_elements, (const char*) #array, (const char*) __func__, __LINE__)
 #define array_destroy(array) _array_destroy((void**) array, (const char*) #array, (const char*) __func__, __LINE__)
 
 LUMINARY_API LuminaryResult
@@ -40,6 +42,7 @@ LUMINARY_API LuminaryResult _array_destroy(void** array, const char* buf_name, c
 LUMINARY_API LuminaryResult array_clear(void* array);
 LUMINARY_API LuminaryResult array_get_size(const void* array, size_t* size);
 LUMINARY_API LuminaryResult array_get_num_elements(const void* array, uint32_t* num_elements);
-LUMINARY_API LuminaryResult array_set_num_elements(void** array, uint32_t num_elements);
+LUMINARY_API LuminaryResult
+  _array_set_num_elements(void** array, uint32_t num_elements, const char* buf_name, const char* func, uint32_t line);
 
 #endif /* LUMINARY_API_ARRAY_H */

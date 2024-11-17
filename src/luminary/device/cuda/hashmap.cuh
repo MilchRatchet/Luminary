@@ -1,7 +1,7 @@
 #ifndef CU_LUMINARY_HASHMAP_H
 #define CU_LUMINARY_HASHMAP_H
 
-#include "device_utils.h"
+#include "../device_utils.h"
 
 // The top bit of the key marks if this entry had a collision during construction
 // This is an optimization to fast forward collision free entries (which will be the case most of the time)

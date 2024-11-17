@@ -140,31 +140,31 @@ inline void _light_tree_fit_bounds_of_bins(
     __macro_in_low                = vec128_min(__macro_in_low, __macro_low_bin);            \
   }
 
-#define _light_tree_construct_bins_kernel(                                                                                       \
-  __macro_in_fragments, __macro_in_fragments_count, __macro_in_bins, __macro_in_low_axis, __macro_in_interval, __macro_in_axis_) \
-  {                                                                                                                              \
-    const double __macro_inv_interval = 1.0 / __macro_in_interval;                                                               \
-    for (uint32_t __macro_i = 0; __macro_i < __macro_in_fragments_count; __macro_i++) {                                          \
-      const double __macro_value = vec128_get_1(vec128_load(&(__macro_in_fragments[__macro_i].middle)), __macro_in_axis_);       \
-      int32_t __macro_pos        = ((int32_t) ceil((__macro_value - __macro_in_low_axis) * __macro_inv_interval)) - 1;           \
-      if (__macro_pos < 0)                                                                                                       \
-        __macro_pos = 0;                                                                                                         \
-                                                                                                                                 \
-      __macro_in_bins[__macro_pos].entry++;                                                                                      \
-      __macro_in_bins[__macro_pos].exit++;                                                                                       \
-      __macro_in_bins[__macro_pos].energy += __macro_in_fragments[__macro_i].power;                                              \
-                                                                                                                                 \
-      Vec128 __macro_high_bin        = vec128_load((float*) &(__macro_in_bins[__macro_pos].high));                               \
-      Vec128 __macro_low_bin         = vec128_load((float*) &(__macro_in_bins[__macro_pos].low));                                \
-      const Vec128 __macro_high_frag = vec128_load((float*) &(__macro_in_fragments[__macro_i].high));                            \
-      const Vec128 __macro_low_frag  = vec128_load((float*) &(__macro_in_fragments[__macro_i].low));                             \
-                                                                                                                                 \
-      __macro_high_bin = vec128_max(__macro_high_bin, __macro_high_frag);                                                        \
-      __macro_low_bin  = vec128_min(__macro_low_bin, __macro_low_frag);                                                          \
-                                                                                                                                 \
-      vec128_store((float*) &(__macro_in_bins[__macro_pos].high), __macro_high_bin);                                             \
-      vec128_store((float*) &(__macro_in_bins[__macro_pos].low), __macro_low_bin);                                               \
-    }                                                                                                                            \
+#define _light_tree_construct_bins_kernel(                                                                                                \
+  __macro_in_fragments, __macro_in_fragments_count, __macro_in_bins, __macro_in_low_axis, __macro_in_interval, __macro_in_axis_)          \
+  {                                                                                                                                       \
+    const double __macro_inv_interval = 1.0 / __macro_in_interval;                                                                        \
+    for (uint32_t __macro_i = 0; __macro_i < __macro_in_fragments_count; __macro_i++) {                                                   \
+      const double __macro_value = vec128_get_1(vec128_load((const float*) &(__macro_in_fragments[__macro_i].middle)), __macro_in_axis_); \
+      int32_t __macro_pos        = ((int32_t) ceil((__macro_value - __macro_in_low_axis) * __macro_inv_interval)) - 1;                    \
+      if (__macro_pos < 0)                                                                                                                \
+        __macro_pos = 0;                                                                                                                  \
+                                                                                                                                          \
+      __macro_in_bins[__macro_pos].entry++;                                                                                               \
+      __macro_in_bins[__macro_pos].exit++;                                                                                                \
+      __macro_in_bins[__macro_pos].energy += __macro_in_fragments[__macro_i].power;                                                       \
+                                                                                                                                          \
+      Vec128 __macro_high_bin        = vec128_load((const float*) &(__macro_in_bins[__macro_pos].high));                                  \
+      Vec128 __macro_low_bin         = vec128_load((const float*) &(__macro_in_bins[__macro_pos].low));                                   \
+      const Vec128 __macro_high_frag = vec128_load((const float*) &(__macro_in_fragments[__macro_i].high));                               \
+      const Vec128 __macro_low_frag  = vec128_load((const float*) &(__macro_in_fragments[__macro_i].low));                                \
+                                                                                                                                          \
+      __macro_high_bin = vec128_max(__macro_high_bin, __macro_high_frag);                                                                 \
+      __macro_low_bin  = vec128_min(__macro_low_bin, __macro_low_frag);                                                                   \
+                                                                                                                                          \
+      vec128_store((float*) &(__macro_in_bins[__macro_pos].high), __macro_high_bin);                                                      \
+      vec128_store((float*) &(__macro_in_bins[__macro_pos].low), __macro_low_bin);                                                        \
+    }                                                                                                                                     \
   }
 
 static double _light_tree_construct_bins(
@@ -199,7 +199,18 @@ static double _light_tree_construct_bins(
     memcpy(bins + i, bins, i * sizeof(Bin));
   }
 
-  _light_tree_construct_bins_kernel(fragments, fragments_count, bins, low_axis, interval, axis);
+  // Axis must be a compile time constant here.
+  switch (axis) {
+    case LIGHT_TREE_SWEEP_AXIS_X:
+      _light_tree_construct_bins_kernel(fragments, fragments_count, bins, low_axis, interval, LIGHT_TREE_SWEEP_AXIS_X);
+      break;
+    case LIGHT_TREE_SWEEP_AXIS_Y:
+      _light_tree_construct_bins_kernel(fragments, fragments_count, bins, low_axis, interval, LIGHT_TREE_SWEEP_AXIS_Y);
+      break;
+    case LIGHT_TREE_SWEEP_AXIS_Z:
+      _light_tree_construct_bins_kernel(fragments, fragments_count, bins, low_axis, interval, LIGHT_TREE_SWEEP_AXIS_Z);
+      break;
+  }
 
   return interval;
 }
@@ -212,7 +223,7 @@ static void _light_tree_divide_middles_along_axis(
   while (left + right < fragments_count) {
     const LightTreeFragment frag = fragments[left];
 
-    const double middle = get_entry_by_axis(frag.middle, axis);
+    const double middle = frag.middle.data[axis];
 
     if (middle > split) {
       const uint32_t swap_index = fragments_count - 1 - right;
@@ -932,7 +943,6 @@ static LuminaryResult _light_tree_finalize(LightTree* tree, LightTreeWork* work)
 
   work->nodes8_packed = (LightTreeNode8Packed*) 0;
   work->paths         = (uint2*) 0;
-  tri_handle_map      = (uint2*) 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -1303,14 +1313,13 @@ LuminaryResult light_tree_update_cache_instance(LightTree* tree, const MeshInsta
 // Material updating
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _light_tree_update_cache_material(
-  LightTreeCacheMaterial* cache, const ARRAY LightTreeCacheMesh* meshes, const Material* material, bool* meshes_need_update) {
+static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* cache, const Material* material, bool* meshes_need_update) {
   __CHECK_NULL_ARGUMENT(cache);
   __CHECK_NULL_ARGUMENT(material);
 
   bool has_emission      = false;
   bool material_is_dirty = false;
-  meshes_need_update     = false;
+  *meshes_need_update    = false;
 
   const bool has_textured_emission = material->luminance_tex != TEXTURE_NONE;
   if (cache->has_textured_emission != has_textured_emission) {
@@ -1338,7 +1347,7 @@ static LuminaryResult _light_tree_update_cache_material(
   if (cache->has_emission != has_emission) {
     cache->has_emission = has_emission;
     material_is_dirty   = true;
-    meshes_need_update  = true;
+    *meshes_need_update = true;
   }
 
   if (has_emission && material_is_dirty) {
@@ -1360,8 +1369,7 @@ LuminaryResult light_tree_update_cache_material(LightTree* tree, const Material*
   }
 
   bool meshes_need_update = false;
-  __FAILURE_HANDLE(
-    _light_tree_update_cache_material(tree->cache.materials + material->id, tree->cache.meshes, material, &meshes_need_update));
+  __FAILURE_HANDLE(_light_tree_update_cache_material(tree->cache.materials + material->id, material, &meshes_need_update));
 
   if (meshes_need_update) {
     uint32_t num_meshes;
@@ -1518,7 +1526,7 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult light_tree_build(LightTree* tree) {
+LuminaryResult light_tree_build(LightTree* tree, Device* device) {
   __CHECK_NULL_ARGUMENT(tree);
 
   // Only build if the cache is dirty.

@@ -221,13 +221,22 @@ __device__ UV add_uv(const UV a, const UV b) {
   return uv;
 }
 
-__device__ UV lerp_uv(const UV vertex_texture, const UV edge1_texture, const UV edge2_texture, const float2 coords) {
+__device__ UV lerp_uv(const UV vertex_texture, const UV vertex1_texture, const UV vertex2_texture, const float2 coords) {
   UV result;
 
-  result.u = vertex_texture.u + coords.x * edge1_texture.u + coords.y * edge2_texture.u;
-  result.v = vertex_texture.v + coords.x * edge1_texture.v + coords.y * edge2_texture.v;
+  result.u = vertex_texture.u + coords.x * (vertex1_texture.u - vertex_texture.u) + coords.y * (vertex2_texture.u - vertex_texture.u);
+  result.v = vertex_texture.v + coords.x * (vertex1_texture.v - vertex_texture.v) + coords.y * (vertex2_texture.v - vertex_texture.v);
 
   return result;
+}
+
+__device__ UV uv_sub(const UV a, const UV b) {
+  UV uv;
+
+  uv.u = a.u - b.u;
+  uv.v = a.v - b.v;
+
+  return uv;
 }
 
 __device__ UV uv_unpack(const uint32_t data) {
@@ -237,6 +246,20 @@ __device__ UV uv_unpack(const uint32_t data) {
   uv.v = __uint_as_float(data << 16);
 
   return uv;
+}
+
+// Octahedron decoding, for example: https://www.shadertoy.com/view/clXXD8
+__device__ vec3 normal_unpack(const uint32_t data) {
+  const float x = ((int16_t) (data & 0xFFFF)) * (1.0f / 0x7FFF);
+  const float y = ((int16_t) (data >> 16)) * (1.0f / 0x7FFF);
+
+  vec3 normal   = get_vector(x, y, 1.0f - fabsf(x) - fabsf(y));
+  const float t = __saturatef(-normal.z);
+
+  normal.x += (normal.x >= 0.0f) ? -t : t;
+  normal.y += (normal.y >= 0.0f) ? -t : t;
+
+  return normalize_vector(normal);
 }
 
 /*
@@ -425,11 +448,11 @@ __device__ vec3 transform_vec3(const Mat3x3 m, const vec3 p) {
 ////////////////////////////////////////////////////////////////////
 
 __device__ vec3 transform_apply_absolute(const DeviceTransform trans, const vec3 v) {
-  return add_vector(v, trans.offset);
+  return add_vector(v, trans.translation);
 }
 
 __device__ vec3 transform_apply_absolute_inv(const DeviceTransform trans, const vec3 v) {
-  return sub_vector(v, trans.offset);
+  return sub_vector(v, trans.translation);
 }
 
 __device__ vec3 transform_apply_relative(const DeviceTransform trans, const vec3 v) {
@@ -1144,7 +1167,7 @@ __device__ float light_get_solid_angle(const TriangleLight triangle, const vec3 
 
   float solid_angle = 2.0f * atan2f(num, denom);
 
-  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
+  if (!is_finite(solid_angle) || solid_angle < 1e-7f) {
     solid_angle = 0.0f;
   }
 
@@ -1255,12 +1278,12 @@ __device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
   e2 = normalize_vector(e2);
 
   const float abs1 = __frsqrt_rn(t1.u * t1.u + t1.v * t1.v);
-  if (!isinf(abs1)) {
+  if (is_finite(abs1)) {
     t1.u *= abs1;
     t1.v *= abs1;
   }
   const float abs2 = __frsqrt_rn(t2.u * t2.u + t2.v * t2.v);
-  if (!isinf(abs2)) {
+  if (is_finite(abs2)) {
     t2.u *= abs2;
     t2.v *= abs2;
   }

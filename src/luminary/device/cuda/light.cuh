@@ -3,6 +3,7 @@
 
 #if defined(SHADING_KERNEL)
 
+#include "hashmap.cuh"
 #include "intrinsics.cuh"
 #include "memory.cuh"
 #include "sky_utils.cuh"
@@ -34,11 +35,15 @@ __device__ float light_triangle_intersection_uv(const TriangleLight triangle, co
 
 __device__ TriangleLight
   light_load(const TriangleHandle handle, const vec3 origin, const vec3 ray, const DeviceTransform trans, float& dist) {
-  const DeviceInstancelet instance = load_instance(device.ptrs.instances, handle.instance_id);
+  const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const float4 v0 = __ldg((float4*) triangle_get_entry_address(0, 0, instance.triangles_offset + handle.tri_id));
-  const float4 v1 = __ldg((float4*) triangle_get_entry_address(1, 0, instance.triangles_offset + handle.tri_id));
-  const float4 v2 = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + handle.tri_id));
+  const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
+  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+
+  const float4 v0   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, handle.tri_id, triangle_count));
+  const float4 v1   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, handle.tri_id, triangle_count));
+  const float4 v2   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
+  const uint32_t v3 = __ldg((uint32_t*) triangle_get_entry_address(tri_ptr, 3, 3, handle.tri_id, triangle_count));
 
   TriangleLight triangle;
   triangle.vertex = get_vector(v0.x, v0.y, v0.z);
@@ -49,25 +54,29 @@ __device__ TriangleLight
   triangle.edge1  = transform_apply(trans, triangle.edge1);
   triangle.edge2  = transform_apply(trans, triangle.edge2);
 
-  const UV vertex_texture = uv_unpack(__float_as_uint(v2.y));
-  const UV edge1_texture  = uv_unpack(__float_as_uint(v2.z));
-  const UV edge2_texture  = uv_unpack(__float_as_uint(v2.w));
+  const UV vertex_texture  = uv_unpack(__float_as_uint(v2.y));
+  const UV vertex1_texture = uv_unpack(__float_as_uint(v2.z));
+  const UV vertex2_texture = uv_unpack(__float_as_uint(v2.w));
 
   float2 coords;
   dist = light_triangle_intersection_uv(triangle, origin, ray, coords);
 
-  triangle.tex_coords  = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
-  triangle.material_id = instance.material_id;
+  triangle.tex_coords  = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
+  triangle.material_id = v3 & 0xFFFF;
 
   return triangle;
 }
 
 __device__ TriangleLight light_load_sample_init(const TriangleHandle handle, const DeviceTransform trans, uint3& packed_light_data) {
-  const DeviceInstancelet instance = load_instance(device.ptrs.instances, handle.instance_id);
+  const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-  const float4 v0 = __ldg((float4*) triangle_get_entry_address(0, 0, instance.triangles_offset + handle.tri_id));
-  const float4 v1 = __ldg((float4*) triangle_get_entry_address(1, 0, instance.triangles_offset + handle.tri_id));
-  const float4 v2 = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + handle.tri_id));
+  const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
+  const uint32_t triangle_count = __ldg(device.ptrs.triangle_counts + mesh_id);
+
+  const float4 v0   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 0, 0, handle.tri_id, triangle_count));
+  const float4 v1   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 1, 0, handle.tri_id, triangle_count));
+  const float4 v2   = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
+  const uint32_t v3 = __ldg((uint32_t*) triangle_get_entry_address(tri_ptr, 3, 3, handle.tri_id, triangle_count));
 
   TriangleLight triangle;
   triangle.vertex = get_vector(v0.x, v0.y, v0.z);
@@ -82,7 +91,7 @@ __device__ TriangleLight light_load_sample_init(const TriangleHandle handle, con
   packed_light_data.y = __float_as_uint(v2.z);
   packed_light_data.z = __float_as_uint(v2.w);
 
-  triangle.material_id = instance.material_id;
+  triangle.material_id = v3 & 0xFFFF;
 
   return triangle;
 }
@@ -104,7 +113,7 @@ __device__ void light_load_sample_finalize(
 
   solid_angle = 2.0f * atan2f(G0, G1 + G2);
 
-  if (isnan(solid_angle) || isinf(solid_angle) || solid_angle < 1e-7f) {
+  if (!is_finite(solid_angle) || solid_angle < 1e-7f) {
     solid_angle = 0.0f;
     dist        = 1.0f;
     return;
@@ -124,7 +133,7 @@ __device__ void light_load_sample_finalize(
 
   ray = normalize_vector(add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t)));
 
-  if (isnan(ray.x) || isnan(ray.y) || isnan(ray.z)) {
+  if (!(is_finite(ray.x) && is_finite(ray.y) && is_finite(ray.z))) {
     solid_angle = 0.0f;
     dist        = FLT_MAX;
     return;
@@ -140,10 +149,10 @@ __device__ void light_load_sample_finalize(
     return;
   }
 
-  const UV vertex_texture = uv_unpack(packed_light_data.x);
-  const UV edge1_texture  = uv_unpack(packed_light_data.y);
-  const UV edge2_texture  = uv_unpack(packed_light_data.z);
-  triangle.tex_coords     = lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+  const UV vertex_texture  = uv_unpack(packed_light_data.x);
+  const UV vertex1_texture = uv_unpack(packed_light_data.y);
+  const UV vertex2_texture = uv_unpack(packed_light_data.z);
+  triangle.tex_coords      = lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 }
 
 __device__ RGBF light_get_color(const TriangleLight triangle) {
@@ -218,12 +227,11 @@ __device__ float light_tree_child_importance(
   return angle * energy / fmaxf(get_length(diff), confidence);
 }
 
-__device__ uint32_t light_tree_traverse(
-  const VolumeDescriptor volume, const LightTreeNode8Packed* light_tree_ptr, const vec3 origin, const vec3 ray, const float limit,
-  float& random, float& pdf) {
+__device__ uint32_t
+  light_tree_traverse(const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, float& random, float& pdf) {
   pdf = 1.0f;
 
-  LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
+  DeviceLightTreeNode node = load_light_tree_node(0);
 
   const float transmittance_importance = color_importance(add_color(volume.scattering, volume.absorption));
 
@@ -301,7 +309,7 @@ __device__ uint32_t light_tree_traverse(
       break;
     }
 
-    node = load_light_tree_node(light_tree_ptr, node.child_ptr + selected_child);
+    node = load_light_tree_node(node.child_ptr + selected_child);
   }
 
   return subset_ptr;
@@ -311,21 +319,11 @@ __device__ TriangleHandle light_tree_query(
   const VolumeDescriptor volume, const vec3 origin, const vec3 ray, const float limit, float random, float& pdf, DeviceTransform& trans) {
   pdf = 1.0f;
 
-  const uint32_t light_instance_id = light_tree_traverse(volume, device.ptrs.top_level_light_tree, origin, ray, limit, random, pdf);
+  const uint32_t light_tree_handle_key = light_tree_traverse(volume, origin, ray, limit, random, pdf);
 
-  const uint32_t instance_id = __ldg(device.ptrs.light_instance_map + light_instance_id);
+  const TriangleHandle handle = device.ptrs.light_tree_tri_handle_map[light_tree_handle_key];
 
-  trans = load_transform(instance_id);
-
-  const vec3 origin_transformated = transform_apply_absolute_inv(trans, origin);
-  const vec3 ray_transformed      = transform_apply_relative_inv(trans, ray);
-
-  const uint32_t tri_id = light_tree_traverse(
-    volume, device.ptrs.bottom_level_light_trees[instance_id], origin_transformated, ray_transformed, limit, random, pdf);
-
-  TriangleHandle handle;
-  handle.instance_id = instance_id;
-  handle.tri_id      = tri_id;
+  trans = load_transform(handle.instance_id);
 
   return handle;
 }
@@ -364,8 +362,8 @@ __device__ float light_tree_child_importance(
   return energy / fmaxf(dot_product(diff, diff), confidence * confidence);
 }
 
-__device__ uint32_t light_tree_traverse(const LightTreeNode8Packed* light_tree_ptr, const vec3 position, float& random, float& pdf) {
-  LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
+__device__ uint32_t light_tree_traverse(const vec3 position, float& random, float& pdf) {
+  DeviceLightTreeNode node = load_light_tree_node(0);
 
   uint32_t result_id = 0xFFFFFFFF;
 
@@ -441,22 +439,21 @@ __device__ uint32_t light_tree_traverse(const LightTreeNode8Packed* light_tree_p
       break;
     }
 
-    node = load_light_tree_node(light_tree_ptr, node.child_ptr + selected_child);
+    node = load_light_tree_node(node.child_ptr + selected_child);
   }
 
   return result_id;
 }
 
-__device__ float light_tree_traverse_pdf(
-  const LightTreeNode8Packed* light_tree_ptr, const uint2* light_paths_ptr, const vec3 position, const uint32_t primitive_id) {
+__device__ float light_tree_traverse_pdf(const vec3 position, const uint32_t primitive_id) {
   float pdf = 1.0f;
 
-  const uint2 light_paths = __ldg(light_paths_ptr + primitive_id);
+  const uint2 light_paths = __ldg(device.ptrs.light_tree_paths + primitive_id);
 
   uint32_t current_light_path = light_paths.x;
   uint32_t current_depth      = 0;
 
-  LightTreeNode8Packed node = load_light_tree_node(light_tree_ptr, 0);
+  LightTreeNode8Packed node = load_light_tree_node(0);
 
   while (true) {
     const vec3 exp    = get_vector(exp2f(node.exp_x), exp2f(node.exp_y), exp2f(node.exp_z));
@@ -511,7 +508,7 @@ __device__ float light_tree_traverse_pdf(
       current_light_path = light_paths.y;
     }
 
-    node = load_light_tree_node(light_tree_ptr, node.child_ptr + selected_child);
+    node = load_light_tree_node(node.child_ptr + selected_child);
   }
 
   return pdf;
@@ -520,36 +517,17 @@ __device__ float light_tree_traverse_pdf(
 __device__ TriangleHandle light_tree_query(const GBufferData data, float random, float& pdf, DeviceTransform& trans) {
   pdf = 1.0f;
 
-  const uint32_t light_instance_id = light_tree_traverse(device.ptrs.top_level_light_tree, data.position, random, pdf);
+  const uint32_t light_tree_handle_key = light_tree_traverse(data.position, random, pdf);
 
-  const uint32_t instance_id = __ldg(device.ptrs.light_instance_map + light_instance_id);
+  const TriangleHandle handle = device.ptrs.light_tree_tri_handle_map[light_tree_handle_key];
 
-  trans = load_transform(instance_id);
-
-  const vec3 position_transformated = transform_apply_absolute_inv(trans, data.position);
-
-  const uint32_t tri_id = light_tree_traverse(device.ptrs.bottom_level_light_trees[instance_id], position_transformated, random, pdf);
-
-  TriangleHandle handle;
-  handle.instance_id = instance_id;
-  handle.tri_id      = tri_id;
+  trans = load_transform(handle.instance_id);
 
   return handle;
 }
 
-__device__ float light_tree_query_pdf(
-  const GBufferData data, const LightTriangleHandle handle, const uint32_t instance_id, const DeviceTransform trans) {
-  float pdf = 1.0f;
-
-  pdf *= light_tree_traverse_pdf(device.ptrs.top_level_light_tree, device.ptrs.top_level_light_paths, data.position, handle.instance_id);
-
-  const vec3 position_transformated = transform_apply_absolute_inv(trans, data.position);
-
-  pdf *= light_tree_traverse_pdf(
-    device.ptrs.bottom_level_light_trees[instance_id], device.ptrs.bottom_level_light_paths[instance_id], position_transformated,
-    handle.tri_id);
-
-  return pdf;
+__device__ float light_tree_query_pdf(const GBufferData data, const uint32_t light_tree_handle_key) {
+  return light_tree_traverse_pdf(data.position, light_tree_handle_key);
 }
 
 #endif /* !VOLUME_KERNEL */

@@ -23,7 +23,7 @@
 // High-Performance Graphics - Symposium Papers, pp. 23-41, 2021
 
 __device__ TriangleHandle ris_sample_light(
-  const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const LightTriangleHandle bsdf_sample_handle,
+  const GBufferData data, const ushort2 pixel, const uint32_t light_ray_index, const uint32_t bsdf_sample_light_key,
   const vec3 bsdf_sample_ray, const bool initial_is_refraction, vec3& selected_ray, RGBF& selected_light_color, float& selected_dist,
   bool& selected_is_refraction) {
   TriangleHandle selected_handle = triangle_handle_get(LIGHT_ID_NONE, 0);
@@ -45,12 +45,13 @@ __device__ TriangleHandle ris_sample_light(
   // Initialize reservoir with an initial sample
   ////////////////////////////////////////////////////////////////////
 
-  if (bsdf_sample_handle.instance_id != HIT_TYPE_LIGHT_BSDF_HINT && !triangle_handle_equal(bsdf_sample_handle, blocked_handle)) {
-    TriangleHandle light_handle;
-    light_handle.instance_id = __ldg(device.ptrs.light_instance_map + bsdf_sample_handle.instance_id);
-    light_handle.tri_id      = bsdf_sample_handle.tri_id;
+  TriangleHandle bsdf_sample_handle = blocked_handle;
+  if (bsdf_sample_light_key != HIT_TYPE_LIGHT_BSDF_HINT) {
+    bsdf_sample_handle = device.ptrs.light_tree_tri_handle_map[bsdf_sample_light_key];
+  }
 
-    const DeviceTransform trans = load_transform(light_handle.instance_id);
+  if (!triangle_handle_equal(bsdf_sample_handle, blocked_handle)) {
+    const DeviceTransform trans = load_transform(bsdf_sample_handle.instance_id);
 
     float dist;
     const TriangleLight triangle_light = light_load(bsdf_sample_handle, data.position, bsdf_sample_ray, trans, dist);
@@ -67,7 +68,7 @@ __device__ TriangleHandle ris_sample_light(
 
       const float bsdf_sample_pdf = bsdf_sample_for_light_pdf(data, bsdf_sample_ray);
 
-      const float nee_light_tree_pdf      = light_tree_query_pdf(data, bsdf_sample_handle, light_handle.instance_id, trans);
+      const float nee_light_tree_pdf      = light_tree_query_pdf(data, bsdf_sample_light_key);
       const float one_over_nee_sample_pdf = solid_angle / (nee_light_tree_pdf * reservoir_size);
 
       // MIS weight pre multiplied with inverse of pdf, little trick by using inverse of NEE pdf, this is fine because NEE pdf is never 0.

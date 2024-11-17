@@ -18,9 +18,9 @@ __device__ void* interleaved_buffer_get_entry_address_chunk_8(
   return (void*) (((float*) ptr) + (count * chunk + id) * 2 + offset);
 }
 
-__device__ void* triangle_get_entry_address(const uint32_t chunk, const uint32_t offset, const uint32_t tri_id) {
-  return interleaved_buffer_get_entry_address_chunk_16(
-    (void*) device.ptrs.triangles, device.non_instanced_triangle_count, chunk, offset, tri_id);
+__device__ void* triangle_get_entry_address(
+  const DeviceTriangle* tri_ptr, const uint32_t chunk, const uint32_t offset, const uint32_t tri_id, const uint32_t triangle_count) {
+  return interleaved_buffer_get_entry_address_chunk_16((void*) tri_ptr, triangle_count, chunk, offset, tri_id);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -195,20 +195,21 @@ __device__ TraversalTriangle load_traversal_triangle(const int offset) {
 
 #endif
 
-__device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
-  const DeviceInstancelet instance = load_instance(device.ptrs.instances, handle.instance_id);
-
-  const float4 data = __ldg((float4*) triangle_get_entry_address(2, 0, instance.triangles_offset + handle.tri_id));
-
-  const UV vertex_texture = uv_unpack(__float_as_uint(data.y));
-  const UV edge1_texture  = uv_unpack(__float_as_uint(data.z));
-  const UV edge2_texture  = uv_unpack(__float_as_uint(data.w));
-
-  return lerp_uv(vertex_texture, edge1_texture, edge2_texture, coords);
+__device__ uint32_t mesh_id_load(const uint32_t instance_id) {
+  return __ldg(device.ptrs.instance_mesh_id + instance_id);
 }
 
-__device__ uint32_t load_instance_material_id(const uint32_t instance_id) {
-  return __ldg(&device.ptrs.instances[instance_id].material_id);
+__device__ UV load_triangle_tex_coords(const TriangleHandle handle, const float2 coords) {
+  const uint32_t mesh_id = mesh_id_load(handle.instance_id);
+
+  const float4 data =
+    __ldg((float4*) triangle_get_entry_address(device.ptrs.triangles[mesh_id], 2, 0, handle.tri_id, device.ptrs.triangle_counts[mesh_id]));
+
+  const UV vertex_texture  = uv_unpack(__float_as_uint(data.y));
+  const UV vertex1_texture = uv_unpack(__float_as_uint(data.z));
+  const UV vertex2_texture = uv_unpack(__float_as_uint(data.w));
+
+  return lerp_uv(vertex_texture, vertex1_texture, vertex2_texture, coords);
 }
 
 __device__ Quad load_quad(const Quad* data, const int offset) {
@@ -274,10 +275,10 @@ __device__ DeviceTransform load_transform(const uint32_t offset) {
   const float4 v1   = __ldg(ptr + 1);
 
   DeviceTransform trans;
-  trans.offset.x = v0.x;
-  trans.offset.y = v0.y;
-  trans.offset.z = v0.z;
-  trans.scale.x  = v0.w;
+  trans.translation.x = v0.x;
+  trans.translation.y = v0.y;
+  trans.translation.z = v0.z;
+  trans.scale.x       = v0.w;
 
   trans.scale.y    = v1.x;
   trans.scale.z    = v1.y;
@@ -289,14 +290,14 @@ __device__ DeviceTransform load_transform(const uint32_t offset) {
   return trans;
 }
 
-__device__ LightTreeNode8Packed load_light_tree_node(const LightTreeNode8Packed* data, const int offset) {
-  const float4* ptr = (float4*) (data + offset);
+__device__ DeviceLightTreeNode load_light_tree_node(const uint32_t offset) {
+  const float4* ptr = (float4*) (device.ptrs.light_tree_nodes + offset);
   const float4 v0   = __ldg(ptr + 0);
   const float4 v1   = __ldg(ptr + 1);
   const float4 v2   = __ldg(ptr + 2);
   const float4 v3   = __ldg(ptr + 3);
 
-  LightTreeNode8Packed node;
+  DeviceLightTreeNode node;
 
   node.base_point.x   = v0.x;
   node.base_point.y   = v0.y;

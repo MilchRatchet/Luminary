@@ -216,8 +216,9 @@ struct DevicePointers {
   DEVICE const float* bridge_lut;
   DEVICE const DeviceMaterialCompressed* materials;
   DEVICE INTERLEAVED_STORAGE const DeviceTriangle** triangles;
+  DEVICE const uint32_t* triangle_counts;
   DEVICE const DeviceTransform* instance_transforms;
-  DEVICE const uint32_t* light_instance_map;
+  DEVICE const uint32_t* instance_mesh_id;
   DEVICE const LightTreeNode8Packed* light_tree_nodes;
   DEVICE const uint2* light_tree_paths;
   DEVICE const TriangleHandle* light_tree_tri_handle_map;
@@ -228,21 +229,20 @@ struct DevicePointers {
 } typedef DevicePointers;
 
 enum DeviceConstantMemoryMember {
-  DEVICE_CONSTANT_MEMORY_MEMBER_PTRS            = 0,
-  DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS        = 1,
-  DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA          = 2,
-  DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN           = 3,
-  DEVICE_CONSTANT_MEMORY_MEMBER_SKY             = 4,
-  DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD           = 5,
-  DEVICE_CONSTANT_MEMORY_MEMBER_FOG             = 6,
-  DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES       = 7,
-  DEVICE_CONSTANT_MEMORY_MEMBER_TOY             = 8,
-  DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META       = 9,
-  DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH       = 10,
-  DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT       = 11,
-  DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX        = 12,
-  DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META = 13,
-  DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC         = 14,
+  DEVICE_CONSTANT_MEMORY_MEMBER_PTRS,
+  DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA,
+  DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN,
+  DEVICE_CONSTANT_MEMORY_MEMBER_SKY,
+  DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD,
+  DEVICE_CONSTANT_MEMORY_MEMBER_FOG,
+  DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES,
+  DEVICE_CONSTANT_MEMORY_MEMBER_TOY,
+  DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META,
+  DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH,
+  DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX,
+  DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META,
+  DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC,
 
   DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 } typedef DeviceConstantMemoryMember;
@@ -274,8 +274,6 @@ struct DeviceConstantMemory {
   OptixTraversableHandle optix_bvh_shadow;
   OptixTraversableHandle optix_bvh_light;
   OptixTraversableHandle optix_bvh_particles;
-  // DEVICE_CONSTANT_MEMORY_MEMBER_TRI_COUNT
-  uint32_t non_instanced_triangle_count;
   // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   DeviceTextureObject moon_albedo_tex;
   DeviceTextureObject moon_normal_tex;

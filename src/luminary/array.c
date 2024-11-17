@@ -191,7 +191,7 @@ LuminaryResult array_get_num_elements(const void* array, uint32_t* num_elements)
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult array_set_num_elements(void** array, uint32_t num_elements) {
+LuminaryResult _array_set_num_elements(void** array, uint32_t num_elements, const char* buf_name, const char* func, uint32_t line) {
   __CHECK_NULL_ARGUMENT(array);
 
   ArrayHeader* header = ((ArrayHeader*) *array) - 1;
@@ -201,7 +201,7 @@ LuminaryResult array_set_num_elements(void** array, uint32_t num_elements) {
   }
 
   if (num_elements > header->allocated_num_elements) {
-    __FAILURE_HANDLE(array_resize(array, num_elements));
+    __FAILURE_HANDLE(_array_resize(array, num_elements, buf_name, func, line));
     header = ((ArrayHeader*) *array) - 1;
   }
 

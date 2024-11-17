@@ -1,6 +1,7 @@
 #ifndef LUMINARY_DEVICE_H
 #define LUMINARY_DEVICE_H
 
+#include "device_light.h"
 #include "device_memory.h"
 #include "device_mesh.h"
 #include "device_staging_manager.h"
