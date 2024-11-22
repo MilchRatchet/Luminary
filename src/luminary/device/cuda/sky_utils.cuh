@@ -52,7 +52,7 @@ __device__ RGBF sky_hdri_sample(const vec3 ray, const float mip_bias) {
   const float u = (theta + PI) / (2.0f * PI);
   const float v = 1.0f - ((phi + 0.5f * PI) / PI);
 
-  const float4 hdri = tex2DLod<float4>(device.ptrs.sky_hdri_luts[0].handle, u, v, mip_bias + device.sky.hdri_mip_bias);
+  const float4 hdri = tex2DLod<float4>(device.sky_hdri_color_tex.handle, u, v, mip_bias + device.sky.hdri_mip_bias);
 
   return get_color(hdri.x, hdri.y, hdri.z);
 }
@@ -64,7 +64,7 @@ __device__ float sky_hdri_sample_alpha(const vec3 ray) {
   const float u = (theta + PI) / (2.0f * PI);
   const float v = 1.0f - ((phi + 0.5f * PI) / PI);
 
-  return tex2D<float>(device.ptrs.sky_hdri_luts[1].handle, u, v);
+  return tex2D<float>(device.sky_hdri_shadow_tex.handle, u, v);
 }
 
 // [Hil20]

@@ -196,9 +196,9 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
   build_input.triangleArray.vertexBuffers       = &device_vertex_buffer_ptr;
 
   DEVICE uint32_t* device_index_buffer;
-  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(uint32_t) * 4 * mesh->data.triangle_count));
+  __FAILURE_HANDLE(device_malloc(&device_index_buffer, sizeof(uint32_t) * 4 * mesh->data.triangle_count));
   __FAILURE_HANDLE(
-    device_upload(device_vertex_buffer, mesh->data.index_buffer, 0, sizeof(uint32_t) * 4 * mesh->data.triangle_count, device->stream_main));
+    device_upload(device_index_buffer, mesh->data.index_buffer, 0, sizeof(uint32_t) * 4 * mesh->data.triangle_count, device->stream_main));
 
   build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_UNSIGNED_INT3;
   build_input.triangleArray.indexStrideInBytes = 16;

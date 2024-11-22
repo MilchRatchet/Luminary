@@ -41,6 +41,7 @@ static const size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, pixels_per_thread),         // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
   offsetof(DeviceConstantMemory, optix_bvh),                 // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   offsetof(DeviceConstantMemory, moon_albedo_tex),           // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  offsetof(DeviceConstantMemory, sky_hdri_color_tex),        // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   offsetof(DeviceConstantMemory, light_tree_hash_map_mask),  // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
   offsetof(DeviceConstantMemory, user_selected_x),           // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
   SIZE_MAX                                                   // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
@@ -60,6 +61,7 @@ static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(uint32_t) * 2,                        // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
   sizeof(OptixTraversableHandle) * 4,          // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   sizeof(uint32_t),                            // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
   sizeof(uint16_t) * 2 + sizeof(uint32_t) * 3  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
 };
@@ -506,7 +508,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(cloud_noise);
   __DEVICE_BUFFER_FREE(sky_ms_luts);
   __DEVICE_BUFFER_FREE(sky_tm_luts);
-  __DEVICE_BUFFER_FREE(sky_hdri_luts);
   __DEVICE_BUFFER_FREE(bsdf_energy_lut);
   __DEVICE_BUFFER_FREE(bluenoise_1D);
   __DEVICE_BUFFER_FREE(bluenoise_2D);
@@ -717,15 +718,16 @@ LuminaryResult device_update_mesh(Device* device, const Mesh* mesh) {
 
   void** direct_access_buffer;
   __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-    device->staging_manager, device->buffers.triangles, sizeof(DeviceTriangle*) * mesh->id, sizeof(DeviceTriangle*),
-    &direct_access_buffer));
+    device->staging_manager, (void*) device->buffers.triangles, sizeof(DeviceTriangle*) * mesh->id, sizeof(DeviceTriangle*),
+    (void**) &direct_access_buffer));
 
   *direct_access_buffer = DEVICE_PTR(device->meshes[mesh->id]->triangles);
 
   __FAILURE_HANDLE(device_staging_manager_register_direct_access(
-    device->staging_manager, device->buffers.triangle_counts, sizeof(uint32_t) * mesh->id, sizeof(uint32_t), &direct_access_buffer));
+    device->staging_manager, (void*) device->buffers.triangle_counts, sizeof(uint32_t) * mesh->id, sizeof(uint32_t),
+    (void**) &direct_access_buffer));
 
-  __FAILURE_HANDLE(array_get_num_elements(device->meshes[mesh->id]->triangles, direct_access_buffer));
+  __FAILURE_HANDLE(array_get_num_elements(device->meshes[mesh->id]->triangles, (uint32_t*) *direct_access_buffer));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -863,6 +865,39 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   // TODO: Build light BVH
 
   DEVICE_UPDATE_CONSTANT_MEMORY(light_tree_hash_map_mask, tree->hash_map->size - 1);
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sky_hdri);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(sky_hdri_generate(sky_hdri, device));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sky_hdri);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  bool hdri_has_changed = false;
+  __FAILURE_HANDLE(device_sky_hdri_update(device->sky_hdri, device, sky_hdri, &hdri_has_changed));
+
+  if (hdri_has_changed) {
+    __FAILURE_HANDLE(device_struct_texture_object_convert(device->sky_hdri->color_tex, &device->constant_memory->sky_hdri_color_tex));
+    __FAILURE_HANDLE(device_struct_texture_object_convert(device->sky_hdri->shadow_tex, &device->constant_memory->sky_hdri_shadow_tex));
+
+    __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX));
+  }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

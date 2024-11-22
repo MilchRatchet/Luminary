@@ -23,6 +23,7 @@
 
 #include "device.h"
 #include "device_light.h"
+#include "device_sky.h"
 #include "thread.h"
 
 struct DeviceManager {
@@ -37,6 +38,7 @@ struct DeviceManager {
   WallTime* queue_wall_time;
   Thread* work_thread;
   LightTree* light_tree;
+  SkyHDRI* sky_hdri;
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);

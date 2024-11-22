@@ -162,6 +162,19 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     current_entity++;
   }
 
+  if (flags & SCENE_ENTITY_SKY) {
+    Sky sky;
+    __FAILURE_HANDLE_CRITICAL(scene_get(device_manager->scene_device, &sky, SCENE_ENTITY_SKY));
+
+    __FAILURE_HANDLE_CRITICAL(sky_hdri_update(device_manager->sky_hdri, &sky));
+    __FAILURE_HANDLE_CRITICAL(device_build_sky_hdri(device_manager->devices[device_manager->main_device_index], device_manager->sky_hdri));
+
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+      __FAILURE_HANDLE_CRITICAL(device_update_sky_hdri(device, device_manager->sky_hdri));
+    }
+  }
+
   if (flags & SCENE_DIRTY_FLAG_MATERIALS) {
     __FAILURE_HANDLE_CRITICAL(_device_manager_handle_device_material_updates(device_manager));
   }
@@ -397,6 +410,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   }
 
   __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
+  __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
 
   ////////////////////////////////////////////////////////////////////
   // Select main device
@@ -514,6 +528,7 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
 
   __FAILURE_HANDLE(array_destroy(&(*device_manager)->devices));
 
+  __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));
   __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
 
   __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));

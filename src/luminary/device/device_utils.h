@@ -209,7 +209,6 @@ struct DevicePointers {
   DEVICE const DeviceTextureObject* cloud_noise;
   DEVICE const DeviceTextureObject* sky_ms_luts;
   DEVICE const DeviceTextureObject* sky_tm_luts;
-  DEVICE const DeviceTextureObject* sky_hdri_luts;
   DEVICE const DeviceTextureObject* bsdf_energy_lut;
   DEVICE const uint16_t* bluenoise_1D;
   DEVICE const uint32_t* bluenoise_2D;
@@ -241,6 +240,7 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META,
   DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH,
   DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX,
+  DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META,
   DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC,
 
@@ -277,6 +277,9 @@ struct DeviceConstantMemory {
   // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   DeviceTextureObject moon_albedo_tex;
   DeviceTextureObject moon_normal_tex;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
+  DeviceTextureObject sky_hdri_color_tex;
+  DeviceTextureObject sky_hdri_shadow_tex;
   // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
   uint32_t light_tree_hash_map_mask;
   // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC

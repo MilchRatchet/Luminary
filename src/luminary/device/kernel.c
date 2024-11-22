@@ -51,7 +51,11 @@ LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary libr
 
   const CUDAKernelConfig* config = cuda_kernel_configs + type;
 
-  CUDA_FAILURE_HANDLE(cuLibraryGetKernel(&(*kernel)->cuda_kernel, library, config->name));
+  CUresult result = cuLibraryGetKernel(&(*kernel)->cuda_kernel, library, config->name);
+
+  if (result != CUDA_SUCCESS) {
+    __RETURN_ERROR(LUMINARY_ERROR_CUDA, "Kernel %s failed to load.", config->name);
+  }
 
   (*kernel)->shared_memory_size = config->shared_memory_size;
   (*kernel)->arg_size           = config->arg_size;

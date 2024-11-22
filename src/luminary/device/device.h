@@ -4,6 +4,7 @@
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_mesh.h"
+#include "device_sky.h"
 #include "device_staging_manager.h"
 #include "device_utils.h"
 #include "kernel.h"
@@ -62,6 +63,7 @@ struct Device {
   ARRAY DeviceMesh** meshes;
   OptixBVHInstanceCache* optix_instance_cache;
   OptixBVH* optix_bvh_ias;
+  DeviceSkyHDRI* sky_hdri;
 } typedef Device;
 
 void _device_init(void);
@@ -79,6 +81,8 @@ LuminaryResult device_apply_material_updates(
   Device* device, const ARRAY MaterialUpdate* updates, const ARRAY DeviceMaterialCompressed* materials);
 LuminaryResult device_build_light_tree(Device* device, LightTree* tree);
 LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree);
+LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
+LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */
