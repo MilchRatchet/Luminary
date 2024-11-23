@@ -776,7 +776,8 @@ LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshIns
   __FAILURE_HANDLE(optix_bvh_instance_cache_update(device->optix_instance_cache, instance_updates));
   __FAILURE_HANDLE(optix_bvh_ias_build(device->optix_bvh_ias, device));
 
-  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh, device->optix_bvh_ias->traversable);
+  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh, device->optix_bvh_ias->traversable[OPTIX_BVH_TYPE_DEFAULT]);
+  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_shadow, device->optix_bvh_ias->traversable[OPTIX_BVH_TYPE_SHADOW]);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
