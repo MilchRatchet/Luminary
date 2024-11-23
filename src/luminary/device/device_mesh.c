@@ -28,6 +28,8 @@ LuminaryResult device_mesh_create(Device* device, DeviceMesh** device_mesh, cons
 
   __FAILURE_HANDLE(struct_triangles_interleave(direct_access_buffer, device_triangles, triangle_count));
 
+  __FAILURE_HANDLE(host_free(&device_triangles));
+
   __FAILURE_HANDLE(optix_bvh_create(&(*device_mesh)->bvh));
   __FAILURE_HANDLE(optix_bvh_gas_build((*device_mesh)->bvh, device, mesh));
 

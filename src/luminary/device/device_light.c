@@ -268,7 +268,6 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
 
   uint32_t begin_of_current_nodes = 0;
   uint32_t end_of_current_nodes   = 1;
-  uint32_t write_ptr              = 1;
 
   while (begin_of_current_nodes != end_of_current_nodes) {
     for (uint32_t node_ptr = begin_of_current_nodes; node_ptr < end_of_current_nodes; node_ptr++) {
@@ -439,7 +438,8 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
     }
 
     begin_of_current_nodes = end_of_current_nodes;
-    end_of_current_nodes   = write_ptr;
+
+    __FAILURE_HANDLE(array_get_num_elements(nodes, &end_of_current_nodes));
   }
 
   __FAILURE_HANDLE(host_free(&bins));
@@ -894,6 +894,7 @@ static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   __FAILURE_HANDLE(host_free(&node_paths));
   __FAILURE_HANDLE(host_free(&node_depths));
   __FAILURE_HANDLE(host_free(&fragments_swap));
+  __FAILURE_HANDLE(host_free(&bvh_triangles_swap));
   __FAILURE_HANDLE(host_free(&new_fragments));
   __FAILURE_HANDLE(host_free(&fragment_paths));
 
@@ -1429,6 +1430,9 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
   uint32_t num_cached_materials;
   __FAILURE_HANDLE(array_get_num_elements(tree->cache.materials, &num_cached_materials));
 
+  __FAILURE_HANDLE(array_create(&instance->fragments, sizeof(LightTreeFragment), 16));
+  __FAILURE_HANDLE(array_create(&instance->bvh_triangles, sizeof(LightTreeBVHTriangle), 16));
+
   for (uint32_t material_slot_id = 0; material_slot_id < num_materials; material_slot_id++) {
     const uint16_t material_id = mesh->materials[material_slot_id];
 
@@ -1445,9 +1449,6 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
 
     uint32_t num_triangles;
     __FAILURE_HANDLE(array_get_num_elements(triangles, &num_triangles));
-
-    __FAILURE_HANDLE(array_create(&instance->fragments, sizeof(LightTreeFragment), num_triangles));
-    __FAILURE_HANDLE(array_create(&instance->bvh_triangles, sizeof(LightTreeBVHTriangle), num_triangles));
 
     for (uint32_t tri_id = 0; tri_id < num_triangles; tri_id++) {
       const LightTreeCacheTriangle* triangle = triangles + tri_id;
@@ -1598,8 +1599,34 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
   for (uint32_t mesh_id = 0; mesh_id < num_meshes; mesh_id++) {
     LightTreeCacheMesh* mesh = (*tree)->cache.meshes + mesh_id;
 
+    if (mesh->materials) {
+      __FAILURE_HANDLE(array_destroy(&mesh->materials));
+    }
+
     if (mesh->triangles) {
+      uint32_t num_materials;
+      __FAILURE_HANDLE(array_get_num_elements(mesh->triangles, &num_materials));
+
+      for (uint32_t material_slot_id = 0; material_slot_id < num_materials; material_slot_id++) {
+        __FAILURE_HANDLE(array_destroy(&mesh->triangles[material_slot_id]));
+      }
+
       __FAILURE_HANDLE(array_destroy(&mesh->triangles));
+    }
+  }
+
+  uint32_t num_instances;
+  __FAILURE_HANDLE(array_get_num_elements((*tree)->cache.instances, &num_instances));
+
+  for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
+    LightTreeCacheInstance* instance = (*tree)->cache.instances + instance_id;
+
+    if (instance->fragments) {
+      __FAILURE_HANDLE(array_destroy(&instance->fragments));
+    }
+
+    if (instance->bvh_triangles) {
+      __FAILURE_HANDLE(array_destroy(&instance->bvh_triangles));
     }
   }
 
