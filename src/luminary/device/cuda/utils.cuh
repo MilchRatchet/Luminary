@@ -15,6 +15,7 @@
 #endif
 
 #define LUMINARY_KERNEL extern "C" __global__ __launch_bounds__(THREADS_PER_BLOCK)
+#define LUMINARY_KERNEL_NO_BOUNDS extern "C" __global__
 
 #ifndef eps
 #define eps 0.000001f

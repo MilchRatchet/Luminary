@@ -1,30 +1,28 @@
 #ifndef CU_SKY_HDRI_H
 #define CU_SKY_HDRI_H
 
-#include "raytrace.h"
-#include "structs.h"
-#include "texture.h"
+#include "math.cuh"
+#include "sky_utils.cuh"
 #include "utils.cuh"
-#include "utils.h"
 
 // This file contains the code for the precomputation of the sky and storing it in a HDRI like LUT.
 // Note that since the LUT will contain cloud data, it will not parametrized like in Hillaire2020.
 // The main goal is to eliminate the cost of the atmosphere if that is desired.
 // Sampling Sun => (pos - hdri_pos) and then precompute the sun pos based on hdri values instead.
 
-LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha) {
+LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha, const uint32_t dim, const vec3 origin, const uint32_t sample_count) {
   unsigned int id = THREAD_ID;
 
-  const int amount = device.sky.hdri_dim * device.sky.hdri_dim;
+  const int amount = dim * dim;
 
-  const float step_size = 1.0f / (device.sky.hdri_dim - 1);
+  const float step_size = 1.0f / (dim - 1);
 
   while (id < amount) {
-    const int y = id / device.sky.hdri_dim;
-    const int x = id - y * device.sky.hdri_dim;
+    const int y = id / dim;
+    const int x = id - y * dim;
 
     const ushort2 pixel_coords = make_ushort2(x, y);
-    const uint32_t pixel       = x + y * device.sky.hdri_dim;
+    const uint32_t pixel       = x + y * dim;
 
     const float2 jitter = quasirandom_sequence_2D(QUASI_RANDOM_TARGET_CAMERA_JITTER, pixel_coords);
 
@@ -39,7 +37,7 @@ LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha) {
     RGBF color                = get_color(0.0f, 0.0f, 0.0f);
     RGBF transmittance        = get_color(1.0f, 1.0f, 1.0f);
     float cloud_transmittance = 1.0f;
-    vec3 sky_origin           = world_to_sky_transform(device.sky.hdri_origin);
+    vec3 sky_origin           = world_to_sky_transform(origin);
 
     if (device.cloud.active) {
       const float offset = clouds_render(sky_origin, ray, FLT_MAX, pixel_coords, color, transmittance, cloud_transmittance);
@@ -73,7 +71,7 @@ LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha) {
       // Same as in temporal accumulation
       // Here this trick has no real downside
       // Just got to make sure we don't do this in the case of 2 samples
-      if (device.sample_id == 1 && device.sky.hdri_samples != 2) {
+      if (device.sample_id == 1 && sample_count != 2) {
         RGBF min = min_color(color, result);
 
         result = min;
@@ -105,65 +103,6 @@ LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha) {
 
     id += blockDim.x * gridDim.x;
   }
-}
-
-extern "C" void sky_hdri_generate_LUT(RaytraceInstance* instance) {
-  if (instance->scene.sky.hdri_initialized) {
-    texture_free_atlas(instance->sky_hdri_luts, 2);
-  }
-
-  instance->scene.sky.hdri_dim = instance->scene.sky.settings_hdri_dim;
-
-  const int dim = instance->scene.sky.hdri_dim;
-
-  if (dim == 0) {
-    error_message("Failed to allocated HDRI because resolution was 0. Turned off HDRI.");
-    instance->scene.sky.mode = SKY_MODE_DEFAULT;
-
-    // Update GPU constants again because we may have already pushed HDRI mode.
-    raytrace_update_device_scene(instance);
-    return;
-  }
-
-  instance->scene.sky.hdri_initialized = 1;
-
-  raytrace_update_device_scene(instance);
-
-  Texture luts_hdri_tex[2];
-  texture_create(luts_hdri_tex + 0, dim, dim, 1, dim, (void*) 0, TexDataFP32, 4, TexStorageGPU);
-  luts_hdri_tex[0].wrap_mode_S = TexModeWrap;
-  luts_hdri_tex[0].wrap_mode_T = TexModeClamp;
-  luts_hdri_tex[0].mipmap      = TexMipmapGenerate;
-
-  texture_create(luts_hdri_tex + 1, dim, dim, 1, dim, (void*) 0, TexDataFP32, 1, TexStorageGPU);
-  luts_hdri_tex[1].wrap_mode_S = TexModeWrap;
-  luts_hdri_tex[1].wrap_mode_T = TexModeClamp;
-  luts_hdri_tex[1].mipmap      = TexMipmapNone;
-
-  device_malloc((void**) &luts_hdri_tex[0].data, luts_hdri_tex[0].height * luts_hdri_tex[0].pitch * 4 * sizeof(float));
-  device_malloc((void**) &luts_hdri_tex[1].data, luts_hdri_tex[1].height * luts_hdri_tex[1].pitch * 1 * sizeof(float));
-
-  int depth = 0;
-  device_update_symbol(depth, depth);
-
-  for (int i = 0; i < instance->scene.sky.hdri_samples; i++) {
-    const float sample_id = (float) i;
-    device_update_symbol(sample_id, sample_id);
-    print_info_inline("HDRI Progress: %i/%i", i, instance->scene.sky.hdri_samples);
-    sky_hdri_compute_hdri_lut<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((float4*) luts_hdri_tex[0].data, (float*) luts_hdri_tex[1].data);
-    gpuErrchk(cudaDeviceSynchronize());
-  }
-
-  texture_create_atlas(&instance->sky_hdri_luts, luts_hdri_tex, 2);
-
-  device_free(luts_hdri_tex[0].data, luts_hdri_tex[0].height * luts_hdri_tex[0].pitch * 4 * sizeof(float));
-  device_free(luts_hdri_tex[1].data, luts_hdri_tex[1].height * luts_hdri_tex[1].pitch * 1 * sizeof(float));
-
-  raytrace_update_device_pointers(instance);
-}
-
-extern "C" void sky_hdri_set_pos_to_cam(RaytraceInstance* instance) {
-  instance->scene.sky.hdri_origin = instance->scene.camera.pos;
 }
 
 #endif /* CU_SKY_HDRI_H */

@@ -268,14 +268,6 @@ __device__ float4 spectrum_split_high(const Spectrum a) {
 
 #define SKY_HEIGHT_OFFSET 0.0005f
 
-#define SKY_MS_TEX_SIZE 32
-#define SKY_TM_TEX_WIDTH 256
-#define SKY_TM_TEX_HEIGHT 64
-
-// Value must be now larger than (1 << 5) because max Kernel Block Dimension in x is 1024 (for z it is only 64)
-#define SKY_MS_BASE (1 << 4)
-#define SKY_MS_ITER (SKY_MS_BASE * SKY_MS_BASE)
-
 #define SKY_WORLD_REFERENCE_HEIGHT (get_length(world_to_sky_transform(get_vector(0.0f, 0.0f, 0.0f))))
 
 // [Hil20]

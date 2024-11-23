@@ -4,6 +4,7 @@
 #include "kernels.cuh"
 #include "particle.cuh"
 #include "sky.cuh"
+#include "sky_hdri.cuh"
 #include "temporal.cuh"
 #include "utils.cuh"
 #include "volume.cuh"
