@@ -29,21 +29,22 @@ static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_memb
 LUM_STATIC_SIZE_ASSERT(device_scene_entity_to_const_memory_member, sizeof(DeviceConstantMemoryMember) * SCENE_ENTITY_GLOBAL_COUNT);
 
 static const size_t device_cuda_const_memory_offsets[] = {
-  offsetof(DeviceConstantMemory, ptrs),                // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
-  offsetof(DeviceConstantMemory, settings),            // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
-  offsetof(DeviceConstantMemory, camera),              // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
-  offsetof(DeviceConstantMemory, ocean),               // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
-  offsetof(DeviceConstantMemory, sky),                 // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
-  offsetof(DeviceConstantMemory, cloud),               // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
-  offsetof(DeviceConstantMemory, fog),                 // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
-  offsetof(DeviceConstantMemory, particles),           // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  offsetof(DeviceConstantMemory, toy),                 // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
-  offsetof(DeviceConstantMemory, pixels_per_thread),   // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
-  offsetof(DeviceConstantMemory, optix_bvh),           // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
-  offsetof(DeviceConstantMemory, moon_albedo_tex),     // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
-  offsetof(DeviceConstantMemory, sky_hdri_color_tex),  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
-  offsetof(DeviceConstantMemory, user_selected_x),     // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
-  SIZE_MAX                                             // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
+  offsetof(DeviceConstantMemory, ptrs),                          // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
+  offsetof(DeviceConstantMemory, settings),                      // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
+  offsetof(DeviceConstantMemory, camera),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
+  offsetof(DeviceConstantMemory, ocean),                         // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
+  offsetof(DeviceConstantMemory, sky),                           // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
+  offsetof(DeviceConstantMemory, cloud),                         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
+  offsetof(DeviceConstantMemory, fog),                           // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
+  offsetof(DeviceConstantMemory, particles),                     // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
+  offsetof(DeviceConstantMemory, toy),                           // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
+  offsetof(DeviceConstantMemory, pixels_per_thread),             // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
+  offsetof(DeviceConstantMemory, optix_bvh),                     // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
+  offsetof(DeviceConstantMemory, moon_albedo_tex),               // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  offsetof(DeviceConstantMemory, sky_lut_transmission_low_tex),  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
+  offsetof(DeviceConstantMemory, sky_hdri_color_tex),            // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
+  offsetof(DeviceConstantMemory, user_selected_x),               // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
+  SIZE_MAX                                                       // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_offsets, sizeof(size_t) * (DEVICE_CONSTANT_MEMORY_MEMBER_COUNT + 1));
 
@@ -60,6 +61,7 @@ static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(uint32_t) * 2,                        // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
   sizeof(OptixTraversableHandle) * 4,          // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  sizeof(DeviceTextureObject) * 4,             // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
   sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   sizeof(uint16_t) * 2 + sizeof(uint32_t) * 3  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
 };
@@ -504,8 +506,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(hit_id_history);
   __DEVICE_BUFFER_FREE(textures);
   __DEVICE_BUFFER_FREE(cloud_noise);
-  __DEVICE_BUFFER_FREE(sky_ms_luts);
-  __DEVICE_BUFFER_FREE(sky_tm_luts);
   __DEVICE_BUFFER_FREE(bsdf_energy_lut);
   __DEVICE_BUFFER_FREE(bluenoise_1D);
   __DEVICE_BUFFER_FREE(bluenoise_2D);
@@ -597,6 +597,9 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(optix_bvh_instance_cache_create(&device->optix_instance_cache, device));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_light));
+
+  __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
+  __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -865,6 +868,46 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sky_lut);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(sky_lut_generate(sky_lut, device));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sky_lut);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  bool hdri_has_changed = false;
+  __FAILURE_HANDLE(device_sky_lut_update(device->sky_lut, device, sky_lut, &hdri_has_changed));
+
+  if (hdri_has_changed) {
+    __FAILURE_HANDLE(
+      device_struct_texture_object_convert(device->sky_lut->transmittance_low, &device->constant_memory->sky_lut_transmission_low_tex));
+    __FAILURE_HANDLE(
+      device_struct_texture_object_convert(device->sky_lut->transmittance_high, &device->constant_memory->sky_lut_transmission_high_tex));
+    __FAILURE_HANDLE(device_struct_texture_object_convert(
+      device->sky_lut->multiscattering_low, &device->constant_memory->sky_lut_multiscattering_low_tex));
+    __FAILURE_HANDLE(device_struct_texture_object_convert(
+      device->sky_lut->multiscattering_high, &device->constant_memory->sky_lut_multiscattering_high_tex));
+
+    __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX));
+  }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sky_hdri);
@@ -877,6 +920,7 @@ LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri) {
 
   return LUMINARY_SUCCESS;
 }
+
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sky_hdri);
@@ -916,6 +960,9 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*device)->meshes));
+
+  __FAILURE_HANDLE(device_sky_lut_destroy(&(*device)->sky_lut));
+  __FAILURE_HANDLE(device_sky_hdri_destroy(&(*device)->sky_hdri));
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));

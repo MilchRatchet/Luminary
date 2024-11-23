@@ -54,7 +54,7 @@ LUMINARY_KERNEL void particle_process_tasks_debug() {
   }
 }
 
-LUMINARY_KERNEL void particle_kernel_generate(
+LUMINARY_KERNEL void particle_generate(
   const uint32_t count, const uint32_t seed, const float size, const float size_variation, float4* vertex_buffer, uint32_t* index_buffer,
   Quad* quads) {
   uint32_t id = THREAD_ID;

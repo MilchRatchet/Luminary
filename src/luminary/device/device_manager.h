@@ -38,6 +38,7 @@ struct DeviceManager {
   WallTime* queue_wall_time;
   Thread* work_thread;
   LightTree* light_tree;
+  SkyLUT* sky_lut;
   SkyHDRI* sky_hdri;
 } typedef DeviceManager;
 

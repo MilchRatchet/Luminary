@@ -10,18 +10,18 @@ struct SkyLUT {
   bool sky_is_dirty;
   Sky sky;
   uint32_t id;
-  Texture* transmittance_high;
   Texture* transmittance_low;
-  Texture* multiscattering_high;
+  Texture* transmittance_high;
   Texture* multiscattering_low;
+  Texture* multiscattering_high;
 } typedef SkyLUT;
 
 struct DeviceSkyLUT {
   uint32_t reference_id;
-  DeviceTexture* transmittance_high;
   DeviceTexture* transmittance_low;
-  DeviceTexture* multiscattering_high;
+  DeviceTexture* transmittance_high;
   DeviceTexture* multiscattering_low;
+  DeviceTexture* multiscattering_high;
 } typedef DeviceSkyLUT;
 
 LuminaryResult sky_lut_create(SkyLUT** lut);

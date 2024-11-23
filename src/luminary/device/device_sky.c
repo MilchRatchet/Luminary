@@ -16,46 +16,46 @@ LuminaryResult sky_lut_create(SkyLUT** lut) {
 
   __FAILURE_HANDLE(sky_get_default(&(*lut)->sky));
 
-  void* transmittance_high_data;
-  __FAILURE_HANDLE(host_malloc(&transmittance_high_data, SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT * sizeof(RGBAF)));
-
   void* transmittance_low_data;
   __FAILURE_HANDLE(host_malloc(&transmittance_low_data, SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT * sizeof(RGBAF)));
 
-  void* multiscattering_high_data;
-  __FAILURE_HANDLE(host_malloc(&multiscattering_high_data, SKY_MS_TEX_SIZE * SKY_MS_TEX_SIZE * sizeof(RGBAF)));
+  void* transmittance_high_data;
+  __FAILURE_HANDLE(host_malloc(&transmittance_high_data, SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT * sizeof(RGBAF)));
 
   void* multiscattering_low_data;
   __FAILURE_HANDLE(host_malloc(&multiscattering_low_data, SKY_MS_TEX_SIZE * SKY_MS_TEX_SIZE * sizeof(RGBAF)));
 
-  __FAILURE_HANDLE(texture_create(
-    &(*lut)->transmittance_high, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH * sizeof(RGBAF), transmittance_high_data,
-    TexDataFP32, 4));
+  void* multiscattering_high_data;
+  __FAILURE_HANDLE(host_malloc(&multiscattering_high_data, SKY_MS_TEX_SIZE * SKY_MS_TEX_SIZE * sizeof(RGBAF)));
+
   __FAILURE_HANDLE(texture_create(
     &(*lut)->transmittance_low, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH * sizeof(RGBAF), transmittance_low_data,
     TexDataFP32, 4));
   __FAILURE_HANDLE(texture_create(
-    &(*lut)->multiscattering_high, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE * sizeof(RGBAF), multiscattering_high_data,
+    &(*lut)->transmittance_high, SKY_TM_TEX_WIDTH, SKY_TM_TEX_HEIGHT, 1, SKY_TM_TEX_WIDTH * sizeof(RGBAF), transmittance_high_data,
     TexDataFP32, 4));
   __FAILURE_HANDLE(texture_create(
     &(*lut)->multiscattering_low, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE * sizeof(RGBAF), multiscattering_low_data,
     TexDataFP32, 4));
-
-  (*lut)->transmittance_high->wrap_mode_R = TexModeClamp;
-  (*lut)->transmittance_high->wrap_mode_S = TexModeClamp;
-  (*lut)->transmittance_high->wrap_mode_T = TexModeClamp;
+  __FAILURE_HANDLE(texture_create(
+    &(*lut)->multiscattering_high, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1, SKY_MS_TEX_SIZE * sizeof(RGBAF), multiscattering_high_data,
+    TexDataFP32, 4));
 
   (*lut)->transmittance_low->wrap_mode_R = TexModeClamp;
   (*lut)->transmittance_low->wrap_mode_S = TexModeClamp;
   (*lut)->transmittance_low->wrap_mode_T = TexModeClamp;
 
-  (*lut)->multiscattering_high->wrap_mode_R = TexModeClamp;
-  (*lut)->multiscattering_high->wrap_mode_S = TexModeClamp;
-  (*lut)->multiscattering_high->wrap_mode_T = TexModeClamp;
+  (*lut)->transmittance_high->wrap_mode_R = TexModeClamp;
+  (*lut)->transmittance_high->wrap_mode_S = TexModeClamp;
+  (*lut)->transmittance_high->wrap_mode_T = TexModeClamp;
 
   (*lut)->multiscattering_low->wrap_mode_R = TexModeClamp;
   (*lut)->multiscattering_low->wrap_mode_S = TexModeClamp;
   (*lut)->multiscattering_low->wrap_mode_T = TexModeClamp;
+
+  (*lut)->multiscattering_high->wrap_mode_R = TexModeClamp;
+  (*lut)->multiscattering_high->wrap_mode_S = TexModeClamp;
+  (*lut)->multiscattering_high->wrap_mode_T = TexModeClamp;
 
   return LUMINARY_SUCCESS;
 }
@@ -81,10 +81,10 @@ static LuminaryResult _sky_lut_generate(SkyLUT* lut, Device* device) {
 
   // TODO: Compute the LUT
   // Currently emulating the side effects
-  memset(lut->transmittance_high->data, 0, SKY_TM_TEX_WIDTH * sizeof(RGBAF) * SKY_TM_TEX_HEIGHT);
   memset(lut->transmittance_low->data, 0, SKY_TM_TEX_WIDTH * sizeof(RGBAF) * SKY_TM_TEX_HEIGHT);
-  memset(lut->multiscattering_high->data, 0, SKY_MS_TEX_SIZE * sizeof(RGBAF) * SKY_MS_TEX_SIZE);
+  memset(lut->transmittance_high->data, 0, SKY_TM_TEX_WIDTH * sizeof(RGBAF) * SKY_TM_TEX_HEIGHT);
   memset(lut->multiscattering_low->data, 0, SKY_MS_TEX_SIZE * sizeof(RGBAF) * SKY_MS_TEX_SIZE);
+  memset(lut->multiscattering_high->data, 0, SKY_MS_TEX_SIZE * sizeof(RGBAF) * SKY_MS_TEX_SIZE);
 
   return LUMINARY_SUCCESS;
 }
@@ -107,10 +107,10 @@ LuminaryResult sky_lut_destroy(SkyLUT** lut) {
   __CHECK_NULL_ARGUMENT(lut);
   __CHECK_NULL_ARGUMENT(*lut);
 
-  __FAILURE_HANDLE(texture_destroy(&(*lut)->transmittance_high));
   __FAILURE_HANDLE(texture_destroy(&(*lut)->transmittance_low));
-  __FAILURE_HANDLE(texture_destroy(&(*lut)->multiscattering_high));
+  __FAILURE_HANDLE(texture_destroy(&(*lut)->transmittance_high));
   __FAILURE_HANDLE(texture_destroy(&(*lut)->multiscattering_low));
+  __FAILURE_HANDLE(texture_destroy(&(*lut)->multiscattering_high));
 
   __FAILURE_HANDLE(host_free(lut));
 
@@ -124,10 +124,10 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_lut_create(DeviceSkyLUT** lut) {
 
   (*lut)->reference_id = 0;
 
-  (*lut)->transmittance_high   = (DeviceTexture*) 0;
   (*lut)->transmittance_low    = (DeviceTexture*) 0;
-  (*lut)->multiscattering_high = (DeviceTexture*) 0;
+  (*lut)->transmittance_high   = (DeviceTexture*) 0;
   (*lut)->multiscattering_low  = (DeviceTexture*) 0;
+  (*lut)->multiscattering_high = (DeviceTexture*) 0;
 
   return LUMINARY_SUCCESS;
 }
@@ -135,20 +135,20 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_lut_create(DeviceSkyLUT** lut) {
 static LuminaryResult _device_sky_lut_free(DeviceSkyLUT* lut) {
   __CHECK_NULL_ARGUMENT(lut);
 
-  if (lut->transmittance_high) {
-    __FAILURE_HANDLE(device_texture_destroy(&lut->transmittance_high));
-  }
-
   if (lut->transmittance_low) {
     __FAILURE_HANDLE(device_texture_destroy(&lut->transmittance_low));
   }
 
-  if (lut->multiscattering_high) {
-    __FAILURE_HANDLE(device_texture_destroy(&lut->multiscattering_high));
+  if (lut->transmittance_high) {
+    __FAILURE_HANDLE(device_texture_destroy(&lut->transmittance_high));
   }
 
   if (lut->multiscattering_low) {
     __FAILURE_HANDLE(device_texture_destroy(&lut->multiscattering_low));
+  }
+
+  if (lut->multiscattering_high) {
+    __FAILURE_HANDLE(device_texture_destroy(&lut->multiscattering_high));
   }
 
   return LUMINARY_SUCCESS;
@@ -164,10 +164,10 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_lut_update(DeviceSkyLUT* lut, Device* 
   if (source_lut->id != lut->reference_id) {
     __FAILURE_HANDLE(_device_sky_lut_free(lut));
 
-    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_high, source_lut->transmittance_high, device->stream_main));
     __FAILURE_HANDLE(device_texture_create(&lut->transmittance_low, source_lut->transmittance_low, device->stream_main));
-    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_high, source_lut->multiscattering_high, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->transmittance_high, source_lut->transmittance_high, device->stream_main));
     __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_low, source_lut->multiscattering_low, device->stream_main));
+    __FAILURE_HANDLE(device_texture_create(&lut->multiscattering_high, source_lut->multiscattering_high, device->stream_main));
 
     lut->reference_id = source_lut->id;
 
