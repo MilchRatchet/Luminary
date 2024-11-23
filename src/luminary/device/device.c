@@ -601,6 +601,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
 
+  __FAILURE_HANDLE(device_post_create(&device->post));
+
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   *_device = device;
@@ -967,6 +969,8 @@ LuminaryResult device_destroy(Device** device) {
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_light));
+
+  __FAILURE_HANDLE(device_post_destroy(&(*device)->post));
 
   uint32_t num_textures;
   __FAILURE_HANDLE(array_get_num_elements((*device)->textures, &num_textures));

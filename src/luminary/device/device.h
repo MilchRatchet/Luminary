@@ -4,6 +4,7 @@
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_mesh.h"
+#include "device_post.h"
 #include "device_sky.h"
 #include "device_staging_manager.h"
 #include "device_utils.h"
@@ -66,6 +67,7 @@ struct Device {
   OptixBVH* optix_bvh_light;
   DeviceSkyLUT* sky_lut;
   DeviceSkyHDRI* sky_hdri;
+  DevicePost* post;
 } typedef Device;
 
 void _device_init(void);
