@@ -1014,17 +1014,14 @@ static void _light_tree_debug_output_export_binary_node(
     for (uint32_t i = 0; i < node.triangle_count; i++) {
       const uint32_t light_id = node.triangles_address + i;
 
-      TriangleLight light = work->triangles[light_id];
+      // This is crashing, no idea why. This is due to changes in the host rework project.
+      LightTreeBVHTriangle light = work->bvh_triangles[light_id];
 
       buffer_offset += sprintf(buffer + buffer_offset, "o Node%u - Tri%u\n", id, light_id);
 
       buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", light.vertex.x, light.vertex.y, light.vertex.z);
-      buffer_offset += sprintf(
-        buffer + buffer_offset, "v %f %f %f\n", light.vertex.x + light.edge1.x, light.vertex.y + light.edge1.y,
-        light.vertex.z + light.edge1.z);
-      buffer_offset += sprintf(
-        buffer + buffer_offset, "v %f %f %f\n", light.vertex.x + light.edge2.x, light.vertex.y + light.edge2.y,
-        light.vertex.z + light.edge2.z);
+      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", light.vertex1.x, light.vertex1.y, light.vertex1.z);
+      buffer_offset += sprintf(buffer + buffer_offset, "v %f %f %f\n", light.vertex2.x, light.vertex2.y, light.vertex2.z);
 
       buffer_offset += sprintf(buffer + buffer_offset, "usemtl TriMTL%u\n", light_id);
 
@@ -1454,6 +1451,9 @@ static LuminaryResult _light_tree_compute_instance_fragments(LightTree* tree, co
       const LightTreeCacheTriangle* triangle = triangles + tri_id;
 
       const float area = 0.5f * vec128_norm2(triangle->cross);
+
+      if (area == 0.0f)
+        continue;
 
       LightTreeFragment fragment;
       fragment.low         = vec128_min(triangle->vertex, vec128_min(triangle->vertex1, triangle->vertex2));
