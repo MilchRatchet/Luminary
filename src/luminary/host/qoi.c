@@ -86,7 +86,7 @@ LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** da
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture is not 2D.");
   }
 
-  const qoi_desc desc = {.width = tex->pitch, .height = tex->height, .channels = 4, .colorspace = QOI_SRGB};
+  const qoi_desc desc = {.width = tex->width, .height = tex->height, .channels = 4, .colorspace = QOI_SRGB};
 
   *data = qoi_encode(tex->data, &desc, encoded_size);
 
@@ -100,7 +100,7 @@ LuminaryResult qoi_decode_RGBA8(const void* data, const int size, Texture** text
   qoi_desc desc;
   void* decoded_data = qoi_decode(data, size, &desc, 4);
 
-  __FAILURE_HANDLE(texture_create(texture, desc.width, desc.height, 1, desc.width, decoded_data, TexDataUINT8, 4));
+  __FAILURE_HANDLE(texture_create(texture, desc.width, desc.height, 1, decoded_data, TexDataUINT8, 4));
 
   return LUMINARY_SUCCESS;
 }

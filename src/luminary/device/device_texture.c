@@ -125,13 +125,13 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
         default:
           __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture mipmap mode is invalid.");
         case TexMipmapNone: {
-          __FAILURE_HANDLE(device_malloc2D(&data_device, pitch * pixel_size, height));
+          __FAILURE_HANDLE(device_malloc2D(&data_device, width * pixel_size, height));
 
           size_t pitch_gpu;
           __FAILURE_HANDLE(device_memory_get_pitch(data_device, &pitch_gpu));
 
           if (data != (void*) 0) {
-            __FAILURE_HANDLE(device_upload2D(data_device, data, pitch * pixel_size, width * pixel_size, height, stream));
+            __FAILURE_HANDLE(device_upload2D(data_device, data, pitch, width * pixel_size, height, stream));
           }
 
           res_desc.resType                  = CU_RESOURCE_TYPE_PITCH2D;

@@ -29,12 +29,8 @@ struct Texture {
   uint32_t num_components;
 } typedef Texture;
 
-/*
- * Stupid convention: The pitch is in the number of pixels, so NOT in bytes.
- */
 LuminaryResult texture_create(
-  Texture** tex, uint32_t width, uint32_t height, uint32_t depth, uint32_t pitch, void* data, TextureDataType type,
-  uint32_t num_components);
+  Texture** tex, uint32_t width, uint32_t height, uint32_t depth, void* data, TextureDataType type, uint32_t num_components);
 LuminaryResult texture_destroy(Texture** tex);
 
 #endif /* LUMINARY_TEXTURE_H */
