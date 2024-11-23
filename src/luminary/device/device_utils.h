@@ -221,7 +221,6 @@ struct DevicePointers {
   DEVICE const LightTreeNode8Packed* light_tree_nodes;
   DEVICE const uint2* light_tree_paths;
   DEVICE const TriangleHandle* light_tree_tri_handle_map;
-  DEVICE const uint32_t* light_tree_hash_map;
   DEVICE const Quad* particle_quads;
   DEVICE const Star* stars;
   DEVICE const uint32_t* stars_offsets;
@@ -241,7 +240,6 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH,
   DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX,
-  DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META,
   DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC,
 
   DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
@@ -280,8 +278,6 @@ struct DeviceConstantMemory {
   // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   DeviceTextureObject sky_hdri_color_tex;
   DeviceTextureObject sky_hdri_shadow_tex;
-  // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
-  uint32_t light_tree_hash_map_mask;
   // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
   uint16_t user_selected_x;
   uint16_t user_selected_y;

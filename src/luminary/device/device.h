@@ -63,6 +63,7 @@ struct Device {
   ARRAY DeviceMesh** meshes;
   OptixBVHInstanceCache* optix_instance_cache;
   OptixBVH* optix_bvh_ias;
+  OptixBVH* optix_bvh_light;
   DeviceSkyHDRI* sky_hdri;
 } typedef Device;
 

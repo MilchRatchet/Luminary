@@ -34,6 +34,13 @@ struct LightTreeCacheMesh {
   ARRAY LightTreeCacheTriangle* ARRAY* triangles;
 } typedef LightTreeCacheMesh;
 
+struct LightTreeBVHTriangle {
+  Vec128 vertex;
+  Vec128 vertex1;
+  Vec128 vertex2;
+} typedef LightTreeBVHTriangle;
+LUM_STATIC_SIZE_ASSERT(LightTreeBVHTriangle, 3 * sizeof(Vec128));
+
 struct LightTreeCacheInstance {
   bool active;
   uint32_t mesh_id;
@@ -41,7 +48,8 @@ struct LightTreeCacheInstance {
   vec3 scale;
   vec3 translation;
   bool is_dirty;
-  ARRAY LightTreeFragment* fragments; /* Computed during build step */
+  ARRAY LightTreeFragment* fragments;        /* Computed during build step */
+  ARRAY LightTreeBVHTriangle* bvh_triangles; /* Computed during build step */
 } typedef LightTreeCacheInstance;
 
 struct LightTreeCacheMaterial {
@@ -68,7 +76,8 @@ struct LightTree {
   size_t paths_size;
   void* tri_handle_map_data;
   size_t tri_handle_map_size;
-  HashMap* hash_map;
+  void* bvh_vertex_buffer_data;
+  uint32_t light_count;
 } typedef LightTree;
 
 struct Device typedef Device;

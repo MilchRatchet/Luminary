@@ -29,22 +29,21 @@ static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_memb
 LUM_STATIC_SIZE_ASSERT(device_scene_entity_to_const_memory_member, sizeof(DeviceConstantMemoryMember) * SCENE_ENTITY_GLOBAL_COUNT);
 
 static const size_t device_cuda_const_memory_offsets[] = {
-  offsetof(DeviceConstantMemory, ptrs),                      // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
-  offsetof(DeviceConstantMemory, settings),                  // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
-  offsetof(DeviceConstantMemory, camera),                    // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
-  offsetof(DeviceConstantMemory, ocean),                     // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
-  offsetof(DeviceConstantMemory, sky),                       // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
-  offsetof(DeviceConstantMemory, cloud),                     // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
-  offsetof(DeviceConstantMemory, fog),                       // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
-  offsetof(DeviceConstantMemory, particles),                 // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  offsetof(DeviceConstantMemory, toy),                       // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
-  offsetof(DeviceConstantMemory, pixels_per_thread),         // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
-  offsetof(DeviceConstantMemory, optix_bvh),                 // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
-  offsetof(DeviceConstantMemory, moon_albedo_tex),           // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
-  offsetof(DeviceConstantMemory, sky_hdri_color_tex),        // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
-  offsetof(DeviceConstantMemory, light_tree_hash_map_mask),  // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
-  offsetof(DeviceConstantMemory, user_selected_x),           // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
-  SIZE_MAX                                                   // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
+  offsetof(DeviceConstantMemory, ptrs),                // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
+  offsetof(DeviceConstantMemory, settings),            // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
+  offsetof(DeviceConstantMemory, camera),              // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
+  offsetof(DeviceConstantMemory, ocean),               // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
+  offsetof(DeviceConstantMemory, sky),                 // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
+  offsetof(DeviceConstantMemory, cloud),               // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
+  offsetof(DeviceConstantMemory, fog),                 // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
+  offsetof(DeviceConstantMemory, particles),           // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
+  offsetof(DeviceConstantMemory, toy),                 // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
+  offsetof(DeviceConstantMemory, pixels_per_thread),   // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
+  offsetof(DeviceConstantMemory, optix_bvh),           // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
+  offsetof(DeviceConstantMemory, moon_albedo_tex),     // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  offsetof(DeviceConstantMemory, sky_hdri_color_tex),  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
+  offsetof(DeviceConstantMemory, user_selected_x),     // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
+  SIZE_MAX                                             // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_offsets, sizeof(size_t) * (DEVICE_CONSTANT_MEMORY_MEMBER_COUNT + 1));
 
@@ -62,7 +61,6 @@ static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(OptixTraversableHandle) * 4,          // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
   sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
-  sizeof(uint32_t),                            // DEVICE_CONSTANT_MEMORY_MEMBER_LIGHT_TREE_META
   sizeof(uint16_t) * 2 + sizeof(uint32_t) * 3  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_sizes, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
@@ -518,7 +516,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_paths);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
-  __DEVICE_BUFFER_FREE(light_tree_hash_map);
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
@@ -599,6 +596,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(array_create(&device->meshes, sizeof(DeviceMesh*), 4));
   __FAILURE_HANDLE(optix_bvh_instance_cache_create(&device->optix_instance_cache, device));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
+  __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_light));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -845,12 +843,10 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_paths);
   __DEVICE_BUFFER_FREE(light_tree_tri_handle_map);
-  __DEVICE_BUFFER_FREE(light_tree_hash_map);
 
   __DEVICE_BUFFER_ALLOCATE(light_tree_nodes, tree->nodes_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_paths, tree->paths_size);
   __DEVICE_BUFFER_ALLOCATE(light_tree_tri_handle_map, tree->tri_handle_map_size);
-  __DEVICE_BUFFER_ALLOCATE(light_tree_hash_map, sizeof(uint32_t) * tree->hash_map->size);
 
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->nodes_data, (DEVICE void*) device->buffers.light_tree_nodes, 0, tree->nodes_size));
@@ -859,13 +855,10 @@ LuminaryResult device_update_light_tree_data(Device* device, LightTree* tree) {
   __FAILURE_HANDLE(device_staging_manager_register(
     device->staging_manager, tree->tri_handle_map_data, (DEVICE void*) device->buffers.light_tree_tri_handle_map, 0,
     tree->tri_handle_map_size));
-  __FAILURE_HANDLE(device_staging_manager_register(
-    device->staging_manager, tree->hash_map->data, (DEVICE void*) device->buffers.light_tree_hash_map, 0,
-    sizeof(uint32_t) * tree->hash_map->size));
 
-  // TODO: Build light BVH
+  __FAILURE_HANDLE(optix_bvh_light_build(device->optix_bvh_light, device, tree));
 
-  DEVICE_UPDATE_CONSTANT_MEMORY(light_tree_hash_map_mask, tree->hash_map->size - 1);
+  DEVICE_UPDATE_CONSTANT_MEMORY(optix_bvh_light, device->optix_bvh_light->traversable[OPTIX_BVH_TYPE_DEFAULT]);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -926,6 +919,7 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));
+  __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_light));
 
   uint32_t num_textures;
   __FAILURE_HANDLE(array_get_num_elements((*device)->textures, &num_textures));

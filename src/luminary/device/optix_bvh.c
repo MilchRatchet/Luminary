@@ -149,7 +149,10 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh) {
   __FAILURE_HANDLE(host_malloc(bvh, sizeof(OptixBVH)));
   memset(*bvh, 0, sizeof(OptixBVH));
 
-  (*bvh)->allocated  = false;
+  for (uint32_t type = 0; type < OPTIX_BVH_TYPE_COUNT; type++) {
+    (*bvh)->allocated_mask[type] = false;
+  }
+
   (*bvh)->fast_trace = false;
 
   return LUMINARY_SUCCESS;
@@ -158,12 +161,11 @@ LuminaryResult optix_bvh_create(OptixBVH** bvh) {
 static LuminaryResult _optix_bvh_free(OptixBVH* bvh) {
   __CHECK_NULL_ARGUMENT(bvh);
 
-  if (bvh->allocated) {
-    for (uint32_t type = 0; type < OPTIX_BVH_TYPE_COUNT; type++) {
+  for (uint32_t type = 0; type < OPTIX_BVH_TYPE_COUNT; type++) {
+    if (bvh->allocated_mask[type]) {
       __FAILURE_HANDLE(device_free(&bvh->bvh_data[type]));
+      bvh->allocated_mask[type] = false;
     }
-
-    bvh->allocated = false;
   }
 
   return LUMINARY_SUCCESS;
@@ -273,8 +275,9 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
       buffer_sizes.outputSizeInBytes = compact_size;
     }
 
-    bvh->bvh_data[type]    = output_buffer;
-    bvh->traversable[type] = traversable;
+    bvh->bvh_data[type]       = output_buffer;
+    bvh->traversable[type]    = traversable;
+    bvh->allocated_mask[type] = true;
   }
 
   ////////////////////////////////////////////////////////////////////
@@ -284,7 +287,6 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
   __FAILURE_HANDLE(device_free(&device_vertex_buffer));
   __FAILURE_HANDLE(device_free(&device_index_buffer));
 
-  bvh->allocated  = true;
   bvh->fast_trace = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
 
   return LUMINARY_SUCCESS;
@@ -367,16 +369,132 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device) {
       buffer_sizes.outputSizeInBytes = compact_size;
     }
 
-    bvh->bvh_data[type]    = output_buffer;
-    bvh->traversable[type] = traversable;
+    bvh->bvh_data[type]       = output_buffer;
+    bvh->traversable[type]    = traversable;
+    bvh->allocated_mask[type] = true;
   }
 
   ////////////////////////////////////////////////////////////////////
   // Finalize
   ////////////////////////////////////////////////////////////////////
 
-  bvh->allocated  = true;
   bvh->fast_trace = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightTree* tree) {
+  __CHECK_NULL_ARGUMENT(bvh);
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(tree);
+
+  __FAILURE_HANDLE(_optix_bvh_free(bvh));
+
+  ////////////////////////////////////////////////////////////////////
+  // Setting up build input
+  ////////////////////////////////////////////////////////////////////
+
+  OptixAccelBuildOptions build_options;
+  memset(&build_options, 0, sizeof(OptixAccelBuildOptions));
+  build_options.operation             = OPTIX_BUILD_OPERATION_BUILD;
+  build_options.motionOptions.flags   = OPTIX_MOTION_FLAG_NONE;
+  build_options.motionOptions.numKeys = 1;
+  build_options.buildFlags            = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
+
+  OptixBuildInput build_input;
+  memset(&build_input, 0, sizeof(OptixBuildInput));
+  build_input.type = OPTIX_BUILD_INPUT_TYPE_TRIANGLES;
+
+  const uint32_t vertex_count = 3 * tree->light_count;
+
+  DEVICE float* device_vertex_buffer;
+  __FAILURE_HANDLE(device_malloc(&device_vertex_buffer, sizeof(float) * 4 * vertex_count));
+  __FAILURE_HANDLE(
+    device_upload(device_vertex_buffer, tree->bvh_vertex_buffer_data, 0, sizeof(float) * 4 * vertex_count, device->stream_main));
+
+  CUdeviceptr device_vertex_buffer_ptr = DEVICE_CUPTR(device_vertex_buffer);
+
+  build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
+  build_input.triangleArray.vertexStrideInBytes = 16;
+  build_input.triangleArray.numVertices         = vertex_count;
+  build_input.triangleArray.vertexBuffers       = &device_vertex_buffer_ptr;
+
+  build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_NONE;
+  build_input.triangleArray.indexStrideInBytes = 0;
+  build_input.triangleArray.numIndexTriplets   = 0;
+  build_input.triangleArray.indexBuffer        = (CUdeviceptr) 0;
+
+  unsigned int inputFlags = 0;
+  inputFlags |= OPTIX_GEOMETRY_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
+
+  build_input.triangleArray.flags         = &inputFlags;
+  build_input.triangleArray.numSbtRecords = 1;
+
+  // Reminder: OptiX requires pointers to be null if there is no data for the OMM and DMM.
+
+  ////////////////////////////////////////////////////////////////////
+  // Building BVH
+  ////////////////////////////////////////////////////////////////////
+
+  OptixAccelBufferSizes buffer_sizes;
+
+  OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(device->optix_ctx, &build_options, &build_input, 1, &buffer_sizes));
+
+  DEVICE void* temp_buffer;
+  __FAILURE_HANDLE(device_malloc(&temp_buffer, buffer_sizes.tempSizeInBytes));
+
+  DEVICE void* output_buffer;
+  __FAILURE_HANDLE(device_malloc(&output_buffer, buffer_sizes.outputSizeInBytes));
+
+  OptixTraversableHandle traversable;
+
+  DEVICE size_t* accel_emit_buffer;
+  __FAILURE_HANDLE(device_malloc(&accel_emit_buffer, sizeof(size_t)));
+
+  OptixAccelEmitDesc accel_emit;
+  memset(&accel_emit, 0, sizeof(OptixAccelEmitDesc));
+
+  accel_emit.result = DEVICE_CUPTR(accel_emit_buffer);
+  accel_emit.type   = OPTIX_PROPERTY_TYPE_COMPACTED_SIZE;
+
+  OPTIX_FAILURE_HANDLE(optixAccelBuild(
+    device->optix_ctx, device->stream_main, &build_options, &build_input, 1, DEVICE_CUPTR(temp_buffer), buffer_sizes.tempSizeInBytes,
+    DEVICE_CUPTR(output_buffer), buffer_sizes.outputSizeInBytes, &traversable, &accel_emit, 1));
+
+  size_t compact_size;
+  __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
+  __FAILURE_HANDLE(device_free(&accel_emit_buffer));
+  __FAILURE_HANDLE(device_free(&temp_buffer));
+
+  if (compact_size < buffer_sizes.outputSizeInBytes) {
+    log_message("OptiX BVH is being compacted from size %zu to size %zu", buffer_sizes.outputSizeInBytes, compact_size);
+    DEVICE void* output_buffer_compact;
+    __FAILURE_HANDLE(device_malloc(&output_buffer_compact, compact_size));
+
+    OPTIX_FAILURE_HANDLE(optixAccelCompact(
+      device->optix_ctx, device->stream_main, traversable, DEVICE_CUPTR(output_buffer_compact), compact_size, &traversable));
+
+    __FAILURE_HANDLE(device_free(&output_buffer));
+
+    output_buffer                  = output_buffer_compact;
+    buffer_sizes.outputSizeInBytes = compact_size;
+  }
+
+  bvh->bvh_data[OPTIX_BVH_TYPE_DEFAULT]       = output_buffer;
+  bvh->traversable[OPTIX_BVH_TYPE_DEFAULT]    = traversable;
+  bvh->allocated_mask[OPTIX_BVH_TYPE_DEFAULT] = true;
+
+  ////////////////////////////////////////////////////////////////////
+  // Clean up
+  ////////////////////////////////////////////////////////////////////
+
+  __FAILURE_HANDLE(device_free(&device_vertex_buffer));
+
+  bvh->fast_trace = (build_options.buildFlags & OPTIX_BUILD_FLAG_PREFER_FAST_TRACE);
+
+  return LUMINARY_SUCCESS;
 
   return LUMINARY_SUCCESS;
 }

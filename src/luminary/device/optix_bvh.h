@@ -21,8 +21,8 @@ DEVICE_CTX_FUNC LuminaryResult
 DEVICE_CTX_FUNC LuminaryResult optix_bvh_instance_cache_destroy(OptixBVHInstanceCache** cache);
 
 struct OptixBVH {
-  bool allocated;
   bool fast_trace;
+  bool allocated_mask[OPTIX_BVH_TYPE_COUNT];
   OptixTraversableHandle traversable[OPTIX_BVH_TYPE_COUNT];
   DEVICE void* bvh_data[OPTIX_BVH_TYPE_COUNT];
 } typedef OptixBVH;
