@@ -730,7 +730,7 @@ LuminaryResult device_update_mesh(Device* device, const Mesh* mesh) {
     device->staging_manager, (void*) device->buffers.triangle_counts, sizeof(uint32_t) * mesh->id, sizeof(uint32_t),
     (void**) &direct_access_buffer));
 
-  __FAILURE_HANDLE(array_get_num_elements(device->meshes[mesh->id]->triangles, (uint32_t*) *direct_access_buffer));
+  *(uint32_t*) direct_access_buffer = mesh->data.triangle_count;
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

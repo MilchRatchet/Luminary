@@ -953,7 +953,7 @@ static LuminaryResult _light_tree_clear_work(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
 
   __FAILURE_HANDLE(host_free(&work->fragments));
-  __FAILURE_HANDLE(host_free(&work->binary_nodes));
+  __FAILURE_HANDLE(array_destroy(&work->binary_nodes));
   __FAILURE_HANDLE(host_free(&work->nodes));
 
   return LUMINARY_SUCCESS;
@@ -1131,15 +1131,23 @@ static LuminaryResult _light_tree_update_cache_mesh(
   // Clear all the triangle related cache, modifying meshes is not supposed to be fast
   ////////////////////////////////////////////////////////////////////
 
-  uint32_t num_materials_allocated;
-  __FAILURE_HANDLE(array_get_num_elements(cache->materials, &num_materials_allocated));
+  if (cache->materials) {
+    uint32_t num_materials_allocated;
+    __FAILURE_HANDLE(array_get_num_elements(cache->materials, &num_materials_allocated));
 
-  for (uint32_t material_id = 0; material_id < num_materials_allocated; material_id++) {
-    __FAILURE_HANDLE(array_destroy(cache->triangles + material_id));
+    for (uint32_t material_id = 0; material_id < num_materials_allocated; material_id++) {
+      __FAILURE_HANDLE(array_destroy(cache->triangles + material_id));
+    }
+
+    __FAILURE_HANDLE(array_clear(&cache->materials));
   }
 
-  __FAILURE_HANDLE(array_clear(cache->triangles));
-  __FAILURE_HANDLE(array_clear(cache->materials));
+  if (cache->triangles) {
+    __FAILURE_HANDLE(array_clear(&cache->triangles));
+  }
+
+  __FAILURE_HANDLE(array_create(&cache->materials, sizeof(uint16_t), 16));
+  __FAILURE_HANDLE(array_create(&cache->triangles, sizeof(LightTreeCacheTriangle*), 16));
 
   ////////////////////////////////////////////////////////////////////
   // Generate triangle caches
@@ -1329,13 +1337,14 @@ static LuminaryResult _light_tree_update_cache_material(LightTreeCacheMaterial* 
     material_is_dirty            = true;
   }
 
+  float intensity;
   if (has_textured_emission) {
     // TODO: Check if triangle_has_textured_emission && (emission texture hash are not equal) then reintegrate.
-
-    has_emission = true;
+    intensity = material->emission_scale;
   }
-
-  const float intensity = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b));
+  else {
+    intensity = fmaxf(material->emission.r, fmaxf(material->emission.g, material->emission.b));
+  }
 
   if (cache->constant_emission_intensity != intensity) {
     cache->constant_emission_intensity = intensity;
@@ -1514,6 +1523,9 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
   for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
     LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
 
+    if (!instance->active)
+      continue;
+
     uint32_t num_fragments;
     __FAILURE_HANDLE(array_get_num_elements(instance->fragments, &num_fragments));
 
@@ -1529,6 +1541,9 @@ static LuminaryResult _light_tree_collect_fragments(LightTree* tree, LightTreeWo
 
   for (uint32_t instance_id = 0; instance_id < num_instances; instance_id++) {
     LightTreeCacheInstance* instance = tree->cache.instances + instance_id;
+
+    if (!instance->active)
+      continue;
 
     uint32_t num_fragments;
     __FAILURE_HANDLE(array_get_num_elements(instance->fragments, &num_fragments));
@@ -1584,13 +1599,13 @@ LuminaryResult light_tree_destroy(LightTree** tree) {
     LightTreeCacheMesh* mesh = (*tree)->cache.meshes + mesh_id;
 
     if (mesh->triangles) {
-      __FAILURE_HANDLE(host_free(&mesh->triangles));
+      __FAILURE_HANDLE(array_destroy(&mesh->triangles));
     }
   }
 
-  __FAILURE_HANDLE(host_free(&(*tree)->cache.meshes));
-  __FAILURE_HANDLE(host_free(&(*tree)->cache.instances));
-  __FAILURE_HANDLE(host_free(&(*tree)->cache.materials));
+  __FAILURE_HANDLE(array_destroy(&(*tree)->cache.meshes));
+  __FAILURE_HANDLE(array_destroy(&(*tree)->cache.instances));
+  __FAILURE_HANDLE(array_destroy(&(*tree)->cache.materials));
 
   __FAILURE_HANDLE(host_free(&(*tree)->nodes_data));
   __FAILURE_HANDLE(host_free(&(*tree)->paths_data));

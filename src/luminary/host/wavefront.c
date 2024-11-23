@@ -781,16 +781,20 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
   __FAILURE_HANDLE(array_resize(&content->texture_instances, 0));
   __FAILURE_HANDLE(array_resize(&content->textures, 0));
 
+  uint32_t material_id_offset;
+  __FAILURE_HANDLE(array_get_num_elements(*materials, &material_id_offset));
+
   for (uint32_t mat_id = 0; mat_id < material_count; mat_id++) {
     const WavefrontMaterial wavefront_mat = content->materials[mat_id];
 
     Material mat;
-    mat.id                         = material_count + mat_id;
+    mat.id                         = material_id_offset + mat_id;
     mat.albedo.r                   = wavefront_mat.diffuse_reflectivity.r;
     mat.albedo.g                   = wavefront_mat.diffuse_reflectivity.g;
     mat.albedo.b                   = wavefront_mat.diffuse_reflectivity.b;
     mat.albedo.r                   = wavefront_mat.dissolve;
     mat.emission                   = wavefront_mat.emission;
+    mat.emission_scale             = 1.0f;
     mat.refraction_index           = wavefront_mat.refraction_index;
     mat.metallic                   = wavefront_mat.specular_reflectivity.r;
     mat.roughness                  = 1.0f - wavefront_mat.specular_exponent / 1000.0f;

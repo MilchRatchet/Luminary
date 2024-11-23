@@ -279,11 +279,11 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->roughness        = _device_struct_convert_float01_to_uint16(material->roughness);
   device_material->refraction_index = _device_struct_convert_float01_to_uint16(0.5f * (material->refraction_index - 1.0f));
 
-  RGBF emission                 = material->emission;
-  const uint16_t emission_scale = (uint16_t) fminf(fmaxf(fmaxf(emission.r, emission.g), emission.b) + 1.0f, (float) 0xFFFFu);
-  emission.r /= (float) emission_scale;
-  emission.g /= (float) emission_scale;
-  emission.b /= (float) emission_scale;
+  RGBF emission                      = material->emission;
+  const float emission_normalization = 1.0f / fminf(fmaxf(fmaxf(emission.r, emission.g), emission.b) + 1.0f, (float) 0xFFFFu);
+  emission.r *= emission_normalization;
+  emission.g *= emission_normalization;
+  emission.b *= emission_normalization;
 
   device_material->albedo_r       = _device_struct_convert_float01_to_uint16(material->albedo.r);
   device_material->albedo_g       = _device_struct_convert_float01_to_uint16(material->albedo.g);
@@ -292,7 +292,7 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->emission_r     = _device_struct_convert_float01_to_uint16(emission.r);
   device_material->emission_g     = _device_struct_convert_float01_to_uint16(emission.g);
   device_material->emission_b     = _device_struct_convert_float01_to_uint16(emission.b);
-  device_material->emission_scale = emission_scale;
+  device_material->emission_scale = material->emission_scale;
   device_material->albedo_tex     = material->albedo_tex;
   device_material->luminance_tex  = material->luminance_tex;
   device_material->material_tex   = material->material_tex;

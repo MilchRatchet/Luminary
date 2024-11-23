@@ -294,6 +294,7 @@ LUMINARY_API struct LuminaryMaterial {
   uint32_t id;
   LuminaryRGBAF albedo;
   LuminaryRGBF emission;
+  float emission_scale;
   float metallic;
   float roughness;
   float roughness_clamp;

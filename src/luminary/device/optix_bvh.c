@@ -64,7 +64,10 @@ LuminaryResult optix_bvh_instance_cache_create(OptixBVHInstanceCache** cache, De
 
   __FAILURE_HANDLE(host_malloc(cache, sizeof(OptixBVHInstanceCache)));
 
-  __FAILURE_HANDLE(device_malloc(&(*cache)->instances, 16 * sizeof(OptixInstance)));
+  for (uint32_t type = 0; type < OPTIX_BVH_TYPE_COUNT; type++) {
+    __FAILURE_HANDLE(device_malloc(&(*cache)->instances[type], 16 * sizeof(OptixInstance)));
+  }
+
   (*cache)->num_instances           = 0;
   (*cache)->num_instances_allocated = 16;
 

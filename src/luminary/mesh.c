@@ -44,12 +44,12 @@ LuminaryResult mesh_instance_get_default(MeshInstance* instance) {
 
   memset(instance, 0, sizeof(MeshInstance));
 
+  instance->active     = true;
   instance->id         = instance_id_counter++;
   instance->rotation.w = 1.0f;
   instance->scale.x    = 1.0f;
   instance->scale.y    = 1.0f;
   instance->scale.z    = 1.0f;
-  instance->active     = false;
 
   return LUMINARY_SUCCESS;
 }
