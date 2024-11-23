@@ -2,6 +2,7 @@
 #include "cloud_noise.cuh"
 #include "geometry.cuh"
 #include "kernels.cuh"
+#include "light.cuh"
 #include "particle.cuh"
 #include "sky.cuh"
 #include "sky_hdri.cuh"

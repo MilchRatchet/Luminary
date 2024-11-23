@@ -418,9 +418,10 @@ LuminaryResult device_struct_texture_object_convert(const struct DeviceTexture* 
   __CHECK_NULL_ARGUMENT(texture);
   __CHECK_NULL_ARGUMENT(texture_object);
 
-  texture_object->handle  = texture->tex;
-  texture_object->gamma   = texture->gamma;
-  texture_object->padding = 0.0f;
+  texture_object->handle = texture->tex;
+  texture_object->gamma  = texture->gamma;
+  texture_object->width  = texture->width;
+  texture_object->height = texture->height;
 
   return LUMINARY_SUCCESS;
 }

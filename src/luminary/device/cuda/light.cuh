@@ -538,15 +538,13 @@ __device__ float light_tree_query_pdf(const GBufferData data, const uint32_t lig
 // Light Processing
 ////////////////////////////////////////////////////////////////////
 
-__device__ float lights_integrate_emission(const TriangleLight light, const UV vertex, const UV edge1, const UV edge2) {
-  const Material mat = load_material(device.ptrs.materials, light.material_id);
-
-  const DeviceTexture tex = device.ptrs.luminance_atlas[mat.luminance_tex];
+__device__ float lights_integrate_emission(const DeviceMaterial material, const UV vertex, const UV edge1, const UV edge2) {
+  const DeviceTextureObject tex = device.ptrs.textures[material.luminance_tex];
 
   // Super crude way of determining the number of texel fetches I will need. If performance of this becomes an issue
   // then I will have to rethink this here.
-  const float texel_steps_u = fmaxf(fabsf(edge1.u), fabsf(edge2.u)) / tex.inv_width;
-  const float texel_steps_v = fmaxf(fabsf(edge1.v), fabsf(edge2.v)) / tex.inv_height;
+  const float texel_steps_u = fmaxf(fabsf(edge1.u), fabsf(edge2.u)) * tex.width;
+  const float texel_steps_v = fmaxf(fabsf(edge1.v), fabsf(edge2.v)) * tex.height;
 
   const float steps = ceilf(fmaxf(texel_steps_u, texel_steps_v));
 
@@ -572,25 +570,30 @@ __device__ float lights_integrate_emission(const TriangleLight light, const UV v
   return color_importance(accumulator) / texel_count;
 }
 
-LUMINARY_KERNEL void light_compute_power(const TriangleLight* tris, const uint32_t lights_count, float* power_dst) {
+LUMINARY_KERNEL void light_compute_power(const TriangleHandle* handles, const uint32_t lights_count, float* power_dst) {
   for (uint32_t light = THREAD_ID; light < lights_count; light += blockDim.x * gridDim.x) {
-    const TriangleLight light_triangle = load_triangle_light(tris, light);
+    const TriangleHandle handle = handles[light];
 
-    const float2 t5 = __ldg((float2*) triangle_get_entry_address(4, 2, light_triangle.triangle_id));
-    const float4 t6 = __ldg((float4*) triangle_get_entry_address(5, 0, light_triangle.triangle_id));
+    const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
-    const UV vertex_texture = get_uv(t5.x, t5.y);
-    const UV edge1_texture  = get_uv(t6.x, t6.y);
-    const UV edge2_texture  = get_uv(t6.z, t6.w);
+    const DeviceTriangle* tri_ptr = device.ptrs.triangles[mesh_id];
+    const uint32_t triangle_count = device.ptrs.triangle_counts[mesh_id];
 
-    power_dst[light] = lights_integrate_emission(light_triangle, vertex_texture, edge1_texture, edge2_texture);
+    const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, handle.tri_id, triangle_count));
+    const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, handle.tri_id, triangle_count));
+
+    const UV vertex_texture  = uv_unpack(__float_as_uint(t2.y));
+    const UV vertex1_texture = uv_unpack(__float_as_uint(t2.z));
+    const UV vertex2_texture = uv_unpack(__float_as_uint(t2.w));
+
+    const UV edge1_texture = uv_sub(vertex1_texture, vertex_texture);
+    const UV edge2_texture = uv_sub(vertex2_texture, vertex_texture);
+
+    const uint16_t material_id    = __float_as_uint(t3.w) & 0xFFFF;
+    const DeviceMaterial material = load_material(device.ptrs.materials, material_id);
+
+    power_dst[light] = lights_integrate_emission(material, vertex_texture, edge1_texture, edge2_texture);
   }
-}
-
-void lights_compute_power_host(const TriangleLight* device_triangle_lights, uint32_t lights_count, float* device_power_dst) {
-  lights_compute_power<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(device_triangle_lights, lights_count, device_power_dst);
-
-  gpuErrchk(cudaDeviceSynchronize());
 }
 
 #endif /* !SHADING_KERNEL */

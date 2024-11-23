@@ -198,11 +198,15 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
 
   CUDA_FAILURE_HANDLE(cuTexObjectCreate(&device_texture->tex, &res_desc, &tex_desc, (const CUDA_RESOURCE_VIEW_DESC*) 0));
 
-  device_texture->memory     = data_device;
-  device_texture->inv_width  = 1.0f / width;
-  device_texture->inv_height = 1.0f / height;
-  device_texture->gamma      = texture->gamma;
-  device_texture->is_3D      = (texture->dim == Tex3D);
+  if (width > 0xFFFF || height > 0xFFFF) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Texture dimension exceeds limits: %ux%u.", width, height);
+  }
+
+  device_texture->memory = data_device;
+  device_texture->width  = width;
+  device_texture->height = height;
+  device_texture->gamma  = texture->gamma;
+  device_texture->is_3D  = (texture->dim == Tex3D);
 
   *_device_texture = device_texture;
 

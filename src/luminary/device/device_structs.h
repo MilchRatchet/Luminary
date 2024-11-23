@@ -229,7 +229,8 @@ typedef CUtexObject DeviceTextureHandle;
 struct DeviceTextureObject {
   DeviceTextureHandle handle;
   float gamma;
-  float padding;
+  uint16_t width;
+  uint16_t height;
 } typedef DeviceTextureObject;
 LUM_STATIC_SIZE_ASSERT(DeviceTextureObject, 0x10u);
 

@@ -8,8 +8,8 @@
 struct DeviceTexture {
   DEVICE void* memory;
   CUtexObject tex;
-  float inv_width;
-  float inv_height;
+  uint16_t width;
+  uint16_t height;
   float gamma;
   bool is_3D;
 } typedef DeviceTexture;
