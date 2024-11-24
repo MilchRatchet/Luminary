@@ -45,6 +45,7 @@ struct Device {
   SampleCountSlice sample_count;
   bool exit_requested;
   bool optix_callback_error;
+  bool is_main_device;
   CUdevice cuda_device;
   CUcontext cuda_ctx;
   CUDAKernel* cuda_kernels[CUDA_KERNEL_TYPE_COUNT];
@@ -76,6 +77,8 @@ void _device_init(void);
 void _device_shutdown(void);
 
 LuminaryResult device_create(Device** device, uint32_t index);
+LuminaryResult device_register_as_main(Device* device);
+LuminaryResult device_unregister_as_main(Device* device);
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);

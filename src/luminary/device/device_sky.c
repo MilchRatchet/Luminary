@@ -3,6 +3,7 @@
 #include "device.h"
 #include "device_texture.h"
 #include "internal_error.h"
+#include "kernel_args.h"
 #include "sky.h"
 #include "sky_defines.h"
 
@@ -71,16 +72,39 @@ LuminaryResult sky_lut_update(SkyLUT* lut, const Sky* sky) {
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _sky_lut_generate(SkyLUT* lut, Device* device) {
+static LuminaryResult _sky_lut_generate_lut(SkyLUT* lut, DeviceSkyLUT* device_lut, Device* device) {
   __CHECK_NULL_ARGUMENT(lut);
   __CHECK_NULL_ARGUMENT(device);
 
-  // TODO: Compute the LUT
-  // Currently emulating the side effects
-  memset(lut->transmittance_low->data, 0, SKY_TM_TEX_WIDTH * sizeof(RGBAF) * SKY_TM_TEX_HEIGHT);
-  memset(lut->transmittance_high->data, 0, SKY_TM_TEX_WIDTH * sizeof(RGBAF) * SKY_TM_TEX_HEIGHT);
-  memset(lut->multiscattering_low->data, 0, SKY_MS_TEX_SIZE * sizeof(RGBAF) * SKY_MS_TEX_SIZE);
-  memset(lut->multiscattering_high->data, 0, SKY_MS_TEX_SIZE * sizeof(RGBAF) * SKY_MS_TEX_SIZE);
+  KernelArgsSkyComputeTransmittanceLUT transmission_lut_args;
+  transmission_lut_args.dst_low  = DEVICE_PTR(device_lut->transmittance_low->memory);
+  transmission_lut_args.dst_high = DEVICE_PTR(device_lut->transmittance_high->memory);
+
+  KernelArgsSkyComputeMultiscatteringLUT multiscattering_lut_args;
+  multiscattering_lut_args.dst_low  = DEVICE_PTR(device_lut->multiscattering_low->memory);
+  multiscattering_lut_args.dst_high = DEVICE_PTR(device_lut->multiscattering_high->memory);
+
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device_lut->transmittance_low, &multiscattering_lut_args.transmission_low_tex));
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device_lut->transmittance_high, &multiscattering_lut_args.transmission_high_tex));
+
+  __FAILURE_HANDLE(device_sync_constant_memory(device));
+  __FAILURE_HANDLE(kernel_execute_with_args(
+    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_TRANSMITTANCE_LUT], &transmission_lut_args, device->stream_main));
+  __FAILURE_HANDLE(kernel_execute_with_args(
+    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_MULTISCATTERING_LUT], &multiscattering_lut_args, device->stream_main));
+
+  __FAILURE_HANDLE(device_download2D(
+    lut->transmittance_low->data, device_lut->transmittance_low->memory, device_lut->transmittance_low->pitch,
+    SKY_TM_TEX_WIDTH * sizeof(RGBAF), SKY_TM_TEX_HEIGHT, device->stream_main));
+  __FAILURE_HANDLE(device_download2D(
+    lut->transmittance_high->data, device_lut->transmittance_high->memory, device_lut->transmittance_high->pitch,
+    SKY_TM_TEX_WIDTH * sizeof(RGBAF), SKY_TM_TEX_HEIGHT, device->stream_main));
+  __FAILURE_HANDLE(device_download2D(
+    lut->multiscattering_low->data, device_lut->multiscattering_low->memory, device_lut->multiscattering_low->pitch,
+    SKY_MS_TEX_SIZE * sizeof(RGBAF), SKY_MS_TEX_SIZE, device->stream_main));
+  __FAILURE_HANDLE(device_download2D(
+    lut->multiscattering_high->data, device_lut->multiscattering_high->memory, device_lut->multiscattering_high->pitch,
+    SKY_MS_TEX_SIZE * sizeof(RGBAF), SKY_MS_TEX_SIZE, device->stream_main));
 
   return LUMINARY_SUCCESS;
 }
@@ -90,10 +114,15 @@ DEVICE_CTX_FUNC LuminaryResult sky_lut_generate(SkyLUT* lut, Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
   if (lut->sky_is_dirty) {
-    __FAILURE_HANDLE(_sky_lut_generate(lut, device));
+    DeviceSkyLUT* device_lut = device->sky_lut;
 
     lut->sky_is_dirty = false;
     lut->id++;
+
+    bool has_changed;
+    __FAILURE_HANDLE(device_sky_lut_update(device_lut, device, lut, &has_changed));
+
+    __FAILURE_HANDLE(_sky_lut_generate_lut(lut, device_lut, device));
   }
 
   return LUMINARY_SUCCESS;

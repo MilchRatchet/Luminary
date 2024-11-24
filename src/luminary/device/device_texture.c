@@ -119,6 +119,8 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
 
   DEVICE void* data_device;
 
+  size_t pitch_gpu;
+
   switch (texture->dim) {
     case Tex2D: {
       switch (texture->mipmap) {
@@ -127,7 +129,6 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
         case TexMipmapNone: {
           __FAILURE_HANDLE(device_malloc2D(&data_device, width * pixel_size, height));
 
-          size_t pitch_gpu;
           __FAILURE_HANDLE(device_memory_get_pitch(data_device, &pitch_gpu));
 
           if (data != (void*) 0) {
@@ -165,6 +166,8 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
           __FAILURE_HANDLE(_device_texture_get_format(texture, &descriptor.Format));
 
           CUDA_FAILURE_HANDLE(cuArray3DCreate((CUarray*) &data_device, &descriptor));
+
+          pitch_gpu = width * pixel_size;
 
           if (data != (void*) 0) {
             CUDA_MEMCPY3D memcpy_info;
@@ -207,6 +210,7 @@ LuminaryResult device_texture_create(DeviceTexture** _device_texture, const Text
   device_texture->height = height;
   device_texture->gamma  = texture->gamma;
   device_texture->is_3D  = (texture->dim == Tex3D);
+  device_texture->pitch  = pitch_gpu;
 
   *_device_texture = device_texture;
 

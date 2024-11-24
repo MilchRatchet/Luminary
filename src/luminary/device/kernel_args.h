@@ -19,4 +19,16 @@ struct KernelArgsCloudComputeWeatherNoise {
   uint8_t* tex;
 } typedef KernelArgsCloudComputeWeatherNoise;
 
+struct KernelArgsSkyComputeTransmittanceLUT {
+  float4* dst_low;
+  float4* dst_high;
+} typedef KernelArgsSkyComputeTransmittanceLUT;
+
+struct KernelArgsSkyComputeMultiscatteringLUT {
+  DeviceTextureObject transmission_low_tex;
+  DeviceTextureObject transmission_high_tex;
+  float4* dst_low;
+  float4* dst_high;
+} typedef KernelArgsSkyComputeMultiscatteringLUT;
+
 #endif /* LUMINARY_KERNEL_ARGS_H */

@@ -193,6 +193,44 @@ LuminaryResult device_upload2D(DEVICE void* dst, const void* src, size_t src_pit
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_download2D(
+  void* dst, const DEVICE void* src, size_t src_pitch, size_t src_width, size_t src_height, CUstream stream) {
+  __CHECK_NULL_ARGUMENT(dst);
+  __CHECK_NULL_ARGUMENT(src);
+
+  struct DeviceMemoryHeader* src_header = (struct DeviceMemoryHeader*) src;
+
+  if (src_header->magic != DEVICE_MEMORY_HEADER_MAGIC) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Destination is not device memory.");
+  }
+
+  if (src_pitch * src_height > src_header->size) {
+    __RETURN_ERROR(
+      LUMINARY_ERROR_API_EXCEPTION,
+      "Download exceeds allocated device memory. %llu bytes are allocated and 2D upload would cover %llu bytes.", src_header->size,
+      src_pitch * src_height);
+  }
+
+  // TODO: src_width is in bytes, make sure that that is clear.
+  CUDA_MEMCPY2D copy_info;
+  copy_info.dstHost       = dst;
+  copy_info.dstMemoryType = CU_MEMORYTYPE_HOST;
+  copy_info.dstPitch      = src_width;
+  copy_info.dstXInBytes   = 0;
+  copy_info.dstY          = 0;
+  copy_info.srcDevice     = src_header->ptr;
+  copy_info.srcMemoryType = CU_MEMORYTYPE_DEVICE;
+  copy_info.srcPitch      = src_pitch;
+  copy_info.srcXInBytes   = 0;
+  copy_info.srcY          = 0;
+  copy_info.WidthInBytes  = src_width;
+  copy_info.Height        = src_height;
+
+  CUDA_FAILURE_HANDLE(cuMemcpy2DAsync(&copy_info, stream));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_memory_get_pitch(DEVICE const void* ptr, size_t* pitch) {
   __CHECK_NULL_ARGUMENT(ptr);
   __CHECK_NULL_ARGUMENT(pitch);

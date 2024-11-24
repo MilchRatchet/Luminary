@@ -75,6 +75,13 @@ struct uint2 {
   uint32_t x;
   uint32_t y;
 } typedef uint2;
+
+struct float4 {
+  float x;
+  float y;
+  float z;
+  float w;
+} typedef float4;
 #endif /* __cplusplus */
 
 ////////////////////////////////////////////////////////////////////

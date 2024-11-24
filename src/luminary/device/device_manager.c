@@ -383,6 +383,8 @@ static LuminaryResult _device_manager_select_main_device(DeviceManager* device_m
 
   device_manager->main_device_index = selected_device;
 
+  __FAILURE_HANDLE(device_register_as_main(device_manager->devices[device_manager->main_device_index]));
+
   return LUMINARY_SUCCESS;
 }
 

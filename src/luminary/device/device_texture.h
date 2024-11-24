@@ -12,6 +12,7 @@ struct DeviceTexture {
   uint16_t height;
   float gamma;
   bool is_3D;
+  size_t pitch;
 } typedef DeviceTexture;
 
 LuminaryResult device_texture_create(DeviceTexture** device_texture, const Texture* texture, CUstream stream);

@@ -141,7 +141,7 @@ __device__ Spectrum sky_compute_transmittance_optical_depth(const float r, const
 }
 
 // [Bru17]
-LUMINARY_KERNEL void sky_compute_transmittance_lut(float4* transmittance_tex_lower, float4* transmittance_tex_higher) {
+LUMINARY_KERNEL void sky_compute_transmittance_lut(KernelArgsSkyComputeTransmittanceLUT args) {
   unsigned int id = THREAD_ID;
 
   const int amount = SKY_TM_TEX_WIDTH * SKY_TM_TEX_HEIGHT;
@@ -170,8 +170,8 @@ LUMINARY_KERNEL void sky_compute_transmittance_lut(float4* transmittance_tex_low
     const Spectrum optical_depth = sky_compute_transmittance_optical_depth(r, mu);
     const Spectrum transmittance = spectrum_exp(spectrum_scale(optical_depth, -1.0f));
 
-    transmittance_tex_lower[x + y * SKY_TM_TEX_WIDTH]  = spectrum_split_low(transmittance);
-    transmittance_tex_higher[x + y * SKY_TM_TEX_WIDTH] = spectrum_split_high(transmittance);
+    args.dst_low[x + y * SKY_TM_TEX_WIDTH]  = spectrum_split_low(transmittance);
+    args.dst_high[x + y * SKY_TM_TEX_WIDTH] = spectrum_split_high(transmittance);
 
     id += blockDim.x * gridDim.x;
   }
@@ -183,7 +183,9 @@ struct msScatteringResult {
 } typedef msScatteringResult;
 
 // [Hil20]
-__device__ msScatteringResult sky_compute_multiscattering_integration(const vec3 origin, const vec3 ray, const vec3 sun_pos) {
+__device__ msScatteringResult sky_compute_multiscattering_integration(
+  const vec3 origin, const vec3 ray, const vec3 sun_pos, const DeviceTextureObject transmission_low,
+  const DeviceTextureObject transmission_high) {
   msScatteringResult result;
 
   result.L               = spectrum_set1(0.0f);
@@ -225,8 +227,8 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
       const float zenith_cos_angle = dot_product(normalize_vector(pos), ray_scatter);
 
       const UV transmittance_uv       = sky_transmittance_lut_uv(height, zenith_cos_angle);
-      const float4 transmittance_low  = tex2D<float4>(device.sky_lut_transmission_low_tex.handle, transmittance_uv.u, transmittance_uv.v);
-      const float4 transmittance_high = tex2D<float4>(device.sky_lut_transmission_high_tex.handle, transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_low  = tex2D<float4>(transmission_low.handle, transmittance_uv.u, transmittance_uv.v);
+      const float4 transmittance_high = tex2D<float4>(transmission_high.handle, transmittance_uv.u, transmittance_uv.v);
       const Spectrum extinction_sun   = spectrum_merge(transmittance_low, transmittance_high);
 
       const float density_rayleigh = sky_rayleigh_density(height) * device.sky.rayleigh_density;
@@ -267,7 +269,7 @@ __device__ msScatteringResult sky_compute_multiscattering_integration(const vec3
 
 // [Hil20]
 // This kernel does not use default Luminary launch bounds, hence it may not be marked as LUMINARY_KERNEL
-LUMINARY_KERNEL_NO_BOUNDS void sky_compute_multiscattering_lut(float4* multiscattering_tex_lower, float4* multiscattering_tex_higher) {
+LUMINARY_KERNEL_NO_BOUNDS void sky_compute_multiscattering_lut(KernelArgsSkyComputeMultiscatteringLUT args) {
   const int x = blockIdx.x;
   const int y = blockIdx.y;
 
@@ -295,7 +297,8 @@ LUMINARY_KERNEL_NO_BOUNDS void sky_compute_multiscattering_lut(float4* multiscat
   const float randB = b / sqrt_sample;
   const vec3 ray    = sample_ray_sphere(2.0f * randA - 1.0f, randB);
 
-  msScatteringResult result = sky_compute_multiscattering_integration(pos, ray, sun_pos);
+  msScatteringResult result =
+    sky_compute_multiscattering_integration(pos, ray, sun_pos, args.transmission_low_tex, args.transmission_high_tex);
 
   luminance_shared[threadIdx.x]       = result.L;
   multiscattering_shared[threadIdx.x] = result.multiScatterAs1;
@@ -318,8 +321,8 @@ LUMINARY_KERNEL_NO_BOUNDS void sky_compute_multiscattering_lut(float4* multiscat
 
   const Spectrum L = spectrum_scale(spectrum_mul(luminance, multiScatteringContribution), device.sky.multiscattering_factor);
 
-  multiscattering_tex_lower[x + y * SKY_MS_TEX_SIZE]  = spectrum_split_low(L);
-  multiscattering_tex_higher[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
+  args.dst_low[x + y * SKY_MS_TEX_SIZE]  = spectrum_split_low(L);
+  args.dst_high[x + y * SKY_MS_TEX_SIZE] = spectrum_split_high(L);
 }
 
 #endif /* SHADING_KERNEL */

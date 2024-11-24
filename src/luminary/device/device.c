@@ -538,6 +538,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   device->index                = index;
   device->optix_callback_error = false;
   device->exit_requested       = false;
+  device->is_main_device       = false;
 
   __FAILURE_HANDLE(_device_reset_constant_memory_dirty(device));
 
@@ -609,6 +610,22 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
   *_device = device;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_register_as_main(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  device->is_main_device = true;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_unregister_as_main(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  device->is_main_device = false;
 
   return LUMINARY_SUCCESS;
 }
