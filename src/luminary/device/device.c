@@ -599,6 +599,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_ias));
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_light));
 
+  __FAILURE_HANDLE(device_renderer_create(&device->renderer));
+
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
 
@@ -667,6 +669,31 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
   memcpy(((uint8_t*) device->constant_memory) + member_offset, object, member_size);
 
   __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, member));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint32_t depth) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  DEVICE_UPDATE_CONSTANT_MEMORY(sample_id, sample_id);
+  DEVICE_UPDATE_CONSTANT_MEMORY(depth, depth);
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_sync_constant_memory(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(_device_update_constant_memory(device));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -963,6 +990,8 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   __FAILURE_HANDLE(array_destroy(&(*device)->meshes));
+
+  __FAILURE_HANDLE(device_renderer_destroy(&(*device)->renderer));
 
   __FAILURE_HANDLE(device_sky_lut_destroy(&(*device)->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_destroy(&(*device)->sky_hdri));

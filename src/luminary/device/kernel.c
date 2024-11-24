@@ -26,6 +26,7 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
     {.name = "cloud_compute_detail_noise", .shared_memory_size = 0, .arg_size = sizeof(KernelArgsCloudComputeDetailNoise)},
   [CUDA_KERNEL_TYPE_CLOUD_COMPUTE_WEATHER_NOISE] =
     {.name = "cloud_compute_weather_noise", .shared_memory_size = 0, .arg_size = sizeof(KernelArgsCloudComputeWeatherNoise)},
+  [CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS]          = {.name = "cloud_process_tasks", .shared_memory_size = 0, .arg_size = 0},
   [CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS]        = {.name = "volume_process_events", .shared_memory_size = 0, .arg_size = 0},
   [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG] = {.name = "particle_process_tasks_debug", .shared_memory_size = 0, .arg_size = 0},
   [CUDA_KERNEL_TYPE_PARTICLE_GENERATE]            = {.name = "particle_generate", .shared_memory_size = 0, .arg_size = 0},

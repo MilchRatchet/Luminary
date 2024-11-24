@@ -312,7 +312,7 @@ __device__ float clouds_render(
 // Kernel
 ////////////////////////////////////////////////////////////////////
 
-LUMINARY_KERNEL void clouds_render_tasks() {
+LUMINARY_KERNEL void cloud_process_tasks() {
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {

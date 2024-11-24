@@ -159,24 +159,16 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult optix_kernel_update_params(OptixKernel* kernel) {
+LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   __CHECK_NULL_ARGUMENT(kernel);
+  __CHECK_NULL_ARGUMENT(device);
 
-  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
-}
-
-LuminaryResult optix_kernel_update_sample_id(OptixKernel* kernel) {
-  __CHECK_NULL_ARGUMENT(kernel);
-
-  __RETURN_ERROR(LUMINARY_ERROR_NOT_IMPLEMENTED, "");
-}
-
-LuminaryResult optix_kernel_execute(OptixKernel* kernel) {
-  __CHECK_NULL_ARGUMENT(kernel);
+  CUDA_FAILURE_HANDLE(cuMemcpyDtoDAsync_v2(
+    DEVICE_CUPTR(kernel->params), device->cuda_device_const_memory, sizeof(DeviceConstantMemory), device->stream_main));
 
   OPTIX_FAILURE_HANDLE(optixLaunch(
-    kernel->pipeline, 0, DEVICE_CUPTR(kernel->params), sizeof(DeviceConstantMemory), &kernel->shaders, THREADS_PER_BLOCK, BLOCKS_PER_GRID,
-    1));
+    kernel->pipeline, device->stream_main, DEVICE_CUPTR(kernel->params), sizeof(DeviceConstantMemory), &kernel->shaders, THREADS_PER_BLOCK,
+    BLOCKS_PER_GRID, 1));
 
   return LUMINARY_SUCCESS;
 }

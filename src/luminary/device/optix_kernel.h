@@ -26,9 +26,7 @@ struct OptixKernel {
 } typedef OptixKernel;
 
 LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type);
-LuminaryResult optix_kernel_update_params(OptixKernel* kernel);
-LuminaryResult optix_kernel_update_sample_id(OptixKernel* kernel);
-LuminaryResult optix_kernel_execute(OptixKernel* kernel);
+LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device);
 LuminaryResult optix_kernel_destroy(OptixKernel** kernel);
 
 #endif /* LUMINARY_OPTIX_KERNEL_H */

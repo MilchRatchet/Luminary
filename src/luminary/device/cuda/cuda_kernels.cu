@@ -1,6 +1,7 @@
 
 #include "camera_post_common.cuh"
 #include "camera_post_lens_flare.cuh"
+#include "cloud.cuh"
 #include "cloud_noise.cuh"
 #include "geometry.cuh"
 #include "kernels.cuh"

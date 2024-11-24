@@ -5,6 +5,7 @@
 #include "device_memory.h"
 #include "device_mesh.h"
 #include "device_post.h"
+#include "device_renderer.h"
 #include "device_sky.h"
 #include "device_staging_manager.h"
 #include "device_utils.h"
@@ -68,6 +69,7 @@ struct Device {
   DeviceSkyLUT* sky_lut;
   DeviceSkyHDRI* sky_hdri;
   DevicePost* post;
+  DeviceRenderer* renderer;
 } typedef Device;
 
 void _device_init(void);
@@ -77,6 +79,8 @@ LuminaryResult device_create(Device** device, uint32_t index);
 LuminaryResult device_compile_kernels(Device* device, CUlibrary library);
 LuminaryResult device_load_embedded_data(Device* device);
 LuminaryResult device_update_scene_entity(Device* device, const void* object, SceneEntity entity);
+LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint32_t depth);
+LuminaryResult device_sync_constant_memory(Device* device);
 LuminaryResult device_allocate_work_buffers(Device* device);
 LuminaryResult device_update_mesh(Device* device, const Mesh* mesh);
 LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshInstanceUpdate* instance_updates);

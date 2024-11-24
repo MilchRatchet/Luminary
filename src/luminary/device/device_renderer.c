@@ -1,0 +1,167 @@
+#include "device_renderer.h"
+
+#include "device.h"
+#include "internal_error.h"
+
+LuminaryResult device_renderer_create(DeviceRenderer** renderer) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  __FAILURE_HANDLE(host_malloc(renderer, sizeof(DeviceRenderer)));
+  memset(*renderer, 0, sizeof(DeviceRenderer));
+
+  __FAILURE_HANDLE(array_create(&(*renderer)->queue, sizeof(DeviceRendererQueueAction), 16));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(array_set_num_elements(renderer->queue, 0));
+
+  DeviceRendererQueueAction action;
+
+  for (uint32_t depth = 0; depth < args->max_depth; depth++) {
+    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
+    action.mem_update = (DeviceRendererQueueActionMemUpdate){.depth = depth};
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+    if (depth == 0) {
+      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+      action.cuda_type = CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+    else {
+      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+      action.cuda_type = CUDA_KERNEL_TYPE_BALANCE_TRACE_TASKS;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
+    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+    action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+    if (args->render_particles) {
+      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+      action.optix_type = OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
+    if (args->render_volumes) {
+      // It is important to compute bridges lighting before sampling volume scattering events.
+      // We want to sample over the whole unoccluded ray path so sampling scattering events before
+      // that would shorten the path.
+
+      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+      action.cuda_type = CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
+    if (args->render_clouds) {
+      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+      action.cuda_type = CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
+    if (args->render_inscattering) {
+      action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+      action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
+    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+    action.cuda_type = CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+    action.optix_type = OPTIX_KERNEL_TYPE_SHADING_GEOMETRY;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+    if (args->render_volumes) {
+      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_VOLUME;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
+    if (args->render_particles) {
+      action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL;
+      action.optix_type = OPTIX_KERNEL_TYPE_SHADING_PARTICLES;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+
+    action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+    action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS;
+    __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
+    if (depth < args->max_depth - 1) {
+      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_ITERATION;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+    else {
+      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE;
+      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+    }
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_set_sample_slice(DeviceRenderer* renderer, SampleCountSlice sample_count) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  renderer->sample_count = sample_count;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_queue_iteration(DeviceRenderer* renderer, Device* device) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(device);
+
+  if (renderer->sample_count.current_sample_count == renderer->sample_count.end_sample_count)
+    return LUMINARY_SUCCESS;
+
+  uint32_t num_actions;
+  __FAILURE_HANDLE(array_get_num_elements(renderer->queue, &num_actions));
+
+  for (uint32_t action_id = renderer->action_ptr; action_id < num_actions; action_id++) {
+    const DeviceRendererQueueAction* action = renderer->queue + action_id;
+
+    switch (action->type) {
+      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL:
+        __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[action->cuda_type], device->stream_main));
+        break;
+      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL:
+        __FAILURE_HANDLE(optix_kernel_execute(device->optix_kernels[action->optix_type], device));
+        break;
+      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
+        __FAILURE_HANDLE(device_update_dynamic_const_mem(device, renderer->sample_count.current_sample_count, action->mem_update.depth));
+        __FAILURE_HANDLE(device_sync_constant_memory(device));
+        break;
+      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_ITERATION:
+        renderer->action_ptr = action_id + 1;
+        return LUMINARY_SUCCESS;
+      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
+        renderer->sample_count.current_sample_count++;
+        return LUMINARY_SUCCESS;
+    }
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_destroy(DeviceRenderer** renderer) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(*renderer);
+
+  __FAILURE_HANDLE(array_destroy(&(*renderer)->queue));
+
+  __FAILURE_HANDLE(host_free(renderer));
+
+  return LUMINARY_SUCCESS;
+}
