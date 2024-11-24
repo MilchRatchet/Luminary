@@ -106,9 +106,7 @@ LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void* arg_struct, CU
   launch_config.attrs          = (CUlaunchAttribute*) 0;
   launch_config.numAttrs       = 0;
 
-  void* kernel_args[] = {CU_LAUNCH_PARAM_BUFFER_POINTER, arg_struct, CU_LAUNCH_PARAM_BUFFER_SIZE, &kernel->arg_size, CU_LAUNCH_PARAM_END};
-
-  CUDA_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, (void**) 0, kernel_args));
+  CUDA_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, &arg_struct, (void**) 0));
 
   return LUMINARY_SUCCESS;
 }
