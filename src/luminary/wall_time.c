@@ -134,3 +134,11 @@ LuminaryResult wall_time_destroy(WallTime** wall_time) {
 
   return LUMINARY_SUCCESS;
 }
+
+LuminaryResult _wall_time_get_timestamp(uint64_t* time) {
+  __CHECK_NULL_ARGUMENT(time);
+
+  *time = _wall_time_get_time();
+
+  return LUMINARY_SUCCESS;
+}

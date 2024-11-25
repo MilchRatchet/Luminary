@@ -601,6 +601,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(optix_bvh_create(&device->optix_bvh_light));
 
   __FAILURE_HANDLE(device_renderer_create(&device->renderer));
+  __FAILURE_HANDLE(device_output_create(&device->output));
 
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
@@ -1008,6 +1009,7 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(array_destroy(&(*device)->meshes));
 
+  __FAILURE_HANDLE(device_output_destroy(&(*device)->output));
   __FAILURE_HANDLE(device_renderer_destroy(&(*device)->renderer));
 
   __FAILURE_HANDLE(device_sky_lut_destroy(&(*device)->sky_lut));

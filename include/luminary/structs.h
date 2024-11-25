@@ -38,18 +38,24 @@ LUMINARY_API struct LuminaryRendererSettings {
   uint32_t width;
   uint32_t height;
   uint32_t max_ray_depth;
-  LUMINARY_DEPRECATED bool use_denoiser;
   uint32_t bridge_max_num_vertices;
   uint32_t bridge_num_ris_samples;
   uint32_t light_num_ris_samples;
   uint32_t light_num_rays;
-  bool use_opacity_micromaps;
-  bool use_displacement_micromaps;
-  LUMINARY_DEPRECATED bool use_luminary_bvh;
+  LUMINARY_DEPRECATED bool use_opacity_micromaps;
+  LUMINARY_DEPRECATED bool use_displacement_micromaps;
   uint32_t undersampling;
   LuminaryShadingMode shading_mode;
   uint32_t max_sample_count;
 } typedef LuminaryRendererSettings;
+
+LUMINARY_API struct LuminaryOutputProperties {
+  bool enabled;
+  uint32_t width;
+  uint32_t height;
+} typedef LuminaryOutputProperties;
+
+LUMINARY_API typedef uint32_t LuminaryOutputHandle;
 
 ////////////////////////////////////////////////////////////////////
 // Camera

@@ -4,6 +4,7 @@
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_mesh.h"
+#include "device_output.h"
 #include "device_post.h"
 #include "device_renderer.h"
 #include "device_sky.h"
@@ -71,6 +72,7 @@ struct Device {
   DeviceSkyHDRI* sky_hdri;
   DevicePost* post;
   DeviceRenderer* renderer;
+  DeviceOutput* output;
 } typedef Device;
 
 void _device_init(void);

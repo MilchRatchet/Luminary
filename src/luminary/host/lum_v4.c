@@ -10,7 +10,6 @@ static LuminaryResult parse_general_settings(
   RendererSettings* settings, ARRAYPTR char*** obj_file_path_strings, ARRAY MeshInstance** instances, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
-  uint32_t bool_uint = 0;
 
   switch (key) {
     /* MESHFILE */
@@ -52,11 +51,6 @@ static LuminaryResult parse_general_settings(
     /* NUMLIGHT */
     case 6073182477647435086u:
       sscanf(value, "%u\n", &settings->light_num_rays);
-      break;
-    /* DENOISER */
-    case 5928236058831373636u:
-      sscanf(value, "%u\n", &bool_uint);
-      settings->use_denoiser = bool_uint;
       break;
 #if 0
     /* OUTPUTFN */

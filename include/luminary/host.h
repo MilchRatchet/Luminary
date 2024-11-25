@@ -54,8 +54,18 @@ LUMINARY_API LuminaryResult luminary_host_get_queue_string(const LuminaryHost* h
  */
 LUMINARY_API LuminaryResult luminary_host_get_queue_time(const LuminaryHost* host, double* time);
 
-LUMINARY_API LuminaryResult luminary_host_set_enable_output(LuminaryHost* host, int enable_output);
-LUMINARY_API LuminaryResult luminary_host_get_last_render(LuminaryHost* host);
+LUMINARY_API LuminaryResult luminary_host_set_output_properties(LuminaryHost* host, LuminaryOutputProperties properties);
+
+/*
+ * Returns handle to an output. Every handle acquired must be released by calling luminary_host_release_output. Consecutive calls to
+ * luminary_host_acquire_output are not guaranteed to return unique handles.
+ * @param host Host instance.
+ * @param output_handle The destination the handle will be written to.
+ */
+LUMINARY_API LuminaryResult luminary_host_acquire_output(LuminaryHost* host, LuminaryOutputHandle* output_handle);
+LUMINARY_API LuminaryResult
+  luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutputHandle output_handle, void* const* output_buffer);
+LUMINARY_API LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHandle* output_handle);
 
 LUMINARY_API LuminaryResult luminary_host_get_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
 LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, LuminaryRendererSettings* settings);

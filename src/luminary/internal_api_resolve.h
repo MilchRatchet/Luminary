@@ -16,6 +16,8 @@ typedef LuminaryRGBAF RGBAF;
 typedef LuminaryRendererSettings RendererSettings;
 typedef LuminaryShadingMode ShadingMode;
 
+typedef LuminaryOutputProperties OutputProperties;
+
 typedef LuminaryCamera Camera;
 typedef LuminaryApertureShape ApertureShape;
 typedef LuminaryFilter Filter;

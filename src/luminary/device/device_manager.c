@@ -203,12 +203,13 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
     const uint32_t previous_light_tree_build_id = device_manager->light_tree->build_id;
-    __FAILURE_HANDLE(device_build_light_tree(device_manager->devices[device_manager->main_device_index], device_manager->light_tree));
+    __FAILURE_HANDLE_CRITICAL(
+      device_build_light_tree(device_manager->devices[device_manager->main_device_index], device_manager->light_tree));
 
     if (previous_light_tree_build_id != device_manager->light_tree->build_id) {
       for (uint32_t device_id = 0; device_id < device_count; device_id++) {
         Device* device = device_manager->devices[device_id];
-        __FAILURE_HANDLE(device_update_light_tree_data(device, device_manager->light_tree));
+        __FAILURE_HANDLE_CRITICAL(device_update_light_tree_data(device, device_manager->light_tree));
       }
     }
 

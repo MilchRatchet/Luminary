@@ -163,8 +163,9 @@ LuminaryResult luminary_host_create(Host** _host) {
 
   Host* host;
   __FAILURE_HANDLE(host_malloc(&host, sizeof(Host)));
-
   memset(host, 0, sizeof(Host));
+
+  __FAILURE_HANDLE(output_handler_create(&host->output_handler));
 
   __FAILURE_HANDLE(array_create(&host->meshes, sizeof(Mesh*), 16));
   __FAILURE_HANDLE(array_create(&host->textures, sizeof(Texture*), 16));
@@ -238,6 +239,8 @@ LuminaryResult luminary_host_destroy(Host** host) {
 
   __FAILURE_HANDLE(scene_destroy(&(*host)->scene_caller));
   __FAILURE_HANDLE(scene_destroy(&(*host)->scene_host));
+
+  __FAILURE_HANDLE(output_handler_destroy(&(*host)->output_handler));
 
   __FAILURE_HANDLE(host_free(host));
 
