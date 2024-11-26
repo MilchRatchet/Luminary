@@ -2,6 +2,25 @@
 
 static uint32_t __num_displays = 0;
 
+static void _display_handle_resize(Display* display) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  SDL_GetWindowSizeInPixels(display->sdl_window, (int*) &(display->width), (int*) &(display->height));
+
+  SDL_Surface* surface = SDL_GetWindowSurface(display->sdl_window);
+
+  display->buffer = surface->pixels;
+  display->ld     = (uint32_t) (surface->pitch / (4 * sizeof(uint8_t)));
+}
+
+static void _display_blit_to_display_buffer(Display* display, uint8_t* output) {
+  for (uint32_t y = 0; y < display->height; y++) {
+    memcpy(
+      display->buffer + y * sizeof(uint8_t) * 4 * display->ld, output + y * sizeof(uint8_t) * 4 * display->width,
+      sizeof(uint8_t) * 4 * display->width);
+  }
+}
+
 void display_create(Display** _display, uint32_t width, uint32_t height) {
   MD_CHECK_NULL_ARGUMENT(_display);
 
@@ -48,10 +67,12 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
     crash_message("Failed to create SDL_Window.");
   }
 
+  _display_handle_resize(display);
+
   *_display = display;
 }
 
-void display_query_events(Display* display, bool* exit_requested) {
+void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(exit_requested);
 
@@ -62,6 +83,13 @@ void display_query_events(Display* display, bool* exit_requested) {
       case SDL_EVENT_QUIT:
         *exit_requested = true;
         break;
+      case SDL_EVENT_DROP_FILE:
+        // TODO: Implement support for dragging and dropping files into Mandarin Duck.
+        break;
+      case SDL_EVENT_WINDOW_RESIZED:
+        _display_handle_resize(display);
+        *dirty = true;
+        break;
       default:
         warn_message("Unhandled SDL event type: %u.", event.type);
         break;
@@ -69,7 +97,34 @@ void display_query_events(Display* display, bool* exit_requested) {
   }
 }
 
+void display_render(Display* display, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  LuminaryOutputHandle output_handle;
+  LUM_FAILURE_HANDLE(luminary_host_acquire_output(host, &output_handle));
+
+  uint8_t* output_buffer;
+  LUM_FAILURE_HANDLE(luminary_host_get_output_buffer(host, output_handle, (void**) &output_buffer));
+
+  // No output buffer means that the renderer has never produced an output image.
+  if (!output_buffer) {
+    for (uint32_t y = 0; y < display->height; y++) {
+      memset(display->buffer + y * sizeof(uint8_t) * 4 * display->ld, 0xFF, sizeof(uint8_t) * 4 * display->width);
+    }
+
+    LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
+    return;
+  }
+
+  _display_blit_to_display_buffer(display, output_buffer);
+
+  LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
+}
+
 void display_update(Display* display) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
   SDL_UpdateWindowSurface(display->sdl_window);
 }
 

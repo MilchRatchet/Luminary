@@ -9,10 +9,13 @@ struct Display {
   SDL_Window* sdl_window;
   uint32_t width;
   uint32_t height;
+  uint8_t* buffer;
+  uint32_t ld;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height);
-void display_query_events(Display* display, bool* exit_requested);
+void display_query_events(Display* display, bool* exit_requested, bool* dirty);
+void display_render(Display* display, LuminaryHost* host);
 void display_update(Display* display);
 void display_destroy(Display** display);
 

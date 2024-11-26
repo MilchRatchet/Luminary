@@ -63,9 +63,8 @@ LUMINARY_API LuminaryResult luminary_host_set_output_properties(LuminaryHost* ho
  * @param output_handle The destination the handle will be written to.
  */
 LUMINARY_API LuminaryResult luminary_host_acquire_output(LuminaryHost* host, LuminaryOutputHandle* output_handle);
-LUMINARY_API LuminaryResult
-  luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutputHandle output_handle, void* const* output_buffer);
-LUMINARY_API LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHandle* output_handle);
+LUMINARY_API LuminaryResult luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutputHandle output_handle, void** output_buffer);
+LUMINARY_API LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHandle output_handle);
 
 LUMINARY_API LuminaryResult luminary_host_get_settings(LuminaryHost* host, LuminaryRendererSettings* settings);
 LUMINARY_API LuminaryResult luminary_host_set_settings(LuminaryHost* host, LuminaryRendererSettings* settings);

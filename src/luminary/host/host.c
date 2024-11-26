@@ -493,3 +493,37 @@ LuminaryResult luminary_host_set_toy(Host* host, Toy* toy) {
 
   return LUMINARY_SUCCESS;
 }
+
+LuminaryResult luminary_host_set_output_properties(LuminaryHost* host, LuminaryOutputProperties properties) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  __FAILURE_HANDLE(output_handler_set_properties(host->output_handler, properties));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_acquire_output(LuminaryHost* host, LuminaryOutputHandle* output_handle) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(output_handle);
+
+  __FAILURE_HANDLE(output_handler_acquire(host->output_handler, output_handle));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_output_buffer(LuminaryHost* host, LuminaryOutputHandle output_handle, void** output_buffer) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(output_buffer);
+
+  __FAILURE_HANDLE(output_handler_get_buffer(host->output_handler, output_handle, output_buffer));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHandle output_handle) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  __FAILURE_HANDLE(output_handler_release(host->output_handler, output_handle));
+
+  return LUMINARY_SUCCESS;
+}

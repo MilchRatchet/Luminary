@@ -19,6 +19,22 @@ LuminaryResult output_handler_create(OutputHandler** output) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult output_handler_set_properties(OutputHandler* output, OutputProperties properties) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(output->mutex));
+
+  output->properties = properties;
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(mutex_unlock(output->mutex));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult output_handler_acquire(OutputHandler* output, uint32_t* handle) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(handle);
@@ -176,6 +192,11 @@ LuminaryResult output_handler_get_buffer(OutputHandler* output, uint32_t handle,
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(buffer);
 
+  if (handle == OUTPUT_OBJECT_HANDLE_INVALID) {
+    *buffer = (void*) 0;
+    return LUMINARY_SUCCESS;
+  }
+
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(mutex_lock(output->mutex));
 
@@ -224,6 +245,7 @@ LuminaryResult output_handler_destroy(OutputHandler** output) {
   __FAILURE_HANDLE_CHECK_CRITICAL();
 
   __FAILURE_HANDLE(mutex_destroy(&(*output)->mutex));
+  __FAILURE_HANDLE(array_destroy(&(*output)->objects));
 
   __FAILURE_HANDLE(host_free(output));
 

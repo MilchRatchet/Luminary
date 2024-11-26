@@ -102,7 +102,9 @@ LuminaryResult wall_time_get_time(WallTime* wall_time, double* time) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Wall time is NULL.");
   }
 
-  wall_time->time = (wall_time->time_point != 0) ? _wall_time_get_time_diff(wall_time->time_point, _wall_time_get_time()) : 0.0f;
+  if (wall_time->time_point != 0) {
+    wall_time->time = _wall_time_get_time_diff(wall_time->time_point, _wall_time_get_time());
+  }
 
   *time = wall_time->time;
 

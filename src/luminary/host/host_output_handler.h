@@ -21,6 +21,7 @@ struct OutputHandler {
 } typedef OutputHandler;
 
 LuminaryResult output_handler_create(OutputHandler** output);
+LuminaryResult output_handler_set_properties(OutputHandler* output, OutputProperties properties);
 LuminaryResult output_handler_acquire(OutputHandler* output, uint32_t* handle);
 LuminaryResult output_handler_release(OutputHandler* output, uint32_t handle);
 LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width, uint32_t height);
