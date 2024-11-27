@@ -229,6 +229,7 @@ struct DevicePointers {
   DEVICE const Quad* particle_quads;
   DEVICE const Star* stars;
   DEVICE const uint32_t* stars_offsets;
+  DEVICE uint32_t* abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 
 enum DeviceConstantMemoryMember {

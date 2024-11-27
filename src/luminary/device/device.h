@@ -98,6 +98,11 @@ LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut);
 LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut);
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri);
+LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
+LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
+LuminaryResult device_continue_render(Device* device);
+LuminaryResult device_set_abort(Device* device);
+LuminaryResult device_unset_abort(Device* device);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

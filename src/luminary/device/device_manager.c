@@ -134,27 +134,36 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(args);
 
+  Scene* scene = device_manager->scene_device;
+
   __FAILURE_HANDLE_LOCK_CRITICAL();
-  __FAILURE_HANDLE_CRITICAL(scene_lock_all(device_manager->scene_device));
+  __FAILURE_HANDLE_CRITICAL(scene_lock_all(scene));
 
   uint32_t device_count;
   __FAILURE_HANDLE_CRITICAL(array_get_num_elements(device_manager->devices, &device_count));
 
   SceneDirtyFlags flags;
-  __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(device_manager->scene_device, &flags));
+  __FAILURE_HANDLE_CRITICAL(scene_get_dirty_flags(scene, &flags));
 
   bool update_device_data_asynchronously = true;
 
   if (flags & SCENE_DIRTY_FLAG_INTEGRATION) {
     // We will override rendering related data, we need to do this synchronously so the stale
     // render kernels don't read crap and crash.
+    // We unset the abort later just before we start rendering again to hide latency coming from the abort procedure.
+    for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      Device* device = device_manager->devices[device_id];
+
+      __FAILURE_HANDLE_CRITICAL(device_set_abort(device));
+    }
+
     update_device_data_asynchronously = false;
   }
 
   uint64_t current_entity = SCENE_ENTITY_GLOBAL_START;
   while (flags && current_entity <= SCENE_ENTITY_GLOBAL_END) {
     if (flags & SCENE_ENTITY_TO_DIRTY(current_entity)) {
-      __FAILURE_HANDLE_CRITICAL(scene_get(device_manager->scene_device, args->entity_buffer, current_entity));
+      __FAILURE_HANDLE_CRITICAL(scene_get(scene, args->entity_buffer, current_entity));
       __FAILURE_HANDLE_CRITICAL(device_struct_scene_entity_convert(args->entity_buffer, args->device_entity_buffer, current_entity));
       __FAILURE_HANDLE_CRITICAL(_device_manager_update_scene_entity_on_devices(device_manager, args->device_entity_buffer, current_entity));
     }
@@ -164,7 +173,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
 
   if (flags & SCENE_ENTITY_SKY) {
     Sky sky;
-    __FAILURE_HANDLE_CRITICAL(scene_get(device_manager->scene_device, &sky, SCENE_ENTITY_SKY));
+    __FAILURE_HANDLE_CRITICAL(scene_get(scene, &sky, SCENE_ENTITY_SKY));
 
     __FAILURE_HANDLE_CRITICAL(sky_lut_update(device_manager->sky_lut, &sky));
     __FAILURE_HANDLE_CRITICAL(device_build_sky_lut(device_manager->devices[device_manager->main_device_index], device_manager->sky_lut));
@@ -215,10 +224,23 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
 
     __FAILURE_HANDLE_CRITICAL(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
 
+    // Main device always computes the first samples
+    __FAILURE_HANDLE_CRITICAL(
+      device_update_sample_count(device_manager->devices[device_manager->main_device_index], &device_manager->sample_count));
+
+    DeviceRendererQueueArgs render_args;
+    render_args.max_depth           = scene->settings.max_ray_depth;
+    render_args.render_clouds       = scene->cloud.active && scene->sky.mode == LUMINARY_SKY_MODE_DEFAULT;
+    render_args.render_inscattering = scene->sky.aerial_perspective && scene->sky.mode != LUMINARY_SKY_MODE_CONSTANT_COLOR;
+    render_args.render_particles    = scene->particles.active;
+    render_args.render_volumes      = scene->fog.active || scene->ocean.active;
+
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
       Device* device = device_manager->devices[device_id];
-      __FAILURE_HANDLE_CRITICAL(sample_count_get_slice(&device_manager->sample_count, 32, &device->sample_count));
-      // TODO: Signal all devices to restart integration
+
+      __FAILURE_HANDLE_CRITICAL(device_update_sample_count(device, &device_manager->sample_count));
+      __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));
+      __FAILURE_HANDLE_CRITICAL(device_start_render(device, &render_args));
     }
   }
 

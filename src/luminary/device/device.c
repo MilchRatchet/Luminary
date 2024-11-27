@@ -520,6 +520,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(particle_quads);
   __DEVICE_BUFFER_FREE(stars);
   __DEVICE_BUFFER_FREE(stars_offsets);
+  __DEVICE_BUFFER_FREE(abort_flag);
 
   return LUMINARY_SUCCESS;
 }
@@ -607,6 +608,15 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
 
   __FAILURE_HANDLE(device_post_create(&device->post));
+
+  ////////////////////////////////////////////////////////////////////
+  // Initialize abort flag
+  ////////////////////////////////////////////////////////////////////
+
+  __DEVICE_BUFFER_ALLOCATE(abort_flag, sizeof(uint32_t));
+
+  uint32_t abort_flag = 0;
+  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, &abort_flag, 0, sizeof(uint32_t), device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -984,6 +994,80 @@ LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri) {
 
     __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX));
   }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(sample_count);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  if (device->sample_count.current_sample_count == device->sample_count.end_sample_count) {
+    __FAILURE_HANDLE(sample_count_get_slice(sample_count, 32, &device->sample_count));
+    __FAILURE_HANDLE(device_renderer_set_sample_slice(device->renderer, device->sample_count));
+  }
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
+  __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_continue_render(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  // Output if last sample in slice or if first slice (I will probably have to update the slice beforehand so this will be first sample in
+  // slice etc)
+  // Queue Post (including async download) (This queueing must have a lock in case the current target output was not yet propagated)
+  // Queue next sample
+  // Host wait on Post done
+  // Signal Device Manager to propagate output to host output handler
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_set_abort(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  uint32_t abort_flag = 0xFFFFFFFF;
+  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, &abort_flag, 0, sizeof(uint32_t), device->stream_secondary));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_unset_abort(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
+
+  uint32_t abort_flag = 0;
+  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, &abort_flag, 0, sizeof(uint32_t), device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

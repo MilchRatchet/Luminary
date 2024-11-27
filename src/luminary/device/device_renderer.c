@@ -18,7 +18,7 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(args);
 
-  __FAILURE_HANDLE(array_set_num_elements(renderer->queue, 0));
+  __FAILURE_HANDLE(array_set_num_elements(&renderer->queue, 0));
 
   DeviceRendererQueueAction action;
 
@@ -97,16 +97,10 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
     action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
     action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS;
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-
-    if (depth < args->max_depth - 1) {
-      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_ITERATION;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
-    else {
-      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE;
-      __FAILURE_HANDLE(array_push(&renderer->queue, &action));
-    }
   }
+
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   return LUMINARY_SUCCESS;
 }
@@ -119,7 +113,7 @@ LuminaryResult device_renderer_set_sample_slice(DeviceRenderer* renderer, Sample
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_queue_iteration(DeviceRenderer* renderer, Device* device) {
+LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
 
@@ -143,9 +137,6 @@ LuminaryResult device_renderer_queue_iteration(DeviceRenderer* renderer, Device*
         __FAILURE_HANDLE(device_update_dynamic_const_mem(device, renderer->sample_count.current_sample_count, action->mem_update.depth));
         __FAILURE_HANDLE(device_sync_constant_memory(device));
         break;
-      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_ITERATION:
-        renderer->action_ptr = action_id + 1;
-        return LUMINARY_SUCCESS;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
         renderer->sample_count.current_sample_count++;
         return LUMINARY_SUCCESS;
