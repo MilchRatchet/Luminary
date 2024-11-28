@@ -1016,12 +1016,13 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args) {
+LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args, CUhostFn callback_func, void* callback_data) {
   __CHECK_NULL_ARGUMENT(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
+  __FAILURE_HANDLE(device_renderer_register_callback(device->renderer, callback_func, callback_data));
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));

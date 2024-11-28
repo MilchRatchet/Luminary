@@ -8,10 +8,11 @@
 struct Device typedef Device;
 
 enum DeviceRendererQueueActionType {
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL      = 0,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL     = 1,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM = 2,
-  DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE    = 3
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL       = 0,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_OPTIX_KERNEL      = 1,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM  = 2,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE = 3,
+  DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE     = 4
 } typedef DeviceRendererQueueActionType;
 
 struct DeviceRendererQueueActionMemUpdate {
@@ -31,6 +32,8 @@ struct DeviceRenderer {
   SampleCountSlice sample_count;
   uint32_t action_ptr;
   ARRAY DeviceRendererQueueAction* queue;
+  CUhostFn registered_callback_func;
+  void* registered_callback_data;
 } typedef DeviceRenderer;
 
 struct DeviceRendererQueueArgs {
@@ -43,6 +46,7 @@ struct DeviceRendererQueueArgs {
 
 DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args);
+DEVICE_CTX_FUNC LuminaryResult device_renderer_register_callback(DeviceRenderer* renderer, CUhostFn callback_func, void* callback_data);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_set_sample_slice(DeviceRenderer* renderer, SampleCountSlice sample_count);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);

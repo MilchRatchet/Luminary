@@ -118,6 +118,30 @@ static LuminaryResult _device_manager_handle_device_instance_updates(DeviceManag
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_handle_device_render(DeviceManager* device_manager, DeviceManagerRenderingCallbackData* data) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(data);
+
+  __FAILURE_HANDLE(device_continue_render(device_manager->devices[data->device_id]));
+
+  return LUMINARY_SUCCESS;
+}
+
+static void _device_manager_render_callback(DeviceManagerRenderingCallbackData* data) {
+  QueueEntry entry;
+
+  entry.name     = "Handle Device Render";
+  entry.function = (QueueEntryFunction) _device_manager_handle_device_render;
+  entry.args     = (void*) data;
+
+  LuminaryResult result = device_manager_queue_work(data->device_manager, &entry);
+
+  if (result) {
+    // TODO: Do proper handling.
+    error_message("Failed to queue _device_manager_handle_device_render.");
+  }
+}
+
 ////////////////////////////////////////////////////////////////////
 // Queue work functions
 ////////////////////////////////////////////////////////////////////
@@ -236,11 +260,16 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     render_args.render_volumes      = scene->fog.active || scene->ocean.active;
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+      DeviceManagerRenderingCallbackData* callback_data = &device_manager->callback_data[device_id];
+
+      callback_data->device_manager = device_manager;
+      callback_data->device_id      = device_id;
+
       Device* device = device_manager->devices[device_id];
 
       __FAILURE_HANDLE_CRITICAL(device_update_sample_count(device, &device_manager->sample_count));
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));
-      __FAILURE_HANDLE_CRITICAL(device_start_render(device, &render_args));
+      __FAILURE_HANDLE_CRITICAL(device_start_render(device, &render_args, (CUhostFn) _device_manager_render_callback, callback_data));
     }
   }
 
@@ -439,6 +468,8 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
     __FAILURE_HANDLE(array_push(&device_manager->devices, &device));
   }
 
+  __FAILURE_HANDLE(host_malloc(&device_manager->callback_data, sizeof(DeviceManagerRenderingCallbackData) * device_count));
+
   __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
   __FAILURE_HANDLE(sky_lut_create(&device_manager->sky_lut));
   __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
@@ -538,38 +569,6 @@ LuminaryResult device_manager_shutdown_queue(DeviceManager* device_manager) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
-  __CHECK_NULL_ARGUMENT(device_manager);
-  __CHECK_NULL_ARGUMENT(*device_manager);
-
-  __FAILURE_HANDLE(device_manager_shutdown_queue(*device_manager));
-
-  __FAILURE_HANDLE(wall_time_destroy(&(*device_manager)->queue_wall_time));
-  __FAILURE_HANDLE(ringbuffer_destroy(&(*device_manager)->ringbuffer));
-  __FAILURE_HANDLE(queue_destroy(&(*device_manager)->work_queue));
-
-  __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
-
-  uint32_t device_count;
-  __FAILURE_HANDLE(array_get_num_elements((*device_manager)->devices, &device_count));
-
-  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_destroy(&((*device_manager)->devices[device_id])));
-  }
-
-  __FAILURE_HANDLE(array_destroy(&(*device_manager)->devices));
-
-  __FAILURE_HANDLE(sky_lut_destroy(&(*device_manager)->sky_lut));
-  __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));
-  __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
-
-  __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));
-
-  __FAILURE_HANDLE(host_free(device_manager));
-
-  return LUMINARY_SUCCESS;
-}
-
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
@@ -642,6 +641,40 @@ LuminaryResult device_manager_add_textures(DeviceManager* device_manager, const 
   entry.args     = (void*) args;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(*device_manager);
+
+  __FAILURE_HANDLE(device_manager_shutdown_queue(*device_manager));
+
+  __FAILURE_HANDLE(wall_time_destroy(&(*device_manager)->queue_wall_time));
+  __FAILURE_HANDLE(ringbuffer_destroy(&(*device_manager)->ringbuffer));
+  __FAILURE_HANDLE(queue_destroy(&(*device_manager)->work_queue));
+
+  __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements((*device_manager)->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_destroy(&((*device_manager)->devices[device_id])));
+  }
+
+  __FAILURE_HANDLE(host_free(&(*device_manager)->callback_data));
+
+  __FAILURE_HANDLE(array_destroy(&(*device_manager)->devices));
+
+  __FAILURE_HANDLE(sky_lut_destroy(&(*device_manager)->sky_lut));
+  __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));
+  __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
+
+  __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));
+
+  __FAILURE_HANDLE(host_free(device_manager));
 
   return LUMINARY_SUCCESS;
 }
