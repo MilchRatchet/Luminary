@@ -31,4 +31,11 @@ struct KernelArgsSkyComputeMultiscatteringLUT {
   float4* dst_high;
 } typedef KernelArgsSkyComputeMultiscatteringLUT;
 
+struct KernelArgsConvertRGBFToXRGB8 {
+  XRGB8* dst;
+  uint32_t width;
+  uint32_t height;
+  LuminaryFilter filter;
+} typedef KernelArgsConvertRGBFToXRGB8;
+
 #endif /* LUMINARY_KERNEL_ARGS_H */

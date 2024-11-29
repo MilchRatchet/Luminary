@@ -142,6 +142,30 @@ static void _device_manager_render_callback(DeviceManagerRenderingCallbackData* 
   }
 }
 
+static LuminaryResult _device_manager_handle_device_output(DeviceManager* device_manager, DeviceManagerRenderingCallbackData* data) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(data);
+
+  // TODO: Queue a copy of the device output to the host output
+
+  return LUMINARY_SUCCESS;
+}
+
+static void _device_manager_output_callback(DeviceManagerRenderingCallbackData* data) {
+  QueueEntry entry;
+
+  entry.name     = "Handle Device Output";
+  entry.function = (QueueEntryFunction) _device_manager_handle_device_output;
+  entry.args     = (void*) data;
+
+  LuminaryResult result = device_manager_queue_work(data->device_manager, &entry);
+
+  if (result) {
+    // TODO: Do proper handling.
+    error_message("Failed to queue _device_manager_handle_device_output.");
+  }
+}
+
 ////////////////////////////////////////////////////////////////////
 // Queue work functions
 ////////////////////////////////////////////////////////////////////

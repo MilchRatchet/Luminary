@@ -12,10 +12,13 @@ struct DeviceOutput {
   uint32_t width;
   uint32_t height;
   STAGING void* buffers[DEVICE_OUTPUT_BUFFER_COUNT];
+  uint32_t buffer_index;
+  DEVICE XRGB8* device_buffer;
 } typedef DeviceOutput;
 
-LuminaryResult device_output_create(DeviceOutput** output);
-LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint32_t height);
-LuminaryResult device_output_destroy(DeviceOutput** output);
+DEVICE_CTX_FUNC LuminaryResult device_output_create(DeviceOutput** output);
+DEVICE_CTX_FUNC LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint32_t height);
+DEVICE_CTX_FUNC LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device);
+DEVICE_CTX_FUNC LuminaryResult device_output_destroy(DeviceOutput** output);
 
 #endif /* LUMINARY_DEVICE_OUTPUT_H */

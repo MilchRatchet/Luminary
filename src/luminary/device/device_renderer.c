@@ -40,7 +40,7 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
 
     // TODO: Figure out better ways of doing this.
     if (depth == 0) {
-      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE;
+      action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE;
       __FAILURE_HANDLE(array_push(&renderer->queue, &action));
     }
 
@@ -104,6 +104,10 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
     action.cuda_type = CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS;
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
   }
+
+  action.type      = DEVICE_RENDERER_QUEUE_ACTION_TYPE_CUDA_KERNEL;
+  action.cuda_type = CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
   action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE;
   __FAILURE_HANDLE(array_push(&renderer->queue, &action));
