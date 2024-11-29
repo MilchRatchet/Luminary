@@ -133,6 +133,25 @@ static LuminaryResult _host_propagate_scene_changes_queue_work(Host* host, void*
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _host_copy_output_queue_work(Host* host, OutputCopyHandle* args) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  uint32_t handle;
+  __FAILURE_HANDLE(output_handler_acquire_new(host->output_handler, args->width, args->height, &handle));
+
+  void* dst;
+  __FAILURE_HANDLE(output_handler_get_buffer(host->output_handler, handle, &dst));
+
+  memcpy(dst, args->src, args->width * args->height * sizeof(XRGB8));
+
+  __FAILURE_HANDLE(output_handler_release_new(host->output_handler, handle));
+
+  // Clean up
+  __FAILURE_HANDLE(ringbuffer_release_entry(host->ringbuffer, sizeof(OutputCopyHandle)));
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
@@ -524,6 +543,25 @@ LuminaryResult luminary_host_release_output(LuminaryHost* host, LuminaryOutputHa
   __CHECK_NULL_ARGUMENT(host);
 
   __FAILURE_HANDLE(output_handler_release(host->output_handler, output_handle));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult host_queue_output_copy_from_device(Host* host, OutputCopyHandle copy_handle) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  OutputCopyHandle* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(OutputCopyHandle), (void**) &args));
+
+  memcpy(args, &copy_handle, sizeof(OutputCopyHandle));
+
+  QueueEntry entry;
+
+  entry.name     = "Copy Output";
+  entry.function = (QueueEntryFunction) _host_copy_output_queue_work;
+  entry.args     = (void*) args;
+
+  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
   return LUMINARY_SUCCESS;
 }

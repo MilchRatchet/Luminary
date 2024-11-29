@@ -24,4 +24,6 @@ struct LuminaryHost {
   OutputHandler* output_handler;
 } typedef LuminaryHost;
 
+LuminaryResult host_queue_output_copy_from_device(Host* host, OutputCopyHandle copy_handle);
+
 #endif /* LUMINARY_INTERNAL_HOST_H */

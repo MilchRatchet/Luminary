@@ -1,6 +1,7 @@
 #ifndef LUMINARY_DEVICE_RENDERER_H
 #define LUMINARY_DEVICE_RENDERER_H
 
+#include "device_callback.h"
 #include "device_utils.h"
 #include "kernel.h"
 #include "optix_kernel.h"
@@ -33,7 +34,7 @@ struct DeviceRenderer {
   uint32_t action_ptr;
   ARRAY DeviceRendererQueueAction* queue;
   CUhostFn registered_callback_func;
-  void* registered_callback_data;
+  DeviceRenderCallbackData callback_data;
 } typedef DeviceRenderer;
 
 struct DeviceRendererQueueArgs {
@@ -46,7 +47,8 @@ struct DeviceRendererQueueArgs {
 
 DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_register_callback(DeviceRenderer* renderer, CUhostFn callback_func, void* callback_data);
+DEVICE_CTX_FUNC LuminaryResult
+  device_renderer_register_callback(DeviceRenderer* renderer, CUhostFn callback_func, DeviceCommonCallbackData callback_data);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_set_sample_slice(DeviceRenderer* renderer, SampleCountSlice sample_count);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);

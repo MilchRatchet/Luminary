@@ -26,8 +26,6 @@
 #include "device_sky.h"
 #include "thread.h"
 
-struct DeviceManagerRenderingCallbackData typedef DeviceManagerRenderingCallbackData;
-
 struct DeviceManager {
   Host* host;
   Scene* scene_device;
@@ -42,13 +40,7 @@ struct DeviceManager {
   LightTree* light_tree;
   SkyLUT* sky_lut;
   SkyHDRI* sky_hdri;
-  DeviceManagerRenderingCallbackData* callback_data;
 } typedef DeviceManager;
-
-struct DeviceManagerRenderingCallbackData {
-  DeviceManager* device_manager;
-  uint32_t device_id;
-};
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager);

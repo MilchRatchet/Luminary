@@ -55,6 +55,9 @@ struct Device {
   OptixKernel* optix_kernels[OPTIX_KERNEL_TYPE_COUNT];
   CUstream stream_main;
   CUstream stream_secondary;
+  CUstream stream_callbacks;
+  CUevent event_queue_render;
+  CUevent event_queue_output;
   DevicePointers buffers;
   STAGING DeviceConstantMemory* constant_memory;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
@@ -99,7 +102,9 @@ LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut);
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri);
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
-LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args, CUhostFn callback_func, void* callback_data);
+LuminaryResult device_start_render(
+  Device* device, DeviceRendererQueueArgs* args, CUhostFn render_callback_func, CUhostFn output_callback_func,
+  DeviceCommonCallbackData callback_data);
 LuminaryResult device_continue_render(Device* device);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);

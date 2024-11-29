@@ -580,6 +580,14 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   CUDA_FAILURE_HANDLE(cuStreamCreate(&device->stream_main, CU_STREAM_NON_BLOCKING));
   CUDA_FAILURE_HANDLE(cuStreamCreate(&device->stream_secondary, CU_STREAM_NON_BLOCKING));
+  CUDA_FAILURE_HANDLE(cuStreamCreate(&device->stream_callbacks, CU_STREAM_NON_BLOCKING));
+
+  ////////////////////////////////////////////////////////////////////
+  // Event creation
+  ////////////////////////////////////////////////////////////////////
+
+  CUDA_FAILURE_HANDLE(cuEventCreate(&device->event_queue_render, CU_EVENT_DISABLE_TIMING));
+  CUDA_FAILURE_HANDLE(cuEventCreate(&device->event_queue_output, CU_EVENT_DISABLE_TIMING));
 
   ////////////////////////////////////////////////////////////////////
   // Constant memory initialization
@@ -710,6 +718,11 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
 
   DEVICE_UPDATE_CONSTANT_MEMORY(sample_id, sample_id);
   DEVICE_UPDATE_CONSTANT_MEMORY(depth, depth);
+
+  // TODO: Set them correctly
+  DEVICE_UPDATE_CONSTANT_MEMORY(user_selected_x, 0xFFFF);
+  DEVICE_UPDATE_CONSTANT_MEMORY(user_selected_y, 0xFFFF);
+  DEVICE_UPDATE_CONSTANT_MEMORY(undersampling, 0);
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1016,13 +1029,16 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args, CUhostFn callback_func, void* callback_data) {
+LuminaryResult device_start_render(
+  Device* device, DeviceRendererQueueArgs* args, CUhostFn render_callback_func, CUhostFn output_callback_func,
+  DeviceCommonCallbackData callback_data) {
   __CHECK_NULL_ARGUMENT(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
+  __FAILURE_HANDLE(device_output_register_callback(device->output, output_callback_func, callback_data));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
-  __FAILURE_HANDLE(device_renderer_register_callback(device->renderer, callback_func, callback_data));
+  __FAILURE_HANDLE(device_renderer_register_callback(device->renderer, render_callback_func, callback_data));
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1129,6 +1145,10 @@ LuminaryResult device_destroy(Device** device) {
 
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_main));
   CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_secondary));
+  CUDA_FAILURE_HANDLE(cuStreamDestroy((*device)->stream_callbacks));
+
+  CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_render));
+  CUDA_FAILURE_HANDLE(cuEventDestroy((*device)->event_queue_output));
 
   OPTIX_FAILURE_HANDLE(optixDeviceContextDestroy((*device)->optix_ctx));
   CUDA_FAILURE_HANDLE(cuCtxDestroy((*device)->cuda_ctx));

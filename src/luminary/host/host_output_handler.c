@@ -108,8 +108,9 @@ LuminaryResult output_handler_release(OutputHandler* output, uint32_t handle) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width, uint32_t height) {
+LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width, uint32_t height, uint32_t* handle) {
   __CHECK_NULL_ARGUMENT(output);
+  __CHECK_NULL_ARGUMENT(handle);
 
   __FAILURE_HANDLE_LOCK_CRITICAL();
   __FAILURE_HANDLE_CRITICAL(mutex_lock(output->mutex));
@@ -149,6 +150,8 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width,
   output->objects[selected_handle].height          = height;
 
   __FAILURE_HANDLE(host_malloc(output->objects[selected_handle].data, sizeof(XRGB8) * width * height));
+
+  *handle = selected_handle;
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(output->mutex));

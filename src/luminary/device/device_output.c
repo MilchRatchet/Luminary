@@ -38,6 +38,18 @@ LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn callback_func, DeviceCommonCallbackData data) {
+  __CHECK_NULL_ARGUMENT(output);
+  __CHECK_NULL_ARGUMENT(callback_func);
+
+  output->registered_callback_func = callback_func;
+
+  output->callback_data.common.device_manager = data.device_manager;
+  output->callback_data.common.device_index   = data.device_index;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_output_generate_output(DeviceOutput* output, Device* device) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
@@ -60,7 +72,14 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   __FAILURE_HANDLE(device_download(
     output->buffers[output->buffer_index], output->device_buffer, 0, output->width * output->height * sizeof(XRGB8), device->stream_main));
 
-  // TODO: Use a CUhostFn call to queue the copy of the output to the host thread (or just sync here)
+  CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_output, device->stream_main));
+
+  output->callback_data.width  = output->width;
+  output->callback_data.height = output->height;
+  output->callback_data.data   = output->buffers[output->buffer_index];
+
+  CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_output, CU_EVENT_WAIT_DEFAULT));
+  CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, output->registered_callback_func, (void*) &output->callback_data));
 
   output->buffer_index = (output->buffer_index + 1) % DEVICE_OUTPUT_BUFFER_COUNT;
 
