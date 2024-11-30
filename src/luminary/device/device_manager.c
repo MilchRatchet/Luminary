@@ -122,7 +122,10 @@ static LuminaryResult _device_manager_handle_device_render(DeviceManager* device
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(data);
 
-  __FAILURE_HANDLE(device_continue_render(device_manager->devices[data->common.device_index]));
+  Device* device = device_manager->devices[data->common.device_index];
+
+  __FAILURE_HANDLE(device_update_sample_count(device, &device_manager->sample_count));
+  __FAILURE_HANDLE(device_continue_render(device));
 
   return LUMINARY_SUCCESS;
 }

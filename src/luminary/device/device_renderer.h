@@ -30,7 +30,6 @@ struct DeviceRendererQueueAction {
 } typedef DeviceRendererQueueAction;
 
 struct DeviceRenderer {
-  SampleCountSlice sample_count;
   uint32_t action_ptr;
   ARRAY DeviceRendererQueueAction* queue;
   CUhostFn registered_callback_func;
@@ -49,8 +48,7 @@ DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer)
 DEVICE_CTX_FUNC LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args);
 DEVICE_CTX_FUNC LuminaryResult
   device_renderer_register_callback(DeviceRenderer* renderer, CUhostFn callback_func, DeviceCommonCallbackData callback_data);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_set_sample_slice(DeviceRenderer* renderer, SampleCountSlice sample_count);
-DEVICE_CTX_FUNC LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device);
+DEVICE_CTX_FUNC LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);
 
 #endif /* LUMINARY_DEVICE_RENDERER_H */

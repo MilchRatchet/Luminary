@@ -1021,7 +1021,6 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
 
   if (device->sample_count.current_sample_count == device->sample_count.end_sample_count) {
     __FAILURE_HANDLE(sample_count_get_slice(sample_count, 32, &device->sample_count));
-    __FAILURE_HANDLE(device_renderer_set_sample_slice(device->renderer, device->sample_count));
   }
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1039,7 +1038,7 @@ LuminaryResult device_start_render(
   __FAILURE_HANDLE(device_output_register_callback(device->output, output_callback_func, callback_data));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
   __FAILURE_HANDLE(device_renderer_register_callback(device->renderer, render_callback_func, callback_data));
-  __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device));
+  __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1057,6 +1056,8 @@ LuminaryResult device_continue_render(Device* device) {
   // Queue next sample
   // Host wait on Post done
   // Signal Device Manager to propagate output to host output handler
+
+  __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

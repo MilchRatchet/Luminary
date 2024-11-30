@@ -127,19 +127,11 @@ LuminaryResult device_renderer_register_callback(DeviceRenderer* renderer, CUhos
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_renderer_set_sample_slice(DeviceRenderer* renderer, SampleCountSlice sample_count) {
-  __CHECK_NULL_ARGUMENT(renderer);
-
-  renderer->sample_count = sample_count;
-
-  return LUMINARY_SUCCESS;
-}
-
-LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device) {
+LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count) {
   __CHECK_NULL_ARGUMENT(renderer);
   __CHECK_NULL_ARGUMENT(device);
 
-  if (renderer->sample_count.current_sample_count == renderer->sample_count.end_sample_count)
+  if (sample_count->current_sample_count == sample_count->end_sample_count)
     return LUMINARY_SUCCESS;
 
   uint32_t num_actions;
@@ -156,7 +148,7 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         __FAILURE_HANDLE(optix_kernel_execute(device->optix_kernels[action->optix_type], device));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
-        __FAILURE_HANDLE(device_update_dynamic_const_mem(device, renderer->sample_count.current_sample_count, action->mem_update.depth));
+        __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_count->current_sample_count, action->mem_update.depth));
         __FAILURE_HANDLE(device_sync_constant_memory(device));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
@@ -165,7 +157,7 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_func, &renderer->callback_data));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-        renderer->sample_count.current_sample_count++;
+        sample_count->current_sample_count++;
         return LUMINARY_SUCCESS;
     }
   }
