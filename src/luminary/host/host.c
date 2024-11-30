@@ -39,11 +39,19 @@ LuminaryResult _host_queue_worker(Host* host) {
 
     __FAILURE_HANDLE(entry.function(host, entry.args));
 
+    if (entry.clear_func) {
+      __FAILURE_HANDLE(entry.clear_func(host, entry.args));
+    }
+
     __FAILURE_HANDLE(wall_time_stop(host->queue_wall_time));
     __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, (const char*) 0));
   }
 
   return LUMINARY_SUCCESS;
+}
+
+static bool _host_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right) {
+  return (left->function == right->function);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -170,9 +178,11 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEnti
 
   QueueEntry entry;
 
-  entry.name     = "Updating scene";
-  entry.function = (QueueEntryFunction) _host_propagate_scene_changes_queue_work;
-  entry.args     = (void*) 0;
+  entry.name              = "Updating scene";
+  entry.function          = (QueueEntryFunction) _host_propagate_scene_changes_queue_work;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) 0;
+  entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
@@ -283,9 +293,11 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
 
   QueueEntry entry;
 
-  entry.name     = "Loading Obj";
-  entry.function = (QueueEntryFunction) _host_load_obj_file;
-  entry.args     = args;
+  entry.name              = "Loading Obj";
+  entry.function          = (QueueEntryFunction) _host_load_obj_file;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = args;
+  entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 
@@ -563,9 +575,11 @@ LuminaryResult host_queue_output_copy_from_device(Host* host, OutputCopyHandle c
 
   QueueEntry entry;
 
-  entry.name     = "Copy Output";
-  entry.function = (QueueEntryFunction) _host_copy_output_queue_work;
-  entry.args     = (void*) args;
+  entry.name              = "Copy Output";
+  entry.function          = (QueueEntryFunction) _host_copy_output_queue_work;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) args;
+  entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
 

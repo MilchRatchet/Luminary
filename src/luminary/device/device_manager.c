@@ -29,11 +29,19 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
 
     __FAILURE_HANDLE(entry.function(device_manager, entry.args));
 
+    if (entry.clear_func) {
+      __FAILURE_HANDLE(entry.clear_func(device_manager, entry.args));
+    }
+
     __FAILURE_HANDLE(wall_time_stop(device_manager->queue_wall_time));
     __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, (const char*) 0));
   }
 
   return LUMINARY_SUCCESS;
+}
+
+static bool _device_manager_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right) {
+  return (left->function == right->function);
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -133,9 +141,11 @@ static LuminaryResult _device_manager_handle_device_render(DeviceManager* device
 static void _device_manager_render_callback(DeviceRenderCallbackData* data) {
   QueueEntry entry;
 
-  entry.name     = "Handle Device Render";
-  entry.function = (QueueEntryFunction) _device_manager_handle_device_render;
-  entry.args     = (void*) data;
+  entry.name              = "Handle Device Render";
+  entry.function          = (QueueEntryFunction) _device_manager_handle_device_render;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) data;
+  entry.remove_duplicates = false;
 
   LuminaryResult result = device_manager_queue_work(data->common.device_manager, &entry);
 
@@ -163,9 +173,11 @@ static LuminaryResult _device_manager_handle_device_output(DeviceManager* device
 static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
   QueueEntry entry;
 
-  entry.name     = "Handle Device Output";
-  entry.function = (QueueEntryFunction) _device_manager_handle_device_output;
-  entry.args     = (void*) data;
+  entry.name              = "Handle Device Output";
+  entry.function          = (QueueEntryFunction) _device_manager_handle_device_output;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) data;
+  entry.remove_duplicates = false;
 
   LuminaryResult result = device_manager_queue_work(data->common.device_manager, &entry);
 
@@ -185,6 +197,18 @@ struct DeviceManagerHandleSceneUpdatesArgs {
   void* entity_buffer;
   void* device_entity_buffer;
 } typedef DeviceManagerHandleSceneUpdatesArgs;
+
+static LuminaryResult _device_manager_handle_scene_updates_clear_queue_work(
+  DeviceManager* device_manager, DeviceManagerHandleSceneUpdatesArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs)));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
+
+  return LUMINARY_SUCCESS;
+}
 
 static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   DeviceManager* device_manager, DeviceManagerHandleSceneUpdatesArgs* args) {
@@ -314,11 +338,6 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
 
   __FAILURE_HANDLE_CHECK_CRITICAL();
 
-  // Cleanup
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerHandleSceneUpdatesArgs)));
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, DEVICE_MANAGER_HANDLE_SCENE_UPDATES_WORK_BUFFER_SIZE));
-
   return LUMINARY_SUCCESS;
 }
 
@@ -326,6 +345,16 @@ struct DeviceManagerAddMeshesArgs {
   const Mesh** meshes;
   uint32_t num_meshes;
 } typedef DeviceManagerAddMeshesArgs;
+
+static LuminaryResult _device_manager_add_meshes_clear(DeviceManager* device_manager, DeviceManagerAddMeshesArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddMeshesArgs)));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(Mesh*) * args->num_meshes));
+
+  return LUMINARY_SUCCESS;
+}
 
 static LuminaryResult _device_manager_add_meshes(DeviceManager* device_manager, DeviceManagerAddMeshesArgs* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
@@ -343,9 +372,6 @@ static LuminaryResult _device_manager_add_meshes(DeviceManager* device_manager, 
     }
   }
 
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddMeshesArgs)));
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(Mesh*) * args->num_meshes));
-
   return LUMINARY_SUCCESS;
 }
 
@@ -353,6 +379,16 @@ struct DeviceManagerAddTexturesArgs {
   const Texture** textures;
   uint32_t num_textures;
 } typedef DeviceManagerAddTexturesArgs;
+
+static LuminaryResult _device_manager_add_textures_clear(DeviceManager* device_manager, DeviceManagerAddTexturesArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(host_free(&args->textures));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddTexturesArgs)));
+
+  return LUMINARY_SUCCESS;
+}
 
 static LuminaryResult _device_manager_add_textures(DeviceManager* device_manager, DeviceManagerAddTexturesArgs* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
@@ -364,10 +400,6 @@ static LuminaryResult _device_manager_add_textures(DeviceManager* device_manager
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_add_textures(device_manager->devices[device_id], args->textures, args->num_textures));
   }
-
-  // Cleanup
-  __FAILURE_HANDLE(host_free(&args->textures));
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddTexturesArgs)));
 
   return LUMINARY_SUCCESS;
 }
@@ -529,15 +561,19 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
 
   QueueEntry entry;
 
-  entry.name     = "Kernel compilation";
-  entry.function = (QueueEntryFunction) _device_manager_compile_kernels;
-  entry.args     = (void*) 0;
+  entry.name              = "Kernel compilation";
+  entry.function          = (QueueEntryFunction) _device_manager_compile_kernels;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) 0;
+  entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
-  entry.name     = "Device initialization";
-  entry.function = (QueueEntryFunction) _device_manager_initialize_devices;
-  entry.args     = (void*) 0;
+  entry.name              = "Device initialization";
+  entry.function          = (QueueEntryFunction) _device_manager_initialize_devices;
+  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.args              = (void*) 0;
+  entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
@@ -569,7 +605,22 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(entry);
 
-  __FAILURE_HANDLE(queue_push(device_manager->work_queue, entry));
+  if (entry->remove_duplicates) {
+    bool entry_already_queued = false;
+    __FAILURE_HANDLE(queue_push_unique(
+      device_manager->work_queue, entry, (LuminaryEqOp) _device_manager_queue_entry_equal_operator, &entry_already_queued));
+
+    if (entry_already_queued) {
+      if (entry->clear_func) {
+        __FAILURE_HANDLE(entry->clear_func(device_manager, entry->args));
+      }
+
+      return LUMINARY_SUCCESS;
+    }
+  }
+  else {
+    __FAILURE_HANDLE(queue_push(device_manager->work_queue, entry));
+  }
 
   bool device_thread_is_running;
   __FAILURE_HANDLE(thread_is_running(device_manager->work_thread, &device_thread_is_running));
@@ -616,9 +667,11 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
 
   QueueEntry entry;
 
-  entry.name     = "Update device scene";
-  entry.function = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
-  entry.args     = args;
+  entry.name              = "Update device scene";
+  entry.function          = (QueueEntryFunction) _device_manager_handle_scene_updates_queue_work;
+  entry.clear_func        = (QueueEntryFunction) _device_manager_handle_scene_updates_clear_queue_work;
+  entry.args              = args;
+  entry.remove_duplicates = true;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
@@ -640,9 +693,11 @@ LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Me
 
   QueueEntry entry;
 
-  entry.name     = "Add meshes";
-  entry.function = (QueueEntryFunction) _device_manager_add_meshes;
-  entry.args     = args;
+  entry.name              = "Add meshes";
+  entry.function          = (QueueEntryFunction) _device_manager_add_meshes;
+  entry.clear_func        = (QueueEntryFunction) _device_manager_add_meshes_clear;
+  entry.args              = args;
+  entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 
@@ -668,9 +723,11 @@ LuminaryResult device_manager_add_textures(DeviceManager* device_manager, const 
 
   QueueEntry entry;
 
-  entry.name     = "Add textures";
-  entry.function = (QueueEntryFunction) _device_manager_add_textures;
-  entry.args     = (void*) args;
+  entry.name              = "Add textures";
+  entry.function          = (QueueEntryFunction) _device_manager_add_textures;
+  entry.clear_func        = (QueueEntryFunction) _device_manager_add_textures_clear;
+  entry.args              = (void*) args;
+  entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 

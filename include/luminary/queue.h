@@ -24,6 +24,8 @@
 struct LuminaryQueue;
 typedef struct LuminaryQueue LuminaryQueue;
 
+typedef bool (*LuminaryEqOp)(void* lhs, void* rhs);
+
 #define queue_create(queue, size_of_element, num_elements) \
   _queue_create(queue, size_of_element, num_elements, (const char*) #queue, (const char*) __func__, __LINE__)
 #define queue_destroy(queue) _queue_destroy(queue, (const char*) #queue, (const char*) __func__, __LINE__)
@@ -31,6 +33,7 @@ typedef struct LuminaryQueue LuminaryQueue;
 LUMINARY_API LuminaryResult
   _queue_create(LuminaryQueue** queue, size_t size_of_element, size_t num_elements, const char* buf_name, const char* func, uint32_t line);
 LUMINARY_API LuminaryResult queue_push(LuminaryQueue* queue, void* object);
+LUMINARY_API LuminaryResult queue_push_unique(LuminaryQueue* queue, void* object, LuminaryEqOp equal_operator, bool* already_queued);
 LUMINARY_API LuminaryResult queue_pop(LuminaryQueue* queue, void* object, bool* success);
 LUMINARY_API LuminaryResult queue_pop_blocking(LuminaryQueue* queue, void* object, bool* success);
 LUMINARY_API LuminaryResult queue_set_is_blocking(LuminaryQueue* queue, bool is_blocking);

@@ -85,6 +85,51 @@ LuminaryResult queue_push(Queue* queue, void* object) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult queue_push_unique(LuminaryQueue* queue, void* object, LuminaryEqOp equal_operator, bool* already_queued) {
+  __CHECK_NULL_ARGUMENT(queue);
+  __CHECK_NULL_ARGUMENT(object);
+
+  if (!queue->buffer) {
+    __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Queue buffer is NULL.");
+  }
+
+  if (queue->elements_in_queue == queue->element_count) {
+    __RETURN_ERROR(LUMINARY_ERROR_OUT_OF_MEMORY, "Queue ran out of memory.");
+  }
+
+  __FAILURE_HANDLE_LOCK_CRITICAL();
+  __FAILURE_HANDLE_CRITICAL(mutex_lock(queue->mutex));
+
+  size_t ptr = queue->read_ptr;
+
+  while (!equal_operator(((uint8_t*) (queue->buffer)) + (ptr * queue->element_size), object) && ptr != queue->write_ptr) {
+    ptr = (ptr + 1 >= queue->element_count) ? 0 : ptr + 1;
+  }
+
+  *already_queued = ptr != queue->write_ptr;
+
+  if (ptr == queue->write_ptr) {
+    uint8_t* dst_ptr = ((uint8_t*) (queue->buffer)) + (queue->write_ptr * queue->element_size);
+
+    memcpy(dst_ptr, object, queue->element_size);
+
+    queue->write_ptr++;
+    if (queue->write_ptr >= queue->element_count)
+      queue->write_ptr = 0;
+
+    queue->elements_in_queue++;
+  }
+
+  __FAILURE_HANDLE_CRITICAL(condition_variable_signal(queue->cond_var));
+
+  __FAILURE_HANDLE_UNLOCK_CRITICAL();
+  __FAILURE_HANDLE(mutex_unlock(queue->mutex));
+
+  __FAILURE_HANDLE_CHECK_CRITICAL();
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult queue_pop(Queue* queue, void* object, bool* success) {
   __CHECK_NULL_ARGUMENT(queue);
 

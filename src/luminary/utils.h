@@ -39,7 +39,9 @@ typedef LuminaryResult (*QueueEntryFunction)(void* worker, void* args);
 struct QueueEntry {
   const char* name;
   LuminaryResult (*function)(void* worker, void* args);
+  LuminaryResult (*clear_func)(void* worker, void* args);
   void* args;
+  bool remove_duplicates;
 } typedef QueueEntry;
 
 struct Quaternion {
