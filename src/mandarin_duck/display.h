@@ -3,6 +3,7 @@
 
 #include <SDL3/SDL.h>
 
+#include "keyboard_state.h"
 #include "utils.h"
 
 struct Display {
@@ -11,6 +12,7 @@ struct Display {
   uint32_t height;
   uint8_t* buffer;
   uint32_t ld;
+  KeyboardState* keyboard_state;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height);

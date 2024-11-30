@@ -22,7 +22,7 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
 
   DeviceRendererQueueAction action;
 
-  for (uint32_t depth = 0; depth < args->max_depth; depth++) {
+  for (uint32_t depth = 0; depth <= args->max_depth; depth++) {
     action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
     action.mem_update = (DeviceRendererQueueActionMemUpdate){.depth = depth};
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
