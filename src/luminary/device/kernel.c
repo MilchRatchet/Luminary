@@ -112,25 +112,24 @@ LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void* arg_struct, CU
 }
 
 LuminaryResult kernel_execute_custom(
-  CUDAKernel* kernel, uint32_t threads_per_block, uint32_t blocks_per_grid, void* arg_struct, size_t arg_struct_size, CUstream stream) {
+  CUDAKernel* kernel, uint32_t block_dim_x, uint32_t block_dim_y, uint32_t block_dim_z, uint32_t grid_dim_x, uint32_t grid_dim_y,
+  uint32_t grid_dim_z, void* arg_struct, CUstream stream) {
   __CHECK_NULL_ARGUMENT(kernel);
 
   CUlaunchConfig launch_config;
 
-  launch_config.blockDimX      = threads_per_block;
-  launch_config.blockDimY      = 1;
-  launch_config.blockDimZ      = 1;
-  launch_config.gridDimX       = blocks_per_grid;
-  launch_config.gridDimY       = 1;
-  launch_config.gridDimZ       = 1;
+  launch_config.blockDimX      = block_dim_x;
+  launch_config.blockDimY      = block_dim_y;
+  launch_config.blockDimZ      = block_dim_z;
+  launch_config.gridDimX       = grid_dim_x;
+  launch_config.gridDimY       = grid_dim_y;
+  launch_config.gridDimZ       = grid_dim_z;
   launch_config.sharedMemBytes = kernel->shared_memory_size;
   launch_config.hStream        = stream;
   launch_config.attrs          = (CUlaunchAttribute*) 0;
   launch_config.numAttrs       = 0;
 
-  void* kernel_args[] = {CU_LAUNCH_PARAM_BUFFER_POINTER, arg_struct, CU_LAUNCH_PARAM_BUFFER_SIZE, &arg_struct_size, CU_LAUNCH_PARAM_END};
-
-  CUDA_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, (void**) 0, kernel_args));
+  CUDA_FAILURE_HANDLE(cuLaunchKernelEx(&launch_config, (CUfunction) kernel->cuda_kernel, &arg_struct, (void**) 0));
 
   return LUMINARY_SUCCESS;
 }

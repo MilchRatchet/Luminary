@@ -90,8 +90,9 @@ static LuminaryResult _sky_lut_generate_lut(SkyLUT* lut, DeviceSkyLUT* device_lu
   __FAILURE_HANDLE(device_sync_constant_memory(device));
   __FAILURE_HANDLE(kernel_execute_with_args(
     device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_TRANSMITTANCE_LUT], &transmission_lut_args, device->stream_main));
-  __FAILURE_HANDLE(kernel_execute_with_args(
-    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_MULTISCATTERING_LUT], &multiscattering_lut_args, device->stream_main));
+  __FAILURE_HANDLE(kernel_execute_custom(
+    device->cuda_kernels[CUDA_KERNEL_TYPE_SKY_COMPUTE_MULTISCATTERING_LUT], SKY_MS_ITER, 1, 1, SKY_MS_TEX_SIZE, SKY_MS_TEX_SIZE, 1,
+    &multiscattering_lut_args, device->stream_main));
 
   __FAILURE_HANDLE(device_download2D(
     lut->transmittance_low->data, device_lut->transmittance_low->memory, device_lut->transmittance_low->pitch,

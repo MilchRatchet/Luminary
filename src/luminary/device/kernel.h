@@ -43,11 +43,12 @@ struct CUDAKernel {
   size_t arg_size;
 } typedef CUDAKernel;
 
-LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type);
-LuminaryResult kernel_execute(CUDAKernel* kernel, CUstream stream);
-LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void* arg_struct, CUstream stream);
-LuminaryResult kernel_execute_custom(
-  CUDAKernel* kernel, uint32_t threads_per_block, uint32_t blocks_per_grid, void* arg_struct, size_t arg_struct_size, CUstream stream);
-LuminaryResult kernel_destroy(CUDAKernel** kernel);
+DEVICE_CTX_FUNC LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type);
+DEVICE_CTX_FUNC LuminaryResult kernel_execute(CUDAKernel* kernel, CUstream stream);
+DEVICE_CTX_FUNC LuminaryResult kernel_execute_with_args(CUDAKernel* kernel, void* arg_struct, CUstream stream);
+DEVICE_CTX_FUNC LuminaryResult kernel_execute_custom(
+  CUDAKernel* kernel, uint32_t block_dim_x, uint32_t block_dim_y, uint32_t block_dim_z, uint32_t grid_dim_x, uint32_t grid_dim_y,
+  uint32_t grid_dim_z, void* arg_struct, CUstream stream);
+DEVICE_CTX_FUNC LuminaryResult kernel_destroy(CUDAKernel** kernel);
 
 #endif /* LUMINARY_KERNEL_H */

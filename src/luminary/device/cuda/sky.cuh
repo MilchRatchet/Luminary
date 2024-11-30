@@ -467,6 +467,8 @@ __device__ Spectrum sky_compute_atmosphere(
       }
     }
 
+    // TODO: Implement stars again
+#if 0
     if (sun_hit == FLT_MAX && earth_hit == FLT_MAX && moon_hit == FLT_MAX) {
       const float ray_altitude = asinf(ray.y);
       const float ray_azimuth  = atan2f(-ray.z, -ray.x) + PI;
@@ -488,6 +490,7 @@ __device__ Spectrum sky_compute_atmosphere(
         }
       }
     }
+#endif
   }
 
   transmittance_out = spectrum_mul(transmittance_out, transmittance);
