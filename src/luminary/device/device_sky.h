@@ -17,6 +17,7 @@ struct SkyLUT {
 } typedef SkyLUT;
 
 struct DeviceSkyLUT {
+  bool force_device_update;
   uint32_t reference_id;
   DeviceTexture* transmittance_low;
   DeviceTexture* transmittance_high;

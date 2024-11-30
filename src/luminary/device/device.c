@@ -958,10 +958,10 @@ LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  bool hdri_has_changed = false;
-  __FAILURE_HANDLE(device_sky_lut_update(device->sky_lut, device, sky_lut, &hdri_has_changed));
+  bool luts_have_changed = false;
+  __FAILURE_HANDLE(device_sky_lut_update(device->sky_lut, device, sky_lut, &luts_have_changed));
 
-  if (hdri_has_changed) {
+  if (luts_have_changed) {
     __FAILURE_HANDLE(
       device_struct_texture_object_convert(device->sky_lut->transmittance_low, &device->constant_memory->sky_lut_transmission_low_tex));
     __FAILURE_HANDLE(

@@ -124,6 +124,10 @@ DEVICE_CTX_FUNC LuminaryResult sky_lut_generate(SkyLUT* lut, Device* device) {
     __FAILURE_HANDLE(device_sky_lut_update(device_lut, device, lut, &has_changed));
 
     __FAILURE_HANDLE(_sky_lut_generate_lut(lut, device_lut, device));
+
+    // The update function will think that the LUT is not dirty on this device but the texture objects have never been uploaded,
+    // so we set this flag to override this
+    device_lut->force_device_update = true;
   }
 
   return LUMINARY_SUCCESS;
@@ -148,7 +152,8 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_lut_create(DeviceSkyLUT** lut) {
 
   __FAILURE_HANDLE(host_malloc(lut, sizeof(DeviceSkyLUT)));
 
-  (*lut)->reference_id = 0;
+  (*lut)->reference_id        = 0;
+  (*lut)->force_device_update = false;
 
   (*lut)->transmittance_low    = (DeviceTexture*) 0;
   (*lut)->transmittance_high   = (DeviceTexture*) 0;
@@ -198,6 +203,11 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_lut_update(DeviceSkyLUT* lut, Device* 
     lut->reference_id = source_lut->id;
 
     *has_changed = true;
+  }
+
+  if (lut->force_device_update) {
+    *has_changed             = true;
+    lut->force_device_update = false;
   }
 
   return LUMINARY_SUCCESS;

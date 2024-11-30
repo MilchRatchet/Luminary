@@ -123,15 +123,18 @@ LuminaryResult scene_unlock_all(Scene* scene) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity) {
+LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity, bool* scene_changed) {
   __CHECK_NULL_ARGUMENT(scene);
   __CHECK_NULL_ARGUMENT(object);
+  __CHECK_NULL_ARGUMENT(scene_changed);
 
   __FAILURE_HANDLE(scene_lock(scene, scene_entity_to_mutex[entity]))
 
   bool output_dirty      = false;
   bool integration_dirty = false;
   bool buffers_dirty     = false;
+
+  *scene_changed = false;
 
   switch (entity) {
     case SCENE_ENTITY_SETTINGS:
@@ -176,6 +179,7 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
 
   if (output_dirty || integration_dirty || buffers_dirty) {
     __FAILURE_HANDLE(scene_update_force(scene, object, entity));
+    *scene_changed = true;
   }
 
   __FAILURE_HANDLE(scene_unlock(scene, scene_entity_to_mutex[entity]));

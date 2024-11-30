@@ -160,7 +160,13 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEnti
   __CHECK_NULL_ARGUMENT(host);
   __CHECK_NULL_ARGUMENT(object);
 
-  __FAILURE_HANDLE(scene_update(host->scene_caller, object, entity));
+  bool scene_changed = false;
+  __FAILURE_HANDLE(scene_update(host->scene_caller, object, entity, &scene_changed));
+
+  // If there are no changes, skip the propagation to avoid hammering the queue.
+  if (!scene_changed) {
+    return LUMINARY_SUCCESS;
+  }
 
   QueueEntry entry;
 
