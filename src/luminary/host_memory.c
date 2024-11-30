@@ -39,7 +39,7 @@ uint64_t _debug_memory_allocations_allocated;
 
 static MemoryDebugAllocation* _debug_memory_allocation_find(const void* ptr) {
   for (uint64_t allocation = 0; allocation < _debug_memory_allocations_count; allocation++) {
-    if (_debug_memory_allocations[allocation].ptr == ptr && _debug_memory_allocations[allocation].size)
+    if (_debug_memory_allocations[allocation].ptr == ptr && _debug_memory_allocations[allocation].size != SIZE_MAX)
       return _debug_memory_allocations + allocation;
   }
 
@@ -128,7 +128,7 @@ static LuminaryResult _debug_memory_allocation_remove(
 
   free((char*) allocation->name);
   free((char*) allocation_name);
-  allocation->size = 0;
+  allocation->size = SIZE_MAX;
 
   mtx_unlock(&_memory_debug_mutex);
 
@@ -175,7 +175,6 @@ LuminaryResult _host_malloc(void** ptr, size_t size, const char* buf_name, const
   __CHECK_NULL_ARGUMENT(ptr);
   __CHECK_NULL_ARGUMENT(buf_name);
   __CHECK_NULL_ARGUMENT(func);
-  LUM_UNUSED(line);
 
   struct HostMemoryHeader* header = (struct HostMemoryHeader*) malloc((uint64_t) size + sizeof(struct HostMemoryHeader));
 
@@ -200,7 +199,6 @@ LuminaryResult _host_realloc(void** ptr, size_t size, const char* buf_name, cons
   __CHECK_NULL_ARGUMENT(*ptr);
   __CHECK_NULL_ARGUMENT(buf_name);
   __CHECK_NULL_ARGUMENT(func);
-  LUM_UNUSED(line);
 
   struct HostMemoryHeader* header = ((struct HostMemoryHeader*) (*ptr)) - 1;
 
@@ -236,7 +234,6 @@ LuminaryResult _host_free(void** ptr, const char* buf_name, const char* func, ui
   __CHECK_NULL_ARGUMENT(*ptr);
   __CHECK_NULL_ARGUMENT(buf_name);
   __CHECK_NULL_ARGUMENT(func);
-  LUM_UNUSED(line);
 
   struct HostMemoryHeader* header = ((struct HostMemoryHeader*) (*ptr)) - 1;
 

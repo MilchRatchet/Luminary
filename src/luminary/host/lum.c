@@ -10,6 +10,7 @@
 #include "internal_path.h"
 #include "ocean.h"
 #include "particles.h"
+#include "settings.h"
 #include "sky.h"
 #include "toy.h"
 #include "utils.h"
@@ -26,6 +27,7 @@ LuminaryResult lum_content_create(LumFileContent** _content) {
 
   __FAILURE_HANDLE(array_create(&content->obj_file_path_strings, sizeof(char*), 16));
 
+  __FAILURE_HANDLE(settings_get_default(&content->settings));
   __FAILURE_HANDLE(camera_get_default(&content->camera));
   __FAILURE_HANDLE(ocean_get_default(&content->ocean));
   __FAILURE_HANDLE(sky_get_default(&content->sky));

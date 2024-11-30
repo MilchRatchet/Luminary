@@ -34,7 +34,12 @@ LuminaryResult _device_malloc(DEVICE void** _ptr, size_t size, const char* buf_n
   struct DeviceMemoryHeader* header;
   __FAILURE_HANDLE(_host_malloc((void**) &header, sizeof(struct DeviceMemoryHeader), buf_name, func, line));
 
-  CUDA_FAILURE_HANDLE(cuMemAlloc(&header->ptr, size));
+  if (size > 0) {
+    CUDA_FAILURE_HANDLE(cuMemAlloc(&header->ptr, size));
+  }
+  else {
+    header->ptr = (CUdeviceptr) 0;
+  }
 
   header->magic = DEVICE_MEMORY_HEADER_MAGIC;
   header->size  = size;
@@ -311,7 +316,9 @@ LuminaryResult _device_free(DEVICE void** ptr, const char* buf_name, const char*
 
   total_memory_allocation[current_device_id] -= header->size;
 
-  CUDA_FAILURE_HANDLE(cuMemFree(header->ptr));
+  if (header->ptr) {
+    CUDA_FAILURE_HANDLE(cuMemFree(header->ptr));
+  }
 
   __FAILURE_HANDLE(_host_free((void**) &header, buf_name, func, line));
 

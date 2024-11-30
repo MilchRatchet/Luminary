@@ -420,7 +420,7 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
   build_input.triangleArray.vertexFormat        = OPTIX_VERTEX_FORMAT_FLOAT3;
   build_input.triangleArray.vertexStrideInBytes = 16;
   build_input.triangleArray.numVertices         = vertex_count;
-  build_input.triangleArray.vertexBuffers       = &device_vertex_buffer_ptr;
+  build_input.triangleArray.vertexBuffers       = (vertex_count > 0) ? &device_vertex_buffer_ptr : (CUdeviceptr*) 0;
 
   build_input.triangleArray.indexFormat        = OPTIX_INDICES_FORMAT_NONE;
   build_input.triangleArray.indexStrideInBytes = 0;

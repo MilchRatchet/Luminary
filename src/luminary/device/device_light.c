@@ -250,6 +250,12 @@ static LuminaryResult _light_tree_build_binary_bvh(LightTreeWork* work) {
   ARRAY LightTreeBinaryNode* nodes;
   __FAILURE_HANDLE(array_create(&nodes, sizeof(LightTreeBinaryNode), 1 + fragments_count));
 
+  if (fragments_count == 0) {
+    work->binary_nodes = nodes;
+    work->nodes_count  = 0;
+    return LUMINARY_SUCCESS;
+  }
+
   {
     LightTreeBinaryNode root_node;
     memset(&root_node, 0, sizeof(LightTreeBinaryNode));
@@ -527,6 +533,13 @@ static LuminaryResult _light_tree_build_traversal_structure(LightTreeWork* work)
 
 static LuminaryResult _light_tree_collapse(LightTreeWork* work) {
   __CHECK_NULL_ARGUMENT(work);
+
+  if (work->nodes_count == 0) {
+    __FAILURE_HANDLE(host_malloc(&work->paths, 0));
+    __FAILURE_HANDLE(host_malloc(&work->nodes8_packed, 0));
+    work->nodes_8_count = 0;
+    return LUMINARY_SUCCESS;
+  }
 
   const uint32_t fragments_count = work->fragments_count;
 

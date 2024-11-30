@@ -716,9 +716,6 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
   while (1) {
     fgets(line, LINE_SIZE, file);
 
-    if (feof(file))
-      break;
-
     if (line[0] == 'G') {
       __FAILURE_HANDLE(parse_general_settings(&content->settings, &content->obj_file_path_strings, &content->instances, line + 7 + 1));
     }
@@ -747,11 +744,14 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
       __FAILURE_HANDLE(parse_toy_settings(&content->toy, line + 3 + 1));
     }
     else if (line[0] == '#' || line[0] == 10) {
-      continue;
+      // Comment
     }
     else {
       warn_message("Scene file contains unknown line!\n Content: %s", line);
     }
+
+    if (feof(file))
+      break;
   }
 
   __FAILURE_HANDLE(host_free(&line));
