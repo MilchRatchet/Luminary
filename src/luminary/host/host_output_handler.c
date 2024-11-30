@@ -149,7 +149,7 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width,
   output->objects[selected_handle].width           = width;
   output->objects[selected_handle].height          = height;
 
-  __FAILURE_HANDLE(host_malloc(output->objects[selected_handle].data, sizeof(XRGB8) * width * height));
+  __FAILURE_HANDLE(host_malloc(&output->objects[selected_handle].data, sizeof(XRGB8) * width * height));
 
   *handle = selected_handle;
 

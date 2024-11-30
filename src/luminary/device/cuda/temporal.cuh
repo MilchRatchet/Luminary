@@ -42,7 +42,7 @@ __device__ RGBF temporal_gather_pixel(
 }
 
 __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offset) {
-  if (isnan(luminance(sample)) || isinf(luminance(sample))) {
+  if (is_finite(luminance(sample))) {
     // Debug code to identify paths that cause NaNs and INFs
 #if 0
       ushort2 pixel;

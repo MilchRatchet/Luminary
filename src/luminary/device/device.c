@@ -1036,6 +1036,8 @@ LuminaryResult device_start_render(
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_output_register_callback(device->output, output_callback_func, callback_data));
+  __FAILURE_HANDLE(
+    device_output_set_size(device->output, device->constant_memory->settings.width, device->constant_memory->settings.height));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
   __FAILURE_HANDLE(device_renderer_register_callback(device->renderer, render_callback_func, callback_data));
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
@@ -1049,6 +1051,10 @@ LuminaryResult device_continue_render(Device* device) {
   __CHECK_NULL_ARGUMENT(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  if (true) {
+    __FAILURE_HANDLE(device_output_generate_output(device->output, device));
+  }
 
   // Output if last sample in slice or if first slice (I will probably have to update the slice beforehand so this will be first sample in
   // slice etc)

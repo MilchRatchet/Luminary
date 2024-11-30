@@ -348,7 +348,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
   device.ptrs.trace_counts[THREAD_ID] = 0;
 }
 
-LUMINARY_KERNEL void generate_final_image(const RGBF* src, const RGBF color_correction, const AGXCustomParams agx_params) {
+LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
   const uint32_t undersampling       = max(device.undersampling, 1);
   const uint32_t undersampling_scale = 1 << undersampling;
 
@@ -375,8 +375,8 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src, const RGBF color_corr
 
         const uint32_t index = pixel_x + pixel_y * device.settings.width;
 
-        RGBF pixel = load_RGBF(src + index);
-        pixel      = tonemap_apply(pixel, pixel_x, pixel_y, color_correction, agx_params);
+        RGBF pixel = load_RGBF(args.src + index);
+        pixel      = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
 
         accumulated_color = add_color(accumulated_color, pixel);
       }
@@ -389,23 +389,23 @@ LUMINARY_KERNEL void generate_final_image(const RGBF* src, const RGBF color_corr
   }
 }
 
-LUMINARY_KERNEL void convert_RGBF_to_XRGB8(XRGB8* dest, const int width, const int height, const int ld, const Filter filter) {
+LUMINARY_KERNEL void convert_RGBF_to_XRGB8(const KernelArgsConvertRGBFToXRGB8 args) {
   uint32_t id = THREAD_ID;
 
-  const uint32_t amount = width * height;
-  const float scale_x   = 1.0f / (width - 1);
-  const float scale_y   = 1.0f / (height - 1);
+  const uint32_t amount = args.width * args.height;
+  const float scale_x   = 1.0f / (args.width - 1);
+  const float scale_y   = 1.0f / (args.height - 1);
 
   const uint32_t undersampling       = max(device.undersampling, 1);
   const uint32_t undersampling_width = (device.settings.width + (1 << undersampling) - 1) >> undersampling;
 
   const float mem_scale = (undersampling > 1) ? 1.0f / (1 << (undersampling - 1)) : 1.0f;
 
-  const bool scaled_output = (width != OUTPUT_DIM(device.settings.width)) || (height != OUTPUT_DIM(device.settings.height));
+  const bool scaled_output = (args.width != OUTPUT_DIM(device.settings.width)) || (args.height != OUTPUT_DIM(device.settings.height));
 
   while (id < amount) {
-    const uint32_t y = id / width;
-    const uint32_t x = id - y * width;
+    const uint32_t y = id / args.width;
+    const uint32_t x = id - y * args.width;
 
     RGBF pixel;
     if (scaled_output) {
@@ -421,7 +421,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(XRGB8* dest, const int width, const i
       pixel                = load_RGBF(device.ptrs.frame_final + src_x + src_y * undersampling_width);
     }
 
-    switch (filter) {
+    switch (args.filter) {
       case LUMINARY_FILTER_NONE:
         break;
       case LUMINARY_FILTER_GRAY:
@@ -456,7 +456,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(XRGB8* dest, const int width, const i
     converted_pixel.g      = (uint8_t) pixel.g;
     converted_pixel.b      = (uint8_t) pixel.b;
 
-    dest[x + y * ld] = converted_pixel;
+    args.dst[x + y * args.width] = converted_pixel;
 
     id += blockDim.x * gridDim.x;
   }

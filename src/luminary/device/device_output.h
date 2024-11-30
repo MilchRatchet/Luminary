@@ -7,7 +7,7 @@
 
 struct Device typedef Device;
 
-#define DEVICE_OUTPUT_BUFFER_COUNT 4
+#define DEVICE_OUTPUT_BUFFER_COUNT 8
 
 struct DeviceOutput {
   uint32_t width;

@@ -58,7 +58,15 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
     __RETURN_ERROR(LUMINARY_ERROR_API_EXCEPTION, "Device output is set to a size of 0.");
   }
 
-  __FAILURE_HANDLE(kernel_execute(device->cuda_kernels[CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE], device->stream_main));
+  KernelArgsGenerateFinalImage generate_final_image_args;
+
+  // TODO: Use the correct buffer based on post
+  generate_final_image_args.src              = DEVICE_PTR(device->buffers.frame_accumulate);
+  generate_final_image_args.color_correction = (RGBF){.r = 1.0f, .g = 1.0f, .b = 1.0f};
+  generate_final_image_args.agx_params       = (AGXCustomParams){.power = 1.0f, .saturation = 1.0f, .slope = 1.0f};
+
+  __FAILURE_HANDLE(kernel_execute_with_args(
+    device->cuda_kernels[CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE], (void*) &generate_final_image_args, device->stream_main));
 
   KernelArgsConvertRGBFToXRGB8 args;
   args.dst    = DEVICE_PTR(output->device_buffer);

@@ -31,6 +31,12 @@ struct KernelArgsSkyComputeMultiscatteringLUT {
   float4* dst_high;
 } typedef KernelArgsSkyComputeMultiscatteringLUT;
 
+struct KernelArgsGenerateFinalImage {
+  RGBF* src;
+  RGBF color_correction;
+  AGXCustomParams agx_params;
+} typedef KernelArgsGenerateFinalImage;
+
 struct KernelArgsConvertRGBFToXRGB8 {
   XRGB8* dst;
   uint32_t width;
