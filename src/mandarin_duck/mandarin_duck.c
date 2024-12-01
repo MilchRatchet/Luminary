@@ -24,7 +24,6 @@ void mandarin_duck_create(MandarinDuck** _duck, LuminaryHost* host) {
   LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
 
   display_create(&duck->display, renderer_settings.width, renderer_settings.height);
-  camera_handler_create(&duck->camera_handler);
 
   _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
 
@@ -47,8 +46,7 @@ void mandarin_duck_run(MandarinDuck* duck) {
       _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
     }
 
-    display_handle_inputs(duck->display);
-    camera_handler_update(duck->camera_handler, duck->host, duck->display->keyboard_state, duck->display->mouse_state);
+    display_handle_inputs(duck->display, duck->host);
 
     display_render(duck->display, duck->host);
 
@@ -67,7 +65,6 @@ void mandarin_duck_destroy(MandarinDuck** duck) {
   MD_CHECK_NULL_ARGUMENT(duck);
 
   display_destroy(&(*duck)->display);
-  camera_handler_destroy(&(*duck)->camera_handler);
 
   LUM_FAILURE_HANDLE(host_free(duck));
 }

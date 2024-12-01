@@ -71,6 +71,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
 
   keyboard_state_create(&display->keyboard_state);
   mouse_state_create(&display->mouse_state);
+  camera_handler_create(&display->camera_handler);
 
   *_display = display;
 }
@@ -117,12 +118,17 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
   }
 }
 
-void display_handle_inputs(Display* display) {
+void display_handle_inputs(Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
 
   if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
-    bool is_relative = SDL_GetWindowRelativeMouseMode(display->sdl_window);
-    SDL_SetWindowRelativeMouseMode(display->sdl_window, !is_relative);
+    display->show_ui = !display->show_ui;
+    SDL_SetWindowRelativeMouseMode(display->sdl_window, !display->show_ui);
+  }
+
+  if (!display->show_ui) {
+    camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state);
   }
 }
 
@@ -164,6 +170,7 @@ void display_destroy(Display** display) {
 
   keyboard_state_destroy(&(*display)->keyboard_state);
   mouse_state_destroy(&(*display)->mouse_state);
+  camera_handler_destroy(&(*display)->camera_handler);
 
   LUM_FAILURE_HANDLE(host_free(display));
 
