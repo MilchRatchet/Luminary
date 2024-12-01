@@ -79,6 +79,7 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(exit_requested);
 
+  keyboard_state_reset_phases(display->keyboard_state);
   mouse_state_reset_motion(display->mouse_state);
 
   SDL_Event event;
@@ -113,6 +114,15 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
         warn_message("Unhandled SDL event type: %u.", event.type);
         break;
     }
+  }
+}
+
+void display_handle_inputs(Display* display) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
+    bool is_relative = SDL_GetWindowRelativeMouseMode(display->sdl_window);
+    SDL_SetWindowRelativeMouseMode(display->sdl_window, !is_relative);
   }
 }
 

@@ -47,6 +47,7 @@ void mandarin_duck_run(MandarinDuck* duck) {
       _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
     }
 
+    display_handle_inputs(duck->display);
     camera_handler_update(duck->camera_handler, duck->host, duck->display->keyboard_state, duck->display->mouse_state);
 
     display_render(duck->display, duck->host);
