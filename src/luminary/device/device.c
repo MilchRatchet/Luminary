@@ -1028,18 +1028,29 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_start_render(
-  Device* device, DeviceRendererQueueArgs* args, CUhostFn render_callback_func, CUhostFn output_callback_func,
-  DeviceCommonCallbackData callback_data) {
+LuminaryResult device_register_callbacks(
+  Device* device, CUhostFn render_callback_func, CUhostFn output_callback_func, DeviceCommonCallbackData callback_data) {
   __CHECK_NULL_ARGUMENT(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   __FAILURE_HANDLE(device_output_register_callback(device->output, output_callback_func, callback_data));
+  __FAILURE_HANDLE(device_renderer_register_callback(device->renderer, render_callback_func, callback_data));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
   __FAILURE_HANDLE(
     device_output_set_size(device->output, device->constant_memory->settings.width, device->constant_memory->settings.height));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
-  __FAILURE_HANDLE(device_renderer_register_callback(device->renderer, render_callback_func, callback_data));
+  __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer));
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1047,14 +1058,23 @@ LuminaryResult device_start_render(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_continue_render(Device* device) {
+LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data) {
   __CHECK_NULL_ARGUMENT(device);
+
+  bool continuation_is_valid;
+  __FAILURE_HANDLE(device_renderer_handle_callback(device->renderer, callback_data, &continuation_is_valid));
+
+  if (!continuation_is_valid) {
+    return LUMINARY_SUCCESS;
+  }
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
   if (true) {
     __FAILURE_HANDLE(device_output_generate_output(device->output, device));
   }
+
+  __FAILURE_HANDLE(device_update_sample_count(device, sample_count));
 
   // Output if last sample in slice or if first slice (I will probably have to update the slice beforehand so this will be first sample in
   // slice etc)
@@ -1077,6 +1097,8 @@ LuminaryResult device_set_abort(Device* device) {
 
   uint32_t abort_flag = 0xFFFFFFFF;
   __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, &abort_flag, 0, sizeof(uint32_t), device->stream_secondary));
+
+  __FAILURE_HANDLE(sample_count_reset(&device->sample_count, 0));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

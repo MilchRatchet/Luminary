@@ -4,6 +4,7 @@ void keyboard_state_create(KeyboardState** keyboard_state) {
   MD_CHECK_NULL_ARGUMENT(keyboard_state);
 
   LUM_FAILURE_HANDLE(host_malloc(keyboard_state, sizeof(KeyboardState)));
+  memset((*keyboard_state), 0, sizeof(KeyboardState));
 }
 
 void keyboard_state_update(KeyboardState* keyboard_state, SDL_KeyboardEvent sdl_event) {

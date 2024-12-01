@@ -132,8 +132,7 @@ static LuminaryResult _device_manager_handle_device_render(DeviceManager* device
 
   Device* device = device_manager->devices[data->common.device_index];
 
-  __FAILURE_HANDLE(device_update_sample_count(device, &device_manager->sample_count));
-  __FAILURE_HANDLE(device_continue_render(device));
+  __FAILURE_HANDLE(device_continue_render(device, &device_manager->sample_count, data));
 
   return LUMINARY_SUCCESS;
 }
@@ -317,17 +316,11 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     render_args.render_volumes      = scene->fog.active || scene->ocean.active;
 
     for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-      DeviceCommonCallbackData callback_data;
-
-      callback_data.device_manager = device_manager;
-      callback_data.device_index   = device_id;
-
       Device* device = device_manager->devices[device_id];
 
       __FAILURE_HANDLE_CRITICAL(device_update_sample_count(device, &device_manager->sample_count));
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));
-      __FAILURE_HANDLE_CRITICAL(device_start_render(
-        device, &render_args, (CUhostFn) _device_manager_render_callback, (CUhostFn) _device_manager_output_callback, callback_data));
+      __FAILURE_HANDLE_CRITICAL(device_start_render(device, &render_args));
     }
   }
 
@@ -472,7 +465,17 @@ static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_m
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
-    __FAILURE_HANDLE(device_load_embedded_data(device_manager->devices[device_id]));
+    Device* device = device_manager->devices[device_id];
+
+    __FAILURE_HANDLE(device_load_embedded_data(device));
+
+    DeviceCommonCallbackData callback_data;
+
+    callback_data.device_manager = device_manager;
+    callback_data.device_index   = device_id;
+
+    __FAILURE_HANDLE(device_register_callbacks(
+      device, (CUhostFn) _device_manager_render_callback, (CUhostFn) _device_manager_output_callback, callback_data));
   }
 
   return LUMINARY_SUCCESS;

@@ -33,7 +33,9 @@ struct DeviceRenderer {
   uint32_t action_ptr;
   ARRAY DeviceRendererQueueAction* queue;
   CUhostFn registered_callback_func;
-  DeviceRenderCallbackData callback_data;
+  DeviceCommonCallbackData callback_data;
+  uint64_t render_id;
+  RingBuffer* callback_data_ringbuffer;
 } typedef DeviceRenderer;
 
 struct DeviceRendererQueueArgs {
@@ -45,9 +47,11 @@ struct DeviceRendererQueueArgs {
 } typedef DeviceRendererQueueArgs;
 
 DEVICE_CTX_FUNC LuminaryResult device_renderer_create(DeviceRenderer** renderer);
+LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceRenderCallbackData* data, bool* is_valid);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, DeviceRendererQueueArgs* args);
 DEVICE_CTX_FUNC LuminaryResult
   device_renderer_register_callback(DeviceRenderer* renderer, CUhostFn callback_func, DeviceCommonCallbackData callback_data);
+DEVICE_CTX_FUNC LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* device, SampleCountSlice* sample_count);
 DEVICE_CTX_FUNC LuminaryResult device_renderer_destroy(DeviceRenderer** renderer);
 

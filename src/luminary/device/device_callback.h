@@ -19,6 +19,7 @@ struct DeviceOutputCallbackData {
 
 struct DeviceRenderCallbackData {
   DeviceCommonCallbackData common;
+  uint64_t render_id;
 } typedef DeviceRenderCallbackData;
 
 #endif /* LUMINARY_DEVICE_CALLBACK_H */

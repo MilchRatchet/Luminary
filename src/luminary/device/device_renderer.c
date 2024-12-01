@@ -11,6 +11,20 @@ LuminaryResult device_renderer_create(DeviceRenderer** renderer) {
 
   __FAILURE_HANDLE(array_create(&(*renderer)->queue, sizeof(DeviceRendererQueueAction), 16));
 
+  __FAILURE_HANDLE(ringbuffer_create(&(*renderer)->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData) * 64));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceRenderCallbackData* data, bool* is_valid) {
+  __CHECK_NULL_ARGUMENT(renderer);
+  __CHECK_NULL_ARGUMENT(data);
+  __CHECK_NULL_ARGUMENT(is_valid);
+
+  *is_valid = renderer->render_id == data->render_id;
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(renderer->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData)));
+
   return LUMINARY_SUCCESS;
 }
 
@@ -121,8 +135,15 @@ LuminaryResult device_renderer_register_callback(DeviceRenderer* renderer, CUhos
 
   renderer->registered_callback_func = callback_func;
 
-  renderer->callback_data.common.device_manager = callback_data.device_manager;
-  renderer->callback_data.common.device_index   = callback_data.device_index;
+  renderer->callback_data = callback_data;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_init_new_render(DeviceRenderer* renderer) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  renderer->render_id++;
 
   return LUMINARY_SUCCESS;
 }
@@ -152,9 +173,16 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         __FAILURE_HANDLE(device_sync_constant_memory(device));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
+        DeviceRenderCallbackData* callback_data;
+        __FAILURE_HANDLE(
+          ringbuffer_allocate_entry(renderer->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData), (void**) &callback_data));
+
+        callback_data->common    = renderer->callback_data;
+        callback_data->render_id = renderer->render_id;
+
         CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_render, device->stream_main));
         CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_render, CU_EVENT_WAIT_DEFAULT));
-        CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_func, &renderer->callback_data));
+        CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_func, callback_data));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
         sample_count->current_sample_count++;
@@ -170,6 +198,7 @@ LuminaryResult device_renderer_destroy(DeviceRenderer** renderer) {
   __CHECK_NULL_ARGUMENT(*renderer);
 
   __FAILURE_HANDLE(array_destroy(&(*renderer)->queue));
+  __FAILURE_HANDLE(ringbuffer_destroy(&(*renderer)->callback_data_ringbuffer));
 
   __FAILURE_HANDLE(host_free(renderer));
 
