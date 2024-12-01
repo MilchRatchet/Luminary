@@ -11,40 +11,6 @@ static void _mandarin_duck_update_host_output_props(LuminaryHost* host, uint32_t
   LUM_FAILURE_HANDLE(luminary_host_set_output_properties(host, properties));
 }
 
-static void _mandarin_duck_handle_inputs(LuminaryHost* host, KeyboardState* state) {
-  MD_CHECK_NULL_ARGUMENT(host);
-  MD_CHECK_NULL_ARGUMENT(state);
-
-  LuminaryCamera camera;
-  LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
-
-  if (state->keys[SDL_SCANCODE_W].down) {
-    camera.pos.z -= 0.1f;
-  }
-
-  if (state->keys[SDL_SCANCODE_A].down) {
-    camera.pos.x -= 0.1f;
-  }
-
-  if (state->keys[SDL_SCANCODE_S].down) {
-    camera.pos.z += 0.1f;
-  }
-
-  if (state->keys[SDL_SCANCODE_D].down) {
-    camera.pos.x += 0.1f;
-  }
-
-  if (state->keys[SDL_SCANCODE_SPACE].down) {
-    camera.pos.y += 0.1f;
-  }
-
-  if (state->keys[SDL_SCANCODE_LCTRL].down) {
-    camera.pos.y -= 0.1f;
-  }
-
-  LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
-}
-
 void mandarin_duck_create(MandarinDuck** _duck, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(_duck);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -58,6 +24,7 @@ void mandarin_duck_create(MandarinDuck** _duck, LuminaryHost* host) {
   LUM_FAILURE_HANDLE(luminary_host_get_settings(duck->host, &renderer_settings));
 
   display_create(&duck->display, renderer_settings.width, renderer_settings.height);
+  camera_handler_create(&duck->camera_handler);
 
   _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
 
@@ -80,7 +47,7 @@ void mandarin_duck_run(MandarinDuck* duck) {
       _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
     }
 
-    _mandarin_duck_handle_inputs(duck->host, duck->display->keyboard_state);
+    camera_handler_update(duck->camera_handler, duck->host, duck->display->keyboard_state, duck->display->mouse_state);
 
     display_render(duck->display, duck->host);
 
@@ -99,6 +66,7 @@ void mandarin_duck_destroy(MandarinDuck** duck) {
   MD_CHECK_NULL_ARGUMENT(duck);
 
   display_destroy(&(*duck)->display);
+  camera_handler_destroy(&(*duck)->camera_handler);
 
   LUM_FAILURE_HANDLE(host_free(duck));
 }

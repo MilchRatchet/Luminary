@@ -70,6 +70,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   _display_handle_resize(display);
 
   keyboard_state_create(&display->keyboard_state);
+  mouse_state_create(&display->mouse_state);
 
   *_display = display;
 }
@@ -77,6 +78,8 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
 void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(exit_requested);
+
+  mouse_state_reset_motion(display->mouse_state);
 
   SDL_Event event;
 
@@ -92,6 +95,16 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
       case SDL_EVENT_KEY_DOWN:
       case SDL_EVENT_KEY_UP:
         keyboard_state_update(display->keyboard_state, event.key);
+        break;
+      case SDL_EVENT_MOUSE_MOTION:
+        mouse_state_update_motion(display->mouse_state, event.motion);
+        break;
+      case SDL_EVENT_MOUSE_BUTTON_DOWN:
+      case SDL_EVENT_MOUSE_BUTTON_UP:
+        mouse_state_update_button(display->mouse_state, event.button);
+        break;
+      case SDL_EVENT_MOUSE_WHEEL:
+        mouse_state_update_wheel(display->mouse_state, event.wheel);
         break;
       case SDL_EVENT_DROP_FILE:
         // TODO: Implement support for dragging and dropping files into Mandarin Duck.
@@ -140,6 +153,7 @@ void display_destroy(Display** display) {
   SDL_DestroyWindow((*display)->sdl_window);
 
   keyboard_state_destroy(&(*display)->keyboard_state);
+  mouse_state_destroy(&(*display)->mouse_state);
 
   LUM_FAILURE_HANDLE(host_free(display));
 
