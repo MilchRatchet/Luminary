@@ -73,6 +73,16 @@ __device__ void optixSetPayloadCompressedAlpha(const CompressedAlpha alpha) {
 }
 #endif
 
+#ifdef OPTIX_PAYLOAD_DEPTH
+__device__ float optixGetPayloadDepth() {
+  return optixGetPayloadGeneric(OPTIX_PAYLOAD_DEPTH);
+}
+
+__device__ void optixSetPayloadDepth(const float depth) {
+  optixSetPayloadGeneric(OPTIX_PAYLOAD_DEPTH, __float_as_uint(depth));
+}
+#endif
+
 #endif
 
 #endif /* CU_OPTIX_UTILS_H */

@@ -233,7 +233,6 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
     ////////////////////////////////////////////////////////////////////
 
     OptixAccelBufferSizes buffer_sizes;
-
     OPTIX_FAILURE_HANDLE(optixAccelComputeMemoryUsage(device->optix_ctx, &build_options, &build_input, 1, &buffer_sizes));
 
     DEVICE void* temp_buffer;
