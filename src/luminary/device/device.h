@@ -1,6 +1,7 @@
 #ifndef LUMINARY_DEVICE_H
 #define LUMINARY_DEVICE_H
 
+#include "device_bsdf.h"
 #include "device_light.h"
 #include "device_memory.h"
 #include "device_mesh.h"
@@ -73,6 +74,7 @@ struct Device {
   OptixBVH* optix_bvh_light;
   DeviceSkyLUT* sky_lut;
   DeviceSkyHDRI* sky_hdri;
+  DeviceBSDFLUT* bsdf_lut;
   DevicePost* post;
   DeviceRenderer* renderer;
   DeviceOutput* output;
@@ -101,6 +103,7 @@ LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut);
 LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut);
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri);
+LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut);
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
 LuminaryResult device_register_callbacks(
   Device* device, CUhostFn render_callback_func, CUhostFn output_callback_func, DeviceCommonCallbackData callback_data);

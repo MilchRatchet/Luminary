@@ -23,6 +23,7 @@
 #define DEVICE_CTX_FUNC
 
 #define STARS_GRID_LD 64
+#define BSDF_LUT_SIZE 32
 
 ////////////////////////////////////////////////////////////////////
 // Failure handles
@@ -214,7 +215,6 @@ struct DevicePointers {
   DEVICE XRGB8* buffer_8bit;
   DEVICE const DeviceTextureObject* textures;
   DEVICE const DeviceTextureObject* cloud_noise;
-  DEVICE const DeviceTextureObject* bsdf_energy_lut;
   DEVICE const uint16_t* bluenoise_1D;
   DEVICE const uint32_t* bluenoise_2D;
   DEVICE const float* bridge_lut;
@@ -247,6 +247,7 @@ enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX,
+  DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX,
   DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC,
 
   DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
@@ -290,6 +291,11 @@ struct DeviceConstantMemory {
   // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   DeviceTextureObject sky_hdri_color_tex;
   DeviceTextureObject sky_hdri_shadow_tex;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
+  DeviceTextureObject bsdf_lut_conductor;
+  DeviceTextureObject bsdf_lut_specular;
+  DeviceTextureObject bsdf_lut_dielectric;
+  DeviceTextureObject bsdf_lut_dielectric_inv;
   // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
   uint16_t user_selected_x;
   uint16_t user_selected_y;

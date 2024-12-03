@@ -7,8 +7,6 @@
 #include "texture.h"
 #include "utils.cuh"
 
-#define BSDF_LUT_SIZE 32
-
 #define BSDF_LOAD_PRECOMPUTED_LUT 0
 
 #if BSDF_LOAD_PRECOMPUTED_LUT

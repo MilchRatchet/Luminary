@@ -37,8 +37,6 @@ struct BSDFSampleInfo {
   bool is_microfacet_based;
 } typedef BSDFSampleInfo;
 
-enum BSDFLUT { BSDF_LUT_SS = 0, BSDF_LUT_SPECULAR = 1, BSDF_LUT_DIELEC = 2, BSDF_LUT_DIELEC_INV = 3 } typedef BSDFLUT;
-
 enum BSDFSamplingHint {
   BSDF_SAMPLING_GENERAL               = 0,
   BSDF_SAMPLING_MICROFACET            = 1,
@@ -367,7 +365,7 @@ __device__ float bsdf_diffuse_evaluate_sampled_microfacet(const GBufferData data
 ///////////////////////////////////////////////////
 
 __device__ float bsdf_conductor_directional_albedo(const float NdotV, const float roughness) {
-  return tex2D<float>(device.ptrs.bsdf_energy_lut[BSDF_LUT_SS].handle, NdotV, roughness);
+  return tex2D<float>(device.bsdf_lut_conductor.handle, NdotV, roughness);
 }
 
 __device__ RGBF bsdf_conductor(
@@ -402,7 +400,7 @@ __device__ RGBF bsdf_conductor(
 }
 
 __device__ float bsdf_glossy_directional_albedo(const float NdotV, const float roughness) {
-  return tex2D<float>(device.ptrs.bsdf_energy_lut[BSDF_LUT_SPECULAR].handle, NdotV, roughness);
+  return tex2D<float>(device.bsdf_lut_specular.handle, NdotV, roughness);
 }
 
 __device__ RGBF
@@ -458,9 +456,9 @@ __device__ float bsdf_dielectric_directional_albedo(const float NdotV, const flo
 
   const float ior_tex_coord = use_inv ? (ior - 1.0f) * 0.5f : (1.0f / ior - 1.0f) * 0.5f;
 
-  const uint32_t lut_index = use_inv ? BSDF_LUT_DIELEC_INV : BSDF_LUT_DIELEC;
+  const DeviceTextureHandle handle = use_inv ? device.bsdf_lut_dielectric_inv.handle : device.bsdf_lut_dielectric.handle;
 
-  return tex3D<float>(device.ptrs.bsdf_energy_lut[lut_index].handle, NdotV, roughness, ior_tex_coord);
+  return tex3D<float>(handle, NdotV, roughness, ior_tex_coord);
 }
 
 __device__ RGBF bsdf_dielectric(

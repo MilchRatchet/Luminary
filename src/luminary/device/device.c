@@ -43,6 +43,7 @@ static const size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, moon_albedo_tex),               // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   offsetof(DeviceConstantMemory, sky_lut_transmission_low_tex),  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
   offsetof(DeviceConstantMemory, sky_hdri_color_tex),            // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
+  offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   offsetof(DeviceConstantMemory, user_selected_x),               // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
   SIZE_MAX                                                       // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
@@ -63,6 +64,7 @@ static const size_t device_cuda_const_memory_sizes[] = {
   sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
   sizeof(DeviceTextureObject) * 4,             // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
   sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
+  sizeof(DeviceTextureObject) * 4,             // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   sizeof(uint16_t) * 2 + sizeof(uint32_t) * 3  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_sizes, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
@@ -506,7 +508,6 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(hit_id_history);
   __DEVICE_BUFFER_FREE(textures);
   __DEVICE_BUFFER_FREE(cloud_noise);
-  __DEVICE_BUFFER_FREE(bsdf_energy_lut);
   __DEVICE_BUFFER_FREE(bluenoise_1D);
   __DEVICE_BUFFER_FREE(bluenoise_2D);
   __DEVICE_BUFFER_FREE(bridge_lut);
@@ -614,6 +615,7 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   __FAILURE_HANDLE(device_sky_lut_create(&device->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_create(&device->sky_hdri));
+  __FAILURE_HANDLE(device_bsdf_lut_create(&device->bsdf_lut));
 
   __FAILURE_HANDLE(device_post_create(&device->post));
 
@@ -1013,6 +1015,27 @@ LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(bsdf_lut);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_bsdf_lut_update(device->bsdf_lut, device, bsdf_lut));
+
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->bsdf_lut->conductor, &device->constant_memory->bsdf_lut_conductor));
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->bsdf_lut->specular, &device->constant_memory->bsdf_lut_specular));
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->bsdf_lut->dielectric, &device->constant_memory->bsdf_lut_dielectric));
+  __FAILURE_HANDLE(
+    device_struct_texture_object_convert(device->bsdf_lut->dielectric_inv, &device->constant_memory->bsdf_lut_dielectric_inv));
+
+  __FAILURE_HANDLE(_device_set_constant_memory_dirty(device, DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sample_count);
@@ -1144,6 +1167,7 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(device_sky_lut_destroy(&(*device)->sky_lut));
   __FAILURE_HANDLE(device_sky_hdri_destroy(&(*device)->sky_hdri));
+  __FAILURE_HANDLE(device_bsdf_lut_destroy(&(*device)->bsdf_lut));
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_destroy(&(*device)->optix_instance_cache));
   __FAILURE_HANDLE(optix_bvh_destroy(&(*device)->optix_bvh_ias));

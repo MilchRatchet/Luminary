@@ -22,6 +22,7 @@
 // queue a device task.
 
 #include "device.h"
+#include "device_bsdf.h"
 #include "device_light.h"
 #include "device_sky.h"
 #include "thread.h"
@@ -40,6 +41,7 @@ struct DeviceManager {
   LightTree* light_tree;
   SkyLUT* sky_lut;
   SkyHDRI* sky_hdri;
+  BSDFLUT* bsdf_lut;
 } typedef DeviceManager;
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);

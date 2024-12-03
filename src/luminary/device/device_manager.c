@@ -397,6 +397,21 @@ static LuminaryResult _device_manager_add_textures(DeviceManager* device_manager
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_generate_bsdf_luts(DeviceManager* device_manager) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  __FAILURE_HANDLE(bsdf_lut_generate(device_manager->bsdf_lut, device_manager->devices[device_manager->main_device_index]));
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_update_bsdf_lut(device_manager->devices[device_id], device_manager->bsdf_lut));
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_manager, void* args) {
   LUM_UNUSED(args);
 
@@ -478,6 +493,8 @@ static LuminaryResult _device_manager_initialize_devices(DeviceManager* device_m
       device, (CUhostFn) _device_manager_render_callback, (CUhostFn) _device_manager_output_callback, callback_data));
   }
 
+  __FAILURE_HANDLE(_device_manager_generate_bsdf_luts(device_manager));
+
   return LUMINARY_SUCCESS;
 }
 
@@ -540,6 +557,7 @@ LuminaryResult device_manager_create(DeviceManager** _device_manager, Host* host
   __FAILURE_HANDLE(light_tree_create(&device_manager->light_tree));
   __FAILURE_HANDLE(sky_lut_create(&device_manager->sky_lut));
   __FAILURE_HANDLE(sky_hdri_create(&device_manager->sky_hdri));
+  __FAILURE_HANDLE(bsdf_lut_create(&device_manager->bsdf_lut));
 
   ////////////////////////////////////////////////////////////////////
   // Select main device
@@ -761,6 +779,7 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(sky_lut_destroy(&(*device_manager)->sky_lut));
   __FAILURE_HANDLE(sky_hdri_destroy(&(*device_manager)->sky_hdri));
   __FAILURE_HANDLE(light_tree_destroy(&(*device_manager)->light_tree));
+  __FAILURE_HANDLE(bsdf_lut_destroy(&(*device_manager)->bsdf_lut));
 
   __FAILURE_HANDLE(scene_destroy(&(*device_manager)->scene_device));
 
