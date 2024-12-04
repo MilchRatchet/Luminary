@@ -40,7 +40,7 @@ enum CUDAKernelType {
 struct CUDAKernel {
   CUkernel cuda_kernel;
   uint32_t shared_memory_size;
-  size_t arg_size;
+  size_t param_size;
 } typedef CUDAKernel;
 
 DEVICE_CTX_FUNC LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type);

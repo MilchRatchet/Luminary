@@ -6,36 +6,42 @@
 
 struct CUDAKernelConfig {
   const char* name;
+  size_t param_size;
 } typedef CUDAKernelConfig;
 
 static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
-  [CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS]                   = {.name = "generate_trace_tasks"},
-  [CUDA_KERNEL_TYPE_BALANCE_TRACE_TASKS]                    = {.name = "balance_trace_tasks"},
-  [CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS]                = {.name = "postprocess_trace_tasks"},
-  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG]           = {.name = "geometry_process_tasks_debug"},
-  [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS]                      = {.name = "sky_process_tasks"},
-  [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG]                = {.name = "sky_process_tasks_debug"},
-  [CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS]        = {.name = "sky_process_inscattering_events"},
-  [CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI]                       = {.name = "sky_compute_hdri"},
-  [CUDA_KERNEL_TYPE_SKY_COMPUTE_TRANSMITTANCE_LUT]          = {.name = "sky_compute_transmittance_lut"},
-  [CUDA_KERNEL_TYPE_SKY_COMPUTE_MULTISCATTERING_LUT]        = {.name = "sky_compute_multiscattering_lut"},
-  [CUDA_KERNEL_TYPE_CLOUD_COMPUTE_SHAPE_NOISE]              = {.name = "cloud_compute_shape_noise"},
-  [CUDA_KERNEL_TYPE_CLOUD_COMPUTE_DETAIL_NOISE]             = {.name = "cloud_compute_detail_noise"},
-  [CUDA_KERNEL_TYPE_CLOUD_COMPUTE_WEATHER_NOISE]            = {.name = "cloud_compute_weather_noise"},
-  [CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS]                    = {.name = "cloud_process_tasks"},
-  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS]                  = {.name = "volume_process_events"},
-  [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG]           = {.name = "particle_process_tasks_debug"},
-  [CUDA_KERNEL_TYPE_PARTICLE_GENERATE]                      = {.name = "particle_generate"},
-  [CUDA_KERNEL_TYPE_LIGHT_COMPUTE_POWER]                    = {.name = "light_compute_power"},
-  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION]                  = {.name = "temporal_accumulation"},
-  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV]              = {.name = "temporal_accumulation_aov"},
-  [CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE]                   = {.name = "generate_final_image"},
-  [CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_XRGB8]                  = {.name = "convert_RGBF_to_XRGB8"},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE]           = {.name = "camera_post_image_downsample"},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE_THRESHOLD] = {.name = "camera_post_image_downsample_threshold"},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE]             = {.name = "camera_post_image_upsample"},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_GHOSTS]          = {.name = "camera_post_lens_flare_ghosts"},
-  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO]            = {.name = "camera_post_lens_flare_halo"}};
+  [CUDA_KERNEL_TYPE_GENERATE_TRACE_TASKS]            = {.name = "generate_trace_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_BALANCE_TRACE_TASKS]             = {.name = "balance_trace_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_POSTPROCESS_TRACE_TASKS]         = {.name = "postprocess_trace_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_GEOMETRY_PROCESS_TASKS_DEBUG]    = {.name = "geometry_process_tasks_debug", .param_size = 0},
+  [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS]               = {.name = "sky_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_SKY_PROCESS_TASKS_DEBUG]         = {.name = "sky_process_tasks_debug", .param_size = 0},
+  [CUDA_KERNEL_TYPE_SKY_PROCESS_INSCATTERING_EVENTS] = {.name = "sky_process_inscattering_events", .param_size = 0},
+  [CUDA_KERNEL_TYPE_SKY_COMPUTE_HDRI]                = {.name = "sky_compute_hdri", .param_size = 0},
+  [CUDA_KERNEL_TYPE_SKY_COMPUTE_TRANSMITTANCE_LUT] =
+    {.name = "sky_compute_transmittance_lut", .param_size = sizeof(KernelArgsSkyComputeTransmittanceLUT)},
+  [CUDA_KERNEL_TYPE_SKY_COMPUTE_MULTISCATTERING_LUT] =
+    {.name = "sky_compute_multiscattering_lut", .param_size = sizeof(KernelArgsSkyComputeMultiscatteringLUT)},
+  [CUDA_KERNEL_TYPE_CLOUD_COMPUTE_SHAPE_NOISE] =
+    {.name = "cloud_compute_shape_noise", .param_size = sizeof(KernelArgsCloudComputeShapeNoise)},
+  [CUDA_KERNEL_TYPE_CLOUD_COMPUTE_DETAIL_NOISE] =
+    {.name = "cloud_compute_detail_noise", .param_size = sizeof(KernelArgsCloudComputeDetailNoise)},
+  [CUDA_KERNEL_TYPE_CLOUD_COMPUTE_WEATHER_NOISE] =
+    {.name = "cloud_compute_weather_noise", .param_size = sizeof(KernelArgsCloudComputeWeatherNoise)},
+  [CUDA_KERNEL_TYPE_CLOUD_PROCESS_TASKS]          = {.name = "cloud_process_tasks", .param_size = 0},
+  [CUDA_KERNEL_TYPE_VOLUME_PROCESS_EVENTS]        = {.name = "volume_process_events", .param_size = 0},
+  [CUDA_KERNEL_TYPE_PARTICLE_PROCESS_TASKS_DEBUG] = {.name = "particle_process_tasks_debug", .param_size = 0},
+  [CUDA_KERNEL_TYPE_PARTICLE_GENERATE]            = {.name = "particle_generate", .param_size = 0},
+  [CUDA_KERNEL_TYPE_LIGHT_COMPUTE_POWER]          = {.name = "light_compute_power", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION]        = {.name = "temporal_accumulation", .param_size = 0},
+  [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV]    = {.name = "temporal_accumulation_aov", .param_size = 0},
+  [CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE]         = {.name = "generate_final_image", .param_size = sizeof(KernelArgsGenerateFinalImage)},
+  [CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_XRGB8]        = {.name = "convert_RGBF_to_XRGB8", .param_size = sizeof(KernelArgsConvertRGBFToXRGB8)},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE] = {.name = "camera_post_image_downsample", .param_size = 0},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE_THRESHOLD] = {.name = "camera_post_image_downsample_threshold", .param_size = 0},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE]             = {.name = "camera_post_image_upsample", .param_size = 0},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_GHOSTS]          = {.name = "camera_post_lens_flare_ghosts", .param_size = 0},
+  [CUDA_KERNEL_TYPE_CAMERA_POST_LENS_FLARE_HALO]            = {.name = "camera_post_lens_flare_halo", .param_size = 0}};
 LUM_STATIC_SIZE_ASSERT(cuda_kernel_configs, sizeof(CUDAKernelConfig) * CUDA_KERNEL_TYPE_COUNT);
 
 LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary library, CUDAKernelType type) {
@@ -53,12 +59,7 @@ LuminaryResult kernel_create(CUDAKernel** kernel, Device* device, CUlibrary libr
     __RETURN_ERROR(LUMINARY_ERROR_CUDA, "Kernel %s failed to load.", config->name);
   }
 
-  size_t param_offset;
-  size_t param_size;
-  result = cuKernelGetParamInfo((*kernel)->cuda_kernel, 0, &param_offset, &param_size);
-
-  // Only if the kernel has arguments will the function succeed.
-  (*kernel)->arg_size = (result != CUDA_SUCCESS) ? param_size : 0;
+  (*kernel)->param_size = config->param_size;
 
   uint32_t shared_memory_size;
   CUDA_FAILURE_HANDLE(
