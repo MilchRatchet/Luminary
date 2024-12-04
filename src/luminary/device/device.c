@@ -886,6 +886,33 @@ LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshIns
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
+  uint32_t num_updates;
+  __FAILURE_HANDLE(array_get_num_elements(instance_updates, &num_updates));
+
+  bool new_instances_are_added = false;
+
+  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
+    const uint32_t instance_id = instance_updates[update_id].instance_id;
+
+    if (instance_id >= device->num_instances) {
+      device->num_instances   = instance_id + 1;
+      new_instances_are_added = true;
+    }
+  }
+
+  if (new_instances_are_added) {
+    __DEVICE_BUFFER_REALLOC(instance_mesh_id, sizeof(uint32_t) * device->num_instances);
+  }
+
+  for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
+    const uint32_t instance_id = instance_updates[update_id].instance_id;
+    const uint32_t mesh_id     = instance_updates[update_id].instance.mesh_id;
+
+    __FAILURE_HANDLE(device_staging_manager_register(
+      device->staging_manager, &mesh_id, (DEVICE void*) device->buffers.instance_mesh_id, sizeof(uint32_t) * instance_id,
+      sizeof(uint32_t)));
+  }
+
   __FAILURE_HANDLE(optix_bvh_instance_cache_update(device->optix_instance_cache, instance_updates));
   __FAILURE_HANDLE(optix_bvh_ias_build(device->optix_bvh_ias, device));
 

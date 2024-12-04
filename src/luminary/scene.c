@@ -495,7 +495,7 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
       for (uint32_t material_update_id = 0; material_update_id < material_updates_count; material_update_id++) {
         const uint32_t material_id_of_update = scene->material_updates[material_update_id].material_id;
         if (material_id_of_update >= material_id) {
-          material_id = material_id_of_update;
+          material_id = material_id_of_update + 1;
         }
       }
 
@@ -524,7 +524,7 @@ LuminaryResult scene_add_entry(Scene* scene, const void* object, SceneEntity ent
         for (uint32_t instance_update_id = 0; instance_update_id < instance_updates_count; instance_update_id++) {
           const uint32_t instance_id_of_update = scene->instance_updates[instance_update_id].instance_id;
           if (instance_id_of_update >= instance_id) {
-            instance_id = instance_id_of_update;
+            instance_id = instance_id_of_update + 1;
           }
         }
       }
