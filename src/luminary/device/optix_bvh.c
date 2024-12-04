@@ -312,6 +312,8 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device) {
   build_options.motionOptions.numKeys = 1;
   build_options.buildFlags            = OPTIX_BUILD_FLAG_PREFER_FAST_TRACE | OPTIX_BUILD_FLAG_ALLOW_COMPACTION;
 
+  __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
+
   for (uint32_t type = 0; type < OPTIX_BVH_TYPE_COUNT; type++) {
     OptixBuildInput build_input;
     memset(&build_input, 0, sizeof(OptixBuildInput));

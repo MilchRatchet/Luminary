@@ -63,7 +63,7 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   memset(&pipeline_compile_options, 0, sizeof(OptixPipelineCompileOptions));
 
   pipeline_compile_options.usesMotionBlur                   = 0;
-  pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY;
+  pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
   pipeline_compile_options.numPayloadValues                 = optix_kernel_configs[type].num_payloads;
   pipeline_compile_options.numAttributeValues               = 2;
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;
