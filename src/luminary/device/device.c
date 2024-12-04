@@ -254,6 +254,43 @@ static LuminaryResult _device_get_properties(DeviceProperties* props, Device* de
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_get_optix_properties(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_LIMIT_MAX_TRACE_DEPTH, &device->optix_properties.max_trace_depth,
+    sizeof(device->optix_properties.max_trace_depth)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_LIMIT_MAX_TRAVERSABLE_GRAPH_DEPTH, &device->optix_properties.max_traversable_graph_depth,
+    sizeof(device->optix_properties.max_traversable_graph_depth)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_LIMIT_MAX_PRIMITIVES_PER_GAS, &device->optix_properties.max_primitives_per_gas,
+    sizeof(device->optix_properties.max_primitives_per_gas)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_LIMIT_MAX_INSTANCES_PER_IAS, &device->optix_properties.max_instances_per_ias,
+    sizeof(device->optix_properties.max_instances_per_ias)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_RTCORE_VERSION, &device->optix_properties.rtcore_version,
+    sizeof(device->optix_properties.rtcore_version)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_LIMIT_MAX_INSTANCE_ID, &device->optix_properties.max_instance_id,
+    sizeof(device->optix_properties.max_instance_id)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_LIMIT_NUM_BITS_INSTANCE_VISIBILITY_MASK,
+    &device->optix_properties.num_bits_instance_visibility_mask, sizeof(device->optix_properties.num_bits_instance_visibility_mask)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_RECORDS_PER_GAS, &device->optix_properties.max_sbt_records_per_gas,
+    sizeof(device->optix_properties.max_sbt_records_per_gas)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_LIMIT_MAX_SBT_OFFSET, &device->optix_properties.max_sbt_offset,
+    sizeof(device->optix_properties.max_sbt_offset)));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextGetProperty(
+    device->optix_ctx, OPTIX_DEVICE_PROPERTY_SHADER_EXECUTION_REORDERING, &device->optix_properties.shader_execution_reordering,
+    sizeof(device->optix_properties.shader_execution_reordering)));
+
+  return LUMINARY_SUCCESS;
+}
+
 static LuminaryResult _device_set_constant_memory_dirty(Device* device, DeviceConstantMemoryMember member) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -573,7 +610,9 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   optix_device_context_options.validationMode      = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
 #endif
 
-  OPTIX_FAILURE_HANDLE(optixDeviceContextCreate((CUcontext) 0, &optix_device_context_options, &device->optix_ctx));
+  OPTIX_FAILURE_HANDLE(optixDeviceContextCreate(device->cuda_ctx, &optix_device_context_options, &device->optix_ctx));
+
+  __FAILURE_HANDLE(_device_get_optix_properties(device));
 
   ////////////////////////////////////////////////////////////////////
   // Stream creation

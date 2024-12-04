@@ -47,9 +47,11 @@ static LuminaryResult _optix_bvh_get_optix_instance(
   __CHECK_NULL_ARGUMENT(instance);
   __CHECK_NULL_ARGUMENT(optix_instance);
 
+  memset(optix_instance, 0, sizeof(OptixInstance));
+
   optix_instance->instanceId        = instance_id;
   optix_instance->sbtOffset         = 0;
-  optix_instance->visibilityMask    = (instance->active) ? 0xFFFFFFFF : 0;
+  optix_instance->visibilityMask    = (instance->active) ? ((1u << (device->optix_properties.num_bits_instance_visibility_mask)) - 1) : 0;
   optix_instance->flags             = OPTIX_INSTANCE_FLAG_DISABLE_TRIANGLE_FACE_CULLING;
   optix_instance->traversableHandle = device->meshes[instance->mesh_id]->bvh->traversable[type];
 
@@ -258,7 +260,6 @@ LuminaryResult optix_bvh_gas_build(OptixBVH* bvh, Device* device, const Mesh* me
 
     size_t compact_size;
     __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
-    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
     __FAILURE_HANDLE(device_free(&accel_emit_buffer));
     __FAILURE_HANDLE(device_free(&temp_buffer));
@@ -354,7 +355,6 @@ LuminaryResult optix_bvh_ias_build(OptixBVH* bvh, Device* device) {
 
     size_t compact_size;
     __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
-    CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
     __FAILURE_HANDLE(device_free(&accel_emit_buffer));
     __FAILURE_HANDLE(device_free(&temp_buffer));
@@ -467,7 +467,6 @@ LuminaryResult optix_bvh_light_build(OptixBVH* bvh, Device* device, const LightT
 
   size_t compact_size;
   __FAILURE_HANDLE(device_download(&compact_size, accel_emit_buffer, 0, sizeof(size_t), device->stream_main));
-  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
   __FAILURE_HANDLE(device_free(&accel_emit_buffer));
   __FAILURE_HANDLE(device_free(&temp_buffer));

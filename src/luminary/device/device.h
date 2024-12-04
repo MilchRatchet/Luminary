@@ -41,9 +41,23 @@ struct DeviceConstantMemoryDirtyProperties {
   DeviceConstantMemoryMember member;
 } typedef DeviceConstantMemoryDirtyProperties;
 
+struct DeviceOptixProperties {
+  uint32_t max_trace_depth;
+  uint32_t max_traversable_graph_depth;
+  uint32_t max_primitives_per_gas;
+  uint32_t max_instances_per_ias;
+  uint32_t rtcore_version;
+  uint32_t max_instance_id;
+  uint32_t num_bits_instance_visibility_mask;
+  uint32_t max_sbt_records_per_gas;
+  uint32_t max_sbt_offset;
+  uint32_t shader_execution_reordering;
+} typedef DeviceOptixProperties;
+
 struct Device {
   uint32_t index;
   DeviceProperties properties;
+  DeviceOptixProperties optix_properties;
   SampleCountSlice sample_count;
   bool exit_requested;
   bool optix_callback_error;
