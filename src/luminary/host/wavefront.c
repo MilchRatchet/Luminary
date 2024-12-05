@@ -21,6 +21,30 @@
 #define LINE_SIZE 256 * 1024               // 256 KB
 #define READ_BUFFER_SIZE 16 * 1024 * 1024  // 16 MB
 
+static WavefrontMaterial _wavefront_get_default_material() {
+  WavefrontMaterial default_material;
+
+  default_material.hash                    = 0;
+  default_material.diffuse_reflectivity.r  = 0.9f;
+  default_material.diffuse_reflectivity.g  = 0.9f;
+  default_material.diffuse_reflectivity.b  = 0.9f;
+  default_material.dissolve                = 1.0f;
+  default_material.specular_reflectivity.r = 0.0f;
+  default_material.specular_reflectivity.g = 0.0f;
+  default_material.specular_reflectivity.b = 0.0f;
+  default_material.specular_exponent       = 300.0f;
+  default_material.emission.r              = 0.0f;
+  default_material.emission.g              = 0.0f;
+  default_material.emission.b              = 0.0f;
+  default_material.refraction_index        = 1.0f;
+  default_material.texture[WF_ALBEDO]      = TEXTURE_NONE;
+  default_material.texture[WF_LUMINANCE]   = TEXTURE_NONE;
+  default_material.texture[WF_MATERIAL]    = TEXTURE_NONE;
+  default_material.texture[WF_NORMAL]      = TEXTURE_NONE;
+
+  return default_material;
+}
+
 LuminaryResult wavefront_create(WavefrontContent** content) {
   __CHECK_NULL_ARGUMENT(content);
 
@@ -35,23 +59,9 @@ LuminaryResult wavefront_create(WavefrontContent** content) {
   __FAILURE_HANDLE(array_create(&(*content)->triangles, sizeof(WavefrontTriangle), 16));
   __FAILURE_HANDLE(array_create(&(*content)->materials, sizeof(WavefrontMaterial), 16));
 
-  (*content)->materials[0].hash                    = 0;
-  (*content)->materials[0].diffuse_reflectivity.r  = 0.9f;
-  (*content)->materials[0].diffuse_reflectivity.g  = 0.9f;
-  (*content)->materials[0].diffuse_reflectivity.b  = 0.9f;
-  (*content)->materials[0].dissolve                = 1.0f;
-  (*content)->materials[0].specular_reflectivity.r = 0.0f;
-  (*content)->materials[0].specular_reflectivity.g = 0.0f;
-  (*content)->materials[0].specular_reflectivity.b = 0.0f;
-  (*content)->materials[0].specular_exponent       = 300.0f;
-  (*content)->materials[0].emission.r              = 0.0f;
-  (*content)->materials[0].emission.g              = 0.0f;
-  (*content)->materials[0].emission.b              = 0.0f;
-  (*content)->materials[0].refraction_index        = 1.0f;
-  (*content)->materials[0].texture[WF_ALBEDO]      = TEXTURE_NONE;
-  (*content)->materials[0].texture[WF_LUMINANCE]   = TEXTURE_NONE;
-  (*content)->materials[0].texture[WF_MATERIAL]    = TEXTURE_NONE;
-  (*content)->materials[0].texture[WF_NORMAL]      = TEXTURE_NONE;
+  WavefrontMaterial default_material = _wavefront_get_default_material();
+
+  __FAILURE_HANDLE(array_push(&(*content)->materials, &default_material));
 
   __FAILURE_HANDLE(array_create(&(*content)->textures, sizeof(Texture*), 16));
   __FAILURE_HANDLE(array_create(&(*content)->texture_instances, sizeof(WavefrontTextureInstance), 16));
@@ -289,24 +299,8 @@ static LuminaryResult read_materials_file(WavefrontContent* content, Path* mtl_f
       char* name  = line + 7;
       size_t hash = hash_djb2((unsigned char*) name);
 
-      WavefrontMaterial mat;
-      mat.hash                    = hash;
-      mat.diffuse_reflectivity.r  = 0.9f;
-      mat.diffuse_reflectivity.g  = 0.9f;
-      mat.diffuse_reflectivity.b  = 0.9f;
-      mat.dissolve                = 1.0f;
-      mat.specular_reflectivity.r = 0.0f;
-      mat.specular_reflectivity.g = 0.0f;
-      mat.specular_reflectivity.b = 0.0f;
-      mat.specular_exponent       = 300.0f;
-      mat.emission.r              = 0.0f;
-      mat.emission.g              = 0.0f;
-      mat.emission.b              = 0.0f;
-      mat.refraction_index        = 1.0f;
-      mat.texture[WF_ALBEDO]      = TEXTURE_NONE;
-      mat.texture[WF_LUMINANCE]   = TEXTURE_NONE;
-      mat.texture[WF_MATERIAL]    = TEXTURE_NONE;
-      mat.texture[WF_NORMAL]      = TEXTURE_NONE;
+      WavefrontMaterial mat = _wavefront_get_default_material();
+      mat.hash              = hash;
 
       __FAILURE_HANDLE(array_push(&content->materials, &mat));
 
@@ -792,7 +786,7 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     mat.albedo.r                   = wavefront_mat.diffuse_reflectivity.r;
     mat.albedo.g                   = wavefront_mat.diffuse_reflectivity.g;
     mat.albedo.b                   = wavefront_mat.diffuse_reflectivity.b;
-    mat.albedo.r                   = wavefront_mat.dissolve;
+    mat.albedo.a                   = wavefront_mat.dissolve;
     mat.emission                   = wavefront_mat.emission;
     mat.emission_scale             = 1.0f;
     mat.refraction_index           = wavefront_mat.refraction_index;

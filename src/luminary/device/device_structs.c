@@ -263,6 +263,13 @@ static uint16_t _device_struct_convert_float01_to_uint16(const float f) {
   return (uint16_t) (f * 0xFFFFu + 0.5f);
 }
 
+static uint16_t _device_struct_convert_float_to_uint16(const float f) {
+  const uint32_t data = *(uint32_t*) &f;
+
+  // 8 Exponent bits and 8 Mantissa bits
+  return (uint16_t) ((data >> 15) & 0xFFFF);
+}
+
 LuminaryResult device_struct_material_convert(const Material* material, DeviceMaterialCompressed* device_material) {
   __CHECK_NULL_ARGUMENT(material);
   __CHECK_NULL_ARGUMENT(device_material);
@@ -292,7 +299,7 @@ LuminaryResult device_struct_material_convert(const Material* material, DeviceMa
   device_material->emission_r     = _device_struct_convert_float01_to_uint16(emission.r);
   device_material->emission_g     = _device_struct_convert_float01_to_uint16(emission.g);
   device_material->emission_b     = _device_struct_convert_float01_to_uint16(emission.b);
-  device_material->emission_scale = material->emission_scale;
+  device_material->emission_scale = _device_struct_convert_float_to_uint16(material->emission_scale / emission_normalization);
   device_material->albedo_tex     = material->albedo_tex;
   device_material->luminance_tex  = material->luminance_tex;
   device_material->material_tex   = material->material_tex;
