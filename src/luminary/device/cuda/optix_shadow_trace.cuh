@@ -164,6 +164,8 @@ __device__ RGBAF optix_alpha_test(const TriangleHandle handle, const uint32_t ma
   return load_material_albedo(device.ptrs.materials, material_id);
 }
 
+// TODO: Implement separate anyhit and closest hit shaders for BSDF light tracing.
+
 extern "C" __global__ void __anyhit__optix() {
   const TriangleHandle handle = optixGetTriangleHandle();
 
@@ -173,28 +175,21 @@ extern "C" __global__ void __anyhit__optix() {
     optixIgnoreIntersection();
   }
 
+  // TODO: Add support to check for fully transparent hits, we want to ignore those.
+  if (target_light.instance_id == HIT_TYPE_LIGHT_BSDF_HINT)
+    return;
+
   const uint32_t mesh_id = mesh_id_load(handle.instance_id);
 
   const uint32_t data = __ldg(
     (uint32_t*) triangle_get_entry_address(device.ptrs.triangles[mesh_id], 3, 3, handle.tri_id, device.ptrs.triangle_counts[mesh_id]));
   const uint16_t material_id = data & 0xFFFF;
 
-  const bool bsdf_sampling_query        = (target_light.instance_id == HIT_TYPE_LIGHT_BSDF_HINT);
   const bool material_has_ior_shadowing = (device.ptrs.materials[material_id].flags & DEVICE_MATERIAL_FLAG_IOR_SHADOWING) != 0;
 
-  unsigned int ray_ior = (bsdf_sampling_query || !material_has_ior_shadowing) ? SKIP_IOR_CHECK : optixGetPayload_3();
+  unsigned int ray_ior = (!material_has_ior_shadowing) ? SKIP_IOR_CHECK : optixGetPayload_3();
 
   const RGBAF albedo = optix_alpha_test(handle, material_id, ray_ior);
-
-  // For finding the hit light of BSDF rays we only care about ignoring fully transparent hits.
-  // I don't have OMMs for this BVH.
-  if (bsdf_sampling_query) {
-    if (albedo.a == 0.0f) {
-      optixIgnoreIntersection();
-    }
-
-    return;
-  }
 
   if (albedo.a == 1.0f) {
     optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE, HIT_TYPE_REJECT);
@@ -234,12 +229,12 @@ extern "C" __global__ void __anyhit__optix() {
 extern "C" __global__ void __closesthit__optix() {
   unsigned int target_light = optixGetPayload_0();
   if (target_light == HIT_TYPE_LIGHT_BSDF_HINT) {
-    optixSetPayload_0(optixGetPrimitiveIndex());
+    optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE + 1, optixGetPrimitiveIndex());
     return;
   }
 
   // This is never executed for triangle lights so we don't need to check if the closest hit is the target light.
-  optixSetPayload_0(HIT_TYPE_REJECT);
+  optixSetPayloadGeneric(OPTIX_PAYLOAD_TRIANGLE_HANDLE, HIT_TYPE_REJECT);
 }
 
 #endif /* OPTIX_KERNEL && SHADING_KERNEL */

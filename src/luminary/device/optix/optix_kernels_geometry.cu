@@ -69,7 +69,6 @@ extern "C" __global__ void __raygen__optix() {
 
     if (data.flags & G_BUFFER_FLAG_USE_LIGHT_RAYS) {
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_sun(data, task.index));
-      accumulated_light = add_color(accumulated_light, optix_compute_light_ray_toy(data, task.index));
       accumulated_light = add_color(accumulated_light, optix_compute_light_ray_geo(data, task.index));
     }
 

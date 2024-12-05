@@ -158,6 +158,8 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   uint32_t num_actions;
   __FAILURE_HANDLE(array_get_num_elements(renderer->queue, &num_actions));
 
+  __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
+
   for (uint32_t action_id = renderer->action_ptr; action_id < num_actions; action_id++) {
     const DeviceRendererQueueAction* action = renderer->queue + action_id;
 

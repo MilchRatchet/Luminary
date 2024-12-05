@@ -14,16 +14,17 @@
 struct OptixKernelConfig {
   const char* name;
   int num_payloads;
+  bool allow_gas;
 } typedef OptixKernelConfig;
 
 // TODO: Rename the ptx to the same as the types.
 static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
-  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernels.ptx", .num_payloads = 3},
-  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernels_trace_particle.ptx", .num_payloads = 2},
-  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernels_geometry.ptx", .num_payloads = 5},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernels_volume.ptx", .num_payloads = 5},
-  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx", .num_payloads = 5},
-  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx", .num_payloads = 5}};
+  [OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY]      = {.name = "optix_kernels.ptx", .num_payloads = 3, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES]     = {.name = "optix_kernels_trace_particle.ptx", .num_payloads = 2, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_GEOMETRY]       = {.name = "optix_kernels_geometry.ptx", .num_payloads = 5, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME]         = {.name = "optix_kernels_volume.ptx", .num_payloads = 5, .allow_gas = false},
+  [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx", .num_payloads = 5, .allow_gas = true},
+  [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx", .num_payloads = 5, .allow_gas = false}};
 
 LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type) {
   __CHECK_NULL_ARGUMENT(kernel);
@@ -63,7 +64,9 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   memset(&pipeline_compile_options, 0, sizeof(OptixPipelineCompileOptions));
 
   pipeline_compile_options.usesMotionBlur                   = 0;
-  pipeline_compile_options.traversableGraphFlags            = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
+  pipeline_compile_options.traversableGraphFlags            = (optix_kernel_configs[type].allow_gas)
+                                                                ? OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_ANY
+                                                                : OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_LEVEL_INSTANCING;
   pipeline_compile_options.numPayloadValues                 = optix_kernel_configs[type].num_payloads;
   pipeline_compile_options.numAttributeValues               = 2;
   pipeline_compile_options.exceptionFlags                   = OPTIX_EXCEPTION_FLAG_NONE;

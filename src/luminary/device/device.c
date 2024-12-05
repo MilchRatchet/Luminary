@@ -902,6 +902,7 @@ LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshIns
 
   if (new_instances_are_added) {
     __DEVICE_BUFFER_REALLOC(instance_mesh_id, sizeof(uint32_t) * device->num_instances);
+    __DEVICE_BUFFER_REALLOC(instance_transforms, sizeof(DeviceTransform) * device->num_instances);
   }
 
   for (uint32_t update_id = 0; update_id < num_updates; update_id++) {
@@ -911,6 +912,14 @@ LuminaryResult device_apply_instance_updates(Device* device, const ARRAY MeshIns
     __FAILURE_HANDLE(device_staging_manager_register(
       device->staging_manager, &mesh_id, (DEVICE void*) device->buffers.instance_mesh_id, sizeof(uint32_t) * instance_id,
       sizeof(uint32_t)));
+
+    DeviceTransform* transform;
+
+    __FAILURE_HANDLE(device_staging_manager_register_direct_access(
+      device->staging_manager, (DEVICE void*) device->buffers.instance_transforms, sizeof(DeviceTransform) * instance_id,
+      sizeof(DeviceTransform), (void**) &transform));
+
+    __FAILURE_HANDLE(device_struct_instance_transform_convert(&instance_updates[update_id].instance, transform));
   }
 
   __FAILURE_HANDLE(optix_bvh_instance_cache_update(device->optix_instance_cache, instance_updates));

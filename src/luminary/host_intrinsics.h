@@ -34,7 +34,7 @@ inline Vec128 vec128_set_1(const float a) {
 
 inline Vec128 vec128_set(const float x, const float y, const float z, const float w) {
 #ifdef LUMINARY_X86_INTRINSICS
-  return (Vec128){._imm = _mm_set_ps(x, y, z, w)};
+  return (Vec128){._imm = _mm_set_ps(w, z, y, x)};
 #else
   return (Vec128){.x = x, .y = y, .z = z, .w = w};
 #endif
