@@ -1090,7 +1090,7 @@ LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut) {
   __FAILURE_HANDLE(device_bsdf_lut_update(device->bsdf_lut, device, bsdf_lut));
 
   __FAILURE_HANDLE(device_struct_texture_object_convert(device->bsdf_lut->conductor, &device->constant_memory->bsdf_lut_conductor));
-  __FAILURE_HANDLE(device_struct_texture_object_convert(device->bsdf_lut->specular, &device->constant_memory->bsdf_lut_specular));
+  __FAILURE_HANDLE(device_struct_texture_object_convert(device->bsdf_lut->specular, &device->constant_memory->bsdf_lut_glossy));
   __FAILURE_HANDLE(device_struct_texture_object_convert(device->bsdf_lut->dielectric, &device->constant_memory->bsdf_lut_dielectric));
   __FAILURE_HANDLE(
     device_struct_texture_object_convert(device->bsdf_lut->dielectric_inv, &device->constant_memory->bsdf_lut_dielectric_inv));

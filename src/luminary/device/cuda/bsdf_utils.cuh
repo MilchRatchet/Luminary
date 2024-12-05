@@ -400,7 +400,7 @@ __device__ RGBF bsdf_conductor(
 }
 
 __device__ float bsdf_glossy_directional_albedo(const float NdotV, const float roughness) {
-  return tex2D<float>(device.bsdf_lut_specular.handle, NdotV, roughness);
+  return tex2D<float>(device.bsdf_lut_glossy.handle, NdotV, roughness);
 }
 
 __device__ RGBF

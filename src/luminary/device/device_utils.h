@@ -293,7 +293,7 @@ struct DeviceConstantMemory {
   DeviceTextureObject sky_hdri_shadow_tex;
   // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
   DeviceTextureObject bsdf_lut_conductor;
-  DeviceTextureObject bsdf_lut_specular;
+  DeviceTextureObject bsdf_lut_glossy;
   DeviceTextureObject bsdf_lut_dielectric;
   DeviceTextureObject bsdf_lut_dielectric_inv;
   // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC

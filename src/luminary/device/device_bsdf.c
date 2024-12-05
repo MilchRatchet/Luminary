@@ -23,7 +23,7 @@ DEVICE_CTX_FUNC LuminaryResult bsdf_lut_generate(BSDFLUT* lut, Device* device) {
 
   uint16_t* specular_data;
   __FAILURE_HANDLE(host_malloc(&specular_data, sizeof(uint16_t) * BSDF_LUT_SIZE * BSDF_LUT_SIZE));
-  memset(specular_data, 0xFF, sizeof(uint16_t) * BSDF_LUT_SIZE * BSDF_LUT_SIZE);
+  memset(specular_data, 0x00, sizeof(uint16_t) * BSDF_LUT_SIZE * BSDF_LUT_SIZE);
 
   uint16_t* dielectric_data;
   __FAILURE_HANDLE(host_malloc(&dielectric_data, sizeof(uint16_t) * BSDF_LUT_SIZE * BSDF_LUT_SIZE * BSDF_LUT_SIZE));

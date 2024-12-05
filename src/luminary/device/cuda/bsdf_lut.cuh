@@ -54,7 +54,7 @@ LUMINARY_KERNEL void bsdf_lut_ss_generate(uint16_t* dst) {
   dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 }
 
-LUMINARY_KERNEL void bsdf_lut_specular_generate(uint16_t* dst, const uint16_t* src_energy_ss) {
+LUMINARY_KERNEL void bsdf_lut_glossy_generate(uint16_t* dst, const uint16_t* src_energy_ss) {
   const uint32_t id = THREAD_ID;
 
   if (id >= BSDF_LUT_SIZE * BSDF_LUT_SIZE)
