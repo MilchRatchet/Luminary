@@ -32,6 +32,9 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
 
   Display* display;
   LUM_FAILURE_HANDLE(host_malloc(&display, sizeof(Display)));
+  memset(display, 0, sizeof(Display));
+
+  display->show_ui = true;
 
   SDL_Rect rect;
   SDL_Rect screen_size;
@@ -94,6 +97,9 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
         _display_handle_resize(display);
         *dirty = true;
         break;
+      case SDL_EVENT_WINDOW_MOUSE_ENTER:
+      case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+        break;
       case SDL_EVENT_KEY_DOWN:
       case SDL_EVENT_KEY_UP:
         keyboard_state_update(display->keyboard_state, event.key);
@@ -118,6 +124,33 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
   }
 }
 
+// TODO: Refactor
+static void _display_move_sun(Display* display, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  LuminarySky sky;
+  LUM_FAILURE_HANDLE(luminary_host_get_sky(host, &sky));
+
+  if (display->keyboard_state->keys[SDL_SCANCODE_LEFT].down) {
+    sky.azimuth -= 0.001f;
+  }
+
+  if (display->keyboard_state->keys[SDL_SCANCODE_RIGHT].down) {
+    sky.azimuth += 0.001f;
+  }
+
+  if (display->keyboard_state->keys[SDL_SCANCODE_UP].down) {
+    sky.altitude += 0.001f;
+  }
+
+  if (display->keyboard_state->keys[SDL_SCANCODE_DOWN].down) {
+    sky.altitude -= 0.001f;
+  }
+
+  LUM_FAILURE_HANDLE(luminary_host_set_sky(host, &sky));
+}
+
 void display_handle_inputs(Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -129,6 +162,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host) {
 
   if (!display->show_ui) {
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state);
+    _display_move_sun(display, host);
   }
 }
 

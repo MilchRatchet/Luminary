@@ -304,12 +304,16 @@ DEVICE_CTX_FUNC LuminaryResult sky_hdri_generate(SkyHDRI* hdri, Device* device) 
       if (hdri->shadow_tex->data) {
         __FAILURE_HANDLE(host_free(&hdri->shadow_tex->data));
       }
-
-      __FAILURE_HANDLE(host_malloc(&hdri->color_tex->data, hdri->color_tex->width * sizeof(RGBAF) * hdri->color_tex->height));
-      __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->pitch * sizeof(float) * hdri->shadow_tex->height));
     }
 
-    __FAILURE_HANDLE(_sky_hdri_compute(hdri, device));
+    if (hdri->sky.mode == LUMINARY_SKY_MODE_HDRI) {
+      if (hdri->output_is_dirty) {
+        __FAILURE_HANDLE(host_malloc(&hdri->color_tex->data, hdri->color_tex->width * sizeof(RGBAF) * hdri->color_tex->height));
+        __FAILURE_HANDLE(host_malloc(&hdri->shadow_tex->data, hdri->shadow_tex->pitch * sizeof(float) * hdri->shadow_tex->height));
+      }
+
+      __FAILURE_HANDLE(_sky_hdri_compute(hdri, device));
+    }
 
     hdri->sky_is_dirty = false;
 
@@ -373,12 +377,14 @@ DEVICE_CTX_FUNC LuminaryResult device_sky_hdri_update(DeviceSkyHDRI* hdri, Devic
   if (source_hdri->id != hdri->reference_id) {
     __FAILURE_HANDLE(_device_sky_hdri_free(hdri));
 
-    __FAILURE_HANDLE(device_texture_create(&hdri->color_tex, source_hdri->color_tex, device->stream_main));
-    __FAILURE_HANDLE(device_texture_create(&hdri->shadow_tex, source_hdri->shadow_tex, device->stream_main));
+    if (source_hdri->sky.mode == LUMINARY_SKY_MODE_HDRI) {
+      __FAILURE_HANDLE(device_texture_create(&hdri->color_tex, source_hdri->color_tex, device->stream_main));
+      __FAILURE_HANDLE(device_texture_create(&hdri->shadow_tex, source_hdri->shadow_tex, device->stream_main));
+
+      *has_changed = true;
+    }
 
     hdri->reference_id = source_hdri->id;
-
-    *has_changed = true;
   }
 
   return LUMINARY_SUCCESS;
