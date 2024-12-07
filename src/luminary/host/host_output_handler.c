@@ -6,6 +6,7 @@
 #include "internal_walltime.h"
 
 #define OUTPUT_OBJECT_HANDLE_INVALID 0xFFFFFFFF
+#define MIN_OUTPUT_HANDLE_COUNT 4
 
 LuminaryResult output_handler_create(OutputHandler** output) {
   __CHECK_NULL_ARGUMENT(output);
@@ -108,6 +109,52 @@ LuminaryResult output_handler_release(OutputHandler* output, uint32_t handle) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _output_handler_get_handle_for_write(
+  OutputHandler* output, uint32_t width, uint32_t height, uint32_t* selected_handle) {
+  __CHECK_NULL_ARGUMENT(output);
+
+  uint32_t num_outputs;
+  __FAILURE_HANDLE(array_get_num_elements(output->objects, &num_outputs));
+
+  *selected_handle              = OUTPUT_OBJECT_HANDLE_INVALID;
+  uint64_t earliest_time_stamp  = UINT64_MAX;
+  bool selected_handle_is_valid = true;
+
+  uint32_t num_valid_outputs = 0;
+
+  for (uint32_t output_id = 0; output_id < num_outputs; output_id++) {
+    OutputObject* object = output->objects + output_id;
+
+    if (object->reference_count)
+      continue;
+
+    // Handles that use other dimensions are always eligible for overwriting.
+    bool handle_is_still_valid = (object->width == width) && (object->height == height);
+    if (handle_is_still_valid) {
+      num_valid_outputs++;
+
+      if (object->time_stamp >= earliest_time_stamp)
+        continue;
+    }
+
+    *selected_handle    = output_id;
+    earliest_time_stamp = object->time_stamp;
+
+    // If we have found an invalid handle, we can safely just overwrite that one.
+    if (!handle_is_still_valid) {
+      selected_handle_is_valid = false;
+      break;
+    }
+  }
+
+  // Make sure we are always multi-buffered, otherwise we may overwrite the only existing valid buffer.
+  if (num_valid_outputs < MIN_OUTPUT_HANDLE_COUNT && selected_handle_is_valid) {
+    *selected_handle = OUTPUT_OBJECT_HANDLE_INVALID;
+  }
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width, uint32_t height, uint32_t* handle) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(handle);
@@ -118,17 +165,8 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width,
   uint32_t num_outputs;
   __FAILURE_HANDLE_CRITICAL(array_get_num_elements(output->objects, &num_outputs));
 
-  uint32_t selected_handle = OUTPUT_OBJECT_HANDLE_INVALID;
-
-  for (uint32_t output_id = 0; output_id < num_outputs; output_id++) {
-    OutputObject* object = output->objects + output_id;
-
-    if (object->reference_count)
-      continue;
-
-    selected_handle = output_id;
-    break;
-  }
+  uint32_t selected_handle;
+  __FAILURE_HANDLE_CRITICAL(_output_handler_get_handle_for_write(output, width, height, &selected_handle));
 
   if (selected_handle == OUTPUT_OBJECT_HANDLE_INVALID) {
     OutputObject new_object;
@@ -139,17 +177,23 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width,
     selected_handle = num_outputs;
   }
 
-  if (output->objects[selected_handle].allocated) {
-    __FAILURE_HANDLE(host_free(&output->objects[selected_handle].data));
+  OutputObject* selected_output = output->objects + selected_handle;
+
+  bool requires_allocation = !selected_output->allocated || (selected_output->width != width) || (selected_output->height != height);
+
+  if (requires_allocation) {
+    if (selected_output->allocated) {
+      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].data));
+    }
+
+    __FAILURE_HANDLE_CRITICAL(host_malloc(&output->objects[selected_handle].data, sizeof(XRGB8) * width * height));
   }
 
-  output->objects[selected_handle].populated       = false;
-  output->objects[selected_handle].allocated       = true;
-  output->objects[selected_handle].reference_count = 1;
-  output->objects[selected_handle].width           = width;
-  output->objects[selected_handle].height          = height;
-
-  __FAILURE_HANDLE(host_malloc(&output->objects[selected_handle].data, sizeof(XRGB8) * width * height));
+  selected_output->populated       = false;
+  selected_output->allocated       = true;
+  selected_output->reference_count = 1;
+  selected_output->width           = width;
+  selected_output->height          = height;
 
   *handle = selected_handle;
 
