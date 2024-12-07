@@ -5,7 +5,6 @@
 #include "utils.h"
 
 #define LUMINARY_MAX_NUM_DEVICES 4
-#define OPTIXRT_NUM_GROUPS 3
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 2048
 

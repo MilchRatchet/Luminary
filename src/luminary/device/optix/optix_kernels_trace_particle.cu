@@ -5,17 +5,8 @@
 
 #include "math.cuh"
 #include "memory.cuh"
-#include "optix_utils.cuh"
+#include "optix_include.cuh"
 #include "utils.cuh"
-
-__device__ bool particle_opacity_cutout(const float2 coord) {
-  const float dx = fabsf(coord.x - 0.5f);
-  const float dy = fabsf(coord.y - 0.5f);
-
-  const float r = dx * dx + dy * dy;
-
-  return (r > 0.25f);
-}
 
 // Kernels must be named __[SEMANTIC]__..., for example, __raygen__...
 // This can be found under function name prefix in the programming guide
@@ -61,7 +52,9 @@ extern "C" __global__ void __raygen__optix() {
 
       OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_DEPTH, 0);
       OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_INSTANCE_ID, 1);
-      optixTrace(device.optix_bvh_particles, p, ray, 0.0f, tmax, 0.0f, vis_mask, OPTIX_RAY_FLAG_NONE, 0, 0, 0, depth, instance_id);
+      optixTrace(
+        device.optix_bvh_particles, p, ray, 0.0f, tmax, 0.0f, vis_mask, OPTIX_RAY_FLAG_NONE, OPTIX_SBT_OFFSET_PARTICLE_TRACE, 0, 0, depth,
+        instance_id);
 
       const float intersection_dist = __uint_as_float(depth);
 
@@ -91,15 +84,4 @@ extern "C" __global__ void __raygen__optix() {
       trace_depth_store(t + __uint_as_float(depth), offset);
     }
   }
-}
-
-extern "C" __global__ void __anyhit__optix() {
-  if (particle_opacity_cutout(optixGetTriangleBarycentrics())) {
-    optixIgnoreIntersection();
-  }
-}
-
-extern "C" __global__ void __closesthit__optix() {
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_DEPTH, __float_as_uint(optixGetRayTmax()));
-  optixSetPayloadGeneric(OPTIX_PAYLOAD_INSTANCE_ID, optixGetPrimitiveIndex());
 }

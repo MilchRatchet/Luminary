@@ -5,6 +5,9 @@
 
 struct Device typedef Device;
 
+#define OPTIX_KERNEL_FUNCTION_COUNT 4
+#define OPTIX_KERNEL_NUM_GROUPS (2 + OPTIX_KERNEL_FUNCTION_COUNT)
+
 enum OptixKernelType {
   OPTIX_KERNEL_TYPE_RAYTRACE_GEOMETRY      = 0,
   OPTIX_KERNEL_TYPE_RAYTRACE_PARTICLES     = 1,
@@ -18,7 +21,7 @@ enum OptixKernelType {
 
 struct OptixKernel {
   OptixModule module;
-  OptixProgramGroup groups[OPTIXRT_NUM_GROUPS];
+  OptixProgramGroup groups[OPTIX_KERNEL_NUM_GROUPS];
   OptixPipeline pipeline;
   DEVICE char* records;
   OptixShaderBindingTable shaders;

@@ -9,7 +9,7 @@
 #include "light.cuh"
 #include "math.cuh"
 #include "memory.cuh"
-#include "optix_shadow_trace.cuh"
+#include "optix_include.cuh"
 #include "ris.cuh"
 #include "sky.cuh"
 #include "utils.cuh"
@@ -444,10 +444,11 @@ __device__ RGBF optix_compute_light_ray_geometry_single(GBufferData data, const 
   const float light_search_dist = (bsdf_sample_is_valid) ? FLT_MAX : -1.0f;
 
   // The compiler has issues with conditional optixTrace, hence we disable them using a negative max dist.
+  // TODO: Add a ray flag to skip anyhit because we don't use it right now.
   OPTIX_PAYLOAD_INDEX_REQUIRE(OPTIX_PAYLOAD_TRIANGLE_HANDLE, 0);
   optixTrace(
-    device.optix_bvh_light, origin, ray, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), 0, 0, 0, 0,
-    bsdf_sample_light_key.instance_id, bsdf_sample_light_key.tri_id);
+    device.optix_bvh_light, origin, ray, 0.0f, light_search_dist, 0.0f, OptixVisibilityMask(0xFFFF), 0, OPTIX_SBT_OFFSET_LIGHT_BSDF_TRACE,
+    0, 0, bsdf_sample_light_key.instance_id, bsdf_sample_light_key.tri_id);
 
   ////////////////////////////////////////////////////////////////////
   // Resample the BSDF direction with NEE based directions

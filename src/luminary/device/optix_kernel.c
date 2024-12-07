@@ -26,6 +26,12 @@ static const OptixKernelConfig optix_kernel_configs[OPTIX_KERNEL_TYPE_COUNT] = {
   [OPTIX_KERNEL_TYPE_SHADING_PARTICLES]      = {.name = "optix_kernels_particle.ptx", .num_payloads = 5, .allow_gas = true},
   [OPTIX_KERNEL_TYPE_SHADING_VOLUME_BRIDGES] = {.name = "optix_kernels_volume_bridges.ptx", .num_payloads = 5, .allow_gas = false}};
 
+static const char* optix_anyhit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
+  "__anyhit__geometry_trace", "__anyhit__particle_trace", "__anyhit__light_bsdf_trace", "__anyhit__shadow_trace"};
+
+static const char* optix_closesthit_function_names[OPTIX_KERNEL_FUNCTION_COUNT] = {
+  "__closesthit__geometry_trace", "__closesthit__particle_trace", "__closesthit__light_bsdf_trace", "__closesthit__shadow_trace"};
+
 LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type) {
   __CHECK_NULL_ARGUMENT(kernel);
   __CHECK_NULL_ARGUMENT(device);
@@ -94,11 +100,12 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   // Group Creation
   ////////////////////////////////////////////////////////////////////
 
+  // TODO: Think about using custom payload types.
   OptixProgramGroupOptions group_options;
   memset(&group_options, 0, sizeof(OptixProgramGroupOptions));
 
-  OptixProgramGroupDesc group_desc[OPTIXRT_NUM_GROUPS];
-  memset(group_desc, 0, OPTIXRT_NUM_GROUPS * sizeof(OptixProgramGroupDesc));
+  OptixProgramGroupDesc group_desc[OPTIX_KERNEL_NUM_GROUPS];
+  memset(group_desc, 0, OPTIX_KERNEL_NUM_GROUPS * sizeof(OptixProgramGroupDesc));
 
   group_desc[0].kind                     = OPTIX_PROGRAM_GROUP_KIND_RAYGEN;
   group_desc[0].raygen.module            = (*kernel)->module;
@@ -106,14 +113,17 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
 
   group_desc[1].kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
 
-  group_desc[2].kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
-  group_desc[2].hitgroup.moduleAH            = (*kernel)->module;
-  group_desc[2].hitgroup.entryFunctionNameAH = "__anyhit__optix";
-  group_desc[2].hitgroup.moduleCH            = (*kernel)->module;
-  group_desc[2].hitgroup.entryFunctionNameCH = "__closesthit__optix";
+  for (uint32_t function_id = 0; function_id < OPTIX_KERNEL_FUNCTION_COUNT; function_id++) {
+    group_desc[2 + function_id].kind                         = OPTIX_PROGRAM_GROUP_KIND_HITGROUP;
+    group_desc[2 + function_id].hitgroup.moduleAH            = (*kernel)->module;
+    group_desc[2 + function_id].hitgroup.entryFunctionNameAH = optix_anyhit_function_names[function_id];
+    group_desc[2 + function_id].hitgroup.moduleCH            = (*kernel)->module;
+    group_desc[2 + function_id].hitgroup.entryFunctionNameCH = optix_closesthit_function_names[function_id];
+  }
 
   OPTIX_FAILURE_HANDLE_LOG(
-    optixProgramGroupCreate(device->optix_ctx, group_desc, OPTIXRT_NUM_GROUPS, &group_options, log, &log_size, (*kernel)->groups), log);
+    optixProgramGroupCreate(device->optix_ctx, group_desc, OPTIX_KERNEL_NUM_GROUPS, &group_options, log, &log_size, (*kernel)->groups),
+    log);
 
   ////////////////////////////////////////////////////////////////////
   // Pipeline Creation
@@ -124,36 +134,42 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
 
   OPTIX_FAILURE_HANDLE_LOG(
     optixPipelineCreate(
-      device->optix_ctx, &pipeline_compile_options, &pipeline_link_options, (*kernel)->groups, OPTIXRT_NUM_GROUPS, log, &log_size,
+      device->optix_ctx, &pipeline_compile_options, &pipeline_link_options, (*kernel)->groups, OPTIX_KERNEL_NUM_GROUPS, log, &log_size,
       &(*kernel)->pipeline),
     log);
 
   ////////////////////////////////////////////////////////////////////
   // Shader Binding Table Creation
   ////////////////////////////////////////////////////////////////////
+  __FAILURE_HANDLE(device_malloc(&(*kernel)->records, OPTIX_KERNEL_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
 
-  __FAILURE_HANDLE(device_malloc(&(*kernel)->records, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE));
+  char* host_records;
+  __FAILURE_HANDLE(host_malloc(&host_records, OPTIX_KERNEL_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE + OPTIX_SBT_RECORD_ALIGNMENT));
 
-  char host_records[OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE];
+  // The SBT record must be aligned on the host for some reason, hardcoded aligning here, assert for if that alignment ever changes.
+  _STATIC_ASSERT(OPTIX_SBT_RECORD_ALIGNMENT == 16);
+  char* records_dst = host_records + (((~((uint64_t) host_records)) + 1) & (OPTIX_SBT_RECORD_ALIGNMENT - 1));
 
-  for (uint32_t i = 0; i < OPTIXRT_NUM_GROUPS; i++) {
-    OPTIX_FAILURE_HANDLE(optixSbtRecordPackHeader((*kernel)->groups[i], host_records + i * OPTIX_SBT_RECORD_HEADER_SIZE));
+  for (uint32_t i = 0; i < OPTIX_KERNEL_NUM_GROUPS; i++) {
+    OPTIX_FAILURE_HANDLE(optixSbtRecordPackHeader((*kernel)->groups[i], records_dst + i * OPTIX_SBT_RECORD_HEADER_SIZE));
   }
 
   __FAILURE_HANDLE(
-    device_upload((*kernel)->records, host_records, 0, OPTIXRT_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE, device->stream_main));
+    device_upload((*kernel)->records, records_dst, 0, OPTIX_KERNEL_NUM_GROUPS * OPTIX_SBT_RECORD_HEADER_SIZE, device->stream_main));
+
+  __FAILURE_HANDLE(host_free(&host_records));
 
   memset(&(*kernel)->shaders, 0, sizeof(OptixShaderBindingTable));
 
-  (*kernel)->shaders.raygenRecord       = DEVICE_CUPTR((*kernel)->records) + 0 * OPTIX_SBT_RECORD_HEADER_SIZE;
-  (*kernel)->shaders.missRecordBase     = DEVICE_CUPTR((*kernel)->records) + 1 * OPTIX_SBT_RECORD_HEADER_SIZE;
-  (*kernel)->shaders.hitgroupRecordBase = DEVICE_CUPTR((*kernel)->records) + 2 * OPTIX_SBT_RECORD_HEADER_SIZE;
+  (*kernel)->shaders.raygenRecord       = DEVICE_CUPTR_OFFSET((*kernel)->records, 0 * OPTIX_SBT_RECORD_HEADER_SIZE);
+  (*kernel)->shaders.missRecordBase     = DEVICE_CUPTR_OFFSET((*kernel)->records, 1 * OPTIX_SBT_RECORD_HEADER_SIZE);
+  (*kernel)->shaders.hitgroupRecordBase = DEVICE_CUPTR_OFFSET((*kernel)->records, 2 * OPTIX_SBT_RECORD_HEADER_SIZE);
 
   (*kernel)->shaders.missRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
   (*kernel)->shaders.missRecordCount         = 1;
 
   (*kernel)->shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
-  (*kernel)->shaders.hitgroupRecordCount         = 1;
+  (*kernel)->shaders.hitgroupRecordCount         = OPTIX_KERNEL_FUNCTION_COUNT;
 
   ////////////////////////////////////////////////////////////////////
   // Params Creation
@@ -168,6 +184,7 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   __CHECK_NULL_ARGUMENT(kernel);
   __CHECK_NULL_ARGUMENT(device);
 
+  // TODO: I am stupid, I can probably just pass the pointer directly :)
   CUDA_FAILURE_HANDLE(cuMemcpyDtoDAsync_v2(
     DEVICE_CUPTR(kernel->params), device->cuda_device_const_memory, sizeof(DeviceConstantMemory), device->stream_main));
 
@@ -185,7 +202,7 @@ LuminaryResult optix_kernel_destroy(OptixKernel** kernel) {
 
   OPTIX_FAILURE_HANDLE(optixPipelineDestroy((*kernel)->pipeline));
 
-  for (uint32_t group_id = 0; group_id < OPTIXRT_NUM_GROUPS; group_id++) {
+  for (uint32_t group_id = 0; group_id < OPTIX_KERNEL_NUM_GROUPS; group_id++) {
     OPTIX_FAILURE_HANDLE(optixProgramGroupDestroy((*kernel)->groups[group_id]));
   }
 

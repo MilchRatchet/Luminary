@@ -7,7 +7,7 @@
 #include "math.cuh"
 #include "memory.cuh"
 #include "ocean_utils.cuh"
-#include "optix_shadow_trace.cuh"
+#include "optix_include.cuh"
 #include "random.cuh"
 #include "utils.cuh"
 #include "utils.h"
