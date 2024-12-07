@@ -663,9 +663,10 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   ////////////////////////////////////////////////////////////////////
 
   __DEVICE_BUFFER_ALLOCATE(abort_flag, sizeof(uint32_t));
+  __FAILURE_HANDLE(device_malloc_staging(&device->abort_flags, sizeof(uint32_t), true));
 
-  uint32_t abort_flag = 0;
-  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, &abort_flag, 0, sizeof(uint32_t), device->stream_main));
+  *device->abort_flags = 0;
+  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1193,8 +1194,12 @@ LuminaryResult device_set_abort(Device* device) {
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  uint32_t abort_flag = 0xFFFFFFFF;
-  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, &abort_flag, 0, sizeof(uint32_t), device->stream_secondary));
+  *device->abort_flags = 0xFFFFFFFF;
+  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_secondary));
+
+  // We have to wait for the upload to finish, otherwise it is in theory possible that the unset abort upload happens before the set abort
+  // upload.
+  CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_secondary));
 
   __FAILURE_HANDLE(sample_count_reset(&device->sample_count, 0));
 
@@ -1210,8 +1215,8 @@ LuminaryResult device_unset_abort(Device* device) {
 
   CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_main));
 
-  uint32_t abort_flag = 0;
-  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, &abort_flag, 0, sizeof(uint32_t), device->stream_main));
+  *device->abort_flags = 0;
+  __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1268,6 +1273,7 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
+  __FAILURE_HANDLE(device_free_staging(&(*device)->abort_flags));
 
   __FAILURE_HANDLE(device_staging_manager_destroy(&(*device)->staging_manager));
 

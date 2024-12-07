@@ -75,6 +75,7 @@ struct Device {
   CUevent event_queue_output;
   DevicePointers buffers;
   STAGING DeviceConstantMemory* constant_memory;
+  STAGING uint32_t* abort_flags;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
