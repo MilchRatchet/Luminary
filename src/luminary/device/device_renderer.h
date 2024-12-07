@@ -29,6 +29,9 @@ struct DeviceRendererQueueAction {
   };
 } typedef DeviceRendererQueueAction;
 
+#define DEVICE_RENDERER_TIMING_EVENTS_COUNT 2
+#define DEVICE_RENDERER_TIMING_EVENTS_MASK (DEVICE_RENDERER_TIMING_EVENTS_COUNT - 1)
+
 struct DeviceRenderer {
   uint32_t action_ptr;
   ARRAY DeviceRendererQueueAction* queue;
@@ -36,6 +39,10 @@ struct DeviceRenderer {
   DeviceCommonCallbackData callback_data;
   uint64_t render_id;
   RingBuffer* callback_data_ringbuffer;
+  uint32_t event_id;
+  CUevent time_start[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
+  CUevent time_end[DEVICE_RENDERER_TIMING_EVENTS_COUNT];
+  float last_time;
 } typedef DeviceRenderer;
 
 struct DeviceRendererQueueArgs {

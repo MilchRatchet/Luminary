@@ -13,6 +13,11 @@ LuminaryResult device_renderer_create(DeviceRenderer** renderer) {
 
   __FAILURE_HANDLE(ringbuffer_create(&(*renderer)->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData) * 64));
 
+  for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
+    __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_start[event_id], 0));
+    __FAILURE_HANDLE(cuEventCreate(&(*renderer)->time_end[event_id], 0));
+  }
+
   return LUMINARY_SUCCESS;
 }
 
@@ -160,6 +165,14 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
 
   __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
+  uint32_t event_id = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
+
+  if (renderer->event_id >= DEVICE_RENDERER_TIMING_EVENTS_COUNT) {
+    CUDA_FAILURE_HANDLE(cuEventElapsedTime(&renderer->last_time, renderer->time_start[event_id], renderer->time_end[event_id]));
+  }
+
+  CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], device->stream_main));
+
   for (uint32_t action_id = renderer->action_ptr; action_id < num_actions; action_id++) {
     const DeviceRendererQueueAction* action = renderer->queue + action_id;
 
@@ -188,6 +201,9 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
         sample_count->current_sample_count++;
+
+        CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_end[event_id], device->stream_main));
+        renderer->event_id++;
         return LUMINARY_SUCCESS;
     }
   }
@@ -201,6 +217,11 @@ LuminaryResult device_renderer_destroy(DeviceRenderer** renderer) {
 
   __FAILURE_HANDLE(array_destroy(&(*renderer)->queue));
   __FAILURE_HANDLE(ringbuffer_destroy(&(*renderer)->callback_data_ringbuffer));
+
+  for (uint32_t event_id = 0; event_id < DEVICE_RENDERER_TIMING_EVENTS_COUNT; event_id++) {
+    __FAILURE_HANDLE(cuEventDestroy((*renderer)->time_start[event_id]));
+    __FAILURE_HANDLE(cuEventDestroy((*renderer)->time_end[event_id]));
+  }
 
   __FAILURE_HANDLE(host_free(renderer));
 
