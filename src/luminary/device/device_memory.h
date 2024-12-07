@@ -5,10 +5,13 @@
 
 #define STAGING
 
-#define DEVICE_PTR_GATHER_ABSTRACTION(device_mem, type) (*((type*) (((uint64_t*) (device_mem)) + 1)))
+#define DEVICE_PTR_GATHER_ABSTRACTION(__macro_device_mem, __macro_type, __macro_offset) \
+  (__macro_type)(((uint8_t*) (*((__macro_type*) (((uint64_t*) (__macro_device_mem)) + 1)))) + __macro_offset)
 
-#define DEVICE_PTR(device_mem) DEVICE_PTR_GATHER_ABSTRACTION(device_mem, void*)
-#define DEVICE_CUPTR(device_mem) DEVICE_PTR_GATHER_ABSTRACTION(device_mem, CUdeviceptr)
+#define DEVICE_PTR(__macro_device_mem) DEVICE_PTR_GATHER_ABSTRACTION(__macro_device_mem, void*, 0)
+#define DEVICE_CUPTR(__macro_device_mem) DEVICE_PTR_GATHER_ABSTRACTION(__macro_device_mem, CUdeviceptr, 0)
+#define DEVICE_CUPTR_OFFSET(__macro_device_mem, __macro_offset) \
+  DEVICE_PTR_GATHER_ABSTRACTION(__macro_device_mem, CUdeviceptr, __macro_offset)
 
 #define device_malloc(ptr, size) _device_malloc((void**) ptr, size, (const char*) #ptr, (const char*) __func__, __LINE__)
 #define device_malloc2D(ptr, width_in_bytes, height) \

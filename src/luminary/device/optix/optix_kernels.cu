@@ -16,6 +16,8 @@ extern "C" __global__ void __raygen__optix() {
   const uint16_t trace_task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < trace_task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const int offset      = get_task_address(i);
     const DeviceTask task = task_load(offset);
 

@@ -20,6 +20,8 @@ extern "C" __global__ void __raygen__optix() {
   const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
 
   for (uint32_t i = 0; i < trace_task_count; i++) {
+    HANDLE_DEVICE_ABORT();
+
     const uint32_t offset = get_task_address(i);
     const DeviceTask task = task_load(offset);
     float tmax            = trace_depth_load(offset);
