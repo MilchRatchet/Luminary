@@ -43,6 +43,8 @@
 
 // TODO: Turns this into a function and call this in the trace kernel if primary ray.
 LUMINARY_KERNEL void generate_trace_tasks() {
+  HANDLE_DEVICE_ABORT();
+
   uint32_t task_count = 0;
 
   const uint32_t undersampling_scale = 1 << device.undersampling;
@@ -55,8 +57,6 @@ LUMINARY_KERNEL void generate_trace_tasks() {
   const uint32_t undersampling_index = roundf(device.sample_id * undersampling_scale * undersampling_scale);
 
   for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
-    HANDLE_DEVICE_ABORT();
-
     uint16_t undersampling_y = (uint16_t) (undersampling_pixel / undersampling_width);
     uint16_t undersampling_x = (uint16_t) (undersampling_pixel - undersampling_y * undersampling_width);
 
@@ -166,11 +166,11 @@ LUMINARY_KERNEL void balance_trace_tasks() {
 }
 
 LUMINARY_KERNEL void sky_process_inscattering_events() {
+  HANDLE_DEVICE_ABORT();
+
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    HANDLE_DEVICE_ABORT();
-
     const int offset            = get_task_address(i);
     DeviceTask task             = task_load(offset);
     const TriangleHandle handle = triangle_handle_load(offset);
@@ -196,6 +196,8 @@ LUMINARY_KERNEL void sky_process_inscattering_events() {
 }
 
 LUMINARY_KERNEL void postprocess_trace_tasks() {
+  HANDLE_DEVICE_ABORT();
+
   const uint32_t task_count    = device.ptrs.trace_counts[THREAD_ID];
   uint16_t geometry_task_count = 0;
   uint16_t particle_task_count = 0;
@@ -206,8 +208,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   // count data
   for (uint32_t i = 0; i < task_count; i++) {
-    HANDLE_DEVICE_ABORT();
-
     const uint32_t offset      = get_task_address(i);
     const uint32_t instance_id = triangle_handle_load(offset).instance_id;
 
@@ -256,8 +256,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   // order data
   while (k < task_count) {
-    HANDLE_DEVICE_ABORT();
-
     const uint32_t offset      = get_task_address(k);
     const uint32_t instance_id = triangle_handle_load(offset).instance_id;
 
@@ -324,8 +322,6 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 
   // process data
   for (uint32_t i = 0; i < num_tasks; i++) {
-    HANDLE_DEVICE_ABORT();
-
     const uint32_t offset       = get_task_address(i);
     const TriangleHandle handle = triangle_handle_load(offset);
 

@@ -19,11 +19,11 @@
 #include "volume_utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
+  HANDLE_DEVICE_ABORT();
+
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    HANDLE_DEVICE_ABORT();
-
     const int offset = get_task_address(i);
     DeviceTask task  = task_load(offset);
     // TODO: We don't need to load the tri_id (and we also don't even need the instance_id either)

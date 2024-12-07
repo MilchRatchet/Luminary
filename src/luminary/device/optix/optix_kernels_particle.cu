@@ -20,13 +20,13 @@
 #include "volume_utils.cuh"
 
 extern "C" __global__ void __raygen__optix() {
+  HANDLE_DEVICE_ABORT();
+
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_PARTICLE];
   int trace_count       = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {
-    HANDLE_DEVICE_ABORT();
-
     const uint32_t offset       = get_task_address(task_offset + i);
     const DeviceTask task       = task_load(offset);
     const TriangleHandle handle = triangle_handle_load(offset);

@@ -12,6 +12,8 @@
 // This can be found under function name prefix in the programming guide
 
 extern "C" __global__ void __raygen__optix() {
+  HANDLE_DEVICE_ABORT();
+
   const uint16_t trace_task_count = device.ptrs.trace_counts[THREAD_ID];
 
   // TODO: Time should not be global but per task.
@@ -20,8 +22,6 @@ extern "C" __global__ void __raygen__optix() {
   const vec3 motion_offset = scale_vector(motion, time * device.particles.speed);
 
   for (uint32_t i = 0; i < trace_task_count; i++) {
-    HANDLE_DEVICE_ABORT();
-
     const uint32_t offset = get_task_address(i);
     const DeviceTask task = task_load(offset);
     float tmax            = trace_depth_load(offset);
