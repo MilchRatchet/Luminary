@@ -171,12 +171,6 @@ LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKe
   (*kernel)->shaders.hitgroupRecordStrideInBytes = OPTIX_SBT_RECORD_HEADER_SIZE;
   (*kernel)->shaders.hitgroupRecordCount         = OPTIX_KERNEL_FUNCTION_COUNT;
 
-  ////////////////////////////////////////////////////////////////////
-  // Params Creation
-  ////////////////////////////////////////////////////////////////////
-
-  __FAILURE_HANDLE(device_malloc(&((*kernel)->params), sizeof(DeviceConstantMemory)));
-
   return LUMINARY_SUCCESS;
 }
 
@@ -184,13 +178,9 @@ LuminaryResult optix_kernel_execute(OptixKernel* kernel, Device* device) {
   __CHECK_NULL_ARGUMENT(kernel);
   __CHECK_NULL_ARGUMENT(device);
 
-  // TODO: I am stupid, I can probably just pass the pointer directly :)
-  CUDA_FAILURE_HANDLE(cuMemcpyDtoDAsync_v2(
-    DEVICE_CUPTR(kernel->params), device->cuda_device_const_memory, sizeof(DeviceConstantMemory), device->stream_main));
-
   OPTIX_FAILURE_HANDLE(optixLaunch(
-    kernel->pipeline, device->stream_main, DEVICE_CUPTR(kernel->params), sizeof(DeviceConstantMemory), &kernel->shaders, THREADS_PER_BLOCK,
-    BLOCKS_PER_GRID, 1));
+    kernel->pipeline, device->stream_main, device->cuda_device_const_memory, sizeof(DeviceConstantMemory), &kernel->shaders,
+    THREADS_PER_BLOCK, BLOCKS_PER_GRID, 1));
 
   return LUMINARY_SUCCESS;
 }
@@ -207,8 +197,6 @@ LuminaryResult optix_kernel_destroy(OptixKernel** kernel) {
   }
 
   OPTIX_FAILURE_HANDLE(optixModuleDestroy((*kernel)->module))
-
-  __FAILURE_HANDLE(device_free(&(*kernel)->params));
 
   __FAILURE_HANDLE(host_free(kernel));
 

@@ -25,7 +25,6 @@ struct OptixKernel {
   OptixPipeline pipeline;
   DEVICE char* records;
   OptixShaderBindingTable shaders;
-  DEVICE DeviceConstantMemory* params;
 } typedef OptixKernel;
 
 LuminaryResult optix_kernel_create(OptixKernel** kernel, Device* device, OptixKernelType type);
