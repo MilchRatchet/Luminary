@@ -5,7 +5,7 @@ void camera_handler_create(CameraHandler** camera_handler) {
 
   LUM_FAILURE_HANDLE(host_malloc(camera_handler, sizeof(CameraHandler)));
 
-  (*camera_handler)->camera_speed = 1.0f;
+  (*camera_handler)->camera_speed = 10.0f;
 }
 
 struct Quaternion {
@@ -50,7 +50,8 @@ static LuminaryVec3 _camera_handler_rotate_vector_by_quaternion(const LuminaryVe
   return result;
 }
 
-void camera_handler_update(CameraHandler* camera_handler, LuminaryHost* host, KeyboardState* keyboard_state, MouseState* mouse_state) {
+void camera_handler_update(
+  CameraHandler* camera_handler, LuminaryHost* host, KeyboardState* keyboard_state, MouseState* mouse_state, float time_step) {
   MD_CHECK_NULL_ARGUMENT(camera_handler);
   MD_CHECK_NULL_ARGUMENT(host);
   MD_CHECK_NULL_ARGUMENT(keyboard_state);
@@ -59,12 +60,14 @@ void camera_handler_update(CameraHandler* camera_handler, LuminaryHost* host, Ke
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
-  camera.rotation.x -= 0.005f * mouse_state->y_motion;
-  camera.rotation.y -= 0.005f * mouse_state->x_motion;
+  camera.rotation.x -= mouse_state->y_motion * time_step;
+  camera.rotation.y -= mouse_state->x_motion * time_step;
 
   Quaternion q = _camera_handler_rotation_to_quaternion(camera.rotation);
 
   LuminaryVec3 camera_movement = {.x = 0.0f, .y = 0.0f, .z = 0.0f};
+
+  float movement_scale = camera_handler->camera_speed * time_step;
 
   if (keyboard_state->keys[SDL_SCANCODE_W].down) {
     camera_movement.z -= 1.0f;
@@ -90,9 +93,11 @@ void camera_handler_update(CameraHandler* camera_handler, LuminaryHost* host, Ke
     camera_movement.y -= 1.0f;
   }
 
-  camera_movement = _camera_handler_rotate_vector_by_quaternion(camera_movement, q);
+  if (keyboard_state->keys[SDL_SCANCODE_LSHIFT].down) {
+    movement_scale *= 2.0f;
+  }
 
-  const float movement_scale = camera_handler->camera_speed;
+  camera_movement = _camera_handler_rotate_vector_by_quaternion(camera_movement, q);
 
   camera.pos.x += movement_scale * camera_movement.x;
   camera.pos.y += movement_scale * camera_movement.y;

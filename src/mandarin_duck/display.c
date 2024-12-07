@@ -125,7 +125,7 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
 }
 
 // TODO: Refactor
-static void _display_move_sun(Display* display, LuminaryHost* host) {
+static void _display_move_sun(Display* display, LuminaryHost* host, float time_step) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
@@ -133,25 +133,25 @@ static void _display_move_sun(Display* display, LuminaryHost* host) {
   LUM_FAILURE_HANDLE(luminary_host_get_sky(host, &sky));
 
   if (display->keyboard_state->keys[SDL_SCANCODE_LEFT].down) {
-    sky.azimuth -= 0.001f;
+    sky.azimuth -= 0.2f * time_step;
   }
 
   if (display->keyboard_state->keys[SDL_SCANCODE_RIGHT].down) {
-    sky.azimuth += 0.001f;
+    sky.azimuth += 0.2f * time_step;
   }
 
   if (display->keyboard_state->keys[SDL_SCANCODE_UP].down) {
-    sky.altitude += 0.001f;
+    sky.altitude += 0.2f * time_step;
   }
 
   if (display->keyboard_state->keys[SDL_SCANCODE_DOWN].down) {
-    sky.altitude -= 0.001f;
+    sky.altitude -= 0.2f * time_step;
   }
 
   LUM_FAILURE_HANDLE(luminary_host_set_sky(host, &sky));
 }
 
-void display_handle_inputs(Display* display, LuminaryHost* host) {
+void display_handle_inputs(Display* display, LuminaryHost* host, float time_step) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
@@ -161,8 +161,8 @@ void display_handle_inputs(Display* display, LuminaryHost* host) {
   }
 
   if (!display->show_ui) {
-    camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state);
-    _display_move_sun(display, host);
+    camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
+    _display_move_sun(display, host, time_step);
   }
 }
 

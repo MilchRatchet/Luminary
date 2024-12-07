@@ -22,7 +22,7 @@ struct Display {
 
 void display_create(Display** _display, uint32_t width, uint32_t height);
 void display_query_events(Display* display, bool* exit_requested, bool* dirty);
-void display_handle_inputs(Display* display, LuminaryHost* host);
+void display_handle_inputs(Display* display, LuminaryHost* host, float time_step);
 void display_render(Display* display, LuminaryHost* host);
 void display_update(Display* display);
 void display_destroy(Display** display);

@@ -36,26 +36,29 @@ void mandarin_duck_run(MandarinDuck* duck) {
   LuminaryWallTime* md_timer;
   LUM_FAILURE_HANDLE(wall_time_create(&md_timer));
 
-  while (!exit_requested) {
-    LUM_FAILURE_HANDLE(wall_time_start(md_timer));
+  LUM_FAILURE_HANDLE(wall_time_start(md_timer));
 
+  while (!exit_requested) {
     bool display_dirty = false;
+
+    // Measure the time between event queries
+    LUM_FAILURE_HANDLE(wall_time_stop(md_timer));
     display_query_events(duck->display, &exit_requested, &display_dirty);
+
+    double time_step;
+    LUM_FAILURE_HANDLE(wall_time_get_time(md_timer, &time_step));
+
+    LUM_FAILURE_HANDLE(wall_time_start(md_timer));
 
     if (display_dirty) {
       _mandarin_duck_update_host_output_props(duck->host, duck->display->width, duck->display->height);
     }
 
-    display_handle_inputs(duck->display, duck->host);
+    display_handle_inputs(duck->display, duck->host, time_step);
 
     display_render(duck->display, duck->host);
 
     display_update(duck->display);
-
-    LUM_FAILURE_HANDLE(wall_time_stop(md_timer));
-
-    double time;
-    LUM_FAILURE_HANDLE(wall_time_get_time(md_timer, &time));
   }
 
   LUM_FAILURE_HANDLE(wall_time_destroy(&md_timer));
