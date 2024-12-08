@@ -461,7 +461,7 @@ static LuminaryResult _device_update_undersampling(Device* device) {
       uint32_t stage      = (undersampling_state & UNDERSAMPLING_STAGE_MASK) - 1;
       undersampling_state = (undersampling_state & ~UNDERSAMPLING_STAGE_MASK) | (stage & UNDERSAMPLING_STAGE_MASK);
 
-      undersampling_state |= 0b10 & UNDERSAMPLING_ITERATION_MASK;
+      undersampling_state |= (stage > 0) ? 0b10 & UNDERSAMPLING_ITERATION_MASK : 0;
     }
     else {
       // Decrement iteration
@@ -1152,6 +1152,23 @@ LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_clear_lighting_buffers(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  const uint32_t internal_pixel_count = device->constant_memory->settings.width * device->constant_memory->settings.height;
+
+  CUDA_FAILURE_HANDLE(
+    cuMemsetD32Async(DEVICE_CUPTR(device->buffers.frame_direct_buffer), 0, internal_pixel_count * 3, device->stream_main));
+  CUDA_FAILURE_HANDLE(
+    cuMemsetD32Async(DEVICE_CUPTR(device->buffers.frame_indirect_buffer), 0, internal_pixel_count * 3, device->stream_main));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(sample_count);
@@ -1256,6 +1273,8 @@ LuminaryResult device_set_abort(Device* device) {
   // upload.
   CUDA_FAILURE_HANDLE(cuStreamSynchronize(device->stream_secondary));
 
+  device->state_abort = true;
+
   __FAILURE_HANDLE(sample_count_reset(&device->sample_count, 0));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
@@ -1272,6 +1291,8 @@ LuminaryResult device_unset_abort(Device* device) {
 
   *device->abort_flags = 0;
   __FAILURE_HANDLE(device_upload(device->buffers.abort_flag, device->abort_flags, 0, sizeof(uint32_t), device->stream_main));
+
+  device->state_abort = false;
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 

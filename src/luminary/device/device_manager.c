@@ -177,6 +177,10 @@ static LuminaryResult _device_manager_handle_device_output(DeviceManager* device
 }
 
 static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
+  // Don't output aborted outputs unless it is the first output.
+  if (data->common.device_manager->devices[data->common.device_index]->state_abort && !data->is_first_output)
+    return;
+
   QueueEntry entry;
 
   entry.name              = "Handle Device Output";
@@ -329,6 +333,7 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
 
       __FAILURE_HANDLE_CRITICAL(device_update_sample_count(device, &device_manager->sample_count));
       __FAILURE_HANDLE_CRITICAL(device_unset_abort(device));
+      __FAILURE_HANDLE_CRITICAL(device_clear_lighting_buffers(device));
       __FAILURE_HANDLE_CRITICAL(device_start_render(device, &render_args));
     }
   }

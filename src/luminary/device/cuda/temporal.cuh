@@ -59,15 +59,6 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
   return sample;
 }
 
-__device__ float temporal_subsample_count(bool include_this_sample) {
-  uint32_t stage     = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
-  uint32_t iteration = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
-
-  const float increment = (include_this_sample) ? 1.0f : 0.0f;
-
-  return device.state.sample_id + (4.0f - iteration + increment) / (4 << (stage * 2));
-}
-
 LUMINARY_KERNEL void temporal_accumulation() {
   const uint32_t amount = device.settings.width * device.settings.height;
 
@@ -165,7 +156,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
 LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) {
   const uint32_t amount = device.settings.width * device.settings.height;
 
-  const float scale = 1.0f / temporal_subsample_count(true);
+  const float scale = 1.0f / (device.state.sample_id + 1);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBF input = load_RGBF(buffer + offset);
@@ -174,7 +165,7 @@ LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumul
     if (device.state.sample_id) {
       output = load_RGBF(accumulate + offset);
 
-      output = scale_color(output, ceilf(device.state.sample_id));
+      output = scale_color(output, device.state.sample_id);
       output = add_color(input, output);
     }
     else {

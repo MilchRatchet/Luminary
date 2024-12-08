@@ -15,6 +15,7 @@ struct DeviceOutputCallbackData {
   uint32_t width;
   uint32_t height;
   void* data;
+  bool is_first_output;
 } typedef DeviceOutputCallbackData;
 
 struct DeviceRenderCallbackData {

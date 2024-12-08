@@ -356,16 +356,24 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 }
 
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
-  const uint32_t undersampling_stage = max((device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT, 1);
+  const uint32_t undersampling_stage         = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+  const uint32_t undersampling_stage_clamped = max(undersampling_stage, 1);
+  const uint32_t undersampling_iteration     = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
 
-  const uint32_t undersampling_scale = 1 << undersampling_stage;
+  const uint32_t undersampling_scale = 1 << undersampling_stage_clamped;
 
-  const uint32_t undersampling_width  = (device.settings.width + (1 << undersampling_stage) - 1) >> undersampling_stage;
-  const uint32_t undersampling_height = (device.settings.height + (1 << undersampling_stage) - 1) >> undersampling_stage;
+  const uint32_t undersampling_width  = (device.settings.width + (1 << undersampling_stage_clamped) - 1) >> undersampling_stage_clamped;
+  const uint32_t undersampling_height = (device.settings.height + (1 << undersampling_stage_clamped) - 1) >> undersampling_stage_clamped;
 
   const uint32_t amount = undersampling_width * undersampling_height;
 
-  const float color_scale = 1.0f / (undersampling_scale * undersampling_scale);
+  float color_scale;
+  if (undersampling_stage) {
+    color_scale = (1 << (undersampling_stage * 2)) / (undersampling_scale * undersampling_scale * (4.0f - undersampling_iteration));
+  }
+  else {
+    color_scale = 1.0f / (undersampling_scale * undersampling_scale);
+  }
 
   for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
     const uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);

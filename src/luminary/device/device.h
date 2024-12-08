@@ -67,6 +67,7 @@ struct Device {
   bool exit_requested;
   bool optix_callback_error;
   bool is_main_device;
+  bool state_abort;
   CUdevice cuda_device;
   CUcontext cuda_ctx;
   CUDAKernel* cuda_kernels[CUDA_KERNEL_TYPE_COUNT];
@@ -126,6 +127,7 @@ LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut);
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri);
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut);
+LuminaryResult device_clear_lighting_buffers(Device* device);
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling);
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
 LuminaryResult device_register_callbacks(

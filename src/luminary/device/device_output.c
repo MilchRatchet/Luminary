@@ -44,8 +44,10 @@ LuminaryResult device_output_register_callback(DeviceOutput* output, CUhostFn ca
 
   output->registered_callback_func = callback_func;
 
-  output->callback_data.common.device_manager = data.device_manager;
-  output->callback_data.common.device_index   = data.device_index;
+  for (uint32_t buffer_index = 0; buffer_index < DEVICE_OUTPUT_BUFFER_COUNT; buffer_index++) {
+    output->callback_data[buffer_index].common.device_manager = data.device_manager;
+    output->callback_data[buffer_index].common.device_index   = data.device_index;
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -82,12 +84,15 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_output, device->stream_main));
 
-  output->callback_data.width  = output->width;
-  output->callback_data.height = output->height;
-  output->callback_data.data   = output->buffers[output->buffer_index];
+  DeviceOutputCallbackData* data = output->callback_data + output->buffer_index;
+
+  data->width           = output->width;
+  data->height          = output->height;
+  data->data            = output->buffers[output->buffer_index];
+  data->is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK);
 
   CUDA_FAILURE_HANDLE(cuStreamWaitEvent(device->stream_callbacks, device->event_queue_output, CU_EVENT_WAIT_DEFAULT));
-  CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, output->registered_callback_func, (void*) &output->callback_data));
+  CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, output->registered_callback_func, (void*) data));
 
   output->buffer_index = (output->buffer_index + 1) % DEVICE_OUTPUT_BUFFER_COUNT;
 
