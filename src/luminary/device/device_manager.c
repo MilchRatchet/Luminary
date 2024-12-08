@@ -35,6 +35,13 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
 
     __FAILURE_HANDLE(wall_time_stop(device_manager->queue_wall_time));
     __FAILURE_HANDLE(wall_time_set_string(device_manager->queue_wall_time, (const char*) 0));
+
+#ifdef LUMINARY_WORK_QUEUE_STATS_PRINT
+    double time;
+    __FAILURE_HANDLE(wall_time_get_time(device_manager->queue_wall_time, &time));
+
+    info_message("DEVICE: %s (%fs)", entry.name, time);
+#endif
   }
 
   return LUMINARY_SUCCESS;

@@ -32,6 +32,9 @@
 #define LIGHT_ID_ANY (0xfffffff0u)
 #define LIGHT_ID_TRIANGLE_ID_LIMIT (0x7fffffffu)
 
+// Print stats for the work queues
+#define LUMINARY_WORK_QUEUE_STATS_PRINT
+
 enum VolumeType { VOLUME_TYPE_FOG = 0, VOLUME_TYPE_OCEAN = 1, VOLUME_TYPE_PARTICLE = 2, VOLUME_TYPE_NONE = 0xFFFFFFFF } typedef VolumeType;
 
 typedef LuminaryResult (*QueueEntryFunction)(void* worker, void* args);

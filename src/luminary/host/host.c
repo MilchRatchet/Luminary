@@ -45,6 +45,13 @@ LuminaryResult _host_queue_worker(Host* host) {
 
     __FAILURE_HANDLE(wall_time_stop(host->queue_wall_time));
     __FAILURE_HANDLE(wall_time_set_string(host->queue_wall_time, (const char*) 0));
+
+#ifdef LUMINARY_WORK_QUEUE_STATS_PRINT
+    double time;
+    __FAILURE_HANDLE(wall_time_get_time(host->queue_wall_time, &time));
+
+    info_message("HOST: %s (%fs)", entry.name, time);
+#endif
   }
 
   return LUMINARY_SUCCESS;
