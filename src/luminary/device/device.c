@@ -642,9 +642,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
 
   __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
 
-  for (uint32_t state_id = 0; state_id < DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT; state_id++) {
-    __FAILURE_HANDLE(device_malloc_staging(&device->execution_states[state_id], sizeof(DeviceExecutionState), true));
-  }
+  __FAILURE_HANDLE(
+    device_malloc_staging(&device->execution_states, sizeof(DeviceExecutionState) * DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT, true));
 
   ////////////////////////////////////////////////////////////////////
   // Optix data
@@ -766,16 +765,17 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
 
   const uint32_t state_id = device->execution_state_counter & DEVICE_DYNAMIC_CONST_MEM_STAGING_MASK;
 
-  device->execution_states[state_id]->sample_id = sample_id;
-  device->execution_states[state_id]->depth     = depth;
+  STAGING DeviceExecutionState* state = device->execution_states + state_id;
 
-  device->execution_states[state_id]->user_selected_x = 0xFFFF;
-  device->execution_states[state_id]->user_selected_y = 0xFFFF;
-  device->execution_states[state_id]->undersampling   = 0;
+  state->sample_id = sample_id;
+  state->depth     = depth;
+
+  state->user_selected_x = 0xFFFF;
+  state->user_selected_y = 0xFFFF;
+  state->undersampling   = 0;
 
   CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync(
-    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state), device->execution_states[state_id],
-    sizeof(DeviceExecutionState), device->stream_main));
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state), state, sizeof(DeviceExecutionState), device->stream_main));
 
   device->execution_state_counter++;
 
@@ -1289,11 +1289,8 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
+  __FAILURE_HANDLE(device_free_staging(&(*device)->execution_states));
   __FAILURE_HANDLE(device_free_staging(&(*device)->abort_flags));
-
-  for (uint32_t state_id = 0; state_id < DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT; state_id++) {
-    __FAILURE_HANDLE(device_free_staging(&(*device)->execution_states[state_id]));
-  }
 
   __FAILURE_HANDLE(device_staging_manager_destroy(&(*device)->staging_manager));
 

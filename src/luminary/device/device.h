@@ -80,7 +80,7 @@ struct Device {
   DevicePointers buffers;
   STAGING DeviceConstantMemory* constant_memory;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
-  STAGING DeviceExecutionState* execution_states[DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT];
+  STAGING DeviceExecutionState* execution_states;
   uint32_t execution_state_counter;
   STAGING uint32_t* abort_flags;
   DeviceTexture* moon_albedo_tex;
