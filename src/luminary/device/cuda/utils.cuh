@@ -139,9 +139,9 @@ __device__ bool is_finite(const float a) {
   return is_nan || is_inf;
 }
 
-#define HANDLE_DEVICE_ABORT()                \
-  if (__ldcv(device.ptrs.abort_flag) != 0) { \
-    return;                                  \
+#define HANDLE_DEVICE_ABORT()                                                                                         \
+  if (__ldcv(device.ptrs.abort_flag) != 0 && ((device.state.undersampling & UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0)) { \
+    return;                                                                                                           \
   }
 
 //===========================================================================================

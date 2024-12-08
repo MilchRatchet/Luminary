@@ -11,7 +11,7 @@
 #include "wavefront.h"
 
 #define HOST_RINGBUFFER_SIZE (0x100000ull)
-#define HOST_QUEUE_SIZE (0x100ull)
+#define HOST_QUEUE_SIZE (0x400ull)
 
 ////////////////////////////////////////////////////////////////////
 // Queue worker functions

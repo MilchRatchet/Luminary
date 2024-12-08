@@ -447,6 +447,33 @@ static LuminaryResult _device_free_embedded_data(Device* device) {
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_update_undersampling(Device* device) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  if (device->undersampling_state) {
+    uint32_t undersampling_state = device->undersampling_state;
+
+    // Remove first sample flag
+    undersampling_state &= ~UNDERSAMPLING_FIRST_SAMPLE_MASK;
+
+    if ((undersampling_state & UNDERSAMPLING_ITERATION_MASK) == 0) {
+      // Decrement stage
+      uint32_t stage      = (undersampling_state & UNDERSAMPLING_STAGE_MASK) - 1;
+      undersampling_state = (undersampling_state & ~UNDERSAMPLING_STAGE_MASK) | (stage & UNDERSAMPLING_STAGE_MASK);
+
+      undersampling_state |= 0b10 & UNDERSAMPLING_ITERATION_MASK;
+    }
+    else {
+      // Decrement iteration
+      uint32_t iteration  = (undersampling_state & UNDERSAMPLING_ITERATION_MASK) - 1;
+      undersampling_state = (undersampling_state & ~UNDERSAMPLING_ITERATION_MASK) | (iteration & UNDERSAMPLING_ITERATION_MASK);
+    }
+
+    device->undersampling_state = undersampling_state;
+  }
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Buffer handling
 ////////////////////////////////////////////////////////////////////
@@ -772,7 +799,7 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
 
   state->user_selected_x = 0xFFFF;
   state->user_selected_y = 0xFFFF;
-  state->undersampling   = 0;
+  state->undersampling   = device->undersampling_state;
 
   CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync(
     device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state), state, sizeof(DeviceExecutionState), device->stream_main));
@@ -1140,6 +1167,17 @@ LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* samp
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  device->undersampling_state = 0;
+  device->undersampling_state |= 0b11 & UNDERSAMPLING_ITERATION_MASK;
+  device->undersampling_state |= (undersampling << 2) & UNDERSAMPLING_STAGE_MASK;
+  device->undersampling_state |= UNDERSAMPLING_FIRST_SAMPLE_MASK;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_register_callbacks(
   Device* device, CUhostFn render_callback_func, CUhostFn output_callback_func, DeviceCommonCallbackData callback_data) {
   __CHECK_NULL_ARGUMENT(device);
@@ -1189,6 +1227,7 @@ LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_c
     __FAILURE_HANDLE(device_output_generate_output(device->output, device));
   }
 
+  __FAILURE_HANDLE(_device_update_undersampling(device));
   __FAILURE_HANDLE(device_update_sample_count(device, sample_count));
 
   // Output if last sample in slice or if first slice (I will probably have to update the slice beforehand so this will be first sample in

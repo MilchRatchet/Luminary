@@ -24,6 +24,11 @@
 #define STARS_GRID_LD 64
 #define BSDF_LUT_SIZE 32
 
+#define UNDERSAMPLING_FIRST_SAMPLE_MASK 0x80
+#define UNDERSAMPLING_STAGE_MASK 0x7C
+#define UNDERSAMPLING_STAGE_SHIFT 2
+#define UNDERSAMPLING_ITERATION_MASK 0x03
+
 ////////////////////////////////////////////////////////////////////
 // Failure handles
 ////////////////////////////////////////////////////////////////////

@@ -8,7 +8,7 @@
 #include "scene.h"
 
 #define DEVICE_MANAGER_RINGBUFFER_SIZE (0x100000ull)
-#define DEVICE_MANAGER_QUEUE_SIZE (0x100ull)
+#define DEVICE_MANAGER_QUEUE_SIZE (0x400ull)
 
 ////////////////////////////////////////////////////////////////////
 // Queue worker functions
@@ -312,6 +312,8 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
     __FAILURE_HANDLE_CRITICAL(sample_count_reset(&device_manager->sample_count, device_manager->scene_device->settings.max_sample_count));
 
     // Main device always computes the first samples
+    __FAILURE_HANDLE_CRITICAL(
+      device_setup_undersampling(device_manager->devices[device_manager->main_device_index], scene->settings.undersampling));
     __FAILURE_HANDLE_CRITICAL(
       device_update_sample_count(device_manager->devices[device_manager->main_device_index], &device_manager->sample_count));
 

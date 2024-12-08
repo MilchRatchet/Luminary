@@ -59,10 +59,13 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
   return sample;
 }
 
-__device__ float temporal_increment() {
-  const uint32_t undersampling_scale = (1 << device.state.undersampling) * (1 << device.state.undersampling);
+__device__ float temporal_subsample_count(bool include_this_sample) {
+  uint32_t stage     = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
+  uint32_t iteration = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
 
-  return 1.0f / undersampling_scale;
+  const float increment = (include_this_sample) ? 1.0f : 0.0f;
+
+  return device.state.sample_id + (4.0f - iteration + increment) / (4 << (stage * 2));
 }
 
 LUMINARY_KERNEL void temporal_accumulation() {
@@ -70,11 +73,9 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
 
-  const float increment = temporal_increment();
-
-  const bool load_accumulate = (device.state.sample_id >= 1.0f);
+  const bool load_accumulate = (device.state.sample_id > 0);
   const float prev_scale     = device.state.sample_id;
-  const float curr_inv_scale = 1.0f / fmaxf(1.0f, device.state.sample_id + increment);
+  const float curr_inv_scale = 1.0f / (device.state.sample_id + 1.0f);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = offset / device.settings.width;
@@ -107,8 +108,8 @@ LUMINARY_KERNEL void temporal_accumulation() {
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
     // Firefly clamping only takes effect after undersampling has stopped.
-    if (device.camera.do_firefly_clamping && device.state.sample_id >= 1.0f) {
-      float variance = (device.state.sample_id < 2.0f) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
+    if (device.camera.do_firefly_clamping && device.state.sample_id) {
+      float variance = (device.state.sample_id < 2) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
       float luminance_buffer = color_importance(indirect_buffer);
       float luminance_output = color_importance(indirect_output);
@@ -128,7 +129,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
       // Taking neighbouring pixels as reference is not the target since I want to consider each
       // pixel as its own independent entity to preserve fine details.
       // TODO: Improve this method to remove the visible dimming during the second frame.
-      if (device.state.sample_id < 2.0f) {
+      if (device.state.sample_id < 2) {
         const float min_luminance = fminf(luminance_buffer, luminance_output);
 
         indirect_output =
@@ -164,15 +165,23 @@ LUMINARY_KERNEL void temporal_accumulation() {
 LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) {
   const uint32_t amount = device.settings.width * device.settings.height;
 
-  const float increment = temporal_increment();
+  const float scale = 1.0f / temporal_subsample_count(true);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
-    RGBF input  = load_RGBF(buffer + offset);
-    RGBF output = (device.state.sample_id == 0.0f) ? input : load_RGBF(accumulate + offset);
+    RGBF input = load_RGBF(buffer + offset);
+    RGBF output;
 
-    output = scale_color(output, ceilf(device.state.sample_id));
-    output = add_color(input, output);
-    output = scale_color(output, 1.0f / (device.state.sample_id + increment));
+    if (device.state.sample_id) {
+      output = load_RGBF(accumulate + offset);
+
+      output = scale_color(output, ceilf(device.state.sample_id));
+      output = add_color(input, output);
+    }
+    else {
+      output = input;
+    }
+
+    output = scale_color(output, scale);
 
     store_RGBF(accumulate + offset, output);
   }
