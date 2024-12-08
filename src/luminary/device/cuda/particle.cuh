@@ -6,6 +6,8 @@
 #include "utils.h"
 
 LUMINARY_KERNEL void particle_process_tasks_debug() {
+  HANDLE_DEVICE_ABORT();
+
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_VOLUME];
 

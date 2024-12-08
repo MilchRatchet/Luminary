@@ -603,6 +603,8 @@ __device__ RGBF sky_color_main(const vec3 origin, const vec3 ray, const uint8_t 
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_KERNEL void sky_process_tasks() {
+  HANDLE_DEVICE_ABORT();
+
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 
@@ -621,6 +623,8 @@ LUMINARY_KERNEL void sky_process_tasks() {
 }
 
 LUMINARY_KERNEL void sky_process_tasks_debug() {
+  HANDLE_DEVICE_ABORT();
+
   const int task_count  = device.ptrs.task_counts[THREAD_ID * TASK_ADDRESS_COUNT_STRIDE + TASK_ADDRESS_OFFSET_SKY];
   const int task_offset = device.ptrs.task_offsets[THREAD_ID * TASK_ADDRESS_OFFSET_STRIDE + TASK_ADDRESS_OFFSET_SKY];
 

@@ -60,6 +60,8 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
 }
 
 LUMINARY_KERNEL void temporal_accumulation() {
+  HANDLE_DEVICE_ABORT();
+
   const uint32_t amount = device.settings.width * device.settings.height;
 
   const float2 jitter = quasirandom_sequence_2D_global(QUASI_RANDOM_TARGET_CAMERA_JITTER);
@@ -154,6 +156,8 @@ LUMINARY_KERNEL void temporal_accumulation() {
 }
 
 LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumulate) {
+  HANDLE_DEVICE_ABORT();
+
   const uint32_t amount = device.settings.width * device.settings.height;
 
   const float scale = 1.0f / (device.state.sample_id + 1);

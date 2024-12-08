@@ -27,6 +27,8 @@
 ////////////////////////////////////////////////////////////////////
 
 LUMINARY_KERNEL void volume_process_events() {
+  HANDLE_DEVICE_ABORT();
+
   const int task_count = device.ptrs.trace_counts[THREAD_ID];
 
   for (int i = 0; i < task_count; i++) {

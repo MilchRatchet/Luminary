@@ -96,6 +96,8 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 }
 
 LUMINARY_KERNEL void balance_trace_tasks() {
+  HANDLE_DEVICE_ABORT();
+
   const int warp = THREAD_ID;
 
   if (warp >= (THREADS_PER_BLOCK * BLOCKS_PER_GRID) >> 5)
@@ -356,6 +358,8 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 }
 
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
+  HANDLE_DEVICE_ABORT();
+
   const uint32_t undersampling_stage         = (device.state.undersampling & UNDERSAMPLING_STAGE_MASK) >> UNDERSAMPLING_STAGE_SHIFT;
   const uint32_t undersampling_stage_clamped = max(undersampling_stage, 1);
   const uint32_t undersampling_iteration     = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
@@ -406,6 +410,8 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
 }
 
 LUMINARY_KERNEL void convert_RGBF_to_XRGB8(const KernelArgsConvertRGBFToXRGB8 args) {
+  HANDLE_DEVICE_ABORT();
+
   uint32_t id = THREAD_ID;
 
   const uint32_t amount = args.width * args.height;
