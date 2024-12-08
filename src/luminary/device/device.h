@@ -54,6 +54,10 @@ struct DeviceOptixProperties {
   uint32_t shader_execution_reordering;
 } typedef DeviceOptixProperties;
 
+#define DEVICE_MAX_DEPTH 128
+#define DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT (2 * DEVICE_MAX_DEPTH)
+#define DEVICE_DYNAMIC_CONST_MEM_STAGING_MASK (DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT - 1)
+
 struct Device {
   uint32_t index;
   DeviceProperties properties;
@@ -75,8 +79,10 @@ struct Device {
   CUevent event_queue_output;
   DevicePointers buffers;
   STAGING DeviceConstantMemory* constant_memory;
-  STAGING uint32_t* abort_flags;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
+  STAGING DeviceExecutionState* execution_states[DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT];
+  uint32_t execution_state_counter;
+  STAGING uint32_t* abort_flags;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
   DeviceStagingManager* staging_manager;

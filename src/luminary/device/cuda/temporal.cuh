@@ -49,7 +49,7 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
       pixel.y = (uint16_t) (offset / device.settings.width);
       pixel.x = (uint16_t) (offset - pixel.y * device.settings.width);
       printf(
-        "Path at (%u, %u) on frame %u ran into a NaN or INF: (%f %f %f)\n", pixel.x, pixel.y, (uint32_t) device.sample_id, sample.r, sample.g,
+        "Path at (%u, %u) on frame %u ran into a NaN or INF: (%f %f %f)\n", pixel.x, pixel.y, (uint32_t) device.state.sample_id, sample.r, sample.g,
         sample.b);
 #endif
 
@@ -60,7 +60,7 @@ __device__ RGBF temporal_reject_invalid_sample(RGBF sample, const uint32_t offse
 }
 
 __device__ float temporal_increment() {
-  const uint32_t undersampling_scale = (1 << device.undersampling) * (1 << device.undersampling);
+  const uint32_t undersampling_scale = (1 << device.state.undersampling) * (1 << device.state.undersampling);
 
   return 1.0f / undersampling_scale;
 }
@@ -72,9 +72,9 @@ LUMINARY_KERNEL void temporal_accumulation() {
 
   const float increment = temporal_increment();
 
-  const bool load_accumulate = (device.sample_id >= 1.0f);
-  const float prev_scale     = device.sample_id;
-  const float curr_inv_scale = 1.0f / fmaxf(1.0f, device.sample_id + increment);
+  const bool load_accumulate = (device.state.sample_id >= 1.0f);
+  const float prev_scale     = device.state.sample_id;
+  const float curr_inv_scale = 1.0f / fmaxf(1.0f, device.state.sample_id + increment);
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     const uint32_t y = offset / device.settings.width;
@@ -107,15 +107,15 @@ LUMINARY_KERNEL void temporal_accumulation() {
     indirect_buffer = temporal_reject_invalid_sample(indirect_buffer, offset);
 
     // Firefly clamping only takes effect after undersampling has stopped.
-    if (device.camera.do_firefly_clamping && device.sample_id >= 1.0f) {
-      float variance = (device.sample_id < 2.0f) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
+    if (device.camera.do_firefly_clamping && device.state.sample_id >= 1.0f) {
+      float variance = (device.state.sample_id < 2.0f) ? 1.0f : __ldcs(device.ptrs.frame_variance + offset);
 
       float luminance_buffer = color_importance(indirect_buffer);
       float luminance_output = color_importance(indirect_output);
 
       const float deviation = fminf(0.1f, sqrtf(fmaxf(variance, eps)));
 
-      variance *= device.sample_id - 1.0f;
+      variance *= device.state.sample_id - 1.0f;
 
       float diff = luminance_buffer - luminance_output;
       diff       = diff * diff;
@@ -128,7 +128,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
       // Taking neighbouring pixels as reference is not the target since I want to consider each
       // pixel as its own independent entity to preserve fine details.
       // TODO: Improve this method to remove the visible dimming during the second frame.
-      if (device.sample_id < 2.0f) {
+      if (device.state.sample_id < 2.0f) {
         const float min_luminance = fminf(luminance_buffer, luminance_output);
 
         indirect_output =
@@ -138,7 +138,7 @@ LUMINARY_KERNEL void temporal_accumulation() {
       }
 
       variance += diff;
-      variance *= 1.0f / device.sample_id;
+      variance *= 1.0f / device.state.sample_id;
 
       __stcs(device.ptrs.frame_variance + offset, variance);
 
@@ -168,11 +168,11 @@ LUMINARY_KERNEL void temporal_accumulation_aov(const RGBF* buffer, RGBF* accumul
 
   for (uint32_t offset = THREAD_ID; offset < amount; offset += blockDim.x * gridDim.x) {
     RGBF input  = load_RGBF(buffer + offset);
-    RGBF output = (device.sample_id == 0.0f) ? input : load_RGBF(accumulate + offset);
+    RGBF output = (device.state.sample_id == 0.0f) ? input : load_RGBF(accumulate + offset);
 
-    output = scale_color(output, ceilf(device.sample_id));
+    output = scale_color(output, ceilf(device.state.sample_id));
     output = add_color(input, output);
-    output = scale_color(output, 1.0f / (device.sample_id + increment));
+    output = scale_color(output, 1.0f / (device.state.sample_id + increment));
 
     store_RGBF(accumulate + offset, output);
   }

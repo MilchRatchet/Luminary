@@ -8,7 +8,7 @@
 #define THREADS_PER_BLOCK 128
 #define BLOCKS_PER_GRID 2048
 
-#define OPTIX_VALIDATION
+// #define OPTIX_VALIDATION
 #define NO_LUMINARY_BVH
 
 /*
@@ -231,6 +231,15 @@ struct DevicePointers {
   DEVICE uint32_t* abort_flag;  // Could be used for general execution flags in the future
 } typedef DevicePointers;
 
+struct DeviceExecutionState {
+  // Warning: This used to be a float, I will from now on have to emulate the old behaviour whenever we do undersampling
+  uint32_t sample_id;
+  uint16_t user_selected_x;
+  uint16_t user_selected_y;
+  uint8_t depth;
+  uint8_t undersampling;
+} typedef DeviceExecutionState;
+
 enum DeviceConstantMemoryMember {
   DEVICE_CONSTANT_MEMORY_MEMBER_PTRS,
   DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,
@@ -295,13 +304,8 @@ struct DeviceConstantMemory {
   DeviceTextureObject bsdf_lut_glossy;
   DeviceTextureObject bsdf_lut_dielectric;
   DeviceTextureObject bsdf_lut_dielectric_inv;
-  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
-  uint16_t user_selected_x;
-  uint16_t user_selected_y;
-  // Warning: This used to be a float, I will from now on have to emulate the old behaviour whenever we do undersampling
-  uint32_t sample_id;
-  uint32_t depth;
-  uint32_t undersampling;
+  // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
+  DeviceExecutionState state;
 } typedef DeviceConstantMemory;
 
 #endif /* LUMINARY_DEVICE_UTILS_H */

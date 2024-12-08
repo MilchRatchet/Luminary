@@ -52,7 +52,7 @@ LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha, const uint3
     RGBF result;
     float variance;
     float alpha;
-    if (device.sample_id != 0.0f) {
+    if (device.state.sample_id != 0.0f) {
       float4 data = __ldcs(dst + pixel);
       alpha       = __ldcs(dst_alpha + pixel);
 
@@ -61,17 +61,17 @@ LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha, const uint3
 
       const float deviation = sqrtf(fmaxf(variance, eps));
 
-      variance  = variance * (device.sample_id - 1.0f);
+      variance  = variance * (device.state.sample_id - 1.0f);
       RGBF diff = sub_color(color, result);
       diff      = mul_color(diff, diff);
 
       variance = variance + color_importance(diff);
-      variance = variance * (1.0f / device.sample_id);
+      variance = variance * (1.0f / device.state.sample_id);
 
       // Same as in temporal accumulation
       // Here this trick has no real downside
       // Just got to make sure we don't do this in the case of 2 samples
-      if (device.sample_id == 1 && sample_count != 2) {
+      if (device.state.sample_id == 1 && sample_count != 2) {
         RGBF min = min_color(color, result);
 
         result = min;
@@ -81,8 +81,8 @@ LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha, const uint3
       RGBF firefly_rejection = add_color(get_color(0.1f, 0.1f, 0.1f), add_color(result, get_color(deviation, deviation, deviation)));
       firefly_rejection      = max_color(get_color(0.0f, 0.0f, 0.0f), sub_color(color, firefly_rejection));
 
-      result = scale_color(result, device.sample_id);
-      alpha *= device.sample_id;
+      result = scale_color(result, device.state.sample_id);
+      alpha *= device.state.sample_id;
 
       color = sub_color(color, firefly_rejection);
     }
@@ -95,8 +95,8 @@ LUMINARY_KERNEL void sky_compute_hdri(float4* dst, float* dst_alpha, const uint3
     result = add_color(result, color);
     alpha += cloud_transmittance;
 
-    result = scale_color(result, 1.0f / (device.sample_id + 1));
-    alpha *= 1.0f / (device.sample_id + 1);
+    result = scale_color(result, 1.0f / (device.state.sample_id + 1));
+    alpha *= 1.0f / (device.state.sample_id + 1);
 
     __stcs(dst + pixel, make_float4(result.r, result.g, result.b, variance));
     __stcs(dst_alpha + pixel, alpha);

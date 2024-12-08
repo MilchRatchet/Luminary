@@ -44,28 +44,28 @@ static const size_t device_cuda_const_memory_offsets[] = {
   offsetof(DeviceConstantMemory, sky_lut_transmission_low_tex),  // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
   offsetof(DeviceConstantMemory, sky_hdri_color_tex),            // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
   offsetof(DeviceConstantMemory, bsdf_lut_conductor),            // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
-  offsetof(DeviceConstantMemory, user_selected_x),               // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
+  offsetof(DeviceConstantMemory, state),                         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
   SIZE_MAX                                                       // DEVICE_CONSTANT_MEMORY_MEMBER_COUNT
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_offsets, sizeof(size_t) * (DEVICE_CONSTANT_MEMORY_MEMBER_COUNT + 1));
 
 static const size_t device_cuda_const_memory_sizes[] = {
-  sizeof(DevicePointers),                      // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
-  sizeof(DeviceRendererSettings),              // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
-  sizeof(DeviceCamera),                        // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
-  sizeof(DeviceOcean),                         // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
-  sizeof(DeviceSky),                           // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
-  sizeof(DeviceCloud),                         // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
-  sizeof(DeviceFog),                           // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
-  sizeof(DeviceParticles),                     // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
-  sizeof(DeviceToy),                           // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
-  sizeof(uint32_t) * 2,                        // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
-  sizeof(OptixTraversableHandle) * 4,          // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
-  sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
-  sizeof(DeviceTextureObject) * 4,             // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
-  sizeof(DeviceTextureObject) * 2,             // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
-  sizeof(DeviceTextureObject) * 4,             // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
-  sizeof(uint16_t) * 2 + sizeof(uint32_t) * 3  // DEVICE_CONSTANT_MEMORY_MEMBER_DYNAMIC
+  sizeof(DevicePointers),              // DEVICE_CONSTANT_MEMORY_MEMBER_PTRS
+  sizeof(DeviceRendererSettings),      // DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS
+  sizeof(DeviceCamera),                // DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA
+  sizeof(DeviceOcean),                 // DEVICE_CONSTANT_MEMORY_MEMBER_OCEAN
+  sizeof(DeviceSky),                   // DEVICE_CONSTANT_MEMORY_MEMBER_SKY
+  sizeof(DeviceCloud),                 // DEVICE_CONSTANT_MEMORY_MEMBER_CLOUD
+  sizeof(DeviceFog),                   // DEVICE_CONSTANT_MEMORY_MEMBER_FOG
+  sizeof(DeviceParticles),             // DEVICE_CONSTANT_MEMORY_MEMBER_PARTICLES
+  sizeof(DeviceToy),                   // DEVICE_CONSTANT_MEMORY_MEMBER_TOY
+  sizeof(uint32_t) * 2,                // DEVICE_CONSTANT_MEMORY_MEMBER_TASK_META
+  sizeof(OptixTraversableHandle) * 4,  // DEVICE_CONSTANT_MEMORY_MEMBER_OPTIX_BVH
+  sizeof(DeviceTextureObject) * 2,     // DEVICE_CONSTANT_MEMORY_MEMBER_MOON_TEX
+  sizeof(DeviceTextureObject) * 4,     // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_LUT_TEX
+  sizeof(DeviceTextureObject) * 2,     // DEVICE_CONSTANT_MEMORY_MEMBER_SKY_HDRI_TEX
+  sizeof(DeviceTextureObject) * 4,     // DEVICE_CONSTANT_MEMORY_MEMBER_BSDF_LUT_TEX
+  sizeof(DeviceExecutionState)         // DEVICE_CONSTANT_MEMORY_MEMBER_STATE
 };
 LUM_STATIC_SIZE_ASSERT(device_cuda_const_memory_sizes, sizeof(size_t) * DEVICE_CONSTANT_MEMORY_MEMBER_COUNT);
 
@@ -604,6 +604,8 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   memset(&optix_device_context_options, 0, sizeof(OptixDeviceContextOptions));
 
 #ifdef OPTIX_VALIDATION
+  // https://forums.developer.nvidia.com/t/avoid-synchronization-in-optixlaunch/221458
+  warn_message("OptiX validation is turned on. This will serialize all OptiX calls!");
   optix_device_context_options.logCallbackData     = (void*) 0;
   optix_device_context_options.logCallbackFunction = _device_optix_log_callback;
   optix_device_context_options.logCallbackLevel    = 3;
@@ -639,6 +641,10 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_staging_manager_create(&device->staging_manager, device));
 
   __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
+
+  for (uint32_t state_id = 0; state_id < DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT; state_id++) {
+    __FAILURE_HANDLE(device_malloc_staging(&device->execution_states[state_id], sizeof(DeviceExecutionState), true));
+  }
 
   ////////////////////////////////////////////////////////////////////
   // Optix data
@@ -758,13 +764,20 @@ LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_i
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  DEVICE_UPDATE_CONSTANT_MEMORY(sample_id, sample_id);
-  DEVICE_UPDATE_CONSTANT_MEMORY(depth, depth);
+  const uint32_t state_id = device->execution_state_counter & DEVICE_DYNAMIC_CONST_MEM_STAGING_MASK;
 
-  // TODO: Set them correctly
-  DEVICE_UPDATE_CONSTANT_MEMORY(user_selected_x, 0xFFFF);
-  DEVICE_UPDATE_CONSTANT_MEMORY(user_selected_y, 0xFFFF);
-  DEVICE_UPDATE_CONSTANT_MEMORY(undersampling, 0);
+  device->execution_states[state_id]->sample_id = sample_id;
+  device->execution_states[state_id]->depth     = depth;
+
+  device->execution_states[state_id]->user_selected_x = 0xFFFF;
+  device->execution_states[state_id]->user_selected_y = 0xFFFF;
+  device->execution_states[state_id]->undersampling   = 0;
+
+  CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state), device->execution_states[state_id],
+    sizeof(DeviceExecutionState), device->stream_main));
+
+  device->execution_state_counter++;
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1146,8 +1159,11 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
+  __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
+
   __FAILURE_HANDLE(
     device_output_set_size(device->output, device->constant_memory->settings.width, device->constant_memory->settings.height));
+  __FAILURE_HANDLE(device_sync_constant_memory(device));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
   __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer));
   __FAILURE_HANDLE(device_renderer_queue_sample(device->renderer, device, &device->sample_count));
@@ -1274,6 +1290,10 @@ LuminaryResult device_destroy(Device** device) {
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
   __FAILURE_HANDLE(device_free_staging(&(*device)->abort_flags));
+
+  for (uint32_t state_id = 0; state_id < DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT; state_id++) {
+    __FAILURE_HANDLE(device_free_staging(&(*device)->execution_states[state_id]));
+  }
 
   __FAILURE_HANDLE(device_staging_manager_destroy(&(*device)->staging_manager));
 

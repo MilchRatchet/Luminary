@@ -202,7 +202,7 @@ __device__ float bsdf_microfacet_pdf(const GBufferData data, const float NdotH, 
 
 __device__ vec3 bsdf_microfacet_sample(
   const GBufferData data, const ushort2 pixel, const uint32_t target = QUASI_RANDOM_TARGET_BSDF_MICROFACET,
-  const uint32_t sequence_id = device.sample_id, const uint32_t depth = device.depth) {
+  const uint32_t sequence_id = device.state.sample_id, const uint32_t depth = device.state.depth) {
   vec3 H = get_vector(0.0f, 0.0f, 1.0f);
   if (data.roughness > 0.0f) {
     const float2 random = quasirandom_sequence_2D_base_float(target, pixel, sequence_id, depth);
@@ -288,7 +288,7 @@ __device__ float bsdf_microfacet_refraction_pdf(
 
 __device__ vec3 bsdf_microfacet_refraction_sample(
   const GBufferData data, const ushort2 pixel, const uint32_t target = QUASI_RANDOM_TARGET_BSDF_REFRACTION,
-  const uint32_t sequence_id = device.sample_id, const uint32_t depth = device.depth) {
+  const uint32_t sequence_id = device.state.sample_id, const uint32_t depth = device.state.depth) {
   vec3 H = get_vector(0.0f, 0.0f, 1.0f);
   if (data.roughness > 0.0f) {
     const float2 random = quasirandom_sequence_2D_base_float(target, pixel, sequence_id, depth);

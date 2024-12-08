@@ -59,7 +59,7 @@ struct CompressedAlpha {
 #define VOLUME_HIT_CHECK(X) ((X == HIT_TYPE_VOLUME_FOG) || (X == HIT_TYPE_VOLUME_OCEAN))
 #define VOLUME_HIT_TYPE(X) ((X <= HIT_TYPE_PARTICLE_MAX) ? VOLUME_TYPE_PARTICLE : ((VolumeType) (X & 0x00000001u)))
 #define PARTICLE_HIT_CHECK(X) ((X <= HIT_TYPE_PARTICLE_MAX) && (X >= HIT_TYPE_PARTICLE_MIN))
-#define IS_PRIMARY_RAY (device.depth == 0)
+#define IS_PRIMARY_RAY (device.state.depth == 0)
 
 //
 // Usage documentation:
@@ -100,11 +100,11 @@ extern "C" static __constant__ DeviceConstantMemory device;
 
 __device__ bool is_selected_pixel(const ushort2 index) {
   // Only the top left subpixel of a pixel can be selected.
-  return (index.x == (device.user_selected_x << 1) && index.y == (device.user_selected_y << 1));
+  return (index.x == (device.state.user_selected_x << 1) && index.y == (device.state.user_selected_y << 1));
 }
 
 __device__ bool is_selected_pixel_lenient(const ushort2 index) {
-  if (device.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
+  if (device.state.user_selected_x == UTILS_NO_PIXEL_SELECTED.x && device.state.user_selected_y == UTILS_NO_PIXEL_SELECTED.y)
     return true;
 
   return is_selected_pixel(index);

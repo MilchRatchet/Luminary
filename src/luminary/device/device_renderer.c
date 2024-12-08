@@ -163,8 +163,6 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
   uint32_t num_actions;
   __FAILURE_HANDLE(array_get_num_elements(renderer->queue, &num_actions));
 
-  __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
-
   uint32_t event_id = renderer->event_id & DEVICE_RENDERER_TIMING_EVENTS_MASK;
 
   if (renderer->event_id >= DEVICE_RENDERER_TIMING_EVENTS_COUNT) {
@@ -185,7 +183,6 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
         __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_count->current_sample_count, action->mem_update.depth));
-        __FAILURE_HANDLE(device_sync_constant_memory(device));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
         DeviceRenderCallbackData* callback_data;

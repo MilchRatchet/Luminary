@@ -47,14 +47,14 @@ LUMINARY_KERNEL void generate_trace_tasks() {
 
   uint32_t task_count = 0;
 
-  const uint32_t undersampling_scale = 1 << device.undersampling;
+  const uint32_t undersampling_scale = 1 << device.state.undersampling;
 
-  const uint32_t undersampling_width  = (device.settings.width + (1 << device.undersampling) - 1) >> device.undersampling;
-  const uint32_t undersampling_height = (device.settings.height + (1 << device.undersampling) - 1) >> device.undersampling;
+  const uint32_t undersampling_width  = (device.settings.width + (1 << device.state.undersampling) - 1) >> device.state.undersampling;
+  const uint32_t undersampling_height = (device.settings.height + (1 << device.state.undersampling) - 1) >> device.state.undersampling;
 
   const uint32_t amount = undersampling_width * undersampling_height;
 
-  const uint32_t undersampling_index = roundf(device.sample_id * undersampling_scale * undersampling_scale);
+  const uint32_t undersampling_index = roundf(device.state.sample_id * undersampling_scale * undersampling_scale);
 
   for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
     uint16_t undersampling_y = (uint16_t) (undersampling_pixel / undersampling_width);
@@ -355,7 +355,7 @@ LUMINARY_KERNEL void postprocess_trace_tasks() {
 }
 
 LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage args) {
-  const uint32_t undersampling       = max(device.undersampling, 1);
+  const uint32_t undersampling       = max(device.state.undersampling, 1);
   const uint32_t undersampling_scale = 1 << undersampling;
 
   const uint32_t undersampling_width  = (device.settings.width + (1 << undersampling) - 1) >> undersampling;
@@ -363,7 +363,7 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
 
   const uint32_t amount = undersampling_width * undersampling_height;
 
-  const float color_scale = 1.0f / (undersampling_scale * undersampling_scale * __saturatef(device.sample_id + temporal_increment()));
+  const float color_scale = 1.0f / (undersampling_scale * undersampling_scale * __saturatef(device.state.sample_id + temporal_increment()));
 
   for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
     const uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);
@@ -402,7 +402,7 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(const KernelArgsConvertRGBFToXRGB8 ar
   const float scale_x   = 1.0f / (args.width - 1);
   const float scale_y   = 1.0f / (args.height - 1);
 
-  const uint32_t undersampling       = max(device.undersampling, 1);
+  const uint32_t undersampling       = max(device.state.undersampling, 1);
   const uint32_t undersampling_width = (device.settings.width + (1 << undersampling) - 1) >> undersampling;
 
   const float mem_scale = (undersampling > 1) ? 1.0f / (1 << (undersampling - 1)) : 1.0f;
@@ -422,8 +422,8 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(const KernelArgsConvertRGBFToXRGB8 ar
         device.ptrs.frame_final, sx, sy, OUTPUT_DIM(device.settings.width), OUTPUT_DIM(device.settings.height), mem_scale);
     }
     else {
-      const uint32_t src_x = x >> (max(device.undersampling, 1) - 1);
-      const uint32_t src_y = y >> (max(device.undersampling, 1) - 1);
+      const uint32_t src_x = x >> (max(device.state.undersampling, 1) - 1);
+      const uint32_t src_y = y >> (max(device.state.undersampling, 1) - 1);
       pixel                = load_RGBF(device.ptrs.frame_final + src_x + src_y * undersampling_width);
     }
 

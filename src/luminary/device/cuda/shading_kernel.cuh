@@ -510,7 +510,7 @@ __device__ RGBF optix_compute_light_ray_geo(const GBufferData data, const ushort
 
 __device__ RGBF optix_compute_light_ray_ambient_sky(
   const GBufferData data, const vec3 ray, const RGBF sample_weight, const bool is_refraction, const ushort2 index) {
-  if (device.depth < device.settings.max_ray_depth || !device.sky.ambient_sampling)
+  if (device.state.depth < device.settings.max_ray_depth || !device.sky.ambient_sampling)
     return get_color(0.0f, 0.0f, 0.0f);
 
   // We don't support compute based sky due to register/performance reasons and because
