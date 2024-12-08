@@ -189,9 +189,11 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEnti
   entry.function          = (QueueEntryFunction) _host_propagate_scene_changes_queue_work;
   entry.clear_func        = (QueueEntryFunction) 0;
   entry.args              = (void*) 0;
-  entry.remove_duplicates = false;
+  entry.remove_duplicates = true;
 
-  __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+  // TODO: Abstract this like in the device_manager.
+  bool already_queued;
+  __FAILURE_HANDLE(queue_push_unique(host->work_queue, &entry, (LuminaryEqOp) _host_queue_entry_equal_operator, &already_queued));
 
   return LUMINARY_SUCCESS;
 }
