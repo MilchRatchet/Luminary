@@ -79,6 +79,7 @@ struct Device {
   STAGING DeviceConstantMemory* constant_memory;
   DeviceConstantMemoryDirtyProperties constant_memory_dirty;
   STAGING uint32_t* abort_flags;
+  STAGING GBufferMetaData* gbuffer_meta_dst;
   DeviceTexture* moon_albedo_tex;
   DeviceTexture* moon_normal_tex;
   DeviceStagingManager* staging_manager;
@@ -131,6 +132,7 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_set_abort(Device* device);
 LuminaryResult device_unset_abort(Device* device);
+LuminaryResult device_get_gbuffer_meta_data(Device* device, uint32_t x, uint32_t y, GBufferMetaData* data);
 LuminaryResult device_destroy(Device** device);
 
 #endif /* LUMINARY_DEVICE_H */

@@ -188,6 +188,15 @@ struct GBufferData {
   float ior_out;
 } typedef GBufferData;
 
+struct GBufferMetaData {
+  uint32_t instance_id;
+  float depth;
+  uint32_t padding32;
+  uint16_t material_id;
+  uint16_t padding16;
+} typedef GBufferMetaData;
+LUM_STATIC_SIZE_ASSERT(GBufferMetaData, 0x10);
+
 ////////////////////////////////////////////////////////////////////
 // Kernel passing structs
 ////////////////////////////////////////////////////////////////////
@@ -239,6 +248,7 @@ struct DevicePointers {
   DEVICE RGBF* frame_indirect_accumulate;
   DEVICE RGBF* frame_post;
   DEVICE RGBF* frame_final;
+  DEVICE GBufferMetaData* frame_gbuffer_meta;
   DEVICE RGBF* records;
   DEVICE uint32_t* hit_id_history;
   DEVICE XRGB8* buffer_8bit;
