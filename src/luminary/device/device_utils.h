@@ -33,6 +33,30 @@
 // Failure handles
 ////////////////////////////////////////////////////////////////////
 
+#define CUDA_STALL_VALIDATION
+
+#ifdef CUDA_STALL_VALIDATION
+#define CUDA_FAILURE_HANDLE(command)                                                                                               \
+  {                                                                                                                                \
+    WallTime* __macro_walltime;                                                                                                    \
+    wall_time_create(&__macro_walltime);                                                                                           \
+    wall_time_start(__macro_walltime);                                                                                             \
+    const CUresult __cuda_err = (command);                                                                                         \
+    double __macro_time;                                                                                                           \
+    wall_time_get_time(__macro_walltime, &__macro_time);                                                                           \
+    wall_time_destroy(&__macro_walltime);                                                                                          \
+    if (__macro_time > 0.01) {                                                                                                     \
+      warn_message("CUDA API call (%s) stalled for %fs", #command, __macro_time);                                                  \
+    }                                                                                                                              \
+    if (__cuda_err != CUDA_SUCCESS) {                                                                                              \
+      const char* __error_name   = (const char*) 0;                                                                                \
+      const char* __error_string = (const char*) 0;                                                                                \
+      cuGetErrorName(__cuda_err, &__error_name);                                                                                   \
+      cuGetErrorString(__cuda_err, &__error_string);                                                                               \
+      __RETURN_ERROR(LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", __error_name, __error_string, #command); \
+    }                                                                                                                              \
+  }
+#else
 #define CUDA_FAILURE_HANDLE(command)                                                                                               \
   {                                                                                                                                \
     const CUresult __cuda_err = (command);                                                                                         \
@@ -44,6 +68,7 @@
       __RETURN_ERROR(LUMINARY_ERROR_CUDA, "CUDA returned error \"%s\" (%s) in call (%s)", __error_name, __error_string, #command); \
     }                                                                                                                              \
   }
+#endif
 
 #define OPTIX_FAILURE_HANDLE(command)                                                                                                 \
   {                                                                                                                                   \
