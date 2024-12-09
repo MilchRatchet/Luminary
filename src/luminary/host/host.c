@@ -50,7 +50,9 @@ LuminaryResult _host_queue_worker(Host* host) {
     double time;
     __FAILURE_HANDLE(wall_time_get_time(host->queue_wall_time, &time));
 
-    info_message("HOST: %s (%fs)", entry.name, time);
+    if (time > LUMINARY_WORK_QUEUE_STATS_PRINT_THRESHOLD) {
+      warn_message("host queue: %s (%fs)", entry.name, time);
+    }
 #endif
   }
 

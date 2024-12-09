@@ -40,7 +40,9 @@ static LuminaryResult _device_manager_queue_worker(DeviceManager* device_manager
     double time;
     __FAILURE_HANDLE(wall_time_get_time(device_manager->queue_wall_time, &time));
 
-    info_message("DEVICE: %s (%fs)", entry.name, time);
+    if (time > LUMINARY_WORK_QUEUE_STATS_PRINT_THRESHOLD) {
+      warn_message("device_manager queue: %s (%fs)", entry.name, time);
+    }
 #endif
   }
 
