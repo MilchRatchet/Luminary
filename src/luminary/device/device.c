@@ -647,9 +647,9 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   // Stream creation
   ////////////////////////////////////////////////////////////////////
 
-  CUDA_FAILURE_HANDLE(cuStreamCreate(&device->stream_main, CU_STREAM_NON_BLOCKING));
-  CUDA_FAILURE_HANDLE(cuStreamCreate(&device->stream_secondary, CU_STREAM_NON_BLOCKING));
-  CUDA_FAILURE_HANDLE(cuStreamCreate(&device->stream_callbacks, CU_STREAM_NON_BLOCKING));
+  CUDA_FAILURE_HANDLE(cuStreamCreateWithPriority(&device->stream_main, CU_STREAM_NON_BLOCKING, 2));
+  CUDA_FAILURE_HANDLE(cuStreamCreateWithPriority(&device->stream_secondary, CU_STREAM_NON_BLOCKING, 0));
+  CUDA_FAILURE_HANDLE(cuStreamCreateWithPriority(&device->stream_callbacks, CU_STREAM_NON_BLOCKING, 1));
 
   ////////////////////////////////////////////////////////////////////
   // Event creation
@@ -668,9 +668,6 @@ LuminaryResult device_create(Device** _device, uint32_t index) {
   __FAILURE_HANDLE(device_staging_manager_create(&device->staging_manager, device));
 
   __FAILURE_HANDLE(array_create(&device->textures, sizeof(DeviceTexture*), 16));
-
-  __FAILURE_HANDLE(
-    device_malloc_staging(&device->execution_states, sizeof(DeviceExecutionState) * DEVICE_DYNAMIC_CONST_MEM_STAGING_COUNT, true));
 
   ////////////////////////////////////////////////////////////////////
   // Optix data
@@ -785,26 +782,37 @@ LuminaryResult device_update_scene_entity(Device* device, const void* object, Sc
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id, uint32_t depth) {
+LuminaryResult device_update_dynamic_const_mem(Device* device, uint32_t sample_id) {
   __CHECK_NULL_ARGUMENT(device);
 
   CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
 
-  const uint32_t state_id = device->execution_state_counter & DEVICE_DYNAMIC_CONST_MEM_STAGING_MASK;
+  // These have to be done through a memset. If a memcpy would be used, the abort flag memcpy would stall until these here
+  // have completed. If the abort flag would use a memset, then that one would stall until all kernels have completed. Hence
+  // it is mandatory that the renderer NEVER queues any host to device memcpys.
 
-  STAGING DeviceExecutionState* state = device->execution_states + state_id;
+  CUDA_FAILURE_HANDLE(cuMemsetD32Async(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.sample_id), sample_id, 1, device->stream_main));
+  CUDA_FAILURE_HANDLE(
+    cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), 0, 1, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuMemsetD32Async(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.user_selected_x), 0xFFFFFFFF, 1, device->stream_main));
+  CUDA_FAILURE_HANDLE(cuMemsetD8Async(
+    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.undersampling), device->undersampling_state, 1,
+    device->stream_main));
 
-  state->sample_id = sample_id;
-  state->depth     = depth;
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
-  state->user_selected_x = 0xFFFF;
-  state->user_selected_y = 0xFFFF;
-  state->undersampling   = device->undersampling_state;
+  return LUMINARY_SUCCESS;
+}
 
-  CUDA_FAILURE_HANDLE(cuMemcpyHtoDAsync(
-    device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state), state, sizeof(DeviceExecutionState), device->stream_main));
+LuminaryResult device_update_depth_const_mem(Device* device, uint8_t depth) {
+  __CHECK_NULL_ARGUMENT(device);
 
-  device->execution_state_counter++;
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  CUDA_FAILURE_HANDLE(
+    cuMemsetD8Async(device->cuda_device_const_memory + offsetof(DeviceConstantMemory, state.depth), depth, 1, device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
 
@@ -1349,7 +1357,6 @@ LuminaryResult device_destroy(Device** device) {
   }
 
   __FAILURE_HANDLE(device_free_staging(&(*device)->constant_memory));
-  __FAILURE_HANDLE(device_free_staging(&(*device)->execution_states));
   __FAILURE_HANDLE(device_free_staging(&(*device)->abort_flags));
 
   __FAILURE_HANDLE(device_staging_manager_destroy(&(*device)->staging_manager));

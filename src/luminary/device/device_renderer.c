@@ -41,8 +41,11 @@ LuminaryResult device_renderer_build_kernel_queue(DeviceRenderer* renderer, Devi
 
   DeviceRendererQueueAction action;
 
+  action.type = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
+  __FAILURE_HANDLE(array_push(&renderer->queue, &action));
+
   for (uint32_t depth = 0; depth <= args->max_depth; depth++) {
-    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM;
+    action.type       = DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH;
     action.mem_update = (DeviceRendererQueueActionMemUpdate){.depth = depth};
     __FAILURE_HANDLE(array_push(&renderer->queue, &action));
 
@@ -182,7 +185,10 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         __FAILURE_HANDLE(optix_kernel_execute(device->optix_kernels[action->optix_type], device));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_CONST_MEM:
-        __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_count->current_sample_count, action->mem_update.depth));
+        __FAILURE_HANDLE(device_update_dynamic_const_mem(device, sample_count->current_sample_count));
+        break;
+      case DEVICE_RENDERER_QUEUE_ACTION_TYPE_UPDATE_DEPTH:
+        __FAILURE_HANDLE(device_update_depth_const_mem(device, action->mem_update.depth));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_QUEUE_NEXT_SAMPLE:
         DeviceRenderCallbackData* callback_data;
