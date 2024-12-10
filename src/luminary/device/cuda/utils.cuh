@@ -132,11 +132,15 @@ __device__ uint32_t get_task_address(const uint32_t number) {
 #endif
 }
 
-__device__ bool is_finite(const float a) {
+__device__ bool is_non_finite(const float a) {
+#ifndef __INTELLISENSE__
+  return isnan(a) || isinf(a);
+#else
   const bool is_nan = a != a;
   const bool is_inf = a < -FLT_MAX || a > FLT_MAX;
 
   return is_nan || is_inf;
+#endif
 }
 
 #define HANDLE_DEVICE_ABORT()                                                                                         \

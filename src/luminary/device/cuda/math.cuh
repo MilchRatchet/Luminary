@@ -1170,7 +1170,7 @@ __device__ float light_get_solid_angle(const TriangleLight triangle, const vec3 
 
   float solid_angle = 2.0f * atan2f(num, denom);
 
-  if (!is_finite(solid_angle) || solid_angle < 1e-7f) {
+  if (is_non_finite(solid_angle) || solid_angle < 1e-7f) {
     solid_angle = 0.0f;
   }
 
@@ -1281,12 +1281,12 @@ __device__ Mat3x3 cotangent_frame(vec3 normal, vec3 e1, vec3 e2, UV t1, UV t2) {
   e2 = normalize_vector(e2);
 
   const float abs1 = __frsqrt_rn(t1.u * t1.u + t1.v * t1.v);
-  if (is_finite(abs1)) {
+  if (!is_non_finite(abs1)) {
     t1.u *= abs1;
     t1.v *= abs1;
   }
   const float abs2 = __frsqrt_rn(t2.u * t2.u + t2.v * t2.v);
-  if (is_finite(abs2)) {
+  if (!is_non_finite(abs2)) {
     t2.u *= abs2;
     t2.v *= abs2;
   }

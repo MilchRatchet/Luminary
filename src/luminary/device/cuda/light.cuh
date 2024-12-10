@@ -84,8 +84,8 @@ __device__ TriangleLight light_load_sample_init(const TriangleHandle handle, con
   triangle.edge2  = get_vector(v1.z, v1.w, v2.x);
 
   triangle.vertex = transform_apply(trans, triangle.vertex);
-  triangle.edge1  = transform_apply(trans, triangle.edge1);
-  triangle.edge2  = transform_apply(trans, triangle.edge2);
+  triangle.edge1  = transform_apply_relative(trans, triangle.edge1);
+  triangle.edge2  = transform_apply_relative(trans, triangle.edge2);
 
   packed_light_data.x = __float_as_uint(v2.y);
   packed_light_data.y = __float_as_uint(v2.z);
@@ -113,7 +113,7 @@ __device__ void light_load_sample_finalize(
 
   solid_angle = 2.0f * atan2f(G0, G1 + G2);
 
-  if (!is_finite(solid_angle) || solid_angle < 1e-7f) {
+  if (is_non_finite(solid_angle) || solid_angle < 1e-7f) {
     solid_angle = 0.0f;
     dist        = 1.0f;
     return;
@@ -133,7 +133,7 @@ __device__ void light_load_sample_finalize(
 
   ray = normalize_vector(add_vector(scale_vector(v1, s - t * s2), scale_vector(v2_t, t)));
 
-  if (!(is_finite(ray.x) && is_finite(ray.y) && is_finite(ray.z))) {
+  if (is_non_finite(ray.x) || is_non_finite(ray.y) || is_non_finite(ray.z)) {
     solid_angle = 0.0f;
     dist        = FLT_MAX;
     return;
