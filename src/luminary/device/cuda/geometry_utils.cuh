@@ -86,8 +86,8 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const vec3 vertex1_normal = transform_apply_relative(trans, normal_unpack(__float_as_uint(t3.y)));
   const vec3 vertex2_normal = transform_apply_relative(trans, normal_unpack(__float_as_uint(t3.z)));
 
-  const vec3 edge1_normal = sub_vector(vertex_normal, vertex1_normal);
-  const vec3 edge2_normal = sub_vector(vertex_normal, vertex2_normal);
+  const vec3 edge1_normal = sub_vector(vertex1_normal, vertex_normal);
+  const vec3 edge2_normal = sub_vector(vertex2_normal, vertex_normal);
 
   bool is_inside;
   const vec3 normal = geometry_compute_normal(
