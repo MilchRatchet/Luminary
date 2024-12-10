@@ -203,7 +203,7 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
         CUDA_FAILURE_HANDLE(cuLaunchHostFunc(device->stream_callbacks, renderer->registered_callback_func, callback_data));
         break;
       case DEVICE_RENDERER_QUEUE_ACTION_TYPE_END_OF_SAMPLE:
-        if (device->undersampling_state == 0) {
+        if ((device->undersampling_state & ~UNDERSAMPLING_FIRST_SAMPLE_MASK) == 0) {
           sample_count->current_sample_count++;
         }
 

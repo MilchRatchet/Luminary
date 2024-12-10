@@ -457,8 +457,8 @@ static LuminaryResult _device_update_undersampling(Device* device) {
     undersampling_state &= ~UNDERSAMPLING_FIRST_SAMPLE_MASK;
 
     if ((undersampling_state & UNDERSAMPLING_ITERATION_MASK) == 0) {
-      // Decrement stage
-      uint32_t stage      = (undersampling_state & UNDERSAMPLING_STAGE_MASK) - 1;
+      // Decrement stage, since iteration is 0 we can just subtract first and then apply the mask.
+      uint32_t stage      = (undersampling_state - 1) & UNDERSAMPLING_STAGE_MASK;
       undersampling_state = (undersampling_state & ~UNDERSAMPLING_STAGE_MASK) | (stage & UNDERSAMPLING_STAGE_MASK);
 
       undersampling_state |= (stage > 0) ? 0b10 & UNDERSAMPLING_ITERATION_MASK : 0;
@@ -469,8 +469,15 @@ static LuminaryResult _device_update_undersampling(Device* device) {
       undersampling_state = (undersampling_state & ~UNDERSAMPLING_ITERATION_MASK) | (iteration & UNDERSAMPLING_ITERATION_MASK);
     }
 
+    // If undersampling state is now 0, we thus have now exactly one sample per pixel, we must increment sample id, else
+    // we would recompute this sample now.
+    if (undersampling_state == 0) {
+      device->sample_count.current_sample_count++;
+    }
+
     device->undersampling_state = undersampling_state;
   }
+
   return LUMINARY_SUCCESS;
 }
 
@@ -1206,9 +1213,12 @@ LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling
   __CHECK_NULL_ARGUMENT(device);
 
   device->undersampling_state = 0;
-  device->undersampling_state |= 0b11 & UNDERSAMPLING_ITERATION_MASK;
-  device->undersampling_state |= (undersampling << 2) & UNDERSAMPLING_STAGE_MASK;
-  device->undersampling_state |= UNDERSAMPLING_FIRST_SAMPLE_MASK;
+
+  if (undersampling > 0) {
+    device->undersampling_state |= 0b11 & UNDERSAMPLING_ITERATION_MASK;
+    device->undersampling_state |= (undersampling << 2) & UNDERSAMPLING_STAGE_MASK;
+    device->undersampling_state |= UNDERSAMPLING_FIRST_SAMPLE_MASK;
+  }
 
   return LUMINARY_SUCCESS;
 }

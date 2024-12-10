@@ -65,8 +65,8 @@ LUMINARY_KERNEL void generate_trace_tasks() {
       undersampling_x *= undersampling_scale;
       undersampling_y *= undersampling_scale;
 
-      undersampling_x += (undersampling_scale >> 1) * ((undersampling_iteration & 0b01) ? 1.0f : 0.0f);
-      undersampling_y += (undersampling_scale >> 1) * ((undersampling_iteration & 0b10) ? 1.0f : 0.0f);
+      undersampling_x += (undersampling_scale >> 1) * ((undersampling_iteration & 0b01) ? 1 : 0);
+      undersampling_y += (undersampling_scale >> 1) * ((undersampling_iteration & 0b10) ? 1 : 0);
     }
 
     if (undersampling_x >= device.settings.width || undersampling_y >= device.settings.height)
@@ -364,20 +364,15 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
   const uint32_t undersampling_stage_clamped = max(undersampling_stage, 1);
   const uint32_t undersampling_iteration     = device.state.undersampling & UNDERSAMPLING_ITERATION_MASK;
 
-  const uint32_t undersampling_scale = 1 << undersampling_stage_clamped;
+  const uint32_t undersampling_scale    = 1 << undersampling_stage_clamped;
+  const uint32_t undersampling_subscale = 1 << undersampling_stage;
 
-  const uint32_t undersampling_width  = (device.settings.width + (1 << undersampling_stage_clamped) - 1) >> undersampling_stage_clamped;
-  const uint32_t undersampling_height = (device.settings.height + (1 << undersampling_stage_clamped) - 1) >> undersampling_stage_clamped;
+  const uint32_t undersampling_width  = (device.settings.width + undersampling_scale - 1) >> undersampling_stage_clamped;
+  const uint32_t undersampling_height = (device.settings.height + undersampling_scale - 1) >> undersampling_stage_clamped;
 
   const uint32_t amount = undersampling_width * undersampling_height;
 
-  float color_scale;
-  if (undersampling_stage) {
-    color_scale = (1 << (undersampling_stage * 2)) / (undersampling_scale * undersampling_scale * (4.0f - undersampling_iteration));
-  }
-  else {
-    color_scale = 1.0f / (undersampling_scale * undersampling_scale);
-  }
+  const float color_scale = (undersampling_stage) ? 1.0f / (4.0f - undersampling_iteration) : 1.0f;
 
   for (uint32_t undersampling_pixel = THREAD_ID; undersampling_pixel < amount; undersampling_pixel += blockDim.x * gridDim.x) {
     const uint16_t y = (uint16_t) (undersampling_pixel / undersampling_width);
@@ -386,26 +381,62 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
     const uint16_t source_x = x * undersampling_scale;
     const uint16_t source_y = y * undersampling_scale;
 
-    RGBF accumulated_color = get_color(0.0f, 0.0f, 0.0f);
+    RGBF color = get_color(0.0f, 0.0f, 0.0f);
 
-    for (uint32_t yi = 0; yi < undersampling_scale; yi++) {
-      for (uint32_t xi = 0; xi < undersampling_scale; xi++) {
-        const uint32_t pixel_x = min(source_x + xi, device.settings.width - 1);
-        const uint32_t pixel_y = min(source_y + yi, device.settings.height - 1);
+    if (undersampling_stage) {
+      for (uint32_t yi = 0; yi < 2; yi++) {
+        for (uint32_t xi = 0; xi < 2; xi++) {
+          RGBF accumulated_sub_color = get_color(0.0f, 0.0f, 0.0f);
 
-        const uint32_t index = pixel_x + pixel_y * device.settings.width;
+          const uint32_t subpixel_x = source_x + xi * undersampling_subscale;
+          const uint32_t subpixel_y = source_y + yi * undersampling_subscale;
 
-        RGBF pixel = load_RGBF(args.src + index);
-        pixel      = tonemap_apply(pixel, pixel_x, pixel_y, args.color_correction, args.agx_params);
+          for (uint32_t yj = 0; yj < undersampling_subscale; yj++) {
+            for (uint32_t xj = 0; xj < undersampling_subscale; xj++) {
+              const uint32_t pixel_x = min(subpixel_x + xj, device.settings.width - 1);
+              const uint32_t pixel_y = min(subpixel_y + yj, device.settings.height - 1);
 
-        accumulated_color = add_color(accumulated_color, pixel);
+              const uint32_t index = pixel_x + pixel_y * device.settings.width;
+
+              RGBF pixel            = load_RGBF(args.src + index);
+              accumulated_sub_color = add_color(accumulated_sub_color, pixel);
+            }
+          }
+
+          accumulated_sub_color = scale_color(accumulated_sub_color, color_scale);
+          accumulated_sub_color = tonemap_apply(accumulated_sub_color, subpixel_x, subpixel_y, args.color_correction, args.agx_params);
+
+          color = add_color(color, accumulated_sub_color);
+        }
       }
     }
+    else {
+      const float2* src_ptr0 = (const float2*) (args.src + source_x + source_y * device.settings.width);
+      const float2* src_ptr1 = (const float2*) (args.src + source_x + (source_y + 1) * device.settings.width);
+      const float2 data00    = __ldg(src_ptr0 + 0);
+      const float2 data01    = __ldg(src_ptr0 + 1);
+      const float2 data02    = __ldg(src_ptr0 + 2);
+      const float2 data10    = __ldg(src_ptr1 + 0);
+      const float2 data11    = __ldg(src_ptr1 + 1);
+      const float2 data12    = __ldg(src_ptr1 + 2);
 
-    accumulated_color = scale_color(accumulated_color, color_scale);
+      const RGBF pixel00 = get_color(data00.x, data00.y, data01.x);
+      color              = add_color(color, tonemap_apply(pixel00, source_x + 0, source_y + 0, args.color_correction, args.agx_params));
+
+      const RGBF pixel01 = get_color(data01.y, data02.x, data02.y);
+      color              = add_color(color, tonemap_apply(pixel01, source_x + 0, source_y + 1, args.color_correction, args.agx_params));
+
+      const RGBF pixel10 = get_color(data10.x, data10.y, data11.x);
+      color              = add_color(color, tonemap_apply(pixel10, source_x + 1, source_y + 0, args.color_correction, args.agx_params));
+
+      const RGBF pixel11 = get_color(data11.y, data12.x, data12.y);
+      color              = add_color(color, tonemap_apply(pixel11, source_x + 1, source_y + 1, args.color_correction, args.agx_params));
+    }
+
+    color = scale_color(color, 0.25f);
 
     const uint32_t dst_index = x + y * undersampling_width;
-    store_RGBF(device.ptrs.frame_final + dst_index, accumulated_color);
+    store_RGBF(device.ptrs.frame_final + dst_index, color);
   }
 }
 
