@@ -250,8 +250,11 @@ __device__ UV uv_unpack(const uint32_t data) {
 
 // Octahedron decoding, for example: https://www.shadertoy.com/view/clXXD8
 __device__ vec3 normal_unpack(const uint32_t data) {
-  const float x = ((int16_t) (data & 0xFFFF)) * (1.0f / 0x7FFF);
-  const float y = ((int16_t) (data >> 16)) * (1.0f / 0x7FFF);
+  float x = (data & 0xFFFF) * (1.0f / 0xFFFF);
+  float y = (data >> 16) * (1.0f / 0xFFFF);
+
+  x = (x * 2.0f) - 1.0f;
+  y = (y * 2.0f) - 1.0f;
 
   vec3 normal   = get_vector(x, y, 1.0f - fabsf(x) - fabsf(y));
   const float t = __saturatef(-normal.z);

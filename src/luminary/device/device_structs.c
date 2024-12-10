@@ -353,7 +353,7 @@ static uint32_t _device_vec3_to_uint(const vec3 normal) {
   double y = normal.y;
   double z = normal.z;
 
-  const double recip_norm = 1.0 / (x * x + y * y + z * z);
+  const double recip_norm = 1.0 / (fabs(x) + fabs(y) + fabs(z));
 
   x *= recip_norm;
   y *= recip_norm;
@@ -364,8 +364,14 @@ static uint32_t _device_vec3_to_uint(const vec3 normal) {
   x += (x >= 0.0) ? t : -t;
   y += (y >= 0.0) ? t : -t;
 
-  const uint32_t x_u16 = (uint32_t) ((int16_t) round(x * 0x7FFF));
-  const uint32_t y_u16 = (uint32_t) ((int16_t) round(y * 0x7FFF));
+  x = fmax(fmin(x, 1.0), -1.0);
+  y = fmax(fmin(y, 1.0), -1.0);
+
+  x = (x + 1.0) * 0.5;
+  y = (y + 1.0) * 0.5;
+
+  const uint32_t x_u16 = (uint32_t) (x * 0xFFFF + 0.5);
+  const uint32_t y_u16 = (uint32_t) (y * 0xFFFF + 0.5);
 
   return (y_u16 << 16) | x_u16;
 }

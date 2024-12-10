@@ -67,9 +67,9 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const float4 t2 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 2, 0, triangle_handle.tri_id, triangle_count));
   const float4 t3 = __ldg((float4*) triangle_get_entry_address(tri_ptr, 3, 0, triangle_handle.tri_id, triangle_count));
 
-  const vec3 vertex = get_vector(t0.x, t0.y, t0.z);
-  const vec3 edge1  = get_vector(t0.w, t1.x, t1.y);
-  const vec3 edge2  = get_vector(t1.z, t1.w, t2.x);
+  const vec3 vertex = transform_apply(trans, get_vector(t0.x, t0.y, t0.z));
+  const vec3 edge1  = transform_apply(trans, get_vector(t0.w, t1.x, t1.y));
+  const vec3 edge2  = transform_apply(trans, get_vector(t1.z, t1.w, t2.x));
 
   const float2 coords = get_coordinates_in_triangle(vertex, edge1, edge2, task.origin);
 
@@ -82,9 +82,9 @@ __device__ GBufferData geometry_generate_g_buffer(const DeviceTask task, const T
   const uint16_t material_id = __float_as_uint(t3.w) & 0xFFFF;
   const DeviceMaterial mat   = load_material(device.ptrs.materials, material_id);
 
-  const vec3 vertex_normal  = normal_unpack(__float_as_uint(t3.x));
-  const vec3 vertex1_normal = normal_unpack(__float_as_uint(t3.y));
-  const vec3 vertex2_normal = normal_unpack(__float_as_uint(t3.z));
+  const vec3 vertex_normal  = transform_apply_relative(trans, normal_unpack(__float_as_uint(t3.x)));
+  const vec3 vertex1_normal = transform_apply_relative(trans, normal_unpack(__float_as_uint(t3.y)));
+  const vec3 vertex2_normal = transform_apply_relative(trans, normal_unpack(__float_as_uint(t3.z)));
 
   const vec3 edge1_normal = sub_vector(vertex_normal, vertex1_normal);
   const vec3 edge2_normal = sub_vector(vertex_normal, vertex2_normal);
