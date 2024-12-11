@@ -56,6 +56,9 @@ LUMINARY_API LuminaryResult luminary_host_get_queue_time(const LuminaryHost* hos
 
 LUMINARY_API LuminaryResult luminary_host_set_output_properties(LuminaryHost* host, LuminaryOutputProperties properties);
 
+LUMINARY_API LuminaryResult luminary_host_set_enable_pixel_query(LuminaryHost* host, bool enable);
+LUMINARY_API LuminaryResult luminary_host_pixel_query(LuminaryHost* host, uint32_t x, uint32_t y, LuminaryPixelQueryResult* result);
+
 /*
  * Returns handle to an output. Every handle acquired must be released by calling luminary_host_release_output. Consecutive calls to
  * luminary_host_acquire_output are not guaranteed to return unique handles.

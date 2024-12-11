@@ -57,6 +57,13 @@ LUMINARY_API struct LuminaryOutputProperties {
 
 LUMINARY_API typedef uint32_t LuminaryOutputHandle;
 
+LUMINARY_API struct LuminaryPixelQueryResult {
+  bool pixel_query_is_valid;
+  uint32_t instance_id;
+  uint16_t material_id;
+  float depth;
+} typedef LuminaryPixelQueryResult;
+
 ////////////////////////////////////////////////////////////////////
 // Camera
 ////////////////////////////////////////////////////////////////////
