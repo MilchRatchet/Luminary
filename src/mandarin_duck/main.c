@@ -1,3 +1,4 @@
+#include "argument_parser.h"
 #include "mandarin_duck.h"
 #include "utils.h"
 
@@ -7,25 +8,10 @@ int main(int argc, char* argv[]) {
   LuminaryHost* host;
   LUM_FAILURE_HANDLE(luminary_host_create(&host));
 
-  if (argc > 1) {
-#if 0
-    LuminaryPath* obj_path;
-    LUM_FAILURE_HANDLE(luminary_path_create(&obj_path));
-    LUM_FAILURE_HANDLE(luminary_path_set_from_string(obj_path, argv[1]));
-
-    LUM_FAILURE_HANDLE(luminary_host_load_obj_file(host, obj_path));
-
-    LUM_FAILURE_HANDLE(luminary_path_destroy(&obj_path));
-#else
-    LuminaryPath* lum_path;
-    LUM_FAILURE_HANDLE(luminary_path_create(&lum_path));
-    LUM_FAILURE_HANDLE(luminary_path_set_from_string(lum_path, argv[1]));
-
-    LUM_FAILURE_HANDLE(luminary_host_load_lum_file(host, lum_path));
-
-    LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
-#endif
-  }
+  ArgumentParser* argument_parser;
+  argument_parser_create(&argument_parser);
+  argument_parser_parse(argument_parser, argc, (const char**) argv, host);
+  argument_parser_destroy(&argument_parser);
 
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
