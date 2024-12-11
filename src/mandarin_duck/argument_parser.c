@@ -39,6 +39,8 @@ static void _argument_parser_arg_func_help(ArgumentParser* parser, LuminaryHost*
 
     printf("\n\t\t%s\n", argument->description);
   }
+
+  parser->dry_run_requested = true;
 }
 
 static void _argument_parser_arg_func_version(ArgumentParser* parser, LuminaryHost* host, uint32_t num_arguments, const char** arguments) {
@@ -50,6 +52,8 @@ static void _argument_parser_arg_func_version(ArgumentParser* parser, LuminaryHo
   printf("Mandarin Duck Frontend\n");
   printf("Luminary %s (Branch: %s)\n", LUMINARY_VERSION_DATE, LUMINARY_BRANCH_NAME);
   printf("(%s, %s, CUDA %s, OptiX %s)\n", LUMINARY_COMPILER, LUMINARY_OS, LUMINARY_CUDA_VERSION, LUMINARY_OPTIX_VERSION);
+
+  parser->dry_run_requested = true;
 }
 
 ////////////////////////////////////////////////////////////////////
@@ -160,6 +164,12 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
 
     if (result.is_argument && result.matched_argument->subargument_count == 0) {
       result.matched_argument->handler_func(parser, host, 0, (const char**) 0);
+
+      if (parser->dry_run_requested) {
+        // Encountered argument that prevents Mandarin Duck from actually executing.
+        return;
+      }
+
       continue;
     }
 

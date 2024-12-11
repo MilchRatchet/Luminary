@@ -468,7 +468,7 @@ static LuminaryResult _device_manager_compile_kernels(DeviceManager* device_mana
     const char* kernel_name;
     CUDA_FAILURE_HANDLE(cuKernelGetName(&kernel_name, kernels[kernel_id]));
 
-    info_message("CUDA Kernel: %s", kernel_name);
+    log_message("CUDA Kernel: %s", kernel_name);
   }
 
   __FAILURE_HANDLE(host_free(&kernels));

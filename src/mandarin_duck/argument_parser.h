@@ -20,6 +20,7 @@ struct ArgumentDescriptor {
 
 struct ArgumentParser {
   ArgumentDescriptor* descriptors;
+  bool dry_run_requested;
 };
 
 void argument_parser_create(ArgumentParser** parser);
