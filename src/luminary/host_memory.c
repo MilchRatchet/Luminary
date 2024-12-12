@@ -137,7 +137,7 @@ static LuminaryResult _debug_memory_allocation_remove(
 
 static void _debug_memory_allocation_check_for_leaks() {
   for (uint64_t allocation = 0; allocation < _debug_memory_allocations_count; allocation++) {
-    if (_debug_memory_allocations[allocation].size) {
+    if (_debug_memory_allocations[allocation].size != SIZE_MAX) {
       luminary_print_error("LUMINARY_MEMORY_DEBUG Allocation %s was not freed.", _debug_memory_allocations[allocation].name);
     }
   }

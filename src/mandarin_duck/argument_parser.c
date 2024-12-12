@@ -119,6 +119,10 @@ void argument_parser_create(ArgumentParser** parser) {
   memset(*parser, 0, sizeof(ArgumentParser));
 
   LUM_FAILURE_HANDLE(array_create(&(*parser)->descriptors, sizeof(ArgumentDescriptor), 16));
+  LUM_FAILURE_HANDLE(array_create(&(*parser)->inputs, sizeof(char*), 16));
+  LUM_FAILURE_HANDLE(array_create(&(*parser)->parsed_arguments, sizeof(ParsedArgument), 16));
+
+  // Add descriptors sorted by category and alphabetically.
 
   ArgumentDescriptor descriptor;
 
@@ -128,6 +132,7 @@ void argument_parser_create(ArgumentParser** parser) {
   descriptor.description       = "Print available commandline arguments";
   descriptor.subargument_count = 0;
   descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_help;
+  descriptor.pre_execute       = true;
 
   LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
 
@@ -137,15 +142,13 @@ void argument_parser_create(ArgumentParser** parser) {
   descriptor.description       = "Print version information";
   descriptor.subargument_count = 0;
   descriptor.handler_func      = (ArgumentHandlerFunc) _argument_parser_arg_func_version;
+  descriptor.pre_execute       = true;
 
   LUM_FAILURE_HANDLE(array_push(&(*parser)->descriptors, &descriptor));
-
-  // TODO: Sort descriptors based on category and alphabetically
 }
 
-void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** argv, LuminaryHost* host) {
+void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** argv) {
   MD_CHECK_NULL_ARGUMENT(parser);
-  MD_CHECK_NULL_ARGUMENT(host);
 
   for (uint32_t argument_id = 1; argument_id < argc; argument_id++) {
     const char* argument = argv[argument_id];
@@ -163,12 +166,20 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
     }
 
     if (result.is_argument && result.matched_argument->subargument_count == 0) {
-      result.matched_argument->handler_func(parser, host, 0, (const char**) 0);
+      if (result.matched_argument->pre_execute) {
+        result.matched_argument->handler_func(parser, (LuminaryHost*) 0, 0, (const char**) 0);
 
-      if (parser->dry_run_requested) {
         // Encountered argument that prevents Mandarin Duck from actually executing.
+        parser->dry_run_requested = true;
         return;
       }
+
+      ParsedArgument parsed_argument;
+
+      parsed_argument.handler_func      = result.matched_argument->handler_func;
+      parsed_argument.subargument_count = 0;
+
+      LUM_FAILURE_HANDLE(array_push(&parser->parsed_arguments, &parsed_argument));
 
       continue;
     }
@@ -176,15 +187,40 @@ void argument_parser_parse(ArgumentParser* parser, uint32_t argc, const char** a
     // TODO: Handle sub-arguments
 
     if (!result.is_argument) {
-      // TODO: Handle obj file inputs
-      LuminaryPath* lum_path;
-      LUM_FAILURE_HANDLE(luminary_path_create(&lum_path));
-      LUM_FAILURE_HANDLE(luminary_path_set_from_string(lum_path, argv[1]));
+      LUM_FAILURE_HANDLE(array_push(&parser->inputs, &argument));
 
-      LUM_FAILURE_HANDLE(luminary_host_load_lum_file(host, lum_path));
-
-      LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
+      continue;
     }
+  }
+}
+
+void argument_parser_execute(ArgumentParser* parser, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(parser);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  uint32_t num_inputs;
+  LUM_FAILURE_HANDLE(array_get_num_elements(parser->inputs, &num_inputs));
+
+  for (uint32_t input_id = 0; input_id < num_inputs; input_id++) {
+    const char* input = parser->inputs[input_id];
+
+    // TODO: Handle obj file inputs
+    LuminaryPath* lum_path;
+    LUM_FAILURE_HANDLE(luminary_path_create(&lum_path));
+    LUM_FAILURE_HANDLE(luminary_path_set_from_string(lum_path, input));
+
+    LUM_FAILURE_HANDLE(luminary_host_load_lum_file(host, lum_path));
+
+    LUM_FAILURE_HANDLE(luminary_path_destroy(&lum_path));
+  }
+
+  uint32_t num_arguments;
+  LUM_FAILURE_HANDLE(array_get_num_elements(parser->parsed_arguments, &num_arguments));
+
+  for (uint32_t argument_id = 0; argument_id < num_arguments; argument_id++) {
+    const ParsedArgument* argument = parser->parsed_arguments + argument_id;
+
+    argument->handler_func(parser, host, argument->subargument_count, (const char**) argument->subarguments);
   }
 }
 
@@ -193,6 +229,8 @@ void argument_parser_destroy(ArgumentParser** parser) {
   MD_CHECK_NULL_ARGUMENT(*parser);
 
   LUM_FAILURE_HANDLE(array_destroy(&(*parser)->descriptors));
+  LUM_FAILURE_HANDLE(array_destroy(&(*parser)->inputs));
+  LUM_FAILURE_HANDLE(array_destroy(&(*parser)->parsed_arguments));
 
   LUM_FAILURE_HANDLE(host_free(parser));
 }
