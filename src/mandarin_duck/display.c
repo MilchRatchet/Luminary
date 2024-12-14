@@ -103,7 +103,9 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
         *dirty = true;
         break;
       case SDL_EVENT_WINDOW_MOUSE_ENTER:
+        break;
       case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+        mouse_state_invalidate(display->mouse_state);
         break;
       case SDL_EVENT_KEY_DOWN:
       case SDL_EVENT_KEY_UP:

@@ -1,5 +1,7 @@
 #include "mouse_state.h"
 
+#include <float.h>
+
 void mouse_state_create(MouseState** mouse_state) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
 
@@ -17,6 +19,14 @@ void mouse_state_reset_motion(MouseState* mouse_state) {
 void mouse_state_reset_button(MouseState* mouse_state) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
 
+  mouse_state->phase = MOUSE_PHASE_STABLE;
+}
+
+void mouse_state_invalidate(MouseState* mouse_state) {
+  MD_CHECK_NULL_ARGUMENT(mouse_state);
+
+  mouse_state->x     = FLT_MAX;
+  mouse_state->y     = FLT_MAX;
   mouse_state->phase = MOUSE_PHASE_STABLE;
 }
 
