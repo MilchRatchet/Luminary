@@ -22,16 +22,17 @@ bool element_button(Window* window, Display* display, ElementButtonArgs args) {
 
   ElementButtonData* data = (ElementButtonData*) &button.data;
 
-  element_compute_size_and_position(&button, context, &args.size);
+  ElementMouseResult mouse_result;
+  element_apply_context(&button, context, &args.size, display, &mouse_result);
 
   data->shape       = args.shape;
   data->color       = args.color;
   data->hover_color = args.hover_color;
   data->press_color = args.press_color;
-  data->is_hovered  = element_is_mouse_hover(&button, display);
-  data->is_pressed  = element_is_pressed(&button, display);
+  data->is_hovered  = mouse_result.is_hovered;
+  data->is_pressed  = mouse_result.is_pressed;
 
   LUM_FAILURE_HANDLE(array_push(&window->element_queue, &button));
 
-  return element_is_clicked(&button, display);
+  return mouse_result.is_clicked;
 }

@@ -22,12 +22,12 @@ struct ElementDataBinding {
   ElementBindingDataType data_type;
 } typedef ElementDataBinding;
 
-void element_compute_size_and_position(Element* element, WindowContext* context, ElementSize* size);
+struct ElementMouseResult {
+  bool is_hovered;
+  bool is_pressed;
+  bool is_clicked;
+} typedef ElementMouseResult;
 
-// TODO: This must be done after element_compute_size_and_position, also this API easily causes duplicate computation, I should combine them
-// all and output a struct with all the info.
-bool element_is_mouse_hover(Element* element, Display* display);
-bool element_is_pressed(Element* element, Display* display);
-bool element_is_clicked(Element* element, Display* display);
+void element_apply_context(Element* element, WindowContext* context, ElementSize* size, Display* display, ElementMouseResult* mouse_result);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_COMMON_H */
