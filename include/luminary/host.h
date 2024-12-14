@@ -36,10 +36,6 @@ LUMINARY_API LuminaryResult luminary_host_shutdown_device(LuminaryHost* host, ui
 LUMINARY_API LuminaryResult luminary_host_load_lum_file(LuminaryHost* host, LuminaryPath* path);
 LUMINARY_API LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, LuminaryPath* path);
 
-LUMINARY_API LuminaryResult luminary_host_start_render(LuminaryHost* host);
-LUMINARY_API LuminaryResult luminary_host_skip_render(LuminaryHost* host);
-LUMINARY_API LuminaryResult luminary_host_stop_render(LuminaryHost* host);
-
 /*
  * Returns the string identifying the host's current queue task.
  * @param host Host instance.

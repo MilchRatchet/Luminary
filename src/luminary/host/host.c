@@ -169,21 +169,20 @@ static LuminaryResult _host_copy_output_queue_work(Host* host, OutputCopyHandle*
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _host_start_render_queue_work(Host* host, void* args) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  LUM_UNUSED(args);
+
+  return LUMINARY_SUCCESS;
+}
+
 ////////////////////////////////////////////////////////////////////
 // Internal implementation
 ////////////////////////////////////////////////////////////////////
 
-static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEntity entity) {
+static LuminaryResult _host_update_scene(Host* host) {
   __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(object);
-
-  bool scene_changed = false;
-  __FAILURE_HANDLE(scene_update(host->scene_caller, object, entity, &scene_changed));
-
-  // If there are no changes, skip the propagation to avoid hammering the queue.
-  if (!scene_changed) {
-    return LUMINARY_SUCCESS;
-  }
 
   QueueEntry entry;
 
@@ -196,6 +195,21 @@ static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEnti
   // TODO: Abstract this like in the device_manager.
   bool already_queued;
   __FAILURE_HANDLE(queue_push_unique(host->work_queue, &entry, (LuminaryEqOp) _host_queue_entry_equal_operator, &already_queued));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _host_set_scene_entity(Host* host, void* object, SceneEntity entity) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(object);
+
+  bool scene_changed = false;
+  __FAILURE_HANDLE(scene_update(host->scene_caller, object, entity, &scene_changed));
+
+  // If there are no changes, skip the propagation to avoid hammering the queue.
+  if (scene_changed) {
+    __FAILURE_HANDLE(_host_update_scene(host));
+  }
 
   return LUMINARY_SUCCESS;
 }
@@ -366,6 +380,9 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
     instance.mesh_id += mesh_id_offset;
 
     __FAILURE_HANDLE(scene_add_entry(host->scene_caller, &instance, SCENE_ENTITY_INSTANCES));
+
+    // We have added an instance, so the scene is dirty and we need to queue the propagation
+    __FAILURE_HANDLE(_host_update_scene(host));
   }
 
   ////////////////////////////////////////////////////////////////////
