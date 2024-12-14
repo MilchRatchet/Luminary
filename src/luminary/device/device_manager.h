@@ -29,6 +29,7 @@
 
 struct DeviceManager {
   Host* host;
+  bool is_shutdown;
   Scene* scene_device;
   SampleCountSlice sample_count;
   ARRAY Device** devices;

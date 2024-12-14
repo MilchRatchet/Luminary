@@ -642,6 +642,14 @@ LuminaryResult device_manager_queue_work(DeviceManager* device_manager, QueueEnt
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(entry);
 
+  if (device_manager->is_shutdown) {
+    if (entry->clear_func) {
+      __FAILURE_HANDLE(entry->clear_func(device_manager, entry->args));
+    }
+
+    return LUMINARY_SUCCESS;
+  }
+
   if (entry->remove_duplicates) {
     bool entry_already_queued = false;
     __FAILURE_HANDLE(queue_push_unique(
@@ -775,6 +783,15 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(*device_manager);
 
+  (*device_manager)->is_shutdown = true;
+
+  uint32_t device_count;
+  __FAILURE_HANDLE(array_get_num_elements((*device_manager)->devices, &device_count));
+
+  for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+    __FAILURE_HANDLE(device_set_abort((*device_manager)->devices[device_id]));
+  }
+
   __FAILURE_HANDLE(device_manager_shutdown_queue(*device_manager));
 
   __FAILURE_HANDLE(wall_time_destroy(&(*device_manager)->queue_wall_time));
@@ -782,9 +799,6 @@ LuminaryResult device_manager_destroy(DeviceManager** device_manager) {
   __FAILURE_HANDLE(queue_destroy(&(*device_manager)->work_queue));
 
   __FAILURE_HANDLE(thread_destroy(&(*device_manager)->work_thread));
-
-  uint32_t device_count;
-  __FAILURE_HANDLE(array_get_num_elements((*device_manager)->devices, &device_count));
 
   for (uint32_t device_id = 0; device_id < device_count; device_id++) {
     __FAILURE_HANDLE(device_destroy(&((*device_manager)->devices[device_id])));
