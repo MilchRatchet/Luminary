@@ -14,6 +14,12 @@ void mouse_state_reset_motion(MouseState* mouse_state) {
   mouse_state->y_motion = 0.0f;
 }
 
+void mouse_state_reset_button(MouseState* mouse_state) {
+  MD_CHECK_NULL_ARGUMENT(mouse_state);
+
+  mouse_state->phase = MOUSE_PHASE_STABLE;
+}
+
 void mouse_state_update_motion(MouseState* mouse_state, SDL_MouseMotionEvent sdl_event) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
 
@@ -25,6 +31,13 @@ void mouse_state_update_motion(MouseState* mouse_state, SDL_MouseMotionEvent sdl
 
 void mouse_state_update_button(MouseState* mouse_state, SDL_MouseButtonEvent sdl_event) {
   MD_CHECK_NULL_ARGUMENT(mouse_state);
+
+  if (sdl_event.button != 1) {
+    // TODO: Add support for other mouse buttons.
+    return;
+  }
+
+  mouse_state->phase = (sdl_event.down) ? MOUSE_PHASE_PRESSED : MOUSE_PHASE_RELEASED;
 }
 
 void mouse_state_update_wheel(MouseState* mouse_state, SDL_MouseWheelEvent sdl_event) {

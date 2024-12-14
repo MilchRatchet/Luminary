@@ -15,7 +15,7 @@ add_executable(LuminaryMD)
 # Sources
 #=============================================================
 
-file(GLOB mandarin_duck_source_files "${CMAKE_CURRENT_SOURCE_DIR}/*.c")
+file(GLOB mandarin_duck_source_files "${CMAKE_CURRENT_SOURCE_DIR}/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/elements/*.c" "${CMAKE_CURRENT_SOURCE_DIR}/windows/*.c")
 
 target_sources(LuminaryMD PRIVATE ${mandarin_duck_source_files})
 
@@ -26,6 +26,7 @@ target_sources(LuminaryMD PRIVATE ${mandarin_duck_source_files})
 target_include_directories(LuminaryMD PRIVATE SDL3::Headers)
 target_include_directories(LuminaryMD PRIVATE SDL3_ttf::SDL3_ttf)
 target_include_directories(LuminaryMD PRIVATE Luminary::Headers)
+target_include_directories(LuminaryMD PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 
 #=============================================================
 # Linking

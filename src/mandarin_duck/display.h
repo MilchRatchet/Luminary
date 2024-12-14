@@ -15,6 +15,7 @@ struct Display {
   uint32_t height;
   uint8_t* buffer;
   uint32_t ld;
+  bool exit_requested;
   bool show_ui;
   KeyboardState* keyboard_state;
   MouseState* mouse_state;

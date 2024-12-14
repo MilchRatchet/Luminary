@@ -10,14 +10,12 @@ static void _display_handle_resize(Display* display) {
   SDL_Surface* surface = SDL_GetWindowSurface(display->sdl_window);
 
   display->buffer = surface->pixels;
-  display->ld     = (uint32_t) (surface->pitch / (4 * sizeof(uint8_t)));
+  display->ld     = (uint32_t) surface->pitch;
 }
 
 static void _display_blit_to_display_buffer(Display* display, uint8_t* output) {
   for (uint32_t y = 0; y < display->height; y++) {
-    memcpy(
-      display->buffer + y * sizeof(uint8_t) * 4 * display->ld, output + y * sizeof(uint8_t) * 4 * display->width,
-      sizeof(uint8_t) * 4 * display->width);
+    memcpy(display->buffer + y * display->ld, output + y * sizeof(uint8_t) * 4 * display->width, sizeof(uint8_t) * 4 * display->width);
   }
 }
 
@@ -84,8 +82,14 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(exit_requested);
 
+  if (display->exit_requested) {
+    *exit_requested = true;
+    return;
+  }
+
   keyboard_state_reset_phases(display->keyboard_state);
   mouse_state_reset_motion(display->mouse_state);
+  mouse_state_reset_button(display->mouse_state);
 
   SDL_Event event;
 
@@ -161,13 +165,16 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
     SDL_SetWindowRelativeMouseMode(display->sdl_window, !display->show_ui);
   }
 
-  if (!display->show_ui) {
+  if (display->show_ui) {
+    user_interface_handle_inputs(display->ui, display, host);
+  }
+  else {
     camera_handler_update(display->camera_handler, host, display->keyboard_state, display->mouse_state, time_step);
     _display_move_sun(display, host, time_step);
   }
 }
 
-void display_render(Display* display, LuminaryHost* host) {
+static void _display_render_output(Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
@@ -180,7 +187,7 @@ void display_render(Display* display, LuminaryHost* host) {
   // No output buffer means that the renderer has never produced an output image.
   if (!output_buffer) {
     for (uint32_t y = 0; y < display->height; y++) {
-      memset(display->buffer + y * sizeof(uint8_t) * 4 * display->ld, 0xFF, sizeof(uint8_t) * 4 * display->width);
+      memset(display->buffer + y * display->ld, 0xFF, sizeof(uint8_t) * 4 * display->width);
     }
 
     LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
@@ -190,6 +197,17 @@ void display_render(Display* display, LuminaryHost* host) {
   _display_blit_to_display_buffer(display, output_buffer);
 
   LUM_FAILURE_HANDLE(luminary_host_release_output(host, output_handle));
+}
+
+void display_render(Display* display, LuminaryHost* host) {
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
+
+  _display_render_output(display, host);
+
+  if (display->show_ui) {
+    user_interface_render(display->ui, display);
+  }
 }
 
 void display_update(Display* display) {
