@@ -6,6 +6,7 @@
 #include "camera_handler.h"
 #include "keyboard_state.h"
 #include "mouse_state.h"
+#include "user_interface.h"
 #include "utils.h"
 
 struct Display {
@@ -18,6 +19,7 @@ struct Display {
   KeyboardState* keyboard_state;
   MouseState* mouse_state;
   CameraHandler* camera_handler;
+  UserInterface* ui;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height);
