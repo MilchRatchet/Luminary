@@ -13,6 +13,7 @@ struct MouseState {
   float x_motion;
   float y_motion;
   MousePhase phase;
+  bool down;
 } typedef MouseState;
 
 void mouse_state_create(MouseState** mouse_state);

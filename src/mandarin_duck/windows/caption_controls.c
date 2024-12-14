@@ -11,9 +11,11 @@ static void _window_caption_controls_action(Window* window, Display* display, Lu
   if (element_button(
         window, display,
         (ElementButtonArgs){
-          .size  = (ElementSize){.is_relative = false, .width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
-          .shape = ELEMENT_BUTTON_SHAPE_CIRCLE,
-          .color = 0xFFFF0000})) {
+          .size        = (ElementSize){.is_relative = false, .width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+          .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
+          .color       = 0xFFFF4444,
+          .hover_color = 0xFFFF0000,
+          .press_color = 0xFFFF8888})) {
     display->exit_requested = true;
   }
 
@@ -22,9 +24,11 @@ static void _window_caption_controls_action(Window* window, Display* display, Lu
   if (element_button(
         window, display,
         (ElementButtonArgs){
-          .size  = (ElementSize){.is_relative = false, .width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
-          .shape = ELEMENT_BUTTON_SHAPE_CIRCLE,
-          .color = 0xFFFF0000})) {
+          .size        = (ElementSize){.is_relative = false, .width = CAPTION_CONTROL_BUTTON_SIZE, .height = CAPTION_CONTROL_BUTTON_SIZE},
+          .shape       = ELEMENT_BUTTON_SHAPE_CIRCLE,
+          .color       = 0xFFFFAA44,
+          .hover_color = 0xFFFFAA00,
+          .press_color = 0xFFFFAA88})) {
     SDL_MinimizeWindow(display->sdl_window);
   }
 }

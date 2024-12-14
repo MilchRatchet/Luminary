@@ -11,7 +11,10 @@ enum ElementButtonShape { ELEMENT_BUTTON_SHAPE_CIRCLE = 0 } typedef ElementButto
 struct ElementButtonData {
   ElementButtonShape shape;
   uint32_t color;
+  uint32_t hover_color;
+  uint32_t press_color;
   bool is_hovered;
+  bool is_pressed;
 } typedef ElementButtonData;
 static_assert(sizeof(ElementButtonData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
@@ -19,6 +22,8 @@ struct ElementButtonArgs {
   ElementSize size;
   ElementButtonShape shape;
   uint32_t color;
+  uint32_t hover_color;
+  uint32_t press_color;
 } typedef ElementButtonArgs;
 
 bool element_button(Window* window, Display* display, ElementButtonArgs args);

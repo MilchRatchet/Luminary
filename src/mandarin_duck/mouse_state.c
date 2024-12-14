@@ -47,6 +47,7 @@ void mouse_state_update_button(MouseState* mouse_state, SDL_MouseButtonEvent sdl
     return;
   }
 
+  mouse_state->down  = sdl_event.down;
   mouse_state->phase = (sdl_event.down) ? MOUSE_PHASE_PRESSED : MOUSE_PHASE_RELEASED;
 }
 

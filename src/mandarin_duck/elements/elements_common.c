@@ -32,6 +32,12 @@ bool element_is_mouse_hover(Element* element, Display* display) {
   return in_horizontal_bounds && in_vertical_bounds;
 }
 
+bool element_is_pressed(Element* element, Display* display) {
+  const MouseState* mouse_state = display->mouse_state;
+
+  return element_is_mouse_hover(element, display) && mouse_state->down;
+}
+
 bool element_is_clicked(Element* element, Display* display) {
   const MouseState* mouse_state = display->mouse_state;
 

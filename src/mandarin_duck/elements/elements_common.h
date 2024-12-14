@@ -27,6 +27,7 @@ void element_compute_size_and_position(Element* element, WindowContext* context,
 // TODO: This must be done after element_compute_size_and_position, also this API easily causes duplicate computation, I should combine them
 // all and output a struct with all the info.
 bool element_is_mouse_hover(Element* element, Display* display);
+bool element_is_pressed(Element* element, Display* display);
 bool element_is_clicked(Element* element, Display* display);
 
 #endif /* MANDARIN_DUCK_ELEMENTS_COMMON_H */
