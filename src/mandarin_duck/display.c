@@ -74,6 +74,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   mouse_state_create(&display->mouse_state);
   camera_handler_create(&display->camera_handler);
   user_interface_create(&display->ui);
+  ui_renderer_create(&display->ui_renderer);
 
   *_display = display;
 }
@@ -227,6 +228,7 @@ void display_destroy(Display** display) {
   mouse_state_destroy(&(*display)->mouse_state);
   camera_handler_destroy(&(*display)->camera_handler);
   user_interface_destroy(&(*display)->ui);
+  ui_renderer_destroy(&(*display)->ui_renderer);
 
   LUM_FAILURE_HANDLE(host_free(display));
 

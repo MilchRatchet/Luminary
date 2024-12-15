@@ -9,7 +9,8 @@ static void _element_button_render_func(Element* button, Display* display) {
 
   uint32_t color = (data->is_pressed) ? data->press_color : ((data->is_hovered) ? data->hover_color : data->color);
 
-  test_render_color(display->buffer, button->x, button->y, button->width, button->height, display->ld, color);
+  test_render_color(
+    display->buffer, button->x, button->y, button->width, button->height, display->ld, color, display->ui_renderer->circle_mask);
 }
 
 bool element_button(Window* window, Display* display, ElementButtonArgs args) {
