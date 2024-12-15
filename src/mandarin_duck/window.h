@@ -8,9 +8,10 @@ struct Display typedef Display;
 struct Window typedef Window;
 
 enum WindowType {
-  WINDOW_TYPE_CAPTION_CONTROLS = 0,
-  WINDOW_TYPE_RENDERER_STATUS  = 1,
-  WINDOW_TYPE_ABOUT            = 2,
+  WINDOW_TYPE_CAPTION_CONTROLS  = 0,
+  WINDOW_TYPE_RENDERER_STATUS   = 1,
+  WINDOW_TYPE_ABOUT             = 2,
+  WINDOW_TYPE_ENTITY_PROPERTIES = 3,
   WINDOW_TYPE_COUNT
 } typedef WindowType;
 

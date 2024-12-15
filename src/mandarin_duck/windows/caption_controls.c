@@ -7,6 +7,8 @@
 
 static void _window_caption_controls_action(Window* window, Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(host);
 
   if (element_button(
         window, display,

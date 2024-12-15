@@ -2,6 +2,7 @@
 #define MANDARIN_DUCK_UI_RENDERER_H
 
 #include "utils.h"
+#include "window.h"
 
 #define UI_UNIT_SIZE 16
 
@@ -10,6 +11,7 @@ struct UIRenderer {
 } typedef UIRenderer;
 
 void ui_renderer_create(UIRenderer** renderer);
+void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* window);
 void ui_renderer_destroy(UIRenderer** renderer);
 
 #endif /* MANDARIN_DUCK_UI_RENDERER_H */

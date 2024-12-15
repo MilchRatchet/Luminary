@@ -2,6 +2,7 @@
 
 #include "display.h"
 #include "windows/caption_controls.h"
+#include "windows/entity_properties.h"
 
 ////////////////////////////////////////////////////////////////////
 // Internal functions
@@ -14,6 +15,11 @@ static void _user_interface_setup(UserInterface* ui) {
   window_caption_controls_create(&window_caption_controls);
 
   LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_caption_controls));
+
+  Window* window_entity_properties_test;
+  window_entity_properties_create(&window_entity_properties_test);
+
+  LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_entity_properties_test));
 }
 
 ////////////////////////////////////////////////////////////////////

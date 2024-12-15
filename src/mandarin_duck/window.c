@@ -62,6 +62,10 @@ void window_render(Window* window, Display* display) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
 
+  if (window->background) {
+    ui_renderer_render_window(display->ui_renderer, display, window);
+  }
+
   uint32_t num_elements;
   LUM_FAILURE_HANDLE(array_get_num_elements(window->element_queue, &num_elements));
 
