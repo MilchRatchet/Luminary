@@ -42,9 +42,17 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
   window->context_stack[0].padding       = window->padding;
   window->context_stack[0].is_horizontal = window->is_horizontal;
 
-  window->action_func(window, display, host);
+  const bool elements_is_mouse_hover = window->action_func(window, display, host);
+  const bool is_mouse_hover          = window_is_mouse_hover(window, display);
 
-  return window_is_mouse_hover(window, display);
+  if (is_mouse_hover && !elements_is_mouse_hover) {
+    if (display->mouse_state->down) {
+      window->x += display->mouse_state->x_motion;
+      window->y += display->mouse_state->y_motion;
+    }
+  }
+
+  return is_mouse_hover;
 }
 
 void window_margin(Window* window, uint32_t margin) {

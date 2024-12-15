@@ -42,7 +42,7 @@ struct Window {
   bool is_horizontal;
   bool is_visible;
   bool background;
-  void (*action_func)(Window* window, Display* display, LuminaryHost* host);
+  bool (*action_func)(Window* window, Display* display, LuminaryHost* host);
 
   // Runtime
   uint32_t context_stack_ptr;

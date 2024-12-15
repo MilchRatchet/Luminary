@@ -1,9 +1,11 @@
 #include "entity_properties.h"
 
-static void _window_entity_properties_action(Window* window, Display* display, LuminaryHost* host) {
+static bool _window_entity_properties_action(Window* window, Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
+
+  return false;
 }
 
 void window_entity_properties_create(Window** window) {

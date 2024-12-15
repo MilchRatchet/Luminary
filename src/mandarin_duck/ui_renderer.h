@@ -7,6 +7,7 @@
 #define UI_UNIT_SIZE 16
 
 struct UIRenderer {
+  uint8_t* disk_mask;
   uint8_t* circle_mask;
 } typedef UIRenderer;
 

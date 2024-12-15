@@ -5,7 +5,7 @@
 
 #define CAPTION_CONTROL_BUTTON_SIZE 16
 
-static void _window_caption_controls_action(Window* window, Display* display, LuminaryHost* host) {
+static bool _window_caption_controls_action(Window* window, Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -45,6 +45,8 @@ static void _window_caption_controls_action(Window* window, Display* display, Lu
           .hover_color = 0xFF13FF21,
           .press_color = 0xFF026200})) {
   }
+
+  return false;
 }
 
 void window_caption_controls_create(Window** window) {
