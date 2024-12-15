@@ -45,6 +45,22 @@ DEVICE_CTX_FUNC LuminaryResult bsdf_lut_generate(BSDFLUT* lut, Device* device) {
 LuminaryResult bsdf_lut_destroy(BSDFLUT** lut) {
   __CHECK_NULL_ARGUMENT(lut);
 
+  if ((*lut)->conductor) {
+    __FAILURE_HANDLE(texture_destroy(&(*lut)->conductor));
+  }
+
+  if ((*lut)->specular) {
+    __FAILURE_HANDLE(texture_destroy(&(*lut)->specular));
+  }
+
+  if ((*lut)->dielectric) {
+    __FAILURE_HANDLE(texture_destroy(&(*lut)->dielectric));
+  }
+
+  if ((*lut)->dielectric_inv) {
+    __FAILURE_HANDLE(texture_destroy(&(*lut)->dielectric_inv));
+  }
+
   __FAILURE_HANDLE(host_free(lut));
 
   return LUMINARY_SUCCESS;
@@ -90,6 +106,22 @@ DEVICE_CTX_FUNC LuminaryResult device_bsdf_lut_update(DeviceBSDFLUT* lut, Device
 
 DEVICE_CTX_FUNC LuminaryResult device_bsdf_lut_destroy(DeviceBSDFLUT** lut) {
   __CHECK_NULL_ARGUMENT(lut);
+
+  if ((*lut)->conductor) {
+    __FAILURE_HANDLE(device_texture_destroy(&(*lut)->conductor));
+  }
+
+  if ((*lut)->specular) {
+    __FAILURE_HANDLE(device_texture_destroy(&(*lut)->specular));
+  }
+
+  if ((*lut)->dielectric) {
+    __FAILURE_HANDLE(device_texture_destroy(&(*lut)->dielectric));
+  }
+
+  if ((*lut)->dielectric_inv) {
+    __FAILURE_HANDLE(device_texture_destroy(&(*lut)->dielectric_inv));
+  }
 
   __FAILURE_HANDLE(host_free(lut));
 

@@ -589,6 +589,7 @@ static LuminaryResult _device_free_buffers(Device* device) {
   __DEVICE_BUFFER_FREE(materials);
   __DEVICE_BUFFER_FREE(triangles);
   __DEVICE_BUFFER_FREE(triangle_counts);
+  __DEVICE_BUFFER_FREE(instance_mesh_id);
   __DEVICE_BUFFER_FREE(instance_transforms);
   __DEVICE_BUFFER_FREE(light_tree_nodes);
   __DEVICE_BUFFER_FREE(light_tree_paths);
