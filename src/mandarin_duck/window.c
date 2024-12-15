@@ -13,7 +13,19 @@ void window_create(Window** window) {
   LUM_FAILURE_HANDLE(array_create(&(*window)->element_queue, sizeof(Element), 128));
 }
 
-void window_handle_input(Window* window, Display* display, LuminaryHost* host) {
+static bool window_is_mouse_hover(Window* window, Display* display) {
+  const MouseState* mouse_state = display->mouse_state;
+
+  const uint32_t mouse_x = mouse_state->x;
+  const uint32_t mouse_y = mouse_state->y;
+
+  const bool in_horizontal_bounds = (mouse_x >= window->x) && (mouse_x <= (window->x + window->width));
+  const bool in_vertical_bounds   = (mouse_y >= window->y) && (mouse_y <= (window->y + window->height));
+
+  return in_horizontal_bounds && in_vertical_bounds;
+}
+
+bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
@@ -31,6 +43,8 @@ void window_handle_input(Window* window, Display* display, LuminaryHost* host) {
   window->context_stack[0].is_horizontal = window->is_horizontal;
 
   window->action_func(window, display, host);
+
+  return window_is_mouse_hover(window, display);
 }
 
 void window_margin(Window* window, uint32_t margin) {

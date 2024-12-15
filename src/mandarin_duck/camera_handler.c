@@ -60,8 +60,8 @@ void camera_handler_update(
   LuminaryCamera camera;
   LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
 
-  camera.rotation.x -= mouse_state->y_motion * time_step;
-  camera.rotation.y -= mouse_state->x_motion * time_step;
+  camera.rotation.x -= mouse_state->y_motion * time_step * 0.5f;
+  camera.rotation.y -= mouse_state->x_motion * time_step * 0.5f;
 
   Quaternion q = _camera_handler_rotation_to_quaternion(camera.rotation);
 

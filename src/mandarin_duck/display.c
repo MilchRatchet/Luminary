@@ -19,6 +19,31 @@ static void _display_blit_to_display_buffer(Display* display, uint8_t* output) {
   }
 }
 
+static SDL_HitTestResult _display_sdl_hittestcallback(SDL_Window* window, const SDL_Point* area, void* data) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(area);
+
+  Display* display = (Display*) data;
+
+  const float prev_mouse_x = display->mouse_state->x;
+  const float prev_mouse_y = display->mouse_state->y;
+
+  display->mouse_state->x = area->x;
+  display->mouse_state->y = area->y;
+
+  bool mouse_hovers_background = false;
+  user_interface_mouse_hovers_background(display->ui, display, &mouse_hovers_background);
+
+  display->mouse_state->x = prev_mouse_x;
+  display->mouse_state->y = prev_mouse_y;
+
+  return (mouse_hovers_background) ? SDL_HITTEST_DRAGGABLE : SDL_HITTEST_NORMAL;
+}
+
+static void _display_set_hittest(Display* display, bool enable) {
+  SDL_SetWindowHitTest(display->sdl_window, (SDL_HitTest) enable ? _display_sdl_hittestcallback : 0, (void*) display);
+}
+
 void display_create(Display** _display, uint32_t width, uint32_t height) {
   MD_CHECK_NULL_ARGUMENT(_display);
 
@@ -76,6 +101,8 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   user_interface_create(&display->ui);
   ui_renderer_create(&display->ui_renderer);
 
+  _display_set_hittest(display, display->show_ui);
+
   *_display = display;
 }
 
@@ -107,6 +134,8 @@ void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
         break;
       case SDL_EVENT_WINDOW_MOUSE_LEAVE:
         mouse_state_invalidate(display->mouse_state);
+        break;
+      case SDL_EVENT_WINDOW_HIT_TEST:
         break;
       case SDL_EVENT_KEY_DOWN:
       case SDL_EVENT_KEY_UP:
@@ -166,6 +195,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
     display->show_ui = !display->show_ui;
     SDL_SetWindowRelativeMouseMode(display->sdl_window, !display->show_ui);
+    _display_set_hittest(display, display->show_ui);
   }
 
   if (display->show_ui) {
