@@ -28,8 +28,6 @@ LuminaryResult device_renderer_handle_callback(DeviceRenderer* renderer, DeviceR
 
   *is_valid = renderer->render_id == data->render_id;
 
-  __FAILURE_HANDLE(ringbuffer_release_entry(renderer->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData)));
-
   return LUMINARY_SUCCESS;
 }
 
@@ -144,6 +142,14 @@ LuminaryResult device_renderer_register_callback(DeviceRenderer* renderer, CUhos
   renderer->registered_callback_func = callback_func;
 
   renderer->callback_data = callback_data;
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_renderer_clear_callback_data(DeviceRenderer* renderer) {
+  __CHECK_NULL_ARGUMENT(renderer);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(renderer->callback_data_ringbuffer, sizeof(DeviceRenderCallbackData)));
 
   return LUMINARY_SUCCESS;
 }

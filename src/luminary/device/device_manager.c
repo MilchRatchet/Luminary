@@ -146,12 +146,23 @@ static LuminaryResult _device_manager_handle_device_render(DeviceManager* device
   return LUMINARY_SUCCESS;
 }
 
+static LuminaryResult _device_manager_clear_handle_device_render(DeviceManager* device_manager, DeviceRenderCallbackData* data) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(data);
+
+  Device* device = device_manager->devices[data->common.device_index];
+
+  __FAILURE_HANDLE(device_renderer_clear_callback_data(device->renderer));
+
+  return LUMINARY_SUCCESS;
+}
+
 static void _device_manager_render_callback(DeviceRenderCallbackData* data) {
   QueueEntry entry;
 
   entry.name              = "Handle Device Render";
   entry.function          = (QueueEntryFunction) _device_manager_handle_device_render;
-  entry.clear_func        = (QueueEntryFunction) 0;
+  entry.clear_func        = (QueueEntryFunction) _device_manager_clear_handle_device_render;
   entry.args              = (void*) data;
   entry.remove_duplicates = false;
 
