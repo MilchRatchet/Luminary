@@ -3,22 +3,20 @@
 
 #include "bsdf_utils.cuh"
 #include "random.cuh"
-#include "raytrace.h"
-#include "texture.h"
 #include "utils.cuh"
 
 #define BSDF_LOAD_PRECOMPUTED_LUT 0
 
 #if BSDF_LOAD_PRECOMPUTED_LUT
 
-extern "C" void bsdf_compute_energy_lut(RaytraceInstance* instance) {
-}
+// TODO: I don't know, back in ancient times I added this section for using precomputed LUT, little did I know that I may never actually
+// implement it :)
 
 #else
 
 #define BSDF_ENERGY_LUT_ITERATIONS (0x10000)
 
-LUMINARY_KERNEL void bsdf_lut_ss_generate(uint16_t* dst) {
+LUMINARY_KERNEL void bsdf_generate_ss_lut(KernelArgsBSDFGenerateSSLUT args) {
   const uint32_t id = THREAD_ID;
 
   if (id >= BSDF_LUT_SIZE * BSDF_LUT_SIZE)
@@ -51,10 +49,10 @@ LUMINARY_KERNEL void bsdf_lut_ss_generate(uint16_t* dst) {
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  args.dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 }
 
-LUMINARY_KERNEL void bsdf_lut_glossy_generate(uint16_t* dst, const uint16_t* src_energy_ss) {
+LUMINARY_KERNEL void bsdf_generate_glossy_lut(KernelArgsBSDFGenerateGlossyLUT args) {
   const uint32_t id = THREAD_ID;
 
   if (id >= BSDF_LUT_SIZE * BSDF_LUT_SIZE)
@@ -91,15 +89,15 @@ LUMINARY_KERNEL void bsdf_lut_glossy_generate(uint16_t* dst, const uint16_t* src
 
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
-  const float single_scattering_term = src_energy_ss[id] * (1.0f / 0xFFFF);
+  const float single_scattering_term = args.src_energy_ss[id] * (1.0f / 0xFFFF);
 
   sum /= single_scattering_term;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  args.dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 }
 
-LUMINARY_KERNEL void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_inv) {
+LUMINARY_KERNEL void bsdf_generate_dielectric_lut(KernelArgsBSDFGenerateDielectricLUT args) {
   const uint32_t id = THREAD_ID;
 
   if (id >= BSDF_LUT_SIZE * BSDF_LUT_SIZE * BSDF_LUT_SIZE)
@@ -156,7 +154,7 @@ LUMINARY_KERNEL void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_i
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
+  args.dst[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 
   data.ior_in  = ior;
   data.ior_out = 1.0f;
@@ -195,55 +193,7 @@ LUMINARY_KERNEL void bsdf_lut_dielectric_generate(uint16_t* dst, uint16_t* dst_i
   sum /= BSDF_ENERGY_LUT_ITERATIONS;
 
   // Ceil because underestimating energy causes excessive energy.
-  dst_inv[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
-}
-
-extern "C" void bsdf_compute_energy_lut(RaytraceInstance* instance) {
-  Texture luts[4];
-  texture_create(&luts[BSDF_LUT_SS], BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, BSDF_LUT_SIZE, (void*) 0, TexDataUINT16, 1, TexStorageGPU);
-  luts[BSDF_LUT_SS].wrap_mode_S = TexModeClamp;
-  luts[BSDF_LUT_SS].wrap_mode_T = TexModeClamp;
-
-  texture_create(&luts[BSDF_LUT_SPECULAR], BSDF_LUT_SIZE, BSDF_LUT_SIZE, 1, BSDF_LUT_SIZE, (void*) 0, TexDataUINT16, 1, TexStorageGPU);
-  luts[BSDF_LUT_SPECULAR].wrap_mode_S = TexModeClamp;
-  luts[BSDF_LUT_SPECULAR].wrap_mode_T = TexModeClamp;
-
-  texture_create(
-    &luts[BSDF_LUT_DIELEC], BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, (void*) 0, TexDataUINT16, 1, TexStorageGPU);
-  luts[BSDF_LUT_DIELEC].wrap_mode_S = TexModeClamp;
-  luts[BSDF_LUT_DIELEC].wrap_mode_T = TexModeClamp;
-
-  texture_create(
-    &luts[BSDF_LUT_DIELEC_INV], BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, BSDF_LUT_SIZE, (void*) 0, TexDataUINT16, 1, TexStorageGPU);
-  luts[BSDF_LUT_DIELEC_INV].wrap_mode_S = TexModeClamp;
-  luts[BSDF_LUT_DIELEC_INV].wrap_mode_T = TexModeClamp;
-
-  size_t lut_sizes[4];
-  lut_sizes[BSDF_LUT_SS]       = luts[BSDF_LUT_SS].height * luts[BSDF_LUT_SS].pitch * sizeof(uint16_t);
-  lut_sizes[BSDF_LUT_SPECULAR] = luts[BSDF_LUT_SPECULAR].height * luts[BSDF_LUT_SPECULAR].pitch * sizeof(uint16_t);
-  lut_sizes[BSDF_LUT_DIELEC] = luts[BSDF_LUT_DIELEC].depth * luts[BSDF_LUT_DIELEC].height * luts[BSDF_LUT_DIELEC].pitch * sizeof(uint16_t);
-  lut_sizes[BSDF_LUT_DIELEC_INV] =
-    luts[BSDF_LUT_DIELEC_INV].depth * luts[BSDF_LUT_DIELEC_INV].height * luts[BSDF_LUT_DIELEC_INV].pitch * sizeof(uint16_t);
-
-  device_malloc((void**) &luts[BSDF_LUT_SS].data, lut_sizes[BSDF_LUT_SS]);
-  device_malloc((void**) &luts[BSDF_LUT_SPECULAR].data, lut_sizes[BSDF_LUT_SPECULAR]);
-  device_malloc((void**) &luts[BSDF_LUT_DIELEC].data, lut_sizes[BSDF_LUT_DIELEC]);
-  device_malloc((void**) &luts[BSDF_LUT_DIELEC_INV].data, lut_sizes[BSDF_LUT_DIELEC_INV]);
-
-  bsdf_lut_ss_generate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>((uint16_t*) luts[BSDF_LUT_SS].data);
-  bsdf_lut_specular_generate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    (uint16_t*) luts[BSDF_LUT_SPECULAR].data, (uint16_t*) luts[BSDF_LUT_SS].data);
-  bsdf_lut_dielectric_generate<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(
-    (uint16_t*) luts[BSDF_LUT_DIELEC].data, (uint16_t*) luts[BSDF_LUT_DIELEC_INV].data);
-
-  texture_create_atlas(&instance->bsdf_energy_lut, luts, 4);
-
-  device_free(luts[BSDF_LUT_SS].data, lut_sizes[BSDF_LUT_SS]);
-  device_free(luts[BSDF_LUT_SPECULAR].data, lut_sizes[BSDF_LUT_SPECULAR]);
-  device_free(luts[BSDF_LUT_DIELEC].data, lut_sizes[BSDF_LUT_DIELEC]);
-  device_free(luts[BSDF_LUT_DIELEC_INV].data, lut_sizes[BSDF_LUT_DIELEC_INV]);
-
-  raytrace_update_device_pointers(instance);
+  args.dst_inv[id] = 1 + (uint16_t) (ceilf(__saturatef(sum) * 0xFFFE));
 }
 
 #endif

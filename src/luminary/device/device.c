@@ -1157,6 +1157,19 @@ LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut) {
+  __CHECK_NULL_ARGUMENT(device);
+  __CHECK_NULL_ARGUMENT(bsdf_lut);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(bsdf_lut_generate(bsdf_lut, device));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut) {
   __CHECK_NULL_ARGUMENT(device);
   __CHECK_NULL_ARGUMENT(bsdf_lut);

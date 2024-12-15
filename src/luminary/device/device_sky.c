@@ -74,6 +74,7 @@ LuminaryResult sky_lut_update(SkyLUT* lut, const Sky* sky) {
 
 static LuminaryResult _sky_lut_generate_lut(SkyLUT* lut, DeviceSkyLUT* device_lut, Device* device) {
   __CHECK_NULL_ARGUMENT(lut);
+  __CHECK_NULL_ARGUMENT(device_lut);
   __CHECK_NULL_ARGUMENT(device);
 
   KernelArgsSkyComputeTransmittanceLUT transmission_lut_args;

@@ -122,6 +122,7 @@ LuminaryResult device_build_sky_lut(Device* device, SkyLUT* sky_lut);
 LuminaryResult device_update_sky_lut(Device* device, const SkyLUT* sky_lut);
 LuminaryResult device_build_sky_hdri(Device* device, SkyHDRI* sky_hdri);
 LuminaryResult device_update_sky_hdri(Device* device, const SkyHDRI* sky_hdri);
+LuminaryResult device_build_bsdf_lut(Device* device, BSDFLUT* bsdf_lut);
 LuminaryResult device_update_bsdf_lut(Device* device, const BSDFLUT* bsdf_lut);
 LuminaryResult device_clear_lighting_buffers(Device* device);
 LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling);

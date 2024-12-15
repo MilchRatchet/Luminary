@@ -427,7 +427,7 @@ static LuminaryResult _device_manager_add_textures(DeviceManager* device_manager
 static LuminaryResult _device_manager_generate_bsdf_luts(DeviceManager* device_manager) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
-  __FAILURE_HANDLE(bsdf_lut_generate(device_manager->bsdf_lut, device_manager->devices[device_manager->main_device_index]));
+  __FAILURE_HANDLE(device_build_bsdf_lut(device_manager->devices[device_manager->main_device_index], device_manager->bsdf_lut));
 
   uint32_t device_count;
   __FAILURE_HANDLE(array_get_num_elements(device_manager->devices, &device_count));

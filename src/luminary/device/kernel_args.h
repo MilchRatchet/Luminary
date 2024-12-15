@@ -3,6 +3,20 @@
 
 #include "device_utils.h"
 
+struct KernelArgsBSDFGenerateSSLUT {
+  uint16_t* dst;
+} typedef KernelArgsBSDFGenerateSSLUT;
+
+struct KernelArgsBSDFGenerateGlossyLUT {
+  uint16_t* dst;
+  const uint16_t* src_energy_ss;
+} typedef KernelArgsBSDFGenerateGlossyLUT;
+
+struct KernelArgsBSDFGenerateDielectricLUT {
+  uint16_t* dst;
+  uint16_t* dst_inv;
+} typedef KernelArgsBSDFGenerateDielectricLUT;
+
 struct KernelArgsCloudComputeShapeNoise {
   uint32_t dim;
   uint8_t* tex;
