@@ -7,32 +7,149 @@
 
 #define MANDARIN_DUCK_X86_INTRINSICS
 
-inline void test_render_color(
-  uint8_t* dst, uint32_t x, uint32_t y, uint32_t width, uint32_t height, uint32_t ld, uint32_t color, uint8_t* mask) {
-  const uint32_t cols = width >> 3;
-  const uint32_t rows = height;
+struct Color256 {
+  union {
+    uint32_t pixel[8];
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+    __m256 _imm;
+    __m256i _immi;
+#endif
+  };
+} typedef Color256;
+_STATIC_ASSERT(sizeof(Color256) == 32);
 
-  __m256i a        = _mm256_set1_epi32(color);
-  __m256i all_ones = _mm256_set1_epi32(0xFFFFFFFF);
+////////////////////////////////////////////////////////////////////
+// Intrinsics
+////////////////////////////////////////////////////////////////////
 
-  dst = dst + 4 * x + y * ld;
+inline Color256 color256_set_1(const uint32_t a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_set1_epi32(a)};
+#else
+  // TODO
+#endif
+}
 
-  for (uint32_t row = 0; row < rows; row++) {
-    for (uint32_t col = 0; col < cols; col++) {
-      __m256i mask_value = _mm256_loadu_si256((__m256i*) (mask + col * 32 + row * 64));
+inline Color256 color256_load(const uint8_t* ptr) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_loadu_si256((__m256i*) ptr)};
+#else
+  // TODO
+#endif
+}
 
-      __m256i base = _mm256_loadu_si256((__m256i*) (dst + col * 32));
+inline void color256_store(const uint8_t* ptr, const Color256 a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  _mm256_storeu_si256((__m256i*) ptr, a._immi);
+#else
+  // TODO
+#endif
+}
 
-      __m256i blend_mask = _mm256_cmpgt_epi32(mask_value, all_ones);
+inline Color256 color256_add32(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_add_epi32(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
 
-      base = _mm256_and_si256(base, blend_mask);
-      base = _mm256_or_si256(base, _mm256_and_si256(a, _mm256_xor_si256(blend_mask, all_ones)));
+inline Color256 color256_sub32(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_sub_epi32(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
 
-      _mm256_storeu_si256((__m256i*) (dst + col * 32), base);
-    }
+inline Color256 color256_mul32(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_mullo_epi32(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
 
-    dst = dst + ld;
-  }
+inline Color256 color256_add8(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_add_epi8(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
+inline Color256 color256_and(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_and_si256(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
+inline Color256 color256_or(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_or_si256(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+#define color256_shift_right(__a, __count) ((Color256){._immi = _mm256_srli_epi32(__a._immi, __count)})
+#endif
+
+////////////////////////////////////////////////////////////////////
+// Macro functions
+////////////////////////////////////////////////////////////////////
+
+/*
+ * @param alpha must be packed into the lower 8 bits of each 32 bit entry
+ * @param mask_low16 Must contain 0x00FF00FF in each entry
+ * @param mask_high16 Must contain 0xFF00FF00 in each entry
+ * @param mask_add Must contain 0x00800080 in each entry
+ */
+inline Color256 color256_alpha_mul(
+  const Color256 color, const Color256 alpha, const Color256 mask_low16, const Color256 mask_high16, const Color256 mask_add) {
+  Color256 rb = color256_and(color, mask_low16);
+  Color256 ga = color256_and(color256_shift_right(color, 8), mask_low16);
+
+  rb = color256_mul32(rb, alpha);
+  ga = color256_mul32(ga, alpha);
+
+  rb = color256_add32(rb, mask_add);
+  ga = color256_add32(ga, mask_add);
+
+  Color256 rb_add = color256_shift_right(rb, 8);
+  Color256 ga_add = color256_shift_right(ga, 8);
+
+  rb_add = color256_and(rb_add, mask_low16);
+  ga_add = color256_and(ga_add, mask_low16);
+
+  rb = color256_add32(rb, rb_add);
+  ga = color256_add32(ga, ga_add);
+
+  rb = color256_and(rb, mask_high16);
+  ga = color256_and(ga, mask_high16);
+
+  return color256_or(ga, color256_shift_right(rb, 8));
+}
+
+/*
+ * @param alpha must be packed into the lower 8 bits of each 32 bit entry
+ * @param mask_low16 Must contain 0x00FF00FF in each entry
+ * @param mask_high16 Must contain 0xFF00FF00 in each entry
+ * @param mask_add Must contain 0x00800080 in each entry
+ * @param mask_full_alpha Must contain 0x000000FF in each entry
+ */
+inline Color256 color256_alpha_blend(
+  const Color256 color1, const Color256 color2, const Color256 alpha, const Color256 mask_low16, const Color256 mask_high16,
+  const Color256 mask_add, const Color256 mask_full_alpha) {
+  const Color256 inverse_alpha = color256_sub32(mask_full_alpha, alpha);
+
+  const Color256 color1_alpha_mul = color256_alpha_mul(color1, alpha, mask_low16, mask_high16, mask_add);
+  const Color256 color2_alpha_mul = color256_alpha_mul(color2, inverse_alpha, mask_low16, mask_high16, mask_add);
+
+  return color256_add8(color1_alpha_mul, color2_alpha_mul);
 }
 
 #endif /* MANDARIN_DUCK_UI_RENDERER_UTILS_H */
