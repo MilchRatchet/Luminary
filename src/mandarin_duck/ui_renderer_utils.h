@@ -30,6 +30,16 @@ inline Color256 color256_set_1(const uint32_t a) {
 #endif
 }
 
+inline Color256 color256_set(
+  const uint32_t v0, const uint32_t v1, const uint32_t v2, const uint32_t v3, const uint32_t v4, const uint32_t v5, const uint32_t v6,
+  const uint32_t v7) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_set_epi32(v0, v1, v2, v3, v4, v5, v6, v7)};
+#else
+  // TODO
+#endif
+}
+
 inline Color256 color256_load(const uint8_t* ptr) {
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
   return (Color256){._immi = _mm256_loadu_si256((__m256i*) ptr)};

@@ -85,14 +85,11 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
 
   static_assert(UI_UNIT_SIZE == 16, "This was written with UI_UNIT_SIZE==16.");
 
-  __m256i left  = _mm256_set_epi32(0, 0, 0, 0, 0, 0, 0, 0xFFFFFFFF);
-  __m256i right = _mm256_set_epi32(0xFFFFFFFF, 0, 0, 0, 0, 0, 0, 0);
-
   dst = dst + 4 * window->x + window->y * ld;
 
   uint32_t row = 0;
 
-  Color256 white           = color256_set_1(0xFFFFFFFF);
+  Color256 base_color      = color256_set_1(0xFFD4AF37);
   Color256 mask_low16      = color256_set_1(0x00FF00FF);
   Color256 mask_high16     = color256_set_1(0xFF00FF00);
   Color256 mask_add        = color256_set_1(0x00800080);
@@ -102,11 +99,11 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
     Color256 circle_left = color256_load(renderer->circle_mask + row * 4 * UI_UNIT_SIZE + 0);
     Color256 base        = color256_load(dst + 0 * 32);
 
-    color256_store(dst + 0 * 32, color256_alpha_blend(white, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
+    color256_store(dst + 0 * 32, color256_alpha_blend(base_color, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
   }
 
   for (uint32_t col = 1; col < cols - 1; col++) {
-    color256_store(dst + col * 32, white);
+    color256_store(dst + col * 32, base_color);
   }
 
   {
@@ -114,7 +111,7 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
     Color256 base         = color256_load(dst + (cols - 1) * 32);
 
     color256_store(
-      dst + (cols - 1) * 32, color256_alpha_blend(white, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
+      dst + (cols - 1) * 32, color256_alpha_blend(base_color, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
   }
 
   row++;
@@ -124,35 +121,52 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
     Color256 circle_left = color256_load(renderer->circle_mask + row * 4 * UI_UNIT_SIZE + 0);
     Color256 base_left   = color256_load(dst + 0 * 32);
 
-    color256_store(dst + 0 * 32, color256_alpha_blend(white, base_left, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
+    color256_store(
+      dst + 0 * 32, color256_alpha_blend(base_color, base_left, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
 
     Color256 circle_right = color256_load(renderer->circle_mask + row * 4 * UI_UNIT_SIZE + 32);
     Color256 base_right   = color256_load(dst + (cols - 1) * 32);
 
     color256_store(
-      dst + (cols - 1) * 32, color256_alpha_blend(white, base_right, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
+      dst + (cols - 1) * 32,
+      color256_alpha_blend(base_color, base_right, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
 
     dst = dst + ld;
   }
 
-  for (; row < rows - 8; row++) {
-    _mm256_storeu_si256((__m256i*) (dst + 0 * 32), left);
-    _mm256_storeu_si256((__m256i*) (dst + (cols - 1) * 32), right);
+  {
+    Color256 left_mask  = color256_set(0, 0, 0, 0, 0, 0, 0, 0xFF);
+    Color256 right_mask = color256_set(0xFF, 0, 0, 0, 0, 0, 0, 0);
 
-    dst = dst + ld;
+    for (; row < rows - 8; row++) {
+      Color256 base_left = color256_load(dst + 0 * 32);
+
+      color256_store(
+        dst + 0 * 32, color256_alpha_blend(base_color, base_left, left_mask, mask_low16, mask_high16, mask_add, mask_full_alpha));
+
+      Color256 base_right = color256_load(dst + (cols - 1) * 32);
+
+      color256_store(
+        dst + (cols - 1) * 32,
+        color256_alpha_blend(base_color, base_right, right_mask, mask_low16, mask_high16, mask_add, mask_full_alpha));
+
+      dst = dst + ld;
+    }
   }
 
   for (; row < rows - 1; row++) {
     Color256 circle_left = color256_load(renderer->circle_mask + (16 - (rows - row)) * 4 * UI_UNIT_SIZE + 0);
     Color256 base_left   = color256_load(dst + 0 * 32);
 
-    color256_store(dst + 0 * 32, color256_alpha_blend(white, base_left, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
+    color256_store(
+      dst + 0 * 32, color256_alpha_blend(base_color, base_left, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
 
     Color256 circle_right = color256_load(renderer->circle_mask + (16 - (rows - row)) * 4 * UI_UNIT_SIZE + 32);
     Color256 base_right   = color256_load(dst + (cols - 1) * 32);
 
     color256_store(
-      dst + (cols - 1) * 32, color256_alpha_blend(white, base_right, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
+      dst + (cols - 1) * 32,
+      color256_alpha_blend(base_color, base_right, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
 
     dst = dst + ld;
   }
@@ -161,11 +175,11 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
     Color256 circle_left = color256_load(renderer->circle_mask + 15 * 4 * UI_UNIT_SIZE + 0);
     Color256 base        = color256_load(dst + 0 * 32);
 
-    color256_store(dst + 0 * 32, color256_alpha_blend(white, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
+    color256_store(dst + 0 * 32, color256_alpha_blend(base_color, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
   }
 
   for (uint32_t col = 1; col < cols - 1; col++) {
-    color256_store(dst + col * 32, white);
+    color256_store(dst + col * 32, base_color);
   }
 
   {
@@ -173,7 +187,7 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
     Color256 base         = color256_load(dst + (cols - 1) * 32);
 
     color256_store(
-      dst + (cols - 1) * 32, color256_alpha_blend(white, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
+      dst + (cols - 1) * 32, color256_alpha_blend(base_color, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
   }
 }
 
