@@ -104,6 +104,14 @@ inline Color256 color256_or(const Color256 a, const Color256 b) {
 #endif
 }
 
+inline Color256 color256_avg8(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_avg_epu8(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
 #define color256_shift_right(__a, __count) ((Color256){._immi = _mm256_srli_epi32(__a._immi, __count)})
 #endif

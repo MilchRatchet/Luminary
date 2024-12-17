@@ -63,4 +63,6 @@ void window_caption_controls_create(Window** window) {
   (*window)->is_visible    = true;
   (*window)->background    = false;
   (*window)->action_func   = _window_caption_controls_action;
+
+  window_allocate_memory(*window);
 }

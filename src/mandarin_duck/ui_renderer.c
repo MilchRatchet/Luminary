@@ -17,6 +17,10 @@ inline float _ui_renderer_rand(const uint32_t offset, const uint32_t phi) {
   return (*(float*) &i) - 1.0f;
 }
 
+////////////////////////////////////////////////////////////////////
+// Mask creation
+////////////////////////////////////////////////////////////////////
+
 static void _ui_renderer_create_disk_mask(UIRenderer* renderer) {
   // TODO: This is just a test, do this properly later.
   for (uint32_t y = 0; y < UI_UNIT_SIZE; y++) {
@@ -67,16 +71,11 @@ static void _ui_renderer_create_circle_mask(UIRenderer* renderer) {
   }
 }
 
-void ui_renderer_create(UIRenderer** renderer) {
-  MD_CHECK_NULL_ARGUMENT(renderer);
+////////////////////////////////////////////////////////////////////
+// Render functions
+////////////////////////////////////////////////////////////////////
 
-  LUM_FAILURE_HANDLE(host_malloc(renderer, sizeof(UIRenderer)));
-
-  LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->disk_mask, sizeof(uint32_t) * UI_UNIT_SIZE * UI_UNIT_SIZE));
-  LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->circle_mask, sizeof(uint32_t) * UI_UNIT_SIZE * UI_UNIT_SIZE));
-
-  _ui_renderer_create_disk_mask(*renderer);
-  _ui_renderer_create_circle_mask(*renderer);
+static void _ui_renderer_create_window_background(UIRenderer* renderer, Window* window, uint8_t* src, uint32_t ld) {
 }
 
 static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uint8_t* dst, uint32_t ld) {
@@ -89,15 +88,19 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
 
   uint32_t row = 0;
 
-  Color256 base_color      = color256_set_1(0xFFD4AF37);
-  Color256 mask_low16      = color256_set_1(0x00FF00FF);
-  Color256 mask_high16     = color256_set_1(0xFF00FF00);
-  Color256 mask_add        = color256_set_1(0x00800080);
-  Color256 mask_full_alpha = color256_set_1(0x000000FF);
+  Color256 base_color       = color256_set_1(0xFFD4AF37);
+  Color256 background_color = color256_set_1(0xFF000000);
+  Color256 mask_low16       = color256_set_1(0x00FF00FF);
+  Color256 mask_high16      = color256_set_1(0xFF00FF00);
+  Color256 mask_add         = color256_set_1(0x00800080);
+  Color256 mask_full_alpha  = color256_set_1(0x000000FF);
 
   {
     Color256 circle_left = color256_load(renderer->circle_mask + row * 4 * UI_UNIT_SIZE + 0);
+    Color256 disk_left   = color256_load(renderer->disk_mask + row * 4 * UI_UNIT_SIZE + 0);
     Color256 base        = color256_load(dst + 0 * 32);
+
+    base = color256_alpha_blend(color256_avg8(base, background_color), base, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
 
     color256_store(dst + 0 * 32, color256_alpha_blend(base_color, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
   }
@@ -108,7 +111,11 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
 
   {
     Color256 circle_right = color256_load(renderer->circle_mask + row * 4 * UI_UNIT_SIZE + 32);
+    Color256 disk_right   = color256_load(renderer->disk_mask + row * 4 * UI_UNIT_SIZE + 32);
     Color256 base         = color256_load(dst + (cols - 1) * 32);
+
+    base =
+      color256_alpha_blend(color256_avg8(base, background_color), base, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
 
     color256_store(
       dst + (cols - 1) * 32, color256_alpha_blend(base_color, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
@@ -119,13 +126,28 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
 
   for (; row < 8; row++) {
     Color256 circle_left = color256_load(renderer->circle_mask + row * 4 * UI_UNIT_SIZE + 0);
+    Color256 disk_left   = color256_load(renderer->disk_mask + row * 4 * UI_UNIT_SIZE + 0);
     Color256 base_left   = color256_load(dst + 0 * 32);
+
+    base_left = color256_alpha_blend(
+      color256_avg8(base_left, background_color), base_left, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
 
     color256_store(
       dst + 0 * 32, color256_alpha_blend(base_color, base_left, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
 
+    for (uint32_t col = 1; col < cols - 1; col++) {
+      Color256 base = color256_load(dst + col * 32);
+      base          = color256_avg8(base, background_color);
+
+      color256_store(dst + col * 32, base);
+    }
+
     Color256 circle_right = color256_load(renderer->circle_mask + row * 4 * UI_UNIT_SIZE + 32);
+    Color256 disk_right   = color256_load(renderer->disk_mask + row * 4 * UI_UNIT_SIZE + 32);
     Color256 base_right   = color256_load(dst + (cols - 1) * 32);
+
+    base_right = color256_alpha_blend(
+      color256_avg8(base_right, background_color), base_right, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
 
     color256_store(
       dst + (cols - 1) * 32,
@@ -140,11 +162,20 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
 
     for (; row < rows - 8; row++) {
       Color256 base_left = color256_load(dst + 0 * 32);
+      base_left          = color256_avg8(base_left, background_color);
 
       color256_store(
         dst + 0 * 32, color256_alpha_blend(base_color, base_left, left_mask, mask_low16, mask_high16, mask_add, mask_full_alpha));
 
+      for (uint32_t col = 1; col < cols - 1; col++) {
+        Color256 base = color256_load(dst + col * 32);
+        base          = color256_avg8(base, background_color);
+
+        color256_store(dst + col * 32, base);
+      }
+
       Color256 base_right = color256_load(dst + (cols - 1) * 32);
+      base_right          = color256_avg8(base_right, background_color);
 
       color256_store(
         dst + (cols - 1) * 32,
@@ -156,13 +187,28 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
 
   for (; row < rows - 1; row++) {
     Color256 circle_left = color256_load(renderer->circle_mask + (16 - (rows - row)) * 4 * UI_UNIT_SIZE + 0);
+    Color256 disk_left   = color256_load(renderer->disk_mask + (16 - (rows - row)) * 4 * UI_UNIT_SIZE + 0);
     Color256 base_left   = color256_load(dst + 0 * 32);
+
+    base_left = color256_alpha_blend(
+      color256_avg8(base_left, background_color), base_left, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
 
     color256_store(
       dst + 0 * 32, color256_alpha_blend(base_color, base_left, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
 
+    for (uint32_t col = 1; col < cols - 1; col++) {
+      Color256 base = color256_load(dst + col * 32);
+      base          = color256_avg8(base, background_color);
+
+      color256_store(dst + col * 32, base);
+    }
+
     Color256 circle_right = color256_load(renderer->circle_mask + (16 - (rows - row)) * 4 * UI_UNIT_SIZE + 32);
+    Color256 disk_right   = color256_load(renderer->disk_mask + (16 - (rows - row)) * 4 * UI_UNIT_SIZE + 32);
     Color256 base_right   = color256_load(dst + (cols - 1) * 32);
+
+    base_right = color256_alpha_blend(
+      color256_avg8(base_right, background_color), base_right, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
 
     color256_store(
       dst + (cols - 1) * 32,
@@ -173,7 +219,10 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
 
   {
     Color256 circle_left = color256_load(renderer->circle_mask + 15 * 4 * UI_UNIT_SIZE + 0);
+    Color256 disk_left   = color256_load(renderer->disk_mask + 15 * 4 * UI_UNIT_SIZE + 0);
     Color256 base        = color256_load(dst + 0 * 32);
+
+    base = color256_alpha_blend(color256_avg8(base, background_color), base, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
 
     color256_store(dst + 0 * 32, color256_alpha_blend(base_color, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha));
   }
@@ -184,15 +233,42 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
 
   {
     Color256 circle_right = color256_load(renderer->circle_mask + 15 * 4 * UI_UNIT_SIZE + 32);
+    Color256 disk_right   = color256_load(renderer->disk_mask + 15 * 4 * UI_UNIT_SIZE + 32);
     Color256 base         = color256_load(dst + (cols - 1) * 32);
+
+    base =
+      color256_alpha_blend(color256_avg8(base, background_color), base, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
 
     color256_store(
       dst + (cols - 1) * 32, color256_alpha_blend(base_color, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha));
   }
 }
 
+////////////////////////////////////////////////////////////////////
+// API functions
+////////////////////////////////////////////////////////////////////
+
+void ui_renderer_create(UIRenderer** renderer) {
+  MD_CHECK_NULL_ARGUMENT(renderer);
+
+  LUM_FAILURE_HANDLE(host_malloc(renderer, sizeof(UIRenderer)));
+
+  LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->disk_mask, sizeof(uint32_t) * UI_UNIT_SIZE * UI_UNIT_SIZE));
+  LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->circle_mask, sizeof(uint32_t) * UI_UNIT_SIZE * UI_UNIT_SIZE));
+
+  _ui_renderer_create_disk_mask(*renderer);
+  _ui_renderer_create_circle_mask(*renderer);
+}
+
+void ui_renderer_create_window_background(UIRenderer* renderer, Display* display, Window* window) {
+  MD_CHECK_NULL_ARGUMENT(renderer);
+  MD_CHECK_NULL_ARGUMENT(display);
+  MD_CHECK_NULL_ARGUMENT(window);
+}
+
 void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* window) {
   MD_CHECK_NULL_ARGUMENT(renderer);
+  MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(window);
 
   _ui_renderer_render_window(renderer, window, display->buffer, display->ld);

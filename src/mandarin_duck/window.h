@@ -28,6 +28,7 @@ struct WindowContext {
 } typedef WindowContext;
 
 #define WINDOW_MAX_CONTEXT_DEPTH 8
+#define WINDOW_MAX_BLUR_MIP_COUNT 4
 
 /*
  * The Window is passed to each element so an element can resize itself based on window orientation (vertical/horizontal)
@@ -48,9 +49,12 @@ struct Window {
   uint32_t context_stack_ptr;
   WindowContext context_stack[WINDOW_MAX_CONTEXT_DEPTH];
   Element* element_queue;
+  uint8_t* background_blur_buffers[WINDOW_MAX_BLUR_MIP_COUNT];
+  uint32_t background_blur_mip_count;
 } typedef Window;
 
 void window_create(Window** window);
+void window_allocate_memory(Window* window);
 
 bool window_is_mouse_hover(Window* window, Display* display);
 bool window_handle_input(Window* window, Display* display, LuminaryHost* host);

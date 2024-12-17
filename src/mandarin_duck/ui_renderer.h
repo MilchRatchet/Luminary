@@ -5,6 +5,7 @@
 #include "window.h"
 
 #define UI_UNIT_SIZE 16
+#define UI_RENDERER_STRIDE 8
 
 struct UIRenderer {
   uint8_t* disk_mask;
@@ -12,6 +13,7 @@ struct UIRenderer {
 } typedef UIRenderer;
 
 void ui_renderer_create(UIRenderer** renderer);
+void ui_renderer_create_window_background(UIRenderer* renderer, Display* display, Window* window);
 void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* window);
 void ui_renderer_destroy(UIRenderer** renderer);
 

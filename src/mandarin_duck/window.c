@@ -13,6 +13,44 @@ void window_create(Window** window) {
   LUM_FAILURE_HANDLE(array_create(&(*window)->element_queue, sizeof(Element), 128));
 }
 
+static uint32_t _window_blur_mip_count(const uint32_t width, const uint32_t height) {
+  // TODO: The mip count must take into account that height > 1 and that width stays a multiple of UI_RENDERER_STRIDE.
+  uint32_t min_dim = min(width, height);
+
+  if (min_dim == 0)
+    return 0;
+
+  uint32_t i = 0;
+
+  while (min_dim >= UI_RENDERER_STRIDE) {
+    i++;
+    min_dim = min_dim >> 1;
+  }
+
+  return min(i, WINDOW_MAX_BLUR_MIP_COUNT);
+}
+
+void window_allocate_memory(Window* window) {
+  MD_CHECK_NULL_ARGUMENT(window);
+
+  if (!window->background)
+    return;
+
+  const uint32_t mip_count = _window_blur_mip_count(window->width, window->height);
+
+  uint32_t width  = window->width;
+  uint32_t height = window->height;
+
+  for (uint32_t mip_id = 0; mip_id < mip_count; mip_id++) {
+    LUM_FAILURE_HANDLE(host_malloc(&window->background_blur_buffers[mip_id], width * height * 4));
+
+    width  = width >> 1;
+    height = height >> 1;
+  }
+
+  window->background_blur_mip_count = mip_count;
+}
+
 static bool window_is_mouse_hover(Window* window, Display* display) {
   const MouseState* mouse_state = display->mouse_state;
 
@@ -71,6 +109,7 @@ void window_render(Window* window, Display* display) {
   MD_CHECK_NULL_ARGUMENT(display);
 
   if (window->background) {
+    ui_renderer_create_window_background(display->ui_renderer, display, window);
     ui_renderer_render_window(display->ui_renderer, display, window);
   }
 
@@ -87,6 +126,10 @@ void window_render(Window* window, Display* display) {
 void window_destroy(Window** window) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(*window);
+
+  for (uint32_t mip_id = 0; mip_id < (*window)->background_blur_mip_count; mip_id++) {
+    LUM_FAILURE_HANDLE(host_free(&(*window)->background_blur_buffers[mip_id]));
+  }
 
   LUM_FAILURE_HANDLE(array_destroy(&(*window)->element_queue));
 

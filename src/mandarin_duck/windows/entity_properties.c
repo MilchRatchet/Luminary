@@ -22,4 +22,6 @@ void window_entity_properties_create(Window** window) {
   (*window)->is_visible    = true;
   (*window)->background    = true;
   (*window)->action_func   = _window_entity_properties_action;
+
+  window_allocate_memory(*window);
 }
