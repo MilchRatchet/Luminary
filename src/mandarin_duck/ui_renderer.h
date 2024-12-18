@@ -6,6 +6,7 @@
 
 #define UI_UNIT_SIZE 16
 #define UI_RENDERER_STRIDE 8
+#define UI_RENDERER_STRIDE_BYTES (UI_RENDERER_STRIDE * 4)
 
 struct UIRenderer {
   uint8_t* disk_mask;

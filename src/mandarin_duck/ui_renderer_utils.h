@@ -18,6 +18,17 @@ struct Color256 {
 } typedef Color256;
 _STATIC_ASSERT(sizeof(Color256) == 32);
 
+struct Color128 {
+  union {
+    uint32_t pixel[4];
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+    __m128 _imm;
+    __m128i _immi;
+#endif
+  };
+} typedef Color128;
+_STATIC_ASSERT(sizeof(Color128) == 16);
+
 ////////////////////////////////////////////////////////////////////
 // Intrinsics
 ////////////////////////////////////////////////////////////////////
@@ -80,6 +91,14 @@ inline Color256 color256_mul32(const Color256 a, const Color256 b) {
 #endif
 }
 
+inline Color256 color256_mul16(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_mullo_epi16(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
 inline Color256 color256_add8(const Color256 a, const Color256 b) {
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
   return (Color256){._immi = _mm256_add_epi8(a._immi, b._immi)};
@@ -112,9 +131,43 @@ inline Color256 color256_avg8(const Color256 a, const Color256 b) {
 #endif
 }
 
+inline Color256 color256_maddubs16(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_maddubs_epi16(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
+inline Color256 color256_packus16(const Color256 a, const Color256 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_packus_epi16(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
 #define color256_shift_right(__a, __count) ((Color256){._immi = _mm256_srli_epi32(__a._immi, __count)})
+#define color256_shift_right16(__a, __count) ((Color256){._immi = _mm256_srli_epi16(__a._immi, __count)})
+#define color256_shift_left(__a, __count) ((Color256){._immi = _mm256_slli_epi32(__a._immi, __count)})
 #endif
+
+inline Color128 color128_load(const uint8_t* ptr) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color128){._immi = _mm_loadu_si128((__m128i*) ptr)};
+#else
+  // TODO
+#endif
+}
+
+inline Color256 color128_extend(const Color128 a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_cvtepi8_epi16(a._immi)};
+#else
+  // TODO
+#endif
+}
 
 ////////////////////////////////////////////////////////////////////
 // Macro functions

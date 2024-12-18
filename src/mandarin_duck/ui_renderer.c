@@ -75,6 +75,69 @@ static void _ui_renderer_create_circle_mask(UIRenderer* renderer) {
 // Render functions
 ////////////////////////////////////////////////////////////////////
 
+static void _ui_renderer_upscale(const uint8_t* src, uint32_t width, uint32_t height, uint32_t src_ld, uint8_t* dst, uint32_t dst_ld) {
+  const uint32_t cols = width >> 3;
+  const uint32_t rows = height;
+
+  const uint8_t* src_ptr = src;
+  uint8_t* dst_ptr       = dst;
+
+  Color256 mask_low  = color256_set_1(0x00FF00FF);
+  Color256 mask_high = color256_set_1(0xFF00FF00);
+
+  for (uint32_t row = 0; row < rows; row++) {
+    for (uint32_t col = 0; col < cols; col++) {
+      Color128 base = color128_load(src_ptr + col * (UI_RENDERER_STRIDE_BYTES >> 1));
+
+      Color256 color = color128_extend(base);
+      color          = color256_and(color, mask_low);
+      color          = color256_or(color256_shift_left(color, 8), color);
+
+      color256_store(dst_ptr + 0 + col * UI_RENDERER_STRIDE_BYTES, color);
+      color256_store(dst_ptr + dst_ld + col * UI_RENDERER_STRIDE_BYTES, color);
+    }
+
+    src_ptr = src_ptr + src_ld;
+    dst_ptr = dst_ptr + 2 * dst_ld;
+  }
+}
+
+static void _ui_renderer_downscale(const uint8_t* src, uint32_t width, uint32_t height, uint32_t src_ld, uint8_t* dst, uint32_t dst_ld) {
+  const uint32_t cols = width >> 4;
+  const uint32_t rows = height >> 1;
+
+  const uint8_t* src_ptr = src;
+  uint8_t* dst_ptr       = dst;
+
+  Color256 one = color256_set_1(0x01010101);
+
+  for (uint32_t row = 0; row < rows; row++) {
+    for (uint32_t col = 0; col < cols; col++) {
+      Color256 base00 = color256_load(src_ptr + 0 + col * 2 * UI_RENDERER_STRIDE_BYTES + 0);
+      Color256 base01 = color256_load(src_ptr + 0 + col * 2 * UI_RENDERER_STRIDE_BYTES + UI_RENDERER_STRIDE_BYTES);
+
+      Color256 base10 = color256_load(src_ptr + src_ld + col * 2 * UI_RENDERER_STRIDE_BYTES + 0);
+      Color256 base11 = color256_load(src_ptr + src_ld + col * 2 * UI_RENDERER_STRIDE_BYTES + UI_RENDERER_STRIDE_BYTES);
+
+      Color256 left  = color256_avg8(base00, base10);
+      Color256 right = color256_avg8(base01, base11);
+
+      Color256 w0 = color256_maddubs16(left, one);
+      Color256 w1 = color256_maddubs16(right, one);
+
+      w0 = color256_shift_right16(w0, 1);
+      w1 = color256_shift_right16(w1, 1);
+
+      w0 = color256_packus16(w0, w1);
+
+      color256_store(dst_ptr + col * UI_RENDERER_STRIDE_BYTES, w0);
+    }
+
+    src_ptr = src_ptr + 2 * src_ld;
+    dst_ptr = dst_ptr + dst_ld;
+  }
+}
+
 static void _ui_renderer_create_window_background(UIRenderer* renderer, Window* window, uint8_t* src, uint32_t ld) {
 }
 
