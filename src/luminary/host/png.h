@@ -36,7 +36,7 @@ enum PNGFilterFunction {
   PNG_FILTER_PAETH   = 4
 } typedef PNGFilterFunction;
 
-LuminaryResult png_store_XRGB8(const char* filename, const XRGB8* image, const int width, const int height);
+LuminaryResult png_store_ARGB8(const char* filename, const ARGB8* image, const int width, const int height);
 LuminaryResult png_store(
   const char* filename, const uint8_t* image, const uint32_t image_length, const uint32_t width, const uint32_t height,
   const PNGColortype color_type, const PNGBitdepth bit_depth);

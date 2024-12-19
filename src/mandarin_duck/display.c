@@ -84,6 +84,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, rect.w);
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, rect.h);
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, 1);
+  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, 1);
 
   display->sdl_window = SDL_CreateWindowWithProperties(sdl_properties);
 
@@ -92,6 +93,8 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   if (!display->sdl_window) {
     crash_message("Failed to create SDL_Window.");
   }
+
+  SDL_SetWindowSurfaceVSync(display->sdl_window, SDL_WINDOW_SURFACE_VSYNC_ADAPTIVE);
 
   _display_handle_resize(display);
 

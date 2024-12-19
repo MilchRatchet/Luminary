@@ -186,7 +186,7 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width,
       __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].data));
     }
 
-    __FAILURE_HANDLE_CRITICAL(host_malloc(&output->objects[selected_handle].data, sizeof(XRGB8) * width * height));
+    __FAILURE_HANDLE_CRITICAL(host_malloc(&output->objects[selected_handle].data, sizeof(ARGB8) * width * height));
   }
 
   selected_output->populated       = false;

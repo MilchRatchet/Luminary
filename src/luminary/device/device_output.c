@@ -25,14 +25,14 @@ LuminaryResult device_output_set_size(DeviceOutput* output, uint32_t width, uint
         __FAILURE_HANDLE(device_free_staging(&output->buffers[buffer_id]));
       }
 
-      __FAILURE_HANDLE(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(XRGB8), false));
+      __FAILURE_HANDLE(device_malloc_staging(&output->buffers[buffer_id], width * height * sizeof(ARGB8), false));
     }
 
     if (output->device_buffer) {
       __FAILURE_HANDLE(device_free(&output->device_buffer));
     }
 
-    __FAILURE_HANDLE(device_malloc(&output->device_buffer, width * height * sizeof(XRGB8)));
+    __FAILURE_HANDLE(device_malloc(&output->device_buffer, width * height * sizeof(ARGB8)));
   }
 
   return LUMINARY_SUCCESS;
@@ -70,17 +70,17 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
   __FAILURE_HANDLE(kernel_execute_with_args(
     device->cuda_kernels[CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE], (void*) &generate_final_image_args, device->stream_main));
 
-  KernelArgsConvertRGBFToXRGB8 args;
+  KernelArgsConvertRGBFToARGB8 args;
   args.dst    = DEVICE_PTR(output->device_buffer);
   args.width  = output->width;
   args.height = output->height;
   args.filter = LUMINARY_FILTER_NONE;  // TODO: Pass the actual filter to here.
 
   __FAILURE_HANDLE(
-    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_XRGB8], (void*) &args, device->stream_main));
+    kernel_execute_with_args(device->cuda_kernels[CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_ARGB8], (void*) &args, device->stream_main));
 
   __FAILURE_HANDLE(device_download(
-    output->buffers[output->buffer_index], output->device_buffer, 0, output->width * output->height * sizeof(XRGB8), device->stream_main));
+    output->buffers[output->buffer_index], output->device_buffer, 0, output->width * output->height * sizeof(ARGB8), device->stream_main));
 
   CUDA_FAILURE_HANDLE(cuEventRecord(device->event_queue_output, device->stream_main));
 

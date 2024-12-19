@@ -13,7 +13,7 @@ extern "C" {
 #define QOI_COLORTYPE_TRUECOLOR 3
 #define QOI_COLORTYPE_TRUECOLOR_ALPHA 4
 
-LuminaryResult store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, const int height);
+LuminaryResult store_ARGB8_qoi(const char* filename, const ARGB8* image, const int width, const int height);
 LuminaryResult store_as_qoi(
   const char* filename, const uint8_t* image, const uint32_t width, const uint32_t height, const uint8_t color_type);
 LuminaryResult qoi_encode_RGBA8(const Texture* tex, int* encoded_size, void** data);

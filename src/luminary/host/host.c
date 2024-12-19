@@ -159,7 +159,7 @@ static LuminaryResult _host_copy_output_queue_work(Host* host, OutputCopyHandle*
   void* dst;
   __FAILURE_HANDLE(output_handler_get_buffer(host->output_handler, handle, &dst));
 
-  memcpy(dst, args->src, args->width * args->height * sizeof(XRGB8));
+  memcpy(dst, args->src, args->width * args->height * sizeof(ARGB8));
 
   __FAILURE_HANDLE(output_handler_release_new(host->output_handler, handle));
 

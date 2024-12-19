@@ -51,11 +51,11 @@ struct KernelArgsGenerateFinalImage {
   AGXCustomParams agx_params;
 } typedef KernelArgsGenerateFinalImage;
 
-struct KernelArgsConvertRGBFToXRGB8 {
-  XRGB8* dst;
+struct KernelArgsConvertRGBFToARGB8 {
+  ARGB8* dst;
   uint32_t width;
   uint32_t height;
   LuminaryFilter filter;
-} typedef KernelArgsConvertRGBFToXRGB8;
+} typedef KernelArgsConvertRGBFToARGB8;
 
 #endif /* LUMINARY_KERNEL_ARGS_H */

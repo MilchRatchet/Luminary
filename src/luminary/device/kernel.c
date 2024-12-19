@@ -40,7 +40,7 @@ static const CUDAKernelConfig cuda_kernel_configs[CUDA_KERNEL_TYPE_COUNT] = {
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION]        = {.name = "temporal_accumulation", .param_size = 0},
   [CUDA_KERNEL_TYPE_TEMPORAL_ACCUMULATION_AOV]    = {.name = "temporal_accumulation_aov", .param_size = 0},
   [CUDA_KERNEL_TYPE_GENERATE_FINAL_IMAGE]         = {.name = "generate_final_image", .param_size = sizeof(KernelArgsGenerateFinalImage)},
-  [CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_XRGB8]        = {.name = "convert_RGBF_to_XRGB8", .param_size = sizeof(KernelArgsConvertRGBFToXRGB8)},
+  [CUDA_KERNEL_TYPE_CONVERT_RGBF_TO_ARGB8]        = {.name = "convert_RGBF_to_ARGB8", .param_size = sizeof(KernelArgsConvertRGBFToARGB8)},
   [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE] = {.name = "camera_post_image_downsample", .param_size = 0},
   [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_DOWNSAMPLE_THRESHOLD] = {.name = "camera_post_image_downsample_threshold", .param_size = 0},
   [CUDA_KERNEL_TYPE_CAMERA_POST_IMAGE_UPSAMPLE]             = {.name = "camera_post_image_upsample", .param_size = 0},

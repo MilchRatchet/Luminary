@@ -43,7 +43,7 @@ LuminaryResult store_as_qoi(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult store_XRGB8_qoi(const char* filename, const XRGB8* image, const int width, const int height) {
+LuminaryResult store_ARGB8_qoi(const char* filename, const ARGB8* image, const int width, const int height) {
   if (!filename) {
     __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "Filename is NULL.");
   }
@@ -57,7 +57,7 @@ LuminaryResult store_XRGB8_qoi(const char* filename, const XRGB8* image, const i
 
   RGB8* buffer_rgb8 = (RGB8*) buffer;
   for (int i = 0; i < height * width; i++) {
-    XRGB8 a        = image[i];
+    ARGB8 a        = image[i];
     RGB8 result    = {.r = a.r, .g = a.g, .b = a.b};
     buffer_rgb8[i] = result;
   }

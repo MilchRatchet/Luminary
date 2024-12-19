@@ -14,7 +14,7 @@ struct DeviceOutput {
   uint32_t height;
   STAGING void* buffers[DEVICE_OUTPUT_BUFFER_COUNT];
   uint32_t buffer_index;
-  DEVICE XRGB8* device_buffer;
+  DEVICE ARGB8* device_buffer;
   CUhostFn registered_callback_func;
   DeviceOutputCallbackData callback_data[DEVICE_OUTPUT_BUFFER_COUNT];
 } typedef DeviceOutput;

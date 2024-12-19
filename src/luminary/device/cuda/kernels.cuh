@@ -440,7 +440,7 @@ LUMINARY_KERNEL void generate_final_image(const KernelArgsGenerateFinalImage arg
   }
 }
 
-LUMINARY_KERNEL void convert_RGBF_to_XRGB8(const KernelArgsConvertRGBFToXRGB8 args) {
+LUMINARY_KERNEL void convert_RGBF_to_ARGB8(const KernelArgsConvertRGBFToARGB8 args) {
   HANDLE_DEVICE_ABORT();
 
   uint32_t id = THREAD_ID;
@@ -503,11 +503,11 @@ LUMINARY_KERNEL void convert_RGBF_to_XRGB8(const KernelArgsConvertRGBFToXRGB8 ar
     pixel.g = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.g)));
     pixel.b = fmaxf(0.0f, fminf(255.9999f, dither + 255.0f * linearRGB_to_SRGB(pixel.b)));
 
-    XRGB8 converted_pixel;
-    converted_pixel.ignore = 0;
-    converted_pixel.r      = (uint8_t) pixel.r;
-    converted_pixel.g      = (uint8_t) pixel.g;
-    converted_pixel.b      = (uint8_t) pixel.b;
+    ARGB8 converted_pixel;
+    converted_pixel.a = 0xFF;
+    converted_pixel.r = (uint8_t) pixel.r;
+    converted_pixel.g = (uint8_t) pixel.g;
+    converted_pixel.b = (uint8_t) pixel.b;
 
     args.dst[x + y * args.width] = converted_pixel;
 
