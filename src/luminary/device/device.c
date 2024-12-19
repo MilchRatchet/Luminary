@@ -16,6 +16,10 @@
 #include "sky.h"
 #include "toy.h"
 
+#ifdef CUDA_STALL_VALIDATION
+WallTime* __cuda_stall_validation_macro_walltime;
+#endif
+
 static const DeviceConstantMemoryMember device_scene_entity_to_const_memory_member[] = {
   DEVICE_CONSTANT_MEMORY_MEMBER_SETTINGS,   // SCENE_ENTITY_SETTINGS
   DEVICE_CONSTANT_MEMORY_MEMBER_CAMERA,     // SCENE_ENTITY_CAMERA
@@ -94,9 +98,17 @@ void _device_init(void) {
   }
 
   _device_memory_init();
+
+#ifdef CUDA_STALL_VALIDATION
+  wall_time_create(&__cuda_stall_validation_macro_walltime);
+#endif
 }
 
 void _device_shutdown(void) {
+#ifdef CUDA_STALL_VALIDATION
+  wall_time_destroy(&__cuda_stall_validation_macro_walltime);
+#endif
+
   _device_memory_shutdown();
 }
 
