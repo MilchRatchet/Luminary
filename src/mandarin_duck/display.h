@@ -2,10 +2,12 @@
 #define MANDARIN_DUCK_DISPLAY_H
 
 #include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include "camera_handler.h"
 #include "keyboard_state.h"
 #include "mouse_state.h"
+#include "text_renderer.h"
 #include "ui_renderer.h"
 #include "user_interface.h"
 #include "utils.h"
@@ -23,6 +25,7 @@ struct Display {
   CameraHandler* camera_handler;
   UserInterface* ui;
   UIRenderer* ui_renderer;
+  TextRenderer* text_renderer;
 } typedef Display;
 
 void display_create(Display** _display, uint32_t width, uint32_t height);

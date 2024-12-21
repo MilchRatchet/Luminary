@@ -49,6 +49,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
 
   if (__num_displays == 0) {
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS);
+    TTF_Init();
   }
 
   __num_displays++;
@@ -83,8 +84,8 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_Y_NUMBER, SDL_WINDOWPOS_CENTERED);
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, rect.w);
   SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, rect.h);
-  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, 1);
-  SDL_SetNumberProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, 1);
+  SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_BORDERLESS_BOOLEAN, true);
+  SDL_SetBooleanProperty(sdl_properties, SDL_PROP_WINDOW_CREATE_TRANSPARENT_BOOLEAN, true);
 
   display->sdl_window = SDL_CreateWindowWithProperties(sdl_properties);
 
@@ -103,6 +104,7 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   camera_handler_create(&display->camera_handler);
   user_interface_create(&display->ui);
   ui_renderer_create(&display->ui_renderer);
+  text_renderer_create(&display->text_renderer);
 
   _display_set_hittest(display, display->show_ui);
 
@@ -262,6 +264,7 @@ void display_destroy(Display** display) {
   camera_handler_destroy(&(*display)->camera_handler);
   user_interface_destroy(&(*display)->ui);
   ui_renderer_destroy(&(*display)->ui_renderer);
+  text_renderer_destroy(&(*display)->text_renderer);
 
   LUM_FAILURE_HANDLE(host_free(display));
 
@@ -269,5 +272,6 @@ void display_destroy(Display** display) {
 
   if (__num_displays == 0) {
     SDL_Quit();
+    TTF_Quit();
   }
 }
