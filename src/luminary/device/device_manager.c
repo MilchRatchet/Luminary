@@ -361,6 +361,33 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   return LUMINARY_SUCCESS;
 }
 
+struct DeviceManagerSetOutputProperties {
+  uint32_t width;
+  uint32_t height;
+} typedef DeviceManagerSetOutputProperties;
+
+static LuminaryResult _device_manager_set_output_properties_clear_work(
+  DeviceManager* device_manager, DeviceManagerSetOutputProperties* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerSetOutputProperties)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_manager_set_output_properties_queue_work(
+  DeviceManager* device_manager, DeviceManagerSetOutputProperties* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  Device* device = device_manager->devices[device_manager->main_device_index];
+
+  __FAILURE_HANDLE(device_update_output_properties(device, args->width, args->height));
+
+  return LUMINARY_SUCCESS;
+}
+
 struct DeviceManagerAddMeshesArgs {
   const Mesh** meshes;
   uint32_t num_meshes;
@@ -728,6 +755,28 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
   entry.clear_func        = (QueueEntryFunction) _device_manager_handle_scene_updates_clear_queue_work;
   entry.args              = args;
   entry.remove_duplicates = true;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, uint32_t width, uint32_t height) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  DeviceManagerSetOutputProperties* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerSetOutputProperties), (void**) &args));
+
+  args->width  = width;
+  args->height = height;
+
+  QueueEntry entry;
+
+  entry.name              = "Set Output Properties";
+  entry.function          = (QueueEntryFunction) _device_manager_set_output_properties_queue_work;
+  entry.clear_func        = (QueueEntryFunction) _device_manager_set_output_properties_clear_work;
+  entry.args              = args;
+  entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
 

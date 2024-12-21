@@ -129,6 +129,7 @@ LuminaryResult device_setup_undersampling(Device* device, uint32_t undersampling
 LuminaryResult device_update_sample_count(Device* device, SampleCountSlice* sample_count);
 LuminaryResult device_register_callbacks(
   Device* device, CUhostFn render_callback_func, CUhostFn output_callback_func, DeviceCommonCallbackData callback_data);
+LuminaryResult device_update_output_properties(Device* device, uint32_t width, uint32_t height);
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args);
 LuminaryResult device_continue_render(Device* device, SampleCountSlice* sample_count, DeviceRenderCallbackData* callback_data);
 LuminaryResult device_set_abort(Device* device);

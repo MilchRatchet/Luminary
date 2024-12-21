@@ -1263,6 +1263,18 @@ LuminaryResult device_register_callbacks(
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_update_output_properties(Device* device, uint32_t width, uint32_t height) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_output_set_size(device->output, width, height));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(device);
 
@@ -1270,8 +1282,6 @@ LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args
 
   __FAILURE_HANDLE(device_staging_manager_execute(device->staging_manager));
 
-  __FAILURE_HANDLE(
-    device_output_set_size(device->output, device->constant_memory->settings.width, device->constant_memory->settings.height));
   __FAILURE_HANDLE(device_sync_constant_memory(device));
   __FAILURE_HANDLE(device_renderer_build_kernel_queue(device->renderer, args));
   __FAILURE_HANDLE(device_renderer_init_new_render(device->renderer));

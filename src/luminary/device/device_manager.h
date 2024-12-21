@@ -47,6 +47,7 @@ struct DeviceManager {
 
 LuminaryResult device_manager_create(DeviceManager** device_manager, Host* host);
 LuminaryResult device_manager_update_scene(DeviceManager* device_manager);
+LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, uint32_t width, uint32_t height);
 LuminaryResult device_manager_add_meshes(DeviceManager* device_manager, const Mesh** meshes, uint32_t num_meshes);
 LuminaryResult device_manager_add_textures(DeviceManager* device_manager, const Texture** textures, uint32_t num_textures);
 LuminaryResult device_manager_start_queue(DeviceManager* device_manager);
