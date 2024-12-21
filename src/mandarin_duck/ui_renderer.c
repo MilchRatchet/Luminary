@@ -76,25 +76,28 @@ static void _ui_renderer_create_circle_mask(UIRenderer* renderer) {
 ////////////////////////////////////////////////////////////////////
 
 static void _ui_renderer_upscale(const uint8_t* src, uint32_t width, uint32_t height, uint32_t src_ld, uint8_t* dst, uint32_t dst_ld) {
-  const uint32_t cols = width >> 3;
+  const uint32_t cols = width >> (UI_RENDERER_STRIDE_LOG - 1);
   const uint32_t rows = height;
 
   const uint8_t* src_ptr = src;
   uint8_t* dst_ptr       = dst;
 
-  Color256 mask_low  = color256_set_1(0x00FF00FF);
-  Color256 mask_high = color256_set_1(0xFF00FF00);
-
   for (uint32_t row = 0; row < rows; row++) {
     for (uint32_t col = 0; col < cols; col++) {
       Color128 base = color128_load(src_ptr + col * (UI_RENDERER_STRIDE_BYTES >> 1));
 
-      Color256 color = color128_extend(base);
-      color          = color256_and(color, mask_low);
-      color          = color256_or(color256_shift_left(color, 8), color);
+      Color256 upper = color256_load(dst_ptr + 0 + col * UI_RENDERER_STRIDE_BYTES);
+      Color256 lower = color256_load(dst_ptr + dst_ld + col * UI_RENDERER_STRIDE_BYTES);
 
-      color256_store(dst_ptr + 0 + col * UI_RENDERER_STRIDE_BYTES, color);
-      color256_store(dst_ptr + dst_ld + col * UI_RENDERER_STRIDE_BYTES, color);
+      Color256 color = color128_extend(base);
+      color          = color256_shift_left64(color, 32);
+      color          = color256_or(color, color256_shift_right64(color, 32));
+
+      upper = color256_avg8(upper, color);
+      lower = color256_avg8(lower, color);
+
+      color256_store(dst_ptr + 0 + col * UI_RENDERER_STRIDE_BYTES, upper);
+      color256_store(dst_ptr + dst_ld + col * UI_RENDERER_STRIDE_BYTES, lower);
     }
 
     src_ptr = src_ptr + src_ld;
@@ -103,13 +106,15 @@ static void _ui_renderer_upscale(const uint8_t* src, uint32_t width, uint32_t he
 }
 
 static void _ui_renderer_downscale(const uint8_t* src, uint32_t width, uint32_t height, uint32_t src_ld, uint8_t* dst, uint32_t dst_ld) {
-  const uint32_t cols = width >> 4;
+  const uint32_t cols = width >> (UI_RENDERER_STRIDE_LOG + 1);
   const uint32_t rows = height >> 1;
 
   const uint8_t* src_ptr = src;
   uint8_t* dst_ptr       = dst;
 
   Color256 one = color256_set_1(0x01010101);
+
+  Color256 shuffle_mask = color256_set(0x0F0B0E0A, 0x0D090C08, 0x07030602, 0x05010400, 0x0F0B0E0A, 0x0D090C08, 0x07030602, 0x05010400);
 
   for (uint32_t row = 0; row < rows; row++) {
     for (uint32_t col = 0; col < cols; col++) {
@@ -122,15 +127,21 @@ static void _ui_renderer_downscale(const uint8_t* src, uint32_t width, uint32_t 
       Color256 left  = color256_avg8(base00, base10);
       Color256 right = color256_avg8(base01, base11);
 
-      Color256 w0 = color256_maddubs16(left, one);
-      Color256 w1 = color256_maddubs16(right, one);
+      left  = color256_shuffle8(left, shuffle_mask);
+      right = color256_shuffle8(right, shuffle_mask);
 
-      w0 = color256_shift_right16(w0, 1);
-      w1 = color256_shift_right16(w1, 1);
+      left  = color256_maddubs16(left, one);
+      right = color256_maddubs16(right, one);
 
-      w0 = color256_packus16(w0, w1);
+      left  = color256_shift_right16(left, 1);
+      right = color256_shift_right16(right, 1);
 
-      color256_store(dst_ptr + col * UI_RENDERER_STRIDE_BYTES, w0);
+      Color256 lower_bits  = color256_permute128(left, right, 0x20);
+      Color256 higher_bits = color256_permute128(left, right, 0x31);
+
+      Color256 result = color256_packus16(lower_bits, higher_bits);
+
+      color256_store(dst_ptr + col * UI_RENDERER_STRIDE_BYTES, result);
     }
 
     src_ptr = src_ptr + 2 * src_ld;
@@ -139,6 +150,42 @@ static void _ui_renderer_downscale(const uint8_t* src, uint32_t width, uint32_t 
 }
 
 static void _ui_renderer_create_window_background(UIRenderer* renderer, Window* window, uint8_t* src, uint32_t ld) {
+  uint8_t* ptr = src + window->y * ld + window->x * 4;
+
+  _ui_renderer_downscale(ptr, window->width, window->height, ld, window->background_blur_buffers[0], window->background_blur_buffers_ld[0]);
+
+  for (uint32_t mip_id = 0; mip_id + 1 < window->background_blur_mip_count; mip_id++) {
+    const uint32_t shift_size = mip_id + 1;
+
+    const uint32_t width  = window->width >> shift_size;
+    const uint32_t height = window->height >> shift_size;
+
+    const uint8_t* src_ptr = window->background_blur_buffers[mip_id];
+    const uint32_t src_ld  = window->background_blur_buffers_ld[mip_id];
+
+    uint8_t* dst_ptr      = window->background_blur_buffers[mip_id + 1];
+    const uint32_t dst_ld = window->background_blur_buffers_ld[mip_id + 1];
+
+    _ui_renderer_downscale(src_ptr, width, height, src_ld, dst_ptr, dst_ld);
+  }
+
+  for (uint32_t mip_id = window->background_blur_mip_count - 1; mip_id > 0; mip_id--) {
+    const uint32_t shift_size = mip_id + 1;
+
+    const uint32_t width  = window->width >> shift_size;
+    const uint32_t height = window->height >> shift_size;
+
+    const uint8_t* src_ptr = window->background_blur_buffers[mip_id];
+    const uint32_t src_ld  = window->background_blur_buffers_ld[mip_id];
+
+    uint8_t* dst_ptr      = window->background_blur_buffers[mip_id - 1];
+    const uint32_t dst_ld = window->background_blur_buffers_ld[mip_id - 1];
+
+    _ui_renderer_upscale(src_ptr, width, height, src_ld, dst_ptr, dst_ld);
+  }
+
+  _ui_renderer_upscale(
+    window->background_blur_buffers[0], window->width >> 1, window->height >> 1, window->background_blur_buffers_ld[0], ptr, ld);
 }
 
 static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uint8_t* dst, uint32_t ld) {
@@ -327,6 +374,8 @@ void ui_renderer_create_window_background(UIRenderer* renderer, Display* display
   MD_CHECK_NULL_ARGUMENT(renderer);
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(window);
+
+  _ui_renderer_create_window_background(renderer, window, display->buffer, display->ld);
 }
 
 void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* window) {

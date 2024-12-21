@@ -19,6 +19,7 @@
 #define LUMINARY_API_UTILS_H
 
 #include <stdbool.h>
+#include <stdint.h>
 
 #define LUMINARY_API
 #define LUMINARY_DEPRECATED
@@ -41,5 +42,12 @@ LUMINARY_API struct LuminaryRGBAF {
   float b;
   float a;
 } typedef LuminaryRGBAF;
+
+LUMINARY_API struct LuminaryARGB8 {
+  uint8_t b;
+  uint8_t g;
+  uint8_t r;
+  uint8_t a;
+} typedef LuminaryARGB8;
 
 #endif /* LUMINARY_API_UTILS_H */

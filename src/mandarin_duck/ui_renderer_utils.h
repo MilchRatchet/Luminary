@@ -9,7 +9,7 @@
 
 struct Color256 {
   union {
-    uint32_t pixel[8];
+    LuminaryARGB8 pixel[8];
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
     __m256 _imm;
     __m256i _immi;
@@ -20,7 +20,7 @@ _STATIC_ASSERT(sizeof(Color256) == 32);
 
 struct Color128 {
   union {
-    uint32_t pixel[4];
+    LuminaryARGB8 pixel[4];
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
     __m128 _imm;
     __m128i _immi;
@@ -36,6 +36,14 @@ _STATIC_ASSERT(sizeof(Color128) == 16);
 inline Color256 color256_set_1(const uint32_t a) {
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
   return (Color256){._immi = _mm256_set1_epi32(a)};
+#else
+  // TODO
+#endif
+}
+
+inline Color256 color256_set_1_64(const uint64_t a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_set1_epi64x(a)};
 #else
   // TODO
 #endif
@@ -150,7 +158,14 @@ inline Color256 color256_packus16(const Color256 a, const Color256 b) {
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
 #define color256_shift_right(__a, __count) ((Color256){._immi = _mm256_srli_epi32(__a._immi, __count)})
 #define color256_shift_right16(__a, __count) ((Color256){._immi = _mm256_srli_epi16(__a._immi, __count)})
+#define color256_shift_right64(__a, __count) ((Color256){._immi = _mm256_srli_epi64(__a._immi, __count)})
 #define color256_shift_left(__a, __count) ((Color256){._immi = _mm256_slli_epi32(__a._immi, __count)})
+#define color256_shift_left64(__a, __count) ((Color256){._immi = _mm256_slli_epi64(__a._immi, __count)})
+
+#define color256_shuffle(__a, __imm) ((Color256){._immi = _mm256_shuffle_epi32(__a._immi, __imm)})
+#define color256_shuffle8(__a, __b) ((Color256){._immi = _mm256_shuffle_epi8(__a._immi, __b._immi)})
+
+#define color256_permute128(__a, __b, __imm) ((Color256){._immi = _mm256_permute2x128_si256(__a._immi, __b._immi, __imm)})
 #endif
 
 inline Color128 color128_load(const uint8_t* ptr) {
@@ -163,7 +178,7 @@ inline Color128 color128_load(const uint8_t* ptr) {
 
 inline Color256 color128_extend(const Color128 a) {
 #ifdef MANDARIN_DUCK_X86_INTRINSICS
-  return (Color256){._immi = _mm256_cvtepi8_epi16(a._immi)};
+  return (Color256){._immi = _mm256_cvtepi32_epi64(a._immi)};
 #else
   // TODO
 #endif

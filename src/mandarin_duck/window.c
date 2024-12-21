@@ -42,10 +42,11 @@ void window_allocate_memory(Window* window) {
   uint32_t height = window->height;
 
   for (uint32_t mip_id = 0; mip_id < mip_count; mip_id++) {
-    LUM_FAILURE_HANDLE(host_malloc(&window->background_blur_buffers[mip_id], width * height * 4));
-
     width  = width >> 1;
     height = height >> 1;
+
+    LUM_FAILURE_HANDLE(host_malloc(&window->background_blur_buffers[mip_id], width * height * 4));
+    window->background_blur_buffers_ld[mip_id] = width * 4;
   }
 
   window->background_blur_mip_count = mip_count;
