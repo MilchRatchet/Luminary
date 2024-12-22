@@ -61,7 +61,7 @@ bool window_is_mouse_hover(Window* window, Display* display);
 bool window_handle_input(Window* window, Display* display, LuminaryHost* host);
 
 void window_margin(Window* window, uint32_t margin);
-void window_push_section(Window* window);
+void window_push_section(Window* window, uint32_t size, uint32_t padding);
 void window_pop_section(Window* window);
 void window_render(Window* window, Display* display);
 

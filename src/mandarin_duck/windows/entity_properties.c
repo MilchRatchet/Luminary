@@ -7,9 +7,19 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
-  element_text(
-    window, display,
-    (ElementTextArgs){.color = 0xFFFFFFFF, .size = (ElementSize){.is_relative = false, .width = 128, .height = 24}, .text = "Camera"});
+  window_push_section(window, 24, 0);
+  {
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .color = 0xFFFFFFFF, .size = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f}, .text = "Camera"});
+
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .color = 0xFFFFFFFF, .size = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f}, .text = "Example"});
+  }
+  window_pop_section(window);
 
   element_text(
     window, display,

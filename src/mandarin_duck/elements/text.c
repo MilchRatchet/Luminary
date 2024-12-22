@@ -9,11 +9,11 @@ static void _element_text_render_func(Element* text, Display* display) {
   SDL_Surface* surface;
   text_renderer_render(display->text_renderer, data->text, &surface);
 
-  if (surface->h > data->size.height) {
+  if (surface->h > (int32_t) text->height) {
     crash_message("Text is taller than the element.");
   }
 
-  const uint32_t padding = (data->size.height - surface->h) >> 1;
+  const uint32_t padding = (text->height - surface->h) >> 1;
 
   SDL_Rect src_rect;
   src_rect.x = 0;

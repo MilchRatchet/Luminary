@@ -102,8 +102,37 @@ void window_margin(Window* window, uint32_t margin) {
   context->fill += margin;
 }
 
-void window_push_section(Window* window);
-void window_pop_section(Window* window);
+void window_push_section(Window* window, uint32_t size, uint32_t padding) {
+  MD_CHECK_NULL_ARGUMENT(window);
+
+  WindowContext* context = window->context_stack + window->context_stack_ptr;
+
+  window->context_stack_ptr++;
+
+  WindowContext* new_context = window->context_stack + window->context_stack_ptr;
+
+  memcpy(new_context, context, sizeof(WindowContext));
+
+  new_context->is_horizontal = !context->is_horizontal;
+  new_context->width         = (new_context->is_horizontal) ? context->width : size;
+  new_context->height        = (new_context->is_horizontal) ? size : context->height;
+  new_context->x             = (context->is_horizontal) ? context->x + context->fill : context->x;
+  new_context->y             = (context->is_horizontal) ? context->y : context->y + context->fill;
+  new_context->padding       = padding;
+  new_context->fill          = 0;
+
+  context->fill += size;
+}
+
+void window_pop_section(Window* window) {
+  MD_CHECK_NULL_ARGUMENT(window);
+
+  if (window->context_stack_ptr == 0) {
+    crash_message("No window context to pop.");
+  }
+
+  window->context_stack_ptr--;
+}
 
 void window_render(Window* window, Display* display) {
   MD_CHECK_NULL_ARGUMENT(window);
