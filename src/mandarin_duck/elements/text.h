@@ -12,6 +12,8 @@ struct ElementTextData {
   const char* text;
   ElementSize size;
   uint32_t color;
+  bool center_x;
+  bool center_y;
 } typedef ElementTextData;
 static_assert(sizeof(ElementTextData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
@@ -19,6 +21,8 @@ struct ElementTextArgs {
   const char* text;
   ElementSize size;
   uint32_t color;
+  bool center_x;
+  bool center_y;
 } typedef ElementTextArgs;
 
 bool element_text(Window* window, Display* display, ElementTextArgs args);

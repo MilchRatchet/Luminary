@@ -9,21 +9,26 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
 
   window_push_section(window, 24, 0);
   {
+    window_margin_relative(window, 0.25f);
     element_text(
       window, display,
       (ElementTextArgs){
-        .color = 0xFFFFFFFF, .size = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f}, .text = "Camera"});
-
-    element_text(
-      window, display,
-      (ElementTextArgs){
-        .color = 0xFFFFFFFF, .size = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f}, .text = "Example"});
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .text     = "Camera",
+        .center_x = true,
+        .center_y = true});
   }
   window_pop_section(window);
 
   element_text(
     window, display,
-    (ElementTextArgs){.color = 0xFFFFFFFF, .size = (ElementSize){.is_relative = false, .width = 128, .height = 24}, .text = "Position X"});
+    (ElementTextArgs){
+      .color    = 0xFFFFFFFF,
+      .size     = (ElementSize){.is_relative = false, .width = 128, .height = 24},
+      .text     = "Position X",
+      .center_x = false,
+      .center_y = true});
 
   return false;
 }

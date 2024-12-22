@@ -13,7 +13,8 @@ static void _element_text_render_func(Element* text, Display* display) {
     crash_message("Text is taller than the element.");
   }
 
-  const uint32_t padding = (text->height - surface->h) >> 1;
+  const uint32_t padding_x = data->center_x ? (text->width - surface->w) >> 1 : 0;
+  const uint32_t padding_y = data->center_y ? (text->height - surface->h) >> 1 : 0;
 
   SDL_Rect src_rect;
   src_rect.x = 0;
@@ -22,8 +23,8 @@ static void _element_text_render_func(Element* text, Display* display) {
   src_rect.h = surface->h;
 
   SDL_Rect dst_rect;
-  dst_rect.x = text->x + padding;
-  dst_rect.y = text->y + padding;
+  dst_rect.x = text->x + padding_x;
+  dst_rect.y = text->y + padding_y;
   dst_rect.w = surface->w;
   dst_rect.h = surface->h;
 
@@ -42,9 +43,11 @@ bool element_text(Window* window, Display* display, ElementTextArgs args) {
 
   ElementTextData* data = (ElementTextData*) &text.data;
 
-  data->color = args.color;
-  data->size  = args.size;
-  data->text  = args.text;
+  data->color    = args.color;
+  data->size     = args.size;
+  data->text     = args.text;
+  data->center_x = args.center_x;
+  data->center_y = args.center_y;
 
   ElementMouseResult mouse_result;
   element_apply_context(&text, context, &args.size, display, &mouse_result);

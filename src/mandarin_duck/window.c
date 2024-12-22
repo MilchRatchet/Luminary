@@ -102,6 +102,14 @@ void window_margin(Window* window, uint32_t margin) {
   context->fill += margin;
 }
 
+void window_margin_relative(Window* window, float margin) {
+  MD_CHECK_NULL_ARGUMENT(window);
+
+  WindowContext* context = window->context_stack + window->context_stack_ptr;
+
+  context->fill += (context->is_horizontal ? context->width : context->height) * margin;
+}
+
 void window_push_section(Window* window, uint32_t size, uint32_t padding) {
   MD_CHECK_NULL_ARGUMENT(window);
 
