@@ -122,8 +122,8 @@ void window_push_section(Window* window, uint32_t size, uint32_t padding) {
   memcpy(new_context, context, sizeof(WindowContext));
 
   new_context->is_horizontal = !context->is_horizontal;
-  new_context->width         = (new_context->is_horizontal) ? context->width : size;
-  new_context->height        = (new_context->is_horizontal) ? size : context->height;
+  new_context->width         = (new_context->is_horizontal) ? context->width - 2 * context->padding : size;
+  new_context->height        = (new_context->is_horizontal) ? size : context->height - 2 * context->padding;
   new_context->x             = ((context->is_horizontal) ? context->x + context->fill : context->x) + context->padding;
   new_context->y             = ((context->is_horizontal) ? context->y : context->y + context->fill) + context->padding;
   new_context->padding       = padding;

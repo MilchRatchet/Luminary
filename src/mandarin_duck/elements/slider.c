@@ -8,6 +8,8 @@
 static void _element_slider_render_float(Element* slider, Display* display) {
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
+  ui_renderer_render_rounded_box(display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0);
+
   char text[256];
   sprintf(text, "%.2f", data->data_float);
 
@@ -28,7 +30,7 @@ static void _element_slider_render_float(Element* slider, Display* display) {
   src_rect.h = surface->h;
 
   SDL_Rect dst_rect;
-  dst_rect.x = slider->x + padding_x;
+  dst_rect.x = slider->x + padding_x + data->component_padding;
   dst_rect.y = slider->y + padding_y;
   dst_rect.w = surface->w;
   dst_rect.h = surface->h;
@@ -41,6 +43,8 @@ static void _element_slider_render_float(Element* slider, Display* display) {
 static void _element_slider_render_uint(Element* slider, Display* display) {
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
+  ui_renderer_render_rounded_box(display->ui_renderer, display, slider->width, slider->height, slider->x, slider->y, 0);
+
   char text[256];
   sprintf(text, "%u", data->data_uint);
 
@@ -51,7 +55,7 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
     crash_message("Text is taller than the element.");
   }
 
-  const uint32_t padding_x = data->center_x ? (slider->width - surface->w) >> 1 : 0;
+  const uint32_t padding_x = data->center_x ? (slider->width - surface->w) >> 1 : data->component_padding;
   const uint32_t padding_y = data->center_y ? (slider->height - surface->h) >> 1 : 0;
 
   SDL_Rect src_rect;
@@ -77,11 +81,12 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
   float* vec_data = (float*) &data->data_vec3;
 
   uint32_t x_offset             = slider->x;
-  const uint32_t component_size = (slider->width - 2 * data->component_padding) / 3;
+  const uint32_t component_size = (slider->width - 6 * data->component_padding) / 3;
 
   for (uint32_t component = 0; component < 3; component++) {
-    char text[256];
+    ui_renderer_render_rounded_box(display->ui_renderer, display, component_size, slider->height, x_offset, slider->y, 0);
 
+    char text[256];
     sprintf(text, "%.2f", vec_data[component]);
 
     SDL_Surface* surface;
@@ -100,14 +105,14 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
     src_rect.h = surface->h;
 
     SDL_Rect dst_rect;
-    dst_rect.x = x_offset;
+    dst_rect.x = x_offset + data->component_padding;
     dst_rect.y = slider->y + padding_y;
     dst_rect.w = surface->w;
     dst_rect.h = surface->h;
 
     SDL_BlitSurface(surface, &src_rect, display->sdl_surface, &dst_rect);
 
-    x_offset += component_size + data->component_padding;
+    x_offset += component_size + 2 * data->component_padding;
 
     SDL_DestroySurface(surface);
   }

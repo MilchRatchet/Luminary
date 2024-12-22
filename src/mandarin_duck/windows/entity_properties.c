@@ -27,13 +27,13 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   }
   window_pop_section(window);
 
-  window_push_section(window, 24, 0);
+  window_push_section(window, 32, 0);
   {
     element_text(
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 0.75f},
         .text     = "Position",
         .center_x = false,
         .center_y = true});
@@ -43,23 +43,23 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
       (ElementSliderArgs){
         .type              = ELEMENT_SLIDER_DATA_TYPE_VECTOR,
         .color             = 0xFFFFFFFF,
-        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 0.75f},
         .data_binding      = &camera.pos,
         .min               = -FLT_MAX,
         .max               = FLT_MAX,
-        .component_padding = 8,
+        .component_padding = 4,
         .center_x          = false,
         .center_y          = true});
   }
   window_pop_section(window);
 
-  window_push_section(window, 24, 0);
+  window_push_section(window, 32, 0);
   {
     element_text(
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 0.75f},
         .text     = "Rotation",
         .center_x = false,
         .center_y = true});
@@ -69,23 +69,23 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
       (ElementSliderArgs){
         .type              = ELEMENT_SLIDER_DATA_TYPE_VECTOR,
         .color             = 0xFFFFFFFF,
-        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 0.75f},
         .data_binding      = &camera.rotation,
         .min               = -FLT_MAX,
         .max               = FLT_MAX,
-        .component_padding = 8,
+        .component_padding = 4,
         .center_x          = false,
         .center_y          = true});
   }
   window_pop_section(window);
 
-  window_push_section(window, 24, 0);
+  window_push_section(window, 32, 0);
   {
     element_text(
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 0.75f},
         .text     = "Field of View",
         .center_x = false,
         .center_y = true});
@@ -95,23 +95,23 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
       (ElementSliderArgs){
         .type              = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
         .color             = 0xFFFFFFFF,
-        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 0.75f},
         .data_binding      = &camera.fov,
         .min               = 0.0f,
         .max               = FLT_MAX,
-        .component_padding = 8,
-        .center_x          = false,
+        .component_padding = 4,
+        .center_x          = true,
         .center_y          = true});
   }
   window_pop_section(window);
 
-  window_push_section(window, 24, 0);
+  window_push_section(window, 32, 0);
   {
     element_text(
       window, display,
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
-        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 0.75f},
         .text     = "Focal Length",
         .center_x = false,
         .center_y = true});
@@ -121,12 +121,12 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
       (ElementSliderArgs){
         .type              = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
         .color             = 0xFFFFFFFF,
-        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 0.75f},
         .data_binding      = &camera.focal_length,
         .min               = 0.0f,
         .max               = FLT_MAX,
-        .component_padding = 8,
-        .center_x          = false,
+        .component_padding = 4,
+        .center_x          = true,
         .center_y          = true});
   }
   window_pop_section(window);

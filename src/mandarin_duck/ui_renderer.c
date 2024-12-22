@@ -21,7 +21,23 @@ inline float _ui_renderer_rand(const uint32_t offset, const uint32_t phi) {
 // Mask creation
 ////////////////////////////////////////////////////////////////////
 
-static void _ui_renderer_create_disk_mask(UIRenderer* renderer, uint8_t* dst, uint32_t size) {
+static void _ui_renderer_create_block_mask(uint8_t* dst_fill, uint8_t* dst_border, uint32_t size) {
+  for (uint32_t y = 0; y < size; y++) {
+    for (uint32_t x = 0; x < size; x++) {
+      dst_fill[4 * (x + y * size) + 0] = 0xFF;
+      dst_fill[4 * (x + y * size) + 1] = 0;
+      dst_fill[4 * (x + y * size) + 2] = 0;
+      dst_fill[4 * (x + y * size) + 3] = 0;
+
+      dst_border[4 * (x + y * size) + 0] = (x == 0 || y == 0 || x + 1 == size || y + 1 == size) ? 0xFF : 0;
+      dst_border[4 * (x + y * size) + 1] = 0;
+      dst_border[4 * (x + y * size) + 2] = 0;
+      dst_border[4 * (x + y * size) + 3] = 0;
+    }
+  }
+}
+
+static void _ui_renderer_create_disk_mask(uint8_t* dst, uint32_t size) {
   const float radius = size * 0.5f;
 
   const float radius_sq = radius * radius;
@@ -49,7 +65,7 @@ static void _ui_renderer_create_disk_mask(UIRenderer* renderer, uint8_t* dst, ui
   }
 }
 
-static void _ui_renderer_create_circle_mask(UIRenderer* renderer, uint8_t* dst, uint32_t size) {
+static void _ui_renderer_create_circle_mask(uint8_t* dst, uint32_t size) {
   const float outer_radius = size * 0.5f;
   const float inner_radius = size * 0.5f - 1.0f;
 
@@ -196,13 +212,15 @@ static void _ui_renderer_create_window_background(UIRenderer* renderer, Window* 
     window->background_blur_buffers[0], window->width >> 1, window->height >> 1, window->background_blur_buffers_ld[0], ptr, ld);
 }
 
-static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uint8_t* dst, uint32_t ld) {
-  const uint32_t cols = window->width >> 3;
-  const uint32_t rows = window->height;
+static void _ui_renderer_render_rounded_box(
+  UIRenderer* renderer, uint8_t* dst, uint32_t width, uint32_t height, uint32_t ld, uint32_t x, uint32_t y, uint32_t rounding_size,
+  uint32_t border_color) {
+  const uint32_t cols = width >> UI_RENDERER_STRIDE_LOG;
+  const uint32_t rows = height;
 
-  uint32_t shape_mask_size = 32;
+  uint32_t shape_mask_size = rounding_size;
 
-  uint32_t shape_mask_size_id = 0;
+  uint32_t shape_mask_size_id = 0xFFFFFFFF;
   for (uint32_t size_id = 0; size_id < SHAPE_MASK_COUNT; size_id++) {
     const uint32_t size = renderer->shape_mask_size[size_id];
 
@@ -212,17 +230,17 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
     }
   }
 
-  shape_mask_size = renderer->shape_mask_size[shape_mask_size_id];
+  shape_mask_size = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->shape_mask_size[shape_mask_size_id] : renderer->block_mask_size;
 
-  const uint8_t* disk_mask   = renderer->disk_mask[shape_mask_size_id];
-  const uint8_t* circle_mask = renderer->circle_mask[shape_mask_size_id];
+  const uint8_t* disk_mask   = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->disk_mask[shape_mask_size_id] : renderer->block_mask;
+  const uint8_t* circle_mask = (shape_mask_size_id != 0xFFFFFFFF) ? renderer->circle_mask[shape_mask_size_id] : renderer->block_mask_border;
 
   const uint32_t shape_mask_half_size = shape_mask_size >> 1;
   const uint32_t shape_mask_ld        = shape_mask_size * sizeof(LuminaryARGB8);
 
   const uint32_t shape_mask_half_cols = shape_mask_half_size >> UI_RENDERER_STRIDE_LOG;
 
-  dst = dst + sizeof(LuminaryARGB8) * window->x + window->y * ld;
+  dst = dst + sizeof(LuminaryARGB8) * x + y * ld;
 
   uint32_t row = 0;
   uint32_t col;
@@ -230,7 +248,7 @@ static void _ui_renderer_render_window(UIRenderer* renderer, Window* window, uin
   uint32_t shape_row = 0;
   uint32_t shape_col;
 
-  Color256 base_color       = color256_set_1(0xFFD4AF37);
+  Color256 base_color       = color256_set_1(border_color);
   Color256 background_color = color256_set_1(0xFF0F0213);
   Color256 mask_low16       = color256_set_1(0x00FF00FF);
   Color256 mask_high16      = color256_set_1(0xFF00FF00);
@@ -497,14 +515,20 @@ void ui_renderer_create(UIRenderer** renderer) {
 
   LUM_FAILURE_HANDLE(host_malloc(renderer, sizeof(UIRenderer)));
 
+  LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->block_mask, sizeof(uint32_t) * 2 * UI_RENDERER_STRIDE * 2 * UI_RENDERER_STRIDE));
+  LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->block_mask_border, sizeof(uint32_t) * 2 * UI_RENDERER_STRIDE * 2 * UI_RENDERER_STRIDE));
+  (*renderer)->block_mask_size = 2 * UI_RENDERER_STRIDE;
+
+  _ui_renderer_create_block_mask((*renderer)->block_mask, (*renderer)->block_mask_border, (*renderer)->block_mask_size);
+
   for (uint32_t size_id = 0; size_id < SHAPE_MASK_COUNT; size_id++) {
-    const uint32_t size = 8 << size_id;
+    const uint32_t size = 16 << size_id;
 
     LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->disk_mask[size_id], sizeof(uint32_t) * size * size));
     LUM_FAILURE_HANDLE(host_malloc(&(*renderer)->circle_mask[size_id], sizeof(uint32_t) * size * size));
 
-    _ui_renderer_create_disk_mask(*renderer, (*renderer)->disk_mask[size_id], size);
-    _ui_renderer_create_circle_mask(*renderer, (*renderer)->circle_mask[size_id], size);
+    _ui_renderer_create_disk_mask((*renderer)->disk_mask[size_id], size);
+    _ui_renderer_create_circle_mask((*renderer)->circle_mask[size_id], size);
 
     (*renderer)->shape_mask_size[size_id] = size;
   }
@@ -523,12 +547,24 @@ void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* w
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(window);
 
-  _ui_renderer_render_window(renderer, window, display->buffer, display->ld);
+  _ui_renderer_render_rounded_box(
+    renderer, display->buffer, window->width, window->height, display->ld, window->x, window->y, 32, 0xFFD4AF37);
+}
+
+void ui_renderer_render_rounded_box(
+  UIRenderer* renderer, Display* display, uint32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t rounding_size) {
+  MD_CHECK_NULL_ARGUMENT(renderer);
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  _ui_renderer_render_rounded_box(renderer, display->buffer, width, height, display->ld, x, y, rounding_size, 0xFF000000);
 }
 
 void ui_renderer_destroy(UIRenderer** renderer) {
   MD_CHECK_NULL_ARGUMENT(renderer);
   MD_CHECK_NULL_ARGUMENT(*renderer);
+
+  LUM_FAILURE_HANDLE(host_free(&(*renderer)->block_mask));
+  LUM_FAILURE_HANDLE(host_free(&(*renderer)->block_mask_border));
 
   for (uint32_t size_id = 0; size_id < SHAPE_MASK_COUNT; size_id++) {
     LUM_FAILURE_HANDLE(host_free(&(*renderer)->disk_mask[size_id]));
