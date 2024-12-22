@@ -184,6 +184,74 @@ inline Color256 color128_extend(const Color128 a) {
 #endif
 }
 
+inline Color128 color128_set_1(const uint32_t a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color128){._immi = _mm_set1_epi32(a)};
+#else
+  // TODO
+#endif
+}
+
+inline Color128 color128_setzero() {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color128){._immi = _mm_setzero_si128()};
+#else
+  // TODO
+#endif
+}
+
+inline Color128 color128_zero_extend8(Color128 a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color128){._immi = _mm_cvtepu8_epi16(a._immi)};
+#else
+  // TODO
+#endif
+}
+
+inline Color128 color128_adds16(Color128 a, Color128 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color128){._immi = _mm_adds_epu16(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
+inline Color128 color128_subs16(Color128 a, Color128 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color128){._immi = _mm_subs_epu16(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
+inline Color128 color128_packus16(Color128 a, Color128 b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color128){._immi = _mm_packus_epi16(a._immi, b._immi)};
+#else
+  // TODO
+#endif
+}
+
+inline void color128_store_stream32(uint8_t* ptr, uint32_t b) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  _mm_stream_si32((int*) ptr, (int32_t) b);
+#else
+  // TODO
+#endif
+}
+
+inline uint32_t color128_get_low(Color128 a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return _mm_cvtsi128_si32(a._immi);
+#else
+  // TODO
+#endif
+}
+
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+#define color128_shift_right16(__a, __count) ((Color128){._immi = _mm_srli_epi16(__a._immi, __count)})
+#endif
+
 ////////////////////////////////////////////////////////////////////
 // Macro functions
 ////////////////////////////////////////////////////////////////////

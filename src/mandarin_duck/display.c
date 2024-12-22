@@ -7,10 +7,9 @@ static void _display_handle_resize(Display* display) {
 
   SDL_GetWindowSizeInPixels(display->sdl_window, (int*) &(display->width), (int*) &(display->height));
 
-  SDL_Surface* surface = SDL_GetWindowSurface(display->sdl_window);
-
-  display->buffer = surface->pixels;
-  display->ld     = (uint32_t) surface->pitch;
+  display->sdl_surface = SDL_GetWindowSurface(display->sdl_window);
+  display->buffer      = display->sdl_surface->pixels;
+  display->ld          = (uint32_t) display->sdl_surface->pitch;
 }
 
 static void _display_blit_to_display_buffer(Display* display, uint8_t* output) {

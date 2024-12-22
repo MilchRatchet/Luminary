@@ -14,6 +14,7 @@
 
 struct Display {
   SDL_Window* sdl_window;
+  SDL_Surface* sdl_surface;
   uint32_t width;
   uint32_t height;
   uint8_t* buffer;

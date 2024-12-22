@@ -3,6 +3,8 @@
 
 struct Window typedef Window;
 
+#include <SDL3/SDL.h>
+
 #include "element.h"
 #include "utils.h"
 #include "window.h"

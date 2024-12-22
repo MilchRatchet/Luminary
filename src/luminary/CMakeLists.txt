@@ -137,6 +137,7 @@ ceb_embed_files(
   ${CMAKE_BINARY_DIR}/ptx/optix_kernels_particle.ptx
   ${CMAKE_BINARY_DIR}/ptx/optix_kernels_volume_bridges.ptx
   ${CMAKE_SOURCE_DIR}/data/LuminaryFont.ttf
+  ${CMAKE_SOURCE_DIR}/data/LuminaryFontBold.ttf
   ${CMAKE_SOURCE_DIR}/data/moon/moon_albedo.png
   ${CMAKE_SOURCE_DIR}/data/moon/moon_normal.png
   ${CMAKE_SOURCE_DIR}/data/bluenoise/bluenoise_1D.bin
