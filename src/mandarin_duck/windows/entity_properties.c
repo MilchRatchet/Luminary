@@ -1,5 +1,8 @@
 #include "entity_properties.h"
 
+#include <float.h>
+
+#include "elements/slider.h"
 #include "elements/text.h"
 
 static bool _window_entity_properties_action(Window* window, Display* display, LuminaryHost* host) {
@@ -21,14 +24,33 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   }
   window_pop_section(window);
 
-  element_text(
-    window, display,
-    (ElementTextArgs){
-      .color    = 0xFFFFFFFF,
-      .size     = (ElementSize){.is_relative = false, .width = 128, .height = 24},
-      .text     = "Position X",
-      .center_x = false,
-      .center_y = true});
+  window_push_section(window, 24, 0);
+  {
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .text     = "Position X",
+        .center_x = false,
+        .center_y = true});
+
+    float test = 1337.0f;
+
+    element_slider(
+      window, display,
+      (ElementSliderArgs){
+        .color        = 0xFFFFFFFF,
+        .size         = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .data_binding = &test,
+        .is_integer   = false,
+        .min          = 0.0f,
+        .max          = FLT_MAX,
+        .center_x     = false,
+        .center_y     = true});
+  }
+
+  window_pop_section(window);
 
   return false;
 }

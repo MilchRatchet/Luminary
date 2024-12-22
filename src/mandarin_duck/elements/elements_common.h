@@ -11,10 +11,16 @@ struct Window typedef Window;
 
 struct ElementSize {
   bool is_relative;
-  float rel_width;
-  float rel_height;
-  uint32_t width;
-  uint32_t height;
+  union {
+    struct {
+      float rel_width;
+      float rel_height;
+    };
+    struct {
+      uint32_t width;
+      uint32_t height;
+    };
+  };
 } typedef ElementSize;
 
 enum ElementBindingDataType { ELEMENT_BINDING_DATA_TYPE_FLOAT = 0 } typedef ElementBindingDataType;

@@ -6,8 +6,6 @@
 #include "elements_common.h"
 #include "utils.h"
 
-enum ElementButtonShape { ELEMENT_BUTTON_SHAPE_CIRCLE = 0 } typedef ElementButtonShape;
-
 struct ElementTextData {
   const char* text;
   ElementSize size;
