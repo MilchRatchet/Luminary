@@ -10,6 +10,7 @@ enum ElementButtonShape { ELEMENT_BUTTON_SHAPE_CIRCLE = 0 } typedef ElementButto
 
 struct ElementButtonData {
   ElementButtonShape shape;
+  uint32_t shape_size_id;
   uint32_t color;
   uint32_t hover_color;
   uint32_t press_color;

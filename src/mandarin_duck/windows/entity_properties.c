@@ -10,6 +10,9 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
+  LuminaryCamera camera;
+  LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
+
   window_push_section(window, 24, 0);
   {
     window_margin_relative(window, 0.25f);
@@ -31,25 +34,101 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
       (ElementTextArgs){
         .color    = 0xFFFFFFFF,
         .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
-        .text     = "Position X",
+        .text     = "Position",
         .center_x = false,
         .center_y = true});
-
-    float test = 1337.0f;
 
     element_slider(
       window, display,
       (ElementSliderArgs){
-        .color        = 0xFFFFFFFF,
-        .size         = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
-        .data_binding = &test,
-        .is_integer   = false,
-        .min          = 0.0f,
-        .max          = FLT_MAX,
-        .center_x     = false,
-        .center_y     = true});
+        .type              = ELEMENT_SLIDER_DATA_TYPE_VECTOR,
+        .color             = 0xFFFFFFFF,
+        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .data_binding      = &camera.pos,
+        .min               = -FLT_MAX,
+        .max               = FLT_MAX,
+        .component_padding = 8,
+        .center_x          = false,
+        .center_y          = true});
   }
+  window_pop_section(window);
 
+  window_push_section(window, 24, 0);
+  {
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .text     = "Rotation",
+        .center_x = false,
+        .center_y = true});
+
+    element_slider(
+      window, display,
+      (ElementSliderArgs){
+        .type              = ELEMENT_SLIDER_DATA_TYPE_VECTOR,
+        .color             = 0xFFFFFFFF,
+        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .data_binding      = &camera.rotation,
+        .min               = -FLT_MAX,
+        .max               = FLT_MAX,
+        .component_padding = 8,
+        .center_x          = false,
+        .center_y          = true});
+  }
+  window_pop_section(window);
+
+  window_push_section(window, 24, 0);
+  {
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .text     = "Field of View",
+        .center_x = false,
+        .center_y = true});
+
+    element_slider(
+      window, display,
+      (ElementSliderArgs){
+        .type              = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+        .color             = 0xFFFFFFFF,
+        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .data_binding      = &camera.fov,
+        .min               = 0.0f,
+        .max               = FLT_MAX,
+        .component_padding = 8,
+        .center_x          = false,
+        .center_y          = true});
+  }
+  window_pop_section(window);
+
+  window_push_section(window, 24, 0);
+  {
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .text     = "Focal Length",
+        .center_x = false,
+        .center_y = true});
+
+    element_slider(
+      window, display,
+      (ElementSliderArgs){
+        .type              = ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+        .color             = 0xFFFFFFFF,
+        .size              = (ElementSize){.is_relative = true, .rel_width = 0.5f, .rel_height = 1.0f},
+        .data_binding      = &camera.focal_length,
+        .min               = 0.0f,
+        .max               = FLT_MAX,
+        .component_padding = 8,
+        .center_x          = false,
+        .center_y          = true});
+  }
   window_pop_section(window);
 
   return false;
@@ -62,7 +141,7 @@ void window_entity_properties_create(Window** window) {
 
   (*window)->x             = 128;
   (*window)->y             = 128;
-  (*window)->width         = 256;
+  (*window)->width         = 384;
   (*window)->height        = 512;
   (*window)->padding       = 8;
   (*window)->is_horizontal = false;

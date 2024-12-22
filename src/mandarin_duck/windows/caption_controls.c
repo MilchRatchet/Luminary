@@ -54,8 +54,8 @@ void window_caption_controls_create(Window** window) {
 
   window_create(window);
 
-  (*window)->x             = CAPTION_CONTROL_BUTTON_SIZE;
-  (*window)->y             = CAPTION_CONTROL_BUTTON_SIZE;
+  (*window)->x             = CAPTION_CONTROL_BUTTON_SIZE * 2;
+  (*window)->y             = CAPTION_CONTROL_BUTTON_SIZE * 2;
   (*window)->width         = CAPTION_CONTROL_BUTTON_SIZE * 5;
   (*window)->height        = CAPTION_CONTROL_BUTTON_SIZE;
   (*window)->padding       = 0;

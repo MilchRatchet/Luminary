@@ -9,9 +9,9 @@ struct Display typedef Display;
 struct Element typedef Element;
 
 enum ElementType {
-  ELEMENT_TYPE_CONTAINER,
   ELEMENT_TYPE_BUTTON,
   ELEMENT_TYPE_TEXT,
+  ELEMENT_TYPE_SLIDER,
   ELEMENT_TYPE_CHECK_BOX,
   ELEMENT_TYPE_COLOR,
   ELEMENT_TYPE_DROPDOWN,

@@ -6,24 +6,37 @@
 #include "elements_common.h"
 #include "utils.h"
 
+enum ElementSliderDataType {
+  ELEMENT_SLIDER_DATA_TYPE_FLOAT,
+  ELEMENT_SLIDER_DATA_TYPE_UINT,
+  ELEMENT_SLIDER_DATA_TYPE_VECTOR,
+  ELEMENT_SLIDER_DATA_TYPE_COLOR_RGB,
+  ELEMENT_SLIDER_DATA_TYPE_COLOR_RGBA
+} typedef ElementSliderDataType;
+
 struct ElementSliderData {
+  ElementSliderDataType type;
   float data_float;
   uint32_t data_uint;
-  bool is_integer;
+  LuminaryVec3 data_vec3;
+  LuminaryRGBF data_RGB;
+  LuminaryRGBAF data_RGBAF;
   ElementSize size;
   uint32_t color;
+  uint32_t component_padding;
   bool center_x;
   bool center_y;
 } typedef ElementSliderData;
 static_assert(sizeof(ElementSliderData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
 struct ElementSliderArgs {
+  ElementSliderDataType type;
   void* data_binding;
-  bool is_integer;
   float max;
   float min;
   ElementSize size;
   uint32_t color;
+  uint32_t component_padding;
   bool center_x;
   bool center_y;
 } typedef ElementSliderArgs;
