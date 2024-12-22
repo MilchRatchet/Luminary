@@ -10,6 +10,9 @@ LuminaryResult device_output_create(DeviceOutput** output) {
   __FAILURE_HANDLE(host_malloc(output, sizeof(DeviceOutput)));
   memset(*output, 0, sizeof(DeviceOutput));
 
+  // Default size
+  device_output_set_size(*output, 1920, 1080);
+
   return LUMINARY_SUCCESS;
 }
 
