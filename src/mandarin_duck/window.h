@@ -49,9 +49,8 @@ struct Window {
   uint32_t context_stack_ptr;
   WindowContext context_stack[WINDOW_MAX_CONTEXT_DEPTH];
   Element* element_queue;
-  uint8_t* background_blur_buffers[WINDOW_MAX_BLUR_MIP_COUNT];
-  uint32_t background_blur_buffers_ld[WINDOW_MAX_BLUR_MIP_COUNT];
-  uint32_t background_blur_mip_count;
+  uint8_t* background_blur_buffer;
+  uint32_t background_blur_buffer_ld;
 } typedef Window;
 
 void window_create(Window** window);

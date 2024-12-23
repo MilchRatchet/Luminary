@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "display.h"
+#include "ui_renderer_blur.h"
 
 void window_create(Window** window) {
   MD_CHECK_NULL_ARGUMENT(window);
@@ -13,43 +14,14 @@ void window_create(Window** window) {
   LUM_FAILURE_HANDLE(array_create(&(*window)->element_queue, sizeof(Element), 128));
 }
 
-static uint32_t _window_blur_mip_count(const uint32_t width, const uint32_t height) {
-  // TODO: The mip count must take into account that height > 1 and that width stays a multiple of UI_RENDERER_STRIDE.
-  uint32_t min_dim = min(width, height);
-
-  if (min_dim == 0)
-    return 0;
-
-  uint32_t i = 0;
-
-  while (min_dim >= UI_RENDERER_STRIDE) {
-    i++;
-    min_dim = min_dim >> 1;
-  }
-
-  return min(i, WINDOW_MAX_BLUR_MIP_COUNT);
-}
-
 void window_allocate_memory(Window* window) {
   MD_CHECK_NULL_ARGUMENT(window);
 
   if (!window->background)
     return;
 
-  const uint32_t mip_count = _window_blur_mip_count(window->width, window->height);
-
-  uint32_t width  = window->width;
-  uint32_t height = window->height;
-
-  for (uint32_t mip_id = 0; mip_id < mip_count; mip_id++) {
-    width  = width >> 1;
-    height = height >> 1;
-
-    LUM_FAILURE_HANDLE(host_malloc(&window->background_blur_buffers[mip_id], width * height * 4));
-    window->background_blur_buffers_ld[mip_id] = width * 4;
-  }
-
-  window->background_blur_mip_count = mip_count;
+  LUM_FAILURE_HANDLE(host_malloc(&window->background_blur_buffer, window->width * window->height * sizeof(LuminaryARGB8)));
+  window->background_blur_buffer_ld = window->width * sizeof(LuminaryARGB8);
 }
 
 static bool window_is_mouse_hover(Window* window, Display* display) {
@@ -165,8 +137,8 @@ void window_destroy(Window** window) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(*window);
 
-  for (uint32_t mip_id = 0; mip_id < (*window)->background_blur_mip_count; mip_id++) {
-    LUM_FAILURE_HANDLE(host_free(&(*window)->background_blur_buffers[mip_id]));
+  if ((*window)->background_blur_buffer) {
+    LUM_FAILURE_HANDLE(host_free(&(*window)->background_blur_buffer));
   }
 
   LUM_FAILURE_HANDLE(array_destroy(&(*window)->element_queue));
