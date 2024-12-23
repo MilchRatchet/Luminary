@@ -45,9 +45,17 @@ bool element_text(Window* window, Display* display, ElementTextArgs args) {
 
   data->color    = args.color;
   data->size     = args.size;
-  data->text     = args.text;
   data->center_x = args.center_x;
   data->center_y = args.center_y;
+
+  const size_t text_size = strlen(args.text);
+
+  if (text_size > 256) {
+    crash_message("Text is too long.");
+  }
+
+  memcpy(data->text, args.text, text_size);
+  memset(data->text + text_size, 0, 256 - text_size);
 
   ElementMouseResult mouse_result;
   element_apply_context(&text, context, &args.size, display, &mouse_result);

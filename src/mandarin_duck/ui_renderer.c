@@ -546,9 +546,11 @@ void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* w
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(window);
 
+  const uint32_t rounding_size = (window->height >= 64) ? 32 : 0;
+
   _ui_renderer_render_rounded_box(
     renderer, window->width, window->height, window->background_blur_buffer, 0, 0, window->background_blur_buffer_ld, display->buffer,
-    window->x, window->y, display->ld, 32, 0, 0xFF111928);
+    window->x, window->y, display->ld, rounding_size, 0, 0xFF111928);
 }
 
 void ui_renderer_render_rounded_box(

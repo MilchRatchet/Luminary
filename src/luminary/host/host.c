@@ -403,6 +403,15 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult luminary_host_get_current_sample_time(Host* host, double* time) {
+  __CHECK_NULL_ARGUMENT(host);
+
+  // TODO: Gather correct time.
+  *time = 0.123;
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult luminary_host_get_queue_string(const Host* host, const char** string) {
   __CHECK_NULL_ARGUMENT(host);
 

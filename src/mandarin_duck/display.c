@@ -196,6 +196,8 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
+  display->frametime = time_step;
+
   if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
     display->show_ui = !display->show_ui;
     SDL_SetWindowRelativeMouseMode(display->sdl_window, !display->show_ui);

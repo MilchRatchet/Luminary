@@ -3,7 +3,7 @@
 
 #include "utils.h"
 
-#define ELEMENT_DATA_SECTION_SIZE 0x100
+#define ELEMENT_DATA_SECTION_SIZE 0x200
 
 struct Display typedef Display;
 struct Element typedef Element;

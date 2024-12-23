@@ -12,6 +12,7 @@ enum WindowType {
   WINDOW_TYPE_RENDERER_STATUS   = 1,
   WINDOW_TYPE_ABOUT             = 2,
   WINDOW_TYPE_ENTITY_PROPERTIES = 3,
+  WINDOW_TYPE_FRAMETIME         = 4,
   WINDOW_TYPE_COUNT
 } typedef WindowType;
 

@@ -7,7 +7,7 @@
 #include "utils.h"
 
 struct ElementTextData {
-  const char* text;
+  char text[256];
   ElementSize size;
   uint32_t color;
   bool center_x;

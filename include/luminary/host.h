@@ -36,6 +36,8 @@ LUMINARY_API LuminaryResult luminary_host_shutdown_device(LuminaryHost* host, ui
 LUMINARY_API LuminaryResult luminary_host_load_lum_file(LuminaryHost* host, LuminaryPath* path);
 LUMINARY_API LuminaryResult luminary_host_load_obj_file(LuminaryHost* host, LuminaryPath* path);
 
+LUMINARY_API LuminaryResult luminary_host_get_current_sample_time(LuminaryHost* host, double* time);
+
 /*
  * Returns the string identifying the host's current queue task.
  * @param host Host instance.

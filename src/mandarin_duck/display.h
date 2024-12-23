@@ -21,6 +21,7 @@ struct Display {
   uint32_t ld;
   bool exit_requested;
   bool show_ui;
+  double frametime;
   KeyboardState* keyboard_state;
   MouseState* mouse_state;
   CameraHandler* camera_handler;
