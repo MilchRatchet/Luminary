@@ -3,8 +3,8 @@
 // TODO: Let Mandarin Duck have its own embedded files.
 void ceb_access(const char* restrict name, void** restrict ptr, int64_t* restrict lmem, uint64_t* restrict info);
 
-#define TTF_FONT_LOCATION "LuminaryFont.ttf"
-#define TTF_FONT_LOCATION_BOLD "LuminaryFontBold.ttf"
+static const char* font_file_locations[TEXT_RENDERER_FONT_COUNT] =
+  {[TEXT_RENDERER_FONT_REGULAR] = "LuminaryFont.ttf", [TEXT_RENDERER_FONT_BOLD] = "LuminaryFontBold.ttf"};
 
 static TTF_Font* _text_renderer_load_font(const char* font_location) {
   char* font_data;
@@ -33,32 +33,30 @@ void text_renderer_create(TextRenderer** text_renderer) {
 
   LUM_FAILURE_HANDLE(host_malloc(text_renderer, sizeof(TextRenderer)));
 
-  (*text_renderer)->font_regular = _text_renderer_load_font(TTF_FONT_LOCATION);
-  (*text_renderer)->font_bold    = _text_renderer_load_font(TTF_FONT_LOCATION_BOLD);
+  for (uint32_t font_id = 0; font_id < TEXT_RENDERER_FONT_COUNT; font_id++) {
+    (*text_renderer)->fonts[font_id] = _text_renderer_load_font(font_file_locations[font_id]);
 
-  if ((*text_renderer)->font_regular == (TTF_Font*) 0) {
-    crash_message("Failed to load regular font.");
-  }
-
-  if ((*text_renderer)->font_bold == (TTF_Font*) 0) {
-    crash_message("Failed to load bold font.");
+    if ((*text_renderer)->fonts[font_id] == (TTF_Font*) 0) {
+      crash_message("Failed to font: %s.", font_file_locations[font_id]);
+    }
   }
 }
 
-void text_renderer_render(TextRenderer* text_renderer, const char* text, SDL_Surface** surface) {
+void text_renderer_render(TextRenderer* text_renderer, const char* text, uint32_t font_id, SDL_Surface** surface) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
 
   SDL_Color opaque      = {0xFF, 0xFF, 0xFF, 0xFF};
   SDL_Color transparent = {0xFF, 0, 0, 0xFF};
 
-  *surface = TTF_RenderText_Blended(text_renderer->font_bold, text, 0, opaque);
+  *surface = TTF_RenderText_Blended(text_renderer->fonts[font_id], text, 0, opaque);
 }
 
 void text_renderer_destroy(TextRenderer** text_renderer) {
   MD_CHECK_NULL_ARGUMENT(text_renderer);
 
-  TTF_CloseFont((*text_renderer)->font_regular);
-  TTF_CloseFont((*text_renderer)->font_bold);
+  for (uint32_t font_id = 0; font_id < TEXT_RENDERER_FONT_COUNT; font_id++) {
+    TTF_CloseFont((*text_renderer)->fonts[font_id]);
+  }
 
   LUM_FAILURE_HANDLE(host_free(text_renderer));
 }

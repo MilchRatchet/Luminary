@@ -5,13 +5,14 @@
 
 #include "utils.h"
 
+enum TextRendererFont { TEXT_RENDERER_FONT_REGULAR, TEXT_RENDERER_FONT_BOLD, TEXT_RENDERER_FONT_COUNT } typedef TextRendererFont;
+
 struct TextRenderer {
-  TTF_Font* font_regular;
-  TTF_Font* font_bold;
+  TTF_Font* fonts[TEXT_RENDERER_FONT_COUNT];
 } typedef TextRenderer;
 
 void text_renderer_create(TextRenderer** text_renderer);
-void text_renderer_render(TextRenderer* text_renderer, const char* text, SDL_Surface** surface);
+void text_renderer_render(TextRenderer* text_renderer, const char* text, uint32_t font_id, SDL_Surface** surface);
 void text_renderer_destroy(TextRenderer** text_renderer);
 
 #endif /* MANDARIN_DUCK_TEXT_RENDERER */

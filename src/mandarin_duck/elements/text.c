@@ -7,7 +7,7 @@ static void _element_text_render_func(Element* text, Display* display) {
   ElementTextData* data = (ElementTextData*) &text->data;
 
   SDL_Surface* surface;
-  text_renderer_render(display->text_renderer, data->text, &surface);
+  text_renderer_render(display->text_renderer, data->text, TEXT_RENDERER_FONT_BOLD, &surface);
 
   if (surface->h > (int32_t) text->height) {
     crash_message("Text is taller than the element.");

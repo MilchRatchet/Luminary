@@ -14,7 +14,7 @@ static void _element_slider_render_float(Element* slider, Display* display) {
   sprintf(text, "%.2f", data->data_float);
 
   SDL_Surface* surface;
-  text_renderer_render(display->text_renderer, text, &surface);
+  text_renderer_render(display->text_renderer, text, TEXT_RENDERER_FONT_REGULAR, &surface);
 
   if (surface->h > (int32_t) slider->height) {
     crash_message("Text is taller than the element.");
@@ -49,7 +49,7 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
   sprintf(text, "%u", data->data_uint);
 
   SDL_Surface* surface;
-  text_renderer_render(display->text_renderer, text, &surface);
+  text_renderer_render(display->text_renderer, text, TEXT_RENDERER_FONT_REGULAR, &surface);
 
   if (surface->h > (int32_t) slider->height) {
     crash_message("Text is taller than the element.");
@@ -80,22 +80,24 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
 
   float* vec_data = (float*) &data->data_vec3;
 
-  uint32_t x_offset             = slider->x;
-  const uint32_t component_size = (slider->width - 6 * data->component_padding) / 3;
+  uint32_t x_offset                    = slider->x;
+  const uint32_t component_size        = (slider->width - 6 * data->component_padding) / 3;
+  const uint32_t component_size_padded = component_size + 2 * data->component_padding;
 
   for (uint32_t component = 0; component < 3; component++) {
-    ui_renderer_render_rounded_box(display->ui_renderer, display, component_size, slider->height, x_offset, slider->y, 0);
+    ui_renderer_render_rounded_box(display->ui_renderer, display, component_size_padded, slider->height, x_offset, slider->y, 0);
 
     char text[256];
     sprintf(text, "%.2f", vec_data[component]);
 
     SDL_Surface* surface;
-    text_renderer_render(display->text_renderer, text, &surface);
+    text_renderer_render(display->text_renderer, text, TEXT_RENDERER_FONT_REGULAR, &surface);
 
     if (surface->h > (int32_t) slider->height || surface->w > (int32_t) component_size) {
       crash_message("Text is too larger.");
     }
 
+    const uint32_t padding_x = data->center_x ? (component_size_padded - surface->w) >> 1 : data->component_padding;
     const uint32_t padding_y = data->center_y ? (slider->height - surface->h) >> 1 : 0;
 
     SDL_Rect src_rect;
@@ -105,14 +107,14 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
     src_rect.h = surface->h;
 
     SDL_Rect dst_rect;
-    dst_rect.x = x_offset + data->component_padding;
+    dst_rect.x = x_offset + padding_x;
     dst_rect.y = slider->y + padding_y;
     dst_rect.w = surface->w;
     dst_rect.h = surface->h;
 
     SDL_BlitSurface(surface, &src_rect, display->sdl_surface, &dst_rect);
 
-    x_offset += component_size + 2 * data->component_padding;
+    x_offset += component_size_padded;
 
     SDL_DestroySurface(surface);
   }
