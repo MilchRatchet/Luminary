@@ -102,7 +102,8 @@ static void _ui_renderer_create_circle_mask(uint8_t* dst, uint32_t size) {
 
 static void _ui_renderer_render_rounded_box(
   UIRenderer* renderer, uint32_t width, uint32_t height, const uint8_t* src, uint32_t src_x, uint32_t src_y, uint32_t src_ld, uint8_t* dst,
-  uint32_t dst_x, uint32_t dst_y, uint32_t dst_ld, uint32_t rounding_size, uint32_t border_color, uint32_t background_color) {
+  uint32_t dst_x, uint32_t dst_y, uint32_t dst_ld, uint32_t rounding_size, uint32_t height_clip, uint32_t border_color,
+  uint32_t background_color) {
   const uint32_t cols = width >> UI_RENDERER_STRIDE_LOG;
   const uint32_t rows = height;
 
@@ -151,85 +152,87 @@ static void _ui_renderer_render_rounded_box(
   // Row kind
   ////////////////////////////////////////////////////////////////////
 
-  col       = 0;
-  shape_col = 0;
+  if (row < height_clip) {
+    col       = 0;
+    shape_col = 0;
 
-  for (; col < shape_mask_half_cols; col++) {
-    const uint32_t col_offset       = col * UI_RENDERER_STRIDE_BYTES;
-    const uint32_t shape_col_offset = shape_col * UI_RENDERER_STRIDE_BYTES;
+    for (; col < shape_mask_half_cols; col++) {
+      const uint32_t col_offset       = col * UI_RENDERER_STRIDE_BYTES;
+      const uint32_t shape_col_offset = shape_col * UI_RENDERER_STRIDE_BYTES;
 
-    Color256 disk_left = color256_load(disk_mask + shape_row * shape_mask_ld + shape_col_offset);
-    Color256 base_dst  = color256_load(dst + col_offset);
-    Color256 base_src  = color256_load(src + col_offset);
-
-    if (use_background) {
-      base_src = color256_avg8(base_src, background);
-    }
-
-    Color256 base = color256_alpha_blend(base_src, base_dst, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
-
-    if (use_border) {
-      Color256 circle_left = color256_load(circle_mask + shape_row * shape_mask_ld + shape_col_offset);
-      base                 = color256_alpha_blend(border, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
-    }
-
-    color256_store(dst + col_offset, base);
-
-    shape_col++;
-  }
-
-  for (; col < cols - shape_mask_half_cols; col++) {
-    const uint32_t col_offset = col * UI_RENDERER_STRIDE_BYTES;
-
-    Color256 base;
-    if (use_border) {
-      base = border;
-    }
-    else {
-      base = color256_load(src + col_offset);
+      Color256 disk_left = color256_load(disk_mask + shape_row * shape_mask_ld + shape_col_offset);
+      Color256 base_dst  = color256_load(dst + col_offset);
+      Color256 base_src  = color256_load(src + col_offset);
 
       if (use_background) {
-        base = color256_avg8(base, background);
+        base_src = color256_avg8(base_src, background);
       }
+
+      Color256 base = color256_alpha_blend(base_src, base_dst, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
+
+      if (use_border) {
+        Color256 circle_left = color256_load(circle_mask + shape_row * shape_mask_ld + shape_col_offset);
+        base                 = color256_alpha_blend(border, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
+      }
+
+      color256_store(dst + col_offset, base);
+
+      shape_col++;
     }
 
-    color256_store(dst + col_offset, base);
+    for (; col < cols - shape_mask_half_cols; col++) {
+      const uint32_t col_offset = col * UI_RENDERER_STRIDE_BYTES;
+
+      Color256 base;
+      if (use_border) {
+        base = border;
+      }
+      else {
+        base = color256_load(src + col_offset);
+
+        if (use_background) {
+          base = color256_avg8(base, background);
+        }
+      }
+
+      color256_store(dst + col_offset, base);
+    }
+
+    for (; col < cols; col++) {
+      const uint32_t col_offset       = col * UI_RENDERER_STRIDE_BYTES;
+      const uint32_t shape_col_offset = shape_col * UI_RENDERER_STRIDE_BYTES;
+
+      Color256 disk_right = color256_load(disk_mask + shape_row * shape_mask_ld + shape_col_offset);
+      Color256 base_dst   = color256_load(dst + col_offset);
+      Color256 base_src   = color256_load(src + col_offset);
+
+      if (use_background) {
+        base_src = color256_avg8(base_src, background);
+      }
+
+      Color256 base = color256_alpha_blend(base_src, base_dst, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
+
+      if (use_border) {
+        Color256 circle_right = color256_load(circle_mask + shape_row * shape_mask_ld + shape_col_offset);
+        base                  = color256_alpha_blend(border, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
+      }
+
+      color256_store(dst + col_offset, base);
+
+      shape_col++;
+    }
+
+    row++;
+    shape_row++;
+    dst = dst + dst_ld;
+    src = src + src_ld;
   }
-
-  for (; col < cols; col++) {
-    const uint32_t col_offset       = col * UI_RENDERER_STRIDE_BYTES;
-    const uint32_t shape_col_offset = shape_col * UI_RENDERER_STRIDE_BYTES;
-
-    Color256 disk_right = color256_load(disk_mask + shape_row * shape_mask_ld + shape_col_offset);
-    Color256 base_dst   = color256_load(dst + col_offset);
-    Color256 base_src   = color256_load(src + col_offset);
-
-    if (use_background) {
-      base_src = color256_avg8(base_src, background);
-    }
-
-    Color256 base = color256_alpha_blend(base_src, base_dst, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
-
-    if (use_border) {
-      Color256 circle_right = color256_load(circle_mask + shape_row * shape_mask_ld + shape_col_offset);
-      base                  = color256_alpha_blend(border, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
-    }
-
-    color256_store(dst + col_offset, base);
-
-    shape_col++;
-  }
-
-  row++;
-  shape_row++;
-  dst = dst + dst_ld;
-  src = src + src_ld;
 
   ////////////////////////////////////////////////////////////////////
   // Row kind
   ////////////////////////////////////////////////////////////////////
 
-  for (; row < shape_mask_half_size; row++) {
+  for (; row < shape_mask_half_size && row < height_clip; row++) {
     col       = 0;
     shape_col = 0;
 
@@ -306,7 +309,7 @@ static void _ui_renderer_render_rounded_box(
     Color256 left_mask  = color256_set(0, 0, 0, 0, 0, 0, 0, 0xFF);
     Color256 right_mask = color256_set(0xFF, 0, 0, 0, 0, 0, 0, 0);
 
-    for (; row < rows - shape_mask_half_size; row++) {
+    for (; row < rows - shape_mask_half_size && row < height_clip; row++) {
       uint32_t col = 0;
 
       for (; col < 1; col++) {
@@ -362,7 +365,7 @@ static void _ui_renderer_render_rounded_box(
   // Row kind
   ////////////////////////////////////////////////////////////////////
 
-  for (; row < rows - 1; row++) {
+  for (; row < rows - 1 && row < height_clip; row++) {
     col       = 0;
     shape_col = 0;
 
@@ -435,73 +438,75 @@ static void _ui_renderer_render_rounded_box(
   // Row kind
   ////////////////////////////////////////////////////////////////////
 
-  col       = 0;
-  shape_col = 0;
+  if (row < height_clip) {
+    col       = 0;
+    shape_col = 0;
 
-  for (; col < shape_mask_half_cols; col++) {
-    const uint32_t col_offset       = col * UI_RENDERER_STRIDE_BYTES;
-    const uint32_t shape_col_offset = shape_col * UI_RENDERER_STRIDE_BYTES;
+    for (; col < shape_mask_half_cols; col++) {
+      const uint32_t col_offset       = col * UI_RENDERER_STRIDE_BYTES;
+      const uint32_t shape_col_offset = shape_col * UI_RENDERER_STRIDE_BYTES;
 
-    Color256 disk_left = color256_load(disk_mask + shape_row * shape_mask_ld + shape_col_offset);
-    Color256 base_dst  = color256_load(dst + col_offset);
-    Color256 base_src  = color256_load(src + col_offset);
-
-    if (use_background) {
-      base_src = color256_avg8(base_src, background);
-    }
-
-    Color256 base = color256_alpha_blend(base_src, base_dst, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
-
-    if (use_border) {
-      Color256 circle_left = color256_load(circle_mask + shape_row * shape_mask_ld + shape_col_offset);
-      base                 = color256_alpha_blend(border, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
-    }
-
-    color256_store(dst + col_offset, base);
-
-    shape_col++;
-  }
-
-  for (; col < cols - shape_mask_half_cols; col++) {
-    const uint32_t col_offset = col * UI_RENDERER_STRIDE_BYTES;
-
-    Color256 base;
-    if (use_border) {
-      base = border;
-    }
-    else {
-      base = color256_load(src + col_offset);
+      Color256 disk_left = color256_load(disk_mask + shape_row * shape_mask_ld + shape_col_offset);
+      Color256 base_dst  = color256_load(dst + col_offset);
+      Color256 base_src  = color256_load(src + col_offset);
 
       if (use_background) {
-        base = color256_avg8(base, background);
+        base_src = color256_avg8(base_src, background);
       }
+
+      Color256 base = color256_alpha_blend(base_src, base_dst, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
+
+      if (use_border) {
+        Color256 circle_left = color256_load(circle_mask + shape_row * shape_mask_ld + shape_col_offset);
+        base                 = color256_alpha_blend(border, base, circle_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
+      }
+
+      color256_store(dst + col_offset, base);
+
+      shape_col++;
     }
 
-    color256_store(dst + col_offset, base);
-  }
+    for (; col < cols - shape_mask_half_cols; col++) {
+      const uint32_t col_offset = col * UI_RENDERER_STRIDE_BYTES;
 
-  for (; col < cols; col++) {
-    const uint32_t col_offset       = col * UI_RENDERER_STRIDE_BYTES;
-    const uint32_t shape_col_offset = shape_col * UI_RENDERER_STRIDE_BYTES;
+      Color256 base;
+      if (use_border) {
+        base = border;
+      }
+      else {
+        base = color256_load(src + col_offset);
 
-    Color256 disk_right = color256_load(disk_mask + shape_row * shape_mask_ld + shape_col_offset);
-    Color256 base_dst   = color256_load(dst + col_offset);
-    Color256 base_src   = color256_load(src + col_offset);
+        if (use_background) {
+          base = color256_avg8(base, background);
+        }
+      }
 
-    if (use_background) {
-      base_src = color256_avg8(base_src, background);
+      color256_store(dst + col_offset, base);
     }
 
-    Color256 base = color256_alpha_blend(base_src, base_dst, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
+    for (; col < cols; col++) {
+      const uint32_t col_offset       = col * UI_RENDERER_STRIDE_BYTES;
+      const uint32_t shape_col_offset = shape_col * UI_RENDERER_STRIDE_BYTES;
 
-    if (use_border) {
-      Color256 circle_right = color256_load(circle_mask + shape_row * shape_mask_ld + shape_col_offset);
-      base                  = color256_alpha_blend(border, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
+      Color256 disk_right = color256_load(disk_mask + shape_row * shape_mask_ld + shape_col_offset);
+      Color256 base_dst   = color256_load(dst + col_offset);
+      Color256 base_src   = color256_load(src + col_offset);
+
+      if (use_background) {
+        base_src = color256_avg8(base_src, background);
+      }
+
+      Color256 base = color256_alpha_blend(base_src, base_dst, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
+
+      if (use_border) {
+        Color256 circle_right = color256_load(circle_mask + shape_row * shape_mask_ld + shape_col_offset);
+        base                  = color256_alpha_blend(border, base, circle_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
+      }
+
+      color256_store(dst + col_offset, base);
+
+      shape_col++;
     }
-
-    color256_store(dst + col_offset, base);
-
-    shape_col++;
   }
 }
 
@@ -546,11 +551,15 @@ void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* w
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(window);
 
+  if (window->y >= (int32_t) display->height)
+    return;
+
   const uint32_t rounding_size = (window->height >= 64) ? 32 : 0;
+  const uint32_t height        = (window->y + window->height > display->height) ? display->height - window->y : window->height;
 
   _ui_renderer_render_rounded_box(
     renderer, window->width, window->height, window->background_blur_buffer, 0, 0, window->background_blur_buffer_ld, display->buffer,
-    window->x, window->y, display->ld, rounding_size, 0, 0xFF111928);
+    window->x, window->y, display->ld, rounding_size, height, 0, 0xFF111928);
 }
 
 void ui_renderer_render_rounded_box(
@@ -558,8 +567,14 @@ void ui_renderer_render_rounded_box(
   MD_CHECK_NULL_ARGUMENT(renderer);
   MD_CHECK_NULL_ARGUMENT(display);
 
+  if (y >= display->height)
+    return;
+
+  const uint32_t height_clip = (y + height > display->height) ? display->height - y : height;
+
   _ui_renderer_render_rounded_box(
-    renderer, width, height, display->buffer, x, y, display->ld, display->buffer, x, y, display->ld, rounding_size, 0xFF111111, 0xFF000000);
+    renderer, width, height, display->buffer, x, y, display->ld, display->buffer, x, y, display->ld, rounding_size, height_clip, 0xFF111111,
+    0xFF000000);
 }
 
 void ui_renderer_destroy(UIRenderer** renderer) {

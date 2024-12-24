@@ -27,11 +27,11 @@ void window_allocate_memory(Window* window) {
 static bool window_is_mouse_hover(Window* window, Display* display) {
   const MouseState* mouse_state = display->mouse_state;
 
-  const uint32_t mouse_x = mouse_state->x;
-  const uint32_t mouse_y = mouse_state->y;
+  const int32_t mouse_x = mouse_state->x;
+  const int32_t mouse_y = mouse_state->y;
 
-  const bool in_horizontal_bounds = (mouse_x >= window->x) && (mouse_x <= (window->x + window->width));
-  const bool in_vertical_bounds   = (mouse_y >= window->y) && (mouse_y <= (window->y + window->height));
+  const bool in_horizontal_bounds = (mouse_x >= window->x) && (mouse_x <= (int32_t) (window->x + window->width));
+  const bool in_vertical_bounds   = (mouse_y >= window->y) && (mouse_y <= (int32_t) (window->y + window->height));
 
   return in_horizontal_bounds && in_vertical_bounds;
 }
@@ -78,6 +78,15 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
     if (display->mouse_state->down) {
       window->x += display->mouse_state->x_motion;
       window->y += display->mouse_state->y_motion;
+
+      if (window->x < 0)
+        window->x = 0;
+
+      if (window->x + window->width > display->width)
+        window->x = display->width - window->width;
+
+      if (window->y < 0)
+        window->y = 0;
     }
   }
 
