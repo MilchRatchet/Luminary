@@ -406,8 +406,7 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
 LuminaryResult luminary_host_get_current_sample_time(Host* host, double* time) {
   __CHECK_NULL_ARGUMENT(host);
 
-  // TODO: Gather correct time.
-  *time = 0.123;
+  __FAILURE_HANDLE(sample_time_get_time(host->device_manager->sample_time, time));
 
   return LUMINARY_SUCCESS;
 }

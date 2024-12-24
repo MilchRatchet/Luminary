@@ -176,6 +176,9 @@ LuminaryResult device_renderer_queue_sample(DeviceRenderer* renderer, Device* de
 
   if (renderer->event_id >= DEVICE_RENDERER_TIMING_EVENTS_COUNT) {
     CUDA_FAILURE_HANDLE(cuEventElapsedTime(&renderer->last_time, renderer->time_start[event_id], renderer->time_end[event_id]));
+
+    // Convert from milliseconds to seconds.
+    renderer->last_time *= 0.001;
   }
 
   CUDA_FAILURE_HANDLE(cuEventRecord(renderer->time_start[event_id], device->stream_main));
