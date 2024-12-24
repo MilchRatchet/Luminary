@@ -7,13 +7,31 @@
 void element_apply_context(
   Element* element, WindowContext* context, ElementSize* size, Display* display, ElementMouseResult* mouse_result) {
   if (size->is_relative) {
-    element->width  = (uint32_t) ((context->width - 2 * context->padding) * size->rel_width);
-    element->height = (uint32_t) ((context->height - 2 * context->padding) * size->rel_height);
+    const float rel_width  = fminf(1.0f, fmaxf(0.0f, size->rel_width));
+    const float rel_height = fminf(1.0f, fmaxf(0.0f, size->rel_height));
+
+    element->width  = (uint32_t) ((context->width - 2 * context->padding) * rel_width);
+    element->height = (uint32_t) ((context->height - 2 * context->padding) * rel_height);
+
+    // If the element has a relative size, we clamp it to fit into the bounds of the context.
+    if (context->is_horizontal) {
+      element->width = (context->fill + element->width + 2 * context->padding <= context->width)
+                         ? element->width
+                         : context->width - context->fill - 2 * context->padding;
+    }
+    else {
+      element->height = (context->fill + element->height + 2 * context->padding <= context->height)
+                          ? element->height
+                          : context->height - context->fill - 2 * context->padding;
+    }
   }
   else {
     element->width  = size->width;
     element->height = size->height;
   }
+
+  // Each element must have a width that is a multiple of the renderer's stride.
+  element->width = (element->width / UI_RENDERER_STRIDE) * UI_RENDERER_STRIDE;
 
   element->x = context->x + context->padding + ((context->is_horizontal) ? context->fill : 0);
   element->y = context->y + context->padding + ((context->is_horizontal) ? 0 : context->fill);

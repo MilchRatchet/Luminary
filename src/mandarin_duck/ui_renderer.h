@@ -8,6 +8,12 @@
 #define UI_RENDERER_STRIDE_LOG 3
 #define UI_RENDERER_STRIDE_BYTES (UI_RENDERER_STRIDE * 4)
 
+enum UIRendererBackgroundMode {
+  UI_RENDERER_BACKGROUND_MODE_OPAQUE          = 0,
+  UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT = 1,
+  UI_RENDERER_BACKGROUND_MODE_TRANSPARENT     = 2
+} typedef UIRendererBackgroundMode;
+
 #define SHAPE_MASK_COUNT 3
 
 struct UIRenderer {
@@ -23,7 +29,8 @@ void ui_renderer_create(UIRenderer** renderer);
 void ui_renderer_create_window_background(UIRenderer* renderer, Display* display, Window* window);
 void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* window);
 void ui_renderer_render_rounded_box(
-  UIRenderer* renderer, Display* display, uint32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t rounding_size);
+  UIRenderer* renderer, Display* display, uint32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t rounding_size,
+  uint32_t border_color, uint32_t background_color, UIRendererBackgroundMode background_mode);
 void ui_renderer_destroy(UIRenderer** renderer);
 
 #endif /* MANDARIN_DUCK_UI_RENDERER_H */

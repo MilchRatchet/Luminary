@@ -10,8 +10,7 @@ enum ElementSliderDataType {
   ELEMENT_SLIDER_DATA_TYPE_FLOAT,
   ELEMENT_SLIDER_DATA_TYPE_UINT,
   ELEMENT_SLIDER_DATA_TYPE_VECTOR,
-  ELEMENT_SLIDER_DATA_TYPE_COLOR_RGB,
-  ELEMENT_SLIDER_DATA_TYPE_COLOR_RGBA
+  ELEMENT_SLIDER_DATA_TYPE_RGB
 } typedef ElementSliderDataType;
 
 struct ElementSliderData {
@@ -19,11 +18,10 @@ struct ElementSliderData {
   float data_float;
   uint32_t data_uint;
   LuminaryVec3 data_vec3;
-  LuminaryRGBF data_RGB;
-  LuminaryRGBAF data_RGBAF;
   ElementSize size;
   uint32_t color;
   uint32_t component_padding;
+  uint32_t margins;
   bool center_x;
   bool center_y;
 } typedef ElementSliderData;
@@ -37,6 +35,7 @@ struct ElementSliderArgs {
   ElementSize size;
   uint32_t color;
   uint32_t component_padding;
+  uint32_t margins;
   bool center_x;
   bool center_y;
 } typedef ElementSliderArgs;

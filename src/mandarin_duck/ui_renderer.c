@@ -103,7 +103,7 @@ static void _ui_renderer_create_circle_mask(uint8_t* dst, uint32_t size) {
 static void _ui_renderer_render_rounded_box(
   UIRenderer* renderer, uint32_t width, uint32_t height, const uint8_t* src, uint32_t src_x, uint32_t src_y, uint32_t src_ld, uint8_t* dst,
   uint32_t dst_x, uint32_t dst_y, uint32_t dst_ld, uint32_t rounding_size, uint32_t height_clip, uint32_t border_color,
-  uint32_t background_color) {
+  uint32_t background_color, UIRendererBackgroundMode background_mode) {
   const uint32_t cols = width >> UI_RENDERER_STRIDE_LOG;
   const uint32_t rows = height;
 
@@ -145,8 +145,9 @@ static void _ui_renderer_render_rounded_box(
   Color256 mask_add        = color256_set_1(0x00800080);
   Color256 mask_full_alpha = color256_set_1(0x000000FF);
 
-  const bool use_background = (background_color != 0);
-  const bool use_border     = (border_color != 0);
+  const bool use_background    = background_mode != UI_RENDERER_BACKGROUND_MODE_TRANSPARENT;
+  const bool opaque_background = background_mode == UI_RENDERER_BACKGROUND_MODE_OPAQUE;
+  const bool use_border        = (border_color != 0);
 
   ////////////////////////////////////////////////////////////////////
   // Row kind
@@ -165,7 +166,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src  = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       Color256 base = color256_alpha_blend(base_src, base_dst, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
@@ -191,7 +192,7 @@ static void _ui_renderer_render_rounded_box(
         base = color256_load(src + col_offset);
 
         if (use_background) {
-          base = color256_avg8(base, background);
+          base = (opaque_background) ? background : color256_avg8(base, background);
         }
       }
 
@@ -207,7 +208,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src   = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       Color256 base = color256_alpha_blend(base_src, base_dst, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
@@ -245,7 +246,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src  = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       Color256 base = color256_alpha_blend(base_src, base_dst, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
@@ -266,7 +267,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       color256_store(dst + col_offset, base_src);
@@ -281,7 +282,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src   = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       Color256 base = color256_alpha_blend(base_src, base_dst, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
@@ -318,7 +319,7 @@ static void _ui_renderer_render_rounded_box(
         Color256 base_src = color256_load(src + col_offset);
 
         if (use_background) {
-          base_src = color256_avg8(base_src, background);
+          base_src = (opaque_background) ? background : color256_avg8(base_src, background);
         }
 
         if (use_border) {
@@ -334,7 +335,7 @@ static void _ui_renderer_render_rounded_box(
         Color256 base_src = color256_load(src + col_offset);
 
         if (use_background) {
-          base_src = color256_avg8(base_src, background);
+          base_src = (opaque_background) ? background : color256_avg8(base_src, background);
         }
 
         color256_store(dst + col_offset, base_src);
@@ -346,7 +347,7 @@ static void _ui_renderer_render_rounded_box(
         Color256 base_src = color256_load(src + col_offset);
 
         if (use_background) {
-          base_src = color256_avg8(base_src, background);
+          base_src = (opaque_background) ? background : color256_avg8(base_src, background);
         }
 
         if (use_border) {
@@ -378,7 +379,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src  = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       Color256 base = color256_alpha_blend(base_src, base_dst, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
@@ -399,7 +400,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       color256_store(dst + col_offset, base_src);
@@ -414,7 +415,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src   = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       Color256 base = color256_alpha_blend(base_src, base_dst, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
@@ -451,7 +452,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src  = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       Color256 base = color256_alpha_blend(base_src, base_dst, disk_left, mask_low16, mask_high16, mask_add, mask_full_alpha);
@@ -477,7 +478,7 @@ static void _ui_renderer_render_rounded_box(
         base = color256_load(src + col_offset);
 
         if (use_background) {
-          base = color256_avg8(base, background);
+          base = (opaque_background) ? background : color256_avg8(base, background);
         }
       }
 
@@ -493,7 +494,7 @@ static void _ui_renderer_render_rounded_box(
       Color256 base_src   = color256_load(src + col_offset);
 
       if (use_background) {
-        base_src = color256_avg8(base_src, background);
+        base_src = (opaque_background) ? background : color256_avg8(base_src, background);
       }
 
       Color256 base = color256_alpha_blend(base_src, base_dst, disk_right, mask_low16, mask_high16, mask_add, mask_full_alpha);
@@ -559,11 +560,12 @@ void ui_renderer_render_window(UIRenderer* renderer, Display* display, Window* w
 
   _ui_renderer_render_rounded_box(
     renderer, window->width, window->height, window->background_blur_buffer, 0, 0, window->background_blur_buffer_ld, display->buffer,
-    window->x, window->y, display->ld, rounding_size, height, 0, 0xFF111928);
+    window->x, window->y, display->ld, rounding_size, height, 0, 0xFF111928, UI_RENDERER_BACKGROUND_MODE_SEMITRANSPARENT);
 }
 
 void ui_renderer_render_rounded_box(
-  UIRenderer* renderer, Display* display, uint32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t rounding_size) {
+  UIRenderer* renderer, Display* display, uint32_t width, uint32_t height, uint32_t x, uint32_t y, uint32_t rounding_size,
+  uint32_t border_color, uint32_t background_color, UIRendererBackgroundMode background_mode) {
   MD_CHECK_NULL_ARGUMENT(renderer);
   MD_CHECK_NULL_ARGUMENT(display);
 
@@ -573,8 +575,8 @@ void ui_renderer_render_rounded_box(
   const uint32_t height_clip = (y + height > display->height) ? display->height - y : height;
 
   _ui_renderer_render_rounded_box(
-    renderer, width, height, display->buffer, x, y, display->ld, display->buffer, x, y, display->ld, rounding_size, height_clip, 0xFF111111,
-    0xFF000000);
+    renderer, width, height, display->buffer, x, y, display->ld, display->buffer, x, y, display->ld, rounding_size, height_clip,
+    border_color, background_color, background_mode);
 }
 
 void ui_renderer_destroy(UIRenderer** renderer) {

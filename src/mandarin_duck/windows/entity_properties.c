@@ -2,6 +2,7 @@
 
 #include <float.h>
 
+#include "elements/color.h"
 #include "elements/slider.h"
 #include "elements/text.h"
 
@@ -21,16 +22,32 @@ static void _window_entity_properties_add_slider(
         .center_x = false,
         .center_y = true});
 
+    if (data_type == ELEMENT_SLIDER_DATA_TYPE_RGB) {
+      LuminaryRGBF color = *(LuminaryRGBF*) data_binding;
+
+      uint32_t color_bits = 0xFF000000;
+
+      color_bits |= ((uint32_t) fminf(255.0f, fmaxf(0.0f, (color.r * 255.0f)))) << 16;
+      color_bits |= ((uint32_t) fminf(255.0f, fmaxf(0.0f, (color.g * 255.0f)))) << 8;
+      color_bits |= ((uint32_t) fminf(255.0f, fmaxf(0.0f, (color.b * 255.0f)))) << 0;
+
+      element_color(
+        window, display, (ElementColorArgs){.size = (ElementSize){.is_relative = false, .width = 24, .height = 24}, .color = color_bits});
+
+      window_margin(window, 4);
+    }
+
     element_slider(
       window, display,
       (ElementSliderArgs){
         .type              = data_type,
         .color             = 0xFFFFFFFF,
-        .size              = (ElementSize){.is_relative = true, .rel_width = 0.6f, .rel_height = 0.75f},
+        .size              = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f},
         .data_binding      = data_binding,
         .min               = min,
         .max               = max,
         .component_padding = 4,
+        .margins           = 4,
         .center_x          = true,
         .center_y          = true});
   }
