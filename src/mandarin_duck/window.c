@@ -74,7 +74,7 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
   const bool elements_is_mouse_hover = window->action_func(window, display, host);
   const bool is_mouse_hover          = window_is_mouse_hover(window, display);
 
-  if (is_mouse_hover && !elements_is_mouse_hover) {
+  if (is_mouse_hover && !elements_is_mouse_hover && window->is_movable) {
     if (display->mouse_state->down) {
       window->x += display->mouse_state->x_motion;
       window->y += display->mouse_state->y_motion;

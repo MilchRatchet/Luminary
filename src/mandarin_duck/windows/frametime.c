@@ -108,6 +108,7 @@ void window_frametime_create(Window** window) {
   (*window)->padding       = 0;
   (*window)->is_horizontal = false;
   (*window)->is_visible    = true;
+  (*window)->is_movable    = false;
   (*window)->background    = true;
   (*window)->auto_size     = false;
   (*window)->auto_align    = true;

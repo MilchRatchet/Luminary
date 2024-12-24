@@ -52,6 +52,7 @@ struct Window {
   WindowMargins margins;
   bool is_horizontal;
   bool is_visible;
+  bool is_movable;
   bool background;
   bool auto_align;
   bool auto_size;

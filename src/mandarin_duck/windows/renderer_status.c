@@ -115,6 +115,7 @@ void window_renderer_status_create(Window** window) {
   (*window)->padding       = 0;
   (*window)->is_horizontal = false;
   (*window)->is_visible    = true;
+  (*window)->is_movable    = false;
   (*window)->background    = true;
   (*window)->auto_size     = true;
   (*window)->auto_align    = true;

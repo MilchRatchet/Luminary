@@ -80,6 +80,7 @@ void window_entity_properties_create(Window** window) {
   (*window)->padding       = 8;
   (*window)->is_horizontal = false;
   (*window)->is_visible    = true;
+  (*window)->is_movable    = true;
   (*window)->background    = true;
   (*window)->auto_size     = false;
   (*window)->action_func   = _window_entity_properties_action;
