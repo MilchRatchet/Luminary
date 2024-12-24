@@ -4,6 +4,7 @@
 #include "windows/caption_controls.h"
 #include "windows/entity_properties.h"
 #include "windows/frametime.h"
+#include "windows/renderer_status.h"
 
 ////////////////////////////////////////////////////////////////////
 // Internal functions
@@ -21,6 +22,11 @@ static void _user_interface_setup(UserInterface* ui) {
   window_frametime_create(&window_frametime);
 
   LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_frametime));
+
+  Window* window_renderer_status;
+  window_renderer_status_create(&window_renderer_status);
+
+  LUM_FAILURE_HANDLE(array_push(&ui->windows, &window_renderer_status));
 
   Window* window_entity_properties_test;
   window_entity_properties_create(&window_entity_properties_test);

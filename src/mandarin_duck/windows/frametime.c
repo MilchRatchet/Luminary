@@ -12,9 +12,6 @@ static bool _window_frametime_action(Window* window, Display* display, LuminaryH
   MD_CHECK_NULL_ARGUMENT(display);
   MD_CHECK_NULL_ARGUMENT(host);
 
-  LuminaryCamera camera;
-  LUM_FAILURE_HANDLE(luminary_host_get_camera(host, &camera));
-
   window_push_section(window, 24, 0);
   {
     window_margin(window, 8);

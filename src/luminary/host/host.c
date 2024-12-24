@@ -413,12 +413,36 @@ LuminaryResult luminary_host_get_current_sample_time(Host* host, double* time) {
 
 LuminaryResult luminary_host_get_queue_string(const Host* host, const char** string) {
   __CHECK_NULL_ARGUMENT(host);
-
-  if (!string) {
-    __RETURN_ERROR(LUMINARY_ERROR_ARGUMENT_NULL, "String is NULL.");
-  }
+  __CHECK_NULL_ARGUMENT(string);
 
   __FAILURE_HANDLE(wall_time_get_string(host->queue_wall_time, string));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_device_queue_string(const Host* host, const char** string) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(string);
+
+  __FAILURE_HANDLE(wall_time_get_string(host->device_manager->queue_wall_time, string));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_queue_time(const Host* host, double* time) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(time);
+
+  __FAILURE_HANDLE(wall_time_get_time(host->queue_wall_time, time));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_get_device_queue_time(const Host* host, double* time) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(time);
+
+  __FAILURE_HANDLE(wall_time_get_time(host->device_manager->queue_wall_time, time));
 
   return LUMINARY_SUCCESS;
 }
