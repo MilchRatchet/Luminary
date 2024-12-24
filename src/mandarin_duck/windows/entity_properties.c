@@ -81,6 +81,7 @@ void window_entity_properties_create(Window** window) {
   (*window)->is_horizontal = false;
   (*window)->is_visible    = true;
   (*window)->background    = true;
+  (*window)->auto_size     = false;
   (*window)->action_func   = _window_entity_properties_action;
 
   window_allocate_memory(*window);

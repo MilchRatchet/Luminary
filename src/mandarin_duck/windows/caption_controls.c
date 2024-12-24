@@ -62,7 +62,11 @@ void window_caption_controls_create(Window** window) {
   (*window)->is_horizontal = true;
   (*window)->is_visible    = true;
   (*window)->background    = false;
-  (*window)->action_func   = _window_caption_controls_action;
+  (*window)->auto_size     = false;
+  (*window)->auto_align    = true;
+  (*window)->margins =
+    (WindowMargins){.margin_top = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_bottom = WINDOW_MARGIN_INVALID};
+  (*window)->action_func = _window_caption_controls_action;
 
   window_allocate_memory(*window);
 }

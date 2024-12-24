@@ -101,15 +101,19 @@ void window_frametime_create(Window** window) {
 
   window_create(window);
 
-  (*window)->x             = 32;
-  (*window)->y             = 1080 - 32 - 48;  // TODO: Implement fixed position windows with computed positions.
+  (*window)->x             = 0;
+  (*window)->y             = 0;
   (*window)->width         = 320;
   (*window)->height        = 48;
   (*window)->padding       = 0;
   (*window)->is_horizontal = false;
   (*window)->is_visible    = true;
   (*window)->background    = true;
-  (*window)->action_func   = _window_frametime_action;
+  (*window)->auto_size     = false;
+  (*window)->auto_align    = true;
+  (*window)->margins =
+    (WindowMargins){.margin_bottom = 32, .margin_left = 32, .margin_right = WINDOW_MARGIN_INVALID, .margin_top = WINDOW_MARGIN_INVALID};
+  (*window)->action_func = _window_frametime_action;
 
   window_allocate_memory(*window);
 }

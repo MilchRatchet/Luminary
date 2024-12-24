@@ -43,6 +43,24 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
 
   LUM_FAILURE_HANDLE(array_clear(window->element_queue));
 
+  if (window->auto_align) {
+    if (window->margins.margin_bottom != WINDOW_MARGIN_INVALID) {
+      window->y = display->height - window->margins.margin_bottom - window->height;
+    }
+
+    if (window->margins.margin_top != WINDOW_MARGIN_INVALID) {
+      window->y = window->margins.margin_top;
+    }
+
+    if (window->margins.margin_right != WINDOW_MARGIN_INVALID) {
+      window->x = display->width - window->margins.margin_right - window->width;
+    }
+
+    if (window->margins.margin_left != WINDOW_MARGIN_INVALID) {
+      window->x = window->margins.margin_left;
+    }
+  }
+
   window->context_stack_ptr = 0;
 
   window->context_stack[0].fill          = 0;
@@ -117,6 +135,20 @@ void window_pop_section(Window* window) {
 void window_render(Window* window, Display* display) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
+
+  if (window->auto_size) {
+    WindowContext* main_context = window->context_stack;
+
+    if (window->is_horizontal) {
+      window->width = main_context->fill;
+    }
+    else {
+      window->height = main_context->fill;
+    }
+  }
+
+  if (window->width == 0 || window->height == 0)
+    return;
 
   if (window->background) {
     ui_renderer_create_window_background(display->ui_renderer, display, window);

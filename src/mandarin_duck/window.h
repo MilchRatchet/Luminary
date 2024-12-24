@@ -28,8 +28,16 @@ struct WindowContext {
                   // an accurate final fill is retrieved
 } typedef WindowContext;
 
+struct WindowMargins {
+  int32_t margin_left;
+  int32_t margin_right;
+  int32_t margin_top;
+  int32_t margin_bottom;
+} typedef WindowMargins;
+
 #define WINDOW_MAX_CONTEXT_DEPTH 8
 #define WINDOW_MAX_BLUR_MIP_COUNT 5
+#define WINDOW_MARGIN_INVALID INT32_MAX
 
 /*
  * The Window is passed to each element so an element can resize itself based on window orientation (vertical/horizontal)
@@ -41,9 +49,12 @@ struct Window {
   uint32_t width;
   uint32_t height;
   uint32_t padding;
+  WindowMargins margins;
   bool is_horizontal;
   bool is_visible;
   bool background;
+  bool auto_align;
+  bool auto_size;
   bool (*action_func)(Window* window, Display* display, LuminaryHost* host);
 
   // Runtime
