@@ -29,6 +29,17 @@ struct Color128 {
 } typedef Color128;
 _STATIC_ASSERT(sizeof(Color128) == 16);
 
+struct Color32 {
+  union {
+    LuminaryARGB8 pixel;
+    uint32_t data;
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+
+#endif
+  };
+} typedef Color32;
+_STATIC_ASSERT(sizeof(Color32) == 4);
+
 ////////////////////////////////////////////////////////////////////
 // Intrinsics
 ////////////////////////////////////////////////////////////////////
@@ -167,6 +178,38 @@ inline Color256 color256_packus16(const Color256 a, const Color256 b) {
 
 #define color256_permute128(__a, __b, __imm) ((Color256){._immi = _mm256_permute2x128_si256(__a._immi, __b._immi, __imm)})
 #endif
+
+inline Color256 color256_load_si32(const uint8_t* ptr) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_castsi128_si256(_mm_cvtsi32_si128(*(uint32_t*) ptr))};
+#else
+  // TODO
+#endif
+}
+
+inline Color256 color256_load_si128(const uint8_t* ptr) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  return (Color256){._immi = _mm256_castsi128_si256(_mm_loadu_si128((const __m128i*) ptr))};
+#else
+  // TODO
+#endif
+}
+
+inline void color256_store_si32(uint8_t* ptr, const Color256 a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  *(int32_t*) ptr = _mm_cvtsi128_si32(_mm256_castsi256_si128(a._immi));
+#else
+  // TODO
+#endif
+}
+
+inline void color256_store_si128(uint8_t* ptr, const Color256 a) {
+#ifdef MANDARIN_DUCK_X86_INTRINSICS
+  _mm_storeu_si128((__m128i*) ptr, _mm256_castsi256_si128(a._immi));
+#else
+  // TODO
+#endif
+}
 
 inline Color128 color128_load(const uint8_t* ptr) {
 #ifdef MANDARIN_DUCK_X86_INTRINSICS

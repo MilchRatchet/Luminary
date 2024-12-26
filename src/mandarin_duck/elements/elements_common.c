@@ -30,9 +30,6 @@ void element_apply_context(
     element->height = size->height;
   }
 
-  // Each element must have a width that is a multiple of the renderer's stride.
-  element->width = (element->width / UI_RENDERER_STRIDE) * UI_RENDERER_STRIDE;
-
   element->x = context->x + context->padding + ((context->is_horizontal) ? context->fill : 0);
   element->y = context->y + context->padding + ((context->is_horizontal) ? 0 : context->fill);
 

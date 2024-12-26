@@ -82,10 +82,7 @@ static void _element_slider_render_uint(Element* slider, Display* display) {
 static void _element_slider_render_vector(Element* slider, Display* display) {
   ElementSliderData* data = (ElementSliderData*) &slider->data;
 
-  // Padding must be 4 pixel aligned.
-  const uint32_t padding = data->component_padding & 0xFFFFFFFC;
-
-  if (slider->width < 6 * padding) {
+  if (slider->width < 6 * data->component_padding) {
     return;
   }
 
@@ -93,9 +90,8 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
 
   uint32_t x_offset = slider->x;
 
-  // Components must be 8 pixel aligned
-  const uint32_t component_size_padded = ((slider->width - 2 * data->margins) / 3) & 0xFFFFFFF8;
-  const uint32_t component_size        = component_size_padded - 2 * padding;
+  const uint32_t component_size_padded = (slider->width - 2 * data->margins) / 3;
+  const uint32_t component_size        = component_size_padded - 2 * data->component_padding;
 
   // Recompute margins so that we actually fill out the whole element's width.
   const uint32_t margins = (slider->width - component_size_padded * 3) >> 1;
@@ -115,7 +111,7 @@ static void _element_slider_render_vector(Element* slider, Display* display) {
       crash_message("Text is too larger.");
     }
 
-    const uint32_t padding_x = data->center_x ? (component_size_padded - surface->w) >> 1 : padding;
+    const uint32_t padding_x = data->center_x ? (component_size_padded - surface->w) >> 1 : data->component_padding;
     const uint32_t padding_y = data->center_y ? (slider->height - surface->h) >> 1 : 0;
 
     SDL_Rect src_rect;
