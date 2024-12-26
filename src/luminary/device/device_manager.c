@@ -304,6 +304,14 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
 
   if (flags & SCENE_DIRTY_FLAG_OUTPUT) {
     // TODO: Signal main device to output current image again.
+
+    // If only the output is dirty, we need to make sure that the changes are actually uploaded.
+    if ((flags & SCENE_DIRTY_FLAG_INTEGRATION) == 0) {
+      for (uint32_t device_id = 0; device_id < device_count; device_id++) {
+        Device* device = device_manager->devices[device_id];
+        __FAILURE_HANDLE_CRITICAL(device_sync_constant_memory(device));
+      }
+    }
   }
 
   if (flags & SCENE_DIRTY_FLAG_BUFFERS) {
