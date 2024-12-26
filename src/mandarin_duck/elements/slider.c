@@ -152,6 +152,31 @@ static void _element_slider_render_func(Element* slider, Display* display) {
   }
 }
 
+static uint32_t _element_slider_get_subelement_index(Window* window, Display* display, Element* slider) {
+  if ((slider->type != ELEMENT_SLIDER_DATA_TYPE_VECTOR) && (slider->type != ELEMENT_SLIDER_DATA_TYPE_RGB)) {
+    return 0;
+  }
+
+  ElementSliderData* data = (ElementSliderData*) &slider->data;
+
+  // Copy from the render functions
+  const uint32_t component_size_padded = (slider->width - 2 * data->margins) / 3;
+  const uint32_t margins               = (slider->width - component_size_padded * 3) >> 1;
+
+  // We only execute this if we have pressed the element, so we know the mouse is inside the element.
+  const uint32_t x = display->mouse_state->x - slider->x;
+
+  if (x < component_size_padded) {
+    return 0;
+  }
+  else if (x < 2 * component_size_padded + margins) {
+    return 1;
+  }
+  else {
+    return 2;
+  }
+}
+
 bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
@@ -189,6 +214,8 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
       data->data_float = *(float*) args.data_binding;
 
       if (use_slider) {
+        mouse_change_rate *= (1.0f + sqrtf(fabsf(data->data_float)));
+
         data->data_float += display->mouse_state->x_motion * mouse_change_rate * 0.001f;
         data->data_float            = fminf(args.max, fmaxf(args.min, data->data_float));
         *(float*) args.data_binding = data->data_float;
@@ -202,6 +229,16 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
     case ELEMENT_SLIDER_DATA_TYPE_VECTOR:
     case ELEMENT_SLIDER_DATA_TYPE_RGB:
       data->data_vec3 = *(LuminaryVec3*) args.data_binding;
+
+      if (use_slider) {
+        float* value = ((float*) &data->data_vec3) + window->state_data.subelement_index;
+        *value += display->mouse_state->x_motion * mouse_change_rate * 0.001f;
+        *value = fminf(args.max, fmaxf(args.min, *value));
+
+        ((float*) args.data_binding)[window->state_data.subelement_index] = *value;
+
+        updated_data = true;
+      }
       break;
   }
 
@@ -210,8 +247,9 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
   }
 
   if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
-    window->state_data.state        = WINDOW_INTERACTION_STATE_SLIDER;
-    window->state_data.element_hash = slider.hash;
+    window->state_data.state            = WINDOW_INTERACTION_STATE_SLIDER;
+    window->state_data.element_hash     = slider.hash;
+    window->state_data.subelement_index = _element_slider_get_subelement_index(window, display, &slider);
 
     SDL_SetWindowRelativeMouseMode(display->sdl_window, true);
     SDL_HideCursor();

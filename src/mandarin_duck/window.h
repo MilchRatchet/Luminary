@@ -40,6 +40,7 @@ enum WindowInteractionState { WINDOW_INTERACTION_STATE_NONE, WINDOW_INTERACTION_
 struct WindowInteractionStateData {
   WindowInteractionState state;
   uint64_t element_hash;
+  uint32_t subelement_index;
 } typedef WindowInteractionStateData;
 
 #define WINDOW_MAX_CONTEXT_DEPTH 8

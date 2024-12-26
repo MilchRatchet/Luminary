@@ -101,8 +101,9 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
       break;
     case WINDOW_INTERACTION_STATE_SLIDER:
       if (display->mouse_state->down == false) {
-        window->state_data.state        = WINDOW_INTERACTION_STATE_NONE;
-        window->state_data.element_hash = 0;
+        window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
+        window->state_data.element_hash     = 0;
+        window->state_data.subelement_index = 0;
         SDL_SetWindowRelativeMouseMode(display->sdl_window, false);
         SDL_ShowCursor();
       }
