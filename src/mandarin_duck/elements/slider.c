@@ -154,12 +154,13 @@ static void _element_slider_render_func(Element* slider, Display* display) {
 bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
-  Element text;
+  Element slider;
 
-  text.type        = ELEMENT_TYPE_SLIDER;
-  text.render_func = _element_slider_render_func;
+  slider.type        = ELEMENT_TYPE_SLIDER;
+  slider.render_func = _element_slider_render_func;
+  slider.hash        = element_compute_hash(args.identifier);
 
-  ElementSliderData* data = (ElementSliderData*) &text.data;
+  ElementSliderData* data = (ElementSliderData*) &slider.data;
 
   data->type              = args.type;
   data->color             = args.color;
@@ -183,9 +184,9 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
   }
 
   ElementMouseResult mouse_result;
-  element_apply_context(&text, context, &args.size, display, &mouse_result);
+  element_apply_context(&slider, context, &args.size, display, &mouse_result);
 
-  LUM_FAILURE_HANDLE(array_push(&window->element_queue, &text));
+  LUM_FAILURE_HANDLE(array_push(&window->element_queue, &slider));
 
   return mouse_result.is_clicked;
 }

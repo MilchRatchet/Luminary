@@ -24,6 +24,7 @@ struct Element {
   uint32_t y;
   uint32_t width;
   uint32_t height;
+  uint64_t hash;
   uint8_t data[ELEMENT_DATA_SECTION_SIZE];
   void (*render_func)(Element* element, Display* display);
 } typedef Element;

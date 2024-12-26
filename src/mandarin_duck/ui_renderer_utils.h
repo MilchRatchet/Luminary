@@ -349,4 +349,8 @@ inline Color256 color256_alpha_blend(
   return color256_add8(color1_alpha_mul, color2_alpha_mul);
 }
 
+inline uint64_t element_hash_accumulate(uint64_t hash, uint64_t value) {
+  return _mm_crc32_u64(hash, value);
+}
+
 #endif /* MANDARIN_DUCK_UI_RENDERER_UTILS_H */

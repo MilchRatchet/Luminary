@@ -13,19 +13,20 @@ static void _element_color_render_func(Element* color, Display* display) {
 bool element_color(Window* window, Display* display, ElementColorArgs args) {
   WindowContext* context = window->context_stack + window->context_stack_ptr;
 
-  Element button;
+  Element color;
 
-  button.type        = ELEMENT_TYPE_COLOR;
-  button.render_func = _element_color_render_func;
+  color.type        = ELEMENT_TYPE_COLOR;
+  color.render_func = _element_color_render_func;
+  color.hash        = 0;
 
-  ElementColorData* data = (ElementColorData*) &button.data;
+  ElementColorData* data = (ElementColorData*) &color.data;
 
   ElementMouseResult mouse_result;
-  element_apply_context(&button, context, &args.size, display, &mouse_result);
+  element_apply_context(&color, context, &args.size, display, &mouse_result);
 
   data->color = args.color;
 
-  LUM_FAILURE_HANDLE(array_push(&window->element_queue, &button));
+  LUM_FAILURE_HANDLE(array_push(&window->element_queue, &color));
 
   return mouse_result.is_clicked;
 }

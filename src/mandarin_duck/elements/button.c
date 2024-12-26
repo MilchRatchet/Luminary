@@ -43,6 +43,7 @@ bool element_button(Window* window, Display* display, ElementButtonArgs args) {
 
   button.type        = ELEMENT_TYPE_BUTTON;
   button.render_func = _element_button_render_func;
+  button.hash        = 0;
 
   ElementButtonData* data = (ElementButtonData*) &button.data;
 

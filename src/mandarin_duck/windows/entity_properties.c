@@ -40,6 +40,7 @@ static void _window_entity_properties_add_slider(
     element_slider(
       window, display,
       (ElementSliderArgs){
+        .identifier        = text,
         .type              = data_type,
         .color             = 0xFFFFFFFF,
         .size              = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f},

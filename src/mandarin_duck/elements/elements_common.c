@@ -2,6 +2,7 @@
 
 #include "display.h"
 #include "element.h"
+#include "ui_renderer_utils.h"
 #include "window.h"
 
 void element_apply_context(
@@ -46,4 +47,35 @@ void element_apply_context(
   mouse_result->is_hovered = in_horizontal_bounds && in_vertical_bounds;
   mouse_result->is_pressed = mouse_result->is_hovered && mouse_state->down;
   mouse_result->is_clicked = mouse_result->is_hovered && (mouse_state->phase == MOUSE_PHASE_RELEASED);
+}
+
+uint64_t element_compute_hash(const char* identifier) {
+  if (identifier == (const char*) 0)
+    return 0;
+
+  size_t string_length = strlen(identifier);
+
+  uint64_t hash = 0;
+
+  while (string_length >= 8) {
+    hash = element_hash_accumulate(hash, *(uint64_t*) identifier);
+
+    identifier    = identifier + 8;
+    string_length = string_length - 8;
+  }
+
+  if (string_length > 0) {
+    uint64_t value = 0;
+
+    while (string_length > 0) {
+      value |= ((uint64_t) (*identifier)) << (8 * string_length);
+
+      identifier    = identifier + 1;
+      string_length = string_length - 1;
+    }
+
+    hash = element_hash_accumulate(hash, value);
+  }
+
+  return hash;
 }

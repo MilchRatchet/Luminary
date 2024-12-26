@@ -28,6 +28,7 @@ struct ElementSliderData {
 static_assert(sizeof(ElementSliderData) <= ELEMENT_DATA_SECTION_SIZE, "Element data exceeds allocated size.");
 
 struct ElementSliderArgs {
+  const char* identifier;
   ElementSliderDataType type;
   void* data_binding;
   float max;

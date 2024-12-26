@@ -40,6 +40,7 @@ bool element_text(Window* window, Display* display, ElementTextArgs args) {
 
   text.type        = ELEMENT_TYPE_TEXT;
   text.render_func = _element_text_render_func;
+  text.hash        = 0;
 
   ElementTextData* data = (ElementTextData*) &text.data;
 
