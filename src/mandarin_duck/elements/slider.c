@@ -1,5 +1,6 @@
 #include "slider.h"
 
+#include <float.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -170,9 +171,30 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
   data->center_x          = args.center_x;
   data->center_y          = args.center_y;
 
+  ElementMouseResult mouse_result;
+  element_apply_context(&slider, context, &args.size, display, &mouse_result);
+
+  bool updated_data = false;
+
+  const bool use_slider = (window->state_data.state == WINDOW_INTERACTION_STATE_SLIDER) && (window->state_data.element_hash == slider.hash)
+                          && (display->mouse_state->down);
+
+  float mouse_change_rate = args.change_rate;
+  if (display->keyboard_state->keys[SDL_SCANCODE_LCTRL].down) {
+    mouse_change_rate = 0.1f * mouse_change_rate;
+  }
+
   switch (args.type) {
     case ELEMENT_SLIDER_DATA_TYPE_FLOAT:
       data->data_float = *(float*) args.data_binding;
+
+      if (use_slider) {
+        data->data_float += display->mouse_state->x_motion * mouse_change_rate * 0.001f;
+        data->data_float            = fminf(args.max, fmaxf(args.min, data->data_float));
+        *(float*) args.data_binding = data->data_float;
+
+        updated_data = true;
+      }
       break;
     case ELEMENT_SLIDER_DATA_TYPE_UINT:
       data->data_uint = *(uint32_t*) args.data_binding;
@@ -183,10 +205,19 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
       break;
   }
 
-  ElementMouseResult mouse_result;
-  element_apply_context(&slider, context, &args.size, display, &mouse_result);
+  if (mouse_result.is_hovered) {
+    window->element_has_hover = true;
+  }
+
+  if (mouse_result.is_pressed && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
+    window->state_data.state        = WINDOW_INTERACTION_STATE_SLIDER;
+    window->state_data.element_hash = slider.hash;
+
+    SDL_SetWindowRelativeMouseMode(display->sdl_window, true);
+    SDL_HideCursor();
+  }
 
   LUM_FAILURE_HANDLE(array_push(&window->element_queue, &slider));
 
-  return mouse_result.is_clicked;
+  return updated_data;
 }

@@ -71,10 +71,16 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
   window->context_stack[0].padding       = window->padding;
   window->context_stack[0].is_horizontal = window->is_horizontal;
 
-  const bool elements_is_mouse_hover = window->action_func(window, display, host);
-  const bool is_mouse_hover          = window_is_mouse_hover(window, display);
+  window->element_has_hover = false;
 
-  if (is_mouse_hover && !elements_is_mouse_hover && window->is_movable) {
+  const bool elements_received_action = window->action_func(window, display, host);
+  const bool is_mouse_hover           = window_is_mouse_hover(window, display);
+
+  if (elements_received_action) {
+    return true;
+  }
+
+  if (is_mouse_hover && !window->element_has_hover && window->is_movable && window->state_data.state == WINDOW_INTERACTION_STATE_NONE) {
     if (display->mouse_state->down) {
       window->x += display->mouse_state->x_motion;
       window->y += display->mouse_state->y_motion;
@@ -88,6 +94,21 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
       if (window->y < 0)
         window->y = 0;
     }
+  }
+
+  switch (window->state_data.state) {
+    case WINDOW_INTERACTION_STATE_NONE:
+      break;
+    case WINDOW_INTERACTION_STATE_SLIDER:
+      if (display->mouse_state->down == false) {
+        window->state_data.state        = WINDOW_INTERACTION_STATE_NONE;
+        window->state_data.element_hash = 0;
+        SDL_SetWindowRelativeMouseMode(display->sdl_window, false);
+        SDL_ShowCursor();
+      }
+      break;
+    default:
+      break;
   }
 
   return is_mouse_hover;

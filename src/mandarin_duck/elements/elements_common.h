@@ -34,6 +34,8 @@ struct ElementMouseResult {
   bool is_hovered;
   bool is_pressed;
   bool is_clicked;
+  float click_rel_x;
+  float click_rel_y;
 } typedef ElementMouseResult;
 
 void element_apply_context(Element* element, WindowContext* context, ElementSize* size, Display* display, ElementMouseResult* mouse_result);

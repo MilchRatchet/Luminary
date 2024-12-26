@@ -47,6 +47,11 @@ void element_apply_context(
   mouse_result->is_hovered = in_horizontal_bounds && in_vertical_bounds;
   mouse_result->is_pressed = mouse_result->is_hovered && mouse_state->down;
   mouse_result->is_clicked = mouse_result->is_hovered && (mouse_state->phase == MOUSE_PHASE_RELEASED);
+
+  if (mouse_result->is_clicked || mouse_result->is_pressed) {
+    mouse_result->click_rel_x = ((float) (mouse_x - element->x)) / element->width;
+    mouse_result->click_rel_y = ((float) (mouse_y - element->y)) / element->height;
+  }
 }
 
 uint64_t element_compute_hash(const char* identifier) {

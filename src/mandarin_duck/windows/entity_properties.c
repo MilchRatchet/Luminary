@@ -6,10 +6,13 @@
 #include "elements/slider.h"
 #include "elements/text.h"
 
-static void _window_entity_properties_add_slider(
-  Window* window, Display* display, const char* text, void* data_binding, ElementSliderDataType data_type, float min, float max) {
+static bool _window_entity_properties_add_slider(
+  Window* window, Display* display, const char* text, void* data_binding, ElementSliderDataType data_type, float min, float max,
+  float change_rate) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
+
+  bool update_data = false;
 
   window_push_section(window, 32, 0);
   {
@@ -37,22 +40,27 @@ static void _window_entity_properties_add_slider(
       window_margin(window, 4);
     }
 
-    element_slider(
-      window, display,
-      (ElementSliderArgs){
-        .identifier        = text,
-        .type              = data_type,
-        .color             = 0xFFFFFFFF,
-        .size              = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f},
-        .data_binding      = data_binding,
-        .min               = min,
-        .max               = max,
-        .component_padding = 4,
-        .margins           = 4,
-        .center_x          = true,
-        .center_y          = true});
+    if (element_slider(
+          window, display,
+          (ElementSliderArgs){
+            .identifier        = text,
+            .type              = data_type,
+            .color             = 0xFFFFFFFF,
+            .size              = (ElementSize){.is_relative = true, .rel_width = 1.0f, .rel_height = 0.75f},
+            .data_binding      = data_binding,
+            .min               = min,
+            .max               = max,
+            .change_rate       = change_rate,
+            .component_padding = 4,
+            .margins           = 4,
+            .center_x          = true,
+            .center_y          = true})) {
+      update_data = true;
+    }
   }
   window_pop_section(window);
+
+  return update_data;
 }
 
 static bool _window_entity_properties_action(Window* window, Display* display, LuminaryHost* host) {
@@ -77,13 +85,26 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   }
   window_pop_section(window);
 
-  _window_entity_properties_add_slider(window, display, "Position", &camera.pos, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX);
-  _window_entity_properties_add_slider(window, display, "Rotation", &camera.rotation, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX);
-  _window_entity_properties_add_slider(window, display, "Field of View", &camera.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX);
-  _window_entity_properties_add_slider(
-    window, display, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX);
+  bool update_data = false;
 
-  return false;
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Position", &camera.pos, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Rotation", &camera.rotation, ELEMENT_SLIDER_DATA_TYPE_VECTOR, -FLT_MAX, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Field of View", &camera.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+  update_data |=
+    _window_entity_properties_add_slider(window, display, "Test", &camera.color_correction, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
+
+  if (update_data) {
+    LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
+  }
+
+  return update_data;
 }
 
 void window_entity_properties_create(Window** window) {

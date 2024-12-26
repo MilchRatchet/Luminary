@@ -33,6 +33,7 @@ struct ElementSliderArgs {
   void* data_binding;
   float max;
   float min;
+  float change_rate;
   ElementSize size;
   uint32_t color;
   uint32_t component_padding;

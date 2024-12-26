@@ -35,6 +35,13 @@ struct WindowMargins {
   int32_t margin_bottom;
 } typedef WindowMargins;
 
+enum WindowInteractionState { WINDOW_INTERACTION_STATE_NONE, WINDOW_INTERACTION_STATE_SLIDER } typedef WindowInteractionState;
+
+struct WindowInteractionStateData {
+  WindowInteractionState state;
+  uint64_t element_hash;
+} typedef WindowInteractionStateData;
+
 #define WINDOW_MAX_CONTEXT_DEPTH 8
 #define WINDOW_MAX_BLUR_MIP_COUNT 5
 #define WINDOW_MARGIN_INVALID INT32_MAX
@@ -57,6 +64,7 @@ struct Window {
   bool auto_align;
   bool auto_size;
   bool (*action_func)(Window* window, Display* display, LuminaryHost* host);
+  WindowInteractionStateData state_data;
 
   // Runtime
   uint32_t context_stack_ptr;
@@ -64,6 +72,7 @@ struct Window {
   Element* element_queue;
   uint8_t* background_blur_buffer;
   uint32_t background_blur_buffer_ld;
+  bool element_has_hover;
 } typedef Window;
 
 void window_create(Window** window);
