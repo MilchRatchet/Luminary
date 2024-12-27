@@ -73,6 +73,7 @@ struct Window {
   Element* element_queue;
   uint8_t* background_blur_buffer;
   uint32_t background_blur_buffer_ld;
+  size_t background_blur_buffer_size;
   bool element_has_hover;
 } typedef Window;
 

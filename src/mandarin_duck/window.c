@@ -20,8 +20,18 @@ void window_allocate_memory(Window* window) {
   if (!window->background)
     return;
 
-  LUM_FAILURE_HANDLE(host_malloc(&window->background_blur_buffer, window->width * window->height * sizeof(LuminaryARGB8)));
-  window->background_blur_buffer_ld = window->width * sizeof(LuminaryARGB8);
+  const size_t required_background_blur_buffer_size = window->width * window->height * sizeof(LuminaryARGB8);
+
+  if (required_background_blur_buffer_size <= window->background_blur_buffer_size)
+    return;
+
+  if (window->background_blur_buffer) {
+    LUM_FAILURE_HANDLE(host_free(&window->background_blur_buffer));
+  }
+
+  LUM_FAILURE_HANDLE(host_malloc(&window->background_blur_buffer, required_background_blur_buffer_size));
+  window->background_blur_buffer_ld   = window->width * sizeof(LuminaryARGB8);
+  window->background_blur_buffer_size = required_background_blur_buffer_size;
 }
 
 static bool window_is_mouse_hover(Window* window, Display* display) {
@@ -171,15 +181,18 @@ void window_render(Window* window, Display* display) {
     WindowContext* main_context = window->context_stack;
 
     if (window->is_horizontal) {
-      window->width = main_context->fill;
+      window->width = main_context->fill + 2 * window->padding;
     }
     else {
-      window->height = main_context->fill;
+      window->height = main_context->fill + 2 * window->padding;
     }
   }
 
   if (window->width == 0 || window->height == 0)
     return;
+
+  // This must be called after potential auto-size work.
+  window_allocate_memory(window);
 
   if (window->background) {
     ui_renderer_create_window_background(display->ui_renderer, display, window);
