@@ -2,6 +2,7 @@
 
 #include <float.h>
 
+#include "elements/checkbox.h"
 #include "elements/color.h"
 #include "elements/slider.h"
 #include "elements/text.h"
@@ -63,6 +64,34 @@ static bool _window_entity_properties_add_slider(
   return update_data;
 }
 
+static bool _window_entity_properties_add_checkbox(Window* window, Display* display, const char* text, void* data_binding) {
+  MD_CHECK_NULL_ARGUMENT(window);
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  bool update_data = false;
+
+  window_push_section(window, 32, 0);
+  {
+    element_text(
+      window, display,
+      (ElementTextArgs){
+        .color    = 0xFFFFFFFF,
+        .size     = (ElementSize){.is_relative = true, .rel_width = 0.4f, .rel_height = 0.75f},
+        .text     = text,
+        .center_x = false,
+        .center_y = true});
+
+    if (element_checkbox(
+          window, display,
+          (ElementCheckBoxArgs){.size = (ElementSize){.is_relative = false, .width = 24, .height = 24}, .data_binding = data_binding})) {
+      update_data = true;
+    }
+  }
+  window_pop_section(window);
+
+  return update_data;
+}
+
 static bool _window_entity_properties_action(Window* window, Display* display, LuminaryHost* host) {
   MD_CHECK_NULL_ARGUMENT(window);
   MD_CHECK_NULL_ARGUMENT(display);
@@ -99,6 +128,7 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
     window, display, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
   update_data |=
     _window_entity_properties_add_slider(window, display, "Test", &camera.color_correction, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
+  update_data |= _window_entity_properties_add_checkbox(window, display, "Firefly Clamping", &camera.do_firefly_clamping);
 
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
