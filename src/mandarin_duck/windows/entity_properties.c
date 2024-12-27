@@ -123,12 +123,39 @@ static bool _window_entity_properties_action(Window* window, Display* display, L
   update_data |= _window_entity_properties_add_slider(
     window, display, "Field of View", &camera.fov, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
   update_data |= _window_entity_properties_add_slider(
+    window, display, "Aperture Size", &camera.aperture_size, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Aperture Blade Count", &camera.aperture_blade_count, ELEMENT_SLIDER_DATA_TYPE_UINT, 1.0f, FLT_MAX, 5.0f);
+  update_data |= _window_entity_properties_add_slider(
     window, display, "Focal Length", &camera.focal_length, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+  update_data |= _window_entity_properties_add_checkbox(window, display, "Firefly Clamping", &camera.do_firefly_clamping);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Russian Roulette Threshold", &camera.russian_roulette_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 1.0f);
+
+  // TODO: Add separator
+
   update_data |= _window_entity_properties_add_slider(
     window, display, "Exposure", &camera.exposure, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Bloom", &camera.bloom_blend, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Film Grain", &camera.film_grain, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, 1.0f, 0.5f);
+  update_data |= _window_entity_properties_add_checkbox(window, display, "Lens Flare", &camera.lens_flare);
+  update_data |= _window_entity_properties_add_slider(
+    window, display, "Lens Flare Threshold", &camera.lens_flare_threshold, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+  update_data |= _window_entity_properties_add_checkbox(window, display, "Purkinje Shift", &camera.purkinje);
+
+  if (camera.purkinje) {
+    update_data |= _window_entity_properties_add_slider(
+      window, display, "Purkinje Blueness", &camera.purkinje_kappa1, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+    update_data |= _window_entity_properties_add_slider(
+      window, display, "Purkinje Brightness", &camera.purkinje_kappa2, ELEMENT_SLIDER_DATA_TYPE_FLOAT, 0.0f, FLT_MAX, 5.0f);
+  }
+
+  update_data |= _window_entity_properties_add_checkbox(window, display, "Dithering", &camera.dithering);
+
   update_data |=
     _window_entity_properties_add_slider(window, display, "Test", &camera.color_correction, ELEMENT_SLIDER_DATA_TYPE_RGB, 0.0f, 1.0f, 1.0f);
-  update_data |= _window_entity_properties_add_checkbox(window, display, "Firefly Clamping", &camera.do_firefly_clamping);
 
   if (update_data) {
     LUM_FAILURE_HANDLE(luminary_host_set_camera(host, &camera));
