@@ -177,8 +177,10 @@ LuminaryResult scene_update(Scene* scene, const void* object, SceneEntity entity
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (integration_dirty) ? SCENE_DIRTY_FLAG_INTEGRATION : 0;
   scene->flags[SCENE_ENTITY_TYPE_GLOBAL] |= (buffers_dirty) ? SCENE_DIRTY_FLAG_BUFFERS : 0;
 
+  // We need to always update the scene because we certain changes might not cause anything to be dirty.
+  __FAILURE_HANDLE(scene_update_force(scene, object, entity));
+
   if (output_dirty || integration_dirty || buffers_dirty) {
-    __FAILURE_HANDLE(scene_update_force(scene, object, entity));
     *scene_changed = true;
   }
 
