@@ -12,10 +12,16 @@ struct DeviceCommonCallbackData {
 
 struct DeviceOutputCallbackData {
   DeviceCommonCallbackData common;
-  uint32_t width;
-  uint32_t height;
-  void* data;
-  bool is_first_output;
+  bool is_recurring_output;
+  union {
+    struct {
+      uint32_t width;
+      uint32_t height;
+      void* data;
+      bool is_first_output;
+    };
+    OutputRequestProperties request_properties;
+  };
 } typedef DeviceOutputCallbackData;
 
 struct DeviceRenderCallbackData {

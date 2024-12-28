@@ -1275,6 +1275,18 @@ LuminaryResult device_update_output_properties(Device* device, uint32_t width, u
   return LUMINARY_SUCCESS;
 }
 
+LuminaryResult device_add_output_request(Device* device, OutputRequestProperties properties) {
+  __CHECK_NULL_ARGUMENT(device);
+
+  CUDA_FAILURE_HANDLE(cuCtxPushCurrent(device->cuda_ctx));
+
+  __FAILURE_HANDLE(device_output_add_request(device->output, properties));
+
+  CUDA_FAILURE_HANDLE(cuCtxPopCurrent(&device->cuda_ctx));
+
+  return LUMINARY_SUCCESS;
+}
+
 LuminaryResult device_start_render(Device* device, DeviceRendererQueueArgs* args) {
   __CHECK_NULL_ARGUMENT(device);
 

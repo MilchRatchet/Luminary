@@ -57,6 +57,14 @@ LUMINARY_API struct LuminaryOutputProperties {
 
 LUMINARY_API typedef uint32_t LuminaryOutputHandle;
 
+LUMINARY_API struct LuminaryOutputRequestProperties {
+  uint32_t sample_count;
+  uint32_t width;
+  uint32_t height;
+} typedef LuminaryOutputRequestProperties;
+
+LUMINARY_API typedef uint32_t LuminaryOutputPromiseHandle;
+
 LUMINARY_API struct LuminaryPixelQueryResult {
   bool pixel_query_is_valid;
   uint32_t instance_id;

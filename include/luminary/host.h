@@ -69,6 +69,11 @@ LUMINARY_API LuminaryResult luminary_host_get_device_queue_time(const LuminaryHo
 
 LUMINARY_API LuminaryResult luminary_host_set_output_properties(LuminaryHost* host, LuminaryOutputProperties properties);
 
+LUMINARY_API LuminaryResult
+  luminary_host_request_output(LuminaryHost* host, LuminaryOutputRequestProperties properties, LuminaryOutputPromiseHandle* handle);
+LUMINARY_API LuminaryResult
+  luminary_host_try_await_output(LuminaryHost* host, LuminaryOutputPromiseHandle handle, LuminaryOutputHandle* output_handle);
+
 LUMINARY_API LuminaryResult luminary_host_set_enable_pixel_query(LuminaryHost* host, bool enable);
 LUMINARY_API LuminaryResult luminary_host_pixel_query(LuminaryHost* host, uint32_t x, uint32_t y, LuminaryPixelQueryResult* result);
 

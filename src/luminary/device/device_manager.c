@@ -181,9 +181,11 @@ static LuminaryResult _device_manager_handle_device_output(DeviceManager* device
 
   OutputCopyHandle copy_handle;
 
-  copy_handle.width  = data->width;
-  copy_handle.height = data->height;
-  copy_handle.src    = data->data;
+  copy_handle.is_recurring = data->is_recurring_output;
+  copy_handle.sample_count = data->is_recurring_output ? 0 : data->request_properties.sample_count;
+  copy_handle.width        = data->width;
+  copy_handle.height       = data->height;
+  copy_handle.src          = data->data;
 
   __FAILURE_HANDLE(host_queue_output_copy_from_device(device_manager->host, copy_handle));
 
@@ -370,29 +372,55 @@ static LuminaryResult _device_manager_handle_scene_updates_queue_work(
   return LUMINARY_SUCCESS;
 }
 
-struct DeviceManagerSetOutputProperties {
+struct DeviceManagerSetOutputPropertiesArgs {
   uint32_t width;
   uint32_t height;
-} typedef DeviceManagerSetOutputProperties;
+} typedef DeviceManagerSetOutputPropertiesArgs;
 
 static LuminaryResult _device_manager_set_output_properties_clear_work(
-  DeviceManager* device_manager, DeviceManagerSetOutputProperties* args) {
+  DeviceManager* device_manager, DeviceManagerSetOutputPropertiesArgs* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(args);
 
-  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerSetOutputProperties)));
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerSetOutputPropertiesArgs)));
 
   return LUMINARY_SUCCESS;
 }
 
 static LuminaryResult _device_manager_set_output_properties_queue_work(
-  DeviceManager* device_manager, DeviceManagerSetOutputProperties* args) {
+  DeviceManager* device_manager, DeviceManagerSetOutputPropertiesArgs* args) {
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(args);
 
   Device* device = device_manager->devices[device_manager->main_device_index];
 
   __FAILURE_HANDLE(device_update_output_properties(device, args->width, args->height));
+
+  return LUMINARY_SUCCESS;
+}
+
+struct DeviceManagerAddOutputRequestArgs {
+  OutputRequestProperties props;
+} typedef DeviceManagerAddOutputRequestArgs;
+
+static LuminaryResult _device_manager_add_output_request_clear_work(
+  DeviceManager* device_manager, DeviceManagerAddOutputRequestArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  __FAILURE_HANDLE(ringbuffer_release_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddOutputRequestArgs)));
+
+  return LUMINARY_SUCCESS;
+}
+
+static LuminaryResult _device_manager_add_output_request_queue_work(
+  DeviceManager* device_manager, DeviceManagerAddOutputRequestArgs* args) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+  __CHECK_NULL_ARGUMENT(args);
+
+  Device* device = device_manager->devices[device_manager->main_device_index];
+
+  __FAILURE_HANDLE(device_add_output_request(device, args->props));
 
   return LUMINARY_SUCCESS;
 }
@@ -774,8 +802,8 @@ LuminaryResult device_manager_update_scene(DeviceManager* device_manager) {
 LuminaryResult device_manager_set_output_properties(DeviceManager* device_manager, uint32_t width, uint32_t height) {
   __CHECK_NULL_ARGUMENT(device_manager);
 
-  DeviceManagerSetOutputProperties* args;
-  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerSetOutputProperties), (void**) &args));
+  DeviceManagerSetOutputPropertiesArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerSetOutputPropertiesArgs), (void**) &args));
 
   args->width  = width;
   args->height = height;
@@ -785,6 +813,27 @@ LuminaryResult device_manager_set_output_properties(DeviceManager* device_manage
   entry.name              = "Set Output Properties";
   entry.function          = (QueueEntryFunction) _device_manager_set_output_properties_queue_work;
   entry.clear_func        = (QueueEntryFunction) _device_manager_set_output_properties_clear_work;
+  entry.args              = args;
+  entry.remove_duplicates = false;
+
+  __FAILURE_HANDLE(device_manager_queue_work(device_manager, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult device_manager_add_output_request(DeviceManager* device_manager, OutputRequestProperties properties) {
+  __CHECK_NULL_ARGUMENT(device_manager);
+
+  DeviceManagerAddOutputRequestArgs* args;
+  __FAILURE_HANDLE(ringbuffer_allocate_entry(device_manager->ringbuffer, sizeof(DeviceManagerAddOutputRequestArgs), (void**) &args));
+
+  args->props = properties;
+
+  QueueEntry entry;
+
+  entry.name              = "Add output request";
+  entry.function          = (QueueEntryFunction) _device_manager_add_output_request_clear_work;
+  entry.clear_func        = (QueueEntryFunction) _device_manager_add_output_request_queue_work;
   entry.args              = args;
   entry.remove_duplicates = false;
 
