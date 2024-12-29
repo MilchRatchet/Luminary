@@ -175,4 +175,15 @@ struct BVHNode8 {
   uint8_t high_z[8];
 } typedef BVHNode8;
 
+struct OutputDescriptor {
+  bool is_recurring_output;
+  struct {
+    uint32_t width;
+    uint32_t height;
+    uint32_t sample_count;
+    bool is_first_output;
+  } meta_data;
+  void* data;
+} typedef OutputDescriptor;
+
 #endif /* LUMINARY_UTILS_H */

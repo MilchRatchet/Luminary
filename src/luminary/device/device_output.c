@@ -75,18 +75,10 @@ static LuminaryResult _device_output_generate_output(DeviceOutput* output, Devic
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(device);
 
-  uint32_t width;
-  uint32_t height;
-  if (callback_data->is_recurring_output) {
-    width  = callback_data->width;
-    height = callback_data->height;
-  }
-  else {
-    width  = callback_data->request_properties.width;
-    height = callback_data->request_properties.height;
-  }
+  const uint32_t width  = callback_data->descriptor.meta_data.width;
+  const uint32_t height = callback_data->descriptor.meta_data.height;
 
-  STAGING void* dst_buffer = callback_data->data;
+  STAGING void* dst_buffer = callback_data->descriptor.data;
 
   KernelArgsConvertRGBFToARGB8 args;
   args.dst    = DEVICE_PTR(output->device_buffer);
@@ -128,11 +120,12 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
   DeviceOutputCallbackData* data = output->callback_data + output->callback_index;
 
-  data->is_recurring_output = true;
-  data->width               = output->width;
-  data->height              = output->height;
-  data->data                = output->buffers[output->buffer_index];
-  data->is_first_output     = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
+  data->descriptor.is_recurring_output       = true;
+  data->descriptor.meta_data.width           = output->width;
+  data->descriptor.meta_data.height          = output->height;
+  data->descriptor.meta_data.sample_count    = device->sample_count.current_sample_count;
+  data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
+  data->descriptor.data                      = output->buffers[output->buffer_index];
 
   __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
 
@@ -153,9 +146,12 @@ LuminaryResult device_output_generate_output(DeviceOutput* output, Device* devic
 
     data = output->callback_data + output->callback_index;
 
-    data->is_recurring_output = false;
-    data->data                = output_request->buffer;
-    data->request_properties  = output_request->props;
+    data->descriptor.is_recurring_output       = true;
+    data->descriptor.meta_data.width           = output_request->props.width;
+    data->descriptor.meta_data.height          = output_request->props.height;
+    data->descriptor.meta_data.sample_count    = output_request->props.sample_count;
+    data->descriptor.meta_data.is_first_output = (device->undersampling_state & UNDERSAMPLING_FIRST_SAMPLE_MASK) != 0;
+    data->descriptor.data                      = output_request->buffer;
 
     __FAILURE_HANDLE(_device_output_generate_output(output, device, data));
 

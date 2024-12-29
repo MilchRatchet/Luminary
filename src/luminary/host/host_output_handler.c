@@ -105,7 +105,7 @@ LuminaryResult output_handler_acquire(OutputHandler* output, uint32_t* handle) {
     if (object->time_stamp <= latest_time_stamp)
       continue;
 
-    if (object->width != output->properties.width || object->height != output->properties.height)
+    if (object->descriptor.meta_data.width != output->properties.width || object->descriptor.meta_data.height != output->properties.height)
       continue;
 
     // Standard acquire function cannot return outputs generated from requests.
@@ -192,8 +192,7 @@ LuminaryResult output_handler_acquire_from_promise(OutputHandler* output, uint32
   return LUMINARY_SUCCESS;
 }
 
-static LuminaryResult _output_handler_get_handle_for_write(
-  OutputHandler* output, uint32_t width, uint32_t height, bool is_for_request, uint32_t* selected_handle) {
+static LuminaryResult _output_handler_get_handle_for_write(OutputHandler* output, OutputDescriptor descriptor, uint32_t* selected_handle) {
   __CHECK_NULL_ARGUMENT(output);
 
   uint32_t num_outputs;
@@ -212,7 +211,10 @@ static LuminaryResult _output_handler_get_handle_for_write(
       continue;
 
     // Handles that use other dimensions are always eligible for overwriting.
-    bool handle_is_still_valid = ((object->width == width) && (object->height == height)) || is_for_request;
+    const bool handle_is_still_valid = ((object->descriptor.meta_data.width == descriptor.meta_data.width)
+                                        && (object->descriptor.meta_data.height == descriptor.meta_data.height))
+                                       || (descriptor.is_recurring_output == false);
+
     if (handle_is_still_valid) {
       num_valid_outputs++;
 
@@ -238,7 +240,7 @@ static LuminaryResult _output_handler_get_handle_for_write(
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width, uint32_t height, uint32_t* handle) {
+LuminaryResult output_handler_acquire_new(OutputHandler* output, OutputDescriptor descriptor, uint32_t* handle) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(handle);
 
@@ -249,7 +251,7 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width,
   __FAILURE_HANDLE_CRITICAL(array_get_num_elements(output->objects, &num_outputs));
 
   uint32_t selected_handle;
-  __FAILURE_HANDLE_CRITICAL(_output_handler_get_handle_for_write(output, width, height, false, &selected_handle));
+  __FAILURE_HANDLE_CRITICAL(_output_handler_get_handle_for_write(output, descriptor, &selected_handle));
 
   if (selected_handle == OUTPUT_HANDLE_INVALID) {
     OutputObject new_object;
@@ -262,22 +264,25 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width,
 
   OutputObject* selected_output = output->objects + selected_handle;
 
-  bool requires_allocation = !selected_output->allocated || (selected_output->width != width) || (selected_output->height != height);
+  const bool requires_allocation = !selected_output->allocated
+                                   || (selected_output->descriptor.meta_data.width != descriptor.meta_data.width)
+                                   || (selected_output->descriptor.meta_data.height != descriptor.meta_data.height);
 
   if (requires_allocation) {
     if (selected_output->allocated) {
-      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].data));
+      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].descriptor.data));
     }
 
-    __FAILURE_HANDLE_CRITICAL(host_malloc(&output->objects[selected_handle].data, sizeof(ARGB8) * width * height));
+    __FAILURE_HANDLE_CRITICAL(host_malloc(
+      &output->objects[selected_handle].descriptor.data, sizeof(ARGB8) * descriptor.meta_data.width * descriptor.meta_data.height));
   }
 
-  selected_output->populated         = false;
-  selected_output->allocated         = true;
-  selected_output->reference_count   = 1;
-  selected_output->width             = width;
-  selected_output->height            = height;
-  selected_output->promise_reference = OUTPUT_HANDLE_INVALID;
+  selected_output->populated                      = false;
+  selected_output->allocated                      = true;
+  selected_output->reference_count                = 1;
+  selected_output->descriptor.is_recurring_output = descriptor.is_recurring_output;
+  selected_output->descriptor.meta_data           = descriptor.meta_data;
+  selected_output->promise_reference              = OUTPUT_HANDLE_INVALID;
 
   *handle = selected_handle;
 
@@ -289,8 +294,7 @@ LuminaryResult output_handler_acquire_new(OutputHandler* output, uint32_t width,
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult output_handler_acquire_from_request_new(
-  OutputHandler* output, uint32_t width, uint32_t height, uint32_t sample_count, uint32_t* handle) {
+LuminaryResult output_handler_acquire_from_request_new(OutputHandler* output, OutputDescriptor descriptor, uint32_t* handle) {
   __CHECK_NULL_ARGUMENT(output);
   __CHECK_NULL_ARGUMENT(handle);
 
@@ -308,13 +312,13 @@ LuminaryResult output_handler_acquire_from_request_new(
     if (promise->populated)
       continue;
 
-    if (promise->properties.width != width)
+    if (promise->properties.width != descriptor.meta_data.width)
       continue;
 
-    if (promise->properties.height != height)
+    if (promise->properties.height != descriptor.meta_data.height)
       continue;
 
-    if (promise->properties.sample_count != sample_count)
+    if (promise->properties.sample_count != descriptor.meta_data.sample_count)
       continue;
 
     selected_promise_handle = promise_id;
@@ -329,7 +333,7 @@ LuminaryResult output_handler_acquire_from_request_new(
   __FAILURE_HANDLE_CRITICAL(array_get_num_elements(output->objects, &num_outputs));
 
   uint32_t selected_handle;
-  __FAILURE_HANDLE_CRITICAL(_output_handler_get_handle_for_write(output, width, height, true, &selected_handle));
+  __FAILURE_HANDLE_CRITICAL(_output_handler_get_handle_for_write(output, descriptor, &selected_handle));
 
   if (selected_handle == OUTPUT_HANDLE_INVALID) {
     OutputObject new_object;
@@ -347,22 +351,25 @@ LuminaryResult output_handler_acquire_from_request_new(
 
   OutputObject* selected_output = output->objects + selected_handle;
 
-  bool requires_allocation = !selected_output->allocated || (selected_output->width != width) || (selected_output->height != height);
+  const bool requires_allocation = !selected_output->allocated
+                                   || (selected_output->descriptor.meta_data.width != descriptor.meta_data.width)
+                                   || (selected_output->descriptor.meta_data.height != descriptor.meta_data.height);
 
   if (requires_allocation) {
     if (selected_output->allocated) {
-      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].data));
+      __FAILURE_HANDLE_CRITICAL(host_free(&output->objects[selected_handle].descriptor.data));
     }
 
-    __FAILURE_HANDLE_CRITICAL(host_malloc(&output->objects[selected_handle].data, sizeof(ARGB8) * width * height));
+    __FAILURE_HANDLE_CRITICAL(host_malloc(
+      &output->objects[selected_handle].descriptor.data, sizeof(ARGB8) * descriptor.meta_data.width * descriptor.meta_data.height));
   }
 
-  selected_output->populated         = false;
-  selected_output->allocated         = true;
-  selected_output->reference_count   = 1;
-  selected_output->width             = width;
-  selected_output->height            = height;
-  selected_output->promise_reference = selected_promise_handle;
+  selected_output->populated                      = false;
+  selected_output->allocated                      = true;
+  selected_output->reference_count                = 1;
+  selected_output->descriptor.is_recurring_output = descriptor.is_recurring_output;
+  selected_output->descriptor.meta_data           = descriptor.meta_data;
+  selected_output->promise_reference              = selected_promise_handle;
 
   *handle = selected_handle;
 
@@ -427,7 +434,7 @@ LuminaryResult output_handler_get_buffer(OutputHandler* output, uint32_t handle,
     __RETURN_ERROR_CRITICAL(LUMINARY_ERROR_API_EXCEPTION, "Output handle %u was not previously acquired.", handle);
   }
 
-  *buffer = output->objects[handle].data;
+  *buffer = output->objects[handle].descriptor.data;
 
   __FAILURE_HANDLE_UNLOCK_CRITICAL();
   __FAILURE_HANDLE(mutex_unlock(output->mutex));
@@ -451,7 +458,7 @@ LuminaryResult output_handler_destroy(OutputHandler** output) {
     OutputObject* object = (*output)->objects + output_id;
 
     if (object->allocated) {
-      __FAILURE_HANDLE_CRITICAL(host_free(&object->data));
+      __FAILURE_HANDLE_CRITICAL(host_free(&object->descriptor.data));
     }
   }
 

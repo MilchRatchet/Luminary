@@ -179,22 +179,14 @@ static LuminaryResult _device_manager_handle_device_output(DeviceManager* device
   __CHECK_NULL_ARGUMENT(device_manager);
   __CHECK_NULL_ARGUMENT(data);
 
-  OutputCopyHandle copy_handle;
-
-  copy_handle.is_recurring = data->is_recurring_output;
-  copy_handle.sample_count = data->is_recurring_output ? 0 : data->request_properties.sample_count;
-  copy_handle.width        = data->width;
-  copy_handle.height       = data->height;
-  copy_handle.src          = data->data;
-
-  __FAILURE_HANDLE(host_queue_output_copy_from_device(device_manager->host, copy_handle));
+  __FAILURE_HANDLE(host_queue_output_copy_from_device(device_manager->host, data->descriptor));
 
   return LUMINARY_SUCCESS;
 }
 
 static void _device_manager_output_callback(DeviceOutputCallbackData* data) {
   // Don't output aborted outputs unless it is the first output.
-  if (data->common.device_manager->devices[data->common.device_index]->state_abort && !data->is_first_output)
+  if (data->common.device_manager->devices[data->common.device_index]->state_abort && !data->descriptor.meta_data.is_first_output)
     return;
 
   QueueEntry entry;
