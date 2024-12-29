@@ -105,9 +105,16 @@ void display_create(Display** _display, uint32_t width, uint32_t height) {
   ui_renderer_create(&display->ui_renderer);
   text_renderer_create(&display->text_renderer);
 
-  _display_set_hittest(display, display->show_ui);
+  display_set_mouse_visible(display, display->show_ui);
 
   *_display = display;
+}
+
+void display_set_mouse_visible(Display* display, bool enable) {
+  MD_CHECK_NULL_ARGUMENT(display);
+
+  SDL_SetWindowRelativeMouseMode(display->sdl_window, !enable);
+  _display_set_hittest(display, enable);
 }
 
 void display_query_events(Display* display, bool* exit_requested, bool* dirty) {
@@ -200,8 +207,7 @@ void display_handle_inputs(Display* display, LuminaryHost* host, float time_step
 
   if (display->keyboard_state->keys[SDL_SCANCODE_E].phase == KEY_PHASE_RELEASED) {
     display->show_ui = !display->show_ui;
-    SDL_SetWindowRelativeMouseMode(display->sdl_window, !display->show_ui);
-    _display_set_hittest(display, display->show_ui);
+    display_set_mouse_visible(display, display->show_ui);
   }
 
   if (display->show_ui) {

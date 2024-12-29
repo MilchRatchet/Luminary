@@ -251,8 +251,7 @@ bool element_slider(Window* window, Display* display, ElementSliderArgs args) {
     window->state_data.element_hash     = slider.hash;
     window->state_data.subelement_index = _element_slider_get_subelement_index(window, display, &slider);
 
-    SDL_SetWindowRelativeMouseMode(display->sdl_window, true);
-    SDL_HideCursor();
+    display_set_mouse_visible(display, false);
   }
 
   LUM_FAILURE_HANDLE(array_push(&window->element_queue, &slider));

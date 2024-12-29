@@ -114,8 +114,8 @@ bool window_handle_input(Window* window, Display* display, LuminaryHost* host) {
         window->state_data.state            = WINDOW_INTERACTION_STATE_NONE;
         window->state_data.element_hash     = 0;
         window->state_data.subelement_index = 0;
-        SDL_SetWindowRelativeMouseMode(display->sdl_window, false);
-        SDL_ShowCursor();
+
+        display_set_mouse_visible(display, true);
       }
       break;
     default:
