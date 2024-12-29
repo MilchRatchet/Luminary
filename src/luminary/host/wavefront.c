@@ -45,12 +45,14 @@ static WavefrontMaterial _wavefront_get_default_material() {
   return default_material;
 }
 
-LuminaryResult wavefront_create(WavefrontContent** content) {
+LuminaryResult wavefront_create(WavefrontContent** content, WavefrontArguments args) {
   __CHECK_NULL_ARGUMENT(content);
 
   __FAILURE_HANDLE(host_malloc(content, sizeof(WavefrontContent)));
 
   (*content)->state = WAVEFRONT_CONTENT_STATE_READY_TO_READ;
+
+  (*content)->args = args;
 
   __FAILURE_HANDLE(array_create(&(*content)->vertices, sizeof(WavefrontVertex), 16));
   __FAILURE_HANDLE(array_create(&(*content)->normals, sizeof(WavefrontNormal), 16));
@@ -802,6 +804,10 @@ static LuminaryResult _wavefront_convert_materials(WavefrontContent* content, AR
     mat.flags.thin_walled          = false;
     mat.flags.colored_transparency = true;
 
+    if (content->args.legacy_smoothness) {
+      mat.roughness = 1.0f - mat.roughness;
+    }
+
     __FAILURE_HANDLE(array_push(materials, &mat));
   }
 
@@ -1053,6 +1059,15 @@ LuminaryResult wavefront_convert_content(
   mesh->data.triangle_count = new_triangle_count;
 
   __FAILURE_HANDLE(array_push(meshes, &mesh));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult wavefront_arguments_get_default(WavefrontArguments* arguments) {
+  __CHECK_NULL_ARGUMENT(arguments);
+
+  arguments->legacy_smoothness         = false;
+  arguments->force_transparency_cutout = false;
 
   return LUMINARY_SUCCESS;
 }

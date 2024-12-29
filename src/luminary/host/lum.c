@@ -36,6 +36,8 @@ LuminaryResult lum_content_create(LumFileContent** _content) {
   __FAILURE_HANDLE(particles_get_default(&content->particles));
   __FAILURE_HANDLE(toy_get_default(&content->toy));
 
+  __FAILURE_HANDLE(wavefront_arguments_get_default(&content->wavefront_args));
+
   __FAILURE_HANDLE(array_create(&content->instances, sizeof(MeshInstance), 16));
 
   *_content = content;

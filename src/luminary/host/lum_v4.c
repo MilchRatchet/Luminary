@@ -6,6 +6,12 @@
 #define LINE_SIZE 4096
 #define CURRENT_VERSION 4
 
+struct LegacyLumFileSettings {
+  bool legacy_smoothness;
+  bool force_transparency_cutout;
+  bool force_thin_walled;
+} typedef LegacyLumFileSettings;
+
 static LuminaryResult parse_general_settings(
   RendererSettings* settings, ARRAYPTR char*** obj_file_path_strings, ARRAY MeshInstance** instances, char* line) {
   const uint64_t key = *((uint64_t*) line);
@@ -66,13 +72,14 @@ static LuminaryResult parse_general_settings(
   return LUMINARY_SUCCESS;
 }
 
-// Not supported
-#if 0
-static void parse_material_settings(GlobalMaterial* material, char* line) {
+// Legacy global material settings
+static void parse_material_settings(LegacyLumFileSettings* settings, char* line) {
   const uint64_t key = *((uint64_t*) line);
   char* value        = line + 9;
+  uint32_t bool_uint = 0;
 
   switch (key) {
+#if 0
     /* LIGHTSON */
     case 5642820479573510476u:
       sscanf(value, "%u\n", &material->lights_active);
@@ -97,28 +104,33 @@ static void parse_material_settings(GlobalMaterial* material, char* line) {
     case 6076837219871509569u:
       sscanf(value, "%f\n", &material->alpha_cutoff);
       break;
+#endif
     /* COLORTRA */
     case 4706917273050042179u:
-      sscanf(value, "%u\n", &material->colored_transparency);
+      sscanf(value, "%u\n", &bool_uint);
+      settings->force_transparency_cutout = bool_uint;
       break;
     /* IORSHADO */
     case 5711762006303985481u:
-      sscanf(value, "%u\n", &material->enable_ior_shadowing);
+      sscanf(value, "%u\n", &bool_uint);
+      settings->force_thin_walled = bool_uint;
       break;
     /* INTERTRO */
     case 5715723589413916233u:
-      sscanf(value, "%u\n", &material->invert_roughness);
+      sscanf(value, "%u\n", &bool_uint);
+      settings->legacy_smoothness = bool_uint;
       break;
+#if 0
     /* ROUGHCLA */
     case 4705209688408805202u:
       sscanf(value, "%f\n", &material->caustic_roughness_clamp);
       break;
+#endif
     default:
       warn_message("%8.8s (%zu) is not a valid MATERIAL setting.", line, key);
       break;
   }
 }
-#endif
 
 static LuminaryResult parse_camera_settings(Camera* camera, char* line) {
   const uint64_t key = *((uint64_t*) line);
@@ -713,6 +725,8 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
 
   __FAILURE_HANDLE(host_malloc(&line, LINE_SIZE));
 
+  LegacyLumFileSettings legacy_settings = {.legacy_smoothness = false, .force_transparency_cutout = false, .force_thin_walled = false};
+
   while (1) {
     fgets(line, LINE_SIZE, file);
 
@@ -720,7 +734,7 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
       __FAILURE_HANDLE(parse_general_settings(&content->settings, &content->obj_file_path_strings, &content->instances, line + 7 + 1));
     }
     else if (line[0] == 'M') {
-      // parse_material_settings(&content->material, line + 8 + 1);
+      parse_material_settings(&legacy_settings, line + 8 + 1);
     }
     else if (line[0] == 'C' && line[1] == 'A') {
       __FAILURE_HANDLE(parse_camera_settings(&content->camera, line + 6 + 1));
@@ -753,6 +767,9 @@ LuminaryResult lum_parse_file_v4(FILE* file, LumFileContent* content) {
     if (feof(file))
       break;
   }
+
+  content->wavefront_args.legacy_smoothness         = legacy_settings.legacy_smoothness;
+  content->wavefront_args.force_transparency_cutout = legacy_settings.force_transparency_cutout;
 
   __FAILURE_HANDLE(host_free(&line));
 

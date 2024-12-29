@@ -69,6 +69,7 @@ static bool _host_queue_entry_equal_operator(QueueEntry* left, QueueEntry* right
 
 struct HostLoadObjArgs {
   Path* path;
+  WavefrontArguments wavefront_args;
 } typedef HostLoadObjArgs;
 
 static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
@@ -77,7 +78,7 @@ static LuminaryResult _host_load_obj_file(Host* host, HostLoadObjArgs* args) {
 
   WavefrontContent* wavefront_content;
 
-  __FAILURE_HANDLE(wavefront_create(&wavefront_content));
+  __FAILURE_HANDLE(wavefront_create(&wavefront_content, args->wavefront_args));
   __FAILURE_HANDLE(wavefront_read_file(wavefront_content, args->path));
 
   // TODO: Lum v5 files contain materials already, figure out how to handle materials coming from mtl files then.
@@ -312,14 +313,13 @@ LuminaryResult luminary_host_destroy(Host** host) {
   return LUMINARY_SUCCESS;
 }
 
-LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
-  __CHECK_NULL_ARGUMENT(host);
-  __CHECK_NULL_ARGUMENT(path);
-
+static LuminaryResult _host_queue_load_obj_file(Host* host, Path* path, WavefrontArguments wavefront_args) {
   HostLoadObjArgs* args;
   __FAILURE_HANDLE(ringbuffer_allocate_entry(host->ringbuffer, sizeof(HostLoadObjArgs), (void**) &args));
 
   __FAILURE_HANDLE(path_copy(&args->path, path));
+
+  args->wavefront_args = wavefront_args;
 
   QueueEntry entry;
 
@@ -330,6 +330,18 @@ LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
   entry.remove_duplicates = false;
 
   __FAILURE_HANDLE(queue_push(host->work_queue, &entry));
+
+  return LUMINARY_SUCCESS;
+}
+
+LuminaryResult luminary_host_load_obj_file(Host* host, Path* path) {
+  __CHECK_NULL_ARGUMENT(host);
+  __CHECK_NULL_ARGUMENT(path);
+
+  WavefrontArguments args;
+  __FAILURE_HANDLE(wavefront_arguments_get_default(&args));
+
+  __FAILURE_HANDLE(_host_queue_load_obj_file(host, path, args));
 
   return LUMINARY_SUCCESS;
 }
@@ -366,7 +378,7 @@ LuminaryResult luminary_host_load_lum_file(Host* host, Path* path) {
     Path* obj_path;
     __FAILURE_HANDLE(path_extend(&obj_path, path, content->obj_file_path_strings[obj_file_id]));
 
-    __FAILURE_HANDLE(luminary_host_load_obj_file(host, obj_path));
+    __FAILURE_HANDLE(_host_queue_load_obj_file(host, obj_path, content->wavefront_args));
 
     __FAILURE_HANDLE(luminary_path_destroy(&obj_path));
   }
